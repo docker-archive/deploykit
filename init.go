@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	mutex   sync.Mutex
+	mutex        sync.Mutex
 	provisioners = map[string]Provisioner{}
 )
 
@@ -17,7 +17,7 @@ func Register(provisioner string, impl Provisioner) {
 	provisioners[provisioner] = impl
 }
 
-// GetProvisioner fetches a 
+// GetProvisioner fetches a
 func GetProvisioner(provisioner string) Provisioner {
 	if p, exists := provisioners[provisioner]; exists {
 		return p
