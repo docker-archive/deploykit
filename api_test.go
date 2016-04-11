@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-func TestApi(t *testing.T) { TestingT(t) }
+func TestAPI(t *testing.T) { TestingT(t) }
 
-type TestSuiteApi struct {
+type TestSuiteAPI struct {
 }
 
-var _ = Suite(&TestSuiteApi{})
+var _ = Suite(&TestSuiteAPI{})
 
-func (suite *TestSuiteApi) SetUpSuite(c *C) {
+func (suite *TestSuiteAPI) SetUpSuite(c *C) {
 }
 
-func (suite *TestSuiteApi) TearDownSuite(c *C) {
+func (suite *TestSuiteAPI) TearDownSuite(c *C) {
 }

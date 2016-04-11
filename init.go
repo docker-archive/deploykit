@@ -6,17 +6,20 @@ import (
 
 var (
 	mutex   sync.Mutex
-	drivers = map[string]Provisioner{}
+	provisioners = map[string]Provisioner{}
 )
 
-func Register(driver string, impl Provisioner) {
+// Register makes a Provisioner implementation available for use by a canonical
+// short name.
+func Register(provisioner string, impl Provisioner) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	drivers[driver] = impl
+	provisioners[provisioner] = impl
 }
 
-func GetProvisioner(driver string) Provisioner {
-	if p, exists := drivers[driver]; exists {
+// GetProvisioner fetches a 
+func GetProvisioner(provisioner string) Provisioner {
+	if p, exists := provisioners[provisioner]; exists {
 		return p
 	}
 	return nil
