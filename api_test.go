@@ -1,7 +1,6 @@
 package libmachete
 
 import (
-	"github.com/docker/libmachete"
 	. "gopkg.in/check.v1"
 	"testing"
 )
