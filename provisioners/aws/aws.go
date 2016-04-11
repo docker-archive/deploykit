@@ -13,6 +13,6 @@ func init() {
 	api.Register("aws", impl)
 }
 
-func (this *aws) Create(request api.CreateRequest) (<-chan api.CreateEvent, error) {
+func (provisioner *aws) Create(request api.CreateRequest) (<-chan api.CreateEvent, error) {
 	return nil, nil
 }
