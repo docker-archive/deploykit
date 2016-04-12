@@ -6,8 +6,10 @@ type EventType int
 const (
 	// CreateStarted indicates that creation has begun.
 	CreateStarted EventType = iota
+
 	// CreateCompleted indicates that creation was successful.
 	CreateCompleted
+
 	// CreateError indicates a problem creating the resource.
 	CreateError
 )
@@ -27,13 +29,12 @@ type BaseRequest struct {
 }
 
 // CreateRequest defines the traits necessary to create a resource.
-type CreateRequest struct {
-	BaseRequest
+type CreateRequest interface {
 	// TODO- driver-specific params
 }
 
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
-	Create(CreateRequest) (<-chan CreateEvent, error)
+	Create(request interface{}) (<-chan CreateEvent, error)
 }
