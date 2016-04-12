@@ -2,3 +2,4 @@ libmachete
 ==========
 
 [![Circle CI](https://circleci.com/gh/docker/libmachete.png?style=shield&circle-token=50d2063f283f98b7d94746416c979af3102275b5)](https://circleci.com/gh/docker/libmachete)
+[![codecov.io](https://codecov.io/github/docker/libmachete/coverage.svg?branch=master&token=z08ZKeIJfA)](https://codecov.io/github/docker/libmachete?branch=master)
