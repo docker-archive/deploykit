@@ -34,11 +34,6 @@ func CreateClient(region, accessKey, secretKey, sessionToken string, retryCount 
 		WithMaxRetries(retryCount)))
 }
 
-// TODO - check keypairs, check subnet, zone, vpc
-func checkPrereqs() error {
-	return nil
-}
-
 func getInstanceSync(client ec2iface.EC2API, instanceID string) (*ec2.Instance, error) {
 	result, err := client.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{&instanceID},
@@ -53,17 +48,14 @@ func getInstanceSync(client ec2iface.EC2API, instanceID string) (*ec2.Instance, 
 }
 
 func tagSync(client ec2iface.EC2API, request CreateInstanceRequest, instance *ec2.Instance) error {
-	tags := []*ec2.Tag{
-		{
-			Key:   aws.String("Name"),
-			Value: &request.MachineName,
-		},
-	}
+	tags := []*ec2.Tag{} // TODO - add a default tag for machine name?
 
 	for k, v := range request.Tags {
+		key := k
+		value := v
 		tags = append(tags, &ec2.Tag{
-			Key:   &k,
-			Value: &v,
+			Key:   &key,
+			Value: &value,
 		})
 	}
 
@@ -76,11 +68,11 @@ func tagSync(client ec2iface.EC2API, request CreateInstanceRequest, instance *ec
 
 func createSync(client ec2iface.EC2API, request CreateInstanceRequest) (*ec2.Instance, error) {
 	reservation, err := client.RunInstances(&ec2.RunInstancesInput{
-		ImageId:  &request.AMI,
+		ImageId:  &request.ImageID,
 		MinCount: aws.Int64(1),
 		MaxCount: aws.Int64(1),
 		Placement: &ec2.Placement{
-			AvailabilityZone: aws.String(request.Region + request.Zone),
+			AvailabilityZone: &request.AvailabilityZone,
 		},
 		KeyName:      &request.KeyName,
 		InstanceType: &request.InstanceType,
@@ -114,7 +106,7 @@ func createSync(client ec2iface.EC2API, request CreateInstanceRequest) (*ec2.Ins
 		return nil, err
 	}
 
-	if len(reservation.Instances) != 1 {
+	if reservation == nil || len(reservation.Instances) != 1 {
 		return nil, &ErrUnexpectedResponse{}
 	}
 	return reservation.Instances[0], nil
@@ -126,7 +118,7 @@ func (p *provisioner) Create(req interface{}) (<-chan api.CreateEvent, error) {
 		return nil, &ErrInvalidRequest{}
 	}
 
-	if err := checkPrereqs(); err != nil {
+	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -145,10 +137,10 @@ func (p *provisioner) Create(req interface{}) (<-chan api.CreateEvent, error) {
 			return
 		}
 
-		WaitUntil(10, 1*time.Second,
+		WaitUntil(30, 10*time.Second,
 			func() (bool, error) {
 				inst, err := getInstanceSync(p.client, *instance.InstanceId)
-				return inst != nil, err
+				return inst != nil && *inst.State.Code == int64(16), err
 			})
 
 		err = tagSync(p.client, request, instance)
