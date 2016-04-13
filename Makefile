@@ -18,7 +18,9 @@ AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
 
 # Package list
-PKGS := $(shell go list -tags "${MY_BUILDTAGS}" ./... | grep -v ^github.com/docker/libmachete/vendor/)
+PKGS := $(shell go list -tags "${MY_BUILDTAGS}" ./... | \
+grep -v ^github.com/docker/libmachete/vendor/ | \
+grep -v ^github.com/docker/libmachete/e2e/)
 
 # A build target
 ${PREFIX}/bin/WHATEVER: $(wildcard **/*.go)
