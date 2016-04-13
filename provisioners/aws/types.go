@@ -2,11 +2,8 @@ package aws
 
 // CreateInstanceRequest is the struct used to create new instances.
 type CreateInstanceRequest struct {
-	AccessKey                string
-	SecretKey                string
-	SessionToken             string
-	Region                   string
-	AMI                      string
+	AvailabilityZone         string
+	ImageID                  string
 	BlockDeviceName          string
 	RootSize                 int64
 	VolumeType               string
@@ -21,8 +18,13 @@ type CreateInstanceRequest struct {
 	IamInstanceProfile       string
 	Tags                     map[string]string
 	KeyName                  string
-	MachineName              string
 	VpcID                    string
 	Zone                     string
 	Monitoring               bool
+}
+
+// Validate checks the data and returns error if not valid
+func (req CreateInstanceRequest) Validate() error {
+	// TODO finish this.
+	return nil
 }
