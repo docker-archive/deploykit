@@ -1,6 +1,7 @@
 {
 	"ImportPath": "github.com/docker/libmachete",
 	"GoVersion": "go1.6",
+	"GodepVersion": "v62",
 	"Packages": [
 		"./..."
 	],
@@ -144,6 +145,11 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
+			"Comment": "v1.1.3-6-g6fe211e",
+			"Rev": "6fe211e493929a8aac0469b93f28b1d0688a9a3a"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/require",
 			"Comment": "v1.1.3-6-g6fe211e",
 			"Rev": "6fe211e493929a8aac0469b93f28b1d0688a9a3a"
 		},

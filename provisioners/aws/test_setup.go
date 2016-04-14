@@ -20,22 +20,22 @@ func (l *LoggingEC2) RunInstances(input *ec2.RunInstancesInput) (*ec2.Reservatio
 	return l.EC2API.RunInstances(input)
 }
 
-type awsFake struct {
+type awsMock struct {
 	mock.Mock
 	ec2iface.EC2API
 }
 
-func (fake *awsFake) RunInstances(input *ec2.RunInstancesInput) (*ec2.Reservation, error) {
+func (fake *awsMock) RunInstances(input *ec2.RunInstancesInput) (*ec2.Reservation, error) {
 	args := fake.Called(input)
 	return args.Get(0).(*ec2.Reservation), args.Error(1)
 }
 
-func (fake *awsFake) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
+func (fake *awsMock) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
 	args := fake.Called(input)
 	return args.Get(0).(*ec2.DescribeInstancesOutput), args.Error(1)
 }
 
-func (fake *awsFake) CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
+func (fake *awsMock) CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
 	args := fake.Called(input)
 	return args.Get(0).(*ec2.CreateTagsOutput), args.Error(1)
 }
