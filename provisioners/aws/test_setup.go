@@ -25,18 +25,18 @@ type awsMock struct {
 	ec2iface.EC2API
 }
 
-func (fake *awsMock) RunInstances(input *ec2.RunInstancesInput) (*ec2.Reservation, error) {
-	args := fake.Called(input)
+func (mockClient *awsMock) RunInstances(input *ec2.RunInstancesInput) (*ec2.Reservation, error) {
+	args := mockClient.Called(input)
 	return args.Get(0).(*ec2.Reservation), args.Error(1)
 }
 
-func (fake *awsMock) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
-	args := fake.Called(input)
+func (mockClient *awsMock) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
+	args := mockClient.Called(input)
 	return args.Get(0).(*ec2.DescribeInstancesOutput), args.Error(1)
 }
 
-func (fake *awsMock) CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
-	args := fake.Called(input)
+func (mockClient *awsMock) CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
+	args := mockClient.Called(input)
 	return args.Get(0).(*ec2.CreateTagsOutput), args.Error(1)
 }
 
