@@ -19,8 +19,7 @@ func noSleep(time.Duration) {
 
 func TestCreateSync(t *testing.T) {
 	request := new(CreateInstanceRequest)
-	err := json.Unmarshal([]byte(testCreateSync[0]), request)
-	require.Nil(t, err)
+	require.Nil(t, json.Unmarshal([]byte(testCreateSync[0]), request))
 
 	clientMock := awsMock{EC2API: &ec2.EC2{}}
 	reservation := ec2.Reservation{
@@ -28,11 +27,7 @@ func TestCreateSync(t *testing.T) {
 	// Validates command against a known-good value.
 	matcher := func(input *ec2.RunInstancesInput) bool {
 		expectedInput := new(ec2.RunInstancesInput)
-		if json.Unmarshal([]byte(testCreateSync[1]), expectedInput) != nil {
-			// TODO(wfarner): Should this panic?  It represents a test setup failure
-			// rather than a test failure.
-			return false
-		}
+		require.Nil(t, json.Unmarshal([]byte(testCreateSync[1]), expectedInput))
 		return reflect.DeepEqual(expectedInput, input)
 	}
 	clientMock.On("RunInstances", mock.MatchedBy(matcher)).Once().Return(&reservation, nil)
