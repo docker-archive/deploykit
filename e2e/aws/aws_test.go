@@ -3,45 +3,44 @@ package aws
 import (
 	api "github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/aws"
-	. "gopkg.in/check.v1"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 )
 
-func TestAws(t *testing.T) {
+func requireEnvVar(t *testing.T, varName string) string {
+	value := os.Getenv(varName)
+	require.NotEmpty(t, value, varName + " environment variable must be set")
+	return value
+}
+
+func TestCreate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping test in short mode.")
 		return
 	}
-	TestingT(t)
-}
 
-type TestSuiteAws struct {
-	accessKey string
-	secretKey string
-	region    string
-}
+	accessKey := requireEnvVar(t, "AWS_ACCESS_KEY")
+	secretKey := requireEnvVar(t, "AWS_SECRET_KEY")
 
-var _ = Suite(&TestSuiteAws{})
+	region := os.Getenv("AWS_REGION")
+	if region == "" {
+		// NOTE: When the region is misconfigured, strange errors can occur within the
+		// AWS client.  For example, as of this writing, a region of "us-west2" results
+		// in client retries and output such as:
+		// 2016/04/14 18:02:46 DEBUG: Response ec2/RunInstances Details:
+		// ---[ RESPONSE ]--------------------------------------
+		// HTTP/0.0 0 status code 0
+		// Content-Length: 0
+		// -----------------------------------------------------
+		// 2016/04/14 18:02:50 Request body type has been overwritten. May cause race conditions
+		//
+		// It would be nice if our tooling could handle this type of bad input with
+		// greater robustness.
+		region = "us-west-2"
+	}
 
-func (suite *TestSuiteAws) SetUpSuite(c *C) {
-	suite.accessKey = os.Getenv("AWS_ACCESS_KEY")
-	suite.secretKey = os.Getenv("AWS_SECRET_KEY")
-
-	c.Assert(len(suite.accessKey), Not(Equals), 0)
-	c.Assert(len(suite.secretKey), Not(Equals), 0)
-
-	suite.region = "us-west-2"
-}
-
-func (suite *TestSuiteAws) TearDownSuite(c *C) {
-}
-
-func (suite *TestSuiteAws) TestCreate(c *C) {
-	client := aws.CreateClient(suite.region, suite.accessKey, suite.secretKey, "", 10)
-	c.Assert(client, Not(IsNil))
-
-	provisioner := aws.New(client)
+	provisioner := aws.New(aws.CreateClient(region, accessKey, secretKey, "", 10))
 
 	request := aws.CreateInstanceRequest{
 		AvailabilityZone:         "us-west-2a",
@@ -66,23 +65,13 @@ func (suite *TestSuiteAws) TestCreate(c *C) {
 	}
 
 	events, err := provisioner.Create(request)
-	c.Assert(err, IsNil)
+	require.Nil(t, err)
 
-	seenCreateStarted := false
-	seenCreateCompleted := false
-
+	var eventTypes []api.EventType
 	for event := range events {
-		c.Log("event=", event)
-
-		switch event.Type {
-		case api.CreateStarted:
-			seenCreateStarted = true
-		case api.CreateCompleted:
-			seenCreateCompleted = true
-		}
+		t.Log("event=", event)
+		eventTypes = append(eventTypes, event.Type)
 	}
 
-	c.Assert(seenCreateStarted, Equals, true)
-	c.Assert(seenCreateCompleted, Equals, true)
-
+	require.Equal(t, []api.EventType{api.CreateStarted, api.CreateCompleted}, eventTypes)
 }

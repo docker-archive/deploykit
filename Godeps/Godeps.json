@@ -152,10 +152,6 @@
 			"ImportPath": "github.com/stretchr/testify/require",
 			"Comment": "v1.1.3-6-g6fe211e",
 			"Rev": "6fe211e493929a8aac0469b93f28b1d0688a9a3a"
-		},
-		{
-			"ImportPath": "gopkg.in/check.v1",
-			"Rev": "4f90aeace3a26ad7021961c297b22c42160c7b25"
 		}
 	]
 }
