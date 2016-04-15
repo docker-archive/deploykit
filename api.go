@@ -21,18 +21,6 @@ type CreateEvent struct {
 	ResourceID string
 }
 
-// BaseRequest defines the common traits of a CreateRequest.
-type BaseRequest struct {
-	Name       string `json:"name"`
-	SSHUser    string `json:"ssh_user"`
-	SSHKeyPath string `json:"ssh_key_path"`
-}
-
-// CreateRequest defines the traits necessary to create a resource.
-type CreateRequest interface {
-	// TODO- driver-specific params
-}
-
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
