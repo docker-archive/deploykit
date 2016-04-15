@@ -41,7 +41,7 @@ func (suite *TestSuiteAws) TestCreate(c *C) {
 	client := aws.CreateClient(suite.region, suite.accessKey, suite.secretKey, "", 10)
 	c.Assert(client, Not(IsNil))
 
-	provisioner := aws.NewProvisioner(client)
+	provisioner := aws.New(client)
 
 	request := aws.CreateInstanceRequest{
 		AvailabilityZone:         "us-west-2a",

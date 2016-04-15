@@ -11,7 +11,8 @@ import (
 )
 
 type provisioner struct {
-	client ec2iface.EC2API
+	client        ec2iface.EC2API
+	sleepFunction func(time.Duration)
 }
 
 func init() {
@@ -19,9 +20,9 @@ func init() {
 	api.Register("aws", impl)
 }
 
-// NewProvisioner returns a provisioner implementation given the EC2 API client.
-func NewProvisioner(client ec2iface.EC2API) api.Provisioner {
-	return &provisioner{client: client}
+// New creates a new AWS provisioner that will use the provided EC2 API implementation.
+func New(client ec2iface.EC2API) api.Provisioner {
+	return &provisioner{client: client, sleepFunction: time.Sleep}
 }
 
 // CreateClient creates the actual EC2 API client.
@@ -137,10 +138,10 @@ func (p *provisioner) Create(req interface{}) (<-chan api.CreateEvent, error) {
 			return
 		}
 
-		WaitUntil(30, 10*time.Second,
+		WaitUntil(p.sleepFunction, 30, 10*time.Second,
 			func() (bool, error) {
 				inst, err := getInstanceSync(p.client, *instance.InstanceId)
-				return inst != nil && *inst.State.Code == int64(16), err
+				return inst != nil && *inst.State.Name == ec2.InstanceStateNameRunning, err
 			})
 
 		err = tagSync(p.client, request, instance)
@@ -156,7 +157,6 @@ func (p *provisioner) Create(req interface{}) (<-chan api.CreateEvent, error) {
 			ResourceID: *instance.InstanceId,
 		}
 		return
-
 	}()
 
 	return events, nil
