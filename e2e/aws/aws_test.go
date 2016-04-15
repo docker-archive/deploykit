@@ -10,7 +10,7 @@ import (
 
 func requireEnvVar(t *testing.T, varName string) string {
 	value := os.Getenv(varName)
-	require.NotEmpty(t, value, varName + " environment variable must be set")
+	require.NotEmpty(t, value, varName+" environment variable must be set")
 	return value
 }
 
