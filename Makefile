@@ -48,11 +48,11 @@ build:
 
 test:
 	@echo "+ $@"
-	@go test -test.short -race -check.vv -tags "${MY_BUILDTAGS}" $(PKGS)
+	@go test -test.short -race -tags "${MY_BUILDTAGS}" $(PKGS)
 
 test-full:
 	@echo "+ $@"
-	@go test -check.vv -race -tags "${MY_BUILDTAGS}" $(PKGS)
+	@go test -race -tags "${MY_BUILDTAGS}" $(PKGS)
 
 # Godep helpers
 dep-check-godep:
