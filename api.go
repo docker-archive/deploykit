@@ -1,28 +1,48 @@
 package libmachete
 
-// EventType is the identifier for a creation event.
-type EventType int
+// CreateInstanceEventType is the identifier for an instance create event.
+type CreateInstanceEventType int
+
+// DestroyInstanceEventType is the identifier for an instance destroy event.
+type DestroyInstanceEventType int
 
 const (
-	// CreateStarted indicates that creation has begun.
-	CreateStarted EventType = iota
+	// CreateInstanceStarted indicates that creation has begun.
+	CreateInstanceStarted CreateInstanceEventType = iota
 
-	// CreateCompleted indicates that creation was successful.
-	CreateCompleted
+	// CreateInstanceCompleted indicates that creation was successful.
+	CreateInstanceCompleted
 
-	// CreateError indicates a problem creating the resource.
-	CreateError
+	// CreateInstanceError indicates a problem creating the instance.
+	CreateInstanceError
+
+	// DestroyInstanceStarted indicates that destruction has begun.
+	DestroyInstanceStarted DestroyInstanceEventType = iota
+
+	// DestroyInstanceCompleted indicates that destruction was successful.
+	DestroyInstanceCompleted
+
+	// DestroyInstanceError indicates a problem destroying the instance.
+	DestroyInstanceError
 )
 
-// A CreateEvent signals a state change in the creation process.
-type CreateEvent struct {
-	Type       EventType
+// A CreateInstanceEvent signals a state change in the instance create process.
+type CreateInstanceEvent struct {
+	Type       CreateInstanceEventType
 	Error      error
-	ResourceID string
+	InstanceID string
+}
+
+// A DestroyInstanceEvent signals a state change in the instance destroy process.
+type DestroyInstanceEvent struct {
+	Type  DestroyInstanceEventType
+	Error error
 }
 
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
-	Create(request interface{}) (<-chan CreateEvent, error)
+	CreateInstance(request interface{}) (<-chan CreateInstanceEvent, error)
+
+	DestroyInstance(instanceID string) (<-chan DestroyInstanceEvent, error)
 }
