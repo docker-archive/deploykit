@@ -15,11 +15,6 @@ type provisioner struct {
 	sleepFunction func(time.Duration)
 }
 
-func init() {
-	impl := &provisioner{}
-	api.Register("aws", impl)
-}
-
 // New creates a new AWS provisioner that will use the provided EC2 API implementation.
 func New(client ec2iface.EC2API) api.Provisioner {
 	return &provisioner{client: client, sleepFunction: time.Sleep}
