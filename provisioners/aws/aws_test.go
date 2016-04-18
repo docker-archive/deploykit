@@ -17,7 +17,7 @@ func noSleep(time.Duration) {
 	// no-op - don't sleep in tests
 }
 
-func TestCreateSync(t *testing.T) {
+func TestCreateInstanceSync(t *testing.T) {
 	request := new(CreateInstanceRequest)
 	require.Nil(t, json.Unmarshal([]byte(testCreateSync[0]), request))
 
@@ -32,7 +32,7 @@ func TestCreateSync(t *testing.T) {
 	}
 	clientMock.On("RunInstances", mock.MatchedBy(matcher)).Once().Return(&reservation, nil)
 
-	instance, err := createSync(&clientMock, *request)
+	instance, err := createInstanceSync(&clientMock, *request)
 
 	clientMock.AssertExpectations(t)
 	require.Nil(t, err)
@@ -41,7 +41,7 @@ func TestCreateSync(t *testing.T) {
 
 func TestCreateIncompatibleType(t *testing.T) {
 	p := &provisioner{client: &awsMock{EC2API: &ec2.EC2{}}, sleepFunction: noSleep}
-	_, err := p.Create("wrongtype")
+	_, err := p.CreateInstance("wrongtype")
 	require.NotNil(t, err)
 }
 
@@ -55,15 +55,25 @@ func makeDescribeOutput(instanceState string) *ec2.DescribeInstancesOutput {
 	}
 }
 
-func collectEvents(eventChan <-chan api.CreateEvent) []api.CreateEvent {
-	var events []api.CreateEvent
+func collectCreateInstanceEvents(
+	eventChan <-chan api.CreateInstanceEvent) []api.CreateInstanceEvent {
+
+	var events []api.CreateInstanceEvent
 	for event := range eventChan {
 		events = append(events, event)
 	}
 	return events
 }
 
-func TestCreateSuccess(t *testing.T) {
+func expectDescribeCall(clientMock *awsMock, instanceID string, returnedState string) {
+	clientMock.On(
+		"DescribeInstances",
+		&ec2.DescribeInstancesInput{InstanceIds: []*string{&instanceID}}).
+		Once().
+		Return(makeDescribeOutput(returnedState), nil)
+}
+
+func TestCreateInstanceSuccess(t *testing.T) {
 	clientMock := awsMock{EC2API: &ec2.EC2{}}
 
 	instanceID := "test-id"
@@ -75,18 +85,10 @@ func TestCreateSuccess(t *testing.T) {
 		Return(&reservation, nil)
 
 	// Simulate the instance not being available yet, the first describe returns nothing.
-	clientMock.On(
-		"DescribeInstances",
-		&ec2.DescribeInstancesInput{InstanceIds: []*string{&instanceID}}).
-		Once().
-		Return(makeDescribeOutput(ec2.InstanceStateNamePending), nil)
+	expectDescribeCall(&clientMock, instanceID, ec2.InstanceStateNamePending)
 
 	// The instance is now running.
-	clientMock.On(
-		"DescribeInstances",
-		&ec2.DescribeInstancesInput{InstanceIds: []*string{&instanceID}}).
-		Once().
-		Return(makeDescribeOutput(ec2.InstanceStateNameRunning), nil)
+	expectDescribeCall(&clientMock, instanceID, ec2.InstanceStateNameRunning)
 
 	clientMock.On(
 		"CreateTags",
@@ -103,20 +105,20 @@ func TestCreateSuccess(t *testing.T) {
 		Return(&ec2.CreateTagsOutput{}, nil)
 
 	provisioner := provisioner{client: &clientMock, sleepFunction: noSleep}
-	eventChan, err := provisioner.Create(CreateInstanceRequest{
+	eventChan, err := provisioner.CreateInstance(CreateInstanceRequest{
 		Tags: map[string]string{"name": "test-instance", "test": "test2"},
 	})
 
 	require.Nil(t, err)
-	expectedEvents := []api.CreateEvent{
-		{Type: api.CreateStarted},
-		{Type: api.CreateCompleted, ResourceID: instanceID}}
-	require.Equal(t, expectedEvents, collectEvents(eventChan))
+	expectedEvents := []api.CreateInstanceEvent{
+		{Type: api.CreateInstanceStarted},
+		{Type: api.CreateInstanceCompleted, InstanceID: instanceID}}
+	require.Equal(t, expectedEvents, collectCreateInstanceEvents(eventChan))
 
 	clientMock.AssertExpectations(t)
 }
 
-func TestCreateError(t *testing.T) {
+func TestCreateInstanceError(t *testing.T) {
 	clientMock := awsMock{EC2API: &ec2.EC2{}}
 
 	runError := errors.New("request failed")
@@ -127,13 +129,76 @@ func TestCreateError(t *testing.T) {
 		Return(&ec2.Reservation{}, runError)
 
 	provisioner := provisioner{client: &clientMock, sleepFunction: noSleep}
-	eventChan, err := provisioner.Create(CreateInstanceRequest{})
+	eventChan, err := provisioner.CreateInstance(CreateInstanceRequest{})
 
 	require.Nil(t, err)
-	expectedEvents := []api.CreateEvent{
-		{Type: api.CreateStarted},
-		{Type: api.CreateError, Error: runError}}
-	require.Equal(t, expectedEvents, collectEvents(eventChan))
+	expectedEvents := []api.CreateInstanceEvent{
+		{Type: api.CreateInstanceStarted},
+		{Type: api.CreateInstanceError, Error: runError}}
+	require.Equal(t, expectedEvents, collectCreateInstanceEvents(eventChan))
+
+	clientMock.AssertExpectations(t)
+}
+
+func collectDestroyInstanceEvents(
+	eventChan <-chan api.DestroyInstanceEvent) []api.DestroyInstanceEvent {
+
+	var events []api.DestroyInstanceEvent
+	for event := range eventChan {
+		events = append(events, event)
+	}
+	return events
+}
+
+func TestDestroyInstanceSuccess(t *testing.T) {
+	clientMock := awsMock{EC2API: &ec2.EC2{}}
+
+	instanceID := "test-id"
+
+	clientMock.On(
+		"TerminateInstances",
+		&ec2.TerminateInstancesInput{InstanceIds: []*string{&instanceID}}).
+		Once().
+		Return(&ec2.TerminateInstancesOutput{
+			TerminatingInstances: []*ec2.InstanceStateChange{{
+				InstanceId: &instanceID,
+			}}}, nil)
+
+	// Instance is in terminating state, not yet terminated.
+	expectDescribeCall(&clientMock, instanceID, ec2.InstanceStateNameStopping)
+
+	expectDescribeCall(&clientMock, instanceID, ec2.InstanceStateNameTerminated)
+
+	provisioner := provisioner{client: &clientMock, sleepFunction: noSleep}
+	eventChan, err := provisioner.DestroyInstance(instanceID)
+
+	require.Nil(t, err)
+	expectedEvents := []api.DestroyInstanceEvent{
+		{Type: api.DestroyInstanceStarted},
+		{Type: api.DestroyInstanceCompleted}}
+	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
+
+	clientMock.AssertExpectations(t)
+}
+
+func TestDestroyInstanceError(t *testing.T) {
+	clientMock := awsMock{EC2API: &ec2.EC2{}}
+
+	runError := errors.New("request failed")
+	clientMock.On(
+		"TerminateInstances",
+		mock.AnythingOfType("*ec2.TerminateInstancesInput")).
+		Once().
+		Return(&ec2.TerminateInstancesOutput{}, runError)
+
+	provisioner := provisioner{client: &clientMock, sleepFunction: noSleep}
+	eventChan, err := provisioner.DestroyInstance("test-id")
+
+	require.Nil(t, err)
+	expectedEvents := []api.DestroyInstanceEvent{
+		{Type: api.DestroyInstanceStarted},
+		{Type: api.DestroyInstanceError, Error: runError}}
+	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
 
 	clientMock.AssertExpectations(t)
 }
