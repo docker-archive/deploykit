@@ -67,7 +67,10 @@ func tagSync(client ec2iface.EC2API, request CreateInstanceRequest, instance *ec
 	return err
 }
 
-func createSync(client ec2iface.EC2API, request CreateInstanceRequest) (*ec2.Instance, error) {
+func createInstanceSync(
+	client ec2iface.EC2API,
+	request CreateInstanceRequest) (*ec2.Instance, error) {
+
 	reservation, err := client.RunInstances(&ec2.RunInstancesInput{
 		ImageId:  &request.ImageID,
 		MinCount: aws.Int64(1),
@@ -113,7 +116,15 @@ func createSync(client ec2iface.EC2API, request CreateInstanceRequest) (*ec2.Ins
 	return reservation.Instances[0], nil
 }
 
-func (p *provisioner) Create(req interface{}) (<-chan api.CreateEvent, error) {
+func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState string) error {
+	return WaitUntil(p.sleepFunction, 30, 10*time.Second,
+		func() (bool, error) {
+			inst, err := getInstanceSync(p.client, instanceID)
+			return inst != nil && *inst.State.Name == instanceState, err
+		})
+}
+
+func (p *provisioner) CreateInstance(req interface{}) (<-chan api.CreateInstanceEvent, error) {
 	request, is := req.(CreateInstanceRequest)
 	if !is {
 		return nil, &ErrInvalidRequest{}
@@ -123,40 +134,89 @@ func (p *provisioner) Create(req interface{}) (<-chan api.CreateEvent, error) {
 		return nil, err
 	}
 
-	events := make(chan api.CreateEvent)
+	events := make(chan api.CreateInstanceEvent)
 	go func() {
 		defer close(events)
 
-		events <- api.CreateEvent{Type: api.CreateStarted}
+		events <- api.CreateInstanceEvent{Type: api.CreateInstanceStarted}
 
-		instance, err := createSync(p.client, request)
+		instance, err := createInstanceSync(p.client, request)
 		if err != nil {
-			events <- api.CreateEvent{
+			events <- api.CreateInstanceEvent{
 				Error: err,
-				Type:  api.CreateError,
+				Type:  api.CreateInstanceError,
 			}
 			return
 		}
 
-		WaitUntil(p.sleepFunction, 30, 10*time.Second,
-			func() (bool, error) {
-				inst, err := getInstanceSync(p.client, *instance.InstanceId)
-				return inst != nil && *inst.State.Name == ec2.InstanceStateNameRunning, err
-			})
+		err = p.blockUntilInstanceInState(*instance.InstanceId, ec2.InstanceStateNameRunning)
+		if err != nil {
+			events <- api.CreateInstanceEvent{
+				Error: err,
+				Type:  api.CreateInstanceError,
+			}
+			return
+		}
 
 		err = tagSync(p.client, request, instance)
 		if err != nil {
-			events <- api.CreateEvent{
+			events <- api.CreateInstanceEvent{
 				Error: err,
-				Type:  api.CreateError,
+				Type:  api.CreateInstanceError,
 			}
 			return
 		}
-		events <- api.CreateEvent{
-			Type:       api.CreateCompleted,
-			ResourceID: *instance.InstanceId,
+		events <- api.CreateInstanceEvent{
+			Type:       api.CreateInstanceCompleted,
+			InstanceID: *instance.InstanceId,
 		}
-		return
+	}()
+
+	return events, nil
+}
+
+func destroyInstanceSync(client ec2iface.EC2API, instanceID string) error {
+	result, err := client.TerminateInstances(&ec2.TerminateInstancesInput{
+		InstanceIds: []*string{&instanceID}})
+
+	if err != nil {
+		return err
+	}
+
+	if len(result.TerminatingInstances) == 1 {
+		return nil
+	}
+
+	// There was no match for the instance ID.
+	return &ErrInvalidRequest{}
+}
+
+func (p *provisioner) DestroyInstance(instanceID string) (<-chan api.DestroyInstanceEvent, error) {
+	events := make(chan api.DestroyInstanceEvent)
+
+	go func() {
+		defer close(events)
+
+		events <- api.DestroyInstanceEvent{Type: api.DestroyInstanceStarted}
+
+		err := destroyInstanceSync(p.client, instanceID)
+		if err != nil {
+			events <- api.DestroyInstanceEvent{
+				Type:  api.DestroyInstanceError,
+				Error: err}
+			return
+		}
+
+		err = p.blockUntilInstanceInState(instanceID, ec2.InstanceStateNameTerminated)
+		if err != nil {
+			events <- api.DestroyInstanceEvent{
+				Error: err,
+				Type:  api.DestroyInstanceError,
+			}
+			return
+		}
+
+		events <- api.DestroyInstanceEvent{Type: api.DestroyInstanceCompleted}
 	}()
 
 	return events, nil
