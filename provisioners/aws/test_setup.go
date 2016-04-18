@@ -40,6 +40,13 @@ func (mockClient *awsMock) CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTa
 	return args.Get(0).(*ec2.CreateTagsOutput), args.Error(1)
 }
 
+func (mockClient *awsMock) TerminateInstances(
+	input *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error) {
+
+	args := mockClient.Called(input)
+	return args.Get(0).(*ec2.TerminateInstancesOutput), args.Error(1)
+}
+
 var (
 	testCreateSync = []string{`
 {

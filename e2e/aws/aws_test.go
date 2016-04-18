@@ -64,14 +64,37 @@ func TestCreate(t *testing.T) {
 		Monitoring: true,
 	}
 
-	events, err := provisioner.Create(request)
+	createEvents, err := provisioner.CreateInstance(request)
 	require.Nil(t, err)
 
-	var eventTypes []api.EventType
-	for event := range events {
+	var createEventTypes []api.CreateInstanceEventType
+	var instanceID string
+	for event := range createEvents {
 		t.Log("event=", event)
-		eventTypes = append(eventTypes, event.Type)
+		createEventTypes = append(createEventTypes, event.Type)
+
+		if event.InstanceID != "" {
+			instanceID = event.InstanceID
+		}
 	}
 
-	require.Equal(t, []api.EventType{api.CreateStarted, api.CreateCompleted}, eventTypes)
+	expectedCreateEvents := []api.CreateInstanceEventType{
+		api.CreateInstanceStarted,
+		api.CreateInstanceCompleted}
+	require.Equal(t, expectedCreateEvents, createEventTypes)
+
+	require.NotEmpty(t, instanceID)
+	destroyEvents, err := provisioner.DestroyInstance(instanceID)
+	require.Nil(t, err)
+
+	var destroyEventTypes []api.DestroyInstanceEventType
+	for event := range destroyEvents {
+		t.Log("event=", event)
+		destroyEventTypes = append(destroyEventTypes, event.Type)
+	}
+
+	expectedDestroyEvents := []api.DestroyInstanceEventType{
+		api.DestroyInstanceStarted,
+		api.DestroyInstanceCompleted}
+	require.Equal(t, expectedDestroyEvents, destroyEventTypes)
 }
