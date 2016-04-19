@@ -1,51 +1,6 @@
 package aws
 
-import (
-	"encoding/json"
-	"fmt"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	"github.com/stretchr/testify/mock"
-)
-
-// LoggingEC2 implements some overrides of the EC2API methods and logs in the input to stdout
-type LoggingEC2 struct {
-	ec2iface.EC2API
-}
-
-// RunInstances implements the EC2API but logs the input to stdout before calling the base.
-func (l *LoggingEC2) RunInstances(input *ec2.RunInstancesInput) (*ec2.Reservation, error) {
-	buff, _ := json.MarshalIndent(input, "  ", "  ")
-	fmt.Println(string(buff))
-	return l.EC2API.RunInstances(input)
-}
-
-type awsMock struct {
-	mock.Mock
-	ec2iface.EC2API
-}
-
-func (mockClient *awsMock) RunInstances(input *ec2.RunInstancesInput) (*ec2.Reservation, error) {
-	args := mockClient.Called(input)
-	return args.Get(0).(*ec2.Reservation), args.Error(1)
-}
-
-func (mockClient *awsMock) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
-	args := mockClient.Called(input)
-	return args.Get(0).(*ec2.DescribeInstancesOutput), args.Error(1)
-}
-
-func (mockClient *awsMock) CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
-	args := mockClient.Called(input)
-	return args.Get(0).(*ec2.CreateTagsOutput), args.Error(1)
-}
-
-func (mockClient *awsMock) TerminateInstances(
-	input *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error) {
-
-	args := mockClient.Called(input)
-	return args.Get(0).(*ec2.TerminateInstancesOutput), args.Error(1)
-}
+//go:generate mockgen -package aws -destination mock_ec2iface.go github.com/aws/aws-sdk-go/service/ec2/ec2iface EC2API
 
 var (
 	testCreateSync = []string{`

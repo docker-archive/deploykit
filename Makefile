@@ -40,11 +40,15 @@ lint:
 	@echo "+ $@"
 	$(if $(shell which golint || echo ''), , \
 		$(error Please install golint: `go get -u github.com/golang/lint/golint`))
-	@test -z "$$(golint ./... 2>&1 | grep -v ^vendor/ | tee /dev/stderr)"
+	@test -z "$$(golint ./... 2>&1 | grep -v ^vendor/ | grep -v mock_.*.go | tee /dev/stderr)"
 
 build:
 	@echo "+ $@"
 	@go build -tags "${MY_BUILDTAGS}" -v ${GO_LDFLAGS} $(PKGS)
+
+generate:
+	@echo "+ $@"
+	@go generate github.com/docker/libmachete/provisioners/aws
 
 test:
 	@echo "+ $@"
