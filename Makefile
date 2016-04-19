@@ -22,7 +22,8 @@ AUTHORS: .mailmap .git/HEAD
 # Package list
 PKGS := $(shell go list ./... | \
 grep -v ^github.com/docker/libmachete/vendor/ | \
-grep -v ^github.com/docker/libmachete/e2e/)
+grep -v ^github.com/docker/libmachete/e2e/ | \
+grep -v ^github.com/docker/libmachete/provisioners/aws/mock)
 
 vet:
 	@echo "+ $@"
@@ -37,11 +38,15 @@ lint:
 	@echo "+ $@"
 	$(if $(shell which golint || echo ''), , \
 		$(error Please install golint: `go get -u github.com/golang/lint/golint`))
-	@test -z "$$(golint ./... 2>&1 | grep -v ^vendor/ | tee /dev/stderr)"
+	@test -z "$$(golint ./... 2>&1 | grep -v ^vendor/ | grep -v mock/ | tee /dev/stderr)"
 
 build:
 	@echo "+ $@"
 	@go build ${GO_LDFLAGS} $(PKGS)
+
+generate:
+	@echo "+ $@"
+	@go generate github.com/docker/libmachete/provisioners/aws
 
 test:
 	@echo "+ $@"
