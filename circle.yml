@@ -1,71 +1,38 @@
-# Pony-up!
 machine:
-  pre:
-  # Install gvm
-    - bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/1.0.22/binscripts/gvm-installer)
-  # Install codecov for coverage
-    - pip install --user codecov
-
-  post:
-  # go
-    - gvm install go1.6 --prefer-binary --name=stable
-
   environment:
-  # Convenient shortcuts to "common" locations
-    CHECKOUT: /home/ubuntu/$CIRCLE_PROJECT_REPONAME
-    BASE_DIR: src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME
-  # Trick circle brainflat "no absolute path" behavior
-    BASE_STABLE: ../../../$HOME/.gvm/pkgsets/stable/global/$BASE_DIR
-    MY_BUILDTAGS: ""
+    OS: "linux"
+    ARCH: "amd64"
+
+    GOVERSION: "1.6"
+    GOPATH: "$HOME/.go_workspace"
+
+    WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
 
 dependencies:
   pre:
-  # Copy the code
-    - >
-      gvm use stable &&
-      mkdir -p "$(dirname $BASE_STABLE)" &&
-      cp -R "$CHECKOUT" "$BASE_STABLE"
+    # Wipe out the default go install.
+    - sudo rm -rf /usr/local/go
+
+    # Force the wipe out of GOPATH to make sure we're not relying on
+    # external dependencies.
+    - rm -rf "$GOPATH"
 
   override:
-  # Install dependencies
-    - gvm use stable && go get github.com/tools/godep github.com/axw/gocov/gocov github.com/golang/lint/golint:
-        pwd: $BASE_STABLE
+    # Install Go
+    - wget "https://storage.googleapis.com/golang/go$GOVERSION.$OS-$ARCH.tar.gz"
+    - sudo tar -C /usr/local -xzf "go$GOVERSION.$OS-$ARCH.tar.gz"
 
+    # Setup the GOPATH
+    - mkdir -p "$(dirname $WORKDIR)"
+    - cp -R "$HOME/$CIRCLE_PROJECT_REPONAME" "$WORKDIR"
+
+    # Install dependencies
+    - cd $WORKDIR && go get github.com/tools/godep github.com/axw/gocov/gocov github.com/golang/lint/golint
 
 test:
-  pre:
-  # Output the go versions we are going to test
-    # - gvm use old && go version
-    - gvm use stable && go version
-
-  # Ensure validation of dependencies
-    - gvm use stable && if test -n "`git diff --stat=1000 master | grep -Ei \"vendor|godeps\"`"; then make dep-validate; fi:
-        pwd: $BASE_STABLE
-
-  # First thing: build everything. This will catch compile errors, and it's
-  # also necessary for go vet to work properly (see #807).
-    - gvm use stable && godep go install $(go list ./... | grep -v "/vendor/" | grep -v "/e2e/"):
-        pwd: $BASE_STABLE
-
-  # FMT
-    - gvm use stable && make fmt:
-        pwd: $BASE_STABLE
-
-   # VET
-    - gvm use stable && make vet:
-        pwd: $BASE_STABLE
-
-  # LINT
-    - gvm use stable && make lint:
-        pwd: $BASE_STABLE
-
   override:
-  # Test stable, and report
-     - gvm use stable; export ROOT_PACKAGE=$(go list .); go list -tags "$MY_BUILDTAGS" ./... | grep -v "/vendor/" | grep -v "/e2e/" | xargs -L 1 -I{} bash -c 'export PACKAGE={}; godep go test -tags "$DOCKER_BUILDTAGS" -test.short -coverprofile=$GOPATH/src/$PACKAGE/coverage.out -coverpkg=$(./coverpkg.sh $PACKAGE $ROOT_PACKAGE) $PACKAGE':
-         timeout: 600
-         pwd: $BASE_STABLE
+    - cd $WORKDIR && make ci
 
   post:
-  # Report to codecov
-    - bash <(curl -s https://codecov.io/bash):
-        pwd: $BASE_STABLE
+    # Report to codecov
+    - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)

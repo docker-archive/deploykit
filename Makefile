@@ -14,22 +14,19 @@ endif
 .DEFAULT: all
 all: fmt vet lint build test binaries
 
+ci: fmt vet lint dep-validate coverage
+
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
 
 # Package list
-PKGS := $(shell go list -tags "${MY_BUILDTAGS}" ./... | \
+PKGS := $(shell go list ./... | \
 grep -v ^github.com/docker/libmachete/vendor/ | \
 grep -v ^github.com/docker/libmachete/e2e/)
 
-# A build target
-${PREFIX}/bin/WHATEVER: $(wildcard **/*.go)
-	@echo "+ $@"
-	@go build -tags "${MY_BUILDTAGS}" -o $@ ${GO_LDFLAGS}  ${GO_GCFLAGS} ./cmd/WHATEVER
-
 vet:
 	@echo "+ $@"
-	@go vet -tags "${MY_BUILDTAGS}" $(PKGS)
+	@go vet $(PKGS)
 
 fmt:
 	@echo "+ $@"
@@ -44,15 +41,21 @@ lint:
 
 build:
 	@echo "+ $@"
-	@go build -tags "${MY_BUILDTAGS}" -v ${GO_LDFLAGS} $(PKGS)
+	@go build ${GO_LDFLAGS} $(PKGS)
 
 test:
 	@echo "+ $@"
-	@go test -test.short -race -tags "${MY_BUILDTAGS}" $(PKGS)
+	@go test -test.short -race $(PKGS)
+
+coverage:
+	@echo "+ $@"
+	@for pkg in $(PKGS); do \
+	  go test -test.short -coverprofile="../../../$$pkg/coverage.txt" $${pkg}; \
+	done
 
 test-full:
 	@echo "+ $@"
-	@go test -race -tags "${MY_BUILDTAGS}" $(PKGS)
+	@go test -race $(PKGS)
 
 # Godep helpers
 dep-check-godep:
