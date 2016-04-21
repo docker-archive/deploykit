@@ -1,7 +1,7 @@
 package aws
 
 import (
-	api "github.com/docker/libmachete"
+	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/provisioners/aws"
 	"github.com/stretchr/testify/require"
 	"os"

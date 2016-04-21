@@ -6,7 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	api "github.com/docker/libmachete"
+	"github.com/docker/libmachete/provisioners/api"
 	"sort"
 	"time"
 )
