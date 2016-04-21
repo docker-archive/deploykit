@@ -7,7 +7,6 @@ machine:
     GOPATH: "$HOME/.go_workspace"
 
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
-    /home/ubuntu/libmachete//home/ubuntu/ .go_workspace /src/github.com/ docker / libmachete
 
 dependencies:
   pre:
