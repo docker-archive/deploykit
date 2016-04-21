@@ -1,13 +1,8 @@
 machine:
-  pre:
-  # Install codecov for coverage
-    - pip install --user codecov
-
-  post:
-  # go
-    - gvm install go1.6 --prefer-binary --name=stable
-
   environment:
+    OS: "linux"
+    ARCH: "amd64"
+
     GOVERSION: "1.6"
     GOPATH: "$HOME/.go_workspace"
 
