@@ -23,8 +23,7 @@ dependencies:
     - sudo tar -C /usr/local -xzf "go$GOVERSION.$OS-$ARCH.tar.gz"
 
     # Install dependencies
-    - go get github.com/tools/godep github.com/axw/gocov/gocov github.com/golang/lint/golint:
-        pwd: $WORKDIR
+    - cd $WORKDIR && go get github.com/tools/godep github.com/axw/gocov/gocov github.com/golang/lint/golint
 
     # Setup the GOPATH
     - mkdir -p "$(dirname $WORKDIR)"
