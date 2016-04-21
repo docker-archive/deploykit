@@ -28,10 +28,13 @@ dependencies:
     - go get github.com/tools/godep github.com/axw/gocov/gocov github.com/golang/lint/golint:
         pwd: $WORKDIR
 
+    # Setup the GOPATH
+    - mkdir -p "$(dirname $WORKDIR)"
+    - cp -R "$HOME/$CIRCLE_PROJECT_REPONAME" "$WORKDIR"
+
 test:
   override:
     - make ci:
-        timeout: 600
         pwd: $WORKDIR
 
   post:
