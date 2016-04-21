@@ -1,7 +1,5 @@
 machine:
   pre:
-  # Install gvm
-    - bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/1.0.22/binscripts/gvm-installer)
   # Install codecov for coverage
     - pip install --user codecov
 
@@ -10,58 +8,38 @@ machine:
     - gvm install go1.6 --prefer-binary --name=stable
 
   environment:
-  # Convenient shortcuts to "common" locations
+    GOVERSION: "1.6"
+    GOPATH: "$HOME/.go_workspace"
+
+    WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+
     CHECKOUT: /home/ubuntu/$CIRCLE_PROJECT_REPONAME
-    BASE_DIR: src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME
-  # Trick circle "no absolute path" behavior
-    BASE_STABLE: ../../../$HOME/.gvm/pkgsets/stable/global/$BASE_DIR
-    MY_BUILDTAGS: ""
 
 dependencies:
   pre:
-  # Copy the code
-    - >
-      gvm use stable &&
-      mkdir -p "$(dirname $BASE_STABLE)" &&
-      cp -R "$CHECKOUT" "$BASE_STABLE"
+    # Wipe out the default go install.
+    - sudo rm -rf /usr/local/go
+
+    # Force the wipe out of GOPATH to make sure we're not relying on
+    # external dependencies.
+    - rm -rf "$GOPATH"
 
   override:
-  # Install dependencies
-    - gvm use stable && go get github.com/tools/godep github.com/axw/gocov/gocov github.com/golang/lint/golint:
-        pwd: $BASE_STABLE
+    # Install Go
+    - wget "https://storage.googleapis.com/golang/go$GOVERSION.$OS-$ARCH.tar.gz"
+    - sudo tar -C /usr/local -xzf "go$GOVERSION.$OS-$ARCH.tar.gz"
+
+    # Install dependencies
+    - go get github.com/tools/godep github.com/axw/gocov/gocov github.com/golang/lint/golint:
+        pwd: $WORKDIR
 
 test:
-  pre:
-  # Output the go versions we are going to test
-    - gvm use stable && go version
-
-  # Validate dependencies
-    - gvm use stable && make dep-validate:
-        pwd: $BASE_STABLE
-
-  # Build everything. This will catch compile errors, and it's also necessary for go vet to work properly.
-    - gvm use stable && make install-all:
-        pwd: $BASE_STABLE
-
-  # FMT
-    - gvm use stable && make fmt:
-        pwd: $BASE_STABLE
-
-   # VET
-    - gvm use stable && make vet:
-        pwd: $BASE_STABLE
-
-  # LINT
-    - gvm use stable && make lint:
-        pwd: $BASE_STABLE
-
   override:
-  # Test stable, and report
-    - gvm use stable && make test-coverage:
+    - make ci:
         timeout: 600
-        pwd: $BASE_STABLE
+        pwd: $WORKDIR
 
   post:
   # Report to codecov
     - bash <(curl -s https://codecov.io/bash):
-        pwd: $BASE_STABLE
+        pwd: $WORKDIR

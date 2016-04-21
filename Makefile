@@ -14,6 +14,8 @@ endif
 .DEFAULT: all
 all: fmt vet lint build test binaries
 
+ci: fmt vet lint dep-validate coverage
+
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
 
@@ -41,18 +43,14 @@ build:
 	@echo "+ $@"
 	@go build ${GO_LDFLAGS} $(PKGS)
 
-install-all:
-	@echo "+ $@"
-	@go install $(PKGS)
-
 test:
 	@echo "+ $@"
 	@go test -test.short -race $(PKGS)
 
-test-coverage:
+coverage:
 	@echo "+ $@"
 	@for pkg in $(PKGS); do \
-	  go test -test.short -coverprofile=$${GOPATH}/src/$${package}/coverage.out $${pkg}; \
+	  go test -test.short -coverprofile="../../../$$pkg/coverage.txt" $${pkg}; \
 	done
 
 test-full:
