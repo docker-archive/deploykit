@@ -57,7 +57,7 @@ test:
 
   override:
   # Test stable, and report
-    - make test-coverage
+    - gvm use stable && make test-coverage:
         timeout: 600
         pwd: $BASE_STABLE
 
