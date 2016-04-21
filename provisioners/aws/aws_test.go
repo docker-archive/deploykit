@@ -95,9 +95,6 @@ func TestCreateInstanceSuccess(t *testing.T) {
 		&ec2.CreateTagsInput{
 			Resources: []*string{&instanceID},
 			Tags: []*ec2.Tag{
-				// Note: The order of this slice is dependent upon the iteration
-				// order of the tag map.  Figure out a better way to validate if
-				// this proves to be brittle.
 				{Key: aws.String("name"), Value: aws.String("test-instance")},
 				{Key: aws.String("test"), Value: aws.String("test2")}},
 		}).

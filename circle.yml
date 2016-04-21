@@ -1,4 +1,3 @@
-# Pony-up!
 machine:
   pre:
   # Install gvm
@@ -14,7 +13,7 @@ machine:
   # Convenient shortcuts to "common" locations
     CHECKOUT: /home/ubuntu/$CIRCLE_PROJECT_REPONAME
     BASE_DIR: src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME
-  # Trick circle brainflat "no absolute path" behavior
+  # Trick circle "no absolute path" behavior
     BASE_STABLE: ../../../$HOME/.gvm/pkgsets/stable/global/$BASE_DIR
     MY_BUILDTAGS: ""
 
@@ -31,20 +30,17 @@ dependencies:
     - gvm use stable && go get github.com/tools/godep github.com/axw/gocov/gocov github.com/golang/lint/golint:
         pwd: $BASE_STABLE
 
-
 test:
   pre:
   # Output the go versions we are going to test
-    # - gvm use old && go version
     - gvm use stable && go version
 
-  # Ensure validation of dependencies
-    - gvm use stable && if test -n "`git diff --stat=1000 master | grep -Ei \"vendor|godeps\"`"; then make dep-validate; fi:
+  # Validate dependencies
+    - gvm use stable && make dep-validate:
         pwd: $BASE_STABLE
 
-  # First thing: build everything. This will catch compile errors, and it's
-  # also necessary for go vet to work properly (see #807).
-    - gvm use stable && godep go install $(go list ./... | grep -v "/vendor/" | grep -v "/e2e/"):
+  # Build everything. This will catch compile errors, and it's also necessary for go vet to work properly.
+    - gvm use stable && make install-all:
         pwd: $BASE_STABLE
 
   # FMT
@@ -61,9 +57,9 @@ test:
 
   override:
   # Test stable, and report
-     - gvm use stable; export ROOT_PACKAGE=$(go list .); go list -tags "$MY_BUILDTAGS" ./... | grep -v "/vendor/" | grep -v "/e2e/" | xargs -L 1 -I{} bash -c 'export PACKAGE={}; godep go test -tags "$DOCKER_BUILDTAGS" -test.short -coverprofile=$GOPATH/src/$PACKAGE/coverage.out -coverpkg=$(./coverpkg.sh $PACKAGE $ROOT_PACKAGE) $PACKAGE':
-         timeout: 600
-         pwd: $BASE_STABLE
+    - make test-coverage
+        timeout: 600
+        pwd: $BASE_STABLE
 
   post:
   # Report to codecov

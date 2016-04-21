@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	api "github.com/docker/libmachete"
+	"sort"
 	"time"
 )
 
@@ -49,11 +50,19 @@ func getInstanceSync(client ec2iface.EC2API, instanceID string) (*ec2.Instance, 
 }
 
 func tagSync(client ec2iface.EC2API, request CreateInstanceRequest, instance *ec2.Instance) error {
-	tags := []*ec2.Tag{} // TODO - add a default tag for machine name?
+	tags := []*ec2.Tag{}
 
-	for k, v := range request.Tags {
+	// Gather the tag keys in sorted order, to provide predictable tag order.  This is
+	// particularly useful for tests.
+	var keys []string
+	for k := range request.Tags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
 		key := k
-		value := v
+		value := request.Tags[key]
 		tags = append(tags, &ec2.Tag{
 			Key:   &key,
 			Value: &value,
