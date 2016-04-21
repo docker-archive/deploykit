@@ -39,10 +39,19 @@ type DestroyInstanceEvent struct {
 	Error error
 }
 
+// MachineRequest defines the basic attributes that any provisioner's creation request must define.
+type MachineRequest interface {
+	GetName() string
+}
+
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
-	CreateInstance(request interface{}) (<-chan CreateInstanceEvent, error)
+	// NewRequestInstance retrieves a new instance of the request type consumed by
+	// CreateInstance.
+	NewRequestInstance() MachineRequest
+
+	CreateInstance(request MachineRequest) (<-chan CreateInstanceEvent, error)
 
 	DestroyInstance(instanceID string) (<-chan DestroyInstanceEvent, error)
 }

@@ -128,7 +128,13 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
-func (p *provisioner) CreateInstance(req interface{}) (<-chan api.CreateInstanceEvent, error) {
+func (p *provisioner) NewRequestInstance() api.MachineRequest {
+	return new(CreateInstanceRequest)
+}
+
+func (p *provisioner) CreateInstance(
+	req api.MachineRequest) (<-chan api.CreateInstanceEvent, error) {
+
 	request, is := req.(CreateInstanceRequest)
 	if !is {
 		return nil, &ErrInvalidRequest{}
