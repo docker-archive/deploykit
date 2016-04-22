@@ -49,7 +49,7 @@ func (r *Registry) Register(
 	return nil
 }
 
-// Get fetches a provisioenr factory by name.
+// Get fetches a provisioner factory by name.
 func (r *Registry) Get(name string, params map[string]string) api.Provisioner {
 	if p, exists := r.provisioners[name]; exists {
 		return p(params)
