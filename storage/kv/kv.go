@@ -9,6 +9,7 @@ type kvStorage struct {
 	kvStore store.Store
 }
 
+// NewStore creates a new storage implementation based on a KV store.
 func NewStore(kvStore store.Store) storage.Storage {
 	return &kvStorage{kvStore: kvStore}
 }
