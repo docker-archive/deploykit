@@ -12,12 +12,12 @@ type Registry struct {
 	provisioners map[string]func(map[string]string) api.Provisioner
 }
 
-// NewEmptyRegistry creates a registry with no associations.
-func NewEmptyRegistry() *Registry {
+// newEmptyRegistry creates a registry with no associations.
+func newEmptyRegistry() *Registry {
 	return &Registry{provisioners: make(map[string]func(map[string]string) api.Provisioner)}
 }
 
-var global = NewEmptyRegistry()
+var global = newEmptyRegistry()
 
 // GetGlobalRegistry returns the static shared registry.
 func GetGlobalRegistry() *Registry {
