@@ -1,7 +1,11 @@
 package aws
 
+import "github.com/docker/libmachete/provisioners/api"
+
 // CreateInstanceRequest is the struct used to create new instances.
 type CreateInstanceRequest struct {
+	api.MachineRequest
+
 	AvailabilityZone         string
 	ImageID                  string
 	BlockDeviceName          string

@@ -29,7 +29,7 @@ func (_m *MockProvisioner) EXPECT() *_MockProvisionerRecorder {
 	return _m.recorder
 }
 
-func (_m *MockProvisioner) CreateInstance(_param0 interface{}) (<-chan api.CreateInstanceEvent, error) {
+func (_m *MockProvisioner) CreateInstance(_param0 api.MachineRequest) (<-chan api.CreateInstanceEvent, error) {
 	ret := _m.ctrl.Call(_m, "CreateInstance", _param0)
 	ret0, _ := ret[0].(<-chan api.CreateInstanceEvent)
 	ret1, _ := ret[1].(error)
@@ -49,4 +49,14 @@ func (_m *MockProvisioner) DestroyInstance(_param0 string) (<-chan api.DestroyIn
 
 func (_mr *_MockProvisionerRecorder) DestroyInstance(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DestroyInstance", arg0)
+}
+
+func (_m *MockProvisioner) NewRequestInstance() api.MachineRequest {
+	ret := _m.ctrl.Call(_m, "NewRequestInstance")
+	ret0, _ := ret[0].(api.MachineRequest)
+	return ret0
+}
+
+func (_mr *_MockProvisionerRecorder) NewRequestInstance() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "NewRequestInstance")
 }

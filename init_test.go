@@ -14,7 +14,7 @@ func TestRegister(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	registry := NewEmptyRegistry()
+	registry := newEmptyRegistry()
 	provisionerA := mock.NewMockProvisioner(ctrl)
 	provisionerB := mock.NewMockProvisioner(ctrl)
 
