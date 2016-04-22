@@ -46,13 +46,20 @@ func TestCreateInstanceSync(t *testing.T) {
 	require.NotNil(t, instance)
 }
 
+type WrongRequestType struct {
+}
+
+func (w WrongRequestType) GetName() string {
+	return "nope"
+}
+
 func TestCreateIncompatibleType(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	clientMock := mock.NewMockEC2API(ctrl)
 
 	p := &provisioner{client: clientMock, sleepFunction: noSleep}
-	_, err := p.CreateInstance("wrongtype")
+	_, err := p.CreateInstance(WrongRequestType{})
 	require.NotNil(t, err)
 }
 
