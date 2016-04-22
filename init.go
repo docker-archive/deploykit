@@ -24,14 +24,6 @@ func GetGlobalRegistry() *Registry {
 	return global
 }
 
-// clear will remove all provisioners, for use in testing.
-func (r *Registry) clear() {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	r.provisioners = make(map[string]func(map[string]string) api.Provisioner)
-}
-
 // Register makes a Provisioner factory available for use by a canonical short name.
 // The factory function will be passed provider-specific details such as credentials.
 func (r *Registry) Register(
