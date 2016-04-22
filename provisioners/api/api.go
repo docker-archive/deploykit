@@ -1,4 +1,4 @@
-package libmachete
+package api
 
 // CreateInstanceEventType is the identifier for an instance create event.
 type CreateInstanceEventType int

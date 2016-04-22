@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	api "github.com/docker/libmachete"
+	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/provisioners/aws/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 )
+
+//go:generate mockgen -package mock -destination mock/mock_ec2iface.go github.com/aws/aws-sdk-go/service/ec2/ec2iface EC2API
 
 func noSleep(time.Duration) {
 	// no-op - don't sleep in tests
