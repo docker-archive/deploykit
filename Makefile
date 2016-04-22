@@ -23,7 +23,7 @@ AUTHORS: .mailmap .git/HEAD
 PKGS := $(shell go list ./... | \
 grep -v ^github.com/docker/libmachete/vendor/ | \
 grep -v ^github.com/docker/libmachete/e2e/ | \
-grep -v ^github.com/docker/libmachete/provisioners/aws/mock)
+grep -v /mock$)
 
 vet:
 	@echo "+ $@"
@@ -46,7 +46,7 @@ build:
 
 generate:
 	@echo "+ $@"
-	@go generate github.com/docker/libmachete/provisioners/aws
+	@go generate -x $(PKGS)
 
 test:
 	@echo "+ $@"
