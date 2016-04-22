@@ -11,7 +11,7 @@ import (
 // instances.
 type machine struct {
 	registry       *Registry
-	templateLoader func(provisioner string, template string) (*string, error)
+	templateLoader func(provisioner string, template string) ([]byte, error)
 }
 
 // CreateMachine creates a new machine.
@@ -19,26 +19,26 @@ func (m *machine) CreateMachine(
 	provisionerName string,
 	provisionerParams map[string]string,
 	templateName string,
-	templateParams string) (<-chan api.CreateInstanceEvent, error) {
+	overrideData []byte) (<-chan api.CreateInstanceEvent, error) {
 
 	provisioner := m.registry.Get(provisionerName, provisionerParams)
 	if provisioner == nil {
 		return nil, fmt.Errorf("Provisioner '%s' does not exist.", provisionerName)
 	}
 
-	template, err := m.templateLoader(provisionerName, templateName)
+	templateData, err := m.templateLoader(provisionerName, templateName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to load template '%s': %s", templateName, err)
 	}
 
 	base := provisioner.NewRequestInstance()
-	err = yaml.Unmarshal([]byte(*template), base)
+	err = yaml.Unmarshal(templateData, base)
 	if err != nil {
 		return nil, fmt.Errorf("Template '%s' is invalid: %s", templateName, err)
 	}
 
 	overlay := provisioner.NewRequestInstance()
-	err = yaml.Unmarshal([]byte(templateParams), overlay)
+	err = yaml.Unmarshal(overrideData, overlay)
 	if err != nil {
 		return nil, fmt.Errorf("Template parameters are invalid: %s", err)
 	}

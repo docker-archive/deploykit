@@ -11,8 +11,12 @@ import (
 
 const (
 	provisionerName = "provisioner"
+	templateName    = "templateName"
+)
 
-	template = `name: larry
+var (
+	provisionerParams = map[string]string{"secret": "42"}
+	templateData      = []byte(`name: larry
 zone: b
 arch: x86_64
 network:
@@ -23,17 +27,12 @@ disks:
   - sda2
 labels:
   a: b
-  c: d`
-	templateName = "templateName"
-
-	overlay = `name: steve
+  c: d`)
+	overlayData = []byte(`name: steve
 network:
-  turbo: true`
-
-	unmappableOverlay = `gpu: true`
+  turbo: true`)
+	unmappableOverlayData = []byte(`gpu: true`)
 )
-
-var provisionerParams = map[string]string{"secret": "42"}
 
 type network struct {
 	Public bool
@@ -66,7 +65,7 @@ func newRegistry(t *testing.T, ctrl *gomock.Controller) (*mock.MockProvisioner, 
 	return provisioner, registry
 }
 
-func createMachine(machine *machine, overlayYaml string) (<-chan api.CreateInstanceEvent, error) {
+func createMachine(machine *machine, overlayYaml []byte) (<-chan api.CreateInstanceEvent, error) {
 	return machine.CreateMachine(
 		provisionerName,
 		provisionerParams,
@@ -77,16 +76,16 @@ func createMachine(machine *machine, overlayYaml string) (<-chan api.CreateInsta
 func newMachine(
 	t *testing.T,
 	ctrl *gomock.Controller,
-	template string) (*mock.MockProvisioner, *machine) {
+	templateData []byte) (*mock.MockProvisioner, *machine) {
 
 	provisioner, registry := newRegistry(t, ctrl)
 
 	machine := &machine{
 		registry: registry,
-		templateLoader: func(provisioner string, name string) (*string, error) {
+		templateLoader: func(provisioner string, name string) ([]byte, error) {
 			require.Equal(t, provisionerName, provisioner)
 			require.Equal(t, templateName, name)
-			return &template, nil
+			return templateData, nil
 		}}
 
 	return provisioner, machine
@@ -96,7 +95,7 @@ func TestCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner, machine := newMachine(t, ctrl, template)
+	provisioner, machine := newMachine(t, ctrl, templateData)
 
 	expectedRequest := testSchema{
 		Name: "steve",
@@ -111,7 +110,7 @@ func TestCreate(t *testing.T) {
 	createEvents := make(<-chan api.CreateInstanceEvent)
 	provisioner.EXPECT().CreateInstance(&expectedRequest).Return(createEvents, nil)
 
-	events, err := createMachine(machine, overlay)
+	events, err := createMachine(machine, overlayData)
 	require.Nil(t, err)
 
 	require.Exactly(t, createEvents, events)
@@ -121,9 +120,9 @@ func TestCreateInvalidTemplate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, machine := newMachine(t, ctrl, "not yaml")
+	_, machine := newMachine(t, ctrl, []byte("not yaml"))
 
-	events, err := createMachine(machine, overlay)
+	events, err := createMachine(machine, overlayData)
 	require.Nil(t, events)
 	require.NotNil(t, err)
 }
@@ -132,9 +131,9 @@ func TestCreateInvalidOverlay(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, machine := newMachine(t, ctrl, template)
+	_, machine := newMachine(t, ctrl, templateData)
 
-	events, err := createMachine(machine, "not yaml")
+	events, err := createMachine(machine, []byte("not yaml"))
 	require.Nil(t, events)
 	require.NotNil(t, err)
 }
@@ -143,7 +142,7 @@ func TestCreateExtraYamlFields(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner, machine := newMachine(t, ctrl, template)
+	provisioner, machine := newMachine(t, ctrl, templateData)
 
 	// TODO(wfarner): Note that this is undesirable behavior.  YAML that does not match up
 	// with the schema should be rejected with an error.  See the following issue for
@@ -161,7 +160,7 @@ func TestCreateExtraYamlFields(t *testing.T) {
 	createEvents := make(<-chan api.CreateInstanceEvent)
 	provisioner.EXPECT().CreateInstance(&expectedRequest).Return(createEvents, nil)
 
-	createMachine(machine, unmappableOverlay)
+	createMachine(machine, unmappableOverlayData)
 }
 
 func TestTemplateLoadError(t *testing.T) {
@@ -172,11 +171,11 @@ func TestTemplateLoadError(t *testing.T) {
 
 	machine := &machine{
 		registry: registry,
-		templateLoader: func(provisioner string, name string) (*string, error) {
+		templateLoader: func(provisioner string, name string) ([]byte, error) {
 			return nil, errors.New("Template not found")
 		}}
 
-	events, err := createMachine(machine, overlay)
+	events, err := createMachine(machine, overlayData)
 	require.Nil(t, events)
 	require.NotNil(t, err)
 }
@@ -185,12 +184,12 @@ func TestUnknownProvisiner(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, machine := newMachine(t, ctrl, template)
+	_, machine := newMachine(t, ctrl, templateData)
 	events, err := machine.CreateMachine(
 		"unknown provisioner",
 		provisionerParams,
 		templateName,
-		overlay)
+		overlayData)
 
 	require.Nil(t, events)
 	require.NotNil(t, err)
