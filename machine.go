@@ -3,7 +3,6 @@ package libmachete
 import (
 	"fmt"
 	"github.com/docker/libmachete/provisioners/api"
-	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v2"
 )
 
@@ -37,16 +36,9 @@ func (m *machine) CreateMachine(
 		return nil, fmt.Errorf("Template '%s' is invalid: %s", templateName, err)
 	}
 
-	overlay := provisioner.NewRequestInstance()
-	err = yaml.Unmarshal(overrideData, overlay)
+	err = yaml.Unmarshal(overrideData, base)
 	if err != nil {
 		return nil, fmt.Errorf("Template parameters are invalid: %s", err)
-	}
-
-	// Overlay the parameters onto the template.
-	err = mergo.MergeWithOverwrite(base, overlay)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to apply parameters to template: %s", err)
 	}
 
 	return provisioner.CreateInstance(base)
