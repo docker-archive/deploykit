@@ -2,6 +2,7 @@ package libmachete
 
 import (
 	"fmt"
+	"github.com/docker/libmachete/provisioners"
 	"github.com/docker/libmachete/provisioners/api"
 	"gopkg.in/yaml.v2"
 )
@@ -9,7 +10,7 @@ import (
 // Machine interfaces between provisioner-specific machine templates and provisioners to create
 // instances.
 type machine struct {
-	registry       *Registry
+	registry       *provisioners.Registry
 	templateLoader func(provisioner string, template string) ([]byte, error)
 }
 
@@ -20,9 +21,9 @@ func (m *machine) CreateMachine(
 	templateName string,
 	overrideData []byte) (<-chan api.CreateInstanceEvent, error) {
 
-	provisioner := m.registry.Get(provisionerName, provisionerParams)
-	if provisioner == nil {
-		return nil, fmt.Errorf("Provisioner '%s' does not exist.", provisionerName)
+	provisioner, err := m.registry.Get(provisionerName, provisionerParams)
+	if err != nil {
+		return nil, err
 	}
 
 	templateData, err := m.templateLoader(provisionerName, templateName)
