@@ -22,10 +22,10 @@ func New(client ec2iface.EC2API) api.Provisioner {
 }
 
 // CreateClient creates the actual EC2 API client.
-func CreateClient(region, accessKey, secretKey, sessionToken string, retryCount int) ec2iface.EC2API {
+func CreateClient(region string, awsCredentials *credentials.Credentials, retryCount int) ec2iface.EC2API {
 	return ec2.New(session.New(aws.NewConfig().
 		WithRegion(region).
-		WithCredentials(credentials.NewStaticCredentials(accessKey, secretKey, sessionToken)).
+		WithCredentials(awsCredentials).
 		WithLogger(getLogger()).
 		WithLogLevel(aws.LogDebugWithHTTPBody).
 		WithMaxRetries(retryCount)))
