@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/provisioners/aws"
 	"github.com/stretchr/testify/require"
@@ -40,7 +41,8 @@ func TestCreate(t *testing.T) {
 		region = "us-west-2"
 	}
 
-	provisioner := aws.New(aws.CreateClient(region, accessKey, secretKey, "", 10))
+	awsCredentials := credentials.NewStaticCredentials(accessKey, secretKey, "")
+	provisioner := aws.New(aws.CreateClient(region, &awsCredentials, 10))
 
 	request := aws.CreateInstanceRequest{
 		AvailabilityZone:         "us-west-2a",
