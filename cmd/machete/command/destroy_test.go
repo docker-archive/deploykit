@@ -1,4 +1,4 @@
-package cmd
+package command
 
 import (
 	"github.com/docker/libmachete/provisioners"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCreate(t *testing.T) {
-	cmd := createCmd(provisioners.NewRegistry(map[string]provisioners.Creator{}))
+func TestDestroy(t *testing.T) {
+	cmd := destroyCmd(provisioners.NewRegistry(map[string]provisioners.ProvisionerBuilder{}))
 	require.Nil(t, cmd.RunE(cmd, []string{}))
 }

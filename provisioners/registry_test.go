@@ -9,7 +9,7 @@ import (
 )
 
 //go:generate mockgen -package mock -destination mock/mock_provisioner.go github.com/docker/libmachete/provisioners/api Provisioner
-//go:generate mockgen -package mock -destination mock/mock_creator.go github.com/docker/libmachete/provisioners Creator
+//go:generate mockgen -package mock -destination mock/mock_creator.go github.com/docker/libmachete/provisioners ProvisionerBuilder
 
 func TestRegister(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -20,16 +20,16 @@ func TestRegister(t *testing.T) {
 	provisionerA := mock.NewMockProvisioner(ctrl)
 	provisionerB := mock.NewMockProvisioner(ctrl)
 
-	creatorA := mock.NewMockCreator(ctrl)
-	creatorA.EXPECT().Create(params).AnyTimes().Return(provisionerA, nil)
+	creatorA := mock.NewMockProvisionerBuilder(ctrl)
+	creatorA.EXPECT().Build(params).AnyTimes().Return(provisionerA, nil)
 
-	creatorB := mock.NewMockCreator(ctrl)
-	creatorB.EXPECT().Create(params).AnyTimes().Return(provisionerB, nil)
+	creatorB := mock.NewMockProvisionerBuilder(ctrl)
+	creatorB.EXPECT().Build(params).AnyTimes().Return(provisionerB, nil)
 
-	creatorE := mock.NewMockCreator(ctrl)
-	creatorE.EXPECT().Create(params).AnyTimes().Return(nil, errors.New("nope"))
+	creatorE := mock.NewMockProvisionerBuilder(ctrl)
+	creatorE.EXPECT().Build(params).AnyTimes().Return(nil, errors.New("nope"))
 
-	registry := NewRegistry(map[string]Creator{
+	registry := NewRegistry(map[string]ProvisionerBuilder{
 		"a": creatorA,
 		"b": creatorB,
 		"e": creatorE,

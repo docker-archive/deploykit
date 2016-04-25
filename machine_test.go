@@ -61,11 +61,11 @@ func newRegistry(
 	provisioner := mock.NewMockProvisioner(ctrl)
 	provisioner.EXPECT().NewRequestInstance().Return(new(testSchema)).AnyTimes()
 
-	creator := mock.NewMockCreator(ctrl)
-	creator.EXPECT().Create(gomock.Any()).Return(provisioner, nil).AnyTimes()
+	creator := mock.NewMockProvisionerBuilder(ctrl)
+	creator.EXPECT().Build(gomock.Any()).Return(provisioner, nil).AnyTimes()
 
 	registry := provisioners.NewRegistry(
-		map[string]provisioners.Creator{provisionerName: creator})
+		map[string]provisioners.ProvisionerBuilder{provisionerName: creator})
 	return provisioner, registry
 }
 
