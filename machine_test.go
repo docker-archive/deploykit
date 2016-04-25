@@ -2,6 +2,7 @@ package libmachete
 
 import (
 	"errors"
+	mock_templates "github.com/docker/libmachete/mock"
 	"github.com/docker/libmachete/provisioners"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/provisioners/mock"
@@ -9,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"testing"
 )
+
+//go:generate mockgen -package mock -destination mock/mock_templates.go github.com/docker/libmachete Templates
 
 const (
 	provisionerName = "provisioner"
@@ -69,8 +72,8 @@ func newRegistry(
 	return provisioner, registry
 }
 
-func createMachine(machine *machine, overlayYaml []byte) (<-chan api.CreateInstanceEvent, error) {
-	return machine.CreateMachine(
+func create(machine *machine, overlayYaml []byte) (<-chan api.CreateInstanceEvent, error) {
+	return machine.Create(
 		provisionerName,
 		provisionerParams,
 		templateName,
@@ -84,15 +87,10 @@ func newMachine(
 
 	provisioner, registry := newRegistry(t, ctrl)
 
-	machine := &machine{
-		registry: registry,
-		templateLoader: func(provisioner string, name string) ([]byte, error) {
-			require.Equal(t, provisionerName, provisioner)
-			require.Equal(t, templateName, name)
-			return templateData, nil
-		}}
+	templates := mock_templates.NewMockTemplates(ctrl)
+	templates.EXPECT().Read(provisionerName, templateName).AnyTimes().Return(templateData, nil)
 
-	return provisioner, machine
+	return provisioner, &machine{registry: registry, templateLoader: templates}
 }
 
 func TestCreate(t *testing.T) {
@@ -114,7 +112,7 @@ func TestCreate(t *testing.T) {
 	createEvents := make(<-chan api.CreateInstanceEvent)
 	provisioner.EXPECT().CreateInstance(&expectedRequest).Return(createEvents, nil)
 
-	events, err := createMachine(machine, overlayData)
+	events, err := create(machine, overlayData)
 	require.Nil(t, err)
 
 	require.Exactly(t, createEvents, events)
@@ -126,7 +124,7 @@ func TestCreateInvalidTemplate(t *testing.T) {
 
 	_, machine := newMachine(t, ctrl, []byte("not yaml"))
 
-	events, err := createMachine(machine, overlayData)
+	events, err := create(machine, overlayData)
 	require.Nil(t, events)
 	require.NotNil(t, err)
 }
@@ -137,7 +135,7 @@ func TestCreateInvalidOverlay(t *testing.T) {
 
 	_, machine := newMachine(t, ctrl, templateData)
 
-	events, err := createMachine(machine, []byte("not yaml"))
+	events, err := create(machine, []byte("not yaml"))
 	require.Nil(t, events)
 	require.NotNil(t, err)
 }
@@ -164,7 +162,7 @@ func TestCreateExtraYamlFields(t *testing.T) {
 	createEvents := make(<-chan api.CreateInstanceEvent)
 	provisioner.EXPECT().CreateInstance(&expectedRequest).Return(createEvents, nil)
 
-	createMachine(machine, unmappableOverlayData)
+	create(machine, unmappableOverlayData)
 }
 
 func TestTemplateLoadError(t *testing.T) {
@@ -173,13 +171,12 @@ func TestTemplateLoadError(t *testing.T) {
 
 	_, registry := newRegistry(t, ctrl)
 
-	machine := &machine{
-		registry: registry,
-		templateLoader: func(provisioner string, name string) ([]byte, error) {
-			return nil, errors.New("Template not found")
-		}}
+	templates := mock_templates.NewMockTemplates(ctrl)
+	templates.EXPECT().Read(provisionerName, templateName).AnyTimes().
+		Return(nil, errors.New("Template not found"))
 
-	events, err := createMachine(machine, overlayData)
+	machine := &machine{registry: registry, templateLoader: templates}
+	events, err := create(machine, overlayData)
 	require.Nil(t, events)
 	require.NotNil(t, err)
 }
@@ -189,7 +186,7 @@ func TestUnknownProvisiner(t *testing.T) {
 	defer ctrl.Finish()
 
 	_, machine := newMachine(t, ctrl, templateData)
-	events, err := machine.CreateMachine(
+	events, err := machine.Create(
 		"unknown provisioner",
 		provisionerParams,
 		templateName,
