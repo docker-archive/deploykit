@@ -1,13 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/docker/libmachete/machete/cmd"
 	"github.com/docker/libmachete/provisioners"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/spf13/cobra"
 	"os"
-	"errors"
 )
 
 type awsCreator struct {
