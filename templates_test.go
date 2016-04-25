@@ -1,6 +1,7 @@
 package libmachete
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
@@ -75,14 +76,29 @@ func TestFileTemplatesBadInputs(t *testing.T) {
 	require.Nil(t, err)
 	defer os.RemoveAll(tempDir)
 
-	templates, err := FileTemplates("a/path/that/does/not/exist/")
+	templates, err := FileTemplates(tempDir)
+	require.Nil(t, err)
+
+	data, err := templates.Read(
+		fmt.Sprintf("bad%sprovisioner", string(os.PathSeparator)),
+		"template")
+	require.NotNil(t, err, "A provisioner name containing a path separator must error")
+	require.Nil(t, data)
+
+	data, err = templates.Read(
+		"provisioner",
+		fmt.Sprintf("bad%stemplate", string(os.PathSeparator)))
+	require.NotNil(t, err, "A template name containing a path separator must error")
+	require.Nil(t, data)
+
+	templates, err = FileTemplates("a/path/that/does/not/exist/")
+	require.NotNil(t, err, "A non-existent template root must error")
 	require.Nil(t, templates)
-	require.NotNil(t, err)
 
 	writer := fileWriter{t: t, dir: tempDir}
 
 	tempFile := writer.write("nothing", "hello", "")
 	templates, err = FileTemplates(tempFile)
+	require.NotNil(t, err, "A file must be disallowed as a template root")
 	require.Nil(t, templates)
-	require.NotNil(t, err)
 }
