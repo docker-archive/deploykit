@@ -9,6 +9,7 @@ import (
 	"github.com/docker/libmachete/provisioners/aws/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 	"reflect"
 	"testing"
 	"time"
@@ -204,4 +205,56 @@ func TestDestroyInstanceError(t *testing.T) {
 		{Type: api.DestroyInstanceStarted},
 		{Type: api.DestroyInstanceError, Error: runError}}
 	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
+}
+
+const yamlDoc = `availability-zone: us-west-2a
+image-id: ami-5
+block-device-name: /dev/sdb
+root-size: 64
+volume-type: gp2
+delete-on-termination: true
+security-group-ids: [sg-1, sg-2]
+subnet-id: my-subnet-id
+instance-type: t2.micro
+private-ip-address: 127.0.0.1
+associate-public-ip-address: true
+private-ip-only: true
+ebs-optimized: true
+iam-instance-profile: my-iam-profile
+tags:
+  Name: unit-test-create
+  test: aws-create-test
+key-name: dev
+vpc-id: my-vpc-id
+zone: a
+monitoring: true`
+
+func TestYamlSpec(t *testing.T) {
+	expected := CreateInstanceRequest{
+		AvailabilityZone:         "us-west-2a",
+		ImageID:                  "ami-5",
+		BlockDeviceName:          "/dev/sdb",
+		RootSize:                 64,
+		VolumeType:               "gp2",
+		DeleteOnTermination:      true,
+		SecurityGroupIds:         []string{"sg-1", "sg-2"},
+		SubnetID:                 "my-subnet-id",
+		InstanceType:             "t2.micro",
+		PrivateIPAddress:         "127.0.0.1",
+		AssociatePublicIPAddress: true,
+		PrivateIPOnly:            true,
+		EbsOptimized:             true,
+		IamInstanceProfile:       "my-iam-profile",
+		Tags: map[string]string{
+			"Name": "unit-test-create",
+			"test": "aws-create-test"},
+		KeyName:    "dev",
+		VpcID:      "my-vpc-id",
+		Zone:       "a",
+		Monitoring: true,
+	}
+	actual := CreateInstanceRequest{}
+	err := yaml.Unmarshal([]byte(yamlDoc), &actual)
+	require.Nil(t, err)
+	require.Equal(t, expected, actual)
 }
