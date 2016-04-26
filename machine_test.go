@@ -2,8 +2,9 @@ package libmachete
 
 import (
 	"errors"
-	"github.com/docker/libmachete/mock"
+	"github.com/docker/libmachete/provisioners"
 	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -53,15 +54,18 @@ func (t *testSchema) GetName() string {
 	return t.Name
 }
 
-func newRegistry(t *testing.T, ctrl *gomock.Controller) (*mock.MockProvisioner, *Registry) {
+func newRegistry(
+	t *testing.T,
+	ctrl *gomock.Controller) (*mock.MockProvisioner, *provisioners.Registry) {
+
 	provisioner := mock.NewMockProvisioner(ctrl)
 	provisioner.EXPECT().NewRequestInstance().Return(new(testSchema)).AnyTimes()
 
-	registry := newEmptyRegistry()
-	registry.Register(provisionerName, func(params map[string]string) api.Provisioner {
-		require.Equal(t, provisionerParams, params)
-		return provisioner
-	})
+	creator := mock.NewMockProvisionerBuilder(ctrl)
+	creator.EXPECT().Build(gomock.Any()).Return(provisioner, nil).AnyTimes()
+
+	registry := provisioners.NewRegistry(
+		map[string]provisioners.ProvisionerBuilder{provisionerName: creator})
 	return provisioner, registry
 }
 

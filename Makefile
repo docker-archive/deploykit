@@ -44,6 +44,10 @@ build:
 	@echo "+ $@"
 	@go build ${GO_LDFLAGS} $(PKGS)
 
+install:
+	@echo "+ $@"
+	@go install ${GO_LDFLAGS} $(PKGS)
+
 generate:
 	@echo "+ $@"
 	@go generate -x $(PKGS)
