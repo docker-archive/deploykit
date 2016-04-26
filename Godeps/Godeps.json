@@ -1,6 +1,7 @@
 {
 	"ImportPath": "github.com/docker/libmachete",
 	"GoVersion": "go1.6",
+	"GodepVersion": "v62",
 	"Packages": [
 		"./..."
 	],
