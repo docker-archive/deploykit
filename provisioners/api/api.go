@@ -41,7 +41,7 @@ type DestroyInstanceEvent struct {
 
 // MachineRequest defines the basic attributes that any provisioner's creation request must define.
 type MachineRequest interface {
-	GetName() string
+	Name() string
 }
 
 // A Provisioner is a vendor-agnostic API used to create and manage

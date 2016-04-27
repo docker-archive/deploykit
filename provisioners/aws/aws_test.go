@@ -9,6 +9,7 @@ import (
 	"github.com/docker/libmachete/provisioners/aws/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 	"reflect"
 	"testing"
 	"time"
@@ -49,7 +50,7 @@ func TestCreateInstanceSync(t *testing.T) {
 type WrongRequestType struct {
 }
 
-func (w WrongRequestType) GetName() string {
+func (w WrongRequestType) Name() string {
 	return "nope"
 }
 
@@ -204,4 +205,56 @@ func TestDestroyInstanceError(t *testing.T) {
 		{Type: api.DestroyInstanceStarted},
 		{Type: api.DestroyInstanceError, Error: runError}}
 	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
+}
+
+const yamlDoc = `availability_zone: us-west-2a
+image_id: ami-5
+block_device_name: /dev/sdb
+root_size: 64
+volume_type: gp2
+delete_on_termination: true
+security_group_ids: [sg-1, sg-2]
+subnet_id: my-subnet-id
+instance_type: t2.micro
+private_ip_address: 127.0.0.1
+associate_public_ip_address: true
+private_ip_only: true
+ebs_optimized: true
+iam_instance_profile: my-iam-profile
+tags:
+  Name: unit-test-create
+  test: aws-create-test
+key_name: dev
+vpc_id: my-vpc-id
+zone: a
+monitoring: true`
+
+func TestYamlSpec(t *testing.T) {
+	expected := CreateInstanceRequest{
+		AvailabilityZone:         "us-west-2a",
+		ImageID:                  "ami-5",
+		BlockDeviceName:          "/dev/sdb",
+		RootSize:                 64,
+		VolumeType:               "gp2",
+		DeleteOnTermination:      true,
+		SecurityGroupIds:         []string{"sg-1", "sg-2"},
+		SubnetID:                 "my-subnet-id",
+		InstanceType:             "t2.micro",
+		PrivateIPAddress:         "127.0.0.1",
+		AssociatePublicIPAddress: true,
+		PrivateIPOnly:            true,
+		EbsOptimized:             true,
+		IamInstanceProfile:       "my-iam-profile",
+		Tags: map[string]string{
+			"Name": "unit-test-create",
+			"test": "aws-create-test"},
+		KeyName:    "dev",
+		VpcID:      "my-vpc-id",
+		Zone:       "a",
+		Monitoring: true,
+	}
+	actual := CreateInstanceRequest{}
+	err := yaml.Unmarshal([]byte(yamlDoc), &actual)
+	require.Nil(t, err)
+	require.Equal(t, expected, actual)
 }
