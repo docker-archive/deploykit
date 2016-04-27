@@ -1,14 +1,8 @@
 package aws
 
-import "github.com/docker/libmachete/provisioners/api"
-
 // CreateInstanceRequest is the struct used to create new instances.
 type CreateInstanceRequest struct {
-	// TODO(wfarner): How do we include a Name field and yaml tag? Also note that this struct
-	//                does not have an implementation for GetName(), required by MachineRequest.
-	//                Need to address this as well.
-	api.MachineRequest
-
+	MachineName              string            `yaml:"name"`
 	AvailabilityZone         string            `yaml:"availability_zone"`
 	ImageID                  string            `yaml:"image_id"`
 	BlockDeviceName          string            `yaml:"block_device_name"`
@@ -28,6 +22,11 @@ type CreateInstanceRequest struct {
 	VpcID                    string            `yaml:"vpc_id"`
 	Zone                     string            `yaml:"zone"`
 	Monitoring               bool              `yaml:"monitoring"`
+}
+
+// Name gets the name to be associated with the machine.
+func (req CreateInstanceRequest) Name() string {
+	return req.MachineName
 }
 
 // Validate checks the data and returns error if not valid

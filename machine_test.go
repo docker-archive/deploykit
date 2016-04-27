@@ -42,16 +42,16 @@ type network struct {
 }
 
 type testSchema struct {
-	Name    string
-	Zone    string
-	Arch    string
-	Network network
-	Disks   []string
-	Labels  map[string]string
+	MachineName string `yaml:"name"`
+	Zone        string
+	Arch        string
+	Network     network
+	Disks       []string
+	Labels      map[string]string
 }
 
-func (t *testSchema) GetName() string {
-	return t.Name
+func (t *testSchema) Name() string {
+	return t.MachineName
 }
 
 func newRegistry(
@@ -102,9 +102,9 @@ func TestCreate(t *testing.T) {
 	provisioner, machine := newMachine(t, ctrl, templateData)
 
 	expectedRequest := testSchema{
-		Name: "steve",
-		Zone: "b",
-		Arch: "x86_64",
+		MachineName: "steve",
+		Zone:        "b",
+		Arch:        "x86_64",
 		Network: network{
 			Public: false,
 			Iface:  "eth0",
@@ -153,9 +153,9 @@ func TestCreateExtraYamlFields(t *testing.T) {
 	// background/updates:
 	// https://github.com/go-yaml/yaml/issues/136
 	expectedRequest := testSchema{
-		Name: "larry",
-		Zone: "b",
-		Arch: "x86_64",
+		MachineName: "larry",
+		Zone:        "b",
+		Arch:        "x86_64",
 		Network: network{
 			Public: false,
 			Iface:  "eth0"},

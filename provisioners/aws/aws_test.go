@@ -50,7 +50,7 @@ func TestCreateInstanceSync(t *testing.T) {
 type WrongRequestType struct {
 }
 
-func (w WrongRequestType) GetName() string {
+func (w WrongRequestType) Name() string {
 	return "nope"
 }
 
