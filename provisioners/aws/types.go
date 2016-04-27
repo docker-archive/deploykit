@@ -9,23 +9,23 @@ type CreateInstanceRequest struct {
 	//                Need to address this as well.
 	api.MachineRequest
 
-	AvailabilityZone         string            `yaml:"availability-zone"`
-	ImageID                  string            `yaml:"image-id"`
-	BlockDeviceName          string            `yaml:"block-device-name"`
-	RootSize                 int64             `yaml:"root-size"`
-	VolumeType               string            `yaml:"volume-type"`
-	DeleteOnTermination      bool              `yaml:"delete-on-termination"`
-	SecurityGroupIds         []string          `yaml:"security-group-ids,flow"`
-	SubnetID                 string            `yaml:"subnet-id"`
-	InstanceType             string            `yaml:"instance-type"`
-	PrivateIPAddress         string            `yaml:"private-ip-address"`
-	AssociatePublicIPAddress bool              `yaml:"associate-public-ip-address"`
-	PrivateIPOnly            bool              `yaml:"private-ip-only"`
-	EbsOptimized             bool              `yaml:"ebs-optimized"`
-	IamInstanceProfile       string            `yaml:"iam-instance-profile"`
+	AvailabilityZone         string            `yaml:"availability_zone"`
+	ImageID                  string            `yaml:"image_id"`
+	BlockDeviceName          string            `yaml:"block_device_name"`
+	RootSize                 int64             `yaml:"root_size"`
+	VolumeType               string            `yaml:"volume_type"`
+	DeleteOnTermination      bool              `yaml:"delete_on_termination"`
+	SecurityGroupIds         []string          `yaml:"security_group_ids,flow"`
+	SubnetID                 string            `yaml:"subnet_id"`
+	InstanceType             string            `yaml:"instance_type"`
+	PrivateIPAddress         string            `yaml:"private_ip_address"`
+	AssociatePublicIPAddress bool              `yaml:"associate_public_ip_address"`
+	PrivateIPOnly            bool              `yaml:"private_ip_only"`
+	EbsOptimized             bool              `yaml:"ebs_optimized"`
+	IamInstanceProfile       string            `yaml:"iam_instance_profile"`
 	Tags                     map[string]string `yaml:"tags"`
-	KeyName                  string            `yaml:"key-name"`
-	VpcID                    string            `yaml:"vpc-id"`
+	KeyName                  string            `yaml:"key_name"`
+	VpcID                    string            `yaml:"vpc_id"`
 	Zone                     string            `yaml:"zone"`
 	Monitoring               bool              `yaml:"monitoring"`
 }

@@ -207,25 +207,25 @@ func TestDestroyInstanceError(t *testing.T) {
 	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
 }
 
-const yamlDoc = `availability-zone: us-west-2a
-image-id: ami-5
-block-device-name: /dev/sdb
-root-size: 64
-volume-type: gp2
-delete-on-termination: true
-security-group-ids: [sg-1, sg-2]
-subnet-id: my-subnet-id
-instance-type: t2.micro
-private-ip-address: 127.0.0.1
-associate-public-ip-address: true
-private-ip-only: true
-ebs-optimized: true
-iam-instance-profile: my-iam-profile
+const yamlDoc = `availability_zone: us-west-2a
+image_id: ami-5
+block_device_name: /dev/sdb
+root_size: 64
+volume_type: gp2
+delete_on_termination: true
+security_group_ids: [sg-1, sg-2]
+subnet_id: my-subnet-id
+instance_type: t2.micro
+private_ip_address: 127.0.0.1
+associate_public_ip_address: true
+private_ip_only: true
+ebs_optimized: true
+iam_instance_profile: my-iam-profile
 tags:
   Name: unit-test-create
   test: aws-create-test
-key-name: dev
-vpc-id: my-vpc-id
+key_name: dev
+vpc_id: my-vpc-id
 zone: a
 monitoring: true`
 
