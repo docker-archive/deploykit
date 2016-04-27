@@ -52,6 +52,13 @@ func TestChecks(t *testing.T) {
 	require.False(t, violateNotZero(reflect.ValueOf(v.NilInt)))
 }
 
+func requireHasFieldNames(t *testing.T, expect []string, err error) {
+	sort.Strings(expect)
+	actual := err.(*ErrStructFields).Names
+	sort.Strings(actual)
+	require.Equal(t, expect, actual)
+}
+
 type input struct {
 	String string `label:"the_string" check:"not_zero"`
 	Int    int    `label:"the_int" check:"not_zero"`
@@ -97,7 +104,7 @@ func TestCheckFields(t *testing.T) {
 	}
 	err = CheckFields(target, nil, nil)
 	require.NotNil(t, err)
-	require.Equal(t, []string{"BoolPtr", "IntPtr", "StringPtr"}, err.(*ErrStructFields).SortNames())
+	requireHasFieldNames(t, []string{"BoolPtr", "IntPtr", "StringPtr"}, err)
 
 	// Case -- when required value fields are missing
 	target = &input{
@@ -107,7 +114,7 @@ func TestCheckFields(t *testing.T) {
 	}
 	err = CheckFields(target, nil, nil)
 	require.NotNil(t, err)
-	require.Equal(t, []string{"Bool", "Int", "String"}, err.(*ErrStructFields).SortNames())
+	requireHasFieldNames(t, []string{"Bool", "Int", "String"}, err)
 
 	// Case - when required pointer field is provided but is empty string
 	emptyString := ""
@@ -120,7 +127,7 @@ func TestCheckFields(t *testing.T) {
 	}
 	err = CheckFields(target, nil, nil)
 	require.NotNil(t, err)
-	require.Equal(t, []string{"Bool", "Int", "String", "StringPtr"}, err.(*ErrStructFields).SortNames())
+	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
 }
 
 func TestCheckFieldCallbacks(t *testing.T) {
@@ -153,7 +160,7 @@ func TestCheckFieldCallbacks(t *testing.T) {
 		})
 
 	require.NotNil(t, err)
-	require.Equal(t, []string{"Bool", "Int", "String", "StringPtr"}, err.(*ErrStructFields).SortNames())
+	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
 	require.Equal(t, 0, *missingPtr) // We provided a pointer but it points to an empty string, so no missing pointers
 	require.Equal(t, 4, *zeros)
 
@@ -176,7 +183,7 @@ func TestCheckFieldCallbacks(t *testing.T) {
 
 	require.NotNil(t, err)
 	// String is the first declared field.
-	require.Equal(t, []string{"String"}, err.(*ErrStructFields).SortNames())
+	require.Equal(t, []string{"String"}, err.(*ErrStructFields).Names)
 	require.Equal(t, 0, *missingPtr)
 	require.Equal(t, 1, *zeros)
 
@@ -223,7 +230,7 @@ func TestCheckFieldsNested(t *testing.T) {
 	}
 	err = CheckFields(target, nil, nil)
 	require.NotNil(t, err)
-	require.Equal(t, []string{"BoolPtr", "IntPtr", "StringPtr"}, err.(*ErrStructFields).SortNames())
+	requireHasFieldNames(t, []string{"BoolPtr", "IntPtr", "StringPtr"}, err)
 
 	// Case -- when required value fields are missing
 	target = &nested{
@@ -235,7 +242,7 @@ func TestCheckFieldsNested(t *testing.T) {
 	}
 	err = CheckFields(target, nil, nil)
 	require.NotNil(t, err)
-	require.Equal(t, []string{"Bool", "Int", "String"}, err.(*ErrStructFields).SortNames())
+	requireHasFieldNames(t, []string{"Bool", "Int", "String"}, err)
 
 	// Case - when required pointer field is provided but is empty string
 	emptyString := ""
@@ -250,5 +257,5 @@ func TestCheckFieldsNested(t *testing.T) {
 	}
 	err = CheckFields(target, nil, nil)
 	require.NotNil(t, err)
-	require.Equal(t, []string{"Bool", "Int", "String", "StringPtr"}, err.(*ErrStructFields).SortNames())
+	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
 }

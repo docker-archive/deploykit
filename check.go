@@ -3,7 +3,6 @@ package libmachete
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"strings"
 )
 
@@ -43,12 +42,6 @@ type ErrStructFields struct {
 
 func (e *ErrStructFields) append(v string) {
 	e.Names = append(e.Names, v)
-}
-
-// SortNames returns a sorted slice of names
-func (e *ErrStructFields) SortNames() []string {
-	sort.Strings(e.Names)
-	return e.Names
 }
 
 func (e *ErrStructFields) Error() string {
