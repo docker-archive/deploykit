@@ -142,7 +142,7 @@ func checkFields(val interface{}, callbacks map[string]FieldCheckCallback, err *
 		for _, name := range rules {
 			rule, has := fieldChecks[name]
 			if !has {
-				panic(fmt.Errorf("Programming error: bad rule:", name))
+				panic(fmt.Errorf("Programming error: bad rule:%s", name))
 			}
 			if rule(fieldValue) {
 				err.append(field.Name)
