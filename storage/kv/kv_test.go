@@ -23,38 +23,64 @@ func TestCrud(t *testing.T) {
 	require.Nil(t, err)
 
 	storage := NewStore(kv)
+	defer storage.Close()
 
-	key := "db-16"
+	key1 := "db-16"
 
-	err = storage.Delete(key)
-	require.NotNil(t, err)
+	contents, err := storage.ReadAll()
+	require.Nil(t, err)
+	require.Equal(t, map[string][]byte{}, contents)
 
-	data, err := storage.Read(key)
+	require.NotNil(t, storage.Delete(key1))
+
+	data, err := storage.Read(key1)
 	require.NotNil(t, err) // An error is returned for an absent key.
 	require.Nil(t, data)
 
 	machineData := []byte("machine information")
 
-	err = storage.Write(key, machineData)
-	require.Nil(t, err)
+	require.Nil(t, storage.Write(key1, machineData))
 
-	data, err = storage.Read(key)
+	contents, err = storage.ReadAll()
+	require.Nil(t, err)
+	require.Equal(t, map[string][]byte{key1: machineData}, contents)
+
+	data, err = storage.Read(key1)
 	require.Nil(t, err)
 	require.Equal(t, machineData, data)
 
 	updatedMachineData := []byte("different information")
 
-	err = storage.Write(key, updatedMachineData)
-	require.Nil(t, err)
+	require.Nil(t, storage.Write(key1, updatedMachineData))
 
-	data, err = storage.Read(key)
+	data, err = storage.Read(key1)
 	require.Nil(t, err)
 	require.Equal(t, updatedMachineData, data)
 
-	err = storage.Delete(key)
+	contents, err = storage.ReadAll()
 	require.Nil(t, err)
+	require.Equal(t, map[string][]byte{key1: updatedMachineData}, contents)
 
-	data, err = storage.Read(key)
+	key2 := "db-17"
+	require.Nil(t, storage.Write(key2, machineData))
+
+	contents, err = storage.ReadAll()
+	require.Nil(t, err)
+	require.Equal(t, map[string][]byte{key1: updatedMachineData, key2: machineData}, contents)
+
+	require.Nil(t, storage.Delete(key1))
+
+	data, err = storage.Read(key1)
 	require.NotNil(t, err)
 	require.Nil(t, data)
+
+	contents, err = storage.ReadAll()
+	require.Nil(t, err)
+	require.Equal(t, map[string][]byte{key2: machineData}, contents)
+
+	require.Nil(t, storage.Delete(key2))
+
+	contents, err = storage.ReadAll()
+	require.Nil(t, err)
+	require.Equal(t, map[string][]byte{}, contents)
 }
