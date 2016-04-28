@@ -60,13 +60,18 @@ func requireHasFieldNames(t *testing.T, expect []string, err error) {
 }
 
 type input struct {
-	String string `label:"the_string" check:"not_zero"`
-	Int    int    `label:"the_int" check:"not_zero"`
-	Bool   bool   `label:"the_bool" check:"not_zero"`
 
-	StringPtr *string `label:"string_ptr" check:"not_nil,not_zero"`
-	IntPtr    *int    `label:"int_ptr" check:"not_nil"`
-	BoolPtr   *bool   `label:"bool_ptr" check:"not_nil"`
+	// For non-pointer fields, `required` implies they are not zero values.
+	// So for strings it makes sense but for some types like bool it can be strange / artificial.
+	String string `yaml:"the_string" check:"required"`
+	Int    int    `yaml:"the_int" check:"required"`
+	Bool   bool   `yaml:"the_bool" check:"required"`
+
+	// For pointer fields, required implies that they need to be set to not nil.  The *string further more has
+	// to be not-empty.
+	StringPtr *string `yaml:"string_ptr" check:"required"`
+	IntPtr    *int    `yaml:"int_ptr" check:"required"`
+	BoolPtr   *bool   `yaml:"bool_ptr" check:"required"`
 
 	DontCareString string
 	DontCareInt    int
@@ -80,7 +85,7 @@ type input struct {
 func TestCheckFields(t *testing.T) {
 
 	theString := "string"
-	theInt := 100
+	theInt := 10
 	theBool := true
 
 	// Case - when everything required is provided
@@ -93,7 +98,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &theInt,
 		BoolPtr:   &theBool,
 	}
-	err := CheckFields(target, nil, nil)
+	err := CheckFields(target, nil)
 	require.Nil(t, err)
 
 	// Case - when required pointer fields are missing
@@ -102,7 +107,7 @@ func TestCheckFields(t *testing.T) {
 		Int:    theInt,
 		Bool:   theBool,
 	}
-	err = CheckFields(target, nil, nil)
+	err = CheckFields(target, nil)
 	require.NotNil(t, err)
 	requireHasFieldNames(t, []string{"BoolPtr", "IntPtr", "StringPtr"}, err)
 
@@ -112,7 +117,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &theInt,
 		BoolPtr:   &theBool,
 	}
-	err = CheckFields(target, nil, nil)
+	err = CheckFields(target, nil)
 	require.NotNil(t, err)
 	requireHasFieldNames(t, []string{"Bool", "Int", "String"}, err)
 
@@ -122,10 +127,24 @@ func TestCheckFields(t *testing.T) {
 	zeroBool := false
 	target = &input{
 		StringPtr: &emptyString,
-		IntPtr:    &zeroInt,  // zero is allowed (no 'not_zero')
-		BoolPtr:   &zeroBool, // zero is allowed (no 'not_zero')
+		IntPtr:    &zeroInt,  // acceptable -- it's not nil but can be 0
+		BoolPtr:   &zeroBool, //  acceptable -- it's not nil but can be false
 	}
-	err = CheckFields(target, nil, nil)
+	err = CheckFields(target, nil)
+	require.NotNil(t, err)
+	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
+
+	// This case here is artificial and doesn't make much sense.  Include here however to make clear the semantics of
+	// required tag in the case of non-pointer fields.
+	target = &input{
+		String:    emptyString, // required means it can't be empty
+		Int:       zeroInt,     // required means it can't be a zero value -- which happens to collide with intended 0
+		Bool:      zeroBool,    // required means it can't be a zero value -- which happens to collide with intended false
+		StringPtr: &emptyString,
+		IntPtr:    &zeroInt,  // acceptable -- it's not nil but can be 0
+		BoolPtr:   &zeroBool, //  acceptable -- it's not nil but can be false
+	}
+	err = CheckFields(target, nil)
 	require.NotNil(t, err)
 	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
 }
@@ -138,67 +157,66 @@ func TestCheckFieldCallbacks(t *testing.T) {
 	zeroBool := false
 	target := &input{
 		StringPtr: &emptyString,
-		IntPtr:    &zeroInt,  // zero is allowed (no 'not_zero')
-		BoolPtr:   &zeroBool, // zero is allowed (no 'not_zero')
+		IntPtr:    &zeroInt,
+		BoolPtr:   &zeroBool,
 	}
 
-	missingPtr := new(int)
-	zeros := new(int)
-	zeroLabels := []string{}
+	missing := new(int)
+	missingLabels := []string{}
 
 	err := CheckFields(target,
 		func(v interface{}, n string, g TagGetter) bool {
-			*missingPtr++
-			return false
-		},
-		func(v interface{}, n string, g TagGetter) bool {
-			*zeros++
+			*missing++
 
 			// Get the label of the field
-			zeroLabels = append(zeroLabels, g("label"))
+			missingLabels = append(missingLabels, g("yaml"))
 			return false
 		})
 
 	require.NotNil(t, err)
 	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
-	require.Equal(t, 0, *missingPtr) // We provided a pointer but it points to an empty string, so no missing pointers
-	require.Equal(t, 4, *zeros)
+	require.Equal(t, 4, *missing)
 
 	// Test / demo on how to access other field tags --> this is useful for reporting missing yaml or json fields.
-	sort.Strings(zeroLabels)
-	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, zeroLabels)
+	sort.Strings(missingLabels)
+	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, missingLabels)
 
 	// Case - callback returns immediately on the first error
-	*missingPtr = 0
-	*zeros = 0
+	*missing = 0
 	err = CheckFields(target,
 		func(v interface{}, n string, g TagGetter) bool {
-			*missingPtr++
-			return true
-		},
-		func(v interface{}, n string, g TagGetter) bool {
-			*zeros++
+			*missing++
 			return true
 		})
 
 	require.NotNil(t, err)
 	// String is the first declared field.
 	require.Equal(t, []string{"String"}, err.(*ErrStructFields).Names)
-	require.Equal(t, 0, *missingPtr)
-	require.Equal(t, 1, *zeros)
+	require.Equal(t, 1, *missing)
 
+	// Case - using the provided callback to collect missing YAML fields
+	missingFields := []string{}
+	err = CheckFields(target, CollectMissingYAMLFields(&missingFields))
+	require.NotNil(t, err)
+	sort.Strings(missingFields)
+	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, missingFields)
+
+	// Case - test the convenience wrapper
+	missingFields = FindMissingFields(target)
+	sort.Strings(missingFields)
+	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, missingFields)
 }
 
 type sub struct {
-	StringPtr *string `check:"not_nil,not_zero"`
-	IntPtr    *int    `check:"not_nil"`
-	BoolPtr   *bool   `check:"not_nil"`
+	StringPtr *string `yaml:"string_ptr" check:"required"`
+	IntPtr    *int    `yaml:"int_ptr" check:"required"`
+	BoolPtr   *bool   `yaml:"bool_ptr" check:"required"`
 }
 
 type nested struct {
-	String string `check:"not_zero"`
-	Int    int    `check:"not_zero"`
-	Bool   bool   `check:"not_zero"`
+	String string `yaml:"the_string" check:"required"`
+	Int    int    `yaml:"the_int" check:"required"`
+	Bool   bool   `yaml:"the_bool" check:"required"`
 	Nested sub
 }
 
@@ -219,7 +237,7 @@ func TestCheckFieldsNested(t *testing.T) {
 			BoolPtr:   &theBool,
 		},
 	}
-	err := CheckFields(target, nil, nil)
+	err := CheckFields(target, nil)
 	require.Nil(t, err)
 
 	// Case - when required pointer fields are missing
@@ -228,7 +246,7 @@ func TestCheckFieldsNested(t *testing.T) {
 		Int:    theInt,
 		Bool:   theBool,
 	}
-	err = CheckFields(target, nil, nil)
+	err = CheckFields(target, nil)
 	require.NotNil(t, err)
 	requireHasFieldNames(t, []string{"BoolPtr", "IntPtr", "StringPtr"}, err)
 
@@ -240,7 +258,7 @@ func TestCheckFieldsNested(t *testing.T) {
 			BoolPtr:   &theBool,
 		},
 	}
-	err = CheckFields(target, nil, nil)
+	err = CheckFields(target, nil)
 	require.NotNil(t, err)
 	requireHasFieldNames(t, []string{"Bool", "Int", "String"}, err)
 
@@ -251,11 +269,16 @@ func TestCheckFieldsNested(t *testing.T) {
 	target = &nested{
 		Nested: sub{
 			StringPtr: &emptyString,
-			IntPtr:    &zeroInt,  // zero is allowed (no 'not_zero')
-			BoolPtr:   &zeroBool, // zero is allowed (no 'not_zero')
+			IntPtr:    &zeroInt,  // zero is allowed since ptr is set
+			BoolPtr:   &zeroBool, // zero is allowed since ptr is set
 		},
 	}
-	err = CheckFields(target, nil, nil)
+	err = CheckFields(target, nil)
 	require.NotNil(t, err)
 	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
+
+	missingFields := FindMissingFields(target)
+	sort.Strings(missingFields)
+	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, missingFields)
+
 }
