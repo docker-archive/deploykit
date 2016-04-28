@@ -1,8 +1,10 @@
 package aws
 
+import "github.com/docker/libmachete/provisioners/api"
+
 // CreateInstanceRequest is the struct used to create new instances.
 type CreateInstanceRequest struct {
-	MachineName              string            `yaml:"name"`
+	api.BaseMachineRequest   `yaml:",inline"`
 	AvailabilityZone         string            `yaml:"availability_zone"`
 	ImageID                  string            `yaml:"image_id"`
 	BlockDeviceName          string            `yaml:"block_device_name"`
@@ -22,11 +24,6 @@ type CreateInstanceRequest struct {
 	VpcID                    string            `yaml:"vpc_id"`
 	Zone                     string            `yaml:"zone"`
 	Monitoring               bool              `yaml:"monitoring"`
-}
-
-// Name gets the name to be associated with the machine.
-func (req CreateInstanceRequest) Name() string {
-	return req.MachineName
 }
 
 // Validate checks the data and returns error if not valid
