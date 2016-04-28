@@ -207,7 +207,8 @@ func TestDestroyInstanceError(t *testing.T) {
 	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
 }
 
-const yamlDoc = `availability_zone: us-west-2a
+const yamlDoc = `name: database
+availability_zone: us-west-2a
 image_id: ami-5
 block_device_name: /dev/sdb
 root_size: 64
@@ -231,6 +232,7 @@ monitoring: true`
 
 func TestYamlSpec(t *testing.T) {
 	expected := CreateInstanceRequest{
+		BaseMachineRequest:       api.BaseMachineRequest{MachineName: "database"},
 		AvailabilityZone:         "us-west-2a",
 		ImageID:                  "ami-5",
 		BlockDeviceName:          "/dev/sdb",

@@ -44,6 +44,17 @@ type MachineRequest interface {
 	Name() string
 }
 
+// BaseMachineRequest defines fields that all machine request types should contain.  This struct
+// should be embedded in all provider-specific request structs.
+type BaseMachineRequest struct {
+	MachineName string `yaml:"name"`
+}
+
+// Name returns the name to give the machine, once created.
+func (req BaseMachineRequest) Name() string {
+	return req.MachineName
+}
+
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
