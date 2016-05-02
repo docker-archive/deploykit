@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -10,6 +11,34 @@ import (
 	"sort"
 	"time"
 )
+
+// Builder is a ProvisionerBuilder for AWS.
+type Builder struct {
+}
+
+// Build creates an AWS provisioner.
+func (a Builder) Build(params map[string]string) (api.Provisioner, error) {
+	region := params["REGION"]
+	if region == "" {
+		return nil, errors.New("REGION must be specified")
+	}
+
+	accessKey := params["ACCESS_KEY"]
+	secretKey := params["SECRET_KEY"]
+	sessionToken := params["SESSION_TOKEN"]
+	var awsCredentials *credentials.Credentials
+	if (accessKey == "" || secretKey == "") && sessionToken == "" {
+		// Fall back to shared credentials
+		awsCredentials = credentials.NewSharedCredentials("", "")
+	} else {
+		awsCredentials =
+			credentials.NewStaticCredentials(accessKey, secretKey, sessionToken)
+	}
+
+	client := CreateClient(region, awsCredentials, 5)
+
+	return New(client), nil
+}
 
 type provisioner struct {
 	client        ec2iface.EC2API
@@ -135,7 +164,7 @@ func (p *provisioner) NewRequestInstance() api.MachineRequest {
 func (p *provisioner) CreateInstance(
 	req api.MachineRequest) (<-chan api.CreateInstanceEvent, error) {
 
-	request, is := req.(CreateInstanceRequest)
+	request, is := req.(*CreateInstanceRequest)
 	if !is {
 		return nil, &ErrInvalidRequest{}
 	}
@@ -150,7 +179,7 @@ func (p *provisioner) CreateInstance(
 
 		events <- api.CreateInstanceEvent{Type: api.CreateInstanceStarted}
 
-		instance, err := createInstanceSync(p.client, request)
+		instance, err := createInstanceSync(p.client, *request)
 		if err != nil {
 			events <- api.CreateInstanceEvent{
 				Error: err,
@@ -168,7 +197,7 @@ func (p *provisioner) CreateInstance(
 			return
 		}
 
-		err = tagSync(p.client, request, instance)
+		err = tagSync(p.client, *request, instance)
 		if err != nil {
 			events <- api.CreateInstanceEvent{
 				Error: err,
