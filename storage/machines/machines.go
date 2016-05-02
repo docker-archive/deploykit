@@ -36,24 +36,20 @@ func New(store storage.Storage) Machines {
 }
 
 type compositeRecord struct {
-	JSONRecord            []byte
+	StoredRecord          Record
 	JSONProvisionerRecord []byte
 }
 
 func (m machineStore) Save(record Record, provisionerRecord interface{}) error {
 	// TODO(wfarner): Populate Record timestamps, etc.
 
-	recordData, err := json.Marshal(record)
-	if err != nil {
-		return err
-	}
 	provisionerData, err := json.Marshal(provisionerRecord)
 	if err != nil {
 		return err
 	}
 
 	composite := compositeRecord{
-		JSONRecord:            recordData,
+		StoredRecord:          record,
 		JSONProvisionerRecord: provisionerData,
 	}
 
@@ -72,12 +68,6 @@ func extractRecord(id string, data []byte, provisionerRecord interface{}) (*Reco
 		return nil, fmt.Errorf("Failed to decode internal record %s: %s", id, err)
 	}
 
-	record := new(Record)
-	err = json.Unmarshal(composite.JSONRecord, record)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to decode record %s: %s", id, err)
-	}
-
 	if provisionerRecord != nil {
 		err = json.Unmarshal(composite.JSONProvisionerRecord, provisionerRecord)
 		if err != nil {
@@ -85,7 +75,7 @@ func extractRecord(id string, data []byte, provisionerRecord interface{}) (*Reco
 		}
 	}
 
-	return record, nil
+	return &composite.StoredRecord, nil
 }
 
 func (m machineStore) List() ([]*Record, error) {
