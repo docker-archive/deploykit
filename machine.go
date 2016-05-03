@@ -7,15 +7,29 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// MachineCreator creates machines with provisioners using instructions provided in template files.
+type MachineCreator interface {
+	Create(
+		provisionerName string,
+		provisionerParams map[string]string,
+		templateName string,
+		overrideData []byte) (<-chan api.CreateInstanceEvent, error)
+}
+
 // Machine interfaces between provisioner-specific machine templates and provisioners to create
 // instances.
 type machine struct {
 	registry       *provisioners.Registry
-	templateLoader func(provisioner string, template string) ([]byte, error)
+	templateLoader Templates
+}
+
+// NewCreator creates a machine creator that will use the provided registry and templates.
+func NewCreator(registry *provisioners.Registry, templates Templates) MachineCreator {
+	return &machine{registry: registry, templateLoader: templates}
 }
 
 // CreateMachine creates a new machine.
-func (m *machine) CreateMachine(
+func (m *machine) Create(
 	provisionerName string,
 	provisionerParams map[string]string,
 	templateName string,
@@ -26,7 +40,7 @@ func (m *machine) CreateMachine(
 		return nil, err
 	}
 
-	templateData, err := m.templateLoader(provisionerName, templateName)
+	templateData, err := m.templateLoader.Read(provisionerName, templateName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to load template '%s': %s", templateName, err)
 	}

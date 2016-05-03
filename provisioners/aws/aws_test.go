@@ -60,7 +60,7 @@ func TestCreateIncompatibleType(t *testing.T) {
 	clientMock := mock.NewMockEC2API(ctrl)
 
 	p := &provisioner{client: clientMock, sleepFunction: noSleep}
-	_, err := p.CreateInstance(WrongRequestType{})
+	_, err := p.CreateInstance(&WrongRequestType{})
 	require.NotNil(t, err)
 }
 
@@ -119,7 +119,7 @@ func TestCreateInstanceSuccess(t *testing.T) {
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
 	provisioner := provisioner{client: clientMock, sleepFunction: noSleep}
-	eventChan, err := provisioner.CreateInstance(CreateInstanceRequest{
+	eventChan, err := provisioner.CreateInstance(&CreateInstanceRequest{
 		Tags: map[string]string{"name": "test-instance", "test": "test2"},
 	})
 
@@ -139,7 +139,7 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := provisioner{client: clientMock, sleepFunction: noSleep}
-	eventChan, err := provisioner.CreateInstance(CreateInstanceRequest{})
+	eventChan, err := provisioner.CreateInstance(&CreateInstanceRequest{})
 
 	require.Nil(t, err)
 	expectedEvents := []api.CreateInstanceEvent{
@@ -207,7 +207,8 @@ func TestDestroyInstanceError(t *testing.T) {
 	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
 }
 
-const yamlDoc = `availability_zone: us-west-2a
+const yamlDoc = `name: database
+availability_zone: us-west-2a
 image_id: ami-5
 block_device_name: /dev/sdb
 root_size: 64
@@ -231,6 +232,7 @@ monitoring: true`
 
 func TestYamlSpec(t *testing.T) {
 	expected := CreateInstanceRequest{
+		BaseMachineRequest:       api.BaseMachineRequest{MachineName: "database"},
 		AvailabilityZone:         "us-west-2a",
 		ImageID:                  "ami-5",
 		BlockDeviceName:          "/dev/sdb",
