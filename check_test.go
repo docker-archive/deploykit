@@ -52,9 +52,8 @@ func TestChecks(t *testing.T) {
 	require.False(t, violateNotZero(reflect.ValueOf(v.NilInt)))
 }
 
-func requireHasFieldNames(t *testing.T, expect []string, err error) {
+func requireEqual(t *testing.T, expect, actual []string) {
 	sort.Strings(expect)
-	actual := err.(*ErrStructFields).Names
 	sort.Strings(actual)
 	require.Equal(t, expect, actual)
 }
@@ -98,8 +97,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &theInt,
 		BoolPtr:   &theBool,
 	}
-	err := CheckFields(target, nil)
-	require.Nil(t, err)
+	require.Equal(t, 0, len(FindMissingFields(target)))
 
 	// Case - when required pointer fields are missing
 	target = &input{
@@ -107,9 +105,7 @@ func TestCheckFields(t *testing.T) {
 		Int:    theInt,
 		Bool:   theBool,
 	}
-	err = CheckFields(target, nil)
-	require.NotNil(t, err)
-	requireHasFieldNames(t, []string{"BoolPtr", "IntPtr", "StringPtr"}, err)
+	requireEqual(t, []string{"bool_ptr", "int_ptr", "string_ptr"}, FindMissingFields(target))
 
 	// Case -- when required value fields are missing
 	target = &input{
@@ -117,9 +113,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &theInt,
 		BoolPtr:   &theBool,
 	}
-	err = CheckFields(target, nil)
-	require.NotNil(t, err)
-	requireHasFieldNames(t, []string{"Bool", "Int", "String"}, err)
+	requireEqual(t, []string{"the_bool", "the_int", "the_string"}, FindMissingFields(target))
 
 	// Case - when required pointer field is provided but is empty string
 	emptyString := ""
@@ -130,9 +124,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &zeroInt,  // acceptable -- it's not nil but can be 0
 		BoolPtr:   &zeroBool, //  acceptable -- it's not nil but can be false
 	}
-	err = CheckFields(target, nil)
-	require.NotNil(t, err)
-	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
+	requireEqual(t, []string{"the_bool", "the_int", "the_string", "string_ptr"}, FindMissingFields(target))
 
 	// This case here is artificial and doesn't make much sense.  Include here however to make clear the semantics of
 	// required tag in the case of non-pointer fields.
@@ -144,67 +136,20 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &zeroInt,  // acceptable -- it's not nil but can be 0
 		BoolPtr:   &zeroBool, //  acceptable -- it's not nil but can be false
 	}
-	err = CheckFields(target, nil)
-	require.NotNil(t, err)
-	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
-}
-
-func TestCheckFieldCallbacks(t *testing.T) {
+	requireEqual(t, []string{"the_bool", "the_int", "the_string", "string_ptr"}, FindMissingFields(target))
 
 	// Case - when required pointer field is provided but is empty string
-	emptyString := ""
-	zeroInt := 0
-	zeroBool := false
-	target := &input{
+	target = &input{
 		StringPtr: &emptyString,
 		IntPtr:    &zeroInt,
 		BoolPtr:   &zeroBool,
 	}
 
-	missing := new(int)
-	missingLabels := []string{}
-
-	err := CheckFields(target,
-		func(v interface{}, n string, g TagGetter) bool {
-			*missing++
-
-			// Get the label of the field
-			missingLabels = append(missingLabels, g("yaml"))
-			return false
-		})
-
-	require.NotNil(t, err)
-	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
-	require.Equal(t, 4, *missing)
-
-	// Test / demo on how to access other field tags --> this is useful for reporting missing yaml or json fields.
-	sort.Strings(missingLabels)
-	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, missingLabels)
-
-	// Case - callback returns immediately on the first error
-	*missing = 0
-	err = CheckFields(target,
-		func(v interface{}, n string, g TagGetter) bool {
-			*missing++
-			return true
-		})
-
-	require.NotNil(t, err)
-	// String is the first declared field.
-	require.Equal(t, []string{"String"}, err.(*ErrStructFields).Names)
-	require.Equal(t, 1, *missing)
-
 	// Case - using the provided callback to collect missing YAML fields
-	missingFields := []string{}
-	err = CheckFields(target, CollectMissingYAMLFields(&missingFields))
-	require.NotNil(t, err)
-	sort.Strings(missingFields)
-	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, missingFields)
+	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, FindMissingFields(target))
 
 	// Case - test the convenience wrapper
-	missingFields = FindMissingFields(target)
-	sort.Strings(missingFields)
-	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, missingFields)
+	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, FindMissingFields(target))
 }
 
 type sub struct {
@@ -237,8 +182,7 @@ func TestCheckFieldsNested(t *testing.T) {
 			BoolPtr:   &theBool,
 		},
 	}
-	err := CheckFields(target, nil)
-	require.Nil(t, err)
+	require.Equal(t, 0, len(FindMissingFields(target)))
 
 	// Case - when required pointer fields are missing
 	target = &nested{
@@ -246,9 +190,7 @@ func TestCheckFieldsNested(t *testing.T) {
 		Int:    theInt,
 		Bool:   theBool,
 	}
-	err = CheckFields(target, nil)
-	require.NotNil(t, err)
-	requireHasFieldNames(t, []string{"BoolPtr", "IntPtr", "StringPtr"}, err)
+	requireEqual(t, []string{"bool_ptr", "int_ptr", "string_ptr"}, FindMissingFields(target))
 
 	// Case -- when required value fields are missing
 	target = &nested{
@@ -258,9 +200,7 @@ func TestCheckFieldsNested(t *testing.T) {
 			BoolPtr:   &theBool,
 		},
 	}
-	err = CheckFields(target, nil)
-	require.NotNil(t, err)
-	requireHasFieldNames(t, []string{"Bool", "Int", "String"}, err)
+	requireEqual(t, []string{"the_bool", "the_int", "the_string"}, FindMissingFields(target))
 
 	// Case - when required pointer field is provided but is empty string
 	emptyString := ""
@@ -273,12 +213,6 @@ func TestCheckFieldsNested(t *testing.T) {
 			BoolPtr:   &zeroBool, // zero is allowed since ptr is set
 		},
 	}
-	err = CheckFields(target, nil)
-	require.NotNil(t, err)
-	requireHasFieldNames(t, []string{"Bool", "Int", "String", "StringPtr"}, err)
-
-	missingFields := FindMissingFields(target)
-	sort.Strings(missingFields)
-	require.Equal(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, missingFields)
+	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, FindMissingFields(target))
 
 }
