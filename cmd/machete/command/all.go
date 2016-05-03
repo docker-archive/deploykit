@@ -1,14 +1,20 @@
 package command
 
 import (
+	"github.com/docker/libmachete"
+	"github.com/docker/libmachete/cmd/machete/console"
 	"github.com/docker/libmachete/provisioners"
 	"github.com/spf13/cobra"
 )
 
 // GetSubcommands gets all the available subcommands.
-func GetSubcommands(registry *provisioners.Registry) []*cobra.Command {
+func GetSubcommands(
+	output console.Console,
+	registry *provisioners.Registry,
+	templates libmachete.Templates) []*cobra.Command {
+
 	return []*cobra.Command{
-		createCmd(registry),
-		destroyCmd(registry),
+		createCmd(output, registry, templates),
+		destroyCmd(output, registry),
 	}
 }

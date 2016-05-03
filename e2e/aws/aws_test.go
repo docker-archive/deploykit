@@ -42,9 +42,9 @@ func TestCreate(t *testing.T) {
 	}
 
 	awsCredentials := credentials.NewStaticCredentials(accessKey, secretKey, "")
-	provisioner := aws.New(aws.CreateClient(region, &awsCredentials, 10))
+	provisioner := aws.New(aws.CreateClient(region, awsCredentials, 10))
 
-	request := aws.CreateInstanceRequest{
+	request := &aws.CreateInstanceRequest{
 		AvailabilityZone:         "us-west-2a",
 		ImageID:                  "ami-30ee0d50",
 		BlockDeviceName:          "/dev/sdb",
