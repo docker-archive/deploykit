@@ -52,8 +52,10 @@ func TestCrud(t *testing.T) {
 	require.Equal(t, []*Record{&record}, records)
 
 	savedPlanet := new(PlanetRecord)
-	savedRecord, err := inventory.Get(record.Name, savedPlanet)
+	savedRecord, err := inventory.GetRecord(Key(record.Name))
 	require.Nil(t, err)
 	require.Equal(t, &record, savedRecord)
+	err = inventory.GetDetails(Key(record.Name), savedPlanet)
+	require.Nil(t, err)
 	require.Equal(t, &planet, savedPlanet)
 }

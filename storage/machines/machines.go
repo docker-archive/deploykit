@@ -6,13 +6,21 @@ import (
 	"github.com/docker/libmachete/storage"
 )
 
+// Key is the globally-unique identifier for machines.
+type Key string
+
 // Machines handles storage of machine inventory.  In addition to standard fields for all machines,
 // it allows provisioners to include custom data.
 type Machines interface {
 	Save(record Record, provisionerData interface{}) error
+
 	List() ([]*Record, error)
-	Get(name string, recordType interface{}) (*Record, error)
-	Delete(name string) error
+
+	GetRecord(key Key) (*Record, error)
+
+	GetDetails(key Key, provisionerData interface{}) error
+
+	Delete(key Key) error
 }
 
 // Timestamp is a unix epoch timestamp, in seconds.
@@ -97,15 +105,25 @@ func (m machineStore) List() ([]*Record, error) {
 	return records, nil
 }
 
-func (m machineStore) Get(id string, provisionerRecord interface{}) (*Record, error) {
-	value, err := m.store.Read(id)
+func (m machineStore) getCompositeRecord(key Key, provisionerData interface{}) (*Record, error) {
+	keyString := string(key)
+	value, err := m.store.Read(keyString)
 	if err != nil {
 		return nil, err
 	}
 
-	return extractRecord(id, value, provisionerRecord)
+	return extractRecord(keyString, value, provisionerData)
 }
 
-func (m machineStore) Delete(id string) error {
-	return m.store.Delete(id)
+func (m machineStore) GetRecord(key Key) (*Record, error) {
+	return m.getCompositeRecord(key, nil)
+}
+
+func (m machineStore) GetDetails(key Key, provisionerData interface{}) error {
+	_, err := m.getCompositeRecord(key, provisionerData)
+	return err
+}
+
+func (m machineStore) Delete(key Key) error {
+	return m.store.Delete(string(key))
 }
