@@ -4,6 +4,8 @@ import (
 	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
@@ -26,14 +28,17 @@ func (a Builder) Build(params map[string]string) (api.Provisioner, error) {
 	accessKey := params["ACCESS_KEY"]
 	secretKey := params["SECRET_KEY"]
 	sessionToken := params["SESSION_TOKEN"]
-	var awsCredentials *credentials.Credentials
-	if (accessKey == "" || secretKey == "") && sessionToken == "" {
-		// Fall back to shared credentials
-		awsCredentials = credentials.NewSharedCredentials("", "")
-	} else {
-		awsCredentials =
-			credentials.NewStaticCredentials(accessKey, secretKey, sessionToken)
-	}
+
+	awsCredentials := credentials.NewChainCredentials([]credentials.Provider{
+		&credentials.StaticProvider{Value: credentials.Value{
+			AccessKeyID:     accessKey,
+			SecretAccessKey: secretKey,
+			SessionToken:    sessionToken,
+		}},
+		&credentials.EnvProvider{},
+		&credentials.SharedCredentialsProvider{},
+		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
+	})
 
 	client := CreateClient(region, awsCredentials, 5)
 
