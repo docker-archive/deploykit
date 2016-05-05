@@ -62,7 +62,6 @@ func TestCreate(t *testing.T) {
 		},
 		KeyName:    "dev",
 		VpcID:      "vpc-74c22510",
-		Zone:       "a",
 		Monitoring: true,
 	}
 

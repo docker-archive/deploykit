@@ -227,7 +227,6 @@ tags:
   test: aws-create-test
 key_name: dev
 vpc_id: my-vpc-id
-zone: a
 monitoring: true`
 
 func TestYamlSpec(t *testing.T) {
@@ -252,7 +251,6 @@ func TestYamlSpec(t *testing.T) {
 			"test": "aws-create-test"},
 		KeyName:    "dev",
 		VpcID:      "my-vpc-id",
-		Zone:       "a",
 		Monitoring: true,
 	}
 	actual := CreateInstanceRequest{}
