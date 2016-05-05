@@ -117,28 +117,8 @@
 			"Rev": "09a34f2d32ca4df07da73ccb303bee6790076d69"
 		},
 		{
-			"ImportPath": "github.com/boltdb/bolt",
-			"Comment": "v1.2.0-17-ge8ca7db",
-			"Rev": "e8ca7db0e78d9513478d5c833410a5921495ca13"
-		},
-		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
-		},
-		{
-			"ImportPath": "github.com/docker/libkv",
-			"Comment": "v0.1.0-35-g7283ef2",
-			"Rev": "7283ef27ed32fe267388510a91709b307bb9942c"
-		},
-		{
-			"ImportPath": "github.com/docker/libkv/store",
-			"Comment": "v0.1.0-35-g7283ef2",
-			"Rev": "7283ef27ed32fe267388510a91709b307bb9942c"
-		},
-		{
-			"ImportPath": "github.com/docker/libkv/store/boltdb",
-			"Comment": "v0.1.0-35-g7283ef2",
-			"Rev": "7283ef27ed32fe267388510a91709b307bb9942c"
 		},
 		{
 			"ImportPath": "github.com/go-ini/ini",
@@ -159,8 +139,28 @@
 			"Rev": "0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74"
 		},
 		{
+			"ImportPath": "github.com/kr/fs",
+			"Rev": "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
+		},
+		{
+			"ImportPath": "github.com/pkg/sftp",
+			"Rev": "9683e1ed9152e4fb052773355eb1b8cdcbac2058"
+		},
+		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
+			"ImportPath": "github.com/spf13/afero",
+			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
+		},
+		{
+			"ImportPath": "github.com/spf13/afero/mem",
+			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
+		},
+		{
+			"ImportPath": "github.com/spf13/afero/sftp",
+			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
@@ -181,8 +181,20 @@
 			"Rev": "6fe211e493929a8aac0469b93f28b1d0688a9a3a"
 		},
 		{
-			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "d9157a9621b69ad1d8d77a1933590c416593f24f"
+			"ImportPath": "golang.org/x/crypto/curve25519",
+			"Rev": "beef0f4390813b96e8e68fd78570396d0f4751fc"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ssh",
+			"Rev": "beef0f4390813b96e8e68fd78570396d0f4751fc"
+		},
+		{
+			"ImportPath": "golang.org/x/text/transform",
+			"Rev": "07b9a78963006a15c538ec5175243979025fa7a8"
+		},
+		{
+			"ImportPath": "golang.org/x/text/unicode/norm",
+			"Rev": "07b9a78963006a15c538ec5175243979025fa7a8"
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
