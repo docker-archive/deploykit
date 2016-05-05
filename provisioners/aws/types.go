@@ -22,7 +22,6 @@ type CreateInstanceRequest struct {
 	Tags                     map[string]string `yaml:"tags"`
 	KeyName                  string            `yaml:"key_name"`
 	VpcID                    string            `yaml:"vpc_id"`
-	Zone                     string            `yaml:"zone"`
 	Monitoring               bool              `yaml:"monitoring"`
 }
 
