@@ -1,11 +1,41 @@
 {
 	"ImportPath": "github.com/docker/libmachete",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v62",
+	"GodepVersion": "v63",
 	"Packages": [
 		"./..."
 	],
 	"Deps": [
+		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions",
+			"Comment": "v2.1.1-beta",
+			"Rev": "a1883f7b98346e4908a6c25230c95a8a3026a10c"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest",
+			"Comment": "v7.0.4-4-gc2939d7",
+			"Rev": "c2939d77429f7663b69691a3a9dcf3b624db39de"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
+			"Comment": "v7.0.4-4-gc2939d7",
+			"Rev": "c2939d77429f7663b69691a3a9dcf3b624db39de"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
+			"Comment": "v7.0.4-4-gc2939d7",
+			"Rev": "c2939d77429f7663b69691a3a9dcf3b624db39de"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
+			"Comment": "v7.0.4-4-gc2939d7",
+			"Rev": "c2939d77429f7663b69691a3a9dcf3b624db39de"
+		},
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.9.0-15-g219c8cb",
+			"Rev": "219c8cb75c258c552e999735be6df753ffc7afdc"
+		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/aws",
 			"Comment": "v1.1.18-5-g09a34f2",
@@ -121,6 +151,11 @@
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
+			"ImportPath": "github.com/dgrijalva/jwt-go",
+			"Comment": "v2.4.0-12-g9a4b9f2",
+			"Rev": "9a4b9f2ac1f7685147a5c01544e3b922dbc1f4a0"
+		},
+		{
 			"ImportPath": "github.com/go-ini/ini",
 			"Comment": "v1.11.0",
 			"Rev": "12f418cc7edc5a618a51407b7ac1f1f512139df3"
@@ -187,6 +222,14 @@
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
 			"Rev": "beef0f4390813b96e8e68fd78570396d0f4751fc"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "318395d8b12f5dd0f1b7cd0fbb95195f49acb0f9"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "7a56174f0086b32866ebd746a794417edbc678a1"
 		},
 		{
 			"ImportPath": "golang.org/x/text/transform",
