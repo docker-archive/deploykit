@@ -11,13 +11,22 @@ import (
 	"regexp"
 )
 
+const (
+	// ProvisionerName is a unique name for this provisioner.
+	// It is used in all API / CLI to identify the provisioner.
+	ProvisionerName = "azure"
+)
+
 // NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
 func NewCredential() api.Credential {
-	return new(credential)
+	return &credential{
+		Provisioner: ProvisionerName,
+	}
 }
 
 type credential struct {
-	azure.Token
+	azure.Token `yaml:",inline"`
+	Provisioner string `yaml:"provisioner" json:"provisioner"`
 }
 
 func (a credential) loadSPT(ctx context.Context) (*azure.ServicePrincipalToken, error) {
@@ -48,6 +57,12 @@ func (a credential) loadSPT(ctx context.Context) (*azure.ServicePrincipalToken, 
 	return azure.NewServicePrincipalTokenFromManualToken(*oauthCfg, clientID, env.ServiceManagementEndpoint, a.Token)
 }
 
+// ProvisionerName implements Credential interface method
+func (a credential) ProvisionerName() string {
+	return a.Provisioner
+}
+
+// Validate implements Credential interface method
 func (a credential) Validate(ctx context.Context) error {
 	if len(a.AccessToken) == 0 && len(a.RefreshToken) == 0 {
 		return fmt.Errorf("Missing access token and refresh token")
@@ -64,6 +79,7 @@ func (a credential) Validate(ctx context.Context) error {
 	return validateToken(env, spt)
 }
 
+// Authenticate implements Credential interface method
 func (a *credential) Authenticate(ctx context.Context) error {
 	env, ok := EnvironmentFromContext(ctx)
 	if !ok {
@@ -101,6 +117,7 @@ func (a *credential) Authenticate(ctx context.Context) error {
 	return nil
 }
 
+// Refresh implements Credential interface method
 func (a *credential) Refresh(ctx context.Context) error {
 	spt, err := a.loadSPT(ctx)
 	if err != nil {

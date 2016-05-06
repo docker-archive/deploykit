@@ -12,6 +12,9 @@ func TestInvalidEmptyCredential(t *testing.T) {
 	require.Len(t, cr.(*credential).AccessToken, 0)
 	require.Len(t, cr.(*credential).RefreshToken, 0)
 
+	// Even empty credential must return the provisioner name
+	require.Equal(t, ProvisionerName, cr.ProvisionerName())
+
 	clientID := "clientID"
 	subscriptionID := "subscriptionID"
 	environment := azure.PublicCloud

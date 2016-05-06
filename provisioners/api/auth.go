@@ -13,6 +13,8 @@ const (
 // For example, a struct containing access id and secret key that can be loaded or saved from storage or
 // user input provides the method implementations to validate, authenticate, and optionally refresh itself.
 type Credential interface {
+	ProvisionerName() string
+
 	Validate(context.Context) error
 
 	Authenticate(context.Context) error
