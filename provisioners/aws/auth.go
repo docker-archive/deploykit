@@ -6,12 +6,21 @@ import (
 	"golang.org/x/net/context"
 )
 
+const (
+	// ProvisionerName is a unique name for this provisioner.
+	// It is used in all API / CLI to identify the provisioner.
+	ProvisionerName = "aws"
+)
+
 // NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
 func NewCredential() api.Credential {
-	return new(credential)
+	return &credential{
+		Provisioner: ProvisionerName,
+	}
 }
 
 type credential struct {
+	Provisioner     string `yaml:"provisioner" json:"provisioner"`
 	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id"`
 	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key"`
 	SessionToken    string `yaml:"session_token" json:"session_token"`
@@ -35,6 +44,11 @@ func (a *credential) Retrieve() (credentials.Value, error) {
 // IsExpired implements the AWS credentials.Provider interface method.  For static credentials this always returns false
 func (a *credential) IsExpired() bool {
 	return false
+}
+
+// ProvisionerName implements Credential interface method
+func (a credential) ProvisionerName() string {
+	return a.Provisioner
 }
 
 // Validate implements Credential interface method
