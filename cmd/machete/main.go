@@ -67,6 +67,7 @@ func main() {
 		Use:   "machete",
 		Short: "provision and manage Docker machines across multiple cloud providers"}
 
+	RootCmd.AddCommand(command.ServerCmd())
 	RootCmd.AddCommand(command.GetSubcommands(output, registry, templates)...)
 
 	switch err := RootCmd.Execute().(type) {

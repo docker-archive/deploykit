@@ -5,11 +5,16 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
 	"golang.org/x/net/context"
 	"net/http"
 	"regexp"
 )
+
+func init() {
+	libmachete.RegisterCredentialer(ProvisionerName, NewCredential)
+}
 
 const (
 	// ProvisionerName is a unique name for this provisioner.
@@ -20,13 +25,13 @@ const (
 // NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
 func NewCredential() api.Credential {
 	return &credential{
-		Provisioner: ProvisionerName,
+		CredentialBase: api.CredentialBase{Provisioner: ProvisionerName},
 	}
 }
 
 type credential struct {
-	azure.Token `yaml:",inline"`
-	Provisioner string `yaml:"provisioner" json:"provisioner"`
+	api.CredentialBase `yaml:",inline"`
+	azure.Token        `yaml:",inline"`
 }
 
 func (a credential) loadSPT(ctx context.Context) (*azure.ServicePrincipalToken, error) {
@@ -55,11 +60,6 @@ func (a credential) loadSPT(ctx context.Context) (*azure.ServicePrincipalToken, 
 		return nil, err
 	}
 	return azure.NewServicePrincipalTokenFromManualToken(*oauthCfg, clientID, env.ServiceManagementEndpoint, a.Token)
-}
-
-// ProvisionerName implements Credential interface method
-func (a credential) ProvisionerName() string {
-	return a.Provisioner
 }
 
 // Validate implements Credential interface method

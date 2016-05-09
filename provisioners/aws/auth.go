@@ -2,9 +2,14 @@ package aws
 
 import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
 	"golang.org/x/net/context"
 )
+
+func init() {
+	libmachete.RegisterCredentialer(ProvisionerName, NewCredential)
+}
 
 const (
 	// ProvisionerName is a unique name for this provisioner.
@@ -15,15 +20,15 @@ const (
 // NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
 func NewCredential() api.Credential {
 	return &credential{
-		Provisioner: ProvisionerName,
+		CredentialBase: api.CredentialBase{Provisioner: ProvisionerName},
 	}
 }
 
 type credential struct {
-	Provisioner     string `yaml:"provisioner" json:"provisioner"`
-	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id"`
-	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key"`
-	SessionToken    string `yaml:"session_token" json:"session_token"`
+	api.CredentialBase `yaml:",inline"`
+	AccessKeyID        string `yaml:"access_key_id" json:"access_key_id"`
+	SecretAccessKey    string `yaml:"secret_access_key" json:"secret_access_key"`
+	SessionToken       string `yaml:"session_token" json:"session_token"`
 }
 
 // Retrieve implements the AWS credentials.Provider interface method
@@ -44,11 +49,6 @@ func (a *credential) Retrieve() (credentials.Value, error) {
 // IsExpired implements the AWS credentials.Provider interface method.  For static credentials this always returns false
 func (a *credential) IsExpired() bool {
 	return false
-}
-
-// ProvisionerName implements Credential interface method
-func (a credential) ProvisionerName() string {
-	return a.Provisioner
 }
 
 // Validate implements Credential interface method
