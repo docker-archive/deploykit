@@ -5,13 +5,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
-	lib "github.com/docker/libmachete/provisioners/api"
 	_ "github.com/docker/libmachete/provisioners/aws"
 	_ "github.com/docker/libmachete/provisioners/azure"
 	"github.com/docker/libmachete/storage/filestores"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/user"
@@ -93,17 +91,17 @@ func (s *api) start() <-chan error {
 				key := rest.GetUrlParameter(req, "key")
 				log.Infof("Add credential %v, %v\n", provisioner, key)
 
-				err := libmachete.CreateCredential(s.credentials, provisioner, key, req.Body)
+				err := s.credentials.CreateCredential(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
 
 				if err == nil {
 					return
 				}
 
 				switch err.Code {
-				case ErrCredentialDuplicate:
+				case libmachete.ErrCredentialDuplicate:
 					respondError(http.StatusConflict, resp, err)
 					return
-				case ErrCredentialNotFound:
+				case libmachete.ErrCredentialNotFound:
 					respondError(http.StatusNotFound, resp, err)
 					return
 				default:
@@ -121,35 +119,20 @@ func (s *api) start() <-chan error {
 				key := rest.GetUrlParameter(req, "key")
 				log.Infof("Update credential %v\n", key)
 
-				buff, err := ioutil.ReadAll(req.Body)
-				if err != nil {
-					respondError(http.StatusInternalServerError, resp, fmt.Errorf("cannot read input"))
+				err := s.credentials.UpdateCredential(key, req.Body, libmachete.CodecByContentTypeHeader(req))
+
+				if err == nil {
 					return
 				}
 
-				if !s.credentials.Exists(key) {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Credential does not exist: %v", key))
+				switch err.Code {
+				case libmachete.ErrCredentialDuplicate:
+					respondError(http.StatusConflict, resp, err)
 					return
-				}
-
-				base := new(lib.CredentialBase)
-				if err = s.credentials.Unmarshal(libmachete.CodecByContentTypeHeader(req), buff, base); err != nil {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Bad input:", string(buff)))
+				case libmachete.ErrCredentialNotFound:
+					respondError(http.StatusNotFound, resp, err)
 					return
-				}
-
-				detail, err := s.credentials.NewCredential(base.ProvisionerName())
-				if err != nil {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown provisioner:%s", base.ProvisionerName()))
-					return
-				}
-
-				if err = s.credentials.Unmarshal(libmachete.CodecByContentTypeHeader(req), buff, detail); err != nil {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Bad input:", string(buff)))
-					return
-				}
-
-				if err = s.credentials.Save(key, detail); err != nil {
+				default:
 					respondError(http.StatusInternalServerError, resp, err)
 					return
 				}

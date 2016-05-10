@@ -37,7 +37,7 @@ var (
 
 	codecs = map[string]*codec{
 		ContentTypeJSON.ContentType: ContentTypeJSON,
-		ContentTypeJSON.ContentType: ContentTypeYAML,
+		ContentTypeYAML.ContentType: ContentTypeYAML,
 	}
 )
 

@@ -12,6 +12,6 @@ func TestCodecByContentType(t *testing.T) {
 	codec = CodecByContentType("application/json")
 	require.Equal(t, ContentTypeJSON, codec)
 
-	codec = CodecByContentType("application/yaml")
+	codec = CodecByContentType("text/plain")
 	require.Equal(t, ContentTypeYAML, codec)
 }

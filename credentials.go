@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/storage"
+	"io"
+	"io/ioutil"
 	"sync"
 )
 
@@ -47,6 +49,12 @@ type Credentials interface {
 
 	// Exists returns true if credential identified by key already exists
 	Exists(key string) bool
+
+	// CreateCredential adds a new credential from the input reader.
+	CreateCredential(provisioner, key string, input io.Reader, codec *codec) *CredentialError
+
+	// UpdateCredential updates an existing credential
+	UpdateCredential(key string, input io.Reader, codec *codec) *CredentialError
 }
 
 type credentials struct {
@@ -138,34 +146,66 @@ const (
 )
 
 type CredentialError struct {
-	Code  int
-	Error string
+	Code    int
+	Message string
 }
 
-func (e CredentialError) Error() {
-	return e.Error
+func (e CredentialError) Error() string {
+	return e.Message
 }
 
-func CreateCredential(c Credentials, provisioner, key string, input io.Reader) *CredentialError {
+// CreateCredential creates a new credential from the input reader.
+func (c *credentials) CreateCredential(provisioner, key string, input io.Reader, codec *codec) *CredentialError {
 	if c.Exists(key) {
-		return &CredentialError{ErrCredentialDuplicate, fmt.Stringf("Key exists: %v", key)}
+		return &CredentialError{ErrCredentialDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
 
 	cr, err := c.NewCredential(provisioner)
 	if err != nil {
-		return &CredentialError{ErrCredentialNotFound, fmt.Stringf("Unknown provisioner:%s", provisioner)}
+		return &CredentialError{ErrCredentialNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
 	}
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &CredentialError{Error: err.Error()}
+		return &CredentialError{Message: err.Error()}
 	}
 
-	if err = c.Unmarshal(CodecByContentTypeHeader(req), buff, cr); err != nil {
-		return &CredentialError{Error: err.Error()}
+	if err = c.Unmarshal(codec, buff, cr); err != nil {
+		return &CredentialError{Message: err.Error()}
 	}
 	if err = c.Save(key, cr); err != nil {
-		return &CredentialError{Error: err.Error()}
+		return &CredentialError{Message: err.Error()}
+	}
+	return nil
+}
+
+func (c *credentials) UpdateCredential(key string, input io.Reader, codec *codec) *CredentialError {
+	if !c.Exists(key) {
+		return &CredentialError{ErrCredentialNotFound, fmt.Sprintf("Credential not found: %v", key)}
+	}
+
+	buff, err := ioutil.ReadAll(input)
+	if err != nil {
+		return &CredentialError{Message: err.Error()}
+
+	}
+
+	base := new(api.CredentialBase)
+	if err = c.Unmarshal(codec, buff, base); err != nil {
+		return &CredentialError{Message: err.Error()}
+	}
+
+	detail, err := c.NewCredential(base.ProvisionerName())
+	if err != nil {
+		return &CredentialError{ErrCredentialNotFound, fmt.Sprintf("Unknow provisioner: %v", base.ProvisionerName())}
+	}
+
+	if err = c.Unmarshal(codec, buff, detail); err != nil {
+		return &CredentialError{Message: err.Error()}
+	}
+
+	if err = c.Save(key, detail); err != nil {
+		return &CredentialError{Message: err.Error()}
 	}
 	return nil
 }
