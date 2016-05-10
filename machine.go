@@ -40,21 +40,15 @@ func (m *machine) Create(
 		return nil, err
 	}
 
-	templateData, err := m.templateLoader.Read(provisionerName, templateName)
+	request, err := m.templateLoader.Get(provisionerName, templateName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to load template '%s': %s", templateName, err)
 	}
 
-	base := provisioner.NewRequestInstance()
-	err = yaml.Unmarshal(templateData, base)
-	if err != nil {
-		return nil, fmt.Errorf("Template '%s' is invalid: %s", templateName, err)
-	}
-
-	err = yaml.Unmarshal(overrideData, base)
+	err = yaml.Unmarshal(overrideData, request)
 	if err != nil {
 		return nil, fmt.Errorf("Template parameters are invalid: %s", err)
 	}
 
-	return provisioner.CreateInstance(base)
+	return provisioner.CreateInstance(request)
 }

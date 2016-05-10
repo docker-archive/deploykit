@@ -23,17 +23,31 @@ func RegisterCredentialer(provisionerName string, f func() api.Credential) {
 	credentialers[provisionerName] = f
 }
 
+const (
+	ErrCredentialDuplicate int = iota
+	ErrCredentialNotFound
+)
+
+type CredentialError struct {
+	Code    int
+	Message string
+}
+
+func (e CredentialError) Error() string {
+	return e.Message
+}
+
 type Credentials interface {
 	// NewCredentials creates an instance of the manager given the backing store.
 	NewCredential(provisionerName string) (api.Credential, error)
 
 	// Unmarshal decodes the bytes and applies onto the credential object, using a given encoding.
 	// If nil codec is passed, the default encoding / content type will be used.
-	Unmarshal(contentType *codec, data []byte, cred api.Credential) error
+	Unmarshal(contentType *Codec, data []byte, cred api.Credential) error
 
 	// Marshal encodes the given credential object and returns the bytes.
 	// If nil codec is passed, the default encoding / content type will be used.
-	Marshal(contentType *codec, cred api.Credential) ([]byte, error)
+	Marshal(contentType *Codec, cred api.Credential) ([]byte, error)
 
 	// ListIds
 	ListIds() ([]string, error)
@@ -51,10 +65,10 @@ type Credentials interface {
 	Exists(key string) bool
 
 	// CreateCredential adds a new credential from the input reader.
-	CreateCredential(provisioner, key string, input io.Reader, codec *codec) *CredentialError
+	CreateCredential(provisioner, key string, input io.Reader, codec *Codec) *CredentialError
 
 	// UpdateCredential updates an existing credential
-	UpdateCredential(key string, input io.Reader, codec *codec) *CredentialError
+	UpdateCredential(key string, input io.Reader, codec *Codec) *CredentialError
 }
 
 type credentials struct {
@@ -66,7 +80,7 @@ func NewCredentials(store storage.Credentials) Credentials {
 	return &credentials{store: store}
 }
 
-func ensureValidCredentialContentType(ct *codec) *codec {
+func ensureValidContentType(ct *Codec) *Codec {
 	if ct != nil {
 		return ct
 	}
@@ -83,14 +97,14 @@ func (cm *credentials) NewCredential(provisionerName string) (api.Credential, er
 
 // Unmarshal decodes the bytes and applies onto the credential object, using a given encoding.
 // If nil codec is passed, the default encoding / content type will be used.
-func (cm *credentials) Unmarshal(contentType *codec, data []byte, cred api.Credential) error {
-	return ensureValidCredentialContentType(contentType).unmarshal(data, cred)
+func (cm *credentials) Unmarshal(contentType *Codec, data []byte, cred api.Credential) error {
+	return ensureValidContentType(contentType).unmarshal(data, cred)
 }
 
 // Marshal encodes the given credential object and returns the bytes.
 // If nil codec is passed, the default encoding / content type will be used.
-func (cm *credentials) Marshal(contentType *codec, cred api.Credential) ([]byte, error) {
-	return ensureValidCredentialContentType(contentType).marshal(cred)
+func (cm *credentials) Marshal(contentType *Codec, cred api.Credential) ([]byte, error) {
+	return ensureValidContentType(contentType).marshal(cred)
 }
 
 func (cm *credentials) ListIds() ([]string, error) {
@@ -140,22 +154,8 @@ func (cm *credentials) Exists(key string) bool {
 	return err == nil
 }
 
-const (
-	ErrCredentialDuplicate int = iota
-	ErrCredentialNotFound
-)
-
-type CredentialError struct {
-	Code    int
-	Message string
-}
-
-func (e CredentialError) Error() string {
-	return e.Message
-}
-
 // CreateCredential creates a new credential from the input reader.
-func (c *credentials) CreateCredential(provisioner, key string, input io.Reader, codec *codec) *CredentialError {
+func (c *credentials) CreateCredential(provisioner, key string, input io.Reader, codec *Codec) *CredentialError {
 	if c.Exists(key) {
 		return &CredentialError{ErrCredentialDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
@@ -179,7 +179,7 @@ func (c *credentials) CreateCredential(provisioner, key string, input io.Reader,
 	return nil
 }
 
-func (c *credentials) UpdateCredential(key string, input io.Reader, codec *codec) *CredentialError {
+func (c *credentials) UpdateCredential(key string, input io.Reader, codec *Codec) *CredentialError {
 	if !c.Exists(key) {
 		return &CredentialError{ErrCredentialNotFound, fmt.Sprintf("Credential not found: %v", key)}
 	}

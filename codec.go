@@ -6,14 +6,14 @@ import (
 	"net/http"
 )
 
-type codec struct {
+type Codec struct {
 	ContentType string
 	marshal     func(v interface{}) ([]byte, error)
 	unmarshal   func(data []byte, v interface{}) error
 }
 
 var (
-	ContentTypeJSON = &codec{
+	ContentTypeJSON = &Codec{
 		ContentType: "application/json",
 		marshal: func(v interface{}) ([]byte, error) {
 			return json.Marshal(v)
@@ -23,7 +23,7 @@ var (
 		},
 	}
 
-	ContentTypeYAML = &codec{
+	ContentTypeYAML = &Codec{
 		ContentType: "text/plain",
 		marshal: func(v interface{}) ([]byte, error) {
 			return yaml.Marshal(v)
@@ -35,20 +35,20 @@ var (
 
 	DefaultContentType = ContentTypeJSON
 
-	codecs = map[string]*codec{
+	codecs = map[string]*Codec{
 		ContentTypeJSON.ContentType: ContentTypeJSON,
 		ContentTypeYAML.ContentType: ContentTypeYAML,
 	}
 )
 
 // CodecByContentTypeHeader returns the codec based on what's set in the http header
-func CodecByContentTypeHeader(req *http.Request) *codec {
+func CodecByContentTypeHeader(req *http.Request) *Codec {
 	return CodecByContentType(req.Header.Get("Content-Type"))
 }
 
 // CodecByContentType returns a code by content type string such as HTTP header 'Content-Type'
 // The default is JSON if the content type is not a supported one.
-func CodecByContentType(t string) *codec {
+func CodecByContentType(t string) *Codec {
 	if c, ok := codecs[t]; ok {
 		return c
 	}
@@ -56,7 +56,7 @@ func CodecByContentType(t string) *codec {
 }
 
 // Respond sets the content type of the response and writes the encoded bytes.
-func (c *codec) Respond(resp http.ResponseWriter, val interface{}) {
+func (c *Codec) Respond(resp http.ResponseWriter, val interface{}) {
 	buff, err := c.marshal(val)
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)

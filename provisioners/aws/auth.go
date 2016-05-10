@@ -2,19 +2,8 @@ package aws
 
 import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
 	"golang.org/x/net/context"
-)
-
-func init() {
-	libmachete.RegisterCredentialer(ProvisionerName, NewCredential)
-}
-
-const (
-	// ProvisionerName is a unique name for this provisioner.
-	// It is used in all API / CLI to identify the provisioner.
-	ProvisionerName = "aws"
 )
 
 // NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.

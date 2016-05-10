@@ -1,5 +1,10 @@
 package storage
 
+import (
+	"fmt"
+	"strings"
+)
+
 // MachineID is the globally-unique identifier for machines.
 type MachineID string
 
@@ -41,4 +46,34 @@ type Credentials interface {
 	GetCredentials(id CredentialsID, credentialsData interface{}) error
 
 	Delete(id CredentialsID) error
+}
+
+// TemplatesID is a -unique identifier for template within a provisioner namespace
+type TemplateID struct {
+	Provisioner string
+	Name        string
+}
+
+func (t TemplateID) Key() string {
+	return fmt.Sprintf("%s-%s", t.Provisioner, t.Name)
+}
+
+func TemplateIDFromString(s string) TemplateID {
+	p := strings.Split(s, "-")
+	if len(p) > 1 {
+		return TemplateID{p[0], p[1]}
+	} else {
+		return TemplateID{"", p[1]} // Invalid template
+	}
+}
+
+// Template handles storage of template
+type Templates interface {
+	Save(id TemplateID, templateData interface{}) error
+
+	List() ([]TemplateID, error)
+
+	GetTemplate(id TemplateID, templateData interface{}) error
+
+	Delete(id TemplateID) error
 }

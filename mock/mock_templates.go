@@ -4,7 +4,11 @@
 package mock
 
 import (
+	libmachete "github.com/docker/libmachete"
+	api "github.com/docker/libmachete/provisioners/api"
+	storage "github.com/docker/libmachete/storage"
 	gomock "github.com/golang/mock/gomock"
+	io "io"
 )
 
 // Mock of Templates interface
@@ -28,13 +32,106 @@ func (_m *MockTemplates) EXPECT() *_MockTemplatesRecorder {
 	return _m.recorder
 }
 
-func (_m *MockTemplates) Read(_param0 string, _param1 string) ([]byte, error) {
-	ret := _m.ctrl.Call(_m, "Read", _param0, _param1)
+func (_m *MockTemplates) CreateTemplate(_param0 string, _param1 string, _param2 io.Reader, _param3 *libmachete.Codec) *libmachete.TemplateError {
+	ret := _m.ctrl.Call(_m, "CreateTemplate", _param0, _param1, _param2, _param3)
+	ret0, _ := ret[0].(*libmachete.TemplateError)
+	return ret0
+}
+
+func (_mr *_MockTemplatesRecorder) CreateTemplate(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateTemplate", arg0, arg1, arg2, arg3)
+}
+
+func (_m *MockTemplates) Delete(_param0 string, _param1 string) error {
+	ret := _m.ctrl.Call(_m, "Delete", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockTemplatesRecorder) Delete(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Delete", arg0, arg1)
+}
+
+func (_m *MockTemplates) Exists(_param0 string, _param1 string) bool {
+	ret := _m.ctrl.Call(_m, "Exists", _param0, _param1)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+func (_mr *_MockTemplatesRecorder) Exists(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Exists", arg0, arg1)
+}
+
+func (_m *MockTemplates) Get(_param0 string, _param1 string) (api.MachineRequest, error) {
+	ret := _m.ctrl.Call(_m, "Get", _param0, _param1)
+	ret0, _ := ret[0].(api.MachineRequest)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockTemplatesRecorder) Get(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Get", arg0, arg1)
+}
+
+func (_m *MockTemplates) ListIds() ([]storage.TemplateID, error) {
+	ret := _m.ctrl.Call(_m, "ListIds")
+	ret0, _ := ret[0].([]storage.TemplateID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockTemplatesRecorder) ListIds() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListIds")
+}
+
+func (_m *MockTemplates) Marshal(_param0 *libmachete.Codec, _param1 api.MachineRequest) ([]byte, error) {
+	ret := _m.ctrl.Call(_m, "Marshal", _param0, _param1)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-func (_mr *_MockTemplatesRecorder) Read(arg0, arg1 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Read", arg0, arg1)
+func (_mr *_MockTemplatesRecorder) Marshal(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Marshal", arg0, arg1)
+}
+
+func (_m *MockTemplates) NewTemplate(_param0 string) (api.MachineRequest, error) {
+	ret := _m.ctrl.Call(_m, "NewTemplate", _param0)
+	ret0, _ := ret[0].(api.MachineRequest)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockTemplatesRecorder) NewTemplate(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "NewTemplate", arg0)
+}
+
+func (_m *MockTemplates) Save(_param0 string, _param1 string, _param2 api.MachineRequest) error {
+	ret := _m.ctrl.Call(_m, "Save", _param0, _param1, _param2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockTemplatesRecorder) Save(arg0, arg1, arg2 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Save", arg0, arg1, arg2)
+}
+
+func (_m *MockTemplates) Unmarshal(_param0 *libmachete.Codec, _param1 []byte, _param2 api.MachineRequest) error {
+	ret := _m.ctrl.Call(_m, "Unmarshal", _param0, _param1, _param2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockTemplatesRecorder) Unmarshal(arg0, arg1, arg2 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Unmarshal", arg0, arg1, arg2)
+}
+
+func (_m *MockTemplates) UpdateTemplate(_param0 string, _param1 string, _param2 io.Reader, _param3 *libmachete.Codec) *libmachete.TemplateError {
+	ret := _m.ctrl.Call(_m, "UpdateTemplate", _param0, _param1, _param2, _param3)
+	ret0, _ := ret[0].(*libmachete.TemplateError)
+	return ret0
+}
+
+func (_mr *_MockTemplatesRecorder) UpdateTemplate(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "UpdateTemplate", arg0, arg1, arg2, arg3)
 }

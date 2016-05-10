@@ -5,8 +5,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
-	_ "github.com/docker/libmachete/provisioners/aws"
-	_ "github.com/docker/libmachete/provisioners/azure"
 	"github.com/docker/libmachete/storage/filestores"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
@@ -22,17 +20,24 @@ type apiOptions struct {
 	RootDir string
 }
 
-type api struct {
+type apiServer struct {
 	options     apiOptions
 	credentials libmachete.Credentials
+	templates   libmachete.Templates
 }
 
-func (s *api) init() error {
-	store, err := filestores.NewCredentials(s.options.RootDir)
+func (s *apiServer) init() error {
+	cStore, err := filestores.NewCredentials(s.options.RootDir)
 	if err != nil {
 		return err
 	}
-	s.credentials = libmachete.NewCredentials(store)
+	s.credentials = libmachete.NewCredentials(cStore)
+
+	tStore, err := filestores.NewTemplates(s.options.RootDir)
+	if err != nil {
+		return err
+	}
+	s.templates = libmachete.NewTemplates(tStore)
 	return nil
 }
 
@@ -43,9 +48,9 @@ func respondError(code int, resp http.ResponseWriter, err error) {
 	resp.Write([]byte(fmt.Sprintf("{\"error\":\"%s\"}", message)))
 }
 
-func (s *api) start() <-chan error {
+func (s *apiServer) start() <-chan error {
 	shutdown := make(chan struct{})
-	stop, stopped := rest.NewService().DisableAuth().
+	service := rest.NewService().DisableAuth().
 		ListenPort(s.options.Port).
 		Route(
 			rest.Endpoint{
@@ -61,127 +66,15 @@ func (s *api) start() <-chan error {
 			func() error {
 				log.Infoln("Executing user custom shutdown...")
 				return nil
-			}).
-		Route(
-			rest.Endpoint{
-				UrlRoute:   "/credentials/json",
-				HttpMethod: rest.GET,
-			}).
-		To(
-			func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-				log.Infoln("List credentials")
-				all, err := s.credentials.ListIds()
-				if err != nil {
-					respondError(http.StatusInternalServerError, resp, err)
-					return
-				}
-				libmachete.ContentTypeJSON.Respond(resp, all)
-			}).
-		Route(
-			rest.Endpoint{
-				UrlRoute:   "/credentials/{key}/create",
-				HttpMethod: rest.POST,
-				UrlQueries: rest.UrlQueries{
-					"provisioner": "",
-				},
-			}).
-		To(
-			func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-				provisioner := rest.GetUrlParameter(req, "provisioner")
-				key := rest.GetUrlParameter(req, "key")
-				log.Infof("Add credential %v, %v\n", provisioner, key)
+			})
+	for endpoint, fn := range credentialRoutes(s.credentials) {
+		service.Route(*endpoint).To(fn)
+	}
+	for endpoint, fn := range templateRoutes(s.templates) {
+		service.Route(*endpoint).To(fn)
+	}
 
-				err := s.credentials.CreateCredential(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
-
-				if err == nil {
-					return
-				}
-
-				switch err.Code {
-				case libmachete.ErrCredentialDuplicate:
-					respondError(http.StatusConflict, resp, err)
-					return
-				case libmachete.ErrCredentialNotFound:
-					respondError(http.StatusNotFound, resp, err)
-					return
-				default:
-					respondError(http.StatusInternalServerError, resp, err)
-					return
-				}
-			}).
-		Route(
-			rest.Endpoint{
-				UrlRoute:   "/credentials/{key}",
-				HttpMethod: rest.PUT,
-			}).
-		To(
-			func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-				key := rest.GetUrlParameter(req, "key")
-				log.Infof("Update credential %v\n", key)
-
-				err := s.credentials.UpdateCredential(key, req.Body, libmachete.CodecByContentTypeHeader(req))
-
-				if err == nil {
-					return
-				}
-
-				switch err.Code {
-				case libmachete.ErrCredentialDuplicate:
-					respondError(http.StatusConflict, resp, err)
-					return
-				case libmachete.ErrCredentialNotFound:
-					respondError(http.StatusNotFound, resp, err)
-					return
-				default:
-					respondError(http.StatusInternalServerError, resp, err)
-					return
-				}
-			}).
-		Route(
-			rest.Endpoint{
-				UrlRoute:   "/credentials/{key}/json",
-				HttpMethod: rest.GET,
-			}).
-		To(
-			func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-				key := rest.GetUrlParameter(req, "key")
-				cr, err := s.credentials.Get(key)
-				if err != nil {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-					return
-				}
-				libmachete.ContentTypeJSON.Respond(resp, cr)
-			}).
-		Route(
-			rest.Endpoint{
-				UrlRoute:   "/credentials/{key}/yaml",
-				HttpMethod: rest.GET,
-			}).
-		To(
-			func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-				key := rest.GetUrlParameter(req, "key")
-				cr, err := s.credentials.Get(key)
-				if err != nil {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-					return
-				}
-				libmachete.ContentTypeYAML.Respond(resp, cr)
-			}).
-		Route(
-			rest.Endpoint{
-				UrlRoute:   "/credentials/{key}",
-				HttpMethod: rest.DELETE,
-			}).
-		To(
-			func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-				key := rest.GetUrlParameter(req, "key")
-				err := s.credentials.Delete(key)
-				if err != nil {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-					return
-				}
-			}).
-		Start()
+	stop, stopped := service.Start()
 
 	// For stopping the api
 	go func() {
@@ -201,7 +94,7 @@ func rootDir() string {
 }
 
 var (
-	apiServer = &api{}
+	server = &apiServer{}
 )
 
 func ServerCmd() *cobra.Command {
@@ -210,19 +103,19 @@ func ServerCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "start the HTTP server",
 		RunE: func(_ *cobra.Command, args []string) error {
-			log.Infoln("Starting server:", apiServer)
-			err := apiServer.init()
+			log.Infoln("Starting server:", server)
+			err := server.init()
 			if err != nil {
 				return err
 			}
-			stopped := apiServer.start()
+			stopped := server.start()
 			<-stopped
 			log.Infoln("Bye")
 			return nil
 		},
 	}
 
-	cmd.Flags().IntVar(&apiServer.options.Port, "port", 8888, "Port the server listens on.")
-	cmd.Flags().StringVar(&apiServer.options.RootDir, "dir", rootDir(), "Root directory for file storage")
+	cmd.Flags().IntVar(&server.options.Port, "port", 8888, "Port the server listens on.")
+	cmd.Flags().StringVar(&server.options.RootDir, "dir", rootDir(), "Root directory for file storage")
 	return cmd
 }

@@ -1,47 +1,185 @@
 package libmachete
 
 import (
-	"errors"
 	"fmt"
+	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/storage"
+	"io"
 	"io/ioutil"
-	"os"
-	"path"
-	"strings"
 )
+
+var (
+	templateBuilders = map[string]func() api.MachineRequest{}
+)
+
+// RegisterCredentialer registers the function that allocates an empty credential for a provisioner.
+// This method should be invoke in the init() of the provisioner package.
+func RegisterTemplateBuilder(provisionerName string, f func() api.MachineRequest) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	templateBuilders[provisionerName] = f
+}
+
+const (
+	ErrTemplateDuplicate int = iota
+	ErrTemplateNotFound
+)
+
+type TemplateError struct {
+	Code    int
+	Message string
+}
+
+func (e TemplateError) Error() string {
+	return e.Message
+}
 
 // Templates looks up and reads template data, scoped by provisioner name.
 type Templates interface {
-	Read(provisioner string, template string) ([]byte, error)
+	// NewTemplate creates an instance of the manager given the backing store.
+	NewTemplate(provisionerName string) (api.MachineRequest, error)
+
+	// Unmarshal decodes the bytes and applies onto the machine request object, using a given encoding.
+	// If nil codec is passed, the default encoding / content type will be used.
+	Unmarshal(contentType *Codec, data []byte, cred api.MachineRequest) error
+
+	// Marshal encodes the given template object and returns the bytes.
+	// If nil codec is passed, the default encoding / content type will be used.
+	Marshal(contentType *Codec, cred api.MachineRequest) ([]byte, error)
+
+	// ListIds
+	ListIds() ([]storage.TemplateID, error)
+
+	// Saves the template identified by provisioner and key
+	Save(provisioner, key string, cred api.MachineRequest) error
+
+	// Get returns a template identified by provisioner and key
+	Get(provisioner, key string) (api.MachineRequest, error)
+
+	// Deletes the template identified by provisioner and key
+	Delete(provisioner, key string) error
+
+	// Exists returns true if template identified by provisioner and key already exists
+	Exists(provisioner, key string) bool
+
+	// CreateTemplate adds a new template from the input reader.
+	CreateTemplate(provisioner, key string, input io.Reader, codec *Codec) *TemplateError
+
+	// UpdateTemplate updates an existing template
+	UpdateTemplate(provisioner, key string, input io.Reader, codec *Codec) *TemplateError
 }
 
-type fileTemplates struct {
-	dir string
+type templates struct {
+	store storage.Templates
 }
 
-// FileTemplates creates a template reader that looks up templates in a file system directory.
-// The provided template directory will be used as a root.  It is the responsibility of the caller
-// to ensure that the template root directory exists.
-func FileTemplates(dir string) (Templates, error) {
-	stat, err := os.Stat(dir)
+// NewTemplates creates an instance of the manager given the backing store.
+func NewTemplates(store storage.Templates) Templates {
+	return &templates{store: store}
+}
+
+// NewCredential returns an empty credential object for a provisioner.
+func (t *templates) NewTemplate(provisionerName string) (api.MachineRequest, error) {
+	if c, has := templateBuilders[provisionerName]; has {
+		return c(), nil
+	}
+	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
+}
+
+// Unmarshal decodes the bytes and applies onto the template object, using a given encoding.
+// If nil codec is passed, the default encoding / content type will be used.
+func (t *templates) Unmarshal(contentType *Codec, data []byte, tmpl api.MachineRequest) error {
+	return ensureValidContentType(contentType).unmarshal(data, tmpl)
+}
+
+// Marshal encodes the given template object and returns the bytes.
+// If nil codec is passed, the default encoding / content type will be used.
+func (t *templates) Marshal(contentType *Codec, tmpl api.MachineRequest) ([]byte, error) {
+	return ensureValidContentType(contentType).marshal(tmpl)
+}
+
+func (t *templates) ListIds() ([]storage.TemplateID, error) {
+	return t.store.List()
+}
+
+func (t *templates) Save(provisioner, key string, tmpl api.MachineRequest) error {
+	return t.store.Save(storage.TemplateID{provisioner, key}, tmpl)
+}
+
+func (t *templates) Get(provisioner, key string) (api.MachineRequest, error) {
+	detail, err := t.NewTemplate(provisioner)
 	if err != nil {
 		return nil, err
 	}
-	if !stat.IsDir() {
-		return nil, fmt.Errorf("%s is not a directory", dir)
-	}
 
-	return &fileTemplates{dir: dir}, nil
+	err = t.store.GetTemplate(storage.TemplateID{provisioner, key}, detail)
+	if err != nil {
+		return nil, err
+	}
+	return detail, nil
 }
 
-// Reads a template by name, associated with the provided provisioner name.  Neither the provisioner
-// name nor the template name may contain a path separator character.
-func (f *fileTemplates) Read(provisioner string, template string) ([]byte, error) {
-	if strings.Contains(provisioner, string(os.PathSeparator)) {
-		return nil, errors.New("Provisioner name must not contain a path separator")
+func (t *templates) Delete(provisioner, key string) error {
+	return t.store.Delete(storage.TemplateID{provisioner, key})
+}
+
+func (t *templates) Exists(provisioner, key string) bool {
+	tmpl, err := t.NewTemplate(provisioner)
+	if err != nil {
+		return false
 	}
-	if strings.Contains(template, string(os.PathSeparator)) {
-		return nil, errors.New("Template name must not contain a path separator")
+	err = t.store.GetTemplate(storage.TemplateID{provisioner, key}, tmpl)
+	return err == nil
+}
+
+// CreateTemplate creates a new template from the input reader.
+func (t *templates) CreateTemplate(provisioner, key string, input io.Reader, codec *Codec) *TemplateError {
+	if t.Exists(provisioner, key) {
+		return &TemplateError{ErrTemplateDuplicate, fmt.Sprintf("Key exists: %v / %v", provisioner, key)}
 	}
 
-	return ioutil.ReadFile(path.Join(f.dir, provisioner, template))
+	tmpl, err := t.NewTemplate(provisioner)
+	if err != nil {
+		return &TemplateError{ErrTemplateNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
+	}
+
+	buff, err := ioutil.ReadAll(input)
+	if err != nil {
+		return &TemplateError{Message: err.Error()}
+	}
+
+	if err = t.Unmarshal(codec, buff, tmpl); err != nil {
+		return &TemplateError{Message: err.Error()}
+	}
+	if err = t.Save(provisioner, key, tmpl); err != nil {
+		return &TemplateError{Message: err.Error()}
+	}
+	return nil
+}
+
+func (t *templates) UpdateTemplate(provisioner, key string, input io.Reader, codec *Codec) *TemplateError {
+	if !t.Exists(provisioner, key) {
+		return &TemplateError{ErrTemplateNotFound, fmt.Sprintf("Template not found: %v / %v", provisioner, key)}
+	}
+
+	buff, err := ioutil.ReadAll(input)
+	if err != nil {
+		return &TemplateError{Message: err.Error()}
+
+	}
+
+	tmpl, err := t.NewTemplate(provisioner)
+	if err != nil {
+		return &TemplateError{ErrTemplateNotFound, fmt.Sprintf("Unknow provisioner: %v", provisioner)}
+	}
+
+	if err = t.Unmarshal(codec, buff, tmpl); err != nil {
+		return &TemplateError{Message: err.Error()}
+	}
+
+	if err = t.Save(provisioner, key, tmpl); err != nil {
+		return &TemplateError{Message: err.Error()}
+	}
+	return nil
 }

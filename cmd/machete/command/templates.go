@@ -14,11 +14,11 @@ import (
 	"net/http"
 )
 
-type credentials struct {
+type templates struct {
 	output console.Console
 }
 
-func credentialsCmd(output console.Console,
+func templatesCmd(output console.Console,
 	registry *provisioners.Registry,
 	templates libmachete.Templates) *cobra.Command {
 
@@ -35,14 +35,14 @@ func credentialsCmd(output console.Console,
 	}
 }
 
-func credentialRoutes(c libmachete.Credentials) map[*rest.Endpoint]rest.Handler {
+func templateRoutes(t libmachete.Templates) map[*rest.Endpoint]rest.Handler {
 	return map[*rest.Endpoint]rest.Handler{
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/json",
+			UrlRoute:   "/templates/json",
 			HttpMethod: rest.GET,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			log.Infoln("List credentials")
-			all, err := c.ListIds()
+			log.Infoln("List templates")
+			all, err := t.ListIds()
 			if err != nil {
 				respondError(http.StatusInternalServerError, resp, err)
 				return
@@ -50,27 +50,24 @@ func credentialRoutes(c libmachete.Credentials) map[*rest.Endpoint]rest.Handler 
 			libmachete.ContentTypeJSON.Respond(resp, all)
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}/create",
+			UrlRoute:   "/templates/{provisioner}/{key}/create",
 			HttpMethod: rest.POST,
-			UrlQueries: rest.UrlQueries{
-				"provisioner": "",
-			},
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			log.Infof("Add credential %v, %v\n", provisioner, key)
+			log.Infof("Add template %v, %v\n", provisioner, key)
 
-			err := c.CreateCredential(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
+			err := t.CreateTemplate(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
 
 			if err == nil {
 				return
 			}
 
 			switch err.Code {
-			case libmachete.ErrCredentialDuplicate:
+			case libmachete.ErrTemplateDuplicate:
 				respondError(http.StatusConflict, resp, err)
 				return
-			case libmachete.ErrCredentialNotFound:
+			case libmachete.ErrTemplateNotFound:
 				respondError(http.StatusNotFound, resp, err)
 				return
 			default:
@@ -79,23 +76,24 @@ func credentialRoutes(c libmachete.Credentials) map[*rest.Endpoint]rest.Handler 
 			}
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}",
+			UrlRoute:   "/templates/{provisioner}/{key}",
 			HttpMethod: rest.PUT,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			log.Infof("Update credential %v\n", key)
+			log.Infof("Update template %v\n", key)
 
-			err := c.UpdateCredential(key, req.Body, libmachete.CodecByContentTypeHeader(req))
+			err := t.UpdateTemplate(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
 
 			if err == nil {
 				return
 			}
 
 			switch err.Code {
-			case libmachete.ErrCredentialDuplicate:
+			case libmachete.ErrTemplateDuplicate:
 				respondError(http.StatusConflict, resp, err)
 				return
-			case libmachete.ErrCredentialNotFound:
+			case libmachete.ErrTemplateNotFound:
 				respondError(http.StatusNotFound, resp, err)
 				return
 			default:
@@ -104,37 +102,40 @@ func credentialRoutes(c libmachete.Credentials) map[*rest.Endpoint]rest.Handler 
 			}
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}/json",
+			UrlRoute:   "/templates/{provisioner}/{key}/json",
 			HttpMethod: rest.GET,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			cr, err := c.Get(key)
+			cr, err := t.Get(provisioner, key)
 			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
+				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown template:%s", key))
 				return
 			}
 			libmachete.ContentTypeJSON.Respond(resp, cr)
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}/yaml",
+			UrlRoute:   "/templates/{provisioner}/{key}/yaml",
 			HttpMethod: rest.GET,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			cr, err := c.Get(key)
+			cr, err := t.Get(provisioner, key)
 			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
+				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown template:%s", key))
 				return
 			}
 			libmachete.ContentTypeYAML.Respond(resp, cr)
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}",
+			UrlRoute:   "/templates/{provisioner}/{key}",
 			HttpMethod: rest.DELETE,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			err := c.Delete(key)
+			err := t.Delete(provisioner, key)
 			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
+				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown template:%s", key))
 				return
 			}
 		},

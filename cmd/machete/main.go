@@ -7,6 +7,7 @@ import (
 	"github.com/docker/libmachete/cmd/machete/console"
 	"github.com/docker/libmachete/provisioners"
 	"github.com/docker/libmachete/provisioners/aws"
+	"github.com/docker/libmachete/storage/filestores"
 	"github.com/spf13/cobra"
 	"os"
 	"os/user"
@@ -42,10 +43,11 @@ func initTemplatesRepo() (libmachete.Templates, error) {
 		return nil, err
 	}
 
-	templates, err := libmachete.FileTemplates(templatesDir)
+	store, err := filestores.NewTemplates(templatesDir)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to locate templates: %s", err)
 	}
+	templates := libmachete.NewTemplates(store)
 	return templates, nil
 }
 

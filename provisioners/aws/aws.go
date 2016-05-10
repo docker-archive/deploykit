@@ -162,6 +162,10 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
+func NewMachineRequest() api.MachineRequest {
+	return new(CreateInstanceRequest)
+}
+
 func (p *provisioner) NewRequestInstance() api.MachineRequest {
 	return new(CreateInstanceRequest)
 }
