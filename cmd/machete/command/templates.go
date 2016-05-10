@@ -50,6 +50,34 @@ func templateRoutes(t libmachete.Templates) map[*rest.Endpoint]rest.Handler {
 			libmachete.ContentTypeJSON.Respond(resp, all)
 		},
 		&rest.Endpoint{
+			UrlRoute:   "/meta/{provisioner}/json",
+			HttpMethod: rest.GET,
+		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+			provisioner := rest.GetUrlParameter(req, "provisioner")
+			log.Infof("Get template example %v", provisioner)
+
+			example, err := t.NewTemplate(provisioner)
+			if err != nil {
+				respondError(http.StatusNotFound, resp, err)
+				return
+			}
+			libmachete.ContentTypeJSON.Respond(resp, example)
+		},
+		&rest.Endpoint{
+			UrlRoute:   "/meta/{provisioner}/yaml",
+			HttpMethod: rest.GET,
+		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+			provisioner := rest.GetUrlParameter(req, "provisioner")
+			log.Infof("Get template example %v", provisioner)
+
+			example, err := t.NewTemplate(provisioner)
+			if err != nil {
+				respondError(http.StatusNotFound, resp, err)
+				return
+			}
+			libmachete.ContentTypeYAML.Respond(resp, example)
+		},
+		&rest.Endpoint{
 			UrlRoute:   "/templates/{provisioner}/{key}/create",
 			HttpMethod: rest.POST,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {

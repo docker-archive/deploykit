@@ -28,7 +28,7 @@ type apiServer struct {
 
 func mkdir(parent, child string) (string, error) {
 	p := filepath.Join(parent, child)
-	return p, os.MkdirAll(p, 0644)
+	return p, os.MkdirAll(p, 0755)
 }
 
 func (s *apiServer) init() error {

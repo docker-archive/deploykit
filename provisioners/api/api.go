@@ -42,17 +42,31 @@ type DestroyInstanceEvent struct {
 // MachineRequest defines the basic attributes that any provisioner's creation request must define.
 type MachineRequest interface {
 	Name() string
+	ProvisionerName() string
+	Version() string
 }
 
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
-	MachineName string `yaml:"name"`
+	MachineName        string `yaml:"name" json:"name"`
+	Provisioner        string `yaml:"provisioner" json:"provisioner"`
+	ProvisionerVersion string `yaml:"version" json:"version"`
 }
 
 // Name returns the name to give the machine, once created.
 func (req BaseMachineRequest) Name() string {
 	return req.MachineName
+}
+
+// Provisioner returns the provisioner
+func (req BaseMachineRequest) ProvisionerName() string {
+	return req.Provisioner
+}
+
+// Version returns a version string.  This is used for provisioners for schema migration and not used by framework.
+func (req BaseMachineRequest) Version() string {
+	return req.ProvisionerVersion
 }
 
 // A Provisioner is a vendor-agnostic API used to create and manage
