@@ -26,14 +26,28 @@ type apiServer struct {
 	templates   libmachete.Templates
 }
 
+func mkdir(parent, child string) (string, error) {
+	p := filepath.Join(parent, child)
+	return p, os.MkdirAll(p, 0644)
+}
+
 func (s *apiServer) init() error {
-	cStore, err := filestores.NewCredentials(s.options.RootDir)
+	cPath, err := mkdir(s.options.RootDir, "credentials")
+	if err != nil {
+		return err
+	}
+	tPath, err := mkdir(s.options.RootDir, "templates")
+	if err != nil {
+		return err
+	}
+
+	cStore, err := filestores.NewCredentials(cPath)
 	if err != nil {
 		return err
 	}
 	s.credentials = libmachete.NewCredentials(cStore)
 
-	tStore, err := filestores.NewTemplates(s.options.RootDir)
+	tStore, err := filestores.NewTemplates(tPath)
 	if err != nil {
 		return err
 	}
