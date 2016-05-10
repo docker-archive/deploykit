@@ -93,28 +93,20 @@ func (s *api) start() <-chan error {
 				key := rest.GetUrlParameter(req, "key")
 				log.Infof("Add credential %v, %v\n", provisioner, key)
 
-				if s.credentials.Exists(key) {
-					respondError(http.StatusConflict, resp, fmt.Errorf("Credential exists: %v", key))
+				err := libmachete.CreateCredential(s.credentials, provisioner, key, req.Body)
+
+				if err == nil {
 					return
 				}
 
-				buff, err := ioutil.ReadAll(req.Body)
-				if err != nil {
-					respondError(http.StatusInternalServerError, resp, fmt.Errorf("cannot read input"))
+				switch err.Code {
+				case ErrCredentialDuplicate:
+					respondError(http.StatusConflict, resp, err)
 					return
-				}
-
-				cr, err := s.credentials.NewCredential(provisioner)
-				if err != nil {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown provisioner:%s", provisioner))
+				case ErrCredentialNotFound:
+					respondError(http.StatusNotFound, resp, err)
 					return
-				}
-
-				if err = s.credentials.Unmarshal(libmachete.CodecByContentTypeHeader(req), buff, cr); err != nil {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Bad input:", string(buff)))
-					return
-				}
-				if err = s.credentials.Save(key, cr); err != nil {
+				default:
 					respondError(http.StatusInternalServerError, resp, err)
 					return
 				}
@@ -129,14 +121,14 @@ func (s *api) start() <-chan error {
 				key := rest.GetUrlParameter(req, "key")
 				log.Infof("Update credential %v\n", key)
 
-				if !s.credentials.Exists(key) {
-					respondError(http.StatusNotFound, resp, fmt.Errorf("Credential does not exist: %v", key))
-					return
-				}
-
 				buff, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					respondError(http.StatusInternalServerError, resp, fmt.Errorf("cannot read input"))
+					return
+				}
+
+				if !s.credentials.Exists(key) {
+					respondError(http.StatusNotFound, resp, fmt.Errorf("Credential does not exist: %v", key))
 					return
 				}
 

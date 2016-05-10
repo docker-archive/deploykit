@@ -131,3 +131,41 @@ func (cm *credentials) Exists(key string) bool {
 	err := cm.store.GetCredentials(storage.CredentialsID(key), base)
 	return err == nil
 }
+
+const (
+	ErrCredentialDuplicate int = iota
+	ErrCredentialNotFound
+)
+
+type CredentialError struct {
+	Code  int
+	Error string
+}
+
+func (e CredentialError) Error() {
+	return e.Error
+}
+
+func CreateCredential(c Credentials, provisioner, key string, input io.Reader) *CredentialError {
+	if c.Exists(key) {
+		return &CredentialError{ErrCredentialDuplicate, fmt.Stringf("Key exists: %v", key)}
+	}
+
+	cr, err := c.NewCredential(provisioner)
+	if err != nil {
+		return &CredentialError{ErrCredentialNotFound, fmt.Stringf("Unknown provisioner:%s", provisioner)}
+	}
+
+	buff, err := ioutil.ReadAll(input)
+	if err != nil {
+		return &CredentialError{Error: err.Error()}
+	}
+
+	if err = c.Unmarshal(CodecByContentTypeHeader(req), buff, cr); err != nil {
+		return &CredentialError{Error: err.Error()}
+	}
+	if err = c.Save(key, cr); err != nil {
+		return &CredentialError{Error: err.Error()}
+	}
+	return nil
+}
