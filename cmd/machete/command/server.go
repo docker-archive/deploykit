@@ -22,6 +22,7 @@ type apiOptions struct {
 
 type apiServer struct {
 	options     apiOptions
+	contexts    libmachete.Contexts
 	credentials libmachete.Credentials
 	templates   libmachete.Templates
 }
@@ -32,6 +33,10 @@ func mkdir(parent, child string) (string, error) {
 }
 
 func (s *apiServer) init() error {
+	ctxPath, err := mkdir(s.options.RootDir, "contexts")
+	if err != nil {
+		return err
+	}
 	cPath, err := mkdir(s.options.RootDir, "credentials")
 	if err != nil {
 		return err
@@ -40,6 +45,12 @@ func (s *apiServer) init() error {
 	if err != nil {
 		return err
 	}
+
+	ctxStore, err := filestores.NewContexts(ctxPath)
+	if err != nil {
+		return err
+	}
+	s.contexts = libmachete.NewContexts(ctxStore)
 
 	cStore, err := filestores.NewCredentials(cPath)
 	if err != nil {
@@ -81,6 +92,9 @@ func (s *apiServer) start() <-chan error {
 				log.Infoln("Executing user custom shutdown...")
 				return nil
 			})
+	for endpoint, fn := range contextRoutes(s.contexts) {
+		service.Route(*endpoint).To(fn)
+	}
 	for endpoint, fn := range credentialRoutes(s.credentials) {
 		service.Route(*endpoint).To(fn)
 	}
