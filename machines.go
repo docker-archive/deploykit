@@ -2,20 +2,24 @@ package libmachete
 
 import (
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/storage"
+	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
-	"sync"
+	"time"
 )
 
+type MachineRequestBuilder func() api.MachineRequest
+
 var (
-	machineCreators = map[string]func() api.Credential{}
+	machineCreators = map[string]MachineRequestBuilder{}
 )
 
 // RegisterMachineCreator registers the function that allocates an empty credential for a provisioner.
 // This method should be invoke in the init() of the provisioner package.
-func RegisterMachineCreator(provisionerName string, f func() api.Credential) {
+func RegisterMachineRequestBuilder(provisionerName string, f MachineRequestBuilder) {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -51,11 +55,8 @@ type Machines interface {
 	// ListIds
 	ListIds() ([]string, error)
 
-	// Saves the machine identified by key
-	Save(key string, m api.MachineRequest) error
-
 	// Get returns a machine identified by key
-	Get(key string) (api.MachineRequest, error)
+	Get(key string) (storage.MachineRecord, error)
 
 	// Deletes the machine identified by key
 	Delete(key string) error
@@ -64,10 +65,8 @@ type Machines interface {
 	Exists(key string) bool
 
 	// CreateMachine adds a new machine from the input reader.
-	CreateMachine(ctx context.Context, cred api.Credential, key string, input io.Reader, codec *Codec) *MachineError
-
-	// UpdateMachine updates an existing machine
-	UpdateMachine(key string, input io.Reader, codec *Codec) *MachineError
+	CreateMachine(ctx context.Context, cred api.Credential,
+		template api.MachineRequest, key string, input io.Reader, codec *Codec) *MachineError
 }
 
 type machines struct {
@@ -79,15 +78,8 @@ func NewMachines(store storage.Machines) Machines {
 	return &machines{store: store}
 }
 
-func ensureValidContentType(ct *Codec) *Codec {
-	if ct != nil {
-		return ct
-	}
-	return DefaultContentType
-}
-
 // NewMachine returns an empty machine object for a provisioner.
-func (cm *machines) NewMachine(provisionerName string) (api.MachineRequest, error) {
+func (cm *machines) NewMachineRequest(provisionerName string) (api.MachineRequest, error) {
 	if c, has := machineCreators[provisionerName]; has {
 		return c(), nil
 	}
@@ -118,93 +110,90 @@ func (cm *machines) ListIds() ([]string, error) {
 	return out, nil
 }
 
-func (cm *machines) Save(key string, m api.MachineRequest) error {
-	return cm.store.Save(storage.MachinesID(key), m)
-}
-
-func (cm *machines) Get(key string) (api.MachineRequest, error) {
-	// Since we don't know the provider, we need to read twice: first with a base
-	// structure, then with a specific structure by provisioner.
-	base := new(api.MachineRequestBase)
-	err := cm.store.GetMachines(storage.MachinesID(key), base)
+func (cm *machines) Get(key string) (storage.MachineRecord, error) {
+	m, err := cm.store.GetRecord(storage.MachineID(key))
 	if err != nil {
-		return nil, err
+		return storage.MachineRecord{}, err
 	}
-
-	detail, err := cm.NewMachine(base.ProvisionerName())
-	if err != nil {
-		return nil, err
-	}
-
-	err = cm.store.GetMachines(storage.MachinesID(key), detail)
-	if err != nil {
-		return nil, err
-	}
-	return detail, nil
+	return *m, nil
 }
 
 func (cm *machines) Delete(key string) error {
-	return cm.store.Delete(storage.MachinesID(key))
+	return cm.store.Delete(storage.MachineID(key))
+}
+
+func (cm *machines) Terminate(key string) error {
+	mr, err := cm.Get(key)
+	if err != nil {
+		return err
+	}
+	mr.AppendEvent(storage.Event{Name: "terminate", Message: "Deleted"})
+	return cm.store.Save(mr, nil)
 }
 
 func (cm *machines) Exists(key string) bool {
-	base := new(api.MachineRequestBase)
-	err := cm.store.GetMachines(storage.MachinesID(key), base)
+	_, err := cm.Get(key)
 	return err == nil
 }
 
 // CreateMachine creates a new machine from the input reader.
-func (c *machines) CreateMachine(provisioner, key string, input io.Reader, codec *Codec) *MachineError {
-	if c.Exists(key) {
+func (cm *machines) CreateMachine(ctx context.Context, cred api.Credential,
+	template api.MachineRequest, key string, input io.Reader, codec *Codec) *MachineError {
+
+	if cm.Exists(key) {
 		return &MachineError{ErrMachineDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
 
-	cr, err := c.NewMachine(provisioner)
+	provisioner := cred.ProvisionerName()
+	mr, err := cm.NewMachineRequest(provisioner)
 	if err != nil {
 		return &MachineError{ErrMachineNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
 	}
 
-	buff, err := ioutil.ReadAll(input)
-	if err != nil {
-		return &MachineError{Message: err.Error()}
-	}
-
-	if err = c.Unmarshal(codec, buff, cr); err != nil {
-		return &MachineError{Message: err.Error()}
-	}
-	if err = c.Save(key, cr); err != nil {
-		return &MachineError{Message: err.Error()}
-	}
-	return nil
-}
-
-func (c *machines) UpdateMachine(key string, input io.Reader, codec *Codec) *MachineError {
-	if !c.Exists(key) {
-		return &MachineError{ErrMachineNotFound, fmt.Sprintf("Machine not found: %v", key)}
+	if template != nil {
+		mr = template
 	}
 
 	buff, err := ioutil.ReadAll(input)
-	if err != nil {
+	if err == nil && len(buff) > 0 {
+		if err = cm.Unmarshal(codec, buff, mr); err != nil {
+			return &MachineError{Message: err.Error()}
+		}
+	}
+
+	mr.SetName(key)
+
+	log.Infoln("cred=", cred, "template=", template, "req=", mr)
+
+	// First save a record
+	record := &storage.MachineRecord{
+		Name:        storage.MachineID(key),
+		Provisioner: provisioner,
+		Created:     storage.Timestamp(time.Now().Unix()),
+	}
+	record.AppendEvent(storage.Event{Name: "init", Message: "Create starts", Data: mr})
+
+	if err = cm.store.Save(*record, mr); err != nil {
 		return &MachineError{Message: err.Error()}
-
 	}
 
-	base := new(api.MachineRequestBase)
-	if err = c.Unmarshal(codec, buff, base); err != nil {
-		return &MachineError{Message: err.Error()}
-	}
+	// TODO - start process
+	go func() {
 
-	detail, err := c.NewMachine(base.ProvisionerName())
-	if err != nil {
-		return &MachineError{ErrMachineNotFound, fmt.Sprintf("Unknow provisioner: %v", base.ProvisionerName())}
-	}
+		for _, e := range []storage.Event{
+			{Name: "ssh", Message: "generated ssh key"},
+			{Name: "instance", Message: "instance created."},
+			{Name: "userdata", Message: "set up per instance userdata"},
+			{Name: "engine", Message: "installing engine"},
+			{Name: "engine", Message: "engine installed"},
+			{Name: "provisioned", Message: "machine is ready."},
+		} {
+			time.Sleep(10 * time.Second) // BOGUS
+			record.AppendEvent(e)
+			err := cm.store.Save(*record, mr)
+			log.Infoln("Saved:", "err=", err, len(record.Events), record)
+		}
+	}()
 
-	if err = c.Unmarshal(codec, buff, detail); err != nil {
-		return &MachineError{Message: err.Error()}
-	}
-
-	if err = c.Save(key, detail); err != nil {
-		return &MachineError{Message: err.Error()}
-	}
 	return nil
 }

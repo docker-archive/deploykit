@@ -3,6 +3,8 @@ package storage
 import (
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 )
 
 // ContextID is the type of the context key
@@ -39,12 +41,36 @@ type Machines interface {
 // Timestamp is a unix epoch timestamp, in seconds.
 type Timestamp uint64
 
+// Event is
+type Event struct {
+	Timestamp time.Time   `json:"on"`
+	Name      string      `json:"event"`
+	Message   string      `json:"message"`
+	Data      interface{} `json:"data,omitempty"`
+}
+
 // MachineRecord is the storage structure that will be included for all machines.
 type MachineRecord struct {
-	Name         MachineID
-	Provisioner  string
-	Created      Timestamp
-	LastModified Timestamp
+	Status       string    `json:"status"`
+	Name         MachineID `json:"name"`
+	Provisioner  string    `json:"provisioner"`
+	Created      Timestamp `json:"created"`
+	LastModified Timestamp `json:"modified"`
+	Events       []Event   `json:"events"`
+
+	lock sync.Mutex
+}
+
+// AppendEvent appends an event to the machine record
+func (m *MachineRecord) AppendEvent(e Event) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.Events == nil {
+		m.Events = []Event{}
+	}
+	e.Timestamp = time.Now()
+	m.Events = append(m.Events, e)
 }
 
 // CredentialsID is the globally-unique identifier for credentials.

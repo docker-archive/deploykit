@@ -25,6 +25,7 @@ type apiServer struct {
 	contexts    libmachete.Contexts
 	credentials libmachete.Credentials
 	templates   libmachete.Templates
+	machines    libmachete.Machines
 }
 
 func mkdir(parent, child string) (string, error) {
@@ -42,6 +43,10 @@ func (s *apiServer) init() error {
 		return err
 	}
 	tPath, err := mkdir(s.options.RootDir, "templates")
+	if err != nil {
+		return err
+	}
+	mPath, err := mkdir(s.options.RootDir, "machines")
 	if err != nil {
 		return err
 	}
@@ -63,6 +68,12 @@ func (s *apiServer) init() error {
 		return err
 	}
 	s.templates = libmachete.NewTemplates(tStore)
+
+	mStore, err := filestores.NewMachines(mPath)
+	if err != nil {
+		return err
+	}
+	s.machines = libmachete.NewMachines(mStore)
 	return nil
 }
 
@@ -99,6 +110,9 @@ func (s *apiServer) start() <-chan error {
 		service.Route(*endpoint).To(fn)
 	}
 	for endpoint, fn := range templateRoutes(s.templates) {
+		service.Route(*endpoint).To(fn)
+	}
+	for endpoint, fn := range machineRoutes(s.contexts, s.credentials, s.templates, s.machines) {
 		service.Route(*endpoint).To(fn)
 	}
 

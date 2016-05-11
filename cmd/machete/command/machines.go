@@ -1,43 +1,22 @@
 package command
 
 import (
-	"bytes"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/cmd/machete/console"
-	"github.com/docker/libmachete/provisioners"
 	_ "github.com/docker/libmachete/provisioners/aws"
 	_ "github.com/docker/libmachete/provisioners/azure"
-	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"io/ioutil"
 	"net/http"
 )
 
-type machines struct {
-	output console.Console
-}
+func machineRoutes(
+	x libmachete.Contexts,
+	c libmachete.Credentials,
+	t libmachete.Templates,
+	m libmachete.Machines) map[*rest.Endpoint]rest.Handler {
 
-func machinesCmd(output console.Console,
-	registry *provisioners.Registry,
-	machines libmachete.Machines) *cobra.Command {
-
-	cmd := create{
-		output:         output,
-		machineCreator: libmachete.NewCreator(registry, machines)}
-
-	return &cobra.Command{
-		Use:   "create provisioner machine",
-		Short: "create a machine",
-		RunE: func(_ *cobra.Command, args []string) error {
-			return cmd.run(args)
-		},
-	}
-}
-
-func machineRoutes(c libmachete.Credentials, m libmachete.Machines) map[*rest.Endpoint]rest.Handler {
 	return map[*rest.Endpoint]rest.Handler{
 		&rest.Endpoint{
 			UrlRoute:   "/machines/json",
@@ -60,104 +39,98 @@ func machineRoutes(c libmachete.Credentials, m libmachete.Machines) map[*rest.En
 				"context":     "default",
 			},
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+			context := rest.GetUrlParameter(req, "context")
 			credentials := rest.GetUrlParameter(req, "credentials")
 			template := rest.GetUrlParameter(req, "template")
 			key := rest.GetUrlParameter(req, "key")
 
-			log.Infof("Add machine %v, %v as %v", template, key, credential)
-
-			buff, err := ioutil.ReadAll(req.Body)
-			if err != nil {
-				respondError(http.StatusInternalServerError, resp, err)
-				return
+			// BUG
+			if context == "" {
+				context = "default"
+			}
+			if credentials == "" {
+				credentials = "default"
+			}
+			if template == "" {
+				template = "default"
 			}
 
-			// TODO - load up the context
-			ctx := context.Background()
+			log.Infof("Add machine context=%v, template=%v, key=%v as %v", context, template, key, credentials)
 
+			// credential
 			cred, err := c.Get(credentials)
 			if err != nil {
 				respondError(http.StatusNotFound, resp, err)
 				return
 			}
 
-			err := t.CreateMachine(ctx, cred, key, bytes.NewBuffer(buff), libmachete.CodecByContentTypeHeader(req))
+			provisioner := cred.ProvisionerName()
 
-			if err == nil {
+			// Runtime context
+			runContext, err := x.Get(context)
+			if err != nil {
+				respondError(http.StatusNotFound, resp, err)
 				return
 			}
 
-			switch err.Code {
-			case libmachete.ErrMachineDuplicate:
-				respondError(http.StatusConflict, resp, err)
-				return
-			case libmachete.ErrMachineNotFound:
+			// Configure the provisioner
+			ctx = libmachete.BuildContext(provisioner, ctx, runContext)
+
+			// Load template
+			tpl, err := t.Get(provisioner, template)
+			if err != nil {
 				respondError(http.StatusNotFound, resp, err)
 				return
+			}
+
+			machineErr := m.CreateMachine(ctx, cred, tpl, key, req.Body, libmachete.CodecByContentTypeHeader(req))
+
+			if machineErr == nil {
+				return
+			}
+
+			switch machineErr.Code {
+			case libmachete.ErrMachineDuplicate:
+				respondError(http.StatusConflict, resp, machineErr)
+				return
+			case libmachete.ErrMachineNotFound:
+				respondError(http.StatusNotFound, resp, machineErr)
+				return
 			default:
-				respondError(http.StatusInternalServerError, resp, err)
+				respondError(http.StatusInternalServerError, resp, machineErr)
 				return
 			}
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/machines/{provisioner}/{key}",
-			HttpMethod: rest.PUT,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			provisioner := rest.GetUrlParameter(req, "provisioner")
-			key := rest.GetUrlParameter(req, "key")
-			log.Infof("Update machine %v\n", key)
-
-			err := t.UpdateMachine(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
-
-			if err == nil {
-				return
-			}
-
-			switch err.Code {
-			case libmachete.ErrMachineDuplicate:
-				respondError(http.StatusConflict, resp, err)
-				return
-			case libmachete.ErrMachineNotFound:
-				respondError(http.StatusNotFound, resp, err)
-				return
-			default:
-				respondError(http.StatusInternalServerError, resp, err)
-				return
-			}
-		},
-		&rest.Endpoint{
-			UrlRoute:   "/machines/{provisioner}/{key}/json",
+			UrlRoute:   "/machines/{key}/json",
 			HttpMethod: rest.GET,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			cr, err := t.Get(provisioner, key)
+			mr, err := m.Get(key)
 			if err != nil {
 				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown machine:%s", key))
 				return
 			}
-			libmachete.ContentTypeJSON.Respond(resp, cr)
+			libmachete.ContentTypeJSON.Respond(resp, mr)
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/machines/{provisioner}/{key}/yaml",
+			UrlRoute:   "/machines/{key}/yaml",
 			HttpMethod: rest.GET,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			cr, err := t.Get(provisioner, key)
+			mr, err := m.Get(key)
 			if err != nil {
 				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown machine:%s", key))
 				return
 			}
-			libmachete.ContentTypeYAML.Respond(resp, cr)
+			libmachete.ContentTypeYAML.Respond(resp, mr)
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/machines/{provisioner}/{key}",
+			UrlRoute:   "/machines/{key}",
 			HttpMethod: rest.DELETE,
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			err := t.Delete(provisioner, key)
+			err := m.Delete(key)
 			if err != nil {
 				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown machine:%s", key))
 				return

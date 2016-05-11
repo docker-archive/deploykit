@@ -44,6 +44,7 @@ type MachineRequest interface {
 	Name() string
 	ProvisionerName() string
 	Version() string
+	SetName(string)
 }
 
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
@@ -52,6 +53,10 @@ type BaseMachineRequest struct {
 	MachineName        string `yaml:"name" json:"name"`
 	Provisioner        string `yaml:"provisioner" json:"provisioner"`
 	ProvisionerVersion string `yaml:"version" json:"version"`
+}
+
+func (req *BaseMachineRequest) SetName(n string) {
+	req.MachineName = n
 }
 
 // Name returns the name to give the machine, once created.
