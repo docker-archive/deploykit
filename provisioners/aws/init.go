@@ -5,6 +5,7 @@ import (
 )
 
 func init() {
+	libmachete.RegisterContextBuilder(ProvisionerName, BuildContextFromKVPair)
 	libmachete.RegisterCredentialer(ProvisionerName, NewCredential)
 	libmachete.RegisterTemplateBuilder(ProvisionerName, NewMachineRequest)
 }

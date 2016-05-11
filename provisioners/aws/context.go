@@ -1,6 +1,8 @@
 package aws
 
 import (
+	"github.com/docker/libmachete"
+	"github.com/mitchellh/mapstructure"
 	"golang.org/x/net/context"
 )
 
@@ -12,6 +14,17 @@ type contextKey int
 const (
 	regionKey contextKey = iota
 )
+
+func BuildContextFromKVPair(parent context.Context, m libmachete.KVPair) context.Context {
+	t := &struct {
+		Region string `json:"region" yaml:"region"`
+	}{}
+	err := mapstructure.Decode(m, t)
+	if err == nil {
+		return BuildContext(parent, t.Region)
+	}
+	return parent
+}
 
 // BuildContext returns a context that's properly configured with the required context data.
 func BuildContext(parent context.Context, region string) context.Context {
