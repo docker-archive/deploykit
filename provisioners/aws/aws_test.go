@@ -54,6 +54,14 @@ func (w WrongRequestType) Name() string {
 	return "nope"
 }
 
+func (w WrongRequestType) ProvisionerName() string {
+	return "nope"
+}
+
+func (w WrongRequestType) Version() string {
+	return "nope"
+}
+
 func TestCreateIncompatibleType(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

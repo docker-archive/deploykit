@@ -5,6 +5,20 @@ import (
 	"strings"
 )
 
+// ContextID is the type of the context key
+type ContextID string
+
+// Contexts handles the storage of context objects
+type Contexts interface {
+	Save(id ContextID, contextData interface{}) error
+
+	List() ([]ContextID, error)
+
+	GetContext(id ContextID, contextData interface{}) error
+
+	Delete(id ContextID) error
+}
+
 // MachineID is the globally-unique identifier for machines.
 type MachineID string
 
