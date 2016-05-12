@@ -13,7 +13,7 @@ import (
 	"path"
 )
 
-func initTemplatesDir(path string) error {
+func initTemplateLoaderDir(path string) error {
 	pathInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -37,7 +37,7 @@ func initTemplatesRepo() (libmachete.TemplateLoader, error) {
 	}
 
 	templatesDir := path.Join(usr.HomeDir, ".machete")
-	err = initTemplatesDir(templatesDir)
+	err = initTemplateLoaderDir(templatesDir)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,6 @@ func main() {
 		Use:   "machete",
 		Short: "provision and manage Docker machines across multiple cloud providers"}
 
-	RootCmd.AddCommand(command.ServerCmd())
 	RootCmd.AddCommand(command.GetSubcommands(output, registry, templates)...)
 
 	switch err := RootCmd.Execute().(type) {
