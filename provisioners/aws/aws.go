@@ -162,6 +162,8 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
+// NewMachineRequest returns a canonical machine request suitable for this provisioner.
+// This includes the standard workflow steps as well as the platform attributes.
 func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
