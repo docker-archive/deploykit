@@ -3,30 +3,29 @@ package aws
 var (
 	testCreateSync = []string{`
 {
-    "AvailabilityZone": "us-west-2a",
-    "ImageID": "ami-30ee0d50",
-    "BlockDeviceName": "/dev/sdb",
-    "RootSize": 64,
-    "VolumeType": "gp2",
-    "DeleteOnTermination": true,
-    "SecurityGroupIds": [
+    "availability_zone": "us-west-2a",
+    "image_id": "ami-30ee0d50",
+    "block_device_name": "/dev/sdb",
+    "root_size": 64,
+    "volume_type": "gp2",
+    "delete_on_termination": true,
+    "security_group_ids": [
       "sg-973491f0"
     ],
-    "SubnetID": "",
-    "InstanceType": "t2.micro",
-    "PrivateIPAddress": "",
-    "AssociatePublicIPAddress": true,
-    "PrivateIPOnly": false,
-    "EbsOptimized": false,
-    "IamInstanceProfile": "",
-    "Tags": {
+    "subnet_id": "",
+    "instance_type": "t2.micro",
+    "private_ip_ddress": "",
+    "associate_public_ip_address": true,
+    "private_ip_only": false,
+    "ebs_optimized": false,
+    "iam_instance_profile": "",
+    "tags": {
       "Name": "unit-test-create",
       "test": "aws-create-test"
     },
-    "KeyName": "dev",
-    "VpcID": "vpc-74c22510",
-    "Zone": "a",
-    "Monitoring": true
+    "key_name": "dev",
+    "vpc_id": "vpc-74c22510",
+    "monitoring": true
 }
 `, `
 {
