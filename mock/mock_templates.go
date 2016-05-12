@@ -32,9 +32,9 @@ func (_m *MockTemplates) EXPECT() *_MockTemplatesRecorder {
 	return _m.recorder
 }
 
-func (_m *MockTemplates) CreateTemplate(_param0 string, _param1 string, _param2 io.Reader, _param3 *libmachete.Codec) *libmachete.TemplateError {
+func (_m *MockTemplates) CreateTemplate(_param0 string, _param1 string, _param2 io.Reader, _param3 *libmachete.Codec) *libmachete.Error {
 	ret := _m.ctrl.Call(_m, "CreateTemplate", _param0, _param1, _param2, _param3)
-	ret0, _ := ret[0].(*libmachete.TemplateError)
+	ret0, _ := ret[0].(*libmachete.Error)
 	return ret0
 }
 
@@ -126,9 +126,9 @@ func (_mr *_MockTemplatesRecorder) Unmarshal(arg0, arg1, arg2 interface{}) *gomo
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Unmarshal", arg0, arg1, arg2)
 }
 
-func (_m *MockTemplates) UpdateTemplate(_param0 string, _param1 string, _param2 io.Reader, _param3 *libmachete.Codec) *libmachete.TemplateError {
+func (_m *MockTemplates) UpdateTemplate(_param0 string, _param1 string, _param2 io.Reader, _param3 *libmachete.Codec) *libmachete.Error {
 	ret := _m.ctrl.Call(_m, "UpdateTemplate", _param0, _param1, _param2, _param3)
-	ret0, _ := ret[0].(*libmachete.TemplateError)
+	ret0, _ := ret[0].(*libmachete.Error)
 	return ret0
 }
 

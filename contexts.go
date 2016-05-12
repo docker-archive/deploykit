@@ -11,13 +11,16 @@ import (
 // KVPair models the key-value pairs
 type KVPair map[string]interface{}
 
+// ContextBuilder is the function that a provisioner can customize a runtime context
+// using values statically defined in a persisted context.  This is where a provisioner
+// can load in configuration parameters such as region, timeouts, OAuth app id, etc.
 type ContextBuilder func(context.Context, KVPair) context.Context
 
 var (
 	contextBuilders = map[string]ContextBuilder{}
 )
 
-// RegisterCredentialer registers the function that allocates an empty credential for a provisioner.
+// RegisterContextBuilder registers the a provisioner's configuration / context builder.
 // This method should be invoke in the init() of the provisioner package.
 func RegisterContextBuilder(provisionerName string, f ContextBuilder) {
 	lock.Lock()
@@ -38,20 +41,6 @@ func BuildContext(provisionerName string, root context.Context, ctx Context) con
 		return root
 	}
 	return builder(root, nvpair)
-}
-
-const (
-	ErrContextDuplicate int = iota
-	ErrContextNotFound
-)
-
-type ContextError struct {
-	Code    int
-	Message string
-}
-
-func (e ContextError) Error() string {
-	return e.Message
 }
 
 // Context is the application / provisioner-level configuration object that
@@ -96,10 +85,10 @@ type Contexts interface {
 	Exists(key string) bool
 
 	// CreateContext adds a new context from the input reader.
-	CreateContext(key string, input io.Reader, codec *Codec) *ContextError
+	CreateContext(key string, input io.Reader, codec *Codec) *Error
 
 	// UpdateContext updates an existing context
-	UpdateContext(key string, input io.Reader, codec *Codec) *ContextError
+	UpdateContext(key string, input io.Reader, codec *Codec) *Error
 }
 
 type contexts struct {
@@ -159,43 +148,43 @@ func (t *contexts) Exists(key string) bool {
 }
 
 // CreateContext creates a new context from the input reader.
-func (t *contexts) CreateContext(key string, input io.Reader, codec *Codec) *ContextError {
+func (t *contexts) CreateContext(key string, input io.Reader, codec *Codec) *Error {
 	if t.Exists(key) {
-		return &ContextError{ErrContextDuplicate, fmt.Sprintf("Key exists: %v", key)}
+		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &ContextError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 
 	ctx := new(Context)
 	if err = t.Unmarshal(codec, buff, ctx); err != nil {
-		return &ContextError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 	if err = t.Save(key, *ctx); err != nil {
-		return &ContextError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 	return nil
 }
 
-func (t *contexts) UpdateContext(key string, input io.Reader, codec *Codec) *ContextError {
+func (t *contexts) UpdateContext(key string, input io.Reader, codec *Codec) *Error {
 	if !t.Exists(key) {
-		return &ContextError{ErrContextNotFound, fmt.Sprintf("Context not found: %v", key)}
+		return &Error{ErrNotFound, fmt.Sprintf("Context not found: %v", key)}
 	}
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &ContextError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 
 	}
 
 	ctx := new(Context)
 	if err = t.Unmarshal(codec, buff, ctx); err != nil {
-		return &ContextError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 	if err = t.Save(key, *ctx); err != nil {
-		return &ContextError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 	return nil
 }

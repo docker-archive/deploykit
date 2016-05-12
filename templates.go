@@ -8,31 +8,21 @@ import (
 	"io/ioutil"
 )
 
+// TemplateBuilder is simply a machine request builder, since templates are just
+// machine requests with values prepopulated.
+type TemplateBuilder MachineRequestBuilder
+
 var (
-	templateBuilders = map[string]func() api.MachineRequest{}
+	templateBuilders = map[string]TemplateBuilder{}
 )
 
-// RegisterCredentialer registers the function that allocates an empty credential for a provisioner.
+// RegisterTemplateBuilder registers the function that allocates an empty credential for a provisioner.
 // This method should be invoke in the init() of the provisioner package.
-func RegisterTemplateBuilder(provisionerName string, f func() api.MachineRequest) {
+func RegisterTemplateBuilder(provisionerName string, f TemplateBuilder) {
 	lock.Lock()
 	defer lock.Unlock()
 
 	templateBuilders[provisionerName] = f
-}
-
-const (
-	ErrTemplateDuplicate int = iota
-	ErrTemplateNotFound
-)
-
-type TemplateError struct {
-	Code    int
-	Message string
-}
-
-func (e TemplateError) Error() string {
-	return e.Message
 }
 
 // Templates looks up and reads template data, scoped by provisioner name.
@@ -64,10 +54,10 @@ type Templates interface {
 	Exists(provisioner, key string) bool
 
 	// CreateTemplate adds a new template from the input reader.
-	CreateTemplate(provisioner, key string, input io.Reader, codec *Codec) *TemplateError
+	CreateTemplate(provisioner, key string, input io.Reader, codec *Codec) *Error
 
 	// UpdateTemplate updates an existing template
-	UpdateTemplate(provisioner, key string, input io.Reader, codec *Codec) *TemplateError
+	UpdateTemplate(provisioner, key string, input io.Reader, codec *Codec) *Error
 }
 
 type templates struct {
@@ -134,52 +124,52 @@ func (t *templates) Exists(provisioner, key string) bool {
 }
 
 // CreateTemplate creates a new template from the input reader.
-func (t *templates) CreateTemplate(provisioner, key string, input io.Reader, codec *Codec) *TemplateError {
+func (t *templates) CreateTemplate(provisioner, key string, input io.Reader, codec *Codec) *Error {
 	if t.Exists(provisioner, key) {
-		return &TemplateError{ErrTemplateDuplicate, fmt.Sprintf("Key exists: %v / %v", provisioner, key)}
+		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v / %v", provisioner, key)}
 	}
 
 	tmpl, err := t.NewTemplate(provisioner)
 	if err != nil {
-		return &TemplateError{ErrTemplateNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
+		return &Error{ErrNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
 	}
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &TemplateError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 
 	if err = t.Unmarshal(codec, buff, tmpl); err != nil {
-		return &TemplateError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 	if err = t.Save(provisioner, key, tmpl); err != nil {
-		return &TemplateError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 	return nil
 }
 
-func (t *templates) UpdateTemplate(provisioner, key string, input io.Reader, codec *Codec) *TemplateError {
+func (t *templates) UpdateTemplate(provisioner, key string, input io.Reader, codec *Codec) *Error {
 	if !t.Exists(provisioner, key) {
-		return &TemplateError{ErrTemplateNotFound, fmt.Sprintf("Template not found: %v / %v", provisioner, key)}
+		return &Error{ErrNotFound, fmt.Sprintf("Template not found: %v / %v", provisioner, key)}
 	}
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &TemplateError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 
 	}
 
 	tmpl, err := t.NewTemplate(provisioner)
 	if err != nil {
-		return &TemplateError{ErrTemplateNotFound, fmt.Sprintf("Unknow provisioner: %v", provisioner)}
+		return &Error{ErrNotFound, fmt.Sprintf("Unknow provisioner: %v", provisioner)}
 	}
 
 	if err = t.Unmarshal(codec, buff, tmpl); err != nil {
-		return &TemplateError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 
 	if err = t.Save(provisioner, key, tmpl); err != nil {
-		return &TemplateError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 	return nil
 }

@@ -11,13 +11,15 @@ import (
 	"time"
 )
 
+// MachineRequestBuilder is a provisioner-provided function that creates a typed request
+// that satifies the MachineRequest interface.
 type MachineRequestBuilder func() api.MachineRequest
 
 var (
 	machineCreators = map[string]MachineRequestBuilder{}
 )
 
-// RegisterMachineCreator registers the function that allocates an empty credential for a provisioner.
+// RegisterMachineRequestBuilder registers by provisioner the request builder.
 // This method should be invoke in the init() of the provisioner package.
 func RegisterMachineRequestBuilder(provisionerName string, f MachineRequestBuilder) {
 	lock.Lock()
@@ -26,20 +28,7 @@ func RegisterMachineRequestBuilder(provisionerName string, f MachineRequestBuild
 	machineCreators[provisionerName] = f
 }
 
-const (
-	ErrMachineDuplicate int = iota
-	ErrMachineNotFound
-)
-
-type MachineError struct {
-	Code    int
-	Message string
-}
-
-func (e MachineError) Error() string {
-	return e.Message
-}
-
+// Machines manages the lifecycle of a machine / node.
 type Machines interface {
 	// NewMachines creates an instance of the manager given the backing store.
 	NewMachineRequest(provisionerName string) (api.MachineRequest, error)
@@ -66,7 +55,7 @@ type Machines interface {
 
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(ctx context.Context, cred api.Credential,
-		template api.MachineRequest, key string, input io.Reader, codec *Codec) *MachineError
+		template api.MachineRequest, key string, input io.Reader, codec *Codec) *Error
 }
 
 type machines struct {
@@ -138,16 +127,16 @@ func (cm *machines) Exists(key string) bool {
 
 // CreateMachine creates a new machine from the input reader.
 func (cm *machines) CreateMachine(ctx context.Context, cred api.Credential,
-	template api.MachineRequest, key string, input io.Reader, codec *Codec) *MachineError {
+	template api.MachineRequest, key string, input io.Reader, codec *Codec) *Error {
 
 	if cm.Exists(key) {
-		return &MachineError{ErrMachineDuplicate, fmt.Sprintf("Key exists: %v", key)}
+		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
 
 	provisioner := cred.ProvisionerName()
 	mr, err := cm.NewMachineRequest(provisioner)
 	if err != nil {
-		return &MachineError{ErrMachineNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
+		return &Error{ErrNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
 	}
 
 	if template != nil {
@@ -157,7 +146,7 @@ func (cm *machines) CreateMachine(ctx context.Context, cred api.Credential,
 	buff, err := ioutil.ReadAll(input)
 	if err == nil && len(buff) > 0 {
 		if err = cm.Unmarshal(codec, buff, mr); err != nil {
-			return &MachineError{Message: err.Error()}
+			return &Error{Message: err.Error()}
 		}
 	}
 
@@ -174,7 +163,7 @@ func (cm *machines) CreateMachine(ctx context.Context, cred api.Credential,
 	record.AppendEvent(storage.Event{Name: "init", Message: "Create starts", Data: mr})
 
 	if err = cm.store.Save(*record, mr); err != nil {
-		return &MachineError{Message: err.Error()}
+		return &Error{Message: err.Error()}
 	}
 
 	// TODO - start process

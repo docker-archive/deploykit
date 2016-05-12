@@ -19,7 +19,7 @@ func RegisterTask(provisionerName string, task api.Task) {
 	tasks[task.Name][provisionerName] = &task
 }
 
-// GetTaskFunc returns the task function by provisioner and task name
+// GetTask returns the task function by provisioner and task name
 func GetTask(provisionerName string, name api.TaskName) *api.Task {
 	if m, has := tasks[name]; has {
 		if f, has := m[provisionerName]; has {

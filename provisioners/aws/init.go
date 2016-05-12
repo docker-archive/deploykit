@@ -21,24 +21,28 @@ func dummy(m string) func(ctx context.Context, cred api.Credential, req api.Mach
 }
 
 var (
+	// SSHKeyGen is the task that generates SSH key
 	SSHKeyGen = api.Task{
 		Name:    api.TaskName("ssh-key-gen"),
 		Message: "Generating ssh key for host",
 		Do:      dummy("SSHKeyGen"),
 	}
 
+	// CreateInstance creates the instance via AWS EC2 API calls
 	CreateInstance = api.Task{
 		Name:    api.TaskName("create-instance"),
 		Message: "Creating instance",
 		Do:      dummy("CreateInstance"),
 	}
 
+	// UserData sets up the instance with user instance data (eg. files, etc.)
 	UserData = api.Task{
 		Name:    api.TaskName("user-data"),
 		Message: "Copy user data",
 		Do:      dummy("UserData"),
 	}
 
+	// InstallEngine is the task for installing docker engine.  Requires SSH access.
 	InstallEngine = api.Task{
 		Name:    api.TaskName("install-engine"),
 		Message: "Install docker engine",

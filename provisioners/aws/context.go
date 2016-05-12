@@ -15,6 +15,8 @@ const (
 	regionKey contextKey = iota
 )
 
+// BuildContextFromKVPair is the ContextBuilder that allows the provisioner to configure
+// itself at runtime using the given static key-value pair loaded by the framework.
 func BuildContextFromKVPair(parent context.Context, m libmachete.KVPair) context.Context {
 	t := &struct {
 		Region string `json:"region" yaml:"region"`

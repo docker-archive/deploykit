@@ -58,6 +58,10 @@ type TaskName string
 // TaskFunc is the unit of work that a provisioner is able to run.  It's identified by the TaskName
 type TaskFunc func(context.Context, Credential, MachineRequest) <-chan interface{}
 
+// Task is a descriptor of task that a provisioner supports.  Tasks are referenced by TaskName
+// in a machine request or template.  This allows customization of provisioner behavior - such
+// as skipping engine installs (if underlying image already has docker engine), skipping SSH
+// key (if no sshd allowed), etc.
 type Task struct {
 	Name    TaskName
 	Message string
@@ -88,7 +92,7 @@ func (req BaseMachineRequest) Name() string {
 	return req.MachineName
 }
 
-// Provisioner returns the provisioner
+// ProvisionerName returns the provisioner name
 func (req BaseMachineRequest) ProvisionerName() string {
 	return req.Provisioner
 }

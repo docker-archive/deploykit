@@ -88,26 +88,28 @@ type Credentials interface {
 	Delete(id CredentialsID) error
 }
 
-// TemplatesID is a -unique identifier for template within a provisioner namespace
+// TemplateID is a unique identifier for template within a provisioner namespace
 type TemplateID struct {
 	Provisioner string
 	Name        string
 }
 
+// Key returns the key used for looking up the template.  Key is composed of the provisioner
+// name and the name of the template (scoped to a provisioner).
 func (t TemplateID) Key() string {
 	return fmt.Sprintf("%s-%s", t.Provisioner, t.Name)
 }
 
+// TemplateIDFromString returns a TemplateID from a simple untyped string of some format.
 func TemplateIDFromString(s string) TemplateID {
 	p := strings.Split(s, "-")
 	if len(p) > 1 {
 		return TemplateID{p[0], p[1]}
-	} else {
-		return TemplateID{"", p[1]} // Invalid template
 	}
+	return TemplateID{"", p[1]} // Invalid template
 }
 
-// Template handles storage of template
+// Templates handles storage of template
 type Templates interface {
 	Save(id TemplateID, templateData interface{}) error
 

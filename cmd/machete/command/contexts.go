@@ -7,8 +7,6 @@ import (
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/cmd/machete/console"
 	"github.com/docker/libmachete/provisioners"
-	_ "github.com/docker/libmachete/provisioners/aws"
-	_ "github.com/docker/libmachete/provisioners/azure"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 	"net/http"
@@ -63,10 +61,10 @@ func contextRoutes(c libmachete.Contexts) map[*rest.Endpoint]rest.Handler {
 			}
 
 			switch err.Code {
-			case libmachete.ErrContextDuplicate:
+			case libmachete.ErrDuplicate:
 				respondError(http.StatusConflict, resp, err)
 				return
-			case libmachete.ErrContextNotFound:
+			case libmachete.ErrNotFound:
 				respondError(http.StatusNotFound, resp, err)
 				return
 			default:
@@ -88,10 +86,10 @@ func contextRoutes(c libmachete.Contexts) map[*rest.Endpoint]rest.Handler {
 			}
 
 			switch err.Code {
-			case libmachete.ErrContextDuplicate:
+			case libmachete.ErrDuplicate:
 				respondError(http.StatusConflict, resp, err)
 				return
-			case libmachete.ErrContextNotFound:
+			case libmachete.ErrNotFound:
 				respondError(http.StatusNotFound, resp, err)
 				return
 			default:

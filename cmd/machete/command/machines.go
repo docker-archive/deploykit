@@ -5,8 +5,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
-	_ "github.com/docker/libmachete/provisioners/aws"
-	_ "github.com/docker/libmachete/provisioners/azure"
 	"golang.org/x/net/context"
 	"net/http"
 )
@@ -90,10 +88,10 @@ func machineRoutes(
 			}
 
 			switch machineErr.Code {
-			case libmachete.ErrMachineDuplicate:
+			case libmachete.ErrDuplicate:
 				respondError(http.StatusConflict, resp, machineErr)
 				return
-			case libmachete.ErrMachineNotFound:
+			case libmachete.ErrNotFound:
 				respondError(http.StatusNotFound, resp, machineErr)
 				return
 			default:

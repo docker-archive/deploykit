@@ -7,8 +7,6 @@ import (
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/cmd/machete/console"
 	"github.com/docker/libmachete/provisioners"
-	_ "github.com/docker/libmachete/provisioners/aws"
-	_ "github.com/docker/libmachete/provisioners/azure"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 	"net/http"
@@ -67,10 +65,10 @@ func credentialRoutes(c libmachete.Credentials) map[*rest.Endpoint]rest.Handler 
 			}
 
 			switch err.Code {
-			case libmachete.ErrCredentialDuplicate:
+			case libmachete.ErrDuplicate:
 				respondError(http.StatusConflict, resp, err)
 				return
-			case libmachete.ErrCredentialNotFound:
+			case libmachete.ErrNotFound:
 				respondError(http.StatusNotFound, resp, err)
 				return
 			default:
@@ -92,10 +90,10 @@ func credentialRoutes(c libmachete.Credentials) map[*rest.Endpoint]rest.Handler 
 			}
 
 			switch err.Code {
-			case libmachete.ErrCredentialDuplicate:
+			case libmachete.ErrDuplicate:
 				respondError(http.StatusConflict, resp, err)
 				return
-			case libmachete.ErrCredentialNotFound:
+			case libmachete.ErrNotFound:
 				respondError(http.StatusNotFound, resp, err)
 				return
 			default:

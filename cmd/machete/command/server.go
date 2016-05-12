@@ -15,6 +15,12 @@ import (
 	"strings"
 )
 
+import (
+	// Load the supported provisioners
+	_ "github.com/docker/libmachete/provisioners/aws"
+	_ "github.com/docker/libmachete/provisioners/azure"
+)
+
 type apiOptions struct {
 	Port    int
 	RootDir string
@@ -139,6 +145,7 @@ var (
 	server = &apiServer{}
 )
 
+// ServerCmd returns the serve subcommand.
 func ServerCmd() *cobra.Command {
 
 	cmd := &cobra.Command{

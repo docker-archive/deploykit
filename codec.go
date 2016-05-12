@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// Codec puts supported format / encoding for objects in one place.
 type Codec struct {
 	ContentType string
 	marshal     func(v interface{}) ([]byte, error)
@@ -13,6 +14,7 @@ type Codec struct {
 }
 
 var (
+	// ContentTypeJSON is the codec for JSON
 	ContentTypeJSON = &Codec{
 		ContentType: "application/json",
 		marshal: func(v interface{}) ([]byte, error) {
@@ -23,6 +25,7 @@ var (
 		},
 	}
 
+	// ContentTypeYAML is the codec for YAML
 	ContentTypeYAML = &Codec{
 		ContentType: "text/plain",
 		marshal: func(v interface{}) ([]byte, error) {
@@ -33,6 +36,9 @@ var (
 		},
 	}
 
+	// DefaultContentType is the content type assumed when
+	// user does not specify the content type is http calls or in api calls
+	// with nil Codec
 	DefaultContentType = ContentTypeJSON
 
 	codecs = map[string]*Codec{

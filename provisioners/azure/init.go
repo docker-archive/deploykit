@@ -2,12 +2,10 @@ package azure
 
 import (
 	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/provisioners/api"
 )
 
 func init() {
 	libmachete.RegisterCredentialer(ProvisionerName, NewCredential)
-	libmachete.RegisterTemplateBuilder(ProvisionerName, NewMachineRequest)
 }
 
 const (
@@ -15,8 +13,3 @@ const (
 	// It is used in all API / CLI to identify the provisioner.
 	ProvisionerName = "azure"
 )
-
-// TODO
-func NewMachineRequest() api.MachineRequest {
-	return nil
-}
