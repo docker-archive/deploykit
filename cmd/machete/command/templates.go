@@ -5,33 +5,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/cmd/machete/console"
-	"github.com/docker/libmachete/provisioners"
-	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 	"net/http"
 )
-
-type templates struct {
-	output console.Console
-}
-
-func templatesCmd(output console.Console,
-	registry *provisioners.Registry,
-	templates libmachete.Templates) *cobra.Command {
-
-	cmd := create{
-		output:         output,
-		machineCreator: libmachete.NewCreator(registry, templates)}
-
-	return &cobra.Command{
-		Use:   "create provisioner template",
-		Short: "create a machine",
-		RunE: func(_ *cobra.Command, args []string) error {
-			return cmd.run(args)
-		},
-	}
-}
 
 func templateRoutes(t libmachete.Templates) map[*rest.Endpoint]rest.Handler {
 	return map[*rest.Endpoint]rest.Handler{

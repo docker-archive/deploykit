@@ -7,7 +7,6 @@ import (
 	"github.com/docker/libmachete/cmd/machete/console"
 	"github.com/docker/libmachete/provisioners"
 	"github.com/docker/libmachete/provisioners/aws"
-	"github.com/docker/libmachete/storage/filestores"
 	"github.com/spf13/cobra"
 	"os"
 	"os/user"
@@ -31,7 +30,7 @@ func initTemplatesDir(path string) error {
 	return nil
 }
 
-func initTemplatesRepo() (libmachete.Templates, error) {
+func initTemplatesRepo() (libmachete.TemplateLoader, error) {
 	usr, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to look up current user: %s", err)
@@ -43,11 +42,10 @@ func initTemplatesRepo() (libmachete.Templates, error) {
 		return nil, err
 	}
 
-	store, err := filestores.NewTemplates(templatesDir)
+	templates, err := libmachete.FileTemplateLoader(templatesDir)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to locate templates: %s", err)
 	}
-	templates := libmachete.NewTemplates(store)
 	return templates, nil
 }
 

@@ -38,7 +38,7 @@ func (c *create) run(args []string) error {
 func createCmd(
 	output console.Console,
 	registry *provisioners.Registry,
-	templates libmachete.Templates) *cobra.Command {
+	templates libmachete.TemplateLoader) *cobra.Command {
 
 	cmd := create{
 		output:         output,
