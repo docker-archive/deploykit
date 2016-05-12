@@ -1,5 +1,9 @@
 package api
 
+import (
+	"golang.org/x/net/context"
+)
+
 // CreateInstanceEventType is the identifier for an instance create event.
 type CreateInstanceEventType int
 
@@ -45,16 +49,36 @@ type MachineRequest interface {
 	ProvisionerName() string
 	Version() string
 	SetName(string)
+	ProvisionWorkflow() []TaskName
+}
+
+// TaskName is a name for a task that a provisioner is able to run
+type TaskName string
+
+// TaskFunc is the unit of work that a provisioner is able to run.  It's identified by the TaskName
+type TaskFunc func(context.Context, Credential, MachineRequest) <-chan interface{}
+
+type Task struct {
+	Name    TaskName
+	Message string
+	Do      TaskFunc
 }
 
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
-	MachineName        string `yaml:"name" json:"name"`
-	Provisioner        string `yaml:"provisioner" json:"provisioner"`
-	ProvisionerVersion string `yaml:"version" json:"version"`
+	MachineName        string     `yaml:"name" json:"name"`
+	Provisioner        string     `yaml:"provisioner" json:"provisioner"`
+	ProvisionerVersion string     `yaml:"version" json:"version"`
+	Workflow           []TaskName `yaml:"workflow,omitempty" json:"workflow,omitempty"`
 }
 
+// ProvisionWorkflow returns the tasks to do
+func (req BaseMachineRequest) ProvisionWorkflow() []TaskName {
+	return req.Workflow
+}
+
+// SetName sets the name of the machine
 func (req *BaseMachineRequest) SetName(n string) {
 	req.MachineName = n
 }

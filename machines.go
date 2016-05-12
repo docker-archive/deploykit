@@ -180,19 +180,43 @@ func (cm *machines) CreateMachine(ctx context.Context, cred api.Credential,
 	// TODO - start process
 	go func() {
 
-		for _, e := range []storage.Event{
-			{Name: "ssh", Message: "generated ssh key"},
-			{Name: "instance", Message: "instance created."},
-			{Name: "userdata", Message: "set up per instance userdata"},
-			{Name: "engine", Message: "installing engine"},
-			{Name: "engine", Message: "engine installed"},
-			{Name: "provisioned", Message: "machine is ready."},
-		} {
-			time.Sleep(10 * time.Second) // BOGUS
-			record.AppendEvent(e)
-			err := cm.store.Save(*record, mr)
-			log.Infoln("Saved:", "err=", err, len(record.Events), record)
+		tasks := []api.Task{}
+		for _, tn := range mr.ProvisionWorkflow() {
+
+			task := GetTask(provisioner, tn)
+			log.Infof("For provisioner %v name %v found task %v", provisioner, tn, task)
+			if task == nil {
+				log.Errorf("Provisioner %v does not support %v", provisioner, tn)
+			} else {
+				tasks = append(tasks, *task)
+			}
+
 		}
+
+		if len(tasks) != len(mr.ProvisionWorkflow()) {
+			return // Don't do anything
+		}
+
+		for _, task := range tasks {
+
+			for data := range task.Do(ctx, cred, mr) {
+				record.AppendEvent(storage.Event{
+					Name:    string(task.Name),
+					Message: task.Message,
+					Data:    data,
+				})
+				cm.store.Save(*record, mr)
+				log.Infoln("Saved:", "err=", err, len(record.Events), record)
+			}
+			record.AppendEvent(storage.Event{
+				Name:    string(task.Name),
+				Message: task.Message + " completed",
+			})
+			cm.store.Save(*record, mr)
+			log.Infoln("Saved:", "err=", err, len(record.Events), record)
+
+		}
+
 	}()
 
 	return nil

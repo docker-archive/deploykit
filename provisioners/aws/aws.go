@@ -166,6 +166,12 @@ func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
+	req.Workflow = []api.TaskName{
+		SSHKeyGen.Name,
+		CreateInstance.Name,
+		UserData.Name,
+		InstallEngine.Name,
+	}
 	return req
 }
 
