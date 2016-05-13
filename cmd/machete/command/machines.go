@@ -81,7 +81,7 @@ func machineRoutes(
 				return
 			}
 
-			machineErr := m.CreateMachine(ctx, cred, tpl, key, req.Body, libmachete.CodecByContentTypeHeader(req))
+			events, machineErr := m.CreateMachine(ctx, cred, tpl, key, req.Body, libmachete.CodecByContentTypeHeader(req))
 
 			if machineErr == nil {
 				return
