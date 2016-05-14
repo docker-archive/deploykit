@@ -41,7 +41,7 @@ func machineRoutes(
 			credentials := rest.GetUrlParameter(req, "credentials")
 			template := rest.GetUrlParameter(req, "template")
 
-			// BUG
+			// TODO - fix this in framework to return default values
 			if context == "" {
 				context = "default"
 			}
@@ -120,7 +120,7 @@ func machineRoutes(
 			key := rest.GetUrlParameter(req, "key")
 			mr, err := m.Get(key)
 			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown machine:%s", key))
+				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown machine:%s, err=%s", key, err.Error()))
 				return
 			}
 			libmachete.ContentTypeJSON.Respond(resp, mr)

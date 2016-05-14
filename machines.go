@@ -195,7 +195,7 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 				}
 				if err := task.Do(ctx, cred, mr, taskEvents); err != nil {
 					event.Message = task.Message + " errored: " + err.Error()
-					event.Error = err
+					event.Error = err.Error()
 				} else {
 					event.Message = task.Message + " completed"
 				}
@@ -221,11 +221,11 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 					event = te
 				case api.HasError:
 					if e := te.GetError(); e != nil {
-						event.Error = e
+						event.Error = e.Error()
 						stop = true
 					}
 				case error:
-					event.Error = te
+					event.Error = te.Error()
 					stop = true
 				}
 

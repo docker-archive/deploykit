@@ -47,7 +47,7 @@ type Event struct {
 	Name      string      `json:"event"`
 	Message   string      `json:"message"`
 	Data      interface{} `json:"data,omitempty"`
-	Error     error       `json:"error,omitempty"`
+	Error     string      `json:"error,omitempty"`
 }
 
 // MachineRecord is the storage structure that will be included for all machines.
