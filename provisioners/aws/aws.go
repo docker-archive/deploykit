@@ -49,7 +49,7 @@ func (a Builder) Build(params map[string]string) (api.Provisioner, error) {
 	return New(client), nil
 }
 
-// BuildWith returns a provision given the runtime context and credential
+// ProvisionerWith returns a provision given the runtime context and credential
 func ProvisionerWith(ctx context.Context, cred api.Credential) (api.Provisioner, error) {
 
 	region, ok := RegionFromContext(ctx)
