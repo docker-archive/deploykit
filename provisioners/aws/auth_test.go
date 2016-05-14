@@ -14,6 +14,6 @@ func TestInvalidEmptyCredential(t *testing.T) {
 	// Even empty credential must return the provisioner name
 	require.Equal(t, ProvisionerName, cr.ProvisionerName())
 
-	ctx := BuildContext(context.Background(), "us-west-2")
+	ctx := BuildContext(context.Background(), "us-west-2", 2)
 	require.Error(t, cr.Validate(ctx))
 }

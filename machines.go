@@ -54,8 +54,8 @@ type Machines interface {
 	Exists(key string) bool
 
 	// CreateMachine adds a new machine from the input reader.
-	CreateMachine(ctx context.Context, cred api.Credential,
-		template api.MachineRequest, key string, input io.Reader, codec *Codec) *Error
+	CreateMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
+		template api.MachineRequest, input io.Reader, codec *Codec) (<-chan interface{}, *Error)
 }
 
 type machines struct {
@@ -126,18 +126,11 @@ func (cm *machines) Exists(key string) bool {
 }
 
 // CreateMachine creates a new machine from the input reader.
-func (cm *machines) CreateMachine(ctx context.Context, cred api.Credential,
-	template api.MachineRequest, key string, input io.Reader, codec *Codec) *Error {
+func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
+	template api.MachineRequest, input io.Reader, codec *Codec) (<-chan interface{}, *Error) {
 
-	if cm.Exists(key) {
-		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
-	}
-
-	provisioner := cred.ProvisionerName()
-	mr, err := cm.NewMachineRequest(provisioner)
-	if err != nil {
-		return &Error{ErrNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
-	}
+	provisionerName := cred.ProvisionerName()
+	mr := provisioner.NewRequestInstance()
 
 	if template != nil {
 		mr = template
@@ -146,67 +139,108 @@ func (cm *machines) CreateMachine(ctx context.Context, cred api.Credential,
 	buff, err := ioutil.ReadAll(input)
 	if err == nil && len(buff) > 0 {
 		if err = cm.Unmarshal(codec, buff, mr); err != nil {
-			return &Error{Message: err.Error()}
+			return nil, &Error{Message: err.Error()}
 		}
 	}
 
-	mr.SetName(key)
+	key := mr.Name()
+	if cm.Exists(key) {
+		return nil, &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
+	}
 
 	log.Infoln("cred=", cred, "template=", template, "req=", mr)
 
 	// First save a record
 	record := &storage.MachineRecord{
 		Name:        storage.MachineID(key),
-		Provisioner: provisioner,
+		Provisioner: provisionerName,
 		Created:     storage.Timestamp(time.Now().Unix()),
 	}
 	record.AppendEvent(storage.Event{Name: "init", Message: "Create starts", Data: mr})
 
 	if err = cm.store.Save(*record, mr); err != nil {
-		return &Error{Message: err.Error()}
+		return nil, &Error{Message: err.Error()}
+	}
+	tasks := []api.Task{}
+	for _, tn := range mr.ProvisionWorkflow() {
+
+		if task, ok := GetTask(tn); ok {
+			taskHandler := provisioner.GetTaskHandler(tn)
+			if taskHandler != nil {
+				task.Do = taskHandler // override the impl
+			}
+			tasks = append(tasks, task)
+		}
 	}
 
-	// TODO - start process
+	if len(tasks) != len(mr.ProvisionWorkflow()) {
+		return nil, &Error{Message: "unknown tasks"}
+	} else {
+		log.Infoln("About to run tasks:", tasks)
+	}
+
+	events := make(chan interface{})
+
 	go func() {
-
-		tasks := []api.Task{}
-		for _, tn := range mr.ProvisionWorkflow() {
-
-			task := GetTask(provisioner, tn)
-			log.Infof("For provisioner %v name %v found task %v", provisioner, tn, task)
-			if task == nil {
-				log.Errorf("Provisioner %v does not support %v", provisioner, tn)
-			} else {
-				tasks = append(tasks, *task)
-			}
-
-		}
-
-		if len(tasks) != len(mr.ProvisionWorkflow()) {
-			return // Don't do anything
-		}
+		close(events)
 
 		for _, task := range tasks {
 
-			for data := range task.Do(ctx, cred, mr) {
-				record.AppendEvent(storage.Event{
-					Name:    string(task.Name),
-					Message: task.Message,
-					Data:    data,
-				})
-				cm.store.Save(*record, mr)
-				log.Infoln("Saved:", "err=", err, len(record.Events), record)
-			}
-			record.AppendEvent(storage.Event{
-				Name:    string(task.Name),
-				Message: task.Message + " completed",
-			})
-			cm.store.Save(*record, mr)
-			log.Infoln("Saved:", "err=", err, len(record.Events), record)
+			taskEvents := make(chan interface{})
 
+			go func() {
+				log.Infoln("RUNNING:", task)
+				event := storage.Event{
+					Name: string(task.Type),
+				}
+				if err := task.Do(ctx, cred, mr, taskEvents); err != nil {
+					event.Message = task.Message + " errored: " + err.Error()
+					event.Error = err
+				} else {
+					event.Message = task.Message + " completed"
+				}
+
+				taskEvents <- event
+				close(taskEvents) // unblocks the listener
+
+				log.Infoln("FINISH:", task)
+			}()
+
+			for te := range taskEvents {
+
+				stop := false
+
+				event := storage.Event{
+					Name: string(task.Type),
+				}
+
+				event.Data = te
+
+				switch te := te.(type) {
+				case storage.Event:
+					event = te
+				case api.HasError:
+					if e := te.GetError(); e != nil {
+						event.Error = e
+						stop = true
+					}
+				case error:
+					event.Error = te
+					stop = true
+				}
+
+				record.AppendEvent(event)
+				err = cm.store.Save(*record, mr)
+				log.Infoln("Saved:", "err=", err, len(record.Events), record)
+
+				if stop {
+					log.Warningln("Stopping due to error")
+					return
+				}
+			}
 		}
 
 	}()
 
-	return nil
+	return events, nil
 }

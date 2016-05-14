@@ -57,7 +57,7 @@ func templateRoutes(t libmachete.Templates) map[*rest.Endpoint]rest.Handler {
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			log.Infof("Add template %v, %v\n", provisioner, key)
+			log.Infof("Add template %v, %v", provisioner, key)
 
 			err := t.CreateTemplate(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
 
@@ -83,7 +83,7 @@ func templateRoutes(t libmachete.Templates) map[*rest.Endpoint]rest.Handler {
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 			provisioner := rest.GetUrlParameter(req, "provisioner")
 			key := rest.GetUrlParameter(req, "key")
-			log.Infof("Update template %v\n", key)
+			log.Infof("Update template %v", key)
 
 			err := t.UpdateTemplate(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
 

@@ -22,10 +22,14 @@ func TestBuildContext(t *testing.T) {
 
 	region := "us-west-2"
 
-	ctx := BuildContext(context.Background(), region)
+	ctx := BuildContext(context.Background(), region, 2)
 	require.NotNil(t, ctx)
 
 	r, ok := RegionFromContext(ctx)
 	require.True(t, ok)
 	require.Equal(t, region, *r)
+
+	c, ok := RetriesFromContext(ctx)
+	require.True(t, ok)
+	require.Equal(t, 2, c)
 }

@@ -13,24 +13,26 @@ type contextKey int
 
 const (
 	regionKey contextKey = iota
+	retriesKey
 )
 
 // BuildContextFromKVPair is the ContextBuilder that allows the provisioner to configure
 // itself at runtime using the given static key-value pair loaded by the framework.
 func BuildContextFromKVPair(parent context.Context, m libmachete.KVPair) context.Context {
 	t := &struct {
-		Region string `json:"region" yaml:"region"`
+		Region  string `json:"region" yaml:"region"`
+		Retries int    `json:"retries" yaml:"retries"`
 	}{}
 	err := mapstructure.Decode(m, t)
 	if err == nil {
-		return BuildContext(parent, t.Region)
+		return BuildContext(parent, t.Region, t.Retries)
 	}
 	return parent
 }
 
 // BuildContext returns a context that's properly configured with the required context data.
-func BuildContext(parent context.Context, region string) context.Context {
-	return WithRegion(parent, region)
+func BuildContext(parent context.Context, region string, retries int) context.Context {
+	return WithRetries(WithRegion(parent, region), retries)
 }
 
 // WithRegion returns a new context given a parent context and the region.
@@ -43,5 +45,16 @@ func WithRegion(parent context.Context, region string) context.Context {
 // RegionFromContext returns the Azure region from the request context.
 func RegionFromContext(ctx context.Context) (*string, bool) {
 	v, ok := ctx.Value(regionKey).(*string)
+	return v, ok
+}
+
+// WithRetries returns a new context given a parent context and the retries.
+func WithRetries(parent context.Context, retries int) context.Context {
+	return context.WithValue(parent, retriesKey, retries)
+}
+
+// RetriesFromContext returns the Azure retries from the request context.
+func RetriesFromContext(ctx context.Context) (int, bool) {
+	v, ok := ctx.Value(retriesKey).(int)
 	return v, ok
 }

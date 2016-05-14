@@ -14,7 +14,7 @@ func TestCreateBadUsage(t *testing.T) {
 	defer ctrl.Finish()
 
 	console := mock_console.NewMockConsole(ctrl)
-	templates := mock.NewMockTemplates(ctrl)
+	templates := mock.NewMockTemplateLoader(ctrl)
 
 	cmd := createCmd(console, &provisioners.Registry{}, templates)
 	require.Exactly(t, UsageError, cmd.RunE(cmd, []string{}))

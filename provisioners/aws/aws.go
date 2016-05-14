@@ -2,6 +2,8 @@ package aws
 
 import (
 	"errors"
+	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
@@ -9,7 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
+	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
+	"golang.org/x/net/context"
 	"sort"
 	"time"
 )
@@ -41,6 +45,34 @@ func (a Builder) Build(params map[string]string) (api.Provisioner, error) {
 	})
 
 	client := CreateClient(region, awsCredentials, 5)
+
+	return New(client), nil
+}
+
+// BuildWith returns a provision given the runtime context and credential
+func ProvisionerWith(ctx context.Context, cred api.Credential) (api.Provisioner, error) {
+
+	region, ok := RegionFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("No region in context")
+	}
+
+	retries := 5
+	if r, ok := RetriesFromContext(ctx); ok {
+		retries = r
+	}
+
+	c, err := checkCredential(cred)
+	if err != nil {
+		return nil, err
+	}
+
+	client := CreateClient(*region, credentials.NewChainCredentials([]credentials.Provider{
+		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
+		&credentials.EnvProvider{},
+		&credentials.SharedCredentialsProvider{},
+		c,
+	}), retries)
 
 	return New(client), nil
 }
@@ -168,17 +200,43 @@ func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Workflow = []api.TaskName{
-		SSHKeyGen.Name,
-		CreateInstance.Name,
-		UserData.Name,
-		InstallEngine.Name,
+	req.Workflow = []api.TaskType{
+		libmachete.TaskSSHKeyGen.Type,
+		libmachete.TaskCreateInstance.Type,
+		libmachete.TaskUserData.Type,
+		libmachete.TaskInstallDockerEngine.Type,
 	}
 	return req
 }
 
 func (p *provisioner) NewRequestInstance() api.MachineRequest {
 	return NewMachineRequest()
+}
+
+func (p *provisioner) GetTaskHandler(t api.TaskType) api.TaskHandler {
+	switch t {
+	case libmachete.TaskCreateInstance.Type:
+		return func(ctx context.Context, cred api.Credential, req api.MachineRequest, events chan<- interface{}) error {
+			r, err := checkMachineRequest(req)
+			if err != nil {
+				return err
+			}
+
+			log.Infoln("IN AWS: create instance: client=", p.client, "cred=", cred, "req=", r)
+
+			createInstanceEvents, err := p.CreateInstance(req)
+			if err != nil {
+				return err
+			}
+
+			for event := range createInstanceEvents {
+				events <- event
+			}
+
+			return nil
+		}
+	}
+	return nil
 }
 
 func (p *provisioner) CreateInstance(

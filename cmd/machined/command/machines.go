@@ -29,7 +29,7 @@ func machineRoutes(
 			libmachete.ContentTypeJSON.Respond(resp, all)
 		},
 		&rest.Endpoint{
-			UrlRoute:   "/machines/{key}/create",
+			UrlRoute:   "/machines/create",
 			HttpMethod: rest.POST,
 			UrlQueries: rest.UrlQueries{
 				"template":    "default",
@@ -40,7 +40,6 @@ func machineRoutes(
 			context := rest.GetUrlParameter(req, "context")
 			credentials := rest.GetUrlParameter(req, "credentials")
 			template := rest.GetUrlParameter(req, "template")
-			key := rest.GetUrlParameter(req, "key")
 
 			// BUG
 			if context == "" {
@@ -53,7 +52,7 @@ func machineRoutes(
 				template = "default"
 			}
 
-			log.Infof("Add machine context=%v, template=%v, key=%v as %v", context, template, key, credentials)
+			log.Infof("Add machine context=%v, template=%v, as %v", context, template, credentials)
 
 			// credential
 			cred, err := c.Get(credentials)
@@ -62,7 +61,7 @@ func machineRoutes(
 				return
 			}
 
-			provisioner := cred.ProvisionerName()
+			provisionerName := cred.ProvisionerName()
 
 			// Runtime context
 			runContext, err := x.Get(context)
@@ -71,19 +70,34 @@ func machineRoutes(
 				return
 			}
 
-			// Configure the provisioner
-			ctx = libmachete.BuildContext(provisioner, ctx, runContext)
+			// Configure the provisioner context
+			ctx = libmachete.BuildContext(provisionerName, ctx, runContext)
 
-			// Load template
-			tpl, err := t.Get(provisioner, template)
+			// Get the provisioner
+			// TODO - clean up the error code to better reflect the nature of error
+			provisioner, err := libmachete.GetProvisioner(provisionerName, ctx, cred)
 			if err != nil {
 				respondError(http.StatusNotFound, resp, err)
 				return
 			}
 
-			machineErr := m.CreateMachine(ctx, cred, tpl, key, req.Body, libmachete.CodecByContentTypeHeader(req))
+			// Load template
+			tpl, err := t.Get(provisionerName, template)
+			if err != nil {
+				respondError(http.StatusNotFound, resp, err)
+				return
+			}
+
+			events, machineErr := m.CreateMachine(provisioner, ctx, cred, tpl,
+				req.Body, libmachete.CodecByContentTypeHeader(req))
 
 			if machineErr == nil {
+				// TODO - if the client requests streaming events... send that out here.
+				go func() {
+					for event := range events {
+						log.Infoln("Event:", event)
+					}
+				}()
 				return
 			}
 

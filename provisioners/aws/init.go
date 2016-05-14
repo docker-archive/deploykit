@@ -8,58 +8,20 @@ import (
 	"time"
 )
 
-func dummy(m string) func(ctx context.Context, cred api.Credential, req api.MachineRequest) <-chan interface{} {
-	return func(ctx context.Context, cred api.Credential, req api.MachineRequest) <-chan interface{} {
-		out := make(chan interface{})
-		go func() {
-			time.Sleep(5 * time.Second)
-			log.Infoln(m)
-			close(out)
-		}()
-		return out
+func dummy(m string) api.TaskHandler {
+	return func(ctx context.Context, cred api.Credential, req api.MachineRequest, events chan<- interface{}) error {
+		time.Sleep(5 * time.Second)
+		log.Infoln(m)
+		return nil
 	}
 }
-
-var (
-	// SSHKeyGen is the task that generates SSH key
-	SSHKeyGen = api.Task{
-		Name:    api.TaskName("ssh-key-gen"),
-		Message: "Generating ssh key for host",
-		Do:      dummy("SSHKeyGen"),
-	}
-
-	// CreateInstance creates the instance via AWS EC2 API calls
-	CreateInstance = api.Task{
-		Name:    api.TaskName("create-instance"),
-		Message: "Creating instance",
-		Do:      dummy("CreateInstance"),
-	}
-
-	// UserData sets up the instance with user instance data (eg. files, etc.)
-	UserData = api.Task{
-		Name:    api.TaskName("user-data"),
-		Message: "Copy user data",
-		Do:      dummy("UserData"),
-	}
-
-	// InstallEngine is the task for installing docker engine.  Requires SSH access.
-	InstallEngine = api.Task{
-		Name:    api.TaskName("install-engine"),
-		Message: "Install docker engine",
-		Do:      dummy("InstallEngine"),
-	}
-)
 
 func init() {
 	libmachete.RegisterContextBuilder(ProvisionerName, BuildContextFromKVPair)
 	libmachete.RegisterCredentialer(ProvisionerName, NewCredential)
 	libmachete.RegisterTemplateBuilder(ProvisionerName, NewMachineRequest)
 	libmachete.RegisterMachineRequestBuilder(ProvisionerName, NewMachineRequest)
-
-	libmachete.RegisterTask(ProvisionerName, SSHKeyGen)
-	libmachete.RegisterTask(ProvisionerName, CreateInstance)
-	libmachete.RegisterTask(ProvisionerName, UserData)
-	libmachete.RegisterTask(ProvisionerName, InstallEngine)
+	libmachete.RegisterProvisionerBuilder(ProvisionerName, ProvisionerWith)
 }
 
 const (
