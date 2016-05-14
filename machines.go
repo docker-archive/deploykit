@@ -175,9 +175,9 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 
 	if len(tasks) != len(mr.ProvisionWorkflow()) {
 		return nil, &Error{Message: "unknown tasks"}
-	} else {
-		log.Infoln("About to run tasks:", tasks)
 	}
+
+	log.Infoln("About to run tasks:", tasks)
 
 	events := make(chan interface{})
 

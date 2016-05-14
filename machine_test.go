@@ -93,7 +93,7 @@ func newMachine(
 	return provisioner, &machine{registry: registry, templateLoader: templates}
 }
 
-func DISABLE_TestCreate(t *testing.T) {
+func DISABLETestCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -118,7 +118,7 @@ func DISABLE_TestCreate(t *testing.T) {
 	require.Exactly(t, createEvents, events)
 }
 
-func DISABLE_TestCreateInvalidTemplate(t *testing.T) {
+func DISABLETestCreateInvalidTemplate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -129,7 +129,7 @@ func DISABLE_TestCreateInvalidTemplate(t *testing.T) {
 	require.NotNil(t, err)
 }
 
-func DISABLE_TestCreateInvalidOverlay(t *testing.T) {
+func DISABLETestCreateInvalidOverlay(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -140,7 +140,7 @@ func DISABLE_TestCreateInvalidOverlay(t *testing.T) {
 	require.NotNil(t, err)
 }
 
-func DISABLE_TestCreateExtraYamlFields(t *testing.T) {
+func DISABLETestCreateExtraYamlFields(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -165,7 +165,7 @@ func DISABLE_TestCreateExtraYamlFields(t *testing.T) {
 	create(machine, unmappableOverlayData)
 }
 
-func DISABLE_TestTemplateLoadError(t *testing.T) {
+func DISABLETestTemplateLoadError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -181,7 +181,7 @@ func DISABLE_TestTemplateLoadError(t *testing.T) {
 	require.NotNil(t, err)
 }
 
-func DISABLE_TestUnknownProvisiner(t *testing.T) {
+func DISABLETestUnknownProvisiner(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

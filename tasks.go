@@ -78,7 +78,7 @@ var (
 		},
 	}
 
-	// TaskInstallEngine is the task for installing docker engine.  Requires SSH access.
+	// TaskInstallDockerEngine is the task for installing docker engine.  Requires SSH access.
 	TaskInstallDockerEngine = api.Task{
 		Type:    api.TaskType("install-engine"),
 		Message: "Install docker engine",

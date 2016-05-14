@@ -43,13 +43,17 @@ type DestroyInstanceEvent struct {
 	Error error
 }
 
+// HasError interface allows object that contain errors be detected and treated as error
 type HasError interface {
 	GetError() error
 }
 
+// GetError returns the error
 func (event CreateInstanceEvent) GetError() error {
 	return event.Error
 }
+
+// GetError returns the error4
 func (event DestroyInstanceEvent) GetError() error {
 	return event.Error
 }
