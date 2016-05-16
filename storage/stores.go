@@ -50,14 +50,21 @@ type Event struct {
 	Error     string      `json:"error,omitempty"`
 }
 
-// MachineRecord is the storage structure that will be included for all machines.
-type MachineRecord struct {
+// MachineSummary keeps minimal information about a machine
+type MachineSummary struct {
 	Status       string    `json:"status"`
 	Name         MachineID `json:"name"`
+	IPAddress    string    `json:"ip"`
 	Provisioner  string    `json:"provisioner"`
 	Created      Timestamp `json:"created"`
 	LastModified Timestamp `json:"modified"`
-	Events       []Event   `json:"events"`
+}
+
+// MachineRecord is the storage structure that will be included for all machines.
+type MachineRecord struct {
+	MachineSummary
+
+	Events []Event `json:"events"`
 
 	lock sync.Mutex
 }

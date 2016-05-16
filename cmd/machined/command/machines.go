@@ -19,8 +19,23 @@ func machineRoutes(
 		&rest.Endpoint{
 			UrlRoute:   "/machines/json",
 			HttpMethod: rest.GET,
+			UrlQueries: rest.UrlQueries{
+				"long": false,
+			},
 		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 			log.Infoln("List machines")
+			long := len(rest.GetUrlParameter(req, "long")) > 0
+
+			if long {
+				all, err := m.List()
+				if err != nil {
+					respondError(http.StatusInternalServerError, resp, err)
+					return
+				}
+				libmachete.ContentTypeJSON.Respond(resp, all)
+				return
+			}
+
 			all, err := m.ListIds()
 			if err != nil {
 				respondError(http.StatusInternalServerError, resp, err)

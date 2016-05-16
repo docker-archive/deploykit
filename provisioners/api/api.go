@@ -118,6 +118,9 @@ type Provisioner interface {
 	// CreateInstance.
 	NewRequestInstance() MachineRequest
 
+	// GetIp returns the IP address from the record
+	GetIPAddress(MachineRequest) (string, error)
+
 	// GetTask returns a task that the provisioner can override and implement.
 	GetTaskHandler(taskType TaskType) TaskHandler
 

@@ -41,6 +41,9 @@ type Machines interface {
 	// If nil codec is passed, the default encoding / content type will be used.
 	Marshal(contentType *Codec, m api.MachineRequest) ([]byte, error)
 
+	// List
+	List() ([]storage.MachineSummary, error)
+
 	// ListIds
 	ListIds() ([]string, error)
 
@@ -85,6 +88,20 @@ func (cm *machines) Unmarshal(contentType *Codec, data []byte, m api.MachineRequ
 // If nil codec is passed, the default encoding / content type will be used.
 func (cm *machines) Marshal(contentType *Codec, m api.MachineRequest) ([]byte, error) {
 	return ensureValidContentType(contentType).marshal(m)
+}
+
+func (cm *machines) List() ([]storage.MachineSummary, error) {
+	out := []storage.MachineSummary{}
+	list, err := cm.store.List()
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range list {
+		if record, err := cm.Get(string(i)); err == nil {
+			out = append(out, record.MachineSummary)
+		}
+	}
+	return out, nil
 }
 
 func (cm *machines) ListIds() ([]string, error) {
@@ -152,9 +169,12 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 
 	// First save a record
 	record := &storage.MachineRecord{
-		Name:        storage.MachineID(key),
-		Provisioner: provisionerName,
-		Created:     storage.Timestamp(time.Now().Unix()),
+		MachineSummary: storage.MachineSummary{
+			Status:      "initiated",
+			Name:        storage.MachineID(key),
+			Provisioner: provisionerName,
+			Created:     storage.Timestamp(time.Now().Unix()),
+		},
 	}
 	record.AppendEvent(storage.Event{Name: "init", Message: "Create starts", Data: mr})
 
@@ -206,6 +226,8 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 				log.Infoln("FINISH:", task)
 			}()
 
+			record.Status = "pending"
+
 			for te := range taskEvents {
 
 				stop := false
@@ -235,8 +257,28 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 
 				if stop {
 					log.Warningln("Stopping due to error")
+
+					record.Status = "failed"
+					record.LastModified = storage.Timestamp(time.Now().Unix())
+					err := cm.store.Save(*record, mr)
+					if err != nil {
+						log.Warningln("err=", err)
+					}
 					return
 				}
+			}
+
+			record.Status = "running"
+			record.LastModified = storage.Timestamp(time.Now().Unix())
+			if ip, err := provisioner.GetIPAddress(mr); err == nil {
+				record.IPAddress = ip
+			} else {
+				log.Warning("can't get ip=", err)
+			}
+
+			err := cm.store.Save(*record, mr)
+			if err != nil {
+				log.Warningln("err=", err)
 			}
 		}
 
