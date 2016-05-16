@@ -213,6 +213,14 @@ func (p *provisioner) NewRequestInstance() api.MachineRequest {
 	return NewMachineRequest()
 }
 
+func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
+	ci, err := checkMachineRequest(req)
+	if err != nil {
+		return "", err
+	}
+	return ci.PrivateIPAddress, nil // TODO - make this configurable based on context??
+}
+
 func (p *provisioner) GetTaskHandler(t api.TaskType) api.TaskHandler {
 	switch t {
 	case libmachete.TaskCreateInstance.Type:
