@@ -50,7 +50,7 @@ func LsCmd(options *ClientOptions) *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			log.Infoln("list options = ", options, "args=", args)
 
-			client, err := getHttpClient(options.Port)
+			client, err := getHTTPClient(options.Port)
 			if err != nil {
 				return err
 			}
@@ -71,7 +71,7 @@ func GetCmd(options *ClientOptions) *cobra.Command {
 
 			node := args[0]
 
-			client, err := getHttpClient(options.Port)
+			client, err := getHTTPClient(options.Port)
 			if err != nil {
 				return err
 			}
@@ -80,7 +80,7 @@ func GetCmd(options *ClientOptions) *cobra.Command {
 	}
 }
 
-func getHttpClient(port string) (*http.Client, error) {
+func getHTTPClient(port string) (*http.Client, error) {
 	client := &http.Client{}
 
 	// If we can't parse the port as an int, assume it's a unix socket
