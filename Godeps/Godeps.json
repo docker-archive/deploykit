@@ -148,18 +148,18 @@
 		},
 		{
 			"ImportPath": "github.com/conductant/gohm/pkg/auth",
-			"Comment": "v0.1-4-g090e3cf",
-			"Rev": "090e3cfff801b0eaf683b9de67903731be387652"
+			"Comment": "v0.1-5-g75cd719",
+			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
 		},
 		{
 			"ImportPath": "github.com/conductant/gohm/pkg/encoding",
-			"Comment": "v0.1-4-g090e3cf",
-			"Rev": "090e3cfff801b0eaf683b9de67903731be387652"
+			"Comment": "v0.1-5-g75cd719",
+			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
 		},
 		{
 			"ImportPath": "github.com/conductant/gohm/pkg/server",
-			"Comment": "v0.1-4-g090e3cf",
-			"Rev": "090e3cfff801b0eaf683b9de67903731be387652"
+			"Comment": "v0.1-5-g75cd719",
+			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",

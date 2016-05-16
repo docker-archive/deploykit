@@ -11,7 +11,7 @@ func main() {
 		Short: "machine daemon",
 	}
 
-	rootCmd.AddCommand(command.ServerCmd())
+	rootCmd.AddCommand(command.ServerCmd(), command.ClientCmd())
 
 	err := rootCmd.Execute()
 	if err != nil {

@@ -22,7 +22,7 @@ import (
 )
 
 type apiOptions struct {
-	Port    int
+	Port    string
 	RootDir string
 }
 
@@ -164,7 +164,7 @@ func ServerCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&server.options.Port, "port", 8888, "Port the server listens on.")
+	cmd.Flags().StringVar(&server.options.Port, "port", "8888", "Port the server listens on. File path for unix socket")
 	cmd.Flags().StringVar(&server.options.RootDir, "dir", rootDir(), "Root directory for file storage")
 	return cmd
 }

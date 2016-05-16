@@ -31,7 +31,7 @@ func NewService() *serviceBuilder {
 }
 
 type serviceBuilder struct {
-	port            int
+	port            interface{}
 	shutdownTimeout time.Duration
 	onShutdownFunc  func() error
 	routes          map[string]*routeBuilder
@@ -41,7 +41,7 @@ type serviceBuilder struct {
 	lock            sync.Mutex
 }
 
-func (this *serviceBuilder) ListenPort(port int) *serviceBuilder {
+func (this *serviceBuilder) ListenPort(port interface{}) *serviceBuilder {
 	this.port = port
 	return this
 }

@@ -8,18 +8,35 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 )
 
-func Start(port int, endpoint http.Handler, onShutdown func() error, timeout time.Duration) (chan<- int, <-chan error) {
+func Start(port interface{}, endpoint http.Handler,
+	onShutdown func() error, timeout time.Duration) (chan<- int, <-chan error) {
+
 	shutdownTasks := make(chan func() error, 100)
 
 	// Custom shutdown task
 	shutdownTasks <- onShutdown
 
-	engineStop, engineStopped := RunServer(&http.Server{Handler: endpoint, Addr: fmt.Sprintf(":%d", port)})
+	addr := ""
+	switch port := port.(type) {
+	case int:
+		addr = fmt.Sprintf(":%d", port)
+	case string:
+		if p, err := strconv.Atoi(port); err == nil {
+			addr = fmt.Sprintf(":%d", p)
+		} else if fp, err := filepath.Abs(port); err == nil {
+			addr = fp
+		} else {
+			panic(err)
+		}
+	}
+
+	engineStop, engineStopped := RunServer(&http.Server{Handler: endpoint, Addr: addr})
 	shutdownTasks <- func() error {
 		engineStop <- 1
 		err := <-engineStopped
@@ -27,7 +44,7 @@ func Start(port int, endpoint http.Handler, onShutdown func() error, timeout tim
 	}
 
 	// Pid file
-	if pid, pidErr := savePidFile(fmt.Sprintf("%d", port)); pidErr == nil {
+	if pid, pidErr := savePidFile(fmt.Sprintf("%v", port)); pidErr == nil {
 		// Clean up pid file
 		shutdownTasks <- func() error {
 			os.Remove(pid)
