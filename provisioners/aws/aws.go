@@ -67,13 +67,21 @@ func ProvisionerWith(ctx context.Context, cred api.Credential) (api.Provisioner,
 		return nil, err
 	}
 
+	if c.EC2RoleProvider {
+		client := CreateClient(*region, credentials.NewChainCredentials([]credentials.Provider{
+			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
+			&credentials.EnvProvider{},
+			&credentials.SharedCredentialsProvider{},
+		}), retries)
+		return New(client), nil
+	}
+
 	client := CreateClient(*region, credentials.NewChainCredentials([]credentials.Provider{
-		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
+		c,
 		&credentials.EnvProvider{},
 		&credentials.SharedCredentialsProvider{},
-		c,
+		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
 	}), retries)
-
 	return New(client), nil
 }
 
