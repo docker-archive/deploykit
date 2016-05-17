@@ -82,17 +82,24 @@ func ProvisionerWith(ctx context.Context, cred api.Credential) (api.Provisioner,
 		&credentials.SharedCredentialsProvider{},
 		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
 	}), retries)
-	return New(client), nil
+
+	cfg := new(Config)
+	config, ok := ConfigFromContext(ctx)
+	if ok {
+		cfg = &config
+	}
+	return &provisioner{client: client, sleepFunction: time.Sleep, config: cfg}, nil
 }
 
 type provisioner struct {
 	client        ec2iface.EC2API
 	sleepFunction func(time.Duration)
+	config        *Config
 }
 
 // New creates a new AWS provisioner that will use the provided EC2 API implementation.
 func New(client ec2iface.EC2API) api.Provisioner {
-	return &provisioner{client: client, sleepFunction: time.Sleep}
+	return &provisioner{client: client, sleepFunction: time.Sleep, config: defaultConfig()}
 }
 
 // CreateClient creates the actual EC2 API client.
@@ -138,6 +145,13 @@ func tagSync(client ec2iface.EC2API, request CreateInstanceRequest, instance *ec
 		})
 	}
 
+	// Add a name tag
+	name := "Name"
+	nameValue := request.Name()
+	tags = append(tags, &ec2.Tag{
+		Key:   &name,
+		Value: &nameValue,
+	})
 	_, err := client.CreateTags(&ec2.CreateTagsInput{
 		Resources: []*string{instance.InstanceId},
 		Tags:      tags,
@@ -195,7 +209,9 @@ func createInstanceSync(
 }
 
 func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState string) error {
-	return WaitUntil(p.sleepFunction, 30, 10*time.Second,
+	return WaitUntil(
+		p.sleepFunction,
+		p.config.CheckInstanceMaxPoll, time.Duration(p.config.CheckInstancePollInterval)*time.Second,
 		func() (bool, error) {
 			inst, err := getInstanceSync(p.client, instanceID)
 			return inst != nil && *inst.State.Name == instanceState, err
@@ -221,12 +237,16 @@ func (p *provisioner) NewRequestInstance() api.MachineRequest {
 	return NewMachineRequest()
 }
 
+// GetIPAddress - this prefers private IP if it's set; make this behavior configurable as a machine template or context?
 func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	ci, err := checkMachineRequest(req)
 	if err != nil {
 		return "", err
 	}
-	return ci.PrivateIPAddress, nil // TODO - make this configurable based on context??
+	if ci.PrivateIPAddress != "" {
+		return ci.PrivateIPAddress, nil // TODO - make this configurable based on context??
+	}
+	return ci.PublicIPAddress, nil
 }
 
 func (p *provisioner) GetTaskHandler(t api.TaskType) api.TaskHandler {
@@ -299,9 +319,30 @@ func (p *provisioner) CreateInstance(
 			}
 			return
 		}
+
+		provisioned, err := getInstanceSync(p.client, *instance.InstanceId)
+		if err != nil {
+			events <- api.CreateInstanceEvent{
+				Error: err,
+				Type:  api.CreateInstanceError,
+			}
+			return
+		}
+
+		provisionedState := *request // copy
+		if provisioned.PrivateIpAddress != nil {
+			provisionedState.PrivateIPAddress = *provisioned.PrivateIpAddress
+		}
+		if provisioned.PublicIpAddress != nil {
+			provisionedState.PublicIPAddress = *provisioned.PublicIpAddress
+		}
+
+		log.Infoln("ProvisionedState=", provisionedState)
+
 		events <- api.CreateInstanceEvent{
 			Type:       api.CreateInstanceCompleted,
 			InstanceID: *instance.InstanceId,
+			Machine:    &provisionedState,
 		}
 	}()
 
