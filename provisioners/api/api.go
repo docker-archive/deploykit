@@ -30,11 +30,22 @@ const (
 	DestroyInstanceError
 )
 
+// HasMachineState allows the events to return the state of the machine for storage
+type HasMachineState interface {
+	GetState() MachineRequest
+}
+
+// HasError interface allows object that contain errors be detected and treated as error
+type HasError interface {
+	GetError() error
+}
+
 // A CreateInstanceEvent signals a state change in the instance create process.
 type CreateInstanceEvent struct {
 	Type       CreateInstanceEventType
 	Error      error
 	InstanceID string
+	Machine    MachineRequest // HACK - this should be changed to a Machine state object
 }
 
 // A DestroyInstanceEvent signals a state change in the instance destroy process.
@@ -43,14 +54,14 @@ type DestroyInstanceEvent struct {
 	Error error
 }
 
-// HasError interface allows object that contain errors be detected and treated as error
-type HasError interface {
-	GetError() error
-}
-
 // GetError returns the error
 func (event CreateInstanceEvent) GetError() error {
 	return event.Error
+}
+
+// GetState returns the state if any
+func (event CreateInstanceEvent) GetState() MachineRequest {
+	return event.Machine
 }
 
 // GetError returns the error4

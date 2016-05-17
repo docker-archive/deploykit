@@ -8,6 +8,7 @@ import (
 	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
+	"reflect"
 	"time"
 )
 
@@ -239,6 +240,10 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 
 				event.Data = te
 
+				// Some events implement both Error and HashMachineState.  So first check for errors
+				// then do type switch on HashMachineState
+
+				log.Infoln("Check error:", te)
 				switch te := te.(type) {
 				case storage.Event:
 					event = te
@@ -250,6 +255,16 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 				case error:
 					event.Error = te.Error()
 					stop = true
+				}
+
+				ms, is := te.(api.HasMachineState)
+				log.Infoln("Check MachineState:", te, "is=", is, "type=", reflect.TypeOf(te))
+				if is {
+					log.Infoln("HasMachineState:", te)
+					if provisionedState := ms.GetState(); provisionedState != nil {
+						log.Infoln("Final provisioned state:", provisionedState)
+						mr = provisionedState
+					}
 				}
 
 				record.AppendEvent(event)

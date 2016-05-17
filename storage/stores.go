@@ -43,28 +43,28 @@ type Timestamp uint64
 
 // Event is
 type Event struct {
-	Timestamp time.Time   `json:"on"`
-	Name      string      `json:"event"`
-	Message   string      `json:"message"`
-	Data      interface{} `json:"data,omitempty"`
-	Error     string      `json:"error,omitempty"`
+	Timestamp time.Time   `json:"on" yaml:"on"`
+	Name      string      `json:"event" yaml:"event"`
+	Message   string      `json:"message" yaml:"message"`
+	Data      interface{} `json:"data,omitempty" yaml:"data"`
+	Error     string      `json:"error,omitempty" yaml:"error"`
 }
 
 // MachineSummary keeps minimal information about a machine
 type MachineSummary struct {
-	Status       string    `json:"status"`
-	Name         MachineID `json:"name"`
-	IPAddress    string    `json:"ip"`
-	Provisioner  string    `json:"provisioner"`
-	Created      Timestamp `json:"created"`
-	LastModified Timestamp `json:"modified"`
+	Status       string    `json:"status" yaml:"status"`
+	Name         MachineID `json:"name" yaml:"name"`
+	IPAddress    string    `json:"ip" yaml:"ip"`
+	Provisioner  string    `json:"provisioner" yaml:"provisioner"`
+	Created      Timestamp `json:"created" yaml:"created"`
+	LastModified Timestamp `json:"modified" yaml:"modified"`
 }
 
 // MachineRecord is the storage structure that will be included for all machines.
 type MachineRecord struct {
 	MachineSummary
 
-	Events []Event `json:"events"`
+	Events []Event `json:"events" yaml:"events"`
 
 	lock sync.Mutex
 }
