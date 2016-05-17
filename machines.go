@@ -161,11 +161,12 @@ func (cm *machines) CreateMachine(provisioner api.Provisioner, ctx context.Conte
 	}
 
 	key := mr.Name()
+
+	log.Infoln("name=", key, "cred=", cred, "template=", template, "req=", mr)
+
 	if cm.Exists(key) {
 		return nil, &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
-
-	log.Infoln("cred=", cred, "template=", template, "req=", mr)
 
 	// First save a record
 	record := &storage.MachineRecord{
