@@ -47,7 +47,7 @@ func (f sandbox) List() ([]string, error) {
 }
 
 func (f sandbox) Mkdir(subPath string) error {
-	return f.fs.Mkdir(path.Join(f.dir, subPath), dirPermission)
+	return f.fs.MkdirAll(path.Join(f.dir, subPath), dirPermission)
 }
 
 func (f sandbox) MarshalAndSave(fileName string, s interface{}) error {

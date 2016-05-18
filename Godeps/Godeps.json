@@ -147,6 +147,21 @@
 			"Rev": "09a34f2d32ca4df07da73ccb303bee6790076d69"
 		},
 		{
+			"ImportPath": "github.com/conductant/gohm/pkg/auth",
+			"Comment": "v0.1-5-g75cd719",
+			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
+		},
+		{
+			"ImportPath": "github.com/conductant/gohm/pkg/encoding",
+			"Comment": "v0.1-5-g75cd719",
+			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
+		},
+		{
+			"ImportPath": "github.com/conductant/gohm/pkg/server",
+			"Comment": "v0.1-5-g75cd719",
+			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
+		},
+		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
@@ -161,8 +176,26 @@
 			"Rev": "12f418cc7edc5a618a51407b7ac1f1f512139df3"
 		},
 		{
+			"ImportPath": "github.com/golang/glog",
+			"Rev": "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
+		},
+		{
 			"ImportPath": "github.com/golang/mock/gomock",
 			"Rev": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "0fd8c908d872c921af513ef5091964bbd2e0d904"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Comment": "v1.1-2-ga8d44e7",
+			"Rev": "a8d44e7d8e4d532b6a27a02dd82abb31cc1b01bd"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Comment": "v1.1-7-g9c19ed5",
+			"Rev": "9c19ed558d5df4da88e2ade9c8940d742aef0e7e"
 		},
 		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
@@ -176,6 +209,10 @@
 		{
 			"ImportPath": "github.com/kr/fs",
 			"Rev": "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/mapstructure",
+			"Rev": "d2dd0262208475919e1a362f675cfc0e7c10e905"
 		},
 		{
 			"ImportPath": "github.com/pkg/sftp",

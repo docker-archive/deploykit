@@ -29,10 +29,12 @@ func TestMachinesCrud(t *testing.T) {
 	require.Error(t, store.GetDetails(db16, Details{}))
 
 	db16Record := storage.MachineRecord{
-		Name:         db16,
-		Provisioner:  "test",
-		Created:      storage.Timestamp(123),
-		LastModified: storage.Timestamp(124),
+		MachineSummary: storage.MachineSummary{
+			Name:         db16,
+			Provisioner:  "test",
+			Created:      storage.Timestamp(123),
+			LastModified: storage.Timestamp(124),
+		},
 	}
 	db16Details := Details{Disks: 5, Attributes: []string{"raid", "x64"}}
 	require.NoError(t, store.Save(db16Record, db16Details))

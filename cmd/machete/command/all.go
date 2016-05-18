@@ -11,7 +11,7 @@ import (
 func GetSubcommands(
 	output console.Console,
 	registry *provisioners.Registry,
-	templates libmachete.Templates) []*cobra.Command {
+	templates libmachete.TemplateLoader) []*cobra.Command {
 
 	return []*cobra.Command{
 		createCmd(output, registry, templates),

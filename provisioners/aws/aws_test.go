@@ -3,6 +3,7 @@ package aws
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete/provisioners/api"
@@ -41,6 +42,8 @@ func TestCreateInstanceSync(t *testing.T) {
 	}
 	clientMock.EXPECT().RunInstances(gomock.Any()).Do(matcher).Return(&reservation, nil)
 
+	fmt.Println(">>>>>>", *request)
+
 	instance, err := createInstanceSync(clientMock, *request)
 
 	require.Nil(t, err)
@@ -54,12 +57,27 @@ func (w WrongRequestType) Name() string {
 	return "nope"
 }
 
+func (w *WrongRequestType) SetName(_ string) {
+}
+
+func (w WrongRequestType) ProvisionerName() string {
+	return "nope"
+}
+
+func (w WrongRequestType) Version() string {
+	return "nope"
+}
+
+func (w WrongRequestType) ProvisionWorkflow() []api.TaskType {
+	return []api.TaskType{}
+}
+
 func TestCreateIncompatibleType(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	clientMock := mock.NewMockEC2API(ctrl)
 
-	p := &provisioner{client: clientMock, sleepFunction: noSleep}
+	p := &provisioner{client: clientMock, sleepFunction: noSleep, config: defaultConfig()}
 	_, err := p.CreateInstance(&WrongRequestType{})
 	require.NotNil(t, err)
 }
@@ -110,23 +128,29 @@ func TestCreateInstanceSuccess(t *testing.T) {
 	// The instance is now running.
 	expectDescribeCall(clientMock, instanceID, ec2.InstanceStateNameRunning)
 
+	// The instance is now running.  Second call to get the ip address
+	expectDescribeCall(clientMock, instanceID, ec2.InstanceStateNameRunning)
+
 	tagRequest := ec2.CreateTagsInput{
 		Resources: []*string{&instanceID},
 		Tags: []*ec2.Tag{
-			{Key: aws.String("name"), Value: aws.String("test-instance")},
-			{Key: aws.String("test"), Value: aws.String("test2")}},
+			{Key: aws.String("test"), Value: aws.String("test2")},
+			{Key: aws.String("Name"), Value: aws.String("test-instance")},
+		},
 	}
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
-	provisioner := provisioner{client: clientMock, sleepFunction: noSleep}
-	eventChan, err := provisioner.CreateInstance(&CreateInstanceRequest{
-		Tags: map[string]string{"name": "test-instance", "test": "test2"},
-	})
+	provisioner := provisioner{client: clientMock, sleepFunction: noSleep, config: defaultConfig()}
+	request := &CreateInstanceRequest{
+		BaseMachineRequest: api.BaseMachineRequest{MachineName: "test-instance"},
+		Tags:               map[string]string{"test": "test2"},
+	}
+	eventChan, err := provisioner.CreateInstance(request)
 
 	require.Nil(t, err)
 	expectedEvents := []api.CreateInstanceEvent{
 		{Type: api.CreateInstanceStarted},
-		{Type: api.CreateInstanceCompleted, InstanceID: instanceID}}
+		{Type: api.CreateInstanceCompleted, InstanceID: instanceID, Machine: request}}
 	require.Equal(t, expectedEvents, collectCreateInstanceEvents(eventChan))
 }
 
@@ -138,7 +162,7 @@ func TestCreateInstanceError(t *testing.T) {
 	runError := errors.New("request failed")
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
-	provisioner := provisioner{client: clientMock, sleepFunction: noSleep}
+	provisioner := provisioner{client: clientMock, sleepFunction: noSleep, config: defaultConfig()}
 	eventChan, err := provisioner.CreateInstance(&CreateInstanceRequest{})
 
 	require.Nil(t, err)
@@ -178,7 +202,7 @@ func TestDestroyInstanceSuccess(t *testing.T) {
 
 	expectDescribeCall(clientMock, instanceID, ec2.InstanceStateNameTerminated)
 
-	provisioner := provisioner{client: clientMock, sleepFunction: noSleep}
+	provisioner := provisioner{client: clientMock, sleepFunction: noSleep, config: defaultConfig()}
 	eventChan, err := provisioner.DestroyInstance(instanceID)
 
 	require.Nil(t, err)
@@ -197,7 +221,7 @@ func TestDestroyInstanceError(t *testing.T) {
 	clientMock.EXPECT().TerminateInstances(gomock.Any()).
 		Return(&ec2.TerminateInstancesOutput{}, runError)
 
-	provisioner := provisioner{client: clientMock, sleepFunction: noSleep}
+	provisioner := provisioner{client: clientMock, sleepFunction: noSleep, config: defaultConfig()}
 	eventChan, err := provisioner.DestroyInstance("test-id")
 
 	require.Nil(t, err)

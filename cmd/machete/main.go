@@ -13,7 +13,7 @@ import (
 	"path"
 )
 
-func initTemplatesDir(path string) error {
+func initTemplateLoaderDir(path string) error {
 	pathInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -30,19 +30,19 @@ func initTemplatesDir(path string) error {
 	return nil
 }
 
-func initTemplatesRepo() (libmachete.Templates, error) {
+func initTemplatesRepo() (libmachete.TemplateLoader, error) {
 	usr, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to look up current user: %s", err)
 	}
 
 	templatesDir := path.Join(usr.HomeDir, ".machete")
-	err = initTemplatesDir(templatesDir)
+	err = initTemplateLoaderDir(templatesDir)
 	if err != nil {
 		return nil, err
 	}
 
-	templates, err := libmachete.FileTemplates(templatesDir)
+	templates, err := libmachete.FileTemplateLoader(templatesDir)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to locate templates: %s", err)
 	}
