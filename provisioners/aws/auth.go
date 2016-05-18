@@ -8,13 +8,17 @@ import (
 
 // NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
 func NewCredential() api.Credential {
-	return new(credential)
+	return &credential{
+		CredentialBase: api.CredentialBase{Provisioner: ProvisionerName},
+	}
 }
 
 type credential struct {
-	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id"`
-	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key"`
-	SessionToken    string `yaml:"session_token" json:"session_token"`
+	api.CredentialBase `yaml:",inline"`
+	AccessKeyID        string `yaml:"access_key_id" json:"access_key_id"`
+	SecretAccessKey    string `yaml:"secret_access_key" json:"secret_access_key"`
+	SessionToken       string `yaml:"session_token" json:"session_token"`
+	EC2RoleProvider    bool   `yaml:"ec2_role_provider" json:"ec2_role_provider"`
 }
 
 // Retrieve implements the AWS credentials.Provider interface method
@@ -39,7 +43,9 @@ func (a *credential) IsExpired() bool {
 
 // Validate implements Credential interface method
 func (a credential) Validate(ctx context.Context) error {
-	if a.AccessKeyID == "" || a.SecretAccessKey == "" {
+	if a.EC2RoleProvider {
+		return nil
+	} else if a.AccessKeyID == "" || a.SecretAccessKey == "" {
 		return credentials.ErrStaticCredentialsEmpty
 	}
 	return nil
