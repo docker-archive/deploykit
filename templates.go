@@ -9,21 +9,8 @@ import (
 )
 
 // TemplateBuilder is simply a machine request builder, since templates are just
-// machine requests with values prepopulated.
+// machine requests with values pre-populated.
 type TemplateBuilder MachineRequestBuilder
-
-var (
-	templateBuilders = map[string]TemplateBuilder{}
-)
-
-// RegisterTemplateBuilder registers the function that allocates an empty credential for a provisioner.
-// This method should be invoke in the init() of the provisioner package.
-func RegisterTemplateBuilder(provisionerName string, f TemplateBuilder) {
-	lock.Lock()
-	defer lock.Unlock()
-
-	templateBuilders[provisionerName] = f
-}
 
 // Templates looks up and reads template data, scoped by provisioner name.
 type Templates interface {
@@ -71,8 +58,8 @@ func NewTemplates(store storage.Templates) Templates {
 
 // NewCredential returns an empty credential object for a provisioner.
 func (t *templates) NewTemplate(provisionerName string) (api.MachineRequest, error) {
-	if c, has := templateBuilders[provisionerName]; has {
-		return c(), nil
+	if builder, has := GetProvisionerBuilder(provisionerName); has {
+		return builder.DefaultMachineRequest, nil
 	}
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
 }
@@ -123,6 +110,7 @@ func (t *templates) Exists(provisioner, key string) bool {
 	return err == nil
 }
 
+// TODO(wfarner): This has no callers, can it be removed?
 // CreateTemplate creates a new template from the input reader.
 func (t *templates) CreateTemplate(provisioner, key string, input io.Reader, codec *Codec) *Error {
 	if t.Exists(provisioner, key) {

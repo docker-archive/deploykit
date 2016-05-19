@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/docker/libmachete",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v63",
+	"GodepVersion": "v69",
 	"Packages": [
 		"./..."
 	],
@@ -148,17 +148,14 @@
 		},
 		{
 			"ImportPath": "github.com/conductant/gohm/pkg/auth",
-			"Comment": "v0.1-5-g75cd719",
 			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
 		},
 		{
 			"ImportPath": "github.com/conductant/gohm/pkg/encoding",
-			"Comment": "v0.1-5-g75cd719",
 			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
 		},
 		{
 			"ImportPath": "github.com/conductant/gohm/pkg/server",
-			"Comment": "v0.1-5-g75cd719",
 			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
 		},
 		{

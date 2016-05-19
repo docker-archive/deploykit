@@ -6,22 +6,7 @@ import (
 	"github.com/docker/libmachete/storage"
 	"io"
 	"io/ioutil"
-	"sync"
 )
-
-var (
-	credentialers = map[string]func() api.Credential{}
-	lock          sync.Mutex
-)
-
-// RegisterCredentialer registers the function that allocates an empty credential for a provisioner.
-// This method should be invoke in the init() of the provisioner package.
-func RegisterCredentialer(provisionerName string, f func() api.Credential) {
-	lock.Lock()
-	defer lock.Unlock()
-
-	credentialers[provisionerName] = f
-}
 
 // Credentials manages the objects used to authenticate and authorize for a provisioner's API
 type Credentials interface {
@@ -76,8 +61,8 @@ func ensureValidContentType(ct *Codec) *Codec {
 
 // NewCredential returns an empty credential object for a provisioner.
 func (c *credentials) NewCredential(provisionerName string) (api.Credential, error) {
-	if c, has := credentialers[provisionerName]; has {
-		return c(), nil
+	if builder, has := GetProvisionerBuilder(provisionerName); has {
+		return builder.DefaultCredential, nil
 	}
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
 }
@@ -141,6 +126,7 @@ func (c *credentials) Exists(key string) bool {
 	return err == nil
 }
 
+// TODO(wfarner): This function is unused.  Can it be removed?
 // CreateCredential creates a new credential from the input reader.
 func (c *credentials) CreateCredential(provisioner, key string, input io.Reader, codec *Codec) *Error {
 	if c.Exists(key) {

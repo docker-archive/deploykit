@@ -16,24 +16,8 @@ import (
 // that satisfies the MachineRequest interface.
 type MachineRequestBuilder func() api.MachineRequest
 
-var (
-	machineCreators = map[string]MachineRequestBuilder{}
-)
-
-// RegisterMachineRequestBuilder registers by provisioner the request builder.
-// This method should be invoke in the init() of the provisioner package.
-func RegisterMachineRequestBuilder(provisionerName string, f MachineRequestBuilder) {
-	lock.Lock()
-	defer lock.Unlock()
-
-	machineCreators[provisionerName] = f
-}
-
 // Machines manages the lifecycle of a machine / node.
 type Machines interface {
-	// NewMachines creates an instance of the manager given the backing store.
-	NewMachineRequest(provisionerName string) (api.MachineRequest, error)
-
 	// List
 	List() ([]storage.MachineSummary, error)
 
@@ -61,14 +45,6 @@ type machines struct {
 // NewMachines creates an instance of the manager given the backing store.
 func NewMachines(store storage.Machines) Machines {
 	return &machines{store: store}
-}
-
-// NewMachine returns an empty machine object for a provisioner.
-func (cm *machines) NewMachineRequest(provisionerName string) (api.MachineRequest, error) {
-	if c, has := machineCreators[provisionerName]; has {
-		return c(), nil
-	}
-	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
 }
 
 func (cm *machines) List() ([]storage.MachineSummary, error) {
