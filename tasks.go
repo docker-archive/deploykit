@@ -63,12 +63,6 @@ func (m *TaskMap) Filter(names []api.TaskName) ([]api.Task, error) {
 	return filtered, nil
 }
 
-// CustomTaskHandler creates a task identical to another task, replacing the handler.
-func CustomTaskHandler(task api.Task, handler api.TaskHandler) api.Task {
-	task.Do = handler
-	return task
-}
-
 func unimplementedTask(name api.TaskName, desc string) api.Task {
 	return api.Task{
 		Name:    name,
@@ -90,12 +84,35 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 	}
 }
 
+func defaultCreateInstanceHandler(
+	prov api.Provisioner,
+	ctx context.Context,
+	cred api.Credential,
+	req api.MachineRequest,
+	events chan<- interface{}) error {
+
+	createInstanceEvents, err := prov.CreateInstance(req)
+	if err != nil {
+		return err
+	}
+
+	for event := range createInstanceEvents {
+		events <- event
+	}
+
+	return nil
+}
+
 var (
 	// TaskSSHKeyGen is the task that generates SSH key
 	TaskSSHKeyGen = unimplementedTask("ssh-keygen", "Generating ssh key for host")
 
 	// TaskCreateInstance creates a machine instance
-	TaskCreateInstance = unimplementedTask("create-instance", "Creates a machine instance")
+	TaskCreateInstance = api.Task{
+		Name:    "create-instance",
+		Message: "Creates a machine instance",
+		Do:      defaultCreateInstanceHandler,
+	}
 
 	// TaskUserData copies per-instance user data on setup
 	TaskUserData = unimplementedTask("user-data", "Copying user data to instance")
