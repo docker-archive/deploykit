@@ -1,9 +1,7 @@
 package aws
 
 import (
-	"fmt"
 	"github.com/docker/libmachete/provisioners/api"
-	"reflect"
 )
 
 // CreateInstanceRequest is the struct used to create new instances.
@@ -28,28 +26,4 @@ type CreateInstanceRequest struct {
 	Tags                     map[string]string `yaml:"tags" json:"tags"`
 	VolumeType               string            `yaml:"volume_type" json:"volume_type"`
 	VpcID                    string            `yaml:"vpc_id" json:"vpc_id"`
-}
-
-// Validate checks the data and returns error if not valid
-func (req CreateInstanceRequest) Validate() error {
-	// TODO finish this.
-	return nil
-}
-
-func checkCredential(cred api.Credential) (c *credential, err error) {
-	is := false
-	if c, is = cred.(*credential); !is {
-		err = fmt.Errorf("credential type mismatch: %v", reflect.TypeOf(cred))
-		return
-	}
-	return
-}
-
-func checkMachineRequest(req api.MachineRequest) (r *CreateInstanceRequest, err error) {
-	is := false
-	if r, is = req.(*CreateInstanceRequest); !is {
-		err = fmt.Errorf("request type mismatch: %v", reflect.TypeOf(req))
-		return
-	}
-	return
 }
