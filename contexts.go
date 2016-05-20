@@ -16,31 +16,19 @@ type KVPair map[string]interface{}
 // can load in configuration parameters such as region, timeouts, OAuth app id, etc.
 type ContextBuilder func(context.Context, KVPair) context.Context
 
-var (
-	contextBuilders = map[string]ContextBuilder{}
-)
-
-// RegisterContextBuilder registers the a provisioner's configuration / context builder.
-// This method should be invoke in the init() of the provisioner package.
-func RegisterContextBuilder(provisionerName string, f ContextBuilder) {
-	lock.Lock()
-	defer lock.Unlock()
-
-	contextBuilders[provisionerName] = f
-}
-
 // BuildContext builds the runtime context customized for the provisioner
 func BuildContext(provisionerName string, root context.Context, ctx Context) context.Context {
-	builder, has := contextBuilders[provisionerName]
+	builder, has := GetProvisionerBuilder(provisionerName)
 	if !has {
 		return root
 	}
+
 	// get the NVPair by the provisioner name
 	nvpair, has := ctx[provisionerName]
 	if !has {
 		return root
 	}
-	return builder(root, nvpair)
+	return builder.BuildContext(root, nvpair)
 }
 
 // Context is the application / provisioner-level configuration object that
