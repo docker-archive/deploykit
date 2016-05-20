@@ -17,14 +17,9 @@ type KVPair map[string]interface{}
 type ContextBuilder func(context.Context, KVPair) context.Context
 
 // BuildContext builds the runtime context customized for the provisioner
-func BuildContext(provisionerName string, root context.Context, ctx Context) context.Context {
-	builder, has := GetProvisionerBuilder(provisionerName)
-	if !has {
-		return root
-	}
-
+func BuildContext(builder ProvisionerBuilder, root context.Context, ctx Context) context.Context {
 	// get the NVPair by the provisioner name
-	nvpair, has := ctx[provisionerName]
+	nvpair, has := ctx[builder.Name]
 	if !has {
 		return root
 	}

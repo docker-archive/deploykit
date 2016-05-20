@@ -30,12 +30,13 @@ type Credentials interface {
 }
 
 type credentials struct {
-	store storage.Credentials
+	store        storage.Credentials
+	provisioners *MachineProvisioners
 }
 
 // NewCredentials creates an instance of the manager given the backing store.
-func NewCredentials(store storage.Credentials) Credentials {
-	return &credentials{store: store}
+func NewCredentials(store storage.Credentials, provisioners *MachineProvisioners) Credentials {
+	return &credentials{store: store, provisioners: provisioners}
 }
 
 func ensureValidContentType(ct *Codec) *Codec {
@@ -46,7 +47,7 @@ func ensureValidContentType(ct *Codec) *Codec {
 }
 
 func (c *credentials) newCredential(provisionerName string) (api.Credential, error) {
-	if builder, has := GetProvisionerBuilder(provisionerName); has {
+	if builder, has := c.provisioners.GetBuilder(provisionerName); has {
 		return builder.DefaultCredential, nil
 	}
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)

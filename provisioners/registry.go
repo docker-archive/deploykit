@@ -5,6 +5,8 @@ import (
 	"github.com/docker/libmachete/provisioners/api"
 )
 
+// TODO(wfarner): Consider removing this file.  It does not appear to have any substantial uses.
+
 // Registry associates Provisioners canonical names.
 type Registry struct {
 	provisioners map[string]ProvisionerBuilder
