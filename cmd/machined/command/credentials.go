@@ -9,108 +9,118 @@ import (
 	"net/http"
 )
 
-func credentialRoutes(c libmachete.Credentials) map[*rest.Endpoint]rest.Handler {
+type credentialsHandler struct {
+	credentials libmachete.Credentials
+}
+
+func (h *credentialsHandler) getAll(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	log.Infoln("List credentials")
+	all, err := h.credentials.ListIds()
+	if err != nil {
+		respondError(http.StatusInternalServerError, resp, err)
+		return
+	}
+	libmachete.ContentTypeJSON.Respond(resp, all)
+}
+
+func (h *credentialsHandler) post(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	provisioner := rest.GetUrlParameter(req, "provisioner")
+	key := rest.GetUrlParameter(req, "key")
+	log.Infof("Add credential %v, %v\n", provisioner, key)
+
+	err := h.credentials.CreateCredential(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
+
+	if err == nil {
+		return
+	}
+
+	switch err.Code {
+	case libmachete.ErrDuplicate:
+		respondError(http.StatusConflict, resp, err)
+		return
+	case libmachete.ErrNotFound:
+		respondError(http.StatusNotFound, resp, err)
+		return
+	default:
+		respondError(http.StatusInternalServerError, resp, err)
+		return
+	}
+}
+
+func (h *credentialsHandler) update(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	key := rest.GetUrlParameter(req, "key")
+	log.Infof("Update credential %v\n", key)
+
+	err := h.credentials.UpdateCredential(key, req.Body, libmachete.CodecByContentTypeHeader(req))
+
+	if err == nil {
+		return
+	}
+
+	switch err.Code {
+	case libmachete.ErrDuplicate:
+		respondError(http.StatusConflict, resp, err)
+		return
+	case libmachete.ErrNotFound:
+		respondError(http.StatusNotFound, resp, err)
+		return
+	default:
+		respondError(http.StatusInternalServerError, resp, err)
+		return
+	}
+}
+
+func (h *credentialsHandler) getOne(codec *libmachete.Codec) rest.Handler {
+	return func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+		key := rest.GetUrlParameter(req, "key")
+		cr, err := h.credentials.Get(key)
+		if err != nil {
+			respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
+			return
+		}
+		codec.Respond(resp, cr)
+	}
+}
+
+func (h *credentialsHandler) delete(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	key := rest.GetUrlParameter(req, "key")
+	err := h.credentials.Delete(key)
+	if err != nil {
+		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
+		return
+	}
+}
+
+func credentialRoutes(credentials libmachete.Credentials) map[*rest.Endpoint]rest.Handler {
+	handler := credentialsHandler{credentials: credentials}
+
 	return map[*rest.Endpoint]rest.Handler{
 		&rest.Endpoint{
 			UrlRoute:   "/credentials/json",
 			HttpMethod: rest.GET,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			log.Infoln("List credentials")
-			all, err := c.ListIds()
-			if err != nil {
-				respondError(http.StatusInternalServerError, resp, err)
-				return
-			}
-			libmachete.ContentTypeJSON.Respond(resp, all)
-		},
+		}: handler.getAll,
 		&rest.Endpoint{
 			UrlRoute:   "/credentials/{key}/create",
 			HttpMethod: rest.POST,
 			UrlQueries: rest.UrlQueries{
 				"provisioner": "",
 			},
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			provisioner := rest.GetUrlParameter(req, "provisioner")
-			key := rest.GetUrlParameter(req, "key")
-			log.Infof("Add credential %v, %v\n", provisioner, key)
-
-			err := c.CreateCredential(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
-
-			if err == nil {
-				return
-			}
-
-			switch err.Code {
-			case libmachete.ErrDuplicate:
-				respondError(http.StatusConflict, resp, err)
-				return
-			case libmachete.ErrNotFound:
-				respondError(http.StatusNotFound, resp, err)
-				return
-			default:
-				respondError(http.StatusInternalServerError, resp, err)
-				return
-			}
-		},
+		}: handler.post,
 		&rest.Endpoint{
 			UrlRoute:   "/credentials/{key}",
 			HttpMethod: rest.PUT,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			key := rest.GetUrlParameter(req, "key")
-			log.Infof("Update credential %v\n", key)
-
-			err := c.UpdateCredential(key, req.Body, libmachete.CodecByContentTypeHeader(req))
-
-			if err == nil {
-				return
-			}
-
-			switch err.Code {
-			case libmachete.ErrDuplicate:
-				respondError(http.StatusConflict, resp, err)
-				return
-			case libmachete.ErrNotFound:
-				respondError(http.StatusNotFound, resp, err)
-				return
-			default:
-				respondError(http.StatusInternalServerError, resp, err)
-				return
-			}
-		},
+		}: handler.update,
 		&rest.Endpoint{
 			UrlRoute:   "/credentials/{key}/json",
 			HttpMethod: rest.GET,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			key := rest.GetUrlParameter(req, "key")
-			cr, err := c.Get(key)
-			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-				return
-			}
-			libmachete.ContentTypeJSON.Respond(resp, cr)
-		},
+		}: handler.getOne(libmachete.ContentTypeJSON),
 		&rest.Endpoint{
 			UrlRoute:   "/credentials/{key}/yaml",
 			HttpMethod: rest.GET,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			key := rest.GetUrlParameter(req, "key")
-			cr, err := c.Get(key)
-			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-				return
-			}
-			libmachete.ContentTypeYAML.Respond(resp, cr)
-		},
+		}: handler.getOne(libmachete.ContentTypeYAML),
 		&rest.Endpoint{
 			UrlRoute:   "/credentials/{key}",
 			HttpMethod: rest.DELETE,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			key := rest.GetUrlParameter(req, "key")
-			err := c.Delete(key)
-			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-				return
-			}
-		},
+		}: handler.delete,
 	}
 }
