@@ -13,6 +13,19 @@ type credentialsHandler struct {
 	credentials libmachete.Credentials
 }
 
+func (h *credentialsHandler) getOne(codec *libmachete.Codec) rest.Handler {
+	return func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+		key := rest.GetUrlParameter(req, "key")
+		cr, err := h.credentials.Get(key)
+		if err == nil {
+			codec.Respond(resp, cr)
+		} else {
+			respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
+			return
+		}
+	}
+}
+
 func (h *credentialsHandler) getAll(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 	log.Infoln("List credentials")
 	all, err := h.credentials.ListIds()
@@ -67,18 +80,6 @@ func (h *credentialsHandler) update(ctx context.Context, resp http.ResponseWrite
 	default:
 		respondError(http.StatusInternalServerError, resp, err)
 		return
-	}
-}
-
-func (h *credentialsHandler) getOne(codec *libmachete.Codec) rest.Handler {
-	return func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-		key := rest.GetUrlParameter(req, "key")
-		cr, err := h.credentials.Get(key)
-		if err != nil {
-			respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-			return
-		}
-		codec.Respond(resp, cr)
 	}
 }
 
