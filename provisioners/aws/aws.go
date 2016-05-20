@@ -14,6 +14,7 @@ import (
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
 	"golang.org/x/net/context"
+	"reflect"
 	"sort"
 	"time"
 )
@@ -47,6 +48,15 @@ func (a Builder) Build(params map[string]string) (api.Provisioner, error) {
 	client := CreateClient(region, awsCredentials, 5)
 
 	return New(client), nil
+}
+
+func checkCredential(cred api.Credential) (c *credential, err error) {
+	is := false
+	if c, is = cred.(*credential); !is {
+		err = fmt.Errorf("credential type mismatch: %v", reflect.TypeOf(cred))
+		return
+	}
+	return
 }
 
 // ProvisionerWith returns a provision given the runtime context and credential
@@ -224,7 +234,7 @@ func getTaskMap() *libmachete.TaskMap {
 		libmachete.TaskSSHKeyGen,
 		libmachete.TaskUserData,
 		libmachete.TaskInstallDockerEngine,
-		libmachete.CustomTaskHandler(libmachete.TaskCreateInstance, handleCreateInstance),
+		libmachete.TaskCreateInstance,
 	)
 }
 
@@ -242,10 +252,19 @@ func (p *provisioner) NewRequestInstance() api.MachineRequest {
 	return NewMachineRequest()
 }
 
+func ensureRequestType(req api.MachineRequest) (r *CreateInstanceRequest, err error) {
+	is := false
+	if r, is = req.(*CreateInstanceRequest); !is {
+		err = fmt.Errorf("request type mismatch: %v", reflect.TypeOf(req))
+		return
+	}
+	return
+}
+
 // GetIPAddress - this prefers private IP if it's set; make this behavior configurable as a
 // machine template or context?
 func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
-	ci, err := checkMachineRequest(req)
+	ci, err := ensureRequestType(req)
 	if err != nil {
 		return "", err
 	}
@@ -255,40 +274,14 @@ func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	return ci.PublicIPAddress, nil
 }
 
-// TODO(wfarner): The registry indirection causes us to reference this function from a global and
-// local context, making it simplest to use a global function rather than a function on the struct.
-// Consider refactoring to push the registry concept higher in the stack to make this call flow
-// more direct.
-func handleCreateInstance(
-	prov api.Provisioner,
-	ctx context.Context,
-	cred api.Credential,
-	req api.MachineRequest,
-	events chan<- interface{}) error {
-
-	p, _ := prov.(*provisioner)
-
-	r, err := checkMachineRequest(req)
-	if err != nil {
-		return err
-	}
-
-	log.Infoln("IN AWS: create instance: client=", p.client, "cred=", cred, "req=", r)
-
-	createInstanceEvents, err := p.CreateInstance(req)
-	if err != nil {
-		return err
-	}
-
-	for event := range createInstanceEvents {
-		events <- event
-	}
-
-	return nil
-}
-
 func (p *provisioner) GetTasks(tasks []api.TaskName) ([]api.Task, error) {
 	return getTaskMap().Filter(tasks)
+}
+
+// Validate checks the data and returns error if not valid
+func validate(req *CreateInstanceRequest) error {
+	// TODO finish this.
+	return nil
 }
 
 func (p *provisioner) CreateInstance(
@@ -299,7 +292,7 @@ func (p *provisioner) CreateInstance(
 		return nil, &ErrInvalidRequest{}
 	}
 
-	if err := request.Validate(); err != nil {
+	if err := validate(request); err != nil {
 		return nil, err
 	}
 

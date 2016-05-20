@@ -22,3 +22,6 @@ func (e *osExitError) Error() string {
 
 // UsageError indicates that the command was used improperly.
 var UsageError = &osExitError{exitCode: -1, text: "incorrect usage"}
+
+// NotImplementedError indicates that the requested behavior is not yet supported.
+var NotImplementedError = &osExitError{exitCode: -2, text: "Not implemented"}
