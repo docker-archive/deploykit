@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/cmd/machete/console"
 	"github.com/docker/libmachete/provisioners"
@@ -9,30 +8,11 @@ import (
 )
 
 type create struct {
-	output         console.Console
-	machineCreator libmachete.MachineCreator
+	output console.Console
 }
 
 func (c *create) run(args []string) error {
-	if len(args) != 2 {
-		return UsageError
-	}
-
-	// TODO(wfarner): Generalize this once we have plumbing for additional parameters.
-	createEvents, err := c.machineCreator.Create(
-		args[0],
-		map[string]string{"REGION": "us-west-2"},
-		args[1],
-		[]byte{})
-	if err != nil {
-		return fmt.Errorf("Machine creation could not start: %s", err)
-	}
-
-	for event := range createEvents {
-		c.output.Println(event)
-	}
-
-	return nil
+	return NotImplementedError
 }
 
 func createCmd(
@@ -40,9 +20,7 @@ func createCmd(
 	registry *provisioners.Registry,
 	templates libmachete.TemplateLoader) *cobra.Command {
 
-	cmd := create{
-		output:         output,
-		machineCreator: libmachete.NewCreator(registry, templates)}
+	cmd := create{output: output}
 
 	return &cobra.Command{
 		Use:   "create provisioner template",
