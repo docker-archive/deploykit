@@ -48,16 +48,17 @@ type Templates interface {
 }
 
 type templates struct {
-	store storage.Templates
+	store        storage.Templates
+	provisioners *MachineProvisioners
 }
 
 // NewTemplates creates an instance of the manager given the backing store.
-func NewTemplates(store storage.Templates) Templates {
-	return &templates{store: store}
+func NewTemplates(store storage.Templates, provisioners *MachineProvisioners) Templates {
+	return &templates{store: store, provisioners: provisioners}
 }
 
 func (t *templates) NewBlankTemplate(provisionerName string) (api.MachineRequest, error) {
-	if builder, has := GetProvisionerBuilder(provisionerName); has {
+	if builder, has := t.provisioners.GetBuilder(provisionerName); has {
 		return builder.DefaultMachineRequest, nil
 	}
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)

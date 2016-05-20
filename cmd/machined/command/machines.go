@@ -15,6 +15,7 @@ type machineHandler struct {
 	creds               libmachete.Credentials
 	templates           libmachete.Templates
 	machines            libmachete.Machines
+	provisioners        libmachete.MachineProvisioners
 }
 
 func (h *machineHandler) getOne(codec *libmachete.Codec) rest.Handler {
@@ -79,7 +80,14 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 		return
 	}
 
-	provisionerName := cred.ProvisionerName()
+	// TODO(wfarner): It's odd that the provisioner name comes from the credentials.  It would seem more appropriate
+	// for the credentials to be scoped _within_ provisioners, and the request to directly specify the provisioner
+	// to use.
+	builder, has := h.provisioners.GetBuilder(cred.ProvisionerName())
+	if !has {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
 
 	// Runtime context
 	runContext, err := h.provisionerContexts.Get(context)
@@ -89,20 +97,18 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 	}
 
 	// Configure the provisioner context
-	ctx = libmachete.BuildContext(provisionerName, ctx, runContext)
+	ctx = libmachete.BuildContext(builder, ctx, runContext)
 
-	// Get the provisioner
-	// TODO - clean up the error code to better reflect the nature of error
-	provisioner, err := libmachete.GetProvisioner(provisionerName, ctx, cred)
+	// Load template
+	tpl, err := h.templates.Get(storage.TemplateID{Provisioner: builder.Name, Name: template})
 	if err != nil {
 		respondError(http.StatusNotFound, resp, err)
 		return
 	}
 
-	// Load template
-	tpl, err := h.templates.Get(storage.TemplateID{Provisioner: provisionerName, Name: template})
+	provisioner, err := builder.Build(ctx, cred)
 	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
+		respondError(http.StatusBadRequest, resp, err)
 		return
 	}
 
@@ -156,6 +162,15 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 
 	provisionerName := cred.ProvisionerName()
 
+	// TODO(wfarner): It's odd that the provisioner name comes from the credentials.  It would seem more appropriate
+	// for the credentials to be scoped _within_ provisioners, and the request to directly specify the provisioner
+	// to use.
+	builder, has := h.provisioners.GetBuilder(provisionerName)
+	if !has {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
+
 	// Runtime context
 	runContext, err := h.provisionerContexts.Get(context)
 	if err != nil {
@@ -164,13 +179,11 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 	}
 
 	// Configure the provisioner context
-	ctx = libmachete.BuildContext(provisionerName, ctx, runContext)
+	ctx = libmachete.BuildContext(builder, ctx, runContext)
 
-	// Get the provisioner
-	// TODO - clean up the error code to better reflect the nature of error
-	provisioner, err := libmachete.GetProvisioner(provisionerName, ctx, cred)
+	provisioner, err := builder.Build(ctx, cred)
 	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
+		respondError(http.StatusBadRequest, resp, err)
 		return
 	}
 

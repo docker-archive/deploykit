@@ -40,46 +40,48 @@ func mkdir(parent, child string) (string, error) {
 }
 
 func (s *apiServer) init() error {
-	ctxPath, err := mkdir(s.options.RootDir, "contexts")
+	provisioners := libmachete.DefaultProvisioners
+
+	contextPath, err := mkdir(s.options.RootDir, "contexts")
 	if err != nil {
 		return err
 	}
-	cPath, err := mkdir(s.options.RootDir, "credentials")
+	credentialsPath, err := mkdir(s.options.RootDir, "credentials")
 	if err != nil {
 		return err
 	}
-	tPath, err := mkdir(s.options.RootDir, "templates")
+	templatesPath, err := mkdir(s.options.RootDir, "templates")
 	if err != nil {
 		return err
 	}
-	mPath, err := mkdir(s.options.RootDir, "machines")
+	machinesPath, err := mkdir(s.options.RootDir, "machines")
 	if err != nil {
 		return err
 	}
 
-	ctxStore, err := filestores.NewContexts(ctxPath)
+	contextStore, err := filestores.NewContexts(contextPath)
 	if err != nil {
 		return err
 	}
-	s.contexts = libmachete.NewContexts(ctxStore)
+	s.contexts = libmachete.NewContexts(contextStore)
 
-	cStore, err := filestores.NewCredentials(cPath)
+	credentialsStore, err := filestores.NewCredentials(credentialsPath)
 	if err != nil {
 		return err
 	}
-	s.credentials = libmachete.NewCredentials(cStore)
+	s.credentials = libmachete.NewCredentials(credentialsStore, &provisioners)
 
-	tStore, err := filestores.NewTemplates(tPath)
+	templateStore, err := filestores.NewTemplates(templatesPath)
 	if err != nil {
 		return err
 	}
-	s.templates = libmachete.NewTemplates(tStore)
+	s.templates = libmachete.NewTemplates(templateStore, &provisioners)
 
-	mStore, err := filestores.NewMachines(mPath)
+	machineStore, err := filestores.NewMachines(machinesPath)
 	if err != nil {
 		return err
 	}
-	s.machines = libmachete.NewMachines(mStore)
+	s.machines = libmachete.NewMachines(machineStore)
 	return nil
 }
 
@@ -164,7 +166,15 @@ func ServerCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&server.options.Port, "port", "8888", "Port the server listens on. File path for unix socket")
-	cmd.Flags().StringVar(&server.options.RootDir, "dir", rootDir(), "Root directory for file storage")
+	cmd.Flags().StringVar(
+		&server.options.Port,
+		"port",
+		"8888",
+		"Port the server listens on. File path for unix socket")
+	cmd.Flags().StringVar(
+		&server.options.RootDir,
+		"dir",
+		rootDir(),
+		"Root directory for file storage")
 	return cmd
 }
