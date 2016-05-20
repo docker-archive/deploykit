@@ -23,7 +23,7 @@ func (h *credentialsHandler) getAll(ctx context.Context, resp http.ResponseWrite
 	libmachete.ContentTypeJSON.Respond(resp, all)
 }
 
-func (h *credentialsHandler) post(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *credentialsHandler) create(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 	provisioner := rest.GetUrlParameter(req, "provisioner")
 	key := rest.GetUrlParameter(req, "key")
 	log.Infof("Add credential %v, %v\n", provisioner, key)
@@ -105,7 +105,7 @@ func credentialRoutes(credentials libmachete.Credentials) map[*rest.Endpoint]res
 			UrlQueries: rest.UrlQueries{
 				"provisioner": "",
 			},
-		}: handler.post,
+		}: handler.create,
 		&rest.Endpoint{
 			UrlRoute:   "/credentials/{key}",
 			HttpMethod: rest.PUT,
