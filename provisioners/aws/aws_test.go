@@ -51,18 +51,7 @@ func TestCreateInstanceSync(t *testing.T) {
 }
 
 type WrongRequestType struct {
-}
-
-func (w WrongRequestType) Name() string {
-	return "nope"
-}
-
-func (w WrongRequestType) ProvisionerName() string {
-	return "nope"
-}
-
-func (w WrongRequestType) Version() string {
-	return "nope"
+	api.BaseMachineRequest
 }
 
 func (w WrongRequestType) ProvisionWorkflow() []api.TaskName {
