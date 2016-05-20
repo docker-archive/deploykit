@@ -48,29 +48,14 @@ type Context map[string]KVPair
 
 // Contexts looks up and reads context data, scoped by provisioner name.
 type Contexts interface {
-
-	// Unmarshal decodes the bytes and applies onto the object, with a encoding.
-	// If nil codec is passed, the default encoding / content type will be used.
-	Unmarshal(contentType *Codec, data []byte, ctx *Context) error
-
-	// Marshal encodes the given context object and returns the bytes.
-	// If nil codec is passed, the default encoding / content type will be used.
-	Marshal(contentType *Codec, ctx Context) ([]byte, error)
-
 	// ListIds
 	ListIds() ([]string, error)
-
-	// Saves the context identified by key
-	Save(key string, ctx Context) error
 
 	// Get returns a context identified by key
 	Get(key string) (Context, error)
 
 	// Deletes the context identified by key
 	Delete(key string) error
-
-	// Exists returns true if context identified key exists
-	Exists(key string) bool
 
 	// CreateContext adds a new context from the input reader.
 	CreateContext(key string, input io.Reader, codec *Codec) *Error
@@ -88,16 +73,8 @@ func NewContexts(store storage.Contexts) Contexts {
 	return &contexts{store: store}
 }
 
-// Unmarshal decodes the bytes and applies onto the context object, using a given encoding.
-// If nil codec is passed, the default encoding / content type will be used.
-func (t *contexts) Unmarshal(contentType *Codec, data []byte, ctx *Context) error {
+func (t *contexts) unmarshal(contentType *Codec, data []byte, ctx *Context) error {
 	return ensureValidContentType(contentType).unmarshal(data, ctx)
-}
-
-// Marshal encodes the given context object and returns the bytes.
-// If nil codec is passed, the default encoding / content type will be used.
-func (t *contexts) Marshal(contentType *Codec, ctx Context) ([]byte, error) {
-	return ensureValidContentType(contentType).marshal(ctx)
 }
 
 func (t *contexts) ListIds() ([]string, error) {
@@ -112,7 +89,7 @@ func (t *contexts) ListIds() ([]string, error) {
 	return list, nil
 }
 
-func (t *contexts) Save(key string, ctx Context) error {
+func (t *contexts) save(key string, ctx Context) error {
 	return t.store.Save(storage.ContextID(key), ctx)
 }
 
@@ -129,7 +106,7 @@ func (t *contexts) Delete(key string) error {
 	return t.store.Delete(storage.ContextID(key))
 }
 
-func (t *contexts) Exists(key string) bool {
+func (t *contexts) exists(key string) bool {
 	ctx := new(Context)
 	err := t.store.GetContext(storage.ContextID(key), ctx)
 	return err == nil
@@ -137,7 +114,7 @@ func (t *contexts) Exists(key string) bool {
 
 // CreateContext creates a new context from the input reader.
 func (t *contexts) CreateContext(key string, input io.Reader, codec *Codec) *Error {
-	if t.Exists(key) {
+	if t.exists(key) {
 		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
 
@@ -147,17 +124,17 @@ func (t *contexts) CreateContext(key string, input io.Reader, codec *Codec) *Err
 	}
 
 	ctx := new(Context)
-	if err = t.Unmarshal(codec, buff, ctx); err != nil {
+	if err = t.unmarshal(codec, buff, ctx); err != nil {
 		return &Error{Message: err.Error()}
 	}
-	if err = t.Save(key, *ctx); err != nil {
+	if err = t.save(key, *ctx); err != nil {
 		return &Error{Message: err.Error()}
 	}
 	return nil
 }
 
 func (t *contexts) UpdateContext(key string, input io.Reader, codec *Codec) *Error {
-	if !t.Exists(key) {
+	if !t.exists(key) {
 		return &Error{ErrNotFound, fmt.Sprintf("Context not found: %v", key)}
 	}
 
@@ -168,10 +145,10 @@ func (t *contexts) UpdateContext(key string, input io.Reader, codec *Codec) *Err
 	}
 
 	ctx := new(Context)
-	if err = t.Unmarshal(codec, buff, ctx); err != nil {
+	if err = t.unmarshal(codec, buff, ctx); err != nil {
 		return &Error{Message: err.Error()}
 	}
-	if err = t.Save(key, *ctx); err != nil {
+	if err = t.save(key, *ctx); err != nil {
 		return &Error{Message: err.Error()}
 	}
 	return nil
