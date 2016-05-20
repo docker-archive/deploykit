@@ -10,17 +10,6 @@ import (
 
 // Credentials manages the objects used to authenticate and authorize for a provisioner's API
 type Credentials interface {
-	// NewCredentials creates an instance of the manager given the backing store.
-	NewCredential(provisionerName string) (api.Credential, error)
-
-	// Unmarshal decodes the bytes and applies onto the credential object, using a given encoding.
-	// If nil codec is passed, the default encoding / content type will be used.
-	Unmarshal(contentType *Codec, data []byte, cred api.Credential) error
-
-	// Marshal encodes the given credential object and returns the bytes.
-	// If nil codec is passed, the default encoding / content type will be used.
-	Marshal(contentType *Codec, cred api.Credential) ([]byte, error)
-
 	// ListIds
 	ListIds() ([]string, error)
 
@@ -32,9 +21,6 @@ type Credentials interface {
 
 	// Deletes the credential identified by key
 	Delete(key string) error
-
-	// Exists returns true if credential identified by key already exists
-	Exists(key string) bool
 
 	// CreateCredential adds a new credential from the input reader.
 	CreateCredential(provisioner, key string, input io.Reader, codec *Codec) *Error
@@ -59,23 +45,18 @@ func ensureValidContentType(ct *Codec) *Codec {
 	return DefaultContentType
 }
 
-// NewCredential returns an empty credential object for a provisioner.
-func (c *credentials) NewCredential(provisionerName string) (api.Credential, error) {
+func (c *credentials) newCredential(provisionerName string) (api.Credential, error) {
 	if builder, has := GetProvisionerBuilder(provisionerName); has {
 		return builder.DefaultCredential, nil
 	}
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
 }
 
-// Unmarshal decodes the bytes and applies onto the credential object, using a given encoding.
-// If nil codec is passed, the default encoding / content type will be used.
-func (c *credentials) Unmarshal(contentType *Codec, data []byte, cred api.Credential) error {
+func (c *credentials) unmarshal(contentType *Codec, data []byte, cred api.Credential) error {
 	return ensureValidContentType(contentType).unmarshal(data, cred)
 }
 
-// Marshal encodes the given credential object and returns the bytes.
-// If nil codec is passed, the default encoding / content type will be used.
-func (c *credentials) Marshal(contentType *Codec, cred api.Credential) ([]byte, error) {
+func (c *credentials) marshal(contentType *Codec, cred api.Credential) ([]byte, error) {
 	return ensureValidContentType(contentType).marshal(cred)
 }
 
@@ -104,7 +85,7 @@ func (c *credentials) Get(key string) (api.Credential, error) {
 		return nil, err
 	}
 
-	detail, err := c.NewCredential(base.ProvisionerName())
+	detail, err := c.newCredential(base.ProvisionerName())
 	if err != nil {
 		return nil, err
 	}
@@ -120,20 +101,19 @@ func (c *credentials) Delete(key string) error {
 	return c.store.Delete(storage.CredentialsID(key))
 }
 
-func (c *credentials) Exists(key string) bool {
+func (c *credentials) exists(key string) bool {
 	base := new(api.CredentialBase)
 	err := c.store.GetCredentials(storage.CredentialsID(key), base)
 	return err == nil
 }
 
-// TODO(wfarner): This function is unused.  Can it be removed?
 // CreateCredential creates a new credential from the input reader.
 func (c *credentials) CreateCredential(provisioner, key string, input io.Reader, codec *Codec) *Error {
-	if c.Exists(key) {
+	if c.exists(key) {
 		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
 
-	cr, err := c.NewCredential(provisioner)
+	cr, err := c.newCredential(provisioner)
 	if err != nil {
 		return &Error{ErrNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
 	}
@@ -143,7 +123,7 @@ func (c *credentials) CreateCredential(provisioner, key string, input io.Reader,
 		return &Error{Message: err.Error()}
 	}
 
-	if err = c.Unmarshal(codec, buff, cr); err != nil {
+	if err = c.unmarshal(codec, buff, cr); err != nil {
 		return &Error{Message: err.Error()}
 	}
 	if err = c.Save(key, cr); err != nil {
@@ -153,7 +133,7 @@ func (c *credentials) CreateCredential(provisioner, key string, input io.Reader,
 }
 
 func (c *credentials) UpdateCredential(key string, input io.Reader, codec *Codec) *Error {
-	if !c.Exists(key) {
+	if !c.exists(key) {
 		return &Error{ErrNotFound, fmt.Sprintf("Credential not found: %v", key)}
 	}
 
@@ -164,16 +144,16 @@ func (c *credentials) UpdateCredential(key string, input io.Reader, codec *Codec
 	}
 
 	base := new(api.CredentialBase)
-	if err = c.Unmarshal(codec, buff, base); err != nil {
+	if err = c.unmarshal(codec, buff, base); err != nil {
 		return &Error{Message: err.Error()}
 	}
 
-	detail, err := c.NewCredential(base.ProvisionerName())
+	detail, err := c.newCredential(base.ProvisionerName())
 	if err != nil {
 		return &Error{ErrNotFound, fmt.Sprintf("Unknow provisioner: %v", base.ProvisionerName())}
 	}
 
-	if err = c.Unmarshal(codec, buff, detail); err != nil {
+	if err = c.unmarshal(codec, buff, detail); err != nil {
 		return &Error{Message: err.Error()}
 	}
 
