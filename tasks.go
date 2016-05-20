@@ -8,94 +8,98 @@ import (
 	"time"
 )
 
-var (
-	tasks = map[api.TaskType]*api.Task{}
-)
-
-// RegisterTask is called by the init of provisioner to register runnable tasks
-func RegisterTask(task api.Task) {
-	lock.Lock()
-	defer lock.Unlock()
-
-	if string(task.Type) == "" {
-		panic(fmt.Errorf("Programming error.  No task type name:%v", task))
-	}
-	if task.Do == nil {
-		panic(fmt.Errorf("Programming error.  No task handler :%v", task))
-	}
-
-	tasks[task.Type] = &task
+// TaskMap can be used by provisioners to filter and report errors when fetching tasks by name.
+type TaskMap struct {
+	tasks []api.Task
 }
 
-// GetTask returns the task by type.  The copy of task returned is owned by the caller
-// and the caller is free to mutate the task object.
-func GetTask(name api.TaskType) (api.Task, bool) {
-	t := tasks[name]
-	if t != nil {
-		copy := *t
-		return copy, true
+func findTask(tasks []api.Task, name api.TaskName) *api.Task {
+	for _, task := range tasks {
+		if task.Name == name {
+			return &task
+		}
 	}
-	return api.Task{}, false
+	return nil
+}
+
+// NewTaskMap creates a TaskMap.
+func NewTaskMap(tasks ...api.Task) *TaskMap {
+	// Manually implementing map-like behavior here to provide stable return values.
+
+	unique := []api.Task{}
+	for _, task := range tasks {
+		if findTask(unique, task.Name) != nil {
+			panic(fmt.Sprintf("Duplicate task name %s", task))
+		} else {
+			unique = append(unique, task)
+		}
+	}
+
+	return &TaskMap{tasks: unique}
+}
+
+// Names returns all supported task names.
+func (m *TaskMap) Names() []api.TaskName {
+	names := []api.TaskName{}
+	for _, task := range m.tasks {
+		names = append(names, task.Name)
+	}
+	return names
+}
+
+// Filter retrieves tasks by name, returning an error of a requested task does not exist.
+func (m *TaskMap) Filter(names []api.TaskName) ([]api.Task, error) {
+	filtered := []api.Task{}
+	for _, name := range names {
+		task := findTask(m.tasks, name)
+		if task != nil {
+			filtered = append(filtered, *task)
+		} else {
+			return nil, fmt.Errorf(
+				"Task %s is not supported, must be one of %s", name, m.Names())
+		}
+	}
+
+	return filtered, nil
+}
+
+// CustomTaskHandler creates a task identical to another task, replacing the handler.
+func CustomTaskHandler(task api.Task, handler api.TaskHandler) api.Task {
+	task.Do = handler
+	return task
+}
+
+func unimplementedTask(name api.TaskName, desc string) api.Task {
+	return api.Task{
+		Name:    name,
+		Message: desc,
+		Do: func(
+			prov api.Provisioner,
+			ctx context.Context,
+			cred api.Credential,
+			req api.MachineRequest,
+			events chan<- interface{}) error {
+
+			log.Infoln(fmt.Sprintf("%s: TO BE IMPLEMENTED", name))
+			time.Sleep(5 * time.Second)
+
+			events <- fmt.Sprintf(
+				"%s: some status here....  need to implement this.", name)
+			return nil
+		},
+	}
 }
 
 var (
 	// TaskSSHKeyGen is the task that generates SSH key
-	TaskSSHKeyGen = api.Task{
-		Type:    api.TaskType("ssh-keygen"),
-		Message: "Generating ssh key for host",
-		Do: func(ctx context.Context, cred api.Credential, req api.MachineRequest, events chan<- interface{}) error {
-			log.Infoln("ssh-key-gen: TO BE IMPLEMENTED")
-			time.Sleep(5 * time.Second)
-
-			events <- "ssh-key-gen: some status here....  need to implement this."
-			return nil
-		},
-	}
+	TaskSSHKeyGen = unimplementedTask("ssh-keygen", "Generating ssh key for host")
 
 	// TaskCreateInstance creates a machine instance
-	TaskCreateInstance = api.Task{
-		Type:    api.TaskType("create-instance"),
-		Message: "Creates a machine instance",
-		Do: func(ctx context.Context, cred api.Credential, req api.MachineRequest, events chan<- interface{}) error {
-			log.Infoln("create-instance: TO BE IMPLEMENTED")
-			time.Sleep(5 * time.Second)
-
-			events <- "create-instance: some status here....  need to implement this."
-			return nil
-		},
-	}
+	TaskCreateInstance = unimplementedTask("create-instance", "Creates a machine instance")
 
 	// TaskUserData copies per-instance user data on setup
-	TaskUserData = api.Task{
-		Type:    api.TaskType("user-data"),
-		Message: "Copying user data to instance",
-		Do: func(ctx context.Context, cred api.Credential, req api.MachineRequest, events chan<- interface{}) error {
-			log.Infoln("user-data: TO BE IMPLEMENTED")
-			time.Sleep(5 * time.Second)
-
-			events <- "user-data: some status here....  need to implement this."
-			return nil
-		},
-	}
+	TaskUserData = unimplementedTask("user-data", "Copying user data to instance")
 
 	// TaskInstallDockerEngine is the task for installing docker engine.  Requires SSH access.
-	TaskInstallDockerEngine = api.Task{
-		Type:    api.TaskType("install-engine"),
-		Message: "Install docker engine",
-		Do: func(ctx context.Context, cred api.Credential, req api.MachineRequest, events chan<- interface{}) error {
-			log.Infoln("install-engine: TO BE IMPLEMENTED")
-			time.Sleep(5 * time.Second)
-
-			events <- "installing engine.... implement this."
-			return nil
-		},
-	}
+	TaskInstallDockerEngine = unimplementedTask("install-engine", "Install docker engine")
 )
-
-// Global tasks
-func init() {
-	RegisterTask(TaskSSHKeyGen)
-	RegisterTask(TaskCreateInstance)
-	RegisterTask(TaskUserData)
-	RegisterTask(TaskInstallDockerEngine)
-}

@@ -21,13 +21,21 @@ func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Workflow = []api.TaskType{
-		libmachete.TaskSSHKeyGen.Type,
-		libmachete.TaskCreateInstance.Type,
-		libmachete.TaskUserData.Type,
-		libmachete.TaskInstallDockerEngine.Type,
-	}
+	req.Workflow = getTaskMap().Names()
 	return req
+}
+
+func getTaskMap() *libmachete.TaskMap {
+	return libmachete.NewTaskMap(
+		libmachete.TaskSSHKeyGen,
+		libmachete.TaskUserData,
+		libmachete.TaskInstallDockerEngine,
+		libmachete.TaskCreateInstance,
+	)
+}
+
+func (p *provisioner) GetTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getTaskMap().Filter(tasks)
 }
 
 func (p *provisioner) NewRequestInstance() api.MachineRequest {
@@ -35,10 +43,6 @@ func (p *provisioner) NewRequestInstance() api.MachineRequest {
 }
 
 func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
-	panic(errors.New("not implemented"))
-}
-
-func (p *provisioner) GetTaskHandler(t api.TaskType) api.TaskHandler {
 	panic(errors.New("not implemented"))
 }
 

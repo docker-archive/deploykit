@@ -1,20 +1,8 @@
 package aws
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/provisioners/api"
-	"golang.org/x/net/context"
-	"time"
 )
-
-func dummy(m string) api.TaskHandler {
-	return func(ctx context.Context, cred api.Credential, req api.MachineRequest, events chan<- interface{}) error {
-		time.Sleep(5 * time.Second)
-		log.Infoln(m)
-		return nil
-	}
-}
 
 func init() {
 	libmachete.RegisterContextBuilder(ProvisionerName, BuildContextFromKVPair)

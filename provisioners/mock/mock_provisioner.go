@@ -62,14 +62,15 @@ func (_mr *_MockProvisionerRecorder) GetIPAddress(arg0 interface{}) *gomock.Call
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetIPAddress", arg0)
 }
 
-func (_m *MockProvisioner) GetTaskHandler(_param0 api.TaskType) api.TaskHandler {
-	ret := _m.ctrl.Call(_m, "GetTaskHandler", _param0)
-	ret0, _ := ret[0].(api.TaskHandler)
-	return ret0
+func (_m *MockProvisioner) GetTasks(_param0 []api.TaskName) ([]api.Task, error) {
+	ret := _m.ctrl.Call(_m, "GetTasks", _param0)
+	ret0, _ := ret[0].([]api.Task)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-func (_mr *_MockProvisionerRecorder) GetTaskHandler(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetTaskHandler", arg0)
+func (_mr *_MockProvisionerRecorder) GetTasks(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetTasks", arg0)
 }
 
 func (_m *MockProvisioner) NewRequestInstance() api.MachineRequest {
