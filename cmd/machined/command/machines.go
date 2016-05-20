@@ -5,6 +5,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
+	"github.com/docker/libmachete/storage"
 	"golang.org/x/net/context"
 	"net/http"
 )
@@ -99,7 +100,7 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 	}
 
 	// Load template
-	tpl, err := h.templates.Get(provisionerName, template)
+	tpl, err := h.templates.Get(storage.TemplateID{Provisioner: provisionerName, Name: template})
 	if err != nil {
 		respondError(http.StatusNotFound, resp, err)
 		return
@@ -108,6 +109,79 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 	events, machineErr := h.machines.CreateMachine(provisioner, ctx, cred, tpl,
 		req.Body, libmachete.CodecByContentTypeHeader(req))
 
+	if machineErr == nil {
+		// TODO - if the client requests streaming events... send that out here.
+		go func() {
+			for event := range events {
+				log.Infoln("Event:", event)
+			}
+		}()
+		return
+	}
+
+	switch machineErr.Code {
+	case libmachete.ErrDuplicate:
+		respondError(http.StatusConflict, resp, machineErr)
+		return
+	case libmachete.ErrNotFound:
+		respondError(http.StatusNotFound, resp, machineErr)
+		return
+	default:
+		respondError(http.StatusInternalServerError, resp, machineErr)
+		return
+	}
+}
+
+func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	context := rest.GetUrlParameter(req, "context")
+	credentials := rest.GetUrlParameter(req, "credentials")
+	machineName := rest.GetUrlParameter(req, "key")
+
+	// TODO - fix this in framework to return default values
+	if context == "" {
+		context = "default"
+	}
+	if credentials == "" {
+		credentials = "default"
+	}
+
+	log.Infof("Delete machine context=%v, name=%v, as %v", context, machineName, credentials)
+
+	// credential
+	cred, err := h.creds.Get(credentials)
+	if err != nil {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
+
+	provisionerName := cred.ProvisionerName()
+
+	// Runtime context
+	runContext, err := h.provisionerContexts.Get(context)
+	if err != nil {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
+
+	// Configure the provisioner context
+	ctx = libmachete.BuildContext(provisionerName, ctx, runContext)
+
+	// Get the provisioner
+	// TODO - clean up the error code to better reflect the nature of error
+	provisioner, err := libmachete.GetProvisioner(provisionerName, ctx, cred)
+	if err != nil {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
+
+	// Load the record of the machine by name
+	record, err := h.machines.Get(machineName)
+	if err != nil {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
+
+	events, machineErr := h.machines.DeleteMachine(provisioner, ctx, cred, record)
 	if machineErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
 		go func() {
@@ -180,13 +254,6 @@ func machineRoutes(
 		&rest.Endpoint{
 			UrlRoute:   "/machines/{key}",
 			HttpMethod: rest.DELETE,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			key := rest.GetUrlParameter(req, "key")
-			err := machines.Delete(key)
-			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown machine:%s", key))
-				return
-			}
-		},
+		}: handler.delete,
 	}
 }

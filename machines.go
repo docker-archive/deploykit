@@ -27,9 +27,6 @@ type Machines interface {
 	// Get returns a machine identified by key
 	Get(key string) (storage.MachineRecord, error)
 
-	// Deletes the machine identified by key
-	Delete(key string) error
-
 	// Exists returns true if machine identified by key already exists
 	Exists(key string) bool
 
@@ -40,7 +37,7 @@ type Machines interface {
 	// DeleteMachine delete a machine with input (optional) in the input reader.  The template contains workflow tasks
 	// for tear down of the machine; however that behavior can also be overriden by the input.
 	DeleteMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
-		template api.MachineRequest, input io.Reader, codec *Codec) (<-chan interface{}, *Error)
+		record storage.MachineRecord) (<-chan interface{}, *Error)
 }
 
 type machines struct {
@@ -84,10 +81,6 @@ func (cm *machines) Get(key string) (storage.MachineRecord, error) {
 		return storage.MachineRecord{}, err
 	}
 	return *m, nil
-}
-
-func (cm *machines) Delete(key string) error {
-	return cm.store.Delete(storage.MachineID(key))
 }
 
 func (cm *machines) Terminate(key string) error {
@@ -165,6 +158,7 @@ func (cm *machines) CreateMachine(
 		},
 	}
 	record.AppendEvent(storage.Event{Name: "init", Message: "Create starts", Data: request})
+	record.AppendChange(request)
 
 	if err := cm.store.Save(*record, request); err != nil {
 		return nil, &Error{Message: err.Error()}
@@ -176,61 +170,60 @@ func (cm *machines) CreateMachine(
 
 	log.Infoln("About to run tasks:", tasks)
 
-	return cm.runTasks(provisioner, tasks, record, ctx, cred, request)
+	return cm.runTasks(provisioner, tasks, record, ctx, cred, request,
+		func() error {
+			record.Status = "running"
+			record.LastModified = storage.Timestamp(time.Now().Unix())
+			if ip, err := provisioner.GetIPAddress(request); err == nil {
+				record.IPAddress = ip
+			}
+			return cm.store.Save(*record, request)
+		})
 }
 
-// DestroyMachine creates a new machine from the input reader.
+// DeleteMachine creates a new machine from the input reader.
 func (cm *machines) DeleteMachine(
 	provisioner api.Provisioner,
 	ctx context.Context,
 	cred api.Credential,
-	template api.MachineRequest,
-	input io.Reader,
-	codec *Codec) (<-chan interface{}, *Error) {
+	record storage.MachineRecord) (<-chan interface{}, *Error) {
 
-	request, err := cm.populateRequest(provisioner, template, input, codec)
+	lastChange := record.GetLastChange()
+	if lastChange == nil {
+		return nil, &Error{Message: fmt.Sprintf("Impossible state. Machine has no history:%v", record.Name)}
+	}
+
+	// On managing changes (or even removal) of the template and the impact on already-provisioned instances:
+	// If the template is removed, we can still teardown the instance using a copy of the original request / intent.
+	// If the template is updated and has new workflow impact, the user can 'upgrade' the machine (method to be provided)
+	// so that the last change request correctly reflects the correct tasks to run to teardown.
+
+	tasks, err := provisioner.GetTeardownTasks(lastChange.TeardownWorkflow())
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
-	// TOOD - Note here we are loading the *current* template.  This can be problemmatic if the
-	// current template has been updated and no longer reflect the settings that are correct at
-	// the time the machine was provisioned.  However, one could also argue that the current version
-	// of the template should be the correct workflow.
-	//
-	// One way to deal with this could be to warn or error out if the version number of the template
-	// recorded at the time of the machine creation isn't the same as the current template.  The user
-	// can then force the use of one vs the other.
+	record.AppendEvent(storage.Event{Name: "init-destroy", Message: "Destroy starts", Data: lastChange})
 
-	key := request.Name()
-
-	log.Infoln("name=", key, "cred=", cred, "template=", template, "req=", request)
-
-	tasks, err := provisioner.GetTeardownTasks(request.TeardownWorkflow())
-	if err != nil {
-		return nil, &Error{Message: err.Error()}
-	}
-
-	// Find the record for this machine
-	record, err := cm.Get(key)
-	if err != nil {
-		return nil, &Error{Message: err.Error()}
-	}
-
-	record.AppendEvent(storage.Event{Name: "init-destroy", Message: "Destroy starts", Data: request})
-
-	if err := cm.store.Save(record, request); err != nil {
+	if err := cm.store.Save(record, lastChange); err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
 	log.Infoln("About to run tasks:", tasks)
 
-	return cm.runTasks(provisioner, tasks, &record, ctx, cred, request)
+	// Need a way to clean up the database of lots of terminated instances.
+	return cm.runTasks(provisioner, tasks, &record, ctx, cred, lastChange,
+		func() error {
+			record.Status = "terminated"
+			record.LastModified = storage.Timestamp(time.Now().Unix())
+			return cm.store.Save(record, lastChange)
+		})
 }
 
 func (cm *machines) runTasks(
 	provisioner api.Provisioner, tasks []api.Task, record *storage.MachineRecord,
-	ctx context.Context, cred api.Credential, request api.MachineRequest) (<-chan interface{}, *Error) {
+	ctx context.Context, cred api.Credential, request api.MachineRequest,
+	onComplete func() error) (<-chan interface{}, *Error) {
 
 	events := make(chan interface{})
 
@@ -315,18 +308,10 @@ func (cm *machines) runTasks(
 				}
 			}
 
-			record.Status = "running"
-			record.LastModified = storage.Timestamp(time.Now().Unix())
-			if ip, err := provisioner.GetIPAddress(request); err == nil {
-				record.IPAddress = ip
-			} else {
-				log.Warning("can't get ip=", err)
+			if err := onComplete(); err != nil {
+				log.Warningln("complete-err=", err)
 			}
-
-			err := cm.store.Save(*record, request)
-			if err != nil {
-				log.Warningln("err=", err)
-			}
+			return
 		}
 
 	}()
