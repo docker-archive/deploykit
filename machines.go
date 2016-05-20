@@ -36,6 +36,11 @@ type Machines interface {
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
 		template api.MachineRequest, input io.Reader, codec *Codec) (<-chan interface{}, *Error)
+
+	// DeleteMachine delete a machine with input (optional) in the input reader.  The template contains workflow tasks
+	// for tear down of the machine; however that behavior can also be overriden by the input.
+	DeleteMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
+		template api.MachineRequest, input io.Reader, codec *Codec) (<-chan interface{}, *Error)
 }
 
 type machines struct {
@@ -164,12 +169,68 @@ func (cm *machines) CreateMachine(
 	if err := cm.store.Save(*record, request); err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
-	tasks, err := provisioner.GetTasks(request.ProvisionWorkflow())
+	tasks, err := provisioner.GetProvisionTasks(request.ProvisionWorkflow())
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
 	log.Infoln("About to run tasks:", tasks)
+
+	return cm.runTasks(provisioner, tasks, record, ctx, cred, request)
+}
+
+// DestroyMachine creates a new machine from the input reader.
+func (cm *machines) DeleteMachine(
+	provisioner api.Provisioner,
+	ctx context.Context,
+	cred api.Credential,
+	template api.MachineRequest,
+	input io.Reader,
+	codec *Codec) (<-chan interface{}, *Error) {
+
+	request, err := cm.populateRequest(provisioner, template, input, codec)
+	if err != nil {
+		return nil, &Error{Message: err.Error()}
+	}
+
+	// TOOD - Note here we are loading the *current* template.  This can be problemmatic if the
+	// current template has been updated and no longer reflect the settings that are correct at
+	// the time the machine was provisioned.  However, one could also argue that the current version
+	// of the template should be the correct workflow.
+	//
+	// One way to deal with this could be to warn or error out if the version number of the template
+	// recorded at the time of the machine creation isn't the same as the current template.  The user
+	// can then force the use of one vs the other.
+
+	key := request.Name()
+
+	log.Infoln("name=", key, "cred=", cred, "template=", template, "req=", request)
+
+	tasks, err := provisioner.GetTeardownTasks(request.TeardownWorkflow())
+	if err != nil {
+		return nil, &Error{Message: err.Error()}
+	}
+
+	// Find the record for this machine
+	record, err := cm.Get(key)
+	if err != nil {
+		return nil, &Error{Message: err.Error()}
+	}
+
+	record.AppendEvent(storage.Event{Name: "init-destroy", Message: "Destroy starts", Data: request})
+
+	if err := cm.store.Save(record, request); err != nil {
+		return nil, &Error{Message: err.Error()}
+	}
+
+	log.Infoln("About to run tasks:", tasks)
+
+	return cm.runTasks(provisioner, tasks, &record, ctx, cred, request)
+}
+
+func (cm *machines) runTasks(
+	provisioner api.Provisioner, tasks []api.Task, record *storage.MachineRecord,
+	ctx context.Context, cred api.Credential, request api.MachineRequest) (<-chan interface{}, *Error) {
 
 	events := make(chan interface{})
 
@@ -238,7 +299,7 @@ func (cm *machines) CreateMachine(
 				}
 
 				record.AppendEvent(event)
-				err = cm.store.Save(*record, request)
+				err := cm.store.Save(*record, request)
 				log.Infoln("Saved:", "err=", err, len(record.Events), record)
 
 				if stop {

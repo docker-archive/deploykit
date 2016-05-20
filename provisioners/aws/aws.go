@@ -229,12 +229,19 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
-func getTaskMap() *libmachete.TaskMap {
+func getProvisionTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
 		libmachete.TaskSSHKeyGen,
+		libmachete.TaskCreateInstance,
 		libmachete.TaskUserData,
 		libmachete.TaskInstallDockerEngine,
-		libmachete.TaskCreateInstance,
+	)
+}
+
+func getTeardownTaskMap() *libmachete.TaskMap {
+	return libmachete.NewTaskMap(
+		libmachete.TaskDestroyInstance,
+		libmachete.TaskSSHKeyRemove,
 	)
 }
 
@@ -244,7 +251,8 @@ func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Workflow = getTaskMap().Names()
+	req.Provision = getProvisionTaskMap().Names()
+	req.Teardown = getTeardownTaskMap().Names()
 	return req
 }
 
@@ -274,8 +282,12 @@ func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	return ci.PublicIPAddress, nil
 }
 
-func (p *provisioner) GetTasks(tasks []api.TaskName) ([]api.Task, error) {
-	return getTaskMap().Filter(tasks)
+func (p *provisioner) GetProvisionTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getProvisionTaskMap().Filter(tasks)
+}
+
+func (p *provisioner) GetTeardownTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getTeardownTaskMap().Filter(tasks)
 }
 
 // Validate checks the data and returns error if not valid

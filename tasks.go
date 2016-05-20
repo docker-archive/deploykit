@@ -103,6 +103,25 @@ func defaultCreateInstanceHandler(
 	return nil
 }
 
+func defaultDestroyInstanceHandler(
+	prov api.Provisioner,
+	ctx context.Context,
+	cred api.Credential,
+	req api.MachineRequest,
+	events chan<- interface{}) error {
+
+	destroyInstanceEvents, err := prov.DestroyInstance(req.Name())
+	if err != nil {
+		return err
+	}
+
+	for event := range destroyInstanceEvents {
+		events <- event
+	}
+
+	return nil
+}
+
 var (
 	// TaskSSHKeyGen is the task that generates SSH key
 	TaskSSHKeyGen = unimplementedTask("ssh-keygen", "Generating ssh key for host")
@@ -119,4 +138,14 @@ var (
 
 	// TaskInstallDockerEngine is the task for installing docker engine.  Requires SSH access.
 	TaskInstallDockerEngine = unimplementedTask("install-engine", "Install docker engine")
+
+	// TaskDestroyInstance irreversibly destroys a machine instance
+	TaskDestroyInstance = api.Task{
+		Name:    "destroy-instance",
+		Message: "Destroys a machine instance",
+		Do:      defaultDestroyInstanceHandler,
+	}
+
+	// TaskSSHKeyRemove is the task that removes or clean up the SSH key
+	TaskSSHKeyRemove = unimplementedTask("ssh-key-remove", "Remove ssh key for host")
 )

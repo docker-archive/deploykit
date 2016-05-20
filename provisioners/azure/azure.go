@@ -21,21 +21,32 @@ func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Workflow = getTaskMap().Names()
+	req.Provision = getProvisionTaskMap().Names()
+	req.Teardown = getTeardownTaskMap().Names()
 	return req
 }
 
-func getTaskMap() *libmachete.TaskMap {
+func getProvisionTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
 		libmachete.TaskSSHKeyGen,
+		libmachete.TaskCreateInstance,
 		libmachete.TaskUserData,
 		libmachete.TaskInstallDockerEngine,
-		libmachete.TaskCreateInstance,
 	)
 }
 
-func (p *provisioner) GetTasks(tasks []api.TaskName) ([]api.Task, error) {
-	return getTaskMap().Filter(tasks)
+func getTeardownTaskMap() *libmachete.TaskMap {
+	return libmachete.NewTaskMap(
+		libmachete.TaskDestroyInstance,
+	)
+}
+
+func (p *provisioner) GetProvisionTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getProvisionTaskMap().Filter(tasks)
+}
+
+func (p *provisioner) GetTeardownTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getTeardownTaskMap().Filter(tasks)
 }
 
 func (p *provisioner) NewRequestInstance() api.MachineRequest {

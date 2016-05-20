@@ -75,6 +75,7 @@ type MachineRequest interface {
 	ProvisionerName() string
 	Version() string
 	ProvisionWorkflow() []TaskName
+	TeardownWorkflow() []TaskName
 }
 
 // TaskName is a kind of work that a provisioner is able to run
@@ -99,12 +100,18 @@ type BaseMachineRequest struct {
 	MachineName        string     `yaml:"name" json:"name"`
 	Provisioner        string     `yaml:"provisioner" json:"provisioner"`
 	ProvisionerVersion string     `yaml:"version" json:"version"`
-	Workflow           []TaskName `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	Provision          []TaskName `yaml:"provision,omitempty" json:"provision,omitempty"`
+	Teardown           []TaskName `yaml:"teardown,omitempty" json:"teardown,omitempty"`
 }
 
 // ProvisionWorkflow returns the tasks to do
 func (req BaseMachineRequest) ProvisionWorkflow() []TaskName {
-	return req.Workflow
+	return req.Provision
+}
+
+// TeardownWorkflow returns the tasks to do
+func (req BaseMachineRequest) TeardownWorkflow() []TaskName {
+	return req.Teardown
 }
 
 // Name returns the name to give the machine, once created.
@@ -132,7 +139,9 @@ type Provisioner interface {
 	// GetIp returns the IP address from the record
 	GetIPAddress(MachineRequest) (string, error)
 
-	GetTasks(tasks []TaskName) ([]Task, error)
+	GetProvisionTasks(tasks []TaskName) ([]Task, error)
+
+	GetTeardownTasks(tasks []TaskName) ([]Task, error)
 
 	CreateInstance(request MachineRequest) (<-chan CreateInstanceEvent, error)
 
