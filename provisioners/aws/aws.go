@@ -211,11 +211,21 @@ func createInstanceSync(
 func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState string) error {
 	return WaitUntil(
 		p.sleepFunction,
-		p.config.CheckInstanceMaxPoll, time.Duration(p.config.CheckInstancePollInterval)*time.Second,
+		p.config.CheckInstanceMaxPoll,
+		time.Duration(p.config.CheckInstancePollInterval)*time.Second,
 		func() (bool, error) {
 			inst, err := getInstanceSync(p.client, instanceID)
 			return inst != nil && *inst.State.Name == instanceState, err
 		})
+}
+
+func getTaskMap() *libmachete.TaskMap {
+	return libmachete.NewTaskMap(
+		libmachete.TaskSSHKeyGen,
+		libmachete.TaskUserData,
+		libmachete.TaskInstallDockerEngine,
+		libmachete.CustomTaskHandler(libmachete.TaskCreateInstance, handleCreateInstance),
+	)
 }
 
 // NewMachineRequest returns a canonical machine request suitable for this provisioner.
@@ -224,12 +234,7 @@ func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Workflow = []api.TaskType{
-		libmachete.TaskSSHKeyGen.Type,
-		libmachete.TaskCreateInstance.Type,
-		libmachete.TaskUserData.Type,
-		libmachete.TaskInstallDockerEngine.Type,
-	}
+	req.Workflow = getTaskMap().Names()
 	return req
 }
 
@@ -237,7 +242,8 @@ func (p *provisioner) NewRequestInstance() api.MachineRequest {
 	return NewMachineRequest()
 }
 
-// GetIPAddress - this prefers private IP if it's set; make this behavior configurable as a machine template or context?
+// GetIPAddress - this prefers private IP if it's set; make this behavior configurable as a
+// machine template or context?
 func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	ci, err := checkMachineRequest(req)
 	if err != nil {
@@ -249,30 +255,40 @@ func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	return ci.PublicIPAddress, nil
 }
 
-func (p *provisioner) GetTaskHandler(t api.TaskType) api.TaskHandler {
-	switch t {
-	case libmachete.TaskCreateInstance.Type:
-		return func(ctx context.Context, cred api.Credential, req api.MachineRequest, events chan<- interface{}) error {
-			r, err := checkMachineRequest(req)
-			if err != nil {
-				return err
-			}
+// TODO(wfarner): The registry indirection causes us to reference this function from a global and
+// local context, making it simplest to use a global function rather than a function on the struct.
+// Consider refactoring to push the registry concept higher in the stack to make this call flow
+// more direct.
+func handleCreateInstance(
+	prov api.Provisioner,
+	ctx context.Context,
+	cred api.Credential,
+	req api.MachineRequest,
+	events chan<- interface{}) error {
 
-			log.Infoln("IN AWS: create instance: client=", p.client, "cred=", cred, "req=", r)
+	p, _ := prov.(*provisioner)
 
-			createInstanceEvents, err := p.CreateInstance(req)
-			if err != nil {
-				return err
-			}
-
-			for event := range createInstanceEvents {
-				events <- event
-			}
-
-			return nil
-		}
+	r, err := checkMachineRequest(req)
+	if err != nil {
+		return err
 	}
+
+	log.Infoln("IN AWS: create instance: client=", p.client, "cred=", cred, "req=", r)
+
+	createInstanceEvents, err := p.CreateInstance(req)
+	if err != nil {
+		return err
+	}
+
+	for event := range createInstanceEvents {
+		events <- event
+	}
+
 	return nil
+}
+
+func (p *provisioner) GetTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getTaskMap().Filter(tasks)
 }
 
 func (p *provisioner) CreateInstance(

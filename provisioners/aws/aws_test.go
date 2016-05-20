@@ -57,9 +57,6 @@ func (w WrongRequestType) Name() string {
 	return "nope"
 }
 
-func (w *WrongRequestType) SetName(_ string) {
-}
-
 func (w WrongRequestType) ProvisionerName() string {
 	return "nope"
 }
@@ -68,8 +65,8 @@ func (w WrongRequestType) Version() string {
 	return "nope"
 }
 
-func (w WrongRequestType) ProvisionWorkflow() []api.TaskType {
-	return []api.TaskType{}
+func (w WrongRequestType) ProvisionWorkflow() []api.TaskName {
+	return []api.TaskName{}
 }
 
 func TestCreateIncompatibleType(t *testing.T) {
