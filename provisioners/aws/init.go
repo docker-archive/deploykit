@@ -5,11 +5,13 @@ import (
 )
 
 func init() {
-	libmachete.RegisterContextBuilder(ProvisionerName, BuildContextFromKVPair)
-	libmachete.RegisterCredentialer(ProvisionerName, NewCredential)
-	libmachete.RegisterTemplateBuilder(ProvisionerName, NewMachineRequest)
-	libmachete.RegisterMachineRequestBuilder(ProvisionerName, NewMachineRequest)
-	libmachete.RegisterProvisionerBuilder(ProvisionerName, ProvisionerWith)
+	libmachete.RegisterProvisioner(libmachete.ProvisionerBuilder{
+		Name:                  ProvisionerName,
+		DefaultCredential:     NewCredential(),
+		DefaultMachineRequest: NewMachineRequest(),
+		BuildContext:          BuildContextFromKVPair,
+		Build:                 ProvisionerWith,
+	})
 }
 
 const (
