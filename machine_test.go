@@ -45,16 +45,12 @@ type network struct {
 }
 
 type testSchema struct {
-	MachineName string `yaml:"name"`
-	Zone        string
-	Arch        string
-	Network     network
-	Disks       []string
-	Labels      map[string]string
-}
-
-func (t *testSchema) Name() string {
-	return t.MachineName
+	api.BaseMachineRequest `yaml:",inline"`
+	Zone                   string
+	Arch                   string
+	Network                network
+	Disks                  []string
+	Labels                 map[string]string
 }
 
 func newRegistry(
@@ -93,16 +89,18 @@ func newMachine(
 	return provisioner, &machine{registry: registry, templateLoader: templates}
 }
 
-func DISABLETestCreate(t *testing.T) {
+func TestCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	provisioner, machine := newMachine(t, ctrl, templateData)
 
 	expectedRequest := testSchema{
-		MachineName: "steve",
-		Zone:        "b",
-		Arch:        "x86_64",
+		BaseMachineRequest: api.BaseMachineRequest{
+			MachineName: "steve",
+		},
+		Zone: "b",
+		Arch: "x86_64",
 		Network: network{
 			Public: false,
 			Iface:  "eth0",
@@ -118,7 +116,7 @@ func DISABLETestCreate(t *testing.T) {
 	require.Exactly(t, createEvents, events)
 }
 
-func DISABLETestCreateInvalidTemplate(t *testing.T) {
+func TestCreateInvalidTemplate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -129,7 +127,7 @@ func DISABLETestCreateInvalidTemplate(t *testing.T) {
 	require.NotNil(t, err)
 }
 
-func DISABLETestCreateInvalidOverlay(t *testing.T) {
+func TestCreateInvalidOverlay(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -140,7 +138,7 @@ func DISABLETestCreateInvalidOverlay(t *testing.T) {
 	require.NotNil(t, err)
 }
 
-func DISABLETestCreateExtraYamlFields(t *testing.T) {
+func TestCreateExtraYamlFields(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -151,9 +149,11 @@ func DISABLETestCreateExtraYamlFields(t *testing.T) {
 	// background/updates:
 	// https://github.com/go-yaml/yaml/issues/136
 	expectedRequest := testSchema{
-		MachineName: "larry",
-		Zone:        "b",
-		Arch:        "x86_64",
+		BaseMachineRequest: api.BaseMachineRequest{
+			MachineName: "larry",
+		},
+		Zone: "b",
+		Arch: "x86_64",
 		Network: network{
 			Public: false,
 			Iface:  "eth0"},
@@ -165,7 +165,7 @@ func DISABLETestCreateExtraYamlFields(t *testing.T) {
 	create(machine, unmappableOverlayData)
 }
 
-func DISABLETestTemplateLoadError(t *testing.T) {
+func TestTemplateLoadError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -181,7 +181,7 @@ func DISABLETestTemplateLoadError(t *testing.T) {
 	require.NotNil(t, err)
 }
 
-func DISABLETestUnknownProvisiner(t *testing.T) {
+func TestUnknownProvisiner(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

@@ -134,7 +134,7 @@ type Provisioner interface {
 
 	GetTasks(tasks []TaskName) ([]Task, error)
 
-	// Proposal - remove these from the interface. Rather everything is defined via TaskTypes
+	// TODO: Consider removing these from the interface. Rather everything is defined via TaskTypes
 	CreateInstance(request MachineRequest) (<-chan CreateInstanceEvent, error)
 
 	DestroyInstance(instanceID string) (<-chan DestroyInstanceEvent, error)
