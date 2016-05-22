@@ -57,17 +57,25 @@ func (f sandbox) MarshalAndSave(fileName string, s interface{}) error {
 	if err != nil {
 		return fmt.Errorf("Failed to marshal record %s: %s", s, err)
 	}
-	err = afero.WriteFile(f.fs, fullPath, data, filePermission)
+	return f.saveBytes(fullPath, data, filePermission)
+}
+
+func (f sandbox) saveBytes(fullPath string, data []byte, filePermission os.FileMode) error {
+	err := afero.WriteFile(f.fs, fullPath, data, filePermission)
 	if err != nil {
 		return fmt.Errorf("Failed to write to %s: %s", fullPath, err)
 	}
 	return nil
 }
 
+func (f sandbox) readBytes(fullPath string) ([]byte, error) {
+	return afero.ReadFile(f.fs, fullPath)
+}
+
 func (f sandbox) ReadAndUnmarshal(fileName string, record interface{}) error {
 	fullPath := path.Join(f.dir, fileName)
 
-	data, err := afero.ReadFile(f.fs, fullPath)
+	data, err := f.readBytes(fullPath)
 	if err != nil {
 		return fmt.Errorf("Failed to read record %s: %s", fullPath, err)
 	}

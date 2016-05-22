@@ -71,6 +71,7 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 			prov api.Provisioner,
 			ctx context.Context,
 			cred api.Credential,
+			resource api.Resource,
 			req api.MachineRequest,
 			events chan<- interface{}) error {
 
@@ -88,6 +89,7 @@ func defaultCreateInstanceHandler(
 	prov api.Provisioner,
 	ctx context.Context,
 	cred api.Credential,
+	resource api.Resource,
 	req api.MachineRequest,
 	events chan<- interface{}) error {
 
@@ -97,6 +99,26 @@ func defaultCreateInstanceHandler(
 	}
 
 	for event := range createInstanceEvents {
+		events <- event
+	}
+
+	return nil
+}
+
+func defaultDestroyInstanceHandler(
+	prov api.Provisioner,
+	ctx context.Context,
+	cred api.Credential,
+	resource api.Resource,
+	req api.MachineRequest,
+	events chan<- interface{}) error {
+
+	destroyInstanceEvents, err := prov.DestroyInstance(resource.ID())
+	if err != nil {
+		return err
+	}
+
+	for event := range destroyInstanceEvents {
 		events <- event
 	}
 
@@ -119,4 +141,14 @@ var (
 
 	// TaskInstallDockerEngine is the task for installing docker engine.  Requires SSH access.
 	TaskInstallDockerEngine = unimplementedTask("install-engine", "Install docker engine")
+
+	// TaskDestroyInstance irreversibly destroys a machine instance
+	TaskDestroyInstance = api.Task{
+		Name:    "destroy-instance",
+		Message: "Destroys a machine instance",
+		Do:      defaultDestroyInstanceHandler,
+	}
+
+	// TaskSSHKeyRemove is the task that removes or clean up the SSH key
+	TaskSSHKeyRemove = unimplementedTask("ssh-key-remove", "Remove ssh key for host")
 )
