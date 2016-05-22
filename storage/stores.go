@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/ssh"
 	"strings"
 	"sync"
 	"time"
@@ -37,6 +38,20 @@ type Machines interface {
 	GetDetails(id MachineID, provisionerData interface{}) error
 
 	Delete(id MachineID) error
+}
+
+// KeyID is a unique id for the SSH key
+type KeyID string
+
+// Keys manage the SSH keys for a machine
+type Keys interface {
+	Save(id KeyID, keyPair *ssh.KeyPair) error
+
+	List() ([]KeyID, error)
+
+	GetPublicKey(id KeyID) ([]byte, error)
+
+	Delete(id KeyID) error
 }
 
 // Timestamp is a unix epoch timestamp, in seconds.
