@@ -139,9 +139,9 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 }
 
 func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	machineName := rest.GetUrlParameter(req, "key")
 	context := rest.GetUrlParameter(req, "context")
 	credentials := rest.GetUrlParameter(req, "credentials")
-	machineName := rest.GetUrlParameter(req, "key")
 
 	// TODO - fix this in framework to return default values
 	if context == "" {
@@ -151,7 +151,7 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 		credentials = "default"
 	}
 
-	log.Infof("Delete machine context=%v, name=%v, as %v", context, machineName, credentials)
+	log.Infof("Delete machine %v as %v with context=%v", machineName, credentials, context)
 
 	// credential
 	cred, err := h.creds.Get(credentials)

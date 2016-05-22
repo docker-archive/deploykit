@@ -269,6 +269,15 @@ func ensureRequestType(req api.MachineRequest) (r *CreateInstanceRequest, err er
 	return
 }
 
+// GetInstanceID returns the infrastructure identifier given the state of the machine.
+func (p *provisioner) GetInstanceID(req api.MachineRequest) (string, error) {
+	ci, err := ensureRequestType(req)
+	if err != nil {
+		return "", err
+	}
+	return ci.InstanceID, nil
+}
+
 // GetIPAddress - this prefers private IP if it's set; make this behavior configurable as a
 // machine template or context?
 func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
@@ -350,6 +359,7 @@ func (p *provisioner) CreateInstance(
 			return
 		}
 
+		// TODO(chungers) -- need to figure out reasonable way to separate request from state
 		provisionedState := *request // copy
 		if provisioned.PrivateIpAddress != nil {
 			provisionedState.PrivateIPAddress = *provisioned.PrivateIpAddress
@@ -357,6 +367,7 @@ func (p *provisioner) CreateInstance(
 		if provisioned.PublicIpAddress != nil {
 			provisionedState.PublicIPAddress = *provisioned.PublicIpAddress
 		}
+		provisionedState.InstanceID = *instance.InstanceId
 
 		log.Infoln("ProvisionedState=", provisionedState)
 

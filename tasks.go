@@ -71,6 +71,7 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 			prov api.Provisioner,
 			ctx context.Context,
 			cred api.Credential,
+			resource api.Resource,
 			req api.MachineRequest,
 			events chan<- interface{}) error {
 
@@ -88,6 +89,7 @@ func defaultCreateInstanceHandler(
 	prov api.Provisioner,
 	ctx context.Context,
 	cred api.Credential,
+	resource api.Resource,
 	req api.MachineRequest,
 	events chan<- interface{}) error {
 
@@ -107,10 +109,11 @@ func defaultDestroyInstanceHandler(
 	prov api.Provisioner,
 	ctx context.Context,
 	cred api.Credential,
+	resource api.Resource,
 	req api.MachineRequest,
 	events chan<- interface{}) error {
 
-	destroyInstanceEvents, err := prov.DestroyInstance(req.Name())
+	destroyInstanceEvents, err := prov.DestroyInstance(resource.ID())
 	if err != nil {
 		return err
 	}

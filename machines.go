@@ -152,7 +152,7 @@ func (cm *machines) CreateMachine(
 	record := &storage.MachineRecord{
 		MachineSummary: storage.MachineSummary{
 			Status:      "initiated",
-			Name:        storage.MachineID(key),
+			MachineName: storage.MachineID(key),
 			Provisioner: provisionerName,
 			Created:     storage.Timestamp(time.Now().Unix()),
 		},
@@ -171,11 +171,14 @@ func (cm *machines) CreateMachine(
 	log.Infoln("About to run tasks:", tasks)
 
 	return cm.runTasks(provisioner, tasks, record, ctx, cred, request,
-		func() error {
+		func(state api.MachineRequest) error {
 			record.Status = "running"
 			record.LastModified = storage.Timestamp(time.Now().Unix())
-			if ip, err := provisioner.GetIPAddress(request); err == nil {
+			if ip, err := provisioner.GetIPAddress(state); err == nil {
 				record.IPAddress = ip
+			}
+			if id, err := provisioner.GetInstanceID(state); err == nil {
+				record.InstanceID = id
 			}
 			return cm.store.Save(*record, request)
 		})
@@ -205,7 +208,7 @@ func (cm *machines) DeleteMachine(
 
 	record.AppendEvent(storage.Event{Name: "init-destroy", Message: "Destroy starts", Data: lastChange})
 
-	if err := cm.store.Save(record, lastChange); err != nil {
+	if err := cm.store.Save(record, nil); err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
@@ -213,7 +216,7 @@ func (cm *machines) DeleteMachine(
 
 	// Need a way to clean up the database of lots of terminated instances.
 	return cm.runTasks(provisioner, tasks, &record, ctx, cred, lastChange,
-		func() error {
+		func(state api.MachineRequest) error {
 			record.Status = "terminated"
 			record.LastModified = storage.Timestamp(time.Now().Unix())
 			return cm.store.Save(record, lastChange)
@@ -223,7 +226,7 @@ func (cm *machines) DeleteMachine(
 func (cm *machines) runTasks(
 	provisioner api.Provisioner, tasks []api.Task, record *storage.MachineRecord,
 	ctx context.Context, cred api.Credential, request api.MachineRequest,
-	onComplete func() error) (<-chan interface{}, *Error) {
+	onComplete func(api.MachineRequest) error) (<-chan interface{}, *Error) {
 
 	events := make(chan interface{})
 
@@ -239,7 +242,7 @@ func (cm *machines) runTasks(
 				event := storage.Event{
 					Name: string(task.Name),
 				}
-				if err := task.Do(provisioner, ctx, cred, request, taskEvents); err != nil {
+				if err := task.Do(provisioner, ctx, cred, *record, request, taskEvents); err != nil {
 					event.Message = task.Message + " errored: " + err.Error()
 					event.Error = err.Error()
 				} else {
@@ -253,6 +256,10 @@ func (cm *machines) runTasks(
 			}()
 
 			record.Status = "pending"
+
+			// TOOD(chungers) - until we separate out the state from the request, at least here
+			// in code we attempt to communicate the proper treatment of request vs state.
+			machineState := request
 
 			for te := range taskEvents {
 
@@ -287,12 +294,12 @@ func (cm *machines) runTasks(
 					log.Infoln("HasMachineState:", te)
 					if provisionedState := ms.GetState(); provisionedState != nil {
 						log.Infoln("Final provisioned state:", provisionedState)
-						request = provisionedState
+						machineState = provisionedState
 					}
 				}
 
 				record.AppendEvent(event)
-				err := cm.store.Save(*record, request)
+				err := cm.store.Save(*record, machineState)
 				log.Infoln("Saved:", "err=", err, len(record.Events), record)
 
 				if stop {
@@ -300,7 +307,7 @@ func (cm *machines) runTasks(
 
 					record.Status = "failed"
 					record.LastModified = storage.Timestamp(time.Now().Unix())
-					err := cm.store.Save(*record, request)
+					err := cm.store.Save(*record, machineState)
 					if err != nil {
 						log.Warningln("err=", err)
 					}
@@ -308,7 +315,7 @@ func (cm *machines) runTasks(
 				}
 			}
 
-			if err := onComplete(); err != nil {
+			if err := onComplete(machineState); err != nil {
 				log.Warningln("complete-err=", err)
 			}
 			return

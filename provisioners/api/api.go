@@ -69,9 +69,15 @@ func (event DestroyInstanceEvent) GetError() error {
 	return event.Error
 }
 
+// Resource is a generic resource that has a friendly name and an identifier that is unique to the provisioner
+type Resource interface {
+	Name() string
+	ID() string
+}
+
 // MachineRequest defines the basic attributes that any provisioner's creation request must define.
 type MachineRequest interface {
-	Name() string
+	Resource
 	ProvisionerName() string
 	Version() string
 	ProvisionWorkflow() []TaskName
@@ -82,7 +88,8 @@ type MachineRequest interface {
 type TaskName string
 
 // TaskHandler is the unit of work that a provisioner is able to run.  It's identified by the TaskName
-type TaskHandler func(Provisioner, context.Context, Credential, MachineRequest, chan<- interface{}) error
+// Note that the data passed as parameters are all read-only, by value (copy).
+type TaskHandler func(Provisioner, context.Context, Credential, Resource, MachineRequest, chan<- interface{}) error
 
 // Task is a descriptor of task that a provisioner supports.  Tasks are referenced by Name
 // in a machine request or template.  This allows customization of provisioner behavior - such
@@ -97,6 +104,7 @@ type Task struct {
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
+	Resource
 	MachineName        string     `yaml:"name" json:"name"`
 	Provisioner        string     `yaml:"provisioner" json:"provisioner"`
 	ProvisionerVersion string     `yaml:"version" json:"version"`
@@ -115,12 +123,12 @@ func (req BaseMachineRequest) TeardownWorkflow() []TaskName {
 }
 
 // Name returns the name to give the machine, once created.
-func (req BaseMachineRequest) Name() string {
+func (req *BaseMachineRequest) Name() string {
 	return req.MachineName
 }
 
 // ProvisionerName returns the provisioner name
-func (req BaseMachineRequest) ProvisionerName() string {
+func (req *BaseMachineRequest) ProvisionerName() string {
 	return req.Provisioner
 }
 
@@ -132,16 +140,29 @@ func (req BaseMachineRequest) Version() string {
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
+	// GetProvisionTasks returns a list of runnable tasks given a list of command task names for allocating a resource.
+	// The task names are generally specific verbs that the user has specified.  The manager can either return
+	// no implementation (thus using framework defaults, or its own override implementation.
+	GetProvisionTasks(tasks []TaskName) ([]Task, error)
+
+	// GetTeardownTasks returns a list of runnable tasks given a list of command task names for tearing down a resource.
+	GetTeardownTasks(tasks []TaskName) ([]Task, error)
+
 	// NewRequestInstance retrieves a new instance of the request type consumed by
 	// CreateInstance.
 	NewRequestInstance() MachineRequest
 
-	// GetIp returns the IP address from the record
+	// GetInstanceKey returns an instanceID based on the request.  It's up to the provisioner
+	// on how to manage the mapping of machine request (which has a user-friendly name) to
+	// an actual infrastructure identifier for the resource.
+	// TODO(chungers) - the machine request here is the *state* not the request
+	GetInstanceID(MachineRequest) (string, error)
+
+	// GetIp returns the IP address from the record.  It's up to the provisioner to decide
+	// which ip address, if more than one network interface cards are on an instance, should be
+	// preferrable and returned to the framework for tracking and managing for user purposes (e.g. ssh sessions)
+	// TODO(chungers) - the machine request here is the *state* not the request
 	GetIPAddress(MachineRequest) (string, error)
-
-	GetProvisionTasks(tasks []TaskName) ([]Task, error)
-
-	GetTeardownTasks(tasks []TaskName) ([]Task, error)
 
 	CreateInstance(request MachineRequest) (<-chan CreateInstanceEvent, error)
 

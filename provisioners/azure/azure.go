@@ -53,6 +53,10 @@ func (p *provisioner) NewRequestInstance() api.MachineRequest {
 	return NewMachineRequest()
 }
 
+func (p *provisioner) GetInstanceID(req api.MachineRequest) (string, error) {
+	panic(errors.New("not implemented"))
+}
+
 func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	panic(errors.New("not implemented"))
 }

@@ -20,20 +20,24 @@ func NewMachines(dir string) (storage.Machines, error) {
 	return &machines{sandbox: sandbox}, nil
 }
 
+// Save saves the record and detail.  The detail can be nil if no new state is known
 func (m machines) Save(record storage.MachineRecord, provisionerData interface{}) error {
-	err := m.sandbox.Mkdir(string(record.Name))
+	err := m.sandbox.Mkdir(string(record.MachineName))
 	if err != nil {
 		return fmt.Errorf("Failed to create machine directory: %s", err)
 	}
 
-	err = m.sandbox.MarshalAndSave(m.recordPath(record.Name), record)
+	err = m.sandbox.MarshalAndSave(m.recordPath(record.MachineName), record)
 	if err != nil {
 		return err
 	}
 
-	err = m.sandbox.MarshalAndSave(m.provisionerRecordPath(record.Name), provisionerData)
-	if err != nil {
-		return err
+	// Save only if there are updates
+	if provisionerData != nil {
+		err = m.sandbox.MarshalAndSave(m.provisionerRecordPath(record.MachineName), provisionerData)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

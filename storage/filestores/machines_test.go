@@ -30,7 +30,7 @@ func TestMachinesCrud(t *testing.T) {
 
 	db16Record := storage.MachineRecord{
 		MachineSummary: storage.MachineSummary{
-			Name:         db16,
+			MachineName:  db16,
 			Provisioner:  "test",
 			Created:      storage.Timestamp(123),
 			LastModified: storage.Timestamp(124),

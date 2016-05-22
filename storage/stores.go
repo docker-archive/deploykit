@@ -54,11 +54,22 @@ type Event struct {
 // MachineSummary keeps minimal information about a machine
 type MachineSummary struct {
 	Status       string    `json:"status" yaml:"status"`
-	Name         MachineID `json:"name" yaml:"name"`
+	MachineName  MachineID `json:"name" yaml:"name"`
+	InstanceID   string    `json:"instance_id" ymal:"instance_id"`
 	IPAddress    string    `json:"ip" yaml:"ip"`
 	Provisioner  string    `json:"provisioner" yaml:"provisioner"`
 	Created      Timestamp `json:"created" yaml:"created"`
 	LastModified Timestamp `json:"modified" yaml:"modified"`
+}
+
+// Name implements Resource.Name
+func (m MachineSummary) Name() string {
+	return string(m.MachineName)
+}
+
+// ID implements Resource.ID
+func (m MachineSummary) ID() string {
+	return m.InstanceID
 }
 
 // MachineRecord is the storage structure that will be included for all machines.
