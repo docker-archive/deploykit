@@ -31,6 +31,7 @@ type apiServer struct {
 	contexts    libmachete.Contexts
 	credentials libmachete.Credentials
 	templates   libmachete.Templates
+	keys        libmachete.Keys
 	machines    libmachete.Machines
 }
 
@@ -58,6 +59,10 @@ func (s *apiServer) init() error {
 	if err != nil {
 		return err
 	}
+	keysPath, err := mkdir(s.options.RootDir, "machines") // a machine and key share the same name
+	if err != nil {
+		return err
+	}
 
 	contextStore, err := filestores.NewContexts(contextPath)
 	if err != nil {
@@ -77,11 +82,17 @@ func (s *apiServer) init() error {
 	}
 	s.templates = libmachete.NewTemplates(templateStore, &provisioners)
 
+	keyStore, err := filestores.NewKeys(keysPath)
+	if err != nil {
+		return err
+	}
+	s.keys = libmachete.NewKeys(keyStore)
+
 	machineStore, err := filestores.NewMachines(machinesPath)
 	if err != nil {
 		return err
 	}
-	s.machines = libmachete.NewMachines(machineStore)
+	s.machines = libmachete.NewMachines(machineStore, s.keys)
 	return nil
 }
 
@@ -120,7 +131,10 @@ func (s *apiServer) start() <-chan error {
 	for endpoint, fn := range templateRoutes(s.templates) {
 		service.Route(*endpoint).To(fn)
 	}
-	for endpoint, fn := range machineRoutes(s.contexts, s.credentials, s.templates, s.machines) {
+	for endpoint, fn := range machineRoutes(s.contexts, s.credentials, s.templates, s.keys, s.machines) {
+		service.Route(*endpoint).To(fn)
+	}
+	for endpoint, fn := range keyRoutes(s.keys) {
 		service.Route(*endpoint).To(fn)
 	}
 

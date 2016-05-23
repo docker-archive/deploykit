@@ -14,6 +14,7 @@ type CreateInstanceRequest struct {
 	EbsOptimized             bool              `yaml:"ebs_optimized" json:"ebs_optimized"`
 	IamInstanceProfile       string            `yaml:"iam_instance_profile" json:"iam_instance_profile"`
 	ImageID                  string            `yaml:"image_id" json:"image_id"`
+	InstanceID               string            `yaml:"instance_id,omitempty" json:"instance_id,omitempty"`
 	InstanceType             string            `yaml:"instance_type" json:"instance_type"`
 	KeyName                  string            `yaml:"key_name" json:"key_name"`
 	Monitoring               bool              `yaml:"monitoring" json:"monitoring"`

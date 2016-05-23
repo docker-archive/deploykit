@@ -69,19 +69,44 @@ func (event DestroyInstanceEvent) GetError() error {
 	return event.Error
 }
 
+// Resource is a generic resource that has a friendly name and an identifier that is unique to the provisioner
+type Resource interface {
+	Name() string
+	ID() string
+}
+
 // MachineRequest defines the basic attributes that any provisioner's creation request must define.
 type MachineRequest interface {
-	Name() string
+	Resource
 	ProvisionerName() string
 	Version() string
 	ProvisionWorkflow() []TaskName
+	TeardownWorkflow() []TaskName
+}
+
+// KeyStore manages key required to access the machine instance
+type KeyStore interface {
+
+	// NewKeyPair creates and saves a new key pair identified by the id
+	NewKeyPair(id string) error
+
+	// GetPublicKey returns the public key bytes for the key pair identified by id
+	GetPublicKey(id string) ([]byte, error)
+
+	// Exists returns true if a key pair identified by the id exists
+	Exists(id string) bool
+
+	// Remove the keypair
+	Remove(id string) error
 }
 
 // TaskName is a kind of work that a provisioner is able to run
 type TaskName string
 
 // TaskHandler is the unit of work that a provisioner is able to run.  It's identified by the TaskName
-type TaskHandler func(Provisioner, context.Context, Credential, MachineRequest, chan<- interface{}) error
+// Note that the data passed as parameters are all read-only, by value (copy).
+type TaskHandler func(Provisioner, KeyStore, context.Context, Credential,
+	Resource, MachineRequest, chan<- interface{}) error
 
 // Task is a descriptor of task that a provisioner supports.  Tasks are referenced by Name
 // in a machine request or template.  This allows customization of provisioner behavior - such
@@ -93,27 +118,43 @@ type Task struct {
 	Do      TaskHandler `json:"-" yaml:"-"`
 }
 
+// Override defines a new task of the same name but with a different implementation / behavior
+func (t Task) Override(message string, do TaskHandler) Task {
+	return Task{
+		Name:    t.Name,
+		Message: message,
+		Do:      do,
+	}
+}
+
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
+	Resource
 	MachineName        string     `yaml:"name" json:"name"`
 	Provisioner        string     `yaml:"provisioner" json:"provisioner"`
 	ProvisionerVersion string     `yaml:"version" json:"version"`
-	Workflow           []TaskName `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	Provision          []TaskName `yaml:"provision,omitempty" json:"provision,omitempty"`
+	Teardown           []TaskName `yaml:"teardown,omitempty" json:"teardown,omitempty"`
 }
 
 // ProvisionWorkflow returns the tasks to do
 func (req BaseMachineRequest) ProvisionWorkflow() []TaskName {
-	return req.Workflow
+	return req.Provision
+}
+
+// TeardownWorkflow returns the tasks to do
+func (req BaseMachineRequest) TeardownWorkflow() []TaskName {
+	return req.Teardown
 }
 
 // Name returns the name to give the machine, once created.
-func (req BaseMachineRequest) Name() string {
+func (req *BaseMachineRequest) Name() string {
 	return req.MachineName
 }
 
 // ProvisionerName returns the provisioner name
-func (req BaseMachineRequest) ProvisionerName() string {
+func (req *BaseMachineRequest) ProvisionerName() string {
 	return req.Provisioner
 }
 
@@ -125,14 +166,29 @@ func (req BaseMachineRequest) Version() string {
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
+	// GetProvisionTasks returns a list of runnable tasks given a list of command task names for allocating a resource.
+	// The task names are generally specific verbs that the user has specified.  The manager can either return
+	// no implementation (thus using framework defaults, or its own override implementation.
+	GetProvisionTasks(tasks []TaskName) ([]Task, error)
+
+	// GetTeardownTasks returns a list of runnable tasks given a list of command task names for tearing down a resource.
+	GetTeardownTasks(tasks []TaskName) ([]Task, error)
+
 	// NewRequestInstance retrieves a new instance of the request type consumed by
 	// CreateInstance.
 	NewRequestInstance() MachineRequest
 
-	// GetIp returns the IP address from the record
-	GetIPAddress(MachineRequest) (string, error)
+	// GetInstanceKey returns an instanceID based on the request.  It's up to the provisioner
+	// on how to manage the mapping of machine request (which has a user-friendly name) to
+	// an actual infrastructure identifier for the resource.
+	// TODO(chungers) - the machine request here is the *state* not the request
+	GetInstanceID(MachineRequest) (string, error)
 
-	GetTasks(tasks []TaskName) ([]Task, error)
+	// GetIp returns the IP address from the record.  It's up to the provisioner to decide
+	// which ip address, if more than one network interface cards are on an instance, should be
+	// preferrable and returned to the framework for tracking and managing for user purposes (e.g. ssh sessions)
+	// TODO(chungers) - the machine request here is the *state* not the request
+	GetIPAddress(MachineRequest) (string, error)
 
 	CreateInstance(request MachineRequest) (<-chan CreateInstanceEvent, error)
 

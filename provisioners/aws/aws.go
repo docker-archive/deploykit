@@ -229,12 +229,19 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
-func getTaskMap() *libmachete.TaskMap {
+func getProvisionTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
-		libmachete.TaskSSHKeyGen,
+		libmachete.TaskSSHKeyGen.Override("AWS - upload generated SSH key", GenerateAndUploadSSHKey),
+		libmachete.TaskCreateInstance,
 		libmachete.TaskUserData,
 		libmachete.TaskInstallDockerEngine,
-		libmachete.TaskCreateInstance,
+	)
+}
+
+func getTeardownTaskMap() *libmachete.TaskMap {
+	return libmachete.NewTaskMap(
+		libmachete.TaskDestroyInstance,
+		libmachete.TaskSSHKeyRemove.Override("AWS - remove ssh key", RemoveLocalAndUploadedSSHKey),
 	)
 }
 
@@ -244,7 +251,8 @@ func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Workflow = getTaskMap().Names()
+	req.Provision = getProvisionTaskMap().Names()
+	req.Teardown = getTeardownTaskMap().Names()
 	return req
 }
 
@@ -261,6 +269,15 @@ func ensureRequestType(req api.MachineRequest) (r *CreateInstanceRequest, err er
 	return
 }
 
+// GetInstanceID returns the infrastructure identifier given the state of the machine.
+func (p *provisioner) GetInstanceID(req api.MachineRequest) (string, error) {
+	ci, err := ensureRequestType(req)
+	if err != nil {
+		return "", err
+	}
+	return ci.InstanceID, nil
+}
+
 // GetIPAddress - this prefers private IP if it's set; make this behavior configurable as a
 // machine template or context?
 func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
@@ -274,8 +291,12 @@ func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	return ci.PublicIPAddress, nil
 }
 
-func (p *provisioner) GetTasks(tasks []api.TaskName) ([]api.Task, error) {
-	return getTaskMap().Filter(tasks)
+func (p *provisioner) GetProvisionTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getProvisionTaskMap().Filter(tasks)
+}
+
+func (p *provisioner) GetTeardownTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getTeardownTaskMap().Filter(tasks)
 }
 
 // Validate checks the data and returns error if not valid
@@ -338,6 +359,7 @@ func (p *provisioner) CreateInstance(
 			return
 		}
 
+		// TODO(chungers) -- need to figure out reasonable way to separate request from state
 		provisionedState := *request // copy
 		if provisioned.PrivateIpAddress != nil {
 			provisionedState.PrivateIPAddress = *provisioned.PrivateIpAddress
@@ -345,6 +367,7 @@ func (p *provisioner) CreateInstance(
 		if provisioned.PublicIpAddress != nil {
 			provisionedState.PublicIPAddress = *provisioned.PublicIpAddress
 		}
+		provisionedState.InstanceID = *instance.InstanceId
 
 		log.Infoln("ProvisionedState=", provisionedState)
 
@@ -403,4 +426,87 @@ func (p *provisioner) DestroyInstance(instanceID string) (<-chan api.DestroyInst
 	}()
 
 	return events, nil
+}
+
+// GenerateAndUploadSSHKey overrides the default SSHKeyGen task to first generate the key then upload to EC2.
+// It also mutates the input request to use the generated key.
+func GenerateAndUploadSSHKey(p api.Provisioner, keystore api.KeyStore,
+	ctx context.Context, cred api.Credential,
+	resource api.Resource, request api.MachineRequest, events chan<- interface{}) error {
+
+	ci, err := ensureRequestType(request)
+	if err != nil {
+		return err
+	}
+
+	prov, is := p.(*provisioner)
+
+	if !is {
+		return fmt.Errorf("Not AWS provisioner:%v", p)
+	}
+
+	// Call the default implementation to generate the key
+	if err := libmachete.TaskSSHKeyGen.Do(prov, keystore, ctx, cred, resource, request, events); err != nil {
+		events <- err
+		return err
+	}
+
+	keyName := resource.Name()
+	publicKey, err := keystore.GetPublicKey(keyName)
+	if err != nil {
+		events <- err
+		return err
+	}
+
+	// AWS requires that the key be uploaded prior to creating the instance
+	if _, err = prov.client.ImportKeyPair(&ec2.ImportKeyPairInput{
+		KeyName:           &keyName,
+		PublicKeyMaterial: publicKey,
+	}); err != nil {
+		events <- err
+		return err
+	}
+
+	// Now we have successfully imported the key, change the input to use this
+	ci.KeyName = keyName
+
+	// Send this change to be logged.
+	events <- ci
+	return nil
+}
+
+// RemoveLocalAndUploadedSSHKey removes the local ssh key and calls EC2 api to remove the uploaded key
+func RemoveLocalAndUploadedSSHKey(p api.Provisioner, keystore api.KeyStore,
+	ctx context.Context, cred api.Credential,
+	resource api.Resource, request api.MachineRequest, events chan<- interface{}) error {
+
+	prov, is := p.(*provisioner)
+
+	if !is {
+		return fmt.Errorf("Not AWS provisioner:%v", p)
+	}
+
+	keyName := resource.Name()
+
+	if !keystore.Exists(keyName) {
+		err := fmt.Errorf("No such key:%v", keyName)
+		events <- err
+		return err
+	}
+
+	// AWS requires that the key be uploaded prior to creating the instance
+	if _, err := prov.client.DeleteKeyPair(&ec2.DeleteKeyPairInput{
+		KeyName: &keyName,
+	}); err != nil {
+		events <- err
+		return err
+	}
+
+	// Call the default implementation to generate the key
+	if err := libmachete.TaskSSHKeyRemove.Do(prov, keystore, ctx, cred, resource, request, events); err != nil {
+		events <- err
+		return err
+	}
+
+	return nil
 }
