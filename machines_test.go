@@ -8,7 +8,6 @@ import (
 	"github.com/docker/libmachete/storage"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	"testing"
 )
 
@@ -109,7 +108,6 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 		provisioner,
 		tasks,
 		record,
-		nil,
 		cred,
 		request,
 		func(r storage.MachineRecord, q api.MachineRequest) error {
@@ -143,7 +141,6 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 		provisioner,
 		tasks,
 		record,
-		nil,
 		cred,
 		request,
 		func(r storage.MachineRecord, q api.MachineRequest) error {
@@ -209,12 +206,9 @@ func TestCreateMachine(t *testing.T) {
 	machines := NewMachines(store)
 	events, err := machines.CreateMachine(
 		provisioner,
-		context.Background(),
 		cred,
 		template,
-		bytes.NewBuffer([]byte(`
-name: new-host
-`)),
+		bytes.NewBuffer([]byte("\nname: new-host\n")),
 		ContentTypeYAML)
 	require.NoError(t, err)
 	require.NotNil(t, events)
@@ -254,11 +248,7 @@ func TestDestroyMachine(t *testing.T) {
 	store := mock_storage.NewMockMachines(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 	machines := NewMachines(store)
-	events, err := machines.DeleteMachine(
-		provisioner,
-		context.Background(),
-		cred,
-		*record)
+	events, err := machines.DeleteMachine(provisioner, cred, *record)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	close(destroyEvents) // Simulates the async destroy completes
@@ -285,7 +275,6 @@ func TestRunTasksNoError(t *testing.T) {
 		provisioner,
 		tasks,
 		record,
-		nil,
 		cred,
 		request,
 		func(r storage.MachineRecord, q api.MachineRequest) error {
@@ -321,7 +310,6 @@ func TestRunTasksErrorAbort(t *testing.T) {
 		provisioner,
 		tasks,
 		record,
-		nil,
 		cred,
 		request,
 		func(r storage.MachineRecord, q api.MachineRequest) error {

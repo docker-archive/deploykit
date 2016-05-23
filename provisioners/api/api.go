@@ -1,7 +1,6 @@
 package api
 
 import (
-	"golang.org/x/net/context"
 	"strconv"
 )
 
@@ -115,13 +114,14 @@ type TaskName string
 
 // TaskHandler is the unit of work that a provisioner is able to run.  It's identified by the TaskName
 // Note that the data passed as parameters are all read-only, by value (copy).
-type TaskHandler func(Provisioner, context.Context, Credential, Resource, MachineRequest, chan<- interface{}) error
+type TaskHandler func(Provisioner, Credential, Resource, MachineRequest, chan<- interface{}) error
 
 // Task is a descriptor of task that a provisioner supports.  Tasks are referenced by Name
 // in a machine request or template.  This allows customization of provisioner behavior - such
 // as skipping engine installs (if underlying image already has docker engine), skipping SSH
 // key (if no sshd allowed), etc.
 type Task struct {
+	// TODO(wfarner): Are the json/yaml tags needed here?
 	Name    TaskName    `json:"name" yaml:"name"`
 	Message string      `json:"message" yaml:"message"`
 	Do      TaskHandler `json:"-" yaml:"-"`

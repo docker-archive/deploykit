@@ -59,7 +59,7 @@ test:
 coverage:
 	@echo "+ $@"
 	@for pkg in $(PKGS); do \
-	  go test -test.short -coverprofile="../../../$$pkg/coverage.txt" $${pkg}; \
+	  go test -test.short -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 
 test-full:

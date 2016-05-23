@@ -4,7 +4,6 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/provisioners/api"
-	"golang.org/x/net/context"
 )
 
 // TaskMap can be used by provisioners to filter and report errors when fetching tasks by name.
@@ -68,7 +67,6 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 		Message: desc,
 		Do: func(
 			prov api.Provisioner,
-			ctx context.Context,
 			cred api.Credential,
 			resource api.Resource,
 			req api.MachineRequest,
@@ -81,7 +79,6 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 
 func defaultCreateInstanceHandler(
 	prov api.Provisioner,
-	ctx context.Context,
 	cred api.Credential,
 	resource api.Resource,
 	req api.MachineRequest,
@@ -101,7 +98,6 @@ func defaultCreateInstanceHandler(
 
 func defaultDestroyInstanceHandler(
 	prov api.Provisioner,
-	ctx context.Context,
 	cred api.Credential,
 	resource api.Resource,
 	req api.MachineRequest,

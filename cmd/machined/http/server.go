@@ -3,11 +3,10 @@ package http
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/storage/filestores"
+	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
-	"golang.org/x/net/context"
 	"net/http"
 	"os"
 	"os/user"
@@ -62,44 +61,25 @@ func respondError(code int, resp http.ResponseWriter, err error) {
 	resp.Write([]byte(fmt.Sprintf("{\"error\":\"%s\"}", message)))
 }
 
-func (s *apiServer) start() <-chan error {
-	shutdown := make(chan struct{})
-	service := rest.NewService().DisableAuth().
-		ListenPort(s.options.Port).
-		Route(
-			rest.Endpoint{
-				UrlRoute:   "/quitquitquit",
-				HttpMethod: rest.POST,
-			}).
-		To(
-			func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-				log.Infoln("Stopping the api....")
-				close(shutdown)
-			}).
-		OnShutdown(
-			func() error {
-				log.Infoln("Executing user custom shutdown...")
-				return nil
-			})
+type routerAttachment interface {
+	attachTo(router *mux.Router)
+}
 
-	for endpoint, fn := range credentialRoutes(s.credentials) {
-		service.Route(*endpoint).To(fn)
-	}
-	for endpoint, fn := range templateRoutes(s.templates) {
-		service.Route(*endpoint).To(fn)
-	}
-	for endpoint, fn := range machineRoutes(s.credentials, s.templates, s.machines) {
-		service.Route(*endpoint).To(fn)
+func (s *apiServer) start() error {
+	attachments := map[string]routerAttachment{
+		"/credentials": &credentialsHandler{credentials: s.credentials},
+		"/templates":   &templatesHandler{templates: s.templates},
+		"/machines":    &machineHandler{creds: s.credentials, templates: s.templates, machines: s.machines},
 	}
 
-	stop, stopped := service.Start()
+	router := mux.NewRouter()
 
-	// For stopping the api
-	go func() {
-		<-shutdown
-		close(stop)
-	}()
-	return stopped
+	for path, attachment := range attachments {
+		attachment.attachTo(router.PathPrefix(path).Subrouter())
+	}
+
+	http.Handle("/", router)
+	return http.ListenAndServe(fmt.Sprintf(":%s", s.options.Port), router)
 }
 
 func rootDir() string {
@@ -125,8 +105,8 @@ func ServerCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			stopped := server.start()
-			<-stopped
+			err = server.start()
+			log.Error(err)
 			log.Infoln("Bye")
 			return nil
 		},
