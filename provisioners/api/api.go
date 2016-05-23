@@ -2,6 +2,7 @@ package api
 
 import (
 	"golang.org/x/net/context"
+	"strconv"
 )
 
 // CreateInstanceEventType is the identifier for an instance create event.
@@ -75,6 +76,31 @@ type MachineRequest interface {
 	ProvisionerName() string
 	Version() string
 	ProvisionWorkflow() []TaskName
+}
+
+// ProvisionControls are parameters that give the provisioner instructions on how to provision the
+// machine.  For example, network timeouts to a third-party API would be configured here rather than
+// in the MachineRequest.
+type ProvisionControls map[string][]string
+
+// GetString returns the string value of a control.
+func (p ProvisionControls) GetString(key string) (string, bool) {
+	value, present := p[key]
+	if present {
+		return "", false
+	}
+	return value[0], true
+}
+
+// GetInt returns the int value of a control.
+func (p ProvisionControls) GetInt(key string) (int, bool, error) {
+	value, present := p.GetString(key)
+	if !present {
+		return 0, false, nil
+	}
+
+	i, err := strconv.Atoi(value)
+	return i, true, err
 }
 
 // TaskName is a kind of work that a provisioner is able to run

@@ -5,17 +5,17 @@ import (
 	log "github.com/Sirupsen/logrus"
 	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
+	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/storage"
 	"golang.org/x/net/context"
 	"net/http"
 )
 
 type machineHandler struct {
-	provisionerContexts libmachete.Contexts
-	creds               libmachete.Credentials
-	templates           libmachete.Templates
-	machines            libmachete.Machines
-	provisioners        libmachete.MachineProvisioners
+	creds        libmachete.Credentials
+	templates    libmachete.Templates
+	machines     libmachete.Machines
+	provisioners libmachete.MachineProvisioners
 }
 
 func (h *machineHandler) getOne(codec *libmachete.Codec) rest.Handler {
@@ -55,15 +55,22 @@ func (h *machineHandler) getAll(ctx context.Context, resp http.ResponseWriter, r
 	libmachete.ContentTypeJSON.Respond(resp, all)
 }
 
+func getProvisionControls(req *http.Request) api.ProvisionControls {
+	// TODO(wfarner): It may be worth exploring a way for the provisioner to specify the
+	// parameters it supports.  Proceeding with this for now for simplicity.
+	// Omit query values used in this context for the purposes of the provisioner.
+	queryValues := req.URL.Query()
+	queryValues.Del("credentials")
+	queryValues.Del("template")
+
+	return api.ProvisionControls(queryValues)
+}
+
 func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-	context := rest.GetUrlParameter(req, "context")
 	credentials := rest.GetUrlParameter(req, "credentials")
 	template := rest.GetUrlParameter(req, "template")
 
 	// TODO - fix this in framework to return default values
-	if context == "" {
-		context = "default"
-	}
 	if credentials == "" {
 		credentials = "default"
 	}
@@ -71,7 +78,9 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 		template = "default"
 	}
 
-	log.Infof("Add machine context=%v, template=%v, as %v", context, template, credentials)
+	provisionControls := getProvisionControls(req)
+
+	log.Infof("Add machine controls=%v, template=%v, as %v", provisionControls, template, credentials)
 
 	// credential
 	cred, err := h.creds.Get(credentials)
@@ -89,16 +98,6 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 		return
 	}
 
-	// Runtime context
-	runContext, err := h.provisionerContexts.Get(context)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
-		return
-	}
-
-	// Configure the provisioner context
-	ctx = libmachete.BuildContext(builder, ctx, runContext)
-
 	// Load template
 	tpl, err := h.templates.Get(storage.TemplateID{Provisioner: builder.Name, Name: template})
 	if err != nil {
@@ -106,7 +105,7 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 		return
 	}
 
-	provisioner, err := builder.Build(ctx, cred)
+	provisioner, err := builder.Build(provisionControls, cred)
 	if err != nil {
 		respondError(http.StatusBadRequest, resp, err)
 		return
@@ -139,16 +138,14 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 }
 
 func machineRoutes(
-	provisionerContexts libmachete.Contexts,
 	creds libmachete.Credentials,
 	templates libmachete.Templates,
 	machines libmachete.Machines) map[*rest.Endpoint]rest.Handler {
 
 	handler := machineHandler{
-		provisionerContexts: provisionerContexts,
-		creds:               creds,
-		templates:           templates,
-		machines:            machines,
+		creds:     creds,
+		templates: templates,
+		machines:  machines,
 	}
 
 	return map[*rest.Endpoint]rest.Handler{

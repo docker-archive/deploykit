@@ -4,11 +4,10 @@ import (
 	"errors"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
-	"golang.org/x/net/context"
 )
 
 // ProvisionerWith returns a provision given the runtime context and credential
-func ProvisionerWith(ctx context.Context, cred api.Credential) (api.Provisioner, error) {
+func ProvisionerWith(controls api.ProvisionControls, cred api.Credential) (api.Provisioner, error) {
 	return new(provisioner), nil
 }
 

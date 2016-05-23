@@ -18,16 +18,10 @@ type credential struct {
 	AccessKeyID        string `yaml:"access_key_id" json:"access_key_id"`
 	SecretAccessKey    string `yaml:"secret_access_key" json:"secret_access_key"`
 	SessionToken       string `yaml:"session_token" json:"session_token"`
-	EC2RoleProvider    bool   `yaml:"ec2_role_provider" json:"ec2_role_provider"`
 }
 
 // Retrieve implements the AWS credentials.Provider interface method
 func (a *credential) Retrieve() (credentials.Value, error) {
-
-	if err := a.Validate(nil); err != nil {
-		return credentials.Value{}, err
-	}
-
 	return credentials.Value{
 		AccessKeyID:     a.AccessKeyID,
 		SecretAccessKey: a.SecretAccessKey,
@@ -39,16 +33,6 @@ func (a *credential) Retrieve() (credentials.Value, error) {
 // IsExpired implements the AWS credentials.Provider interface method.  For static credentials this always returns false
 func (a *credential) IsExpired() bool {
 	return false
-}
-
-// Validate implements Credential interface method
-func (a credential) Validate(ctx context.Context) error {
-	if a.EC2RoleProvider {
-		return nil
-	} else if a.AccessKeyID == "" || a.SecretAccessKey == "" {
-		return credentials.ErrStaticCredentialsEmpty
-	}
-	return nil
 }
 
 // Authenticate implements Credential interface method

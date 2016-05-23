@@ -9,8 +9,7 @@ func init() {
 		Name:                  ProvisionerName,
 		DefaultCredential:     NewCredential(),
 		DefaultMachineRequest: NewMachineRequest(),
-		BuildContext:          BuildContextFromKVPair,
-		Build:                 ProvisionerWith,
+		Build: ProvisionerWith,
 	})
 }
 

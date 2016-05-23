@@ -2,11 +2,13 @@ package aws
 
 import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/provisioners/aws"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+	"time"
 )
 
 func requireEnvVar(t *testing.T, varName string) string {
