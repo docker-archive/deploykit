@@ -134,6 +134,9 @@ func (s *apiServer) start() <-chan error {
 	for endpoint, fn := range machineRoutes(s.contexts, s.credentials, s.templates, s.keys, s.machines) {
 		service.Route(*endpoint).To(fn)
 	}
+	for endpoint, fn := range keyRoutes(s.keys) {
+		service.Route(*endpoint).To(fn)
+	}
 
 	stop, stopped := service.Start()
 
