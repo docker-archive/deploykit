@@ -42,11 +42,12 @@ type Machines interface {
 
 type machines struct {
 	store storage.Machines
+	keys  Keys
 }
 
 // NewMachines creates an instance of the manager given the backing store.
-func NewMachines(store storage.Machines) Machines {
-	return &machines{store: store}
+func NewMachines(store storage.Machines, keys Keys) Machines {
+	return &machines{store: store, keys: keys}
 }
 
 func (cm *machines) List() ([]storage.MachineSummary, error) {
@@ -170,7 +171,7 @@ func (cm *machines) CreateMachine(
 
 	log.Infoln("About to run tasks:", tasks)
 
-	return cm.runTasks(provisioner, tasks, record, ctx, cred, request,
+	return cm.runTasks(provisioner, cm.keys, tasks, record, ctx, cred, request,
 		func(state api.MachineRequest) error {
 			record.Status = "running"
 			record.LastModified = storage.Timestamp(time.Now().Unix())
@@ -215,7 +216,7 @@ func (cm *machines) DeleteMachine(
 	log.Infoln("About to run tasks:", tasks)
 
 	// Need a way to clean up the database of lots of terminated instances.
-	return cm.runTasks(provisioner, tasks, &record, ctx, cred, lastChange,
+	return cm.runTasks(provisioner, cm.keys, tasks, &record, ctx, cred, lastChange,
 		func(state api.MachineRequest) error {
 			record.Status = "terminated"
 			record.LastModified = storage.Timestamp(time.Now().Unix())
@@ -223,8 +224,8 @@ func (cm *machines) DeleteMachine(
 		})
 }
 
-func (cm *machines) runTasks(
-	provisioner api.Provisioner, tasks []api.Task, record *storage.MachineRecord,
+func (cm *machines) runTasks(provisioner api.Provisioner, keystore api.KeyStore,
+	tasks []api.Task, record *storage.MachineRecord,
 	ctx context.Context, cred api.Credential, request api.MachineRequest,
 	onComplete func(api.MachineRequest) error) (<-chan interface{}, *Error) {
 
@@ -242,7 +243,7 @@ func (cm *machines) runTasks(
 				event := storage.Event{
 					Name: string(task.Name),
 				}
-				if err := task.Do(provisioner, ctx, cred, *record, request, taskEvents); err != nil {
+				if err := task.Do(provisioner, keystore, ctx, cred, *record, request, taskEvents); err != nil {
 					event.Message = task.Message + " errored: " + err.Error()
 					event.Error = err.Error()
 				} else {

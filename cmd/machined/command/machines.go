@@ -14,6 +14,7 @@ type machineHandler struct {
 	provisionerContexts libmachete.Contexts
 	creds               libmachete.Credentials
 	templates           libmachete.Templates
+	keys                libmachete.Keys
 	machines            libmachete.Machines
 	provisioners        libmachete.MachineProvisioners
 }
@@ -222,12 +223,14 @@ func machineRoutes(
 	provisionerContexts libmachete.Contexts,
 	creds libmachete.Credentials,
 	templates libmachete.Templates,
+	keys libmachete.Keys,
 	machines libmachete.Machines) map[*rest.Endpoint]rest.Handler {
 
 	handler := machineHandler{
 		provisionerContexts: provisionerContexts,
 		creds:               creds,
 		templates:           templates,
+		keys:                keys,
 		machines:            machines,
 	}
 

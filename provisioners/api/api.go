@@ -84,12 +84,29 @@ type MachineRequest interface {
 	TeardownWorkflow() []TaskName
 }
 
+// KeyStore manages key required to access the machine instance
+type KeyStore interface {
+
+	// NewKeyPair creates and saves a new key pair identified by the id
+	NewKeyPair(id string) error
+
+	// GetPublicKey returns the public key bytes for the key pair identified by id
+	GetPublicKey(id string) ([]byte, error)
+
+	// Exists returns true if a key pair identified by the id exists
+	Exists(id string) bool
+
+	// Remove the keypair
+	Remove(id string) error
+}
+
 // TaskName is a kind of work that a provisioner is able to run
 type TaskName string
 
 // TaskHandler is the unit of work that a provisioner is able to run.  It's identified by the TaskName
 // Note that the data passed as parameters are all read-only, by value (copy).
-type TaskHandler func(Provisioner, context.Context, Credential, Resource, MachineRequest, chan<- interface{}) error
+type TaskHandler func(Provisioner, KeyStore, context.Context, Credential,
+	Resource, MachineRequest, chan<- interface{}) error
 
 // Task is a descriptor of task that a provisioner supports.  Tasks are referenced by Name
 // in a machine request or template.  This allows customization of provisioner behavior - such
@@ -99,6 +116,15 @@ type Task struct {
 	Name    TaskName    `json:"name" yaml:"name"`
 	Message string      `json:"message" yaml:"message"`
 	Do      TaskHandler `json:"-" yaml:"-"`
+}
+
+// Override defines a new task of the same name but with a different implementation / behavior
+func (t Task) Override(message string, do TaskHandler) Task {
+	return Task{
+		Name:    t.Name,
+		Message: message,
+		Do:      do,
+	}
 }
 
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct

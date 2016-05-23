@@ -231,7 +231,7 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 
 func getProvisionTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
-		libmachete.TaskSSHKeyGen,
+		libmachete.TaskSSHKeyGen.Override("AWS - upload generated SSH key", generateAndUploadSSHKey),
 		libmachete.TaskCreateInstance,
 		libmachete.TaskUserData,
 		libmachete.TaskInstallDockerEngine,
@@ -241,7 +241,7 @@ func getProvisionTaskMap() *libmachete.TaskMap {
 func getTeardownTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
 		libmachete.TaskDestroyInstance,
-		libmachete.TaskSSHKeyRemove,
+		libmachete.TaskSSHKeyRemove.Override("AWS - remove ssh key", removeLocalAndUploadedSSHKey),
 	)
 }
 
@@ -426,4 +426,73 @@ func (p *provisioner) DestroyInstance(instanceID string) (<-chan api.DestroyInst
 	}()
 
 	return events, nil
+}
+
+func generateAndUploadSSHKey(p api.Provisioner, keystore api.KeyStore,
+	ctx context.Context, cred api.Credential,
+	resource api.Resource, request api.MachineRequest, events chan<- interface{}) error {
+
+	prov, is := p.(*provisioner)
+
+	if !is {
+		return fmt.Errorf("Not AWS provisioner:%v", p)
+	}
+
+	// Call the default implementation to generate the key
+	if err := libmachete.TaskSSHKeyGen.Do(prov, keystore, ctx, cred, resource, request, events); err != nil {
+		events <- err
+		return err
+	}
+
+	keyName := resource.Name()
+	publicKey, err := keystore.GetPublicKey(keyName)
+	if err != nil {
+		events <- err
+		return err
+	}
+
+	// AWS requires that the key be uploaded prior to creating the instance
+	if _, err = prov.client.ImportKeyPair(&ec2.ImportKeyPairInput{
+		KeyName:           &keyName,
+		PublicKeyMaterial: publicKey,
+	}); err != nil {
+		events <- err
+		return err
+	}
+	return nil
+}
+
+func removeLocalAndUploadedSSHKey(p api.Provisioner, keystore api.KeyStore,
+	ctx context.Context, cred api.Credential,
+	resource api.Resource, request api.MachineRequest, events chan<- interface{}) error {
+
+	prov, is := p.(*provisioner)
+
+	if !is {
+		return fmt.Errorf("Not AWS provisioner:%v", p)
+	}
+
+	keyName := resource.Name()
+
+	if !keystore.Exists(keyName) {
+		err := fmt.Errorf("No such key:%v", keyName)
+		events <- err
+		return err
+	}
+
+	// AWS requires that the key be uploaded prior to creating the instance
+	if _, err := prov.client.DeleteKeyPair(&ec2.DeleteKeyPairInput{
+		KeyName: &keyName,
+	}); err != nil {
+		events <- err
+		return err
+	}
+
+	// Call the default implementation to generate the key
+	if err := libmachete.TaskSSHKeyRemove.Do(prov, keystore, ctx, cred, resource, request, events); err != nil {
+		events <- err
+		return err
+	}
+
+	return nil
 }
