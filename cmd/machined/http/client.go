@@ -1,4 +1,4 @@
-package command
+package http
 
 import (
 	"encoding/json"

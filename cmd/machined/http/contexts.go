@@ -1,4 +1,4 @@
-package command
+package http
 
 import (
 	"fmt"
@@ -9,26 +9,25 @@ import (
 	"net/http"
 )
 
-type credentialsHandler struct {
-	credentials libmachete.Credentials
+type contextHandler struct {
+	contexts libmachete.Contexts
 }
 
-func (h *credentialsHandler) getOne(codec *libmachete.Codec) rest.Handler {
+func (h *contextHandler) getOne(codec *libmachete.Codec) rest.Handler {
 	return func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 		key := rest.GetUrlParameter(req, "key")
-		cr, err := h.credentials.Get(key)
+		cr, err := h.contexts.Get(key)
 		if err == nil {
 			codec.Respond(resp, cr)
 		} else {
-			respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-			return
+			respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown context:%s", key))
 		}
 	}
 }
 
-func (h *credentialsHandler) getAll(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-	log.Infoln("List credentials")
-	all, err := h.credentials.ListIds()
+func (h *contextHandler) getAll(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	log.Infoln("List contexts")
+	all, err := h.contexts.ListIds()
 	if err != nil {
 		respondError(http.StatusInternalServerError, resp, err)
 		return
@@ -36,12 +35,11 @@ func (h *credentialsHandler) getAll(ctx context.Context, resp http.ResponseWrite
 	libmachete.ContentTypeJSON.Respond(resp, all)
 }
 
-func (h *credentialsHandler) create(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-	provisioner := rest.GetUrlParameter(req, "provisioner")
+func (h *contextHandler) create(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 	key := rest.GetUrlParameter(req, "key")
-	log.Infof("Add credential %v, %v\n", provisioner, key)
+	log.Infof("Add context %v", key)
 
-	err := h.credentials.CreateCredential(provisioner, key, req.Body, libmachete.CodecByContentTypeHeader(req))
+	err := h.contexts.CreateContext(key, req.Body, libmachete.CodecByContentTypeHeader(req))
 
 	if err == nil {
 		return
@@ -60,11 +58,11 @@ func (h *credentialsHandler) create(ctx context.Context, resp http.ResponseWrite
 	}
 }
 
-func (h *credentialsHandler) update(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *contextHandler) update(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 	key := rest.GetUrlParameter(req, "key")
-	log.Infof("Update credential %v\n", key)
+	log.Infof("Update context %v", key)
 
-	err := h.credentials.UpdateCredential(key, req.Body, libmachete.CodecByContentTypeHeader(req))
+	err := h.contexts.UpdateContext(key, req.Body, libmachete.CodecByContentTypeHeader(req))
 
 	if err == nil {
 		return
@@ -83,44 +81,41 @@ func (h *credentialsHandler) update(ctx context.Context, resp http.ResponseWrite
 	}
 }
 
-func (h *credentialsHandler) delete(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *contextHandler) delete(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 	key := rest.GetUrlParameter(req, "key")
-	err := h.credentials.Delete(key)
+	err := h.contexts.Delete(key)
 	if err != nil {
-		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
+		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown context:%s", key))
 		return
 	}
 }
 
-func credentialRoutes(credentials libmachete.Credentials) map[*rest.Endpoint]rest.Handler {
-	handler := credentialsHandler{credentials: credentials}
+func contextRoutes(contexts libmachete.Contexts) map[*rest.Endpoint]rest.Handler {
+	handler := contextHandler{contexts: contexts}
 
 	return map[*rest.Endpoint]rest.Handler{
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/json",
+			UrlRoute:   "/contexts/json",
 			HttpMethod: rest.GET,
 		}: handler.getAll,
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}/create",
+			UrlRoute:   "/contexts/{key}/create",
 			HttpMethod: rest.POST,
-			UrlQueries: rest.UrlQueries{
-				"provisioner": "",
-			},
 		}: handler.create,
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}",
+			UrlRoute:   "/contexts/{key}",
 			HttpMethod: rest.PUT,
 		}: handler.update,
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}/json",
+			UrlRoute:   "/contexts/{key}/json",
 			HttpMethod: rest.GET,
 		}: handler.getOne(libmachete.ContentTypeJSON),
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}/yaml",
+			UrlRoute:   "/contexts/{key}/yaml",
 			HttpMethod: rest.GET,
 		}: handler.getOne(libmachete.ContentTypeYAML),
 		&rest.Endpoint{
-			UrlRoute:   "/credentials/{key}",
+			UrlRoute:   "/contexts/{key}",
 			HttpMethod: rest.DELETE,
 		}: handler.delete,
 	}
