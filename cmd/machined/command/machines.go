@@ -270,6 +270,10 @@ func machineRoutes(
 		&rest.Endpoint{
 			UrlRoute:   "/machines/{key}",
 			HttpMethod: rest.DELETE,
+			UrlQueries: rest.UrlQueries{
+				"credentials": "default",
+				"context":     "default",
+			},
 		}: handler.delete,
 	}
 }
