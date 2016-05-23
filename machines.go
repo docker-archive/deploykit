@@ -289,6 +289,13 @@ func (cm *machines) runTasks(provisioner api.Provisioner, keystore api.KeyStore,
 					stop = true
 				}
 
+				change, is := te.(api.MachineRequest)
+				log.Infoln("Check MachineRequest:", te, "is=", is, "type=", reflect.TypeOf(te))
+				if is {
+					log.Infoln("MachineRequest mutated. Logging it.")
+					record.AppendChange(change)
+				}
+
 				ms, is := te.(api.HasMachineState)
 				log.Infoln("Check MachineState:", te, "is=", is, "type=", reflect.TypeOf(te))
 				if is {

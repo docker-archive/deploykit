@@ -231,7 +231,7 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 
 func getProvisionTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
-		libmachete.TaskSSHKeyGen.Override("AWS - upload generated SSH key", generateAndUploadSSHKey),
+		libmachete.TaskSSHKeyGen.Override("AWS - upload generated SSH key", GenerateAndUploadSSHKey),
 		libmachete.TaskCreateInstance,
 		libmachete.TaskUserData,
 		libmachete.TaskInstallDockerEngine,
@@ -241,7 +241,7 @@ func getProvisionTaskMap() *libmachete.TaskMap {
 func getTeardownTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
 		libmachete.TaskDestroyInstance,
-		libmachete.TaskSSHKeyRemove.Override("AWS - remove ssh key", removeLocalAndUploadedSSHKey),
+		libmachete.TaskSSHKeyRemove.Override("AWS - remove ssh key", RemoveLocalAndUploadedSSHKey),
 	)
 }
 
@@ -428,9 +428,16 @@ func (p *provisioner) DestroyInstance(instanceID string) (<-chan api.DestroyInst
 	return events, nil
 }
 
-func generateAndUploadSSHKey(p api.Provisioner, keystore api.KeyStore,
+// GenerateAndUploadSSHKey overrides the default SSHKeyGen task to first generate the key then upload to EC2.
+// It also mutates the input request to use the generated key.
+func GenerateAndUploadSSHKey(p api.Provisioner, keystore api.KeyStore,
 	ctx context.Context, cred api.Credential,
 	resource api.Resource, request api.MachineRequest, events chan<- interface{}) error {
+
+	ci, err := ensureRequestType(request)
+	if err != nil {
+		return err
+	}
 
 	prov, is := p.(*provisioner)
 
@@ -459,10 +466,17 @@ func generateAndUploadSSHKey(p api.Provisioner, keystore api.KeyStore,
 		events <- err
 		return err
 	}
+
+	// Now we have successfully imported the key, change the input to use this
+	ci.KeyName = keyName
+
+	// Send this change to be logged.
+	events <- ci
 	return nil
 }
 
-func removeLocalAndUploadedSSHKey(p api.Provisioner, keystore api.KeyStore,
+// RemoveLocalAndUploadedSSHKey removes the local ssh key and calls EC2 api to remove the uploaded key
+func RemoveLocalAndUploadedSSHKey(p api.Provisioner, keystore api.KeyStore,
 	ctx context.Context, cred api.Credential,
 	resource api.Resource, request api.MachineRequest, events chan<- interface{}) error {
 
