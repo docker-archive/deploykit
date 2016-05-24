@@ -156,7 +156,7 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 	// credential
 	cred, err := h.creds.Get(credentials)
 	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
+		respondError(http.StatusBadRequest, resp, err)
 		return
 	}
 
