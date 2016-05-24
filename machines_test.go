@@ -49,7 +49,7 @@ func TestListingSorted(t *testing.T) {
 
 	for _, m := range data {
 		result := m.Record
-		store.EXPECT().GetRecord(gomock.Eq(m.ID)).Return(&result, nil)
+		store.EXPECT().GetRecord(m.ID).Return(&result, nil)
 	}
 
 	machines := NewMachines(store)
@@ -120,9 +120,7 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 		})
 	require.NoError(t, err)
 	require.NotNil(t, events)
-	go func() {
-		close(createEvents) // Simulates the async creation completes
-	}()
+	close(createEvents) // Simulates the async creation completes
 	checkTasksAreRun(t, events, tasks)
 }
 
@@ -156,9 +154,7 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 		})
 	require.NoError(t, err)
 	require.NotNil(t, events)
-	go func() {
-		close(destroyEvents) // Simulates the async destroy completes
-	}()
+	close(destroyEvents) // Simulates the async destroy completes
 	checkTasksAreRun(t, events, tasks)
 }
 
@@ -191,9 +187,9 @@ func TestCreateMachine(t *testing.T) {
 
 	provisioner.EXPECT().Name().Return("test-provisioner")
 	provisioner.EXPECT().NewRequestInstance().Return(request)
-	provisioner.EXPECT().GetProvisionTasks(gomock.Eq(provisionNames)).Return(provision, nil)
+	provisioner.EXPECT().GetProvisionTasks(provisionNames).Return(provision, nil)
 	createEvents := make(chan api.CreateInstanceEvent)
-	provisioner.EXPECT().CreateInstance(gomock.Eq(expectReq)).Return(createEvents, nil)
+	provisioner.EXPECT().CreateInstance(expectReq).Return(createEvents, nil)
 	provisioner.EXPECT().GetIPAddress(gomock.Any()).Return("ip", nil)
 	provisioner.EXPECT().GetInstanceID(gomock.Any()).Return(id, nil)
 
@@ -208,8 +204,8 @@ func TestCreateMachine(t *testing.T) {
 		Provision:   provisionNames,
 	})
 	notFound := &Error{Code: ErrNotFound}
-	store.EXPECT().GetRecord(gomock.Eq(storage.MachineID(record.MachineName))).Times(1).Return(record, notFound)
-	store.EXPECT().GetRecord(gomock.Eq(storage.MachineID(record.MachineName))).AnyTimes().Return(record, nil)
+	store.EXPECT().GetRecord(storage.MachineID(record.MachineName)).Times(1).Return(record, notFound)
+	store.EXPECT().GetRecord(storage.MachineID(record.MachineName)).AnyTimes().Return(record, nil)
 	machines := NewMachines(store)
 	events, err := machines.CreateMachine(
 		provisioner,
@@ -222,9 +218,7 @@ name: new-host
 		ContentTypeYAML)
 	require.NoError(t, err)
 	require.NotNil(t, events)
-	go func() {
-		close(createEvents) // Simulates the async destroy completes
-	}()
+	close(createEvents) // Simulates the async destroy completes
 	checkTasksAreRun(t, events, provision)
 }
 
@@ -253,9 +247,9 @@ func TestDestroyMachine(t *testing.T) {
 		Teardown:    teardownNames,
 	})
 
-	provisioner.EXPECT().GetTeardownTasks(gomock.Eq(teardownNames)).Return(teardown, nil)
+	provisioner.EXPECT().GetTeardownTasks(teardownNames).Return(teardown, nil)
 	destroyEvents := make(chan api.DestroyInstanceEvent)
-	provisioner.EXPECT().DestroyInstance(gomock.Eq(record.InstanceID)).Return(destroyEvents, nil)
+	provisioner.EXPECT().DestroyInstance(record.InstanceID).Return(destroyEvents, nil)
 
 	store := mock_storage.NewMockMachines(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -267,9 +261,7 @@ func TestDestroyMachine(t *testing.T) {
 		*record)
 	require.NoError(t, err)
 	require.NotNil(t, events)
-	go func() {
-		close(destroyEvents) // Simulates the async destroy completes
-	}()
+	close(destroyEvents) // Simulates the async destroy completes
 	checkTasksAreRun(t, events, teardown)
 }
 

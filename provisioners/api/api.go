@@ -77,7 +77,6 @@ type Resource interface {
 
 // MachineRequest defines the basic attributes that any provisioner's creation request must define.
 type MachineRequest interface {
-	//	Resource
 	Name() string
 	ProvisionerName() string
 	Version() string
@@ -105,7 +104,6 @@ type Task struct {
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
-	//	Resource
 	MachineName        string     `yaml:"name" json:"name"`
 	Provisioner        string     `yaml:"provisioner" json:"provisioner"`
 	ProvisionerVersion string     `yaml:"version" json:"version"`
@@ -124,12 +122,12 @@ func (req BaseMachineRequest) TeardownWorkflow() []TaskName {
 }
 
 // Name returns the name to give the machine, once created.
-func (req *BaseMachineRequest) Name() string {
+func (req BaseMachineRequest) Name() string {
 	return req.MachineName
 }
 
 // ProvisionerName returns the provisioner name
-func (req *BaseMachineRequest) ProvisionerName() string {
+func (req BaseMachineRequest) ProvisionerName() string {
 	return req.Provisioner
 }
 
