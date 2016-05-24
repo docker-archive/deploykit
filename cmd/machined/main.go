@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/docker/libmachete/cmd/machined/command"
+	"github.com/docker/libmachete/cmd/machined/http"
 	"github.com/spf13/cobra"
 )
 
@@ -11,7 +11,7 @@ func main() {
 		Short: "machine daemon",
 	}
 
-	rootCmd.AddCommand(command.ServerCmd(), command.ClientCmd())
+	rootCmd.AddCommand(http.ServerCmd(), http.ClientCmd())
 
 	err := rootCmd.Execute()
 	if err != nil {
