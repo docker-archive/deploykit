@@ -28,19 +28,19 @@ func TestListingSorted(t *testing.T) {
 	defer ctrl.Finish()
 
 	data := []struct {
-		Id     storage.MachineID
+		ID     storage.MachineID
 		Record storage.MachineRecord
 	}{
-		{Id: storage.MachineID("host2"), Record: machineRecord("host2")},
-		{Id: storage.MachineID("host1"), Record: machineRecord("host1")},
-		{Id: storage.MachineID("host3"), Record: machineRecord("host3")},
+		{ID: storage.MachineID("host2"), Record: machineRecord("host2")},
+		{ID: storage.MachineID("host1"), Record: machineRecord("host1")},
+		{ID: storage.MachineID("host3"), Record: machineRecord("host3")},
 	}
 
 	store := mock_storage.NewMockMachines(ctrl)
 
 	ids := []storage.MachineID{}
 	for _, m := range data {
-		ids = append(ids, m.Id)
+		ids = append(ids, m.ID)
 	}
 	t.Log("ids=", ids)
 
@@ -48,7 +48,7 @@ func TestListingSorted(t *testing.T) {
 
 	for _, m := range data {
 		result := m.Record
-		store.EXPECT().GetRecord(gomock.Eq(m.Id)).Return(&result, nil)
+		store.EXPECT().GetRecord(gomock.Eq(m.ID)).Return(&result, nil)
 	}
 
 	machines := NewMachines(store)
