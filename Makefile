@@ -54,7 +54,7 @@ generate:
 
 test:
 	@echo "+ $@"
-	@go test -test.short -race $(PKGS)
+	@go test -test.short -race -v $(PKGS)
 
 coverage:
 	@echo "+ $@"

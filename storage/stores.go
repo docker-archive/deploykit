@@ -49,6 +49,9 @@ type Event struct {
 	Message   string      `json:"message" yaml:"message"`
 	Data      interface{} `json:"data,omitempty" yaml:"data"`
 	Error     string      `json:"error,omitempty" yaml:"error"`
+
+	// Status: 0 = not run, 1 = success, -1 = error
+	Status int `json:"status" yaml:"status"`
 }
 
 // MachineSummary keeps minimal information about a machine
