@@ -5,25 +5,20 @@ import (
 )
 
 type credentials struct {
-	sandbox *sandbox
+	sandbox Sandbox
 }
 
-// NewCredentials creates a new credentials store backed by the local file system.
-func NewCredentials(dir string) (storage.Credentials, error) {
-	sandbox, err := newSandbox(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	return &credentials{sandbox: sandbox}, nil
+// NewCredentials creates a new credentials store within the provided sandbox.
+func NewCredentials(sandbox Sandbox) storage.Credentials {
+	return &credentials{sandbox: sandbox}
 }
 
 func (c credentials) Save(id storage.CredentialsID, credentialsData interface{}) error {
-	return c.sandbox.MarshalAndSave(string(id), credentialsData)
+	return c.sandbox.marshalAndSave(string(id), credentialsData)
 }
 
 func (c credentials) List() ([]storage.CredentialsID, error) {
-	contents, err := c.sandbox.List()
+	contents, err := c.sandbox.list()
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +30,9 @@ func (c credentials) List() ([]storage.CredentialsID, error) {
 }
 
 func (c credentials) GetCredentials(id storage.CredentialsID, credentialsData interface{}) error {
-	return c.sandbox.ReadAndUnmarshal(string(id), credentialsData)
+	return c.sandbox.readAndUnmarshal(string(id), credentialsData)
 }
 
 func (c credentials) Delete(id storage.CredentialsID) error {
-	return c.sandbox.Remove(string(id))
+	return c.sandbox.remove(string(id))
 }
