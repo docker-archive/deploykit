@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/spf13/afero"
-	"os"
 	"path"
 )
 
@@ -13,27 +12,29 @@ const (
 	filePermission = 0600
 )
 
-type sandbox struct {
+// Sandbox is a subdirectory of a file system.
+type Sandbox struct {
 	fs  afero.Fs
 	dir string
 }
 
-func newSandbox(dir string) (*sandbox, error) {
-	fs := afero.NewOsFs()
-	stat, err := fs.Stat(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("Directory %s does not exist", dir)
-		}
-		return nil, err
-	}
-	if !stat.IsDir() {
-		return nil, fmt.Errorf("%s must be a directory", dir)
-	}
-	return &sandbox{fs: fs, dir: dir}, nil
+// NewOsSandbox creates a sandbox backed by the OS file system.
+func NewOsSandbox(dir string) Sandbox {
+	return Sandbox{fs: afero.NewOsFs(), dir: dir}
 }
 
-func (f sandbox) List() ([]string, error) {
+// Mkdirs ensures that the sandbox directory exists.  The creator of a sandbox should call this prior to using a
+// sandbox.
+func (f Sandbox) Mkdirs() error {
+	return f.fs.MkdirAll(f.dir, 0750)
+}
+
+// Nested creates a sandbox based on a subdirectory of this sandbox.
+func (f Sandbox) Nested(subpath string) Sandbox {
+	return Sandbox{fs: f.fs, dir: path.Join(f.dir, subpath)}
+}
+
+func (f Sandbox) list() ([]string, error) {
 	files := []string{}
 	contents, err := afero.ReadDir(f.fs, f.dir)
 	if err != nil {
@@ -46,11 +47,11 @@ func (f sandbox) List() ([]string, error) {
 	return files, nil
 }
 
-func (f sandbox) Mkdir(subPath string) error {
+func (f Sandbox) mkdir(subPath string) error {
 	return f.fs.MkdirAll(path.Join(f.dir, subPath), dirPermission)
 }
 
-func (f sandbox) MarshalAndSave(fileName string, s interface{}) error {
+func (f Sandbox) marshalAndSave(fileName string, s interface{}) error {
 	fullPath := path.Join(f.dir, fileName)
 
 	data, err := json.Marshal(s)
@@ -64,7 +65,7 @@ func (f sandbox) MarshalAndSave(fileName string, s interface{}) error {
 	return nil
 }
 
-func (f sandbox) ReadAndUnmarshal(fileName string, record interface{}) error {
+func (f Sandbox) readAndUnmarshal(fileName string, record interface{}) error {
 	fullPath := path.Join(f.dir, fileName)
 
 	data, err := afero.ReadFile(f.fs, fullPath)
@@ -79,10 +80,10 @@ func (f sandbox) ReadAndUnmarshal(fileName string, record interface{}) error {
 	return nil
 }
 
-func (f sandbox) Remove(name string) error {
+func (f Sandbox) remove(name string) error {
 	return f.fs.Remove(path.Join(f.dir, name))
 }
 
-func (f sandbox) RemoveAll(name string) error {
+func (f Sandbox) removeAll(name string) error {
 	return f.fs.RemoveAll(path.Join(f.dir, name))
 }
