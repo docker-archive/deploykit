@@ -4,8 +4,8 @@
 package api
 
 import (
-	context "golang.org/x/net/context"
 	gomock "github.com/golang/mock/gomock"
+	context "golang.org/x/net/context"
 )
 
 // Mock of Credential interface

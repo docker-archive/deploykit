@@ -1,6 +1,7 @@
 package libmachete
 
 import (
+	"bytes"
 	mock_api "github.com/docker/libmachete/mock/provisioners/api"
 	mock_storage "github.com/docker/libmachete/mock/storage"
 	"github.com/docker/libmachete/provisioners/api"
@@ -168,4 +169,27 @@ func TestRunTasksErrorAbort(t *testing.T) {
 
 	require.Equal(t, len(tasks)-1, len(seen))
 	require.Equal(t, []string{"step1", "step2", "step3"}, executed)
+}
+
+func TestPopulateRequest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	provisioner := mock_api.NewMockProvisioner(ctrl)
+	template := mock_api.NewMockMachineRequest(ctrl)
+	request := mock_api.NewMockMachineRequest(ctrl)
+	store := mock_storage.NewMockMachines(ctrl)
+	machines := &machines{store: store}
+
+	provisioner.EXPECT().NewRequestInstance().Return(request)
+	input := bytes.NewBuffer([]byte(""))
+
+	_, err := machines.populateRequest(provisioner, template, input, ContentTypeYAML)
+	require.Nil(t, err)
+
+	provisioner.EXPECT().NewRequestInstance().Return(request)
+	input = bytes.NewBuffer([]byte(""))
+	_, err = machines.populateRequest(provisioner, nil, input, ContentTypeYAML)
+	require.Nil(t, err)
+
 }

@@ -131,9 +131,6 @@ func (cm *machines) CreateMachine(
 	}
 
 	key := request.Name()
-
-	log.Infoln("name=", key, "cred=", cred, "template=", template, "req=", request)
-
 	if cm.exists(key) {
 		return nil, &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
