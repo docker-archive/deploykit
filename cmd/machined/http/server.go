@@ -34,55 +34,27 @@ type apiServer struct {
 	machines    libmachete.Machines
 }
 
-func mkdir(parent, child string) (string, error) {
-	p := filepath.Join(parent, child)
-	return p, os.MkdirAll(p, 0755)
-}
-
-func (s *apiServer) init() error {
+func build(options apiOptions) (*apiServer, error) {
 	provisioners := libmachete.DefaultProvisioners
 
-	contextPath, err := mkdir(s.options.RootDir, "contexts")
-	if err != nil {
-		return err
-	}
-	credentialsPath, err := mkdir(s.options.RootDir, "credentials")
-	if err != nil {
-		return err
-	}
-	templatesPath, err := mkdir(s.options.RootDir, "templates")
-	if err != nil {
-		return err
-	}
-	machinesPath, err := mkdir(s.options.RootDir, "machines")
-	if err != nil {
-		return err
+	sandbox := filestores.NewOsSandbox(options.RootDir)
+	contextSandbox := sandbox.Nested("contexts")
+	credentialsSandbox := sandbox.Nested("credentials")
+	templatesSandbox := sandbox.Nested("templates")
+	machinesSandbox := sandbox.Nested("machines")
+	for _, box := range []filestores.Sandbox{contextSandbox, credentialsSandbox, templatesSandbox, machinesSandbox} {
+		err := box.Mkdirs()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	contextStore, err := filestores.NewContexts(contextPath)
-	if err != nil {
-		return err
-	}
-	s.contexts = libmachete.NewContexts(contextStore)
-
-	credentialsStore, err := filestores.NewCredentials(credentialsPath)
-	if err != nil {
-		return err
-	}
-	s.credentials = libmachete.NewCredentials(credentialsStore, &provisioners)
-
-	templateStore, err := filestores.NewTemplates(templatesPath)
-	if err != nil {
-		return err
-	}
-	s.templates = libmachete.NewTemplates(templateStore, &provisioners)
-
-	machineStore, err := filestores.NewMachines(machinesPath)
-	if err != nil {
-		return err
-	}
-	s.machines = libmachete.NewMachines(machineStore)
-	return nil
+	return &apiServer{
+		contexts:    libmachete.NewContexts(filestores.NewContexts(contextSandbox)),
+		credentials: libmachete.NewCredentials(filestores.NewCredentials(credentialsSandbox), &provisioners),
+		templates:   libmachete.NewTemplates(filestores.NewTemplates(templatesSandbox), &provisioners),
+		machines:    libmachete.NewMachines(filestores.NewMachines(machinesSandbox)),
+	}, nil
 }
 
 func respondError(code int, resp http.ResponseWriter, err error) {
@@ -143,19 +115,17 @@ func rootDir() string {
 	return filepath.Join(p, ".machete")
 }
 
-var (
-	server = &apiServer{}
-)
-
 // ServerCmd returns the serve subcommand.
 func ServerCmd() *cobra.Command {
+	options := apiOptions{}
 
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "start the HTTP server",
 		RunE: func(_ *cobra.Command, args []string) error {
-			log.Infoln("Starting server:", server)
-			err := server.init()
+			log.Infoln("Starting server")
+
+			server, err := build(options)
 			if err != nil {
 				return err
 			}
@@ -167,12 +137,12 @@ func ServerCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(
-		&server.options.Port,
+		&options.Port,
 		"port",
 		"8888",
 		"Port the server listens on. File path for unix socket")
 	cmd.Flags().StringVar(
-		&server.options.RootDir,
+		&options.RootDir,
 		"dir",
 		rootDir(),
 		"Root directory for file storage")

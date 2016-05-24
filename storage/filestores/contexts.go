@@ -5,25 +5,20 @@ import (
 )
 
 type contexts struct {
-	sandbox *sandbox
+	sandbox Sandbox
 }
 
-// NewContexts creates a new contexts store backed by the local file system.
-func NewContexts(dir string) (storage.Contexts, error) {
-	sandbox, err := newSandbox(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	return &contexts{sandbox: sandbox}, nil
+// NewContexts creates a new contexts store within the provided sandbox.
+func NewContexts(sandbox Sandbox) storage.Contexts {
+	return &contexts{sandbox: sandbox}
 }
 
 func (c contexts) Save(id storage.ContextID, contextData interface{}) error {
-	return c.sandbox.MarshalAndSave(string(id), contextData)
+	return c.sandbox.marshalAndSave(string(id), contextData)
 }
 
 func (c contexts) List() ([]storage.ContextID, error) {
-	contents, err := c.sandbox.List()
+	contents, err := c.sandbox.list()
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +30,9 @@ func (c contexts) List() ([]storage.ContextID, error) {
 }
 
 func (c contexts) GetContext(id storage.ContextID, contextData interface{}) error {
-	return c.sandbox.ReadAndUnmarshal(string(id), contextData)
+	return c.sandbox.readAndUnmarshal(string(id), contextData)
 }
 
 func (c contexts) Delete(id storage.ContextID) error {
-	return c.sandbox.Remove(string(id))
+	return c.sandbox.remove(string(id))
 }
