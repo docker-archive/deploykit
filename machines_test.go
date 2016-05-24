@@ -96,7 +96,7 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
-	request := mock_api.NewMockMachineRequest(ctrl)
+	request := &api.BaseMachineRequest{}
 	record := new(storage.MachineRecord)
 
 	tasks := []api.Task{
@@ -130,7 +130,7 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
-	request := mock_api.NewMockMachineRequest(ctrl)
+	request := &api.BaseMachineRequest{}
 	record := new(storage.MachineRecord)
 
 	tasks := []api.Task{
@@ -271,7 +271,7 @@ func TestRunTasksNoError(t *testing.T) {
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
-	request := mock_api.NewMockMachineRequest(ctrl)
+	request := &api.BaseMachineRequest{}
 	record := new(storage.MachineRecord)
 
 	tasks := []api.Task{
@@ -307,7 +307,7 @@ func TestRunTasksErrorAbort(t *testing.T) {
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
-	request := mock_api.NewMockMachineRequest(ctrl)
+	request := &api.BaseMachineRequest{}
 	record := new(storage.MachineRecord)
 
 	tasks := []api.Task{

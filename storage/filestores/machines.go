@@ -27,7 +27,6 @@ func (m machines) Save(record storage.MachineRecord, provisionerData interface{}
 		return err
 	}
 
-	// Save only if there are updates
 	if provisionerData != nil {
 		err = m.sandbox.marshalAndSave(m.provisionerRecordPath(record.MachineName), provisionerData)
 		if err != nil {

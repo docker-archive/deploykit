@@ -134,7 +134,7 @@ func TestCreateInstanceSuccess(t *testing.T) {
 	eventChan, err := provisioner.CreateInstance(request)
 
 	require.Nil(t, err)
-	request.InstanceID = instanceID // this needs to be populated
+	request.InstanceID = instanceID
 	expectedEvents := []api.CreateInstanceEvent{
 		{Type: api.CreateInstanceStarted},
 		{Type: api.CreateInstanceCompleted, InstanceID: instanceID, Machine: request}}
