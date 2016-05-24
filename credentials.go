@@ -41,7 +41,7 @@ func NewCredentials(store storage.Credentials, provisioners *MachineProvisioners
 
 func (c *credentials) newCredential(provisionerName string) (api.Credential, error) {
 	if builder, has := c.provisioners.GetBuilder(provisionerName); has {
-		return builder.DefaultCredential, nil
+		return builder.DefaultCredential(), nil
 	}
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
 }

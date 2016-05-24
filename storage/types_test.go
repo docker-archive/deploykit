@@ -2,7 +2,6 @@ package storage
 
 import (
 	_ "encoding/json"
-	mock_api "github.com/docker/libmachete/mock/provisioners/api"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -28,12 +27,13 @@ func TestAppendChange(t *testing.T) {
 		api.TaskName("t2"),
 		api.TaskName("t3"),
 	}
-	change := mock_api.NewMockMachineRequest(ctrl)
-	change.EXPECT().Name().Times(1).Return(name)
-	change.EXPECT().ProvisionerName().Times(1).Return(provisionerName)
-	change.EXPECT().Version().Times(1).Return(version)
-	change.EXPECT().ProvisionWorkflow().Times(1).Return(provision)
-	change.EXPECT().TeardownWorkflow().Times(1).Return(teardown)
+	change := api.BaseMachineRequest{
+		MachineName:        name,
+		Provisioner:        provisionerName,
+		ProvisionerVersion: version,
+		Provision:          provision,
+		Teardown:           teardown,
+	}
 
 	record := &MachineRecord{
 		MachineSummary: MachineSummary{

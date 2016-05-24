@@ -14,7 +14,6 @@ import (
 //go:generate mockgen -package storage -destination mock/storage/machines.go github.com/docker/libmachete/storage Machines
 //go:generate mockgen -package api -destination mock/provisioners/api/provisioner.go github.com/docker/libmachete/provisioners/api Provisioner
 //go:generate mockgen -package api -destination mock/provisioners/api/credential.go github.com/docker/libmachete/provisioners/api Credential
-//go:generate mockgen -package api -destination mock/provisioners/api/machine_request.go github.com/docker/libmachete/provisioners/api MachineRequest
 
 func machineRecord(name string) storage.MachineRecord {
 	return storage.MachineRecord{

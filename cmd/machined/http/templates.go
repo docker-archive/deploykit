@@ -15,12 +15,12 @@ type templatesHandler struct {
 
 func (h *templatesHandler) getOne(resp http.ResponseWriter, req *http.Request) {
 	id := getTemplateID(req)
-	cr, err := h.templates.Get(id)
+	template, err := h.templates.Get(id)
 	if err != nil {
 		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown template:%s", id.Name))
 		return
 	}
-	libmachete.ContentTypeJSON.Respond(resp, cr)
+	libmachete.ContentTypeJSON.Respond(resp, template)
 }
 
 func (h *templatesHandler) getBlank(resp http.ResponseWriter, req *http.Request) {
@@ -45,26 +45,30 @@ func (h *templatesHandler) getAll(resp http.ResponseWriter, req *http.Request) {
 	libmachete.ContentTypeJSON.Respond(resp, all)
 }
 
+var errorCodeMap = map[int]int{
+	libmachete.ErrBadInput:  http.StatusBadRequest,
+	libmachete.ErrUnknown:   http.StatusInternalServerError,
+	libmachete.ErrDuplicate: http.StatusConflict,
+	libmachete.ErrNotFound:  http.StatusNotFound,
+}
+
+func handleError(resp http.ResponseWriter, err libmachete.Error) {
+	statusCode, mapped := errorCodeMap[err.Code]
+	if !mapped {
+		statusCode = http.StatusInternalServerError
+	}
+
+	respondError(statusCode, resp, err)
+}
+
 func (h *templatesHandler) create(resp http.ResponseWriter, req *http.Request) {
 	id := getTemplateID(req)
 	log.Infof("Add template %v", id)
 
 	err := h.templates.CreateTemplate(id, req.Body, libmachete.ContentTypeJSON)
 
-	if err == nil {
-		return
-	}
-
-	switch err.Code {
-	case libmachete.ErrDuplicate:
-		respondError(http.StatusConflict, resp, err)
-		return
-	case libmachete.ErrNotFound:
-		respondError(http.StatusNotFound, resp, err)
-		return
-	default:
-		respondError(http.StatusInternalServerError, resp, err)
-		return
+	if err != nil {
+		handleError(resp, *err)
 	}
 }
 
@@ -74,26 +78,16 @@ func (h *templatesHandler) update(resp http.ResponseWriter, req *http.Request) {
 
 	err := h.templates.UpdateTemplate(id, req.Body, libmachete.ContentTypeJSON)
 
-	if err == nil {
-		return
-	}
-
-	switch err.Code {
-	case libmachete.ErrDuplicate:
-		respondError(http.StatusConflict, resp, err)
-		return
-	case libmachete.ErrNotFound:
-		respondError(http.StatusNotFound, resp, err)
-		return
-	default:
-		respondError(http.StatusInternalServerError, resp, err)
-		return
+	if err != nil {
+		handleError(resp, *err)
 	}
 }
 
 func (h *templatesHandler) delete(resp http.ResponseWriter, req *http.Request) {
 	id := getTemplateID(req)
 	err := h.templates.Delete(id)
+
+	// TODO(wfarner): Convert to use handleError() for status code mapping.
 	if err != nil {
 		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown template:%s", id.Name))
 		return
@@ -108,7 +102,7 @@ func getTemplateID(request *http.Request) storage.TemplateID {
 }
 
 func getProvisionerName(request *http.Request) string {
-	return request.URL.Query().Get("provisioner")
+	return mux.Vars(request)["provisioner"]
 }
 
 func (h *templatesHandler) attachTo(router *mux.Router) {
