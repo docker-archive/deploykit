@@ -5,7 +5,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/provisioners/api"
 	"golang.org/x/net/context"
-	"time"
 )
 
 // TaskMap can be used by provisioners to filter and report errors when fetching tasks by name.
@@ -74,12 +73,7 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 			resource api.Resource,
 			req api.MachineRequest,
 			events chan<- interface{}) error {
-
 			log.Infoln(fmt.Sprintf("%s: TO BE IMPLEMENTED", name))
-			time.Sleep(5 * time.Second)
-
-			events <- fmt.Sprintf(
-				"%s: some status here....  need to implement this.", name)
 			return nil
 		},
 	}

@@ -41,6 +41,11 @@ func getTeardownTaskMap() *libmachete.TaskMap {
 	)
 }
 
+// Name returns the name of the provisioner
+func (p *provisioner) Name() string {
+	return ProvisionerName
+}
+
 func (p *provisioner) GetProvisionTasks(tasks []api.TaskName) ([]api.Task, error) {
 	return getProvisionTaskMap().Filter(tasks)
 }

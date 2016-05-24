@@ -124,7 +124,6 @@ func (cm *machines) CreateMachine(
 	input io.Reader,
 	codec *Codec) (<-chan interface{}, *Error) {
 
-	provisionerName := cred.ProvisionerName()
 	request, err := cm.populateRequest(provisioner, template, input, codec)
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
@@ -140,7 +139,7 @@ func (cm *machines) CreateMachine(
 		MachineSummary: storage.MachineSummary{
 			Status:      "initiated",
 			MachineName: storage.MachineID(key),
-			Provisioner: provisionerName,
+			Provisioner: provisioner.Name(),
 			Created:     storage.Timestamp(time.Now().Unix()),
 		},
 	}

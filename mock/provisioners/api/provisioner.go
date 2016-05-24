@@ -95,6 +95,16 @@ func (_mr *_MockProvisionerRecorder) GetTeardownTasks(arg0 interface{}) *gomock.
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetTeardownTasks", arg0)
 }
 
+func (_m *MockProvisioner) Name() string {
+	ret := _m.ctrl.Call(_m, "Name")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+func (_mr *_MockProvisionerRecorder) Name() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Name")
+}
+
 func (_m *MockProvisioner) NewRequestInstance() api.MachineRequest {
 	ret := _m.ctrl.Call(_m, "NewRequestInstance")
 	ret0, _ := ret[0].(api.MachineRequest)

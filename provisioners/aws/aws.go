@@ -256,6 +256,11 @@ func NewMachineRequest() api.MachineRequest {
 	return req
 }
 
+// Name returns the name of the provisioner
+func (p *provisioner) Name() string {
+	return ProvisionerName
+}
+
 func (p *provisioner) NewRequestInstance() api.MachineRequest {
 	return NewMachineRequest()
 }

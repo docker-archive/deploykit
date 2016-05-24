@@ -140,6 +140,10 @@ func (req BaseMachineRequest) Version() string {
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
+
+	// Name returns an identifier for this provisioner
+	Name() string
+
 	// GetProvisionTasks returns a list of runnable tasks given a list of command task names for allocating a resource.
 	// The task names are generally specific verbs that the user has specified.  The manager can either return
 	// no implementation (thus using framework defaults, or its own override implementation.
