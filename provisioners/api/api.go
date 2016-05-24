@@ -77,7 +77,8 @@ type Resource interface {
 
 // MachineRequest defines the basic attributes that any provisioner's creation request must define.
 type MachineRequest interface {
-	Resource
+	//	Resource
+	Name() string
 	ProvisionerName() string
 	Version() string
 	ProvisionWorkflow() []TaskName
@@ -104,7 +105,7 @@ type Task struct {
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
-	Resource
+	//	Resource
 	MachineName        string     `yaml:"name" json:"name"`
 	Provisioner        string     `yaml:"provisioner" json:"provisioner"`
 	ProvisionerVersion string     `yaml:"version" json:"version"`

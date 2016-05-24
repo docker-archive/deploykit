@@ -160,12 +160,14 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 		return
 	}
 
-	provisionerName := cred.ProvisionerName()
+	// Load the record of the machine by name
+	record, err := h.machines.Get(machineName)
+	if err != nil {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
 
-	// TODO(wfarner): It's odd that the provisioner name comes from the credentials.  It would seem more appropriate
-	// for the credentials to be scoped _within_ provisioners, and the request to directly specify the provisioner
-	// to use.
-	builder, has := h.provisioners.GetBuilder(provisionerName)
+	builder, has := h.provisioners.GetBuilder(record.Provisioner)
 	if !has {
 		respondError(http.StatusNotFound, resp, err)
 		return
@@ -184,13 +186,6 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 	provisioner, err := builder.Build(ctx, cred)
 	if err != nil {
 		respondError(http.StatusBadRequest, resp, err)
-		return
-	}
-
-	// Load the record of the machine by name
-	record, err := h.machines.Get(machineName)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
 		return
 	}
 

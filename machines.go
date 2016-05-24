@@ -143,7 +143,7 @@ func (cm *machines) CreateMachine(
 			Created:     storage.Timestamp(time.Now().Unix()),
 		},
 	}
-	record.AppendEvent(storage.Event{Name: "init", Message: "Create starts", Data: request})
+	record.AppendEvent("init", "Create starts", request)
 	record.AppendChange(request)
 
 	if err := cm.store.Save(*record, request); err != nil {
@@ -194,7 +194,7 @@ func (cm *machines) DeleteMachine(
 		return nil, &Error{Message: err.Error()}
 	}
 
-	record.AppendEvent(storage.Event{Name: "init-destroy", Message: "Destroy starts", Data: lastChange})
+	record.AppendEvent("init-destroy", "Destroy starts", lastChange)
 
 	if err := cm.store.Save(record, nil); err != nil {
 		return nil, &Error{Message: err.Error()}
@@ -257,8 +257,8 @@ func runTasks(provisioner api.Provisioner,
 				event := storage.Event{
 					Name:      string(task.Name),
 					Timestamp: time.Now(),
-					Data:      te,
 				}
+				event.AddData(te)
 
 				log.Infoln("Check error:", te, "type=", reflect.TypeOf(te))
 				switch te := te.(type) {
@@ -294,7 +294,7 @@ func runTasks(provisioner api.Provisioner,
 					}
 				}
 
-				record.AppendEvent(event)
+				record.AppendEventObject(event)
 				record.LastModified = storage.Timestamp(time.Now().Unix())
 				save(*record, machineState)
 
