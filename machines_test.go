@@ -44,7 +44,6 @@ func TestListingSorted(t *testing.T) {
 	for _, m := range data {
 		ids = append(ids, m.ID)
 	}
-	t.Log("ids=", ids)
 
 	store.EXPECT().List().Return(ids, nil)
 
@@ -56,7 +55,7 @@ func TestListingSorted(t *testing.T) {
 	machines := NewMachines(store)
 
 	summaries, err := machines.List()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	names := []string{}
 	for _, s := range summaries {
@@ -68,31 +67,8 @@ func TestListingSorted(t *testing.T) {
 	store.EXPECT().List().Return(ids, nil)
 
 	l, err := machines.ListIds()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, names, l)
-}
-
-func TestPopulateRequest(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	provisioner := mock_api.NewMockProvisioner(ctrl)
-	template := mock_api.NewMockMachineRequest(ctrl)
-	request := mock_api.NewMockMachineRequest(ctrl)
-	store := mock_storage.NewMockMachines(ctrl)
-	machines := &machines{store: store}
-
-	provisioner.EXPECT().NewRequestInstance().Return(request)
-	input := bytes.NewBuffer([]byte(""))
-
-	_, err := machines.populateRequest(provisioner, template, input, ContentTypeYAML)
-	require.Nil(t, err)
-
-	provisioner.EXPECT().NewRequestInstance().Return(request)
-	input = bytes.NewBuffer([]byte(""))
-	_, err = machines.populateRequest(provisioner, nil, input, ContentTypeYAML)
-	require.Nil(t, err)
-
 }
 
 func checkTasksAreRun(t *testing.T, events <-chan interface{}, tasks []api.Task) {
@@ -105,7 +81,7 @@ func checkTasksAreRun(t *testing.T, events <-chan interface{}, tasks []api.Task)
 			executed = append(executed, evt.Name)
 		}
 	}
-	t.Log("expected=", tasks, "seen=", seen)
+
 	require.Equal(t, len(tasks), len(seen))
 	taskNames := []string{}
 	for _, t := range tasks {
@@ -142,7 +118,7 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 		func(r *storage.MachineRecord, s api.MachineRequest) {
 			return
 		})
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, events)
 	go func() {
 		close(createEvents) // Simulates the async creation completes
@@ -178,7 +154,7 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 		func(r *storage.MachineRecord, s api.MachineRequest) {
 			return
 		})
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, events)
 	go func() {
 		close(destroyEvents) // Simulates the async destroy completes
@@ -244,7 +220,7 @@ func TestCreateMachine(t *testing.T) {
 name: new-host
 `)),
 		ContentTypeYAML)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, events)
 	go func() {
 		close(createEvents) // Simulates the async destroy completes
@@ -289,7 +265,7 @@ func TestDestroyMachine(t *testing.T) {
 		context.Background(),
 		cred,
 		*record)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, events)
 	go func() {
 		close(destroyEvents) // Simulates the async destroy completes
@@ -327,7 +303,7 @@ func TestRunTasksNoError(t *testing.T) {
 			return
 		})
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, events)
 
 	checkTasksAreRun(t, events, tasks)
@@ -363,7 +339,7 @@ func TestRunTasksErrorAbort(t *testing.T) {
 			return
 		})
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, events)
 
 	checkTasksAreRun(t, events, tasks[0:3])

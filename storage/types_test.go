@@ -79,10 +79,8 @@ func TestMarshalMachineRecord(t *testing.T) {
 	}
 
 	buff, err := yaml.Marshal(record)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.True(t, len(buff) > 0)
-	t.Log(string(buff))
-
 }
 
 func TestUnmarshalMachineRecord(t *testing.T) {
@@ -108,7 +106,7 @@ changes:
 	record := new(MachineRecord)
 
 	err := yaml.Unmarshal([]byte(input), record)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.Equal(t, 1, len(record.Changes))
 	require.Equal(t, 3, len(record.GetLastChange().ProvisionWorkflow()))

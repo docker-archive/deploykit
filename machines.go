@@ -8,7 +8,6 @@ import (
 	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
-	"reflect"
 	"sort"
 	"time"
 )
@@ -143,7 +142,7 @@ func (cm *machines) CreateMachine(
 			Created:     storage.Timestamp(time.Now().Unix()),
 		},
 	}
-	record.AppendEvent("init", "Create starts", request)
+	record.AppendEvent("init", "Create started", request)
 	record.AppendChange(request)
 
 	if err := cm.store.Save(*record, request); err != nil {
@@ -153,8 +152,6 @@ func (cm *machines) CreateMachine(
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
-
-	log.Infoln("About to run tasks:", tasks)
 
 	return runTasks(provisioner, tasks, record, ctx, cred, request,
 		func(record storage.MachineRecord, state api.MachineRequest) error {
@@ -172,7 +169,8 @@ func (cm *machines) CreateMachine(
 		})
 }
 
-// DeleteMachine creates a new machine from the input reader.
+// DeleteMachine deletes an existing machine.  Completion of this marks the record as 'terminated'.
+// TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
 func (cm *machines) DeleteMachine(
 	provisioner api.Provisioner,
 	ctx context.Context,
@@ -194,15 +192,12 @@ func (cm *machines) DeleteMachine(
 		return nil, &Error{Message: err.Error()}
 	}
 
-	record.AppendEvent("init-destroy", "Destroy starts", lastChange)
+	record.AppendEvent("init-destroy", "Destroy started", lastChange)
 
 	if err := cm.store.Save(record, nil); err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
-	log.Infoln("About to run tasks:", tasks)
-
-	// Need a way to clean up the database of lots of terminated instances.
 	return runTasks(provisioner, tasks, &record, ctx, cred, lastChange,
 		func(record storage.MachineRecord, state api.MachineRequest) error {
 			return cm.store.Save(record, state)
@@ -212,7 +207,7 @@ func (cm *machines) DeleteMachine(
 		})
 }
 
-func runTasks(provisioner api.Provisioner,
+func _runTasks(provisioner api.Provisioner,
 	tasks []api.Task, record *storage.MachineRecord,
 	ctx context.Context, cred api.Credential, request api.MachineRequest,
 	save func(storage.MachineRecord, api.MachineRequest) error,
@@ -260,7 +255,6 @@ func runTasks(provisioner api.Provisioner,
 				}
 				event.AddData(te)
 
-				log.Infoln("Check error:", te, "type=", reflect.TypeOf(te))
 				switch te := te.(type) {
 				case storage.Event:
 					event = te
@@ -277,16 +271,115 @@ func runTasks(provisioner api.Provisioner,
 					stop = true
 				}
 
-				change, is := te.(api.MachineRequest)
-				log.Infoln("Check MachineRequest:", te, "is=", is, "type=", reflect.TypeOf(te))
-				if is {
+				if change, is := te.(api.MachineRequest); is {
 					log.Infoln("MachineRequest mutated. Logging it.")
 					record.AppendChange(change)
 				}
 
-				ms, is := te.(api.HasMachineState)
-				log.Infoln("Check MachineState:", te, "is=", is, "type=", reflect.TypeOf(te))
-				if is {
+				if ms, is := te.(api.HasMachineState); is {
+					log.Infoln("HasMachineState:", te)
+					if provisionedState := ms.GetState(); provisionedState != nil {
+						log.Infoln("Final provisioned state:", provisionedState)
+						machineState = provisionedState
+					}
+				}
+
+				record.AppendEventObject(event)
+				record.LastModified = storage.Timestamp(time.Now().Unix())
+				save(*record, machineState)
+
+				events <- event
+
+				if stop {
+					log.Warningln("Stopping due to error")
+					record.Status = "failed"
+					record.LastModified = storage.Timestamp(time.Now().Unix())
+					save(*record, machineState)
+					return
+				}
+			}
+		}
+
+		onComplete(record, nil)
+		record.LastModified = storage.Timestamp(time.Now().Unix())
+		save(*record, nil)
+		return
+	}()
+
+	return events, nil
+}
+
+func runTasks(provisioner api.Provisioner,
+	tasks []api.Task, record *storage.MachineRecord,
+	ctx context.Context, cred api.Credential, request api.MachineRequest,
+	save func(storage.MachineRecord, api.MachineRequest) error,
+	onComplete func(*storage.MachineRecord, api.MachineRequest)) (<-chan interface{}, *Error) {
+
+	events := make(chan interface{})
+	go func() {
+		defer close(events)
+		for _, task := range tasks {
+			taskEvents := make(chan interface{})
+
+			record.Status = "pending"
+			record.LastModified = storage.Timestamp(time.Now().Unix())
+			save(*record, nil)
+
+			go func(task api.Task) {
+				log.Infoln("START", task.Name)
+				event := storage.Event{Name: string(task.Name)}
+				if task.Do != nil {
+					if err := task.Do(provisioner, ctx, cred, *record, request, taskEvents); err != nil {
+						event.Message = task.Message + " errored: " + err.Error()
+						event.Error = err.Error()
+						event.Status = -1
+					} else {
+						event.Message = task.Message + " completed"
+						event.Status = 1
+					}
+				} else {
+					event.Message = task.Message + " skipped"
+				}
+				taskEvents <- event
+				close(taskEvents) // unblocks the listener
+				log.Infoln("FINISH", task.Name)
+
+			}(task) // Goroutine with a copy of the task to avoid data races.
+
+			// TOOD(chungers) - until we separate out the state from the request, at least here
+			// in code we attempt to communicate the proper treatment of request vs state.
+			machineState := request
+
+			for te := range taskEvents {
+				stop := false
+				event := storage.Event{
+					Name:      string(task.Name),
+					Timestamp: time.Now(),
+				}
+				event.AddData(te)
+
+				switch te := te.(type) {
+				case storage.Event:
+					event = te
+					if event.Status < 0 {
+						stop = true
+					}
+				case api.HasError:
+					if e := te.GetError(); e != nil {
+						event.Error = e.Error()
+						stop = true
+					}
+				case error:
+					event.Error = te.Error()
+					stop = true
+				}
+
+				if change, is := te.(api.MachineRequest); is {
+					log.Infoln("MachineRequest mutated. Logging it.")
+					record.AppendChange(change)
+				}
+
+				if ms, is := te.(api.HasMachineState); is {
 					log.Infoln("HasMachineState:", te)
 					if provisionedState := ms.GetState(); provisionedState != nil {
 						log.Infoln("Final provisioned state:", provisionedState)
