@@ -17,7 +17,7 @@ func TestCredentialsCrud(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	testPath := ".machete/credentials"
 	require.NoError(t, fs.Mkdir(testPath, 0700))
-	store := credentials{sandbox: &sandbox{fs: fs, dir: testPath}}
+	store := credentials{sandbox: Sandbox{fs: fs, dir: testPath}}
 
 	idA := storage.CredentialsID("id_a")
 

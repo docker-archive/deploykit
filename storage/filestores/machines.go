@@ -7,31 +7,26 @@ import (
 )
 
 type machines struct {
-	sandbox *sandbox
+	sandbox Sandbox
 }
 
-// NewMachines creates a new machine store backed by the local file system.
-func NewMachines(dir string) (storage.Machines, error) {
-	sandbox, err := newSandbox(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	return &machines{sandbox: sandbox}, nil
+// NewMachines creates a new machine store within the provided sandbox.
+func NewMachines(sandbox Sandbox) storage.Machines {
+	return &machines{sandbox: sandbox}
 }
 
 func (m machines) Save(record storage.MachineRecord, provisionerData interface{}) error {
-	err := m.sandbox.Mkdir(string(record.Name))
+	err := m.sandbox.mkdir(string(record.Name))
 	if err != nil {
 		return fmt.Errorf("Failed to create machine directory: %s", err)
 	}
 
-	err = m.sandbox.MarshalAndSave(m.recordPath(record.Name), record)
+	err = m.sandbox.marshalAndSave(m.recordPath(record.Name), record)
 	if err != nil {
 		return err
 	}
 
-	err = m.sandbox.MarshalAndSave(m.provisionerRecordPath(record.Name), provisionerData)
+	err = m.sandbox.marshalAndSave(m.provisionerRecordPath(record.Name), provisionerData)
 	if err != nil {
 		return err
 	}
@@ -40,7 +35,7 @@ func (m machines) Save(record storage.MachineRecord, provisionerData interface{}
 }
 
 func (m machines) List() ([]storage.MachineID, error) {
-	contents, err := m.sandbox.List()
+	contents, err := m.sandbox.list()
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +48,7 @@ func (m machines) List() ([]storage.MachineID, error) {
 
 func (m machines) GetRecord(id storage.MachineID) (*storage.MachineRecord, error) {
 	record := new(storage.MachineRecord)
-	err := m.sandbox.ReadAndUnmarshal(m.recordPath(id), record)
+	err := m.sandbox.readAndUnmarshal(m.recordPath(id), record)
 	if err != nil {
 		return nil, err
 	}
@@ -61,12 +56,12 @@ func (m machines) GetRecord(id storage.MachineID) (*storage.MachineRecord, error
 }
 
 func (m machines) GetDetails(id storage.MachineID, provisionerData interface{}) error {
-	err := m.sandbox.ReadAndUnmarshal(m.provisionerRecordPath(id), provisionerData)
+	err := m.sandbox.readAndUnmarshal(m.provisionerRecordPath(id), provisionerData)
 	return err
 }
 
 func (m machines) Delete(id storage.MachineID) error {
-	return m.sandbox.RemoveAll(m.machinePath(id))
+	return m.sandbox.removeAll(m.machinePath(id))
 }
 
 func (m machines) machinePath(id storage.MachineID) string {

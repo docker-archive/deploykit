@@ -17,7 +17,7 @@ func TestMachinesCrud(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	testPath := ".machete/machines"
 	require.NoError(t, fs.Mkdir(testPath, 0700))
-	store := machines{sandbox: &sandbox{fs: fs, dir: testPath}}
+	store := machines{sandbox: Sandbox{fs: fs, dir: testPath}}
 
 	db16 := storage.MachineID("db-16")
 
