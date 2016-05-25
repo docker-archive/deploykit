@@ -30,6 +30,7 @@ type apiServer struct {
 	credentials libmachete.Credentials
 	templates   libmachete.Templates
 	machines    libmachete.Machines
+	keystore    libmachete.Keys
 }
 
 func build(options apiOptions) (*apiServer, error) {
@@ -40,6 +41,7 @@ func build(options apiOptions) (*apiServer, error) {
 	credentialsSandbox := sandbox.Nested("credentials")
 	templatesSandbox := sandbox.Nested("templates")
 	machinesSandbox := sandbox.Nested("machines")
+	keystoreSandbox := sandbox.Nested("machines")
 	for _, box := range []filestores.Sandbox{contextSandbox, credentialsSandbox, templatesSandbox, machinesSandbox} {
 		err := box.Mkdirs()
 		if err != nil {
@@ -51,6 +53,7 @@ func build(options apiOptions) (*apiServer, error) {
 		credentials: libmachete.NewCredentials(filestores.NewCredentials(credentialsSandbox), &provisioners),
 		templates:   libmachete.NewTemplates(filestores.NewTemplates(templatesSandbox), &provisioners),
 		machines:    libmachete.NewMachines(filestores.NewMachines(machinesSandbox)),
+		keystore:    libmachete.NewKeys(filestores.NewKeys(keystoreSandbox)),
 	}, nil
 }
 
@@ -69,7 +72,11 @@ func (s *apiServer) start() error {
 	attachments := map[string]routerAttachment{
 		"/credentials": &credentialsHandler{credentials: s.credentials},
 		"/templates":   &templatesHandler{templates: s.templates},
-		"/machines":    &machineHandler{creds: s.credentials, templates: s.templates, machines: s.machines},
+		"/machines": &machineHandler{
+			creds:     s.credentials,
+			templates: s.templates,
+			machines:  s.machines,
+			keystore:  s.keystore},
 	}
 
 	router := mux.NewRouter()

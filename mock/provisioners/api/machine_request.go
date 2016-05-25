@@ -29,16 +29,6 @@ func (_m *MockMachineRequest) EXPECT() *_MockMachineRequestRecorder {
 	return _m.recorder
 }
 
-func (_m *MockMachineRequest) ID() string {
-	ret := _m.ctrl.Call(_m, "ID")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-func (_mr *_MockMachineRequestRecorder) ID() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "ID")
-}
-
 func (_m *MockMachineRequest) Name() string {
 	ret := _m.ctrl.Call(_m, "Name")
 	ret0, _ := ret[0].(string)

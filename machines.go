@@ -29,6 +29,7 @@ type Machines interface {
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(
 		provisioner api.Provisioner,
+		keystore api.KeyStore,
 		cred api.Credential,
 		template api.MachineRequest,
 		input io.Reader,
@@ -38,6 +39,7 @@ type Machines interface {
 	// tasks for tear down of the machine; however that behavior can also be overriden by the input.
 	DeleteMachine(
 		provisioner api.Provisioner,
+		keystore api.KeyStore,
 		cred api.Credential,
 		record storage.MachineRecord) (<-chan interface{}, *Error)
 }
@@ -122,6 +124,7 @@ func (cm *machines) populateRequest(
 // CreateMachine creates a new machine from the input reader.
 func (cm *machines) CreateMachine(
 	provisioner api.Provisioner,
+	keystore api.KeyStore,
 	cred api.Credential,
 	template api.MachineRequest,
 	input io.Reader,
@@ -157,7 +160,7 @@ func (cm *machines) CreateMachine(
 		return nil, &Error{Message: err.Error()}
 	}
 
-	return runTasks(provisioner, tasks, record, cred, request,
+	return runTasks(provisioner, keystore, tasks, record, cred, request,
 		func(record storage.MachineRecord, state api.MachineRequest) error {
 			return cm.store.Save(record, state)
 		},
@@ -177,6 +180,7 @@ func (cm *machines) CreateMachine(
 // TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
 func (cm *machines) DeleteMachine(
 	provisioner api.Provisioner,
+	keystore api.KeyStore,
 	cred api.Credential,
 	record storage.MachineRecord) (<-chan interface{}, *Error) {
 
@@ -201,7 +205,7 @@ func (cm *machines) DeleteMachine(
 		return nil, &Error{Message: err.Error()}
 	}
 
-	return runTasks(provisioner, tasks, &record, cred, lastChange,
+	return runTasks(provisioner, keystore, tasks, &record, cred, lastChange,
 		func(record storage.MachineRecord, state api.MachineRequest) error {
 			return cm.store.Save(record, state)
 		},
@@ -211,7 +215,7 @@ func (cm *machines) DeleteMachine(
 }
 
 func runTasks(
-	provisioner api.Provisioner,
+	provisioner api.Provisioner, keystore api.KeyStore,
 	tasks []api.Task,
 	record *storage.MachineRecord,
 	cred api.Credential,
@@ -233,7 +237,7 @@ func runTasks(
 				log.Infoln("START", task.Name)
 				event := storage.Event{Name: string(task.Name)}
 				if task.Do != nil {
-					if err := task.Do(provisioner, cred, *record, request, taskEvents); err != nil {
+					if err := task.Do(provisioner, keystore, cred, *record, request, taskEvents); err != nil {
 						event.Message = task.Message + " errored: " + err.Error()
 						event.Error = err.Error()
 						event.Status = -1

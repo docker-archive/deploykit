@@ -12,6 +12,7 @@ import (
 
 type machineHandler struct {
 	creds        libmachete.Credentials
+	keystore     libmachete.Keys
 	templates    libmachete.Templates
 	machines     libmachete.Machines
 	provisioners libmachete.MachineProvisioners
@@ -116,6 +117,7 @@ func (h *machineHandler) create(resp http.ResponseWriter, req *http.Request) {
 
 	events, machineErr := h.machines.CreateMachine(
 		provisioner,
+		h.keystore,
 		cred,
 		tpl,
 		req.Body,
@@ -185,7 +187,7 @@ func (h *machineHandler) delete(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	events, machineErr := h.machines.DeleteMachine(provisioner, cred, record)
+	events, machineErr := h.machines.DeleteMachine(provisioner, h.keystore, cred, record)
 	if machineErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
 		go func() {

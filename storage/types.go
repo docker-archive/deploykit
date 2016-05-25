@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/ssh"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,20 @@ type MachineID string
 
 // Timestamp is a unix epoch timestamp, in seconds.
 type Timestamp uint64
+
+// KeyID is a unique id for the SSH key
+type KeyID string
+
+// Keys manage the SSH keys for a machine
+type Keys interface {
+	Save(id KeyID, keyPair *ssh.KeyPair) error
+
+	List() ([]KeyID, error)
+
+	GetPublicKey(id KeyID) ([]byte, error)
+
+	Delete(id KeyID) error
+}
 
 // Event is captures the data / emitted by tasks
 type Event struct {

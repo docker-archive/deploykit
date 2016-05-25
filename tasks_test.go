@@ -19,7 +19,7 @@ func makeErrorTask(name string) api.Task {
 	return api.Task{
 		Name:    api.TaskName(name),
 		Message: "message",
-		Do: func(api.Provisioner, api.Credential, api.Resource, api.MachineRequest, chan<- interface{}) error {
+		Do: func(api.Provisioner, api.KeyStore, api.Credential, api.Resource, api.MachineRequest, chan<- interface{}) error {
 			return errors.New("test-error")
 		},
 	}

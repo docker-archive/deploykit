@@ -58,13 +58,3 @@ func (_m *MockCredential) Refresh(_param0 context.Context) error {
 func (_mr *_MockCredentialRecorder) Refresh(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Refresh", arg0)
 }
-
-func (_m *MockCredential) Validate(_param0 context.Context) error {
-	ret := _m.ctrl.Call(_m, "Validate", _param0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-func (_mr *_MockCredentialRecorder) Validate(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Validate", arg0)
-}

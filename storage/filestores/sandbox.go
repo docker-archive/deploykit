@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/spf13/afero"
+	"os"
 	"path"
 )
 
@@ -63,6 +64,18 @@ func (f Sandbox) marshalAndSave(fileName string, s interface{}) error {
 		return fmt.Errorf("Failed to write to %s: %s", fullPath, err)
 	}
 	return nil
+}
+
+func (f Sandbox) saveBytes(fullPath string, data []byte, filePermission os.FileMode) error {
+	err := afero.WriteFile(f.fs, fullPath, data, filePermission)
+	if err != nil {
+		return fmt.Errorf("Failed to write to %s: %s", fullPath, err)
+	}
+	return nil
+}
+
+func (f Sandbox) readBytes(fullPath string) ([]byte, error) {
+	return afero.ReadFile(f.fs, fullPath)
 }
 
 func (f Sandbox) readAndUnmarshal(fileName string, record interface{}) error {
