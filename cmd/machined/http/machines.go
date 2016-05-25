@@ -138,6 +138,81 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 	}
 }
 
+func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	machineName := rest.GetUrlParameter(req, "key")
+	context := rest.GetUrlParameter(req, "context")
+	credentials := rest.GetUrlParameter(req, "credentials")
+
+	// TODO - fix this in framework to return default values
+	if context == "" {
+		context = "default"
+	}
+	if credentials == "" {
+		credentials = "default"
+	}
+
+	log.Infof("Delete machine %v as %v with context=%v", machineName, credentials, context)
+
+	// credential
+	cred, err := h.creds.Get(credentials)
+	if err != nil {
+		respondError(http.StatusBadRequest, resp, err)
+		return
+	}
+
+	// Load the record of the machine by name
+	record, err := h.machines.Get(machineName)
+	if err != nil {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
+
+	builder, has := h.provisioners.GetBuilder(record.Provisioner)
+	if !has {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
+
+	// Runtime context
+	runContext, err := h.provisionerContexts.Get(context)
+	if err != nil {
+		respondError(http.StatusNotFound, resp, err)
+		return
+	}
+
+	// Configure the provisioner context
+	ctx = libmachete.BuildContext(builder, ctx, runContext)
+
+	provisioner, err := builder.Build(ctx, cred)
+	if err != nil {
+		respondError(http.StatusBadRequest, resp, err)
+		return
+	}
+
+	events, machineErr := h.machines.DeleteMachine(provisioner, ctx, cred, record)
+	if machineErr == nil {
+		// TODO - if the client requests streaming events... send that out here.
+		go func() {
+			for event := range events {
+				log.Infoln("Event:", event)
+			}
+		}()
+		return
+	}
+
+	switch machineErr.Code {
+	case libmachete.ErrDuplicate:
+		respondError(http.StatusConflict, resp, machineErr)
+		return
+	case libmachete.ErrNotFound:
+		respondError(http.StatusNotFound, resp, machineErr)
+		return
+	default:
+		respondError(http.StatusInternalServerError, resp, machineErr)
+		return
+	}
+}
+
 func machineRoutes(
 	provisionerContexts libmachete.Contexts,
 	creds libmachete.Credentials,
@@ -187,13 +262,6 @@ func machineRoutes(
 		&rest.Endpoint{
 			UrlRoute:   "/machines/{key}",
 			HttpMethod: rest.DELETE,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			key := rest.GetUrlParameter(req, "key")
-			err := machines.Delete(key)
-			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown machine:%s", key))
-				return
-			}
-		},
+		}: handler.delete,
 	}
 }
