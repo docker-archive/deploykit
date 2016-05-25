@@ -8,7 +8,7 @@ import (
 	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
-	"reflect"
+	"sort"
 	"time"
 )
 
@@ -27,15 +27,14 @@ type Machines interface {
 	// Get returns a machine identified by key
 	Get(key string) (storage.MachineRecord, error)
 
-	// Deletes the machine identified by key
-	Delete(key string) error
-
-	// Exists returns true if machine identified by key already exists
-	Exists(key string) bool
-
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
 		template api.MachineRequest, input io.Reader, codec *Codec) (<-chan interface{}, *Error)
+
+	// DeleteMachine delete a machine with input (optional) in the input reader.  The template contains workflow tasks
+	// for tear down of the machine; however that behavior can also be overriden by the input.
+	DeleteMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
+		record storage.MachineRecord) (<-chan interface{}, *Error)
 }
 
 type machines struct {
@@ -49,11 +48,11 @@ func NewMachines(store storage.Machines) Machines {
 
 func (cm *machines) List() ([]storage.MachineSummary, error) {
 	out := []storage.MachineSummary{}
-	list, err := cm.store.List()
+	ids, err := cm.ListIds()
 	if err != nil {
 		return nil, err
 	}
-	for _, i := range list {
+	for _, i := range ids {
 		if record, err := cm.Get(string(i)); err == nil {
 			out = append(out, record.MachineSummary)
 		}
@@ -70,6 +69,7 @@ func (cm *machines) ListIds() ([]string, error) {
 	for _, i := range list {
 		out = append(out, string(i))
 	}
+	sort.Strings(out)
 	return out, nil
 }
 
@@ -81,20 +81,7 @@ func (cm *machines) Get(key string) (storage.MachineRecord, error) {
 	return *m, nil
 }
 
-func (cm *machines) Delete(key string) error {
-	return cm.store.Delete(storage.MachineID(key))
-}
-
-func (cm *machines) Terminate(key string) error {
-	mr, err := cm.Get(key)
-	if err != nil {
-		return err
-	}
-	mr.AppendEvent(storage.Event{Name: "terminate", Message: "Deleted"})
-	return cm.store.Save(mr, nil)
-}
-
-func (cm *machines) Exists(key string) bool {
+func (cm *machines) exists(key string) bool {
 	_, err := cm.Get(key)
 	return err == nil
 }
@@ -136,17 +123,13 @@ func (cm *machines) CreateMachine(
 	input io.Reader,
 	codec *Codec) (<-chan interface{}, *Error) {
 
-	provisionerName := cred.ProvisionerName()
 	request, err := cm.populateRequest(provisioner, template, input, codec)
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
 	key := request.Name()
-
-	log.Infoln("name=", key, "cred=", cred, "template=", template, "req=", request)
-
-	if cm.Exists(key) {
+	if cm.exists(key) {
 		return nil, &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
 
@@ -154,69 +137,131 @@ func (cm *machines) CreateMachine(
 	record := &storage.MachineRecord{
 		MachineSummary: storage.MachineSummary{
 			Status:      "initiated",
-			Name:        storage.MachineID(key),
-			Provisioner: provisionerName,
+			MachineName: storage.MachineID(key),
+			Provisioner: provisioner.Name(),
 			Created:     storage.Timestamp(time.Now().Unix()),
 		},
 	}
-	record.AppendEvent(storage.Event{Name: "init", Message: "Create starts", Data: request})
+	record.AppendEvent("init", "Create started", request)
+	record.AppendChange(request)
 
 	if err := cm.store.Save(*record, request); err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
-	tasks, err := provisioner.GetTasks(request.ProvisionWorkflow())
+	tasks, err := provisioner.GetProvisionTasks(request.ProvisionWorkflow())
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
-	log.Infoln("About to run tasks:", tasks)
+	return runTasks(provisioner, tasks, record, ctx, cred, request,
+		func(record storage.MachineRecord, state api.MachineRequest) error {
+			return cm.store.Save(record, state)
+		},
+		func(record *storage.MachineRecord, state api.MachineRequest) {
+			record.Status = "provisioned"
+			record.LastModified = storage.Timestamp(time.Now().Unix())
+			if ip, err := provisioner.GetIPAddress(state); err == nil {
+				record.IPAddress = ip
+			}
+			if id, err := provisioner.GetInstanceID(state); err == nil {
+				record.InstanceID = id
+			}
+		})
+}
+
+// DeleteMachine deletes an existing machine.  Completion of this marks the record as 'terminated'.
+// TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
+func (cm *machines) DeleteMachine(
+	provisioner api.Provisioner,
+	ctx context.Context,
+	cred api.Credential,
+	record storage.MachineRecord) (<-chan interface{}, *Error) {
+
+	lastChange := record.GetLastChange()
+	if lastChange == nil {
+		return nil, &Error{Message: fmt.Sprintf("Impossible state. Machine has no history:%v", record.Name)}
+	}
+
+	// On managing changes (or even removal) of the template and the impact on already-provisioned instances:
+	// If the template is removed, we can still teardown the instance using a copy of the original request / intent.
+	// If the template is updated and has new workflow impact, the user can 'upgrade' the machine (method to be provided)
+	// so that the last change request correctly reflects the correct tasks to run to teardown.
+
+	tasks, err := provisioner.GetTeardownTasks(lastChange.TeardownWorkflow())
+	if err != nil {
+		return nil, &Error{Message: err.Error()}
+	}
+
+	record.AppendEvent("init-destroy", "Destroy started", lastChange)
+
+	if err := cm.store.Save(record, nil); err != nil {
+		return nil, &Error{Message: err.Error()}
+	}
+
+	return runTasks(provisioner, tasks, &record, ctx, cred, lastChange,
+		func(record storage.MachineRecord, state api.MachineRequest) error {
+			return cm.store.Save(record, state)
+		},
+		func(record *storage.MachineRecord, state api.MachineRequest) {
+			record.Status = "terminated"
+		})
+}
+
+func runTasks(provisioner api.Provisioner,
+	tasks []api.Task, record *storage.MachineRecord,
+	ctx context.Context, cred api.Credential, request api.MachineRequest,
+	save func(storage.MachineRecord, api.MachineRequest) error,
+	onComplete func(*storage.MachineRecord, api.MachineRequest)) (<-chan interface{}, *Error) {
 
 	events := make(chan interface{})
-
 	go func() {
-		close(events)
-
+		defer close(events)
 		for _, task := range tasks {
-
 			taskEvents := make(chan interface{})
 
-			go func() {
-				log.Infoln("RUNNING:", task)
-				event := storage.Event{
-					Name: string(task.Name),
-				}
-				if err := task.Do(provisioner, ctx, cred, request, taskEvents); err != nil {
-					event.Message = task.Message + " errored: " + err.Error()
-					event.Error = err.Error()
-				} else {
-					event.Message = task.Message + " completed"
-				}
+			record.Status = "pending"
+			record.LastModified = storage.Timestamp(time.Now().Unix())
+			save(*record, nil)
 
+			go func(task api.Task) {
+				log.Infoln("START", task.Name)
+				event := storage.Event{Name: string(task.Name)}
+				if task.Do != nil {
+					if err := task.Do(provisioner, ctx, cred, *record, request, taskEvents); err != nil {
+						event.Message = task.Message + " errored: " + err.Error()
+						event.Error = err.Error()
+						event.Status = -1
+					} else {
+						event.Message = task.Message + " completed"
+						event.Status = 1
+					}
+				} else {
+					event.Message = task.Message + " skipped"
+				}
 				taskEvents <- event
 				close(taskEvents) // unblocks the listener
+				log.Infoln("FINISH", task.Name)
 
-				log.Infoln("FINISH:", task)
-			}()
+			}(task) // Goroutine with a copy of the task to avoid data races.
 
-			record.Status = "pending"
+			// TOOD(chungers) - until we separate out the state from the request, at least here
+			// in code we attempt to communicate the proper treatment of request vs state.
+			machineState := request
 
 			for te := range taskEvents {
-
 				stop := false
-
 				event := storage.Event{
-					Name: string(task.Name),
+					Name:      string(task.Name),
+					Timestamp: time.Now(),
 				}
+				event.AddData(te)
 
-				event.Data = te
-
-				// Some events implement both Error and HashMachineState.
-				// So first check for errors then do type switch on HashMachineState
-
-				log.Infoln("Check error:", te)
 				switch te := te.(type) {
 				case storage.Event:
 					event = te
+					if event.Status < 0 {
+						stop = true
+					}
 				case api.HasError:
 					if e := te.GetError(); e != nil {
 						event.Error = e.Error()
@@ -227,47 +272,39 @@ func (cm *machines) CreateMachine(
 					stop = true
 				}
 
-				ms, is := te.(api.HasMachineState)
-				log.Infoln("Check MachineState:", te, "is=", is, "type=", reflect.TypeOf(te))
-				if is {
+				if change, is := te.(api.MachineRequest); is {
+					log.Infoln("MachineRequest mutated. Logging it.")
+					record.AppendChange(change)
+				}
+
+				if ms, is := te.(api.HasMachineState); is {
 					log.Infoln("HasMachineState:", te)
 					if provisionedState := ms.GetState(); provisionedState != nil {
 						log.Infoln("Final provisioned state:", provisionedState)
-						request = provisionedState
+						machineState = provisionedState
 					}
 				}
 
-				record.AppendEvent(event)
-				err = cm.store.Save(*record, request)
-				log.Infoln("Saved:", "err=", err, len(record.Events), record)
+				record.AppendEventObject(event)
+				record.LastModified = storage.Timestamp(time.Now().Unix())
+				save(*record, machineState)
+
+				events <- event
 
 				if stop {
 					log.Warningln("Stopping due to error")
-
 					record.Status = "failed"
 					record.LastModified = storage.Timestamp(time.Now().Unix())
-					err := cm.store.Save(*record, request)
-					if err != nil {
-						log.Warningln("err=", err)
-					}
+					save(*record, machineState)
 					return
 				}
 			}
-
-			record.Status = "running"
-			record.LastModified = storage.Timestamp(time.Now().Unix())
-			if ip, err := provisioner.GetIPAddress(request); err == nil {
-				record.IPAddress = ip
-			} else {
-				log.Warning("can't get ip=", err)
-			}
-
-			err := cm.store.Save(*record, request)
-			if err != nil {
-				log.Warningln("err=", err)
-			}
 		}
 
+		onComplete(record, nil)
+		record.LastModified = storage.Timestamp(time.Now().Unix())
+		save(*record, nil)
+		return
 	}()
 
 	return events, nil

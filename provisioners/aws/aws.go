@@ -209,12 +209,19 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
-func getTaskMap() *libmachete.TaskMap {
+func getProvisionTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
 		libmachete.TaskSSHKeyGen,
+		libmachete.TaskCreateInstance,
 		libmachete.TaskUserData,
 		libmachete.TaskInstallDockerEngine,
-		libmachete.TaskCreateInstance,
+	)
+}
+
+func getTeardownTaskMap() *libmachete.TaskMap {
+	return libmachete.NewTaskMap(
+		libmachete.TaskDestroyInstance,
+		libmachete.TaskSSHKeyRemove,
 	)
 }
 
@@ -224,8 +231,14 @@ func NewMachineRequest() api.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Workflow = getTaskMap().Names()
+	req.Provision = getProvisionTaskMap().Names()
+	req.Teardown = getTeardownTaskMap().Names()
 	return req
+}
+
+// Name returns the name of the provisioner
+func (p *provisioner) Name() string {
+	return ProvisionerName
 }
 
 func (p *provisioner) NewRequestInstance() api.MachineRequest {
@@ -241,6 +254,15 @@ func ensureRequestType(req api.MachineRequest) (r *CreateInstanceRequest, err er
 	return
 }
 
+// GetInstanceID returns the infrastructure identifier given the state of the machine.
+func (p *provisioner) GetInstanceID(req api.MachineRequest) (string, error) {
+	ci, err := ensureRequestType(req)
+	if err != nil {
+		return "", err
+	}
+	return ci.InstanceID, nil
+}
+
 // GetIPAddress - this prefers private IP if it's set; make this behavior configurable as a
 // machine template or context?
 func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
@@ -254,8 +276,12 @@ func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	return ci.PublicIPAddress, nil
 }
 
-func (p *provisioner) GetTasks(tasks []api.TaskName) ([]api.Task, error) {
-	return getTaskMap().Filter(tasks)
+func (p *provisioner) GetProvisionTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getProvisionTaskMap().Filter(tasks)
+}
+
+func (p *provisioner) GetTeardownTasks(tasks []api.TaskName) ([]api.Task, error) {
+	return getTeardownTaskMap().Filter(tasks)
 }
 
 // Validate checks the data and returns error if not valid
@@ -318,6 +344,7 @@ func (p *provisioner) CreateInstance(
 			return
 		}
 
+		// TODO(chungers) -- need to figure out reasonable way to separate request from state
 		provisionedState := *request // copy
 		if provisioned.PrivateIpAddress != nil {
 			provisionedState.PrivateIPAddress = *provisioned.PrivateIpAddress
@@ -325,6 +352,7 @@ func (p *provisioner) CreateInstance(
 		if provisioned.PublicIpAddress != nil {
 			provisionedState.PublicIPAddress = *provisioned.PublicIpAddress
 		}
+		provisionedState.InstanceID = *instance.InstanceId
 
 		log.Infoln("ProvisionedState=", provisionedState)
 
