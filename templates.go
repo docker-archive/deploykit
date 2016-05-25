@@ -35,6 +35,7 @@ type Templates interface {
 	Get(id storage.TemplateID) (api.MachineRequest, error)
 
 	// Deletes the template identified by provisioner and key
+	// TODO(wfarner): Consider replacing this return type (and others) to *Error for uniformity.
 	Delete(id storage.TemplateID) error
 
 	// Exists returns true if template identified by provisioner and key already exists
@@ -59,7 +60,7 @@ func NewTemplates(store storage.Templates, provisioners *MachineProvisioners) Te
 
 func (t *templates) NewBlankTemplate(provisionerName string) (api.MachineRequest, error) {
 	if builder, has := t.provisioners.GetBuilder(provisionerName); has {
-		return builder.DefaultMachineRequest, nil
+		return builder.DefaultMachineRequest(), nil
 	}
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
 }
@@ -107,6 +108,7 @@ func (t *templates) Exists(id storage.TemplateID) bool {
 		return false
 	}
 	err = t.store.GetTemplate(id, tmpl)
+	// TODO(wfarner): This result mixes error cases (failure to read/unmarshal with absence).
 	return err == nil
 }
 
@@ -126,7 +128,7 @@ func (t *templates) CreateTemplate(id storage.TemplateID, input io.Reader, codec
 	}
 
 	if err = t.Unmarshal(codec, buff, tmpl); err != nil {
-		return &Error{Message: err.Error()}
+		return &Error{ErrBadInput, err.Error()}
 	}
 	if err = t.Save(id, tmpl); err != nil {
 		return &Error{Message: err.Error()}

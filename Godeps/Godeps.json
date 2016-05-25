@@ -156,6 +156,10 @@
 			"Rev": "9a4b9f2ac1f7685147a5c01544e3b922dbc1f4a0"
 		},
 		{
+			"ImportPath": "github.com/drewolson/testflight",
+			"Rev": "d504a0f0d14b0220237a2c56450e76071d954750"
+		},
+		{
 			"ImportPath": "github.com/go-ini/ini",
 			"Comment": "v1.11.0",
 			"Rev": "12f418cc7edc5a618a51407b7ac1f1f512139df3"

@@ -7,8 +7,8 @@ import (
 func init() {
 	libmachete.DefaultProvisioners.Register(libmachete.ProvisionerBuilder{
 		Name:                  ProvisionerName,
-		DefaultCredential:     NewCredential(),
-		DefaultMachineRequest: NewMachineRequest(),
+		DefaultCredential:     NewCredential,
+		DefaultMachineRequest: NewMachineRequest,
 		Build: ProvisionerWith,
 	})
 }
