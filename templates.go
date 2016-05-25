@@ -67,13 +67,13 @@ func (t *templates) NewBlankTemplate(provisionerName string) (api.MachineRequest
 // Unmarshal decodes the bytes and applies onto the template object, using a given encoding.
 // If nil codec is passed, the default encoding / content type will be used.
 func (t *templates) Unmarshal(contentType *Codec, data []byte, tmpl api.MachineRequest) error {
-	return ensureValidContentType(contentType).unmarshal(data, tmpl)
+	return contentType.unmarshal(data, tmpl)
 }
 
 // Marshal encodes the given template object and returns the bytes.
 // If nil codec is passed, the default encoding / content type will be used.
 func (t *templates) Marshal(contentType *Codec, tmpl api.MachineRequest) ([]byte, error) {
-	return ensureValidContentType(contentType).marshal(tmpl)
+	return contentType.marshal(tmpl)
 }
 
 func (t *templates) ListIds() ([]storage.TemplateID, error) {

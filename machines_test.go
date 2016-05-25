@@ -208,8 +208,8 @@ func TestCreateMachine(t *testing.T) {
 		provisioner,
 		cred,
 		template,
-		bytes.NewBuffer([]byte("\nname: new-host\n")),
-		ContentTypeYAML)
+		bytes.NewBuffer([]byte(`{"name": "new-host"}`)),
+		ContentTypeJSON)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	close(createEvents) // Simulates the async destroy completes
