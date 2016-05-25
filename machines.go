@@ -5,7 +5,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/storage"
-	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
 	"sort"
@@ -28,12 +27,18 @@ type Machines interface {
 	Get(key string) (storage.MachineRecord, error)
 
 	// CreateMachine adds a new machine from the input reader.
-	CreateMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
-		template api.MachineRequest, input io.Reader, codec *Codec) (<-chan interface{}, *Error)
+	CreateMachine(
+		provisioner api.Provisioner,
+		cred api.Credential,
+		template api.MachineRequest,
+		input io.Reader,
+		codec *Codec) (<-chan interface{}, *Error)
 
-	// DeleteMachine delete a machine with input (optional) in the input reader.  The template contains workflow tasks
-	// for tear down of the machine; however that behavior can also be overriden by the input.
-	DeleteMachine(provisioner api.Provisioner, ctx context.Context, cred api.Credential,
+	// DeleteMachine delete a machine with input (optional) in the input reader.  The template contains workflow
+	// tasks for tear down of the machine; however that behavior can also be overriden by the input.
+	DeleteMachine(
+		provisioner api.Provisioner,
+		cred api.Credential,
 		record storage.MachineRecord) (<-chan interface{}, *Error)
 }
 
@@ -117,7 +122,6 @@ func (cm *machines) populateRequest(
 // CreateMachine creates a new machine from the input reader.
 func (cm *machines) CreateMachine(
 	provisioner api.Provisioner,
-	ctx context.Context,
 	cred api.Credential,
 	template api.MachineRequest,
 	input io.Reader,
@@ -153,7 +157,7 @@ func (cm *machines) CreateMachine(
 		return nil, &Error{Message: err.Error()}
 	}
 
-	return runTasks(provisioner, tasks, record, ctx, cred, request,
+	return runTasks(provisioner, tasks, record, cred, request,
 		func(record storage.MachineRecord, state api.MachineRequest) error {
 			return cm.store.Save(record, state)
 		},
@@ -173,7 +177,6 @@ func (cm *machines) CreateMachine(
 // TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
 func (cm *machines) DeleteMachine(
 	provisioner api.Provisioner,
-	ctx context.Context,
 	cred api.Credential,
 	record storage.MachineRecord) (<-chan interface{}, *Error) {
 
@@ -198,7 +201,7 @@ func (cm *machines) DeleteMachine(
 		return nil, &Error{Message: err.Error()}
 	}
 
-	return runTasks(provisioner, tasks, &record, ctx, cred, lastChange,
+	return runTasks(provisioner, tasks, &record, cred, lastChange,
 		func(record storage.MachineRecord, state api.MachineRequest) error {
 			return cm.store.Save(record, state)
 		},
@@ -207,9 +210,12 @@ func (cm *machines) DeleteMachine(
 		})
 }
 
-func runTasks(provisioner api.Provisioner,
-	tasks []api.Task, record *storage.MachineRecord,
-	ctx context.Context, cred api.Credential, request api.MachineRequest,
+func runTasks(
+	provisioner api.Provisioner,
+	tasks []api.Task,
+	record *storage.MachineRecord,
+	cred api.Credential,
+	request api.MachineRequest,
 	save func(storage.MachineRecord, api.MachineRequest) error,
 	onComplete func(*storage.MachineRecord, api.MachineRequest)) (<-chan interface{}, *Error) {
 
@@ -227,7 +233,7 @@ func runTasks(provisioner api.Provisioner,
 				log.Infoln("START", task.Name)
 				event := storage.Event{Name: string(task.Name)}
 				if task.Do != nil {
-					if err := task.Do(provisioner, ctx, cred, *record, request, taskEvents); err != nil {
+					if err := task.Do(provisioner, cred, *record, request, taskEvents); err != nil {
 						event.Message = task.Message + " errored: " + err.Error()
 						event.Error = err.Error()
 						event.Status = -1

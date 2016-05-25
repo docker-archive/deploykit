@@ -147,18 +147,6 @@
 			"Rev": "09a34f2d32ca4df07da73ccb303bee6790076d69"
 		},
 		{
-			"ImportPath": "github.com/conductant/gohm/pkg/auth",
-			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
-		},
-		{
-			"ImportPath": "github.com/conductant/gohm/pkg/encoding",
-			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
-		},
-		{
-			"ImportPath": "github.com/conductant/gohm/pkg/server",
-			"Rev": "75cd71981203dec11a63c486f27ca79ec41cc319"
-		},
-		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
@@ -173,16 +161,8 @@
 			"Rev": "12f418cc7edc5a618a51407b7ac1f1f512139df3"
 		},
 		{
-			"ImportPath": "github.com/golang/glog",
-			"Rev": "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
-		},
-		{
 			"ImportPath": "github.com/golang/mock/gomock",
 			"Rev": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9"
-		},
-		{
-			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "0fd8c908d872c921af513ef5091964bbd2e0d904"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",

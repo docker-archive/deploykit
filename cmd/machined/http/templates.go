@@ -3,10 +3,9 @@ package http
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/storage"
-	"golang.org/x/net/context"
+	"github.com/gorilla/mux"
 	"net/http"
 )
 
@@ -14,8 +13,8 @@ type templatesHandler struct {
 	templates libmachete.Templates
 }
 
-func (h *templatesHandler) getOne(codec *libmachete.Codec) rest.Handler {
-	return func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *templatesHandler) getOne(codec *libmachete.Codec) Handler {
+	return func(resp http.ResponseWriter, req *http.Request) {
 		id := getTemplateID(req)
 		cr, err := h.templates.Get(id)
 		if err != nil {
@@ -26,9 +25,9 @@ func (h *templatesHandler) getOne(codec *libmachete.Codec) rest.Handler {
 	}
 }
 
-func (h *templatesHandler) getBlank(codec *libmachete.Codec) rest.Handler {
-	return func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-		provisioner := rest.GetUrlParameter(req, "provisioner")
+func (h *templatesHandler) getBlank(codec *libmachete.Codec) Handler {
+	return func(resp http.ResponseWriter, req *http.Request) {
+		provisioner := getProvisionerName(req)
 		log.Infof("Get template example %v", provisioner)
 
 		example, err := h.templates.NewBlankTemplate(provisioner)
@@ -40,7 +39,7 @@ func (h *templatesHandler) getBlank(codec *libmachete.Codec) rest.Handler {
 	}
 }
 
-func (h *templatesHandler) getAll(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *templatesHandler) getAll(resp http.ResponseWriter, req *http.Request) {
 	log.Infoln("List templates")
 	all, err := h.templates.ListIds()
 	if err != nil {
@@ -50,7 +49,7 @@ func (h *templatesHandler) getAll(ctx context.Context, resp http.ResponseWriter,
 	libmachete.ContentTypeJSON.Respond(resp, all)
 }
 
-func (h *templatesHandler) create(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *templatesHandler) create(resp http.ResponseWriter, req *http.Request) {
 	id := getTemplateID(req)
 	log.Infof("Add template %v", id)
 
@@ -73,7 +72,7 @@ func (h *templatesHandler) create(ctx context.Context, resp http.ResponseWriter,
 	}
 }
 
-func (h *templatesHandler) update(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *templatesHandler) update(resp http.ResponseWriter, req *http.Request) {
 	id := getTemplateID(req)
 	log.Infof("Update template %v", id.Name)
 
@@ -96,7 +95,7 @@ func (h *templatesHandler) update(ctx context.Context, resp http.ResponseWriter,
 	}
 }
 
-func (h *templatesHandler) delete(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *templatesHandler) delete(resp http.ResponseWriter, req *http.Request) {
 	id := getTemplateID(req)
 	err := h.templates.Delete(id)
 	if err != nil {
@@ -107,46 +106,22 @@ func (h *templatesHandler) delete(ctx context.Context, resp http.ResponseWriter,
 
 func getTemplateID(request *http.Request) storage.TemplateID {
 	return storage.TemplateID{
-		Provisioner: rest.GetUrlParameter(request, "provisioner"),
-		Name:        rest.GetUrlParameter(request, "key"),
+		Provisioner: getProvisionerName(request),
+		Name:        mux.Vars(request)["key"],
 	}
 }
 
-func templateRoutes(templates libmachete.Templates) map[*rest.Endpoint]rest.Handler {
-	handler := templatesHandler{templates: templates}
+func getProvisionerName(request *http.Request) string {
+	return request.URL.Query().Get("provisioner")
+}
 
-	return map[*rest.Endpoint]rest.Handler{
-		&rest.Endpoint{
-			UrlRoute:   "/templates/json",
-			HttpMethod: rest.GET,
-		}: handler.getAll,
-		&rest.Endpoint{
-			UrlRoute:   "/meta/{provisioner}/json",
-			HttpMethod: rest.GET,
-		}: handler.getBlank(libmachete.ContentTypeJSON),
-		&rest.Endpoint{
-			UrlRoute:   "/meta/{provisioner}/yaml",
-			HttpMethod: rest.GET,
-		}: handler.getBlank(libmachete.ContentTypeYAML),
-		&rest.Endpoint{
-			UrlRoute:   "/templates/{provisioner}/{key}/create",
-			HttpMethod: rest.POST,
-		}: handler.create,
-		&rest.Endpoint{
-			UrlRoute:   "/templates/{provisioner}/{key}",
-			HttpMethod: rest.PUT,
-		}: handler.update,
-		&rest.Endpoint{
-			UrlRoute:   "/templates/{provisioner}/{key}/json",
-			HttpMethod: rest.GET,
-		}: handler.getOne(libmachete.ContentTypeJSON),
-		&rest.Endpoint{
-			UrlRoute:   "/templates/{provisioner}/{key}/yaml",
-			HttpMethod: rest.GET,
-		}: handler.getOne(libmachete.ContentTypeYAML),
-		&rest.Endpoint{
-			UrlRoute:   "/templates/{provisioner}/{key}",
-			HttpMethod: rest.DELETE,
-		}: handler.delete,
-	}
+func (h *templatesHandler) attachTo(router *mux.Router) {
+	router.HandleFunc("/json", h.getAll).Methods("GET")
+	router.HandleFunc("/meta/{provisioner}/json", h.getBlank(libmachete.ContentTypeJSON)).Methods("GET")
+	router.HandleFunc("/meta/{provisioner}/yaml", h.getBlank(libmachete.ContentTypeYAML)).Methods("GET")
+	router.HandleFunc("/{provisioner}/{key}/create", h.create).Methods("POST")
+	router.HandleFunc("/{provisioner}/{key}", h.update).Methods("PUT")
+	router.HandleFunc("/{provisioner}/{key}/json", h.getOne(libmachete.ContentTypeJSON)).Methods("GET")
+	router.HandleFunc("/{provisioner}/{key}/yaml", h.getOne(libmachete.ContentTypeYAML)).Methods("GET")
+	router.HandleFunc("/{provisioner}/{key}", h.delete).Methods("DELETE")
 }

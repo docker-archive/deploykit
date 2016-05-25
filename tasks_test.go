@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	"testing"
 )
 
@@ -20,8 +19,7 @@ func makeErrorTask(name string) api.Task {
 	return api.Task{
 		Name:    api.TaskName(name),
 		Message: "message",
-		Do: func(api.Provisioner, context.Context,
-			api.Credential, api.Resource, api.MachineRequest, chan<- interface{}) error {
+		Do: func(api.Provisioner, api.Credential, api.Resource, api.MachineRequest, chan<- interface{}) error {
 			return errors.New("test-error")
 		},
 	}

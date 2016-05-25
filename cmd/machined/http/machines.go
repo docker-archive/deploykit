@@ -3,11 +3,10 @@ package http
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	rest "github.com/conductant/gohm/pkg/server"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/storage"
-	"golang.org/x/net/context"
+	"github.com/gorilla/mux"
 	"net/http"
 )
 
@@ -18,9 +17,13 @@ type machineHandler struct {
 	provisioners libmachete.MachineProvisioners
 }
 
-func (h *machineHandler) getOne(codec *libmachete.Codec) rest.Handler {
-	return func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-		key := rest.GetUrlParameter(req, "key")
+func getMachineID(req *http.Request) string {
+	return mux.Vars(req)["key"]
+}
+
+func (h *machineHandler) getOne(codec *libmachete.Codec) Handler {
+	return func(resp http.ResponseWriter, req *http.Request) {
+		key := getMachineID(req)
 		mr, err := h.machines.Get(key)
 		if err == nil {
 			codec.Respond(resp, mr)
@@ -33,9 +36,9 @@ func (h *machineHandler) getOne(codec *libmachete.Codec) rest.Handler {
 	}
 }
 
-func (h *machineHandler) getAll(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+func (h *machineHandler) getAll(resp http.ResponseWriter, req *http.Request) {
 	log.Infoln("List machines")
-	long := len(rest.GetUrlParameter(req, "long")) > 0
+	long := len(req.URL.Query().Get("long")) > 0
 
 	if long {
 		all, err := h.machines.List()
@@ -66,9 +69,9 @@ func getProvisionControls(req *http.Request) api.ProvisionControls {
 	return api.ProvisionControls(queryValues)
 }
 
-func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-	credentials := rest.GetUrlParameter(req, "credentials")
-	template := rest.GetUrlParameter(req, "template")
+func (h *machineHandler) create(resp http.ResponseWriter, req *http.Request) {
+	credentials := req.URL.Query().Get("credentials")
+	template := req.URL.Query().Get("template")
 
 	// TODO - fix this in framework to return default values
 	if credentials == "" {
@@ -111,8 +114,12 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 		return
 	}
 
-	events, machineErr := h.machines.CreateMachine(provisioner, ctx, cred, tpl,
-		req.Body, libmachete.CodecByContentTypeHeader(req))
+	events, machineErr := h.machines.CreateMachine(
+		provisioner,
+		cred,
+		tpl,
+		req.Body,
+		libmachete.CodecByContentTypeHeader(req))
 
 	if machineErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
@@ -137,15 +144,11 @@ func (h *machineHandler) create(ctx context.Context, resp http.ResponseWriter, r
 	}
 }
 
-func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-	machineName := rest.GetUrlParameter(req, "key")
-	context := rest.GetUrlParameter(req, "context")
-	credentials := rest.GetUrlParameter(req, "credentials")
+func (h *machineHandler) delete(resp http.ResponseWriter, req *http.Request) {
+	machineName := getMachineID(req)
+	credentials := req.URL.Query().Get("credentials")
 
 	// TODO - fix this in framework to return default values
-	if context == "" {
-		context = "default"
-	}
 	if credentials == "" {
 		credentials = "default"
 	}
@@ -182,7 +185,7 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 		return
 	}
 
-	events, machineErr := h.machines.DeleteMachine(provisioner, ctx, cred, record)
+	events, machineErr := h.machines.DeleteMachine(provisioner, cred, record)
 	if machineErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
 		go func() {
@@ -206,53 +209,10 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 	}
 }
 
-func machineRoutes(
-	creds libmachete.Credentials,
-	templates libmachete.Templates,
-	machines libmachete.Machines) map[*rest.Endpoint]rest.Handler {
-
-	handler := machineHandler{
-		creds:     creds,
-		templates: templates,
-		machines:  machines,
-	}
-
-	return map[*rest.Endpoint]rest.Handler{
-		&rest.Endpoint{
-			UrlRoute:   "/machines/json",
-			HttpMethod: rest.GET,
-			UrlQueries: rest.UrlQueries{
-				"long": false,
-			},
-		}: handler.getAll,
-		&rest.Endpoint{
-			UrlRoute:   "/machines/create",
-			HttpMethod: rest.POST,
-			UrlQueries: rest.UrlQueries{
-				"template":    "default",
-				"credentials": "default",
-				"context":     "default",
-			},
-		}: handler.create,
-		&rest.Endpoint{
-			UrlRoute:   "/machines/{key}/json",
-			HttpMethod: rest.GET,
-		}: handler.getOne(libmachete.ContentTypeJSON),
-		&rest.Endpoint{
-			UrlRoute:   "/machines/{key}/yaml",
-			HttpMethod: rest.GET,
-		}: func(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-			key := rest.GetUrlParameter(req, "key")
-			mr, err := machines.Get(key)
-			if err != nil {
-				respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown machine:%s", key))
-				return
-			}
-			libmachete.ContentTypeYAML.Respond(resp, mr)
-		},
-		&rest.Endpoint{
-			UrlRoute:   "/machines/{key}",
-			HttpMethod: rest.DELETE,
-		}: handler.delete,
-	}
+func (h *machineHandler) attachTo(router *mux.Router) {
+	router.HandleFunc("/json", h.getAll).Methods("GET")
+	router.HandleFunc("/create", h.create).Methods("POST")
+	router.HandleFunc("/{key}/json", h.getOne(libmachete.ContentTypeJSON)).Methods("GET")
+	router.HandleFunc("/{key}/yaml", h.getOne(libmachete.ContentTypeYAML)).Methods("GET")
+	router.HandleFunc("/{key}", h.delete).Methods("DELETE")
 }
