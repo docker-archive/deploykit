@@ -22,18 +22,16 @@ func getMachineID(req *http.Request) string {
 	return mux.Vars(req)["key"]
 }
 
-func (h *machineHandler) getOne(codec *libmachete.Codec) Handler {
-	return func(resp http.ResponseWriter, req *http.Request) {
-		key := getMachineID(req)
-		mr, err := h.machines.Get(key)
-		if err == nil {
-			codec.Respond(resp, mr)
-		} else {
-			respondError(
-				http.StatusNotFound,
-				resp,
-				fmt.Errorf("Unknown machine:%s, err=%s", key, err.Error()))
-		}
+func (h *machineHandler) getOne(resp http.ResponseWriter, req *http.Request) {
+	key := getMachineID(req)
+	mr, err := h.machines.Get(key)
+	if err == nil {
+		libmachete.ContentTypeJSON.Respond(resp, mr)
+	} else {
+		respondError(
+			http.StatusNotFound,
+			resp,
+			fmt.Errorf("Unknown machine:%s, err=%s", key, err.Error()))
 	}
 }
 
@@ -121,7 +119,7 @@ func (h *machineHandler) create(resp http.ResponseWriter, req *http.Request) {
 		cred,
 		tpl,
 		req.Body,
-		libmachete.CodecByContentTypeHeader(req))
+		libmachete.ContentTypeJSON)
 
 	if machineErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
@@ -214,7 +212,6 @@ func (h *machineHandler) delete(resp http.ResponseWriter, req *http.Request) {
 func (h *machineHandler) attachTo(router *mux.Router) {
 	router.HandleFunc("/json", h.getAll).Methods("GET")
 	router.HandleFunc("/create", h.create).Methods("POST")
-	router.HandleFunc("/{key}/json", h.getOne(libmachete.ContentTypeJSON)).Methods("GET")
-	router.HandleFunc("/{key}/yaml", h.getOne(libmachete.ContentTypeYAML)).Methods("GET")
+	router.HandleFunc("/{key}/json", h.getOne).Methods("GET")
 	router.HandleFunc("/{key}", h.delete).Methods("DELETE")
 }
