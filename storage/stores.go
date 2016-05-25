@@ -1,5 +1,9 @@
 package storage
 
+import (
+	"github.com/docker/libmachete/ssh"
+)
+
 // Contexts handles the storage of context objects
 type Contexts interface {
 	Save(id ContextID, contextData interface{}) error
@@ -46,4 +50,16 @@ type Templates interface {
 	GetTemplate(id TemplateID, templateData interface{}) error
 
 	Delete(id TemplateID) error
+}
+
+// Keys manage the SSH keys for a machine
+type Keys interface {
+	Save(id KeyID, keyPair *ssh.KeyPair) error
+
+	List() ([]KeyID, error)
+
+	// GetEncodedPublicKey returns the public key bytes in the OpenSSH authorized_keys format
+	GetEncodedPublicKey(id KeyID) ([]byte, error)
+
+	Delete(id KeyID) error
 }

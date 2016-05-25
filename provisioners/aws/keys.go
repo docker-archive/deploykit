@@ -33,7 +33,7 @@ func GenerateAndUploadSSHKey(
 	}
 
 	keyName := resource.Name()
-	publicKey, err := keystore.GetPublicKey(keyName)
+	publicKey, err := keystore.GetEncodedPublicKey(keyName)
 	if err != nil {
 		events <- err
 		return err
@@ -71,10 +71,6 @@ func RemoveLocalAndUploadedSSHKey(
 	}
 
 	keyName := resource.Name()
-
-	if !keystore.Exists(keyName) {
-		return fmt.Errorf("No such key:%v", keyName)
-	}
 
 	// AWS requires that the key be uploaded prior to creating the instance
 	if _, err := prov.client.DeleteKeyPair(&ec2.DeleteKeyPairInput{

@@ -9,11 +9,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"golang.org/x/crypto/ssh"
 	"io"
-	"os"
-	"runtime"
-
-	gossh "golang.org/x/crypto/ssh"
 )
 
 var (
@@ -25,15 +22,19 @@ var (
 
 	// ErrPublicKey is the error when generating a new public key fails
 	ErrPublicKey = errors.New("Unable to convert public key")
-
-	// ErrUnableToWriteFile is the error when keys cannot be written to files
-	ErrUnableToWriteFile = errors.New("Unable to write file")
 )
 
 // KeyPair is a public and private key pair
 type KeyPair struct {
-	PrivateKey []byte
-	PublicKey  []byte
+	PrivateKey []byte `json:"-" yaml:"-"`
+	PublicKey  []byte `json:"-" yaml:"-"`
+
+	// EncodedPrivateKey contains the bytes in the x509 PCKS DER format. In JSON it's encoded in Base64
+	EncodedPrivateKey []byte `json:"public_key" yaml:"public_key"`
+
+	// EncodedPublicKey contains the bytes in the OpenSSH authorized_keys format.  In this form it's ready
+	// for import to most infrastructure providers as SSH key.  Note that when marshaled in JSON it's Base64 encoded.
+	EncodedPublicKey []byte `json:"private_key" yaml:"private_key"`
 }
 
 // NewKeyPair generates a new SSH keypair
@@ -50,112 +51,26 @@ func NewKeyPair() (keyPair *KeyPair, err error) {
 
 	privDer := x509.MarshalPKCS1PrivateKey(priv)
 
-	pubSSH, err := gossh.NewPublicKey(&priv.PublicKey)
+	pubSSH, err := ssh.NewPublicKey(&priv.PublicKey)
 	if err != nil {
 		return nil, ErrPublicKey
 	}
 
+	pubPem := ssh.MarshalAuthorizedKey(pubSSH)
+	privPem := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Headers: nil, Bytes: privDer})
+
 	return &KeyPair{
-		PrivateKey: privDer,
-		PublicKey:  gossh.MarshalAuthorizedKey(pubSSH),
+		PrivateKey:        privDer,
+		PublicKey:         pubPem,
+		EncodedPublicKey:  pubPem,
+		EncodedPrivateKey: privPem,
 	}, nil
-}
-
-// KeyWriter writes the key data at the given path
-type KeyWriter func(path string, data []byte, perm os.FileMode) error
-
-// Write writes the key pair
-func (kp *KeyPair) Write(privateKeyPath, publicKeyPath string, sink KeyWriter) error {
-	files := []struct {
-		File  string
-		Type  string
-		Value []byte
-	}{
-		{
-			File:  privateKeyPath,
-			Value: pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Headers: nil, Bytes: kp.PrivateKey}),
-		},
-		{
-			File:  publicKeyPath,
-			Value: kp.PublicKey,
-		},
-	}
-
-	for _, v := range files {
-		if err := sink(v.File, v.Value, 0600); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// WriteToFile writes keypair to files
-func (kp *KeyPair) WriteToFile(privateKeyPath string, publicKeyPath string) error {
-	files := []struct {
-		File  string
-		Type  string
-		Value []byte
-	}{
-		{
-			File:  privateKeyPath,
-			Value: pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Headers: nil, Bytes: kp.PrivateKey}),
-		},
-		{
-			File:  publicKeyPath,
-			Value: kp.PublicKey,
-		},
-	}
-
-	for _, v := range files {
-		f, err := os.Create(v.File)
-		if err != nil {
-			return ErrUnableToWriteFile
-		}
-
-		if _, err := f.Write(v.Value); err != nil {
-			return ErrUnableToWriteFile
-		}
-
-		// windows does not support chmod
-		switch runtime.GOOS {
-		case "darwin", "linux":
-			if err := f.Chmod(0600); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 // Fingerprint calculates the fingerprint of the public key
 func (kp *KeyPair) Fingerprint() string {
 	b, _ := base64.StdEncoding.DecodeString(string(kp.PublicKey))
 	h := md5.New()
-
 	io.WriteString(h, string(b))
-
 	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-// GenerateSSHKey generates SSH keypair based on path of the private key
-// The public key would be generated to the same path with ".pub" added
-func GenerateSSHKey(path string) error {
-	if _, err := os.Stat(path); err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("Desired directory for SSH keys does not exist: %s", err)
-		}
-
-		kp, err := NewKeyPair()
-		if err != nil {
-			return fmt.Errorf("Error generating key pair: %s", err)
-		}
-
-		if err := kp.WriteToFile(path, fmt.Sprintf("%s.pub", path)); err != nil {
-			return fmt.Errorf("Error writing keys to file(s): %s", err)
-		}
-	}
-
-	return nil
 }

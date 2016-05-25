@@ -31,6 +31,11 @@ func (km *keys) NewKeyPair(id string) error {
 	if err != nil {
 		return err
 	}
+
+	if km.exists(id) {
+		return NewError(ErrNotFound, "Key %v not found.", id)
+	}
+
 	return km.store.Save(storage.KeyID(id), kp)
 }
 
@@ -39,14 +44,14 @@ func (km *keys) ListIds() ([]storage.KeyID, error) {
 	return km.store.List()
 }
 
-// Get returns a public key
-func (km *keys) GetPublicKey(id string) ([]byte, error) {
-	return km.store.GetPublicKey(storage.KeyID(id))
+// GetEncodedPublicKey returns an OpenSSH authorized_key format public key
+func (km *keys) GetEncodedPublicKey(id string) ([]byte, error) {
+	return km.store.GetEncodedPublicKey(storage.KeyID(id))
 }
 
 // Exists returns true if machine identified by key already exists
-func (km *keys) Exists(id string) bool {
-	_, err := km.store.GetPublicKey(storage.KeyID(id))
+func (km *keys) exists(id string) bool {
+	_, err := km.store.GetEncodedPublicKey(storage.KeyID(id))
 	return err == nil
 }
 

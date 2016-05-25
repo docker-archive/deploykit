@@ -22,7 +22,7 @@ func (m keys) Save(id storage.KeyID, keyPair *ssh.KeyPair) error {
 	if err != nil {
 		return fmt.Errorf("Failed to create key directory: %s", err)
 	}
-	return keyPair.Write(m.privateKeyFullPath(id), m.publicKeyFullPath(id), m.sandbox.saveBytes)
+	return m.sandbox.marshalAndSave(m.keyFullPath(id), keyPair)
 }
 
 func (m keys) List() ([]storage.KeyID, error) {
@@ -37,8 +37,14 @@ func (m keys) List() ([]storage.KeyID, error) {
 	return ids, nil
 }
 
-func (m keys) GetPublicKey(id storage.KeyID) ([]byte, error) {
-	return m.sandbox.readBytes(m.publicKeyFullPath(id))
+// GetEncodedPublicKey returns the pem encoded public key as bytes
+func (m keys) GetEncodedPublicKey(id storage.KeyID) ([]byte, error) {
+	kp := new(ssh.KeyPair)
+	err := m.sandbox.readAndUnmarshal(m.keyFullPath(id), kp)
+	if err != nil {
+		return nil, err
+	}
+	return kp.EncodedPublicKey, nil
 }
 
 func (m keys) Delete(id storage.KeyID) error {
@@ -49,10 +55,6 @@ func (m keys) keyPath(id storage.KeyID) string {
 	return string(id)
 }
 
-func (m keys) privateKeyFullPath(id storage.KeyID) string {
-	return filepath.Join(m.keyPath(id), "id_rsa")
-}
-
-func (m keys) publicKeyFullPath(id storage.KeyID) string {
-	return m.privateKeyFullPath(id) + ".pub"
+func (m keys) keyFullPath(id storage.KeyID) string {
+	return filepath.Join(m.keyPath(id), "key.json")
 }
