@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
@@ -13,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
-	"golang.org/x/net/context"
 	"reflect"
 	"sort"
 	"time"
@@ -21,33 +19,6 @@ import (
 
 // Builder is a ProvisionerBuilder for AWS.
 type Builder struct {
-}
-
-// Build creates an AWS provisioner.
-func (a Builder) Build(params map[string]string) (api.Provisioner, error) {
-	region := params["REGION"]
-	if region == "" {
-		return nil, errors.New("REGION must be specified")
-	}
-
-	accessKey := params["ACCESS_KEY"]
-	secretKey := params["SECRET_KEY"]
-	sessionToken := params["SESSION_TOKEN"]
-
-	awsCredentials := credentials.NewChainCredentials([]credentials.Provider{
-		&credentials.StaticProvider{Value: credentials.Value{
-			AccessKeyID:     accessKey,
-			SecretAccessKey: secretKey,
-			SessionToken:    sessionToken,
-		}},
-		&credentials.EnvProvider{},
-		&credentials.SharedCredentialsProvider{},
-		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
-	})
-
-	client := CreateClient(region, awsCredentials, 5)
-
-	return New(client), nil
 }
 
 func checkCredential(cred api.Credential) (c *credential, err error) {
@@ -59,46 +30,55 @@ func checkCredential(cred api.Credential) (c *credential, err error) {
 	return
 }
 
-// ProvisionerWith returns a provision given the runtime context and credential
-func ProvisionerWith(ctx context.Context, cred api.Credential) (api.Provisioner, error) {
+func getConfig(controls api.ProvisionControls) (*Config, error) {
+	config := defaultConfig()
 
-	region, ok := RegionFromContext(ctx)
-	if !ok {
+	region, ok := controls.GetString("region")
+	if ok {
+		config.Region = region
+	} else {
 		return nil, fmt.Errorf("No region in context")
 	}
 
-	retries := 5
-	if r, ok := RetriesFromContext(ctx); ok {
-		retries = r
+	if retries, ok, err := controls.GetInt("retries"); ok && err != nil {
+		config.Retries = retries
 	}
 
-	c, err := checkCredential(cred)
+	if maxPoll, ok, err := controls.GetInt("check_instance_max_poll"); ok && err != nil {
+		config.CheckInstanceMaxPoll = maxPoll
+	}
+
+	if pollInterval, ok, err := controls.GetInt("check_instance_poll_interval"); ok && err != nil {
+		config.CheckInstancePollInterval = pollInterval
+	}
+
+	return config, nil
+}
+
+// ProvisionerWith returns a provision given the runtime context and credential
+func ProvisionerWith(controls api.ProvisionControls, cred api.Credential) (api.Provisioner, error) {
+	config, err := getConfig(controls)
 	if err != nil {
 		return nil, err
 	}
 
-	if c.EC2RoleProvider {
-		client := CreateClient(*region, credentials.NewChainCredentials([]credentials.Provider{
-			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
-			&credentials.EnvProvider{},
-			&credentials.SharedCredentialsProvider{},
-		}), retries)
-		return New(client), nil
+	creds, err := checkCredential(cred)
+	if err != nil {
+		return nil, err
 	}
 
-	client := CreateClient(*region, credentials.NewChainCredentials([]credentials.Provider{
-		c,
+	// TODO(wfarner): Consider using pointers for all fields in api.Credential.  Otherwise it is not possible to
+	// distinguish between supplied empty values and absent values.  As a result, we must put the static credential
+	// value last in the chain.  With proper handling of empty values, it probably belongs at the top of the list
+	// as it is more explicit than values in the environment.
+	client := CreateClient(config.Region, credentials.NewChainCredentials([]credentials.Provider{
+		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
 		&credentials.EnvProvider{},
 		&credentials.SharedCredentialsProvider{},
-		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
-	}), retries)
+		creds,
+	}), config.Retries)
 
-	cfg := new(Config)
-	config, ok := ConfigFromContext(ctx)
-	if ok {
-		cfg = &config
-	}
-	return &provisioner{client: client, sleepFunction: time.Sleep, config: cfg}, nil
+	return &provisioner{client: client, sleepFunction: time.Sleep, config: config}, nil
 }
 
 type provisioner struct {
@@ -107,7 +87,7 @@ type provisioner struct {
 	config        *Config
 }
 
-// New creates a new AWS provisioner that will use the provided EC2 API implementation.
+// New creates a new AWS provisioner that will use the provided EC2 API implementation and default config.
 func New(client ec2iface.EC2API) api.Provisioner {
 	return &provisioner{client: client, sleepFunction: time.Sleep, config: defaultConfig()}
 }
