@@ -39,13 +39,6 @@ func NewCredentials(store storage.Credentials, provisioners *MachineProvisioners
 	return &credentials{store: store, provisioners: provisioners}
 }
 
-func ensureValidContentType(ct *Codec) *Codec {
-	if ct != nil {
-		return ct
-	}
-	return DefaultContentType
-}
-
 func (c *credentials) newCredential(provisionerName string) (api.Credential, error) {
 	if builder, has := c.provisioners.GetBuilder(provisionerName); has {
 		return builder.DefaultCredential, nil
@@ -53,12 +46,12 @@ func (c *credentials) newCredential(provisionerName string) (api.Credential, err
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
 }
 
-func (c *credentials) unmarshal(contentType *Codec, data []byte, cred api.Credential) error {
-	return ensureValidContentType(contentType).unmarshal(data, cred)
+func (c *credentials) unmarshal(codec *Codec, data []byte, cred api.Credential) error {
+	return codec.unmarshal(data, cred)
 }
 
-func (c *credentials) marshal(contentType *Codec, cred api.Credential) ([]byte, error) {
-	return ensureValidContentType(contentType).marshal(cred)
+func (c *credentials) marshal(codec *Codec, cred api.Credential) ([]byte, error) {
+	return codec.marshal(cred)
 }
 
 func (c *credentials) ListIds() ([]string, error) {

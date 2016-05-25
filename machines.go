@@ -110,7 +110,7 @@ func (cm *machines) populateRequest(
 
 	buff, err := ioutil.ReadAll(input)
 	if err == nil && len(buff) > 0 {
-		err = ensureValidContentType(codec).unmarshal(buff, request)
+		err = codec.unmarshal(buff, request)
 		if err != nil {
 			return nil, err
 		}
