@@ -45,8 +45,6 @@ func (cb *CredentialBase) Refresh(context.Context) error {
 type Credential interface {
 	ProvisionerName() string
 
-	Validate(context.Context) error
-
 	Authenticate(context.Context) error
 
 	Refresh(context.Context) error

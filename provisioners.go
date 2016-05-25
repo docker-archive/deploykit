@@ -2,7 +2,6 @@ package libmachete
 
 import (
 	"github.com/docker/libmachete/provisioners/api"
-	"golang.org/x/net/context"
 	"sync"
 )
 
@@ -17,8 +16,7 @@ type ProvisionerBuilder struct {
 	Name                  string
 	DefaultCredential     api.Credential
 	DefaultMachineRequest api.MachineRequest
-	BuildContext          ContextBuilder
-	Build                 func(ctx context.Context, cred api.Credential) (api.Provisioner, error)
+	Build                 func(controls api.ProvisionControls, cred api.Credential) (api.Provisioner, error)
 }
 
 // MachineProvisioners maintains the collection of available provisioners.

@@ -28,7 +28,6 @@ type apiOptions struct {
 
 type apiServer struct {
 	options     apiOptions
-	contexts    libmachete.Contexts
 	credentials libmachete.Credentials
 	templates   libmachete.Templates
 	machines    libmachete.Machines
@@ -50,7 +49,6 @@ func build(options apiOptions) (*apiServer, error) {
 	}
 
 	return &apiServer{
-		contexts:    libmachete.NewContexts(filestores.NewContexts(contextSandbox)),
 		credentials: libmachete.NewCredentials(filestores.NewCredentials(credentialsSandbox), &provisioners),
 		templates:   libmachete.NewTemplates(filestores.NewTemplates(templatesSandbox), &provisioners),
 		machines:    libmachete.NewMachines(filestores.NewMachines(machinesSandbox)),
@@ -83,16 +81,14 @@ func (s *apiServer) start() <-chan error {
 				log.Infoln("Executing user custom shutdown...")
 				return nil
 			})
-	for endpoint, fn := range contextRoutes(s.contexts) {
-		service.Route(*endpoint).To(fn)
-	}
+
 	for endpoint, fn := range credentialRoutes(s.credentials) {
 		service.Route(*endpoint).To(fn)
 	}
 	for endpoint, fn := range templateRoutes(s.templates) {
 		service.Route(*endpoint).To(fn)
 	}
-	for endpoint, fn := range machineRoutes(s.contexts, s.credentials, s.templates, s.machines) {
+	for endpoint, fn := range machineRoutes(s.credentials, s.templates, s.machines) {
 		service.Route(*endpoint).To(fn)
 	}
 
