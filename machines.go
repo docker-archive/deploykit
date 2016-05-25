@@ -214,6 +214,7 @@ func (cm *machines) DeleteMachine(
 		})
 }
 
+// runTasks is the main task execution loop
 func runTasks(
 	provisioner api.Provisioner, keystore api.KeyStore,
 	tasks []api.Task,
