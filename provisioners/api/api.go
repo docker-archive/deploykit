@@ -169,12 +169,14 @@ type Provisioner interface {
 	// Name returns an identifier for this provisioner
 	Name() string
 
-	// GetProvisionTasks returns a list of runnable tasks given a list of command task names for allocating a resource.
+	// GetProvisionTasks returns a list of runnable tasks given a list of command task names for allocating a
+	// resource.
 	// The task names are generally specific verbs that the user has specified.  The manager can either return
 	// no implementation (thus using framework defaults, or its own override implementation.
 	GetProvisionTasks(tasks []TaskName) ([]Task, error)
 
-	// GetTeardownTasks returns a list of runnable tasks given a list of command task names for tearing down a resource.
+	// GetTeardownTasks returns a list of runnable tasks given a list of command task names for tearing down a
+	// resource.
 	GetTeardownTasks(tasks []TaskName) ([]Task, error)
 
 	// NewRequestInstance retrieves a new instance of the request type consumed by

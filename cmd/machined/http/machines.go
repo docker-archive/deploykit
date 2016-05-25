@@ -150,7 +150,11 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 		credentials = "default"
 	}
 
-	log.Infof("Delete machine %v as %v with context=%v", machineName, credentials, context)
+	// TODO(wfarner): ProvisionControls is no longer an appropriate name since it's reused for deletion.  Leaving
+	// for now as a revamp is imminent.
+	deleteControls := getProvisionControls(req)
+
+	log.Infof("Delete machine %v as %v with controls=%v", machineName, credentials, deleteControls)
 
 	// credential
 	cred, err := h.creds.Get(credentials)
@@ -172,17 +176,7 @@ func (h *machineHandler) delete(ctx context.Context, resp http.ResponseWriter, r
 		return
 	}
 
-	// Runtime context
-	runContext, err := h.provisionerContexts.Get(context)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
-		return
-	}
-
-	// Configure the provisioner context
-	ctx = libmachete.BuildContext(builder, ctx, runContext)
-
-	provisioner, err := builder.Build(ctx, cred)
+	provisioner, err := builder.Build(deleteControls, cred)
 	if err != nil {
 		respondError(http.StatusBadRequest, resp, err)
 		return
