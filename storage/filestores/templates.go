@@ -2,6 +2,7 @@ package filestores
 
 import (
 	"github.com/docker/libmachete/storage"
+	"path"
 )
 
 type templates struct {
@@ -14,7 +15,7 @@ func NewTemplates(sandbox Sandbox) storage.Templates {
 }
 
 func (c templates) Save(id storage.TemplateID, templatesData interface{}) error {
-	return c.sandbox.marshalAndSave(id.Key(), templatesData)
+	return c.sandbox.marshalAndSave(templatePath(id), templatesData)
 }
 
 func (c templates) List() ([]storage.TemplateID, error) {
@@ -24,7 +25,8 @@ func (c templates) List() ([]storage.TemplateID, error) {
 	}
 	ids := []storage.TemplateID{}
 	for _, element := range contents {
-		ids = append(ids, storage.TemplateIDFromString(element))
+		dir, file := dirAndFile(element)
+		ids = append(ids, storage.TemplateID{Provisioner: dir, Name: file})
 	}
 	return ids, nil
 }
@@ -32,9 +34,13 @@ func (c templates) List() ([]storage.TemplateID, error) {
 // TODO(wfarner): Consider pushing unmarshaling higher up the stack.  At the very least, other store implementations
 // should not need to reimplement this.
 func (c templates) GetTemplate(id storage.TemplateID, templatesData interface{}) error {
-	return c.sandbox.readAndUnmarshal(id.Key(), templatesData)
+	return c.sandbox.readAndUnmarshal(templatePath(id), templatesData)
 }
 
 func (c templates) Delete(id storage.TemplateID) error {
-	return c.sandbox.remove(id.Key())
+	return c.sandbox.remove(templatePath(id))
+}
+
+func templatePath(t storage.TemplateID) string {
+	return path.Join(t.Provisioner, t.Name)
 }

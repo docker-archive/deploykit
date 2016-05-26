@@ -2,9 +2,7 @@ package storage
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/docker/libmachete/provisioners/api"
-	"strings"
 	"sync"
 	"time"
 )
@@ -135,26 +133,13 @@ func (m *MachineRecord) AppendEventObject(e Event) {
 }
 
 // CredentialsID is the globally-unique identifier for credentials.
-type CredentialsID string
+type CredentialsID struct {
+	Provisioner string
+	Name        string
+}
 
 // TemplateID is a unique identifier for template within a provisioner namespace
 type TemplateID struct {
 	Provisioner string `json:"provisioner"`
 	Name        string `json:"name"`
-}
-
-// Key returns the key used for looking up the template.  Key is composed of the provisioner
-// name and the name of the template (scoped to a provisioner).
-func (t TemplateID) Key() string {
-	return fmt.Sprintf("%s-%s", t.Provisioner, t.Name)
-}
-
-// TemplateIDFromString returns a TemplateID from a simple untyped string of some format.
-// TODO(wfarner): Consider solving this in the store to avoid the string formatting dance.
-func TemplateIDFromString(s string) TemplateID {
-	p := strings.Split(s, "-")
-	if len(p) > 1 {
-		return TemplateID{p[0], p[1]}
-	}
-	return TemplateID{"", p[1]} // Invalid template
 }

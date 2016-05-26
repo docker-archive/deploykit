@@ -19,7 +19,7 @@ func TestCredentialsCrud(t *testing.T) {
 	require.NoError(t, fs.Mkdir(testPath, 0700))
 	store := credentials{sandbox: Sandbox{fs: fs, dir: testPath}}
 
-	idA := storage.CredentialsID("id_a")
+	idA := storage.CredentialsID{"provisioner", "id_a"}
 
 	// Behavior against an empty store.
 	expectCredentials(t, store, []storage.CredentialsID{})
@@ -33,10 +33,10 @@ func TestCredentialsCrud(t *testing.T) {
 	require.NoError(t, store.GetCredentials(idA, &storedA))
 	require.Equal(t, credsA, storedA)
 
-	idB := storage.CredentialsID("id_b")
+	idB := storage.CredentialsID{"other_provisioner", "id_b"}
 	credsB := CredsB{Token: 2326, Roles: []string{"users", "donkeys"}}
 	require.NoError(t, store.Save(idB, credsB))
-	expectCredentials(t, store, []storage.CredentialsID{idA, idB})
+	expectCredentials(t, store, []storage.CredentialsID{idB, idA})
 
 	storedB := CredsB{}
 	require.NoError(t, store.GetCredentials(idB, &storedB))

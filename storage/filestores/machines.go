@@ -10,6 +10,9 @@ type machines struct {
 	sandbox Sandbox
 }
 
+const machineFile = "machine.json"
+const detailsFile = "details.json"
+
 // NewMachines creates a new machine store within the provided sandbox.
 func NewMachines(sandbox Sandbox) storage.Machines {
 	return &machines{sandbox: sandbox}
@@ -44,7 +47,10 @@ func (m machines) List() ([]storage.MachineID, error) {
 	}
 	ids := []storage.MachineID{}
 	for _, element := range contents {
-		ids = append(ids, storage.MachineID(element))
+		dir, file := dirAndFile(element)
+		if file == machineFile {
+			ids = append(ids, storage.MachineID(dir))
+		}
 	}
 	return ids, nil
 }
@@ -72,9 +78,9 @@ func (m machines) machinePath(id storage.MachineID) string {
 }
 
 func (m machines) recordPath(id storage.MachineID) string {
-	return path.Join(m.machinePath(id), "machine.json")
+	return path.Join(m.machinePath(id), machineFile)
 }
 
 func (m machines) provisionerRecordPath(id storage.MachineID) string {
-	return path.Join(m.machinePath(id), "details.json")
+	return path.Join(m.machinePath(id), detailsFile)
 }
