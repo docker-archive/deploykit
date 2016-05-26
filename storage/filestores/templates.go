@@ -29,6 +29,8 @@ func (c templates) List() ([]storage.TemplateID, error) {
 	return ids, nil
 }
 
+// TODO(wfarner): Consider pushing unmarshaling higher up the stack.  At the very least, other store implementations
+// should not need to reimplement this.
 func (c templates) GetTemplate(id storage.TemplateID, templatesData interface{}) error {
 	return c.sandbox.readAndUnmarshal(id.Key(), templatesData)
 }
