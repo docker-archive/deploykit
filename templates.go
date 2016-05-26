@@ -15,30 +15,16 @@ type TemplateBuilder MachineRequestBuilder
 // Templates looks up and reads template data, scoped by provisioner name.
 type Templates interface {
 	// NewTemplate returns a blank template, which can be used to describe the template schema.
-	NewBlankTemplate(provisionerName string) (api.MachineRequest, error)
-
-	// Unmarshal decodes the bytes and applies onto the machine request object, using a given encoding.
-	// If nil codec is passed, the default encoding / content type will be used.
-	Unmarshal(contentType *Codec, data []byte, cred api.MachineRequest) error
-
-	// Marshal encodes the given template object and returns the bytes.
-	// If nil codec is passed, the default encoding / content type will be used.
-	Marshal(contentType *Codec, cred api.MachineRequest) ([]byte, error)
+	NewBlankTemplate(provisionerName string) (api.MachineRequest, *Error)
 
 	// ListIds
-	ListIds() ([]storage.TemplateID, error)
-
-	// Saves the template identified by provisioner and key
-	Save(id storage.TemplateID, cred api.MachineRequest) error
+	ListIds() ([]storage.TemplateID, *Error)
 
 	// Get returns a template identified by provisioner and key
-	Get(id storage.TemplateID) (api.MachineRequest, error)
+	Get(id storage.TemplateID) (api.MachineRequest, *Error)
 
 	// Deletes the template identified by provisioner and key
-	Delete(id storage.TemplateID) error
-
-	// Exists returns true if template identified by provisioner and key already exists
-	Exists(id storage.TemplateID) bool
+	Delete(id storage.TemplateID) *Error
 
 	// CreateTemplate adds a new template from the input reader.
 	CreateTemplate(id storage.TemplateID, input io.Reader, codec *Codec) *Error
@@ -57,85 +43,82 @@ func NewTemplates(store storage.Templates, provisioners *MachineProvisioners) Te
 	return &templates{store: store, provisioners: provisioners}
 }
 
-func (t *templates) NewBlankTemplate(provisionerName string) (api.MachineRequest, error) {
+func (t *templates) NewBlankTemplate(provisionerName string) (api.MachineRequest, *Error) {
 	if builder, has := t.provisioners.GetBuilder(provisionerName); has {
-		return builder.DefaultMachineRequest, nil
+		return builder.DefaultMachineRequest(), nil
 	}
-	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
+	return nil, &Error{ErrBadInput, fmt.Sprintf("Unknown provisioner: %v", provisionerName)}
 }
 
-// Unmarshal decodes the bytes and applies onto the template object, using a given encoding.
-// If nil codec is passed, the default encoding / content type will be used.
-func (t *templates) Unmarshal(contentType *Codec, data []byte, tmpl api.MachineRequest) error {
-	return contentType.unmarshal(data, tmpl)
-}
-
-// Marshal encodes the given template object and returns the bytes.
-// If nil codec is passed, the default encoding / content type will be used.
-func (t *templates) Marshal(contentType *Codec, tmpl api.MachineRequest) ([]byte, error) {
-	return contentType.marshal(tmpl)
-}
-
-func (t *templates) ListIds() ([]storage.TemplateID, error) {
-	return t.store.List()
-}
-
-func (t *templates) Save(id storage.TemplateID, tmpl api.MachineRequest) error {
-	return t.store.Save(id, tmpl)
-}
-
-func (t *templates) Get(id storage.TemplateID) (api.MachineRequest, error) {
-	detail, err := t.NewBlankTemplate(id.Provisioner)
+func (t *templates) ListIds() ([]storage.TemplateID, *Error) {
+	ids, err := t.store.List()
 	if err != nil {
-		return nil, err
+		return nil, &Error{ErrUnknown, err.Error()}
+	}
+	return ids, nil
+}
+
+func (t *templates) Get(id storage.TemplateID) (api.MachineRequest, *Error) {
+	detail, apiErr := t.NewBlankTemplate(id.Provisioner)
+	if apiErr != nil {
+		return nil, apiErr
 	}
 
-	err = t.store.GetTemplate(id, detail)
+	err := t.store.GetTemplate(id, detail)
 	if err != nil {
-		return nil, err
+		return nil, &Error{ErrNotFound, err.Error()}
 	}
 	return detail, nil
 }
 
-func (t *templates) Delete(id storage.TemplateID) error {
-	return t.store.Delete(id)
+func (t *templates) Delete(id storage.TemplateID) *Error {
+	err := t.store.Delete(id)
+	if err != nil {
+		return &Error{ErrNotFound, err.Error()}
+	}
+	return nil
 }
 
-func (t *templates) Exists(id storage.TemplateID) bool {
+func (t *templates) exists(id storage.TemplateID) bool {
 	tmpl, err := t.NewBlankTemplate(id.Provisioner)
 	if err != nil {
 		return false
 	}
-	err = t.store.GetTemplate(id, tmpl)
-	return err == nil
+
+	// TODO(wfarner): This result mixes error cases (failure to read/unmarshal with absence).
+	return t.store.GetTemplate(id, tmpl) == nil
+}
+
+func (t *templates) unmarshal(contentType *Codec, data []byte, tmpl api.MachineRequest) error {
+	return contentType.unmarshal(data, tmpl)
 }
 
 func (t *templates) CreateTemplate(id storage.TemplateID, input io.Reader, codec *Codec) *Error {
-	if t.Exists(id) {
+	if t.exists(id) {
 		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", id)}
 	}
 
-	tmpl, err := t.NewBlankTemplate(id.Provisioner)
-	if err != nil {
+	tmpl, apiErr := t.NewBlankTemplate(id.Provisioner)
+	if apiErr != nil {
 		return &Error{ErrNotFound, fmt.Sprintf("Unknown provisioner:%s", id.Provisioner)}
 	}
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &Error{Message: err.Error()}
+		return &Error{ErrUnknown, err.Error()}
 	}
 
-	if err = t.Unmarshal(codec, buff, tmpl); err != nil {
-		return &Error{Message: err.Error()}
+	if err = t.unmarshal(codec, buff, tmpl); err != nil {
+		return &Error{ErrBadInput, err.Error()}
 	}
-	if err = t.Save(id, tmpl); err != nil {
-		return &Error{Message: err.Error()}
+	if err = t.store.Save(id, tmpl); err != nil {
+		return &Error{ErrUnknown, err.Error()}
 	}
 	return nil
 }
 
 func (t *templates) UpdateTemplate(id storage.TemplateID, input io.Reader, codec *Codec) *Error {
-	if !t.Exists(id) {
+	if !t.exists(id) {
 		return &Error{ErrNotFound, fmt.Sprintf("Template not found: %v", id)}
 	}
 
@@ -145,16 +128,16 @@ func (t *templates) UpdateTemplate(id storage.TemplateID, input io.Reader, codec
 
 	}
 
-	tmpl, err := t.NewBlankTemplate(id.Provisioner)
-	if err != nil {
-		return &Error{ErrNotFound, fmt.Sprintf("Unknow provisioner: %v", id.Provisioner)}
+	tmpl, apiErr := t.NewBlankTemplate(id.Provisioner)
+	if apiErr != nil {
+		return apiErr
 	}
 
-	if err = t.Unmarshal(codec, buff, tmpl); err != nil {
+	if err = t.unmarshal(codec, buff, tmpl); err != nil {
 		return &Error{Message: err.Error()}
 	}
 
-	if err = t.Save(id, tmpl); err != nil {
+	if err = t.store.Save(id, tmpl); err != nil {
 		return &Error{Message: err.Error()}
 	}
 	return nil

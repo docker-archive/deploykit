@@ -5,6 +5,7 @@ package api
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	// Note: this line is hand-edited as a workaround for https://github.com/golang/mock/issues/4
 	context "golang.org/x/net/context"
 )
 

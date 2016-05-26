@@ -142,8 +142,8 @@ type CredentialsID string
 
 // TemplateID is a unique identifier for template within a provisioner namespace
 type TemplateID struct {
-	Provisioner string
-	Name        string
+	Provisioner string `json:"provisioner"`
+	Name        string `json:"name"`
 }
 
 // Key returns the key used for looking up the template.  Key is composed of the provisioner
@@ -153,6 +153,7 @@ func (t TemplateID) Key() string {
 }
 
 // TemplateIDFromString returns a TemplateID from a simple untyped string of some format.
+// TODO(wfarner): Consider solving this in the store to avoid the string formatting dance.
 func TemplateIDFromString(s string) TemplateID {
 	p := strings.Split(s, "-")
 	if len(p) > 1 {

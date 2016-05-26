@@ -1,8 +1,6 @@
 package http
 
 import (
-	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/storage"
 	"github.com/gorilla/mux"
@@ -13,91 +11,28 @@ type templatesHandler struct {
 	templates libmachete.Templates
 }
 
-func (h *templatesHandler) getOne(resp http.ResponseWriter, req *http.Request) {
-	id := getTemplateID(req)
-	cr, err := h.templates.Get(id)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown template:%s", id.Name))
-		return
-	}
-	libmachete.ContentTypeJSON.Respond(resp, cr)
+func (h *templatesHandler) getOne(req *http.Request) (interface{}, *libmachete.Error) {
+	return h.templates.Get(getTemplateID(req))
 }
 
-func (h *templatesHandler) getBlank(resp http.ResponseWriter, req *http.Request) {
-	provisioner := getProvisionerName(req)
-	log.Infof("Get template example %v", provisioner)
-
-	example, err := h.templates.NewBlankTemplate(provisioner)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
-		return
-	}
-	libmachete.ContentTypeJSON.Respond(resp, example)
+func (h *templatesHandler) getBlank(req *http.Request) (interface{}, *libmachete.Error) {
+	return h.templates.NewBlankTemplate(getProvisionerName(req))
 }
 
-func (h *templatesHandler) getAll(resp http.ResponseWriter, req *http.Request) {
-	log.Infoln("List templates")
-	all, err := h.templates.ListIds()
-	if err != nil {
-		respondError(http.StatusInternalServerError, resp, err)
-		return
-	}
-	libmachete.ContentTypeJSON.Respond(resp, all)
+func (h *templatesHandler) getAll(req *http.Request) (interface{}, *libmachete.Error) {
+	return h.templates.ListIds()
 }
 
-func (h *templatesHandler) create(resp http.ResponseWriter, req *http.Request) {
-	id := getTemplateID(req)
-	log.Infof("Add template %v", id)
-
-	err := h.templates.CreateTemplate(id, req.Body, libmachete.ContentTypeJSON)
-
-	if err == nil {
-		return
-	}
-
-	switch err.Code {
-	case libmachete.ErrDuplicate:
-		respondError(http.StatusConflict, resp, err)
-		return
-	case libmachete.ErrNotFound:
-		respondError(http.StatusNotFound, resp, err)
-		return
-	default:
-		respondError(http.StatusInternalServerError, resp, err)
-		return
-	}
+func (h *templatesHandler) create(req *http.Request) (interface{}, *libmachete.Error) {
+	return nil, h.templates.CreateTemplate(getTemplateID(req), req.Body, libmachete.ContentTypeJSON)
 }
 
-func (h *templatesHandler) update(resp http.ResponseWriter, req *http.Request) {
-	id := getTemplateID(req)
-	log.Infof("Update template %v", id.Name)
-
-	err := h.templates.UpdateTemplate(id, req.Body, libmachete.ContentTypeJSON)
-
-	if err == nil {
-		return
-	}
-
-	switch err.Code {
-	case libmachete.ErrDuplicate:
-		respondError(http.StatusConflict, resp, err)
-		return
-	case libmachete.ErrNotFound:
-		respondError(http.StatusNotFound, resp, err)
-		return
-	default:
-		respondError(http.StatusInternalServerError, resp, err)
-		return
-	}
+func (h *templatesHandler) update(req *http.Request) (interface{}, *libmachete.Error) {
+	return nil, h.templates.UpdateTemplate(getTemplateID(req), req.Body, libmachete.ContentTypeJSON)
 }
 
-func (h *templatesHandler) delete(resp http.ResponseWriter, req *http.Request) {
-	id := getTemplateID(req)
-	err := h.templates.Delete(id)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown template:%s", id.Name))
-		return
-	}
+func (h *templatesHandler) delete(req *http.Request) (interface{}, *libmachete.Error) {
+	return nil, h.templates.Delete(getTemplateID(req))
 }
 
 func getTemplateID(request *http.Request) storage.TemplateID {
@@ -108,14 +43,14 @@ func getTemplateID(request *http.Request) storage.TemplateID {
 }
 
 func getProvisionerName(request *http.Request) string {
-	return request.URL.Query().Get("provisioner")
+	return mux.Vars(request)["provisioner"]
 }
 
 func (h *templatesHandler) attachTo(router *mux.Router) {
-	router.HandleFunc("/json", h.getAll).Methods("GET")
-	router.HandleFunc("/meta/{provisioner}/json", h.getBlank).Methods("GET")
-	router.HandleFunc("/{provisioner}/{key}/create", h.create).Methods("POST")
-	router.HandleFunc("/{provisioner}/{key}", h.update).Methods("PUT")
-	router.HandleFunc("/{provisioner}/{key}/json", h.getOne).Methods("GET")
-	router.HandleFunc("/{provisioner}/{key}", h.delete).Methods("DELETE")
+	router.HandleFunc("/json", outputHandler(h.getAll)).Methods("GET")
+	router.HandleFunc("/meta/{provisioner}/json", outputHandler(h.getBlank)).Methods("GET")
+	router.HandleFunc("/{provisioner}/{key}/create", outputHandler(h.create)).Methods("POST")
+	router.HandleFunc("/{provisioner}/{key}", outputHandler(h.update)).Methods("PUT")
+	router.HandleFunc("/{provisioner}/{key}/json", outputHandler(h.getOne)).Methods("GET")
+	router.HandleFunc("/{provisioner}/{key}", outputHandler(h.delete)).Methods("DELETE")
 }

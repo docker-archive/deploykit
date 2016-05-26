@@ -15,7 +15,7 @@ type CredentialBase struct {
 	Provisioner string `yaml:"provisioner" json:"provisioner"`
 }
 
-// ProvisionerName returns the name of the provisioner this credentail object is for.
+// ProvisionerName returns the name of the provisioner this credential object is for.
 func (cb CredentialBase) ProvisionerName() string {
 	return cb.Provisioner
 }

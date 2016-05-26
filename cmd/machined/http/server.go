@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete"
@@ -11,7 +12,6 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strings"
 )
 
 import (
@@ -33,16 +33,12 @@ type apiServer struct {
 	keystore    libmachete.Keys
 }
 
-func build(options apiOptions) (*apiServer, error) {
-	provisioners := libmachete.DefaultProvisioners
-
-	sandbox := filestores.NewOsSandbox(options.RootDir)
-	contextSandbox := sandbox.Nested("contexts")
+func build(sandbox filestores.Sandbox, provisioners *libmachete.MachineProvisioners) (*apiServer, error) {
 	credentialsSandbox := sandbox.Nested("credentials")
 	templatesSandbox := sandbox.Nested("templates")
 	machinesSandbox := sandbox.Nested("machines")
 	keystoreSandbox := sandbox.Nested("machines")
-	for _, box := range []filestores.Sandbox{contextSandbox, credentialsSandbox, templatesSandbox, machinesSandbox} {
+	for _, box := range []filestores.Sandbox{credentialsSandbox, templatesSandbox, machinesSandbox} {
 		err := box.Mkdirs()
 		if err != nil {
 			return nil, err
@@ -50,8 +46,8 @@ func build(options apiOptions) (*apiServer, error) {
 	}
 
 	return &apiServer{
-		credentials: libmachete.NewCredentials(filestores.NewCredentials(credentialsSandbox), &provisioners),
-		templates:   libmachete.NewTemplates(filestores.NewTemplates(templatesSandbox), &provisioners),
+		credentials: libmachete.NewCredentials(filestores.NewCredentials(credentialsSandbox), provisioners),
+		templates:   libmachete.NewTemplates(filestores.NewTemplates(templatesSandbox), provisioners),
 		machines:    libmachete.NewMachines(filestores.NewMachines(machinesSandbox)),
 		keystore:    libmachete.NewKeys(filestores.NewKeys(keystoreSandbox)),
 	}, nil
@@ -60,15 +56,19 @@ func build(options apiOptions) (*apiServer, error) {
 func respondError(code int, resp http.ResponseWriter, err error) {
 	resp.WriteHeader(code)
 	resp.Header().Set("Content-Type", "application/json")
-	message := strings.Replace(err.Error(), "\"", "'", -1)
-	resp.Write([]byte(fmt.Sprintf("{\"error\":\"%s\"}", message)))
+	body, err := json.Marshal(map[string]string{"error": err.Error()})
+	if err == nil {
+		resp.Write(body)
+		return
+	}
+	panic(fmt.Sprintf("Failed to marshal error text: %s", err.Error()))
 }
 
 type routerAttachment interface {
 	attachTo(router *mux.Router)
 }
 
-func (s *apiServer) start() error {
+func (s *apiServer) getHandler() http.Handler {
 	attachments := map[string]routerAttachment{
 		"/credentials": &credentialsHandler{credentials: s.credentials},
 		"/templates":   &templatesHandler{templates: s.templates},
@@ -85,8 +85,13 @@ func (s *apiServer) start() error {
 		attachment.attachTo(router.PathPrefix(path).Subrouter())
 	}
 
-	http.Handle("/", router)
-	return http.ListenAndServe(fmt.Sprintf(":%s", s.options.Port), router)
+	return router
+}
+
+func (s *apiServer) start() error {
+	handler := s.getHandler()
+	http.Handle("/", handler)
+	return http.ListenAndServe(fmt.Sprintf(":%s", s.options.Port), handler)
 }
 
 func rootDir() string {
@@ -108,7 +113,7 @@ func ServerCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			log.Infoln("Starting server")
 
-			server, err := build(options)
+			server, err := build(filestores.NewOsSandbox(options.RootDir), &libmachete.DefaultProvisioners)
 			if err != nil {
 				return err
 			}

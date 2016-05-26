@@ -14,8 +14,8 @@ var (
 // of constructing a provisioner.
 type ProvisionerBuilder struct {
 	Name                  string
-	DefaultCredential     api.Credential
-	DefaultMachineRequest api.MachineRequest
+	DefaultCredential     func() api.Credential
+	DefaultMachineRequest func() api.MachineRequest
 	Build                 func(controls api.ProvisionControls, cred api.Credential) (api.Provisioner, error)
 }
 
@@ -23,6 +23,15 @@ type ProvisionerBuilder struct {
 type MachineProvisioners struct {
 	builders     map[string]ProvisionerBuilder
 	buildersLock sync.Mutex
+}
+
+// NewMachineProvisioners creates a collection of provisioners from a slice of builders.
+func NewMachineProvisioners(builders []ProvisionerBuilder) *MachineProvisioners {
+	m := MachineProvisioners{builders: make(map[string]ProvisionerBuilder)}
+	for _, builder := range builders {
+		m.Register(builder)
+	}
+	return &m
 }
 
 // GetBuilder retrieves a registered provisioner builder.

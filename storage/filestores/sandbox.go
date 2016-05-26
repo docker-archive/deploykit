@@ -19,9 +19,14 @@ type Sandbox struct {
 	dir string
 }
 
+// NewSandbox creates a sandbox backed by the provided file system.
+func NewSandbox(fs afero.Fs, dir string) Sandbox {
+	return Sandbox{fs: fs, dir: dir}
+}
+
 // NewOsSandbox creates a sandbox backed by the OS file system.
 func NewOsSandbox(dir string) Sandbox {
-	return Sandbox{fs: afero.NewOsFs(), dir: dir}
+	return NewSandbox(afero.NewOsFs(), dir)
 }
 
 // Mkdirs ensures that the sandbox directory exists.  The creator of a sandbox should call this prior to using a
