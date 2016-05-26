@@ -11,16 +11,13 @@ import (
 // Credentials manages the objects used to authenticate and authorize for a provisioner's API
 type Credentials interface {
 	// ListIds
-	ListIds() ([]string, error)
-
-	// Saves the credential identified by key
-	Save(key string, cred api.Credential) error
+	ListIds() ([]string, *Error)
 
 	// Get returns a credential identified by key
-	Get(key string) (api.Credential, error)
+	Get(key string) (api.Credential, *Error)
 
 	// Deletes the credential identified by key
-	Delete(key string) error
+	Delete(key string) *Error
 
 	// CreateCredential adds a new credential from the input reader.
 	CreateCredential(provisioner, key string, input io.Reader, codec *Codec) *Error
@@ -54,11 +51,11 @@ func (c *credentials) marshal(codec *Codec, cred api.Credential) ([]byte, error)
 	return codec.marshal(cred)
 }
 
-func (c *credentials) ListIds() ([]string, error) {
+func (c *credentials) ListIds() ([]string, *Error) {
 	out := []string{}
 	list, err := c.store.List()
 	if err != nil {
-		return nil, err
+		return nil, UnknownError(err)
 	}
 	for _, i := range list {
 		out = append(out, string(i))
@@ -66,33 +63,35 @@ func (c *credentials) ListIds() ([]string, error) {
 	return out, nil
 }
 
-func (c *credentials) Save(key string, cred api.Credential) error {
-	return c.store.Save(storage.CredentialsID(key), cred)
-}
-
-func (c *credentials) Get(key string) (api.Credential, error) {
-	// Since we don't know the provider, we need to read twice: first with a base
+func (c *credentials) Get(key string) (api.Credential, *Error) {
+	// TODO(wfarner): Adjust this once credentials are scoped by provisioner.
+	// Since we don't know the provisioner, we need to read twice: first with a base
 	// structure, then with a specific structure by provisioner.
 	base := new(api.CredentialBase)
 	err := c.store.GetCredentials(storage.CredentialsID(key), base)
 	if err != nil {
-		return nil, err
+		return nil, &Error{ErrNotFound, err.Error()}
 	}
 
 	detail, err := c.newCredential(base.ProvisionerName())
 	if err != nil {
-		return nil, err
+		return nil, &Error{ErrBadInput, err.Error()}
 	}
 
 	err = c.store.GetCredentials(storage.CredentialsID(key), detail)
 	if err != nil {
-		return nil, err
+		return nil, UnknownError(err)
 	}
 	return detail, nil
 }
 
-func (c *credentials) Delete(key string) error {
-	return c.store.Delete(storage.CredentialsID(key))
+func (c *credentials) Delete(key string) *Error {
+	err := c.store.Delete(storage.CredentialsID(key))
+	// TODO(wfarner): Give better visibility from the store to disambiguate between failure cases.
+	if err != nil {
+		return UnknownError(err)
+	}
+	return nil
 }
 
 func (c *credentials) exists(key string) bool {
@@ -107,21 +106,21 @@ func (c *credentials) CreateCredential(provisioner, key string, input io.Reader,
 		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
 	}
 
-	cr, err := c.newCredential(provisioner)
+	creds, err := c.newCredential(provisioner)
 	if err != nil {
 		return &Error{ErrNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
 	}
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &Error{Message: err.Error()}
+		return UnknownError(err)
 	}
 
-	if err = c.unmarshal(codec, buff, cr); err != nil {
-		return &Error{Message: err.Error()}
+	if err = c.unmarshal(codec, buff, creds); err != nil {
+		return UnknownError(err)
 	}
-	if err = c.Save(key, cr); err != nil {
-		return &Error{Message: err.Error()}
+	if err = c.store.Save(storage.CredentialsID(key), creds); err != nil {
+		return UnknownError(err)
 	}
 	return nil
 }
@@ -133,26 +132,25 @@ func (c *credentials) UpdateCredential(key string, input io.Reader, codec *Codec
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &Error{Message: err.Error()}
-
+		return UnknownError(err)
 	}
 
 	base := new(api.CredentialBase)
 	if err = c.unmarshal(codec, buff, base); err != nil {
-		return &Error{Message: err.Error()}
+		return UnknownError(err)
 	}
 
-	detail, err := c.newCredential(base.ProvisionerName())
+	creds, err := c.newCredential(base.ProvisionerName())
 	if err != nil {
-		return &Error{ErrNotFound, fmt.Sprintf("Unknow provisioner: %v", base.ProvisionerName())}
+		return &Error{ErrNotFound, err.Error()}
 	}
 
-	if err = c.unmarshal(codec, buff, detail); err != nil {
-		return &Error{Message: err.Error()}
+	if err = c.unmarshal(codec, buff, creds); err != nil {
+		return UnknownError(err)
 	}
 
-	if err = c.Save(key, detail); err != nil {
-		return &Error{Message: err.Error()}
+	if err = c.store.Save(storage.CredentialsID(key), creds); err != nil {
+		return UnknownError(err)
 	}
 	return nil
 }

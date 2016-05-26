@@ -17,14 +17,14 @@ type MachineRequestBuilder func() api.MachineRequest
 
 // Machines manages the lifecycle of a machine / node.
 type Machines interface {
-	// List
-	List() ([]storage.MachineSummary, error)
+	// List returns summaries of all machines.
+	List() ([]storage.MachineSummary, *Error)
 
-	// ListIds
-	ListIds() ([]string, error)
+	// ListIds returns the identifiers for all machines.
+	ListIds() ([]string, *Error)
 
 	// Get returns a machine identified by key
-	Get(key string) (storage.MachineRecord, error)
+	Get(key string) (storage.MachineRecord, *Error)
 
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(
@@ -51,11 +51,11 @@ func NewMachines(store storage.Machines) Machines {
 	return &machines{store: store}
 }
 
-func (cm *machines) List() ([]storage.MachineSummary, error) {
+func (cm *machines) List() ([]storage.MachineSummary, *Error) {
 	out := []storage.MachineSummary{}
 	ids, err := cm.ListIds()
 	if err != nil {
-		return nil, err
+		return nil, UnknownError(err)
 	}
 	for _, i := range ids {
 		if record, err := cm.Get(string(i)); err == nil {
@@ -65,11 +65,11 @@ func (cm *machines) List() ([]storage.MachineSummary, error) {
 	return out, nil
 }
 
-func (cm *machines) ListIds() ([]string, error) {
+func (cm *machines) ListIds() ([]string, *Error) {
 	out := []string{}
 	list, err := cm.store.List()
 	if err != nil {
-		return nil, err
+		return nil, UnknownError(err)
 	}
 	for _, i := range list {
 		out = append(out, string(i))
@@ -78,10 +78,10 @@ func (cm *machines) ListIds() ([]string, error) {
 	return out, nil
 }
 
-func (cm *machines) Get(key string) (storage.MachineRecord, error) {
+func (cm *machines) Get(key string) (storage.MachineRecord, *Error) {
 	m, err := cm.store.GetRecord(storage.MachineID(key))
 	if err != nil {
-		return storage.MachineRecord{}, err
+		return storage.MachineRecord{}, UnknownError(err)
 	}
 	return *m, nil
 }
@@ -129,7 +129,7 @@ func (cm *machines) CreateMachine(
 
 	request, err := cm.populateRequest(provisioner, template, input, codec)
 	if err != nil {
-		return nil, &Error{Message: err.Error()}
+		return nil, UnknownError(err)
 	}
 
 	key := request.Name()

@@ -27,3 +27,8 @@ type Error struct {
 func (e Error) Error() string {
 	return e.Message
 }
+
+// UnknownError creates a standard Error when the cause is unknown.
+func UnknownError(err error) *Error {
+	return &Error{ErrUnknown, err.Error()}
+}
