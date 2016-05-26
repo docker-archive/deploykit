@@ -4,6 +4,7 @@ import (
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/ssh"
 	"github.com/docker/libmachete/storage"
+	"sort"
 )
 
 // Keys manages SSH keys
@@ -13,7 +14,7 @@ type Keys interface {
 	api.KeyStore
 
 	// ListIds
-	ListIds() ([]storage.KeyID, error)
+	ListIds() ([]string, error)
 }
 
 type keys struct {
@@ -40,8 +41,17 @@ func (km *keys) NewKeyPair(id string) error {
 }
 
 // ListIds returns a list of key ids.
-func (km *keys) ListIds() ([]storage.KeyID, error) {
-	return km.store.List()
+func (km *keys) ListIds() ([]string, error) {
+	all, err := km.store.List()
+	if err != nil {
+		return nil, err
+	}
+	list := []string{}
+	for _, k := range all {
+		list = append(list, string(k))
+	}
+	sort.Strings(list)
+	return list, nil
 }
 
 // GetEncodedPublicKey returns an OpenSSH authorized_key format public key

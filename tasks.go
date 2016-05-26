@@ -128,7 +128,7 @@ func defaultSSHKeyGenHandler(prov api.Provisioner, keys api.KeyStore,
 
 	key := resource.Name()
 	if key == "" {
-		return fmt.Errorf("Bad resource name")
+		return NewError(ErrBadInput, "Bad resource name")
 	}
 	return keys.NewKeyPair(key)
 }
@@ -142,7 +142,7 @@ func defaultSSHKeyRemoveHandler(prov api.Provisioner, keys api.KeyStore,
 
 	key := resource.Name()
 	if key == "" {
-		return fmt.Errorf("Bad resource name")
+		return NewError(ErrBadInput, "Bad resource name")
 	}
 	return keys.Remove(key)
 }

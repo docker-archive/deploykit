@@ -9,6 +9,8 @@ const (
 	ErrDuplicate int = iota
 	// ErrNotFound indicates object does not exist by key
 	ErrNotFound
+	// ErrBadInput indicates bad user input
+	ErrBadInput
 )
 
 // Error is the libmachete specific error

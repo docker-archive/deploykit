@@ -22,8 +22,6 @@ func TestNewKeyPair(t *testing.T) {
 	buff, err := json.MarshalIndent(kp, " ", " ")
 	require.NoError(t, err)
 
-	t.Log(string(buff))
-
 	kp2 := new(KeyPair)
 	err = json.Unmarshal(buff, kp2)
 	require.NoError(t, err)

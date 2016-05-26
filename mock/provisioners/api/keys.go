@@ -28,16 +28,6 @@ func (_m *MockKeyStore) EXPECT() *_MockKeyStoreRecorder {
 	return _m.recorder
 }
 
-func (_m *MockKeyStore) Exists(_param0 string) bool {
-	ret := _m.ctrl.Call(_m, "Exists", _param0)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-func (_mr *_MockKeyStoreRecorder) Exists(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Exists", arg0)
-}
-
 func (_m *MockKeyStore) GetEncodedPublicKey(_param0 string) ([]byte, error) {
 	ret := _m.ctrl.Call(_m, "GetEncodedPublicKey", _param0)
 	ret0, _ := ret[0].([]byte)
