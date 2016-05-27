@@ -137,7 +137,7 @@ func (cm *machines) CreateMachine(
 
 	key := request.Name()
 	if cm.exists(key) {
-		return nil, &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
+		return nil, &Error{Code: ErrDuplicate, Message: fmt.Sprintf("Key exists: %v", key)}
 	}
 
 	// First save a record

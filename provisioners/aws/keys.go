@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
@@ -24,7 +23,7 @@ func GenerateAndUploadSSHKey(
 	prov, is := p.(*provisioner)
 
 	if !is {
-		return fmt.Errorf("Not AWS provisioner:%v", p)
+		return libmachete.NewError(libmachete.ErrBadInput, "Not AWS provisioner:%v", p)
 	}
 
 	// Call the default implementation to generate the key
@@ -67,7 +66,7 @@ func RemoveLocalAndUploadedSSHKey(
 	prov, is := p.(*provisioner)
 
 	if !is {
-		return fmt.Errorf("Not AWS provisioner:%v", p)
+		return libmachete.NewError(libmachete.ErrBadInput, "Not AWS provisioner:%v", p)
 	}
 
 	keyName := resource.Name()

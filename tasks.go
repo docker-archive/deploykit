@@ -150,7 +150,7 @@ func defaultSSHKeyRemoveHandler(prov api.Provisioner, keys api.KeyStore,
 var (
 	// TaskSSHKeyGen is the task that generates SSH key
 	TaskSSHKeyGen = api.Task{
-		Name:    "ssh-keygen",
+		Name:    "ssh-key-generate",
 		Message: "Generating ssh key for host",
 		Do:      defaultSSHKeyGenHandler,
 	}
@@ -164,14 +164,14 @@ var (
 
 	// TaskCreateInstance creates a machine instance
 	TaskCreateInstance = api.Task{
-		Name:    "create-instance",
+		Name:    "instance-create",
 		Message: "Creates a machine instance",
 		Do:      defaultCreateInstanceHandler,
 	}
 
 	// TaskDestroyInstance irreversibly destroys a machine instance
 	TaskDestroyInstance = api.Task{
-		Name:    "destroy-instance",
+		Name:    "instance-destroy",
 		Message: "Destroys a machine instance",
 		Do:      defaultDestroyInstanceHandler,
 	}
