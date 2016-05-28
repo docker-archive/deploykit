@@ -34,7 +34,7 @@ func (km *keys) NewKeyPair(id string) error {
 	}
 
 	if km.exists(id) {
-		return NewError(ErrNotFound, "Key %v not found.", id)
+		return NewError(ErrDuplicate, "Duplicate key: %v", id)
 	}
 
 	return km.store.Save(storage.KeyID(id), kp)

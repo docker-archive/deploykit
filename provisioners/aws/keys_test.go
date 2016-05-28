@@ -39,21 +39,16 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	client.EXPECT().ImportKeyPair(gomock.Any()).Do(matcher).Return(nil, nil)
 
 	request := new(CreateInstanceRequest)
-	require.NoError(t, json.Unmarshal([]byte(testCreateSync[0]), request))
-	payload := fmt.Sprintf(`{"name": "%s", "provision" : [ "ssh-key-generate", "instance-create" ]}`, host)
-	require.NoError(t, json.Unmarshal([]byte(payload), request))
-
-	// Initial request before we generate key and import it
-	require.NotEqual(t, host, request.KeyName)
-	require.Equal(t, host, request.Name())
+	request.KeyName = ""
+	request.MachineName = host
 
 	events := make(chan interface{})
 	record := &storage.MachineRecord{}
 	record.MachineName = storage.MachineID(host)
 
 	go func() {
-		for evt := range events {
-			t.Log("event=", evt)
+		for range events {
+			// consume events
 		}
 	}()
 
@@ -64,7 +59,8 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// Verify that the keyName has been updated.
+	// Verify that the keyName has been updated.  Note the line above the KeyName
+	// was not specified.
 	require.Equal(t, host, request.KeyName)
 
 }
@@ -82,10 +78,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	client := mock.NewMockEC2API(ctrl)
 	provisioner := New(client)
 
-	matcher := func(input *ec2.DeleteKeyPairInput) {
-		require.Equal(t, host, *input.KeyName)
-	}
-	client.EXPECT().DeleteKeyPair(gomock.Any()).Do(matcher).Return(nil, nil)
+	client.EXPECT().DeleteKeyPair(&ec2.DeleteKeyPairInput{KeyName: &host}).Return(nil, nil)
 
 	request := new(CreateInstanceRequest)
 	require.NoError(t, json.Unmarshal([]byte(testCreateSync[0]), request))
@@ -101,6 +94,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	err := RemoveLocalAndUploadedSSHKey(provisioner, keys, cred, record, request, events)
 	require.NoError(t, err)
 
+	close(events)
 	ids, err := keys.ListIds()
 	require.NoError(t, err)
 	require.Equal(t, []string{}, ids)
@@ -137,8 +131,7 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 		},
 	).Return(nil, nil)
 
-	template := new(CreateInstanceRequest)
-	require.NoError(t, json.Unmarshal([]byte(testCreateSync[0]), template))
+	template := loadTemplate(t)
 
 	events, err := machines.CreateMachine(
 		provisioner,
@@ -151,8 +144,12 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, events)
 
-	for evt := range events {
-		t.Log("event=", evt)
+	for range events {
 	}
+}
 
+func loadTemplate(t *testing.T) *CreateInstanceRequest {
+	template := new(CreateInstanceRequest)
+	require.NoError(t, json.Unmarshal([]byte(testCreateSync[0]), template))
+	return template
 }

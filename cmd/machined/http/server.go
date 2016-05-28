@@ -37,7 +37,6 @@ func build(sandbox filestores.Sandbox, provisioners *libmachete.MachineProvision
 	credentialsSandbox := sandbox.Nested("credentials")
 	templatesSandbox := sandbox.Nested("templates")
 	machinesSandbox := sandbox.Nested("machines")
-	keystoreSandbox := sandbox.Nested("machines")
 	for _, box := range []filestores.Sandbox{credentialsSandbox, templatesSandbox, machinesSandbox} {
 		err := box.Mkdirs()
 		if err != nil {
@@ -49,7 +48,7 @@ func build(sandbox filestores.Sandbox, provisioners *libmachete.MachineProvision
 		credentials: libmachete.NewCredentials(filestores.NewCredentials(credentialsSandbox), provisioners),
 		templates:   libmachete.NewTemplates(filestores.NewTemplates(templatesSandbox), provisioners),
 		machines:    libmachete.NewMachines(filestores.NewMachines(machinesSandbox)),
-		keystore:    libmachete.NewKeys(filestores.NewKeys(keystoreSandbox)),
+		keystore:    libmachete.NewKeys(filestores.NewKeys(machinesSandbox)), // Keys are stored with host/instance data
 	}, nil
 }
 
