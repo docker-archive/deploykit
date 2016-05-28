@@ -1,8 +1,6 @@
 package http
 
 import (
-	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete"
 	"github.com/gorilla/mux"
 	"net/http"
@@ -16,86 +14,34 @@ func getCredentialID(req *http.Request) string {
 	return mux.Vars(req)["key"]
 }
 
-func (h *credentialsHandler) getOne(resp http.ResponseWriter, req *http.Request) {
-	key := getCredentialID(req)
-	cr, err := h.credentials.Get(key)
-	if err == nil {
-		libmachete.ContentTypeJSON.Respond(resp, cr)
-	} else {
-		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-	}
+func (h *credentialsHandler) getOne(req *http.Request) (interface{}, *libmachete.Error) {
+	return h.credentials.Get(getCredentialID(req))
 }
 
-func (h *credentialsHandler) getAll(resp http.ResponseWriter, req *http.Request) {
-	log.Infoln("List credentials")
-	all, err := h.credentials.ListIds()
-	if err != nil {
-		respondError(http.StatusInternalServerError, resp, err)
-		return
-	}
-	libmachete.ContentTypeJSON.Respond(resp, all)
+func (h *credentialsHandler) getAll(req *http.Request) (interface{}, *libmachete.Error) {
+	return h.credentials.ListIds()
 }
 
-func (h *credentialsHandler) create(resp http.ResponseWriter, req *http.Request) {
-	provisioner := req.URL.Query().Get("provisioner")
-	key := getCredentialID(req)
-	log.Infof("Add credential %v, %v\n", provisioner, key)
-
-	err := h.credentials.CreateCredential(provisioner, key, req.Body, libmachete.ContentTypeJSON)
-
-	if err == nil {
-		return
-	}
-
-	switch err.Code {
-	case libmachete.ErrDuplicate:
-		respondError(http.StatusConflict, resp, err)
-		return
-	case libmachete.ErrNotFound:
-		respondError(http.StatusNotFound, resp, err)
-		return
-	default:
-		respondError(http.StatusInternalServerError, resp, err)
-		return
-	}
+func (h *credentialsHandler) create(req *http.Request) (interface{}, *libmachete.Error) {
+	return nil, h.credentials.CreateCredential(
+		req.URL.Query().Get("provisioner"),
+		getCredentialID(req),
+		req.Body,
+		libmachete.ContentTypeJSON)
 }
 
-func (h *credentialsHandler) update(resp http.ResponseWriter, req *http.Request) {
-	key := getCredentialID(req)
-	log.Infof("Update credential %v\n", key)
-
-	err := h.credentials.UpdateCredential(key, req.Body, libmachete.ContentTypeJSON)
-
-	if err == nil {
-		return
-	}
-
-	switch err.Code {
-	case libmachete.ErrDuplicate:
-		respondError(http.StatusConflict, resp, err)
-		return
-	case libmachete.ErrNotFound:
-		respondError(http.StatusNotFound, resp, err)
-		return
-	default:
-		respondError(http.StatusInternalServerError, resp, err)
-		return
-	}
+func (h *credentialsHandler) update(req *http.Request) (interface{}, *libmachete.Error) {
+	return nil, h.credentials.UpdateCredential(getCredentialID(req), req.Body, libmachete.ContentTypeJSON)
 }
 
-func (h *credentialsHandler) delete(resp http.ResponseWriter, req *http.Request) {
-	key := getCredentialID(req)
-	err := h.credentials.Delete(key)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, fmt.Errorf("Unknown credential:%s", key))
-		return
-	}
+func (h *credentialsHandler) delete(req *http.Request) (interface{}, *libmachete.Error) {
+	return nil, h.credentials.Delete(getCredentialID(req))
 }
 
 func (h *credentialsHandler) attachTo(router *mux.Router) {
-	router.HandleFunc("/json", h.getAll).Methods("GET")
-	router.HandleFunc("/{key}/create", h.create).Methods("POST")
-	router.HandleFunc("/{key}", h.update).Methods("PUT")
-	router.HandleFunc("/{key}/json", h.getOne).Methods("GET")
-	router.HandleFunc("/{key}", h.delete).Methods("DELETE")
+	router.HandleFunc("/json", outputHandler(h.getAll)).Methods("GET")
+	router.HandleFunc("/{key}/create", outputHandler(h.create)).Methods("POST")
+	router.HandleFunc("/{key}", outputHandler(h.update)).Methods("PUT")
+	router.HandleFunc("/{key}/json", outputHandler(h.getOne)).Methods("GET")
+	router.HandleFunc("/{key}", outputHandler(h.delete)).Methods("DELETE")
 }

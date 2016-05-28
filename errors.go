@@ -33,6 +33,11 @@ func (e Error) Error() string {
 	return e.Message
 }
 
+// UnknownError creates a standard Error when the cause is unknown.
+func UnknownError(err error) *Error {
+	return &Error{ErrUnknown, err.Error()}
+}
+
 // NewError creates an Error with the specified code.
 func NewError(code int, format string, args ...interface{}) error {
 	return Error{Code: code, Message: fmt.Sprintf(format, args...)}

@@ -53,7 +53,7 @@ func (t *templates) NewBlankTemplate(provisionerName string) (api.MachineRequest
 func (t *templates) ListIds() ([]storage.TemplateID, *Error) {
 	ids, err := t.store.List()
 	if err != nil {
-		return nil, &Error{ErrUnknown, err.Error()}
+		return nil, UnknownError(err)
 	}
 	return ids, nil
 }
@@ -105,14 +105,14 @@ func (t *templates) CreateTemplate(id storage.TemplateID, input io.Reader, codec
 
 	buff, err := ioutil.ReadAll(input)
 	if err != nil {
-		return &Error{ErrUnknown, err.Error()}
+		return UnknownError(err)
 	}
 
 	if err = t.unmarshal(codec, buff, tmpl); err != nil {
 		return &Error{ErrBadInput, err.Error()}
 	}
 	if err = t.store.Save(id, tmpl); err != nil {
-		return &Error{ErrUnknown, err.Error()}
+		return UnknownError(err)
 	}
 	return nil
 }

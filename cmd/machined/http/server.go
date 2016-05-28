@@ -52,6 +52,7 @@ func build(sandbox filestores.Sandbox, provisioners *libmachete.MachineProvision
 	}, nil
 }
 
+// TODO(wfarner): Consider collapsing this or moving it closer to outputHandler.
 func respondError(code int, resp http.ResponseWriter, err error) {
 	resp.WriteHeader(code)
 	resp.Header().Set("Content-Type", "application/json")

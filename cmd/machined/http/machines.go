@@ -22,39 +22,16 @@ func getMachineID(req *http.Request) string {
 	return mux.Vars(req)["key"]
 }
 
-func (h *machineHandler) getOne(resp http.ResponseWriter, req *http.Request) {
-	key := getMachineID(req)
-	mr, err := h.machines.Get(key)
-	if err == nil {
-		libmachete.ContentTypeJSON.Respond(resp, mr)
-	} else {
-		respondError(
-			http.StatusNotFound,
-			resp,
-			fmt.Errorf("Unknown machine:%s, err=%s", key, err.Error()))
-	}
+func (h *machineHandler) getOne(req *http.Request) (interface{}, *libmachete.Error) {
+	return h.machines.Get(getMachineID(req))
 }
 
-func (h *machineHandler) getAll(resp http.ResponseWriter, req *http.Request) {
-	log.Infoln("List machines")
-	long := len(req.URL.Query().Get("long")) > 0
-
-	if long {
-		all, err := h.machines.List()
-		if err != nil {
-			respondError(http.StatusInternalServerError, resp, err)
-			return
-		}
-		libmachete.ContentTypeJSON.Respond(resp, all)
-		return
+func (h *machineHandler) getAll(req *http.Request) (interface{}, *libmachete.Error) {
+	if len(req.URL.Query().Get("long")) > 0 {
+		return h.machines.List()
 	}
 
-	all, err := h.machines.ListIds()
-	if err != nil {
-		respondError(http.StatusInternalServerError, resp, err)
-		return
-	}
-	libmachete.ContentTypeJSON.Respond(resp, all)
+	return h.machines.ListIds()
 }
 
 func getProvisionControls(req *http.Request) api.ProvisionControls {
@@ -68,27 +45,26 @@ func getProvisionControls(req *http.Request) api.ProvisionControls {
 	return api.ProvisionControls(queryValues)
 }
 
-func (h *machineHandler) create(resp http.ResponseWriter, req *http.Request) {
+func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Error) {
 	credentials := req.URL.Query().Get("credentials")
-	template := req.URL.Query().Get("template")
+	templateName := req.URL.Query().Get("template")
 
-	// TODO - fix this in framework to return default values
+	// TODO: fix this in framework to return default values
 	if credentials == "" {
 		credentials = "default"
 	}
-	if template == "" {
-		template = "default"
+	if templateName == "" {
+		templateName = "default"
 	}
 
 	provisionControls := getProvisionControls(req)
 
-	log.Infof("Add machine controls=%v, template=%v, as %v", provisionControls, template, credentials)
+	log.Infof("Add machine controls=%v, template=%v, as %v", provisionControls, templateName, credentials)
 
 	// credential
-	cred, err := h.creds.Get(credentials)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
-		return
+	cred, apiErr := h.creds.Get(credentials)
+	if apiErr != nil {
+		return nil, apiErr
 	}
 
 	// TODO(wfarner): It's odd that the provisioner name comes from the credentials.  It would seem more appropriate
@@ -96,55 +72,46 @@ func (h *machineHandler) create(resp http.ResponseWriter, req *http.Request) {
 	// to use.
 	builder, has := h.provisioners.GetBuilder(cred.ProvisionerName())
 	if !has {
-		respondError(http.StatusNotFound, resp, err)
-		return
+		return nil, &libmachete.Error{
+			libmachete.ErrUnknown,
+			fmt.Sprintf("Credentials referenced a provisioner that does not exist: %s", cred.ProvisionerName())}
 	}
 
 	// Load template
-	tpl, err := h.templates.Get(storage.TemplateID{Provisioner: builder.Name, Name: template})
-	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
-		return
+	template, apiErr := h.templates.Get(storage.TemplateID{Provisioner: builder.Name, Name: templateName})
+	if apiErr != nil {
+		// Overriding the error code here as ErrNotFound should not be returned for a referenced auxiliary
+		// entity.
+		return nil, &libmachete.Error{libmachete.ErrBadInput, apiErr.Error()}
 	}
 
 	provisioner, err := builder.Build(provisionControls, cred)
 	if err != nil {
-		respondError(http.StatusBadRequest, resp, err)
-		return
+		return nil, &libmachete.Error{libmachete.ErrBadInput, err.Error()}
 	}
 
-	events, machineErr := h.machines.CreateMachine(
+	events, apiErr := h.machines.CreateMachine(
 		provisioner,
 		h.keystore,
 		cred,
-		tpl,
+		template,
 		req.Body,
 		libmachete.ContentTypeJSON)
 
-	if machineErr == nil {
+	if apiErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
 		go func() {
 			for event := range events {
 				log.Infoln("Event:", event)
 			}
 		}()
-		return
+		return nil, nil
 	}
 
-	switch machineErr.Code {
-	case libmachete.ErrDuplicate:
-		respondError(http.StatusConflict, resp, machineErr)
-		return
-	case libmachete.ErrNotFound:
-		respondError(http.StatusNotFound, resp, machineErr)
-		return
-	default:
-		respondError(http.StatusInternalServerError, resp, machineErr)
-		return
-	}
+	return nil, apiErr
 }
 
-func (h *machineHandler) delete(resp http.ResponseWriter, req *http.Request) {
+func (h *machineHandler) delete(req *http.Request) (interface{}, *libmachete.Error) {
 	machineName := getMachineID(req)
 	credentials := req.URL.Query().Get("credentials")
 
@@ -160,58 +127,46 @@ func (h *machineHandler) delete(resp http.ResponseWriter, req *http.Request) {
 	log.Infof("Delete machine %v as %v with controls=%v", machineName, credentials, deleteControls)
 
 	// credential
-	cred, err := h.creds.Get(credentials)
-	if err != nil {
-		respondError(http.StatusBadRequest, resp, err)
-		return
+	cred, apiErr := h.creds.Get(credentials)
+	if apiErr != nil {
+		return nil, &libmachete.Error{libmachete.ErrBadInput, apiErr.Error()}
 	}
 
 	// Load the record of the machine by name
-	record, err := h.machines.Get(machineName)
-	if err != nil {
-		respondError(http.StatusNotFound, resp, err)
-		return
+	record, apiErr := h.machines.Get(machineName)
+	if apiErr != nil {
+		return nil, apiErr
 	}
 
 	builder, has := h.provisioners.GetBuilder(record.Provisioner)
 	if !has {
-		respondError(http.StatusNotFound, resp, err)
-		return
+		return nil, &libmachete.Error{
+			libmachete.ErrUnknown,
+			fmt.Sprintf("Machine record referenced a provisioner that does not exist: %s", record.Provisioner)}
 	}
 
 	provisioner, err := builder.Build(deleteControls, cred)
 	if err != nil {
-		respondError(http.StatusBadRequest, resp, err)
-		return
+		return nil, &libmachete.Error{libmachete.ErrBadInput, err.Error()}
 	}
 
-	events, machineErr := h.machines.DeleteMachine(provisioner, h.keystore, cred, record)
-	if machineErr == nil {
+	events, apiErr := h.machines.DeleteMachine(provisioner, h.keystore, cred, record)
+	if apiErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
 		go func() {
 			for event := range events {
 				log.Infoln("Event:", event)
 			}
 		}()
-		return
+		return nil, nil
 	}
 
-	switch machineErr.Code {
-	case libmachete.ErrDuplicate:
-		respondError(http.StatusConflict, resp, machineErr)
-		return
-	case libmachete.ErrNotFound:
-		respondError(http.StatusNotFound, resp, machineErr)
-		return
-	default:
-		respondError(http.StatusInternalServerError, resp, machineErr)
-		return
-	}
+	return nil, apiErr
 }
 
 func (h *machineHandler) attachTo(router *mux.Router) {
-	router.HandleFunc("/json", h.getAll).Methods("GET")
-	router.HandleFunc("/create", h.create).Methods("POST")
-	router.HandleFunc("/{key}/json", h.getOne).Methods("GET")
-	router.HandleFunc("/{key}", h.delete).Methods("DELETE")
+	router.HandleFunc("/json", outputHandler(h.getAll)).Methods("GET")
+	router.HandleFunc("/create", outputHandler(h.create)).Methods("POST")
+	router.HandleFunc("/{key}/json", outputHandler(h.getOne)).Methods("GET")
+	router.HandleFunc("/{key}", outputHandler(h.delete)).Methods("DELETE")
 }
