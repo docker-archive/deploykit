@@ -13,6 +13,7 @@ const (
 
 // CredentialBase is a common base struct that should be reused by provisioner via embedding.
 type CredentialBase struct {
+	// TODO(wfarner): Consider removing this struct, as it provides no inherited value.
 }
 
 // Authenticate authenticates the user modeled by this credential against the backend

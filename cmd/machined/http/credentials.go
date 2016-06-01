@@ -38,8 +38,8 @@ func (h *credentialsHandler) delete(req *http.Request) (interface{}, *libmachete
 
 func (h *credentialsHandler) attachTo(router *mux.Router) {
 	router.HandleFunc("/json", outputHandler(h.getAll)).Methods("GET")
-	router.HandleFunc("/{key}/create", outputHandler(h.create)).Methods("POST")
-	router.HandleFunc("/{key}", outputHandler(h.update)).Methods("PUT")
-	router.HandleFunc("/{key}/json", outputHandler(h.getOne)).Methods("GET")
-	router.HandleFunc("/{key}", outputHandler(h.delete)).Methods("DELETE")
+	router.HandleFunc("/{provisioner}/{key}/create", outputHandler(h.create)).Methods("POST")
+	router.HandleFunc("/{provisioner}/{key}", outputHandler(h.update)).Methods("PUT")
+	router.HandleFunc("/{provisioner}/{key}/json", outputHandler(h.getOne)).Methods("GET")
+	router.HandleFunc("/{provisioner}/{key}", outputHandler(h.delete)).Methods("DELETE")
 }

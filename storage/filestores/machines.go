@@ -41,7 +41,7 @@ func (m machines) Save(record storage.MachineRecord, provisionerData interface{}
 }
 
 func (m machines) List() ([]storage.MachineID, error) {
-	contents, err := m.sandbox.list()
+	contents, err := m.sandbox.listRecursive()
 	if err != nil {
 		return nil, err
 	}

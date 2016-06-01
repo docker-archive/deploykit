@@ -19,7 +19,7 @@ func (c templates) Save(id storage.TemplateID, templatesData interface{}) error 
 }
 
 func (c templates) List() ([]storage.TemplateID, error) {
-	contents, err := c.sandbox.list()
+	contents, err := c.sandbox.listRecursive()
 	if err != nil {
 		return nil, err
 	}

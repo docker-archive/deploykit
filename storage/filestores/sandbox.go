@@ -42,7 +42,7 @@ func (f Sandbox) Nested(subpath string) Sandbox {
 	return Sandbox{fs: f.fs, dir: path.Join(f.dir, subpath)}
 }
 
-func (f Sandbox) list() ([]string, error) {
+func (f Sandbox) listRecursive() ([]string, error) {
 	paths := []string{}
 
 	walker := func(filePath string, info os.FileInfo, err error) error {

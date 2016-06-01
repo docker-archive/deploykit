@@ -23,7 +23,7 @@ func (c credentials) Save(id storage.CredentialsID, credentialsData interface{})
 }
 
 func (c credentials) List() ([]storage.CredentialsID, error) {
-	contents, err := c.sandbox.list()
+	contents, err := c.sandbox.listRecursive()
 	if err != nil {
 		return nil, err
 	}

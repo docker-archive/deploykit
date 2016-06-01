@@ -59,27 +59,35 @@ func (h *machineHandler) getProvisionerBuilder(req *http.Request) (*libmachete.P
 	return &builder, nil
 }
 
-func orDefault(v string) string {
+func orDefault(v string, defaultValue string) string {
 	if v == "" {
-		return "default"
+		return defaultValue
 	}
 	return v
 }
 
-func (h *machineHandler) credentialsOrDefault(provisioner string, req *http.Request) (api.Credential, *libmachete.Error) {
+func (h *machineHandler) credentialsOrDefault(
+	provisioner string,
+	req *http.Request,
+	defaultName string) (api.Credential, *libmachete.Error) {
+
 	cred, err := h.creds.Get(storage.CredentialsID{
 		Provisioner: provisioner,
-		Name:        orDefault(req.URL.Query().Get("credentials"))})
+		Name:        orDefault(req.URL.Query().Get("credentials"), defaultName)})
 	if err != nil {
 		return nil, err
 	}
 	return cred, nil
 }
 
-func (h *machineHandler) templateOrDefault(provisioner string, req *http.Request) (api.MachineRequest, *libmachete.Error) {
+func (h *machineHandler) templateOrDefault(
+	provisioner string,
+	req *http.Request,
+	defaultName string) (api.MachineRequest, *libmachete.Error) {
+
 	template, apiErr := h.templates.Get(storage.TemplateID{
 		Provisioner: provisioner,
-		Name:        orDefault(req.URL.Query().Get("template"))})
+		Name:        orDefault(req.URL.Query().Get("template"), defaultName)})
 	if apiErr != nil {
 		// Overriding the error code here as ErrNotFound should not be returned for a referenced auxiliary
 		// entity.
@@ -94,12 +102,12 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Err
 		return nil, apiErr
 	}
 
-	cred, apiErr := h.credentialsOrDefault(builder.Name, req)
+	cred, apiErr := h.credentialsOrDefault(builder.Name, req, "default")
 	if apiErr != nil {
 		return nil, apiErr
 	}
 
-	template, apiErr := h.templateOrDefault(builder.Name, req)
+	template, apiErr := h.templateOrDefault(builder.Name, req, "default")
 	if apiErr != nil {
 		return nil, apiErr
 	}
@@ -132,7 +140,7 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Err
 func (h *machineHandler) delete(req *http.Request) (interface{}, *libmachete.Error) {
 	machineName := getMachineID(req)
 
-	cred, apiErr := h.credentialsOrDefault(provisionerNameFromQuery(req), req)
+	cred, apiErr := h.credentialsOrDefault(provisionerNameFromQuery(req), req, "default")
 	if apiErr != nil {
 		return nil, apiErr
 	}
