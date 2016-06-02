@@ -44,47 +44,75 @@ func getProvisionControls(req *http.Request) api.ProvisionControls {
 	return api.ProvisionControls(queryValues)
 }
 
-func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Error) {
-	credentials := req.URL.Query().Get("credentials")
-	templateName := req.URL.Query().Get("template")
+func provisionerNameFromQuery(req *http.Request) string {
+	return req.URL.Query().Get("provisioner")
+}
 
-	// TODO: fix this in framework to return default values
-	if credentials == "" {
-		credentials = "default"
-	}
-	if templateName == "" {
-		templateName = "default"
-	}
-
-	provisionControls := getProvisionControls(req)
-
-	log.Infof("Add machine controls=%v, template=%v, as %v", provisionControls, templateName, credentials)
-
-	// credential
-	cred, apiErr := h.creds.Get(credentials)
-	if apiErr != nil {
-		return nil, apiErr
-	}
-
-	// TODO(wfarner): It's odd that the provisioner name comes from the credentials.  It would seem more appropriate
-	// for the credentials to be scoped _within_ provisioners, and the request to directly specify the provisioner
-	// to use.
-	builder, has := h.provisioners.GetBuilder(cred.ProvisionerName())
+func (h *machineHandler) getProvisionerBuilder(req *http.Request) (*libmachete.ProvisionerBuilder, *libmachete.Error) {
+	provisionerName := provisionerNameFromQuery(req)
+	builder, has := h.provisioners.GetBuilder(provisionerName)
 	if !has {
 		return nil, &libmachete.Error{
-			libmachete.ErrUnknown,
-			fmt.Sprintf("Credentials referenced a provisioner that does not exist: %s", cred.ProvisionerName())}
+			libmachete.ErrBadInput,
+			fmt.Sprintf("Unknown provisioner: %s", provisionerName)}
 	}
+	return &builder, nil
+}
 
-	// Load template
-	template, apiErr := h.templates.Get(storage.TemplateID{Provisioner: builder.Name, Name: templateName})
+func orDefault(v string, defaultValue string) string {
+	if v == "" {
+		return defaultValue
+	}
+	return v
+}
+
+func (h *machineHandler) credentialsOrDefault(
+	provisioner string,
+	req *http.Request,
+	defaultName string) (api.Credential, *libmachete.Error) {
+
+	cred, err := h.creds.Get(storage.CredentialsID{
+		Provisioner: provisioner,
+		Name:        orDefault(req.URL.Query().Get("credentials"), defaultName)})
+	if err != nil {
+		return nil, err
+	}
+	return cred, nil
+}
+
+func (h *machineHandler) templateOrDefault(
+	provisioner string,
+	req *http.Request,
+	defaultName string) (api.MachineRequest, *libmachete.Error) {
+
+	template, apiErr := h.templates.Get(storage.TemplateID{
+		Provisioner: provisioner,
+		Name:        orDefault(req.URL.Query().Get("template"), defaultName)})
 	if apiErr != nil {
 		// Overriding the error code here as ErrNotFound should not be returned for a referenced auxiliary
 		// entity.
 		return nil, &libmachete.Error{libmachete.ErrBadInput, apiErr.Error()}
 	}
+	return template, nil
+}
 
-	provisioner, err := builder.Build(provisionControls, cred)
+func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Error) {
+	builder, apiErr := h.getProvisionerBuilder(req)
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	cred, apiErr := h.credentialsOrDefault(builder.Name, req, "default")
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	template, apiErr := h.templateOrDefault(builder.Name, req, "default")
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	provisioner, err := builder.Build(getProvisionControls(req), cred)
 	if err != nil {
 		return nil, &libmachete.Error{libmachete.ErrBadInput, err.Error()}
 	}
@@ -111,24 +139,15 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Err
 
 func (h *machineHandler) delete(req *http.Request) (interface{}, *libmachete.Error) {
 	machineName := getMachineID(req)
-	credentials := req.URL.Query().Get("credentials")
 
-	// TODO - fix this in framework to return default values
-	if credentials == "" {
-		credentials = "default"
+	cred, apiErr := h.credentialsOrDefault(provisionerNameFromQuery(req), req, "default")
+	if apiErr != nil {
+		return nil, apiErr
 	}
 
 	// TODO(wfarner): ProvisionControls is no longer an appropriate name since it's reused for deletion.  Leaving
 	// for now as a revamp is imminent.
 	deleteControls := getProvisionControls(req)
-
-	log.Infof("Delete machine %v as %v with controls=%v", machineName, credentials, deleteControls)
-
-	// credential
-	cred, apiErr := h.creds.Get(credentials)
-	if apiErr != nil {
-		return nil, &libmachete.Error{libmachete.ErrBadInput, apiErr.Error()}
-	}
 
 	// Load the record of the machine by name
 	record, apiErr := h.machines.Get(machineName)

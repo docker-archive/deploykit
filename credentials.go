@@ -11,19 +11,19 @@ import (
 // Credentials manages the objects used to authenticate and authorize for a provisioner's API
 type Credentials interface {
 	// ListIds
-	ListIds() ([]string, *Error)
+	ListIds() ([]storage.CredentialsID, *Error)
 
 	// Get returns a credential identified by key
-	Get(key string) (api.Credential, *Error)
+	Get(id storage.CredentialsID) (api.Credential, *Error)
 
 	// Deletes the credential identified by key
-	Delete(key string) *Error
+	Delete(id storage.CredentialsID) *Error
 
 	// CreateCredential adds a new credential from the input reader.
-	CreateCredential(provisioner, key string, input io.Reader, codec *Codec) *Error
+	CreateCredential(id storage.CredentialsID, input io.Reader, codec *Codec) *Error
 
 	// UpdateCredential updates an existing credential
-	UpdateCredential(key string, input io.Reader, codec *Codec) *Error
+	UpdateCredential(id storage.CredentialsID, input io.Reader, codec *Codec) *Error
 }
 
 type credentials struct {
@@ -51,42 +51,29 @@ func (c *credentials) marshal(codec *Codec, cred api.Credential) ([]byte, error)
 	return codec.marshal(cred)
 }
 
-func (c *credentials) ListIds() ([]string, *Error) {
-	out := []string{}
-	list, err := c.store.List()
+func (c *credentials) ListIds() ([]storage.CredentialsID, *Error) {
+	ids, err := c.store.List()
 	if err != nil {
 		return nil, UnknownError(err)
 	}
-	for _, i := range list {
-		out = append(out, string(i))
-	}
-	return out, nil
+	return ids, nil
 }
 
-func (c *credentials) Get(key string) (api.Credential, *Error) {
-	// TODO(wfarner): Adjust this once credentials are scoped by provisioner.
-	// Since we don't know the provisioner, we need to read twice: first with a base
-	// structure, then with a specific structure by provisioner.
-	base := new(api.CredentialBase)
-	err := c.store.GetCredentials(storage.CredentialsID(key), base)
-	if err != nil {
-		return nil, &Error{ErrNotFound, err.Error()}
-	}
-
-	detail, err := c.newCredential(base.ProvisionerName())
+func (c *credentials) Get(id storage.CredentialsID) (api.Credential, *Error) {
+	detail, err := c.newCredential(id.Provisioner)
 	if err != nil {
 		return nil, &Error{ErrBadInput, err.Error()}
 	}
 
-	err = c.store.GetCredentials(storage.CredentialsID(key), detail)
+	err = c.store.GetCredentials(id, detail)
 	if err != nil {
 		return nil, UnknownError(err)
 	}
 	return detail, nil
 }
 
-func (c *credentials) Delete(key string) *Error {
-	err := c.store.Delete(storage.CredentialsID(key))
+func (c *credentials) Delete(id storage.CredentialsID) *Error {
+	err := c.store.Delete(id)
 	// TODO(wfarner): Give better visibility from the store to disambiguate between failure cases.
 	if err != nil {
 		return UnknownError(err)
@@ -94,21 +81,20 @@ func (c *credentials) Delete(key string) *Error {
 	return nil
 }
 
-func (c *credentials) exists(key string) bool {
-	base := new(api.CredentialBase)
-	err := c.store.GetCredentials(storage.CredentialsID(key), base)
+func (c *credentials) exists(id storage.CredentialsID) bool {
+	err := c.store.GetCredentials(id, new(api.CredentialBase))
 	return err == nil
 }
 
 // CreateCredential creates a new credential from the input reader.
-func (c *credentials) CreateCredential(provisioner, key string, input io.Reader, codec *Codec) *Error {
-	if c.exists(key) {
-		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", key)}
+func (c *credentials) CreateCredential(id storage.CredentialsID, input io.Reader, codec *Codec) *Error {
+	if c.exists(id) {
+		return &Error{ErrDuplicate, fmt.Sprintf("Credentials already exists: %v", id)}
 	}
 
-	creds, err := c.newCredential(provisioner)
+	creds, err := c.newCredential(id.Provisioner)
 	if err != nil {
-		return &Error{ErrNotFound, fmt.Sprintf("Unknown provisioner:%s", provisioner)}
+		return &Error{ErrNotFound, err.Error()}
 	}
 
 	buff, err := ioutil.ReadAll(input)
@@ -119,15 +105,15 @@ func (c *credentials) CreateCredential(provisioner, key string, input io.Reader,
 	if err = c.unmarshal(codec, buff, creds); err != nil {
 		return UnknownError(err)
 	}
-	if err = c.store.Save(storage.CredentialsID(key), creds); err != nil {
+	if err = c.store.Save(id, creds); err != nil {
 		return UnknownError(err)
 	}
 	return nil
 }
 
-func (c *credentials) UpdateCredential(key string, input io.Reader, codec *Codec) *Error {
-	if !c.exists(key) {
-		return &Error{ErrNotFound, fmt.Sprintf("Credential not found: %v", key)}
+func (c *credentials) UpdateCredential(id storage.CredentialsID, input io.Reader, codec *Codec) *Error {
+	if !c.exists(id) {
+		return &Error{ErrNotFound, fmt.Sprintf("Credential not found: %v", id)}
 	}
 
 	buff, err := ioutil.ReadAll(input)
@@ -135,12 +121,7 @@ func (c *credentials) UpdateCredential(key string, input io.Reader, codec *Codec
 		return UnknownError(err)
 	}
 
-	base := new(api.CredentialBase)
-	if err = c.unmarshal(codec, buff, base); err != nil {
-		return UnknownError(err)
-	}
-
-	creds, err := c.newCredential(base.ProvisionerName())
+	creds, err := c.newCredential(id.Provisioner)
 	if err != nil {
 		return &Error{ErrNotFound, err.Error()}
 	}
@@ -149,7 +130,7 @@ func (c *credentials) UpdateCredential(key string, input io.Reader, codec *Codec
 		return UnknownError(err)
 	}
 
-	if err = c.store.Save(storage.CredentialsID(key), creds); err != nil {
+	if err = c.store.Save(id, creds); err != nil {
 		return UnknownError(err)
 	}
 	return nil
