@@ -13,6 +13,7 @@ import (
 
 //go:generate mockgen -package storage -destination mock/storage/machines.go github.com/docker/libmachete/storage Machines
 //go:generate mockgen -package api -destination mock/provisioners/api/provisioner.go github.com/docker/libmachete/provisioners/api Provisioner
+//go:generate mockgen -package api -destination mock/provisioners/api/keys.go github.com/docker/libmachete/provisioners/api KeyStore
 //go:generate mockgen -package api -destination mock/provisioners/api/credential.go github.com/docker/libmachete/provisioners/api Credential
 
 func machineRecord(name string) storage.MachineRecord {
@@ -93,6 +94,7 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
+	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := &api.BaseMachineRequest{}
 	record := new(storage.MachineRecord)
@@ -105,6 +107,7 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 	provisioner.EXPECT().CreateInstance(gomock.Any()).Return(createEvents, nil)
 	events, err := runTasks(
 		provisioner,
+		keystore,
 		tasks,
 		record,
 		cred,
@@ -126,6 +129,7 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
+	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := &api.BaseMachineRequest{}
 	record := new(storage.MachineRecord)
@@ -138,6 +142,7 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 	provisioner.EXPECT().DestroyInstance(gomock.Any()).Return(destroyEvents, nil)
 	events, err := runTasks(
 		provisioner,
+		keystore,
 		tasks,
 		record,
 		cred,
@@ -162,7 +167,6 @@ func TestCreateMachine(t *testing.T) {
 	cred := mock_api.NewMockCredential(ctrl)
 
 	provision := []api.Task{
-		TaskSSHKeyGen,
 		TaskCreateInstance,
 	}
 	provisionNames := []api.TaskName{}
@@ -189,6 +193,8 @@ func TestCreateMachine(t *testing.T) {
 	provisioner.EXPECT().GetIPAddress(gomock.Any()).Return("ip", nil)
 	provisioner.EXPECT().GetInstanceID(gomock.Any()).Return(id, nil)
 
+	keystore := mock_api.NewMockKeyStore(ctrl)
+
 	store := mock_storage.NewMockMachines(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 
@@ -205,6 +211,7 @@ func TestCreateMachine(t *testing.T) {
 	machines := NewMachines(store)
 	events, err := machines.CreateMachine(
 		provisioner,
+		keystore,
 		cred,
 		template,
 		bytes.NewBuffer([]byte(`{"name": "new-host"}`)),
@@ -220,11 +227,11 @@ func TestDestroyMachine(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
+	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 
 	teardown := []api.Task{
 		TaskDestroyInstance,
-		TaskSSHKeyRemove,
 	}
 	teardownNames := []api.TaskName{}
 	for _, t := range teardown {
@@ -247,7 +254,7 @@ func TestDestroyMachine(t *testing.T) {
 	store := mock_storage.NewMockMachines(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 	machines := NewMachines(store)
-	events, err := machines.DeleteMachine(provisioner, cred, *record)
+	events, err := machines.DeleteMachine(provisioner, keystore, cred, *record)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	close(destroyEvents) // Simulates the async destroy completes
@@ -259,6 +266,7 @@ func TestRunTasksNoError(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
+	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := &api.BaseMachineRequest{}
 	record := new(storage.MachineRecord)
@@ -272,6 +280,7 @@ func TestRunTasksNoError(t *testing.T) {
 
 	events, err := runTasks(
 		provisioner,
+		keystore,
 		tasks,
 		record,
 		cred,
@@ -294,6 +303,7 @@ func TestRunTasksErrorAbort(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_api.NewMockProvisioner(ctrl)
+	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := &api.BaseMachineRequest{}
 	record := new(storage.MachineRecord)
@@ -307,6 +317,7 @@ func TestRunTasksErrorAbort(t *testing.T) {
 
 	events, err := runTasks(
 		provisioner,
+		keystore,
 		tasks,
 		record,
 		cred,

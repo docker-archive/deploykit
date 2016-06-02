@@ -1,5 +1,9 @@
 package libmachete
 
+import (
+	"fmt"
+)
+
 const (
 	// ErrUnknown is the default error code.  This should generally not be used, or should be reserved for cases
 	// where it is not possible to offer additional information on the error.
@@ -7,6 +11,7 @@ const (
 
 	// ErrDuplicate is returned when an attempt is made to create an object that already exists.
 	ErrDuplicate
+
 	// ErrNotFound indicates that a referenced object does not exist by key
 	ErrNotFound
 
@@ -31,4 +36,17 @@ func (e Error) Error() string {
 // UnknownError creates a standard Error when the cause is unknown.
 func UnknownError(err error) *Error {
 	return &Error{ErrUnknown, err.Error()}
+}
+
+// NewError creates an Error with the specified code.
+func NewError(code int, format string, args ...interface{}) error {
+	return Error{Code: code, Message: fmt.Sprintf(format, args...)}
+}
+
+// IsErr returns whether the error is an Error and has the specified code
+func IsErr(e error, code int) bool {
+	if err, ok := e.(Error); ok {
+		return err.Code == code
+	}
+	return false
 }

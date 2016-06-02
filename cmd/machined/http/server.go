@@ -30,6 +30,7 @@ type apiServer struct {
 	credentials libmachete.Credentials
 	templates   libmachete.Templates
 	machines    libmachete.Machines
+	keystore    libmachete.Keys
 }
 
 func build(sandbox filestores.Sandbox, provisioners *libmachete.MachineProvisioners) (*apiServer, error) {
@@ -47,6 +48,7 @@ func build(sandbox filestores.Sandbox, provisioners *libmachete.MachineProvision
 		credentials: libmachete.NewCredentials(filestores.NewCredentials(credentialsSandbox), provisioners),
 		templates:   libmachete.NewTemplates(filestores.NewTemplates(templatesSandbox), provisioners),
 		machines:    libmachete.NewMachines(filestores.NewMachines(machinesSandbox)),
+		keystore:    libmachete.NewKeys(filestores.NewKeys(machinesSandbox)), // Keys are stored with host/instance data
 	}, nil
 }
 
@@ -70,7 +72,11 @@ func (s *apiServer) getHandler() http.Handler {
 	attachments := map[string]routerAttachment{
 		"/credentials": &credentialsHandler{credentials: s.credentials},
 		"/templates":   &templatesHandler{templates: s.templates},
-		"/machines":    &machineHandler{creds: s.credentials, templates: s.templates, machines: s.machines},
+		"/machines": &machineHandler{
+			creds:     s.credentials,
+			templates: s.templates,
+			machines:  s.machines,
+			keystore:  s.keystore},
 	}
 
 	router := mux.NewRouter()

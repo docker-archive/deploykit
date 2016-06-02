@@ -67,6 +67,7 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 		Message: desc,
 		Do: func(
 			prov api.Provisioner,
+			keystore api.KeyStore,
 			cred api.Credential,
 			resource api.Resource,
 			req api.MachineRequest,
@@ -79,6 +80,7 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 
 func defaultCreateInstanceHandler(
 	prov api.Provisioner,
+	keystore api.KeyStore,
 	cred api.Credential,
 	resource api.Resource,
 	req api.MachineRequest,
@@ -98,6 +100,7 @@ func defaultCreateInstanceHandler(
 
 func defaultDestroyInstanceHandler(
 	prov api.Provisioner,
+	keystore api.KeyStore,
 	cred api.Credential,
 	resource api.Resource,
 	req api.MachineRequest,
@@ -115,15 +118,62 @@ func defaultDestroyInstanceHandler(
 	return nil
 }
 
+// defaultSSHKeyGenHandler is the default task handler that generates a SSH keypair identified by the resource's name.
+// If a keypair by the same name already exists, it will emit an error
+func defaultSSHKeyGenHandler(prov api.Provisioner, keys api.KeyStore,
+	cred api.Credential,
+	resource api.Resource,
+	req api.MachineRequest,
+	events chan<- interface{}) error {
+
+	key := resource.Name()
+	if key == "" {
+		return NewError(ErrBadInput, "Bad resource name")
+	}
+	return keys.NewKeyPair(key)
+}
+
+// defaultSSHKeyRemoveHandler is the default task handler that will remove the SSH key pair identified by the resource's name.
+func defaultSSHKeyRemoveHandler(prov api.Provisioner, keys api.KeyStore,
+	cred api.Credential,
+	resource api.Resource,
+	req api.MachineRequest,
+	events chan<- interface{}) error {
+
+	key := resource.Name()
+	if key == "" {
+		return NewError(ErrBadInput, "Bad resource name")
+	}
+	return keys.Remove(key)
+}
+
 var (
 	// TaskSSHKeyGen is the task that generates SSH key
-	TaskSSHKeyGen = unimplementedTask("ssh-keygen", "Generating ssh key for host")
+	TaskSSHKeyGen = api.Task{
+		Name:    "ssh-key-generate",
+		Message: "Generating ssh key for host",
+		Do:      defaultSSHKeyGenHandler,
+	}
+
+	// TaskSSHKeyRemove is the task that removes or clean up the SSH key
+	TaskSSHKeyRemove = api.Task{
+		Name:    "ssh-key-remove",
+		Message: "Remove ssh key for host",
+		Do:      defaultSSHKeyRemoveHandler,
+	}
 
 	// TaskCreateInstance creates a machine instance
 	TaskCreateInstance = api.Task{
-		Name:    "create-instance",
+		Name:    "instance-create",
 		Message: "Creates a machine instance",
 		Do:      defaultCreateInstanceHandler,
+	}
+
+	// TaskDestroyInstance irreversibly destroys a machine instance
+	TaskDestroyInstance = api.Task{
+		Name:    "instance-destroy",
+		Message: "Destroys a machine instance",
+		Do:      defaultDestroyInstanceHandler,
 	}
 
 	// TaskUserData copies per-instance user data on setup
@@ -131,14 +181,4 @@ var (
 
 	// TaskInstallDockerEngine is the task for installing docker engine.  Requires SSH access.
 	TaskInstallDockerEngine = unimplementedTask("install-engine", "Install docker engine")
-
-	// TaskDestroyInstance irreversibly destroys a machine instance
-	TaskDestroyInstance = api.Task{
-		Name:    "destroy-instance",
-		Message: "Destroys a machine instance",
-		Do:      defaultDestroyInstanceHandler,
-	}
-
-	// TaskSSHKeyRemove is the task that removes or clean up the SSH key
-	TaskSSHKeyRemove = unimplementedTask("ssh-key-remove", "Remove ssh key for host")
 )

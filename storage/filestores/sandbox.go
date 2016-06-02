@@ -42,6 +42,19 @@ func (f Sandbox) Nested(subpath string) Sandbox {
 	return Sandbox{fs: f.fs, dir: path.Join(f.dir, subpath)}
 }
 
+func (f Sandbox) list() ([]string, error) {
+	files := []string{}
+	contents, err := afero.ReadDir(f.fs, f.dir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range contents {
+		files = append(files, entry.Name())
+	}
+	return files, nil
+}
+
 func (f Sandbox) listRecursive() ([]string, error) {
 	paths := []string{}
 

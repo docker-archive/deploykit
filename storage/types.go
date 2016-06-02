@@ -16,6 +16,9 @@ type MachineID string
 // Timestamp is a unix epoch timestamp, in seconds.
 type Timestamp uint64
 
+// KeyID is a unique id for the SSH key
+type KeyID string
+
 // Event is captures the data / emitted by tasks
 type Event struct {
 	Timestamp time.Time `json:"on" yaml:"on"`

@@ -3,7 +3,6 @@ package aws
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete/provisioners/api"
@@ -41,8 +40,6 @@ func TestCreateInstanceSync(t *testing.T) {
 		}
 	}
 	clientMock.EXPECT().RunInstances(gomock.Any()).Do(matcher).Return(&reservation, nil)
-
-	fmt.Println(">>>>>>", *request)
 
 	instance, err := createInstanceSync(clientMock, *request)
 
