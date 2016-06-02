@@ -146,8 +146,6 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 
 	for range events {
 	}
-
-	close(events)
 }
 
 func loadTemplate(t *testing.T) *CreateInstanceRequest {
