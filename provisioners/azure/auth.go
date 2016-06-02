@@ -13,9 +13,7 @@ import (
 
 // NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
 func NewCredential() api.Credential {
-	return &credential{
-		CredentialBase: api.CredentialBase{Provisioner: ProvisionerName},
-	}
+	return &credential{CredentialBase: api.CredentialBase{}}
 }
 
 type credential struct {
