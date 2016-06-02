@@ -211,7 +211,7 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 
 func getProvisionTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
-		libmachete.TaskSSHKeyGen,
+		libmachete.TaskSSHKeyGen.Override("AWS - upload generated SSH key", GenerateAndUploadSSHKey),
 		libmachete.TaskCreateInstance,
 		libmachete.TaskUserData,
 		libmachete.TaskInstallDockerEngine,
@@ -221,7 +221,7 @@ func getProvisionTaskMap() *libmachete.TaskMap {
 func getTeardownTaskMap() *libmachete.TaskMap {
 	return libmachete.NewTaskMap(
 		libmachete.TaskDestroyInstance,
-		libmachete.TaskSSHKeyRemove,
+		libmachete.TaskSSHKeyRemove.Override("AWS - remove ssh key", RemoveLocalAndUploadedSSHKey),
 	)
 }
 
