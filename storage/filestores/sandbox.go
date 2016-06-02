@@ -42,6 +42,19 @@ func (f Sandbox) Nested(subpath string) Sandbox {
 	return Sandbox{fs: f.fs, dir: path.Join(f.dir, subpath)}
 }
 
+func (f Sandbox) list() ([]string, error) {
+	files := []string{}
+	contents, err := afero.ReadDir(f.fs, f.dir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range contents {
+		files = append(files, entry.Name())
+	}
+	return files, nil
+}
+
 func (f Sandbox) listRecursive() ([]string, error) {
 	paths := []string{}
 
@@ -80,18 +93,6 @@ func (f Sandbox) marshalAndSave(fileName string, s interface{}) error {
 		return fmt.Errorf("Failed to write to %s: %s", fullPath, err)
 	}
 	return nil
-}
-
-func (f Sandbox) saveBytes(fullPath string, data []byte, filePermission os.FileMode) error {
-	err := afero.WriteFile(f.fs, fullPath, data, filePermission)
-	if err != nil {
-		return fmt.Errorf("Failed to write to %s: %s", fullPath, err)
-	}
-	return nil
-}
-
-func (f Sandbox) readBytes(fullPath string) ([]byte, error) {
-	return afero.ReadFile(f.fs, fullPath)
 }
 
 func (f Sandbox) readAndUnmarshal(fileName string, record interface{}) error {
