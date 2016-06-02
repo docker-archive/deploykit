@@ -5,7 +5,8 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/storage/filestores"
+	"github.com/docker/libmachete/storage"
+	"github.com/docker/libmachete/storage/filestore"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"net/http"
@@ -30,25 +31,15 @@ type apiServer struct {
 	credentials libmachete.Credentials
 	templates   libmachete.Templates
 	machines    libmachete.Machines
-	keystore    libmachete.Keys
+	keystore    libmachete.SSHKeys
 }
 
-func build(sandbox filestores.Sandbox, provisioners *libmachete.MachineProvisioners) (*apiServer, error) {
-	credentialsSandbox := sandbox.Nested("credentials")
-	templatesSandbox := sandbox.Nested("templates")
-	machinesSandbox := sandbox.Nested("machines")
-	for _, box := range []filestores.Sandbox{credentialsSandbox, templatesSandbox, machinesSandbox} {
-		err := box.Mkdirs()
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func build(store storage.KvStore, provisioners *libmachete.MachineProvisioners) (*apiServer, error) {
 	return &apiServer{
-		credentials: libmachete.NewCredentials(filestores.NewCredentials(credentialsSandbox), provisioners),
-		templates:   libmachete.NewTemplates(filestores.NewTemplates(templatesSandbox), provisioners),
-		machines:    libmachete.NewMachines(filestores.NewMachines(machinesSandbox)),
-		keystore:    libmachete.NewKeys(filestores.NewKeys(machinesSandbox)), // Keys are stored with host/instance data
+		credentials: libmachete.NewCredentials(storage.NestedStore(store, "credentials"), provisioners),
+		templates:   libmachete.NewTemplates(storage.NestedStore(store, "templates"), provisioners),
+		machines:    libmachete.NewMachines(storage.NestedStore(store, "machines")),
+		keystore:    libmachete.NewSSHKeys(storage.NestedStore(store, "keys")),
 	}, nil
 }
 
@@ -113,7 +104,7 @@ func ServerCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			log.Infoln("Starting server")
 
-			server, err := build(filestores.NewOsSandbox(options.RootDir), &libmachete.DefaultProvisioners)
+			server, err := build(filestore.NewOsFileStore(options.RootDir), &libmachete.DefaultProvisioners)
 			if err != nil {
 				return err
 			}

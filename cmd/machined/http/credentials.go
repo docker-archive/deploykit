@@ -2,7 +2,6 @@ package http
 
 import (
 	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/storage"
 	"github.com/gorilla/mux"
 	"net/http"
 )
@@ -11,9 +10,9 @@ type credentialsHandler struct {
 	credentials libmachete.Credentials
 }
 
-func getCredentialID(req *http.Request) storage.CredentialsID {
+func getCredentialID(req *http.Request) libmachete.CredentialsID {
 	vars := mux.Vars(req)
-	return storage.CredentialsID{Provisioner: vars["provisioner"], Name: vars["key"]}
+	return libmachete.CredentialsID{Provisioner: vars["provisioner"], Name: vars["key"]}
 }
 
 func (h *credentialsHandler) getOne(req *http.Request) (interface{}, *libmachete.Error) {

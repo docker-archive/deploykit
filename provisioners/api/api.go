@@ -200,7 +200,7 @@ type Provisioner interface {
 
 	// GetIp returns the IP address from the record.  It's up to the provisioner to decide
 	// which ip address, if more than one network interface cards are on an instance, should be
-	// preferrable and returned to the framework for tracking and managing for user purposes (e.g. ssh sessions)
+	// preferable and returned to the framework for tracking and managing for user purposes (e.g. ssh sessions)
 	// TODO(chungers) - the machine request here is the *state* not the request
 	GetIPAddress(MachineRequest) (string, error)
 

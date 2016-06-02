@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/storage"
+	"github.com/docker/libmachete"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"net"
@@ -138,7 +138,7 @@ func doGet(client *http.Client, node string) error {
 		return fmt.Errorf("error:%v, message=%v", resp.StatusCode, buff)
 	}
 
-	record := new(storage.MachineRecord)
+	record := new(libmachete.MachineRecord)
 
 	err = json.Unmarshal(buff, record)
 	if err != nil {

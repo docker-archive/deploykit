@@ -4,7 +4,7 @@ import (
 	"github.com/docker/libmachete"
 	mock_api "github.com/docker/libmachete/mock/provisioners/api"
 	"github.com/docker/libmachete/provisioners/api"
-	"github.com/docker/libmachete/storage/filestores"
+	"github.com/docker/libmachete/storage/filestore"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
@@ -26,9 +26,9 @@ func prepareTest(t *testing.T, ctrl *gomock.Controller) (*mock_api.MockProvision
 		},
 	}
 
-	sandbox := filestores.NewSandbox(afero.NewMemMapFs(), "/")
-
-	server, err := build(sandbox, libmachete.NewMachineProvisioners([]libmachete.ProvisionerBuilder{builder}))
+	server, err := build(
+		filestore.NewFileStore(afero.NewMemMapFs(), "/"),
+		libmachete.NewMachineProvisioners([]libmachete.ProvisionerBuilder{builder}))
 	require.NoError(t, err)
 
 	return provisioner, server.getHandler()

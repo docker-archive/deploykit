@@ -1,6 +1,7 @@
 package libmachete
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/storage"
@@ -18,28 +19,28 @@ type Templates interface {
 	NewBlankTemplate(provisionerName string) (api.MachineRequest, *Error)
 
 	// ListIds
-	ListIds() ([]storage.TemplateID, *Error)
+	ListIds() ([]TemplateID, *Error)
 
 	// Get returns a template identified by provisioner and key
-	Get(id storage.TemplateID) (api.MachineRequest, *Error)
+	Get(id TemplateID) (api.MachineRequest, *Error)
 
 	// Deletes the template identified by provisioner and key
-	Delete(id storage.TemplateID) *Error
+	Delete(id TemplateID) *Error
 
 	// CreateTemplate adds a new template from the input reader.
-	CreateTemplate(id storage.TemplateID, input io.Reader, codec *Codec) *Error
+	CreateTemplate(id TemplateID, input io.Reader, codec *Codec) *Error
 
 	// UpdateTemplate updates an existing template
-	UpdateTemplate(id storage.TemplateID, input io.Reader, codec *Codec) *Error
+	UpdateTemplate(id TemplateID, input io.Reader, codec *Codec) *Error
 }
 
 type templates struct {
-	store        storage.Templates
+	store        storage.KvStore
 	provisioners *MachineProvisioners
 }
 
 // NewTemplates creates an instance of the manager given the backing store.
-func NewTemplates(store storage.Templates, provisioners *MachineProvisioners) Templates {
+func NewTemplates(store storage.KvStore, provisioners *MachineProvisioners) Templates {
 	return &templates{store: store, provisioners: provisioners}
 }
 
@@ -50,95 +51,106 @@ func (t *templates) NewBlankTemplate(provisionerName string) (api.MachineRequest
 	return nil, &Error{ErrBadInput, fmt.Sprintf("Unknown provisioner: %v", provisionerName)}
 }
 
-func (t *templates) ListIds() ([]storage.TemplateID, *Error) {
-	ids, err := t.store.List()
+// Key returns the key used for looking up the template.  Key is composed of the provisioner
+// name and the name of the template (scoped to a provisioner).
+func keyFromTemplateID(id TemplateID) storage.Key {
+	return storage.Key{Path: []string{id.Provisioner, id.Name}}
+}
+
+func templateIDFromKey(key storage.Key) TemplateID {
+	requirePathLength(key, 2)
+	return TemplateID{Provisioner: key.Path[0], Name: key.Path[1]}
+}
+
+func (t *templates) ListIds() ([]TemplateID, *Error) {
+	keys, err := t.store.ListRecursive(storage.RootKey)
 	if err != nil {
 		return nil, UnknownError(err)
 	}
+
+	ids := []TemplateID{}
+	for _, key := range keys {
+		ids = append(ids, templateIDFromKey(key))
+	}
+
 	return ids, nil
 }
 
-func (t *templates) Get(id storage.TemplateID) (api.MachineRequest, *Error) {
+func (t *templates) Get(id TemplateID) (api.MachineRequest, *Error) {
 	detail, apiErr := t.NewBlankTemplate(id.Provisioner)
 	if apiErr != nil {
 		return nil, apiErr
 	}
 
-	err := t.store.GetTemplate(id, detail)
+	data, err := t.store.Get(keyFromTemplateID(id))
 	if err != nil {
-		return nil, &Error{ErrNotFound, err.Error()}
+		return nil, &Error{Code: ErrNotFound, Message: "Template does not exist"}
 	}
+
+	err = json.Unmarshal(data, detail)
+	if err != nil {
+		return nil, UnknownError(err)
+	}
+
 	return detail, nil
 }
 
-func (t *templates) Delete(id storage.TemplateID) *Error {
-	err := t.store.Delete(id)
+func (t *templates) Delete(id TemplateID) *Error {
+	err := t.store.Delete(keyFromTemplateID(id))
 	if err != nil {
 		return &Error{ErrNotFound, err.Error()}
 	}
 	return nil
 }
 
-func (t *templates) exists(id storage.TemplateID) bool {
-	tmpl, err := t.NewBlankTemplate(id.Provisioner)
-	if err != nil {
-		return false
-	}
-
-	// TODO(wfarner): This result mixes error cases (failure to read/unmarshal with absence).
-	return t.store.GetTemplate(id, tmpl) == nil
+func (t *templates) exists(id TemplateID) bool {
+	_, err := t.store.Get(keyFromTemplateID(id))
+	return err == nil
 }
 
 func (t *templates) unmarshal(contentType *Codec, data []byte, tmpl api.MachineRequest) error {
 	return contentType.unmarshal(data, tmpl)
 }
 
-func (t *templates) CreateTemplate(id storage.TemplateID, input io.Reader, codec *Codec) *Error {
-	if t.exists(id) {
-		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", id)}
-	}
-
-	tmpl, apiErr := t.NewBlankTemplate(id.Provisioner)
-	if apiErr != nil {
-		return &Error{ErrNotFound, fmt.Sprintf("Unknown provisioner:%s", id.Provisioner)}
-	}
-
+func (t *templates) saveTemplate(id TemplateID, input io.Reader, codec *Codec) *Error {
 	buff, err := ioutil.ReadAll(input)
+	if err != nil {
+		return UnknownError(err)
+
+	}
+
+	template, apiErr := t.NewBlankTemplate(id.Provisioner)
+	if apiErr != nil {
+		return apiErr
+	}
+
+	if err = t.unmarshal(codec, buff, template); err != nil {
+		return UnknownError(err)
+	}
+
+	data, err := json.Marshal(template)
 	if err != nil {
 		return UnknownError(err)
 	}
 
-	if err = t.unmarshal(codec, buff, tmpl); err != nil {
-		return &Error{ErrBadInput, err.Error()}
-	}
-	if err = t.store.Save(id, tmpl); err != nil {
+	if err = t.store.Save(keyFromTemplateID(id), data); err != nil {
 		return UnknownError(err)
 	}
 	return nil
 }
 
-func (t *templates) UpdateTemplate(id storage.TemplateID, input io.Reader, codec *Codec) *Error {
+func (t *templates) CreateTemplate(id TemplateID, input io.Reader, codec *Codec) *Error {
+	if t.exists(id) {
+		return &Error{ErrDuplicate, fmt.Sprintf("Key exists: %v", id)}
+	}
+
+	return t.saveTemplate(id, input, codec)
+}
+
+func (t *templates) UpdateTemplate(id TemplateID, input io.Reader, codec *Codec) *Error {
 	if !t.exists(id) {
 		return &Error{ErrNotFound, fmt.Sprintf("Template not found: %v", id)}
 	}
 
-	buff, err := ioutil.ReadAll(input)
-	if err != nil {
-		return &Error{Message: err.Error()}
-
-	}
-
-	tmpl, apiErr := t.NewBlankTemplate(id.Provisioner)
-	if apiErr != nil {
-		return apiErr
-	}
-
-	if err = t.unmarshal(codec, buff, tmpl); err != nil {
-		return &Error{Message: err.Error()}
-	}
-
-	if err = t.store.Save(id, tmpl); err != nil {
-		return &Error{Message: err.Error()}
-	}
-	return nil
+	return t.saveTemplate(id, input, codec)
 }

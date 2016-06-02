@@ -40,16 +40,6 @@ func (_mr *_MockCredentialRecorder) Authenticate(arg0 interface{}) *gomock.Call 
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Authenticate", arg0)
 }
 
-func (_m *MockCredential) ProvisionerName() string {
-	ret := _m.ctrl.Call(_m, "ProvisionerName")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-func (_mr *_MockCredentialRecorder) ProvisionerName() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "ProvisionerName")
-}
-
 func (_m *MockCredential) Refresh(_param0 context.Context) error {
 	ret := _m.ctrl.Call(_m, "Refresh", _param0)
 	ret0, _ := ret[0].(error)

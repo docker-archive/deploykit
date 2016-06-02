@@ -1,6 +1,7 @@
 package libmachete
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/storage"
@@ -11,28 +12,28 @@ import (
 // Credentials manages the objects used to authenticate and authorize for a provisioner's API
 type Credentials interface {
 	// ListIds
-	ListIds() ([]storage.CredentialsID, *Error)
+	ListIds() ([]CredentialsID, *Error)
 
 	// Get returns a credential identified by key
-	Get(id storage.CredentialsID) (api.Credential, *Error)
+	Get(id CredentialsID) (api.Credential, *Error)
 
 	// Deletes the credential identified by key
-	Delete(id storage.CredentialsID) *Error
+	Delete(id CredentialsID) *Error
 
 	// CreateCredential adds a new credential from the input reader.
-	CreateCredential(id storage.CredentialsID, input io.Reader, codec *Codec) *Error
+	CreateCredential(id CredentialsID, input io.Reader, codec *Codec) *Error
 
 	// UpdateCredential updates an existing credential
-	UpdateCredential(id storage.CredentialsID, input io.Reader, codec *Codec) *Error
+	UpdateCredential(id CredentialsID, input io.Reader, codec *Codec) *Error
 }
 
 type credentials struct {
-	store        storage.Credentials
+	store        storage.KvStore
 	provisioners *MachineProvisioners
 }
 
 // NewCredentials creates an instance of the manager given the backing store.
-func NewCredentials(store storage.Credentials, provisioners *MachineProvisioners) Credentials {
+func NewCredentials(store storage.KvStore, provisioners *MachineProvisioners) Credentials {
 	return &credentials{store: store, provisioners: provisioners}
 }
 
@@ -51,29 +52,50 @@ func (c *credentials) marshal(codec *Codec, cred api.Credential) ([]byte, error)
 	return codec.marshal(cred)
 }
 
-func (c *credentials) ListIds() ([]storage.CredentialsID, *Error) {
-	ids, err := c.store.List()
+func keyFromCredentialsID(id CredentialsID) storage.Key {
+	return storage.Key{Path: []string{id.Provisioner, id.Name}}
+}
+
+func credentialsIDFromKey(key storage.Key) CredentialsID {
+	requirePathLength(key, 2)
+	return CredentialsID{Provisioner: key.Path[0], Name: key.Path[1]}
+}
+
+func (c *credentials) ListIds() ([]CredentialsID, *Error) {
+	keys, err := c.store.ListRecursive(storage.RootKey)
 	if err != nil {
 		return nil, UnknownError(err)
 	}
+
+	ids := []CredentialsID{}
+	for _, key := range keys {
+		ids = append(ids, credentialsIDFromKey(key))
+	}
+
 	return ids, nil
 }
 
-func (c *credentials) Get(id storage.CredentialsID) (api.Credential, *Error) {
+func (c *credentials) Get(id CredentialsID) (api.Credential, *Error) {
+	data, err := c.store.Get(keyFromCredentialsID(id))
+	if err != nil {
+		return nil, UnknownError(err)
+	}
+
 	detail, err := c.newCredential(id.Provisioner)
 	if err != nil {
 		return nil, &Error{ErrBadInput, err.Error()}
 	}
 
-	err = c.store.GetCredentials(id, detail)
+	err = json.Unmarshal(data, detail)
 	if err != nil {
-		return nil, UnknownError(err)
+		return nil, &Error{ErrBadInput, err.Error()}
 	}
+
 	return detail, nil
 }
 
-func (c *credentials) Delete(id storage.CredentialsID) *Error {
-	err := c.store.Delete(id)
+func (c *credentials) Delete(id CredentialsID) *Error {
+	err := c.store.Delete(keyFromCredentialsID(id))
 	// TODO(wfarner): Give better visibility from the store to disambiguate between failure cases.
 	if err != nil {
 		return UnknownError(err)
@@ -81,13 +103,25 @@ func (c *credentials) Delete(id storage.CredentialsID) *Error {
 	return nil
 }
 
-func (c *credentials) exists(id storage.CredentialsID) bool {
-	err := c.store.GetCredentials(id, new(api.CredentialBase))
+func (c *credentials) exists(id CredentialsID) bool {
+	_, err := c.store.Get(keyFromCredentialsID(id))
 	return err == nil
 }
 
+func (c credentials) save(id CredentialsID, creds api.Credential) *Error {
+	stored, err := json.Marshal(creds)
+	if err != nil {
+		return UnknownError(err)
+	}
+
+	if err = c.store.Save(keyFromCredentialsID(id), stored); err != nil {
+		return UnknownError(err)
+	}
+	return nil
+}
+
 // CreateCredential creates a new credential from the input reader.
-func (c *credentials) CreateCredential(id storage.CredentialsID, input io.Reader, codec *Codec) *Error {
+func (c *credentials) CreateCredential(id CredentialsID, input io.Reader, codec *Codec) *Error {
 	if c.exists(id) {
 		return &Error{ErrDuplicate, fmt.Sprintf("Credentials already exists: %v", id)}
 	}
@@ -105,13 +139,11 @@ func (c *credentials) CreateCredential(id storage.CredentialsID, input io.Reader
 	if err = c.unmarshal(codec, buff, creds); err != nil {
 		return UnknownError(err)
 	}
-	if err = c.store.Save(id, creds); err != nil {
-		return UnknownError(err)
-	}
-	return nil
+
+	return c.save(id, creds)
 }
 
-func (c *credentials) UpdateCredential(id storage.CredentialsID, input io.Reader, codec *Codec) *Error {
+func (c *credentials) UpdateCredential(id CredentialsID, input io.Reader, codec *Codec) *Error {
 	if !c.exists(id) {
 		return &Error{ErrNotFound, fmt.Sprintf("Credential not found: %v", id)}
 	}
@@ -130,8 +162,5 @@ func (c *credentials) UpdateCredential(id storage.CredentialsID, input io.Reader
 		return UnknownError(err)
 	}
 
-	if err = c.store.Save(id, creds); err != nil {
-		return UnknownError(err)
-	}
-	return nil
+	return c.save(id, creds)
 }

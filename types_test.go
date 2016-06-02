@@ -1,4 +1,4 @@
-package storage
+package libmachete
 
 import (
 	_ "encoding/json"
