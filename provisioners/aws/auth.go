@@ -6,11 +6,9 @@ import (
 	"golang.org/x/net/context"
 )
 
-// NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
+// NewCredential allocates a blank credential object.
 func NewCredential() api.Credential {
-	return &credential{
-		CredentialBase: api.CredentialBase{Provisioner: ProvisionerName},
-	}
+	return &credential{CredentialBase: api.CredentialBase{}}
 }
 
 type credential struct {

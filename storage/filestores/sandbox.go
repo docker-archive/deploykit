@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/afero"
 	"os"
 	"path"
+	"sort"
+	"strings"
 )
 
 const (
@@ -40,17 +42,26 @@ func (f Sandbox) Nested(subpath string) Sandbox {
 	return Sandbox{fs: f.fs, dir: path.Join(f.dir, subpath)}
 }
 
-func (f Sandbox) list() ([]string, error) {
-	files := []string{}
-	contents, err := afero.ReadDir(f.fs, f.dir)
+func (f Sandbox) listRecursive() ([]string, error) {
+	paths := []string{}
+
+	walker := func(filePath string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			paths = append(paths, strings.TrimPrefix(filePath, f.dir+string(os.PathSeparator)))
+		}
+
+		return nil
+	}
+
+	err := afero.Walk(f.fs, f.dir, walker)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, entry := range contents {
-		files = append(files, entry.Name())
-	}
-	return files, nil
+	// Return in predictable order.
+	sort.Strings(paths)
+
+	return paths, nil
 }
 
 func (f Sandbox) mkdir(subPath string) error {
@@ -104,4 +115,9 @@ func (f Sandbox) remove(name string) error {
 
 func (f Sandbox) removeAll(name string) error {
 	return f.fs.RemoveAll(path.Join(f.dir, name))
+}
+
+func dirAndFile(filePath string) (string, string) {
+	dir, file := path.Split(filePath)
+	return strings.TrimSuffix(dir, string(os.PathSeparator)), file
 }
