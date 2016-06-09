@@ -2,12 +2,12 @@ package azure
 
 import (
 	"errors"
-	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/provisioners/spi"
 )
 
 // ProvisionerWith returns a provision given the runtime context and credential
-func ProvisionerWith(controls api.ProvisionControls, cred api.Credential) (api.Provisioner, error) {
+func ProvisionerWith(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error) {
 	return new(provisioner), nil
 }
 
@@ -16,7 +16,7 @@ type provisioner struct {
 
 // NewMachineRequest returns a canonical machine request suitable for this provisioner.
 // This includes the standard workflow steps as well as the platform attributes.
-func NewMachineRequest() api.MachineRequest {
+func NewMachineRequest() spi.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
@@ -25,18 +25,18 @@ func NewMachineRequest() api.MachineRequest {
 	return req
 }
 
-func getProvisionTaskMap() *libmachete.TaskMap {
-	return libmachete.NewTaskMap(
-		libmachete.TaskSSHKeyGen,
-		libmachete.TaskCreateInstance,
-		libmachete.TaskUserData,
-		libmachete.TaskInstallDockerEngine,
+func getProvisionTaskMap() *api.TaskMap {
+	return api.NewTaskMap(
+		api.TaskSSHKeyGen,
+		api.TaskCreateInstance,
+		api.TaskUserData,
+		api.TaskInstallDockerEngine,
 	)
 }
 
-func getTeardownTaskMap() *libmachete.TaskMap {
-	return libmachete.NewTaskMap(
-		libmachete.TaskDestroyInstance,
+func getTeardownTaskMap() *api.TaskMap {
+	return api.NewTaskMap(
+		api.TaskDestroyInstance,
 	)
 }
 
@@ -45,30 +45,30 @@ func (p *provisioner) Name() string {
 	return ProvisionerName
 }
 
-func (p *provisioner) GetProvisionTasks(tasks []api.TaskName) ([]api.Task, error) {
+func (p *provisioner) GetProvisionTasks(tasks []spi.TaskName) ([]spi.Task, error) {
 	return getProvisionTaskMap().Filter(tasks)
 }
 
-func (p *provisioner) GetTeardownTasks(tasks []api.TaskName) ([]api.Task, error) {
+func (p *provisioner) GetTeardownTasks(tasks []spi.TaskName) ([]spi.Task, error) {
 	return getTeardownTaskMap().Filter(tasks)
 }
 
-func (p *provisioner) NewRequestInstance() api.MachineRequest {
+func (p *provisioner) NewRequestInstance() spi.MachineRequest {
 	return NewMachineRequest()
 }
 
-func (p *provisioner) GetInstanceID(req api.MachineRequest) (string, error) {
+func (p *provisioner) GetInstanceID(req spi.MachineRequest) (string, error) {
 	panic(errors.New("not implemented"))
 }
 
-func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
+func (p *provisioner) GetIPAddress(req spi.MachineRequest) (string, error) {
 	panic(errors.New("not implemented"))
 }
 
-func (p *provisioner) CreateInstance(req api.MachineRequest) (<-chan api.CreateInstanceEvent, error) {
+func (p *provisioner) CreateInstance(req spi.MachineRequest) (<-chan spi.CreateInstanceEvent, error) {
 	panic(errors.New("not implemented"))
 }
 
-func (p *provisioner) DestroyInstance(instanceID string) (<-chan api.DestroyInstanceEvent, error) {
+func (p *provisioner) DestroyInstance(instanceID string) (<-chan spi.DestroyInstanceEvent, error) {
 	panic(errors.New("not implemented"))
 }

@@ -1,6 +1,6 @@
-package api
+package spi
 
-// TODO(wfarner): This appears to be split away from libmachete.SSHKeys just to work around a circular import.  The root
+// TODO(wfarner): This appears to be split away from api.SSHKeys just to work around a circular import.  The root
 // of the cycle (which we appear destined to revisit) appears to be TaskHandler.  Revisit that signature and the means
 // by which Tasks receive dependencies to avoid this problem.
 

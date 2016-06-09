@@ -1,9 +1,9 @@
-package libmachete
+package api
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
 	"io"
 	"io/ioutil"
@@ -15,7 +15,7 @@ type Credentials interface {
 	ListIds() ([]CredentialsID, *Error)
 
 	// Get returns a credential identified by key
-	Get(id CredentialsID) (api.Credential, *Error)
+	Get(id CredentialsID) (spi.Credential, *Error)
 
 	// Deletes the credential identified by key
 	Delete(id CredentialsID) *Error
@@ -37,18 +37,18 @@ func NewCredentials(store storage.KvStore, provisioners *MachineProvisioners) Cr
 	return &credentials{store: store, provisioners: provisioners}
 }
 
-func (c *credentials) newCredential(provisionerName string) (api.Credential, error) {
+func (c *credentials) newCredential(provisionerName string) (spi.Credential, error) {
 	if builder, has := c.provisioners.GetBuilder(provisionerName); has {
 		return builder.DefaultCredential(), nil
 	}
 	return nil, fmt.Errorf("Unknown provisioner: %v", provisionerName)
 }
 
-func (c *credentials) unmarshal(codec *Codec, data []byte, cred api.Credential) error {
+func (c *credentials) unmarshal(codec *Codec, data []byte, cred spi.Credential) error {
 	return codec.unmarshal(data, cred)
 }
 
-func (c *credentials) marshal(codec *Codec, cred api.Credential) ([]byte, error) {
+func (c *credentials) marshal(codec *Codec, cred spi.Credential) ([]byte, error) {
 	return codec.marshal(cred)
 }
 
@@ -75,7 +75,7 @@ func (c *credentials) ListIds() ([]CredentialsID, *Error) {
 	return ids, nil
 }
 
-func (c *credentials) Get(id CredentialsID) (api.Credential, *Error) {
+func (c *credentials) Get(id CredentialsID) (spi.Credential, *Error) {
 	data, err := c.store.Get(keyFromCredentialsID(id))
 	if err != nil {
 		return nil, UnknownError(err)
@@ -108,7 +108,7 @@ func (c *credentials) exists(id CredentialsID) bool {
 	return err == nil
 }
 
-func (c credentials) save(id CredentialsID, creds api.Credential) *Error {
+func (c credentials) save(id CredentialsID, creds spi.Credential) *Error {
 	stored, err := json.Marshal(creds)
 	if err != nil {
 		return UnknownError(err)

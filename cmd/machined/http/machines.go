@@ -3,29 +3,29 @@ package http
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/gorilla/mux"
 	"net/http"
 )
 
 type machineHandler struct {
-	creds        libmachete.Credentials
-	keystore     libmachete.SSHKeys
-	templates    libmachete.Templates
-	machines     libmachete.Machines
-	provisioners libmachete.MachineProvisioners
+	creds        api.Credentials
+	keystore     api.SSHKeys
+	templates    api.Templates
+	machines     api.Machines
+	provisioners api.MachineProvisioners
 }
 
-func getMachineID(req *http.Request) libmachete.MachineID {
-	return libmachete.MachineID(mux.Vars(req)["key"])
+func getMachineID(req *http.Request) api.MachineID {
+	return api.MachineID(mux.Vars(req)["key"])
 }
 
-func (h *machineHandler) getOne(req *http.Request) (interface{}, *libmachete.Error) {
+func (h *machineHandler) getOne(req *http.Request) (interface{}, *api.Error) {
 	return h.machines.Get(getMachineID(req))
 }
 
-func (h *machineHandler) getAll(req *http.Request) (interface{}, *libmachete.Error) {
+func (h *machineHandler) getAll(req *http.Request) (interface{}, *api.Error) {
 	if len(req.URL.Query().Get("long")) > 0 {
 		return h.machines.List()
 	}
@@ -33,7 +33,7 @@ func (h *machineHandler) getAll(req *http.Request) (interface{}, *libmachete.Err
 	return h.machines.ListIds()
 }
 
-func getProvisionControls(req *http.Request) api.ProvisionControls {
+func getProvisionControls(req *http.Request) spi.ProvisionControls {
 	// TODO(wfarner): It may be worth exploring a way for the provisioner to specify the
 	// parameters it supports.  Proceeding with this for now for simplicity.
 	// Omit query values used in this context for the purposes of the provisioner.
@@ -41,19 +41,19 @@ func getProvisionControls(req *http.Request) api.ProvisionControls {
 	queryValues.Del("credentials")
 	queryValues.Del("template")
 
-	return api.ProvisionControls(queryValues)
+	return spi.ProvisionControls(queryValues)
 }
 
 func provisionerNameFromQuery(req *http.Request) string {
 	return req.URL.Query().Get("provisioner")
 }
 
-func (h *machineHandler) getProvisionerBuilder(req *http.Request) (*libmachete.ProvisionerBuilder, *libmachete.Error) {
+func (h *machineHandler) getProvisionerBuilder(req *http.Request) (*api.ProvisionerBuilder, *api.Error) {
 	provisionerName := provisionerNameFromQuery(req)
 	builder, has := h.provisioners.GetBuilder(provisionerName)
 	if !has {
-		return nil, &libmachete.Error{
-			libmachete.ErrBadInput,
+		return nil, &api.Error{
+			api.ErrBadInput,
 			fmt.Sprintf("Unknown provisioner: %s", provisionerName)}
 	}
 	return &builder, nil
@@ -69,9 +69,9 @@ func orDefault(v string, defaultValue string) string {
 func (h *machineHandler) credentialsOrDefault(
 	provisioner string,
 	req *http.Request,
-	defaultName string) (api.Credential, *libmachete.Error) {
+	defaultName string) (spi.Credential, *api.Error) {
 
-	cred, err := h.creds.Get(libmachete.CredentialsID{
+	cred, err := h.creds.Get(api.CredentialsID{
 		Provisioner: provisioner,
 		Name:        orDefault(req.URL.Query().Get("credentials"), defaultName)})
 	if err != nil {
@@ -83,20 +83,20 @@ func (h *machineHandler) credentialsOrDefault(
 func (h *machineHandler) templateOrDefault(
 	provisioner string,
 	req *http.Request,
-	defaultName string) (api.MachineRequest, *libmachete.Error) {
+	defaultName string) (spi.MachineRequest, *api.Error) {
 
-	template, apiErr := h.templates.Get(libmachete.TemplateID{
+	template, apiErr := h.templates.Get(api.TemplateID{
 		Provisioner: provisioner,
 		Name:        orDefault(req.URL.Query().Get("template"), defaultName)})
 	if apiErr != nil {
 		// Overriding the error code here as ErrNotFound should not be returned for a referenced auxiliary
 		// entity.
-		return nil, &libmachete.Error{libmachete.ErrBadInput, apiErr.Error()}
+		return nil, &api.Error{api.ErrBadInput, apiErr.Error()}
 	}
 	return template, nil
 }
 
-func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Error) {
+func (h *machineHandler) create(req *http.Request) (interface{}, *api.Error) {
 	builder, apiErr := h.getProvisionerBuilder(req)
 	if apiErr != nil {
 		return nil, apiErr
@@ -114,7 +114,7 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Err
 
 	provisioner, err := builder.Build(getProvisionControls(req), cred)
 	if err != nil {
-		return nil, &libmachete.Error{libmachete.ErrBadInput, err.Error()}
+		return nil, &api.Error{api.ErrBadInput, err.Error()}
 	}
 
 	events, apiErr := h.machines.CreateMachine(
@@ -123,7 +123,7 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Err
 		cred,
 		template,
 		req.Body,
-		libmachete.ContentTypeJSON)
+		api.ContentTypeJSON)
 
 	if apiErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
@@ -138,7 +138,7 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Err
 	return nil, apiErr
 }
 
-func (h *machineHandler) delete(req *http.Request) (interface{}, *libmachete.Error) {
+func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
 	cred, apiErr := h.credentialsOrDefault(provisionerNameFromQuery(req), req, "default")
 	if apiErr != nil {
 		return nil, apiErr
@@ -156,14 +156,14 @@ func (h *machineHandler) delete(req *http.Request) (interface{}, *libmachete.Err
 
 	builder, has := h.provisioners.GetBuilder(record.Provisioner)
 	if !has {
-		return nil, &libmachete.Error{
-			libmachete.ErrUnknown,
+		return nil, &api.Error{
+			api.ErrUnknown,
 			fmt.Sprintf("Machine record referenced a provisioner that does not exist: %s", record.Provisioner)}
 	}
 
 	provisioner, err := builder.Build(deleteControls, cred)
 	if err != nil {
-		return nil, &libmachete.Error{libmachete.ErrBadInput, err.Error()}
+		return nil, &api.Error{api.ErrBadInput, err.Error()}
 	}
 
 	events, apiErr := h.machines.DeleteMachine(provisioner, h.keystore, cred, record)

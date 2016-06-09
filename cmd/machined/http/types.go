@@ -2,7 +2,7 @@ package http
 
 import (
 	"fmt"
-	"github.com/docker/libmachete"
+	"github.com/docker/libmachete/api"
 	"net/http"
 )
 
@@ -10,16 +10,16 @@ import (
 type Handler func(resp http.ResponseWriter, req *http.Request)
 
 var errorCodeMap = map[int]int{
-	libmachete.ErrBadInput:  http.StatusBadRequest,
-	libmachete.ErrUnknown:   http.StatusInternalServerError,
-	libmachete.ErrDuplicate: http.StatusConflict,
-	libmachete.ErrNotFound:  http.StatusNotFound,
+	api.ErrBadInput:  http.StatusBadRequest,
+	api.ErrUnknown:   http.StatusInternalServerError,
+	api.ErrDuplicate: http.StatusConflict,
+	api.ErrNotFound:  http.StatusNotFound,
 }
 
 // SimpleHandler is a reduced HTTP handler interface that may be used with handleError().
-type SimpleHandler func(req *http.Request) (interface{}, *libmachete.Error)
+type SimpleHandler func(req *http.Request) (interface{}, *api.Error)
 
-func handleError(err libmachete.Error, resp http.ResponseWriter) {
+func handleError(err api.Error, resp http.ResponseWriter) {
 	statusCode, mapped := errorCodeMap[err.Code]
 	if !mapped {
 		statusCode = http.StatusInternalServerError
@@ -39,7 +39,7 @@ func outputHandler(handler SimpleHandler) Handler {
 
 		result, err := handler(req)
 		if result != nil {
-			libmachete.ContentTypeJSON.Respond(resp, result)
+			api.ContentTypeJSON.Respond(resp, result)
 		}
 
 		if err != nil {

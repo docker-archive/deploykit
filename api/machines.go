@@ -1,10 +1,10 @@
-package libmachete
+package api
 
 import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
 	"io"
 	"io/ioutil"
@@ -13,7 +13,7 @@ import (
 
 // MachineRequestBuilder is a provisioner-provided function that creates a typed request
 // that satisfies the MachineRequest interface.
-type MachineRequestBuilder func() api.MachineRequest
+type MachineRequestBuilder func() spi.MachineRequest
 
 // Machines manages the lifecycle of a machine / node.
 type Machines interface {
@@ -28,19 +28,19 @@ type Machines interface {
 
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(
-		provisioner api.Provisioner,
-		keystore api.KeyStore,
-		cred api.Credential,
-		template api.MachineRequest,
+		provisioner spi.Provisioner,
+		keystore spi.KeyStore,
+		cred spi.Credential,
+		template spi.MachineRequest,
 		input io.Reader,
 		codec *Codec) (<-chan interface{}, *Error)
 
 	// DeleteMachine delete a machine with input (optional) in the input reader.  The template contains workflow
 	// tasks for tear down of the machine; however that behavior can also be overridden by the input.
 	DeleteMachine(
-		provisioner api.Provisioner,
-		keystore api.KeyStore,
-		cred api.Credential,
+		provisioner spi.Provisioner,
+		keystore spi.KeyStore,
+		cred spi.Credential,
 		record MachineRecord) (<-chan interface{}, *Error)
 }
 
@@ -116,10 +116,10 @@ func (cm *machines) exists(id MachineID) bool {
 }
 
 func (cm *machines) populateRequest(
-	provisioner api.Provisioner,
-	template api.MachineRequest,
+	provisioner spi.Provisioner,
+	template spi.MachineRequest,
 	input io.Reader,
-	codec *Codec) (api.MachineRequest, error) {
+	codec *Codec) (spi.MachineRequest, error) {
 
 	// Three components are used to fully populate a MachineRequest:
 	// 1. a stock request with low-level defaults from the provisioner
@@ -163,7 +163,7 @@ func (cm machines) marshalAndSave(key storage.Key, value interface{}) *Error {
 	return nil
 }
 
-func (cm machines) saveMachineData(record MachineRecord, details api.MachineRequest) *Error {
+func (cm machines) saveMachineData(record MachineRecord, details spi.MachineRequest) *Error {
 	key := keyFromMachineID(record.MachineName)
 	if err := cm.marshalAndSave(machineRecordKey(key), record); err != nil {
 		return err
@@ -177,10 +177,10 @@ func (cm machines) saveMachineData(record MachineRecord, details api.MachineRequ
 
 // CreateMachine creates a new machine from the input reader.
 func (cm *machines) CreateMachine(
-	provisioner api.Provisioner,
-	keystore api.KeyStore,
-	cred api.Credential,
-	template api.MachineRequest,
+	provisioner spi.Provisioner,
+	keystore spi.KeyStore,
+	cred spi.Credential,
+	template spi.MachineRequest,
 	input io.Reader,
 	codec *Codec) (<-chan interface{}, *Error) {
 
@@ -217,10 +217,10 @@ func (cm *machines) CreateMachine(
 	}
 
 	return runTasks(provisioner, keystore, tasks, &record, cred, request,
-		func(record MachineRecord, state api.MachineRequest) error {
+		func(record MachineRecord, state spi.MachineRequest) error {
 			return cm.saveMachineData(record, state)
 		},
-		func(record *MachineRecord, state api.MachineRequest) {
+		func(record *MachineRecord, state spi.MachineRequest) {
 			record.Status = "provisioned"
 			record.LastModified = Timestamp(time.Now().Unix())
 			if ip, err := provisioner.GetIPAddress(state); err == nil {
@@ -235,9 +235,9 @@ func (cm *machines) CreateMachine(
 // DeleteMachine deletes an existing machine.  Completion of this marks the record as 'terminated'.
 // TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
 func (cm *machines) DeleteMachine(
-	provisioner api.Provisioner,
-	keystore api.KeyStore,
-	cred api.Credential,
+	provisioner spi.Provisioner,
+	keystore spi.KeyStore,
+	cred spi.Credential,
 	record MachineRecord) (<-chan interface{}, *Error) {
 
 	lastChange := record.GetLastChange()
@@ -263,24 +263,24 @@ func (cm *machines) DeleteMachine(
 	//}
 
 	return runTasks(provisioner, keystore, tasks, &record, cred, lastChange,
-		func(record MachineRecord, state api.MachineRequest) error {
+		func(record MachineRecord, state spi.MachineRequest) error {
 			return cm.saveMachineData(record, state)
 		},
-		func(record *MachineRecord, state api.MachineRequest) {
+		func(record *MachineRecord, state spi.MachineRequest) {
 			record.Status = "terminated"
 		})
 }
 
 // runTasks is the main task execution loop
 func runTasks(
-	provisioner api.Provisioner,
-	keystore api.KeyStore,
-	tasks []api.Task,
+	provisioner spi.Provisioner,
+	keystore spi.KeyStore,
+	tasks []spi.Task,
 	record *MachineRecord,
-	cred api.Credential,
-	request api.MachineRequest,
-	save func(MachineRecord, api.MachineRequest) error,
-	onComplete func(*MachineRecord, api.MachineRequest)) (<-chan interface{}, *Error) {
+	cred spi.Credential,
+	request spi.MachineRequest,
+	save func(MachineRecord, spi.MachineRequest) error,
+	onComplete func(*MachineRecord, spi.MachineRequest)) (<-chan interface{}, *Error) {
 
 	events := make(chan interface{})
 	go func() {
@@ -292,7 +292,7 @@ func runTasks(
 			record.LastModified = Timestamp(time.Now().Unix())
 			save(*record, nil)
 
-			go func(task api.Task) {
+			go func(task spi.Task) {
 				log.Infoln("START", task.Name)
 				event := Event{Name: string(task.Name)}
 				if task.Do != nil {
@@ -331,7 +331,7 @@ func runTasks(
 					if event.Status < 0 {
 						stop = true
 					}
-				case api.HasError:
+				case spi.HasError:
 					if e := te.GetError(); e != nil {
 						event.Error = e.Error()
 						stop = true
@@ -341,12 +341,12 @@ func runTasks(
 					stop = true
 				}
 
-				if change, is := te.(api.MachineRequest); is {
+				if change, is := te.(spi.MachineRequest); is {
 					log.Infoln("MachineRequest mutated. Logging it.")
 					record.AppendChange(change)
 				}
 
-				if ms, is := te.(api.HasMachineState); is {
+				if ms, is := te.(spi.HasMachineState); is {
 					log.Infoln("HasMachineState:", te)
 					if provisionedState := ms.GetState(); provisionedState != nil {
 						log.Infoln("Final provisioned state:", provisionedState)

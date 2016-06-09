@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"net/http"
 	"time"
 )
 
 func subscriptionsClient(baseURI string) subscriptions.Client {
 	c := subscriptions.NewClientWithBaseURI(baseURI, "") // used only for unauthenticated requests for generic subs IDs
-	c.Client.UserAgent += fmt.Sprintf(";libmachete/%s", api.Version)
+	c.Client.UserAgent += fmt.Sprintf(";libmachete/%s", spi.Version)
 	c.RequestInspector = func(p autorest.Preparer) autorest.Preparer {
 		return autorest.PreparerFunc(func(r *http.Request) (*http.Request, error) {
 			return p.Prepare(r)
@@ -27,7 +27,7 @@ func subscriptionsClient(baseURI string) subscriptions.Client {
 }
 
 func oauthClient() autorest.Client {
-	c := autorest.NewClientWithUserAgent(fmt.Sprintf("libmachete/%s", api.Version))
+	c := autorest.NewClientWithUserAgent(fmt.Sprintf("libmachete/%s", spi.Version))
 	c.RequestInspector = func(p autorest.Preparer) autorest.Preparer {
 		return autorest.PreparerFunc(func(r *http.Request) (*http.Request, error) {
 			return p.Prepare(r)

@@ -5,19 +5,19 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"golang.org/x/net/context"
 	"net/http"
 	"regexp"
 )
 
 // NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
-func NewCredential() api.Credential {
-	return &credential{CredentialBase: api.CredentialBase{}}
+func NewCredential() spi.Credential {
+	return &credential{CredentialBase: spi.CredentialBase{}}
 }
 
 type credential struct {
-	api.CredentialBase `yaml:",inline"`
+	spi.CredentialBase `yaml:",inline"`
 	azure.Token        `yaml:",inline"`
 }
 

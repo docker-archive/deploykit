@@ -1,11 +1,11 @@
 package azure
 
 import (
-	"github.com/docker/libmachete"
+	"github.com/docker/libmachete/api"
 )
 
 func init() {
-	libmachete.DefaultProvisioners.Register(libmachete.ProvisionerBuilder{
+	api.DefaultProvisioners.Register(api.ProvisionerBuilder{
 		Name:                  ProvisionerName,
 		DefaultCredential:     NewCredential,
 		DefaultMachineRequest: NewMachineRequest,

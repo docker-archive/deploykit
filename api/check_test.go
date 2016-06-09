@@ -1,4 +1,4 @@
-package libmachete
+package api
 
 import (
 	"github.com/stretchr/testify/require"

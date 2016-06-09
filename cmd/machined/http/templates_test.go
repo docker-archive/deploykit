@@ -2,28 +2,28 @@ package http
 
 import (
 	"encoding/json"
-	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func marshalTemplate(t *testing.T, template api.BaseMachineRequest) string {
+func marshalTemplate(t *testing.T, template spi.BaseMachineRequest) string {
 	body, err := json.Marshal(template)
 	require.NoError(t, err)
 	return string(body)
 }
 
-func unmarshalTemplate(t *testing.T, data string) api.BaseMachineRequest {
-	value := api.BaseMachineRequest{}
+func unmarshalTemplate(t *testing.T, data string) spi.BaseMachineRequest {
+	value := spi.BaseMachineRequest{}
 	err := json.Unmarshal([]byte(data), &value)
 	require.NoError(t, err)
 	return value
 }
 
-type TemplateList []libmachete.TemplateID
+type TemplateList []api.TemplateID
 
 func requireTemplates(t *testing.T, r *testflight.Requester, expected TemplateList) {
 	response := r.Get("/templates/json")
@@ -45,7 +45,7 @@ func TestTemplateCrud(t *testing.T) {
 		requireTemplates(t, r, TemplateList{})
 
 		// Create a template
-		template := api.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"}
+		template := spi.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"}
 		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, marshalTemplate(t, template))
 		require.Equal(t, 200, response.StatusCode)
 
@@ -54,13 +54,13 @@ func TestTemplateCrud(t *testing.T) {
 		require.Equal(t, 200, response.StatusCode)
 		require.Equal(t, template, unmarshalTemplate(t, response.Body))
 
-		id := libmachete.TemplateID{Provisioner: "testcloud", Name: "prodtemplate"}
+		id := api.TemplateID{Provisioner: "testcloud", Name: "prodtemplate"}
 
 		// It should appear in a list request
 		requireTemplates(t, r, TemplateList{id})
 
 		// Update the template
-		updated := api.BaseMachineRequest{MachineName: "testnew", Provisioner: "testcloud"}
+		updated := spi.BaseMachineRequest{MachineName: "testnew", Provisioner: "testcloud"}
 		response = r.Put("/templates/testcloud/prodtemplate", JSON, marshalTemplate(t, updated))
 		require.Equal(t, 200, response.StatusCode)
 
@@ -88,7 +88,7 @@ func TestErrorResponses(t *testing.T) {
 	_, handler := prepareTest(t, ctrl)
 
 	testflight.WithServer(handler, func(r *testflight.Requester) {
-		template := api.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"}
+		template := spi.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"}
 
 		// Non-existent provisioner and/or template.
 		require.Equal(t, 400, r.Get("/templates/meta/absentprovisioner/json").StatusCode)
