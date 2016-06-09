@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"reflect"
 	"sort"
 	"time"
@@ -21,7 +21,7 @@ import (
 type Builder struct {
 }
 
-func checkCredential(cred api.Credential) (c *credential, err error) {
+func checkCredential(cred spi.Credential) (c *credential, err error) {
 	is := false
 	if c, is = cred.(*credential); !is {
 		err = fmt.Errorf("credential type mismatch: %v", reflect.TypeOf(cred))
@@ -30,7 +30,7 @@ func checkCredential(cred api.Credential) (c *credential, err error) {
 	return
 }
 
-func getConfig(controls api.ProvisionControls) (*Config, error) {
+func getConfig(controls spi.ProvisionControls) (*Config, error) {
 	config := defaultConfig()
 
 	region, ok := controls.GetString("region")
@@ -56,7 +56,7 @@ func getConfig(controls api.ProvisionControls) (*Config, error) {
 }
 
 // ProvisionerWith returns a provision given the runtime context and credential
-func ProvisionerWith(controls api.ProvisionControls, cred api.Credential) (api.Provisioner, error) {
+func ProvisionerWith(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error) {
 	config, err := getConfig(controls)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func ProvisionerWith(controls api.ProvisionControls, cred api.Credential) (api.P
 		return nil, err
 	}
 
-	// TODO(wfarner): Consider using pointers for all fields in api.Credential.  Otherwise it is not possible to
+	// TODO(wfarner): Consider using pointers for all fields in spi.Credential.  Otherwise it is not possible to
 	// distinguish between supplied empty values and absent values.  As a result, we must put the static credential
 	// value last in the chain.  With proper handling of empty values, it probably belongs at the top of the list
 	// as it is more explicit than values in the environment.
@@ -88,7 +88,7 @@ type provisioner struct {
 }
 
 // New creates a new AWS provisioner that will use the provided EC2 API implementation and default config.
-func New(client ec2iface.EC2API) api.Provisioner {
+func New(client ec2iface.EC2API) spi.Provisioner {
 	return &provisioner{client: client, sleepFunction: time.Sleep, config: defaultConfig()}
 }
 
@@ -209,25 +209,25 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
-func getProvisionTaskMap() *libmachete.TaskMap {
-	return libmachete.NewTaskMap(
-		libmachete.TaskSSHKeyGen.Override("AWS - upload generated SSH key", GenerateAndUploadSSHKey),
-		libmachete.TaskCreateInstance,
-		libmachete.TaskUserData,
-		libmachete.TaskInstallDockerEngine,
+func getProvisionTaskMap() *api.TaskMap {
+	return api.NewTaskMap(
+		api.TaskSSHKeyGen.Override("AWS - upload generated SSH key", GenerateAndUploadSSHKey),
+		api.TaskCreateInstance,
+		api.TaskUserData,
+		api.TaskInstallDockerEngine,
 	)
 }
 
-func getTeardownTaskMap() *libmachete.TaskMap {
-	return libmachete.NewTaskMap(
-		libmachete.TaskDestroyInstance,
-		libmachete.TaskSSHKeyRemove.Override("AWS - remove ssh key", RemoveLocalAndUploadedSSHKey),
+func getTeardownTaskMap() *api.TaskMap {
+	return api.NewTaskMap(
+		api.TaskDestroyInstance,
+		api.TaskSSHKeyRemove.Override("AWS - remove ssh key", RemoveLocalAndUploadedSSHKey),
 	)
 }
 
 // NewMachineRequest returns a canonical machine request suitable for this provisioner.
 // This includes the standard workflow steps as well as the platform attributes.
-func NewMachineRequest() api.MachineRequest {
+func NewMachineRequest() spi.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
@@ -241,11 +241,11 @@ func (p *provisioner) Name() string {
 	return ProvisionerName
 }
 
-func (p *provisioner) NewRequestInstance() api.MachineRequest {
+func (p *provisioner) NewRequestInstance() spi.MachineRequest {
 	return NewMachineRequest()
 }
 
-func ensureRequestType(req api.MachineRequest) (r *CreateInstanceRequest, err error) {
+func ensureRequestType(req spi.MachineRequest) (r *CreateInstanceRequest, err error) {
 	is := false
 	if r, is = req.(*CreateInstanceRequest); !is {
 		err = fmt.Errorf("request type mismatch: %v", reflect.TypeOf(req))
@@ -255,7 +255,7 @@ func ensureRequestType(req api.MachineRequest) (r *CreateInstanceRequest, err er
 }
 
 // GetInstanceID returns the infrastructure identifier given the state of the machine.
-func (p *provisioner) GetInstanceID(req api.MachineRequest) (string, error) {
+func (p *provisioner) GetInstanceID(req spi.MachineRequest) (string, error) {
 	ci, err := ensureRequestType(req)
 	if err != nil {
 		return "", err
@@ -265,7 +265,7 @@ func (p *provisioner) GetInstanceID(req api.MachineRequest) (string, error) {
 
 // GetIPAddress - this prefers private IP if it's set; make this behavior configurable as a
 // machine template or context?
-func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
+func (p *provisioner) GetIPAddress(req spi.MachineRequest) (string, error) {
 	ci, err := ensureRequestType(req)
 	if err != nil {
 		return "", err
@@ -276,11 +276,11 @@ func (p *provisioner) GetIPAddress(req api.MachineRequest) (string, error) {
 	return ci.PublicIPAddress, nil
 }
 
-func (p *provisioner) GetProvisionTasks(tasks []api.TaskName) ([]api.Task, error) {
+func (p *provisioner) GetProvisionTasks(tasks []spi.TaskName) ([]spi.Task, error) {
 	return getProvisionTaskMap().Filter(tasks)
 }
 
-func (p *provisioner) GetTeardownTasks(tasks []api.TaskName) ([]api.Task, error) {
+func (p *provisioner) GetTeardownTasks(tasks []spi.TaskName) ([]spi.Task, error) {
 	return getTeardownTaskMap().Filter(tasks)
 }
 
@@ -291,7 +291,7 @@ func validate(req *CreateInstanceRequest) error {
 }
 
 func (p *provisioner) CreateInstance(
-	req api.MachineRequest) (<-chan api.CreateInstanceEvent, error) {
+	req spi.MachineRequest) (<-chan spi.CreateInstanceEvent, error) {
 
 	request, is := req.(*CreateInstanceRequest)
 	if !is {
@@ -302,44 +302,44 @@ func (p *provisioner) CreateInstance(
 		return nil, err
 	}
 
-	events := make(chan api.CreateInstanceEvent)
+	events := make(chan spi.CreateInstanceEvent)
 	go func() {
 		defer close(events)
 
-		events <- api.CreateInstanceEvent{Type: api.CreateInstanceStarted}
+		events <- spi.CreateInstanceEvent{Type: spi.CreateInstanceStarted}
 
 		instance, err := createInstanceSync(p.client, *request)
 		if err != nil {
-			events <- api.CreateInstanceEvent{
+			events <- spi.CreateInstanceEvent{
 				Error: err,
-				Type:  api.CreateInstanceError,
+				Type:  spi.CreateInstanceError,
 			}
 			return
 		}
 
 		err = p.blockUntilInstanceInState(*instance.InstanceId, ec2.InstanceStateNameRunning)
 		if err != nil {
-			events <- api.CreateInstanceEvent{
+			events <- spi.CreateInstanceEvent{
 				Error: err,
-				Type:  api.CreateInstanceError,
+				Type:  spi.CreateInstanceError,
 			}
 			return
 		}
 
 		err = tagSync(p.client, *request, instance)
 		if err != nil {
-			events <- api.CreateInstanceEvent{
+			events <- spi.CreateInstanceEvent{
 				Error: err,
-				Type:  api.CreateInstanceError,
+				Type:  spi.CreateInstanceError,
 			}
 			return
 		}
 
 		provisioned, err := getInstanceSync(p.client, *instance.InstanceId)
 		if err != nil {
-			events <- api.CreateInstanceEvent{
+			events <- spi.CreateInstanceEvent{
 				Error: err,
-				Type:  api.CreateInstanceError,
+				Type:  spi.CreateInstanceError,
 			}
 			return
 		}
@@ -356,8 +356,8 @@ func (p *provisioner) CreateInstance(
 
 		log.Infoln("ProvisionedState=", provisionedState)
 
-		events <- api.CreateInstanceEvent{
-			Type:       api.CreateInstanceCompleted,
+		events <- spi.CreateInstanceEvent{
+			Type:       spi.CreateInstanceCompleted,
 			InstanceID: *instance.InstanceId,
 			Machine:    &provisionedState,
 		}
@@ -382,32 +382,32 @@ func destroyInstanceSync(client ec2iface.EC2API, instanceID string) error {
 	return &ErrInvalidRequest{}
 }
 
-func (p *provisioner) DestroyInstance(instanceID string) (<-chan api.DestroyInstanceEvent, error) {
-	events := make(chan api.DestroyInstanceEvent)
+func (p *provisioner) DestroyInstance(instanceID string) (<-chan spi.DestroyInstanceEvent, error) {
+	events := make(chan spi.DestroyInstanceEvent)
 
 	go func() {
 		defer close(events)
 
-		events <- api.DestroyInstanceEvent{Type: api.DestroyInstanceStarted}
+		events <- spi.DestroyInstanceEvent{Type: spi.DestroyInstanceStarted}
 
 		err := destroyInstanceSync(p.client, instanceID)
 		if err != nil {
-			events <- api.DestroyInstanceEvent{
-				Type:  api.DestroyInstanceError,
+			events <- spi.DestroyInstanceEvent{
+				Type:  spi.DestroyInstanceError,
 				Error: err}
 			return
 		}
 
 		err = p.blockUntilInstanceInState(instanceID, ec2.InstanceStateNameTerminated)
 		if err != nil {
-			events <- api.DestroyInstanceEvent{
+			events <- spi.DestroyInstanceEvent{
 				Error: err,
-				Type:  api.DestroyInstanceError,
+				Type:  spi.DestroyInstanceError,
 			}
 			return
 		}
 
-		events <- api.DestroyInstanceEvent{Type: api.DestroyInstanceCompleted}
+		events <- spi.DestroyInstanceEvent{Type: spi.DestroyInstanceCompleted}
 	}()
 
 	return events, nil
