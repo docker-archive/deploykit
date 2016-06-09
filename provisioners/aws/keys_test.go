@@ -7,9 +7,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete"
 	mock_api "github.com/docker/libmachete/mock/provisioners/api"
+	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/provisioners/aws/mock"
 	"github.com/docker/libmachete/storage"
-	"github.com/docker/libmachete/storage/filestores"
+	"github.com/docker/libmachete/storage/filestore"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
@@ -17,14 +18,11 @@ import (
 )
 
 func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	host := "new-host"
-	sandbox := filestores.NewSandbox(afero.NewMemMapFs(), "/")
-	keystore := filestores.NewKeys(sandbox)
-	keys := libmachete.NewKeys(keystore)
+	keys := libmachete.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/"))
 
 	cred := mock_api.NewMockCredential(ctrl)
 	client := mock.NewMockEC2API(ctrl)
@@ -43,8 +41,8 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	request.MachineName = host
 
 	events := make(chan interface{})
-	record := &storage.MachineRecord{}
-	record.MachineName = storage.MachineID(host)
+	record := &libmachete.MachineRecord{}
+	record.MachineName = libmachete.MachineID(host)
 
 	go func() {
 		for range events {
@@ -70,9 +68,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	defer ctrl.Finish()
 
 	host := "new-host"
-	sandbox := filestores.NewSandbox(afero.NewMemMapFs(), "/")
-	keystore := filestores.NewKeys(sandbox)
-	keys := libmachete.NewKeys(keystore)
+	keys := libmachete.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/"))
 
 	cred := mock_api.NewMockCredential(ctrl)
 	client := mock.NewMockEC2API(ctrl)
@@ -88,16 +84,19 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	require.Equal(t, host, request.Name())
 
 	events := make(chan interface{})
-	record := &storage.MachineRecord{}
-	record.MachineName = storage.MachineID(host)
+	record := &libmachete.MachineRecord{}
+	record.MachineName = libmachete.MachineID(host)
 
 	err := RemoveLocalAndUploadedSSHKey(provisioner, keys, cred, record, request, events)
-	require.NoError(t, err)
+	// TODO(wfarner): This was previously require.NoError(), which does not seem to make sense since the SSH key
+	// being deleted did not exist, which should be an error.  Consider adding a step to the beginning of the test
+	// that first creates the SSH key.
+	require.Error(t, err)
 
 	close(events)
 	ids, err := keys.ListIds()
 	require.NoError(t, err)
-	require.Equal(t, []string{}, ids)
+	require.Equal(t, []api.SSHKeyID{}, ids)
 }
 
 func TestGeneratedKeyNameIsPropagated(t *testing.T) {
@@ -106,11 +105,9 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 	defer ctrl.Finish()
 
 	host := "new-host"
-	sandbox := filestores.NewSandbox(afero.NewMemMapFs(), "/")
-	machinestore := filestores.NewMachines(sandbox)
-	keystore := filestores.NewKeys(sandbox)
-	keys := libmachete.NewKeys(keystore)
-	machines := libmachete.NewMachines(machinestore)
+	store := filestore.NewFileStore(afero.NewMemMapFs(), "/")
+	keys := libmachete.NewSSHKeys(storage.NestedStore(store, "keys"))
+	machines := libmachete.NewMachines(storage.NestedStore(store, "machines"))
 
 	cred := mock_api.NewMockCredential(ctrl)
 	client := mock.NewMockEC2API(ctrl)
@@ -138,7 +135,8 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 		keys,
 		cred,
 		template,
-		bytes.NewBuffer([]byte(fmt.Sprintf(`{"name": "%s", "provision" : [ "ssh-key-generate", "instance-create" ]}`, host))),
+		bytes.NewBuffer([]byte(fmt.Sprintf(
+			`{"name": "%s", "provision" : [ "ssh-key-generate", "instance-create" ]}`, host))),
 		libmachete.ContentTypeJSON)
 
 	require.NoError(t, err)

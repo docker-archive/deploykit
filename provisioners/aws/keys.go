@@ -32,7 +32,7 @@ func GenerateAndUploadSSHKey(
 	}
 
 	keyName := resource.Name()
-	publicKey, err := keystore.GetEncodedPublicKey(keyName)
+	publicKey, err := keystore.GetEncodedPublicKey(api.SSHKeyID(keyName))
 	if err != nil {
 		events <- err
 		return err
