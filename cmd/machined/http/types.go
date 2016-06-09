@@ -1,9 +1,9 @@
 package http
 
 import (
+	"fmt"
 	"github.com/docker/libmachete"
 	"net/http"
-	"fmt"
 )
 
 // Handler is shorthand for an HTTP request handler function.

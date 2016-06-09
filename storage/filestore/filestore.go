@@ -1,10 +1,12 @@
 package filestore
 
 import (
+	"fmt"
 	"github.com/docker/libmachete/storage"
 	"github.com/spf13/afero"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 )
 
@@ -30,6 +32,18 @@ func (f fileStore) Mkdirs() error {
 	return f.fs.MkdirAll(f.dir, 0750)
 }
 
+const pathRegexp = "^[\\w\\.\\-]+$"
+
+func validateKey(key storage.Key) error {
+	for _, part := range key.Path {
+		if matched, _ := regexp.MatchString(pathRegexp, part); !matched {
+			return fmt.Errorf("Key part contains illegal characters: %s", part)
+		}
+	}
+
+	return nil
+}
+
 func (f fileStore) keyToPath(key storage.Key) string {
 	elements := []string{f.dir}
 	elements = append(elements, key.Path...)
@@ -37,13 +51,23 @@ func (f fileStore) keyToPath(key storage.Key) string {
 }
 
 func (f fileStore) Save(key storage.Key, data []byte) error {
+	err := validateKey(key)
+	if err != nil {
+		return err
+	}
+
 	return afero.WriteFile(f.fs, f.keyToPath(key), data, 0700)
 }
 
 func (f fileStore) ListRecursive(key storage.Key) ([]storage.Key, error) {
+	err := validateKey(key)
+	if err != nil {
+		return nil, err
+	}
+
 	keys := []storage.Key{}
 
-	err := afero.Walk(f.fs, f.keyToPath(key), func(path string, info os.FileInfo, err error) error {
+	err = afero.Walk(f.fs, f.keyToPath(key), func(path string, info os.FileInfo, err error) error {
 		if info != nil && !info.IsDir() {
 			keys = append(keys, storage.Key{Path: strings.Split(strings.Trim(path, slash), slash)})
 		}
@@ -59,9 +83,19 @@ func (f fileStore) ListRecursive(key storage.Key) ([]storage.Key, error) {
 }
 
 func (f fileStore) Get(key storage.Key) ([]byte, error) {
+	err := validateKey(key)
+	if err != nil {
+		return nil, err
+	}
+
 	return afero.ReadFile(f.fs, f.keyToPath(key))
 }
 
 func (f fileStore) Delete(key storage.Key) error {
+	err := validateKey(key)
+	if err != nil {
+		return err
+	}
+
 	return f.fs.Remove(f.keyToPath(key))
 }
