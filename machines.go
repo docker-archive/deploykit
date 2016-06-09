@@ -1,13 +1,13 @@
 package libmachete
 
 import (
+	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/storage"
 	"io"
 	"io/ioutil"
-	"sort"
 	"time"
 )
 
@@ -18,13 +18,13 @@ type MachineRequestBuilder func() api.MachineRequest
 // Machines manages the lifecycle of a machine / node.
 type Machines interface {
 	// List returns summaries of all machines.
-	List() ([]storage.MachineSummary, *Error)
+	List() ([]MachineSummary, *Error)
 
 	// ListIds returns the identifiers for all machines.
-	ListIds() ([]string, *Error)
+	ListIds() ([]MachineID, *Error)
 
 	// Get returns a machine identified by key
-	Get(key string) (storage.MachineRecord, *Error)
+	Get(id MachineID) (MachineRecord, *Error)
 
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(
@@ -36,60 +36,82 @@ type Machines interface {
 		codec *Codec) (<-chan interface{}, *Error)
 
 	// DeleteMachine delete a machine with input (optional) in the input reader.  The template contains workflow
-	// tasks for tear down of the machine; however that behavior can also be overriden by the input.
+	// tasks for tear down of the machine; however that behavior can also be overridden by the input.
 	DeleteMachine(
 		provisioner api.Provisioner,
 		keystore api.KeyStore,
 		cred api.Credential,
-		record storage.MachineRecord) (<-chan interface{}, *Error)
+		record MachineRecord) (<-chan interface{}, *Error)
 }
 
 type machines struct {
-	store storage.Machines
+	store storage.KvStore
 }
 
 // NewMachines creates an instance of the manager given the backing store.
-func NewMachines(store storage.Machines) Machines {
+func NewMachines(store storage.KvStore) Machines {
 	return &machines{store: store}
 }
 
-func (cm *machines) List() ([]storage.MachineSummary, *Error) {
-	out := []storage.MachineSummary{}
-	ids, err := cm.ListIds()
+func machineIDFromKey(key storage.Key) MachineID {
+	requirePathLength(key, 1)
+	return MachineID(key.Path[0])
+}
+
+func keyFromMachineID(id MachineID) storage.Key {
+	return storage.Key{Path: []string{string(id)}}
+}
+
+func (cm *machines) List() ([]MachineSummary, *Error) {
+	keys, err := cm.store.ListRecursive(storage.RootKey)
 	if err != nil {
 		return nil, UnknownError(err)
 	}
-	for _, i := range ids {
-		if record, err := cm.Get(string(i)); err == nil {
-			out = append(out, record.MachineSummary)
+
+	summaries := []MachineSummary{}
+	for _, key := range keys {
+		record, err := cm.Get(machineIDFromKey(key))
+		if err != nil {
+			return nil, UnknownError(err)
 		}
+		summaries = append(summaries, record.MachineSummary)
 	}
-	return out, nil
+
+	return summaries, nil
 }
 
-func (cm *machines) ListIds() ([]string, *Error) {
-	out := []string{}
-	list, err := cm.store.List()
+func (cm *machines) ListIds() ([]MachineID, *Error) {
+	keys, err := cm.store.ListRecursive(storage.RootKey)
 	if err != nil {
 		return nil, UnknownError(err)
 	}
-	for _, i := range list {
-		out = append(out, string(i))
+
+	storage.SortKeys(keys)
+
+	ids := []MachineID{}
+	for _, key := range keys {
+		ids = append(ids, machineIDFromKey(key))
 	}
-	sort.Strings(out)
-	return out, nil
+	return ids, nil
 }
 
-func (cm *machines) Get(key string) (storage.MachineRecord, *Error) {
-	m, err := cm.store.GetRecord(storage.MachineID(key))
+func (cm *machines) Get(id MachineID) (MachineRecord, *Error) {
+	data, err := cm.store.Get(keyFromMachineID(id))
 	if err != nil {
-		return storage.MachineRecord{}, UnknownError(err)
+		return MachineRecord{}, UnknownError(err)
 	}
-	return *m, nil
+
+	record := MachineRecord{}
+	err = json.Unmarshal(data, &record)
+	if err != nil {
+		return record, UnknownError(err)
+	}
+
+	return record, nil
 }
 
-func (cm *machines) exists(key string) bool {
-	_, err := cm.Get(key)
+func (cm *machines) exists(id MachineID) bool {
+	_, err := cm.store.Get(keyFromMachineID(id))
 	return err == nil
 }
 
@@ -121,6 +143,38 @@ func (cm *machines) populateRequest(
 	return request, nil
 }
 
+func machineRecordKey(baseKey storage.Key) storage.Key {
+	return storage.Key{Path: append(baseKey.Path, "record.json")}
+}
+
+func machineDetailsKey(baseKey storage.Key) storage.Key {
+	return storage.Key{Path: append(baseKey.Path, "details.json")}
+}
+
+func (cm machines) marshalAndSave(key storage.Key, value interface{}) *Error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return UnknownError(err)
+	}
+
+	if err := cm.store.Save(key, data); err != nil {
+		return UnknownError(err)
+	}
+	return nil
+}
+
+func (cm machines) saveMachineData(record MachineRecord, details api.MachineRequest) *Error {
+	key := keyFromMachineID(record.MachineName)
+	if err := cm.marshalAndSave(machineRecordKey(key), record); err != nil {
+		return err
+	}
+
+	if err := cm.marshalAndSave(machineDetailsKey(key), details); err != nil {
+		return err
+	}
+	return nil
+}
+
 // CreateMachine creates a new machine from the input reader.
 func (cm *machines) CreateMachine(
 	provisioner api.Provisioner,
@@ -135,38 +189,40 @@ func (cm *machines) CreateMachine(
 		return nil, UnknownError(err)
 	}
 
-	key := request.Name()
-	if cm.exists(key) {
-		return nil, &Error{Code: ErrDuplicate, Message: fmt.Sprintf("Key exists: %v", key)}
+	machineID := MachineID(request.Name())
+	if cm.exists(machineID) {
+		return nil, &Error{Code: ErrDuplicate, Message: fmt.Sprintf("Key exists: %v", machineID)}
 	}
 
 	// First save a record
-	record := &storage.MachineRecord{
-		MachineSummary: storage.MachineSummary{
+	record := MachineRecord{
+		MachineSummary: MachineSummary{
 			Status:      "initiated",
-			MachineName: storage.MachineID(key),
+			MachineName: machineID,
 			Provisioner: provisioner.Name(),
-			Created:     storage.Timestamp(time.Now().Unix()),
+			Created:     Timestamp(time.Now().Unix()),
 		},
 	}
 	record.AppendEvent("init", "Create started", request)
 	record.AppendChange(request)
 
-	if err := cm.store.Save(*record, request); err != nil {
-		return nil, &Error{Message: err.Error()}
+	apiErr := cm.saveMachineData(record, request)
+	if apiErr != nil {
+		return nil, apiErr
 	}
+
 	tasks, err := provisioner.GetProvisionTasks(request.ProvisionWorkflow())
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
-	return runTasks(provisioner, keystore, tasks, record, cred, request,
-		func(record storage.MachineRecord, state api.MachineRequest) error {
-			return cm.store.Save(record, state)
+	return runTasks(provisioner, keystore, tasks, &record, cred, request,
+		func(record MachineRecord, state api.MachineRequest) error {
+			return cm.saveMachineData(record, state)
 		},
-		func(record *storage.MachineRecord, state api.MachineRequest) {
+		func(record *MachineRecord, state api.MachineRequest) {
 			record.Status = "provisioned"
-			record.LastModified = storage.Timestamp(time.Now().Unix())
+			record.LastModified = Timestamp(time.Now().Unix())
 			if ip, err := provisioner.GetIPAddress(state); err == nil {
 				record.IPAddress = ip
 			}
@@ -182,11 +238,11 @@ func (cm *machines) DeleteMachine(
 	provisioner api.Provisioner,
 	keystore api.KeyStore,
 	cred api.Credential,
-	record storage.MachineRecord) (<-chan interface{}, *Error) {
+	record MachineRecord) (<-chan interface{}, *Error) {
 
 	lastChange := record.GetLastChange()
 	if lastChange == nil {
-		return nil, &Error{Message: fmt.Sprintf("Impossible state. Machine has no history:%v", record.Name)}
+		return nil, &Error{Message: fmt.Sprintf("Impossible state. Machine has no history:%v", record.Name())}
 	}
 
 	// On managing changes (or even removal) of the template and the impact on already-provisioned instances:
@@ -201,15 +257,16 @@ func (cm *machines) DeleteMachine(
 
 	record.AppendEvent("init-destroy", "Destroy started", lastChange)
 
-	if err := cm.store.Save(record, nil); err != nil {
-		return nil, &Error{Message: err.Error()}
-	}
+	// TODO(wfarner): Nothing is actually deleted, is that intentional?
+	//if err := cm.store.Save(record, nil); err != nil {
+	//	return nil, &Error{Message: err.Error()}
+	//}
 
 	return runTasks(provisioner, keystore, tasks, &record, cred, lastChange,
-		func(record storage.MachineRecord, state api.MachineRequest) error {
-			return cm.store.Save(record, state)
+		func(record MachineRecord, state api.MachineRequest) error {
+			return cm.saveMachineData(record, state)
 		},
-		func(record *storage.MachineRecord, state api.MachineRequest) {
+		func(record *MachineRecord, state api.MachineRequest) {
 			record.Status = "terminated"
 		})
 }
@@ -219,11 +276,11 @@ func runTasks(
 	provisioner api.Provisioner,
 	keystore api.KeyStore,
 	tasks []api.Task,
-	record *storage.MachineRecord,
+	record *MachineRecord,
 	cred api.Credential,
 	request api.MachineRequest,
-	save func(storage.MachineRecord, api.MachineRequest) error,
-	onComplete func(*storage.MachineRecord, api.MachineRequest)) (<-chan interface{}, *Error) {
+	save func(MachineRecord, api.MachineRequest) error,
+	onComplete func(*MachineRecord, api.MachineRequest)) (<-chan interface{}, *Error) {
 
 	events := make(chan interface{})
 	go func() {
@@ -232,12 +289,12 @@ func runTasks(
 			taskEvents := make(chan interface{})
 
 			record.Status = "pending"
-			record.LastModified = storage.Timestamp(time.Now().Unix())
+			record.LastModified = Timestamp(time.Now().Unix())
 			save(*record, nil)
 
 			go func(task api.Task) {
 				log.Infoln("START", task.Name)
-				event := storage.Event{Name: string(task.Name)}
+				event := Event{Name: string(task.Name)}
 				if task.Do != nil {
 					if err := task.Do(provisioner, keystore, cred, *record, request, taskEvents); err != nil {
 						event.Message = task.Message + " errored: " + err.Error()
@@ -256,20 +313,20 @@ func runTasks(
 
 			}(task) // Goroutine with a copy of the task to avoid data races.
 
-			// TOOD(chungers) - until we separate out the state from the request, at least here
+			// TODO(chungers) - until we separate out the state from the request, at least here
 			// in code we attempt to communicate the proper treatment of request vs state.
 			machineState := request
 
 			for te := range taskEvents {
 				stop := false
-				event := storage.Event{
+				event := Event{
 					Name:      string(task.Name),
 					Timestamp: time.Now(),
 				}
 				event.AddData(te)
 
 				switch te := te.(type) {
-				case storage.Event:
+				case Event:
 					event = te
 					if event.Status < 0 {
 						stop = true
@@ -298,7 +355,7 @@ func runTasks(
 				}
 
 				record.AppendEventObject(event)
-				record.LastModified = storage.Timestamp(time.Now().Unix())
+				record.LastModified = Timestamp(time.Now().Unix())
 				save(*record, machineState)
 
 				events <- event
@@ -306,7 +363,7 @@ func runTasks(
 				if stop {
 					log.Warningln("Stopping due to error")
 					record.Status = "failed"
-					record.LastModified = storage.Timestamp(time.Now().Unix())
+					record.LastModified = Timestamp(time.Now().Unix())
 					save(*record, machineState)
 					return
 				}
@@ -314,7 +371,7 @@ func runTasks(
 		}
 
 		onComplete(record, nil)
-		record.LastModified = storage.Timestamp(time.Now().Unix())
+		record.LastModified = Timestamp(time.Now().Unix())
 		save(*record, nil)
 		return
 	}()

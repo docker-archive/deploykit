@@ -5,21 +5,20 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
-	"github.com/docker/libmachete/storage"
 	"github.com/gorilla/mux"
 	"net/http"
 )
 
 type machineHandler struct {
 	creds        libmachete.Credentials
-	keystore     libmachete.Keys
+	keystore     libmachete.SSHKeys
 	templates    libmachete.Templates
 	machines     libmachete.Machines
 	provisioners libmachete.MachineProvisioners
 }
 
-func getMachineID(req *http.Request) string {
-	return mux.Vars(req)["key"]
+func getMachineID(req *http.Request) libmachete.MachineID {
+	return libmachete.MachineID(mux.Vars(req)["key"])
 }
 
 func (h *machineHandler) getOne(req *http.Request) (interface{}, *libmachete.Error) {
@@ -72,7 +71,7 @@ func (h *machineHandler) credentialsOrDefault(
 	req *http.Request,
 	defaultName string) (api.Credential, *libmachete.Error) {
 
-	cred, err := h.creds.Get(storage.CredentialsID{
+	cred, err := h.creds.Get(libmachete.CredentialsID{
 		Provisioner: provisioner,
 		Name:        orDefault(req.URL.Query().Get("credentials"), defaultName)})
 	if err != nil {
@@ -86,7 +85,7 @@ func (h *machineHandler) templateOrDefault(
 	req *http.Request,
 	defaultName string) (api.MachineRequest, *libmachete.Error) {
 
-	template, apiErr := h.templates.Get(storage.TemplateID{
+	template, apiErr := h.templates.Get(libmachete.TemplateID{
 		Provisioner: provisioner,
 		Name:        orDefault(req.URL.Query().Get("template"), defaultName)})
 	if apiErr != nil {
@@ -140,8 +139,6 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *libmachete.Err
 }
 
 func (h *machineHandler) delete(req *http.Request) (interface{}, *libmachete.Error) {
-	machineName := getMachineID(req)
-
 	cred, apiErr := h.credentialsOrDefault(provisionerNameFromQuery(req), req, "default")
 	if apiErr != nil {
 		return nil, apiErr
@@ -152,7 +149,7 @@ func (h *machineHandler) delete(req *http.Request) (interface{}, *libmachete.Err
 	deleteControls := getProvisionControls(req)
 
 	// Load the record of the machine by name
-	record, apiErr := h.machines.Get(machineName)
+	record, apiErr := h.machines.Get(getMachineID(req))
 	if apiErr != nil {
 		return nil, apiErr
 	}

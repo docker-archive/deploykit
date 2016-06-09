@@ -2,7 +2,6 @@ package http
 
 import (
 	"github.com/docker/libmachete"
-	"github.com/docker/libmachete/storage"
 	"github.com/gorilla/mux"
 	"net/http"
 )
@@ -35,8 +34,8 @@ func (h *templatesHandler) delete(req *http.Request) (interface{}, *libmachete.E
 	return nil, h.templates.Delete(getTemplateID(req))
 }
 
-func getTemplateID(request *http.Request) storage.TemplateID {
-	return storage.TemplateID{
+func getTemplateID(request *http.Request) libmachete.TemplateID {
+	return libmachete.TemplateID{
 		Provisioner: getProvisionerName(request),
 		Name:        mux.Vars(request)["key"],
 	}

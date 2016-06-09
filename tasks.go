@@ -130,7 +130,8 @@ func defaultSSHKeyGenHandler(prov api.Provisioner, keys api.KeyStore,
 	if key == "" {
 		return NewError(ErrBadInput, "Bad resource name")
 	}
-	return keys.NewKeyPair(key)
+	err := keys.NewKeyPair(api.SSHKeyID(key))
+	return err
 }
 
 // defaultSSHKeyRemoveHandler is the default task handler that will remove the SSH key pair identified by the resource's name.
@@ -144,7 +145,7 @@ func defaultSSHKeyRemoveHandler(prov api.Provisioner, keys api.KeyStore,
 	if key == "" {
 		return NewError(ErrBadInput, "Bad resource name")
 	}
-	return keys.Remove(key)
+	return keys.Remove(api.SSHKeyID(key))
 }
 
 var (

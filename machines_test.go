@@ -2,6 +2,7 @@ package libmachete
 
 import (
 	"bytes"
+	"encoding/json"
 	mock_api "github.com/docker/libmachete/mock/provisioners/api"
 	mock_storage "github.com/docker/libmachete/mock/storage"
 	"github.com/docker/libmachete/provisioners/api"
@@ -11,16 +12,13 @@ import (
 	"testing"
 )
 
-//go:generate mockgen -package storage -destination mock/storage/machines.go github.com/docker/libmachete/storage Machines
 //go:generate mockgen -package api -destination mock/provisioners/api/provisioner.go github.com/docker/libmachete/provisioners/api Provisioner
 //go:generate mockgen -package api -destination mock/provisioners/api/keys.go github.com/docker/libmachete/provisioners/api KeyStore
 //go:generate mockgen -package api -destination mock/provisioners/api/credential.go github.com/docker/libmachete/provisioners/api Credential
 
-func machineRecord(name string) storage.MachineRecord {
-	return storage.MachineRecord{
-		MachineSummary: storage.MachineSummary{
-			MachineName: storage.MachineID(name),
-		},
+func machineRecord(name string) MachineRecord {
+	return MachineRecord{
+		MachineSummary: MachineSummary{MachineName: MachineID(name)},
 	}
 }
 
@@ -29,26 +27,28 @@ func TestListingSorted(t *testing.T) {
 	defer ctrl.Finish()
 
 	data := []struct {
-		ID     storage.MachineID
-		Record storage.MachineRecord
+		ID     MachineID
+		Record MachineRecord
 	}{
-		{ID: storage.MachineID("host2"), Record: machineRecord("host2")},
-		{ID: storage.MachineID("host1"), Record: machineRecord("host1")},
-		{ID: storage.MachineID("host3"), Record: machineRecord("host3")},
+		{ID: MachineID("host1"), Record: machineRecord("host1")},
+		{ID: MachineID("host2"), Record: machineRecord("host2")},
+		{ID: MachineID("host3"), Record: machineRecord("host3")},
 	}
 
-	store := mock_storage.NewMockMachines(ctrl)
+	store := mock_storage.NewMockKvStore(ctrl)
 
-	ids := []storage.MachineID{}
+	keys := []storage.Key{}
 	for _, m := range data {
-		ids = append(ids, m.ID)
+		keys = append(keys, keyFromMachineID(m.ID))
 	}
 
-	store.EXPECT().List().Return(ids, nil)
+	store.EXPECT().ListRecursive(storage.RootKey).Return(keys, nil)
 
 	for _, m := range data {
 		result := m.Record
-		store.EXPECT().GetRecord(m.ID).Return(&result, nil)
+		resultJSON, err := json.Marshal(result)
+		require.NoError(t, err)
+		store.EXPECT().Get(keyFromMachineID(m.ID)).Return(resultJSON, nil)
 	}
 
 	machines := NewMachines(store)
@@ -56,18 +56,18 @@ func TestListingSorted(t *testing.T) {
 	summaries, err := machines.List()
 	require.NoError(t, err)
 
-	names := []string{}
-	for _, s := range summaries {
-		names = append(names, string(s.MachineName))
+	ids := []MachineID{}
+	for _, summary := range summaries {
+		ids = append(ids, summary.MachineName)
 	}
-	require.Equal(t, []string{"host1", "host2", "host3"}, names)
+	require.Equal(t, []MachineID{MachineID("host1"), MachineID("host2"), MachineID("host3")}, ids)
 
 	// Another -- test listing of ids only
-	store.EXPECT().List().Return(ids, nil)
+	store.EXPECT().ListRecursive(storage.RootKey).Return(keys, nil)
 
-	l, err := machines.ListIds()
+	ids, err = machines.ListIds()
 	require.NoError(t, err)
-	require.Equal(t, names, l)
+	require.Equal(t, ids, ids)
 }
 
 func checkTasksAreRun(t *testing.T, events <-chan interface{}, tasks []api.Task) {
@@ -76,7 +76,7 @@ func checkTasksAreRun(t *testing.T, events <-chan interface{}, tasks []api.Task)
 	executed := []string{}
 	for e := range events {
 		seen = append(seen, e)
-		if evt, ok := e.(storage.Event); ok {
+		if evt, ok := e.(Event); ok {
 			executed = append(executed, evt.Name)
 		}
 	}
@@ -97,7 +97,7 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := &api.BaseMachineRequest{}
-	record := new(storage.MachineRecord)
+	record := new(MachineRecord)
 
 	tasks := []api.Task{
 		TaskCreateInstance,
@@ -112,10 +112,10 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 		record,
 		cred,
 		request,
-		func(r storage.MachineRecord, q api.MachineRequest) error {
+		func(r MachineRecord, q api.MachineRequest) error {
 			return nil
 		},
-		func(r *storage.MachineRecord, s api.MachineRequest) {
+		func(r *MachineRecord, s api.MachineRequest) {
 			return
 		})
 	require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := &api.BaseMachineRequest{}
-	record := new(storage.MachineRecord)
+	record := new(MachineRecord)
 
 	tasks := []api.Task{
 		TaskDestroyInstance,
@@ -147,10 +147,10 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 		record,
 		cred,
 		request,
-		func(r storage.MachineRecord, q api.MachineRequest) error {
+		func(r MachineRecord, q api.MachineRequest) error {
 			return nil
 		},
-		func(r *storage.MachineRecord, s api.MachineRequest) {
+		func(r *MachineRecord, s api.MachineRequest) {
 			return
 		})
 	require.NoError(t, err)
@@ -195,19 +195,23 @@ func TestCreateMachine(t *testing.T) {
 
 	keystore := mock_api.NewMockKeyStore(ctrl)
 
-	store := mock_storage.NewMockMachines(ctrl)
+	store := mock_storage.NewMockKvStore(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 
-	record := new(storage.MachineRecord)
-	record.MachineName = storage.MachineID(name)
+	record := new(MachineRecord)
+	record.MachineName = MachineID(name)
 	record.InstanceID = id
 	record.AppendChange(&api.BaseMachineRequest{
 		MachineName: string(record.MachineName),
 		Provision:   provisionNames,
 	})
 	notFound := &Error{Code: ErrNotFound}
-	store.EXPECT().GetRecord(storage.MachineID(record.MachineName)).Times(1).Return(record, notFound)
-	store.EXPECT().GetRecord(storage.MachineID(record.MachineName)).AnyTimes().Return(record, nil)
+
+	recordJSON, err := json.Marshal(record)
+	require.NoError(t, err)
+
+	store.EXPECT().Get(keyFromMachineID(record.MachineName)).Times(1).Return(recordJSON, notFound)
+	store.EXPECT().Get(keyFromMachineID(record.MachineName)).AnyTimes().Return(recordJSON, nil)
 	machines := NewMachines(store)
 	events, err := machines.CreateMachine(
 		provisioner,
@@ -239,7 +243,7 @@ func TestDestroyMachine(t *testing.T) {
 	}
 
 	// Data from previous provisioning run
-	record := new(storage.MachineRecord)
+	record := new(MachineRecord)
 	record.MachineName = "test-host"
 	record.InstanceID = "id-test-host"
 	record.AppendChange(&api.BaseMachineRequest{
@@ -251,7 +255,7 @@ func TestDestroyMachine(t *testing.T) {
 	destroyEvents := make(chan api.DestroyInstanceEvent)
 	provisioner.EXPECT().DestroyInstance(record.InstanceID).Return(destroyEvents, nil)
 
-	store := mock_storage.NewMockMachines(ctrl)
+	store := mock_storage.NewMockKvStore(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 	machines := NewMachines(store)
 	events, err := machines.DeleteMachine(provisioner, keystore, cred, *record)
@@ -269,7 +273,7 @@ func TestRunTasksNoError(t *testing.T) {
 	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := &api.BaseMachineRequest{}
-	record := new(storage.MachineRecord)
+	record := new(MachineRecord)
 
 	tasks := []api.Task{
 		makeTask("step1"),
@@ -285,10 +289,10 @@ func TestRunTasksNoError(t *testing.T) {
 		record,
 		cred,
 		request,
-		func(r storage.MachineRecord, q api.MachineRequest) error {
+		func(r MachineRecord, q api.MachineRequest) error {
 			return nil
 		},
-		func(r *storage.MachineRecord, s api.MachineRequest) {
+		func(r *MachineRecord, s api.MachineRequest) {
 			return
 		})
 
@@ -306,7 +310,7 @@ func TestRunTasksErrorAbort(t *testing.T) {
 	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := &api.BaseMachineRequest{}
-	record := new(storage.MachineRecord)
+	record := new(MachineRecord)
 
 	tasks := []api.Task{
 		makeTask("step1"),
@@ -322,10 +326,10 @@ func TestRunTasksErrorAbort(t *testing.T) {
 		record,
 		cred,
 		request,
-		func(r storage.MachineRecord, q api.MachineRequest) error {
+		func(r MachineRecord, q api.MachineRequest) error {
 			return nil
 		},
-		func(r *storage.MachineRecord, s api.MachineRequest) {
+		func(r *MachineRecord, s api.MachineRequest) {
 			return
 		})
 

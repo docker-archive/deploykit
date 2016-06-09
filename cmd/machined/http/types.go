@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"github.com/docker/libmachete"
 	"net/http"
 )
@@ -29,6 +30,13 @@ func handleError(err libmachete.Error, resp http.ResponseWriter) {
 
 func outputHandler(handler SimpleHandler) Handler {
 	return func(resp http.ResponseWriter, req *http.Request) {
+		// Handle panics cleanly.
+		defer func() {
+			if err := recover(); err != nil {
+				respondError(500, resp, fmt.Errorf("Panic: %v", err))
+			}
+		}()
+
 		result, err := handler(req)
 		if result != nil {
 			libmachete.ContentTypeJSON.Respond(resp, result)

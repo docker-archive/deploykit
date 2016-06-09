@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-//go:generate mockgen -package storage -destination mock/storage/keys.go github.com/docker/libmachete/storage Keys
+//go:generate mockgen -package storage -destination mock/storage/kv_store.go github.com/docker/libmachete/storage KvStore
 
 func TestDefaultSSHKeyGenAndRemove(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -22,15 +22,15 @@ func TestDefaultSSHKeyGenAndRemove(t *testing.T) {
 	keystore := mock_api.NewMockKeyStore(ctrl)
 	cred := mock_api.NewMockCredential(ctrl)
 	request := new(api.BaseMachineRequest)
-	record := new(storage.MachineRecord)
-	record.MachineName = storage.MachineID(host)
+	record := new(MachineRecord)
+	record.MachineName = MachineID(host)
 	tasks := []api.Task{
 		TaskSSHKeyGen,
 		TaskSSHKeyRemove,
 	}
 
-	keystore.EXPECT().NewKeyPair(host).Return(nil)
-	keystore.EXPECT().Remove(host).Return(nil)
+	keystore.EXPECT().NewKeyPair(api.SSHKeyID(host)).Return(nil)
+	keystore.EXPECT().Remove(api.SSHKeyID(host)).Return(nil)
 
 	events, err := runTasks(
 		provisioner,
@@ -39,10 +39,10 @@ func TestDefaultSSHKeyGenAndRemove(t *testing.T) {
 		record,
 		cred,
 		request,
-		func(r storage.MachineRecord, q api.MachineRequest) error {
+		func(r MachineRecord, q api.MachineRequest) error {
 			return nil
 		},
-		func(r *storage.MachineRecord, s api.MachineRequest) {
+		func(r *MachineRecord, s api.MachineRequest) {
 			return
 		})
 	require.NoError(t, err)
@@ -50,21 +50,31 @@ func TestDefaultSSHKeyGenAndRemove(t *testing.T) {
 	checkTasksAreRun(t, events, tasks)
 }
 
+func storageKey(value string) storage.Key {
+	return storage.Key{Path: []string{value}}
+}
+
 func TestSortedKeys(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	keystore := mock_storage.NewMockKeys(ctrl)
-	keys := NewKeys(keystore)
+	store := mock_storage.NewMockKvStore(ctrl)
+	keys := NewSSHKeys(store)
 
-	keystore.EXPECT().List().Return([]storage.KeyID{
-		storage.KeyID("k1"),
-		storage.KeyID("k3"),
-		storage.KeyID("k4"),
-		storage.KeyID("k2"),
-	}, nil)
+	store.EXPECT().ListRecursive(storage.RootKey).Return(
+		[]storage.Key{
+			storageKey("k1"),
+			storageKey("k2"),
+			storageKey("k3"),
+			storageKey("k4")},
+		nil)
 
 	ids, err := keys.ListIds()
 	require.NoError(t, err)
-	require.Equal(t, []string{"k1", "k2", "k3", "k4"}, ids)
+	require.Equal(t, []api.SSHKeyID{
+		api.SSHKeyID("k1"),
+		api.SSHKeyID("k2"),
+		api.SSHKeyID("k3"),
+		api.SSHKeyID("k4")},
+		ids)
 }

@@ -4,6 +4,7 @@
 package api
 
 import (
+	api "github.com/docker/libmachete/provisioners/api"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -28,7 +29,7 @@ func (_m *MockKeyStore) EXPECT() *_MockKeyStoreRecorder {
 	return _m.recorder
 }
 
-func (_m *MockKeyStore) GetEncodedPublicKey(_param0 string) ([]byte, error) {
+func (_m *MockKeyStore) GetEncodedPublicKey(_param0 api.SSHKeyID) ([]byte, error) {
 	ret := _m.ctrl.Call(_m, "GetEncodedPublicKey", _param0)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
@@ -39,7 +40,7 @@ func (_mr *_MockKeyStoreRecorder) GetEncodedPublicKey(arg0 interface{}) *gomock.
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetEncodedPublicKey", arg0)
 }
 
-func (_m *MockKeyStore) NewKeyPair(_param0 string) error {
+func (_m *MockKeyStore) NewKeyPair(_param0 api.SSHKeyID) error {
 	ret := _m.ctrl.Call(_m, "NewKeyPair", _param0)
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -49,7 +50,7 @@ func (_mr *_MockKeyStoreRecorder) NewKeyPair(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "NewKeyPair", arg0)
 }
 
-func (_m *MockKeyStore) Remove(_param0 string) error {
+func (_m *MockKeyStore) Remove(_param0 api.SSHKeyID) error {
 	ret := _m.ctrl.Call(_m, "Remove", _param0)
 	ret0, _ := ret[0].(error)
 	return ret0

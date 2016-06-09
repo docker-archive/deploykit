@@ -2,8 +2,8 @@ package http
 
 import (
 	"encoding/json"
+	"github.com/docker/libmachete"
 	"github.com/docker/libmachete/provisioners/api"
-	"github.com/docker/libmachete/storage"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ func unmarshalTemplate(t *testing.T, data string) api.BaseMachineRequest {
 	return value
 }
 
-type TemplateList []storage.TemplateID
+type TemplateList []libmachete.TemplateID
 
 func requireTemplates(t *testing.T, r *testflight.Requester, expected TemplateList) {
 	response := r.Get("/templates/json")
@@ -54,7 +54,7 @@ func TestTemplateCrud(t *testing.T) {
 		require.Equal(t, 200, response.StatusCode)
 		require.Equal(t, template, unmarshalTemplate(t, response.Body))
 
-		id := storage.TemplateID{Provisioner: "testcloud", Name: "prodtemplate"}
+		id := libmachete.TemplateID{Provisioner: "testcloud", Name: "prodtemplate"}
 
 		// It should appear in a list request
 		requireTemplates(t, r, TemplateList{id})
@@ -92,7 +92,7 @@ func TestErrorResponses(t *testing.T) {
 
 		// Non-existent provisioner and/or template.
 		require.Equal(t, 400, r.Get("/templates/meta/absentprovisioner/json").StatusCode)
-		require.Equal(t, 404, r.Post(
+		require.Equal(t, 400, r.Post(
 			"/templates/absentprovisioner/name/create",
 			JSON,
 			marshalTemplate(t, template)).StatusCode)
