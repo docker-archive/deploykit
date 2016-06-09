@@ -2,8 +2,11 @@ package aws
 
 import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/provisioners/aws"
 	"github.com/docker/libmachete/provisioners/spi"
+	"github.com/docker/libmachete/storage/filestore"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -42,7 +45,9 @@ func TestCreate(t *testing.T) {
 	}
 
 	awsCredentials := credentials.NewStaticCredentials(accessKey, secretKey, "")
-	provisioner := aws.New(aws.CreateClient(region, awsCredentials, 10))
+	provisioner := aws.New(
+		aws.CreateClient(region, awsCredentials, 10),
+		api.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/")))
 
 	request := &aws.CreateInstanceRequest{
 		AvailabilityZone:         "us-west-2a",
@@ -68,7 +73,7 @@ func TestCreate(t *testing.T) {
 	createEvents, err := provisioner.CreateInstance(request)
 	require.Nil(t, err)
 
-	var createEventTypes []api.CreateInstanceEventType
+	var createEventTypes []spi.CreateInstanceEventType
 	var instanceID string
 	for event := range createEvents {
 		t.Log("event=", event)
@@ -79,23 +84,23 @@ func TestCreate(t *testing.T) {
 		}
 	}
 
-	expectedCreateEvents := []api.CreateInstanceEventType{
-		api.CreateInstanceStarted,
-		api.CreateInstanceCompleted}
+	expectedCreateEvents := []spi.CreateInstanceEventType{
+		spi.CreateInstanceStarted,
+		spi.CreateInstanceCompleted}
 	require.Equal(t, expectedCreateEvents, createEventTypes)
 
 	require.NotEmpty(t, instanceID)
 	destroyEvents, err := provisioner.DestroyInstance(instanceID)
 	require.Nil(t, err)
 
-	var destroyEventTypes []api.DestroyInstanceEventType
+	var destroyEventTypes []spi.DestroyInstanceEventType
 	for event := range destroyEvents {
 		t.Log("event=", event)
 		destroyEventTypes = append(destroyEventTypes, event.Type)
 	}
 
-	expectedDestroyEvents := []api.DestroyInstanceEventType{
-		api.DestroyInstanceStarted,
-		api.DestroyInstanceCompleted}
+	expectedDestroyEvents := []spi.DestroyInstanceEventType{
+		spi.DestroyInstanceStarted,
+		spi.DestroyInstanceCompleted}
 	require.Equal(t, expectedDestroyEvents, destroyEventTypes)
 }

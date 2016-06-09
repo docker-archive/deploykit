@@ -117,14 +117,7 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *api.Error) {
 		return nil, &api.Error{api.ErrBadInput, err.Error()}
 	}
 
-	events, apiErr := h.machines.CreateMachine(
-		provisioner,
-		h.keystore,
-		cred,
-		template,
-		req.Body,
-		api.ContentTypeJSON)
-
+	events, apiErr := h.machines.CreateMachine(provisioner, template, req.Body, api.ContentTypeJSON)
 	if apiErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
 		go func() {
@@ -166,7 +159,7 @@ func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
 		return nil, &api.Error{api.ErrBadInput, err.Error()}
 	}
 
-	events, apiErr := h.machines.DeleteMachine(provisioner, h.keystore, cred, record)
+	events, apiErr := h.machines.DeleteMachine(provisioner, record)
 	if apiErr == nil {
 		// TODO - if the client requests streaming events... send that out here.
 		go func() {

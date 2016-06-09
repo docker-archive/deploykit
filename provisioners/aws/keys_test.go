@@ -6,27 +6,33 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete/api"
-	mock_spi "github.com/docker/libmachete/mock/provisioners/spi"
 	"github.com/docker/libmachete/provisioners/aws/mock"
-	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
 	"github.com/docker/libmachete/storage/filestore"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
+
+func newTestClientAndProvisioner(ctrl *gomock.Controller) (*mock.MockEC2API, provisioner) {
+	client := mock.NewMockEC2API(ctrl)
+	provisioner := provisioner{
+		client:        client,
+		sleepFunction: func(_ time.Duration) {},
+		config:        defaultConfig(),
+		sshKeys:       api.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/")),
+	}
+	return client, provisioner
+}
 
 func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	host := "new-host"
-	keys := api.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/"))
-
-	cred := mock_spi.NewMockCredential(ctrl)
-	client := mock.NewMockEC2API(ctrl)
-	provisioner := New(client)
+	client, provisioner := newTestClientAndProvisioner(ctrl)
 
 	matcher := func(input *ec2.ImportKeyPairInput) {
 		require.NotNil(t, input)
@@ -51,7 +57,7 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	}()
 
 	// blocks synchronously
-	err := GenerateAndUploadSSHKey(provisioner, keys, cred, record, request, events)
+	err := provisioner.generateAndUploadSSHKey(record, request, events)
 
 	close(events)
 
@@ -70,9 +76,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	host := "new-host"
 	keys := api.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/"))
 
-	cred := mock_spi.NewMockCredential(ctrl)
-	client := mock.NewMockEC2API(ctrl)
-	provisioner := New(client)
+	client, provisioner := newTestClientAndProvisioner(ctrl)
 
 	client.EXPECT().DeleteKeyPair(&ec2.DeleteKeyPairInput{KeyName: &host}).Return(nil, nil)
 
@@ -87,7 +91,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	record := &api.MachineRecord{}
 	record.MachineName = api.MachineID(host)
 
-	err := RemoveLocalAndUploadedSSHKey(provisioner, keys, cred, record, request, events)
+	err := provisioner.removeLocalAndUploadedSSHKey(record, request, events)
 	// TODO(wfarner): This was previously require.NoError(), which does not seem to make sense since the SSH key
 	// being deleted did not exist, which should be an error.  Consider adding a step to the beginning of the test
 	// that first creates the SSH key.
@@ -96,22 +100,18 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	close(events)
 	ids, err := keys.ListIds()
 	require.NoError(t, err)
-	require.Equal(t, []spi.SSHKeyID{}, ids)
+	require.Equal(t, []api.SSHKeyID{}, ids)
 }
 
 func TestGeneratedKeyNameIsPropagated(t *testing.T) {
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	host := "new-host"
 	store := filestore.NewFileStore(afero.NewMemMapFs(), "/")
-	keys := api.NewSSHKeys(storage.NestedStore(store, "keys"))
 	machines := api.NewMachines(storage.NestedStore(store, "machines"))
 
-	cred := mock_spi.NewMockCredential(ctrl)
-	client := mock.NewMockEC2API(ctrl)
-	provisioner := New(client)
+	client, provisioner := newTestClientAndProvisioner(ctrl)
 
 	client.EXPECT().ImportKeyPair(gomock.Any()).Do(
 		func(input *ec2.ImportKeyPairInput) {
@@ -131,9 +131,7 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 	template := loadTemplate(t)
 
 	events, err := machines.CreateMachine(
-		provisioner,
-		keys,
-		cred,
+		&provisioner,
 		template,
 		bytes.NewBuffer([]byte(fmt.Sprintf(
 			`{"name": "%s", "provision" : [ "ssh-key-generate", "instance-create" ]}`, host))),

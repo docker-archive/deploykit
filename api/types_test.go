@@ -17,15 +17,15 @@ func TestAppendChange(t *testing.T) {
 	name := "test-host"
 	provisionerName := "test"
 	version := "0.1"
-	provision := []spi.TaskName{
-		spi.TaskName("p1"),
-		spi.TaskName("p2"),
-		spi.TaskName("p3"),
+	provision := []string{
+		"p1",
+		"p2",
+		"p3",
 	}
-	teardown := []spi.TaskName{
-		spi.TaskName("t1"),
-		spi.TaskName("t2"),
-		spi.TaskName("t3"),
+	teardown := []string{
+		"t1",
+		"t2",
+		"t3",
 	}
 	change := spi.BaseMachineRequest{
 		MachineName:        name,
@@ -64,15 +64,15 @@ func TestMarshalMachineRecord(t *testing.T) {
 			{
 				MachineName: "test-host",
 				Provisioner: "test",
-				Provision: []spi.TaskName{
-					spi.TaskName("task1"),
-					spi.TaskName("task2"),
-					spi.TaskName("task3"),
+				Provision: []string{
+					"task1",
+					"task2",
+					"task3",
 				},
-				Teardown: []spi.TaskName{
-					spi.TaskName("task1"),
-					spi.TaskName("task2"),
-					spi.TaskName("task3"),
+				Teardown: []string{
+					"task1",
+					"task2",
+					"task3",
 				},
 			},
 		},

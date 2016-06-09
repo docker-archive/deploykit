@@ -29,19 +29,12 @@ type Machines interface {
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(
 		provisioner spi.Provisioner,
-		keystore spi.KeyStore,
-		cred spi.Credential,
 		template spi.MachineRequest,
 		input io.Reader,
 		codec *Codec) (<-chan interface{}, *Error)
 
-	// DeleteMachine delete a machine with input (optional) in the input reader.  The template contains workflow
-	// tasks for tear down of the machine; however that behavior can also be overridden by the input.
-	DeleteMachine(
-		provisioner spi.Provisioner,
-		keystore spi.KeyStore,
-		cred spi.Credential,
-		record MachineRecord) (<-chan interface{}, *Error)
+	// DeleteMachine delete a machine.  The record contains workflow tasks for tear down of the machine.
+	DeleteMachine(provisioner spi.Provisioner, record MachineRecord) (<-chan interface{}, *Error)
 }
 
 type machines struct {
@@ -178,8 +171,6 @@ func (cm machines) saveMachineData(record MachineRecord, details spi.MachineRequ
 // CreateMachine creates a new machine from the input reader.
 func (cm *machines) CreateMachine(
 	provisioner spi.Provisioner,
-	keystore spi.KeyStore,
-	cred spi.Credential,
 	template spi.MachineRequest,
 	input io.Reader,
 	codec *Codec) (<-chan interface{}, *Error) {
@@ -211,12 +202,15 @@ func (cm *machines) CreateMachine(
 		return nil, apiErr
 	}
 
-	tasks, err := provisioner.GetProvisionTasks(request.ProvisionWorkflow())
+	tasks, err := filterTasks(provisioner.GetProvisionTasks(), request.ProvisionWorkflow())
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
 
-	return runTasks(provisioner, keystore, tasks, &record, cred, request,
+	return runTasks(
+		tasks,
+		record,
+		request,
 		func(record MachineRecord, state spi.MachineRequest) error {
 			return cm.saveMachineData(record, state)
 		},
@@ -232,12 +226,42 @@ func (cm *machines) CreateMachine(
 		})
 }
 
+func findTask(tasks []spi.Task, name string) *spi.Task {
+	for _, task := range tasks {
+		if task.Name == name {
+			return &task
+		}
+	}
+	return nil
+}
+
+func taskNames(tasks []spi.Task) []string {
+	names := []string{}
+	for _, task := range tasks {
+		names = append(names, task.Name)
+	}
+	return names
+}
+
+func filterTasks(tasks []spi.Task, selectNames []string) ([]spi.Task, error) {
+	filtered := []spi.Task{}
+	for _, name := range selectNames {
+		task := findTask(tasks, name)
+		if task != nil {
+			filtered = append(filtered, *task)
+		} else {
+			return nil, fmt.Errorf(
+				"Task %s is not supported, must be one of %s", name, taskNames(tasks))
+		}
+	}
+
+	return filtered, nil
+}
+
 // DeleteMachine deletes an existing machine.  Completion of this marks the record as 'terminated'.
 // TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
 func (cm *machines) DeleteMachine(
 	provisioner spi.Provisioner,
-	keystore spi.KeyStore,
-	cred spi.Credential,
 	record MachineRecord) (<-chan interface{}, *Error) {
 
 	lastChange := record.GetLastChange()
@@ -247,10 +271,11 @@ func (cm *machines) DeleteMachine(
 
 	// On managing changes (or even removal) of the template and the impact on already-provisioned instances:
 	// If the template is removed, we can still teardown the instance using a copy of the original request / intent.
-	// If the template is updated and has new workflow impact, the user can 'upgrade' the machine (method to be provided)
-	// so that the last change request correctly reflects the correct tasks to run to teardown.
+	// If the template is updated and has new workflow impact, the user can 'upgrade' the machine
+	// (method to be provided) so that the last change request correctly reflects the correct tasks to run to
+	// teardown.
 
-	tasks, err := provisioner.GetTeardownTasks(lastChange.TeardownWorkflow())
+	tasks, err := filterTasks(provisioner.GetTeardownTasks(), lastChange.TeardownWorkflow())
 	if err != nil {
 		return nil, &Error{Message: err.Error()}
 	}
@@ -262,7 +287,10 @@ func (cm *machines) DeleteMachine(
 	//	return nil, &Error{Message: err.Error()}
 	//}
 
-	return runTasks(provisioner, keystore, tasks, &record, cred, lastChange,
+	return runTasks(
+		tasks,
+		record,
+		lastChange,
 		func(record MachineRecord, state spi.MachineRequest) error {
 			return cm.saveMachineData(record, state)
 		},
@@ -273,11 +301,8 @@ func (cm *machines) DeleteMachine(
 
 // runTasks is the main task execution loop
 func runTasks(
-	provisioner spi.Provisioner,
-	keystore spi.KeyStore,
 	tasks []spi.Task,
-	record *MachineRecord,
-	cred spi.Credential,
+	record MachineRecord,
 	request spi.MachineRequest,
 	save func(MachineRecord, spi.MachineRequest) error,
 	onComplete func(*MachineRecord, spi.MachineRequest)) (<-chan interface{}, *Error) {
@@ -290,13 +315,14 @@ func runTasks(
 
 			record.Status = "pending"
 			record.LastModified = Timestamp(time.Now().Unix())
-			save(*record, nil)
+			save(record, nil)
 
 			go func(task spi.Task) {
 				log.Infoln("START", task.Name)
 				event := Event{Name: string(task.Name)}
 				if task.Do != nil {
-					if err := task.Do(provisioner, keystore, cred, *record, request, taskEvents); err != nil {
+					err := task.Do(record, request, taskEvents)
+					if err != nil {
 						event.Message = task.Message + " errored: " + err.Error()
 						event.Error = err.Error()
 						event.Status = -1
@@ -356,7 +382,7 @@ func runTasks(
 
 				record.AppendEventObject(event)
 				record.LastModified = Timestamp(time.Now().Unix())
-				save(*record, machineState)
+				save(record, machineState)
 
 				events <- event
 
@@ -364,15 +390,15 @@ func runTasks(
 					log.Warningln("Stopping due to error")
 					record.Status = "failed"
 					record.LastModified = Timestamp(time.Now().Unix())
-					save(*record, machineState)
+					save(record, machineState)
 					return
 				}
 			}
 		}
 
-		onComplete(record, nil)
+		onComplete(&record, nil)
 		record.LastModified = Timestamp(time.Now().Unix())
-		save(*record, nil)
+		save(record, nil)
 		return
 	}()
 

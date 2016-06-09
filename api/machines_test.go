@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	mock_spi "github.com/docker/libmachete/mock/provisioners/spi"
 	mock_storage "github.com/docker/libmachete/mock/storage"
 	"github.com/docker/libmachete/provisioners/spi"
@@ -12,7 +13,7 @@ import (
 	"testing"
 )
 
-//go:generate mockgen -package api -destination ../mock/provisioners/spi/spi.go github.com/docker/libmachete/provisioners/spi Credential,KeyStore,Provisioner
+//go:generate mockgen -package api -destination ../mock/provisioners/spi/spi.go github.com/docker/libmachete/provisioners/spi Provisioner
 
 func machineRecord(name string) MachineRecord {
 	return MachineRecord{
@@ -92,23 +93,16 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_spi.NewMockProvisioner(ctrl)
-	keystore := mock_spi.NewMockKeyStore(ctrl)
-	cred := mock_spi.NewMockCredential(ctrl)
 	request := &spi.BaseMachineRequest{}
-	record := new(MachineRecord)
+	record := MachineRecord{}
 
-	tasks := []spi.Task{
-		TaskCreateInstance,
-	}
+	tasks := []spi.Task{CreateInstance(provisioner)}
 
 	createEvents := make(chan spi.CreateInstanceEvent)
 	provisioner.EXPECT().CreateInstance(gomock.Any()).Return(createEvents, nil)
 	events, err := runTasks(
-		provisioner,
-		keystore,
 		tasks,
 		record,
-		cred,
 		request,
 		func(r MachineRecord, q spi.MachineRequest) error {
 			return nil
@@ -127,23 +121,16 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_spi.NewMockProvisioner(ctrl)
-	keystore := mock_spi.NewMockKeyStore(ctrl)
-	cred := mock_spi.NewMockCredential(ctrl)
 	request := &spi.BaseMachineRequest{}
-	record := new(MachineRecord)
+	record := MachineRecord{}
 
-	tasks := []spi.Task{
-		TaskDestroyInstance,
-	}
+	tasks := []spi.Task{DestroyInstance(provisioner)}
 
 	destroyEvents := make(chan spi.DestroyInstanceEvent)
 	provisioner.EXPECT().DestroyInstance(gomock.Any()).Return(destroyEvents, nil)
 	events, err := runTasks(
-		provisioner,
-		keystore,
 		tasks,
 		record,
-		cred,
 		request,
 		func(r MachineRecord, q spi.MachineRequest) error {
 			return nil
@@ -161,37 +148,25 @@ func TestCreateMachine(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_spi.NewMockProvisioner(ctrl)
-	cred := mock_spi.NewMockCredential(ctrl)
-
-	provision := []spi.Task{
-		TaskCreateInstance,
-	}
-	provisionNames := []spi.TaskName{}
-	for _, t := range provision {
-		provisionNames = append(provisionNames, t.Name)
-	}
-
 	name := "new-host"
 	id := "id-new-host"
 
-	template := &spi.BaseMachineRequest{
-		Provision: provisionNames,
-	}
+	template := &spi.BaseMachineRequest{Provision: []string{CreateInstanceName}}
 	request := new(spi.BaseMachineRequest)
 	expectReq := new(spi.BaseMachineRequest)
 	*expectReq = *template
 	expectReq.MachineName = name
 
+	provisioner := mock_spi.NewMockProvisioner(ctrl)
 	provisioner.EXPECT().Name().Return("test-provisioner")
 	provisioner.EXPECT().NewRequestInstance().Return(request)
-	provisioner.EXPECT().GetProvisionTasks(provisionNames).Return(provision, nil)
+
+	provision := []spi.Task{CreateInstance(provisioner)}
+	provisioner.EXPECT().GetProvisionTasks().Return(provision)
 	createEvents := make(chan spi.CreateInstanceEvent)
 	provisioner.EXPECT().CreateInstance(expectReq).Return(createEvents, nil)
 	provisioner.EXPECT().GetIPAddress(gomock.Any()).Return("ip", nil)
 	provisioner.EXPECT().GetInstanceID(gomock.Any()).Return(id, nil)
-
-	keystore := mock_spi.NewMockKeyStore(ctrl)
 
 	store := mock_storage.NewMockKvStore(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -201,7 +176,7 @@ func TestCreateMachine(t *testing.T) {
 	record.InstanceID = id
 	record.AppendChange(&spi.BaseMachineRequest{
 		MachineName: string(record.MachineName),
-		Provision:   provisionNames,
+		Provision:   template.Provision,
 	})
 	notFound := &Error{Code: ErrNotFound}
 
@@ -213,8 +188,6 @@ func TestCreateMachine(t *testing.T) {
 	machines := NewMachines(store)
 	events, err := machines.CreateMachine(
 		provisioner,
-		keystore,
-		cred,
 		template,
 		bytes.NewBuffer([]byte(`{"name": "new-host"}`)),
 		ContentTypeJSON)
@@ -229,16 +202,9 @@ func TestDestroyMachine(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_spi.NewMockProvisioner(ctrl)
-	keystore := mock_spi.NewMockKeyStore(ctrl)
-	cred := mock_spi.NewMockCredential(ctrl)
 
-	teardown := []spi.Task{
-		TaskDestroyInstance,
-	}
-	teardownNames := []spi.TaskName{}
-	for _, t := range teardown {
-		teardownNames = append(teardownNames, t.Name)
-	}
+	teardown := []spi.Task{DestroyInstance(provisioner)}
+	teardownNames := []string{DestroyInstanceName}
 
 	// Data from previous provisioning run
 	record := new(MachineRecord)
@@ -249,29 +215,44 @@ func TestDestroyMachine(t *testing.T) {
 		Teardown:    teardownNames,
 	})
 
-	provisioner.EXPECT().GetTeardownTasks(teardownNames).Return(teardown, nil)
+	provisioner.EXPECT().GetTeardownTasks().Return(teardown)
 	destroyEvents := make(chan spi.DestroyInstanceEvent)
 	provisioner.EXPECT().DestroyInstance(record.InstanceID).Return(destroyEvents, nil)
 
 	store := mock_storage.NewMockKvStore(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 	machines := NewMachines(store)
-	events, err := machines.DeleteMachine(provisioner, keystore, cred, *record)
+	events, err := machines.DeleteMachine(provisioner, *record)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	close(destroyEvents) // Simulates the async destroy completes
 	checkTasksAreRun(t, events, teardown)
 }
 
+func makeTask(name string) spi.Task {
+	return spi.Task{
+		Name:    name,
+		Message: "message",
+		Do:      nil,
+	}
+}
+
+func makeErrorTask(name string) spi.Task {
+	return spi.Task{
+		Name:    name,
+		Message: "message",
+		Do: func(spi.Resource, spi.MachineRequest, chan<- interface{}) error {
+			return errors.New("test-error")
+		},
+	}
+}
+
 func TestRunTasksNoError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_spi.NewMockProvisioner(ctrl)
-	keystore := mock_spi.NewMockKeyStore(ctrl)
-	cred := mock_spi.NewMockCredential(ctrl)
 	request := &spi.BaseMachineRequest{}
-	record := new(MachineRecord)
+	record := MachineRecord{}
 
 	tasks := []spi.Task{
 		makeTask("step1"),
@@ -281,11 +262,8 @@ func TestRunTasksNoError(t *testing.T) {
 	}
 
 	events, err := runTasks(
-		provisioner,
-		keystore,
 		tasks,
 		record,
-		cred,
 		request,
 		func(r MachineRecord, q spi.MachineRequest) error {
 			return nil
@@ -304,11 +282,8 @@ func TestRunTasksErrorAbort(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_spi.NewMockProvisioner(ctrl)
-	keystore := mock_spi.NewMockKeyStore(ctrl)
-	cred := mock_spi.NewMockCredential(ctrl)
 	request := &spi.BaseMachineRequest{}
-	record := new(MachineRecord)
+	record := MachineRecord{}
 
 	tasks := []spi.Task{
 		makeTask("step1"),
@@ -318,11 +293,8 @@ func TestRunTasksErrorAbort(t *testing.T) {
 	}
 
 	events, err := runTasks(
-		provisioner,
-		keystore,
 		tasks,
 		record,
-		cred,
 		request,
 		func(r MachineRecord, q spi.MachineRequest) error {
 			return nil
