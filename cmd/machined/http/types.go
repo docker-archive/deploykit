@@ -3,6 +3,7 @@ package http
 import (
 	"github.com/docker/libmachete"
 	"net/http"
+	"fmt"
 )
 
 // Handler is shorthand for an HTTP request handler function.
@@ -30,11 +31,11 @@ func handleError(err libmachete.Error, resp http.ResponseWriter) {
 func outputHandler(handler SimpleHandler) Handler {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		// Handle panics cleanly.
-		/*defer func() {
+		defer func() {
 			if err := recover(); err != nil {
 				respondError(500, resp, fmt.Errorf("Panic: %v", err))
 			}
-		}()*/
+		}()
 
 		result, err := handler(req)
 		if result != nil {
