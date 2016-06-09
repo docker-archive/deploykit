@@ -1,4 +1,4 @@
-package libmachete
+package api
 
 import (
 	"encoding/json"

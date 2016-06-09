@@ -1,7 +1,7 @@
-package libmachete
+package api
 
 import (
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"sync"
 )
 
@@ -14,9 +14,9 @@ var (
 // of constructing a provisioner.
 type ProvisionerBuilder struct {
 	Name                  string
-	DefaultCredential     func() api.Credential
-	DefaultMachineRequest func() api.MachineRequest
-	Build                 func(controls api.ProvisionControls, cred api.Credential) (api.Provisioner, error)
+	DefaultCredential     func() spi.Credential
+	DefaultMachineRequest func() spi.MachineRequest
+	Build                 func(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error)
 }
 
 // MachineProvisioners maintains the collection of available provisioners.

@@ -1,17 +1,17 @@
-package libmachete
+package api
 
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 )
 
 // TaskMap can be used by provisioners to filter and report errors when fetching tasks by name.
 type TaskMap struct {
-	tasks []api.Task
+	tasks []spi.Task
 }
 
-func findTask(tasks []api.Task, name api.TaskName) *api.Task {
+func findTask(tasks []spi.Task, name spi.TaskName) *spi.Task {
 	for _, task := range tasks {
 		if task.Name == name {
 			return &task
@@ -21,10 +21,10 @@ func findTask(tasks []api.Task, name api.TaskName) *api.Task {
 }
 
 // NewTaskMap creates a TaskMap.
-func NewTaskMap(tasks ...api.Task) *TaskMap {
+func NewTaskMap(tasks ...spi.Task) *TaskMap {
 	// Manually implementing map-like behavior here to provide stable return values.
 
-	unique := []api.Task{}
+	unique := []spi.Task{}
 	for _, task := range tasks {
 		if findTask(unique, task.Name) != nil {
 			panic(fmt.Sprintf("Duplicate task name %s", task))
@@ -37,8 +37,8 @@ func NewTaskMap(tasks ...api.Task) *TaskMap {
 }
 
 // Names returns all supported task names.
-func (m *TaskMap) Names() []api.TaskName {
-	names := []api.TaskName{}
+func (m *TaskMap) Names() []spi.TaskName {
+	names := []spi.TaskName{}
 	for _, task := range m.tasks {
 		names = append(names, task.Name)
 	}
@@ -46,8 +46,8 @@ func (m *TaskMap) Names() []api.TaskName {
 }
 
 // Filter retrieves tasks by name, returning an error of a requested task does not exist.
-func (m *TaskMap) Filter(names []api.TaskName) ([]api.Task, error) {
-	filtered := []api.Task{}
+func (m *TaskMap) Filter(names []spi.TaskName) ([]spi.Task, error) {
+	filtered := []spi.Task{}
 	for _, name := range names {
 		task := findTask(m.tasks, name)
 		if task != nil {
@@ -61,16 +61,16 @@ func (m *TaskMap) Filter(names []api.TaskName) ([]api.Task, error) {
 	return filtered, nil
 }
 
-func unimplementedTask(name api.TaskName, desc string) api.Task {
-	return api.Task{
+func unimplementedTask(name spi.TaskName, desc string) spi.Task {
+	return spi.Task{
 		Name:    name,
 		Message: desc,
 		Do: func(
-			prov api.Provisioner,
-			keystore api.KeyStore,
-			cred api.Credential,
-			resource api.Resource,
-			req api.MachineRequest,
+			prov spi.Provisioner,
+			keystore spi.KeyStore,
+			cred spi.Credential,
+			resource spi.Resource,
+			req spi.MachineRequest,
 			events chan<- interface{}) error {
 			log.Infoln(fmt.Sprintf("%s: TO BE IMPLEMENTED", name))
 			return nil
@@ -79,11 +79,11 @@ func unimplementedTask(name api.TaskName, desc string) api.Task {
 }
 
 func defaultCreateInstanceHandler(
-	prov api.Provisioner,
-	keystore api.KeyStore,
-	cred api.Credential,
-	resource api.Resource,
-	req api.MachineRequest,
+	prov spi.Provisioner,
+	keystore spi.KeyStore,
+	cred spi.Credential,
+	resource spi.Resource,
+	req spi.MachineRequest,
 	events chan<- interface{}) error {
 
 	createInstanceEvents, err := prov.CreateInstance(req)
@@ -99,11 +99,11 @@ func defaultCreateInstanceHandler(
 }
 
 func defaultDestroyInstanceHandler(
-	prov api.Provisioner,
-	keystore api.KeyStore,
-	cred api.Credential,
-	resource api.Resource,
-	req api.MachineRequest,
+	prov spi.Provisioner,
+	keystore spi.KeyStore,
+	cred spi.Credential,
+	resource spi.Resource,
+	req spi.MachineRequest,
 	events chan<- interface{}) error {
 
 	destroyInstanceEvents, err := prov.DestroyInstance(resource.ID())
@@ -120,58 +120,58 @@ func defaultDestroyInstanceHandler(
 
 // defaultSSHKeyGenHandler is the default task handler that generates a SSH keypair identified by the resource's name.
 // If a keypair by the same name already exists, it will emit an error
-func defaultSSHKeyGenHandler(prov api.Provisioner, keys api.KeyStore,
-	cred api.Credential,
-	resource api.Resource,
-	req api.MachineRequest,
+func defaultSSHKeyGenHandler(prov spi.Provisioner, keys spi.KeyStore,
+	cred spi.Credential,
+	resource spi.Resource,
+	req spi.MachineRequest,
 	events chan<- interface{}) error {
 
 	key := resource.Name()
 	if key == "" {
 		return NewError(ErrBadInput, "Bad resource name")
 	}
-	err := keys.NewKeyPair(api.SSHKeyID(key))
+	err := keys.NewKeyPair(spi.SSHKeyID(key))
 	return err
 }
 
 // defaultSSHKeyRemoveHandler is the default task handler that will remove the SSH key pair identified by the resource's name.
-func defaultSSHKeyRemoveHandler(prov api.Provisioner, keys api.KeyStore,
-	cred api.Credential,
-	resource api.Resource,
-	req api.MachineRequest,
+func defaultSSHKeyRemoveHandler(prov spi.Provisioner, keys spi.KeyStore,
+	cred spi.Credential,
+	resource spi.Resource,
+	req spi.MachineRequest,
 	events chan<- interface{}) error {
 
 	key := resource.Name()
 	if key == "" {
 		return NewError(ErrBadInput, "Bad resource name")
 	}
-	return keys.Remove(api.SSHKeyID(key))
+	return keys.Remove(spi.SSHKeyID(key))
 }
 
 var (
 	// TaskSSHKeyGen is the task that generates SSH key
-	TaskSSHKeyGen = api.Task{
+	TaskSSHKeyGen = spi.Task{
 		Name:    "ssh-key-generate",
 		Message: "Generating ssh key for host",
 		Do:      defaultSSHKeyGenHandler,
 	}
 
 	// TaskSSHKeyRemove is the task that removes or clean up the SSH key
-	TaskSSHKeyRemove = api.Task{
+	TaskSSHKeyRemove = spi.Task{
 		Name:    "ssh-key-remove",
 		Message: "Remove ssh key for host",
 		Do:      defaultSSHKeyRemoveHandler,
 	}
 
 	// TaskCreateInstance creates a machine instance
-	TaskCreateInstance = api.Task{
+	TaskCreateInstance = spi.Task{
 		Name:    "instance-create",
 		Message: "Creates a machine instance",
 		Do:      defaultCreateInstanceHandler,
 	}
 
 	// TaskDestroyInstance irreversibly destroys a machine instance
-	TaskDestroyInstance = api.Task{
+	TaskDestroyInstance = spi.Task{
 		Name:    "instance-destroy",
 		Message: "Destroys a machine instance",
 		Do:      defaultDestroyInstanceHandler,

@@ -1,41 +1,41 @@
 package http
 
 import (
-	"github.com/docker/libmachete"
+	"github.com/docker/libmachete/api"
 	"github.com/gorilla/mux"
 	"net/http"
 )
 
 type templatesHandler struct {
-	templates libmachete.Templates
+	templates api.Templates
 }
 
-func (h *templatesHandler) getOne(req *http.Request) (interface{}, *libmachete.Error) {
+func (h *templatesHandler) getOne(req *http.Request) (interface{}, *api.Error) {
 	return h.templates.Get(getTemplateID(req))
 }
 
-func (h *templatesHandler) getBlank(req *http.Request) (interface{}, *libmachete.Error) {
+func (h *templatesHandler) getBlank(req *http.Request) (interface{}, *api.Error) {
 	return h.templates.NewBlankTemplate(getProvisionerName(req))
 }
 
-func (h *templatesHandler) getAll(req *http.Request) (interface{}, *libmachete.Error) {
+func (h *templatesHandler) getAll(req *http.Request) (interface{}, *api.Error) {
 	return h.templates.ListIds()
 }
 
-func (h *templatesHandler) create(req *http.Request) (interface{}, *libmachete.Error) {
-	return nil, h.templates.CreateTemplate(getTemplateID(req), req.Body, libmachete.ContentTypeJSON)
+func (h *templatesHandler) create(req *http.Request) (interface{}, *api.Error) {
+	return nil, h.templates.CreateTemplate(getTemplateID(req), req.Body, api.ContentTypeJSON)
 }
 
-func (h *templatesHandler) update(req *http.Request) (interface{}, *libmachete.Error) {
-	return nil, h.templates.UpdateTemplate(getTemplateID(req), req.Body, libmachete.ContentTypeJSON)
+func (h *templatesHandler) update(req *http.Request) (interface{}, *api.Error) {
+	return nil, h.templates.UpdateTemplate(getTemplateID(req), req.Body, api.ContentTypeJSON)
 }
 
-func (h *templatesHandler) delete(req *http.Request) (interface{}, *libmachete.Error) {
+func (h *templatesHandler) delete(req *http.Request) (interface{}, *api.Error) {
 	return nil, h.templates.Delete(getTemplateID(req))
 }
 
-func getTemplateID(request *http.Request) libmachete.TemplateID {
-	return libmachete.TemplateID{
+func getTemplateID(request *http.Request) api.TemplateID {
+	return api.TemplateID{
 		Provisioner: getProvisionerName(request),
 		Name:        mux.Vars(request)["key"],
 	}

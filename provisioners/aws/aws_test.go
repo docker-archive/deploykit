@@ -5,8 +5,8 @@ import (
 	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/docker/libmachete/provisioners/api"
 	"github.com/docker/libmachete/provisioners/aws/mock"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -48,11 +48,11 @@ func TestCreateInstanceSync(t *testing.T) {
 }
 
 type WrongRequestType struct {
-	api.BaseMachineRequest
+	spi.BaseMachineRequest
 }
 
-func (w WrongRequestType) ProvisionWorkflow() []api.TaskName {
-	return []api.TaskName{}
+func (w WrongRequestType) ProvisionWorkflow() []spi.TaskName {
+	return []spi.TaskName{}
 }
 
 func TestCreateIncompatibleType(t *testing.T) {
@@ -77,9 +77,9 @@ func makeDescribeOutput(instanceState string) *ec2.DescribeInstancesOutput {
 }
 
 func collectCreateInstanceEvents(
-	eventChan <-chan api.CreateInstanceEvent) []api.CreateInstanceEvent {
+	eventChan <-chan spi.CreateInstanceEvent) []spi.CreateInstanceEvent {
 
-	var events []api.CreateInstanceEvent
+	var events []spi.CreateInstanceEvent
 	for event := range eventChan {
 		events = append(events, event)
 	}
@@ -125,16 +125,16 @@ func TestCreateInstanceSuccess(t *testing.T) {
 
 	provisioner := provisioner{client: clientMock, sleepFunction: noSleep, config: defaultConfig()}
 	request := &CreateInstanceRequest{
-		BaseMachineRequest: api.BaseMachineRequest{MachineName: "test-instance"},
+		BaseMachineRequest: spi.BaseMachineRequest{MachineName: "test-instance"},
 		Tags:               map[string]string{"test": "test2"},
 	}
 	eventChan, err := provisioner.CreateInstance(request)
 
 	require.Nil(t, err)
 	request.InstanceID = instanceID
-	expectedEvents := []api.CreateInstanceEvent{
-		{Type: api.CreateInstanceStarted},
-		{Type: api.CreateInstanceCompleted, InstanceID: instanceID, Machine: request}}
+	expectedEvents := []spi.CreateInstanceEvent{
+		{Type: spi.CreateInstanceStarted},
+		{Type: spi.CreateInstanceCompleted, InstanceID: instanceID, Machine: request}}
 	require.Equal(t, expectedEvents, collectCreateInstanceEvents(eventChan))
 }
 
@@ -150,16 +150,16 @@ func TestCreateInstanceError(t *testing.T) {
 	eventChan, err := provisioner.CreateInstance(&CreateInstanceRequest{})
 
 	require.Nil(t, err)
-	expectedEvents := []api.CreateInstanceEvent{
-		{Type: api.CreateInstanceStarted},
-		{Type: api.CreateInstanceError, Error: runError}}
+	expectedEvents := []spi.CreateInstanceEvent{
+		{Type: spi.CreateInstanceStarted},
+		{Type: spi.CreateInstanceError, Error: runError}}
 	require.Equal(t, expectedEvents, collectCreateInstanceEvents(eventChan))
 }
 
 func collectDestroyInstanceEvents(
-	eventChan <-chan api.DestroyInstanceEvent) []api.DestroyInstanceEvent {
+	eventChan <-chan spi.DestroyInstanceEvent) []spi.DestroyInstanceEvent {
 
-	var events []api.DestroyInstanceEvent
+	var events []spi.DestroyInstanceEvent
 	for event := range eventChan {
 		events = append(events, event)
 	}
@@ -190,9 +190,9 @@ func TestDestroyInstanceSuccess(t *testing.T) {
 	eventChan, err := provisioner.DestroyInstance(instanceID)
 
 	require.Nil(t, err)
-	expectedEvents := []api.DestroyInstanceEvent{
-		{Type: api.DestroyInstanceStarted},
-		{Type: api.DestroyInstanceCompleted}}
+	expectedEvents := []spi.DestroyInstanceEvent{
+		{Type: spi.DestroyInstanceStarted},
+		{Type: spi.DestroyInstanceCompleted}}
 	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
 }
 
@@ -209,9 +209,9 @@ func TestDestroyInstanceError(t *testing.T) {
 	eventChan, err := provisioner.DestroyInstance("test-id")
 
 	require.Nil(t, err)
-	expectedEvents := []api.DestroyInstanceEvent{
-		{Type: api.DestroyInstanceStarted},
-		{Type: api.DestroyInstanceError, Error: runError}}
+	expectedEvents := []spi.DestroyInstanceEvent{
+		{Type: spi.DestroyInstanceStarted},
+		{Type: spi.DestroyInstanceError, Error: runError}}
 	require.Equal(t, expectedEvents, collectDestroyInstanceEvents(eventChan))
 }
 
@@ -239,7 +239,7 @@ monitoring: true`
 
 func TestYamlSpec(t *testing.T) {
 	expected := CreateInstanceRequest{
-		BaseMachineRequest:       api.BaseMachineRequest{MachineName: "database"},
+		BaseMachineRequest:       spi.BaseMachineRequest{MachineName: "database"},
 		AvailabilityZone:         "us-west-2a",
 		ImageID:                  "ami-5",
 		BlockDeviceName:          "/dev/sdb",

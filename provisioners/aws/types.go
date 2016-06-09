@@ -1,12 +1,12 @@
 package aws
 
 import (
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 )
 
 // CreateInstanceRequest is the struct used to create new instances.
 type CreateInstanceRequest struct {
-	api.BaseMachineRequest   `yaml:",inline"`
+	spi.BaseMachineRequest   `yaml:",inline"`
 	AssociatePublicIPAddress bool              `yaml:"associate_public_ip_address" json:"associate_public_ip_address"`
 	AvailabilityZone         string            `yaml:"availability_zone" json:"availability_zone"`
 	BlockDeviceName          string            `yaml:"block_device_name" json:"block_device_name"`

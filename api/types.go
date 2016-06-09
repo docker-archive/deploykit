@@ -1,9 +1,9 @@
-package libmachete
+package api
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
 	"time"
 )
@@ -76,11 +76,11 @@ type MachineRecord struct {
 	// machines (especially those baremetal/ home provisioned machines) can support the notion
 	// of upgrade and we could see upgrades / downgrades and other states for this machine. It's also
 	// possible that changes to workflow are applied to pre-existing records to fix-up the records.
-	Changes []*api.BaseMachineRequest `json:"changes" yaml:"changes"`
+	Changes []*spi.BaseMachineRequest `json:"changes" yaml:"changes"`
 }
 
 // GetLastChange returns the last change requested.
-func (m *MachineRecord) GetLastChange() api.MachineRequest {
+func (m *MachineRecord) GetLastChange() spi.MachineRequest {
 	if len(m.Changes) > 0 {
 		return m.Changes[len(m.Changes)-1]
 	}
@@ -88,11 +88,11 @@ func (m *MachineRecord) GetLastChange() api.MachineRequest {
 }
 
 // AppendChange appends a change to the record
-func (m *MachineRecord) AppendChange(c api.MachineRequest) {
+func (m *MachineRecord) AppendChange(c spi.MachineRequest) {
 	if m.Changes == nil {
-		m.Changes = []*api.BaseMachineRequest{}
+		m.Changes = []*spi.BaseMachineRequest{}
 	}
-	m.Changes = append(m.Changes, &api.BaseMachineRequest{
+	m.Changes = append(m.Changes, &spi.BaseMachineRequest{
 		MachineName:        c.Name(),
 		Provisioner:        c.ProvisionerName(),
 		ProvisionerVersion: c.Version(),

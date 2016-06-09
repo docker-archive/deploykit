@@ -1,8 +1,8 @@
-package libmachete
+package api
 
 import (
 	_ "encoding/json"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -17,17 +17,17 @@ func TestAppendChange(t *testing.T) {
 	name := "test-host"
 	provisionerName := "test"
 	version := "0.1"
-	provision := []api.TaskName{
-		api.TaskName("p1"),
-		api.TaskName("p2"),
-		api.TaskName("p3"),
+	provision := []spi.TaskName{
+		spi.TaskName("p1"),
+		spi.TaskName("p2"),
+		spi.TaskName("p3"),
 	}
-	teardown := []api.TaskName{
-		api.TaskName("t1"),
-		api.TaskName("t2"),
-		api.TaskName("t3"),
+	teardown := []spi.TaskName{
+		spi.TaskName("t1"),
+		spi.TaskName("t2"),
+		spi.TaskName("t3"),
 	}
-	change := api.BaseMachineRequest{
+	change := spi.BaseMachineRequest{
 		MachineName:        name,
 		Provisioner:        provisionerName,
 		ProvisionerVersion: version,
@@ -60,19 +60,19 @@ func TestMarshalMachineRecord(t *testing.T) {
 			Created:      Timestamp(time.Now().Unix()),
 			LastModified: Timestamp(time.Now().Unix()),
 		},
-		Changes: []*api.BaseMachineRequest{
+		Changes: []*spi.BaseMachineRequest{
 			{
 				MachineName: "test-host",
 				Provisioner: "test",
-				Provision: []api.TaskName{
-					api.TaskName("task1"),
-					api.TaskName("task2"),
-					api.TaskName("task3"),
+				Provision: []spi.TaskName{
+					spi.TaskName("task1"),
+					spi.TaskName("task2"),
+					spi.TaskName("task3"),
 				},
-				Teardown: []api.TaskName{
-					api.TaskName("task1"),
-					api.TaskName("task2"),
-					api.TaskName("task3"),
+				Teardown: []spi.TaskName{
+					spi.TaskName("task1"),
+					spi.TaskName("task2"),
+					spi.TaskName("task3"),
 				},
 			},
 		},

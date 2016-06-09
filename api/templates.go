@@ -1,9 +1,9 @@
-package libmachete
+package api
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/docker/libmachete/provisioners/api"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
 	"io"
 	"io/ioutil"
@@ -16,13 +16,13 @@ type TemplateBuilder MachineRequestBuilder
 // Templates looks up and reads template data, scoped by provisioner name.
 type Templates interface {
 	// NewTemplate returns a blank template, which can be used to describe the template schema.
-	NewBlankTemplate(provisionerName string) (api.MachineRequest, *Error)
+	NewBlankTemplate(provisionerName string) (spi.MachineRequest, *Error)
 
 	// ListIds
 	ListIds() ([]TemplateID, *Error)
 
 	// Get returns a template identified by provisioner and key
-	Get(id TemplateID) (api.MachineRequest, *Error)
+	Get(id TemplateID) (spi.MachineRequest, *Error)
 
 	// Deletes the template identified by provisioner and key
 	Delete(id TemplateID) *Error
@@ -44,7 +44,7 @@ func NewTemplates(store storage.KvStore, provisioners *MachineProvisioners) Temp
 	return &templates{store: store, provisioners: provisioners}
 }
 
-func (t *templates) NewBlankTemplate(provisionerName string) (api.MachineRequest, *Error) {
+func (t *templates) NewBlankTemplate(provisionerName string) (spi.MachineRequest, *Error) {
 	if builder, has := t.provisioners.GetBuilder(provisionerName); has {
 		return builder.DefaultMachineRequest(), nil
 	}
@@ -76,7 +76,7 @@ func (t *templates) ListIds() ([]TemplateID, *Error) {
 	return ids, nil
 }
 
-func (t *templates) Get(id TemplateID) (api.MachineRequest, *Error) {
+func (t *templates) Get(id TemplateID) (spi.MachineRequest, *Error) {
 	detail, apiErr := t.NewBlankTemplate(id.Provisioner)
 	if apiErr != nil {
 		return nil, apiErr
@@ -108,7 +108,7 @@ func (t *templates) exists(id TemplateID) bool {
 	return err == nil
 }
 
-func (t *templates) unmarshal(contentType *Codec, data []byte, tmpl api.MachineRequest) error {
+func (t *templates) unmarshal(contentType *Codec, data []byte, tmpl spi.MachineRequest) error {
 	return contentType.unmarshal(data, tmpl)
 }
 

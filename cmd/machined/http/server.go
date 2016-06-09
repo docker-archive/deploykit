@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete"
+	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/storage"
 	"github.com/docker/libmachete/storage/filestore"
 	"github.com/gorilla/mux"
@@ -28,18 +28,18 @@ type apiOptions struct {
 
 type apiServer struct {
 	options     apiOptions
-	credentials libmachete.Credentials
-	templates   libmachete.Templates
-	machines    libmachete.Machines
-	keystore    libmachete.SSHKeys
+	credentials api.Credentials
+	templates   api.Templates
+	machines    api.Machines
+	keystore    api.SSHKeys
 }
 
-func build(store storage.KvStore, provisioners *libmachete.MachineProvisioners) (*apiServer, error) {
+func build(store storage.KvStore, provisioners *api.MachineProvisioners) (*apiServer, error) {
 	return &apiServer{
-		credentials: libmachete.NewCredentials(storage.NestedStore(store, "credentials"), provisioners),
-		templates:   libmachete.NewTemplates(storage.NestedStore(store, "templates"), provisioners),
-		machines:    libmachete.NewMachines(storage.NestedStore(store, "machines")),
-		keystore:    libmachete.NewSSHKeys(storage.NestedStore(store, "keys")),
+		credentials: api.NewCredentials(storage.NestedStore(store, "credentials"), provisioners),
+		templates:   api.NewTemplates(storage.NestedStore(store, "templates"), provisioners),
+		machines:    api.NewMachines(storage.NestedStore(store, "machines")),
+		keystore:    api.NewSSHKeys(storage.NestedStore(store, "keys")),
 	}, nil
 }
 
@@ -104,7 +104,7 @@ func ServerCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			log.Infoln("Starting server")
 
-			server, err := build(filestore.NewOsFileStore(options.RootDir), &libmachete.DefaultProvisioners)
+			server, err := build(filestore.NewOsFileStore(options.RootDir), &api.DefaultProvisioners)
 			if err != nil {
 				return err
 			}
