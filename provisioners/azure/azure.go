@@ -12,6 +12,7 @@ func ProvisionerWith(controls spi.ProvisionControls, cred spi.Credential) (spi.P
 }
 
 type provisioner struct {
+	sshKeys api.SSHKeys
 }
 
 // NewMachineRequest returns a canonical machine request suitable for this provisioner.
@@ -20,24 +21,9 @@ func NewMachineRequest() spi.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Provision = getProvisionTaskMap().Names()
-	req.Teardown = getTeardownTaskMap().Names()
+	req.Provision = []string{api.SSHKeyGenerateName, api.CreateInstanceName}
+	req.Teardown = []string{api.SSHKeyRemoveName, api.DestroyInstanceName}
 	return req
-}
-
-func getProvisionTaskMap() *api.TaskMap {
-	return api.NewTaskMap(
-		api.TaskSSHKeyGen,
-		api.TaskCreateInstance,
-		api.TaskUserData,
-		api.TaskInstallDockerEngine,
-	)
-}
-
-func getTeardownTaskMap() *api.TaskMap {
-	return api.NewTaskMap(
-		api.TaskDestroyInstance,
-	)
 }
 
 // Name returns the name of the provisioner
@@ -45,12 +31,18 @@ func (p *provisioner) Name() string {
 	return ProvisionerName
 }
 
-func (p *provisioner) GetProvisionTasks(tasks []spi.TaskName) ([]spi.Task, error) {
-	return getProvisionTaskMap().Filter(tasks)
+func (p *provisioner) GetProvisionTasks() []spi.Task {
+	return []spi.Task{
+		api.SSHKeyGen(p.sshKeys),
+		api.CreateInstance(p),
+	}
 }
 
-func (p *provisioner) GetTeardownTasks(tasks []spi.TaskName) ([]spi.Task, error) {
-	return getTeardownTaskMap().Filter(tasks)
+func (p *provisioner) GetTeardownTasks() []spi.Task {
+	return []spi.Task{
+		api.SSHKeyRemove(p.sshKeys),
+		api.DestroyInstance(p),
+	}
 }
 
 func (p *provisioner) NewRequestInstance() spi.MachineRequest {

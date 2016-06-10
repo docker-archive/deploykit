@@ -80,8 +80,8 @@ type MachineRequest interface {
 	Name() string
 	ProvisionerName() string
 	Version() string
-	ProvisionWorkflow() []TaskName
-	TeardownWorkflow() []TaskName
+	ProvisionWorkflow() []string
+	TeardownWorkflow() []string
 }
 
 // ProvisionControls are parameters that give the provisioner instructions on how to provision the
@@ -109,22 +109,18 @@ func (p ProvisionControls) GetInt(key string) (int, bool, error) {
 	return i, true, err
 }
 
-// TaskName is a kind of work that a provisioner is able to run
-type TaskName string
-
 // TaskHandler is the unit of work that a provisioner is able to run.  It's identified by the TaskName
 // Note that the data passed as parameters are all read-only, by value (copy).
-type TaskHandler func(Provisioner, KeyStore, Credential, Resource, MachineRequest, chan<- interface{}) error
+type TaskHandler func(Resource, MachineRequest, chan<- interface{}) error
 
 // Task is a descriptor of task that a provisioner supports.  Tasks are referenced by Name
 // in a machine request or template.  This allows customization of provisioner behavior - such
 // as skipping engine installs (if underlying image already has docker engine), skipping SSH
 // key (if no sshd allowed), etc.
 type Task struct {
-	// TODO(wfarner): Are the json/yaml tags needed here?
-	Name    TaskName    `json:"name" yaml:"name"`
-	Message string      `json:"message" yaml:"message"`
-	Do      TaskHandler `json:"-" yaml:"-"`
+	Name    string
+	Message string
+	Do      TaskHandler
 }
 
 // Override defines a new task of the same name but with a different implementation / behavior
@@ -139,20 +135,20 @@ func (t Task) Override(message string, do TaskHandler) Task {
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
-	MachineName        string     `yaml:"name" json:"name"`
-	Provisioner        string     `yaml:"provisioner" json:"provisioner"`
-	ProvisionerVersion string     `yaml:"version" json:"version"`
-	Provision          []TaskName `yaml:"provision,omitempty" json:"provision,omitempty"`
-	Teardown           []TaskName `yaml:"teardown,omitempty" json:"teardown,omitempty"`
+	MachineName        string   `yaml:"name" json:"name"`
+	Provisioner        string   `yaml:"provisioner" json:"provisioner"`
+	ProvisionerVersion string   `yaml:"version" json:"version"`
+	Provision          []string `yaml:"provision,omitempty" json:"provision,omitempty"`
+	Teardown           []string `yaml:"teardown,omitempty" json:"teardown,omitempty"`
 }
 
 // ProvisionWorkflow returns the tasks to do
-func (req BaseMachineRequest) ProvisionWorkflow() []TaskName {
+func (req BaseMachineRequest) ProvisionWorkflow() []string {
 	return req.Provision
 }
 
 // TeardownWorkflow returns the tasks to do
-func (req BaseMachineRequest) TeardownWorkflow() []TaskName {
+func (req BaseMachineRequest) TeardownWorkflow() []string {
 	return req.Teardown
 }
 
@@ -178,15 +174,13 @@ type Provisioner interface {
 	// Name returns an identifier for this provisioner
 	Name() string
 
-	// GetProvisionTasks returns a list of runnable tasks given a list of command task names for allocating a
-	// resource.
-	// The task names are generally specific verbs that the user has specified.  The manager can either return
+	// GetProvisionTasks returns the available tasks for provisioning a resource.
+	// Task names are generally specific verbs that the user has specified.  The manager can either return
 	// no implementation (thus using framework defaults, or its own override implementation.
-	GetProvisionTasks(tasks []TaskName) ([]Task, error)
+	GetProvisionTasks() []Task
 
-	// GetTeardownTasks returns a list of runnable tasks given a list of command task names for tearing down a
-	// resource.
-	GetTeardownTasks(tasks []TaskName) ([]Task, error)
+	// GetTeardownTasks returns a list of available tasks for tearing down a resource.
+	GetTeardownTasks() []Task
 
 	// NewRequestInstance retrieves a new instance of the request type consumed by
 	// CreateInstance.

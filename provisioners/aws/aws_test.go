@@ -51,8 +51,8 @@ type WrongRequestType struct {
 	spi.BaseMachineRequest
 }
 
-func (w WrongRequestType) ProvisionWorkflow() []spi.TaskName {
-	return []spi.TaskName{}
+func (w WrongRequestType) ProvisionWorkflow() []string {
+	return []string{}
 }
 
 func TestCreateIncompatibleType(t *testing.T) {

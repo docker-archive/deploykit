@@ -1,47 +1,81 @@
 package api
 
 import (
-	"errors"
+	mock_storage "github.com/docker/libmachete/mock/storage"
 	"github.com/docker/libmachete/provisioners/spi"
+	"github.com/docker/libmachete/storage"
+	"github.com/docker/libmachete/storage/filestore"
+	"github.com/golang/mock/gomock"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func makeTask(name string) spi.Task {
-	return spi.Task{
-		Name:    spi.TaskName(name),
-		Message: "message",
-		Do:      nil,
-	}
-}
+//go:generate mockgen -package storage -destination ../mock/storage/kv_store.go github.com/docker/libmachete/storage KvStore
 
-func makeErrorTask(name string) spi.Task {
-	return spi.Task{
-		Name:    spi.TaskName(name),
-		Message: "message",
-		Do: func(spi.Provisioner, spi.KeyStore, spi.Credential, spi.Resource, spi.MachineRequest, chan<- interface{}) error {
-			return errors.New("test-error")
+func requireSuccessfulRun(t *testing.T, hostName string, tasks []spi.Task) {
+	events, err := runTasks(
+		tasks,
+		MachineRecord{MachineSummary: MachineSummary{MachineName: MachineID(hostName)}},
+		new(spi.BaseMachineRequest),
+		func(r MachineRecord, q spi.MachineRequest) error {
+			return nil
 		},
-	}
+		func(r *MachineRecord, s spi.MachineRequest) {
+			return
+		})
+	require.NoError(t, err)
+	require.NotNil(t, events)
+	checkTasksAreRun(t, events, tasks)
 }
 
-func TestTaskMap(t *testing.T) {
-	a := makeTask("a")
-	b := makeTask("b")
-	c := makeTask("c")
+func TestSSHKeyGenAndRemove(t *testing.T) {
+	sshKeys := NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/"))
 
-	require.Panics(t, func() {
-		NewTaskMap(a, a)
-	})
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	taskMap := NewTaskMap(a, b, c)
+	host := "test-host"
 
-	require.Equal(t, []spi.TaskName{a.Name, b.Name, c.Name}, taskMap.Names())
+	requireSuccessfulRun(t, host, []spi.Task{SSHKeyGen(sshKeys)})
 
-	_, err := taskMap.Filter([]spi.TaskName{spi.TaskName("d")})
-	require.Error(t, err)
-
-	filtered, err := taskMap.Filter([]spi.TaskName{a.Name, c.Name})
+	// Key should have been created.
+	data, err := sshKeys.GetEncodedPublicKey(SSHKeyID(host))
 	require.NoError(t, err)
-	require.Equal(t, []spi.Task{a, c}, filtered)
+	require.NotEmpty(t, data)
+
+	requireSuccessfulRun(t, host, []spi.Task{SSHKeyRemove(sshKeys)})
+
+	// Key should have been removed.
+	_, err = sshKeys.GetEncodedPublicKey(SSHKeyID(host))
+	require.Error(t, err)
+}
+
+func storageKey(value string) storage.Key {
+	return storage.Key{Path: []string{value}}
+}
+
+func TestSortedKeys(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	store := mock_storage.NewMockKvStore(ctrl)
+	keys := NewSSHKeys(store)
+
+	store.EXPECT().ListRecursive(storage.RootKey).Return(
+		[]storage.Key{
+			storageKey("k1"),
+			storageKey("k2"),
+			storageKey("k3"),
+			storageKey("k4")},
+		nil)
+
+	ids, err := keys.ListIds()
+	require.NoError(t, err)
+	require.Equal(t, []SSHKeyID{
+		SSHKeyID("k1"),
+		SSHKeyID("k2"),
+		SSHKeyID("k3"),
+		SSHKeyID("k4")},
+		ids)
 }
