@@ -4,6 +4,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/gorilla/mux"
 	"net/http"
@@ -14,7 +15,7 @@ type machineHandler struct {
 	keystore     api.SSHKeys
 	templates    api.Templates
 	machines     api.Machines
-	provisioners api.MachineProvisioners
+	provisioners machines.MachineProvisioners
 }
 
 func getMachineID(req *http.Request) api.MachineID {
@@ -48,7 +49,7 @@ func provisionerNameFromQuery(req *http.Request) string {
 	return req.URL.Query().Get("provisioner")
 }
 
-func (h *machineHandler) getProvisionerBuilder(req *http.Request) (*api.ProvisionerBuilder, *api.Error) {
+func (h *machineHandler) getProvisionerBuilder(req *http.Request) (*machines.ProvisionerBuilder, *api.Error) {
 	provisionerName := provisionerNameFromQuery(req)
 	builder, has := h.provisioners.GetBuilder(provisionerName)
 	if !has {
@@ -151,7 +152,9 @@ func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
 	if !has {
 		return nil, &api.Error{
 			api.ErrUnknown,
-			fmt.Sprintf("Machine record referenced a provisioner that does not exist: %s", record.Provisioner)}
+			fmt.Sprintf(
+				"Machine record referenced a provisioner that does not exist: %s",
+				record.Provisioner)}
 	}
 
 	provisioner, err := builder.Build(deleteControls, cred)

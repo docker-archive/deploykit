@@ -1,4 +1,4 @@
-package api
+package machines
 
 import (
 	"github.com/docker/libmachete/provisioners/spi"
