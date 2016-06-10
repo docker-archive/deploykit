@@ -85,11 +85,16 @@ type provisioner struct {
 	client        ec2iface.EC2API
 	sleepFunction func(time.Duration)
 	config        *Config
+	sshKeys       api.SSHKeys
 }
 
 // New creates a new AWS provisioner that will use the provided EC2 API implementation and default config.
-func New(client ec2iface.EC2API) spi.Provisioner {
-	return &provisioner{client: client, sleepFunction: time.Sleep, config: defaultConfig()}
+func New(client ec2iface.EC2API, sshKeys api.SSHKeys) spi.Provisioner {
+	return &provisioner{
+		client:        client,
+		sleepFunction: time.Sleep,
+		config:        defaultConfig(),
+		sshKeys:       sshKeys}
 }
 
 // CreateClient creates the actual EC2 API client.
@@ -209,30 +214,14 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
-func getProvisionTaskMap() *api.TaskMap {
-	return api.NewTaskMap(
-		api.TaskSSHKeyGen.Override("AWS - upload generated SSH key", GenerateAndUploadSSHKey),
-		api.TaskCreateInstance,
-		api.TaskUserData,
-		api.TaskInstallDockerEngine,
-	)
-}
-
-func getTeardownTaskMap() *api.TaskMap {
-	return api.NewTaskMap(
-		api.TaskDestroyInstance,
-		api.TaskSSHKeyRemove.Override("AWS - remove ssh key", RemoveLocalAndUploadedSSHKey),
-	)
-}
-
 // NewMachineRequest returns a canonical machine request suitable for this provisioner.
 // This includes the standard workflow steps as well as the platform attributes.
 func NewMachineRequest() spi.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Provision = getProvisionTaskMap().Names()
-	req.Teardown = getTeardownTaskMap().Names()
+	req.Provision = []string{api.SSHKeyGenerateName, api.CreateInstanceName}
+	req.Teardown = []string{api.SSHKeyRemoveName, api.DestroyInstanceName}
 	return req
 }
 
@@ -276,12 +265,18 @@ func (p *provisioner) GetIPAddress(req spi.MachineRequest) (string, error) {
 	return ci.PublicIPAddress, nil
 }
 
-func (p *provisioner) GetProvisionTasks(tasks []spi.TaskName) ([]spi.Task, error) {
-	return getProvisionTaskMap().Filter(tasks)
+func (p *provisioner) GetProvisionTasks() []spi.Task {
+	return []spi.Task{
+		api.SSHKeyGen(p.sshKeys).Override("AWS - upload generated SSH key", p.generateAndUploadSSHKey),
+		api.CreateInstance(p),
+	}
 }
 
-func (p *provisioner) GetTeardownTasks(tasks []spi.TaskName) ([]spi.Task, error) {
-	return getTeardownTaskMap().Filter(tasks)
+func (p *provisioner) GetTeardownTasks() []spi.Task {
+	return []spi.Task{
+		api.SSHKeyRemove(p.sshKeys).Override("AWS - remove ssh key", p.removeLocalAndUploadedSSHKey),
+		api.DestroyInstance(p),
+	}
 }
 
 // Validate checks the data and returns error if not valid
