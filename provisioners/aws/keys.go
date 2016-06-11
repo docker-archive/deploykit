@@ -6,7 +6,7 @@ import (
 	"github.com/docker/libmachete/provisioners/spi"
 )
 
-// awsKeyImport imports a generated SSH key to EC2.
+// importEC2Key imports a generated SSH key to EC2.
 // It also mutates the input request to use the generated key.
 func (p provisioner) importEC2Key(resource spi.Resource, request spi.MachineRequest, events chan<- interface{}) error {
 	createInstanceRequest, err := ensureRequestType(request)
@@ -35,7 +35,7 @@ func (p provisioner) importEC2Key(resource spi.Resource, request spi.MachineRequ
 	return nil
 }
 
-// removeLocalAndUploadedSSHKey calls EC2 api to remove an imported key.
+// deleteEC2Key removes an imported key from EC2.
 func (p provisioner) deleteEC2Key(
 	resource spi.Resource,
 	request spi.MachineRequest,
