@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/provisioners/aws/mock"
+	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
 	"github.com/docker/libmachete/storage/filestore"
 	"github.com/golang/mock/gomock"
@@ -25,6 +26,16 @@ func newTestClientAndProvisioner(ctrl *gomock.Controller) (*mock.MockEC2API, pro
 		sshKeys:       api.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/")),
 	}
 	return client, provisioner
+}
+
+func getTaskByName(t *testing.T, tasks []spi.Task, name string) spi.Task {
+	for _, task := range tasks {
+		if task.Name() == name {
+			return task
+		}
+	}
+	require.FailNow(t, "Task not found")
+	return nil
 }
 
 func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
@@ -56,8 +67,8 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 		}
 	}()
 
-	// blocks synchronously
-	err := provisioner.generateAndUploadSSHKey(record, request, events)
+	// runs synchronously
+	err := getTaskByName(t, provisioner.GetProvisionTasks(), api.SSHKeyGenerateName).Run(record, request, events)
 
 	close(events)
 
@@ -66,7 +77,6 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	// Verify that the keyName has been updated.  Note the line above the KeyName
 	// was not specified.
 	require.Equal(t, host, request.KeyName)
-
 }
 
 func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
@@ -91,7 +101,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	record := &api.MachineRecord{}
 	record.MachineName = api.MachineID(host)
 
-	err := provisioner.removeLocalAndUploadedSSHKey(record, request, events)
+	err := getTaskByName(t, provisioner.GetTeardownTasks(), api.SSHKeyRemoveName).Run(record, request, events)
 	// TODO(wfarner): This was previously require.NoError(), which does not seem to make sense since the SSH key
 	// being deleted did not exist, which should be an error.  Consider adding a step to the beginning of the test
 	// that first creates the SSH key.

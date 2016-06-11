@@ -37,14 +37,14 @@ func TestSSHKeyGenAndRemove(t *testing.T) {
 
 	host := "test-host"
 
-	requireSuccessfulRun(t, host, []spi.Task{SSHKeyGen(sshKeys)})
+	requireSuccessfulRun(t, host, []spi.Task{SSHKeyGen{sshKeys}})
 
 	// Key should have been created.
 	data, err := sshKeys.GetEncodedPublicKey(SSHKeyID(host))
 	require.NoError(t, err)
 	require.NotEmpty(t, data)
 
-	requireSuccessfulRun(t, host, []spi.Task{SSHKeyRemove(sshKeys)})
+	requireSuccessfulRun(t, host, []spi.Task{SSHKeyRemove{sshKeys}})
 
 	// Key should have been removed.
 	_, err = sshKeys.GetEncodedPublicKey(SSHKeyID(host))

@@ -228,7 +228,7 @@ func (cm *machines) CreateMachine(
 
 func findTask(tasks []spi.Task, name string) *spi.Task {
 	for _, task := range tasks {
-		if task.Name == name {
+		if task.Name() == name {
 			return &task
 		}
 	}
@@ -238,7 +238,7 @@ func findTask(tasks []spi.Task, name string) *spi.Task {
 func taskNames(tasks []spi.Task) []string {
 	names := []string{}
 	for _, task := range tasks {
-		names = append(names, task.Name)
+		names = append(names, task.Name())
 	}
 	return names
 }
@@ -318,20 +318,16 @@ func runTasks(
 			save(record, nil)
 
 			go func(task spi.Task) {
-				log.Infoln("START", task.Name)
-				event := Event{Name: string(task.Name)}
-				if task.Do != nil {
-					err := task.Do(record, request, taskEvents)
-					if err != nil {
-						event.Message = task.Message + " errored: " + err.Error()
-						event.Error = err.Error()
-						event.Status = -1
-					} else {
-						event.Message = task.Message + " completed"
-						event.Status = 1
-					}
+				log.Infoln("START", task.Name())
+				event := Event{Name: string(task.Name())}
+				err := task.Run(record, request, taskEvents)
+				if err != nil {
+					event.Message = task.Name() + " failed: " + err.Error()
+					event.Error = err.Error()
+					event.Status = -1
 				} else {
-					event.Message = task.Message + " skipped"
+					event.Message = task.Name() + " completed"
+					event.Status = 1
 				}
 				taskEvents <- event
 				close(taskEvents) // unblocks the listener
@@ -345,10 +341,7 @@ func runTasks(
 
 			for te := range taskEvents {
 				stop := false
-				event := Event{
-					Name:      string(task.Name),
-					Timestamp: time.Now(),
-				}
+				event := Event{Name: task.Name(), Timestamp: time.Now()}
 				event.AddData(te)
 
 				switch te := te.(type) {

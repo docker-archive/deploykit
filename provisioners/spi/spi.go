@@ -117,18 +117,66 @@ type TaskHandler func(Resource, MachineRequest, chan<- interface{}) error
 // in a machine request or template.  This allows customization of provisioner behavior - such
 // as skipping engine installs (if underlying image already has docker engine), skipping SSH
 // key (if no sshd allowed), etc.
-type Task struct {
-	Name    string
-	Message string
-	Do      TaskHandler
+type Task interface {
+	Name() string
+	Run(Resource, MachineRequest, chan<- interface{}) error
 }
 
-// Override defines a new task of the same name but with a different implementation / behavior
-func (t Task) Override(message string, do TaskHandler) Task {
-	return Task{
-		Name:    t.Name,
-		Message: message,
-		Do:      do,
+type composedTask struct {
+	description string
+	task        Task
+	handler     TaskHandler
+	taskFirst   bool
+}
+
+func (c composedTask) Name() string {
+	return c.task.Name()
+}
+
+func (c composedTask) Description() string {
+	return c.description
+}
+
+func (c composedTask) Run(resource Resource, request MachineRequest, events chan<- interface{}) error {
+	if c.taskFirst {
+		err := c.task.Run(resource, request, events)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := c.handler(resource, request, events)
+	if err != nil {
+		return err
+	}
+
+	if !c.taskFirst {
+		err := c.task.Run(resource, request, events)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DoBeforeTask chains a TaskHandler to run before a task, aborting if the handler fails.
+func DoBeforeTask(description string, handler TaskHandler, task Task) Task {
+	return &composedTask{
+		description: description,
+		task:        task,
+		handler:     handler,
+		taskFirst:   false,
+	}
+}
+
+// DoAfterTask chains a TaskHandler to run after a task, aborting if the task fails.
+func DoAfterTask(description string, task Task, handler TaskHandler) Task {
+	return &composedTask{
+		description: description,
+		task:        task,
+		handler:     handler,
+		taskFirst:   true,
 	}
 }
 
