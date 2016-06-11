@@ -42,7 +42,7 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	}
 	client.EXPECT().ImportKeyPair(gomock.Any()).Do(matcher).Return(nil, nil)
 
-	request := new(CreateInstanceRequest)
+	request := &CreateInstanceRequest{}
 	request.KeyName = ""
 	request.MachineName = host
 
@@ -80,7 +80,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 
 	client.EXPECT().DeleteKeyPair(&ec2.DeleteKeyPairInput{KeyName: &host}).Return(nil, nil)
 
-	request := new(CreateInstanceRequest)
+	request := &CreateInstanceRequest{}
 	require.NoError(t, json.Unmarshal([]byte(testCreateSync[0]), request))
 	payload := fmt.Sprintf(`{"name": "%s", "provision" : [ "ssh-key-generate", "instance-create" ]}`, host)
 	require.NoError(t, json.Unmarshal([]byte(payload), request))
@@ -145,7 +145,7 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 }
 
 func loadTemplate(t *testing.T) *CreateInstanceRequest {
-	template := new(CreateInstanceRequest)
+	template := &CreateInstanceRequest{}
 	require.NoError(t, json.Unmarshal([]byte(testCreateSync[0]), template))
 	return template
 }

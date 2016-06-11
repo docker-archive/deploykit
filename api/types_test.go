@@ -103,7 +103,7 @@ changes:
   - task2
   - task3
 `
-	record := new(MachineRecord)
+	record := &MachineRecord{}
 
 	err := yaml.Unmarshal([]byte(input), record)
 	require.NoError(t, err)

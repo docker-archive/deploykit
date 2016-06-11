@@ -152,8 +152,8 @@ func TestCreateMachine(t *testing.T) {
 	id := "id-new-host"
 
 	template := &spi.BaseMachineRequest{Provision: []string{CreateInstanceName}}
-	request := new(spi.BaseMachineRequest)
-	expectReq := new(spi.BaseMachineRequest)
+	request := &spi.BaseMachineRequest{}
+	expectReq := &spi.BaseMachineRequest{}
 	*expectReq = *template
 	expectReq.MachineName = name
 
@@ -171,7 +171,7 @@ func TestCreateMachine(t *testing.T) {
 	store := mock_storage.NewMockKvStore(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 
-	record := new(MachineRecord)
+	record := &MachineRecord{}
 	record.MachineName = MachineID(name)
 	record.InstanceID = id
 	record.AppendChange(&spi.BaseMachineRequest{
@@ -207,7 +207,7 @@ func TestDestroyMachine(t *testing.T) {
 	teardownNames := []string{DestroyInstanceName}
 
 	// Data from previous provisioning run
-	record := new(MachineRecord)
+	record := &MachineRecord{}
 	record.MachineName = "test-host"
 	record.InstanceID = "id-test-host"
 	record.AppendChange(&spi.BaseMachineRequest{

@@ -217,7 +217,7 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 // NewMachineRequest returns a canonical machine request suitable for this provisioner.
 // This includes the standard workflow steps as well as the platform attributes.
 func NewMachineRequest() spi.MachineRequest {
-	req := new(CreateInstanceRequest)
+	req := &CreateInstanceRequest{}
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
 	req.Provision = []string{api.SSHKeyGenerateName, api.CreateInstanceName}

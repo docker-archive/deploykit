@@ -17,7 +17,7 @@ func requireSuccessfulRun(t *testing.T, hostName string, tasks []spi.Task) {
 	events, err := runTasks(
 		tasks,
 		MachineRecord{MachineSummary: MachineSummary{MachineName: MachineID(hostName)}},
-		new(spi.BaseMachineRequest),
+		&spi.BaseMachineRequest{},
 		func(r MachineRecord, q spi.MachineRequest) error {
 			return nil
 		},
