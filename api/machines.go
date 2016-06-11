@@ -194,7 +194,7 @@ func (cm *machines) CreateMachine(
 			Created:     Timestamp(time.Now().Unix()),
 		},
 	}
-	record.AppendEvent("init", "Create started", request)
+	record.AppendEvent("init", "Create started")
 	record.AppendChange(request)
 
 	apiErr := cm.saveMachineData(record, request)
@@ -280,7 +280,7 @@ func (cm *machines) DeleteMachine(
 		return nil, &Error{Message: err.Error()}
 	}
 
-	record.AppendEvent("init-destroy", "Destroy started", lastChange)
+	record.AppendEvent("init-destroy", "Destroy started")
 
 	// TODO(wfarner): Nothing is actually deleted, is that intentional?
 	//if err := cm.store.Save(record, nil); err != nil {
@@ -319,19 +319,13 @@ func runTasks(
 
 			go func(task spi.Task) {
 				log.Infoln("START", task.Name)
-				event := Event{Name: string(task.Name)}
-				if task.Do != nil {
-					err := task.Do(record, request, taskEvents)
-					if err != nil {
-						event.Message = task.Message + " errored: " + err.Error()
-						event.Error = err.Error()
-						event.Status = -1
-					} else {
-						event.Message = task.Message + " completed"
-						event.Status = 1
-					}
+				event := Event{Name: task.Name}
+				err := task.Do(record, request, taskEvents)
+				if err != nil {
+					event.Message = task.Message + " failed"
+					event.Error = err.Error()
 				} else {
-					event.Message = task.Message + " skipped"
+					event.Message = task.Message + " completed"
 				}
 				taskEvents <- event
 				close(taskEvents) // unblocks the listener
@@ -345,16 +339,12 @@ func runTasks(
 
 			for te := range taskEvents {
 				stop := false
-				event := Event{
-					Name:      string(task.Name),
-					Timestamp: time.Now(),
-				}
-				event.AddData(te)
+				event := Event{Name: task.Name, Timestamp: time.Now()}
 
 				switch te := te.(type) {
 				case Event:
 					event = te
-					if event.Status < 0 {
+					if len(event.Error) > 0 {
 						stop = true
 					}
 				case spi.HasError:

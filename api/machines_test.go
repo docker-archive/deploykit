@@ -233,7 +233,7 @@ func makeTask(name string) spi.Task {
 	return spi.Task{
 		Name:    name,
 		Message: "message",
-		Do:      nil,
+		Do:      func(spi.Resource, spi.MachineRequest, chan<- interface{}) error { return nil },
 	}
 }
 

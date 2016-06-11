@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
@@ -22,20 +21,10 @@ type Timestamp uint64
 
 // Event is captures the data / emitted by tasks
 type Event struct {
-	Timestamp time.Time `json:"on" yaml:"on"`
-	Name      string    `json:"event" yaml:"event"`
-	Message   string    `json:"message" yaml:"message"`
-
-	// Data is an encode string of some relevant data
-	Data string `json:"data,omitempty" yaml:"data"`
-
-	// ContentType is the content type of the data (yaml or json -- MIME type)
-	ContentType string `json:"content_type" yaml:"content_type"`
-
-	Error string `json:"error,omitempty" yaml:"error"`
-
-	// Status: 0 = not run, 1 = success, -1 = error
-	Status int `json:"status" yaml:"status"`
+	Timestamp time.Time `json:"timestamp"`
+	Name      string    `json:"name"`
+	Message   string    `json:"message,omitempty"`
+	Error     string    `json:"error,omitempty"`
 }
 
 // MachineSummary keeps minimal information about a machine
@@ -101,22 +90,13 @@ func (m *MachineRecord) AppendChange(c spi.MachineRequest) {
 	})
 }
 
-// AddData appends custom data with a default encoding
-func (e *Event) AddData(data interface{}) {
-	if buff, err := json.Marshal(data); err == nil {
-		e.ContentType = "application/json"
-		e.Data = string(buff)
-	}
-}
-
 // AppendEvent appends an event to the machine record
-func (m *MachineRecord) AppendEvent(name, message string, data interface{}) {
+func (m *MachineRecord) AppendEvent(name, message string) {
 	e := Event{
 		Name:      name,
 		Message:   message,
 		Timestamp: time.Now(),
 	}
-	e.AddData(data)
 	m.AppendEventObject(e)
 }
 
