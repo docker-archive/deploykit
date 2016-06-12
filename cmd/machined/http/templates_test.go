@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/drewolson/testflight"
@@ -10,28 +9,13 @@ import (
 	"testing"
 )
 
-func marshalTemplate(t *testing.T, template spi.BaseMachineRequest) string {
-	body, err := json.Marshal(template)
-	require.NoError(t, err)
-	return string(body)
-}
-
-func unmarshalTemplate(t *testing.T, data string) spi.BaseMachineRequest {
-	value := spi.BaseMachineRequest{}
-	err := json.Unmarshal([]byte(data), &value)
-	require.NoError(t, err)
-	return value
-}
-
 type TemplateList []api.TemplateID
 
 func requireTemplates(t *testing.T, r *testflight.Requester, expected TemplateList) {
 	response := r.Get("/templates/json")
 	require.Equal(t, 200, response.StatusCode)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
-	payload := TemplateList{}
-	require.NoError(t, json.Unmarshal([]byte(response.Body), &payload))
-	require.Equal(t, expected, payload)
+	requireUnmarshalEqual(t, &expected, response.Body, &TemplateList{})
 }
 
 func TestTemplateCrud(t *testing.T) {
@@ -46,13 +30,14 @@ func TestTemplateCrud(t *testing.T) {
 
 		// Create a template
 		template := spi.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"}
-		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, marshalTemplate(t, template))
+		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, requireMarshalSuccess(t, template))
 		require.Equal(t, 200, response.StatusCode)
 
 		// It should return by id
 		response = r.Get("/templates/testcloud/prodtemplate/json")
 		require.Equal(t, 200, response.StatusCode)
-		require.Equal(t, template, unmarshalTemplate(t, response.Body))
+		value := spi.BaseMachineRequest{}
+		requireUnmarshalEqual(t, &template, response.Body, &value)
 
 		id := api.TemplateID{Provisioner: "testcloud", Name: "prodtemplate"}
 
@@ -61,13 +46,14 @@ func TestTemplateCrud(t *testing.T) {
 
 		// Update the template
 		updated := spi.BaseMachineRequest{MachineName: "testnew", Provisioner: "testcloud"}
-		response = r.Put("/templates/testcloud/prodtemplate", JSON, marshalTemplate(t, updated))
+		response = r.Put("/templates/testcloud/prodtemplate", JSON, requireMarshalSuccess(t, updated))
 		require.Equal(t, 200, response.StatusCode)
 
 		// It should be updated
 		response = r.Get("/templates/testcloud/prodtemplate/json")
 		require.Equal(t, 200, response.StatusCode)
-		require.Equal(t, updated, unmarshalTemplate(t, response.Body))
+		value = spi.BaseMachineRequest{}
+		requireUnmarshalEqual(t, &updated, response.Body, &value)
 
 		// It should still appear in a list request
 		requireTemplates(t, r, TemplateList{id})
@@ -81,7 +67,7 @@ func TestTemplateCrud(t *testing.T) {
 	})
 }
 
-func TestErrorResponses(t *testing.T) {
+func TestTemplatesErrorResponses(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -95,18 +81,18 @@ func TestErrorResponses(t *testing.T) {
 		require.Equal(t, 400, r.Post(
 			"/templates/absentprovisioner/name/create",
 			JSON,
-			marshalTemplate(t, template)).StatusCode)
+			requireMarshalSuccess(t, template)).StatusCode)
 		require.Equal(t, 404, r.Put(
 			"/templates/absentprovisioner/name",
 			JSON,
-			marshalTemplate(t, template)).StatusCode)
+			requireMarshalSuccess(t, template)).StatusCode)
 		require.Equal(t, 404, r.Get("/templates/absentprovisioner/name").StatusCode)
 		require.Equal(t, 404, r.Delete("/templates/absentprovisioner/name", JSON, "").StatusCode)
 
 		// Duplicate template.
-		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, marshalTemplate(t, template))
+		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, requireMarshalSuccess(t, template))
 		require.Equal(t, 200, response.StatusCode)
-		response = r.Post("/templates/testcloud/prodtemplate/create", JSON, marshalTemplate(t, template))
+		response = r.Post("/templates/testcloud/prodtemplate/create", JSON, requireMarshalSuccess(t, template))
 		require.Equal(t, 409, response.StatusCode)
 	})
 }
