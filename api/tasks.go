@@ -90,7 +90,7 @@ type SSHKeyRemove struct {
 	Keys SSHKeys
 }
 
-// Run returns the task name.
+// Name returns the task name.
 func (s SSHKeyRemove) Name() string {
 	return SSHKeyRemoveName
 }
