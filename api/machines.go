@@ -41,14 +41,22 @@ type machines struct {
 	store storage.KvStore
 }
 
+const (
+	detailsRoot = "details"
+	recordsRoot = "records"
+)
+
+var recordsRootKey = storage.Key{Path: []string{recordsRoot}}
+
 // NewMachines creates an instance of the manager given the backing store.
 func NewMachines(store storage.KvStore) Machines {
 	return &machines{store: store}
 }
 
-func machineIDFromKey(key storage.Key) MachineID {
-	requirePathLength(key, 1)
-	return MachineID(key.Path[0])
+func machineIDFromRecordKey(key storage.Key) MachineID {
+	// Strip the record root path component.
+	requirePathLength(key, 2)
+	return MachineID(key.Path[1])
 }
 
 func keyFromMachineID(id MachineID) storage.Key {
@@ -56,14 +64,14 @@ func keyFromMachineID(id MachineID) storage.Key {
 }
 
 func (cm *machines) List() ([]MachineSummary, *Error) {
-	keys, err := cm.store.ListRecursive(storage.RootKey)
+	keys, err := cm.store.ListRecursive(recordsRootKey)
 	if err != nil {
 		return nil, UnknownError(err)
 	}
 
 	summaries := []MachineSummary{}
 	for _, key := range keys {
-		record, err := cm.Get(machineIDFromKey(key))
+		record, err := cm.Get(machineIDFromRecordKey(key))
 		if err != nil {
 			return nil, UnknownError(err)
 		}
@@ -74,7 +82,7 @@ func (cm *machines) List() ([]MachineSummary, *Error) {
 }
 
 func (cm *machines) ListIds() ([]MachineID, *Error) {
-	keys, err := cm.store.ListRecursive(storage.RootKey)
+	keys, err := cm.store.ListRecursive(recordsRootKey)
 	if err != nil {
 		return nil, UnknownError(err)
 	}
@@ -83,13 +91,13 @@ func (cm *machines) ListIds() ([]MachineID, *Error) {
 
 	ids := []MachineID{}
 	for _, key := range keys {
-		ids = append(ids, machineIDFromKey(key))
+		ids = append(ids, machineIDFromRecordKey(key))
 	}
 	return ids, nil
 }
 
 func (cm *machines) Get(id MachineID) (MachineRecord, *Error) {
-	data, err := cm.store.Get(keyFromMachineID(id))
+	data, err := cm.store.Get(machineRecordKey(keyFromMachineID(id)))
 	if err != nil {
 		return MachineRecord{}, UnknownError(err)
 	}
@@ -104,7 +112,7 @@ func (cm *machines) Get(id MachineID) (MachineRecord, *Error) {
 }
 
 func (cm *machines) exists(id MachineID) bool {
-	_, err := cm.store.Get(keyFromMachineID(id))
+	_, err := cm.store.Get(machineRecordKey(keyFromMachineID(id)))
 	return err == nil
 }
 
@@ -136,12 +144,16 @@ func (cm *machines) populateRequest(
 	return request, nil
 }
 
-func machineRecordKey(baseKey storage.Key) storage.Key {
-	return storage.Key{Path: append(baseKey.Path, "record.json")}
+func machineRecordKey(machineKey storage.Key) storage.Key {
+	path := []string{recordsRoot}
+	path = append(path, machineKey.Path...)
+	return storage.Key{Path: path}
 }
 
-func machineDetailsKey(baseKey storage.Key) storage.Key {
-	return storage.Key{Path: append(baseKey.Path, "details.json")}
+func machineDetailsKey(machineKey storage.Key) storage.Key {
+	path := []string{detailsRoot}
+	path = append(path, machineKey.Path...)
+	return storage.Key{Path: path}
 }
 
 func (cm machines) marshalAndSave(key storage.Key, value interface{}) *Error {
@@ -181,6 +193,10 @@ func (cm *machines) CreateMachine(
 	}
 
 	machineID := MachineID(request.Name())
+	if len(machineID) == 0 {
+		return nil, &Error{Code: ErrBadInput, Message: "Machine name may not be empty"}
+	}
+
 	if cm.exists(machineID) {
 		return nil, &Error{Code: ErrDuplicate, Message: fmt.Sprintf("Key exists: %v", machineID)}
 	}
@@ -217,6 +233,7 @@ func (cm *machines) CreateMachine(
 		func(record *MachineRecord, state spi.MachineRequest) {
 			record.Status = "provisioned"
 			record.LastModified = Timestamp(time.Now().Unix())
+			// TODO(wfarner): Should errors here be fatal?  Currently they're silent.
 			if ip, err := provisioner.GetIPAddress(state); err == nil {
 				record.IPAddress = ip
 			}
@@ -313,6 +330,8 @@ func runTasks(
 		for _, task := range tasks {
 			taskEvents := make(chan interface{})
 
+			// TODO(wfarner): The 'pending' status is used for both creating and destroying.  These should
+			// be different states.
 			record.Status = "pending"
 			record.LastModified = Timestamp(time.Now().Unix())
 			save(record, nil)
@@ -396,7 +415,7 @@ func runTasks(
 			}
 		}
 
-		onComplete(&record, nil)
+		onComplete(&record, request)
 		record.LastModified = Timestamp(time.Now().Unix())
 		save(record, nil)
 		return

@@ -36,11 +36,11 @@ type Templates interface {
 
 type templates struct {
 	store        storage.KvStore
-	provisioners *MachineProvisioners
+	provisioners MachineProvisioners
 }
 
 // NewTemplates creates an instance of the manager given the backing store.
-func NewTemplates(store storage.KvStore, provisioners *MachineProvisioners) Templates {
+func NewTemplates(store storage.KvStore, provisioners MachineProvisioners) Templates {
 	return &templates{store: store, provisioners: provisioners}
 }
 
@@ -127,6 +127,9 @@ func (t *templates) saveTemplate(id TemplateID, input io.Reader, codec *Codec) *
 	if err = t.unmarshal(codec, buff, template); err != nil {
 		return UnknownError(err)
 	}
+
+	// TODO(wfarner): Validate that the the provisioner name in the template ID matches the template.  Also consider
+	// eliminating this redundancy, probably removing ProvisionerName from the template.
 
 	data, err := json.Marshal(template)
 	if err != nil {

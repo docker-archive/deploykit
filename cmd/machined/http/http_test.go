@@ -21,13 +21,19 @@ type testCredentials struct {
 	Secret   string `json:"secret"`
 }
 
+type testMachineRequest struct {
+	spi.BaseMachineRequest `yaml:",inline"`
+	Quantum                bool `yaml:"quantum,omitempty"`
+	TurboButtons           uint `yaml:"turbo_buttons,omitempty"`
+}
+
 func prepareTest(t *testing.T, ctrl *gomock.Controller) (*mock_spi.MockProvisioner, http.Handler) {
 	provisioner := mock_spi.NewMockProvisioner(ctrl)
 
 	builder := api.ProvisionerBuilder{
 		Name:                  "testcloud",
 		DefaultCredential:     func() spi.Credential { return &testCredentials{} },
-		DefaultMachineRequest: func() spi.MachineRequest { return &spi.BaseMachineRequest{} },
+		DefaultMachineRequest: func() spi.MachineRequest { return &testMachineRequest{} },
 		Build: func(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error) {
 			return provisioner, nil
 		},
