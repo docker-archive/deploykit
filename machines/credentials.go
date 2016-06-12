@@ -57,7 +57,7 @@ func (c *credentials) ListIds() ([]api.CredentialsID, *api.Error) {
 func (c *credentials) Get(id api.CredentialsID) (spi.Credential, *api.Error) {
 	data, err := c.store.Get(keyFromCredentialsID(id))
 	if err != nil {
-		return nil, api.UnknownError(err)
+		return nil, &api.Error{Code: api.ErrNotFound, Message: "Credentials entry does not exist"}
 	}
 
 	detail, err := c.newCredential(id.Provisioner)
@@ -77,7 +77,7 @@ func (c *credentials) Delete(id api.CredentialsID) *api.Error {
 	err := c.store.Delete(keyFromCredentialsID(id))
 	// TODO(wfarner): Give better visibility from the store to disambiguate between failure cases.
 	if err != nil {
-		return api.UnknownError(err)
+		return &api.Error{api.ErrNotFound, err.Error()}
 	}
 	return nil
 }
@@ -107,7 +107,7 @@ func (c *credentials) CreateCredential(id api.CredentialsID, input io.Reader, co
 
 	creds, err := c.newCredential(id.Provisioner)
 	if err != nil {
-		return &api.Error{api.ErrNotFound, err.Error()}
+		return &api.Error{api.ErrBadInput, err.Error()}
 	}
 
 	buff, err := ioutil.ReadAll(input)

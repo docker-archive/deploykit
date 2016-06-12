@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"github.com/docker/libmachete/machines"
 	mock_spi "github.com/docker/libmachete/mock/provisioners/spi"
 	"github.com/docker/libmachete/provisioners/spi"
