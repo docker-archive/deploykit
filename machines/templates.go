@@ -16,11 +16,11 @@ type TemplateBuilder MachineRequestBuilder
 
 type templates struct {
 	store        storage.KvStore
-	provisioners *MachineProvisioners
+	provisioners MachineProvisioners
 }
 
 // NewTemplates creates an instance of the manager given the backing store.
-func NewTemplates(store storage.KvStore, provisioners *MachineProvisioners) api.Templates {
+func NewTemplates(store storage.KvStore, provisioners MachineProvisioners) api.Templates {
 	return &templates{store: store, provisioners: provisioners}
 }
 

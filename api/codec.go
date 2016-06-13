@@ -25,4 +25,4 @@ func (c contentTypeJSON) Unmarshal(data []byte, v interface{}) error {
 }
 
 // ContentTypeJSON is a codec that transforms into and from JSON.
-var ContentTypeJSON = contentTypeJSON{}
+var ContentTypeJSON = &contentTypeJSON{}
