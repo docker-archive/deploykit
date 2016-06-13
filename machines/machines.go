@@ -1,10 +1,9 @@
-package machines
+package api
 
 import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
 	"io"
@@ -16,35 +15,65 @@ import (
 // that satisfies the MachineRequest interface.
 type MachineRequestBuilder func() spi.MachineRequest
 
+// Machines manages the lifecycle of a machine / node.
+type Machines interface {
+	// List returns summaries of all machines.
+	List() ([]MachineSummary, *Error)
+
+	// ListIds returns the identifiers for all machines.
+	ListIds() ([]MachineID, *Error)
+
+	// Get returns a machine identified by key
+	Get(id MachineID) (MachineRecord, *Error)
+
+	// CreateMachine adds a new machine from the input reader.
+	CreateMachine(
+		provisioner spi.Provisioner,
+		template spi.MachineRequest,
+		input io.Reader,
+		codec *Codec) (<-chan interface{}, *Error)
+
+	// DeleteMachine delete a machine.  The record contains workflow tasks for tear down of the machine.
+	DeleteMachine(provisioner spi.Provisioner, record MachineRecord) (<-chan interface{}, *Error)
+}
+
 type machines struct {
 	store storage.KvStore
 }
 
+const (
+	detailsRoot = "details"
+	recordsRoot = "records"
+)
+
+var recordsRootKey = storage.Key{Path: []string{recordsRoot}}
+
 // NewMachines creates an instance of the manager given the backing store.
-func NewMachines(store storage.KvStore) api.Machines {
+func NewMachines(store storage.KvStore) Machines {
 	return &machines{store: store}
 }
 
-func machineIDFromKey(key storage.Key) api.MachineID {
-	key.RequirePathLength(1)
-	return api.MachineID(key.Path[0])
+func machineIDFromRecordKey(key storage.Key) MachineID {
+	// Strip the record root path component.
+	requirePathLength(key, 2)
+	return MachineID(key.Path[1])
 }
 
-func keyFromMachineID(id api.MachineID) storage.Key {
+func keyFromMachineID(id MachineID) storage.Key {
 	return storage.Key{Path: []string{string(id)}}
 }
 
-func (cm *machines) List() ([]api.MachineSummary, *api.Error) {
-	keys, err := cm.store.ListRecursive(storage.RootKey)
+func (cm *machines) List() ([]MachineSummary, *Error) {
+	keys, err := cm.store.ListRecursive(recordsRootKey)
 	if err != nil {
-		return nil, api.UnknownError(err)
+		return nil, UnknownError(err)
 	}
 
-	summaries := []api.MachineSummary{}
+	summaries := []MachineSummary{}
 	for _, key := range keys {
-		record, err := cm.Get(machineIDFromKey(key))
+		record, err := cm.Get(machineIDFromRecordKey(key))
 		if err != nil {
-			return nil, api.UnknownError(err)
+			return nil, UnknownError(err)
 		}
 		summaries = append(summaries, record.MachineSummary)
 	}
@@ -52,38 +81,38 @@ func (cm *machines) List() ([]api.MachineSummary, *api.Error) {
 	return summaries, nil
 }
 
-func (cm *machines) ListIds() ([]api.MachineID, *api.Error) {
-	keys, err := cm.store.ListRecursive(storage.RootKey)
+func (cm *machines) ListIds() ([]MachineID, *Error) {
+	keys, err := cm.store.ListRecursive(recordsRootKey)
 	if err != nil {
-		return nil, api.UnknownError(err)
+		return nil, UnknownError(err)
 	}
 
 	storage.SortKeys(keys)
 
-	ids := []api.MachineID{}
+	ids := []MachineID{}
 	for _, key := range keys {
-		ids = append(ids, machineIDFromKey(key))
+		ids = append(ids, machineIDFromRecordKey(key))
 	}
 	return ids, nil
 }
 
-func (cm *machines) Get(id api.MachineID) (api.MachineRecord, *api.Error) {
-	data, err := cm.store.Get(keyFromMachineID(id))
+func (cm *machines) Get(id MachineID) (MachineRecord, *Error) {
+	data, err := cm.store.Get(machineRecordKey(keyFromMachineID(id)))
 	if err != nil {
-		return api.MachineRecord{}, api.UnknownError(err)
+		return MachineRecord{}, UnknownError(err)
 	}
 
-	record := api.MachineRecord{}
+	record := MachineRecord{}
 	err = json.Unmarshal(data, &record)
 	if err != nil {
-		return record, api.UnknownError(err)
+		return record, UnknownError(err)
 	}
 
 	return record, nil
 }
 
-func (cm *machines) exists(id api.MachineID) bool {
-	_, err := cm.store.Get(keyFromMachineID(id))
+func (cm *machines) exists(id MachineID) bool {
+	_, err := cm.store.Get(machineRecordKey(keyFromMachineID(id)))
 	return err == nil
 }
 
@@ -91,7 +120,7 @@ func (cm *machines) populateRequest(
 	provisioner spi.Provisioner,
 	template spi.MachineRequest,
 	input io.Reader,
-	codec api.Codec) (spi.MachineRequest, error) {
+	codec *Codec) (spi.MachineRequest, error) {
 
 	// Three components are used to fully populate a MachineRequest:
 	// 1. a stock request with low-level defaults from the provisioner
@@ -106,7 +135,7 @@ func (cm *machines) populateRequest(
 
 	buff, err := ioutil.ReadAll(input)
 	if err == nil && len(buff) > 0 {
-		err = codec.Unmarshal(buff, request)
+		err = codec.unmarshal(buff, request)
 		if err != nil {
 			return nil, err
 		}
@@ -115,27 +144,31 @@ func (cm *machines) populateRequest(
 	return request, nil
 }
 
-func machineRecordKey(baseKey storage.Key) storage.Key {
-	return storage.Key{Path: append(baseKey.Path, "record.json")}
+func machineRecordKey(machineKey storage.Key) storage.Key {
+	path := []string{recordsRoot}
+	path = append(path, machineKey.Path...)
+	return storage.Key{Path: path}
 }
 
-func machineDetailsKey(baseKey storage.Key) storage.Key {
-	return storage.Key{Path: append(baseKey.Path, "details.json")}
+func machineDetailsKey(machineKey storage.Key) storage.Key {
+	path := []string{detailsRoot}
+	path = append(path, machineKey.Path...)
+	return storage.Key{Path: path}
 }
 
-func (cm machines) marshalAndSave(key storage.Key, value interface{}) *api.Error {
+func (cm machines) marshalAndSave(key storage.Key, value interface{}) *Error {
 	data, err := json.Marshal(value)
 	if err != nil {
-		return api.UnknownError(err)
+		return UnknownError(err)
 	}
 
 	if err := cm.store.Save(key, data); err != nil {
-		return api.UnknownError(err)
+		return UnknownError(err)
 	}
 	return nil
 }
 
-func (cm machines) saveMachineData(record api.MachineRecord, details spi.MachineRequest) *api.Error {
+func (cm machines) saveMachineData(record MachineRecord, details spi.MachineRequest) *Error {
 	key := keyFromMachineID(record.MachineName)
 	if err := cm.marshalAndSave(machineRecordKey(key), record); err != nil {
 		return err
@@ -152,25 +185,29 @@ func (cm *machines) CreateMachine(
 	provisioner spi.Provisioner,
 	template spi.MachineRequest,
 	input io.Reader,
-	codec api.Codec) (<-chan interface{}, *api.Error) {
+	codec *Codec) (<-chan interface{}, *Error) {
 
 	request, err := cm.populateRequest(provisioner, template, input, codec)
 	if err != nil {
-		return nil, api.UnknownError(err)
+		return nil, UnknownError(err)
 	}
 
-	machineID := api.MachineID(request.Name())
+	machineID := MachineID(request.Name())
+	if len(machineID) == 0 {
+		return nil, &Error{Code: ErrBadInput, Message: "Machine name may not be empty"}
+	}
+
 	if cm.exists(machineID) {
-		return nil, &api.Error{Code: api.ErrDuplicate, Message: fmt.Sprintf("Key exists: %v", machineID)}
+		return nil, &Error{Code: ErrDuplicate, Message: fmt.Sprintf("Key exists: %v", machineID)}
 	}
 
 	// First save a record
-	record := api.MachineRecord{
-		MachineSummary: api.MachineSummary{
+	record := MachineRecord{
+		MachineSummary: MachineSummary{
 			Status:      "initiated",
 			MachineName: machineID,
 			Provisioner: provisioner.Name(),
-			Created:     api.Timestamp(time.Now().Unix()),
+			Created:     Timestamp(time.Now().Unix()),
 		},
 	}
 	record.AppendEvent("init", "Create started", request)
@@ -183,19 +220,20 @@ func (cm *machines) CreateMachine(
 
 	tasks, err := filterTasks(provisioner.GetProvisionTasks(), request.ProvisionWorkflow())
 	if err != nil {
-		return nil, &api.Error{Message: err.Error()}
+		return nil, &Error{Message: err.Error()}
 	}
 
 	return runTasks(
 		tasks,
 		record,
 		request,
-		func(record api.MachineRecord, state spi.MachineRequest) error {
+		func(record MachineRecord, state spi.MachineRequest) error {
 			return cm.saveMachineData(record, state)
 		},
-		func(record *api.MachineRecord, state spi.MachineRequest) {
+		func(record *MachineRecord, state spi.MachineRequest) {
 			record.Status = "provisioned"
-			record.LastModified = api.Timestamp(time.Now().Unix())
+			record.LastModified = Timestamp(time.Now().Unix())
+			// TODO(wfarner): Should errors here be fatal?  Currently they're silent.
 			if ip, err := provisioner.GetIPAddress(state); err == nil {
 				record.IPAddress = ip
 			}
@@ -241,11 +279,11 @@ func filterTasks(tasks []spi.Task, selectNames []string) ([]spi.Task, error) {
 // TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
 func (cm *machines) DeleteMachine(
 	provisioner spi.Provisioner,
-	record api.MachineRecord) (<-chan interface{}, *api.Error) {
+	record MachineRecord) (<-chan interface{}, *Error) {
 
 	lastChange := record.GetLastChange()
 	if lastChange == nil {
-		return nil, &api.Error{Message: fmt.Sprintf("Impossible state. Machine has no history:%v", record.Name())}
+		return nil, &Error{Message: fmt.Sprintf("Impossible state. Machine has no history:%v", record.Name())}
 	}
 
 	// On managing changes (or even removal) of the template and the impact on already-provisioned instances:
@@ -256,24 +294,24 @@ func (cm *machines) DeleteMachine(
 
 	tasks, err := filterTasks(provisioner.GetTeardownTasks(), lastChange.TeardownWorkflow())
 	if err != nil {
-		return nil, &api.Error{Message: err.Error()}
+		return nil, &Error{Message: err.Error()}
 	}
 
 	record.AppendEvent("init-destroy", "Destroy started", lastChange)
 
 	// TODO(wfarner): Nothing is actually deleted, is that intentional?
 	//if err := cm.store.Save(record, nil); err != nil {
-	//	return nil, &api.Error{Message: err.Error()}
+	//	return nil, &Error{Message: err.Error()}
 	//}
 
 	return runTasks(
 		tasks,
 		record,
 		lastChange,
-		func(record api.MachineRecord, state spi.MachineRequest) error {
+		func(record MachineRecord, state spi.MachineRequest) error {
 			return cm.saveMachineData(record, state)
 		},
-		func(record *api.MachineRecord, state spi.MachineRequest) {
+		func(record *MachineRecord, state spi.MachineRequest) {
 			record.Status = "terminated"
 		})
 }
@@ -281,15 +319,10 @@ func (cm *machines) DeleteMachine(
 // runTasks is the main task execution loop
 func runTasks(
 	tasks []spi.Task,
-	record api.MachineRecord,
+	record MachineRecord,
 	request spi.MachineRequest,
-	rawSave func(api.MachineRecord, spi.MachineRequest) error,
-	onComplete func(*api.MachineRecord, spi.MachineRequest)) (<-chan interface{}, *api.Error) {
-
-	save := func(record api.MachineRecord, machineState spi.MachineRequest) error {
-		record.LastModified = api.Timestamp(time.Now().Unix())
-		return rawSave(record, machineState)
-	}
+	save func(MachineRecord, spi.MachineRequest) error,
+	onComplete func(*MachineRecord, spi.MachineRequest)) (<-chan interface{}, *Error) {
 
 	events := make(chan interface{})
 	go func() {
@@ -297,12 +330,15 @@ func runTasks(
 		for _, task := range tasks {
 			taskEvents := make(chan interface{})
 
+			// TODO(wfarner): The 'pending' status is used for both creating and destroying.  These should
+			// be different states.
 			record.Status = "pending"
+			record.LastModified = Timestamp(time.Now().Unix())
 			save(record, nil)
 
 			go func(task spi.Task) {
 				log.Infoln("START", task.Name)
-				event := api.Event{Name: string(task.Name)}
+				event := Event{Name: string(task.Name)}
 				if task.Do != nil {
 					err := task.Do(record, request, taskEvents)
 					if err != nil {
@@ -328,14 +364,14 @@ func runTasks(
 
 			for te := range taskEvents {
 				stop := false
-				event := api.Event{
+				event := Event{
 					Name:      string(task.Name),
 					Timestamp: time.Now(),
 				}
 				event.AddData(te)
 
 				switch te := te.(type) {
-				case api.Event:
+				case Event:
 					event = te
 					if event.Status < 0 {
 						stop = true
@@ -364,6 +400,7 @@ func runTasks(
 				}
 
 				record.AppendEventObject(event)
+				record.LastModified = Timestamp(time.Now().Unix())
 				save(record, machineState)
 
 				events <- event
@@ -371,14 +408,15 @@ func runTasks(
 				if stop {
 					log.Warningln("Stopping due to error")
 					record.Status = "failed"
-					record.LastModified = api.Timestamp(time.Now().Unix())
+					record.LastModified = Timestamp(time.Now().Unix())
 					save(record, machineState)
 					return
 				}
 			}
 		}
 
-		onComplete(&record, nil)
+		onComplete(&record, request)
+		record.LastModified = Timestamp(time.Now().Unix())
 		save(record, nil)
 		return
 	}()
