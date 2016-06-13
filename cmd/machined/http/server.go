@@ -27,19 +27,21 @@ type apiOptions struct {
 }
 
 type apiServer struct {
-	options     apiOptions
-	credentials api.Credentials
-	templates   api.Templates
-	machines    api.Machines
-	keystore    api.SSHKeys
+	options      apiOptions
+	credentials  api.Credentials
+	templates    api.Templates
+	machines     api.Machines
+	keystore     api.SSHKeys
+	provisioners api.MachineProvisioners
 }
 
-func build(store storage.KvStore, provisioners *api.MachineProvisioners) (*apiServer, error) {
+func build(store storage.KvStore, provisioners api.MachineProvisioners) (*apiServer, error) {
 	return &apiServer{
-		credentials: api.NewCredentials(storage.NestedStore(store, "credentials"), provisioners),
-		templates:   api.NewTemplates(storage.NestedStore(store, "templates"), provisioners),
-		machines:    api.NewMachines(storage.NestedStore(store, "machines")),
-		keystore:    api.NewSSHKeys(storage.NestedStore(store, "keys")),
+		credentials:  api.NewCredentials(storage.NestedStore(store, "credentials"), provisioners),
+		templates:    api.NewTemplates(storage.NestedStore(store, "templates"), provisioners),
+		machines:     api.NewMachines(storage.NestedStore(store, "machines")),
+		keystore:     api.NewSSHKeys(storage.NestedStore(store, "keys")),
+		provisioners: provisioners,
 	}, nil
 }
 
@@ -64,10 +66,11 @@ func (s *apiServer) getHandler() http.Handler {
 		"/credentials": &credentialsHandler{credentials: s.credentials},
 		"/templates":   &templatesHandler{templates: s.templates},
 		"/machines": &machineHandler{
-			creds:     s.credentials,
-			templates: s.templates,
-			machines:  s.machines,
-			keystore:  s.keystore},
+			creds:        s.credentials,
+			templates:    s.templates,
+			machines:     s.machines,
+			keystore:     s.keystore,
+			provisioners: s.provisioners},
 	}
 
 	router := mux.NewRouter()
@@ -104,7 +107,7 @@ func ServerCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			log.Infoln("Starting server")
 
-			server, err := build(filestore.NewOsFileStore(options.RootDir), &api.DefaultProvisioners)
+			server, err := build(filestore.NewOsFileStore(options.RootDir), api.DefaultProvisioners)
 			if err != nil {
 				return err
 			}

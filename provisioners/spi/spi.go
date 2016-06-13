@@ -71,6 +71,8 @@ func (event DestroyInstanceEvent) GetError() error {
 
 // Resource is a generic resource that has a friendly name and an identifier that is unique to the provisioner
 type Resource interface {
+	// TODO(wfarner): It isn't clear which function is meaningful, and when.  In tasks related to SSH keys, Name()
+	// is used for a key identifier, but in tasks related to instances, ID() is used for a machine identifier.
 	Name() string
 	ID() string
 }
@@ -183,9 +185,9 @@ func DoAfterTask(description string, task Task, handler TaskHandler) Task {
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
-	MachineName        string   `yaml:"name" json:"name"`
-	Provisioner        string   `yaml:"provisioner" json:"provisioner"`
-	ProvisionerVersion string   `yaml:"version" json:"version"`
+	MachineName        string   `yaml:"name" json:"name,omitempty"`
+	Provisioner        string   `yaml:"provisioner" json:"provisioner,omitempty"`
+	ProvisionerVersion string   `yaml:"version" json:"version,omitempty"`
 	Provision          []string `yaml:"provision,omitempty" json:"provision,omitempty"`
 	Teardown           []string `yaml:"teardown,omitempty" json:"teardown,omitempty"`
 }
@@ -218,7 +220,6 @@ func (req BaseMachineRequest) Version() string {
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
-
 	// Name returns an identifier for this provisioner
 	Name() string
 
@@ -238,6 +239,8 @@ type Provisioner interface {
 	// on how to manage the mapping of machine request (which has a user-friendly name) to
 	// an actual infrastructure identifier for the resource.
 	// TODO(chungers) - the machine request here is the *state* not the request
+	// TODO(wfarner): Seems like InstanceID effectively becomes a required (but hidden) attribute of MachineRequest;
+	// seems like it should just become a first-class attribute.  Same with IPAddress.
 	GetInstanceID(MachineRequest) (string, error)
 
 	// GetIp returns the IP address from the record.  It's up to the provisioner to decide

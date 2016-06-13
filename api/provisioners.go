@@ -2,7 +2,6 @@ package api
 
 import (
 	"github.com/docker/libmachete/provisioners/spi"
-	"sync"
 )
 
 var (
@@ -12,26 +11,28 @@ var (
 
 // ProvisionerBuilder defines structures needed for the provisioner to operate, and is capable
 // of constructing a provisioner.
+// TODO(wfarner): Consider converting this to an interface.
 type ProvisionerBuilder struct {
-	Name                  string
-	DefaultCredential     func() spi.Credential
+	// TODO(wfarner): This function is redundant with Provisioner.Name().
+	Name              string
+	DefaultCredential func() spi.Credential
+	// TODO(wfarner): This function is redundant with Provisioner.NewRequestInstance().
 	DefaultMachineRequest func() spi.MachineRequest
 	Build                 func(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error)
 }
 
 // MachineProvisioners maintains the collection of available provisioners.
 type MachineProvisioners struct {
-	builders     map[string]ProvisionerBuilder
-	buildersLock sync.Mutex
+	builders map[string]ProvisionerBuilder
 }
 
 // NewMachineProvisioners creates a collection of provisioners from a slice of builders.
-func NewMachineProvisioners(builders []ProvisionerBuilder) *MachineProvisioners {
+func NewMachineProvisioners(builders []ProvisionerBuilder) MachineProvisioners {
 	m := MachineProvisioners{builders: make(map[string]ProvisionerBuilder)}
 	for _, builder := range builders {
 		m.Register(builder)
 	}
-	return &m
+	return m
 }
 
 // GetBuilder retrieves a registered provisioner builder.
@@ -42,8 +43,5 @@ func (m *MachineProvisioners) GetBuilder(name string) (ProvisionerBuilder, bool)
 
 // Register makes a provisioner available for other components to fetch.
 func (m *MachineProvisioners) Register(builder ProvisionerBuilder) {
-	m.buildersLock.Lock()
-	defer m.buildersLock.Unlock()
-
 	m.builders[builder.Name] = builder
 }

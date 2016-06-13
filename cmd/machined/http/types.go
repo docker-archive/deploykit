@@ -38,11 +38,9 @@ func outputHandler(handler SimpleHandler) Handler {
 		}()
 
 		result, err := handler(req)
-		if result != nil {
+		if err == nil {
 			api.ContentTypeJSON.Respond(resp, result)
-		}
-
-		if err != nil {
+		} else {
 			handleError(*err, resp)
 		}
 	}

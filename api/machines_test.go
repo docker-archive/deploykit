@@ -34,20 +34,22 @@ func TestListingSorted(t *testing.T) {
 		{ID: MachineID("host3"), Record: machineRecord("host3")},
 	}
 
+	// TODO(wfarner): Consider using a fake rather than mock store, this test is currently highly coupled to
+	// implementation details.
 	store := mock_storage.NewMockKvStore(ctrl)
 
 	keys := []storage.Key{}
 	for _, m := range data {
-		keys = append(keys, keyFromMachineID(m.ID))
+		keys = append(keys, machineRecordKey(keyFromMachineID(m.ID)))
 	}
 
-	store.EXPECT().ListRecursive(storage.RootKey).Return(keys, nil)
+	store.EXPECT().ListRecursive(recordsRootKey).Return(keys, nil)
 
 	for _, m := range data {
 		result := m.Record
 		resultJSON, err := json.Marshal(result)
 		require.NoError(t, err)
-		store.EXPECT().Get(keyFromMachineID(m.ID)).Return(resultJSON, nil)
+		store.EXPECT().Get(machineRecordKey(keyFromMachineID(m.ID))).Return(resultJSON, nil)
 	}
 
 	machines := NewMachines(store)
@@ -62,7 +64,7 @@ func TestListingSorted(t *testing.T) {
 	require.Equal(t, []MachineID{MachineID("host1"), MachineID("host2"), MachineID("host3")}, ids)
 
 	// Another -- test listing of ids only
-	store.EXPECT().ListRecursive(storage.RootKey).Return(keys, nil)
+	store.EXPECT().ListRecursive(recordsRootKey).Return(keys, nil)
 
 	ids, err = machines.ListIds()
 	require.NoError(t, err)
@@ -183,8 +185,9 @@ func TestCreateMachine(t *testing.T) {
 	recordJSON, err := json.Marshal(record)
 	require.NoError(t, err)
 
-	store.EXPECT().Get(keyFromMachineID(record.MachineName)).Times(1).Return(recordJSON, notFound)
-	store.EXPECT().Get(keyFromMachineID(record.MachineName)).AnyTimes().Return(recordJSON, nil)
+	machineStorageKey := machineRecordKey(keyFromMachineID(record.MachineName))
+	store.EXPECT().Get(machineStorageKey).Times(1).Return(recordJSON, notFound)
+	store.EXPECT().Get(machineStorageKey).AnyTimes().Return(recordJSON, nil)
 	machines := NewMachines(store)
 	events, err := machines.CreateMachine(
 		provisioner,
