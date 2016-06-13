@@ -9,7 +9,7 @@ import (
 )
 
 func requireCredentials(t *testing.T, r *testflight.Requester, expected ...api.CredentialsID) {
-	response := r.Get("/credentials/")
+	response := r.Get("/credentials")
 	require.Equal(t, 200, response.StatusCode)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
 	if expected == nil {

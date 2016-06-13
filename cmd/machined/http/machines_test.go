@@ -12,7 +12,7 @@ import (
 )
 
 func requireMachines(t *testing.T, r *testflight.Requester, expected ...api.MachineID) {
-	response := r.Get("/machines/?long=true")
+	response := r.Get("/machines?long=true")
 	require.Equal(t, 200, response.StatusCode, response.Body)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
 	if expected == nil {
@@ -31,7 +31,7 @@ func requireMachines(t *testing.T, r *testflight.Requester, expected ...api.Mach
 	require.Equal(t, expected, actualIds)
 
 	// Also validate the short form
-	response = r.Get("/machines/")
+	response = r.Get("/machines")
 	require.Equal(t, 200, response.StatusCode, response.Body)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
 
