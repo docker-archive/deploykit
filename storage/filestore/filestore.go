@@ -36,6 +36,10 @@ const pathRegexp = "^[\\w\\.\\-]+$"
 
 func validateKey(key storage.Key) error {
 	for _, part := range key.Path {
+		if len(part) == 0 {
+			return fmt.Errorf("A key may not have empty path parts")
+		}
+
 		if matched, _ := regexp.MatchString(pathRegexp, part); !matched {
 			return fmt.Errorf("Key part contains illegal characters: %s", part)
 		}

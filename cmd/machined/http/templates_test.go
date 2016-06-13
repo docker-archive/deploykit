@@ -9,13 +9,14 @@ import (
 	"testing"
 )
 
-type TemplateList []api.TemplateID
-
-func requireTemplates(t *testing.T, r *testflight.Requester, expected TemplateList) {
+func requireTemplates(t *testing.T, r *testflight.Requester, expected ...api.TemplateID) {
 	response := r.Get("/templates/json")
 	require.Equal(t, 200, response.StatusCode)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
-	requireUnmarshalEqual(t, &expected, response.Body, &TemplateList{})
+	if expected == nil {
+		expected = []api.TemplateID{}
+	}
+	requireUnmarshalEqual(t, &expected, response.Body, &[]api.TemplateID{})
 }
 
 func TestTemplateCrud(t *testing.T) {
@@ -26,44 +27,48 @@ func TestTemplateCrud(t *testing.T) {
 
 	testflight.WithServer(handler, func(r *testflight.Requester) {
 		// There should initially be no templates
-		requireTemplates(t, r, TemplateList{})
+		requireTemplates(t, r)
 
 		// Create a template
-		template := spi.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"}
+		template := testMachineRequest{
+			BaseMachineRequest: spi.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"},
+			Quantum:            true,
+		}
 		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, requireMarshalSuccess(t, template))
 		require.Equal(t, 200, response.StatusCode)
 
 		// It should return by id
 		response = r.Get("/templates/testcloud/prodtemplate/json")
 		require.Equal(t, 200, response.StatusCode)
-		value := spi.BaseMachineRequest{}
-		requireUnmarshalEqual(t, &template, response.Body, &value)
+		requireUnmarshalEqual(t, &template, response.Body, &testMachineRequest{})
 
 		id := api.TemplateID{Provisioner: "testcloud", Name: "prodtemplate"}
 
 		// It should appear in a list request
-		requireTemplates(t, r, TemplateList{id})
+		requireTemplates(t, r, id)
 
 		// Update the template
-		updated := spi.BaseMachineRequest{MachineName: "testnew", Provisioner: "testcloud"}
+		updated := testMachineRequest{
+			BaseMachineRequest: spi.BaseMachineRequest{MachineName: "testnew", Provisioner: "testcloud"},
+			Quantum:            true,
+		}
 		response = r.Put("/templates/testcloud/prodtemplate", JSON, requireMarshalSuccess(t, updated))
 		require.Equal(t, 200, response.StatusCode)
 
 		// It should be updated
 		response = r.Get("/templates/testcloud/prodtemplate/json")
 		require.Equal(t, 200, response.StatusCode)
-		value = spi.BaseMachineRequest{}
-		requireUnmarshalEqual(t, &updated, response.Body, &value)
+		requireUnmarshalEqual(t, &updated, response.Body, &testMachineRequest{})
 
 		// It should still appear in a list request
-		requireTemplates(t, r, TemplateList{id})
+		requireTemplates(t, r, id)
 
 		// Delete the template
 		require.Equal(t, 200, r.Delete("/templates/testcloud/prodtemplate", JSON, "").StatusCode)
 
 		// It should no longer exist
 		require.Equal(t, 404, r.Get("/templates/testcloud/prodtemplate/json").StatusCode)
-		requireTemplates(t, r, TemplateList{})
+		requireTemplates(t, r)
 	})
 }
 
@@ -74,7 +79,10 @@ func TestTemplatesErrorResponses(t *testing.T) {
 	_, handler := prepareTest(t, ctrl)
 
 	testflight.WithServer(handler, func(r *testflight.Requester) {
-		template := spi.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"}
+		template := testMachineRequest{
+			BaseMachineRequest: spi.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"},
+			Quantum:            true,
+		}
 
 		// Non-existent provisioner and/or template.
 		require.Equal(t, 400, r.Get("/templates/meta/absentprovisioner/json").StatusCode)

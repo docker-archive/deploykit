@@ -29,11 +29,11 @@ type Credentials interface {
 
 type credentials struct {
 	store        storage.KvStore
-	provisioners *MachineProvisioners
+	provisioners MachineProvisioners
 }
 
 // NewCredentials creates an instance of the manager given the backing store.
-func NewCredentials(store storage.KvStore, provisioners *MachineProvisioners) Credentials {
+func NewCredentials(store storage.KvStore, provisioners MachineProvisioners) Credentials {
 	return &credentials{store: store, provisioners: provisioners}
 }
 
