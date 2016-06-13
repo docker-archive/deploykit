@@ -26,7 +26,7 @@ func TestCreateInstanceSync(t *testing.T) {
 	defer ctrl.Finish()
 	clientMock := mock.NewMockEC2API(ctrl)
 
-	request := new(CreateInstanceRequest)
+	request := new(createInstanceRequest)
 	require.Nil(t, json.Unmarshal([]byte(testCreateSync[0]), request))
 
 	reservation := ec2.Reservation{
@@ -124,7 +124,7 @@ func TestCreateInstanceSuccess(t *testing.T) {
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
 	provisioner := provisioner{client: clientMock, sleepFunction: noSleep, config: defaultConfig()}
-	request := &CreateInstanceRequest{
+	request := &createInstanceRequest{
 		BaseMachineRequest: spi.BaseMachineRequest{MachineName: "test-instance"},
 		Tags:               map[string]string{"test": "test2"},
 	}
@@ -147,7 +147,7 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := provisioner{client: clientMock, sleepFunction: noSleep, config: defaultConfig()}
-	eventChan, err := provisioner.CreateInstance(&CreateInstanceRequest{})
+	eventChan, err := provisioner.CreateInstance(&createInstanceRequest{})
 
 	require.Nil(t, err)
 	expectedEvents := []spi.CreateInstanceEvent{
@@ -238,7 +238,7 @@ vpc_id: my-vpc-id
 monitoring: true`
 
 func TestYamlSpec(t *testing.T) {
-	expected := CreateInstanceRequest{
+	expected := createInstanceRequest{
 		BaseMachineRequest:       spi.BaseMachineRequest{MachineName: "database"},
 		AvailabilityZone:         "us-west-2a",
 		ImageID:                  "ami-5",
@@ -261,7 +261,7 @@ func TestYamlSpec(t *testing.T) {
 		VpcID:      "my-vpc-id",
 		Monitoring: true,
 	}
-	actual := CreateInstanceRequest{}
+	actual := createInstanceRequest{}
 	err := yaml.Unmarshal([]byte(yamlDoc), &actual)
 	require.Nil(t, err)
 	require.Equal(t, expected, actual)

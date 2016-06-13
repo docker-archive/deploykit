@@ -30,6 +30,25 @@ func requireSuccessfulRun(t *testing.T, hostName string, tasks []spi.Task) {
 	checkTasksAreRun(t, events, tasks)
 }
 
+func checkTasksAreRun(t *testing.T, events <-chan interface{}, tasks []spi.Task) {
+	seen := []interface{}{}
+	// extract the name of the events
+	executed := []string{}
+	for event := range events {
+		seen = append(seen, event)
+		if evt, ok := event.(api.Event); ok {
+			executed = append(executed, evt.Name)
+		}
+	}
+
+	require.Equal(t, len(tasks), len(seen))
+	taskNames := []string{}
+	for _, task := range tasks {
+		taskNames = append(taskNames, task.Name())
+	}
+	require.Equal(t, taskNames, executed)
+}
+
 func TestSSHKeyGenAndRemove(t *testing.T) {
 	sshKeys := NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/"))
 

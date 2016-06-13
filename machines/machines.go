@@ -16,30 +16,11 @@ import (
 // that satisfies the MachineRequest interface.
 type MachineRequestBuilder func() spi.MachineRequest
 
-// Machines manages the lifecycle of a machine / node.
-type Machines interface {
-	// List returns summaries of all machines.
-	List() ([]api.MachineSummary, *api.Error)
-
-	// ListIds returns the identifiers for all machines.
-	ListIds() ([]api.MachineID, *api.Error)
-
-	// Get returns a machine identified by key
-	Get(id api.MachineID) (api.MachineRecord, *api.Error)
-
-	// CreateMachine adds a new machine from the input reader.
-	CreateMachine(
-		provisioner spi.Provisioner,
-		template spi.MachineRequest,
-		input io.Reader,
-		codec api.Codec) (<-chan interface{}, *api.Error)
-
-	// DeleteMachine delete a machine.  The record contains workflow tasks for tear down of the machine.
-	DeleteMachine(provisioner spi.Provisioner, record api.MachineRecord) (<-chan interface{}, *api.Error)
-}
-
 type machines struct {
-	store storage.KvStore
+	store        storage.KvStore
+	provisioners MachineProvisioners
+	templates    api.Templates
+	credentials  api.Credentials
 }
 
 const (
@@ -50,8 +31,18 @@ const (
 var recordsRootKey = storage.Key{Path: []string{recordsRoot}}
 
 // NewMachines creates an instance of the manager given the backing store.
-func NewMachines(store storage.KvStore) Machines {
-	return &machines{store: store}
+func NewMachines(
+	store storage.KvStore,
+	provisioners MachineProvisioners,
+	templates api.Templates,
+	credentials api.Credentials) api.Machines {
+
+	return &machines{
+		store:        store,
+		provisioners: provisioners,
+		templates:    templates,
+		credentials:  credentials,
+	}
 }
 
 func machineIDFromRecordKey(key storage.Key) api.MachineID {
@@ -118,7 +109,7 @@ func (cm *machines) exists(id api.MachineID) bool {
 }
 
 func (cm *machines) populateRequest(
-	provisioner spi.Provisioner,
+	emptyRequest spi.MachineRequest,
 	template spi.MachineRequest,
 	input io.Reader,
 	codec api.Codec) (spi.MachineRequest, error) {
@@ -128,21 +119,19 @@ func (cm *machines) populateRequest(
 	// 2. an externally-defined template which may be incomplete
 	// 3. extra parameters that should supplement (and possibly override) fields in (1) or (2)
 
-	request := provisioner.NewRequestInstance()
-
 	if template != nil {
-		request = template
+		emptyRequest = template
 	}
 
 	buff, err := ioutil.ReadAll(input)
 	if err == nil && len(buff) > 0 {
-		err = codec.Unmarshal(buff, request)
+		err = codec.Unmarshal(buff, emptyRequest)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return request, nil
+	return emptyRequest, nil
 }
 
 func machineRecordKey(machineKey storage.Key) storage.Key {
@@ -183,12 +172,34 @@ func (cm machines) saveMachineData(record api.MachineRecord, details spi.Machine
 
 // CreateMachine creates a new machine from the input reader.
 func (cm *machines) CreateMachine(
-	provisioner spi.Provisioner,
-	template spi.MachineRequest,
+	provisionerName string,
+	credentialsName string,
+	controls spi.ProvisionControls,
+	templateName string,
 	input io.Reader,
 	codec api.Codec) (<-chan interface{}, *api.Error) {
 
-	request, err := cm.populateRequest(provisioner, template, input, codec)
+	cred, apiErr := cm.credentials.Get(api.CredentialsID{Provisioner: provisionerName, Name: credentialsName})
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	template, apiErr := cm.templates.Get(api.TemplateID{Provisioner: provisionerName, Name: templateName})
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	builder, has := cm.provisioners.GetBuilder(provisionerName)
+	if !has {
+		return nil, &api.Error{api.ErrBadInput, fmt.Sprintf("Unknown provisioner: %s", provisionerName)}
+	}
+
+	provisioner, err := builder.Build(controls, cred)
+	if err != nil {
+		return nil, &api.Error{api.ErrBadInput, err.Error()}
+	}
+
+	request, err := cm.populateRequest(builder.DefaultMachineRequest(), template, input, codec)
 	if err != nil {
 		return nil, api.UnknownError(err)
 	}
@@ -207,14 +218,14 @@ func (cm *machines) CreateMachine(
 		MachineSummary: api.MachineSummary{
 			Status:      "initiated",
 			MachineName: machineID,
-			Provisioner: provisioner.Name(),
+			Provisioner: provisionerName,
 			Created:     api.Timestamp(time.Now().Unix()),
 		},
 	}
 	record.AppendEvent("init", "Create started", request)
 	record.AppendChange(request)
 
-	apiErr := cm.saveMachineData(record, request)
+	apiErr = cm.saveMachineData(record, request)
 	if apiErr != nil {
 		return nil, apiErr
 	}
@@ -279,8 +290,33 @@ func filterTasks(tasks []spi.Task, selectNames []string) ([]spi.Task, error) {
 // DeleteMachine deletes an existing machine.  Completion of this marks the record as 'terminated'.
 // TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
 func (cm *machines) DeleteMachine(
-	provisioner spi.Provisioner,
-	record api.MachineRecord) (<-chan interface{}, *api.Error) {
+	credentialsName string,
+	controls spi.ProvisionControls,
+	machine api.MachineID) (<-chan interface{}, *api.Error) {
+
+	// Load the record of the machine by name
+	record, apiErr := cm.Get(machine)
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	builder, has := cm.provisioners.GetBuilder(record.Provisioner)
+	if !has {
+		return nil, &api.Error{
+			api.ErrUnknown,
+			fmt.Sprintf(
+				"Machine record referenced a provisioner that does not exist: %s", record.Provisioner)}
+	}
+
+	cred, apiErr := cm.credentials.Get(api.CredentialsID{Provisioner: record.Provisioner, Name: credentialsName})
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	provisioner, err := builder.Build(controls, cred)
+	if err != nil {
+		return nil, &api.Error{api.ErrBadInput, err.Error()}
+	}
 
 	lastChange := record.GetLastChange()
 	if lastChange == nil {
@@ -355,7 +391,7 @@ func runTasks(
 				}
 				taskEvents <- event
 				close(taskEvents) // unblocks the listener
-				log.Infoln("FINISH", task.Name)
+				log.Infoln("FINISH", task.Name())
 
 			}(task) // Goroutine with a copy of the task to avoid data races.
 
