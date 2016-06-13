@@ -12,7 +12,7 @@ import (
 )
 
 func requireMachines(t *testing.T, r *testflight.Requester, expected ...api.MachineID) {
-	response := r.Get("/machines/json?long=true")
+	response := r.Get("/machines/?long=true")
 	require.Equal(t, 200, response.StatusCode, response.Body)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
 	if expected == nil {
@@ -31,7 +31,7 @@ func requireMachines(t *testing.T, r *testflight.Requester, expected ...api.Mach
 	require.Equal(t, expected, actualIds)
 
 	// Also validate the short form
-	response = r.Get("/machines/json")
+	response = r.Get("/machines/")
 	require.Equal(t, 200, response.StatusCode, response.Body)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
 
@@ -39,7 +39,7 @@ func requireMachines(t *testing.T, r *testflight.Requester, expected ...api.Mach
 }
 
 func fetchRecord(t *testing.T, r *testflight.Requester, machineName string) api.MachineRecord {
-	response := r.Get(fmt.Sprintf("/machines/%s/json", machineName))
+	response := r.Get(fmt.Sprintf("/machines/%s", machineName))
 	require.Equal(t, 200, response.StatusCode, response.Body)
 	record := api.MachineRecord{}
 	err := json.Unmarshal([]byte(response.Body), &record)
@@ -65,19 +65,19 @@ func TestMachineLifecycle(t *testing.T) {
 			},
 			TurboButtons: 5,
 		}
-		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, requireMarshalSuccess(t, template))
+		response := r.Post("/templates/testcloud/prodtemplate", JSON, requireMarshalSuccess(t, template))
 		require.Equal(t, 200, response.StatusCode)
 
 		// Add credentials for the provisioner
 		response = r.Post(
-			"/credentials/testcloud/production/create",
+			"/credentials/testcloud/production",
 			JSON,
 			requireMarshalSuccess(t, testCredentials{Identity: "larry", Secret: "12345"}))
 		require.Equal(t, 200, response.StatusCode)
 
 		// Also register default credentials for the provisioner
 		response = r.Post(
-			"/credentials/testcloud/default/create",
+			"/credentials/testcloud/default",
 			JSON,
 			requireMarshalSuccess(t, testCredentials{Identity: "root", Secret: "password"}))
 		require.Equal(t, 200, response.StatusCode)
@@ -115,7 +115,7 @@ func TestMachineLifecycle(t *testing.T) {
 		}
 
 		response = r.Post(
-			"/machines/frontend/create"+
+			"/machines/frontend"+
 				"?provisioner=testcloud&credentials=production&template=prodtemplate&block=true",
 			JSON,
 			requireMarshalSuccess(t, overlay))

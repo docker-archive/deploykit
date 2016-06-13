@@ -196,8 +196,8 @@ func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
 }
 
 func (h *machineHandler) attachTo(router *mux.Router) {
-	router.HandleFunc("/json", outputHandler(h.getAll)).Methods("GET")
-	router.HandleFunc("/{key}/create", outputHandler(h.create)).Methods("POST")
-	router.HandleFunc("/{key}/json", outputHandler(h.getOne)).Methods("GET")
+	router.HandleFunc("/", outputHandler(h.getAll)).Methods("GET")
+	router.HandleFunc("/{key}", outputHandler(h.create)).Methods("POST")
+	router.HandleFunc("/{key}", outputHandler(h.getOne)).Methods("GET")
 	router.HandleFunc("/{key}", outputHandler(h.delete)).Methods("DELETE")
 }

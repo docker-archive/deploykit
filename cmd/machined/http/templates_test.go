@@ -10,7 +10,7 @@ import (
 )
 
 func requireTemplates(t *testing.T, r *testflight.Requester, expected ...api.TemplateID) {
-	response := r.Get("/templates/json")
+	response := r.Get("/templates")
 	require.Equal(t, 200, response.StatusCode)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
 	if expected == nil {
@@ -34,11 +34,11 @@ func TestTemplateCrud(t *testing.T) {
 			BaseMachineRequest: spi.BaseMachineRequest{MachineName: "test", Provisioner: "testcloud"},
 			Quantum:            true,
 		}
-		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, requireMarshalSuccess(t, template))
+		response := r.Post("/templates/testcloud/prodtemplate", JSON, requireMarshalSuccess(t, template))
 		require.Equal(t, 200, response.StatusCode)
 
 		// It should return by id
-		response = r.Get("/templates/testcloud/prodtemplate/json")
+		response = r.Get("/templates/testcloud/prodtemplate")
 		require.Equal(t, 200, response.StatusCode)
 		requireUnmarshalEqual(t, &template, response.Body, &testMachineRequest{})
 
@@ -56,7 +56,7 @@ func TestTemplateCrud(t *testing.T) {
 		require.Equal(t, 200, response.StatusCode)
 
 		// It should be updated
-		response = r.Get("/templates/testcloud/prodtemplate/json")
+		response = r.Get("/templates/testcloud/prodtemplate")
 		require.Equal(t, 200, response.StatusCode)
 		requireUnmarshalEqual(t, &updated, response.Body, &testMachineRequest{})
 
@@ -67,7 +67,7 @@ func TestTemplateCrud(t *testing.T) {
 		require.Equal(t, 200, r.Delete("/templates/testcloud/prodtemplate", JSON, "").StatusCode)
 
 		// It should no longer exist
-		require.Equal(t, 404, r.Get("/templates/testcloud/prodtemplate/json").StatusCode)
+		require.Equal(t, 404, r.Get("/templates/testcloud/prodtemplate").StatusCode)
 		requireTemplates(t, r)
 	})
 }
@@ -85,22 +85,22 @@ func TestTemplatesErrorResponses(t *testing.T) {
 		}
 
 		// Non-existent provisioner and/or template.
-		require.Equal(t, 400, r.Get("/templates/meta/absentprovisioner/json").StatusCode)
+		require.Equal(t, 400, r.Get("/templates/meta/absentprovisioner").StatusCode)
 		require.Equal(t, 400, r.Post(
-			"/templates/absentprovisioner/name/create",
+			"/templates/absentprovisioner/name",
 			JSON,
 			requireMarshalSuccess(t, template)).StatusCode)
 		require.Equal(t, 404, r.Put(
 			"/templates/absentprovisioner/name",
 			JSON,
 			requireMarshalSuccess(t, template)).StatusCode)
-		require.Equal(t, 404, r.Get("/templates/absentprovisioner/name").StatusCode)
+		require.Equal(t, 400, r.Get("/templates/absentprovisioner/name").StatusCode)
 		require.Equal(t, 404, r.Delete("/templates/absentprovisioner/name", JSON, "").StatusCode)
 
 		// Duplicate template.
-		response := r.Post("/templates/testcloud/prodtemplate/create", JSON, requireMarshalSuccess(t, template))
+		response := r.Post("/templates/testcloud/prodtemplate", JSON, requireMarshalSuccess(t, template))
 		require.Equal(t, 200, response.StatusCode)
-		response = r.Post("/templates/testcloud/prodtemplate/create", JSON, requireMarshalSuccess(t, template))
+		response = r.Post("/templates/testcloud/prodtemplate", JSON, requireMarshalSuccess(t, template))
 		require.Equal(t, 409, response.StatusCode)
 	})
 }

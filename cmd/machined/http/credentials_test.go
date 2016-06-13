@@ -9,7 +9,7 @@ import (
 )
 
 func requireCredentials(t *testing.T, r *testflight.Requester, expected ...api.CredentialsID) {
-	response := r.Get("/credentials/json")
+	response := r.Get("/credentials/")
 	require.Equal(t, 200, response.StatusCode)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
 	if expected == nil {
@@ -31,13 +31,13 @@ func TestCredentialsCrud(t *testing.T) {
 		// Create an entry
 		credentials := testCredentials{Identity: "larry", Secret: "12345"}
 		response := r.Post(
-			"/credentials/testcloud/production/create",
+			"/credentials/testcloud/production",
 			JSON,
 			requireMarshalSuccess(t, credentials))
 		require.Equal(t, 200, response.StatusCode)
 
 		// It should return by id
-		response = r.Get("/credentials/testcloud/production/json")
+		response = r.Get("/credentials/testcloud/production")
 		require.Equal(t, 200, response.StatusCode)
 		requireUnmarshalEqual(t, &credentials, response.Body, &testCredentials{})
 
@@ -52,7 +52,7 @@ func TestCredentialsCrud(t *testing.T) {
 		require.Equal(t, 200, response.StatusCode)
 
 		// It should be updated
-		response = r.Get("/credentials/testcloud/production/json")
+		response = r.Get("/credentials/testcloud/production")
 		require.Equal(t, 200, response.StatusCode)
 		requireUnmarshalEqual(t, &updated, response.Body, &testCredentials{})
 
@@ -63,7 +63,7 @@ func TestCredentialsCrud(t *testing.T) {
 		require.Equal(t, 200, r.Delete("/credentials/testcloud/production", JSON, "").StatusCode)
 
 		// It should no longer exist
-		require.Equal(t, 404, r.Get("/credentials/testcloud/production/json").StatusCode)
+		require.Equal(t, 404, r.Get("/credentials/testcloud/production").StatusCode)
 		requireCredentials(t, r)
 	})
 }
@@ -79,7 +79,7 @@ func TestCredentialsErrorResponses(t *testing.T) {
 
 		// Non-existent provisioner and/or credentials.
 		require.Equal(t, 400, r.Post(
-			"/credentials/absentprovisioner/name/create",
+			"/credentials/absentprovisioner/name",
 			JSON,
 			requireMarshalSuccess(t, credentials)).StatusCode)
 		require.Equal(t, 404, r.Put(
@@ -91,12 +91,12 @@ func TestCredentialsErrorResponses(t *testing.T) {
 
 		// Duplicate credentials.
 		response := r.Post(
-			"/credentials/testcloud/production/create",
+			"/credentials/testcloud/production",
 			JSON,
 			requireMarshalSuccess(t, credentials))
 		require.Equal(t, 200, response.StatusCode)
 		response = r.Post(
-			"/credentials/testcloud/production/create",
+			"/credentials/testcloud/production",
 			JSON,
 			requireMarshalSuccess(t, credentials))
 		require.Equal(t, 409, response.StatusCode)
