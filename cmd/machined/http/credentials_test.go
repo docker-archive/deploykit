@@ -8,13 +8,14 @@ import (
 	"testing"
 )
 
-type CredentialsList []api.CredentialsID
-
-func requireCredentials(t *testing.T, r *testflight.Requester, expected CredentialsList) {
+func requireCredentials(t *testing.T, r *testflight.Requester, expected ...api.CredentialsID) {
 	response := r.Get("/credentials/json")
 	require.Equal(t, 200, response.StatusCode)
 	require.Equal(t, JSON, response.Header.Get("Content-Type"))
-	requireUnmarshalEqual(t, &expected, response.Body, &CredentialsList{})
+	if expected == nil {
+		expected = []api.CredentialsID{}
+	}
+	requireUnmarshalEqual(t, &expected, response.Body, &[]api.CredentialsID{})
 }
 
 func TestCredentialsCrud(t *testing.T) {
@@ -25,7 +26,7 @@ func TestCredentialsCrud(t *testing.T) {
 
 	testflight.WithServer(handler, func(r *testflight.Requester) {
 		// There should initially be no credentials
-		requireCredentials(t, r, CredentialsList{})
+		requireCredentials(t, r)
 
 		// Create an entry
 		credentials := testCredentials{Identity: "larry", Secret: "12345"}
@@ -43,7 +44,7 @@ func TestCredentialsCrud(t *testing.T) {
 		id := api.CredentialsID{Provisioner: "testcloud", Name: "production"}
 
 		// It should appear in a list request
-		requireCredentials(t, r, CredentialsList{id})
+		requireCredentials(t, r, id)
 
 		// Update the entry
 		updated := testCredentials{Identity: "larry", Secret: "password"}
@@ -56,14 +57,14 @@ func TestCredentialsCrud(t *testing.T) {
 		requireUnmarshalEqual(t, &updated, response.Body, &testCredentials{})
 
 		// It should still appear in a list request
-		requireCredentials(t, r, CredentialsList{id})
+		requireCredentials(t, r, id)
 
 		// Delete the entry
 		require.Equal(t, 200, r.Delete("/credentials/testcloud/production", JSON, "").StatusCode)
 
 		// It should no longer exist
 		require.Equal(t, 404, r.Get("/credentials/testcloud/production/json").StatusCode)
-		requireCredentials(t, r, CredentialsList{})
+		requireCredentials(t, r)
 	})
 }
 
