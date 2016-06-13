@@ -322,8 +322,13 @@ func runTasks(
 	tasks []spi.Task,
 	record api.MachineRecord,
 	request spi.MachineRequest,
-	save func(api.MachineRecord, spi.MachineRequest) error,
+	rawSave func(api.MachineRecord, spi.MachineRequest) error,
 	onComplete func(*api.MachineRecord, spi.MachineRequest)) (<-chan interface{}, *api.Error) {
+
+	save := func(record api.MachineRecord, machineState spi.MachineRequest) error {
+		record.LastModified = api.Timestamp(time.Now().Unix())
+		return rawSave(record, machineState)
+	}
 
 	events := make(chan interface{})
 	go func() {
@@ -334,7 +339,6 @@ func runTasks(
 			// TODO(wfarner): The 'pending' status is used for both creating and destroying.  These should
 			// be different states.
 			record.Status = "pending"
-			record.LastModified = api.Timestamp(time.Now().Unix())
 			save(record, nil)
 
 			go func(task spi.Task) {
@@ -401,7 +405,6 @@ func runTasks(
 				}
 
 				record.AppendEventObject(event)
-				record.LastModified = api.Timestamp(time.Now().Unix())
 				save(record, machineState)
 
 				events <- event
@@ -409,7 +412,6 @@ func runTasks(
 				if stop {
 					log.Warningln("Stopping due to error")
 					record.Status = "failed"
-					record.LastModified = api.Timestamp(time.Now().Unix())
 					save(record, machineState)
 					return
 				}
@@ -417,7 +419,6 @@ func runTasks(
 		}
 
 		onComplete(&record, request)
-		record.LastModified = api.Timestamp(time.Now().Unix())
 		save(record, nil)
 		return
 	}()
