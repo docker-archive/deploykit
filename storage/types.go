@@ -1,10 +1,20 @@
 package storage
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // Key is the unique identifier for stored values.
 type Key struct {
 	Path []string
+}
+
+// RequirePathLength panics if the path length does not match the expected value.
+func (k Key) RequirePathLength(requiredPathLength uint) {
+	if len(k.Path) != int(requiredPathLength) {
+		panic(fmt.Sprintf("Key %v must have exactly %d parts", k, requiredPathLength))
+	}
 }
 
 // RootKey is an unscoped key, useful for listing the root level of a store.

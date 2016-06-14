@@ -1,11 +1,11 @@
 package aws
 
 import (
-	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 )
 
 func init() {
-	api.DefaultProvisioners.Register(api.ProvisionerBuilder{
+	machines.DefaultProvisioners.Register(machines.ProvisionerBuilder{
 		Name:                  ProvisionerName,
 		DefaultCredential:     NewCredential,
 		DefaultMachineRequest: NewMachineRequest,

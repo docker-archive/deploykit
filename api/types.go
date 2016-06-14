@@ -1,20 +1,12 @@
 package api
 
 import (
-	"fmt"
 	"github.com/docker/libmachete/provisioners/spi"
-	"github.com/docker/libmachete/storage"
 	"time"
 )
 
 // MachineID is the globally-unique identifier for machines.
 type MachineID string
-
-func requirePathLength(key storage.Key, requiredPathLength uint) {
-	if len(key.Path) != int(requiredPathLength) {
-		panic(fmt.Sprintf("Key %v must have exactly %d parts", key, requiredPathLength))
-	}
-}
 
 // Timestamp is a unix epoch timestamp, in seconds.
 type Timestamp uint64
@@ -119,3 +111,6 @@ type TemplateID struct {
 	Provisioner string `json:"provisioner"`
 	Name        string `json:"name"`
 }
+
+// SSHKeyID is a unique id for an SSH key
+type SSHKeyID string
