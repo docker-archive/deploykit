@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/aws/mock"
 	"github.com/docker/libmachete/storage"
 	"github.com/docker/libmachete/storage/filestore"
@@ -22,7 +23,7 @@ func newTestClientAndProvisioner(ctrl *gomock.Controller) (*mock.MockEC2API, pro
 		client:        client,
 		sleepFunction: func(_ time.Duration) {},
 		config:        defaultConfig(),
-		sshKeys:       api.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/")),
+		sshKeys:       machines.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/")),
 	}
 	return client, provisioner
 }
@@ -74,7 +75,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	defer ctrl.Finish()
 
 	host := "new-host"
-	keys := api.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/"))
+	keys := machines.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/"))
 
 	client, provisioner := newTestClientAndProvisioner(ctrl)
 
@@ -109,7 +110,7 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 
 	host := "new-host"
 	store := filestore.NewFileStore(afero.NewMemMapFs(), "/")
-	machines := api.NewMachines(storage.NestedStore(store, "machines"))
+	machines := machines.NewMachines(storage.NestedStore(store, "machines"))
 
 	client, provisioner := newTestClientAndProvisioner(ctrl)
 
