@@ -69,7 +69,8 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	}()
 
 	// runs synchronously
-	err := getTaskByName(t, provisioner.GetProvisionTasks(), api.SSHKeyGenerateName).Run(record, request, events)
+	err := getTaskByName(t, provisioner.GetProvisionTasks(), machines.SSHKeyGenerateName).
+		Run(record, request, events)
 
 	close(events)
 
@@ -102,7 +103,8 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	record := &api.MachineRecord{}
 	record.MachineName = api.MachineID(host)
 
-	err := getTaskByName(t, provisioner.GetTeardownTasks(), api.SSHKeyRemoveName).Run(record, request, events)
+	err := getTaskByName(t, provisioner.GetTeardownTasks(), machines.SSHKeyRemoveName).
+		Run(record, request, events)
 	// TODO(wfarner): This was previously require.NoError(), which does not seem to make sense since the SSH key
 	// being deleted did not exist, which should be an error.  Consider adding a step to the beginning of the test
 	// that first creates the SSH key.

@@ -3,7 +3,6 @@ package aws
 import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete/api"
-	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/spi"
 )
 
