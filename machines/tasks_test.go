@@ -1,6 +1,7 @@
-package api
+package machines
 
 import (
+	"github.com/docker/libmachete/api"
 	mock_storage "github.com/docker/libmachete/mock/storage"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
@@ -16,12 +17,12 @@ import (
 func requireSuccessfulRun(t *testing.T, hostName string, tasks []spi.Task) {
 	events, err := runTasks(
 		tasks,
-		MachineRecord{MachineSummary: MachineSummary{MachineName: MachineID(hostName)}},
+		api.MachineRecord{MachineSummary: api.MachineSummary{MachineName: api.MachineID(hostName)}},
 		new(spi.BaseMachineRequest),
-		func(r MachineRecord, q spi.MachineRequest) error {
+		func(r api.MachineRecord, q spi.MachineRequest) error {
 			return nil
 		},
-		func(r *MachineRecord, s spi.MachineRequest) {
+		func(r *api.MachineRecord, s spi.MachineRequest) {
 			return
 		})
 	require.NoError(t, err)
@@ -40,14 +41,14 @@ func TestSSHKeyGenAndRemove(t *testing.T) {
 	requireSuccessfulRun(t, host, []spi.Task{SSHKeyGen{sshKeys}})
 
 	// Key should have been created.
-	data, err := sshKeys.GetEncodedPublicKey(SSHKeyID(host))
+	data, err := sshKeys.GetEncodedPublicKey(api.SSHKeyID(host))
 	require.NoError(t, err)
 	require.NotEmpty(t, data)
 
 	requireSuccessfulRun(t, host, []spi.Task{SSHKeyRemove{sshKeys}})
 
 	// Key should have been removed.
-	_, err = sshKeys.GetEncodedPublicKey(SSHKeyID(host))
+	_, err = sshKeys.GetEncodedPublicKey(api.SSHKeyID(host))
 	require.Error(t, err)
 }
 
@@ -72,10 +73,10 @@ func TestSortedKeys(t *testing.T) {
 
 	ids, err := keys.ListIds()
 	require.NoError(t, err)
-	require.Equal(t, []SSHKeyID{
-		SSHKeyID("k1"),
-		SSHKeyID("k2"),
-		SSHKeyID("k3"),
-		SSHKeyID("k4")},
+	require.Equal(t, []api.SSHKeyID{
+		api.SSHKeyID("k1"),
+		api.SSHKeyID("k2"),
+		api.SSHKeyID("k3"),
+		api.SSHKeyID("k4")},
 		ids)
 }

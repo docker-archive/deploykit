@@ -1,6 +1,7 @@
-package api
+package machines
 
 import (
+	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/provisioners/spi"
 )
 
@@ -68,7 +69,7 @@ func (d DestroyInstance) Run(resource spi.Resource, _ spi.MachineRequest, events
 
 // SSHKeyGen generates and locally stores an SSH key.
 type SSHKeyGen struct {
-	Keys SSHKeys
+	Keys api.SSHKeys
 }
 
 // Name returns the task name.
@@ -80,14 +81,14 @@ func (s SSHKeyGen) Name() string {
 func (s SSHKeyGen) Run(resource spi.Resource, _ spi.MachineRequest, _ chan<- interface{}) error {
 	key := resource.Name()
 	if key == "" {
-		return NewError(ErrBadInput, "Invalid resource name")
+		return api.NewError(api.ErrBadInput, "Invalid resource name")
 	}
-	return s.Keys.NewKeyPair(SSHKeyID(key))
+	return s.Keys.NewKeyPair(api.SSHKeyID(key))
 }
 
 // SSHKeyRemove destroys a locally-saved SSH key.
 type SSHKeyRemove struct {
-	Keys SSHKeys
+	Keys api.SSHKeys
 }
 
 // Name returns the task name.
@@ -99,7 +100,7 @@ func (s SSHKeyRemove) Name() string {
 func (s SSHKeyRemove) Run(resource spi.Resource, _ spi.MachineRequest, _ chan<- interface{}) error {
 	key := resource.Name()
 	if key == "" {
-		return NewError(ErrBadInput, "Invalid resource name")
+		return api.NewError(api.ErrBadInput, "Invalid resource name")
 	}
-	return s.Keys.Remove(SSHKeyID(key))
+	return s.Keys.Remove(api.SSHKeyID(key))
 }

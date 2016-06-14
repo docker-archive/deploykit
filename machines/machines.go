@@ -1,9 +1,10 @@
-package api
+package machines
 
 import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage"
 	"io"
@@ -18,23 +19,23 @@ type MachineRequestBuilder func() spi.MachineRequest
 // Machines manages the lifecycle of a machine / node.
 type Machines interface {
 	// List returns summaries of all machines.
-	List() ([]MachineSummary, *Error)
+	List() ([]api.MachineSummary, *api.Error)
 
 	// ListIds returns the identifiers for all machines.
-	ListIds() ([]MachineID, *Error)
+	ListIds() ([]api.MachineID, *api.Error)
 
 	// Get returns a machine identified by key
-	Get(id MachineID) (MachineRecord, *Error)
+	Get(id api.MachineID) (api.MachineRecord, *api.Error)
 
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(
 		provisioner spi.Provisioner,
 		template spi.MachineRequest,
 		input io.Reader,
-		codec *Codec) (<-chan interface{}, *Error)
+		codec api.Codec) (<-chan interface{}, *api.Error)
 
 	// DeleteMachine delete a machine.  The record contains workflow tasks for tear down of the machine.
-	DeleteMachine(provisioner spi.Provisioner, record MachineRecord) (<-chan interface{}, *Error)
+	DeleteMachine(provisioner spi.Provisioner, record api.MachineRecord) (<-chan interface{}, *api.Error)
 }
 
 type machines struct {
@@ -53,27 +54,27 @@ func NewMachines(store storage.KvStore) Machines {
 	return &machines{store: store}
 }
 
-func machineIDFromRecordKey(key storage.Key) MachineID {
+func machineIDFromRecordKey(key storage.Key) api.MachineID {
 	// Strip the record root path component.
-	requirePathLength(key, 2)
-	return MachineID(key.Path[1])
+	key.RequirePathLength(2)
+	return api.MachineID(key.Path[1])
 }
 
-func keyFromMachineID(id MachineID) storage.Key {
+func keyFromMachineID(id api.MachineID) storage.Key {
 	return storage.Key{Path: []string{string(id)}}
 }
 
-func (cm *machines) List() ([]MachineSummary, *Error) {
+func (cm *machines) List() ([]api.MachineSummary, *api.Error) {
 	keys, err := cm.store.ListRecursive(recordsRootKey)
 	if err != nil {
-		return nil, UnknownError(err)
+		return nil, api.UnknownError(err)
 	}
 
-	summaries := []MachineSummary{}
+	summaries := []api.MachineSummary{}
 	for _, key := range keys {
 		record, err := cm.Get(machineIDFromRecordKey(key))
 		if err != nil {
-			return nil, UnknownError(err)
+			return nil, api.UnknownError(err)
 		}
 		summaries = append(summaries, record.MachineSummary)
 	}
@@ -81,37 +82,37 @@ func (cm *machines) List() ([]MachineSummary, *Error) {
 	return summaries, nil
 }
 
-func (cm *machines) ListIds() ([]MachineID, *Error) {
+func (cm *machines) ListIds() ([]api.MachineID, *api.Error) {
 	keys, err := cm.store.ListRecursive(recordsRootKey)
 	if err != nil {
-		return nil, UnknownError(err)
+		return nil, api.UnknownError(err)
 	}
 
 	storage.SortKeys(keys)
 
-	ids := []MachineID{}
+	ids := []api.MachineID{}
 	for _, key := range keys {
 		ids = append(ids, machineIDFromRecordKey(key))
 	}
 	return ids, nil
 }
 
-func (cm *machines) Get(id MachineID) (MachineRecord, *Error) {
+func (cm *machines) Get(id api.MachineID) (api.MachineRecord, *api.Error) {
 	data, err := cm.store.Get(machineRecordKey(keyFromMachineID(id)))
 	if err != nil {
-		return MachineRecord{}, UnknownError(err)
+		return api.MachineRecord{}, api.UnknownError(err)
 	}
 
-	record := MachineRecord{}
+	record := api.MachineRecord{}
 	err = json.Unmarshal(data, &record)
 	if err != nil {
-		return record, UnknownError(err)
+		return record, api.UnknownError(err)
 	}
 
 	return record, nil
 }
 
-func (cm *machines) exists(id MachineID) bool {
+func (cm *machines) exists(id api.MachineID) bool {
 	_, err := cm.store.Get(machineRecordKey(keyFromMachineID(id)))
 	return err == nil
 }
@@ -120,7 +121,7 @@ func (cm *machines) populateRequest(
 	provisioner spi.Provisioner,
 	template spi.MachineRequest,
 	input io.Reader,
-	codec *Codec) (spi.MachineRequest, error) {
+	codec api.Codec) (spi.MachineRequest, error) {
 
 	// Three components are used to fully populate a MachineRequest:
 	// 1. a stock request with low-level defaults from the provisioner
@@ -135,7 +136,7 @@ func (cm *machines) populateRequest(
 
 	buff, err := ioutil.ReadAll(input)
 	if err == nil && len(buff) > 0 {
-		err = codec.unmarshal(buff, request)
+		err = codec.Unmarshal(buff, request)
 		if err != nil {
 			return nil, err
 		}
@@ -156,19 +157,19 @@ func machineDetailsKey(machineKey storage.Key) storage.Key {
 	return storage.Key{Path: path}
 }
 
-func (cm machines) marshalAndSave(key storage.Key, value interface{}) *Error {
+func (cm machines) marshalAndSave(key storage.Key, value interface{}) *api.Error {
 	data, err := json.Marshal(value)
 	if err != nil {
-		return UnknownError(err)
+		return api.UnknownError(err)
 	}
 
 	if err := cm.store.Save(key, data); err != nil {
-		return UnknownError(err)
+		return api.UnknownError(err)
 	}
 	return nil
 }
 
-func (cm machines) saveMachineData(record MachineRecord, details spi.MachineRequest) *Error {
+func (cm machines) saveMachineData(record api.MachineRecord, details spi.MachineRequest) *api.Error {
 	key := keyFromMachineID(record.MachineName)
 	if err := cm.marshalAndSave(machineRecordKey(key), record); err != nil {
 		return err
@@ -185,29 +186,29 @@ func (cm *machines) CreateMachine(
 	provisioner spi.Provisioner,
 	template spi.MachineRequest,
 	input io.Reader,
-	codec *Codec) (<-chan interface{}, *Error) {
+	codec api.Codec) (<-chan interface{}, *api.Error) {
 
 	request, err := cm.populateRequest(provisioner, template, input, codec)
 	if err != nil {
-		return nil, UnknownError(err)
+		return nil, api.UnknownError(err)
 	}
 
-	machineID := MachineID(request.Name())
+	machineID := api.MachineID(request.Name())
 	if len(machineID) == 0 {
-		return nil, &Error{Code: ErrBadInput, Message: "Machine name may not be empty"}
+		return nil, &api.Error{Code: api.ErrBadInput, Message: "Machine name may not be empty"}
 	}
 
 	if cm.exists(machineID) {
-		return nil, &Error{Code: ErrDuplicate, Message: fmt.Sprintf("Key exists: %v", machineID)}
+		return nil, &api.Error{Code: api.ErrDuplicate, Message: fmt.Sprintf("Key exists: %v", machineID)}
 	}
 
 	// First save a record
-	record := MachineRecord{
-		MachineSummary: MachineSummary{
+	record := api.MachineRecord{
+		MachineSummary: api.MachineSummary{
 			Status:      "initiated",
 			MachineName: machineID,
 			Provisioner: provisioner.Name(),
-			Created:     Timestamp(time.Now().Unix()),
+			Created:     api.Timestamp(time.Now().Unix()),
 		},
 	}
 	record.AppendEvent("init", "Create started", request)
@@ -220,19 +221,19 @@ func (cm *machines) CreateMachine(
 
 	tasks, err := filterTasks(provisioner.GetProvisionTasks(), request.ProvisionWorkflow())
 	if err != nil {
-		return nil, &Error{Message: err.Error()}
+		return nil, &api.Error{Message: err.Error()}
 	}
 
 	return runTasks(
 		tasks,
 		record,
 		request,
-		func(record MachineRecord, state spi.MachineRequest) error {
+		func(record api.MachineRecord, state spi.MachineRequest) error {
 			return cm.saveMachineData(record, state)
 		},
-		func(record *MachineRecord, state spi.MachineRequest) {
+		func(record *api.MachineRecord, state spi.MachineRequest) {
 			record.Status = "provisioned"
-			record.LastModified = Timestamp(time.Now().Unix())
+			record.LastModified = api.Timestamp(time.Now().Unix())
 			// TODO(wfarner): Should errors here be fatal?  Currently they're silent.
 			if ip, err := provisioner.GetIPAddress(state); err == nil {
 				record.IPAddress = ip
@@ -279,11 +280,11 @@ func filterTasks(tasks []spi.Task, selectNames []string) ([]spi.Task, error) {
 // TODO(chungers) - There needs to be a way for user to clean / garbage collect the records marked 'terminated'.
 func (cm *machines) DeleteMachine(
 	provisioner spi.Provisioner,
-	record MachineRecord) (<-chan interface{}, *Error) {
+	record api.MachineRecord) (<-chan interface{}, *api.Error) {
 
 	lastChange := record.GetLastChange()
 	if lastChange == nil {
-		return nil, &Error{Message: fmt.Sprintf("Impossible state. Machine has no history:%v", record.Name())}
+		return nil, &api.Error{Message: fmt.Sprintf("Impossible state. Machine has no history:%v", record.Name())}
 	}
 
 	// On managing changes (or even removal) of the template and the impact on already-provisioned instances:
@@ -294,24 +295,24 @@ func (cm *machines) DeleteMachine(
 
 	tasks, err := filterTasks(provisioner.GetTeardownTasks(), lastChange.TeardownWorkflow())
 	if err != nil {
-		return nil, &Error{Message: err.Error()}
+		return nil, &api.Error{Message: err.Error()}
 	}
 
 	record.AppendEvent("init-destroy", "Destroy started", lastChange)
 
 	// TODO(wfarner): Nothing is actually deleted, is that intentional?
 	//if err := cm.store.Save(record, nil); err != nil {
-	//	return nil, &Error{Message: err.Error()}
+	//	return nil, &api.Error{Message: err.Error()}
 	//}
 
 	return runTasks(
 		tasks,
 		record,
 		lastChange,
-		func(record MachineRecord, state spi.MachineRequest) error {
+		func(record api.MachineRecord, state spi.MachineRequest) error {
 			return cm.saveMachineData(record, state)
 		},
-		func(record *MachineRecord, state spi.MachineRequest) {
+		func(record *api.MachineRecord, state spi.MachineRequest) {
 			record.Status = "terminated"
 		})
 }
@@ -319,10 +320,15 @@ func (cm *machines) DeleteMachine(
 // runTasks is the main task execution loop
 func runTasks(
 	tasks []spi.Task,
-	record MachineRecord,
+	record api.MachineRecord,
 	request spi.MachineRequest,
-	save func(MachineRecord, spi.MachineRequest) error,
-	onComplete func(*MachineRecord, spi.MachineRequest)) (<-chan interface{}, *Error) {
+	rawSave func(api.MachineRecord, spi.MachineRequest) error,
+	onComplete func(*api.MachineRecord, spi.MachineRequest)) (<-chan interface{}, *api.Error) {
+
+	save := func(record api.MachineRecord, machineState spi.MachineRequest) error {
+		record.LastModified = api.Timestamp(time.Now().Unix())
+		return rawSave(record, machineState)
+	}
 
 	events := make(chan interface{})
 	go func() {
@@ -333,12 +339,11 @@ func runTasks(
 			// TODO(wfarner): The 'pending' status is used for both creating and destroying.  These should
 			// be different states.
 			record.Status = "pending"
-			record.LastModified = Timestamp(time.Now().Unix())
 			save(record, nil)
 
 			go func(task spi.Task) {
 				log.Infoln("START", task.Name())
-				event := Event{Name: string(task.Name())}
+				event := api.Event{Name: string(task.Name())}
 				err := task.Run(record, request, taskEvents)
 				if err != nil {
 					event.Message = task.Name() + " failed: " + err.Error()
@@ -360,11 +365,11 @@ func runTasks(
 
 			for te := range taskEvents {
 				stop := false
-				event := Event{Name: task.Name(), Timestamp: time.Now()}
+				event := api.Event{Name: task.Name(), Timestamp: time.Now()}
 				event.AddData(te)
 
 				switch te := te.(type) {
-				case Event:
+				case api.Event:
 					event = te
 					if event.Status < 0 {
 						stop = true
@@ -393,7 +398,6 @@ func runTasks(
 				}
 
 				record.AppendEventObject(event)
-				record.LastModified = Timestamp(time.Now().Unix())
 				save(record, machineState)
 
 				events <- event
@@ -401,7 +405,6 @@ func runTasks(
 				if stop {
 					log.Warningln("Stopping due to error")
 					record.Status = "failed"
-					record.LastModified = Timestamp(time.Now().Unix())
 					save(record, machineState)
 					return
 				}
@@ -409,7 +412,6 @@ func runTasks(
 		}
 
 		onComplete(&record, request)
-		record.LastModified = Timestamp(time.Now().Unix())
 		save(record, nil)
 		return
 	}()
