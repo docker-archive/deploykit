@@ -268,22 +268,16 @@ func (p *provisioner) GetIPAddress(req spi.MachineRequest) (string, error) {
 
 func (p *provisioner) GetProvisionTasks() []spi.Task {
 	return []spi.Task{
-		machines.SSHKeyGen(p.sshKeys).Override("AWS - upload generated SSH key", p.generateAndUploadSSHKey),
-		machines.CreateInstance(p),
+		spi.DoAfterTask("AWS - upload generated SSH key", machines.SSHKeyGen{Keys: p.sshKeys}, p.importEC2Key),
+		machines.CreateInstance{Provisioner: p},
 	}
 }
 
 func (p *provisioner) GetTeardownTasks() []spi.Task {
 	return []spi.Task{
-		machines.SSHKeyRemove(p.sshKeys).Override("AWS - remove ssh key", p.removeLocalAndUploadedSSHKey),
-		machines.DestroyInstance(p),
+		spi.DoBeforeTask("AWS - remove ssh key", p.deleteEC2Key, machines.SSHKeyRemove{Keys: p.sshKeys}),
+		machines.DestroyInstance{Provisioner: p},
 	}
-}
-
-// Validate checks the data and returns error if not valid
-func validate(req *CreateInstanceRequest) error {
-	// TODO finish this.
-	return nil
 }
 
 func (p *provisioner) CreateInstance(
@@ -292,10 +286,6 @@ func (p *provisioner) CreateInstance(
 	request, is := req.(*CreateInstanceRequest)
 	if !is {
 		return nil, &ErrInvalidRequest{}
-	}
-
-	if err := validate(request); err != nil {
-		return nil, err
 	}
 
 	events := make(chan spi.CreateInstanceEvent)
