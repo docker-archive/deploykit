@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
@@ -61,7 +62,7 @@ func TestMachineLifecycle(t *testing.T) {
 		template := testMachineRequest{
 			BaseMachineRequest: spi.BaseMachineRequest{
 				Provisioner: "testcloud",
-				Teardown:    []string{api.DestroyInstanceName},
+				Teardown:    []string{machines.DestroyInstanceName},
 			},
 			TurboButtons: 5,
 		}
@@ -86,13 +87,14 @@ func TestMachineLifecycle(t *testing.T) {
 		id := api.MachineID("frontend")
 		mockProvisioner.EXPECT().NewRequestInstance().Return(&testMachineRequest{})
 		mockProvisioner.EXPECT().Name().Return("testcloud")
-		mockProvisioner.EXPECT().GetProvisionTasks().Return([]spi.Task{api.CreateInstance(mockProvisioner)})
+		mockProvisioner.EXPECT().GetProvisionTasks().Return(
+			[]spi.Task{machines.CreateInstance(mockProvisioner)})
 		expectedRequest := testMachineRequest{
 			BaseMachineRequest: spi.BaseMachineRequest{
 				MachineName: string(id),
 				Provisioner: "testcloud",
-				Provision:   []string{api.CreateInstanceName},
-				Teardown:    []string{api.DestroyInstanceName},
+				Provision:   []string{machines.CreateInstanceName},
+				Teardown:    []string{machines.DestroyInstanceName},
 			},
 			TurboButtons: 6,
 		}
@@ -109,7 +111,7 @@ func TestMachineLifecycle(t *testing.T) {
 		overlay := testMachineRequest{
 			BaseMachineRequest: spi.BaseMachineRequest{
 				MachineName: string(id),
-				Provision:   []string{api.CreateInstanceName},
+				Provision:   []string{machines.CreateInstanceName},
 			},
 			TurboButtons: 6,
 		}
@@ -135,7 +137,8 @@ func TestMachineLifecycle(t *testing.T) {
 		requireMachines(t, r, id)
 
 		// Delete the machine
-		mockProvisioner.EXPECT().GetTeardownTasks().Return([]spi.Task{api.DestroyInstance(mockProvisioner)})
+		mockProvisioner.EXPECT().GetTeardownTasks().Return(
+			[]spi.Task{machines.DestroyInstance(mockProvisioner)})
 		destroyEvents := make(chan spi.DestroyInstanceEvent)
 		mockProvisioner.EXPECT().DestroyInstance(instanceID).Return(destroyEvents, nil)
 		go func() {

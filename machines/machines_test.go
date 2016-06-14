@@ -1,9 +1,10 @@
-package api
+package machines
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/docker/libmachete/api"
 	mock_spi "github.com/docker/libmachete/mock/provisioners/spi"
 	mock_storage "github.com/docker/libmachete/mock/storage"
 	"github.com/docker/libmachete/provisioners/spi"
@@ -13,11 +14,11 @@ import (
 	"testing"
 )
 
-//go:generate mockgen -package api -destination ../mock/provisioners/spi/spi.go github.com/docker/libmachete/provisioners/spi Provisioner
+//go:generate mockgen -package machines -destination ../mock/provisioners/spi/spi.go github.com/docker/libmachete/provisioners/spi Provisioner
 
-func machineRecord(name string) MachineRecord {
-	return MachineRecord{
-		MachineSummary: MachineSummary{MachineName: MachineID(name)},
+func machineRecord(name string) api.MachineRecord {
+	return api.MachineRecord{
+		MachineSummary: api.MachineSummary{MachineName: api.MachineID(name)},
 	}
 }
 
@@ -26,12 +27,12 @@ func TestListingSorted(t *testing.T) {
 	defer ctrl.Finish()
 
 	data := []struct {
-		ID     MachineID
-		Record MachineRecord
+		ID     api.MachineID
+		Record api.MachineRecord
 	}{
-		{ID: MachineID("host1"), Record: machineRecord("host1")},
-		{ID: MachineID("host2"), Record: machineRecord("host2")},
-		{ID: MachineID("host3"), Record: machineRecord("host3")},
+		{ID: api.MachineID("host1"), Record: machineRecord("host1")},
+		{ID: api.MachineID("host2"), Record: machineRecord("host2")},
+		{ID: api.MachineID("host3"), Record: machineRecord("host3")},
 	}
 
 	// TODO(wfarner): Consider using a fake rather than mock store, this test is currently highly coupled to
@@ -57,11 +58,11 @@ func TestListingSorted(t *testing.T) {
 	summaries, err := machines.List()
 	require.NoError(t, err)
 
-	ids := []MachineID{}
+	ids := []api.MachineID{}
 	for _, summary := range summaries {
 		ids = append(ids, summary.MachineName)
 	}
-	require.Equal(t, []MachineID{MachineID("host1"), MachineID("host2"), MachineID("host3")}, ids)
+	require.Equal(t, []api.MachineID{api.MachineID("host1"), api.MachineID("host2"), api.MachineID("host3")}, ids)
 
 	// Another -- test listing of ids only
 	store.EXPECT().ListRecursive(recordsRootKey).Return(keys, nil)
@@ -77,7 +78,7 @@ func checkTasksAreRun(t *testing.T, events <-chan interface{}, tasks []spi.Task)
 	executed := []string{}
 	for e := range events {
 		seen = append(seen, e)
-		if evt, ok := e.(Event); ok {
+		if evt, ok := e.(api.Event); ok {
 			executed = append(executed, evt.Name)
 		}
 	}
@@ -96,7 +97,7 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 
 	provisioner := mock_spi.NewMockProvisioner(ctrl)
 	request := &spi.BaseMachineRequest{}
-	record := MachineRecord{}
+	record := api.MachineRecord{}
 
 	tasks := []spi.Task{CreateInstance(provisioner)}
 
@@ -106,12 +107,10 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 		tasks,
 		record,
 		request,
-		func(r MachineRecord, q spi.MachineRequest) error {
+		func(api.MachineRecord, spi.MachineRequest) error {
 			return nil
 		},
-		func(r *MachineRecord, s spi.MachineRequest) {
-			return
-		})
+		func(*api.MachineRecord, spi.MachineRequest) {})
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	close(createEvents) // Simulates the async creation completes
@@ -124,7 +123,7 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 
 	provisioner := mock_spi.NewMockProvisioner(ctrl)
 	request := &spi.BaseMachineRequest{}
-	record := MachineRecord{}
+	record := api.MachineRecord{}
 
 	tasks := []spi.Task{DestroyInstance(provisioner)}
 
@@ -134,12 +133,10 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 		tasks,
 		record,
 		request,
-		func(r MachineRecord, q spi.MachineRequest) error {
+		func(api.MachineRecord, spi.MachineRequest) error {
 			return nil
 		},
-		func(r *MachineRecord, s spi.MachineRequest) {
-			return
-		})
+		func(*api.MachineRecord, spi.MachineRequest) {})
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	close(destroyEvents) // Simulates the async destroy completes
@@ -173,14 +170,14 @@ func TestCreateMachine(t *testing.T) {
 	store := mock_storage.NewMockKvStore(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 
-	record := new(MachineRecord)
-	record.MachineName = MachineID(name)
+	record := api.MachineRecord{}
+	record.MachineName = api.MachineID(name)
 	record.InstanceID = id
 	record.AppendChange(&spi.BaseMachineRequest{
 		MachineName: string(record.MachineName),
 		Provision:   template.Provision,
 	})
-	notFound := &Error{Code: ErrNotFound}
+	notFound := &api.Error{Code: api.ErrNotFound}
 
 	recordJSON, err := json.Marshal(record)
 	require.NoError(t, err)
@@ -193,7 +190,7 @@ func TestCreateMachine(t *testing.T) {
 		provisioner,
 		template,
 		bytes.NewBuffer([]byte(`{"name": "new-host"}`)),
-		ContentTypeJSON)
+		api.ContentTypeJSON)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	close(createEvents) // Simulates the async destroy completes
@@ -210,7 +207,7 @@ func TestDestroyMachine(t *testing.T) {
 	teardownNames := []string{DestroyInstanceName}
 
 	// Data from previous provisioning run
-	record := new(MachineRecord)
+	record := api.MachineRecord{}
 	record.MachineName = "test-host"
 	record.InstanceID = "id-test-host"
 	record.AppendChange(&spi.BaseMachineRequest{
@@ -225,7 +222,7 @@ func TestDestroyMachine(t *testing.T) {
 	store := mock_storage.NewMockKvStore(ctrl)
 	store.EXPECT().Save(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 	machines := NewMachines(store)
-	events, err := machines.DeleteMachine(provisioner, *record)
+	events, err := machines.DeleteMachine(provisioner, record)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	close(destroyEvents) // Simulates the async destroy completes
@@ -255,7 +252,7 @@ func TestRunTasksNoError(t *testing.T) {
 	defer ctrl.Finish()
 
 	request := &spi.BaseMachineRequest{}
-	record := MachineRecord{}
+	record := api.MachineRecord{}
 
 	tasks := []spi.Task{
 		makeTask("step1"),
@@ -268,12 +265,10 @@ func TestRunTasksNoError(t *testing.T) {
 		tasks,
 		record,
 		request,
-		func(r MachineRecord, q spi.MachineRequest) error {
+		func(api.MachineRecord, spi.MachineRequest) error {
 			return nil
 		},
-		func(r *MachineRecord, s spi.MachineRequest) {
-			return
-		})
+		func(*api.MachineRecord, spi.MachineRequest) {})
 
 	require.NoError(t, err)
 	require.NotNil(t, events)
@@ -286,7 +281,7 @@ func TestRunTasksErrorAbort(t *testing.T) {
 	defer ctrl.Finish()
 
 	request := &spi.BaseMachineRequest{}
-	record := MachineRecord{}
+	record := api.MachineRecord{}
 
 	tasks := []spi.Task{
 		makeTask("step1"),
@@ -299,12 +294,10 @@ func TestRunTasksErrorAbort(t *testing.T) {
 		tasks,
 		record,
 		request,
-		func(r MachineRecord, q spi.MachineRequest) error {
+		func(api.MachineRecord, spi.MachineRequest) error {
 			return nil
 		},
-		func(r *MachineRecord, s spi.MachineRequest) {
-			return
-		})
+		func(*api.MachineRecord, spi.MachineRequest) {})
 
 	require.NoError(t, err)
 	require.NotNil(t, events)

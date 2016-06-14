@@ -1,4 +1,4 @@
-package api
+package machines
 
 import (
 	"github.com/stretchr/testify/require"
@@ -8,7 +8,6 @@ import (
 )
 
 func TestChecks(t *testing.T) {
-
 	theName := "name"
 	theInt := 10
 
@@ -59,7 +58,6 @@ func requireEqual(t *testing.T, expect, actual []string) {
 }
 
 type input struct {
-
 	// For non-pointer fields, `required` implies they are not zero values.
 	// So for strings it makes sense but for some types like bool it can be strange / artificial.
 	String string `yaml:"the_string" check:"required"`
@@ -82,7 +80,6 @@ type input struct {
 }
 
 func TestCheckFields(t *testing.T) {
-
 	theString := "string"
 	theInt := 10
 	theBool := true
@@ -97,7 +94,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &theInt,
 		BoolPtr:   &theBool,
 	}
-	require.Equal(t, 0, len(FindMissingFields(target)))
+	require.Equal(t, 0, len(findMissingFields(target)))
 
 	// Case - when required pointer fields are missing
 	target = &input{
@@ -105,7 +102,7 @@ func TestCheckFields(t *testing.T) {
 		Int:    theInt,
 		Bool:   theBool,
 	}
-	requireEqual(t, []string{"bool_ptr", "int_ptr", "string_ptr"}, FindMissingFields(target))
+	requireEqual(t, []string{"bool_ptr", "int_ptr", "string_ptr"}, findMissingFields(target))
 
 	// Case -- when required value fields are missing
 	target = &input{
@@ -113,7 +110,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &theInt,
 		BoolPtr:   &theBool,
 	}
-	requireEqual(t, []string{"the_bool", "the_int", "the_string"}, FindMissingFields(target))
+	requireEqual(t, []string{"the_bool", "the_int", "the_string"}, findMissingFields(target))
 
 	// Case - when required pointer field is provided but is empty string
 	emptyString := ""
@@ -124,7 +121,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &zeroInt,  // acceptable -- it's not nil but can be 0
 		BoolPtr:   &zeroBool, //  acceptable -- it's not nil but can be false
 	}
-	requireEqual(t, []string{"the_bool", "the_int", "the_string", "string_ptr"}, FindMissingFields(target))
+	requireEqual(t, []string{"the_bool", "the_int", "the_string", "string_ptr"}, findMissingFields(target))
 
 	// This case here is artificial and doesn't make much sense.  Include here however to make clear the semantics of
 	// required tag in the case of non-pointer fields.
@@ -136,7 +133,7 @@ func TestCheckFields(t *testing.T) {
 		IntPtr:    &zeroInt,  // acceptable -- it's not nil but can be 0
 		BoolPtr:   &zeroBool, //  acceptable -- it's not nil but can be false
 	}
-	requireEqual(t, []string{"the_bool", "the_int", "the_string", "string_ptr"}, FindMissingFields(target))
+	requireEqual(t, []string{"the_bool", "the_int", "the_string", "string_ptr"}, findMissingFields(target))
 
 	// Case - when required pointer field is provided but is empty string
 	target = &input{
@@ -146,10 +143,10 @@ func TestCheckFields(t *testing.T) {
 	}
 
 	// Case - using the provided callback to collect missing YAML fields
-	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, FindMissingFields(target))
+	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, findMissingFields(target))
 
 	// Case - test the convenience wrapper
-	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, FindMissingFields(target))
+	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, findMissingFields(target))
 }
 
 type sub struct {
@@ -166,7 +163,6 @@ type nested struct {
 }
 
 func TestCheckFieldsNested(t *testing.T) {
-
 	theString := "string"
 	theInt := 100
 	theBool := true
@@ -182,7 +178,7 @@ func TestCheckFieldsNested(t *testing.T) {
 			BoolPtr:   &theBool,
 		},
 	}
-	require.Equal(t, 0, len(FindMissingFields(target)))
+	require.Equal(t, 0, len(findMissingFields(target)))
 
 	// Case - when required pointer fields are missing
 	target = &nested{
@@ -190,7 +186,7 @@ func TestCheckFieldsNested(t *testing.T) {
 		Int:    theInt,
 		Bool:   theBool,
 	}
-	requireEqual(t, []string{"bool_ptr", "int_ptr", "string_ptr"}, FindMissingFields(target))
+	requireEqual(t, []string{"bool_ptr", "int_ptr", "string_ptr"}, findMissingFields(target))
 
 	// Case -- when required value fields are missing
 	target = &nested{
@@ -200,7 +196,7 @@ func TestCheckFieldsNested(t *testing.T) {
 			BoolPtr:   &theBool,
 		},
 	}
-	requireEqual(t, []string{"the_bool", "the_int", "the_string"}, FindMissingFields(target))
+	requireEqual(t, []string{"the_bool", "the_int", "the_string"}, findMissingFields(target))
 
 	// Case - when required pointer field is provided but is empty string
 	emptyString := ""
@@ -213,6 +209,16 @@ func TestCheckFieldsNested(t *testing.T) {
 			BoolPtr:   &zeroBool, // zero is allowed since ptr is set
 		},
 	}
-	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, FindMissingFields(target))
+	requireEqual(t, []string{"string_ptr", "the_bool", "the_int", "the_string"}, findMissingFields(target))
+}
 
+func findMissingFields(v interface{}) []string {
+	missing := []string{}
+	if reflect.TypeOf(v).Kind() == reflect.Ptr && reflect.TypeOf(v).Elem().Kind() == reflect.Struct {
+		callbacks := map[string]fieldCheckCallback{
+			ruleRequired: ensureNotNil(collectMissingYAMLFields(&missing)),
+		}
+		checkFields(v, callbacks)
+	}
+	return missing
 }

@@ -1,23 +1,10 @@
-package api
+package machines
 
 import (
 	"fmt"
 	"reflect"
 	"strings"
 )
-
-// FindMissingFields examines the struct provided and based on the field tag annotations, returns a list
-// of YAML fields that are required but not provided.
-func FindMissingFields(v interface{}) []string {
-	missing := []string{}
-	if reflect.TypeOf(v).Kind() == reflect.Ptr && reflect.TypeOf(v).Elem().Kind() == reflect.Struct {
-		callbacks := map[string]fieldCheckCallback{
-			ruleRequired: ensureNotNil(collectMissingYAMLFields(&missing)),
-		}
-		checkFields(v, callbacks)
-	}
-	return missing
-}
 
 // tagGetter is a function that the callback can use to access other tags in the field.
 // For example, the callback may want to access the `json` tag in the field to report to
