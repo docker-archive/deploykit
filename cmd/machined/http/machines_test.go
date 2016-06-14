@@ -88,7 +88,7 @@ func TestMachineLifecycle(t *testing.T) {
 		mockProvisioner.EXPECT().NewRequestInstance().Return(&testMachineRequest{})
 		mockProvisioner.EXPECT().Name().Return("testcloud")
 		mockProvisioner.EXPECT().GetProvisionTasks().Return(
-			[]spi.Task{machines.CreateInstance(mockProvisioner)})
+			[]spi.Task{machines.CreateInstance{mockProvisioner}})
 		expectedRequest := testMachineRequest{
 			BaseMachineRequest: spi.BaseMachineRequest{
 				MachineName: string(id),
@@ -138,7 +138,7 @@ func TestMachineLifecycle(t *testing.T) {
 
 		// Delete the machine
 		mockProvisioner.EXPECT().GetTeardownTasks().Return(
-			[]spi.Task{machines.DestroyInstance(mockProvisioner)})
+			[]spi.Task{machines.DestroyInstance{mockProvisioner}})
 		destroyEvents := make(chan spi.DestroyInstanceEvent)
 		mockProvisioner.EXPECT().DestroyInstance(instanceID).Return(destroyEvents, nil)
 		go func() {

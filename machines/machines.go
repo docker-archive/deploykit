@@ -246,7 +246,7 @@ func (cm *machines) CreateMachine(
 
 func findTask(tasks []spi.Task, name string) *spi.Task {
 	for _, task := range tasks {
-		if task.Name == name {
+		if task.Name() == name {
 			return &task
 		}
 	}
@@ -256,7 +256,7 @@ func findTask(tasks []spi.Task, name string) *spi.Task {
 func taskNames(tasks []spi.Task) []string {
 	names := []string{}
 	for _, task := range tasks {
-		names = append(names, task.Name)
+		names = append(names, task.Name())
 	}
 	return names
 }
@@ -343,13 +343,13 @@ func runTasks(
 
 			go func(task spi.Task) {
 				log.Infoln("START", task.Name)
-				event := api.Event{Name: task.Name}
-				err := task.Do(record, request, taskEvents)
+				event := api.Event{Name: task.Name()}
+				err := task.Run(record, request, taskEvents)
 				if err != nil {
-					event.Message = task.Message + " failed"
+					event.Message = "failed"
 					event.Error = err.Error()
 				} else {
-					event.Message = task.Message + " completed"
+					event.Message = "completed"
 				}
 				taskEvents <- event
 				close(taskEvents) // unblocks the listener
@@ -363,7 +363,7 @@ func runTasks(
 
 			for te := range taskEvents {
 				stop := false
-				event := api.Event{Name: task.Name, Timestamp: time.Now()}
+				event := api.Event{Name: task.Name(), Timestamp: time.Now()}
 
 				switch te := te.(type) {
 				case api.Event:
