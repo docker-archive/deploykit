@@ -2,7 +2,7 @@ package http
 
 import (
 	"encoding/json"
-	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 	mock_spi "github.com/docker/libmachete/mock/provisioners/spi"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage/filestore"
@@ -30,7 +30,7 @@ type testMachineRequest struct {
 func prepareTest(t *testing.T, ctrl *gomock.Controller) (*mock_spi.MockProvisioner, http.Handler) {
 	provisioner := mock_spi.NewMockProvisioner(ctrl)
 
-	builder := api.ProvisionerBuilder{
+	builder := machines.ProvisionerBuilder{
 		Name:                  "testcloud",
 		DefaultCredential:     func() spi.Credential { return &testCredentials{} },
 		DefaultMachineRequest: func() spi.MachineRequest { return &testMachineRequest{} },
@@ -41,7 +41,7 @@ func prepareTest(t *testing.T, ctrl *gomock.Controller) (*mock_spi.MockProvision
 
 	server, err := build(
 		filestore.NewFileStore(afero.NewMemMapFs(), "/"),
-		api.NewMachineProvisioners([]api.ProvisionerBuilder{builder}))
+		machines.NewMachineProvisioners([]machines.ProvisionerBuilder{builder}))
 	require.NoError(t, err)
 
 	return provisioner, server.getHandler()

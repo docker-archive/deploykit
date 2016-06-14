@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/storage"
 	"github.com/docker/libmachete/storage/filestore"
 	"github.com/gorilla/mux"
@@ -32,15 +33,15 @@ type apiServer struct {
 	templates    api.Templates
 	machines     api.Machines
 	keystore     api.SSHKeys
-	provisioners api.MachineProvisioners
+	provisioners machines.MachineProvisioners
 }
 
-func build(store storage.KvStore, provisioners api.MachineProvisioners) (*apiServer, error) {
+func build(store storage.KvStore, provisioners machines.MachineProvisioners) (*apiServer, error) {
 	return &apiServer{
-		credentials:  api.NewCredentials(storage.NestedStore(store, "credentials"), provisioners),
-		templates:    api.NewTemplates(storage.NestedStore(store, "templates"), provisioners),
-		machines:     api.NewMachines(storage.NestedStore(store, "machines")),
-		keystore:     api.NewSSHKeys(storage.NestedStore(store, "keys")),
+		credentials:  machines.NewCredentials(storage.NestedStore(store, "credentials"), provisioners),
+		templates:    machines.NewTemplates(storage.NestedStore(store, "templates"), provisioners),
+		machines:     machines.NewMachines(storage.NestedStore(store, "machines")),
+		keystore:     machines.NewSSHKeys(storage.NestedStore(store, "keys")),
 		provisioners: provisioners,
 	}, nil
 }
@@ -108,7 +109,7 @@ func ServerCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			log.Infoln("Starting server")
 
-			server, err := build(filestore.NewOsFileStore(options.RootDir), api.DefaultProvisioners)
+			server, err := build(filestore.NewOsFileStore(options.RootDir), machines.DefaultProvisioners)
 			if err != nil {
 				return err
 			}

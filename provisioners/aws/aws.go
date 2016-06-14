@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/spi"
 	"reflect"
 	"sort"
@@ -220,8 +221,8 @@ func NewMachineRequest() spi.MachineRequest {
 	req := new(CreateInstanceRequest)
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Provision = []string{api.SSHKeyGenerateName, api.CreateInstanceName}
-	req.Teardown = []string{api.SSHKeyRemoveName, api.DestroyInstanceName}
+	req.Provision = []string{machines.SSHKeyGenerateName, machines.CreateInstanceName}
+	req.Teardown = []string{machines.SSHKeyRemoveName, machines.DestroyInstanceName}
 	return req
 }
 
@@ -267,15 +268,15 @@ func (p *provisioner) GetIPAddress(req spi.MachineRequest) (string, error) {
 
 func (p *provisioner) GetProvisionTasks() []spi.Task {
 	return []spi.Task{
-		api.SSHKeyGen(p.sshKeys).Override("AWS - upload generated SSH key", p.generateAndUploadSSHKey),
-		api.CreateInstance(p),
+		machines.SSHKeyGen(p.sshKeys).Override("AWS - upload generated SSH key", p.generateAndUploadSSHKey),
+		machines.CreateInstance(p),
 	}
 }
 
 func (p *provisioner) GetTeardownTasks() []spi.Task {
 	return []spi.Task{
-		api.SSHKeyRemove(p.sshKeys).Override("AWS - remove ssh key", p.removeLocalAndUploadedSSHKey),
-		api.DestroyInstance(p),
+		machines.SSHKeyRemove(p.sshKeys).Override("AWS - remove ssh key", p.removeLocalAndUploadedSSHKey),
+		machines.DestroyInstance(p),
 	}
 }
 
