@@ -20,79 +20,87 @@ const (
 )
 
 // CreateInstance creates an instance using a provisioner.
-func CreateInstance(provisioner spi.Provisioner) spi.Task {
-	handler := func(_ spi.Resource, req spi.MachineRequest, events chan<- interface{}) error {
-		createInstanceEvents, err := provisioner.CreateInstance(req)
-		if err != nil {
-			return err
-		}
+type CreateInstance struct {
+	Provisioner spi.Provisioner
+}
 
-		for event := range createInstanceEvents {
-			events <- event
-		}
+// Name returns the task name.
+func (c CreateInstance) Name() string {
+	return CreateInstanceName
+}
 
-		return nil
+// Run creates the instance with the provisioner.
+func (c CreateInstance) Run(resource spi.Resource, req spi.MachineRequest, events chan<- interface{}) error {
+	createInstanceEvents, err := c.Provisioner.CreateInstance(req)
+	if err != nil {
+		return err
 	}
 
-	return spi.Task{
-		Name:    CreateInstanceName,
-		Message: "Creates a machine instance",
-		Do:      handler,
+	for event := range createInstanceEvents {
+		events <- event
 	}
+
+	return nil
 }
 
 // DestroyInstance creates an instance using a provisioner.
-func DestroyInstance(provisioner spi.Provisioner) spi.Task {
-	handler := func(resource spi.Resource, req spi.MachineRequest, events chan<- interface{}) error {
-		destroyInstanceEvents, err := provisioner.DestroyInstance(resource.ID())
-		if err != nil {
-			return err
-		}
+type DestroyInstance struct {
+	Provisioner spi.Provisioner
+}
 
-		for event := range destroyInstanceEvents {
-			events <- event
-		}
+// Name returns the task name.
+func (d DestroyInstance) Name() string {
+	return DestroyInstanceName
+}
 
-		return nil
+// Run destroys the instance with the provisioner.
+func (d DestroyInstance) Run(resource spi.Resource, _ spi.MachineRequest, events chan<- interface{}) error {
+	destroyInstanceEvents, err := d.Provisioner.DestroyInstance(resource.ID())
+	if err != nil {
+		return err
 	}
 
-	return spi.Task{
-		Name:    DestroyInstanceName,
-		Message: "Destroys a machine instance",
-		Do:      handler,
+	for event := range destroyInstanceEvents {
+		events <- event
 	}
+
+	return nil
 }
 
 // SSHKeyGen generates and locally stores an SSH key.
-func SSHKeyGen(keys api.SSHKeys) spi.Task {
-	handler := func(resource spi.Resource, req spi.MachineRequest, events chan<- interface{}) error {
-		key := resource.Name()
-		if key == "" {
-			return api.NewError(api.ErrBadInput, "Bad resource name")
-		}
-		return keys.NewKeyPair(api.SSHKeyID(key))
-	}
+type SSHKeyGen struct {
+	Keys api.SSHKeys
+}
 
-	return spi.Task{
-		Name:    SSHKeyGenerateName,
-		Message: "Generating ssh key for host",
-		Do:      handler,
+// Name returns the task name.
+func (s SSHKeyGen) Name() string {
+	return SSHKeyGenerateName
+}
+
+// Run generates and saves an SSH key.
+func (s SSHKeyGen) Run(resource spi.Resource, _ spi.MachineRequest, _ chan<- interface{}) error {
+	key := resource.Name()
+	if key == "" {
+		return api.NewError(api.ErrBadInput, "Invalid resource name")
 	}
+	return s.Keys.NewKeyPair(api.SSHKeyID(key))
 }
 
 // SSHKeyRemove destroys a locally-saved SSH key.
-func SSHKeyRemove(keys api.SSHKeys) spi.Task {
-	handler := func(resource spi.Resource, req spi.MachineRequest, events chan<- interface{}) error {
-		key := resource.Name()
-		if key == "" {
-			return api.NewError(api.ErrBadInput, "Bad resource name")
-		}
-		return keys.Remove(api.SSHKeyID(key))
-	}
+type SSHKeyRemove struct {
+	Keys api.SSHKeys
+}
 
-	return spi.Task{
-		Name:    SSHKeyRemoveName,
-		Message: "Remove ssh key for host",
-		Do:      handler,
+// Name returns the task name.
+func (s SSHKeyRemove) Name() string {
+	return SSHKeyRemoveName
+}
+
+// Run removes an SSH key.
+func (s SSHKeyRemove) Run(resource spi.Resource, _ spi.MachineRequest, _ chan<- interface{}) error {
+	key := resource.Name()
+	if key == "" {
+		return api.NewError(api.ErrBadInput, "Invalid resource name")
 	}
+	return s.Keys.Remove(api.SSHKeyID(key))
 }

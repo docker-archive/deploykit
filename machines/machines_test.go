@@ -76,17 +76,17 @@ func checkTasksAreRun(t *testing.T, events <-chan interface{}, tasks []spi.Task)
 	seen := []interface{}{}
 	// extract the name of the events
 	executed := []string{}
-	for e := range events {
-		seen = append(seen, e)
-		if evt, ok := e.(api.Event); ok {
+	for event := range events {
+		seen = append(seen, event)
+		if evt, ok := event.(api.Event); ok {
 			executed = append(executed, evt.Name)
 		}
 	}
 
 	require.Equal(t, len(tasks), len(seen))
 	taskNames := []string{}
-	for _, t := range tasks {
-		taskNames = append(taskNames, string(t.Name))
+	for _, task := range tasks {
+		taskNames = append(taskNames, task.Name())
 	}
 	require.Equal(t, taskNames, executed)
 }
@@ -99,7 +99,7 @@ func TestDefaultRunCreateInstance(t *testing.T) {
 	request := &spi.BaseMachineRequest{}
 	record := api.MachineRecord{}
 
-	tasks := []spi.Task{CreateInstance(provisioner)}
+	tasks := []spi.Task{CreateInstance{provisioner}}
 
 	createEvents := make(chan spi.CreateInstanceEvent)
 	provisioner.EXPECT().CreateInstance(gomock.Any()).Return(createEvents, nil)
@@ -125,7 +125,7 @@ func TestDefaultRunDestroyInstance(t *testing.T) {
 	request := &spi.BaseMachineRequest{}
 	record := api.MachineRecord{}
 
-	tasks := []spi.Task{DestroyInstance(provisioner)}
+	tasks := []spi.Task{DestroyInstance{provisioner}}
 
 	destroyEvents := make(chan spi.DestroyInstanceEvent)
 	provisioner.EXPECT().DestroyInstance(gomock.Any()).Return(destroyEvents, nil)
@@ -160,7 +160,7 @@ func TestCreateMachine(t *testing.T) {
 	provisioner.EXPECT().Name().Return("test-provisioner")
 	provisioner.EXPECT().NewRequestInstance().Return(request)
 
-	provision := []spi.Task{CreateInstance(provisioner)}
+	provision := []spi.Task{CreateInstance{provisioner}}
 	provisioner.EXPECT().GetProvisionTasks().Return(provision)
 	createEvents := make(chan spi.CreateInstanceEvent)
 	provisioner.EXPECT().CreateInstance(expectReq).Return(createEvents, nil)
@@ -203,7 +203,7 @@ func TestDestroyMachine(t *testing.T) {
 
 	provisioner := mock_spi.NewMockProvisioner(ctrl)
 
-	teardown := []spi.Task{DestroyInstance(provisioner)}
+	teardown := []spi.Task{DestroyInstance{provisioner}}
 	teardownNames := []string{DestroyInstanceName}
 
 	// Data from previous provisioning run
@@ -229,22 +229,20 @@ func TestDestroyMachine(t *testing.T) {
 	checkTasksAreRun(t, events, teardown)
 }
 
-func makeTask(name string) spi.Task {
-	return spi.Task{
-		Name:    name,
-		Message: "message",
-		Do:      nil,
-	}
+type testTask struct {
+	name        string
+	returnError bool
 }
 
-func makeErrorTask(name string) spi.Task {
-	return spi.Task{
-		Name:    name,
-		Message: "message",
-		Do: func(spi.Resource, spi.MachineRequest, chan<- interface{}) error {
-			return errors.New("test-error")
-		},
+func (t testTask) Name() string {
+	return t.name
+}
+
+func (t testTask) Run(spi.Resource, spi.MachineRequest, chan<- interface{}) error {
+	if t.returnError {
+		return errors.New("test-error")
 	}
+	return nil
 }
 
 func TestRunTasksNoError(t *testing.T) {
@@ -255,10 +253,10 @@ func TestRunTasksNoError(t *testing.T) {
 	record := api.MachineRecord{}
 
 	tasks := []spi.Task{
-		makeTask("step1"),
-		makeTask("step2"),
-		makeTask("step3"),
-		makeTask("step4"),
+		testTask{name: "step1"},
+		testTask{name: "step2"},
+		testTask{name: "step3"},
+		testTask{name: "step4"},
 	}
 
 	events, err := runTasks(
@@ -284,10 +282,10 @@ func TestRunTasksErrorAbort(t *testing.T) {
 	record := api.MachineRecord{}
 
 	tasks := []spi.Task{
-		makeTask("step1"),
-		makeTask("step2"),
-		makeErrorTask("step3"),
-		makeTask("step4"),
+		testTask{name: "step1"},
+		testTask{name: "step2"},
+		testTask{name: "step1", returnError: true},
+		testTask{name: "step4"},
 	}
 
 	events, err := runTasks(

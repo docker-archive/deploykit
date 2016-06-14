@@ -113,11 +113,11 @@ func (m *MachineRecord) AppendEvent(name, message string, data interface{}) {
 }
 
 // AppendEventObject appends the full event object
-func (m *MachineRecord) AppendEventObject(e Event) {
+func (m *MachineRecord) AppendEventObject(event Event) {
 	if m.Events == nil {
 		m.Events = []Event{}
 	}
-	m.Events = append(m.Events, e)
+	m.Events = append(m.Events, event)
 }
 
 // CredentialsID is the globally-unique identifier for credentials.
