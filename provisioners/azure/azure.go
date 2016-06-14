@@ -34,15 +34,15 @@ func (p *provisioner) Name() string {
 
 func (p *provisioner) GetProvisionTasks() []spi.Task {
 	return []spi.Task{
-		machines.SSHKeyGen(p.sshKeys),
-		machines.CreateInstance(p),
+		machines.SSHKeyGen{Keys: p.sshKeys},
+		machines.CreateInstance{Provisioner: p},
 	}
 }
 
 func (p *provisioner) GetTeardownTasks() []spi.Task {
 	return []spi.Task{
-		machines.SSHKeyRemove(p.sshKeys),
-		machines.DestroyInstance(p),
+		machines.SSHKeyRemove{Keys: p.sshKeys},
+		machines.DestroyInstance{Provisioner: p},
 	}
 }
 
