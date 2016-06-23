@@ -79,6 +79,7 @@ func (s *apiServer) getHandler() http.Handler {
 	}
 
 	router := mux.NewRouter()
+	router.StrictSlash(true)
 
 	for path, attachment := range attachments {
 		attachment.attachTo(router.PathPrefix(path).Subrouter())
