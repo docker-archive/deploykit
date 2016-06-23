@@ -3,6 +3,7 @@ package azure
 import (
 	"errors"
 	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/spi"
 )
 
@@ -21,8 +22,8 @@ func NewMachineRequest() spi.MachineRequest {
 	req := &CreateInstanceRequest{}
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
-	req.Provision = []string{api.SSHKeyGenerateName, api.CreateInstanceName}
-	req.Teardown = []string{api.SSHKeyRemoveName, api.DestroyInstanceName}
+	req.Provision = []string{machines.SSHKeyGenerateName, machines.CreateInstanceName}
+	req.Teardown = []string{machines.SSHKeyRemoveName, machines.DestroyInstanceName}
 	return req
 }
 
@@ -33,15 +34,15 @@ func (p *provisioner) Name() string {
 
 func (p *provisioner) GetProvisionTasks() []spi.Task {
 	return []spi.Task{
-		api.SSHKeyGen(p.sshKeys),
-		api.CreateInstance(p),
+		machines.SSHKeyGen{Keys: p.sshKeys},
+		machines.CreateInstance{Provisioner: p},
 	}
 }
 
 func (p *provisioner) GetTeardownTasks() []spi.Task {
 	return []spi.Task{
-		api.SSHKeyRemove(p.sshKeys),
-		api.DestroyInstance(p),
+		machines.SSHKeyRemove{Keys: p.sshKeys},
+		machines.DestroyInstance{Provisioner: p},
 	}
 }
 

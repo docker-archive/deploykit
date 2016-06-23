@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/api"
 	"net/http"
@@ -38,11 +39,16 @@ func outputHandler(handler SimpleHandler) Handler {
 		}()
 
 		result, err := handler(req)
-		if result != nil {
-			api.ContentTypeJSON.Respond(resp, result)
-		}
-
-		if err != nil {
+		if err == nil {
+			buff, err := json.Marshal(result)
+			if err != nil {
+				resp.WriteHeader(http.StatusInternalServerError)
+				resp.Write([]byte(err.Error()))
+				return
+			}
+			resp.Header().Set("Content-Type", "application/json")
+			resp.Write(buff)
+		} else {
 			handleError(*err, resp)
 		}
 	}

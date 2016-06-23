@@ -75,6 +75,7 @@ func TestIllegalKeys(t *testing.T) {
 	store := NewFileStore(afero.NewMemMapFs(), "/")
 
 	illegalKeys := []string{
+		"",
 		" key",
 		"key/",
 		"ke,y",

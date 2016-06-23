@@ -71,6 +71,8 @@ func (event DestroyInstanceEvent) GetError() error {
 
 // Resource is a generic resource that has a friendly name and an identifier that is unique to the provisioner
 type Resource interface {
+	// TODO(wfarner): It isn't clear which function is meaningful, and when.  In tasks related to SSH keys, Name()
+	// is used for a key identifier, but in tasks related to instances, ID() is used for a machine identifier.
 	Name() string
 	ID() string
 }
@@ -117,27 +119,75 @@ type TaskHandler func(Resource, MachineRequest, chan<- interface{}) error
 // in a machine request or template.  This allows customization of provisioner behavior - such
 // as skipping engine installs (if underlying image already has docker engine), skipping SSH
 // key (if no sshd allowed), etc.
-type Task struct {
-	Name    string
-	Message string
-	Do      TaskHandler
+type Task interface {
+	Name() string
+	Run(Resource, MachineRequest, chan<- interface{}) error
 }
 
-// Override defines a new task of the same name but with a different implementation / behavior
-func (t Task) Override(message string, do TaskHandler) Task {
-	return Task{
-		Name:    t.Name,
-		Message: message,
-		Do:      do,
+type composedTask struct {
+	description string
+	task        Task
+	handler     TaskHandler
+	taskFirst   bool
+}
+
+func (c composedTask) Name() string {
+	return c.task.Name()
+}
+
+func (c composedTask) Description() string {
+	return c.description
+}
+
+func (c composedTask) Run(resource Resource, request MachineRequest, events chan<- interface{}) error {
+	if c.taskFirst {
+		err := c.task.Run(resource, request, events)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := c.handler(resource, request, events)
+	if err != nil {
+		return err
+	}
+
+	if !c.taskFirst {
+		err := c.task.Run(resource, request, events)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DoBeforeTask chains a TaskHandler to run before a task, aborting if the handler fails.
+func DoBeforeTask(description string, handler TaskHandler, task Task) Task {
+	return &composedTask{
+		description: description,
+		task:        task,
+		handler:     handler,
+		taskFirst:   false,
+	}
+}
+
+// DoAfterTask chains a TaskHandler to run after a task, aborting if the task fails.
+func DoAfterTask(description string, task Task, handler TaskHandler) Task {
+	return &composedTask{
+		description: description,
+		task:        task,
+		handler:     handler,
+		taskFirst:   true,
 	}
 }
 
 // BaseMachineRequest defines fields that all machine request types should contain.  This struct
 // should be embedded in all provider-specific request structs.
 type BaseMachineRequest struct {
-	MachineName        string   `yaml:"name" json:"name"`
-	Provisioner        string   `yaml:"provisioner" json:"provisioner"`
-	ProvisionerVersion string   `yaml:"version" json:"version"`
+	MachineName        string   `yaml:"name" json:"name,omitempty"`
+	Provisioner        string   `yaml:"provisioner" json:"provisioner,omitempty"`
+	ProvisionerVersion string   `yaml:"version" json:"version,omitempty"`
 	Provision          []string `yaml:"provision,omitempty" json:"provision,omitempty"`
 	Teardown           []string `yaml:"teardown,omitempty" json:"teardown,omitempty"`
 }
@@ -170,7 +220,6 @@ func (req BaseMachineRequest) Version() string {
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
-
 	// Name returns an identifier for this provisioner
 	Name() string
 
@@ -190,6 +239,8 @@ type Provisioner interface {
 	// on how to manage the mapping of machine request (which has a user-friendly name) to
 	// an actual infrastructure identifier for the resource.
 	// TODO(chungers) - the machine request here is the *state* not the request
+	// TODO(wfarner): Seems like InstanceID effectively becomes a required (but hidden) attribute of MachineRequest;
+	// seems like it should just become a first-class attribute.  Same with IPAddress.
 	GetInstanceID(MachineRequest) (string, error)
 
 	// GetIp returns the IP address from the record.  It's up to the provisioner to decide

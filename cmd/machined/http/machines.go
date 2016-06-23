@@ -4,6 +4,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/api"
+	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/gorilla/mux"
 	"net/http"
@@ -14,7 +15,7 @@ type machineHandler struct {
 	keystore     api.SSHKeys
 	templates    api.Templates
 	machines     api.Machines
-	provisioners api.MachineProvisioners
+	provisioners machines.MachineProvisioners
 }
 
 func getMachineID(req *http.Request) api.MachineID {
@@ -48,7 +49,7 @@ func provisionerNameFromQuery(req *http.Request) string {
 	return req.URL.Query().Get("provisioner")
 }
 
-func (h *machineHandler) getProvisionerBuilder(req *http.Request) (*api.ProvisionerBuilder, *api.Error) {
+func (h *machineHandler) getProvisionerBuilder(req *http.Request) (*machines.ProvisionerBuilder, *api.Error) {
 	provisionerName := provisionerNameFromQuery(req)
 	builder, has := h.provisioners.GetBuilder(provisionerName)
 	if !has {
@@ -96,6 +97,10 @@ func (h *machineHandler) templateOrDefault(
 	return template, nil
 }
 
+func blockingRequested(req *http.Request) bool {
+	return len(req.URL.Query().Get("block")) > 0
+}
+
 func (h *machineHandler) create(req *http.Request) (interface{}, *api.Error) {
 	builder, apiErr := h.getProvisionerBuilder(req)
 	if apiErr != nil {
@@ -119,12 +124,21 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *api.Error) {
 
 	events, apiErr := h.machines.CreateMachine(provisioner, template, req.Body, api.ContentTypeJSON)
 	if apiErr == nil {
-		// TODO - if the client requests streaming events... send that out here.
-		go func() {
+		readEvents := func() {
 			for event := range events {
 				log.Infoln("Event:", event)
 			}
-		}()
+		}
+
+		if blockingRequested(req) {
+			// TODO - if the client requests streaming events... send that out here.
+			readEvents()
+		} else {
+			go func() {
+				readEvents()
+			}()
+		}
+
 		return nil, nil
 	}
 
@@ -132,7 +146,13 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *api.Error) {
 }
 
 func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
-	cred, apiErr := h.credentialsOrDefault(provisionerNameFromQuery(req), req, "default")
+	// Load the record of the machine by name
+	record, apiErr := h.machines.Get(getMachineID(req))
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	cred, apiErr := h.credentialsOrDefault(record.Provisioner, req, "default")
 	if apiErr != nil {
 		return nil, apiErr
 	}
@@ -141,17 +161,13 @@ func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
 	// for now as a revamp is imminent.
 	deleteControls := getProvisionControls(req)
 
-	// Load the record of the machine by name
-	record, apiErr := h.machines.Get(getMachineID(req))
-	if apiErr != nil {
-		return nil, apiErr
-	}
-
 	builder, has := h.provisioners.GetBuilder(record.Provisioner)
 	if !has {
 		return nil, &api.Error{
 			api.ErrUnknown,
-			fmt.Sprintf("Machine record referenced a provisioner that does not exist: %s", record.Provisioner)}
+			fmt.Sprintf(
+				"Machine record referenced a provisioner that does not exist: %s",
+				record.Provisioner)}
 	}
 
 	provisioner, err := builder.Build(deleteControls, cred)
@@ -161,21 +177,28 @@ func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
 
 	events, apiErr := h.machines.DeleteMachine(provisioner, record)
 	if apiErr == nil {
-		// TODO - if the client requests streaming events... send that out here.
-		go func() {
+		readEvents := func() {
 			for event := range events {
 				log.Infoln("Event:", event)
 			}
-		}()
-		return nil, nil
+		}
+
+		if blockingRequested(req) {
+			// TODO - if the client requests streaming events... send that out here.
+			readEvents()
+		} else {
+			go func() {
+				readEvents()
+			}()
+		}
 	}
 
 	return nil, apiErr
 }
 
 func (h *machineHandler) attachTo(router *mux.Router) {
-	router.HandleFunc("/json", outputHandler(h.getAll)).Methods("GET")
-	router.HandleFunc("/create", outputHandler(h.create)).Methods("POST")
-	router.HandleFunc("/{key}/json", outputHandler(h.getOne)).Methods("GET")
+	router.HandleFunc("/", outputHandler(h.getAll)).Methods("GET")
+	router.HandleFunc("/{key}", outputHandler(h.create)).Methods("POST")
+	router.HandleFunc("/{key}", outputHandler(h.getOne)).Methods("GET")
 	router.HandleFunc("/{key}", outputHandler(h.delete)).Methods("DELETE")
 }
