@@ -46,10 +46,10 @@ func getProvisionerName(request *http.Request) string {
 }
 
 func (h *templatesHandler) attachTo(router *mux.Router) {
-	router.HandleFunc("/json", outputHandler(h.getAll)).Methods("GET")
-	router.HandleFunc("/meta/{provisioner}/json", outputHandler(h.getBlank)).Methods("GET")
-	router.HandleFunc("/{provisioner}/{key}/create", outputHandler(h.create)).Methods("POST")
+	router.HandleFunc("/", outputHandler(h.getAll)).Methods("GET")
+	router.HandleFunc("/meta/{provisioner}", outputHandler(h.getBlank)).Methods("GET")
+	router.HandleFunc("/{provisioner}/{key}", outputHandler(h.create)).Methods("POST")
 	router.HandleFunc("/{provisioner}/{key}", outputHandler(h.update)).Methods("PUT")
-	router.HandleFunc("/{provisioner}/{key}/json", outputHandler(h.getOne)).Methods("GET")
+	router.HandleFunc("/{provisioner}/{key}", outputHandler(h.getOne)).Methods("GET")
 	router.HandleFunc("/{provisioner}/{key}", outputHandler(h.delete)).Methods("DELETE")
 }
