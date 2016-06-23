@@ -43,7 +43,8 @@ type Machines interface {
 		input io.Reader,
 		codec Codec) (<-chan interface{}, *Error)
 
-	// DeleteMachine delete a machine.  The record contains workflow tasks for tear down of the machine.
+	// DeleteMachine deletes a machine.  The stored record for the machine will be used to define workflow tasks
+	// performed.
 	// TODO(wfarner): ProvisionControls is no longer an appropriate name since it's reused for deletion.  Leaving
 	// for now as a revamp is imminent.
 	DeleteMachine(
