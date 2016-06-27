@@ -8,14 +8,12 @@ import (
 // MachineID is the globally-unique identifier for machines.
 type MachineID string
 
-// Timestamp is a unix epoch timestamp, in seconds.
-type Timestamp uint64
-
 // Event is captures the data / emitted by tasks
 type Event struct {
 	Timestamp time.Time `json:"timestamp"`
 	Name      string    `json:"name"`
 	Message   string    `json:"message,omitempty"`
+	Metadata  string    `json:"metadata,omitempty"`
 	Error     string    `json:"error,omitempty"`
 }
 
@@ -26,8 +24,8 @@ type MachineSummary struct {
 	InstanceID   string    `json:"instance_id" ymal:"instance_id"`
 	IPAddress    string    `json:"ip" yaml:"ip"`
 	Provisioner  string    `json:"provisioner" yaml:"provisioner"`
-	Created      Timestamp `json:"created" yaml:"created"`
-	LastModified Timestamp `json:"modified" yaml:"modified"`
+	Created      time.Time `json:"created" yaml:"created"`
+	LastModified time.Time `json:"modified" yaml:"modified"`
 }
 
 // Name implements Resource.Name
@@ -82,21 +80,12 @@ func (m *MachineRecord) AppendChange(c spi.MachineRequest) {
 	})
 }
 
-// AppendEvent appends an event to the machine record
-func (m *MachineRecord) AppendEvent(name, message string) {
-	e := Event{
-		Name:      name,
-		Message:   message,
-		Timestamp: time.Now(),
-	}
-	m.AppendEventObject(e)
-}
-
-// AppendEventObject appends the full event object
-func (m *MachineRecord) AppendEventObject(event Event) {
+// AppendEvent appends an event to the machine record, setting the timestamp to the current time.
+func (m *MachineRecord) AppendEvent(event Event) {
 	if m.Events == nil {
 		m.Events = []Event{}
 	}
+	event.Timestamp = time.Now()
 	m.Events = append(m.Events, event)
 }
 

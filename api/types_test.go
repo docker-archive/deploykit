@@ -38,8 +38,8 @@ func TestAppendChange(t *testing.T) {
 	record := &MachineRecord{
 		MachineSummary: MachineSummary{
 			MachineName:  MachineID("test-host"),
-			Created:      Timestamp(time.Now().Unix()),
-			LastModified: Timestamp(time.Now().Unix()),
+			Created:      time.Now(),
+			LastModified: time.Now(),
 		},
 	}
 
@@ -57,8 +57,8 @@ func TestMarshalMachineRecord(t *testing.T) {
 	record := &MachineRecord{
 		MachineSummary: MachineSummary{
 			MachineName:  MachineID("test-host"),
-			Created:      Timestamp(time.Now().Unix()),
-			LastModified: Timestamp(time.Now().Unix()),
+			Created:      time.Now(),
+			LastModified: time.Now(),
 		},
 		Changes: []*spi.BaseMachineRequest{
 			{
@@ -87,8 +87,8 @@ func TestUnmarshalMachineRecord(t *testing.T) {
 	input := `
 name: test-host
 provisioner: test
-created: 1464122054
-modified: 1464122054
+created: "2016-06-27T22:47:31Z"
+modified: "2016-06-28T22:47:31Z"
 events: []
 changes:
 - name: test-host
