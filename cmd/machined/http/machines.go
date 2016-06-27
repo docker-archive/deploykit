@@ -67,62 +67,18 @@ func orDefault(v string, defaultValue string) string {
 	return v
 }
 
-func (h *machineHandler) credentialsOrDefault(
-	provisioner string,
-	req *http.Request,
-	defaultName string) (spi.Credential, *api.Error) {
-
-	cred, err := h.creds.Get(api.CredentialsID{
-		Provisioner: provisioner,
-		Name:        orDefault(req.URL.Query().Get("credentials"), defaultName)})
-	if err != nil {
-		return nil, err
-	}
-	return cred, nil
-}
-
-func (h *machineHandler) templateOrDefault(
-	provisioner string,
-	req *http.Request,
-	defaultName string) (spi.MachineRequest, *api.Error) {
-
-	template, apiErr := h.templates.Get(api.TemplateID{
-		Provisioner: provisioner,
-		Name:        orDefault(req.URL.Query().Get("template"), defaultName)})
-	if apiErr != nil {
-		// Overriding the error code here as ErrNotFound should not be returned for a referenced auxiliary
-		// entity.
-		return nil, &api.Error{api.ErrBadInput, apiErr.Error()}
-	}
-	return template, nil
-}
-
 func blockingRequested(req *http.Request) bool {
 	return len(req.URL.Query().Get("block")) > 0
 }
 
 func (h *machineHandler) create(req *http.Request) (interface{}, *api.Error) {
-	builder, apiErr := h.getProvisionerBuilder(req)
-	if apiErr != nil {
-		return nil, apiErr
-	}
-
-	cred, apiErr := h.credentialsOrDefault(builder.Name, req, "default")
-	if apiErr != nil {
-		return nil, apiErr
-	}
-
-	template, apiErr := h.templateOrDefault(builder.Name, req, "default")
-	if apiErr != nil {
-		return nil, apiErr
-	}
-
-	provisioner, err := builder.Build(getProvisionControls(req), cred)
-	if err != nil {
-		return nil, &api.Error{api.ErrBadInput, err.Error()}
-	}
-
-	events, apiErr := h.machines.CreateMachine(provisioner, template, req.Body, api.ContentTypeJSON)
+	events, apiErr := h.machines.CreateMachine(
+		provisionerNameFromQuery(req),
+		orDefault(req.URL.Query().Get("credentials"), "default"),
+		getProvisionControls(req),
+		orDefault(req.URL.Query().Get("template"), "default"),
+		req.Body,
+		api.ContentTypeJSON)
 	if apiErr == nil {
 		readEvents := func() {
 			for event := range events {
@@ -146,36 +102,10 @@ func (h *machineHandler) create(req *http.Request) (interface{}, *api.Error) {
 }
 
 func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
-	// Load the record of the machine by name
-	record, apiErr := h.machines.Get(getMachineID(req))
-	if apiErr != nil {
-		return nil, apiErr
-	}
-
-	cred, apiErr := h.credentialsOrDefault(record.Provisioner, req, "default")
-	if apiErr != nil {
-		return nil, apiErr
-	}
-
-	// TODO(wfarner): ProvisionControls is no longer an appropriate name since it's reused for deletion.  Leaving
-	// for now as a revamp is imminent.
-	deleteControls := getProvisionControls(req)
-
-	builder, has := h.provisioners.GetBuilder(record.Provisioner)
-	if !has {
-		return nil, &api.Error{
-			api.ErrUnknown,
-			fmt.Sprintf(
-				"Machine record referenced a provisioner that does not exist: %s",
-				record.Provisioner)}
-	}
-
-	provisioner, err := builder.Build(deleteControls, cred)
-	if err != nil {
-		return nil, &api.Error{api.ErrBadInput, err.Error()}
-	}
-
-	events, apiErr := h.machines.DeleteMachine(provisioner, record)
+	events, apiErr := h.machines.DeleteMachine(
+		orDefault(req.URL.Query().Get("credentials"), "default"),
+		getProvisionControls(req),
+		getMachineID(req))
 	if apiErr == nil {
 		readEvents := func() {
 			for event := range events {

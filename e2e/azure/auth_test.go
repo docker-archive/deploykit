@@ -36,7 +36,7 @@ func TestAuth(t *testing.T) {
 	ctx := azure.BuildContext(context.Background(), clientID, subscriptionID, environment)
 
 	// Get a blank object
-	cred := azure.NewCredential()
+	cred := azure.newCredential()
 
 	// Typically here the framework calling the provisioner will unmarshal user's input onto
 	// the structure here.

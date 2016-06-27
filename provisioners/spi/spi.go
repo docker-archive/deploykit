@@ -220,9 +220,6 @@ func (req BaseMachineRequest) Version() string {
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
-	// Name returns an identifier for this provisioner
-	Name() string
-
 	// GetProvisionTasks returns the available tasks for provisioning a resource.
 	// Task names are generally specific verbs that the user has specified.  The manager can either return
 	// no implementation (thus using framework defaults, or its own override implementation.
@@ -230,10 +227,6 @@ type Provisioner interface {
 
 	// GetTeardownTasks returns a list of available tasks for tearing down a resource.
 	GetTeardownTasks() []Task
-
-	// NewRequestInstance retrieves a new instance of the request type consumed by
-	// CreateInstance.
-	NewRequestInstance() MachineRequest
 
 	// GetInstanceKey returns an instanceID based on the request.  It's up to the provisioner
 	// on how to manage the mapping of machine request (which has a user-friendly name) to

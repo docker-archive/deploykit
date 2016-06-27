@@ -16,22 +16,6 @@ type provisioner struct {
 	sshKeys api.SSHKeys
 }
 
-// NewMachineRequest returns a canonical machine request suitable for this provisioner.
-// This includes the standard workflow steps as well as the platform attributes.
-func NewMachineRequest() spi.MachineRequest {
-	req := &CreateInstanceRequest{}
-	req.Provisioner = ProvisionerName
-	req.ProvisionerVersion = ProvisionerVersion
-	req.Provision = []string{machines.SSHKeyGenerateName, machines.CreateInstanceName}
-	req.Teardown = []string{machines.SSHKeyRemoveName, machines.DestroyInstanceName}
-	return req
-}
-
-// Name returns the name of the provisioner
-func (p *provisioner) Name() string {
-	return ProvisionerName
-}
-
 func (p *provisioner) GetProvisionTasks() []spi.Task {
 	return []spi.Task{
 		machines.SSHKeyGen{Keys: p.sshKeys},
@@ -44,10 +28,6 @@ func (p *provisioner) GetTeardownTasks() []spi.Task {
 		machines.SSHKeyRemove{Keys: p.sshKeys},
 		machines.DestroyInstance{Provisioner: p},
 	}
-}
-
-func (p *provisioner) NewRequestInstance() spi.MachineRequest {
-	return NewMachineRequest()
 }
 
 func (p *provisioner) GetInstanceID(req spi.MachineRequest) (string, error) {

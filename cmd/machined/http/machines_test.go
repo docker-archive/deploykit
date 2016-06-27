@@ -12,6 +12,8 @@ import (
 	"testing"
 )
 
+//go:generate mockgen -package api -destination ../../../mock/provisioners/spi/spi.go github.com/docker/libmachete/provisioners/spi Provisioner
+
 func requireMachines(t *testing.T, r *testflight.Requester, expected ...api.MachineID) {
 	response := r.Get("/machines?long=true")
 	require.Equal(t, 200, response.StatusCode, response.Body)
@@ -85,8 +87,6 @@ func TestMachineLifecycle(t *testing.T) {
 
 		// Create a machine
 		id := api.MachineID("frontend")
-		mockProvisioner.EXPECT().NewRequestInstance().Return(&testMachineRequest{})
-		mockProvisioner.EXPECT().Name().Return("testcloud")
 		mockProvisioner.EXPECT().GetProvisionTasks().Return(
 			[]spi.Task{machines.CreateInstance{mockProvisioner}})
 		expectedRequest := testMachineRequest{
@@ -146,7 +146,8 @@ func TestMachineLifecycle(t *testing.T) {
 			close(destroyEvents)
 		}()
 
-		require.Equal(t, 200, r.Delete("/machines/frontend?block=true", JSON, "").StatusCode)
+		response = r.Delete("/machines/frontend?block=true", JSON, "")
+		require.Equal(t, 200, response.StatusCode, response.Body)
 
 		// It should be moved to the destroyed state.
 		record = fetchRecord(t, r, "frontend")

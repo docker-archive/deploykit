@@ -4,8 +4,7 @@ import (
 	"github.com/docker/libmachete/provisioners/spi"
 )
 
-// CreateInstanceRequest is the struct used to create new instances.
-type CreateInstanceRequest struct {
+type createInstanceRequest struct {
 	spi.BaseMachineRequest   `yaml:",inline"`
 	AssociatePublicIPAddress bool              `yaml:"associate_public_ip_address" json:"associate_public_ip_address"`
 	AvailabilityZone         string            `yaml:"availability_zone" json:"availability_zone"`

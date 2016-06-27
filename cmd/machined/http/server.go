@@ -37,10 +37,14 @@ type apiServer struct {
 }
 
 func build(store storage.KvStore, provisioners machines.MachineProvisioners) (*apiServer, error) {
+	credentials := machines.NewCredentials(storage.NestedStore(store, "credentials"), provisioners)
+	templates := machines.NewTemplates(storage.NestedStore(store, "templates"), provisioners)
+	mach := machines.NewMachines(storage.NestedStore(store, "machines"), provisioners, templates, credentials)
+
 	return &apiServer{
-		credentials:  machines.NewCredentials(storage.NestedStore(store, "credentials"), provisioners),
-		templates:    machines.NewTemplates(storage.NestedStore(store, "templates"), provisioners),
-		machines:     machines.NewMachines(storage.NestedStore(store, "machines")),
+		credentials:  credentials,
+		templates:    templates,
+		machines:     mach,
 		keystore:     machines.NewSSHKeys(storage.NestedStore(store, "keys")),
 		provisioners: provisioners,
 	}, nil

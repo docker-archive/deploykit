@@ -92,23 +92,3 @@ func (_m *MockProvisioner) GetTeardownTasks() []spi.Task {
 func (_mr *_MockProvisionerRecorder) GetTeardownTasks() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetTeardownTasks")
 }
-
-func (_m *MockProvisioner) Name() string {
-	ret := _m.ctrl.Call(_m, "Name")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-func (_mr *_MockProvisionerRecorder) Name() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Name")
-}
-
-func (_m *MockProvisioner) NewRequestInstance() spi.MachineRequest {
-	ret := _m.ctrl.Call(_m, "NewRequestInstance")
-	ret0, _ := ret[0].(spi.MachineRequest)
-	return ret0
-}
-
-func (_mr *_MockProvisionerRecorder) NewRequestInstance() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "NewRequestInstance")
-}
