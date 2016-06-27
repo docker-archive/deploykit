@@ -121,7 +121,7 @@ func getInstanceSync(client ec2iface.EC2API, instanceID string) (*ec2.Instance, 
 	return result.Reservations[0].Instances[0], nil
 }
 
-func tagSync(client ec2iface.EC2API, request CreateInstanceRequest, instance *ec2.Instance) error {
+func tagSync(client ec2iface.EC2API, request createInstanceRequest, instance *ec2.Instance) error {
 	tags := []*ec2.Tag{}
 
 	// Gather the tag keys in sorted order, to provide predictable tag order.  This is
@@ -157,7 +157,7 @@ func tagSync(client ec2iface.EC2API, request CreateInstanceRequest, instance *ec
 
 func createInstanceSync(
 	client ec2iface.EC2API,
-	request CreateInstanceRequest) (*ec2.Instance, error) {
+	request createInstanceRequest) (*ec2.Instance, error) {
 
 	reservation, err := client.RunInstances(&ec2.RunInstancesInput{
 		ImageId:  &request.ImageID,
@@ -215,33 +215,12 @@ func (p *provisioner) blockUntilInstanceInState(instanceID string, instanceState
 		})
 }
 
-// NewMachineRequest returns a canonical machine request suitable for this provisioner.
-// This includes the standard workflow steps as well as the platform attributes.
-func NewMachineRequest() spi.MachineRequest {
-	req := &CreateInstanceRequest{}
-	req.Provisioner = ProvisionerName
-	req.ProvisionerVersion = ProvisionerVersion
-	req.Provision = []string{machines.SSHKeyGenerateName, machines.CreateInstanceName}
-	req.Teardown = []string{machines.SSHKeyRemoveName, machines.DestroyInstanceName}
-	return req
-}
-
-// Name returns the name of the provisioner
-func (p *provisioner) Name() string {
-	return ProvisionerName
-}
-
-func (p *provisioner) NewRequestInstance() spi.MachineRequest {
-	return NewMachineRequest()
-}
-
-func ensureRequestType(req spi.MachineRequest) (r *CreateInstanceRequest, err error) {
-	is := false
-	if r, is = req.(*CreateInstanceRequest); !is {
-		err = fmt.Errorf("request type mismatch: %v", reflect.TypeOf(req))
-		return
+func ensureRequestType(req spi.MachineRequest) (*createInstanceRequest, error) {
+	r, is := req.(*createInstanceRequest)
+	if is {
+		return r, nil
 	}
-	return
+	return nil, fmt.Errorf("request type mismatch: %v", reflect.TypeOf(req))
 }
 
 // GetInstanceID returns the infrastructure identifier given the state of the machine.
@@ -268,14 +247,20 @@ func (p *provisioner) GetIPAddress(req spi.MachineRequest) (string, error) {
 
 func (p *provisioner) GetProvisionTasks() []spi.Task {
 	return []spi.Task{
-		spi.DoAfterTask("AWS - upload generated SSH key", machines.SSHKeyGen{Keys: p.sshKeys}, p.importEC2Key),
+		spi.DoAfterTask(
+			"AWS - upload generated SSH key",
+			machines.SSHKeyGen{Keys: p.sshKeys},
+			importEC2Key(p.sshKeys, p.client)),
 		machines.CreateInstance{Provisioner: p},
 	}
 }
 
 func (p *provisioner) GetTeardownTasks() []spi.Task {
 	return []spi.Task{
-		spi.DoBeforeTask("AWS - remove ssh key", p.deleteEC2Key, machines.SSHKeyRemove{Keys: p.sshKeys}),
+		spi.DoBeforeTask(
+			"AWS - remove ssh key",
+			deleteEC2Key(p.client),
+			machines.SSHKeyRemove{Keys: p.sshKeys}),
 		machines.DestroyInstance{Provisioner: p},
 	}
 }
@@ -283,7 +268,7 @@ func (p *provisioner) GetTeardownTasks() []spi.Task {
 func (p *provisioner) CreateInstance(
 	req spi.MachineRequest) (<-chan spi.CreateInstanceEvent, error) {
 
-	request, is := req.(*CreateInstanceRequest)
+	request, is := req.(*createInstanceRequest)
 	if !is {
 		return nil, &ErrInvalidRequest{}
 	}

@@ -2,15 +2,31 @@ package azure
 
 import (
 	"github.com/docker/libmachete/machines"
+	"github.com/docker/libmachete/provisioners/spi"
 )
 
 func init() {
 	machines.DefaultProvisioners.Register(machines.ProvisionerBuilder{
 		Name:                  ProvisionerName,
-		DefaultCredential:     NewCredential,
-		DefaultMachineRequest: NewMachineRequest,
+		DefaultCredential:     newCredential,
+		DefaultMachineRequest: newMachineRequest,
 		Build: ProvisionerWith,
 	})
+}
+
+func newCredential() spi.Credential {
+	return &credential{CredentialBase: spi.CredentialBase{}}
+}
+
+func newMachineRequest() spi.MachineRequest {
+	return &createInstanceRequest{
+		BaseMachineRequest: spi.BaseMachineRequest{
+			Provisioner:        ProvisionerName,
+			ProvisionerVersion: ProvisionerVersion,
+			Provision:          []string{machines.SSHKeyGenerateName, machines.CreateInstanceName},
+			Teardown:           []string{machines.SSHKeyRemoveName, machines.DestroyInstanceName},
+		},
+	}
 }
 
 const (

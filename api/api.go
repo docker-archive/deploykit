@@ -36,13 +36,21 @@ type Machines interface {
 
 	// CreateMachine adds a new machine from the input reader.
 	CreateMachine(
-		provisioner spi.Provisioner,
-		template spi.MachineRequest,
+		provisionerName string,
+		credentialsName string,
+		controls spi.ProvisionControls,
+		templateName string,
 		input io.Reader,
 		codec Codec) (<-chan interface{}, *Error)
 
-	// DeleteMachine delete a machine.  The record contains workflow tasks for tear down of the machine.
-	DeleteMachine(provisioner spi.Provisioner, record MachineRecord) (<-chan interface{}, *Error)
+	// DeleteMachine deletes a machine.  The stored record for the machine will be used to define workflow tasks
+	// performed.
+	// TODO(wfarner): ProvisionControls is no longer an appropriate name since it's reused for deletion.  Leaving
+	// for now as a revamp is imminent.
+	DeleteMachine(
+		credentialsName string,
+		controls spi.ProvisionControls,
+		machine MachineID) (<-chan interface{}, *Error)
 }
 
 // SSHKeys provides operations for generating and managing SSH keys.

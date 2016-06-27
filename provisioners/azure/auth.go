@@ -11,11 +11,6 @@ import (
 	"regexp"
 )
 
-// NewCredential allocates a blank credential object.  Calling Validate() on this object will result in error.
-func NewCredential() spi.Credential {
-	return &credential{CredentialBase: spi.CredentialBase{}}
-}
-
 type credential struct {
 	spi.CredentialBase `yaml:",inline"`
 	azure.Token        `yaml:",inline"`

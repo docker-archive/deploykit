@@ -49,7 +49,7 @@ func TestCreate(t *testing.T) {
 		aws.CreateClient(region, awsCredentials, 10),
 		api.NewSSHKeys(filestore.NewFileStore(afero.NewMemMapFs(), "/")))
 
-	request := &aws.CreateInstanceRequest{
+	request := &aws.createInstanceRequest{
 		AvailabilityZone:         "us-west-2a",
 		ImageID:                  "ami-30ee0d50",
 		BlockDeviceName:          "/dev/sdb",
