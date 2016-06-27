@@ -3,7 +3,7 @@ package azure
 import (
 	"errors"
 	"github.com/docker/libmachete/api"
-	"github.com/docker/libmachete/machines"
+	"github.com/docker/libmachete/machines/tasks"
 	"github.com/docker/libmachete/provisioners/spi"
 )
 
@@ -18,15 +18,15 @@ type provisioner struct {
 
 func (p *provisioner) GetProvisionTasks() []spi.Task {
 	return []spi.Task{
-		machines.SSHKeyGen{Keys: p.sshKeys},
-		machines.CreateInstance{Provisioner: p},
+		tasks.SSHKeyGen{Keys: p.sshKeys},
+		tasks.CreateInstance{Provisioner: p},
 	}
 }
 
 func (p *provisioner) GetTeardownTasks() []spi.Task {
 	return []spi.Task{
-		machines.SSHKeyRemove{Keys: p.sshKeys},
-		machines.DestroyInstance{Provisioner: p},
+		tasks.SSHKeyRemove{Keys: p.sshKeys},
+		tasks.DestroyInstance{Provisioner: p},
 	}
 }
 
