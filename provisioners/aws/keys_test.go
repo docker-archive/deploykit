@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -9,7 +8,6 @@ import (
 	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/aws/mock"
 	"github.com/docker/libmachete/provisioners/spi"
-	"github.com/docker/libmachete/storage"
 	"github.com/docker/libmachete/storage/filestore"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/afero"
@@ -54,7 +52,7 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	}
 	client.EXPECT().ImportKeyPair(gomock.Any()).Do(matcher).Return(nil, nil)
 
-	request := &CreateInstanceRequest{}
+	request := &createInstanceRequest{}
 	request.KeyName = ""
 	request.MachineName = host
 
@@ -92,7 +90,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 
 	client.EXPECT().DeleteKeyPair(&ec2.DeleteKeyPairInput{KeyName: &host}).Return(nil, nil)
 
-	request := &CreateInstanceRequest{}
+	request := &createInstanceRequest{}
 	require.NoError(t, json.Unmarshal([]byte(testCreateSync[0]), request))
 	payload := fmt.Sprintf(`{"name": "%s", "provision" : [ "ssh-key-generate", "instance-create" ]}`, host)
 	require.NoError(t, json.Unmarshal([]byte(payload), request))
@@ -120,12 +118,9 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	host := "new-host"
-	store := filestore.NewFileStore(afero.NewMemMapFs(), "/")
-	machines := machines.NewMachines(storage.NestedStore(store, "machines"))
-
 	client, provisioner := newTestClientAndProvisioner(ctrl)
 
+	host := "new-host"
 	client.EXPECT().ImportKeyPair(gomock.Any()).Do(
 		func(input *ec2.ImportKeyPairInput) {
 			require.NotNil(t, input)
@@ -134,31 +129,21 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 			require.True(t, len(input.PublicKeyMaterial) > 0)
 		},
 	).Return(nil, nil)
-	client.EXPECT().RunInstances(gomock.Any()).Do(
-		func(input *ec2.RunInstancesInput) {
-			require.NotNil(t, input)
-			require.Equal(t, host, *input.KeyName)
-		},
-	).Return(nil, nil)
 
-	template := loadTemplate(t)
+	events := make(chan interface{})
+	record := api.MachineRecord{MachineSummary: api.MachineSummary{MachineName: api.MachineID(host)}}
+	request := &createInstanceRequest{}
 
-	events, err := machines.CreateMachine(
-		&provisioner,
-		template,
-		bytes.NewBuffer([]byte(fmt.Sprintf(
-			`{"name": "%s", "provision" : [ "ssh-key-generate", "instance-create" ]}`, host))),
-		api.ContentTypeJSON)
+	go func() {
+		err := getTaskByName(t, provisioner.GetProvisionTasks(), machines.SSHKeyGenerateName).
+			Run(record, request, events)
+		require.NoError(t, err)
+		close(events)
+	}()
 
-	require.NoError(t, err)
-	require.NotNil(t, events)
-
-	for range events {
+	for event := range events {
+		request, is := event.(*createInstanceRequest)
+		require.True(t, is)
+		require.Equal(t, string(record.MachineName), request.KeyName)
 	}
-}
-
-func loadTemplate(t *testing.T) *CreateInstanceRequest {
-	template := &CreateInstanceRequest{}
-	require.NoError(t, json.Unmarshal([]byte(testCreateSync[0]), template))
-	return template
 }
