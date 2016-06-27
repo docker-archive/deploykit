@@ -26,14 +26,14 @@ func TestCreateInstanceSync(t *testing.T) {
 	defer ctrl.Finish()
 	clientMock := mock.NewMockEC2API(ctrl)
 
-	request := new(createInstanceRequest)
+	request := &createInstanceRequest{}
 	require.Nil(t, json.Unmarshal([]byte(testCreateSync[0]), request))
 
 	reservation := ec2.Reservation{
 		Instances: []*ec2.Instance{{InstanceId: aws.String("test-id")}}}
 	// Validates command against a known-good value.
 	matcher := func(input *ec2.RunInstancesInput) {
-		expectedInput := new(ec2.RunInstancesInput)
+		expectedInput := &ec2.RunInstancesInput{}
 		require.Nil(t, json.Unmarshal([]byte(testCreateSync[1]), expectedInput))
 		if !reflect.DeepEqual(expectedInput, input) {
 			t.Error("Expected and actual did not match.", expectedInput, input)

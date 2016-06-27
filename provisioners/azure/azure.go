@@ -9,7 +9,7 @@ import (
 
 // ProvisionerWith returns a provision given the runtime context and credential
 func ProvisionerWith(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error) {
-	return new(provisioner), nil
+	return &provisioner{}, nil
 }
 
 type provisioner struct {
