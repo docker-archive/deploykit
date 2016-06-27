@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/api"
-	"github.com/docker/libmachete/machines"
+	"github.com/docker/libmachete/machines/tasks"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
@@ -64,7 +64,7 @@ func TestMachineLifecycle(t *testing.T) {
 		template := testMachineRequest{
 			BaseMachineRequest: spi.BaseMachineRequest{
 				Provisioner: "testcloud",
-				Teardown:    []string{machines.DestroyInstanceName},
+				Teardown:    []string{tasks.DestroyInstanceName},
 			},
 			TurboButtons: 5,
 		}
@@ -88,13 +88,13 @@ func TestMachineLifecycle(t *testing.T) {
 		// Create a machine
 		id := api.MachineID("frontend")
 		mockProvisioner.EXPECT().GetProvisionTasks().Return(
-			[]spi.Task{machines.CreateInstance{mockProvisioner}})
+			[]spi.Task{tasks.CreateInstance{mockProvisioner}})
 		expectedRequest := testMachineRequest{
 			BaseMachineRequest: spi.BaseMachineRequest{
 				MachineName: string(id),
 				Provisioner: "testcloud",
-				Provision:   []string{machines.CreateInstanceName},
-				Teardown:    []string{machines.DestroyInstanceName},
+				Provision:   []string{tasks.CreateInstanceName},
+				Teardown:    []string{tasks.DestroyInstanceName},
 			},
 			TurboButtons: 6,
 		}
@@ -111,7 +111,7 @@ func TestMachineLifecycle(t *testing.T) {
 		overlay := testMachineRequest{
 			BaseMachineRequest: spi.BaseMachineRequest{
 				MachineName: string(id),
-				Provision:   []string{machines.CreateInstanceName},
+				Provision:   []string{tasks.CreateInstanceName},
 			},
 			TurboButtons: 6,
 		}
@@ -138,7 +138,7 @@ func TestMachineLifecycle(t *testing.T) {
 
 		// Delete the machine
 		mockProvisioner.EXPECT().GetTeardownTasks().Return(
-			[]spi.Task{machines.DestroyInstance{mockProvisioner}})
+			[]spi.Task{tasks.DestroyInstance{mockProvisioner}})
 		destroyEvents := make(chan spi.DestroyInstanceEvent)
 		mockProvisioner.EXPECT().DestroyInstance(instanceID).Return(destroyEvents, nil)
 		go func() {
