@@ -151,8 +151,8 @@ func TestCreateMachine(t *testing.T) {
 	id := "id-new-host"
 
 	template := &spi.BaseMachineRequest{Provision: []string{CreateInstanceName}}
-	request := new(spi.BaseMachineRequest)
-	expectReq := new(spi.BaseMachineRequest)
+	request := &spi.BaseMachineRequest{}
+	expectReq := &spi.BaseMachineRequest{}
 	*expectReq = *template
 	expectReq.MachineName = name
 

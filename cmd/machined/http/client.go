@@ -138,7 +138,7 @@ func doGet(client *http.Client, node string) error {
 		return fmt.Errorf("error:%v, message=%v", resp.StatusCode, buff)
 	}
 
-	record := new(api.MachineRecord)
+	record := &api.MachineRecord{}
 
 	err = json.Unmarshal(buff, record)
 	if err != nil {

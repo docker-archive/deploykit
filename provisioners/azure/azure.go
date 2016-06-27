@@ -9,7 +9,7 @@ import (
 
 // ProvisionerWith returns a provision given the runtime context and credential
 func ProvisionerWith(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error) {
-	return new(provisioner), nil
+	return &provisioner{}, nil
 }
 
 type provisioner struct {
@@ -19,7 +19,7 @@ type provisioner struct {
 // NewMachineRequest returns a canonical machine request suitable for this provisioner.
 // This includes the standard workflow steps as well as the platform attributes.
 func NewMachineRequest() spi.MachineRequest {
-	req := new(CreateInstanceRequest)
+	req := &CreateInstanceRequest{}
 	req.Provisioner = ProvisionerName
 	req.ProvisionerVersion = ProvisionerVersion
 	req.Provision = []string{machines.SSHKeyGenerateName, machines.CreateInstanceName}
