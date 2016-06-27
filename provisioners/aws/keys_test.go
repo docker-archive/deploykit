@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/machines"
+	"github.com/docker/libmachete/machines/tasks"
 	"github.com/docker/libmachete/provisioners/aws/mock"
 	"github.com/docker/libmachete/provisioners/spi"
 	"github.com/docker/libmachete/storage/filestore"
@@ -67,7 +68,7 @@ func TestTaskGenerateAndUploadSSHKey(t *testing.T) {
 	}()
 
 	// runs synchronously
-	err := getTaskByName(t, provisioner.GetProvisionTasks(), machines.SSHKeyGenerateName).
+	err := getTaskByName(t, provisioner.GetProvisionTasks(), tasks.SSHKeyGenerateName).
 		Run(record, request, events)
 
 	close(events)
@@ -101,7 +102,7 @@ func TestTaskRemoveLocalAndUploadedSSHKey(t *testing.T) {
 	record := &api.MachineRecord{}
 	record.MachineName = api.MachineID(host)
 
-	err := getTaskByName(t, provisioner.GetTeardownTasks(), machines.SSHKeyRemoveName).
+	err := getTaskByName(t, provisioner.GetTeardownTasks(), tasks.SSHKeyRemoveName).
 		Run(record, request, events)
 	// TODO(wfarner): This was previously require.NoError(), which does not seem to make sense since the SSH key
 	// being deleted did not exist, which should be an error.  Consider adding a step to the beginning of the test
@@ -135,7 +136,7 @@ func TestGeneratedKeyNameIsPropagated(t *testing.T) {
 	request := &createInstanceRequest{}
 
 	go func() {
-		err := getTaskByName(t, provisioner.GetProvisionTasks(), machines.SSHKeyGenerateName).
+		err := getTaskByName(t, provisioner.GetProvisionTasks(), tasks.SSHKeyGenerateName).
 			Run(record, request, events)
 		require.NoError(t, err)
 		close(events)

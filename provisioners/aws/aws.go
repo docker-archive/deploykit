@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/api"
-	"github.com/docker/libmachete/machines"
+	"github.com/docker/libmachete/machines/tasks"
 	"github.com/docker/libmachete/provisioners/spi"
 	"reflect"
 	"sort"
@@ -249,9 +249,9 @@ func (p *provisioner) GetProvisionTasks() []spi.Task {
 	return []spi.Task{
 		spi.DoAfterTask(
 			"AWS - upload generated SSH key",
-			machines.SSHKeyGen{Keys: p.sshKeys},
+			tasks.SSHKeyGen{Keys: p.sshKeys},
 			importEC2Key(p.sshKeys, p.client)),
-		machines.CreateInstance{Provisioner: p},
+		tasks.CreateInstance{Provisioner: p},
 	}
 }
 
@@ -260,8 +260,8 @@ func (p *provisioner) GetTeardownTasks() []spi.Task {
 		spi.DoBeforeTask(
 			"AWS - remove ssh key",
 			deleteEC2Key(p.client),
-			machines.SSHKeyRemove{Keys: p.sshKeys}),
-		machines.DestroyInstance{Provisioner: p},
+			tasks.SSHKeyRemove{Keys: p.sshKeys}),
+		tasks.DestroyInstance{Provisioner: p},
 	}
 }
 
