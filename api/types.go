@@ -134,3 +134,6 @@ type TemplateID struct {
 
 // SSHKeyID is a unique id for an SSH key
 type SSHKeyID string
+
+// SwarmID is the unique id for a swarm cluster.
+type SwarmID string

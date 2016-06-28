@@ -2,7 +2,6 @@ package http
 
 import (
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/api"
 	"github.com/docker/libmachete/machines"
 	"github.com/docker/libmachete/provisioners/spi"
@@ -72,58 +71,22 @@ func blockingRequested(req *http.Request) bool {
 }
 
 func (h *machineHandler) create(req *http.Request) (interface{}, *api.Error) {
-	events, apiErr := h.machines.CreateMachine(
+	events, err := h.machines.CreateMachine(
 		provisionerNameFromQuery(req),
 		orDefault(req.URL.Query().Get("credentials"), "default"),
 		getProvisionControls(req),
 		orDefault(req.URL.Query().Get("template"), "default"),
 		req.Body,
 		api.ContentTypeJSON)
-	if apiErr == nil {
-		readEvents := func() {
-			for event := range events {
-				log.Infoln("Event:", event)
-			}
-		}
-
-		if blockingRequested(req) {
-			// TODO - if the client requests streaming events... send that out here.
-			readEvents()
-		} else {
-			go func() {
-				readEvents()
-			}()
-		}
-
-		return nil, nil
-	}
-
-	return nil, apiErr
+	return handleEventResponse(req, events, err)
 }
 
 func (h *machineHandler) delete(req *http.Request) (interface{}, *api.Error) {
-	events, apiErr := h.machines.DeleteMachine(
+	events, err := h.machines.DeleteMachine(
 		orDefault(req.URL.Query().Get("credentials"), "default"),
 		getProvisionControls(req),
 		getMachineID(req))
-	if apiErr == nil {
-		readEvents := func() {
-			for event := range events {
-				log.Infoln("Event:", event)
-			}
-		}
-
-		if blockingRequested(req) {
-			// TODO - if the client requests streaming events... send that out here.
-			readEvents()
-		} else {
-			go func() {
-				readEvents()
-			}()
-		}
-	}
-
-	return nil, apiErr
+	return handleEventResponse(req, events, err)
 }
 
 func (h *machineHandler) attachTo(router *mux.Router) {

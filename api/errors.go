@@ -42,11 +42,3 @@ func UnknownError(err error) *Error {
 func NewError(code int, format string, args ...interface{}) error {
 	return Error{Code: code, Message: fmt.Sprintf(format, args...)}
 }
-
-// IsErr returns whether the error is an Error and has the specified code
-func IsErr(e error, code int) bool {
-	if err, ok := e.(Error); ok {
-		return err.Code == code
-	}
-	return false
-}
