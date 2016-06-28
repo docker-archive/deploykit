@@ -20,6 +20,7 @@ import (
 	// Load the supported provisioners
 	_ "github.com/docker/libmachete/provisioners/aws"
 	_ "github.com/docker/libmachete/provisioners/azure"
+	"github.com/docker/libmachete/swarms"
 )
 
 type apiOptions struct {
@@ -32,6 +33,7 @@ type apiServer struct {
 	credentials  api.Credentials
 	templates    api.Templates
 	machines     api.Machines
+	swarms       api.Swarms
 	keystore     api.SSHKeys
 	provisioners machines.MachineProvisioners
 }
@@ -45,6 +47,7 @@ func build(store storage.KvStore, provisioners machines.MachineProvisioners) (*a
 		credentials:  credentials,
 		templates:    templates,
 		machines:     mach,
+		swarms:       swarms.New(provisioners, templates, credentials),
 		keystore:     machines.NewSSHKeys(storage.NestedStore(store, "keys")),
 		provisioners: provisioners,
 	}, nil
@@ -62,6 +65,29 @@ func respondError(code int, resp http.ResponseWriter, err error) {
 	panic(fmt.Sprintf("Failed to marshal error text: %s", err.Error()))
 }
 
+func handleEventResponse(req *http.Request, events <-chan interface{}, err *api.Error) (interface{}, *api.Error) {
+	if err == nil {
+		readEvents := func() {
+			for event := range events {
+				log.Infoln("Event:", event)
+			}
+		}
+
+		if blockingRequested(req) {
+			// TODO - if the client requests streaming events... send that out here.
+			readEvents()
+		} else {
+			go func() {
+				readEvents()
+			}()
+		}
+
+		return nil, nil
+	}
+
+	return nil, err
+}
+
 type routerAttachment interface {
 	attachTo(router *mux.Router)
 }
@@ -76,6 +102,7 @@ func (s *apiServer) getHandler() http.Handler {
 			machines:     s.machines,
 			keystore:     s.keystore,
 			provisioners: s.provisioners},
+		"/swarms": &swarmHandler{swarms: s.swarms},
 	}
 
 	router := mux.NewRouter()
