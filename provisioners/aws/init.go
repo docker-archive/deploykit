@@ -2,6 +2,7 @@ package aws
 
 import (
 	"github.com/docker/libmachete/machines"
+	"github.com/docker/libmachete/machines/tasks"
 	"github.com/docker/libmachete/provisioners/spi"
 )
 
@@ -19,8 +20,8 @@ func newMachineRequest() spi.MachineRequest {
 		BaseMachineRequest: spi.BaseMachineRequest{
 			Provisioner:        ProvisionerName,
 			ProvisionerVersion: ProvisionerVersion,
-			Provision:          []string{machines.SSHKeyGenerateName, machines.CreateInstanceName},
-			Teardown:           []string{machines.SSHKeyRemoveName, machines.DestroyInstanceName},
+			Provision:          []string{tasks.SSHKeyGenerateName, tasks.CreateInstanceName},
+			Teardown:           []string{tasks.SSHKeyRemoveName, tasks.DestroyInstanceName},
 		},
 	}
 }
