@@ -29,6 +29,16 @@ func (_m *MockProvisioner) EXPECT() *_MockProvisionerRecorder {
 	return _m.recorder
 }
 
+func (_m *MockProvisioner) AddGroupInstances(_param0 spi.GroupID, _param1 uint) error {
+	ret := _m.ctrl.Call(_m, "AddGroupInstances", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockProvisionerRecorder) AddGroupInstances(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "AddGroupInstances", arg0, arg1)
+}
+
 func (_m *MockProvisioner) CreateInstance(_param0 spi.MachineRequest) (<-chan spi.CreateInstanceEvent, error) {
 	ret := _m.ctrl.Call(_m, "CreateInstance", _param0)
 	ret0, _ := ret[0].(<-chan spi.CreateInstanceEvent)
@@ -71,6 +81,17 @@ func (_m *MockProvisioner) GetInstanceID(_param0 spi.MachineRequest) (string, er
 
 func (_mr *_MockProvisionerRecorder) GetInstanceID(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetInstanceID", arg0)
+}
+
+func (_m *MockProvisioner) GetInstances(_param0 spi.GroupID) ([]spi.InstanceID, error) {
+	ret := _m.ctrl.Call(_m, "GetInstances", _param0)
+	ret0, _ := ret[0].([]spi.InstanceID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockProvisionerRecorder) GetInstances(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetInstances", arg0)
 }
 
 func (_m *MockProvisioner) GetProvisionTasks() []spi.Task {

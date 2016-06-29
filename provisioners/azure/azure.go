@@ -45,3 +45,11 @@ func (p *provisioner) CreateInstance(req spi.MachineRequest) (<-chan spi.CreateI
 func (p *provisioner) DestroyInstance(instanceID string) (<-chan spi.DestroyInstanceEvent, error) {
 	panic(errors.New("not implemented"))
 }
+
+func (p *provisioner) GetInstances(group spi.GroupID) ([]spi.InstanceID, error) {
+	panic(errors.New("not implemented"))
+}
+
+func (p *provisioner) AddGroupInstances(group spi.GroupID, count uint) error {
+	panic(errors.New("not implemented"))
+}

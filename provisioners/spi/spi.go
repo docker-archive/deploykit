@@ -217,6 +217,14 @@ func (req BaseMachineRequest) Version() string {
 	return req.ProvisionerVersion
 }
 
+// InstanceID is the identifier for a machine instance.
+// TODO(wfarner): Convert other uses of string as an instance identifier to use InstanceID.
+type InstanceID string
+
+// GroupID is the identifier used for a managed group of instances.
+// A group is a collection of instances that are replicas of a service.
+type GroupID string
+
 // A Provisioner is a vendor-agnostic API used to create and manage
 // resources with an infrastructure provider.
 type Provisioner interface {
@@ -227,6 +235,12 @@ type Provisioner interface {
 
 	// GetTeardownTasks returns a list of available tasks for tearing down a resource.
 	GetTeardownTasks() []Task
+
+	// GetInstances returns all instances included in a group.
+	GetInstances(group GroupID) ([]InstanceID, error)
+
+	// AddGroupInstances instructs the provisioner to create more replicas of a group.
+	AddGroupInstances(group GroupID, count uint) error
 
 	// GetInstanceKey returns an instanceID based on the request.  It's up to the provisioner
 	// on how to manage the mapping of machine request (which has a user-friendly name) to

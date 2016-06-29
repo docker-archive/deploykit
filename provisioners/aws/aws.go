@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
@@ -382,4 +383,12 @@ func (p *provisioner) DestroyInstance(instanceID string) (<-chan spi.DestroyInst
 	}()
 
 	return events, nil
+}
+
+func (p *provisioner) GetInstances(group spi.GroupID) ([]spi.InstanceID, error) {
+	panic(errors.New("not implemented"))
+}
+
+func (p *provisioner) AddGroupInstances(group spi.GroupID, count uint) error {
+	panic(errors.New("not implemented"))
 }
