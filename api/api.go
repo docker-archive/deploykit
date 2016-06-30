@@ -53,6 +53,27 @@ type Machines interface {
 		machine MachineID) (<-chan interface{}, *Error)
 }
 
+// Swarms manages the lifecycle of a cluster of machines.
+type Swarms interface {
+	// ListIDs returns the IDs for all known swarms.
+	ListIDs() ([]SwarmID, *Error)
+
+	// Get returns the description of a swarm.
+	// TODO(wfarner): Return the specific document type once defined.
+	Get(id SwarmID) (interface{}, *Error)
+
+	// CreateSwarm creates a new cluster based on instructions from the input data.
+	Create(
+		provisionerName string,
+		credentialsName string,
+		templateName string,
+		input io.Reader,
+		codec Codec) (<-chan interface{}, *Error)
+
+	// DeleteMachine deletes a swarm.
+	Delete(credentialsName string, machine SwarmID) (<-chan interface{}, *Error)
+}
+
 // SSHKeys provides operations for generating and managing SSH keys.
 type SSHKeys interface {
 	// NewKeyPair creates and saves a new key pair identified by the id
