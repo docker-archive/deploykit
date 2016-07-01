@@ -18,7 +18,7 @@ type ProvisionerBuilder struct {
 	DefaultCredential func() spi.Credential
 	// TODO(wfarner): This function is redundant with Provisioner.NewRequestInstance().
 	DefaultMachineRequest func() spi.MachineRequest
-	Build                 func(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error)
+	Build                 func(controls spi.ProvisionControls, cred spi.Credential) (spi.MachineProvisioner, error)
 }
 
 // MachineProvisioners maintains the collection of available provisioners.

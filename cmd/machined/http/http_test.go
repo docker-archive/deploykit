@@ -34,7 +34,7 @@ func prepareTest(t *testing.T, ctrl *gomock.Controller) (*mock_spi.MockProvision
 		Name:                  "testcloud",
 		DefaultCredential:     func() spi.Credential { return &testCredentials{} },
 		DefaultMachineRequest: func() spi.MachineRequest { return &testMachineRequest{} },
-		Build: func(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error) {
+		Build: func(controls spi.ProvisionControls, cred spi.Credential) (spi.MachineProvisioner, error) {
 			return provisioner, nil
 		},
 	}

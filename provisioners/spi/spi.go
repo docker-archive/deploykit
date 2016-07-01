@@ -227,6 +227,11 @@ type Provisioner interface {
 
 	// GetTeardownTasks returns a list of available tasks for tearing down a resource.
 	GetTeardownTasks() []Task
+}
+
+// MachineProvisioner interface adds additional methods appropriate for machine provisioning
+type MachineProvisioner interface {
+	Provisioner
 
 	// GetInstanceKey returns an instanceID based on the request.  It's up to the provisioner
 	// on how to manage the mapping of machine request (which has a user-friendly name) to
@@ -245,4 +250,10 @@ type Provisioner interface {
 	CreateInstance(request MachineRequest) (<-chan CreateInstanceEvent, error)
 
 	DestroyInstance(instanceID string) (<-chan DestroyInstanceEvent, error)
+}
+
+// SwarmProvisioner provisions entire infrastructure for a swarm.  This can be implemented
+// in a variety of ways from CloudFormation on AWS to programmatic API calls on other platforms.
+type SwarmProvisioner interface {
+	Provisioner
 }
