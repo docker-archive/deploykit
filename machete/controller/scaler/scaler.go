@@ -1,29 +1,49 @@
 package scaler
 
 import (
-	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/provisioners/spi"
+	"github.com/docker/libmachete/machete/spi/instance"
 	"sort"
 	"sync"
 	"time"
 )
 
-// Scaler is an auto-scaler that monitors individual instance groups.
-type Scaler interface {
-	// MaintainCount will poll the `provisioner` periodically to ensure that an instance group has exactly `count`
-	// instances.  When the count is found to be different, the provisioner will be instructed to add or remove
-	// instances to return to the desired instance count.
-	MaintainCount(provisioner spi.Provisioner, id spi.GroupID, count uint) error
+// RunStop is an operation that may be Run (synchronously) and interrupted by calling Stop.
+type RunStop interface {
+	Run()
+
+	Stop()
 }
 
 type scaler struct {
-	pollInterval time.Duration
-	ticker       *time.Ticker
-	lock         sync.Mutex
+	pollInterval     time.Duration
+	provisioner      instance.Provisioner
+	provisionRequest string
+	group            instance.GroupID
+	count            uint
+	stop             chan bool
 }
 
-type naturalSort []spi.InstanceID
+// NewFixedScaler creates a RunStop that monitors a group of instances on a provisioner, attempting to maintain a
+// fixed count.
+func NewFixedScaler(
+	pollInterval time.Duration,
+	provisioner instance.Provisioner,
+	provisionRequest string,
+	group instance.GroupID,
+	count uint) RunStop {
+
+	return &scaler{
+		pollInterval:     pollInterval,
+		provisioner:      provisioner,
+		provisionRequest: provisionRequest,
+		group:            group,
+		count:            count,
+		stop:             make(chan bool),
+	}
+}
+
+type naturalSort []instance.ID
 
 func (n naturalSort) Len() int {
 	return len(n)
@@ -37,7 +57,7 @@ func (n naturalSort) Less(i, j int) bool {
 	return n[i] < n[j]
 }
 
-func stableSelect(instances []spi.InstanceID, count uint) []spi.InstanceID {
+func stableSelect(instances []instance.ID, count uint) []instance.ID {
 	if count > uint(len(instances)) {
 		panic("scaler: too many values to select")
 	}
@@ -48,89 +68,86 @@ func stableSelect(instances []spi.InstanceID, count uint) []spi.InstanceID {
 	return instances[:count]
 }
 
-func destroy(provisioner spi.Provisioner, instance spi.InstanceID) {
-	events, err := provisioner.DestroyInstance(string(instance))
+func (s *scaler) checkState() {
+	log.Debugf("Checking instance count for group %s", s.group)
+	instances, err := s.provisioner.ListGroup(s.group)
 	if err != nil {
-		log.Errorf("Failed to destroy %s: %s", instance, err)
+		log.Infof("Failed to check count of %s: %s", s.group, err)
 		return
 	}
 
-	for event := range events {
-		log.Debug(event)
-	}
-}
+	log.Debugf("Found existing instances: %v", instances)
 
-func (s *scaler) maintainCountSync(provisioner spi.Provisioner, group spi.GroupID, count uint) {
-	for range s.ticker.C {
-		log.Debugf("Checking instance count for group %s", group)
-		instances, err := provisioner.GetInstances(group)
-		if err != nil {
-			log.Infof("Failed to check count of %s: %s", group, err)
-			continue
+	actualCount := uint(len(instances))
+
+	switch {
+	case actualCount == s.count:
+		log.Infof("Group %s has %d instances, no action is needed", s.group, s.count)
+
+	case actualCount > s.count:
+		remove := actualCount - s.count
+		log.Infof("Removing %d instances from group %s to reach desired %d", remove, s.group, s.count)
+
+		group := sync.WaitGroup{}
+		for _, instance := range stableSelect(instances, remove) {
+			group.Add(1)
+			destroyID := instance
+			go func() {
+				defer group.Done()
+
+				err := s.provisioner.Destroy(destroyID)
+				if err != nil {
+					log.Errorf("Failed to destroy %s: %s", destroyID, err)
+					return
+				}
+			}()
 		}
 
-		actualCount := uint(len(instances))
+		// Wait for all destroy calls to finish.
+		// It is not imperative to avoid stepping on another removal operation by this routine
+		// (within this process or another) since the selection of removal candidates is stable.
+		// However, we do so here to mitigate redundant work and avoidable benign (but confusing) errors
+		// when overlaps happen.
+		group.Wait()
 
-		switch {
-		case actualCount == count:
-			log.Debugf("Group %s has %d instances, no action is needed", group, count)
+	case actualCount < s.count:
+		add := s.count - actualCount
+		log.Infof("Adding %d instances to group %s to reach desired %d", add, s.group, s.count)
 
-		case actualCount > count:
-			remove := actualCount - count
-			log.Infof("Removing %d instances from group %s to reach desired %d", remove, group, count)
+		group := sync.WaitGroup{}
+		for i := 0; i < int(add); i++ {
+			group.Add(1)
+			go func() {
+				defer group.Done()
 
-			group := sync.WaitGroup{}
-			for _, instance := range stableSelect(instances, remove) {
-				group.Add(1)
-				destroyID := instance
-				go func() {
-					defer group.Done()
-					destroy(provisioner, destroyID)
-				}()
-			}
+				id, err := s.provisioner.Provision(s.provisionRequest)
 
-			// Wait for all destroy calls to finish.
-			// It is not imperative to avoid stepping on another removal operation by this routine
-			// (within this process or another) since the selection of removal candidates is stable.
-			// However, we do so here to mitigate redundant work and avoidable benign (but confusing) errors
-			// when overlaps happen.
-			group.Wait()
+				if err != nil {
+					log.Errorf("Failed to grow group %s: %s", s.group, err)
+				} else {
+					log.Infof("Created instance %s", *id)
+				}
+			}()
+		}
 
-		case actualCount < count:
-			add := count - actualCount
-			log.Infof("Adding %d instances to group %s to reach desired %d", add, group, count)
-			err = provisioner.AddGroupInstances(group, add)
-			if err != nil {
-				log.Errorf("Failed to grow group %s: %s", group, err)
-			}
+		group.Wait()
+	}
+}
+
+func (s *scaler) Run() {
+	ticker := time.NewTicker(s.pollInterval)
+
+	for {
+		select {
+		case <-ticker.C:
+			s.checkState()
+		case <-s.stop:
+			ticker.Stop()
+			return
 		}
 	}
 }
 
-func (s *scaler) MaintainCount(provisioner spi.Provisioner, id spi.GroupID, count uint) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if s.ticker != nil {
-		return fmt.Errorf("Already monitoring %s", id)
-	}
-
-	s.ticker = time.NewTicker(s.pollInterval)
-	go s.maintainCountSync(provisioner, id, count)
-
-	return nil
-}
-
-func (s *scaler) Stop() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if s.ticker == nil {
-		return fmt.Errorf("Scaler is not active")
-	}
-
-	s.ticker.Stop()
-	s.ticker = nil
-
-	return nil
+func (s *scaler) Stop() {
+	s.stop <- true
 }

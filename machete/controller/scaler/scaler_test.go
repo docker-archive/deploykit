@@ -1,82 +1,85 @@
 package scaler
 
 import (
-	mock_spi "github.com/docker/libmachete/mock/provisioners/spi"
-	"github.com/docker/libmachete/provisioners/spi"
+	mock_instance "github.com/docker/libmachete/machete/mock/spi/instance"
+	"github.com/docker/libmachete/machete/spi/instance"
 	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
+//go:generate mockgen -package instance -destination ../../mock/spi/instance/instance.go github.com/docker/libmachete/machete/spi/instance Provisioner
+
 var (
-	group = spi.GroupID("1")
-	a     = spi.InstanceID("a")
-	b     = spi.InstanceID("b")
-	c     = spi.InstanceID("c")
-	d     = spi.InstanceID("d")
+	group = instance.GroupID("1")
+	a     = instance.ID("a")
+	b     = instance.ID("b")
+	c     = instance.ID("c")
+	d     = instance.ID("d")
+)
+
+const (
+	provisionRequest = "request body"
 )
 
 func TestScaleUp(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_spi.NewMockProvisioner(ctrl)
-	scaler := scaler{pollInterval: 1 * time.Millisecond}
-
-	finished := make(chan bool)
-
-	gomock.InOrder(
-		provisioner.EXPECT().GetInstances(group).Return([]spi.InstanceID{a, b, c}, nil),
-		provisioner.EXPECT().GetInstances(group).Return([]spi.InstanceID{a, b, c}, nil),
-		provisioner.EXPECT().GetInstances(group).Return([]spi.InstanceID{a, b}, nil),
-		provisioner.EXPECT().AddGroupInstances(group, uint(1)).Return(nil),
-		provisioner.EXPECT().GetInstances(group).Do(func(_ spi.GroupID) {
-			finished <- true
-		}).Return([]spi.InstanceID{a, b, c}, nil),
+	provisioner := mock_instance.NewMockProvisioner(ctrl)
+	scaler := NewFixedScaler(
+		1*time.Millisecond,
+		provisioner,
+		provisionRequest,
+		group,
+		uint(3),
 	)
 
-	require.NoError(t, scaler.MaintainCount(provisioner, group, uint(3)))
+	gomock.InOrder(
+		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b, c}, nil),
+		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b, c}, nil),
+		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b}, nil),
+		provisioner.EXPECT().Provision(provisionRequest).Return(&d, nil),
+		provisioner.EXPECT().ListGroup(group).Do(func(_ instance.GroupID) {
+			go scaler.Stop()
+		}).Return([]instance.ID{a, b, c}, nil),
+		// Allow subsequent calls to ListGroup() to mitigate ordering flakiness of async Stop() call.
+		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b, c, d}, nil).AnyTimes(),
+	)
 
-	<-finished
-	require.NoError(t, scaler.Stop())
-	require.Error(t, scaler.Stop())
+	scaler.Run()
 }
 
 func TestScaleDown(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_spi.NewMockProvisioner(ctrl)
-	scaler := scaler{pollInterval: 1 * time.Millisecond}
-	group := spi.GroupID("1")
-	finished := make(chan bool)
+	provisioner := mock_instance.NewMockProvisioner(ctrl)
+	scaler := NewFixedScaler(
+		1*time.Millisecond,
+		provisioner,
+		"foobar",
+		group,
+		uint(2),
+	)
+	group := instance.GroupID("1")
 
-	a := spi.InstanceID("a")
-	b := spi.InstanceID("b")
-	c := spi.InstanceID("c")
+	a := instance.ID("a")
+	b := instance.ID("b")
+	c := instance.ID("c")
 
 	gomock.InOrder(
-		provisioner.EXPECT().GetInstances(group).Return([]spi.InstanceID{c, b}, nil),
-		provisioner.EXPECT().GetInstances(group).Return([]spi.InstanceID{c, a, d, b}, nil),
-		provisioner.EXPECT().GetInstances(group).Do(func(_ spi.GroupID) {
-			finished <- true
-		}).Return([]spi.InstanceID{a, b}, nil),
+		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{c, b}, nil),
+		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{c, a, d, b}, nil),
+		provisioner.EXPECT().ListGroup(group).Do(func(_ instance.GroupID) {
+			go scaler.Stop()
+		}).Return([]instance.ID{a, b}, nil),
+		// Allow subsequent calls to ListGroup() to mitigate ordering flakiness of async Stop() call.
+		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{c, d}, nil).AnyTimes(),
 	)
 
-	eventsC := make(chan spi.DestroyInstanceEvent)
-	eventsD := make(chan spi.DestroyInstanceEvent)
+	provisioner.EXPECT().Destroy(a).Return(nil)
+	provisioner.EXPECT().Destroy(b).Return(nil)
 
-	provisioner.EXPECT().DestroyInstance(string(a)).Return(eventsC, nil)
-	provisioner.EXPECT().DestroyInstance(string(b)).Return(eventsD, nil)
-
-	go func() {
-		close(eventsC)
-		close(eventsD)
-	}()
-
-	require.NoError(t, scaler.MaintainCount(provisioner, group, uint(2)))
-
-	<-finished
-	require.NoError(t, scaler.Stop())
+	scaler.Run()
 }
