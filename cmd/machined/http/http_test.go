@@ -13,6 +13,8 @@ import (
 	"testing"
 )
 
+//go:generate mockgen -package api -destination ../../../mock/provisioners/spi/spi.go github.com/docker/libmachete/provisioners/spi Provisioner
+
 const JSON = "application/json"
 
 type testCredentials struct {

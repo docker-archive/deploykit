@@ -12,8 +12,6 @@ import (
 	"testing"
 )
 
-//go:generate mockgen -package api -destination ../../../mock/provisioners/spi/spi.go github.com/docker/libmachete/provisioners/spi Provisioner
-
 func requireMachines(t *testing.T, r *testflight.Requester, expected ...api.MachineID) {
 	response := r.Get("/machines?long=true")
 	require.Equal(t, 200, response.StatusCode, response.Body)
