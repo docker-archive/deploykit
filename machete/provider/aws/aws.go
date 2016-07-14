@@ -12,17 +12,21 @@ import (
 )
 
 const (
+	// ClusterTag is the AWS tag name used to track instances managed by this machete instance.
+	ClusterTag = "machete-cluster"
+
 	// GroupTag is the AWS tag name used to track instances included in a group.
-	GroupTag = "Group"
+	GroupTag = "machete-group"
 )
 
 type provisioner struct {
-	client ec2iface.EC2API
+	client  ec2iface.EC2API
+	cluster spi.ClusterID
 }
 
 // NewInstanceProvisioner creates a new provisioner.
-func NewInstanceProvisioner(client ec2iface.EC2API) instance.Provisioner {
-	return &provisioner{client: client}
+func NewInstanceProvisioner(client ec2iface.EC2API, cluster spi.ClusterID) instance.Provisioner {
+	return &provisioner{client: client, cluster: cluster}
 }
 
 func makePointerSlice(stackSlice []string) []*string {
@@ -79,7 +83,7 @@ func createInstance(client ec2iface.EC2API, request createInstanceRequest) (*ec2
 	return reservation.Instances[0], nil
 }
 
-func tagInstance(client ec2iface.EC2API, request createInstanceRequest, instance *ec2.Instance) error {
+func (p provisioner) tagInstance(request createInstanceRequest, instance *ec2.Instance) error {
 	tags := []*ec2.Tag{}
 
 	// Gather the tag keys in sorted order, to provide predictable tag order.  This is
@@ -96,10 +100,13 @@ func tagInstance(client ec2iface.EC2API, request createInstanceRequest, instance
 		tags = append(tags, &ec2.Tag{Key: &key, Value: &value})
 	}
 
-	// Add group tag
-	tags = append(tags, &ec2.Tag{Key: aws.String(GroupTag), Value: aws.String(string(request.Group))})
+	// Add cluster and group tags
+	tags = append(
+		tags,
+		&ec2.Tag{Key: aws.String(ClusterTag), Value: aws.String(string(p.cluster))},
+		&ec2.Tag{Key: aws.String(GroupTag), Value: aws.String(string(request.Group))})
 
-	_, err := client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{instance.InstanceId}, Tags: tags})
+	_, err := p.client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{instance.InstanceId}, Tags: tags})
 	return err
 }
 
@@ -122,7 +129,7 @@ func (p provisioner) Provision(req string) (*instance.ID, *spi.Error) {
 
 	id := (*instance.ID)(ec2Instance.InstanceId)
 
-	err = tagInstance(p.client, request, ec2Instance)
+	err = p.tagInstance(request, ec2Instance)
 	if err != nil {
 		return id, spi.UnknownError(err)
 	}
@@ -147,15 +154,17 @@ func (p provisioner) Destroy(id instance.ID) *spi.Error {
 	return nil
 }
 
-func describeGroupRequest(id instance.GroupID, nextToken *string) *ec2.DescribeInstancesInput {
+func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken *string) *ec2.DescribeInstancesInput {
 	return &ec2.DescribeInstancesInput{
 		NextToken: nextToken,
 		Filters: []*ec2.Filter{
 			{
-				Name: aws.String(fmt.Sprintf("tag:%s", GroupTag)),
-				Values: []*string{
-					aws.String(string(id)),
-				},
+				Name:   aws.String(fmt.Sprintf("tag:%s", ClusterTag)),
+				Values: []*string{aws.String(string(cluster))},
+			},
+			{
+				Name:   aws.String(fmt.Sprintf("tag:%s", GroupTag)),
+				Values: []*string{aws.String(string(id))},
 			},
 			{
 				Name: aws.String("instance-state-name"),
@@ -168,10 +177,8 @@ func describeGroupRequest(id instance.GroupID, nextToken *string) *ec2.DescribeI
 	}
 }
 
-func describeInstances(client ec2iface.EC2API, group instance.GroupID, nextToken *string) ([]instance.ID, *spi.Error) {
-	// TODO(wfarner): This needs an additional 'stack'-specific identifier to avoid mixing results for different
-	// swarms.
-	result, err := client.DescribeInstances(describeGroupRequest(group, nextToken))
+func (p provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.ID, *spi.Error) {
+	result, err := p.client.DescribeInstances(describeGroupRequest(p.cluster, group, nextToken))
 	if err != nil {
 		return nil, spi.UnknownError(err)
 	}
@@ -185,7 +192,7 @@ func describeInstances(client ec2iface.EC2API, group instance.GroupID, nextToken
 
 	if result.NextToken != nil {
 		// There are more pages of results.
-		remainingPages, err := describeInstances(client, group, result.NextToken)
+		remainingPages, err := p.describeInstances(group, result.NextToken)
 		if err != nil {
 			return nil, err
 		}
@@ -198,5 +205,5 @@ func describeInstances(client ec2iface.EC2API, group instance.GroupID, nextToken
 
 // ListGroup returns all instances included in a group.
 func (p provisioner) ListGroup(group instance.GroupID) ([]instance.ID, *spi.Error) {
-	return describeInstances(p.client, group, nil)
+	return p.describeInstances(group, nil)
 }
