@@ -219,10 +219,10 @@ func (cm *machines) CreateMachine(
 			Status:      "initiated",
 			MachineName: machineID,
 			Provisioner: provisionerName,
-			Created:     api.Timestamp(time.Now().Unix()),
+			Created:     time.Now(),
 		},
 	}
-	record.AppendEvent("init", "Create started", request)
+	record.AppendEvent(api.Event{Name: "init", Message: "Create started", Metadata: fmt.Sprintf("%#v", request)})
 	record.AppendChange(request)
 
 	apiErr = cm.saveMachineData(record, request)
@@ -244,7 +244,7 @@ func (cm *machines) CreateMachine(
 		},
 		func(record *api.MachineRecord, state spi.MachineRequest) {
 			record.Status = "provisioned"
-			record.LastModified = api.Timestamp(time.Now().Unix())
+			record.LastModified = time.Now()
 			// TODO(wfarner): Should errors here be fatal?  Currently they're silent.
 			if ip, err := provisioner.GetIPAddress(state); err == nil {
 				record.IPAddress = ip
@@ -334,7 +334,7 @@ func (cm *machines) DeleteMachine(
 		return nil, &api.Error{Message: err.Error()}
 	}
 
-	record.AppendEvent("init-destroy", "Destroy started", lastChange)
+	record.AppendEvent(api.Event{Name: "init-destroy", Message: "Destroy started"})
 
 	// TODO(wfarner): Nothing is actually deleted, is that intentional?
 	//if err := cm.store.Save(record, nil); err != nil {
@@ -362,7 +362,7 @@ func runTasks(
 	onComplete func(*api.MachineRecord, spi.MachineRequest)) (<-chan interface{}, *api.Error) {
 
 	save := func(record api.MachineRecord, machineState spi.MachineRequest) error {
-		record.LastModified = api.Timestamp(time.Now().Unix())
+		record.LastModified = time.Now()
 		return rawSave(record, machineState)
 	}
 
@@ -379,15 +379,13 @@ func runTasks(
 
 			go func(task spi.Task) {
 				log.Infoln("START", task.Name())
-				event := api.Event{Name: string(task.Name())}
+				event := api.Event{Name: task.Name()}
 				err := task.Run(record, request, taskEvents)
 				if err != nil {
-					event.Message = task.Name() + " failed: " + err.Error()
+					event.Message = "failed"
 					event.Error = err.Error()
-					event.Status = -1
 				} else {
-					event.Message = task.Name() + " completed"
-					event.Status = 1
+					event.Message = "completed"
 				}
 				taskEvents <- event
 				close(taskEvents) // unblocks the listener
@@ -401,13 +399,12 @@ func runTasks(
 
 			for te := range taskEvents {
 				stop := false
-				event := api.Event{Name: task.Name(), Timestamp: time.Now()}
-				event.AddData(te)
+				event := api.Event{Name: task.Name()}
 
 				switch te := te.(type) {
 				case api.Event:
 					event = te
-					if event.Status < 0 {
+					if len(event.Error) > 0 {
 						stop = true
 					}
 				case spi.HasError:
@@ -433,7 +430,7 @@ func runTasks(
 					}
 				}
 
-				record.AppendEventObject(event)
+				record.AppendEvent(event)
 				save(record, machineState)
 
 				events <- event
