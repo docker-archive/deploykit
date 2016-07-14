@@ -57,17 +57,6 @@ func (n naturalSort) Less(i, j int) bool {
 	return n[i] < n[j]
 }
 
-func stableSelect(instances []instance.ID, count uint) []instance.ID {
-	if count > uint(len(instances)) {
-		panic("scaler: too many values to select")
-	}
-
-	// Sorting first ensures that redundant operations are non-destructive.
-	sort.Sort(naturalSort(instances))
-
-	return instances[:count]
-}
-
 func (s *scaler) checkState() {
 	log.Debugf("Checking instance count for group %s", s.group)
 	instances, err := s.provisioner.ListGroup(s.group)
@@ -88,8 +77,13 @@ func (s *scaler) checkState() {
 		remove := actualCount - s.count
 		log.Infof("Removing %d instances from group %s to reach desired %d", remove, s.group, s.count)
 
+		// Sorting first ensures that redundant operations are non-destructive.
+		sort.Sort(naturalSort(instances))
+
+		toRemove := instances[:remove]
+
 		group := sync.WaitGroup{}
-		for _, instance := range stableSelect(instances, remove) {
+		for _, instance := range toRemove {
 			group.Add(1)
 			destroyID := instance
 			go func() {
