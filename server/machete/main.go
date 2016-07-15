@@ -4,16 +4,23 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/server"
+	"github.com/docker/libmachete/spi"
 	"github.com/spf13/cobra"
 	"os"
 )
 
 func main() {
 	var port uint
+	var cluster string
 
 	rootCmd := &cobra.Command{Use: "machete"}
 
 	rootCmd.Flags().UintVar(&port, "port", 8888, "Port the server listens on")
+	rootCmd.Flags().StringVar(
+		&cluster,
+		"cluster",
+		"default",
+		"Machete cluster ID, used to isolate separate infrastructures")
 
 	builders := map[string]server.ProvisionerBuilder{
 		"aws": &aws.Builder{},
@@ -22,7 +29,7 @@ func main() {
 	run := func(cmd *cobra.Command, args []string) {
 		log.Infoln("Starting server on port", port)
 
-		provisioner, err := builders[cmd.Name()].BuildInstanceProvisioner()
+		provisioner, err := builders[cmd.Name()].BuildInstanceProvisioner(spi.ClusterID(cluster))
 		if err != nil {
 			log.Error(err)
 			return

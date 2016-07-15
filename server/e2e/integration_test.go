@@ -9,6 +9,7 @@ import (
 	"github.com/docker/libmachete/controller/scaler"
 	"github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/server"
+	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
@@ -107,7 +108,7 @@ func TestIntegration(t *testing.T) {
 	defer ctrl.Finish()
 
 	backend := &fakeEc2{}
-	provisioner := aws.NewInstanceProvisioner(backend)
+	provisioner := aws.NewInstanceProvisioner(backend, spi.ClusterID("test-cluster"))
 
 	testflight.WithServer(server.NewHandler(provisioner), func(r *testflight.Requester) {
 		target := 3
