@@ -3,6 +3,7 @@ package aws
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	mock_ec2 "github.com/docker/libmachete/mock/ec2"
@@ -15,19 +16,7 @@ import (
 
 //go:generate mockgen -package mock -destination ../../mock/ec2/mock_ec2iface.go github.com/aws/aws-sdk-go/service/ec2/ec2iface EC2API
 
-func expectDescribeCall(clientMock *mock_ec2.MockEC2API, instanceID string, returnedState string) {
-	result := &ec2.DescribeInstancesOutput{
-		Reservations: []*ec2.Reservation{
-			{Instances: []*ec2.Instance{
-				{State: &ec2.InstanceState{Name: &returnedState}}},
-			},
-		},
-	}
-
-	clientMock.EXPECT().
-		DescribeInstances(&ec2.DescribeInstancesInput{InstanceIds: []*string{&instanceID}}).
-		Return(result, nil)
-}
+const testCluster = spi.ClusterID("test-cluster")
 
 func TestCreateInstanceSuccess(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -47,12 +36,13 @@ func TestCreateInstanceSuccess(t *testing.T) {
 		Resources: []*string{&instanceID},
 		Tags: []*ec2.Tag{
 			{Key: aws.String("test"), Value: aws.String("aws-create-test")},
-			{Key: aws.String("Group"), Value: aws.String("group")},
+			{Key: aws.String(ClusterTag), Value: aws.String(string(testCluster))},
+			{Key: aws.String(GroupTag), Value: aws.String("group")},
 		},
 	}
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
-	provisioner := NewInstanceProvisioner(clientMock)
+	provisioner := NewInstanceProvisioner(clientMock, testCluster)
 	id, err := provisioner.Provision(inputJSON)
 
 	require.NoError(t, err)
@@ -64,7 +54,7 @@ func TestCreateInstanceRequiresGroup(t *testing.T) {
 	defer ctrl.Finish()
 	clientMock := mock_ec2.NewMockEC2API(ctrl)
 
-	provisioner := NewInstanceProvisioner(clientMock)
+	provisioner := NewInstanceProvisioner(clientMock, testCluster)
 	_, err := provisioner.Provision("{}")
 	require.Error(t, err)
 	require.Equal(t, spi.ErrBadInput, err.Code)
@@ -78,7 +68,7 @@ func TestCreateInstanceError(t *testing.T) {
 	runError := errors.New("request failed")
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
-	provisioner := NewInstanceProvisioner(clientMock)
+	provisioner := NewInstanceProvisioner(clientMock, testCluster)
 	id, err := provisioner.Provision(`{"Group": "a"}`)
 
 	require.Error(t, err)
@@ -100,7 +90,7 @@ func TestDestroyInstanceSuccess(t *testing.T) {
 				InstanceId: &instanceID,
 			}}}, nil)
 
-	provisioner := NewInstanceProvisioner(clientMock)
+	provisioner := NewInstanceProvisioner(clientMock, testCluster)
 	require.NoError(t, provisioner.Destroy(instance.ID(instanceID)))
 }
 
@@ -115,7 +105,7 @@ func TestDestroyInstanceError(t *testing.T) {
 	clientMock.EXPECT().TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: []*string{&instanceID}}).
 		Return(nil, runError)
 
-	provisioner := NewInstanceProvisioner(clientMock)
+	provisioner := NewInstanceProvisioner(clientMock, testCluster)
 	require.Error(t, provisioner.Destroy(instance.ID(instanceID)))
 }
 
@@ -132,27 +122,59 @@ func describeInstancesResponse(instanceIds [][]string, nextToken *string) *ec2.D
 	return &ec2.DescribeInstancesOutput{NextToken: nextToken, Reservations: reservations}
 }
 
+func TestDescribeGroupRequest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	group := instance.GroupID("manager-nodes")
+
+	var nextToken *string
+	request := describeGroupRequest(testCluster, group, nextToken)
+
+	require.Equal(t, nextToken, request.NextToken)
+
+	requireFilter := func(name, value string) {
+		for _, filter := range request.Filters {
+			if *filter.Name == name {
+				for _, filterValue := range filter.Values {
+					if *filterValue == value {
+						// Match found
+						return
+					}
+				}
+			}
+		}
+		require.Fail(t, fmt.Sprintf("Did not have filter %s/%s", name, value))
+	}
+	requireFilter("tag:machete-cluster", string(testCluster))
+	requireFilter("tag:machete-group", string(group))
+
+	nextToken = aws.String("page-2")
+	request = describeGroupRequest(testCluster, group, nextToken)
+	require.Equal(t, nextToken, request.NextToken)
+}
+
 func TestListGroup(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	clientMock := mock_ec2.NewMockEC2API(ctrl)
 
-	group := "manager-nodes"
+	group := instance.GroupID("manager-nodes")
 	page2Token := "page2"
 
 	// Split instance IDs across multiple reservations and request pages.
 	gomock.InOrder(
-		clientMock.EXPECT().DescribeInstances(describeGroupRequest(instance.GroupID(group), nil)).
+		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testCluster, group, nil)).
 			Return(describeInstancesResponse([][]string{
 				{"a", "b", "c"},
 				{"d", "e"},
 			}, &page2Token), nil),
-		clientMock.EXPECT().DescribeInstances(describeGroupRequest(instance.GroupID(group), &page2Token)).
+		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testCluster, group, &page2Token)).
 			Return(describeInstancesResponse([][]string{{"f", "g"}}, nil), nil),
 	)
 
-	provisioner := NewInstanceProvisioner(clientMock)
-	ids, err := provisioner.ListGroup(instance.GroupID(group))
+	provisioner := NewInstanceProvisioner(clientMock, testCluster)
+	ids, err := provisioner.ListGroup(group)
 
 	require.NoError(t, err)
 	require.Equal(t, []instance.ID{

@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/spf13/pflag"
 	"log"
@@ -38,7 +39,7 @@ func (b *Builder) Flags() *pflag.FlagSet {
 }
 
 // BuildInstanceProvisioner creates an instance Provisioner configured with the Flags.
-func (b *Builder) BuildInstanceProvisioner() (instance.Provisioner, error) {
+func (b *Builder) BuildInstanceProvisioner(cluster spi.ClusterID) (instance.Provisioner, error) {
 	providers := []credentials.Provider{
 		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
 		&credentials.EnvProvider{},
@@ -63,7 +64,7 @@ func (b *Builder) BuildInstanceProvisioner() (instance.Provisioner, error) {
 		//WithLogLevel(aws.LogDebugWithRequestErrors).
 		WithMaxRetries(b.options.retries)))
 
-	return NewInstanceProvisioner(client), nil
+	return NewInstanceProvisioner(client, cluster), nil
 }
 
 type logger struct {
