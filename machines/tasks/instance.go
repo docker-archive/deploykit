@@ -14,7 +14,7 @@ const (
 
 // CreateInstance creates an instance using a provisioner.
 type CreateInstance struct {
-	Provisioner spi.Provisioner
+	Provisioner spi.MachineProvisioner
 }
 
 // Name returns the task name.
@@ -38,7 +38,7 @@ func (c CreateInstance) Run(resource spi.Resource, req spi.MachineRequest, event
 
 // DestroyInstance creates an instance using a provisioner.
 type DestroyInstance struct {
-	Provisioner spi.Provisioner
+	Provisioner spi.MachineProvisioner
 }
 
 // Name returns the task name.

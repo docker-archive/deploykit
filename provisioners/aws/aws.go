@@ -58,7 +58,7 @@ func getConfig(controls spi.ProvisionControls) (*Config, error) {
 }
 
 // ProvisionerWith returns a provision given the runtime context and credential
-func ProvisionerWith(controls spi.ProvisionControls, cred spi.Credential) (spi.Provisioner, error) {
+func ProvisionerWith(controls spi.ProvisionControls, cred spi.Credential) (spi.MachineProvisioner, error) {
 	config, err := getConfig(controls)
 	if err != nil {
 		return nil, err
