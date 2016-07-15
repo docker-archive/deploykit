@@ -4,7 +4,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/machete/client"
 	"github.com/docker/libmachete/machete/controller/scaler"
-	"github.com/docker/libmachete/machete/spi/instance"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
@@ -15,23 +14,22 @@ import (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use: "scaler <machete address> <instance group> <target count> <config path>",
+		Use: "scaler <machete address> <target count> <config path>",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 4 {
+			if len(args) != 3 {
 				cmd.Usage()
 				return
 			}
 
 			macheteAddress := args[0]
-			group := args[1]
 
-			targetCount, err := strconv.ParseUint(args[2], 10, 32)
+			targetCount, err := strconv.ParseUint(args[1], 10, 32)
 			if err != nil {
 				log.Error("Invalid target count", err)
 				os.Exit(1)
 			}
 
-			configPath := args[3]
+			configPath := args[2]
 
 			requestData, err := ioutil.ReadFile(configPath)
 			if err != nil {
@@ -39,12 +37,15 @@ func main() {
 				os.Exit(1)
 			}
 
-			instanceWatcher := scaler.NewFixedScaler(
+			instanceWatcher, err := scaler.NewFixedScaler(
 				5*time.Second,
 				client.NewInstanceProvisioner(macheteAddress),
 				string(requestData),
-				instance.GroupID(group),
 				uint(targetCount))
+			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
 
 			c := make(chan os.Signal, 1)
 			signal.Notify(c, os.Interrupt)

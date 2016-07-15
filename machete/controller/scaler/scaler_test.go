@@ -4,42 +4,63 @@ import (
 	mock_instance "github.com/docker/libmachete/machete/mock/spi/instance"
 	"github.com/docker/libmachete/machete/spi/instance"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
 //go:generate mockgen -package instance -destination ../../mock/spi/instance/instance.go github.com/docker/libmachete/machete/spi/instance Provisioner
 
+const (
+	testRequest = `{"Group": "test-group"}`
+)
+
 var (
-	group = instance.GroupID("1")
+	group = instance.GroupID("test-group")
 	a     = instance.ID("a")
 	b     = instance.ID("b")
 	c     = instance.ID("c")
 	d     = instance.ID("d")
 )
 
-const (
-	provisionRequest = "request body"
-)
+func TestInvalidRequest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	requireFailsWithRequest := func(request string) {
+		scaler, err := NewFixedScaler(
+			1*time.Millisecond,
+			mock_instance.NewMockProvisioner(ctrl),
+			request,
+			uint(3),
+		)
+		require.Error(t, err)
+		require.Nil(t, scaler)
+	}
+
+	requireFailsWithRequest("")
+	requireFailsWithRequest("{}")
+	requireFailsWithRequest(`{"Group": ""`)
+}
 
 func TestScaleUp(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	provisioner := mock_instance.NewMockProvisioner(ctrl)
-	scaler := NewFixedScaler(
+	scaler, err := NewFixedScaler(
 		1*time.Millisecond,
 		provisioner,
-		provisionRequest,
-		group,
+		testRequest,
 		uint(3),
 	)
+	require.NoError(t, err)
 
 	gomock.InOrder(
 		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b, c}, nil),
 		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b, c}, nil),
 		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b}, nil),
-		provisioner.EXPECT().Provision(provisionRequest).Return(&d, nil),
+		provisioner.EXPECT().Provision(testRequest).Return(&d, nil),
 		provisioner.EXPECT().ListGroup(group).Do(func(_ instance.GroupID) {
 			go scaler.Stop()
 		}).Return([]instance.ID{a, b, c}, nil),
@@ -55,14 +76,13 @@ func TestScaleDown(t *testing.T) {
 	defer ctrl.Finish()
 
 	provisioner := mock_instance.NewMockProvisioner(ctrl)
-	scaler := NewFixedScaler(
+	scaler, err := NewFixedScaler(
 		1*time.Millisecond,
 		provisioner,
-		"foobar",
-		group,
+		testRequest,
 		uint(2),
 	)
-	group := instance.GroupID("1")
+	require.NoError(t, err)
 
 	a := instance.ID("a")
 	b := instance.ID("b")
