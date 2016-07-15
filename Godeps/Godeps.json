@@ -7,31 +7,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions",
-			"Comment": "v2.1.1-beta",
-			"Rev": "a1883f7b98346e4908a6c25230c95a8a3026a10c"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v7.0.4-4-gc2939d7",
-			"Rev": "c2939d77429f7663b69691a3a9dcf3b624db39de"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v7.0.4-4-gc2939d7",
-			"Rev": "c2939d77429f7663b69691a3a9dcf3b624db39de"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v7.0.4-4-gc2939d7",
-			"Rev": "c2939d77429f7663b69691a3a9dcf3b624db39de"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v7.0.4-4-gc2939d7",
-			"Rev": "c2939d77429f7663b69691a3a9dcf3b624db39de"
-		},
-		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.9.0-15-g219c8cb",
 			"Rev": "219c8cb75c258c552e999735be6df753ffc7afdc"
@@ -151,11 +126,6 @@
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
-			"ImportPath": "github.com/dgrijalva/jwt-go",
-			"Comment": "v2.4.0-12-g9a4b9f2",
-			"Rev": "9a4b9f2ac1f7685147a5c01544e3b922dbc1f4a0"
-		},
-		{
 			"ImportPath": "github.com/drewolson/testflight",
 			"Rev": "d504a0f0d14b0220237a2c56450e76071d954750"
 		},
@@ -188,28 +158,8 @@
 			"Rev": "0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74"
 		},
 		{
-			"ImportPath": "github.com/kr/fs",
-			"Rev": "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
-		},
-		{
-			"ImportPath": "github.com/pkg/sftp",
-			"Rev": "9683e1ed9152e4fb052773355eb1b8cdcbac2058"
-		},
-		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
-		},
-		{
-			"ImportPath": "github.com/spf13/afero",
-			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
-		},
-		{
-			"ImportPath": "github.com/spf13/afero/mem",
-			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
-		},
-		{
-			"ImportPath": "github.com/spf13/afero/sftp",
-			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
@@ -230,32 +180,8 @@
 			"Rev": "6fe211e493929a8aac0469b93f28b1d0688a9a3a"
 		},
 		{
-			"ImportPath": "golang.org/x/crypto/curve25519",
-			"Rev": "beef0f4390813b96e8e68fd78570396d0f4751fc"
-		},
-		{
-			"ImportPath": "golang.org/x/crypto/ssh",
-			"Rev": "beef0f4390813b96e8e68fd78570396d0f4751fc"
-		},
-		{
-			"ImportPath": "golang.org/x/net/context",
-			"Rev": "318395d8b12f5dd0f1b7cd0fbb95195f49acb0f9"
-		},
-		{
 			"ImportPath": "golang.org/x/sys/unix",
 			"Rev": "7a56174f0086b32866ebd746a794417edbc678a1"
-		},
-		{
-			"ImportPath": "golang.org/x/text/transform",
-			"Rev": "07b9a78963006a15c538ec5175243979025fa7a8"
-		},
-		{
-			"ImportPath": "golang.org/x/text/unicode/norm",
-			"Rev": "07b9a78963006a15c538ec5175243979025fa7a8"
-		},
-		{
-			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "a83829b6f1293c91addabc89d0571c246397bbf4"
 		}
 	]
 }
