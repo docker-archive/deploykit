@@ -1,6 +1,8 @@
 package scaler
 
 import (
+	"encoding/json"
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/spi/instance"
 	"sort"
@@ -24,23 +26,36 @@ type scaler struct {
 	stop             chan bool
 }
 
+type provisionRequest struct {
+	Group instance.GroupID `json:"group"`
+}
+
 // NewFixedScaler creates a RunStop that monitors a group of instances on a provisioner, attempting to maintain a
 // fixed count.
 func NewFixedScaler(
 	pollInterval time.Duration,
 	provisioner instance.Provisioner,
-	provisionRequest string,
-	group instance.GroupID,
-	count uint) RunStop {
+	request string,
+	count uint) (RunStop, error) {
+
+	req := provisionRequest{}
+	err := json.Unmarshal([]byte(request), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Group == "" {
+		return nil, errors.New("Group must not be empty")
+	}
 
 	return &scaler{
 		pollInterval:     pollInterval,
 		provisioner:      provisioner,
-		provisionRequest: provisionRequest,
-		group:            group,
+		provisionRequest: request,
+		group:            req.Group,
 		count:            count,
 		stop:             make(chan bool),
-	}
+	}, nil
 }
 
 type naturalSort []instance.ID

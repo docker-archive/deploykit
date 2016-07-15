@@ -10,9 +10,9 @@ import (
 	"github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/server"
 	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/instance"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
 	"strconv"
 	"sync"
 	"testing"
@@ -113,12 +113,12 @@ func TestIntegration(t *testing.T) {
 	testflight.WithServer(server.NewHandler(provisioner), func(r *testflight.Requester) {
 		target := 3
 		group := "integration-test-manager"
-		watcher := scaler.NewFixedScaler(
+		watcher, err := scaler.NewFixedScaler(
 			10*time.Millisecond,
 			client.NewInstanceProvisioner(r.Url("")),
 			fmt.Sprintf(`{"Group": "%s"}`, group),
-			instance.GroupID(group),
 			uint(target))
+		require.NoError(t, err)
 
 		go watcher.Run()
 
