@@ -12,7 +12,7 @@ plain text):
 
 ![Colored](http://i.imgur.com/PY7qMwd.png)
 
-With `log.Formatter = new(logrus.JSONFormatter)`, for easy parsing by logstash
+With `log.SetFormatter(&log.JSONFormatter{})`, for easy parsing by logstash
 or Splunk:
 
 ```json
@@ -32,7 +32,7 @@ ocean","size":10,"time":"2014-03-10 19:57:38.562264131 -0400 EDT"}
 "time":"2014-03-10 19:57:38.562543128 -0400 EDT"}
 ```
 
-With the default `log.Formatter = new(&log.TextFormatter{})` when a TTY is not
+With the default `log.SetFormatter(&log.TextFormatter{})` when a TTY is not
 attached, the output is compatible with the
 [logfmt](http://godoc.org/github.com/kr/logfmt) format:
 
@@ -218,12 +218,17 @@ Note: Syslog hook also support connecting to local syslog (Ex. "/dev/log" or "/v
 | [Rollrus](https://github.com/heroku/rollrus) | Hook for sending errors to rollbar |
 | [Fluentd](https://github.com/evalphobia/logrus_fluent) | Hook for logging to fluentd |
 | [Mongodb](https://github.com/weekface/mgorus) | Hook for logging to mongodb |
+| [Influxus] (http://github.com/vlad-doru/influxus) | Hook for concurrently logging to [InfluxDB] (http://influxdata.com/) |
 | [InfluxDB](https://github.com/Abramovic/logrus_influxdb) | Hook for logging to influxdb |
 | [Octokit](https://github.com/dorajistyle/logrus-octokit-hook) | Hook for logging to github via octokit |
 | [DeferPanic](https://github.com/deferpanic/dp-logrus) | Hook for logging to DeferPanic |
 | [Redis-Hook](https://github.com/rogierlommers/logrus-redis-hook) | Hook for logging to a ELK stack (through Redis) |
 | [Amqp-Hook](https://github.com/vladoatanasov/logrus_amqp) | Hook for logging to Amqp broker (Like RabbitMQ) |
 | [KafkaLogrus](https://github.com/goibibo/KafkaLogrus) | Hook for logging to kafka |
+| [Typetalk](https://github.com/dragon3/logrus-typetalk-hook) | Hook for logging to [Typetalk](https://www.typetalk.in/) |
+| [ElasticSearch](https://github.com/sohlich/elogrus) | Hook for logging to ElasticSearch|
+| [Sumorus](https://github.com/doublefree/sumorus) | Hook for logging to [SumoLogic](https://www.sumologic.com/)|
+| [Logstash](https://github.com/bshuster-repo/logrus-logstash-hook) | Hook for logging to [Logstash](https://www.elastic.co/products/logstash) |
 
 #### Level logging
 

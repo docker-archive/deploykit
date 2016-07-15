@@ -9,6 +9,7 @@ import (
 	"github.com/docker/libmachete/controller/scaler"
 	"github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/server"
+	"github.com/docker/libmachete/spi"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -33,6 +34,9 @@ func (e *fakeEc2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error
 }
 
 func (e *fakeEc2) DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	instances := []*ec2.Instance{}
 	for _, id := range e.instanceIds {
 		copy := id
@@ -72,16 +76,25 @@ func (e *fakeEc2) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2.T
 	return &ec2.TerminateInstancesOutput{TerminatingInstances: []*ec2.InstanceStateChange{{}}}, nil
 }
 
-func (e *fakeEc2) resetIds(ids []string) {
+func (e *fakeEc2) maybeResetIds(newIds []string, predicate func([]string) bool) bool {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	e.instanceIds = ids
+
+	if predicate(e.instanceIds) {
+		e.instanceIds = newIds
+		return true
+	}
+
+	return false
 }
 
 func resetAtTarget(backend *fakeEc2, target int, newIds []string) {
+	metTargetLength := func(currentIds []string) bool {
+		return len(currentIds) == target
+	}
+
 	for {
-		if len(backend.instanceIds) == target {
-			backend.resetIds(newIds)
+		if backend.maybeResetIds(newIds, metTargetLength) {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -95,7 +108,7 @@ func TestIntegration(t *testing.T) {
 	defer ctrl.Finish()
 
 	backend := &fakeEc2{}
-	provisioner := aws.NewInstanceProvisioner(backend)
+	provisioner := aws.NewInstanceProvisioner(backend, spi.ClusterID("test-cluster"))
 
 	testflight.WithServer(server.NewHandler(provisioner), func(r *testflight.Requester) {
 		target := 3
