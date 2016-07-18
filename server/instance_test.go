@@ -53,7 +53,7 @@ func TestListGroupError(t *testing.T) {
 		require.Equal(t, 400, response.StatusCode)
 
 		group := "worker-nodes"
-		provisioner.EXPECT().ListGroup(instance.GroupID(group)).Return(nil, &BadInputError)
+		provisioner.EXPECT().ListGroup(instance.GroupID(group)).Return(nil, BadInputError)
 		expectBadInputError(t, r.Get(fmt.Sprintf("/instance/?group=%s", group)))
 	})
 }
@@ -86,7 +86,7 @@ func TestProvisionError(t *testing.T) {
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		request := "{}"
-		provisioner.EXPECT().Provision(request).Return(nil, &BadInputError)
+		provisioner.EXPECT().Provision(request).Return(nil, BadInputError)
 		expectBadInputError(t, r.Post("/instance/", "application/json", request))
 	})
 }
@@ -114,7 +114,7 @@ func TestDestroyError(t *testing.T) {
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		id := instance.ID("instance-id")
-		provisioner.EXPECT().Destroy(id).Return(&BadInputError)
+		provisioner.EXPECT().Destroy(id).Return(BadInputError)
 		expectBadInputError(t, r.Delete(fmt.Sprintf("/instance/%s", id), "application/json", ""))
 	})
 }

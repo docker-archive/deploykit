@@ -32,11 +32,21 @@ func (e Error) Error() string {
 }
 
 // UnknownError creates a standard Error when the cause is unknown.
-func UnknownError(err error) *Error {
-	return &Error{ErrUnknown, err.Error()}
+func UnknownError(err error) error {
+	return Error{ErrUnknown, err.Error()}
 }
 
 // NewError creates an Error with the specified code.
-func NewError(code int, format string, args ...interface{}) *Error {
-	return &Error{Code: code, Message: fmt.Sprintf(format, args...)}
+func NewError(code int, format string, args ...interface{}) error {
+	return Error{Code: code, Message: fmt.Sprintf(format, args...)}
+}
+
+// CodeFromError returns the code associated with an error.
+// Returns ErrUnknown if the error is not an spi error.
+func CodeFromError(err error) int {
+	spiErr, is := err.(Error)
+	if !is {
+		return ErrUnknown
+	}
+	return spiErr.Code
 }

@@ -20,10 +20,10 @@ type instanceClient struct {
 	host string
 }
 
-func (c instanceClient) sendRequest(method, path, body string) (*http.Response, *spi.Error) {
+func (c instanceClient) sendRequest(method, path, body string) (*http.Response, error) {
 	req, err := http.NewRequest(method, fmt.Sprintf("http://%s/%s", c.host, path), strings.NewReader(body))
 	if err != nil {
-		return nil, spi.UnknownError(err)
+		return nil, err
 	}
 
 	if body != "" {
@@ -32,7 +32,7 @@ func (c instanceClient) sendRequest(method, path, body string) (*http.Response, 
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, spi.UnknownError(err)
+		return nil, err
 	}
 
 	if (resp.StatusCode / 100) != 2 {
@@ -44,7 +44,7 @@ func (c instanceClient) sendRequest(method, path, body string) (*http.Response, 
 	return resp, nil
 }
 
-func (c instanceClient) Provision(request string) (*instance.ID, *spi.Error) {
+func (c instanceClient) Provision(request string) (*instance.ID, error) {
 	resp, apiErr := c.sendRequest("POST", "instance/", request)
 	if apiErr != nil {
 		return nil, apiErr
@@ -52,19 +52,19 @@ func (c instanceClient) Provision(request string) (*instance.ID, *spi.Error) {
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, spi.UnknownError(err)
+		return nil, err
 	}
 
 	id := instance.ID(string(data))
 	return &id, nil
 }
 
-func (c instanceClient) Destroy(instance instance.ID) *spi.Error {
+func (c instanceClient) Destroy(instance instance.ID) error {
 	_, apiErr := c.sendRequest("DELETE", fmt.Sprintf("instance/%s", instance), "")
 	return apiErr
 }
 
-func (c instanceClient) ListGroup(group instance.GroupID) ([]instance.ID, *spi.Error) {
+func (c instanceClient) ListGroup(group instance.GroupID) ([]instance.ID, error) {
 	resp, apiErr := c.sendRequest("GET", fmt.Sprintf("instance/?group=%s", group), "")
 	if apiErr != nil {
 		return nil, apiErr
@@ -72,13 +72,13 @@ func (c instanceClient) ListGroup(group instance.GroupID) ([]instance.ID, *spi.E
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, spi.UnknownError(err)
+		return nil, err
 	}
 
 	ids := []instance.ID{}
 	err = json.Unmarshal(data, &ids)
 	if err != nil {
-		return nil, spi.UnknownError(err)
+		return nil, err
 	}
 
 	return ids, nil

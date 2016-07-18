@@ -57,7 +57,7 @@ func TestCreateInstanceRequiresGroup(t *testing.T) {
 	provisioner := NewInstanceProvisioner(clientMock, testCluster)
 	_, err := provisioner.Provision("{}")
 	require.Error(t, err)
-	require.Equal(t, spi.ErrBadInput, err.Code)
+	require.Equal(t, spi.ErrBadInput, spi.CodeFromError(err))
 }
 
 func TestCreateInstanceError(t *testing.T) {
