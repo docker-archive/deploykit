@@ -20,7 +20,7 @@ var errorCodeMap = map[int]int{
 }
 
 // SimpleHandler is a reduced HTTP handler interface that may be used with handleError().
-type SimpleHandler func(req *http.Request) (interface{}, *spi.Error)
+type SimpleHandler func(req *http.Request) (interface{}, error)
 
 func respondError(code int, resp http.ResponseWriter, err error) {
 	resp.WriteHeader(code)
@@ -33,8 +33,8 @@ func respondError(code int, resp http.ResponseWriter, err error) {
 	panic(fmt.Sprintf("Failed to marshal error text: %s", err.Error()))
 }
 
-func handleError(err spi.Error, resp http.ResponseWriter) {
-	statusCode, mapped := errorCodeMap[err.Code]
+func handleError(err error, resp http.ResponseWriter) {
+	statusCode, mapped := errorCodeMap[spi.CodeFromError(err)]
 	if !mapped {
 		statusCode = http.StatusInternalServerError
 	}
@@ -68,7 +68,7 @@ func outputHandler(handler SimpleHandler) Handler {
 			resp.Header().Set("Content-Type", "application/json")
 			resp.Write(buff)
 		} else {
-			handleError(*err, resp)
+			handleError(err, resp)
 		}
 	}
 }
