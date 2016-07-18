@@ -111,7 +111,7 @@ func (p provisioner) tagInstance(request createInstanceRequest, instance *ec2.In
 }
 
 // Provision creates a new instance.
-func (p provisioner) Provision(req string) (*instance.ID, *spi.Error) {
+func (p provisioner) Provision(req string) (*instance.ID, error) {
 	request := createInstanceRequest{}
 	err := json.Unmarshal([]byte(req), &request)
 	if err != nil {
@@ -138,7 +138,7 @@ func (p provisioner) Provision(req string) (*instance.ID, *spi.Error) {
 }
 
 // Destroy terminates an existing instance.
-func (p provisioner) Destroy(id instance.ID) *spi.Error {
+func (p provisioner) Destroy(id instance.ID) error {
 	result, err := p.client.TerminateInstances(&ec2.TerminateInstancesInput{
 		InstanceIds: []*string{aws.String(string(id))}})
 
@@ -148,7 +148,7 @@ func (p provisioner) Destroy(id instance.ID) *spi.Error {
 
 	if len(result.TerminatingInstances) != 1 {
 		// There was no match for the instance ID.
-		return &spi.Error{Code: spi.ErrBadInput, Message: "No matching instance"}
+		return spi.Error{Code: spi.ErrBadInput, Message: "No matching instance"}
 	}
 
 	return nil
@@ -177,7 +177,7 @@ func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken 
 	}
 }
 
-func (p provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.ID, *spi.Error) {
+func (p provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.ID, error) {
 	result, err := p.client.DescribeInstances(describeGroupRequest(p.cluster, group, nextToken))
 	if err != nil {
 		return nil, spi.UnknownError(err)
@@ -204,6 +204,6 @@ func (p provisioner) describeInstances(group instance.GroupID, nextToken *string
 }
 
 // ListGroup returns all instances included in a group.
-func (p provisioner) ListGroup(group instance.GroupID) ([]instance.ID, *spi.Error) {
+func (p provisioner) ListGroup(group instance.GroupID) ([]instance.ID, error) {
 	return p.describeInstances(group, nil)
 }
