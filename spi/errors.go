@@ -15,10 +15,13 @@ const (
 
 	// ErrBadInput is returned when an operation was supplied invalid user input.
 	ErrBadInput
+
+	// ErrNotImplemented is returned when a provisioner does not implement certain operations
+	ErrNotImplemented
 )
 
-// Error is the libmachete specific error
-type Error struct {
+// spiError is the libmachete specific error
+type spiError struct {
 	// Code is the error code
 	Code int
 
@@ -27,24 +30,24 @@ type Error struct {
 }
 
 // Implements the Error interface.
-func (e Error) Error() string {
+func (e spiError) Error() string {
 	return e.Message
 }
 
 // UnknownError creates a standard Error when the cause is unknown.
 func UnknownError(err error) error {
-	return Error{ErrUnknown, err.Error()}
+	return spiError{ErrUnknown, err.Error()}
 }
 
 // NewError creates an Error with the specified code.
 func NewError(code int, format string, args ...interface{}) error {
-	return Error{Code: code, Message: fmt.Sprintf(format, args...)}
+	return spiError{Code: code, Message: fmt.Sprintf(format, args...)}
 }
 
 // CodeFromError returns the code associated with an error.
 // Returns ErrUnknown if the error is not an spi error.
 func CodeFromError(err error) int {
-	spiErr, is := err.(Error)
+	spiErr, is := err.(spiError)
 	if !is {
 		return ErrUnknown
 	}

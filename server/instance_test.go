@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-var BadInputError = spi.Error{Code: spi.ErrBadInput, Message: "Bad Input"}
+var BadInputError = spi.NewError(spi.ErrBadInput, "Bad Input")
 
 func TestListGroup(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -38,7 +38,7 @@ func expectBadInputError(t *testing.T, response *testflight.Response) {
 	require.Equal(t, 400, response.StatusCode)
 	body := map[string]string{}
 	require.NoError(t, json.Unmarshal([]byte(response.Body), &body))
-	require.Equal(t, map[string]string{"error": BadInputError.Message}, body)
+	require.Equal(t, map[string]string{"error": BadInputError.Error()}, body)
 }
 
 func TestListGroupError(t *testing.T) {
