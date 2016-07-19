@@ -19,7 +19,7 @@ func getInstanceID(req *http.Request) instance.ID {
 func (h *instanceHandler) listGroup(req *http.Request) (interface{}, error) {
 	group := req.URL.Query().Get("group")
 	if len(group) == 0 {
-		return nil, spi.Error{Code: spi.ErrBadInput, Message: "Group must be specified"}
+		return nil, spi.NewError(spi.ErrBadInput, "Group must be specified")
 	}
 
 	return h.provisioner.ListGroup(instance.GroupID(group))
@@ -28,7 +28,7 @@ func (h *instanceHandler) listGroup(req *http.Request) (interface{}, error) {
 func (h *instanceHandler) provision(req *http.Request) (interface{}, error) {
 	buff, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return nil, spi.Error{Code: spi.ErrBadInput, Message: "Failed to read request input"}
+		return nil, spi.NewError(spi.ErrBadInput, "Failed to read request input")
 	}
 
 	return h.provisioner.Provision(string(buff))
