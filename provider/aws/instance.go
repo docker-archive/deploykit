@@ -148,7 +148,7 @@ func (p provisioner) Destroy(id instance.ID) error {
 
 	if len(result.TerminatingInstances) != 1 {
 		// There was no match for the instance ID.
-		return spi.Error{Code: spi.ErrBadInput, Message: "No matching instance"}
+		return spi.NewError(spi.ErrBadInput, "No matching instance")
 	}
 
 	return nil
