@@ -20,10 +20,8 @@ AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
 
 # Package list
-PKGS := $(shell go list ./... | \
-grep -v ^github.com/docker/libmachete/vendor/ | \
-grep -v ^github.com/docker/libmachete/e2e/ | \
-grep -v /mock$)
+PKGS_AND_MOCKS := $(shell go list ./... | grep -v ^github.com/docker/libmachete/vendor/)
+PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
 
 vet:
 	@echo "+ $@"
@@ -54,7 +52,7 @@ install:
 
 generate:
 	@echo "+ $@"
-	@go generate -x $(PKGS)
+	@go generate -x $(PKGS_AND_MOCKS)
 
 test:
 	@echo "+ $@"
