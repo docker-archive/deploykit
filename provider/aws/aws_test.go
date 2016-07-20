@@ -14,8 +14,6 @@ import (
 	"testing"
 )
 
-//go:generate mockgen -package mock -destination ../../mock/ec2/mock_ec2iface.go github.com/aws/aws-sdk-go/service/ec2/ec2iface EC2API
-
 const testCluster = spi.ClusterID("test-cluster")
 
 func TestCreateInstanceSuccess(t *testing.T) {

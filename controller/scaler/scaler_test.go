@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-//go:generate mockgen -package instance -destination ../../mock/spi/instance/instance.go github.com/docker/libmachete/spi/instance Provisioner
-
 const (
 	testRequest = `{"Group": "test-group"}`
 )
