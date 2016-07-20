@@ -124,14 +124,14 @@ func (p provisioner) Provision(req string) (*instance.ID, error) {
 
 	ec2Instance, err := createInstance(p.client, request)
 	if err != nil {
-		return nil, spi.UnknownError(err)
+		return nil, err
 	}
 
 	id := (*instance.ID)(ec2Instance.InstanceId)
 
 	err = p.tagInstance(request, ec2Instance)
 	if err != nil {
-		return id, spi.UnknownError(err)
+		return id, err
 	}
 
 	return id, nil
@@ -143,7 +143,7 @@ func (p provisioner) Destroy(id instance.ID) error {
 		InstanceIds: []*string{aws.String(string(id))}})
 
 	if err != nil {
-		return spi.UnknownError(err)
+		return err
 	}
 
 	if len(result.TerminatingInstances) != 1 {
@@ -180,7 +180,7 @@ func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken 
 func (p provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.ID, error) {
 	result, err := p.client.DescribeInstances(describeGroupRequest(p.cluster, group, nextToken))
 	if err != nil {
-		return nil, spi.UnknownError(err)
+		return nil, err
 	}
 
 	ids := []instance.ID{}
