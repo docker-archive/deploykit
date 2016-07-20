@@ -38,7 +38,7 @@ func (c instanceClient) sendRequest(method, path, body string) (*http.Response, 
 		// TODO(wfarner): Reverse-map HTTP status codes to spi.Error codes for better error handling, then
 		// return spi.Error
 		data, _ := ioutil.ReadAll(resp.Body)
-		return nil, spi.Error{Code: spi.ErrUnknown, Message: string(data)}
+		return nil, spi.NewError(spi.ErrUnknown, string(data))
 	}
 
 	return resp, nil
