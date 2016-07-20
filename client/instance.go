@@ -2,7 +2,6 @@ package client
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
@@ -36,9 +35,10 @@ func (c instanceClient) sendRequest(method, path, body string) (*http.Response, 
 	}
 
 	if (resp.StatusCode / 100) != 2 {
-		// TODO(wfarner): Reverse-map HTTP status codes to spi.Error codes for better error handling.
+		// TODO(wfarner): Reverse-map HTTP status codes to spi.Error codes for better error handling, then
+		// return spi.Error
 		data, _ := ioutil.ReadAll(resp.Body)
-		return nil, spi.UnknownError(errors.New(string(data)))
+		return nil, spi.NewError(spi.ErrUnknown, string(data))
 	}
 
 	return resp, nil
