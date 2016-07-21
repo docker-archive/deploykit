@@ -12,9 +12,11 @@ import (
 )
 
 var (
+	// ErrBadData - bad data from backend
 	ErrBadData = fmt.Errorf("bad-data")
 )
 
+// Options - options for Azure
 type Options struct {
 	Environment    string
 	SubscriptionID string
@@ -27,14 +29,15 @@ type Options struct {
 	ResourceGroupName string
 }
 
-type albProvisioner struct {
+type albDriver struct {
 	client        *network.LoadBalancersClient
 	name          string
 	resourceGroup string
 }
 
-func NewALBProvisioner(client *network.LoadBalancersClient, resourceGroup, name string) (loadbalancer.L4Provisioner, error) {
-	return &albProvisioner{
+// NewALBDriver creates a load balancer driver
+func NewALBDriver(client *network.LoadBalancersClient, resourceGroup, name string) (loadbalancer.Driver, error) {
+	return &albDriver{
 		client:        client,
 		name:          name,
 		resourceGroup: resourceGroup,
@@ -53,11 +56,11 @@ func wrap(a autorest.Response, e error) (loadbalancer.Result, error) {
 
 type describeResult network.LoadBalancer
 
-func (p *albProvisioner) Name() string {
+func (p *albDriver) Name() string {
 	return p.name
 }
 
-func (p *albProvisioner) State() (loadbalancer.State, error) {
+func (p *albDriver) State() (loadbalancer.State, error) {
 	lb, err := p.currentState()
 	if err != nil {
 		return nil, err
@@ -85,7 +88,7 @@ func toProtocol(p loadbalancer.Protocol) network.TransportProtocol {
 	return network.TransportProtocolTCP
 }
 
-func (p *albProvisioner) PublishService(ext loadbalancer.Protocol, extPort uint32,
+func (p *albDriver) PublishService(ext loadbalancer.Protocol, extPort uint32,
 	backend loadbalancer.Protocol, backendPort uint32) (loadbalancer.Result, error) {
 
 	lb, err := p.currentState()
@@ -136,7 +139,7 @@ func (p *albProvisioner) PublishService(ext loadbalancer.Protocol, extPort uint3
 	return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancel))
 }
 
-func (p *albProvisioner) UnpublishService(extPort uint32) (loadbalancer.Result, error) {
+func (p *albDriver) UnpublishService(extPort uint32) (loadbalancer.Result, error) {
 	lb, err := p.currentState()
 	if err != nil {
 		return nil, err
@@ -238,7 +241,7 @@ func buildProbe(name string, protocol loadbalancer.Protocol, backendPort uint32,
 	}
 }
 
-func (p *albProvisioner) ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int,
+func (p *albDriver) ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int,
 	interval, timeout time.Duration) (loadbalancer.Result, error) {
 	lb, err := p.currentState()
 	if err != nil {
@@ -265,17 +268,17 @@ func (p *albProvisioner) ConfigureHealthCheck(backendPort uint32, healthy, unhea
 	return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancel))
 }
 
-func (p *albProvisioner) RegisterBackend(id string, more ...string) (loadbalancer.Result, error) {
+func (p *albDriver) RegisterBackend(id string, more ...string) (loadbalancer.Result, error) {
 	// Not implemented because instances are added to LB via ScaleSet
 	return nil, fmt.Errorf("not-implemented")
 }
 
-func (p *albProvisioner) DeregisterBackend(id string, more ...string) (loadbalancer.Result, error) {
+func (p *albDriver) DeregisterBackend(id string, more ...string) (loadbalancer.Result, error) {
 	// Not implemented because instances are added to LB via ScaleSet
 	return nil, fmt.Errorf("not-implemented")
 }
 
-func (p *albProvisioner) currentState() (*network.LoadBalancer, error) {
+func (p *albDriver) currentState() (*network.LoadBalancer, error) {
 	lb, err := p.client.Get(p.resourceGroup, p.name, "")
 	if err != nil {
 		return nil, err
@@ -352,6 +355,7 @@ func (d describeResult) VisitListeners(v func(lbPort, instancePort uint32, proto
 	}
 }
 
+// CreateALBClient creates a client of the SDK
 func CreateALBClient(cred *Credential, opt Options) (*network.LoadBalancersClient, error) {
 	env, ok := environments[opt.Environment]
 	if !ok {

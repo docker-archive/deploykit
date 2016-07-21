@@ -21,14 +21,14 @@ type Options struct {
 	Retries int
 }
 
-type elbProvisioner struct {
+type elbDriver struct {
 	client elbiface.ELBAPI
 	name   string
 }
 
-// NewELBProvisioner creates an AWS-based ELB provisioner.
-func NewELBProvisioner(client elbiface.ELBAPI, name string) (loadbalancer.L4Provisioner, error) {
-	return &elbProvisioner{
+// NewELBDriver creates an AWS-based ELB provisioner.
+func NewELBDriver(client elbiface.ELBAPI, name string) (loadbalancer.Driver, error) {
+	return &elbDriver{
 		client: client,
 		name:   name,
 	}, nil
@@ -66,11 +66,11 @@ func CreateELBClient(awsCredentials *credentials.Credentials, opt Options) elbif
 		WithMaxRetries(opt.Retries)))
 }
 
-func (p *elbProvisioner) Name() string {
+func (p *elbDriver) Name() string {
 	return p.name
 }
 
-func (p *elbProvisioner) State() (loadbalancer.State, error) {
+func (p *elbDriver) State() (loadbalancer.State, error) {
 	v, err := p.client.DescribeLoadBalancers(&elb.DescribeLoadBalancersInput{
 		LoadBalancerNames: []*string{aws.String(p.name)},
 	})
@@ -169,21 +169,21 @@ func instances(instanceID string, otherIDs ...string) []*elb.Instance {
 	return instances
 }
 
-func (p *elbProvisioner) RegisterBackend(instanceID string, otherIDs ...string) (loadbalancer.Result, error) {
+func (p *elbDriver) RegisterBackend(instanceID string, otherIDs ...string) (loadbalancer.Result, error) {
 	return p.client.RegisterInstancesWithLoadBalancer(&elb.RegisterInstancesWithLoadBalancerInput{
 		Instances:        instances(instanceID, otherIDs...),
 		LoadBalancerName: aws.String(p.name),
 	})
 }
 
-func (p *elbProvisioner) DeregisterBackend(instanceID string, otherIDs ...string) (loadbalancer.Result, error) {
+func (p *elbDriver) DeregisterBackend(instanceID string, otherIDs ...string) (loadbalancer.Result, error) {
 	return p.client.DeregisterInstancesFromLoadBalancer(&elb.DeregisterInstancesFromLoadBalancerInput{
 		Instances:        instances(instanceID, otherIDs...),
 		LoadBalancerName: aws.String(p.name),
 	})
 }
 
-func (p *elbProvisioner) PublishService(ext loadbalancer.Protocol, extPort uint32,
+func (p *elbDriver) PublishService(ext loadbalancer.Protocol, extPort uint32,
 	backend loadbalancer.Protocol, backendPort uint32) (loadbalancer.Result, error) {
 
 	if ext == loadbalancer.Invalid || backend == loadbalancer.Invalid {
@@ -205,14 +205,14 @@ func (p *elbProvisioner) PublishService(ext loadbalancer.Protocol, extPort uint3
 	})
 }
 
-func (p *elbProvisioner) UnpublishService(extPort uint32) (loadbalancer.Result, error) {
+func (p *elbDriver) UnpublishService(extPort uint32) (loadbalancer.Result, error) {
 	return p.client.DeleteLoadBalancerListeners(&elb.DeleteLoadBalancerListenersInput{
 		LoadBalancerPorts: []*int64{aws.Int64(int64(extPort))},
 		LoadBalancerName:  aws.String(p.name),
 	})
 }
 
-func (p *elbProvisioner) ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int,
+func (p *elbDriver) ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int,
 	interval, timeout time.Duration) (loadbalancer.Result, error) {
 
 	return p.client.ConfigureHealthCheck(&elb.ConfigureHealthCheckInput{

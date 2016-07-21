@@ -18,10 +18,12 @@ var (
 	}
 )
 
+// NewCredential allocates a credential
 func NewCredential() *Credential {
 	return new(Credential)
 }
 
+// Credential for azure
 type Credential struct {
 	azure.Token
 	authorizer autorest.Authorizer
@@ -47,6 +49,7 @@ func (a Credential) loadSPT(opt Options) (*azure.ServicePrincipalToken, error) {
 		opt.OAuthClientID, env.ServiceManagementEndpoint, a.Token)
 }
 
+// Validate performs validation on the credential
 func (a Credential) Validate(opt Options) error {
 	if len(a.AccessToken) == 0 && len(a.RefreshToken) == 0 {
 		return fmt.Errorf("no token")
@@ -64,18 +67,19 @@ func (a Credential) Validate(opt Options) error {
 	return validateToken(env, spt)
 }
 
+// Authenticate performs authentication
 func (a *Credential) Authenticate(opt Options) error {
 	env, ok := environments[opt.Environment]
 	if !ok {
 		return fmt.Errorf("No valid environment")
 	}
 
-	tenantId, err := getTenantID(env, opt.SubscriptionID)
+	tenantID, err := getTenantID(env, opt.SubscriptionID)
 	if err != nil {
 		return err
 	}
 
-	oauthCfg, err := env.OAuthConfigForTenant(tenantId)
+	oauthCfg, err := env.OAuthConfigForTenant(tenantID)
 	if err != nil {
 		return err
 	}
@@ -93,20 +97,21 @@ func (a *Credential) Authenticate(opt Options) error {
 		}
 		a.authorizer = spt
 		return nil
-	} else {
-		spt, err = tokenFromDeviceFlow(*oauthCfg, opt.OAuthClientID, env.ServiceManagementEndpoint)
-		if err != nil {
-			return err
-		}
-		if len(spt.AccessToken) > 0 && len(spt.RefreshToken) > 0 {
-			a.Token = spt.Token
-			return nil
-		}
+	}
+
+	spt, err = tokenFromDeviceFlow(*oauthCfg, opt.OAuthClientID, env.ServiceManagementEndpoint)
+	if err != nil {
+		return err
+	}
+	if len(spt.AccessToken) > 0 && len(spt.RefreshToken) > 0 {
+		a.Token = spt.Token
+		return nil
 	}
 
 	return fmt.Errorf("not-authorized")
 }
 
+// Refresh refreshes the oauth token
 func (a *Credential) Refresh(opt Options) error {
 	spt, err := a.loadSPT(opt)
 	if err != nil {

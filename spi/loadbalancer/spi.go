@@ -24,8 +24,10 @@ type Result interface {
 	fmt.Stringer
 }
 
-// L4Provisioner is the generic provisioner for a signle L4 load balancer instance
-type L4Provisioner interface {
+// TODO(chungers) -- Update the interface to support Vhosts for L7 routing.
+
+// Driver is the generic driver for a signle L4 load balancer instance
+type Driver interface {
 
 	// Name is the name of the load balancer
 	Name() string
