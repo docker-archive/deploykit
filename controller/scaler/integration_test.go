@@ -1,17 +1,20 @@
-package e2e
+package scaler
 
 import (
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/client"
-	"github.com/docker/libmachete/controller/scaler"
-	"github.com/docker/libmachete/provider/aws"
+	mock_ssh_util "github.com/docker/libmachete/mock/spi/util/sshutil"
+	aws_provider "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/server"
 	"github.com/docker/libmachete/spi"
+	"github.com/docker/libmachete/spi/util/sshutil"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"strconv"
 	"sync"
@@ -40,7 +43,7 @@ func (e *fakeEc2) DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeI
 	instances := []*ec2.Instance{}
 	for _, id := range e.instanceIds {
 		copy := id
-		instances = append(instances, &ec2.Instance{InstanceId: &copy})
+		instances = append(instances, &ec2.Instance{InstanceId: &copy, KeyName: aws.String("key")})
 	}
 
 	return &ec2.DescribeInstancesOutput{Reservations: []*ec2.Reservation{{Instances: instances}}}, nil
@@ -76,6 +79,14 @@ func (e *fakeEc2) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2.T
 	return &ec2.TerminateInstancesOutput{TerminatingInstances: []*ec2.InstanceStateChange{{}}}, nil
 }
 
+func (e *fakeEc2) CreateKeyPair(*ec2.CreateKeyPairInput) (*ec2.CreateKeyPairOutput, error) {
+	return &ec2.CreateKeyPairOutput{KeyMaterial: aws.String("fake key data")}, nil
+}
+
+func (e *fakeEc2) DeleteKeyPair(*ec2.DeleteKeyPairInput) (*ec2.DeleteKeyPairOutput, error) {
+	return &ec2.DeleteKeyPairOutput{}, nil
+}
+
 func (e *fakeEc2) maybeResetIds(newIds []string, predicate func([]string) bool) bool {
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -101,19 +112,26 @@ func resetAtTarget(backend *fakeEc2, target int, newIds []string) {
 	}
 }
 
-// TestIntegration combines a scaler, HTTP client, machete server, and provisioner backend to ensure all components
+// TestScalerIntegration combines a scaler, HTTP client, machete server, and provisioner backend to ensure all components
 // work together.
-func TestIntegration(t *testing.T) {
+func TestScalerIntegration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	backend := &fakeEc2{}
-	provisioner := aws.NewInstanceProvisioner(backend, spi.ClusterID("test-cluster"))
+	runnerMock := mock_ssh_util.NewMockCommandRunner(ctrl)
+
+	provisioner := aws_provider.Provisioner{
+		Client:        backend,
+		Cluster:       spi.ClusterID("test-cluster"),
+		CommandRunner: runnerMock,
+		KeyStore:      sshutil.FileSystemKeyStore(afero.NewMemMapFs(), "/"),
+	}
 
 	testflight.WithServer(server.NewHandler(provisioner), func(r *testflight.Requester) {
 		target := 3
 		group := "integration-test-manager"
-		watcher, err := scaler.NewFixedScaler(
+		watcher, err := NewFixedScaler(
 			10*time.Millisecond,
 			client.NewInstanceProvisioner(r.Url("")),
 			fmt.Sprintf(`{"Group": "%s"}`, group),

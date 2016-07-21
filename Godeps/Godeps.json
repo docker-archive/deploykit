@@ -158,8 +158,28 @@
 			"Rev": "0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74"
 		},
 		{
+			"ImportPath": "github.com/kr/fs",
+			"Rev": "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
+		},
+		{
+			"ImportPath": "github.com/pkg/sftp",
+			"Rev": "9683e1ed9152e4fb052773355eb1b8cdcbac2058"
+		},
+		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
+			"ImportPath": "github.com/spf13/afero",
+			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
+		},
+		{
+			"ImportPath": "github.com/spf13/afero/mem",
+			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
+		},
+		{
+			"ImportPath": "github.com/spf13/afero/sftp",
+			"Rev": "eb0cc807c28245e500631c2d261d29e9daf37bc2"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
@@ -180,8 +200,24 @@
 			"Rev": "bcd9e3389dd03b0b668d11f4d462a6af6c2dfd60"
 		},
 		{
+			"ImportPath": "golang.org/x/crypto/curve25519",
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ssh",
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
+		},
+		{
 			"ImportPath": "golang.org/x/sys/unix",
 			"Rev": "f64b50fbea64174967a8882830d621a18ee1548e"
+		},
+		{
+			"ImportPath": "golang.org/x/text/transform",
+			"Rev": "07b9a78963006a15c538ec5175243979025fa7a8"
+		},
+		{
+			"ImportPath": "golang.org/x/text/unicode/norm",
+			"Rev": "07b9a78963006a15c538ec5175243979025fa7a8"
 		}
 	]
 }

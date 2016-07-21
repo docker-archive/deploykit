@@ -8,6 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/libmachete/spi/util/sshutil"
+	"github.com/spf13/afero"
+	"golang.org/x/crypto/ssh"
 	"sort"
 )
 
@@ -19,17 +22,25 @@ const (
 	GroupTag = "machete-group"
 )
 
-type provisioner struct {
-	client  ec2iface.EC2API
-	cluster spi.ClusterID
+// Provisioner is an instance provisioner for AWS.
+type Provisioner struct {
+	Client        ec2iface.EC2API
+	Cluster       spi.ClusterID
+	CommandRunner sshutil.CommandRunner
+	KeyStore      sshutil.KeyStore
 }
 
-// NewInstanceProvisioner creates a new provisioner.
+// NewInstanceProvisioner creates a new provisioner using an SSH command runner and local private key storage.
 func NewInstanceProvisioner(client ec2iface.EC2API, cluster spi.ClusterID) instance.Provisioner {
-	return &provisioner{client: client, cluster: cluster}
+	return &Provisioner{
+		Client:        client,
+		Cluster:       cluster,
+		CommandRunner: sshutil.NewCommandRunner(),
+		KeyStore:      sshutil.FileSystemKeyStore(afero.NewOsFs(), "./"),
+	}
 }
 
-func (p provisioner) tagInstance(request createInstanceRequest, instance *ec2.Instance) error {
+func (p Provisioner) tagInstance(request createInstanceRequest, instance *ec2.Instance) error {
 	tags := []*ec2.Tag{}
 
 	// Gather the tag keys in sorted order, to provide predictable tag order.  This is
@@ -49,10 +60,10 @@ func (p provisioner) tagInstance(request createInstanceRequest, instance *ec2.In
 	// Add cluster and group tags
 	tags = append(
 		tags,
-		&ec2.Tag{Key: aws.String(ClusterTag), Value: aws.String(string(p.cluster))},
+		&ec2.Tag{Key: aws.String(ClusterTag), Value: aws.String(string(p.Cluster))},
 		&ec2.Tag{Key: aws.String(GroupTag), Value: aws.String(string(request.Group))})
 
-	_, err := p.client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{instance.InstanceId}, Tags: tags})
+	_, err := p.Client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{instance.InstanceId}, Tags: tags})
 	return err
 }
 
@@ -63,7 +74,7 @@ type createInstanceRequest struct {
 }
 
 // Provision creates a new instance.
-func (p provisioner) Provision(req string) (*instance.ID, error) {
+func (p Provisioner) Provision(req string) (*instance.ID, error) {
 	request := createInstanceRequest{}
 	err := json.Unmarshal([]byte(req), &request)
 	if err != nil {
@@ -74,8 +85,26 @@ func (p provisioner) Provision(req string) (*instance.ID, error) {
 		return nil, spi.NewError(spi.ErrBadInput, "'group' field must not be blank")
 	}
 
-	reservation, err := p.client.RunInstances(&request.RunInstancesInput)
+	keyName := fmt.Sprintf("machete-%s", randomString(5))
+
+	result, err := p.Client.CreateKeyPair(&ec2.CreateKeyPairInput{KeyName: aws.String(keyName)})
 	if err != nil {
+		return nil, err
+	}
+
+	// TODO(wfarner): Need to re-evaluate code paths where keys should be
+	// deleted.
+
+	err = p.KeyStore.Write(keyName, []byte(*result.KeyMaterial))
+	if err != nil {
+		return nil, err
+	}
+
+	reservation, err := p.Client.RunInstances(&request.RunInstancesInput)
+	if err != nil {
+		// TODO(wfarner): Need to disambiguate between error types.  If there is uncertainty over whether the
+		// instance was _actually_ created, we should not delete the key.
+		p.KeyStore.Delete(keyName)
 		return nil, err
 	}
 
@@ -95,8 +124,20 @@ func (p provisioner) Provision(req string) (*instance.ID, error) {
 }
 
 // Destroy terminates an existing instance.
-func (p provisioner) Destroy(id instance.ID) error {
-	result, err := p.client.TerminateInstances(&ec2.TerminateInstancesInput{
+func (p Provisioner) Destroy(id instance.ID) error {
+	describeResult, err := p.describeInstance(id)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.Client.DeleteKeyPair(&ec2.DeleteKeyPairInput{KeyName: describeResult.KeyName})
+	if err != nil {
+		return err
+	}
+
+	p.KeyStore.Delete(*describeResult.KeyName)
+
+	result, err := p.Client.TerminateInstances(&ec2.TerminateInstancesInput{
 		InstanceIds: []*string{aws.String(string(id))}})
 
 	if err != nil {
@@ -134,8 +175,8 @@ func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken 
 	}
 }
 
-func (p provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.ID, error) {
-	result, err := p.client.DescribeInstances(describeGroupRequest(p.cluster, group, nextToken))
+func (p Provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.ID, error) {
+	result, err := p.Client.DescribeInstances(describeGroupRequest(p.Cluster, group, nextToken))
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +202,49 @@ func (p provisioner) describeInstances(group instance.GroupID, nextToken *string
 }
 
 // ListGroup returns all instances included in a group.
-func (p provisioner) ListGroup(group instance.GroupID) ([]instance.ID, error) {
+func (p Provisioner) ListGroup(group instance.GroupID) ([]instance.ID, error) {
 	return p.describeInstances(group, nil)
+}
+
+func (p Provisioner) describeInstance(id instance.ID) (*ec2.Instance, error) {
+	result, err := p.Client.DescribeInstances(&ec2.DescribeInstancesInput{
+		InstanceIds: []*string{aws.String(string(id))},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Reservations) == 0 || len(result.Reservations[0].Instances) == 0 {
+		return nil, spi.NewError(spi.ErrBadInput, "Instance not found")
+	}
+
+	return result.Reservations[0].Instances[0], nil
+}
+
+// ShellExec implements instance.ShellExec.
+func (p Provisioner) ShellExec(id instance.ID, shellCode string) (*string, error) {
+	instance, err := p.describeInstance(id)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyData, err := p.KeyStore.Read(*instance.KeyName)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := ssh.ParsePrivateKey(privateKeyData)
+	if err != nil {
+		fmt.Println("Invalid key", string(privateKeyData))
+		return nil, err
+	}
+
+	config := &ssh.ClientConfig{
+		// TODO(wfarner): Figure out how to use the user appropriate for the machine/image.
+		User: "ubuntu",
+		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+	}
+
+	// TODO(wfarner): We probably want the private IP in most cases (and may have no choice, if the host
+	// only has a private IP).  Need to figure out what to do here and whether the caller should choose.
+	return p.CommandRunner.Exec(fmt.Sprintf("%s:22", *instance.PublicIpAddress), config, shellCode)
 }

@@ -3,16 +3,19 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/spf13/pflag"
 	"net/http"
+	"reflect"
+	"runtime/debug"
 )
 
 // Handler is shorthand for an HTTP request handler function.
 type Handler func(resp http.ResponseWriter, req *http.Request)
 
-var errorCodeMap = map[int]int{
+var spiErrorToHTTPStatus = map[int]int{
 	spi.ErrBadInput:  http.StatusBadRequest,
 	spi.ErrUnknown:   http.StatusInternalServerError,
 	spi.ErrDuplicate: http.StatusConflict,
@@ -22,24 +25,21 @@ var errorCodeMap = map[int]int{
 // SimpleHandler is a reduced HTTP handler interface that may be used with handleError().
 type SimpleHandler func(req *http.Request) (interface{}, error)
 
-func respondError(code int, resp http.ResponseWriter, err error) {
-	resp.WriteHeader(code)
-	resp.Header().Set("Content-Type", "application/json")
-	body, err := json.Marshal(map[string]string{"error": err.Error()})
-	if err == nil {
-		resp.Write(body)
-		return
+func sendResponse(status int, body interface{}, resp http.ResponseWriter) {
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		status = http.StatusInternalServerError
+		bodyJSON = []byte(`{"error": "Internal error"`)
+		log.Warn("Failed to marshal response body %v: %s", body, err.Error())
 	}
-	panic(fmt.Sprintf("Failed to marshal error text: %s", err.Error()))
+
+	resp.WriteHeader(status)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Write(bodyJSON)
 }
 
-func handleError(err error, resp http.ResponseWriter) {
-	statusCode, mapped := errorCodeMap[spi.CodeFromError(err)]
-	if !mapped {
-		statusCode = http.StatusInternalServerError
-	}
-
-	respondError(statusCode, resp, err)
+func errorBody(err error) interface{} {
+	return map[string]string{"error": err.Error()}
 }
 
 func outputHandler(handler SimpleHandler) Handler {
@@ -47,29 +47,41 @@ func outputHandler(handler SimpleHandler) Handler {
 		// Handle panics cleanly.
 		defer func() {
 			if err := recover(); err != nil {
-				respondError(500, resp, fmt.Errorf("Panic: %v", err))
+				log.Errorf("%s: %s", err, debug.Stack())
+				sendResponse(
+					http.StatusInternalServerError,
+					errorBody(fmt.Errorf("Panic: %s", err)),
+					resp)
 			}
 		}()
 
-		result, err := handler(req)
+		responseBody, err := handler(req)
+
+		var status int
 		if err == nil {
-			if req.Method == "POST" {
-				resp.WriteHeader(http.StatusCreated)
-			} else {
-				resp.WriteHeader(http.StatusOK)
+			switch req.Method {
+			case "POST":
+				status = http.StatusCreated
+			default:
+				status = http.StatusOK
+			}
+		} else {
+			log.Warn("Request failed: ", err)
+
+			var mapped bool
+			status, mapped = spiErrorToHTTPStatus[spi.CodeFromError(err)]
+			if !mapped {
+				status = http.StatusInternalServerError
 			}
 
-			buff, err := json.Marshal(result)
-			if err != nil {
-				resp.WriteHeader(http.StatusInternalServerError)
-				resp.Write([]byte(err.Error()))
-				return
+			// Only use the error to define the response body if there was no result from the handler.
+			if responseBody == nil || reflect.ValueOf(responseBody).IsNil() {
+				// Use the error to define the response
+				responseBody = errorBody(err)
 			}
-			resp.Header().Set("Content-Type", "application/json")
-			resp.Write(buff)
-		} else {
-			handleError(err, resp)
 		}
+
+		sendResponse(status, responseBody, resp)
 	}
 }
 
