@@ -1,29 +1,52 @@
 package aws
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	mock_ec2 "github.com/docker/libmachete/mock/ec2"
+	mock_ssh_util "github.com/docker/libmachete/mock/spi/util/sshutil"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/libmachete/spi/util/sshutil"
 	"github.com/golang/mock/gomock"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ssh"
 	"testing"
 )
 
-const testCluster = spi.ClusterID("test-cluster")
+const (
+	testCluster = spi.ClusterID("test-cluster")
+	ipAddress   = "256.256.256.256"
+)
 
-func TestCreateInstanceSuccess(t *testing.T) {
+func TestInstanceLifecycle(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+
 	clientMock := mock_ec2.NewMockEC2API(ctrl)
+	runnerMock := mock_ssh_util.NewMockCommandRunner(ctrl)
+	provisioner := Provisioner{
+		Client:        clientMock,
+		Cluster:       testCluster,
+		CommandRunner: runnerMock,
+		KeyStore:      sshutil.FileSystemKeyStore(afero.NewMemMapFs(), "/"),
+	}
+
+	// Create an instance.
 
 	instanceID := "test-id"
-	reservation := ec2.Reservation{Instances: []*ec2.Instance{{InstanceId: &instanceID}}}
 
-	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&reservation, nil)
+	keyName := expectKeyPairCreation(t, clientMock)
+
+	clientMock.EXPECT().RunInstances(gomock.Any()).
+		Return(&ec2.Reservation{Instances: []*ec2.Instance{{InstanceId: &instanceID}}}, nil)
 
 	tagRequest := ec2.CreateTagsInput{
 		Resources: []*string{&instanceID},
@@ -35,11 +58,35 @@ func TestCreateInstanceSuccess(t *testing.T) {
 	}
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
-	provisioner := NewInstanceProvisioner(clientMock, testCluster)
 	id, err := provisioner.Provision(inputJSON)
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
+
+	// Execute a shell command
+
+	command := "echo hello"
+	commandOutput := "hello"
+
+	expectDescribeInstance(t, clientMock, instanceID, *keyName).AnyTimes()
+	runnerMock.EXPECT().Exec(fmt.Sprintf("%s:22", ipAddress), gomock.Any(), command).Do(
+		func(addr string, config *ssh.ClientConfig, command string) {
+			require.Equal(t, "ubuntu", config.User)
+		}).Return(&commandOutput, nil)
+
+	output, err := provisioner.ShellExec(*id, command)
+	require.NoError(t, err)
+	require.Equal(t, "hello", *output)
+
+	// Destroy the instance.
+
+	expectKeyPairDeletion(t, clientMock, *keyName)
+	clientMock.EXPECT().TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: []*string{&instanceID}}).
+		Return(&ec2.TerminateInstancesOutput{
+			TerminatingInstances: []*ec2.InstanceStateChange{{InstanceId: &instanceID}}},
+			nil)
+
+	require.NoError(t, provisioner.Destroy(instance.ID(instanceID)))
 }
 
 func TestCreateInstanceRequiresGroup(t *testing.T) {
@@ -59,6 +106,7 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock := mock_ec2.NewMockEC2API(ctrl)
 
 	runError := errors.New("request failed")
+	expectKeyPairCreation(t, clientMock)
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := NewInstanceProvisioner(clientMock, testCluster)
@@ -66,25 +114,6 @@ func TestCreateInstanceError(t *testing.T) {
 
 	require.Error(t, err)
 	require.Nil(t, id)
-}
-
-func TestDestroyInstanceSuccess(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	clientMock := mock_ec2.NewMockEC2API(ctrl)
-
-	instanceID := "test-id"
-
-	clientMock.EXPECT().
-		TerminateInstances(
-			&ec2.TerminateInstancesInput{InstanceIds: []*string{&instanceID}}).
-		Return(&ec2.TerminateInstancesOutput{
-			TerminatingInstances: []*ec2.InstanceStateChange{{
-				InstanceId: &instanceID,
-			}}}, nil)
-
-	provisioner := NewInstanceProvisioner(clientMock, testCluster)
-	require.NoError(t, provisioner.Destroy(instance.ID(instanceID)))
 }
 
 func TestDestroyInstanceError(t *testing.T) {
@@ -95,6 +124,8 @@ func TestDestroyInstanceError(t *testing.T) {
 	instanceID := "test-id"
 
 	runError := errors.New("request failed")
+	expectDescribeInstance(t, clientMock, instanceID, "keyName")
+	expectKeyPairDeletion(t, clientMock, "keyName")
 	clientMock.EXPECT().TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: []*string{&instanceID}}).
 		Return(nil, runError)
 
@@ -179,6 +210,36 @@ func TestListGroup(t *testing.T) {
 		"f",
 		"g",
 	}, ids)
+}
+
+func expectDescribeInstance(t *testing.T, clientMock *mock_ec2.MockEC2API, id string, keyName string) *gomock.Call {
+	return clientMock.EXPECT().DescribeInstances(&ec2.DescribeInstancesInput{
+		InstanceIds: []*string{aws.String(id)},
+	}).Return(&ec2.DescribeInstancesOutput{Reservations: []*ec2.Reservation{
+		{Instances: []*ec2.Instance{{PublicIpAddress: aws.String(ipAddress), KeyName: aws.String(keyName)}}},
+	}}, nil)
+}
+
+func expectKeyPairCreation(t *testing.T, clientMock *mock_ec2.MockEC2API) *string {
+	key, err := rsa.GenerateKey(rand.Reader, 512)
+	require.NoError(t, err)
+
+	err = key.Validate()
+	require.NoError(t, err)
+
+	data := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+
+	keyName := ""
+	clientMock.EXPECT().CreateKeyPair(gomock.Any()).Do(func(input *ec2.CreateKeyPairInput) {
+		require.NotNil(t, input.KeyName)
+		require.NotEqual(t, "", *input.KeyName)
+		keyName = *input.KeyName
+	}).Return(&ec2.CreateKeyPairOutput{KeyMaterial: &data}, nil)
+	return &keyName
+}
+
+func expectKeyPairDeletion(t *testing.T, clientMock *mock_ec2.MockEC2API, keyName string) {
+	clientMock.EXPECT().DeleteKeyPair(&ec2.DeleteKeyPairInput{KeyName: aws.String(keyName)}).Return(nil, nil)
 }
 
 const (
