@@ -29,60 +29,6 @@ func NewInstanceProvisioner(client ec2iface.EC2API, cluster spi.ClusterID) insta
 	return &provisioner{client: client, cluster: cluster}
 }
 
-func makePointerSlice(stackSlice []string) []*string {
-	pointerSlice := []*string{}
-	for i := range stackSlice {
-		pointerSlice = append(pointerSlice, &stackSlice[i])
-	}
-	return pointerSlice
-}
-
-func createInstance(client ec2iface.EC2API, request createInstanceRequest) (*ec2.Instance, error) {
-	reservation, err := client.RunInstances(&ec2.RunInstancesInput{
-		ImageId:  &request.ImageID,
-		MinCount: aws.Int64(1),
-		MaxCount: aws.Int64(1),
-		Placement: &ec2.Placement{
-			AvailabilityZone: &request.AvailabilityZone,
-		},
-		KeyName:      &request.KeyName,
-		InstanceType: &request.InstanceType,
-		NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{{
-			DeviceIndex:              aws.Int64(0), // eth0
-			Groups:                   makePointerSlice(request.SecurityGroupIds),
-			SubnetId:                 &request.SubnetID,
-			AssociatePublicIpAddress: &request.AssociatePublicIPAddress,
-			DeleteOnTermination:      &request.DeleteOnTermination,
-		}},
-		Monitoring: &ec2.RunInstancesMonitoringEnabled{
-			Enabled: &request.Monitoring,
-		},
-		IamInstanceProfile: &ec2.IamInstanceProfileSpecification{
-			Name: &request.IamInstanceProfile,
-		},
-		EbsOptimized: &request.EbsOptimized,
-		BlockDeviceMappings: []*ec2.BlockDeviceMapping{
-			{
-				DeviceName: &request.BlockDeviceName,
-				Ebs: &ec2.EbsBlockDevice{
-					VolumeSize:          &request.RootSize,
-					VolumeType:          &request.VolumeType,
-					DeleteOnTermination: &request.DeleteOnTermination,
-				},
-			},
-		},
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	if reservation == nil || len(reservation.Instances) != 1 {
-		return nil, &ErrUnexpectedResponse{}
-	}
-	return reservation.Instances[0], nil
-}
-
 func (p provisioner) tagInstance(request createInstanceRequest, instance *ec2.Instance) error {
 	tags := []*ec2.Tag{}
 
@@ -110,6 +56,12 @@ func (p provisioner) tagInstance(request createInstanceRequest, instance *ec2.In
 	return err
 }
 
+type createInstanceRequest struct {
+	Group             instance.GroupID      `json:"group"`
+	Tags              map[string]string     `json:"tags"`
+	RunInstancesInput ec2.RunInstancesInput `json:"run_instances_input"`
+}
+
 // Provision creates a new instance.
 func (p provisioner) Provision(req string) (*instance.ID, error) {
 	request := createInstanceRequest{}
@@ -122,10 +74,15 @@ func (p provisioner) Provision(req string) (*instance.ID, error) {
 		return nil, spi.NewError(spi.ErrBadInput, "'group' field must not be blank")
 	}
 
-	ec2Instance, err := createInstance(p.client, request)
+	reservation, err := p.client.RunInstances(&request.RunInstancesInput)
 	if err != nil {
 		return nil, err
 	}
+
+	if reservation == nil || len(reservation.Instances) != 1 {
+		return nil, spi.NewError(spi.ErrUnknown, "Unexpected AWS API response")
+	}
+	ec2Instance := reservation.Instances[0]
 
 	id := (*instance.ID)(ec2Instance.InstanceId)
 
