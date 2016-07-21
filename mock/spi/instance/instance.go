@@ -60,3 +60,14 @@ func (_m *MockProvisioner) Provision(_param0 string) (*instance.ID, error) {
 func (_mr *_MockProvisionerRecorder) Provision(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Provision", arg0)
 }
+
+func (_m *MockProvisioner) ShellExec(_param0 instance.ID, _param1 string) (*string, error) {
+	ret := _m.ctrl.Call(_m, "ShellExec", _param0, _param1)
+	ret0, _ := ret[0].(*string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockProvisionerRecorder) ShellExec(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ShellExec", arg0, arg1)
+}
