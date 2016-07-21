@@ -81,7 +81,7 @@ func (p provisioner) Provision(req string) (*instance.ID, error) {
 	}
 
 	if reservation == nil || len(reservation.Instances) != 1 {
-		return nil, spi.UnknownError(errors.New("Unexpected AWS API response"))
+		return nil, spi.NewError(spi.ErrUnknown, "Unexpected AWS API response")
 	}
 	ec2Instance := reservation.Instances[0]
 
@@ -89,7 +89,7 @@ func (p provisioner) Provision(req string) (*instance.ID, error) {
 
 	err = p.tagInstance(request, ec2Instance)
 	if err != nil {
-		return id, spi.UnknownError(err)
+		return id, err
 	}
 
 	return id, nil
@@ -101,7 +101,7 @@ func (p provisioner) Destroy(id instance.ID) error {
 		InstanceIds: []*string{aws.String(string(id))}})
 
 	if err != nil {
-		return spi.UnknownError(err)
+		return err
 	}
 
 	if len(result.TerminatingInstances) != 1 {
@@ -138,7 +138,7 @@ func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken 
 func (p provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.ID, error) {
 	result, err := p.client.DescribeInstances(describeGroupRequest(p.cluster, group, nextToken))
 	if err != nil {
-		return nil, spi.UnknownError(err)
+		return nil, err
 	}
 
 	ids := []instance.ID{}
