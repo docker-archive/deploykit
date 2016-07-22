@@ -470,6 +470,10 @@ type EC2API interface {
 
 	DescribeScheduledInstances(*ec2.DescribeScheduledInstancesInput) (*ec2.DescribeScheduledInstancesOutput, error)
 
+	DescribeSecurityGroupReferencesRequest(*ec2.DescribeSecurityGroupReferencesInput) (*request.Request, *ec2.DescribeSecurityGroupReferencesOutput)
+
+	DescribeSecurityGroupReferences(*ec2.DescribeSecurityGroupReferencesInput) (*ec2.DescribeSecurityGroupReferencesOutput, error)
+
 	DescribeSecurityGroupsRequest(*ec2.DescribeSecurityGroupsInput) (*request.Request, *ec2.DescribeSecurityGroupsOutput)
 
 	DescribeSecurityGroups(*ec2.DescribeSecurityGroupsInput) (*ec2.DescribeSecurityGroupsOutput, error)
@@ -509,6 +513,10 @@ type EC2API interface {
 	DescribeSpotPriceHistory(*ec2.DescribeSpotPriceHistoryInput) (*ec2.DescribeSpotPriceHistoryOutput, error)
 
 	DescribeSpotPriceHistoryPages(*ec2.DescribeSpotPriceHistoryInput, func(*ec2.DescribeSpotPriceHistoryOutput, bool) bool) error
+
+	DescribeStaleSecurityGroupsRequest(*ec2.DescribeStaleSecurityGroupsInput) (*request.Request, *ec2.DescribeStaleSecurityGroupsOutput)
+
+	DescribeStaleSecurityGroups(*ec2.DescribeStaleSecurityGroupsInput) (*ec2.DescribeStaleSecurityGroupsOutput, error)
 
 	DescribeSubnetsRequest(*ec2.DescribeSubnetsInput) (*request.Request, *ec2.DescribeSubnetsOutput)
 
@@ -632,6 +640,10 @@ type EC2API interface {
 
 	GetConsoleOutput(*ec2.GetConsoleOutputInput) (*ec2.GetConsoleOutputOutput, error)
 
+	GetConsoleScreenshotRequest(*ec2.GetConsoleScreenshotInput) (*request.Request, *ec2.GetConsoleScreenshotOutput)
+
+	GetConsoleScreenshot(*ec2.GetConsoleScreenshotInput) (*ec2.GetConsoleScreenshotOutput, error)
+
 	GetPasswordDataRequest(*ec2.GetPasswordDataInput) (*request.Request, *ec2.GetPasswordDataOutput)
 
 	GetPasswordData(*ec2.GetPasswordDataInput) (*ec2.GetPasswordDataOutput, error)
@@ -707,6 +719,10 @@ type EC2API interface {
 	ModifyVpcEndpointRequest(*ec2.ModifyVpcEndpointInput) (*request.Request, *ec2.ModifyVpcEndpointOutput)
 
 	ModifyVpcEndpoint(*ec2.ModifyVpcEndpointInput) (*ec2.ModifyVpcEndpointOutput, error)
+
+	ModifyVpcPeeringConnectionOptionsRequest(*ec2.ModifyVpcPeeringConnectionOptionsInput) (*request.Request, *ec2.ModifyVpcPeeringConnectionOptionsOutput)
+
+	ModifyVpcPeeringConnectionOptions(*ec2.ModifyVpcPeeringConnectionOptionsInput) (*ec2.ModifyVpcPeeringConnectionOptionsOutput, error)
 
 	MonitorInstancesRequest(*ec2.MonitorInstancesInput) (*request.Request, *ec2.MonitorInstancesOutput)
 
