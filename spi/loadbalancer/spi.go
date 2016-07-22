@@ -42,6 +42,9 @@ type Driver interface {
 	UnpublishService(extPort uint32) (Result, error)
 
 	// ConfigureHealthCheck configures the health checks for instance removal and reconfiguration
+	// The parameters healthy and unhealthy indicate the number of consecutive success or fail pings required to
+	// mark a backend instance as healthy or unhealthy.   The ping occurs on the backendPort parameter and
+	// at the interval specified.
 	ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int, interval, timeout time.Duration) (Result, error)
 
 	// RegisterBackend registers instances identified by the IDs to the LB's backend pool

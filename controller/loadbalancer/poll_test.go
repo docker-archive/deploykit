@@ -159,6 +159,8 @@ func TestRunPoller(t *testing.T) {
 
 	found := []swarm.Service{}
 
+	stopPoller := make(chan interface{})
+
 	poller, err := NewServicePoller(client, 200*time.Millisecond).
 		AddService("proxy",
 
@@ -170,6 +172,8 @@ func TestRunPoller(t *testing.T) {
 				require.Equal(t, 1, len(s))
 				require.Equal(t, "80/http", s[0].Spec.Labels["docker.editions.proxy.port"])
 				found = append(found, s[0])
+
+				close(stopPoller)
 			}).
 		Build()
 
@@ -177,7 +181,7 @@ func TestRunPoller(t *testing.T) {
 	require.NotNil(t, poller)
 
 	go func() {
-		time.Sleep(1 * time.Second)
+		<-stopPoller
 		poller.Stop()
 	}()
 
