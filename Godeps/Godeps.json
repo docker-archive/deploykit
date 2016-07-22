@@ -191,38 +191,48 @@
 		},
 		{
 			"ImportPath": "github.com/docker/docker/api",
-			"Comment": "TP6",
-			"Rev": "52b27c184fce91b8d2a0970de0a99df6a69130d1"
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/api/server/httputils",
-			"Comment": "TP6",
-			"Rev": "52b27c184fce91b8d2a0970de0a99df6a69130d1"
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/dockerversion",
-			"Comment": "TP6",
-			"Rev": "52b27c184fce91b8d2a0970de0a99df6a69130d1"
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/opts",
-			"Comment": "TP6",
-			"Rev": "52b27c184fce91b8d2a0970de0a99df6a69130d1"
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/ioutils",
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/longpath",
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/parsers/kernel",
-			"Comment": "TP6",
-			"Rev": "52b27c184fce91b8d2a0970de0a99df6a69130d1"
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/system",
-			"Comment": "TP6",
-			"Rev": "52b27c184fce91b8d2a0970de0a99df6a69130d1"
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/useragent",
-			"Comment": "TP6",
-			"Rev": "52b27c184fce91b8d2a0970de0a99df6a69130d1"
+			"Comment": "docs-v1.12.0-rc4-2016-07-15-161-gb059a3b",
+			"Rev": "b059a3b82060534a070f0081069f0d56e5ea61db"
 		},
 		{
 			"ImportPath": "github.com/docker/engine-api/client",
