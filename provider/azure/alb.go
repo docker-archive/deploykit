@@ -47,7 +47,7 @@ func NewALBDriver(client *network.LoadBalancersClient, resourceGroup, name strin
 type autorestResp autorest.Response
 
 func (a autorestResp) String() string {
-	return fmt.Sprintf("%v", a)
+	return fmt.Sprintf("%v", autorest.Response(a))
 }
 
 func wrap(a autorest.Response, e error) (loadbalancer.Result, error) {
