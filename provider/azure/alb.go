@@ -35,8 +35,10 @@ type albDriver struct {
 	resourceGroup string
 }
 
-// NewALBDriver creates a load balancer driver
-func NewALBDriver(client *network.LoadBalancersClient, resourceGroup, name string) (loadbalancer.Driver, error) {
+// NewLoadBalancerDriver creates a load balancer driver
+func NewLoadBalancerDriver(client *network.LoadBalancersClient,
+	resourceGroup, name string) (loadbalancer.Driver, error) {
+
 	return &albDriver{
 		client:        client,
 		name:          name,

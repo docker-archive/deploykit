@@ -14,8 +14,8 @@ import (
 	"runtime"
 )
 
-// newDockerClient creates a new API client.
-func newDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, error) {
+// NewDockerClient creates a new API client.
+func NewDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, error) {
 	tlsOptions := tls
 	host, err := getServerHost(host, tlsOptions)
 	if err != nil {
