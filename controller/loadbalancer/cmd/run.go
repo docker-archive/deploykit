@@ -195,6 +195,11 @@ func runCommand() *cobra.Command {
 		"environment", "", "environment")
 	cmd.Flags().StringVar(&albOptions.OAuthClientID,
 		"oauth_client_id", "", "OAuth client ID")
+
+	cmd.Flags().StringVar(&albOptions.ADClientID,
+		"ad_app_id", "", "AD app ID")
+	cmd.Flags().StringVar(&albOptions.ADClientSecret,
+		"ad_app_secret", "", "AD app secret")
 	cmd.Flags().StringVar(&albOptions.SubscriptionID,
 		"subscription_id", "", "subscription ID")
 	cmd.Flags().StringVar(&albOptions.ResourceGroupName,
