@@ -8,9 +8,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var elbOptions = new(aws.Options)
-
 func elbCommand() *cobra.Command {
+
+	elbOptions := new(aws.Options)
+
 	cmd := &cobra.Command{
 		Use:   "elb",
 		Short: "Ops on the ELB",

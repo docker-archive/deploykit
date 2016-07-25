@@ -8,27 +8,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var albOptions = &azure.Options{}
-
 func albCommand() *cobra.Command {
+	albOptions := &azure.Options{}
+
 	cmd := &cobra.Command{
 		Use:   "alb",
 		Short: "Ops on the ALB (Azure Load Balancer)",
 	}
-	cmd.PersistentFlags().IntVar(&albOptions.PollingDelay,
+	cmd.Flags().IntVar(&albOptions.PollingDelay,
 		"polling_delay", 5, "Polling delay")
-	cmd.PersistentFlags().StringVar(&albOptions.Environment,
+	cmd.Flags().StringVar(&albOptions.Environment,
 		"environment", "", "environment")
-	cmd.PersistentFlags().StringVar(&albOptions.OAuthClientID,
+	cmd.Flags().StringVar(&albOptions.OAuthClientID,
 		"oauth_client_id", "", "OAuth client ID")
-	cmd.PersistentFlags().StringVar(&albOptions.SubscriptionID,
+	cmd.Flags().StringVar(&albOptions.SubscriptionID,
 		"subscription_id", "", "subscription ID")
-	cmd.PersistentFlags().StringVar(&albOptions.ResourceGroupName,
+	cmd.Flags().StringVar(&albOptions.ResourceGroupName,
 		"resource_group", "", "resource group name")
 
-	cmd.PersistentFlags().StringVar(&albOptions.ADClientID,
+	cmd.Flags().StringVar(&albOptions.ADClientID,
 		"ad_app_id", "", "AD app ID")
-	cmd.PersistentFlags().StringVar(&albOptions.ADClientSecret,
+	cmd.Flags().StringVar(&albOptions.ADClientSecret,
 		"ad_app_secret", "", "AD app secret")
 
 	describeCmd := &cobra.Command{

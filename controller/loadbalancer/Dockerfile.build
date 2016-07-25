@@ -1,4 +1,7 @@
-FROM golang:1.6.1
+# Dockerfile for compiling and building the controller binary
+#
+# Uses 1.6.3 image to host the compiler and the build tools
+FROM golang:1.6.3
 
 ENV GOPATH=/go
 

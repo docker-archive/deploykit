@@ -16,8 +16,8 @@ import (
 
 func runCommand() *cobra.Command {
 
-	elbOptions = new(aws.Options)
-	albOptions = new(azure.Options)
+	elbOptions := new(aws.Options)
+	albOptions := new(azure.Options)
 	elbConfig := ""
 	interval := 3
 	forceLeader := false
@@ -26,7 +26,8 @@ func runCommand() *cobra.Command {
 		RemoveListeners:   true,
 		PublishAllExposed: true,
 	}
-	disableHealthCheck := true
+
+	doHealthCheck := false
 	healthCheck := controller.HealthCheck{
 		Port:            0,
 		Healthy:         2,
@@ -45,7 +46,7 @@ func runCommand() *cobra.Command {
 
 			ctx := context.Background()
 
-			if !disableHealthCheck {
+			if doHealthCheck {
 				options.HealthCheck = &healthCheck
 			}
 
@@ -199,8 +200,8 @@ func runCommand() *cobra.Command {
 	cmd.Flags().StringVar(&albOptions.ResourceGroupName,
 		"resource_group", "", "resource group name")
 
-	cmd.Flags().BoolVar(&disableHealthCheck, "no_health_check", disableHealthCheck,
-		"True to disable auto config ELB health check.")
+	cmd.Flags().BoolVar(&doHealthCheck, "health_check", doHealthCheck,
+		"True to enable auto config ELB health check.")
 	cmd.Flags().BoolVar(&options.RemoveListeners, "gc", options.RemoveListeners,
 		"True to remove listeners in load balancer")
 	cmd.Flags().BoolVar(&options.PublishAllExposed, "all", options.PublishAllExposed,
