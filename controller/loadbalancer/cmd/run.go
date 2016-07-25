@@ -14,12 +14,6 @@ import (
 	"time"
 )
 
-var (
-	AnyLabels = map[string]string{
-		"*": "",
-	}
-)
-
 func runCommand() *cobra.Command {
 
 	elbOptions = new(aws.Options)
@@ -92,7 +86,7 @@ func runCommand() *cobra.Command {
 
 			log.Infoln("Running on leader node: forceLeader=", forceLeader)
 
-			elbRule := controller.ExposeServicePortInExternalLoadBalancer(
+			actionExposePublishedPorts := controller.ExposeServicePortInExternalLoadBalancer(
 				func() map[string]loadbalancer.Driver {
 					// Loads the hostname to elb mapping
 					buff, err := ioutil.ReadFile(elbConfig)
@@ -170,7 +164,7 @@ func runCommand() *cobra.Command {
 				}, options)
 
 			poller, err := controller.NewServicePoller(client, time.Duration(interval)*time.Second).
-				AddService("elb-rule", controller.MatchSpecLabels(AnyLabels), elbRule).
+				AddService("elb-rule", controller.AnyServices, actionExposePublishedPorts).
 				Build()
 
 			if err != nil {
