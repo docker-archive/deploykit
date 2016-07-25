@@ -31,6 +31,18 @@ func matchMaps(a, b map[string]string) bool {
 
 }
 
+var (
+	// AnyLabels matches any labels in a service
+	AnyLabels = map[string]string{
+		"*": "",
+	}
+
+	// AnyServices is a matcher that will match any service.
+	AnyServices = func(s swarm.Service) bool {
+		return true
+	}
+)
+
 // MatchSpecLabels returns a matcher that matches the labels as given map.  This is an OR / ANY match
 func MatchSpecLabels(kv map[string]string) ServiceMatcher {
 	return func(s swarm.Service) bool {
