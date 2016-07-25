@@ -17,32 +17,13 @@ DOCKER_SRC_ROOT=${GOPATH}/src/github.com/docker
 
 SRC_ROOT?=${DOCKER_SRC_ROOT}/libmachete
 
-
-# Allow turning off function inlining and variable registerization
-ifeq (${DISABLE_OPTIMIZATION},true)
-	GO_GCFLAGS=-gcflags "-N -l"
-	VERSION:="$(VERSION)-noopt"
-endif
-
 .PHONY: clean all
 .DEFAULT: all
 all: docker
 
-AUTHORS: .mailmap .git/HEAD
-	 git log --format='%aN <%aE>' | sort -fu > $@
-
-# Package list
-PKGS := $(shell go list ./... | \
-grep -v ^.*/vendor/ | \
-grep -v /mock$)
-
 test:
 	@echo "+ $@"
 	godep go test -race -v ./...
-
-build:
-	@echo "+ $@"
-	@go build ${GO_LDFLAGS} $(PKGS)
 
 clean:
 	@echo "+ $@"
@@ -71,26 +52,3 @@ dep-engine-api:
 	@cd ${SRC_ROOT} && godep update github.com/docker/engine-api/...
 	@echo "Updated vendoring dependencies"
 	@git status
-
-# Godep helpers
-dep-check-godep:
-	$(if $(shell which godep || echo ''), , \
-		$(error Please install godep: go get github.com/tools/godep))
-
-dep-save: dep-check-godep
-	@echo "+ $@"
-	@godep save $(PKGS)
-
-dep-restore: dep-check-godep
-	@echo "+ $@"
-	@godep restore -v
-
-dep-validate: dep-restore
-	@echo "+ $@"
-	@rm -Rf .vendor.bak
-	@mv vendor .vendor.bak
-	@rm -Rf Godeps
-	@godep save ./...
-	@test -z "$$(diff -r vendor .vendor.bak 2>&1 | tee /dev/stderr)" || \
-		(echo >&2 "+ borked dependencies! what you have in Godeps/Godeps.json does not match with what you have in vendor" && false)
-	@rm -Rf .vendor.bak
