@@ -1,3 +1,7 @@
 # build binaries
 
+# Temp directory for versioned dependencies
+deps/
+
+# Build artifacts directory
 build/
