@@ -1,5 +1,5 @@
 # The Commit hash or SHA of the docker/docker repo
-DOCKER_DOCKER_CHECKPOINT=4144e11d3205ef45bedc3f7bf04da5d6a24ec342
+DOCKER_DOCKER_CHECKPOINT=v1.12.0-rc5
 # The Commit hash of engine-api to build against.
 DOCKER_ENGINE_API_CHECKPOINT=a52656d77f09d394104c1639824eada038bfdb89
 
