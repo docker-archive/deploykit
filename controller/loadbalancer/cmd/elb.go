@@ -16,9 +16,9 @@ func elbCommand() *cobra.Command {
 		Use:   "elb",
 		Short: "Ops on the ELB",
 	}
-	cmd.PersistentFlags().IntVar(&elbOptions.Retries,
+	cmd.Flags().IntVar(&elbOptions.Retries,
 		"retries", 10, "Retries")
-	cmd.PersistentFlags().StringVar(&elbOptions.Region,
+	cmd.Flags().StringVar(&elbOptions.Region,
 		"region", "", "Region")
 
 	describeCmd := &cobra.Command{
