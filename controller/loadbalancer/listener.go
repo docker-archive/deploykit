@@ -10,33 +10,38 @@ import (
 	"strings"
 )
 
-// Listener monitors a swarm service.
-type Listener struct {
+type listener struct {
 	Service       string
 	URL           *url.URL
 	SwarmPort     uint32
 	SwarmProtocol loadbalancer.Protocol
 }
 
-// NewListener creates a new swarm listener.
-func NewListener(service string, swarmPort uint32, urlStr string) (*Listener, error) {
+func newListener(service string, swarmPort uint32, urlStr string) (*listener, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
-	return &Listener{
+	return &listener{
 		Service:   service,
 		URL:       u,
 		SwarmPort: swarmPort,
 	}, nil
 }
 
-func (l *Listener) String() string {
+func (l *listener) asBackend() loadbalancer.Backend {
+	return loadbalancer.Backend{
+		Port:             l.SwarmPort,
+		Protocol:         l.protocol(),
+		LoadBalancerPort: l.extPort(),
+	}
+}
+
+func (l *listener) String() string {
 	return fmt.Sprintf("service(%s):%d ==> %s", l.Service, l.SwarmPort, l.URL)
 }
 
-// ExtPort gets the TCP port of the service.
-func (l *Listener) ExtPort() uint32 {
+func (l *listener) extPort() uint32 {
 	hostport := ":80"
 	scheme := "http"
 	if l.URL != nil {
@@ -59,8 +64,7 @@ func (l *Listener) ExtPort() uint32 {
 	}
 }
 
-// Host gets the host name of the service.
-func (l *Listener) Host() string {
+func (l *listener) host() string {
 	hostport := ":80"
 	if l.URL != nil {
 		hostport = l.URL.Host
@@ -73,7 +77,7 @@ func (l *Listener) Host() string {
 }
 
 // Protocol gets the network protocol used by the service.
-func (l *Listener) Protocol() loadbalancer.Protocol {
+func (l *listener) protocol() loadbalancer.Protocol {
 	scheme := ""
 	if l.URL != nil {
 		scheme = l.URL.Scheme
@@ -81,8 +85,8 @@ func (l *Listener) Protocol() loadbalancer.Protocol {
 	return loadbalancer.ProtocolFromString(scheme)
 }
 
-// ExplicitSwarmPortToURL is explicit mapping in the format of {swarm_port}={url}
-func ExplicitSwarmPortToURL(service, spec string) (*Listener, error) {
+// explicitSwarmPortToURL is explicit mapping in the format of {swarm_port}={url}
+func explicitSwarmPortToURL(service, spec string) (*listener, error) {
 	parts := strings.Split(strings.Trim(spec, " \t"), "=")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("bad spec: %s for service %s", spec, service)
@@ -92,13 +96,13 @@ func ExplicitSwarmPortToURL(service, spec string) (*Listener, error) {
 		return nil, fmt.Errorf("bad spec: %s for service %s", spec, service)
 	}
 
-	listener, err := ImpliedSwarmPortToURL(service, parts[1])
+	listener, err := impliedSwarmPortToURL(service, parts[1])
 	listener.SwarmPort = uint32(swarmPort)
 	return listener, nil
 }
 
-// ImpliedSwarmPortToURL is implied when only one exposed port exists for the service.  It's just a {url}
-func ImpliedSwarmPortToURL(service, spec string) (*Listener, error) {
+// impliedSwarmPortToURL is implied when only one exposed port exists for the service.  It's just a {url}
+func impliedSwarmPortToURL(service, spec string) (*listener, error) {
 	if strings.Index(spec, "=") > -1 {
 		return nil, fmt.Errorf("bad format:%s", spec)
 	}
@@ -106,19 +110,19 @@ func ImpliedSwarmPortToURL(service, spec string) (*Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewListener(service, uint32(0), serviceURL.String())
+	return newListener(service, uint32(0), serviceURL.String())
 }
 
-func addListenerToHostMap(m map[string][]*Listener, l *Listener) {
-	host := l.Host()
+func addListenerToHostMap(m map[string][]*listener, l *listener) {
+	host := l.host()
 	if _, has := m[host]; !has {
-		m[host] = []*Listener{}
+		m[host] = []*listener{}
 	}
 	m[host] = append(m[host], l)
 }
 
-// Generate a list of listeners, where the URL are defaulted to the swarm port and default ELB
-func listenersFromExposedPorts(service swarm.Service) []*Listener {
+// listenersFromExposedPorts generates a list of listeners, where the URL is defaulted to the swarm port and default ELB
+func listenersFromExposedPorts(service swarm.Service) []*listener {
 
 	// Rule on publishing ports
 	// If the user specified -p X:Y, then we publish the port to the ELB.  If the port
@@ -136,14 +140,14 @@ func listenersFromExposedPorts(service swarm.Service) []*Listener {
 	}
 
 	// Now look at the ports that are actually published:
-	listeners := []*Listener{}
+	listeners := []*listener{}
 	for _, exposed := range service.Endpoint.Ports {
 
 		requestedPublishPort, has := requestedPublishPorts[exposed.TargetPort]
 		if has && requestedPublishPort == exposed.PublishedPort {
 
 			urlString := fmt.Sprintf("%v://:%d", strings.ToLower(string(exposed.Protocol)), exposed.PublishedPort)
-			if listener, err := NewListener(service.Spec.Name, exposed.PublishedPort, urlString); err == nil {
+			if listener, err := newListener(service.Spec.Name, exposed.PublishedPort, urlString); err == nil {
 				listeners = append(listeners, listener)
 			} else {
 				log.Warningln("Error creating listener for exposed port:", exposed, "err=", err)
@@ -156,27 +160,27 @@ func listenersFromExposedPorts(service swarm.Service) []*Listener {
 	return listeners
 }
 
-// Generates a list of listeners based on what's specifiedi in the label.  The listeners
+// listenersFromLabel generates a list of listeners based on what's specified in the label.  The listeners
 // are then matched against the exposed ports in the service.
-func listenersFromLabel(service swarm.Service, label string) []*Listener {
+func listenersFromLabel(service swarm.Service, label string) []*listener {
 	// get all the specs -- the label determines what elb listeners are to be created.
 	labelValue, has := service.Spec.Labels[label]
 	if !has || labelValue == "" {
-		return []*Listener{}
+		return []*listener{}
 	}
 
 	// If the swarm exposes more than one port, we'd need to have explicit mapping; otherwise
 	// it's impossible to determine which one of the exposed ports maps to which url.
 	// However, if there's only one exposed port, it's actually ok to have more than one url mapping.
 
-	listenersToPublish := []*Listener{}
+	listenersToPublish := []*listener{}
 
 	// spec can be comma-delimited list
 	for _, spec := range strings.Split(labelValue, ",") {
 
-		specParser := ImpliedSwarmPortToURL
+		specParser := impliedSwarmPortToURL
 		if strings.Index(spec, "=") > -1 {
-			specParser = ExplicitSwarmPortToURL
+			specParser = explicitSwarmPortToURL
 		}
 
 		listener, err := specParser(service.Spec.Name, strings.Trim(spec, " \t"))

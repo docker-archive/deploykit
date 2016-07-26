@@ -5,18 +5,16 @@ import (
 	"time"
 )
 
-// State is the state of the load balancer with a string representation.
-type State interface {
-	fmt.Stringer
+// Backend is a description of a network target for a load balancer.
+type Backend struct {
+	// Port is the TCP port that the backend instance is listening on.
+	Port uint32
 
-	// GetName returns the name of this load balancer
-	GetName() string
+	// Protocol is the network protocol that the load balancer is routing.
+	Protocol Protocol
 
-	// HashListener returns the backendPort and true if the listener exists.
-	HasListener(extPort uint32, protocol Protocol) (uint32, bool)
-
-	// VisitListeners provides a mechanism for caller to iterate through all the listeners
-	VisitListeners(v func(lbPort, instancePort uint32, protocol Protocol))
+	// LoadBalancerPort is the TCP port that the load balancer is listening on.
+	LoadBalancerPort uint32
 }
 
 // Result is the result of an operation
@@ -32,14 +30,14 @@ type Driver interface {
 	// Name is the name of the load balancer
 	Name() string
 
-	// State returns the current state of the load balancer
-	State() (State, error)
+	// Backends lists all known backends.
+	Backends() ([]Backend, error)
 
-	// PublishService publishes a service in the LB by adding a load balancing rule
-	PublishService(ext Protocol, extPort uint32, backend Protocol, backendPort uint32) (Result, error)
+	// Publish publishes a backend in the LB by adding a load balancing rule
+	Publish(backend Backend) (Result, error)
 
 	// UnpublishService dissociates the load balancer from the backend service at the given port.
-	UnpublishService(extPort uint32) (Result, error)
+	Unpublish(extPort uint32) (Result, error)
 
 	// ConfigureHealthCheck configures the health checks for instance removal and reconfiguration
 	// The parameters healthy and unhealthy indicate the number of consecutive success or fail pings required to

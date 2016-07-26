@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
@@ -70,91 +69,28 @@ func (p *elbDriver) Name() string {
 	return p.name
 }
 
-func (p *elbDriver) State() (loadbalancer.State, error) {
-	v, err := p.client.DescribeLoadBalancers(&elb.DescribeLoadBalancersInput{
+// Backends lists all registered backends.
+func (p *elbDriver) Backends() ([]loadbalancer.Backend, error) {
+	output, err := p.client.DescribeLoadBalancers(&elb.DescribeLoadBalancersInput{
 		LoadBalancerNames: []*string{aws.String(p.name)},
 	})
-	if v == nil {
-		v = &elb.DescribeLoadBalancersOutput{}
-	}
-	return describeResult(*v), err
-}
-
-// describeResult contains details about an existing ELB.
-type describeResult elb.DescribeLoadBalancersOutput
-
-// GetName returns the name of the load balancer
-func (d describeResult) GetName() string {
-	r := elb.DescribeLoadBalancersOutput(d)
-	if len(r.LoadBalancerDescriptions) == 0 {
-		return ""
-	}
-
-	if len(r.LoadBalancerDescriptions[0].ListenerDescriptions) == 0 {
-		return ""
-	}
-
-	name := r.LoadBalancerDescriptions[0].LoadBalancerName
-
-	if name != nil {
-		return *name
-	}
-	return ""
-}
-
-// String returns a string representation of the struct (JSON)
-func (d describeResult) String() string {
-	buff, err := json.MarshalIndent(d, "   ", "   ")
 	if err != nil {
-		return fmt.Sprintf("%v", elb.DescribeLoadBalancersOutput(d))
-	}
-	return string(buff)
-}
-
-// HasListener returns true and the current backend port if there's a listener.
-func (d describeResult) HasListener(extPort uint32, protocol loadbalancer.Protocol) (uint32, bool) {
-	r := elb.DescribeLoadBalancersOutput(d)
-	if len(r.LoadBalancerDescriptions) == 0 {
-		return 0, false
+		return nil, err
 	}
 
-	if len(r.LoadBalancerDescriptions[0].ListenerDescriptions) == 0 {
-		return 0, false
-	}
+	backends := []loadbalancer.Backend{}
 
-	for _, ld := range r.LoadBalancerDescriptions[0].ListenerDescriptions {
-		if ld.Listener == nil {
-			return 0, false
-		}
-		if (ld.Listener.LoadBalancerPort != nil && uint32(*ld.Listener.LoadBalancerPort) == extPort) &&
-			(ld.Listener.Protocol != nil && *ld.Listener.Protocol == string(protocol)) {
-			return uint32(*ld.Listener.InstancePort), true
+	if len(output.LoadBalancerDescriptions) > 0 && output.LoadBalancerDescriptions[0].ListenerDescriptions != nil {
+		for _, listener := range output.LoadBalancerDescriptions[0].ListenerDescriptions {
+			backends = append(backends, loadbalancer.Backend{
+				Port:             uint32(*listener.Listener.InstancePort),
+				Protocol:         loadbalancer.ProtocolFromString(*listener.Listener.Protocol),
+				LoadBalancerPort: uint32(*listener.Listener.LoadBalancerPort),
+			})
 		}
 	}
-	return 0, false
-}
 
-// VisitListeners visits the list of listeners that are in the describe output
-func (d describeResult) VisitListeners(v func(lbPort, instancePort uint32, protocol loadbalancer.Protocol)) {
-	r := elb.DescribeLoadBalancersOutput(d)
-	if len(r.LoadBalancerDescriptions) == 0 {
-		return
-	}
-
-	if len(r.LoadBalancerDescriptions[0].ListenerDescriptions) == 0 {
-		return
-	}
-
-	for _, ld := range r.LoadBalancerDescriptions[0].ListenerDescriptions {
-		if ld.Listener == nil {
-			continue
-		}
-		if ld.Listener.LoadBalancerPort != nil && ld.Listener.InstancePort != nil && ld.Listener.Protocol != nil {
-			v(uint32(*ld.Listener.LoadBalancerPort),
-				uint32(*ld.Listener.InstancePort),
-				loadbalancer.ProtocolFromString(*ld.Listener.Protocol))
-		}
-	}
+	return backends, nil
 }
 
 func instances(instanceID string, otherIDs ...string) []*elb.Instance {
@@ -183,18 +119,17 @@ func (p *elbDriver) DeregisterBackend(instanceID string, otherIDs ...string) (lo
 	})
 }
 
-func (p *elbDriver) PublishService(ext loadbalancer.Protocol, extPort uint32,
-	backend loadbalancer.Protocol, backendPort uint32) (loadbalancer.Result, error) {
+func (p *elbDriver) Publish(backend loadbalancer.Backend) (loadbalancer.Result, error) {
 
-	if ext == loadbalancer.Invalid || backend == loadbalancer.Invalid {
+	if backend.Protocol == loadbalancer.Invalid {
 		return nil, fmt.Errorf("Bad protocol")
 	}
 
 	listener := &elb.Listener{
-		InstancePort:     aws.Int64(int64(backendPort)),
-		LoadBalancerPort: aws.Int64(int64(extPort)),
-		Protocol:         aws.String(string(ext)),
-		InstanceProtocol: aws.String(string(backend)),
+		InstancePort:     aws.Int64(int64(backend.Port)),
+		LoadBalancerPort: aws.Int64(int64(backend.LoadBalancerPort)),
+		Protocol:         aws.String(string(backend.Protocol)),
+		InstanceProtocol: aws.String(string(backend.Protocol)),
 	}
 
 	// TODO(chungers) - Support SSL id
@@ -205,7 +140,7 @@ func (p *elbDriver) PublishService(ext loadbalancer.Protocol, extPort uint32,
 	})
 }
 
-func (p *elbDriver) UnpublishService(extPort uint32) (loadbalancer.Result, error) {
+func (p *elbDriver) Unpublish(extPort uint32) (loadbalancer.Result, error) {
 	return p.client.DeleteLoadBalancerListeners(&elb.DeleteLoadBalancerListenersInput{
 		LoadBalancerPorts: []*int64{aws.Int64(int64(extPort))},
 		LoadBalancerName:  aws.String(p.name),

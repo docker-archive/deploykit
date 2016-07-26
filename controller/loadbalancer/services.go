@@ -44,10 +44,10 @@ type Options struct {
 }
 
 func externalLoadBalancerListenersFromServices(services []swarm.Service, label string,
-	options Options) map[string][]*Listener {
+	options Options) map[string][]*listener {
 
 	// group the listeners by hostname.  hostname maps to a ELB somewhere else.
-	listeners := map[string][]*Listener{}
+	listeners := map[string][]*listener{}
 	for _, s := range services {
 
 		// We index all the exposed ports by swarm port
@@ -96,28 +96,41 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 	return listeners
 }
 
-func configureL4(elb loadbalancer.Driver, listeners []*Listener, options Options) error {
+func findBackendPort(
+	backends []loadbalancer.Backend,
+	loadbalancerPort uint32,
+	protocol loadbalancer.Protocol) (uint32, bool) {
+
+	for _, backend := range backends {
+		if backend.LoadBalancerPort == loadbalancerPort && backend.Protocol == protocol {
+			return backend.Port, true
+		}
+	}
+	return 0, false
+}
+
+func configureL4(elb loadbalancer.Driver, listeners []*listener, options Options) error {
 	// Process the listeners
-	describe, err := elb.State()
+	backends, err := elb.Backends()
 	if err != nil {
 		log.Warningln("Error describing ELB err=", err)
 		return err
 	}
-	log.Debugln("describe elb=", describe)
+	log.Debugln("describe elb=", backends)
 
 	log.Infoln("Listeners to sync with ELB:", listeners)
-	toCreate := []*Listener{}
-	toChange := []*Listener{}
-	toRemove := []*Listener{}
+	toCreate := []*listener{}
+	toChange := []*listener{}
+	toRemove := []*listener{}
 
 	// Index the listener set up
-	listenerIndex := map[string]*Listener{}
+	listenerIndex := map[string]*listener{}
 	listenerIndexKey := func(p loadbalancer.Protocol, extPort, instancePort uint32) string {
 		return fmt.Sprintf("%v/%5d/%5d", p, extPort, instancePort)
 	}
 
 	for _, l := range listeners {
-		instancePort, hasListener := describe.HasListener(l.ExtPort(), l.Protocol())
+		instancePort, hasListener := findBackendPort(backends, l.extPort(), l.protocol())
 
 		if !hasListener {
 			toCreate = append(toCreate, l)
@@ -125,24 +138,28 @@ func configureL4(elb loadbalancer.Driver, listeners []*Listener, options Options
 			toChange = append(toChange, l)
 		}
 
-		listenerIndex[listenerIndexKey(l.Protocol(), l.ExtPort(), instancePort)] = l
+		listenerIndex[listenerIndexKey(l.protocol(), l.extPort(), instancePort)] = l
 	}
 	log.Debugln("ListenerIndex=", listenerIndex)
 
-	describe.VisitListeners(
-		func(lbPort, instancePort uint32, protocol loadbalancer.Protocol) {
-			if _, has := listenerIndex[listenerIndexKey(protocol, lbPort, instancePort)]; !has {
+	for _, backend := range backends {
+		protocol := backend.Protocol
+		lbPort := backend.LoadBalancerPort
+		instancePort := backend.Port
 
-				l, err := NewListener("delete", instancePort, fmt.Sprintf("%v://:%d", protocol, lbPort))
-				if err == nil {
-					toRemove = append(toRemove, l)
-				} else {
-					log.Warningln("error deleting listener protocol=", protocol, "lbPort=", lbPort, "instancePort=", instancePort)
-				}
+		if _, has := listenerIndex[listenerIndexKey(protocol, lbPort, instancePort)]; !has {
+
+			l, err := newListener("delete", instancePort, fmt.Sprintf("%v://:%d", protocol, lbPort))
+			if err == nil {
+				toRemove = append(toRemove, l)
 			} else {
-				log.Infoln("keeping protocol=", protocol, "port=", lbPort, "instancePort=", instancePort)
+				log.Warningln("error deleting listener protocol=", protocol,
+					"lbPort=", lbPort, "instancePort=", instancePort)
 			}
-		})
+		} else {
+			log.Infoln("keeping protocol=", protocol, "port=", lbPort, "instancePort=", instancePort)
+		}
+	}
 
 	log.Infoln("listeners to create:", toCreate)
 	log.Infoln("listeners to change:", toChange)
@@ -152,7 +169,7 @@ func configureL4(elb loadbalancer.Driver, listeners []*Listener, options Options
 	for _, l := range toCreate {
 		log.Infoln("CREATE on", elb.Name(), "listener", l)
 
-		_, err := elb.PublishService(l.Protocol(), l.ExtPort(), l.Protocol(), l.SwarmPort) // No SSL cert yet..
+		_, err := elb.Publish(l.asBackend()) // No SSL cert yet..
 		if err != nil {
 			log.Warningln("err unpublishing", l, "err=", err)
 			return err
@@ -162,12 +179,12 @@ func configureL4(elb loadbalancer.Driver, listeners []*Listener, options Options
 	for _, l := range toChange {
 		log.Infoln("CHANGE on", elb.Name(), "listener", l)
 
-		_, err := elb.UnpublishService(l.ExtPort())
+		_, err := elb.Unpublish(l.extPort())
 		if err != nil {
 			log.Warningln("err unpublishing", l, "err=", err)
 			return err
 		}
-		_, err = elb.PublishService(l.Protocol(), l.ExtPort(), l.Protocol(), l.SwarmPort) // No SSL cert yet..
+		_, err = elb.Publish(l.asBackend()) // No SSL cert yet..
 		if err != nil {
 			log.Warningln("err publishing", l, "err=", err)
 			return err
@@ -178,7 +195,7 @@ func configureL4(elb loadbalancer.Driver, listeners []*Listener, options Options
 		log.Infoln("REMOVE on", elb.Name(), "listener", l)
 
 		if options.RemoveListeners {
-			_, err := elb.UnpublishService(l.ExtPort())
+			_, err := elb.Unpublish(l.extPort())
 			if err != nil {
 				log.Warningln("err unpublishing", l, "err=", err)
 				return err
@@ -225,7 +242,7 @@ func ExposeServicePortInExternalLoadBalancer(elbMap VhostLoadBalancerMap, option
 
 		// to avoid multiple dates when ELBs have aliases need to agregate all of them by elb than just hostname
 		// since different hostnames can point to the same ELB.
-		targets := map[loadbalancer.Driver][]*Listener{}
+		targets := map[loadbalancer.Driver][]*listener{}
 
 		listenersByHost := externalLoadBalancerListenersFromServices(services, LabelExternalLoadBalancerSpec, options)
 
@@ -234,7 +251,7 @@ func ExposeServicePortInExternalLoadBalancer(elbMap VhostLoadBalancerMap, option
 		elbs := elbMap()
 		for hostname, elb := range elbs {
 			if _, has := targets[elb]; !has {
-				add := []*Listener{}
+				add := []*listener{}
 				if list, exists := listenersByHost[hostname]; exists {
 					add = list
 				}
@@ -255,7 +272,7 @@ func ExposeServicePortInExternalLoadBalancer(elbMap VhostLoadBalancerMap, option
 			cleaned := map[string]interface{}{}
 			for _, elb := range elbs {
 				if _, has := cleaned[elb.Name()]; !has {
-					err := configureL4(elb, []*Listener{}, options)
+					err := configureL4(elb, []*listener{}, options)
 					if err != nil {
 						log.Warning("Cannot clean up ELB %s:", elb.Name())
 						continue
