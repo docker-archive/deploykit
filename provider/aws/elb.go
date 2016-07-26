@@ -26,8 +26,8 @@ type elbDriver struct {
 	name   string
 }
 
-// NewELBDriver creates an AWS-based ELB provisioner.
-func NewELBDriver(client elbiface.ELBAPI, name string) (loadbalancer.Driver, error) {
+// NewLoadBalancerDriver creates an AWS-based ELB provisioner.
+func NewLoadBalancerDriver(client elbiface.ELBAPI, name string) (loadbalancer.Driver, error) {
 	return &elbDriver{
 		client: client,
 		name:   name,
