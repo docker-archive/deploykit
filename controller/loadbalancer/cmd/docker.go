@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/opts"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/filters"
 	"github.com/docker/engine-api/types/swarm"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/docker/libmachete/controller/loadbalancer"
@@ -112,7 +112,6 @@ func dockerCommand() *cobra.Command {
 		},
 	}
 
-	taskListOptions := &types.TaskListOptions{}
 	taskListCmd := &cobra.Command{
 		Use:   "tasks",
 		Short: "Swarm tasks for service",
@@ -137,13 +136,12 @@ func dockerCommand() *cobra.Command {
 				return err
 			}
 
-			filter := opts.NewFilterOpt()
-			filter.Value().Add("service", svc.ID)
-			filter.Value().Add("desired_state", string(swarm.TaskStateRunning))
-			filter.Value().Add("desired_state", string(swarm.TaskStateAccepted))
-			taskListOptions.Filter = filter.Value()
+			filter := filters.Args{}
+			filter.Add("service", svc.ID)
+			filter.Add("desired_state", string(swarm.TaskStateRunning))
+			filter.Add("desired_state", string(swarm.TaskStateAccepted))
 
-			list, err := client.TaskList(context.Background(), *taskListOptions)
+			list, err := client.TaskList(context.Background(), types.TaskListOptions{Filter: filter})
 			if err != nil {
 				return err
 			}

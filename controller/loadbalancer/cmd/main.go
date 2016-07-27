@@ -1,14 +1,15 @@
 package main
 
 import (
+	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/opts"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/spf13/cobra"
 )
 
 var (
-	host       = opts.DefaultHost
+	// Default host value borrowed from github.com/docker/docker/opts
+	host       = fmt.Sprintf("unix://%s", "/var/run/docker.sock")
 	tlsOptions = tlsconfig.Options{}
 	logLevel   = len(log.AllLevels) - 1
 )
