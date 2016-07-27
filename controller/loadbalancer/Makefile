@@ -1,11 +1,11 @@
 # The Commit hash or SHA of the docker/docker repo
-DOCKER_DOCKER_CHECKPOINT=v1.12.0-rc4
+DOCKER_DOCKER_CHECKPOINT=v1.12.0-rc5
 # The Commit hash of engine-api to build against.
-DOCKER_ENGINE_API_CHECKPOINT=98348ad6f9c89bb10f31ac32cd1b12cbadd292b6
+DOCKER_ENGINE_API_CHECKPOINT=a52656d77f09d394104c1639824eada038bfdb89
 
 # Docker image to build
 DOCKER_REPO?="docker4x/controller"
-DOCKER_TAG?="dev"
+DOCKER_TAG?="aws-v1.12.0-rc5-beta3"
 DOCKER_IMAGE=${DOCKER_REPO}:${DOCKER_TAG}
 
 # Engine dependencies via git checkout
