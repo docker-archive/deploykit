@@ -30,11 +30,11 @@ type Driver interface {
 	// Name is the name of the load balancer
 	Name() string
 
-	// Backends lists all known backends.
-	Backends() ([]Route, error)
+	// Routes lists all known routes.
+	Routes() ([]Route, error)
 
-	// Publish publishes a backend in the LB by adding a load balancing rule
-	Publish(backend Route) (Result, error)
+	// Publish publishes a route in the LB by adding a load balancing rule
+	Publish(route Route) (Result, error)
 
 	// UnpublishService dissociates the load balancer from the backend service at the given port.
 	Unpublish(extPort uint32) (Result, error)

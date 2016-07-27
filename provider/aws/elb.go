@@ -69,8 +69,8 @@ func (p *elbDriver) Name() string {
 	return p.name
 }
 
-// Backends lists all registered backends.
-func (p *elbDriver) Backends() ([]loadbalancer.Route, error) {
+// Routes lists all registered routes.
+func (p *elbDriver) Routes() ([]loadbalancer.Route, error) {
 	output, err := p.client.DescribeLoadBalancers(&elb.DescribeLoadBalancersInput{
 		LoadBalancerNames: []*string{aws.String(p.name)},
 	})
@@ -78,11 +78,11 @@ func (p *elbDriver) Backends() ([]loadbalancer.Route, error) {
 		return nil, err
 	}
 
-	backends := []loadbalancer.Route{}
+	routes := []loadbalancer.Route{}
 
 	if len(output.LoadBalancerDescriptions) > 0 && output.LoadBalancerDescriptions[0].ListenerDescriptions != nil {
 		for _, listener := range output.LoadBalancerDescriptions[0].ListenerDescriptions {
-			backends = append(backends, loadbalancer.Route{
+			routes = append(routes, loadbalancer.Route{
 				Port:             uint32(*listener.Listener.InstancePort),
 				Protocol:         loadbalancer.ProtocolFromString(*listener.Listener.Protocol),
 				LoadBalancerPort: uint32(*listener.Listener.LoadBalancerPort),
@@ -90,7 +90,7 @@ func (p *elbDriver) Backends() ([]loadbalancer.Route, error) {
 		}
 	}
 
-	return backends, nil
+	return routes, nil
 }
 
 func instances(instanceID string, otherIDs ...string) []*elb.Instance {
@@ -119,17 +119,17 @@ func (p *elbDriver) DeregisterBackend(instanceID string, otherIDs ...string) (lo
 	})
 }
 
-func (p *elbDriver) Publish(backend loadbalancer.Route) (loadbalancer.Result, error) {
+func (p *elbDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, error) {
 
-	if backend.Protocol == loadbalancer.Invalid {
+	if route.Protocol == loadbalancer.Invalid {
 		return nil, fmt.Errorf("Bad protocol")
 	}
 
 	listener := &elb.Listener{
-		InstancePort:     aws.Int64(int64(backend.Port)),
-		LoadBalancerPort: aws.Int64(int64(backend.LoadBalancerPort)),
-		Protocol:         aws.String(string(backend.Protocol)),
-		InstanceProtocol: aws.String(string(backend.Protocol)),
+		InstancePort:     aws.Int64(int64(route.Port)),
+		LoadBalancerPort: aws.Int64(int64(route.LoadBalancerPort)),
+		Protocol:         aws.String(string(route.Protocol)),
+		InstanceProtocol: aws.String(string(route.Protocol)),
 	}
 
 	// TODO(chungers) - Support SSL id

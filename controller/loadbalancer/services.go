@@ -96,14 +96,14 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 	return listeners
 }
 
-func findBackendPort(
-	backends []loadbalancer.Route,
+func findRoutePort(
+	routes []loadbalancer.Route,
 	loadbalancerPort uint32,
 	protocol loadbalancer.Protocol) (uint32, bool) {
 
-	for _, backend := range backends {
-		if backend.LoadBalancerPort == loadbalancerPort && backend.Protocol == protocol {
-			return backend.Port, true
+	for _, route := range routes {
+		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol {
+			return route.Port, true
 		}
 	}
 	return 0, false
@@ -111,12 +111,12 @@ func findBackendPort(
 
 func configureL4(elb loadbalancer.Driver, listeners []*listener, options Options) error {
 	// Process the listeners
-	backends, err := elb.Backends()
+	routes, err := elb.Routes()
 	if err != nil {
 		log.Warningln("Error describing ELB err=", err)
 		return err
 	}
-	log.Debugln("describe elb=", backends)
+	log.Debugln("describe elb=", routes)
 
 	log.Infoln("Listeners to sync with ELB:", listeners)
 	toCreate := []*listener{}
@@ -130,7 +130,7 @@ func configureL4(elb loadbalancer.Driver, listeners []*listener, options Options
 	}
 
 	for _, l := range listeners {
-		instancePort, hasListener := findBackendPort(backends, l.extPort(), l.protocol())
+		instancePort, hasListener := findRoutePort(routes, l.extPort(), l.protocol())
 
 		if !hasListener {
 			toCreate = append(toCreate, l)
@@ -142,10 +142,10 @@ func configureL4(elb loadbalancer.Driver, listeners []*listener, options Options
 	}
 	log.Debugln("ListenerIndex=", listenerIndex)
 
-	for _, backend := range backends {
-		protocol := backend.Protocol
-		lbPort := backend.LoadBalancerPort
-		instancePort := backend.Port
+	for _, route := range routes {
+		protocol := route.Protocol
+		lbPort := route.LoadBalancerPort
+		instancePort := route.Port
 
 		if _, has := listenerIndex[listenerIndexKey(protocol, lbPort, instancePort)]; !has {
 
@@ -169,7 +169,7 @@ func configureL4(elb loadbalancer.Driver, listeners []*listener, options Options
 	for _, l := range toCreate {
 		log.Infoln("CREATE on", elb.Name(), "listener", l)
 
-		_, err := elb.Publish(l.asBackend()) // No SSL cert yet..
+		_, err := elb.Publish(l.asRoute()) // No SSL cert yet..
 		if err != nil {
 			log.Warningln("err unpublishing", l, "err=", err)
 			return err
@@ -184,7 +184,7 @@ func configureL4(elb loadbalancer.Driver, listeners []*listener, options Options
 			log.Warningln("err unpublishing", l, "err=", err)
 			return err
 		}
-		_, err = elb.Publish(l.asBackend()) // No SSL cert yet..
+		_, err = elb.Publish(l.asRoute()) // No SSL cert yet..
 		if err != nil {
 			log.Warningln("err publishing", l, "err=", err)
 			return err

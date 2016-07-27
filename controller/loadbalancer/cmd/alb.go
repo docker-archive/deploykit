@@ -56,11 +56,11 @@ func albCommand() *cobra.Command {
 				return err
 			}
 
-			backends, err := p.Backends()
+			routes, err := p.Routes()
 			if err != nil {
 				return err
 			}
-			fmt.Println(backends)
+			fmt.Println(routes)
 			return nil
 		},
 	}

@@ -29,7 +29,7 @@ func newListener(service string, swarmPort uint32, urlStr string) (*listener, er
 	}, nil
 }
 
-func (l *listener) asBackend() loadbalancer.Route {
+func (l *listener) asRoute() loadbalancer.Route {
 	return loadbalancer.Route{
 		Port:             l.SwarmPort,
 		Protocol:         l.protocol(),

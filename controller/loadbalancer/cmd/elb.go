@@ -33,7 +33,7 @@ func elbCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			result, err := p.Backends()
+			result, err := p.Routes()
 			if err != nil {
 				return err
 			}

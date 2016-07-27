@@ -79,7 +79,7 @@ func toProtocol(p loadbalancer.Protocol) network.TransportProtocol {
 	return network.TransportProtocolTCP
 }
 
-func (p *albDriver) Publish(backend loadbalancer.Route) (loadbalancer.Result, error) {
+func (p *albDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, error) {
 
 	lb, err := p.currentState()
 	if err != nil {
@@ -97,19 +97,19 @@ func (p *albDriver) Publish(backend loadbalancer.Route) (loadbalancer.Result, er
 	}
 
 	rule := &network.LoadBalancingRule{}
-	if _, has := index[backend.LoadBalancerPort]; has {
-		rule = index[backend.LoadBalancerPort]
+	if _, has := index[route.LoadBalancerPort]; has {
+		rule = index[route.LoadBalancerPort]
 	} else {
-		index[backend.LoadBalancerPort] = rule
+		index[route.LoadBalancerPort] = rule
 	}
 
-	name := fmt.Sprintf("%s-%d-%d-%s", p.Name(), backend.LoadBalancerPort, backend.Port, backend.Protocol)
-	frontendPort := int32(backend.LoadBalancerPort)
-	backPort := int32(backend.Port)
+	name := fmt.Sprintf("%s-%d-%d-%s", p.Name(), route.LoadBalancerPort, route.Port, route.Protocol)
+	frontendPort := int32(route.LoadBalancerPort)
+	backPort := int32(route.Port)
 	timeoutMinutes := int32(5)
 
 	rule.Name = &name
-	rule.Properties.Protocol = toProtocol(backend.Protocol)
+	rule.Properties.Protocol = toProtocol(route.Protocol)
 	rule.Properties.FrontendPort = &frontendPort
 	rule.Properties.BackendPort = &backPort
 	rule.Properties.BackendAddressPool = backendPool
@@ -276,17 +276,17 @@ func (p *albDriver) currentState() (*network.LoadBalancer, error) {
 	return &lb, nil
 }
 
-func (p *albDriver) Backends() ([]loadbalancer.Route, error) {
+func (p *albDriver) Routes() ([]loadbalancer.Route, error) {
 	lbState, err := p.currentState()
 	if err != nil {
 		return nil, err
 	}
 
-	backends := []loadbalancer.Route{}
+	routes := []loadbalancer.Route{}
 
 	if lbState.Properties != nil && lbState.Properties.LoadBalancingRules != nil {
 		for _, rule := range *lbState.Properties.LoadBalancingRules {
-			backends = append(backends, loadbalancer.Route{
+			routes = append(routes, loadbalancer.Route{
 				Port:             uint32(*rule.Properties.BackendPort),
 				Protocol:         loadbalancer.ProtocolFromString(string(rule.Properties.Protocol)),
 				LoadBalancerPort: uint32(*rule.Properties.FrontendPort),
@@ -294,7 +294,7 @@ func (p *albDriver) Backends() ([]loadbalancer.Route, error) {
 		}
 	}
 
-	return backends, nil
+	return routes, nil
 }
 
 // CreateALBClient creates a client of the SDK
