@@ -2,6 +2,7 @@ package loadbalancer
 
 import (
 	"crypto/tls"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/go-connections/sockets"
@@ -9,6 +10,10 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+)
+
+const (
+	clientVersion = "1.25"
 )
 
 // NewDockerClient creates a new API client.
@@ -19,7 +24,7 @@ func NewDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, err
 		"User-Agent": clientUserAgent(),
 	}
 
-	verStr := "1.25"
+	verStr := clientVersion
 	if tmpStr := os.Getenv("DOCKER_API_VERSION"); tmpStr != "" {
 		verStr = tmpStr
 	}
@@ -58,5 +63,5 @@ func newHTTPClient(host string, tlsOptions *tlsconfig.Options) (*http.Client, er
 }
 
 func clientUserAgent() string {
-	return "Docker-Client/1.12.0-rc4 (" + runtime.GOOS + ")"
+	return fmt.Sprintf("Docker-Client/%s (%s)", clientVersion, runtime.GOOS)
 }
