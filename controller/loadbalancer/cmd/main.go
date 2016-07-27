@@ -2,15 +2,19 @@ package main
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/opts"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/spf13/cobra"
 )
 
+const (
+	// Default host value borrowed from github.com/docker/docker/opts
+	defaultHost = "unix:///var/run/docker.sock"
+)
+
 var (
-	host       = opts.DefaultHost
 	tlsOptions = tlsconfig.Options{}
 	logLevel   = len(log.AllLevels) - 1
+	host       = defaultHost
 )
 
 func main() {
@@ -28,7 +32,9 @@ func main() {
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(&host, "host", host, "Docker host")
+	var host string
+
+	cmd.PersistentFlags().StringVar(&host, "host", defaultHost, "Docker host")
 	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
 	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
 	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")

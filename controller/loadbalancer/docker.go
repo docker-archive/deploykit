@@ -2,10 +2,8 @@ package loadbalancer
 
 import (
 	"crypto/tls"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/api"
-	"github.com/docker/docker/dockerversion"
-	"github.com/docker/docker/opts"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
@@ -14,19 +12,19 @@ import (
 	"runtime"
 )
 
+const (
+	clientVersion = "1.25"
+)
+
 // NewDockerClient creates a new API client.
 func NewDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, error) {
 	tlsOptions := tls
-	host, err := getServerHost(host, tlsOptions)
-	if err != nil {
-		return &client.Client{}, err
-	}
 
 	customHeaders := map[string]string{
 		"User-Agent": clientUserAgent(),
 	}
 
-	verStr := api.DefaultVersion
+	verStr := clientVersion
 	if tmpStr := os.Getenv("DOCKER_API_VERSION"); tmpStr != "" {
 		verStr = tmpStr
 	}
@@ -37,13 +35,6 @@ func NewDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, err
 	}
 
 	return client.NewClient(host, verStr, httpClient, customHeaders)
-}
-
-func getServerHost(host string, tlsOptions *tlsconfig.Options) (string, error) {
-	if host == "" {
-		host = os.Getenv("DOCKER_HOST")
-	}
-	return opts.ParseHost(tlsOptions != nil, host)
 }
 
 func newHTTPClient(host string, tlsOptions *tlsconfig.Options) (*http.Client, error) {
@@ -72,5 +63,5 @@ func newHTTPClient(host string, tlsOptions *tlsconfig.Options) (*http.Client, er
 }
 
 func clientUserAgent() string {
-	return "Docker-Client/" + dockerversion.Version + " (" + runtime.GOOS + ")"
+	return fmt.Sprintf("Docker-Client/%s (%s)", clientVersion, runtime.GOOS)
 }
