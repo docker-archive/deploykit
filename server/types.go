@@ -15,11 +15,20 @@ import (
 // Handler is shorthand for an HTTP request handler function.
 type Handler func(resp http.ResponseWriter, req *http.Request)
 
+// Counterpart to the inverse map on the client side.
 var spiErrorToHTTPStatus = map[int]int{
 	spi.ErrBadInput:  http.StatusBadRequest,
 	spi.ErrUnknown:   http.StatusInternalServerError,
 	spi.ErrDuplicate: http.StatusConflict,
 	spi.ErrNotFound:  http.StatusNotFound,
+}
+
+func getStatusCode(err error) int {
+	status, mapped := spiErrorToHTTPStatus[spi.CodeFromError(err)]
+	if !mapped {
+		status = http.StatusInternalServerError
+	}
+	return status
 }
 
 // SimpleHandler is a reduced HTTP handler interface that may be used with handleError().
@@ -67,12 +76,7 @@ func outputHandler(handler SimpleHandler) Handler {
 			}
 		} else {
 			log.Warn("Request failed: ", err)
-
-			var mapped bool
-			status, mapped = spiErrorToHTTPStatus[spi.CodeFromError(err)]
-			if !mapped {
-				status = http.StatusInternalServerError
-			}
+			status = getStatusCode(err)
 
 			// Only use the error to define the response body if there was no result from the handler.
 			if responseBody == nil || reflect.ValueOf(responseBody).IsNil() {

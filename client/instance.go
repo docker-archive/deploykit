@@ -19,6 +19,22 @@ type instanceClient struct {
 	host string
 }
 
+// Counterpart to the inverse map on the server side.
+var httpStatusToSpiError = map[int]int{
+	http.StatusBadRequest:          spi.ErrBadInput,
+	http.StatusInternalServerError: spi.ErrUnknown,
+	http.StatusConflict:            spi.ErrDuplicate,
+	http.StatusNotFound:            spi.ErrNotFound,
+}
+
+func getSpiErrorCode(status int) int {
+	code, mapped := httpStatusToSpiError[status]
+	if !mapped {
+		code = spi.ErrUnknown
+	}
+	return code
+}
+
 func (c instanceClient) sendRequest(method, path, body string) ([]byte, error) {
 	req, err := http.NewRequest(method, fmt.Sprintf("http://%s/%s", c.host, path), strings.NewReader(body))
 	if err != nil {
@@ -44,10 +60,7 @@ func (c instanceClient) sendRequest(method, path, body string) ([]byte, error) {
 			unmarshalErr := json.Unmarshal(data, &errorStruct)
 			if unmarshalErr == nil && errorStruct["error"] != "" {
 				data = nil
-
-				// TODO(wfarner): Reverse-map HTTP status codes to spi.Error codes for better error
-				// handling.
-				err = spi.NewError(spi.ErrUnknown, errorStruct["error"])
+				err = spi.NewError(getSpiErrorCode(resp.StatusCode), errorStruct["error"])
 			} else {
 				err = spi.NewError(spi.ErrUnknown, "")
 			}
