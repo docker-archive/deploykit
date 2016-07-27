@@ -97,7 +97,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 }
 
 func findBackendPort(
-	backends []loadbalancer.Backend,
+	backends []loadbalancer.Route,
 	loadbalancerPort uint32,
 	protocol loadbalancer.Protocol) (uint32, bool) {
 

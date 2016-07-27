@@ -94,7 +94,7 @@ func albCommand() *cobra.Command {
 				return err
 			}
 
-			result, err := p.Publish(loadbalancer.Backend{
+			result, err := p.Publish(loadbalancer.Route{
 				Port:             publishOptions.BackendPort,
 				Protocol:         loadbalancer.ProtocolFromString(publishOptions.Protocol),
 				LoadBalancerPort: publishOptions.ExtPort,

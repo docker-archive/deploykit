@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// Backend is a description of a network target for a load balancer.
-type Backend struct {
+// Route is a description of a network target for a load balancer.
+type Route struct {
 	// Port is the TCP port that the backend instance is listening on.
 	Port uint32
 
@@ -31,10 +31,10 @@ type Driver interface {
 	Name() string
 
 	// Backends lists all known backends.
-	Backends() ([]Backend, error)
+	Backends() ([]Route, error)
 
 	// Publish publishes a backend in the LB by adding a load balancing rule
-	Publish(backend Backend) (Result, error)
+	Publish(backend Route) (Result, error)
 
 	// UnpublishService dissociates the load balancer from the backend service at the given port.
 	Unpublish(extPort uint32) (Result, error)

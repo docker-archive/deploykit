@@ -79,7 +79,7 @@ func toProtocol(p loadbalancer.Protocol) network.TransportProtocol {
 	return network.TransportProtocolTCP
 }
 
-func (p *albDriver) Publish(backend loadbalancer.Backend) (loadbalancer.Result, error) {
+func (p *albDriver) Publish(backend loadbalancer.Route) (loadbalancer.Result, error) {
 
 	lb, err := p.currentState()
 	if err != nil {
@@ -276,17 +276,17 @@ func (p *albDriver) currentState() (*network.LoadBalancer, error) {
 	return &lb, nil
 }
 
-func (p *albDriver) Backends() ([]loadbalancer.Backend, error) {
+func (p *albDriver) Backends() ([]loadbalancer.Route, error) {
 	lbState, err := p.currentState()
 	if err != nil {
 		return nil, err
 	}
 
-	backends := []loadbalancer.Backend{}
+	backends := []loadbalancer.Route{}
 
 	if lbState.Properties != nil && lbState.Properties.LoadBalancingRules != nil {
 		for _, rule := range *lbState.Properties.LoadBalancingRules {
-			backends = append(backends, loadbalancer.Backend{
+			backends = append(backends, loadbalancer.Route{
 				Port:             uint32(*rule.Properties.BackendPort),
 				Protocol:         loadbalancer.ProtocolFromString(string(rule.Properties.Protocol)),
 				LoadBalancerPort: uint32(*rule.Properties.FrontendPort),

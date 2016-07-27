@@ -70,7 +70,7 @@ func (p *elbDriver) Name() string {
 }
 
 // Backends lists all registered backends.
-func (p *elbDriver) Backends() ([]loadbalancer.Backend, error) {
+func (p *elbDriver) Backends() ([]loadbalancer.Route, error) {
 	output, err := p.client.DescribeLoadBalancers(&elb.DescribeLoadBalancersInput{
 		LoadBalancerNames: []*string{aws.String(p.name)},
 	})
@@ -78,11 +78,11 @@ func (p *elbDriver) Backends() ([]loadbalancer.Backend, error) {
 		return nil, err
 	}
 
-	backends := []loadbalancer.Backend{}
+	backends := []loadbalancer.Route{}
 
 	if len(output.LoadBalancerDescriptions) > 0 && output.LoadBalancerDescriptions[0].ListenerDescriptions != nil {
 		for _, listener := range output.LoadBalancerDescriptions[0].ListenerDescriptions {
-			backends = append(backends, loadbalancer.Backend{
+			backends = append(backends, loadbalancer.Route{
 				Port:             uint32(*listener.Listener.InstancePort),
 				Protocol:         loadbalancer.ProtocolFromString(*listener.Listener.Protocol),
 				LoadBalancerPort: uint32(*listener.Listener.LoadBalancerPort),
@@ -119,7 +119,7 @@ func (p *elbDriver) DeregisterBackend(instanceID string, otherIDs ...string) (lo
 	})
 }
 
-func (p *elbDriver) Publish(backend loadbalancer.Backend) (loadbalancer.Result, error) {
+func (p *elbDriver) Publish(backend loadbalancer.Route) (loadbalancer.Result, error) {
 
 	if backend.Protocol == loadbalancer.Invalid {
 		return nil, fmt.Errorf("Bad protocol")
