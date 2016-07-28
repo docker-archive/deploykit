@@ -256,6 +256,7 @@ type Info struct {
 	Runtimes           map[string]Runtime
 	DefaultRuntime     string
 	Swarm              swarm.Info
+	LiveRestore        bool
 }
 
 // PluginsInfo is a temp struct holding Plugins name
@@ -282,7 +283,7 @@ type ExecStartCheck struct {
 type HealthcheckResult struct {
 	Start    time.Time // Start is the time this check started
 	End      time.Time // End is the time this check ended
-	ExitCode int       // ExitCode meanings: 0=healthy, 1=unhealthy, 2=starting, else=error running probe
+	ExitCode int       // ExitCode meanings: 0=healthy, 1=unhealthy, 2=reserved (considered unhealthy), else=error running probe
 	Output   string    // Output from last check
 }
 

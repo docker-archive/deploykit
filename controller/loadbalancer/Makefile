@@ -1,11 +1,9 @@
-# The Commit hash or SHA of the docker/docker repo
-DOCKER_DOCKER_CHECKPOINT=v1.12.0-rc4
 # The Commit hash of engine-api to build against.
-DOCKER_ENGINE_API_CHECKPOINT=98348ad6f9c89bb10f31ac32cd1b12cbadd292b6
+DOCKER_ENGINE_API_CHECKPOINT=a52656d77f09d394104c1639824eada038bfdb89
 
 # Docker image to build
 DOCKER_REPO?="docker4x/controller"
-DOCKER_TAG?="dev"
+DOCKER_TAG?="aws-v1.12.0-beta4"
 DOCKER_IMAGE=${DOCKER_REPO}:${DOCKER_TAG}
 
 # Engine dependencies via git checkout
@@ -43,7 +41,7 @@ clean:
 	-@docker rmi -f ${DOCKER_IMAGE}  # remove local version
 	-@docker rmi -f ${DOCKER_REPO}:latest  # remove local version
 
-docker: clean checkout-docker-docker checkout-engine-api #update-dep
+docker: clean checkout-engine-api
 	@echo "+ $@"
 	-docker rmi -f build_binary
 	@echo "Run from top level project directory and copy tree to build in container"
@@ -56,20 +54,13 @@ ifeq (${DOCKER_TAG_LATEST},true)
 	docker push ${DOCKER_REPO}:latest
 endif
 
-checkout-docker-docker:
-	-rm -rf ${DOCKER_SRC_ROOT}/docker
-	@cd ${DOCKER_SRC_ROOT} && git clone git@github.com:docker/docker.git
-	@cd ${DOCKER_SRC_ROOT}/docker && git checkout ${DOCKER_DOCKER_CHECKPOINT}
-	@echo "Checked out docker/docker"
-
 checkout-engine-api:
 	-rm -rf ${DOCKER_SRC_ROOT}/engine-api
 	@cd ${DOCKER_SRC_ROOT} && git clone git@github.com:docker/engine-api.git
 	@cd ${DOCKER_SRC_ROOT}/engine-api && git checkout ${DOCKER_ENGINE_API_CHECKPOINT}
 	@echo "Checked out engine-api"
 
-update-dep: checkout-docker-docker checkout-engine-api
-	@cd ${SRC_ROOT} && godep update github.com/docker/docker/...
+update-dep: checkout-engine-api
 	@cd ${SRC_ROOT} && godep update github.com/docker/engine-api/...
 	@echo "Updated vendoring dependencies"
 	@git status
