@@ -64,3 +64,25 @@ func TestClientServerRelay(t *testing.T) {
 		require.Equal(t, noOutput, returnedOutput)
 	})
 }
+
+func TestErrorMapping(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	backend := mock_instance.NewMockProvisioner(ctrl)
+
+	testflight.WithServer(NewHandler(backend), func(r *testflight.Requester) {
+		client := client.NewInstanceProvisioner(r.Url(""))
+
+		id := instance.ID("instance-1")
+
+		shellCode := "echo hello"
+
+		backendErr := spi.NewError(spi.ErrBadInput, "Bad")
+
+		backend.EXPECT().ShellExec(id, shellCode).Return(nil, backendErr)
+		returnedOutput, err := client.ShellExec(id, shellCode)
+		require.Equal(t, backendErr, err)
+		require.Nil(t, returnedOutput)
+	})
+}
