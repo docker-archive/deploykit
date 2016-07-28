@@ -55,11 +55,12 @@ func albCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			result, err := p.State()
+
+			routes, err := p.Routes()
 			if err != nil {
 				return err
 			}
-			fmt.Println(result)
+			fmt.Println(routes)
 			return nil
 		},
 	}
@@ -93,10 +94,11 @@ func albCommand() *cobra.Command {
 				return err
 			}
 
-			ext := loadbalancer.ProtocolFromString(publishOptions.Protocol)
-			backend := ext
-
-			result, err := p.PublishService(ext, publishOptions.ExtPort, backend, publishOptions.BackendPort)
+			result, err := p.Publish(loadbalancer.Route{
+				Port:             publishOptions.BackendPort,
+				Protocol:         loadbalancer.ProtocolFromString(publishOptions.Protocol),
+				LoadBalancerPort: publishOptions.ExtPort,
+			})
 			if err != nil {
 				return err
 			}
@@ -132,7 +134,7 @@ func albCommand() *cobra.Command {
 				return err
 			}
 
-			result, err := p.UnpublishService(unpublishPort)
+			result, err := p.Unpublish(unpublishPort)
 			if err != nil {
 				return err
 			}

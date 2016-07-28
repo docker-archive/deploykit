@@ -1,7 +1,6 @@
 package azure
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest"
@@ -56,18 +55,8 @@ func wrap(a autorest.Response, e error) (loadbalancer.Result, error) {
 	return autorestResp(a), e
 }
 
-type describeResult network.LoadBalancer
-
 func (p *albDriver) Name() string {
 	return p.name
-}
-
-func (p *albDriver) State() (loadbalancer.State, error) {
-	lb, err := p.currentState()
-	if err != nil {
-		return nil, err
-	}
-	return describeResult(*lb), nil
 }
 
 func toProbeProtocol(p loadbalancer.Protocol) network.ProbeProtocol {
@@ -90,8 +79,7 @@ func toProtocol(p loadbalancer.Protocol) network.TransportProtocol {
 	return network.TransportProtocolTCP
 }
 
-func (p *albDriver) PublishService(ext loadbalancer.Protocol, extPort uint32,
-	backend loadbalancer.Protocol, backendPort uint32) (loadbalancer.Result, error) {
+func (p *albDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, error) {
 
 	lb, err := p.currentState()
 	if err != nil {
@@ -109,19 +97,19 @@ func (p *albDriver) PublishService(ext loadbalancer.Protocol, extPort uint32,
 	}
 
 	rule := &network.LoadBalancingRule{}
-	if _, has := index[extPort]; has {
-		rule = index[extPort]
+	if _, has := index[route.LoadBalancerPort]; has {
+		rule = index[route.LoadBalancerPort]
 	} else {
-		index[extPort] = rule
+		index[route.LoadBalancerPort] = rule
 	}
 
-	name := fmt.Sprintf("%s-%d-%d-%s", p.Name(), extPort, backendPort, string(ext))
-	frontendPort := int32(extPort)
-	backPort := int32(backendPort)
+	name := fmt.Sprintf("%s-%d-%d-%s", p.Name(), route.LoadBalancerPort, route.Port, route.Protocol)
+	frontendPort := int32(route.LoadBalancerPort)
+	backPort := int32(route.Port)
 	timeoutMinutes := int32(5)
 
 	rule.Name = &name
-	rule.Properties.Protocol = toProtocol(ext)
+	rule.Properties.Protocol = toProtocol(route.Protocol)
 	rule.Properties.FrontendPort = &frontendPort
 	rule.Properties.BackendPort = &backPort
 	rule.Properties.BackendAddressPool = backendPool
@@ -141,7 +129,7 @@ func (p *albDriver) PublishService(ext loadbalancer.Protocol, extPort uint32,
 	return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancel))
 }
 
-func (p *albDriver) UnpublishService(extPort uint32) (loadbalancer.Result, error) {
+func (p *albDriver) Unpublish(extPort uint32) (loadbalancer.Result, error) {
 	lb, err := p.currentState()
 	if err != nil {
 		return nil, err
@@ -288,73 +276,25 @@ func (p *albDriver) currentState() (*network.LoadBalancer, error) {
 	return &lb, nil
 }
 
-func (d describeResult) String() string {
-	buff, err := json.MarshalIndent(d, "   ", "   ")
+func (p *albDriver) Routes() ([]loadbalancer.Route, error) {
+	lbState, err := p.currentState()
 	if err != nil {
-		return fmt.Sprintf("%v", network.LoadBalancer(d))
+		return nil, err
 	}
-	return string(buff)
-}
 
-func (d describeResult) GetName() string {
-	lb := network.LoadBalancer(d)
-	name := lb.Name
-	if name != nil {
-		return *name
-	}
-	return ""
-}
+	routes := []loadbalancer.Route{}
 
-func (d describeResult) HasListener(extPort uint32, protocol loadbalancer.Protocol) (uint32, bool) {
-	lb := network.LoadBalancer(d)
-	if lb.Properties == nil {
-		return 0, false
-	}
-	if lb.Properties.LoadBalancingRules == nil || len(*lb.Properties.LoadBalancingRules) == 0 {
-		return 0, false
-	}
-	for _, rule := range *lb.Properties.LoadBalancingRules {
-		if rule.Properties == nil {
-			continue
+	if lbState.Properties != nil && lbState.Properties.LoadBalancingRules != nil {
+		for _, rule := range *lbState.Properties.LoadBalancingRules {
+			routes = append(routes, loadbalancer.Route{
+				Port:             uint32(*rule.Properties.BackendPort),
+				Protocol:         loadbalancer.ProtocolFromString(string(rule.Properties.Protocol)),
+				LoadBalancerPort: uint32(*rule.Properties.FrontendPort),
+			})
 		}
+	}
 
-		var frontendPort, backendPort uint32
-		if rule.Properties.FrontendPort != nil {
-			frontendPort = uint32(*rule.Properties.FrontendPort)
-		}
-		if rule.Properties.BackendPort != nil {
-			backendPort = uint32(*rule.Properties.BackendPort)
-		}
-		if loadbalancer.ProtocolFromString(string(rule.Properties.Protocol)) == protocol && frontendPort == extPort {
-			return backendPort, true
-		}
-	}
-	return 0, false
-}
-
-func (d describeResult) VisitListeners(v func(lbPort, instancePort uint32, protocol loadbalancer.Protocol)) {
-	lb := network.LoadBalancer(d)
-	if lb.Properties == nil {
-		return
-	}
-	if lb.Properties.LoadBalancingRules == nil || len(*lb.Properties.LoadBalancingRules) == 0 {
-		return
-	}
-	for _, rule := range *lb.Properties.LoadBalancingRules {
-		if rule.Properties == nil {
-			continue
-		}
-
-		var frontendPort, backendPort uint32
-		if rule.Properties.FrontendPort != nil {
-			frontendPort = uint32(*rule.Properties.FrontendPort)
-		}
-		if rule.Properties.BackendPort != nil {
-			backendPort = uint32(*rule.Properties.BackendPort)
-		}
-		protocol := loadbalancer.ProtocolFromString(string(rule.Properties.Protocol))
-		v(frontendPort, backendPort, protocol)
-	}
+	return routes, nil
 }
 
 // CreateALBClient creates a client of the SDK
