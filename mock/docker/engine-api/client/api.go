@@ -767,14 +767,14 @@ func (_mr *_MockAPIClientRecorder) SwarmLeave(arg0, arg1 interface{}) *gomock.Ca
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SwarmLeave", arg0, arg1)
 }
 
-func (_m *MockAPIClient) SwarmUpdate(_param0 context.Context, _param1 swarm.Version, _param2 swarm.Spec) error {
-	ret := _m.ctrl.Call(_m, "SwarmUpdate", _param0, _param1, _param2)
+func (_m *MockAPIClient) SwarmUpdate(_param0 context.Context, _param1 swarm.Version, _param2 swarm.Spec, _param3 swarm.UpdateFlags) error {
+	ret := _m.ctrl.Call(_m, "SwarmUpdate", _param0, _param1, _param2, _param3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockAPIClientRecorder) SwarmUpdate(arg0, arg1, arg2 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SwarmUpdate", arg0, arg1, arg2)
+func (_mr *_MockAPIClientRecorder) SwarmUpdate(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SwarmUpdate", arg0, arg1, arg2, arg3)
 }
 
 func (_m *MockAPIClient) TaskInspectWithRaw(_param0 context.Context, _param1 string) (swarm.Task, []byte, error) {

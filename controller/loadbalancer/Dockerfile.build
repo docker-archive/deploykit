@@ -21,9 +21,7 @@ RUN go get github.com/tools/godep
 ADD . /go/src/github.com/docker/libmachete
 
 # Remove the vendored dependencies and replace with pinned versions
-RUN rm -rf /go/src/github.com/docker/libmachete/vendor/github.com/docker/docker
 RUN rm -rf /go/src/github.com/docker/libmachete/vendor/github.com/docker/engine-api
-ADD ./controller/loadbalancer/deps/go/src/github.com/docker/docker /go/src/github.com/docker/libmachete/vendor/github.com/docker/docker
 ADD ./controller/loadbalancer/deps/go/src/github.com/docker/engine-api /go/src/github.com/docker/libmachete/vendor/github.com/docker/engine-api
 
 RUN mkdir -p /build/controller

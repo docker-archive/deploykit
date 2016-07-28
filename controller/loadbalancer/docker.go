@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	clientVersion = "1.25"
+	clientVersion = "1.24"
 )
 
 // NewDockerClient creates a new API client.
