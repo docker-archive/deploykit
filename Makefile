@@ -10,11 +10,11 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test binaries
+.PHONY: clean all fmt vet lint build test vendor-sync vendor-add
 .DEFAULT: all
-all: fmt vet lint build test binaries
+all: fmt vet lint build test
 
-ci: fmt vet lint dep-validate coverage
+ci: fmt vet lint vendor-check coverage
 
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
@@ -42,11 +42,11 @@ lint:
 		$(error Please install golint: `go get -u github.com/golang/lint/golint`))
 	@test -z "$$(golint ./... 2>&1 | grep -v ^vendor/ | grep -v mock/ | tee /dev/stderr)"
 
-build:
+build: vendor-sync
 	@echo "+ $@"
 	@go build ${GO_LDFLAGS} $(PKGS)
 
-install:
+install: vendor-sync
 	@echo "+ $@"
 	@go install ${GO_LDFLAGS} $(PKGS)
 
@@ -54,39 +54,33 @@ generate:
 	@echo "+ $@"
 	@go generate -x $(PKGS_AND_MOCKS)
 
-test:
+test: vendor-sync
 	@echo "+ $@"
 	@go test -test.short -race -v $(PKGS)
 
-coverage:
+coverage: vendor-sync
 	@echo "+ $@"
 	@for pkg in $(PKGS); do \
 	  go test -test.short -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 
-test-full:
+test-full: vendor-sync
 	@echo "+ $@"
 	@go test -race $(PKGS)
 
-# Godep helpers
-dep-check-godep:
-	$(if $(shell which godep || echo ''), , \
-		$(error Please install godep: go get github.com/tools/godep))
+# govendor helpers
+check-govendor:
+	$(if $(shell which govendor || echo ''), , \
+		$(error Please install govendor: get github.com/kardianos/govendor))
 
-dep-save: dep-check-godep
+vendor-sync: check-govendor
 	@echo "+ $@"
-	@godep save $(PKGS)
+	@govendor sync
 
-dep-restore: dep-check-godep
+vendor-save: check-govendor
 	@echo "+ $@"
-	@godep restore -v
+	@govendor add +external
 
-dep-validate: dep-restore
+vendor-check:
 	@echo "+ $@"
-	@rm -Rf .vendor.bak
-	@mv vendor .vendor.bak
-	@rm -Rf Godeps
-	@godep save ./...
-	@test -z "$$(diff -r vendor .vendor.bak 2>&1 | tee /dev/stderr)" || \
-		(echo >&2 "+ borked dependencies! what you have in Godeps/Godeps.json does not match with what you have in vendor" && false)
-	@rm -Rf .vendor.bak
+	@if [[ `govendor status` ]]; then echo 'Please address dependency issues'; exit 1; fi
