@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 # Build a go binary in an alpine container, and extract the binary.
-# This is useful for a cross-compile step when preparing an alpine image of a
-# go binary without any special
+# This is useful for a cross-compile step when preparing an alpine image that contains only the go binary.
 
 set -o errexit
 set -o nounset
@@ -10,7 +9,7 @@ set -o pipefail
 
 if [[ $# -ne 2 ]]
 then
-  echo "Usage: $0 <main.go path> <output path>"
+  echo "Usage: $0 <path to main.go> <path to binary build>"
   exit 1
 fi
 
@@ -44,6 +43,12 @@ then
 fi
 
 BIN_NAME=$(basename "$OUT_PATH")
+
+echo 'Populating vendor/ from scratch'
+mv vendor/vendor.json .
+rm -rf vendor/*
+mv vendor.json vendor/
+govendor sync
 
 echo 'Building'
 container_id=$(docker run --detach \
