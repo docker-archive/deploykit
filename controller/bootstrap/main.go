@@ -30,8 +30,10 @@ type config struct {
 }
 
 var (
-	// Build information to be included
-	Version  = "Unspecified"
+	// Version is the build release identifier.
+	Version = "Unspecified"
+
+	// Revision is the build source control revision.
 	Revision = "Unspecified"
 )
 
@@ -111,7 +113,7 @@ func run(templateFile, configStr string) {
 		os.Exit(1)
 	}
 
-	log.Printf("Successfully created stack %s", output.StackId)
+	log.Printf("Successfully created stack %s", *output.StackId)
 }
 
 func main() {
