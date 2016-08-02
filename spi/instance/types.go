@@ -6,3 +6,9 @@ type ID string
 // GroupID is the identifier used for a managed group of instances.
 // A group is typically a collection of instances that are replicas of a service.
 type GroupID string
+
+// Description contains details about an instance.
+type Description struct {
+	ID               ID
+	PrivateIPAddress string
+}

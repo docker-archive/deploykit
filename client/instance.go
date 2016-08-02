@@ -91,19 +91,19 @@ func (c instanceClient) Destroy(instance instance.ID) error {
 	return apiErr
 }
 
-func (c instanceClient) ListGroup(group instance.GroupID) ([]instance.ID, error) {
+func (c instanceClient) DescribeInstances(group instance.GroupID) ([]instance.Description, error) {
 	data, apiErr := c.sendRequest("GET", fmt.Sprintf("instance/?group=%s", group), "")
 	if apiErr != nil {
 		return nil, apiErr
 	}
 
-	ids := []instance.ID{}
-	err := json.Unmarshal(data, &ids)
+	descriptions := []instance.Description{}
+	err := json.Unmarshal(data, &descriptions)
 	if err != nil {
 		return nil, err
 	}
 
-	return ids, nil
+	return descriptions, nil
 }
 
 func (c instanceClient) ShellExec(id instance.ID, shellCode string) (*string, error) {

@@ -22,15 +22,19 @@ func TestListGroup(t *testing.T) {
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		group := "worker-nodes"
-		ids := []instance.ID{"a", "b", "c"}
+		descriptions := []instance.Description{
+			{ID: instance.ID("a"), PrivateIPAddress: "10.0.0.3"},
+			{ID: instance.ID("b"), PrivateIPAddress: "10.0.0.4"},
+			{ID: instance.ID("c"), PrivateIPAddress: "10.0.0.5"},
+		}
 
-		provisioner.EXPECT().ListGroup(instance.GroupID(group)).Return(ids, nil)
+		provisioner.EXPECT().DescribeInstances(instance.GroupID(group)).Return(descriptions, nil)
 
 		response := r.Get(fmt.Sprintf("/instance/?group=%s", group))
 		require.Equal(t, 200, response.StatusCode)
-		result := []instance.ID{}
+		result := []instance.Description{}
 		require.NoError(t, json.Unmarshal([]byte(response.Body), &result))
-		require.Equal(t, ids, result)
+		require.Equal(t, descriptions, result)
 	})
 }
 
@@ -53,7 +57,7 @@ func TestListGroupError(t *testing.T) {
 		require.Equal(t, 400, response.StatusCode)
 
 		group := "worker-nodes"
-		provisioner.EXPECT().ListGroup(instance.GroupID(group)).Return(nil, BadInputError)
+		provisioner.EXPECT().DescribeInstances(instance.GroupID(group)).Return(nil, BadInputError)
 		expectBadInputError(t, r.Get(fmt.Sprintf("/instance/?group=%s", group)))
 	})
 }
