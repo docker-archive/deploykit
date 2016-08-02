@@ -71,7 +71,7 @@ test-full: vendor-sync
 # govendor helpers
 check-govendor:
 	$(if $(shell which govendor || echo ''), , \
-		$(error Please install govendor: get github.com/kardianos/govendor))
+		$(error Please install govendor: go get github.com/kardianos/govendor))
 
 vendor-sync: check-govendor
 	@echo "+ $@"
