@@ -7,6 +7,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+LDFLAGS=${LDFLAGS:-}
+
 if [[ $# -ne 2 ]]
 then
   echo "Usage: $0 <path to main.go> <path to binary build>"
@@ -55,9 +57,16 @@ container_id=$(docker run --detach \
   -v "$PWD":/go/src/github.com/docker/libmachete \
   -w /go/src/github.com/docker/libmachete \
   golang:1.6-alpine \
-  go build -o /build/$BIN_NAME "$MAIN")
+  go build -ldflags "$LDFLAGS" -o /build/$BIN_NAME "$MAIN")
 
-docker wait $container_id >/dev/null
+exit_code=$(docker wait $container_id)
+if [[ "$exit_code" != "0" ]]
+then
+  echo "Build failed with code $exit_code"
+  docker logs $container_id
+  docker rm $container_id >/dev/null
+  exit 1
+fi
 
 echo 'Copying binary'
 docker cp $container_id:/build/$BIN_NAME "$OUT_PATH"

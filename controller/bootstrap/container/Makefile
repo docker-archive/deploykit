@@ -7,12 +7,8 @@ DOCKER_IMAGE=$(DOCKER_REPO):$(DOCKER_TAG)
 
 .PHONY: container
 
-container: binary
+container:
 	@echo "+ $@"
+	cd ../../.. && LDFLAGS="-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" \
+	  ./scripts/build-in-docker controller/bootstrap/main.go controller/bootstrap/container/bin/bootstrap
 	docker build -t $(DOCKER_IMAGE) -t $(DOCKER_REPO):latest -t $(DOCKER_REPO):$(VERSION) .
-
-binary:
-	@echo "+ $@"
-	mkdir -p bin && CGO_ENABLED=0 GOOS=linux go build \
-	  -ldflags "-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" \
-	  -o bin/bootstrap ../main.go
