@@ -10,6 +10,15 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+	"fmt"
+)
+
+var (
+	// Version is the build release identifier.
+	Version = "Unspecified"
+
+	// Revision is the build source control revision.
+	Revision = "Unspecified"
 )
 
 func main() {
@@ -27,7 +36,19 @@ request (suitable for use with the driver running at the target machete server).
 The provisioning request must be a go-style template, with '{{.IP}}' included.
 This parameter will be substituted with one of the provided quorum IP addresses
 when a quorum member is absent.`,
+	}
 
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "print the bootstrap version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("%s (revision %s)\n", Version, Revision)
+		},
+	})
+
+	rootCmd.AddCommand(&cobra.Command{
+		Use: "run",
+		Short: "run the quorum controller",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 3 {
 				cmd.Usage()
@@ -70,7 +91,7 @@ when a quorum member is absent.`,
 				os.Exit(1)
 			}
 		},
-	}
+	})
 
 	err := rootCmd.Execute()
 	if err != nil {
