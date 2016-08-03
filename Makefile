@@ -14,7 +14,7 @@ endif
 .DEFAULT: all
 all: fmt vet lint build test
 
-ci: fmt vet lint vendor-check coverage
+ci: fmt vet lint vendor-sync vendor-check coverage
 
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
