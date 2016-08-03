@@ -46,7 +46,7 @@ when a quorum member is absent.`,
 	})
 
 	rootCmd.AddCommand(&cobra.Command{
-		Use:   "run",
+		Use:   "run <machete address> <instance addresses> <config path>",
 		Short: "run the quorum controller",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 3 {
