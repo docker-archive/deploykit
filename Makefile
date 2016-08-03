@@ -83,4 +83,4 @@ vendor-save: check-govendor
 
 vendor-check:
 	@echo "+ $@"
-	@if [ `govendor status` ]; then echo 'Please address dependency issues'; exit 1; fi
+	@test -z "$$(govendor status | tee /dev/stderr)"
