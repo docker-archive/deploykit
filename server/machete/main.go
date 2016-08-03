@@ -15,8 +15,8 @@ func main() {
 
 	rootCmd := &cobra.Command{Use: "machete"}
 
-	rootCmd.Flags().UintVar(&port, "port", 8888, "Port the server listens on")
-	rootCmd.Flags().StringVar(
+	rootCmd.PersistentFlags().UintVar(&port, "port", 8888, "Port the server listens on")
+	rootCmd.PersistentFlags().StringVar(
 		&cluster,
 		"cluster",
 		"default",
