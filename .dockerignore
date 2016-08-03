@@ -1,6 +1,0 @@
-# Ignore vendors when copy this directory as context to
-# Docker builds.  Instead use govendor to fetch all
-# dependencies based on manifest in vendor/vendor.json
-
-vendor/*
-!vendor/vendor.json
