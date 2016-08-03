@@ -39,7 +39,7 @@ when a quorum member is absent.`,
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
-		Short: "print the bootstrap version",
+		Short: "print build version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf("%s (revision %s)\n", Version, Revision)
 		},
