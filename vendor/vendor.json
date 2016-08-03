@@ -177,6 +177,12 @@
 			"revisionTime": "2016-05-24T17:51:21Z"
 		},
 		{
+			"checksumSHA1": "0SJnt2rTA7eI3sPSslzqkAPCT8M=",
+			"path": "github.com/aws/aws-sdk-go/service/cloudformation",
+			"revision": "073693d6cf3e1a74b323877172a5392f3e56bc97",
+			"revisionTime": "2016-05-24T17:51:21Z"
+		},
+		{
 			"checksumSHA1": "H3wPCfQrrQN2sxBwwahimRs7UIY=",
 			"path": "github.com/aws/aws-sdk-go/service/ec2",
 			"revision": "073693d6cf3e1a74b323877172a5392f3e56bc97",
