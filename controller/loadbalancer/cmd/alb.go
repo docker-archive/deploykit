@@ -9,27 +9,19 @@ import (
 )
 
 func albCommand() *cobra.Command {
-	albOptions := &azure.Options{}
+	albOptions := azure.Options{}
 
 	cmd := &cobra.Command{
 		Use:   "alb",
 		Short: "Ops on the ALB (Azure Load Balancer)",
 	}
-	cmd.Flags().IntVar(&albOptions.PollingDelay,
-		"polling_delay", 5, "Polling delay")
-	cmd.Flags().StringVar(&albOptions.Environment,
-		"environment", "", "environment")
-	cmd.Flags().StringVar(&albOptions.OAuthClientID,
-		"oauth_client_id", "", "OAuth client ID")
-	cmd.Flags().StringVar(&albOptions.SubscriptionID,
-		"subscription_id", "", "subscription ID")
-	cmd.Flags().StringVar(&albOptions.ResourceGroupName,
-		"resource_group", "", "resource group name")
-
-	cmd.Flags().StringVar(&albOptions.ADClientID,
-		"ad_app_id", "", "AD app ID")
-	cmd.Flags().StringVar(&albOptions.ADClientSecret,
-		"ad_app_secret", "", "AD app secret")
+	cmd.Flags().IntVar(&albOptions.PollingDelay, "polling_delay", 5, "Polling delay")
+	cmd.Flags().StringVar(&albOptions.Environment, "environment", "", "environment")
+	cmd.Flags().StringVar(&albOptions.OAuthClientID, "oauth_client_id", "", "OAuth client ID")
+	cmd.Flags().StringVar(&albOptions.SubscriptionID, "subscription_id", "", "subscription ID")
+	cmd.Flags().StringVar(&albOptions.ResourceGroupName, "resource_group", "", "resource group name")
+	cmd.Flags().StringVar(&albOptions.ADClientID, "ad_app_id", "", "AD app ID")
+	cmd.Flags().StringVar(&albOptions.ADClientSecret, "ad_app_secret", "", "AD app secret")
 
 	describeCmd := &cobra.Command{
 		Use:   "describe",
@@ -41,12 +33,12 @@ func albCommand() *cobra.Command {
 
 			cred := azure.NewCredential()
 
-			err := cred.Authenticate(*albOptions)
+			err := cred.Authenticate(albOptions)
 			if err != nil {
 				return err
 			}
 
-			client, err := azure.CreateALBClient(cred, *albOptions)
+			client, err := azure.CreateALBClient(cred, albOptions)
 			if err != nil {
 				return err
 			}
@@ -79,12 +71,12 @@ func albCommand() *cobra.Command {
 
 			cred := azure.NewCredential()
 
-			err := cred.Authenticate(*albOptions)
+			err := cred.Authenticate(albOptions)
 			if err != nil {
 				return err
 			}
 
-			client, err := azure.CreateALBClient(cred, *albOptions)
+			client, err := azure.CreateALBClient(cred, albOptions)
 			if err != nil {
 				return err
 			}
@@ -119,12 +111,12 @@ func albCommand() *cobra.Command {
 
 			cred := azure.NewCredential()
 
-			err := cred.Authenticate(*albOptions)
+			err := cred.Authenticate(albOptions)
 			if err != nil {
 				return err
 			}
 
-			client, err := azure.CreateALBClient(cred, *albOptions)
+			client, err := azure.CreateALBClient(cred, albOptions)
 			if err != nil {
 				return err
 			}
