@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/client"
 	"github.com/docker/libmachete/controller/quorum"
@@ -10,7 +11,6 @@ import (
 	"os/signal"
 	"strings"
 	"time"
-	"fmt"
 )
 
 var (
@@ -25,8 +25,7 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use: "quorum <machete address> <quorum IP addresses> <config path>",
 		Long: `
-quorum manages a group of instances that require a fixed set of instances that
-require fixed IP addresses.
+quorum manages a group of instances that require fixed IP addresses.
 
 Any nodes provisioned will be allocated one of the configured IP addresses, and
 the controller will converge towards having every IP address represented.
@@ -47,7 +46,7 @@ when a quorum member is absent.`,
 	})
 
 	rootCmd.AddCommand(&cobra.Command{
-		Use: "run",
+		Use:   "run",
 		Short: "run the quorum controller",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 3 {
