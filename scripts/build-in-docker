@@ -11,7 +11,7 @@ LDFLAGS=${LDFLAGS:-}
 
 if [[ $# -ne 2 ]]
 then
-  echo "Usage: $0 <path to main.go> <path to binary build>"
+  echo "Usage: $0 <packages> <path to binary build>"
   exit 1
 fi
 
@@ -20,15 +20,8 @@ HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Switch to the repo root.
 cd "$HERE/.."
 
-MAIN="$1"
+PACKAGES="$1"
 OUT_PATH="$2"
-
-if [[ ! -f "$MAIN" ]]
-then
-  echo "Golang main file $MAIN does not exist."
-  echo "Make sure this is a path relative from the repository root."
-  exit 1
-fi
 
 OUT_DIR=$(dirname "$OUT_PATH")
 if [[ ! -d "$OUT_DIR" ]]
@@ -57,7 +50,7 @@ container_id=$(docker run --detach \
   -v "$PWD":/go/src/github.com/docker/libmachete \
   -w /go/src/github.com/docker/libmachete \
   golang:1.6-alpine \
-  go build -ldflags "$LDFLAGS" -o /build/$BIN_NAME "$MAIN")
+  go build -ldflags "$LDFLAGS" -o /build/$BIN_NAME $PACKAGES)
 
 exit_code=$(docker wait $container_id)
 if [[ "$exit_code" != "0" ]]
