@@ -33,13 +33,15 @@ func TestClientServerRelay(t *testing.T) {
 		err = client.Destroy(id)
 		require.NoError(t, err)
 
-		ids := []instance.ID{id, instance.ID("instance-2")}
+		descriptions := []instance.Description{
+			{ID: id, PrivateIPAddress: "10.0.0.2"},
+			{ID: instance.ID("instance-2"), PrivateIPAddress: "10.0.0.3"}}
 
 		group := instance.GroupID("group-1")
-		backend.EXPECT().ListGroup(group).Return(ids, nil)
-		returnedIDs, err := client.ListGroup(group)
+		backend.EXPECT().DescribeInstances(group).Return(descriptions, nil)
+		returnedDescriptions, err := client.DescribeInstances(group)
 		require.NoError(t, err)
-		require.Equal(t, ids, returnedIDs)
+		require.Equal(t, descriptions, returnedDescriptions)
 
 		shellCode := "echo hello"
 		cmdOutput := "hello"
