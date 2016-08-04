@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/spf13/cobra"
@@ -15,6 +16,12 @@ var (
 	tlsOptions = tlsconfig.Options{}
 	logLevel   = len(log.AllLevels) - 1
 	host       = defaultHost
+
+	// Version is the build release identifier.
+	Version = "Unspecified"
+
+	// Revision is the build source control revision.
+	Revision = "Unspecified"
 )
 
 func main() {
@@ -32,14 +39,22 @@ func main() {
 		},
 	}
 
+	cmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "print build version information",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("%s (revision %s)\n", Version, Revision)
+		},
+	})
+
 	var host string
 
-	cmd.PersistentFlags().StringVar(&host, "host", defaultHost, "Docker host")
-	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
-	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
-	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")
-	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
-	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
+	cmd.Flags().StringVar(&host, "host", defaultHost, "Docker host")
+	cmd.Flags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
+	cmd.Flags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
+	cmd.Flags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")
+	cmd.Flags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
+	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	cmd.AddCommand(runCommand(), elbCommand(), albCommand(), dockerCommand())
 

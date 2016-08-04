@@ -184,21 +184,14 @@ func runCommand() *cobra.Command {
 	cmd.Flags().StringVar(&elbOptions.Region, "region", "", "Region")
 	cmd.Flags().StringVar(&elbConfig, "config", "/var/lib/docker/swarm/elb.config", "Loadbalancer config")
 
-	cmd.Flags().IntVar(&albOptions.PollingDelay,
-		"polling_delay", 5, "Polling delay")
-	cmd.Flags().StringVar(&albOptions.Environment,
-		"environment", "", "environment")
-	cmd.Flags().StringVar(&albOptions.OAuthClientID,
-		"oauth_client_id", "", "OAuth client ID")
+	cmd.Flags().IntVar(&albOptions.PollingDelay, "polling_delay", 5, "Polling delay")
+	cmd.Flags().StringVar(&albOptions.Environment, "environment", "", "environment")
+	cmd.Flags().StringVar(&albOptions.OAuthClientID, "oauth_client_id", "", "OAuth client ID")
 
-	cmd.Flags().StringVar(&albOptions.ADClientID,
-		"ad_app_id", "", "AD app ID")
-	cmd.Flags().StringVar(&albOptions.ADClientSecret,
-		"ad_app_secret", "", "AD app secret")
-	cmd.Flags().StringVar(&albOptions.SubscriptionID,
-		"subscription_id", "", "subscription ID")
-	cmd.Flags().StringVar(&albOptions.ResourceGroupName,
-		"resource_group", "", "resource group name")
+	cmd.Flags().StringVar(&albOptions.ADClientID, "ad_app_id", "", "AD app ID")
+	cmd.Flags().StringVar(&albOptions.ADClientSecret, "ad_app_secret", "", "AD app secret")
+	cmd.Flags().StringVar(&albOptions.SubscriptionID, "subscription_id", "", "subscription ID")
+	cmd.Flags().StringVar(&albOptions.ResourceGroupName, "resource_group", "", "resource group name")
 
 	cmd.Flags().BoolVar(&doHealthCheck, "health_check", doHealthCheck,
 		"True to enable auto config ELB health check.")
