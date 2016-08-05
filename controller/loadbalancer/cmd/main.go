@@ -49,12 +49,12 @@ func main() {
 
 	var host string
 
-	cmd.Flags().StringVar(&host, "host", defaultHost, "Docker host")
-	cmd.Flags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
-	cmd.Flags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
-	cmd.Flags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")
-	cmd.Flags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
-	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
+	cmd.PersistentFlags().StringVar(&host, "host", defaultHost, "Docker host")
+	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
+	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
+	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")
+	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
+	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	cmd.AddCommand(runCommand(), elbCommand(), albCommand(), dockerCommand())
 

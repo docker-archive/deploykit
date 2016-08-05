@@ -16,6 +16,8 @@ var (
 		azure.USGovernmentCloud.Name: azure.USGovernmentCloud,
 		azure.ChinaCloud.Name:        azure.ChinaCloud,
 	}
+
+	DefaultEnvironment = azure.PublicCloud.Name
 )
 
 // NewCredential allocates a credential

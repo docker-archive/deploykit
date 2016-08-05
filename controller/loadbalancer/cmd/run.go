@@ -37,6 +37,7 @@ func runCommand() *cobra.Command {
 	}
 
 	driver := "aws"
+	defaultLBName := ""
 
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -104,6 +105,11 @@ func runCommand() *cobra.Command {
 						log.Warningln("Error parsing config:", err)
 					}
 
+					if defaultLBName != "" {
+						mapping["default"] = defaultLBName
+						log.Infoln("Default LB name override to", defaultLBName)
+					}
+
 					log.Infoln("ELB mapping:", mapping)
 
 					// Must return unique instances and not multiple instances with same name
@@ -140,7 +146,7 @@ func runCommand() *cobra.Command {
 									continue
 								}
 
-								v, err = azure.NewLoadBalancerDriver(client, albOptions.ResourceGroupName, elbName)
+								v, err = azure.NewLoadBalancerDriver(client, *albOptions, albOptions.ResourceGroupName, elbName)
 								if err != nil {
 									log.Warningln("Cannot create provisioner for", elbName)
 									continue
@@ -185,6 +191,7 @@ func runCommand() *cobra.Command {
 	cmd.Flags().StringVar(&elbConfig, "config", "/var/lib/docker/swarm/elb.config", "Loadbalancer config")
 
 	cmd.Flags().IntVar(&albOptions.PollingDelay, "polling_delay", 5, "Polling delay")
+	cmd.Flags().IntVar(&albOptions.PollingDuration, "polling_duration", 30, "Polling duration in seconds")
 	cmd.Flags().StringVar(&albOptions.Environment, "environment", "", "environment")
 	cmd.Flags().StringVar(&albOptions.OAuthClientID, "oauth_client_id", "", "OAuth client ID")
 
@@ -192,6 +199,8 @@ func runCommand() *cobra.Command {
 	cmd.Flags().StringVar(&albOptions.ADClientSecret, "ad_app_secret", "", "AD app secret")
 	cmd.Flags().StringVar(&albOptions.SubscriptionID, "subscription_id", "", "subscription ID")
 	cmd.Flags().StringVar(&albOptions.ResourceGroupName, "resource_group", "", "resource group name")
+
+	cmd.Flags().StringVar(&defaultLBName, "default_lb_name", defaultLBName, "Set to override the name of the default LB")
 
 	cmd.Flags().BoolVar(&doHealthCheck, "health_check", doHealthCheck,
 		"True to enable auto config ELB health check.")

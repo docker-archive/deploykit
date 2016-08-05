@@ -17,13 +17,13 @@ var (
 
 // Options - options for Azure
 type Options struct {
-	Environment    string
-	SubscriptionID string
-	OAuthClientID  string // The app client id
-	PollingDelay   int
-
-	ADClientID     string // AD client app id
-	ADClientSecret string // AD client secret key
+	Environment     string
+	SubscriptionID  string
+	OAuthClientID   string // The app client id
+	PollingDelay    int    // The number of seconds to delay between polls
+	PollingDuration int    // The number of seconds to poll for async status before cancel
+	ADClientID      string // AD client app id
+	ADClientSecret  string // AD client secret key
 
 	ResourceGroupName string
 }
@@ -32,27 +32,19 @@ type albDriver struct {
 	client        *network.LoadBalancersClient
 	name          string
 	resourceGroup string
+	options       Options
 }
 
 // NewLoadBalancerDriver creates a load balancer driver
-func NewLoadBalancerDriver(client *network.LoadBalancersClient,
+func NewLoadBalancerDriver(client *network.LoadBalancersClient, opt Options,
 	resourceGroup, name string) (loadbalancer.Driver, error) {
 
 	return &albDriver{
 		client:        client,
 		name:          name,
 		resourceGroup: resourceGroup,
+		options:       opt,
 	}, nil
-}
-
-type autorestResp autorest.Response
-
-func (a autorestResp) String() string {
-	return fmt.Sprintf("%v", autorest.Response(a))
-}
-
-func wrap(a autorest.Response, e error) (loadbalancer.Result, error) {
-	return autorestResp(a), e
 }
 
 func (p *albDriver) Name() string {
@@ -87,16 +79,20 @@ func (p *albDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, erro
 	}
 
 	index := getRules(lb)
-	if len(index) == 0 {
-		return nil, ErrBadData
-	}
 
 	backendPool := getBackendPool(lb)
 	if backendPool == nil {
 		return nil, ErrBadData
 	}
 
-	rule := &network.LoadBalancingRule{}
+	frontendIPConfig := getFrontendIPConfig(lb)
+	if frontendIPConfig == nil {
+		return nil, ErrBadData
+	}
+
+	rule := &network.LoadBalancingRule{
+		Properties: &network.LoadBalancingRulePropertiesFormat{},
+	}
 	if _, has := index[route.LoadBalancerPort]; has {
 		rule = index[route.LoadBalancerPort]
 	} else {
@@ -113,6 +109,7 @@ func (p *albDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, erro
 	rule.Properties.FrontendPort = &frontendPort
 	rule.Properties.BackendPort = &backPort
 	rule.Properties.BackendAddressPool = backendPool
+	rule.Properties.FrontendIPConfiguration = frontendIPConfig
 
 	// TODO - this is tedious and not very flexible... the function signature does not allow for setting
 	// specific properties like 'EnableFloatingIP'.  Should implement this as template.
@@ -123,10 +120,11 @@ func (p *albDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, erro
 	for _, r := range index {
 		updated = append(updated, *r)
 	}
-
-	cancel := make(chan struct{})
 	lb.Properties.LoadBalancingRules = &updated
-	return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancel))
+
+	return callAsync(func() (loadbalancer.Result, error) {
+		return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancelAfterSeconds(p.options.PollingDuration)))
+	})
 }
 
 func (p *albDriver) Unpublish(extPort uint32) (loadbalancer.Result, error) {
@@ -144,10 +142,94 @@ func (p *albDriver) Unpublish(extPort uint32) (loadbalancer.Result, error) {
 	for _, r := range index {
 		filtered = append(filtered, *r)
 	}
-
-	cancel := make(chan struct{})
 	lb.Properties.LoadBalancingRules = &filtered
-	return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancel))
+
+	return callAsync(func() (loadbalancer.Result, error) {
+		return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancelAfterSeconds(p.options.PollingDuration)))
+	})
+}
+
+func cancelAfterSeconds(seconds int) chan struct{} {
+	cancel := make(chan struct{})
+	go func() {
+		timer := time.After(time.Duration(seconds) * time.Second)
+		<-timer
+		close(cancel)
+	}()
+	return cancel
+}
+
+func callAsync(f func() (loadbalancer.Result, error)) (loadbalancer.Result, error) {
+	done := make(chan interface{})
+	go func() {
+		result, err := f()
+		if err != nil {
+			done <- err
+		} else {
+			done <- result
+		}
+		close(done)
+	}()
+	return &asyncResponse{
+		done: done,
+	}, nil
+}
+
+type asyncResponse struct {
+	done <-chan interface{}
+}
+
+// String implements the Result interface (stringer)
+func (a asyncResponse) String() string {
+	// In this case we don't want to block (this may be called from a logging printf...
+	return "operation started"
+}
+
+// WaitFor allows the caller to actually block for the real result
+func WaitFor(result loadbalancer.Result, err error) (loadbalancer.Result, error) {
+	r, is := result.(*asyncResponse)
+	if !is {
+		return result, err // don't block
+	}
+	out := <-r.done // won't block if closed
+	switch out := out.(type) {
+	case loadbalancer.Result:
+		return out, nil
+	case error:
+		return nil, out
+	}
+	return result, err
+}
+
+type autorestResp autorest.Response
+
+func (a autorestResp) String() string {
+	return fmt.Sprintf("%v", autorest.Response(a))
+}
+
+func wrap(a autorest.Response, e error) (loadbalancer.Result, error) {
+	return autorestResp(a), e
+}
+
+func getFrontendIPConfig(lb *network.LoadBalancer) *network.SubResource {
+	if lb.Properties == nil {
+		return nil
+	}
+	if lb.Properties.FrontendIPConfigurations == nil {
+		return nil
+	}
+	for _, b := range *lb.Properties.FrontendIPConfigurations {
+		if b.Properties == nil {
+			continue
+		}
+		if b.ID == nil {
+			continue
+		}
+		return &network.SubResource{
+			ID: b.ID,
+		}
+	}
+	return nil
 }
 
 func getBackendPool(lb *network.LoadBalancer) *network.SubResource {
@@ -252,10 +334,11 @@ func (p *albDriver) ConfigureHealthCheck(backendPort uint32, healthy, unhealthy 
 	for _, r := range index {
 		updated = append(updated, *r)
 	}
-
-	cancel := make(chan struct{})
 	lb.Properties.Probes = &updated
-	return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancel))
+
+	return callAsync(func() (loadbalancer.Result, error) {
+		return wrap(p.client.CreateOrUpdate(p.resourceGroup, p.name, *lb, cancelAfterSeconds(p.options.PollingDuration)))
+	})
 }
 
 func (p *albDriver) RegisterBackend(id string, more ...string) (loadbalancer.Result, error) {
@@ -325,5 +408,6 @@ func CreateALBClient(cred *Credential, opt Options) (*network.LoadBalancersClien
 		})
 	}
 	c.PollingDelay = time.Second * time.Duration(opt.PollingDelay)
+
 	return &c, nil
 }
