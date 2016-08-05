@@ -281,7 +281,8 @@ const (
         ],
         "Placement": {
             "AvailabilityZone": "us-west-2a"
-        }
+        },
+        "UserData": "A string; which must && be base64 encoded"
     }
 }
 `
