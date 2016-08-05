@@ -138,7 +138,10 @@ func describeInstancesResponse(instanceIds [][]string, nextToken *string) *ec2.D
 	for _, ids := range instanceIds {
 		instances := []*ec2.Instance{}
 		for _, id := range ids {
-			instances = append(instances, &ec2.Instance{InstanceId: aws.String(id)})
+			instances = append(instances, &ec2.Instance{
+				InstanceId:       aws.String(id),
+				PrivateIpAddress: aws.String("127.0.0.1"),
+			})
 		}
 		reservations = append(reservations, &ec2.Reservation{Instances: instances})
 	}
@@ -146,7 +149,7 @@ func describeInstancesResponse(instanceIds [][]string, nextToken *string) *ec2.D
 	return &ec2.DescribeInstancesOutput{NextToken: nextToken, Reservations: reservations}
 }
 
-func TestDescribeGroupRequest(t *testing.T) {
+func TestDescribeInstancesRequest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -198,18 +201,18 @@ func TestListGroup(t *testing.T) {
 	)
 
 	provisioner := NewInstanceProvisioner(clientMock, testCluster)
-	ids, err := provisioner.ListGroup(group)
+	descriptions, err := provisioner.DescribeInstances(group)
 
 	require.NoError(t, err)
-	require.Equal(t, []instance.ID{
-		"a",
-		"b",
-		"c",
-		"d",
-		"e",
-		"f",
-		"g",
-	}, ids)
+	require.Equal(t, []instance.Description{
+		{ID: "a", PrivateIPAddress: "127.0.0.1"},
+		{ID: "b", PrivateIPAddress: "127.0.0.1"},
+		{ID: "c", PrivateIPAddress: "127.0.0.1"},
+		{ID: "d", PrivateIPAddress: "127.0.0.1"},
+		{ID: "e", PrivateIPAddress: "127.0.0.1"},
+		{ID: "f", PrivateIPAddress: "127.0.0.1"},
+		{ID: "g", PrivateIPAddress: "127.0.0.1"},
+	}, descriptions)
 }
 
 func expectDescribeInstance(t *testing.T, clientMock *mock_ec2.MockEC2API, id string, keyName string) *gomock.Call {

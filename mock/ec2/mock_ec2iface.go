@@ -1988,6 +1988,28 @@ func (_mr *_MockEC2APIRecorder) DescribeIdFormatRequest(arg0 interface{}) *gomoc
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeIdFormatRequest", arg0)
 }
 
+func (_m *MockEC2API) DescribeIdentityIdFormat(_param0 *ec2.DescribeIdentityIdFormatInput) (*ec2.DescribeIdentityIdFormatOutput, error) {
+	ret := _m.ctrl.Call(_m, "DescribeIdentityIdFormat", _param0)
+	ret0, _ := ret[0].(*ec2.DescribeIdentityIdFormatOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeIdentityIdFormat(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeIdentityIdFormat", arg0)
+}
+
+func (_m *MockEC2API) DescribeIdentityIdFormatRequest(_param0 *ec2.DescribeIdentityIdFormatInput) (*request.Request, *ec2.DescribeIdentityIdFormatOutput) {
+	ret := _m.ctrl.Call(_m, "DescribeIdentityIdFormatRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.DescribeIdentityIdFormatOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeIdentityIdFormatRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeIdentityIdFormatRequest", arg0)
+}
+
 func (_m *MockEC2API) DescribeImageAttribute(_param0 *ec2.DescribeImageAttributeInput) (*ec2.DescribeImageAttributeOutput, error) {
 	ret := _m.ctrl.Call(_m, "DescribeImageAttribute", _param0)
 	ret0, _ := ret[0].(*ec2.DescribeImageAttributeOutput)
@@ -2729,6 +2751,16 @@ func (_m *MockEC2API) DescribeSpotFleetRequests(_param0 *ec2.DescribeSpotFleetRe
 
 func (_mr *_MockEC2APIRecorder) DescribeSpotFleetRequests(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeSpotFleetRequests", arg0)
+}
+
+func (_m *MockEC2API) DescribeSpotFleetRequestsPages(_param0 *ec2.DescribeSpotFleetRequestsInput, _param1 func(*ec2.DescribeSpotFleetRequestsOutput, bool) bool) error {
+	ret := _m.ctrl.Call(_m, "DescribeSpotFleetRequestsPages", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeSpotFleetRequestsPages(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeSpotFleetRequestsPages", arg0, arg1)
 }
 
 func (_m *MockEC2API) DescribeSpotFleetRequestsRequest(_param0 *ec2.DescribeSpotFleetRequestsInput) (*request.Request, *ec2.DescribeSpotFleetRequestsOutput) {
@@ -3682,6 +3714,28 @@ func (_m *MockEC2API) ModifyIdFormatRequest(_param0 *ec2.ModifyIdFormatInput) (*
 
 func (_mr *_MockEC2APIRecorder) ModifyIdFormatRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ModifyIdFormatRequest", arg0)
+}
+
+func (_m *MockEC2API) ModifyIdentityIdFormat(_param0 *ec2.ModifyIdentityIdFormatInput) (*ec2.ModifyIdentityIdFormatOutput, error) {
+	ret := _m.ctrl.Call(_m, "ModifyIdentityIdFormat", _param0)
+	ret0, _ := ret[0].(*ec2.ModifyIdentityIdFormatOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) ModifyIdentityIdFormat(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ModifyIdentityIdFormat", arg0)
+}
+
+func (_m *MockEC2API) ModifyIdentityIdFormatRequest(_param0 *ec2.ModifyIdentityIdFormatInput) (*request.Request, *ec2.ModifyIdentityIdFormatOutput) {
+	ret := _m.ctrl.Call(_m, "ModifyIdentityIdFormatRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.ModifyIdentityIdFormatOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) ModifyIdentityIdFormatRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ModifyIdentityIdFormatRequest", arg0)
 }
 
 func (_m *MockEC2API) ModifyImageAttribute(_param0 *ec2.ModifyImageAttributeInput) (*ec2.ModifyImageAttributeOutput, error) {

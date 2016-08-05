@@ -4,8 +4,9 @@
 package sshutil
 
 import (
+	// This line is hand-edited to work around https://github.com/golang/mock/issues/30
 	gomock "github.com/golang/mock/gomock"
-	ssh "golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh"
 )
 
 // Mock of CommandRunner interface

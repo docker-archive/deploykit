@@ -21,24 +21,12 @@ var (
 	d     = instance.ID("d")
 )
 
-func TestInvalidRequest(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	requireFailsWithRequest := func(request string) {
-		scaler, err := NewFixedScaler(
-			1*time.Millisecond,
-			mock_instance.NewMockProvisioner(ctrl),
-			request,
-			uint(3),
-		)
-		require.Error(t, err)
-		require.Nil(t, scaler)
+func desc(ids []instance.ID) []instance.Description {
+	descriptions := []instance.Description{}
+	for _, id := range ids {
+		descriptions = append(descriptions, instance.Description{ID: id})
 	}
-
-	requireFailsWithRequest("")
-	requireFailsWithRequest("{}")
-	requireFailsWithRequest(`{"Group": ""`)
+	return descriptions
 }
 
 func TestScaleUp(t *testing.T) {
@@ -55,15 +43,15 @@ func TestScaleUp(t *testing.T) {
 	require.NoError(t, err)
 
 	gomock.InOrder(
-		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b, c}, nil),
-		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b, c}, nil),
-		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b}, nil),
+		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b, c}), nil),
+		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b, c}), nil),
+		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b}), nil),
 		provisioner.EXPECT().Provision(testRequest).Return(&d, nil),
-		provisioner.EXPECT().ListGroup(group).Do(func(_ instance.GroupID) {
+		provisioner.EXPECT().DescribeInstances(group).Do(func(_ instance.GroupID) {
 			go scaler.Stop()
-		}).Return([]instance.ID{a, b, c}, nil),
-		// Allow subsequent calls to ListGroup() to mitigate ordering flakiness of async Stop() call.
-		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{a, b, c, d}, nil).AnyTimes(),
+		}).Return(desc([]instance.ID{a, b, c}), nil),
+		// Allow subsequent calls to DescribeInstances() to mitigate ordering flakiness of async Stop() call.
+		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b, c, d}), nil).AnyTimes(),
 	)
 
 	scaler.Run()
@@ -82,18 +70,14 @@ func TestScaleDown(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	a := instance.ID("a")
-	b := instance.ID("b")
-	c := instance.ID("c")
-
 	gomock.InOrder(
-		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{c, b}, nil),
-		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{c, a, d, b}, nil),
-		provisioner.EXPECT().ListGroup(group).Do(func(_ instance.GroupID) {
+		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{c, b}), nil),
+		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{c, a, d, b}), nil),
+		provisioner.EXPECT().DescribeInstances(group).Do(func(_ instance.GroupID) {
 			go scaler.Stop()
-		}).Return([]instance.ID{a, b}, nil),
-		// Allow subsequent calls to ListGroup() to mitigate ordering flakiness of async Stop() call.
-		provisioner.EXPECT().ListGroup(group).Return([]instance.ID{c, d}, nil).AnyTimes(),
+		}).Return(desc([]instance.ID{a, b}), nil),
+		// Allow subsequent calls to DescribeInstances() to mitigate ordering flakiness of async Stop() call.
+		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{c, d}), nil).AnyTimes(),
 	)
 
 	provisioner.EXPECT().Destroy(a).Return(nil)
