@@ -17,6 +17,7 @@ var (
 		azure.ChinaCloud.Name:        azure.ChinaCloud,
 	}
 
+	// DefaultEnvironment assumed environment - for use by CLI or other clients to avoid import azure packages
 	DefaultEnvironment = azure.PublicCloud.Name
 )
 

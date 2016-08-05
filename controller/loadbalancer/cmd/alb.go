@@ -27,7 +27,7 @@ func albCommand() *cobra.Command {
 	}
 	cmd.PersistentFlags().IntVar(&albOptions.PollingDelay, "polling_delay", 5, "Polling delay")
 	cmd.PersistentFlags().IntVar(&albOptions.PollingDuration, "polling_duration", 30, "Polling duration")
-	cmd.PersistentFlags().StringVar(&albOptions.Environment, "environment", "", "environment")
+	cmd.PersistentFlags().StringVar(&albOptions.Environment, "environment", azure.DefaultEnvironment, "environment")
 	cmd.PersistentFlags().StringVar(&albOptions.OAuthClientID, "oauth_client_id", "", "OAuth client ID")
 	cmd.PersistentFlags().StringVar(&albOptions.SubscriptionID, "subscription_id", "", "subscription ID")
 	cmd.PersistentFlags().StringVar(&albOptions.ResourceGroupName, "resource_group", "", "resource group name")

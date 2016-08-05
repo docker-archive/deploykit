@@ -192,7 +192,7 @@ func runCommand() *cobra.Command {
 
 	cmd.Flags().IntVar(&albOptions.PollingDelay, "polling_delay", 5, "Polling delay")
 	cmd.Flags().IntVar(&albOptions.PollingDuration, "polling_duration", 30, "Polling duration in seconds")
-	cmd.Flags().StringVar(&albOptions.Environment, "environment", "", "environment")
+	cmd.Flags().StringVar(&albOptions.Environment, "environment", azure.DefaultEnvironment, "environment")
 	cmd.Flags().StringVar(&albOptions.OAuthClientID, "oauth_client_id", "", "OAuth client ID")
 
 	cmd.Flags().StringVar(&albOptions.ADClientID, "ad_app_id", "", "AD app ID")
