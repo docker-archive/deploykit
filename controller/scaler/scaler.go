@@ -1,21 +1,13 @@
 package scaler
 
 import (
-	"encoding/json"
-	"errors"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/controller/util"
 	"github.com/docker/libmachete/spi/instance"
 	"sort"
 	"sync"
 	"time"
 )
-
-// RunStop is an operation that may be Run (synchronously) and interrupted by calling Stop.
-type RunStop interface {
-	Run()
-
-	Stop()
-}
 
 type scaler struct {
 	pollInterval     time.Duration
@@ -36,53 +28,48 @@ func NewFixedScaler(
 	pollInterval time.Duration,
 	provisioner instance.Provisioner,
 	request string,
-	count uint) (RunStop, error) {
+	count uint) (util.RunStop, error) {
 
-	req := provisionRequest{}
-	err := json.Unmarshal([]byte(request), &req)
+	group, err := util.GroupFromRequest(request)
 	if err != nil {
 		return nil, err
-	}
-
-	if req.Group == "" {
-		return nil, errors.New("Group must not be empty")
 	}
 
 	return &scaler{
 		pollInterval:     pollInterval,
 		provisioner:      provisioner,
 		provisionRequest: request,
-		group:            req.Group,
+		group:            *group,
 		count:            count,
 		stop:             make(chan bool),
 	}, nil
 }
 
-type naturalSort []instance.ID
+type sortByID []instance.Description
 
-func (n naturalSort) Len() int {
+func (n sortByID) Len() int {
 	return len(n)
 }
 
-func (n naturalSort) Swap(i, j int) {
+func (n sortByID) Swap(i, j int) {
 	n[i], n[j] = n[j], n[i]
 }
 
-func (n naturalSort) Less(i, j int) bool {
-	return n[i] < n[j]
+func (n sortByID) Less(i, j int) bool {
+	return n[i].ID < n[j].ID
 }
 
 func (s *scaler) checkState() {
 	log.Debugf("Checking instance count for group %s", s.group)
-	instances, err := s.provisioner.ListGroup(s.group)
+	descriptions, err := s.provisioner.DescribeInstances(s.group)
 	if err != nil {
 		log.Infof("Failed to check count of %s: %s", s.group, err)
 		return
 	}
 
-	log.Debugf("Found existing instances: %v", instances)
+	log.Debugf("Found existing instances: %v", descriptions)
 
-	actualCount := uint(len(instances))
+	actualCount := uint(len(descriptions))
 
 	switch {
 	case actualCount == s.count:
@@ -93,14 +80,14 @@ func (s *scaler) checkState() {
 		log.Infof("Removing %d instances from group %s to reach desired %d", remove, s.group, s.count)
 
 		// Sorting first ensures that redundant operations are non-destructive.
-		sort.Sort(naturalSort(instances))
+		sort.Sort(sortByID(descriptions))
 
-		toRemove := instances[:remove]
+		toRemove := descriptions[:remove]
 
 		group := sync.WaitGroup{}
-		for _, instance := range toRemove {
+		for _, description := range toRemove {
 			group.Add(1)
-			destroyID := instance
+			destroyID := description.ID
 			go func() {
 				defer group.Done()
 

@@ -175,16 +175,19 @@ func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken 
 	}
 }
 
-func (p Provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.ID, error) {
+func (p Provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.Description, error) {
 	result, err := p.Client.DescribeInstances(describeGroupRequest(p.Cluster, group, nextToken))
 	if err != nil {
 		return nil, err
 	}
 
-	ids := []instance.ID{}
+	descriptions := []instance.Description{}
 	for _, reservation := range result.Reservations {
 		for _, ec2Instance := range reservation.Instances {
-			ids = append(ids, instance.ID(*ec2Instance.InstanceId))
+			descriptions = append(descriptions, instance.Description{
+				ID:               instance.ID(*ec2Instance.InstanceId),
+				PrivateIPAddress: *ec2Instance.PrivateIpAddress,
+			})
 		}
 	}
 
@@ -195,14 +198,14 @@ func (p Provisioner) describeInstances(group instance.GroupID, nextToken *string
 			return nil, err
 		}
 
-		ids = append(ids, remainingPages...)
+		descriptions = append(descriptions, remainingPages...)
 	}
 
-	return ids, nil
+	return descriptions, nil
 }
 
-// ListGroup returns all instances included in a group.
-func (p Provisioner) ListGroup(group instance.GroupID) ([]instance.ID, error) {
+// DescribeInstances implements instance.Provisioner.DescribeInstances.
+func (p Provisioner) DescribeInstances(group instance.GroupID) ([]instance.Description, error) {
 	return p.describeInstances(group, nil)
 }
 

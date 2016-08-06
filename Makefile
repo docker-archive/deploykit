@@ -14,7 +14,7 @@ endif
 .DEFAULT: all
 all: fmt vet lint build test
 
-ci: fmt vet lint vendor-check coverage
+ci: fmt vet lint vendor-sync vendor-check coverage
 
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
@@ -83,4 +83,4 @@ vendor-save: check-govendor
 
 vendor-check:
 	@echo "+ $@"
-	@if [ `govendor status` ]; then echo 'Please address dependency issues'; exit 1; fi
+	@test -z "$$(govendor status | tee /dev/stderr)"

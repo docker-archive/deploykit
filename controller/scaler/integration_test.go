@@ -43,7 +43,10 @@ func (e *fakeEc2) DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeI
 	instances := []*ec2.Instance{}
 	for _, id := range e.instanceIds {
 		copy := id
-		instances = append(instances, &ec2.Instance{InstanceId: &copy, KeyName: aws.String("key")})
+		instances = append(instances, &ec2.Instance{
+			InstanceId: &copy, KeyName: aws.String("key"),
+			PrivateIpAddress: aws.String("10.0.0.3"),
+		})
 	}
 
 	return &ec2.DescribeInstancesOutput{Reservations: []*ec2.Reservation{{Instances: instances}}}, nil

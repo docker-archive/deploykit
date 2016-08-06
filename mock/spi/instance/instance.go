@@ -29,6 +29,17 @@ func (_m *MockProvisioner) EXPECT() *_MockProvisionerRecorder {
 	return _m.recorder
 }
 
+func (_m *MockProvisioner) DescribeInstances(_param0 instance.GroupID) ([]instance.Description, error) {
+	ret := _m.ctrl.Call(_m, "DescribeInstances", _param0)
+	ret0, _ := ret[0].([]instance.Description)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockProvisionerRecorder) DescribeInstances(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeInstances", arg0)
+}
+
 func (_m *MockProvisioner) Destroy(_param0 instance.ID) error {
 	ret := _m.ctrl.Call(_m, "Destroy", _param0)
 	ret0, _ := ret[0].(error)
@@ -37,17 +48,6 @@ func (_m *MockProvisioner) Destroy(_param0 instance.ID) error {
 
 func (_mr *_MockProvisionerRecorder) Destroy(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
-}
-
-func (_m *MockProvisioner) ListGroup(_param0 instance.GroupID) ([]instance.ID, error) {
-	ret := _m.ctrl.Call(_m, "ListGroup", _param0)
-	ret0, _ := ret[0].([]instance.ID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-func (_mr *_MockProvisionerRecorder) ListGroup(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListGroup", arg0)
 }
 
 func (_m *MockProvisioner) Provision(_param0 string) (*instance.ID, error) {
