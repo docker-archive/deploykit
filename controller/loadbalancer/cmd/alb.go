@@ -1,12 +1,22 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/provider/azure"
 	"github.com/docker/libmachete/spi/loadbalancer"
 	"github.com/spf13/cobra"
 )
+
+func printJSON(obj interface{}) error {
+	buff, err := json.MarshalIndent(obj, "  ", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(buff))
+	return nil
+}
 
 func albCommand() *cobra.Command {
 	albOptions := azure.Options{}
@@ -15,13 +25,14 @@ func albCommand() *cobra.Command {
 		Use:   "alb",
 		Short: "Ops on the ALB (Azure Load Balancer)",
 	}
-	cmd.Flags().IntVar(&albOptions.PollingDelay, "polling_delay", 5, "Polling delay")
-	cmd.Flags().StringVar(&albOptions.Environment, "environment", "", "environment")
-	cmd.Flags().StringVar(&albOptions.OAuthClientID, "oauth_client_id", "", "OAuth client ID")
-	cmd.Flags().StringVar(&albOptions.SubscriptionID, "subscription_id", "", "subscription ID")
-	cmd.Flags().StringVar(&albOptions.ResourceGroupName, "resource_group", "", "resource group name")
-	cmd.Flags().StringVar(&albOptions.ADClientID, "ad_app_id", "", "AD app ID")
-	cmd.Flags().StringVar(&albOptions.ADClientSecret, "ad_app_secret", "", "AD app secret")
+	cmd.PersistentFlags().IntVar(&albOptions.PollingDelaySeconds, "polling_delay", 5, "Polling delay")
+	cmd.PersistentFlags().IntVar(&albOptions.PollingDurationSeconds, "polling_duration", 30, "Polling duration")
+	cmd.PersistentFlags().StringVar(&albOptions.Environment, "environment", azure.DefaultEnvironment, "environment")
+	cmd.PersistentFlags().StringVar(&albOptions.OAuthClientID, "oauth_client_id", "", "OAuth client ID")
+	cmd.PersistentFlags().StringVar(&albOptions.SubscriptionID, "subscription_id", "", "subscription ID")
+	cmd.PersistentFlags().StringVar(&albOptions.ResourceGroupName, "resource_group", "", "resource group name")
+	cmd.PersistentFlags().StringVar(&albOptions.ADClientID, "ad_app_id", "", "AD app ID")
+	cmd.PersistentFlags().StringVar(&albOptions.ADClientSecret, "ad_app_secret", "", "AD app secret")
 
 	describeCmd := &cobra.Command{
 		Use:   "describe",
@@ -43,7 +54,7 @@ func albCommand() *cobra.Command {
 				return err
 			}
 
-			p, err := azure.NewLoadBalancerDriver(client, albOptions.ResourceGroupName, name)
+			p, err := azure.NewLoadBalancerDriver(client, albOptions, name)
 			if err != nil {
 				return err
 			}
@@ -52,8 +63,7 @@ func albCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(routes)
-			return nil
+			return printJSON(routes)
 		},
 	}
 
@@ -81,21 +91,21 @@ func albCommand() *cobra.Command {
 				return err
 			}
 
-			p, err := azure.NewLoadBalancerDriver(client, albOptions.ResourceGroupName, name)
+			p, err := azure.NewLoadBalancerDriver(client, albOptions, name)
 			if err != nil {
 				return err
 			}
 
-			result, err := p.Publish(loadbalancer.Route{
+			result, err := azure.WaitFor(p.Publish(loadbalancer.Route{
 				Port:             publishOptions.BackendPort,
 				Protocol:         loadbalancer.ProtocolFromString(publishOptions.Protocol),
 				LoadBalancerPort: publishOptions.ExtPort,
-			})
+			}))
 			if err != nil {
 				return err
 			}
-			fmt.Println(result)
-			return nil
+
+			return printJSON(result)
 		},
 	}
 	publishCmd.Flags().Uint32Var(&publishOptions.ExtPort, "ext_port", 80, "External port")
@@ -121,17 +131,17 @@ func albCommand() *cobra.Command {
 				return err
 			}
 
-			p, err := azure.NewLoadBalancerDriver(client, albOptions.ResourceGroupName, name)
+			p, err := azure.NewLoadBalancerDriver(client, albOptions, name)
 			if err != nil {
 				return err
 			}
 
-			result, err := p.Unpublish(unpublishPort)
+			result, err := azure.WaitFor(p.Unpublish(unpublishPort))
 			if err != nil {
 				return err
 			}
-			fmt.Println(result)
-			return nil
+
+			return printJSON(result)
 		},
 	}
 	unpublishCmd.Flags().Uint32Var(&unpublishPort, "ext_port", unpublishPort, "External port")
