@@ -14,7 +14,7 @@ REVISION=$(shell git rev-list -1 HEAD)
 
 # Docker image to build
 DOCKER_REPO?=docker4x/controller
-DOCKER_TAG?=azure-v1.12.0-beta4
+DOCKER_TAG?=dev
 DOCKER_IMAGE=${DOCKER_REPO}:${DOCKER_TAG}
 
 

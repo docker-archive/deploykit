@@ -146,7 +146,7 @@ func runCommand() *cobra.Command {
 									continue
 								}
 
-								v, err = azure.NewLoadBalancerDriver(client, *albOptions, albOptions.ResourceGroupName, elbName)
+								v, err = azure.NewLoadBalancerDriver(client, *albOptions, elbName)
 								if err != nil {
 									log.Warningln("Cannot create provisioner for", elbName)
 									continue
@@ -190,8 +190,8 @@ func runCommand() *cobra.Command {
 	cmd.Flags().StringVar(&elbOptions.Region, "region", "", "Region")
 	cmd.Flags().StringVar(&elbConfig, "config", "/var/lib/docker/swarm/elb.config", "Loadbalancer config")
 
-	cmd.Flags().IntVar(&albOptions.PollingDelay, "polling_delay", 5, "Polling delay")
-	cmd.Flags().IntVar(&albOptions.PollingDuration, "polling_duration", 30, "Polling duration in seconds")
+	cmd.Flags().IntVar(&albOptions.PollingDelaySeconds, "polling_delay", 5, "Polling delay in seconds")
+	cmd.Flags().IntVar(&albOptions.PollingDurationSeconds, "polling_duration", 30, "Polling duration in seconds")
 	cmd.Flags().StringVar(&albOptions.Environment, "environment", azure.DefaultEnvironment, "environment")
 	cmd.Flags().StringVar(&albOptions.OAuthClientID, "oauth_client_id", "", "OAuth client ID")
 
