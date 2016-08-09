@@ -32,7 +32,7 @@ func run(port uint, dockerSocket string) {
 				w.Write([]byte(err.Error()))
 			}
 
-			cli, err := client.NewClient(fmt.Sprintf("unix://%s", dockerSocket), "v1.22", nil, map[string]string{})
+			cli, err := client.NewClient(fmt.Sprintf("unix://%s", dockerSocket), "v1.24", nil, map[string]string{})
 			if err != nil {
 				sendError(http.StatusBadGateway, err)
 				return
