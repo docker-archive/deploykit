@@ -1,4 +1,6 @@
 #!/bin/bash
+#
+# This is a script intended to be injected into boot-time 'user data' for a Docker Swarm worker instance.
 
 set -o errexit
 set -o nounset
