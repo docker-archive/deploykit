@@ -3,12 +3,10 @@ package main
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	docker_client "github.com/docker/engine-api/client"
 	"github.com/docker/libmachete/client"
 	"github.com/docker/libmachete/controller/scaler"
-	"github.com/docker/libmachete/controller/util/swarm"
+	"github.com/docker/libmachete/controller/util/cli"
 	"github.com/spf13/cobra"
-	"golang.org/x/net/context"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -37,88 +35,53 @@ func main() {
 		},
 	})
 
-	var dockerSocket string
-	var pollInterval time.Duration
-	runCmd := cobra.Command{
-		Use: "run <machete address> <target count> <config path>",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 3 {
-				cmd.Usage()
-				return
+	runCmd := cobra.Command{Use: "run <machete address> <target count> <config path>"}
+
+	runWhenLeading := cli.LeaderCmd(runCmd)
+
+	runCmd.Run = func(cmd *cobra.Command, args []string) {
+		if len(args) != 3 {
+			cmd.Usage()
+			return
+		}
+
+		macheteAddress := args[0]
+
+		targetCount, err := strconv.ParseUint(args[1], 10, 32)
+		if err != nil {
+			log.Error("Invalid target count", err)
+			os.Exit(1)
+		}
+
+		configPath := args[2]
+
+		requestData, err := ioutil.ReadFile(configPath)
+		if err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
+
+		instanceWatcher, err := scaler.NewFixedScaler(
+			5*time.Second,
+			client.NewInstanceProvisioner(macheteAddress),
+			string(requestData),
+			uint(targetCount))
+		if err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
+
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for range c {
+				log.Info("Stopping scaler")
+				instanceWatcher.Stop()
 			}
+		}()
 
-			macheteAddress := args[0]
-
-			targetCount, err := strconv.ParseUint(args[1], 10, 32)
-			if err != nil {
-				log.Error("Invalid target count", err)
-				os.Exit(1)
-			}
-
-			configPath := args[2]
-
-			requestData, err := ioutil.ReadFile(configPath)
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			instanceWatcher, err := scaler.NewFixedScaler(
-				5*time.Second,
-				client.NewInstanceProvisioner(macheteAddress),
-				string(requestData),
-				uint(targetCount))
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			c := make(chan os.Signal, 1)
-			signal.Notify(c, os.Interrupt)
-			go func() {
-				for range c {
-					log.Info("Stopping scaler")
-					instanceWatcher.Stop()
-				}
-			}()
-
-			dockerClient, err := docker_client.NewClient(
-				fmt.Sprintf("unix://%s", dockerSocket),
-				"v1.24",
-				nil,
-				map[string]string{})
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			err = swarm.RunWhenLeading(
-				context.Background(),
-				dockerClient,
-				pollInterval,
-				func() {
-					go instanceWatcher.Run()
-				},
-				func() {
-					instanceWatcher.Stop()
-				})
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-		},
+		runWhenLeading(instanceWatcher)
 	}
-	runCmd.Flags().StringVar(&dockerSocket, "docker-socket", "/var/run/docker.sock", "Docker daemon socket path")
-	runCmd.Flags().DurationVar(
-		&pollInterval,
-		"poll-interval",
-		5*time.Second,
-		"How often to poll for local Docker Engine leadership status")
 
 	rootCmd.AddCommand(&runCmd)
 
