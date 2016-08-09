@@ -85,17 +85,17 @@ func (p Provisioner) Provision(req string) (*instance.ID, error) {
 		return nil, spi.NewError(spi.ErrBadInput, "'group' field must not be blank")
 	}
 
-	keyName := fmt.Sprintf("machete-%s", randomString(5))
+	request.RunInstancesInput.MinCount = aws.Int64(1)
+	request.RunInstancesInput.MaxCount = aws.Int64(1)
+	request.RunInstancesInput.KeyName = aws.String(fmt.Sprintf("machete-%s", randomString(5)))
 
-	result, err := p.Client.CreateKeyPair(&ec2.CreateKeyPairInput{KeyName: aws.String(keyName)})
+	result, err := p.Client.CreateKeyPair(&ec2.CreateKeyPairInput{KeyName: request.RunInstancesInput.KeyName})
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO(wfarner): Need to re-evaluate code paths where keys should be
-	// deleted.
-
-	err = p.KeyStore.Write(keyName, []byte(*result.KeyMaterial))
+	// TODO(wfarner): Need to re-evaluate code paths where keys should be deleted.
+	err = p.KeyStore.Write(*request.RunInstancesInput.KeyName, []byte(*result.KeyMaterial))
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (p Provisioner) Provision(req string) (*instance.ID, error) {
 	if err != nil {
 		// TODO(wfarner): Need to disambiguate between error types.  If there is uncertainty over whether the
 		// instance was _actually_ created, we should not delete the key.
-		p.KeyStore.Delete(keyName)
+		p.KeyStore.Delete(*request.RunInstancesInput.KeyName)
 		return nil, err
 	}
 
