@@ -1,8 +1,15 @@
 package aws
 
-import "math/rand"
+import (
+	"math/rand"
+	"time"
+)
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+}
 
 func randomString(length int) string {
 	b := make([]byte, length)
