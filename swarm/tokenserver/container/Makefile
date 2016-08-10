@@ -1,9 +1,10 @@
 VERSION?=0.0-snapshot
 REVISION=$(shell git rev-list -1 HEAD)
 
-DOCKER_REPO?="docker4x/tokenserver"
-DOCKER_TAG?="dev"
-DOCKER_IMAGE=$(DOCKER_REPO):$(DOCKER_TAG)
+DOCKER_REPO_OWNER?=machete
+DOCKER_REPO?=${DOCKER_REPO_OWNER}/tokenserver
+DOCKER_TAG?=dev
+DOCKER_IMAGE=${DOCKER_REPO}:${DOCKER_TAG}
 
 .PHONY: clean container
 
@@ -17,3 +18,9 @@ container: clean
 	cd ../../.. && LDFLAGS="-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" \
 	  ./scripts/build-in-docker swarm/tokenserver/main.go swarm/tokenserver/container/bin/tokenserver
 	docker build -t $(DOCKER_IMAGE) -t $(DOCKER_REPO):latest -t $(DOCKER_REPO):$(VERSION) .
+ifeq (${DOCKER_PUSH},true)
+	docker push ${DOCKER_IMAGE}
+ifeq (${DOCKER_TAG_LATEST},true)
+	docker push ${DOCKER_REPO}:latest
+endif
+endif

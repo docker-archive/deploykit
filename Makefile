@@ -10,7 +10,7 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test vendor-sync vendor-add
+.PHONY: clean all fmt vet lint build test vendor-sync containers
 .DEFAULT: all
 all: fmt vet lint build test
 
@@ -84,3 +84,11 @@ vendor-save: check-govendor
 vendor-check:
 	@echo "+ $@"
 	@test -z "$$(govendor status | tee /dev/stderr)"
+
+containers:
+	@echo "+ $@"
+	cd controller/loadbalancer/container && make container
+	cd controller/quorum/container && make container
+	cd controller/scaler/container && make container
+	cd swarm/swarmboot/container && make container
+	cd swarm/tokenserver/container && make container
