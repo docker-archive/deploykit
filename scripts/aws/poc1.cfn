@@ -380,7 +380,8 @@
                     {"IpProtocol" : "tcp", "FromPort" : "2377", "ToPort" : "2377", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "NodeVpcSG", "GroupId" ] } },
                     {"IpProtocol" : "udp", "FromPort" : "4789", "ToPort" : "4789", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "NodeVpcSG", "GroupId" ] } },
                     {"IpProtocol" : "tcp", "FromPort" : "7946", "ToPort" : "7946", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "NodeVpcSG", "GroupId" ] } },
-                    {"IpProtocol" : "udp", "FromPort" : "7946", "ToPort" : "7946", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "NodeVpcSG", "GroupId" ] } }
+                    {"IpProtocol" : "udp", "FromPort" : "7946", "ToPort" : "7946", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "NodeVpcSG", "GroupId" ] } },
+                    {"IpProtocol" : "tcp", "FromPort" : "8889", "ToPort" : "8889", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "Vpc", "DefaultSecurityGroup" ] } }
                 ]
             }
         },
@@ -454,6 +455,14 @@
                                 "-v /etc/group:/etc/group:ro ",
                                 "docker4x/shell-aws:$DOCKER_FOR_IAAS_VERSION\n",
 
+                                "docker run --detach --name=swarm_boot ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "wfarner/swarmboot init\n",
+
+                                "docker run --restart=always -d --publish 8889:8889 --name=token_server ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "wfarner/tokenserver run\n",
+
                                 "docker run --restart=always -d --name=editions_controller ",
                                 "-v /var/run/docker.sock:/var/run/docker.sock ",
                                 "-v /var/lib/docker/swarm:/var/lib/docker/swarm ",
@@ -465,6 +474,154 @@
             }
         },
 
+        "Manager2" : {
+            "DependsOn" : ["PubSubnet1RouteTableAssociation", "ManagerVpcSG"],
+            "Type" : "AWS::EC2::Instance",
+            "Properties" : {
+                "AvailabilityZone" : { "Fn::GetAtt" : [ "PubSubnetAz1", "AvailabilityZone" ] },
+                "InstanceType": {"Ref" : "ManagerInstanceType"},
+                "IamInstanceProfile" : { "Ref" : "ManagerInstanceProfile" },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Fn::FindInMap": ["AWSRegionArch2AMI", {
+                        "Ref": "AWS::Region"
+                    }, {
+                        "Fn::FindInMap": ["AWSInstanceType2Arch", {"Ref" : "ManagerInstanceType"}, "Arch"]
+                    }]
+                },
+                "NetworkInterfaces" : [
+                    {
+                        "AssociatePublicIpAddress": true,
+                        "SubnetId" : { "Ref" : "PubSubnetAz1" },
+                        "GroupSet": [ { "Ref" : "ManagerVpcSG"}, { "Ref" : "SwarmSG"} ],
+                        "DeviceIndex": "0"
+                    }
+                ],
+                "Monitoring" : true,
+                "Tags" : [
+                    {"Key" : "Name", "Value" : {"Fn::Join" : [ "", [{ "Ref" : "AWS::StackName"}, "-manager2"]] }},
+                    { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName"} }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "", [
+                                "#!/bin/sh\n",
+                                "echo \"", {"Ref": "ExternalLoadBalancer"}, "\" > /var/lib/docker/swarm/lb_name\n",
+                                "echo \"# hostname : ELB_name\" >> /var/lib/docker/swarm/elb.config\n",
+                                "echo \"default: ", {"Ref": "ExternalLoadBalancer"}, "\" >> /var/lib/docker/swarm/elb.config\n",
+                                "export DOCKER_FOR_IAAS_VERSION='", { "Fn::FindInMap" : [ "DockerForAWS", "version", "forAws" ] }, "'\n",
+                                "chown -R docker /home/docker/\n",
+                                "chgrp -R docker /home/docker/\n",
+                                "sleep 5\n",
+
+                                "docker run --restart=always -d -p 22:22 ",
+                                "-v /home/docker/:/home/docker/ ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "-v /var/lib/docker/swarm/lb_name:/var/lib/docker/swarm/lb_name:ro ",
+                                "-v /var/lib/docker/swarm/elb.config:/var/lib/docker/swarm/elb.config ",
+                                "-v /usr/bin/docker:/usr/bin/docker ",
+                                "-v /var/log:/var/log ",
+                                "-v /etc/passwd:/etc/passwd:ro ",
+                                "-v /etc/shadow:/etc/shadow:ro ",
+                                "-v /etc/group:/etc/group:ro ",
+                                "docker4x/shell-aws:$DOCKER_FOR_IAAS_VERSION\n",
+
+                                "docker run --detach --name=swarm_boot ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "wfarner/swarmboot join ", { "Fn::GetAtt" : [ "Manager1", "PrivateIp" ] },"\n",
+
+                                "docker run --restart=always -d  --name=token_server ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "wfarner/tokenserver run\n",
+
+                                "docker run --restart=always -d --name=editions_controller ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "-v /var/lib/docker/swarm:/var/lib/docker/swarm ",
+                                "docker4x/controller:$DOCKER_FOR_IAAS_VERSION run --log=4 --all=true\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+
+
+        "Manager3" : {
+            "DependsOn" : ["PubSubnet1RouteTableAssociation", "ManagerVpcSG"],
+            "Type" : "AWS::EC2::Instance",
+            "Properties" : {
+                "AvailabilityZone" : { "Fn::GetAtt" : [ "PubSubnetAz1", "AvailabilityZone" ] },
+                "InstanceType": {"Ref" : "ManagerInstanceType"},
+                "IamInstanceProfile" : { "Ref" : "ManagerInstanceProfile" },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Fn::FindInMap": ["AWSRegionArch2AMI", {
+                        "Ref": "AWS::Region"
+                    }, {
+                        "Fn::FindInMap": ["AWSInstanceType2Arch", {"Ref" : "ManagerInstanceType"}, "Arch"]
+                    }]
+                },
+                "NetworkInterfaces" : [
+                    {
+                        "AssociatePublicIpAddress": true,
+                        "SubnetId" : { "Ref" : "PubSubnetAz1" },
+                        "GroupSet": [ { "Ref" : "ManagerVpcSG"}, { "Ref" : "SwarmSG"} ],
+                        "DeviceIndex": "0"
+                    }
+                ],
+                "Monitoring" : true,
+                "Tags" : [
+                    {"Key" : "Name", "Value" : {"Fn::Join" : [ "", [{ "Ref" : "AWS::StackName"}, "-manager3"]] }},
+                    { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName"} }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "", [
+                                "#!/bin/sh\n",
+                                "echo \"", {"Ref": "ExternalLoadBalancer"}, "\" > /var/lib/docker/swarm/lb_name\n",
+                                "echo \"# hostname : ELB_name\" >> /var/lib/docker/swarm/elb.config\n",
+                                "echo \"default: ", {"Ref": "ExternalLoadBalancer"}, "\" >> /var/lib/docker/swarm/elb.config\n",
+                                "export DOCKER_FOR_IAAS_VERSION='", { "Fn::FindInMap" : [ "DockerForAWS", "version", "forAws" ] }, "'\n",
+                                "chown -R docker /home/docker/\n",
+                                "chgrp -R docker /home/docker/\n",
+                                "sleep 5\n",
+
+                                "docker run --restart=always -d -p 22:22 ",
+                                "-v /home/docker/:/home/docker/ ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "-v /var/lib/docker/swarm/lb_name:/var/lib/docker/swarm/lb_name:ro ",
+                                "-v /var/lib/docker/swarm/elb.config:/var/lib/docker/swarm/elb.config ",
+                                "-v /usr/bin/docker:/usr/bin/docker ",
+                                "-v /var/log:/var/log ",
+                                "-v /etc/passwd:/etc/passwd:ro ",
+                                "-v /etc/shadow:/etc/shadow:ro ",
+                                "-v /etc/group:/etc/group:ro ",
+                                "docker4x/shell-aws:$DOCKER_FOR_IAAS_VERSION\n",
+
+                                "docker run --detach --name=swarm_boot ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "wfarner/swarmboot join ", { "Fn::GetAtt" : [ "Manager1", "PrivateIp" ] },"\n",
+
+                                "docker run --restart=always -d  --name=token_server ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "wfarner/tokenserver run\n",
+
+                                "docker run --restart=always -d --name=editions_controller ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "-v /var/lib/docker/swarm:/var/lib/docker/swarm ",
+                                "docker4x/controller:$DOCKER_FOR_IAAS_VERSION run --log=4 --all=true\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
 
         "NodeAsg" : {
             "DependsOn" : ["NodeLaunchConfig"],
@@ -543,6 +700,12 @@
                                 "-e RESOURCE='NodeAsg' ",
                                 "chungers/cfn-signal:latest",
                                 "\n",
+
+                                "docker run --detach --name=swarm_boot ",
+                                "-v /var/run/docker.sock:/var/run/docker.sock ",
+                                "wfarner/swarmboot join --worker ", { "Fn::GetAtt" : [ "Manager1", "PrivateIp" ] },"\n",
+
+
                                 "# Start SSH container for debugging and development only. \n",
                                 "docker run --restart=always -d -p 22:22 ",
                                 "-v /home/docker/:/home/docker/ ",
