@@ -5,6 +5,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/client"
 	"github.com/docker/libmachete/controller/quorum"
+	"github.com/docker/libmachete/controller/util/cli"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
@@ -45,52 +46,52 @@ when a quorum member is absent.`,
 		},
 	})
 
-	rootCmd.AddCommand(&cobra.Command{
+	runCmd := cobra.Command{
 		Use:   "run <machete address> <instance addresses> <config path>",
 		Short: "run the quorum controller",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 3 {
-				cmd.Usage()
-				return
+	}
+
+	runWhenLeading := cli.LeaderCmd(runCmd)
+
+	runCmd.Run = func(cmd *cobra.Command, args []string) {
+		if len(args) != 3 {
+			cmd.Usage()
+			return
+		}
+
+		macheteAddress := args[0]
+		ipAddresses := strings.Split(args[1], ",")
+		configPath := args[2]
+
+		requestData, err := ioutil.ReadFile(configPath)
+		if err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
+
+		instanceWatcher, err := quorum.NewQuorum(
+			5*time.Second,
+			client.NewInstanceProvisioner(macheteAddress),
+			string(requestData),
+			ipAddresses)
+		if err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
+
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for range c {
+				log.Info("Stopping quorum")
+				instanceWatcher.Stop()
 			}
+		}()
 
-			macheteAddress := args[0]
-			ipAddresses := strings.Split(args[1], ",")
-			configPath := args[2]
+		runWhenLeading(instanceWatcher)
+	}
 
-			requestData, err := ioutil.ReadFile(configPath)
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			instanceWatcher, err := quorum.NewQuorum(
-				5*time.Second,
-				client.NewInstanceProvisioner(macheteAddress),
-				string(requestData),
-				ipAddresses)
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			c := make(chan os.Signal, 1)
-			signal.Notify(c, os.Interrupt)
-			go func() {
-				for range c {
-					log.Info("Stopping quorum")
-					instanceWatcher.Stop()
-				}
-			}()
-
-			instanceWatcher.Run()
-
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-		},
-	})
+	rootCmd.AddCommand(&runCmd)
 
 	err := rootCmd.Execute()
 	if err != nil {
