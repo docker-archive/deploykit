@@ -1,0 +1,17 @@
+FROM alpine:3.3
+
+RUN apk add --update bash ca-certificates jq groff less python py-pip py-setuptools \
+    && pip install awscli \
+    && pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz \
+    && apk --purge -v del py-pip \
+    && rm -rf /var/cache/apk/*
+
+# needed in order for go binary to work.
+RUN mkdir /lib64 && ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
+
+# setup init which signals instance start up in CFN
+RUN mkdir -p /usr/bin/ /var/log/docker/
+COPY cfn-init.sh /usr/bin/
+RUN chmod 755 /usr/bin/cfn-init.sh
+
+CMD ["cfn-init.sh"]
