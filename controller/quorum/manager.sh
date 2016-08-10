@@ -2,8 +2,6 @@
 #
 # This is a script intended to be injected into boot-time 'user data' for a Docker Swarm manager instance.
 
-# TODO(wfarner): Create worker-request.swpt and manager-request.swpt files.
-
 install_script() {
   set -o errexit
   set -o nounset
@@ -19,6 +17,7 @@ install_script() {
   DRIVER_AND_ARGS='aws --region us-west-2'
   MANAGER_IPS=10.78.190.2,10.78.190.3,10.78.190.4
   BOOT_LEADER=$(echo $MANAGER_IPS | tr ',' '\n' | head -n1)
+  NUM_WORKERS=3
 
   boot_args="join $BOOT_LEADER"
   if [[ $(hostname -i) = "$BOOT_LEADER" ]]
@@ -51,24 +50,13 @@ install_script() {
     wfarner/tokenserver \
     run
 
-  # Maintains worker node pool.
-  docker run \
-    --detach \
-    --volume /var/run/docker.sock:/var/run/docker.sock \
-    --restart always \
-    wfarner/scaler \
-    localhost:$MACHETE_PORT $NUM_WORKERS ./worker-request.swpt
-
-  # Maintains manager node pool (managers 'watch' each other).
   manager_setup_script="#!/bin/bash
-
 $install_script_src
 
-install_script_src=$(declare -f install_script)
-install_script "$install_script_src" &
+install_script_src=\"\$\(declare -f install_script\)\"
+install_script \"\$install_script_src\" &
 "
-
-  user_data=$(echo "$manager_setup_script" | base64)
+  manager_user_data=$(echo "$manager_setup_script" | base64)
 
   cat << EOF > ./manager-request.swpt
 {
@@ -95,20 +83,78 @@ install_script "$install_script_src" &
         },
         "SubnetId": "subnet-d270878a",
         "SecurityGroupIds": ["sg-89f23fef"],
-        "UserData": "$user_data"
+        "UserData": "$manager_user_data"
     }
 }
 EOF
 
+  # Maintains manager node pool (managers 'watch' each other).
   docker run \
     --detach \
     --volume /var/run/docker.sock:/var/run/docker.sock \
     --restart always \
     wfarner/quorum \
     localhost:$MACHETE_PORT $MANAGER_IPS ./manager-request.swpt
+
+
+  worker_setup_script="#!/bin/bash
+set -o errexit
+set -o nounset
+set -o pipefail
+
+start_install() {
+  sleep 5
+  curl -sSL https://get.docker.com/ | sh
+  docker run \
+    --detach \
+    --volume /var/run/docker.sock:/var/run/docker.sock \
+    wfarner/swarmboot \
+    join $BOOT_LEADER --worker
 }
 
-# The install script source is an input to itself to allow for 'self-replication' of manager nodes
+start_install &
+"
+  worker_user_data=$(echo "$worker_setup_script" | base64)
+
+  cat << EOF > ./worker-request.swpt
+{
+    "group": "workers",
+    "tags": {"bill-machete-testing": "testing"},
+    "run_instances_input": {
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sdb",
+            "Ebs": {
+                "DeleteOnTermination": true,
+                "VolumeSize": 64,
+                "VolumeType": "gp2"
+            }
+          }
+        ],
+        "EbsOptimized": false,
+        "ImageId": "ami-b9ff39d9",
+        "InstanceType": "t2.small",
+        "KeyName": "dev",
+        "Placement": {
+            "AvailabilityZone": "us-west-2c"
+        },
+        "SubnetId": "subnet-d270878a",
+        "SecurityGroupIds": ["sg-89f23fef"],
+        "UserData": "$worker_user_data"
+    }
+}
+EOF
+
+  # Maintains worker node pool.
+  docker run \
+    --detach \
+    --volume /var/run/docker.sock:/var/run/docker.sock \
+    --restart always \
+    wfarner/scaler \
+    localhost:$MACHETE_PORT $NUM_WORKERS ./worker-request.swpt
+}
+
+# The install script function source is an input to itself to allow for 'self-replication' of manager nodes
 # via the quorum controller.  For this reason, it's important to keep the majority of logic in the install_script
 # function.
 install_script_src=$(declare -f install_script)
