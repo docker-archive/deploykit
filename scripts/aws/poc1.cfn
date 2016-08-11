@@ -381,8 +381,8 @@
                     {"IpProtocol" : "udp", "FromPort" : "4789", "ToPort" : "4789", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "NodeVpcSG", "GroupId" ] } },
                     {"IpProtocol" : "tcp", "FromPort" : "7946", "ToPort" : "7946", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "NodeVpcSG", "GroupId" ] } },
                     {"IpProtocol" : "udp", "FromPort" : "7946", "ToPort" : "7946", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "NodeVpcSG", "GroupId" ] } },
-                    {"IpProtocol" : "tcp", "FromPort" : "8889", "ToPort" : "8889", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "Vpc", "DefaultSecurityGroup" ] } }
-                ]
+                    {"IpProtocol" : "tcp", "FromPort" : "8889", "ToPort" : "8888", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "Vpc", "DefaultSecurityGroup" ] } },
+                    {"IpProtocol" : "tcp", "FromPort" : "8889", "ToPort" : "8889", "SourceSecurityGroupId" : { "Fn::GetAtt" : [ "Vpc", "DefaultSecurityGroup" ] } }                ]
             }
         },
         "NodeVpcSG": {
@@ -471,6 +471,7 @@
                                 "docker4x/controller:$DOCKER_FOR_IAAS_VERSION run --log=4 --all=true\n",
 
 				"docker run --detach --restart=always --name macheted ",
+				"-p 8888:8888 ",
 				"--volume /var/run/docker.sock:/var/run/docker.sock ",
 				"wfarner/machete --cluster ", { "Ref" : "AWS::StackName" },
 				" --port 8888 aws --region ", { "Ref" : "AWS::Region"}, "\n",
@@ -505,6 +506,7 @@
 				"EOF\n",
 				"docker run --detach --restart always --name scaler ",
 				"--volume /var/run/docker.sock:/var/run/docker.sock ",
+				"--volume /worker-request.swpt:/worker-request.swpt ",
 				"wfarner/scaler run ${MANAGER}:8888 ",{ "Ref": "ClusterSize"}," ./worker-request.swpt \n"
                             ]
                         ]
@@ -804,7 +806,7 @@
                     "Version" : "2012-10-17",
                     "Statement": [ {
                         "Effect": "Allow",
-                        "Action": "autoscaling:*",
+                        "Action": "ec2:*",
                         "Resource": "*"
                     } ]
                 },
