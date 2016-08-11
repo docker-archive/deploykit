@@ -476,7 +476,7 @@
 				" --port 8888 aws --region ", { "Ref" : "AWS::Region"}, "\n",
 				"\n",
 				"run_worker=\"#!/bin/bash\ndocker run --detach --volume /var/run/docker.sock:/var/run/docker.sock wfarner/swarmboot join $(hostname -i) --worker\" \n",
-				"worker_user_data=$(echo \"$run_worker\" | base64)",
+				"worker_user_data=$(echo \"$run_worker\" | base64 | tr -d '\n')",
 				"\n",
 				"cat << EOF > ./worker-request.swpt\n",
 				"{",
