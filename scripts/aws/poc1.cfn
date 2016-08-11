@@ -435,6 +435,8 @@
                         "Fn::Join": [
                             "", [
                                 "#!/bin/sh\n",
+				"set -x\n",
+				"MANAGER=$(wget -qO- http://169.254.169.254/latest/meta-data/hostname)\n",
                                 "echo \"", {"Ref": "ExternalLoadBalancer"}, "\" > /var/lib/docker/swarm/lb_name\n",
                                 "echo \"# hostname : ELB_name\" >> /var/lib/docker/swarm/elb.config\n",
                                 "echo \"default: ", {"Ref": "ExternalLoadBalancer"}, "\" >> /var/lib/docker/swarm/elb.config\n",
@@ -466,7 +468,44 @@
                                 "docker run --restart=always -d --name=editions_controller ",
                                 "-v /var/run/docker.sock:/var/run/docker.sock ",
                                 "-v /var/lib/docker/swarm:/var/lib/docker/swarm ",
-                                "docker4x/controller:$DOCKER_FOR_IAAS_VERSION run --log=4 --all=true\n"
+                                "docker4x/controller:$DOCKER_FOR_IAAS_VERSION run --log=4 --all=true\n",
+
+				"docker run --detach --restart=always --name macheted ",
+				"--volume /var/run/docker.sock:/var/run/docker.sock ",
+				"wfarner/machete --cluster ", { "Ref" : "AWS::StackName" },
+				" --port 8888 aws --region ", { "Ref" : "AWS::Region"}, "\n",
+				"\n",
+				"run_worker=\"#!/bin/bash\ndocker run --detach --volume /var/run/docker.sock:/var/run/docker.sock wfarner/swarmboot join $(hostname -i) --worker\" \n",
+				"worker_user_data=$(echo \"$run_worker\" | base64)",
+				"\n",
+				"cat << EOF > ./worker-request.swpt\n",
+				"{",
+				"    \"group\": \"workers\",",
+				"    \"tags\": {\"bill-machete-testing\": \"testing\"},",
+				"    \"run_instances_input\": {",
+				"        \"EbsOptimized\": false,",
+				"        \"ImageId\": \"",
+				{
+				    "Fn::FindInMap": ["AWSRegionArch2AMI", {
+					"Ref": "AWS::Region"
+				    }, {
+					"Fn::FindInMap": ["AWSInstanceType2Arch", {"Ref" : "InstanceType"}, "Arch"]
+				    }]
+				}, "\",",
+				"        \"InstanceType\": \"",{ "Ref" : "InstanceType" },"\",",
+				"        \"KeyName\": \"",{ "Ref" : "KeyName" },"\",",
+				"        \"Placement\": {",
+				"            \"AvailabilityZone\": \"", { "Fn::GetAtt" : [ "PubSubnetAz2", "AvailabilityZone" ] },"\"",
+				"        },",
+				"        \"SubnetId\": \"",{ "Ref" : "PubSubnetAz2" },"\",",
+				"        \"SecurityGroupIds\": [\"",{ "Ref" : "SwarmSG" },"\"],",
+				"        \"UserData\": \"$worker_user_data\"",
+				"    }",
+				"}\n",
+				"EOF\n",
+				"docker run --detach --restart always --name scaler ",
+				"--volume /var/run/docker.sock:/var/run/docker.sock ",
+				"wfarner/scaler run ${MANAGER}:8888 ",{ "Ref": "ClusterSize"}," ./worker-request.swpt \n"
                             ]
                         ]
                     }
@@ -616,106 +655,6 @@
                                 "-v /var/run/docker.sock:/var/run/docker.sock ",
                                 "-v /var/lib/docker/swarm:/var/lib/docker/swarm ",
                                 "docker4x/controller:$DOCKER_FOR_IAAS_VERSION run --log=4 --all=true\n"
-                            ]
-                        ]
-                    }
-                }
-            }
-        },
-
-        "NodeAsg" : {
-            "DependsOn" : ["NodeLaunchConfig"],
-            "Type" : "AWS::AutoScaling::AutoScalingGroup",
-            "Properties" : {
-                "VPCZoneIdentifier" : [ { "Fn::Join" : [",", [ { "Ref" : "PubSubnetAz1" }, { "Ref" : "PubSubnetAz2" } ] ] } ],
-                "LaunchConfigurationName" : { "Ref" : "NodeLaunchConfig" },
-                "LoadBalancerNames" : [ { "Ref" : "ExternalLoadBalancer" } ],
-                "MinSize" : 0,
-                "MaxSize" : 100,
-                "DesiredCapacity" : { "Ref" : "ClusterSize"},
-                "Tags": [
-                    { "Key" : "Name",
-                      "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "worker" ] ] },
-                      "PropagateAtLaunch" : true },
-                    { "Key" : "swarm-node-type",
-                      "Value" : "worker",
-                      "PropagateAtLaunch" : true },
-                    { "Key" : "swarm-stack-id",
-                      "Value" : { "Ref" : "AWS::StackId"},
-                      "PropagateAtLaunch" : true },
-                    { "Key": "DOCKER_FOR_AWS_VERSION",
-                      "Value": { "Fn::FindInMap" : [ "DockerForAWS", "version", "forAws" ] },
-                      "PropagateAtLaunch" : true },
-                    { "Key": "DOCKER_VERSION",
-                      "Value": { "Fn::FindInMap" : [ "DockerForAWS", "version", "docker" ] },
-                      "PropagateAtLaunch" : true
-                    }
-                ]
-            },
-            "CreationPolicy": {
-                "ResourceSignal": {
-                    "Count": { "Ref" : "ClusterSize"},
-                    "Timeout": "PT10M"
-                }
-            },
-            "UpdatePolicy" : {
-                "AutoScalingRollingUpdate" : {
-                    "MinInstancesInService" : 1,
-                    "MaxBatchSize" : 1,
-                    "WaitOnResourceSignals" : true,
-                    "PauseTime" : "PT10M"
-                }
-            }
-        },
-        "NodeLaunchConfig": {
-            "DependsOn": ["SwarmSG", "Manager1"],
-            "Type": "AWS::AutoScaling::LaunchConfiguration",
-            "Properties": {
-                "InstanceType": {"Ref" : "InstanceType"},
-                "IamInstanceProfile" : { "Ref" : "ManagerInstanceProfile" },
-                "KeyName": {
-                    "Ref": "KeyName"
-                },
-                "ImageId": {
-                    "Fn::FindInMap": ["AWSRegionArch2AMI", {
-                        "Ref": "AWS::Region"
-                    }, {
-                        "Fn::FindInMap": ["AWSInstanceType2Arch", {"Ref" : "InstanceType"}, "Arch"]
-                    }]
-                },
-                "AssociatePublicIpAddress": true,
-                "SecurityGroups": [ { "Ref" : "NodeVpcSG"}, { "Ref" : "SwarmSG"} ],
-                "UserData": {
-                    "Fn::Base64": {
-                        "Fn::Join": [
-                            "", [
-                                "#!/bin/sh\n",
-                                "export DOCKER_FOR_IAAS_VERSION='", { "Fn::FindInMap" : [ "DockerForAWS", "version", "forAws" ] }, "'\n",
-                                "chown -R docker /home/docker/\n",
-                                "chgrp -R docker /home/docker/\n",
-                                "echo \"Started ${DOCKER_FOR_IAAS_VERSION}!\"\n",
-                                "docker run --restart=no ",
-                                "-e STACK='", { "Ref" : "AWS::StackName" }, "' ",
-                                "-e REGION='", { "Ref" : "AWS::Region" }, "' ",
-                                "-e RESOURCE='NodeAsg' ",
-                                "chungers/cfn-signal:latest",
-                                "\n",
-
-                                "docker run --detach --name=swarm_boot ",
-                                "-v /var/run/docker.sock:/var/run/docker.sock ",
-                                "wfarner/swarmboot join --worker ", { "Fn::GetAtt" : [ "Manager1", "PrivateIp" ] },"\n",
-
-
-                                "# Start SSH container for debugging and development only. \n",
-                                "docker run --restart=always -d -p 22:22 ",
-                                "-v /home/docker/:/home/docker/ ",
-                                "-v /var/run/docker.sock:/var/run/docker.sock ",
-                                "-v /usr/bin/docker:/usr/bin/docker ",
-                                "-v /var/log:/var/log ",
-                                "-v /etc/passwd:/etc/passwd:ro ",
-                                "-v /etc/shadow:/etc/shadow:ro ",
-                                "-v /etc/group:/etc/group:ro ",
-                                "docker4x/shell-aws:$DOCKER_FOR_IAAS_VERSION\n"
                             ]
                         ]
                     }
