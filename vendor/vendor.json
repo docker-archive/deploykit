@@ -256,6 +256,12 @@
 			"revisionTime": "2016-08-02T16:15:23Z"
 		},
 		{
+			"checksumSHA1": "MmGovHdbIs1TkEdSWctvMTdRs8c=",
+			"path": "github.com/docker/engine-api",
+			"revision": "a55b27b2dcac6e7b6531380cf3047ea2c0f010d1",
+			"revisionTime": "2016-08-12T19:38:37Z"
+		},
+		{
 			"checksumSHA1": "eTDiSq90I43NEMwYVrlgBVs/1tk=",
 			"path": "github.com/docker/engine-api/client",
 			"revision": "603ec41824c63d1e6498a22271987fa1f268c0c0",
