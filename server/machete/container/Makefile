@@ -2,7 +2,7 @@ VERSION?=0.0-snapshot
 REVISION=$(shell git rev-list -1 HEAD)
 
 DOCKER_REPO_OWNER?=machete
-DOCKER_REPO?=${DOCKER_REPO_OWNER}/tokenserver
+DOCKER_REPO?=${DOCKER_REPO_OWNER}/machete
 DOCKER_TAG?=dev
 DOCKER_IMAGE=${DOCKER_REPO}:${DOCKER_TAG}
 
@@ -16,7 +16,7 @@ container: clean
 	@echo "+ $@"
 	mkdir -p bin
 	cd ../../.. && LDFLAGS="-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" \
-	  ./scripts/build-in-docker swarm/tokenserver/main.go swarm/tokenserver/container/bin/tokenserver
+	  ./scripts/build-in-docker 'server/machete/main.go' server/machete/container/bin/machete
 	docker build -t $(DOCKER_IMAGE) -t $(DOCKER_REPO):latest -t $(DOCKER_REPO):$(VERSION) .
 ifeq (${DOCKER_PUSH},true)
 	docker push ${DOCKER_IMAGE}
