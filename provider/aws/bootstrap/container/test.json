@@ -1,0 +1,41 @@
+{
+  "DriverAndArgs": "aws --region us-west-2",
+  "ClusterName": "bill-testing",
+  "AvailabilityZone": "us-west-2a",
+  "ManagerIPs": ["192.168.33.4", "192.168.33.5", "192.168.33.6"],
+  "NumWorkers": 3,
+  "ManagerInstance": {
+    "run_instances_input": {
+        "ImageId": "ami-f701cb97",
+        "InstanceType": "t2.micro",
+        "KeyName": "bill-laptop",
+        "NetworkInterfaces": [
+          {
+            "AssociatePublicIpAddress": true,
+            "DeleteOnTermination": true,
+            "DeviceIndex": 0
+          }
+        ],
+        "Placement": {
+            "AvailabilityZone": "us-west-2a"
+        }
+    }
+  },
+  "WorkerInstance": {
+    "run_instances_input": {
+      "ImageId": "ami-f701cb97",
+      "InstanceType": "t2.micro",
+      "KeyName": "bill-laptop",
+      "NetworkInterfaces": [
+        {
+          "AssociatePublicIpAddress": true,
+          "DeleteOnTermination": true,
+          "DeviceIndex": 0
+        }
+      ],
+      "Placement": {
+        "AvailabilityZone": "us-west-2a"
+      }
+    }
+  }
+}

@@ -22,14 +22,14 @@ const (
 // TODO(wfarner): Consider accepting a list of IP addresses, and have this routine fall back to different tokenservers
 // and engines for better redundancy.
 
-func joinSwarm(localDocker *client.Client, joinIP string, worker bool) error {
+func joinSwarm(localDocker *client.Client, joinIP string, manager bool) error {
 	var joinToken string
 
 	var tokenEndpoint string
-	if worker {
-		tokenEndpoint = "worker"
-	} else {
+	if manager {
 		tokenEndpoint = "manager"
+	} else {
+		tokenEndpoint = "worker"
 	}
 
 	fetchToken := func() bool {

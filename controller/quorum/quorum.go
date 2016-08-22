@@ -2,6 +2,7 @@ package quorum
 
 import (
 	"bytes"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
 	"github.com/docker/libmachete/spi/instance"
@@ -91,22 +92,29 @@ func (q *quorum) checkState() {
 
 	for _, missingIP := range missingIPs {
 		log.Infof("IP %s is missing, provisioning new instance", missingIP)
-
-		buffer := bytes.Buffer{}
-		err := q.provisionTemplate.Execute(&buffer, templateInput{IP: missingIP})
+		err := ProvisionManager(q.provisioner, q.provisionTemplate, missingIP)
 		if err != nil {
-			log.Errorf("Failed to create provision request: %s", err)
+			log.Error(err)
 			continue
 		}
-
-		id, err := q.provisioner.Provision(buffer.String())
-		if err != nil {
-			log.Errorf("Failed to provision: %s", err)
-			continue
-		}
-
-		log.Infof("Provisioned instance %s with IP %s", *id, missingIP)
 	}
+}
+
+// ProvisionManager creates a single manager instance, replacing the IP address wildcard with the provided IP.
+func ProvisionManager(provisioner instance.Provisioner, provisionTemplate *template.Template, ip string) error {
+	buffer := bytes.Buffer{}
+	err := provisionTemplate.Execute(&buffer, templateInput{IP: ip})
+	if err != nil {
+		return fmt.Errorf("Failed to create provision request: %s", err)
+	}
+
+	id, err := provisioner.Provision(buffer.String())
+	if err != nil {
+		return fmt.Errorf("Failed to provision: %s", err)
+	}
+
+	log.Infof("Provisioned instance %s with IP %s", *id, ip)
+	return nil
 }
 
 type templateInput struct {

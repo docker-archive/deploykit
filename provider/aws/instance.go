@@ -16,7 +16,7 @@ import (
 
 const (
 	// ClusterTag is the AWS tag name used to track instances managed by this machete instance.
-	ClusterTag = "machete-cluster"
+	ClusterTag = "docker-machete"
 
 	// GroupTag is the AWS tag name used to track instances included in a group.
 	GroupTag = "machete-group"
@@ -40,7 +40,7 @@ func NewInstanceProvisioner(client ec2iface.EC2API, cluster spi.ClusterID) insta
 	}
 }
 
-func (p Provisioner) tagInstance(request createInstanceRequest, instance *ec2.Instance) error {
+func (p Provisioner) tagInstance(request CreateInstanceRequest, instance *ec2.Instance) error {
 	tags := []*ec2.Tag{}
 
 	// Gather the tag keys in sorted order, to provide predictable tag order.  This is
@@ -67,7 +67,8 @@ func (p Provisioner) tagInstance(request createInstanceRequest, instance *ec2.In
 	return err
 }
 
-type createInstanceRequest struct {
+// CreateInstanceRequest is the concrete provision request type.
+type CreateInstanceRequest struct {
 	Group             instance.GroupID      `json:"group"`
 	Tags              map[string]string     `json:"tags"`
 	RunInstancesInput ec2.RunInstancesInput `json:"run_instances_input"`
@@ -75,7 +76,7 @@ type createInstanceRequest struct {
 
 // Provision creates a new instance.
 func (p Provisioner) Provision(req string) (*instance.ID, error) {
-	request := createInstanceRequest{}
+	request := CreateInstanceRequest{}
 	err := json.Unmarshal([]byte(req), &request)
 	if err != nil {
 		return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Invalid input formatting: %s", err))
@@ -87,17 +88,23 @@ func (p Provisioner) Provision(req string) (*instance.ID, error) {
 
 	request.RunInstancesInput.MinCount = aws.Int64(1)
 	request.RunInstancesInput.MaxCount = aws.Int64(1)
-	request.RunInstancesInput.KeyName = aws.String(fmt.Sprintf("machete-%s", randomString(5)))
 
-	result, err := p.Client.CreateKeyPair(&ec2.CreateKeyPairInput{KeyName: request.RunInstancesInput.KeyName})
-	if err != nil {
-		return nil, err
-	}
+	if request.RunInstancesInput.KeyName == nil || *request.RunInstancesInput.KeyName == "" {
+		// A custom key was not specified, create one and manage it locally.
 
-	// TODO(wfarner): Need to re-evaluate code paths where keys should be deleted.
-	err = p.KeyStore.Write(*request.RunInstancesInput.KeyName, []byte(*result.KeyMaterial))
-	if err != nil {
-		return nil, err
+		request.RunInstancesInput.KeyName = aws.String(fmt.Sprintf("machete-%s", randomString(5)))
+
+		result, err := p.Client.CreateKeyPair(
+			&ec2.CreateKeyPairInput{KeyName: request.RunInstancesInput.KeyName})
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO(wfarner): Need to re-evaluate code paths where keys should be deleted.
+		err = p.KeyStore.Write(*request.RunInstancesInput.KeyName, []byte(*result.KeyMaterial))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	reservation, err := p.Client.RunInstances(&request.RunInstancesInput)
@@ -130,12 +137,16 @@ func (p Provisioner) Destroy(id instance.ID) error {
 		return err
 	}
 
-	_, err = p.Client.DeleteKeyPair(&ec2.DeleteKeyPairInput{KeyName: describeResult.KeyName})
-	if err != nil {
-		return err
+	// Only delete the remote key pair if the key is available locally.
+	// This enables use of custom or shared keys that are not managed by machete.
+	err = p.KeyStore.Delete(*describeResult.KeyName)
+	if err == nil {
+		_, err = p.Client.DeleteKeyPair(
+			&ec2.DeleteKeyPairInput{KeyName: describeResult.KeyName})
+		if err != nil {
+			return err
+		}
 	}
-
-	p.KeyStore.Delete(*describeResult.KeyName)
 
 	result, err := p.Client.TerminateInstances(&ec2.TerminateInstancesInput{
 		InstanceIds: []*string{aws.String(string(id))}})

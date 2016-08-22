@@ -16,7 +16,7 @@ import (
 
 func runCommand() *cobra.Command {
 
-	elbOptions := new(aws.Options)
+	elbOptions := new(aws.ELBOptions)
 	albOptions := new(azure.Options)
 	elbConfig := ""
 	interval := 3
