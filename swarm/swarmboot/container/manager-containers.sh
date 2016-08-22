@@ -11,7 +11,7 @@ wget -O config.swim $SWIM_URL
 CLUSTER_NAME=$(jq -r '.ClusterName' config.swim)
 MANAGER_IPS=$(jq -c '.ManagerIPs' config.swim | tr -d '"' | tr -d '[' | tr -d ']')
 NUM_WORKERS=$(jq -r '.NumWorkers' config.swim)
-DRIVER_AND_ARGS=$(jq -r '.DriverAndArgs' config.swim)
+DRIVER_AND_ARGS=$(jq -r '.Driver' config.swim)
 jq '.ManagerInstance' config.swim > /scratch/manager-request.swpt
 jq '.WorkerInstance' config.swim > /scratch/worker-request.swpt
 

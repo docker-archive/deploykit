@@ -478,14 +478,13 @@ func startInitialManager(config client.ConfigProvider, swimConfig fakeSWIMSchema
 }
 
 type fakeSWIMSchema struct {
-	// TODO(wfarner): This should be inferred, perhaps aside from the driver name.  Need to figure out a way to
-	// pass this information to the instances.
-	DriverAndArgs string
-	ClusterName   string
+	Driver      string
+	ClusterName string
 
 	// VpcID is only kept for cleanup.
 	VpcID           string
 	ManagerIPs      []string
+	NumManagers     int
 	NumWorkers      int
 	ManagerInstance machete_aws.CreateInstanceRequest
 	WorkerInstance  machete_aws.CreateInstanceRequest
@@ -508,7 +507,12 @@ func applyInstanceDefaults(r *ec2.RunInstancesInput) {
 }
 
 func (s *fakeSWIMSchema) applyDefaults() {
-	s.ManagerIPs = []string{"192.168.33.4", "192.168.33.5", "192.168.33.6"}
+	bootLeaderLastOctet := 4
+	s.ManagerIPs = []string{}
+	for i := 0; i < s.NumManagers; i++ {
+		s.ManagerIPs = append(s.ManagerIPs, fmt.Sprintf("192.168.33.%d", bootLeaderLastOctet+i))
+	}
+
 	s.WorkerInstance.Group = "workers"
 	s.ManagerInstance.Group = "managers"
 
@@ -521,6 +525,10 @@ func (s *fakeSWIMSchema) validate() error {
 		return errors.New("Configuration must specify ClusterName")
 	}
 
+	if s.NumManagers != 1 && s.NumManagers != 3 && s.NumManagers != 5 {
+		return errors.New("NumManagers must be 1, 3, or 5")
+	}
+
 	if s.NumWorkers < 1 {
 		return errors.New("NumWorkers must be at least 1")
 	}
@@ -531,6 +539,7 @@ func (s *fakeSWIMSchema) validate() error {
 	if s.WorkerInstance.RunInstancesInput.Placement == nil {
 		return errors.New("WorkerInstance.run_instance_input.Placement must be set")
 	}
+
 	if *s.ManagerInstance.RunInstancesInput.Placement.AvailabilityZone == "" {
 		return errors.New("ManagerIntance.run_instanceInput.Placement.AvailabilityZone must be set")
 	}
@@ -710,7 +719,12 @@ func bootstrap(swimFile string) error {
 	}
 
 	ec2Client := ec2.New(sess)
-	instancesResp, err := ec2Client.DescribeInstances(&ec2.DescribeInstancesInput{Filters: swim.resourceFilter()})
+	filter := []*ec2.Filter{{
+		Name:   aws.String("instance-state-name"),
+		Values: []*string{aws.String("pending"), aws.String("running")},
+	}}
+	filter = append(filter, swim.resourceFilter()...)
+	instancesResp, err := ec2Client.DescribeInstances(&ec2.DescribeInstancesInput{Filters: filter})
 	if err != nil {
 		return fmt.Errorf("Failed to fetch instances: %s", err)
 	}
@@ -718,7 +732,13 @@ func bootstrap(swimFile string) error {
 	for _, reservation := range instancesResp.Reservations {
 		for _, instance := range reservation.Instances {
 			if publicIP == "" {
-				publicIP = *instance.PublicIpAddress
+				if instance.PublicIpAddress == nil {
+					log.Warnf(
+						"Expected instances to have public IPs but %s does not",
+						*instance.InstanceId)
+				} else {
+					publicIP = *instance.PublicIpAddress
+				}
 			} else {
 				log.Warnf(
 					"Expected only one instance in the cluster, also found %s",

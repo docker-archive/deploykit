@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -58,6 +59,17 @@ func (b *Builder) BuildInstanceProvisioner(cluster spi.ClusterID) (instance.Prov
 				},
 			}
 			providers = append(providers, &staticCreds)
+		}
+
+		if b.options.region == "" {
+			log.Println("region not specified, attempting to discover from EC2 instance metadata")
+			region, err := GetRegion()
+			if err != nil {
+				return nil, errors.New("Unable to determine region")
+			}
+
+			log.Printf("Defaulting to local region %s\n", region)
+			b.options.region = region
 		}
 
 		b.Config = session.New(aws.NewConfig().
