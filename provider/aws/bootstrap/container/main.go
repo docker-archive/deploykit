@@ -57,7 +57,7 @@ func addToS3(config client.ConfigProvider, swim fakeSWIMSchema) (*string, error)
 			return nil, err
 		}
 
-		log.Infof("S3 bucket create result: %s", bucketCreateResult)
+		log.Infof("Created S3 bucket: %s", bucketCreateResult.Location)
 
 		err = s3Client.WaitUntilBucketExists(head)
 		if err != nil {
@@ -150,13 +150,13 @@ func createRouteTable(ec2Client ec2iface.EC2API, swim fakeSWIMSchema) (*ec2.Rout
 	if err != nil {
 		return nil, nil, err
 	}
+	log.Infof("Created internet gateway %s", *internetGateway.InternetGatewayId)
 
-	routeTable, err := ec2Client.CreateRouteTable(&ec2.CreateRouteTableInput{
-		VpcId: aws.String(swim.VpcID),
-	})
+	routeTable, err := ec2Client.CreateRouteTable(&ec2.CreateRouteTableInput{VpcId: aws.String(swim.VpcID)})
 	if err != nil {
 		return nil, nil, err
 	}
+	log.Infof("Created route table %s", *routeTable.RouteTable.RouteTableId)
 
 	// Route to the internet via the internet gateway.
 	_, err = ec2Client.CreateRoute(&ec2.CreateRouteInput{
@@ -184,9 +184,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) error {
 
 	ec2Client := ec2.New(config)
 
-	vpc, err := ec2Client.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock: aws.String("192.168.0.0/16"),
-	})
+	vpc, err := ec2Client.CreateVpc(&ec2.CreateVpcInput{CidrBlock: aws.String("192.168.0.0/16")})
 	if err != nil {
 		return err
 	}
@@ -224,8 +222,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) error {
 	if err != nil {
 		return err
 	}
-
-	log.Infof("Created worker subnet %s", workerSubnet)
+	log.Infof("Created worker subnet %s", *workerSubnet.Subnet.SubnetId)
 
 	managerSubnet, err := ec2Client.CreateSubnet(&ec2.CreateSubnetInput{
 		VpcId:            aws.String(swim.VpcID),
@@ -235,8 +232,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) error {
 	if err != nil {
 		return err
 	}
-
-	log.Infof("Created manager subnet %s", managerSubnet)
+	log.Infof("Created manager subnet %s", *managerSubnet.Subnet.SubnetId)
 
 	workerGroupRequest := ec2.CreateSecurityGroupInput{
 		GroupName:   aws.String("WorkerSecurityGroup"),
@@ -247,8 +243,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) error {
 	if err != nil {
 		return err
 	}
-
-	log.Infof("Created worker security group %s", workerSecurityGroup)
+	log.Infof("Created worker security group %s", *workerSecurityGroup.GroupId)
 
 	managerGroupRequest := ec2.CreateSecurityGroupInput{
 		GroupName:   aws.String("ManagerSecurityGroup"),
@@ -259,8 +254,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) error {
 	if err != nil {
 		return err
 	}
-
-	log.Infof("Created manager security group %s", managerSecurityGroup)
+	log.Infof("Created manager security group %s", *managerSecurityGroup.GroupId)
 
 	err = configureManagerSecurityGroup(
 		ec2Client,
@@ -346,7 +340,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 		return err
 	}
 
-	log.Infof("Created IAM role %s", role)
+	log.Infof("Created IAM role %s (id %s)", *role.Role.RoleName, *role.Role.RoleId)
 
 	policy, err := iamClient.CreatePolicy(&iam.CreatePolicyInput{
 		PolicyName: aws.String(swim.managerPolicyName()),
@@ -364,7 +358,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 		return err
 	}
 
-	log.Infof("Created IAM policy %s", policy)
+	log.Infof("Created IAM policy %s (id %s)", *policy.Policy.PolicyName, *policy.Policy.PolicyId)
 
 	_, err = iamClient.AttachRolePolicy(&iam.AttachRolePolicyInput{
 		RoleName:  role.Role.RoleName,
@@ -497,7 +491,32 @@ type fakeSWIMSchema struct {
 	WorkerInstance  machete_aws.CreateInstanceRequest
 }
 
-func (s fakeSWIMSchema) validate() error {
+func applyInstanceDefaults(r *ec2.RunInstancesInput) {
+	if r.InstanceType == nil {
+		r.InstanceType = aws.String("t2.micro")
+	}
+
+	if r.NetworkInterfaces == nil || len(r.NetworkInterfaces) == 0 {
+		r.NetworkInterfaces = []*ec2.InstanceNetworkInterfaceSpecification{
+			{
+				AssociatePublicIpAddress: aws.Bool(true),
+				DeleteOnTermination:      aws.Bool(true),
+				DeviceIndex:              aws.Int64(0),
+			},
+		}
+	}
+}
+
+func (s *fakeSWIMSchema) applyDefaults() {
+	s.ManagerIPs = []string{"192.168.33.4", "192.168.33.5", "192.168.33.6"}
+	s.WorkerInstance.Group = "workers"
+	s.ManagerInstance.Group = "managers"
+
+	applyInstanceDefaults(&s.ManagerInstance.RunInstancesInput)
+	applyInstanceDefaults(&s.WorkerInstance.RunInstancesInput)
+}
+
+func (s *fakeSWIMSchema) validate() error {
 	if s.ClusterName == "" {
 		return errors.New("Configuration must specify ClusterName")
 	}
@@ -522,44 +541,50 @@ func (s fakeSWIMSchema) validate() error {
 		return errors.New("ManagerInstance and WorkerInstance must be in the same AvailabilityZone")
 	}
 
-	if len(s.ManagerIPs) < 1 {
-		return errors.New("ManagerIPs must be set")
-	}
-
 	return nil
 }
 
-func (s fakeSWIMSchema) availabilityZone() string {
+func (s *fakeSWIMSchema) availabilityZone() string {
 	return *s.ManagerInstance.RunInstancesInput.Placement.AvailabilityZone
 }
 
-func (s fakeSWIMSchema) clusterFilter() *ec2.Filter {
+func (s *fakeSWIMSchema) resourceFilter() []*ec2.Filter {
+	return []*ec2.Filter{
+		{
+			Name:   aws.String("vpc-id"),
+			Values: []*string{aws.String(s.VpcID)},
+		},
+		s.clusterFilter(),
+	}
+}
+
+func (s *fakeSWIMSchema) clusterFilter() *ec2.Filter {
 	return &ec2.Filter{
 		Name:   aws.String(fmt.Sprintf("tag:%s", machete_aws.ClusterTag)),
 		Values: []*string{aws.String(s.ClusterName)},
 	}
 }
 
-func (s fakeSWIMSchema) roleName() string {
+func (s *fakeSWIMSchema) roleName() string {
 	return fmt.Sprintf("%s-ManagerRole", s.ClusterName)
 }
 
-func (s fakeSWIMSchema) managerPolicyName() string {
+func (s *fakeSWIMSchema) managerPolicyName() string {
 	return fmt.Sprintf("%s-ManagerPolicy", s.ClusterName)
 }
 
-func (s fakeSWIMSchema) instanceProfileName() string {
+func (s *fakeSWIMSchema) instanceProfileName() string {
 	return fmt.Sprintf("%s-ManagerProfile", s.ClusterName)
 }
 
-func (s fakeSWIMSchema) resourceTag() *ec2.Tag {
+func (s *fakeSWIMSchema) resourceTag() *ec2.Tag {
 	return &ec2.Tag{
 		Key:   aws.String(machete_aws.ClusterTag),
 		Value: aws.String(s.ClusterName),
 	}
 }
 
-func (s fakeSWIMSchema) region() string {
+func (s *fakeSWIMSchema) region() string {
 	az := s.availabilityZone()
 	return az[:len(az)-1]
 }
@@ -575,8 +600,7 @@ func getAWSClientConfig(swim fakeSWIMSchema) client.ConfigProvider {
 		WithRegion(swim.region()).
 		WithCredentialsChainVerboseErrors(true).
 		WithCredentials(credentials.NewChainCredentials(providers)).
-		WithLogger(&logger{}).
-		WithLogLevel(aws.LogDebugWithHTTPBody))
+		WithLogger(&logger{}))
 }
 
 const machineBootCommand = `#!/usr/bin/env bash
@@ -636,13 +660,11 @@ func bootstrap(swimFile string) error {
 		return fmt.Errorf("Invalid SWIM file: %s", err)
 	}
 
-	swim.WorkerInstance.Group = "workers"
-	swim.ManagerInstance.Group = "managers"
+	swim.applyDefaults()
 
 	sess := getAWSClientConfig(swim)
 
-	// TODO(wfarner): Get basic bootstrap flow working without EBS before trying to integrate this.
-	// Create EBS volumes.
+	// TODO(wfarner): Integrate setup and attachment of EBS volumes.
 	// TODO(wfarner): Figure out a way to format them during bootstrapping as well, since it would be unsafe
 	// for the manager nodes to determine whether they should be formatted.
 	/*
@@ -687,6 +709,25 @@ func bootstrap(swimFile string) error {
 		return err
 	}
 
+	ec2Client := ec2.New(sess)
+	instancesResp, err := ec2Client.DescribeInstances(&ec2.DescribeInstancesInput{Filters: swim.resourceFilter()})
+	if err != nil {
+		return fmt.Errorf("Failed to fetch instances: %s", err)
+	}
+	publicIP := ""
+	for _, reservation := range instancesResp.Reservations {
+		for _, instance := range reservation.Instances {
+			if publicIP == "" {
+				publicIP = *instance.PublicIpAddress
+			} else {
+				log.Warnf(
+					"Expected only one instance in the cluster, also found %s",
+					*instance.InstanceId)
+			}
+		}
+	}
+	log.Infof("Boot leader has public IP %s", publicIP)
+
 	return nil
 }
 
@@ -711,13 +752,7 @@ func destroy(swimURL string) error {
 
 	ec2Client := ec2.New(sess)
 
-	vpcFilter := &ec2.Filter{
-		Name:   aws.String("vpc-id"),
-		Values: []*string{aws.String(swim.VpcID)},
-	}
-
-	describeInstances := &ec2.DescribeInstancesInput{Filters: []*ec2.Filter{vpcFilter, swim.clusterFilter()}}
-	instancesResp, err := ec2Client.DescribeInstances(describeInstances)
+	instancesResp, err := ec2Client.DescribeInstances(&ec2.DescribeInstancesInput{Filters: swim.resourceFilter()})
 	if err != nil {
 		return fmt.Errorf("Failed to fetch instances: %s", err)
 	}
@@ -730,7 +765,12 @@ func destroy(swimURL string) error {
 	}
 
 	if len(instanceIDs) > 0 {
-		log.Infof("Terminating instances %s", instanceIDs)
+		nonPointerIds := []string{}
+		for _, id := range instanceIDs {
+			nonPointerIds = append(nonPointerIds, *id)
+		}
+
+		log.Infof("Terminating instances %s", nonPointerIds)
 		_, err = ec2Client.TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: instanceIDs})
 		if err != nil {
 			return fmt.Errorf("Failed to terminate instances: %s", err)
@@ -755,6 +795,7 @@ func destroy(swimURL string) error {
 		log.Warnf("Error while removing role from instance profile: %s", err)
 	}
 
+	log.Infof("Deleting instance profile %s", swim.instanceProfileName())
 	_, err = iamClient.DeleteInstanceProfile(&iam.DeleteInstanceProfileInput{
 		InstanceProfileName: aws.String(swim.instanceProfileName()),
 	})
@@ -776,6 +817,7 @@ func destroy(swimURL string) error {
 				log.Warnf("Error while detaching IAM role policy: %s", err)
 			}
 
+			log.Infof("Deleting IAM policy %s", *policy.Arn)
 			_, err = iamClient.DeletePolicy(&iam.DeletePolicyInput{
 				PolicyArn: policy.Arn,
 			})
@@ -789,16 +831,18 @@ func destroy(swimURL string) error {
 		log.Warnf("Error while deleting IAM role policy: %s", err)
 	}
 
+	log.Infof("Deleting IAM role %s", swim.roleName())
 	_, err = iamClient.DeleteRole(&iam.DeleteRoleInput{RoleName: aws.String(swim.roleName())})
 	if err != nil {
 		log.Warnf("Error while deleting IAM role: %s", err)
 	}
 
 	securityGroups, err := ec2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-		Filters: []*ec2.Filter{vpcFilter, swim.clusterFilter()},
+		Filters: swim.resourceFilter(),
 	})
 	if err == nil {
 		for _, securityGroup := range securityGroups.SecurityGroups {
+			log.Infof("Deleting security group %s", *securityGroup.GroupId)
 			_, err = ec2Client.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
 				GroupId: securityGroup.GroupId,
 			})
@@ -819,6 +863,7 @@ func destroy(swimURL string) error {
 	}})
 	if err == nil {
 		for _, subnet := range subnets.Subnets {
+			log.Infof("Deleting subnet %s", *subnet.SubnetId)
 			_, err = ec2Client.DeleteSubnet(&ec2.DeleteSubnetInput{SubnetId: subnet.SubnetId})
 			if err != nil {
 				log.Warnf("Error while deleting subnet: %s", err)
@@ -839,6 +884,10 @@ func destroy(swimURL string) error {
 	})
 	if err == nil {
 		for _, internetGateway := range internetGateways.InternetGateways {
+			log.Infof(
+				"Detaching internet gateway %s from VPC %s",
+				*internetGateway.InternetGatewayId,
+				swim.VpcID)
 			_, err := ec2Client.DetachInternetGateway(&ec2.DetachInternetGatewayInput{
 				InternetGatewayId: internetGateway.InternetGatewayId,
 				VpcId:             aws.String(swim.VpcID),
@@ -847,6 +896,7 @@ func destroy(swimURL string) error {
 				log.Warnf("Error detaching internet gateways: %s", err)
 			}
 
+			log.Infof("Detaching internet gateway %s", *internetGateway.InternetGatewayId)
 			_, err = ec2Client.DeleteInternetGateway(&ec2.DeleteInternetGatewayInput{
 				InternetGatewayId: internetGateway.InternetGatewayId,
 			})
@@ -858,11 +908,10 @@ func destroy(swimURL string) error {
 		log.Warnf("Error looking up internet gateways: %s", err)
 	}
 
-	routeTables, err := ec2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
-		Filters: []*ec2.Filter{vpcFilter, swim.clusterFilter()},
-	})
+	routeTables, err := ec2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{Filters: swim.resourceFilter()})
 	if err == nil {
 		for _, routeTable := range routeTables.RouteTables {
+			log.Infof("Deleting route table %s", *routeTable.RouteTableId)
 			_, err = ec2Client.DeleteRouteTable(&ec2.DeleteRouteTableInput{
 				RouteTableId: routeTable.RouteTableId,
 			})
@@ -874,6 +923,7 @@ func destroy(swimURL string) error {
 		log.Warnf("Error while describing route tables: %s", err)
 	}
 
+	log.Infof("Deleting VPC %s", swim.VpcID)
 	_, err = ec2Client.DeleteVpc(&ec2.DeleteVpcInput{VpcId: aws.String(swim.VpcID)})
 	if err != nil {
 		log.Warnf("Error while deleting VPC: %s", err)
