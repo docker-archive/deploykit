@@ -916,7 +916,7 @@ func destroy(swimURL string) error {
 				log.Warnf("Error detaching internet gateways: %s", err)
 			}
 
-			log.Infof("Detaching internet gateway %s", *internetGateway.InternetGatewayId)
+			log.Infof("Deleting internet gateway %s", *internetGateway.InternetGatewayId)
 			_, err = ec2Client.DeleteInternetGateway(&ec2.DeleteInternetGatewayInput{
 				InternetGatewayId: internetGateway.InternetGatewayId,
 			})
