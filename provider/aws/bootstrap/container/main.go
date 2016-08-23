@@ -189,14 +189,14 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 
 	vpc, err := ec2Client.CreateVpc(&ec2.CreateVpcInput{CidrBlock: aws.String("192.168.0.0/16")})
 	if err != nil {
-		return err
+		return "", err
 	}
 	vpcID := *vpc.Vpc.VpcId
 
 	log.Infof("Waiting until VPC %s is available", vpcID)
 	err = ec2Client.WaitUntilVpcAvailable(&ec2.DescribeVpcsInput{VpcIds: []*string{vpc.Vpc.VpcId}})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	_, err = ec2Client.ModifyVpcAttribute(&ec2.ModifyVpcAttributeInput{
@@ -204,7 +204,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		EnableDnsSupport: &ec2.AttributeBooleanValue{Value: aws.Bool(true)},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// The API does not allow enabling DnsSupport and DnsHostnames in the same request, so a second modification
@@ -214,7 +214,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		EnableDnsHostnames: &ec2.AttributeBooleanValue{Value: aws.Bool(true)},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	workerSubnet, err := ec2Client.CreateSubnet(&ec2.CreateSubnetInput{
@@ -223,7 +223,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		AvailabilityZone: aws.String(swim.availabilityZone()),
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	log.Infof("Created worker subnet %s", *workerSubnet.Subnet.SubnetId)
 
@@ -233,7 +233,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		AvailabilityZone: aws.String(swim.availabilityZone()),
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	log.Infof("Created manager subnet %s", *managerSubnet.Subnet.SubnetId)
 
@@ -244,7 +244,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	}
 	workerSecurityGroup, err := ec2Client.CreateSecurityGroup(&workerGroupRequest)
 	if err != nil {
-		return err
+		return "", err
 	}
 	log.Infof("Created worker security group %s", *workerSecurityGroup.GroupId)
 
@@ -255,7 +255,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	}
 	managerSecurityGroup, err := ec2Client.CreateSecurityGroup(&managerGroupRequest)
 	if err != nil {
-		return err
+		return "", err
 	}
 	log.Infof("Created manager security group %s", *managerSecurityGroup.GroupId)
 
@@ -265,17 +265,17 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		*managerSubnet.Subnet,
 		*workerSubnet.Subnet)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = configureWorkerSecurityGroup(ec2Client, *workerSecurityGroup.GroupId, *managerSubnet.Subnet)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	routeTable, internetGateway, err := createRouteTable(ec2Client, vpcID, *swim)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	_, err = ec2Client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
@@ -283,7 +283,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		RouteTableId: routeTable.RouteTableId,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	_, err = ec2Client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
@@ -291,7 +291,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		RouteTableId: routeTable.RouteTableId,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Tag all resources created.
@@ -308,7 +308,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		Tags: []*ec2.Tag{swim.resourceTag()},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	applySubnetAndSecurityGroups(
@@ -320,12 +320,14 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		workerSubnet.Subnet.SubnetId,
 		workerSecurityGroup.GroupId)
 
-	return nil
+	return vpcID, nil
 }
 
 func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error {
 	iamClient := iam.New(config)
 
+	// TODO(wfarner): IAM roles are a global concept in AWS, meaning we will probably need to include region
+	// in these entities to avoid collisions.
 	role, err := iamClient.CreateRole(&iam.CreateRoleInput{
 		RoleName: aws.String(swim.roleName()),
 		AssumeRolePolicyDocument: aws.String(`{
@@ -754,41 +756,14 @@ func bootstrap(swimFile string) error {
 	return nil
 }
 
-func destroy(swimFile string) error {
-	swimData, err := ioutil.ReadFile(swimFile)
-	if err != nil {
-		return fmt.Errorf("Failed to read config file: %s", err)
-	}
-
-	swim := fakeSWIMSchema{}
-	err = json.Unmarshal(swimData, &swim)
-	if err != nil {
-		return fmt.Errorf("Invalid JSON in SWIM file: %s", err)
-	}
-
-	sess := getAWSClientConfig(swim)
-
-	ec2Client := ec2.New(sess)
-
-	vpcs, err := ec2Client.DescribeVpcs(&ec2.DescribeVpcsInput{Filters: []*ec2.Filter{swim.clusterFilter()}})
-	if err != nil {
-		return fmt.Errorf("Failed to look up VPC: %s", err)
-	}
-
-	var vpcID string
-	switch len(vpcs.Vpcs) {
-	case 0:
-		return fmt.Errorf("No VPCs found for cluster %s", swim.ClusterName)
-	case 1:
-		vpcID = *vpcs.Vpcs[0].VpcId
-	default:
-		return fmt.Errorf("Found multiple VPCs for cluster %s", swim.ClusterName)
-	}
+func destroyInstances(config client.ConfigProvider, swim fakeSWIMSchema, vpcID string) {
+	ec2Client := ec2.New(config)
 
 	instancesResp, err := ec2Client.DescribeInstances(
 		&ec2.DescribeInstancesInput{Filters: swim.resourceFilter(vpcID)})
 	if err != nil {
-		return fmt.Errorf("Failed to fetch instances: %s", err)
+		log.Errorf("Failed to fetch instances: %s", err)
+		return
 	}
 
 	instanceIDs := []*string{}
@@ -807,7 +782,8 @@ func destroy(swimFile string) error {
 		log.Infof("Terminating instances %s", nonPointerIds)
 		_, err = ec2Client.TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: instanceIDs})
 		if err != nil {
-			return fmt.Errorf("Failed to terminate instances: %s", err)
+			log.Errorf("Failed to terminate instances: %s", err)
+			return
 		}
 
 		// TODO(wfarner): Need a more robust routine here since instances can self-replicate.  For example,
@@ -815,13 +791,15 @@ func destroy(swimFile string) error {
 		// instance count.
 		err = ec2Client.WaitUntilInstanceTerminated(&ec2.DescribeInstancesInput{InstanceIds: instanceIDs})
 		if err != nil {
-			return fmt.Errorf("Error while waiting for instances to terminate: %s", err)
+			log.Warnf("Error while waiting for instances to terminate: %s", err)
 		}
 	}
+}
 
-	iamClient := iam.New(sess)
+func destroyAccessRoles(config client.ConfigProvider, swim fakeSWIMSchema) {
+	iamClient := iam.New(config)
 
-	_, err = iamClient.RemoveRoleFromInstanceProfile(&iam.RemoveRoleFromInstanceProfileInput{
+	_, err := iamClient.RemoveRoleFromInstanceProfile(&iam.RemoveRoleFromInstanceProfileInput{
 		InstanceProfileName: aws.String(swim.instanceProfileName()),
 		RoleName:            aws.String(swim.roleName()),
 	})
@@ -870,6 +848,10 @@ func destroy(swimFile string) error {
 	if err != nil {
 		log.Warnf("Error while deleting IAM role: %s", err)
 	}
+}
+
+func destroyNetwork(config client.ConfigProvider, swim fakeSWIMSchema, vpcID string) {
+	ec2Client := ec2.New(config)
 
 	securityGroups, err := ec2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
 		Filters: swim.resourceFilter(vpcID),
@@ -962,6 +944,50 @@ func destroy(swimFile string) error {
 	_, err = ec2Client.DeleteVpc(&ec2.DeleteVpcInput{VpcId: aws.String(vpcID)})
 	if err != nil {
 		log.Warnf("Error while deleting VPC: %s", err)
+	}
+}
+
+func destroy(swimFile string) error {
+	swimData, err := ioutil.ReadFile(swimFile)
+	if err != nil {
+		return fmt.Errorf("Failed to read config file: %s", err)
+	}
+
+	swim := fakeSWIMSchema{}
+	err = json.Unmarshal(swimData, &swim)
+	if err != nil {
+		return fmt.Errorf("Invalid JSON in SWIM file: %s", err)
+	}
+
+	sess := getAWSClientConfig(swim)
+
+	ec2Client := ec2.New(sess)
+
+	vpcs, err := ec2Client.DescribeVpcs(&ec2.DescribeVpcsInput{Filters: []*ec2.Filter{swim.clusterFilter()}})
+	if err != nil {
+		return fmt.Errorf("Failed to look up VPC: %s", err)
+	}
+
+	// TODO(wfarner): We omit the VPC ID from resource tags and allow more failure-resistant cleanup as long as we
+	// disallow clusters of the same name to exist within a region.
+	var vpcID string
+	switch len(vpcs.Vpcs) {
+	case 0:
+		log.Warnf("No VPCs found for cluster %s, unable to remove networks or instances", swim.ClusterName)
+	case 1:
+		vpcID = *vpcs.Vpcs[0].VpcId
+	default:
+		log.Warnf("Found multiple VPCs for cluster %s, unable to remove networks or instances", swim.ClusterName)
+	}
+
+	if vpcID != "" {
+		destroyInstances(sess, swim, vpcID)
+	}
+
+	destroyAccessRoles(sess, swim)
+
+	if vpcID != "" {
+		destroyNetwork(sess, swim, vpcID)
 	}
 
 	return nil
