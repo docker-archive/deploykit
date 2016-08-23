@@ -125,7 +125,6 @@ func TestDestroyInstanceError(t *testing.T) {
 
 	runError := errors.New("request failed")
 	expectDescribeInstance(t, clientMock, instanceID, "keyName")
-	expectKeyPairDeletion(t, clientMock, "keyName")
 	clientMock.EXPECT().TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: []*string{&instanceID}}).
 		Return(nil, runError)
 
@@ -173,7 +172,7 @@ func TestDescribeInstancesRequest(t *testing.T) {
 		}
 		require.Fail(t, fmt.Sprintf("Did not have filter %s/%s", name, value))
 	}
-	requireFilter("tag:machete-cluster", string(testCluster))
+	requireFilter("tag:docker-machete", string(testCluster))
 	requireFilter("tag:machete-group", string(group))
 
 	nextToken = aws.String("page-2")
@@ -264,7 +263,6 @@ const (
         "EbsOptimized": false,
         "ImageId": "ami-30ee0d50",
         "InstanceType": "t2.micro",
-        "KeyName": "dev",
         "Monitoring": {
             "Enabled": true
         },

@@ -14,8 +14,8 @@ import (
 	"time"
 )
 
-// Options are the configuration parameters for the ELB provisioner.
-type Options struct {
+// ELBOptions are the configuration parameters for the ELB provisioner.
+type ELBOptions struct {
 	Region  string
 	Retries int
 }
@@ -49,7 +49,7 @@ func Credentials(cred *Credential) *credentials.Credentials {
 }
 
 // CreateELBClient creates an AWS ELB API client.
-func CreateELBClient(awsCredentials *credentials.Credentials, opt Options) elbiface.ELBAPI {
+func CreateELBClient(awsCredentials *credentials.Credentials, opt ELBOptions) elbiface.ELBAPI {
 	region := opt.Region
 	if region == "" {
 		region, _ = GetRegion()
