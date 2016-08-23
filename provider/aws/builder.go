@@ -1,7 +1,9 @@
 package aws
 
 import (
+	"errors"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -24,6 +26,7 @@ type options struct {
 
 // Builder is a ProvisionerBuilder that creates an AWS instance provisioner.
 type Builder struct {
+	Config  client.ConfigProvider
 	options options
 }
 
@@ -40,31 +43,44 @@ func (b *Builder) Flags() *pflag.FlagSet {
 
 // BuildInstanceProvisioner creates an instance Provisioner configured with the Flags.
 func (b *Builder) BuildInstanceProvisioner(cluster spi.ClusterID) (instance.Provisioner, error) {
-	providers := []credentials.Provider{
-		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
-		&credentials.EnvProvider{},
-		&credentials.SharedCredentialsProvider{},
-	}
-
-	if (len(b.options.accessKeyID) > 0 && len(b.options.secretAccessKey) > 0) || len(b.options.sessionToken) > 0 {
-		staticCreds := credentials.StaticProvider{
-			Value: credentials.Value{
-				AccessKeyID:     b.options.accessKeyID,
-				SecretAccessKey: b.options.secretAccessKey,
-				SessionToken:    b.options.sessionToken,
-			},
+	if b.Config == nil {
+		providers := []credentials.Provider{
+			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
+			&credentials.EnvProvider{},
+			&credentials.SharedCredentialsProvider{},
 		}
-		providers = append(providers, &staticCreds)
+
+		if (len(b.options.accessKeyID) > 0 && len(b.options.secretAccessKey) > 0) || len(b.options.sessionToken) > 0 {
+			staticCreds := credentials.StaticProvider{
+				Value: credentials.Value{
+					AccessKeyID:     b.options.accessKeyID,
+					SecretAccessKey: b.options.secretAccessKey,
+					SessionToken:    b.options.sessionToken,
+				},
+			}
+			providers = append(providers, &staticCreds)
+		}
+
+		if b.options.region == "" {
+			log.Println("region not specified, attempting to discover from EC2 instance metadata")
+			region, err := GetRegion()
+			if err != nil {
+				return nil, errors.New("Unable to determine region")
+			}
+
+			log.Printf("Defaulting to local region %s\n", region)
+			b.options.region = region
+		}
+
+		b.Config = session.New(aws.NewConfig().
+			WithRegion(b.options.region).
+			WithCredentials(credentials.NewChainCredentials(providers)).
+			WithLogger(getLogger()).
+			//WithLogLevel(aws.LogDebugWithRequestErrors).
+			WithMaxRetries(b.options.retries))
 	}
 
-	client := ec2.New(session.New(aws.NewConfig().
-		WithRegion(b.options.region).
-		WithCredentials(credentials.NewChainCredentials(providers)).
-		WithLogger(getLogger()).
-		//WithLogLevel(aws.LogDebugWithRequestErrors).
-		WithMaxRetries(b.options.retries)))
-
-	return NewInstanceProvisioner(client, cluster), nil
+	return NewInstanceProvisioner(ec2.New(b.Config), cluster), nil
 }
 
 type logger struct {

@@ -10,7 +10,7 @@ import (
 
 func elbCommand() *cobra.Command {
 
-	elbOptions := new(aws.Options)
+	elbOptions := new(aws.ELBOptions)
 
 	cmd := &cobra.Command{
 		Use:   "elb",
