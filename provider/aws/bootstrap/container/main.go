@@ -357,7 +357,6 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 	if err != nil {
 		return err
 	}
-
 	log.Infof("Created IAM policy %s (id %s)", *policy.Policy.PolicyName, *policy.Policy.PolicyId)
 
 	_, err = iamClient.AttachRolePolicy(&iam.AttachRolePolicyInput{
@@ -371,6 +370,10 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 	if err != nil {
 		return err
 	}
+	log.Infof(
+		"Created IAM instance profile %s (id %s)",
+		*instanceProfile.InstanceProfile.InstanceProfileName,
+		*instanceProfile.InstanceProfile.InstanceProfileId)
 
 	err = iamClient.WaitUntilInstanceProfileExists(&iam.GetInstanceProfileInput{
 		InstanceProfileName: instanceProfile.InstanceProfile.InstanceProfileName,
