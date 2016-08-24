@@ -621,8 +621,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 start_install() {
-  sleep 5
-  curl -sSL https://get.docker.com/ | sh
+  if command -v docker >/dev/null
+  then
+    echo 'Detected existing Docker installation'
+  else
+    sleep 5
+    curl -sSL https://get.docker.com/ | sh
+  fi
 
   docker run \
     --detach \
