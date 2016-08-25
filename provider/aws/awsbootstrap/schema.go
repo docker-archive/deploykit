@@ -101,8 +101,8 @@ func (i instanceGroup) isManager() bool {
 type fakeSWIMSchema struct {
 	Driver      string
 	ClusterName string
-	ManagerIPs []string
-	Groups     map[string]instanceGroup
+	ManagerIPs  []string
+	Groups      map[string]instanceGroup
 }
 
 func (s *fakeSWIMSchema) cluster() clusterID {
