@@ -188,7 +188,7 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 			}
 
 			groups := []string{}
-			for name, _ := range swim.Groups {
+			for name := range swim.Groups {
 				groups = append(groups, name)
 			}
 

@@ -21,12 +21,12 @@ import (
 const (
 	workerType  = "worker"
 	managerType = "manager"
-	s3File = "config.swim"
+	s3File      = "config.swim"
 )
 
 type clusterID struct {
 	region string
-	name string
+	name   string
 }
 
 func (c clusterID) getAWSClient() client.ConfigProvider {

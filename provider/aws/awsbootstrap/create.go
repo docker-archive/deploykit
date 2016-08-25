@@ -78,9 +78,9 @@ func createInternetGateway(ec2Client ec2iface.EC2API, vpcID string, swim fakeSWI
 }
 
 func createRouteTable(
-ec2Client ec2iface.EC2API,
-vpcID string,
-swim fakeSWIMSchema) (*ec2.RouteTable, *ec2.InternetGateway, error) {
+	ec2Client ec2iface.EC2API,
+	vpcID string,
+	swim fakeSWIMSchema) (*ec2.RouteTable, *ec2.InternetGateway, error) {
 
 	internetGateway, err := createInternetGateway(ec2Client, vpcID, swim)
 	if err != nil {
@@ -353,10 +353,10 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 }
 
 func configureManagerSecurityGroup(
-ec2Client ec2iface.EC2API,
-groupID string,
-managerSubnet ec2.Subnet,
-workerSubnet ec2.Subnet) error {
+	ec2Client ec2iface.EC2API,
+	groupID string,
+	managerSubnet ec2.Subnet,
+	workerSubnet ec2.Subnet) error {
 
 	// Authorize traffic from worker nodes.
 	_, err := ec2Client.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
