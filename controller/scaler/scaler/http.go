@@ -112,7 +112,7 @@ func handlers(backend *backend) http.Handler {
 					return
 				}
 			}
-			resp.WriteHeader(http.StatusInternalServerError)
+			resp.WriteHeader(http.StatusNoContent)
 			return
 		}).Methods("GET")
 	return router

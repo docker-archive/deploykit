@@ -2,7 +2,6 @@ package scaler
 
 import (
 	"encoding/json"
-	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
 	"github.com/docker/libmachete/spi/instance"
@@ -11,6 +10,8 @@ import (
 	"time"
 )
 
+// Scaler is the spi of the scaler controller which mimics the behavior
+// of an autoscaling group / scale set on AWS or Azure.
 type Scaler interface {
 	util.RunStop
 	GetState() (json.RawMessage, error)
@@ -24,10 +25,6 @@ type scaler struct {
 	count            uint
 	stop             chan bool
 }
-
-// type provisionRequest struct {
-// 	Group instance.GroupID `json:"group"`
-// }
 
 // NewFixedScaler creates a RunStop that monitors a group of instances on a provisioner, attempting to maintain a
 // fixed count.
@@ -67,7 +64,12 @@ func (n sortByID) Less(i, j int) bool {
 
 // GetState returns a raw json of the state, including configuration
 func (s *scaler) GetState() (json.RawMessage, error) {
-	return nil, fmt.Errorf("not-implemented")
+	out := map[string]interface{}{
+		"config": s.provisionRequest,
+		"count":  s.count,
+	}
+	buff, err := json.Marshal(out)
+	return json.RawMessage(buff), err
 }
 
 func (s *scaler) checkState() {

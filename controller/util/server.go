@@ -72,6 +72,9 @@ func StartServer(addr string, endpoint http.Handler, shutdown ...func() error) (
 	return fromUser, stopped, nil
 }
 
+// ProtocolFromListenString checks the format of the input listen string
+// to see if it should be a tcp or unix socket protcol. For example,
+// --listen :8080 is tcp, while --listen /path/to/uds/file is unix
 func ProtocolFromListenString(listen string) string {
 	protocol := "tcp"
 	// e.g. 0.0.0.0:80 or :80 or :8080

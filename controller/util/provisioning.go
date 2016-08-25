@@ -11,7 +11,7 @@ type provisionRequest struct {
 	Count uint             `json:"count"`
 }
 
-// GroupFromRequest extracts the group ID and count from an otherwise opaque provisioning request.
+// GroupAndCountFromRequest extracts the group ID and count from an otherwise opaque provisioning request.
 func GroupAndCountFromRequest(request string) (*instance.GroupID, uint, error) {
 	req := provisionRequest{}
 	err := json.Unmarshal([]byte(request), &req)
