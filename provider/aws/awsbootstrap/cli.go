@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	machete_aws "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/spi/cli"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -65,29 +68,75 @@ func abort(format string, args ...interface{}) {
 func (a awsBootstrap) Command() *cobra.Command {
 	cmd := cobra.Command{Use: "aws"}
 
-	cmd.AddCommand(&cobra.Command{
-		Use:   "create <swim config>",
-		Short: "perform the bootstrap sequence",
-		Long:  "bootstrap a swarm cluster using a SWIM configuration",
+	cluster := clusterIDFlags{}
+
+	var keyName string
+	createCmd := cobra.Command{
+		Use:   "create [<swim config>]",
+		Short: "create a swarm cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
+			swim := fakeSWIMSchema{}
+			if len(args) == 1 {
+				if keyName != "" || cluster.ID.name != "" || cluster.ID.region != "" {
+					abort("No other cluster-related flags may be set when a SWIM file is used")
+				}
+
+				var err error
+				swim, err = readConfig(args[0])
+				if err != nil {
+					abort("Invalid config file: %s", err)
+				}
+			} else {
+				if keyName == "" || !cluster.valid() {
+					abort("When creating from flags, --key, --cluster, and --region must be provided")
+				}
+
+				instanceConfig := machete_aws.CreateInstanceRequest{
+					RunInstancesInput: ec2.RunInstancesInput{
+						ImageId: aws.String("ami-f701cb97"),
+						KeyName: aws.String(keyName),
+						Placement: &ec2.Placement{
+							// TODO(wfarner): Picking the AZ like this feels hackish.
+							AvailabilityZone: aws.String(cluster.ID.region + "a"),
+						},
+					},
+				}
+
+				swim = fakeSWIMSchema{
+					Driver:      "aws",
+					ClusterName: cluster.ID.name,
+					Groups: map[string]instanceGroup{
+						"Managers": {
+							Type:   managerType,
+							Size:   3,
+							Config: instanceConfig,
+						},
+						"Workers": {
+							Type:   workerType,
+							Size:   3,
+							Config: instanceConfig,
+						},
+					},
+				}
+
+				err := swim.validate()
+				if err != nil {
+					abort(err.Error())
+				}
+
+				swim.applyDefaults()
 			}
 
-			swim, err := readConfig(args[0])
-			if err != nil {
-				abort("Invalid config file: %s", err)
-			}
-
-			err = bootstrap(swim)
+			err := bootstrap(swim)
 			if err != nil {
 				abort(err.Error())
 			}
 		},
-	})
+	}
+	createCmd.Flags().AddFlagSet(cluster.flags())
+	createCmd.Flags().StringVar(&keyName, "key", "", "The existing SSH key in AWS to use for provisioned instances")
 
-	cluster := clusterIDFlags{}
+	cmd.AddCommand(&createCmd)
 
 	var swimFile string
 	destroyCmd := cobra.Command{

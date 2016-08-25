@@ -101,9 +101,6 @@ func (i instanceGroup) isManager() bool {
 type fakeSWIMSchema struct {
 	Driver      string
 	ClusterName string
-
-	// VpcID is only kept for cleanup.
-	VpcID      string
 	ManagerIPs []string
 	Groups     map[string]instanceGroup
 }

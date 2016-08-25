@@ -129,7 +129,13 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	vpcID := *vpc.Vpc.VpcId
 
 	log.Infof("Waiting until VPC %s is available", vpcID)
-	err = ec2Client.WaitUntilVpcAvailable(&ec2.DescribeVpcsInput{VpcIds: []*string{vpc.Vpc.VpcId}})
+	vpcDescribe := ec2.DescribeVpcsInput{VpcIds: []*string{vpc.Vpc.VpcId}}
+	err = ec2Client.WaitUntilVpcExists(&vpcDescribe)
+	if err != nil {
+		return "", fmt.Errorf("Failed while waiting for VPC to exist - %s", err)
+	}
+
+	err = ec2Client.WaitUntilVpcAvailable(&vpcDescribe)
 	if err != nil {
 		return "", fmt.Errorf("Failed while waiting for VPC to become available - %s", err)
 	}
@@ -486,7 +492,20 @@ func bootstrap(swim fakeSWIMSchema) error {
 		}
 	*/
 
-	err := createAccessRole(sess, &swim)
+	keyNames := []*string{}
+	for _, group := range swim.Groups {
+		keyNames = append(keyNames, group.Config.RunInstancesInput.KeyName)
+	}
+
+	ec2Client := ec2.New(sess)
+	_, err := ec2Client.DescribeKeyPairs(&ec2.DescribeKeyPairsInput{
+		KeyNames: keyNames,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = createAccessRole(sess, &swim)
 	if err != nil {
 		return err
 	}
@@ -512,35 +531,60 @@ func bootstrap(swim fakeSWIMSchema) error {
 		return err
 	}
 
-	ec2Client := ec2.New(sess)
-	filter := []*ec2.Filter{{
-		Name:   aws.String("instance-state-name"),
-		Values: []*string{aws.String("pending"), aws.String("running")},
-	}}
-	filter = append(filter, swim.cluster().resourceFilter(vpcID)...)
-	instancesResp, err := ec2Client.DescribeInstances(&ec2.DescribeInstancesInput{Filters: filter})
-	if err != nil {
-		return fmt.Errorf("Failed to fetch instances: %s", err)
-	}
-	publicIP := ""
-	for _, reservation := range instancesResp.Reservations {
-		for _, instance := range reservation.Instances {
-			if publicIP == "" {
-				if instance.PublicIpAddress == nil {
-					log.Warnf(
-						"Expected instances to have public IPs but %s does not",
-						*instance.InstanceId)
-				} else {
-					publicIP = *instance.PublicIpAddress
-				}
-			} else {
-				log.Warnf(
-					"Expected only one instance in the cluster, also found %s",
-					*instance.InstanceId)
-			}
+	getInstances := func(req *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
+		instances := []*ec2.Instance{}
+
+		instancesResp, err := ec2Client.DescribeInstances(req)
+		if err != nil {
+			return nil, err
 		}
+		for _, reservation := range instancesResp.Reservations {
+			instances = append(instances, reservation.Instances...)
+		}
+		return instances, nil
 	}
-	log.Infof("Boot leader has public IP %s", publicIP)
+
+	instances, err := getInstances(&ec2.DescribeInstancesInput{Filters: swim.cluster().resourceFilter(vpcID)})
+	if err != nil {
+		return fmt.Errorf("Failed to fetch boot leader: %s", err)
+	}
+	if len(instances) != 1 {
+		log.Warnf("Expected exactly one instance to be starting up, but found %s", len(instances))
+		return nil
+	}
+
+	// Public IP addresses are assigned some time between when an instance is started and when it enters running.
+	// To avoid racing here, we wait until running state to ensure a public IP is assigned.
+	log.Infof("Waiting for boot leader to run")
+	getBootLeader := ec2.DescribeInstancesInput{InstanceIds: []*string{instances[0].InstanceId}}
+	err = ec2Client.WaitUntilInstanceRunning(&getBootLeader)
+	if err != nil {
+		return fmt.Errorf("Failed while waiting for boot leader to start up: %s", err)
+	}
+
+	leaders, err := getInstances(&getBootLeader)
+	if err != nil {
+		return fmt.Errorf("Failed to fetch boot leader: %s", err)
+	}
+	if len(leaders) != 1 {
+		log.Warnf("Expected exactly one boot leader, but found %s", len(instances))
+		return nil
+	}
+
+	leader := leaders[0]
+	if leader.PublicIpAddress == nil {
+		log.Warnf(
+			"Expected instances to have public IPs but %s does not",
+			*leader.InstanceId)
+	} else {
+		log.Infof("")
+		log.Infof("Your Docker cluster is now booting!")
+		log.Infof("")
+		log.Infof("It may take a few more minutes for the cluster to be ready, at which point you can SSH")
+		log.Infof("to %s using the default login user for the AMI, and the private", *leader.PublicIpAddress)
+		log.Infof("SSH key associated with the public key '%s' in AWS", *leader.KeyName)
+		log.Infof("You can see other nodes tha thave joined the cluster by running 'docker node ls'")
+	}
 
 	return nil
 }
