@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func getUrl(url string) ([]byte, error) {
+func getURL(url string) ([]byte, error) {
 	client := &http.Client{}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -18,12 +18,11 @@ func getUrl(url string) ([]byte, error) {
 	}
 	if resp.StatusCode == http.StatusOK {
 		return ioutil.ReadAll(resp.Body)
-	} else {
-		return nil, fmt.Errorf("http error=%d", resp.StatusCode)
 	}
+	return nil, fmt.Errorf("http error=%d", resp.StatusCode)
 }
 
-func watchUrl() *cobra.Command {
+func watchURL() *cobra.Command {
 
 	pollingInterval := time.Duration(1 * time.Second)
 	watch := &cobra.Command{
@@ -32,7 +31,7 @@ func watchUrl() *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 
 			if len(args) == 0 {
-				return fmt.Errorf("no url specified.")
+				return fmt.Errorf("no url specified")
 			}
 
 			url := args[0]
@@ -48,7 +47,7 @@ func watchUrl() *cobra.Command {
 							log.Infoln("Watcher stopped.")
 							return
 						case <-tick:
-							data, err := getUrl(url)
+							data, err := getURL(url)
 
 							log.Debugln("fetched", url, "len=", len(data), "err=", err)
 

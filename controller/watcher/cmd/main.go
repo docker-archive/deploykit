@@ -73,7 +73,7 @@ func main() {
 	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
-	cmd.AddCommand(watchUrl())
+	cmd.AddCommand(watchURL())
 
 	err := cmd.Execute()
 	if err != nil {
@@ -92,6 +92,7 @@ func getMap(v interface{}, key string) map[string]interface{} {
 	return nil
 }
 
+// RestartControllers restart the controllers in the swim file.
 // Given the config data, restart any active containers as necessary.
 // Initially we assume a simple config that lists the controllers to restart.
 // In reality, it's more complicated -- we would parse the swim config and analyze

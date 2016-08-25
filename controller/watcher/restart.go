@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// Restarter retarts a container that matches the given image.
 type Restarter struct {
 	docker  client.APIClient
 	ctx     context.Context
@@ -17,6 +18,7 @@ type Restarter struct {
 	timeout time.Duration
 }
 
+// Restart handles restarting containers
 func Restart(docker client.APIClient, image string) *Restarter {
 	return &Restarter{
 		docker:  docker,
@@ -26,6 +28,7 @@ func Restart(docker client.APIClient, image string) *Restarter {
 	}
 }
 
+// SetTimeout sets the timeout for docker in restarting container.
 func (r *Restarter) SetTimeout(t time.Duration) *Restarter {
 	r.timeout = t
 	return r
@@ -68,6 +71,7 @@ func (r *Restarter) findContainer() (*types.Container, error) {
 	}
 }
 
+// Run starts the container restart
 func (r *Restarter) Run() error {
 
 	r.ctx = context.Background()
