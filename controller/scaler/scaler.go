@@ -38,6 +38,8 @@ func NewFixedScaler(
 		return nil, err
 	}
 
+	log.Infoln("FixedScaler with group=", group, "count=", count)
+
 	return &scaler{
 		pollInterval:     pollInterval,
 		provisioner:      provisioner,
