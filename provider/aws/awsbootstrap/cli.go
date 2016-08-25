@@ -12,7 +12,8 @@ import (
 	"strconv"
 )
 
-func NewDriverCli() cli.DriverCli {
+// NewDriverCLI creates a DriverCLI implementation that exposes AWS commands.
+func NewDriverCLI() cli.DriverCLI {
 	return &awsBootstrap{}
 }
 

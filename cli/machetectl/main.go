@@ -17,7 +17,7 @@ var (
 	Revision = "Unspecified"
 )
 
-func attachDriver(rootCmd *cobra.Command, cli cli.DriverCli, requiredName string) {
+func attachDriver(rootCmd *cobra.Command, cli cli.DriverCLI, requiredName string) {
 	cmd := cli.Command()
 	if cmd.Name() != requiredName {
 		panic(fmt.Sprintf("Internal error - driver must use name '%s'", requiredName))
@@ -37,7 +37,7 @@ func main() {
 		},
 	})
 
-	attachDriver(rootCmd, awsbootstrap.NewDriverCli(), "aws")
+	attachDriver(rootCmd, awsbootstrap.NewDriverCLI(), "aws")
 
 	err := rootCmd.Execute()
 	if err != nil {
