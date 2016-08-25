@@ -1944,6 +1944,50 @@ func (_mr *_MockEC2APIRecorder) DescribeFlowLogsRequest(arg0 interface{}) *gomoc
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeFlowLogsRequest", arg0)
 }
 
+func (_m *MockEC2API) DescribeHostReservationOfferings(_param0 *ec2.DescribeHostReservationOfferingsInput) (*ec2.DescribeHostReservationOfferingsOutput, error) {
+	ret := _m.ctrl.Call(_m, "DescribeHostReservationOfferings", _param0)
+	ret0, _ := ret[0].(*ec2.DescribeHostReservationOfferingsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeHostReservationOfferings(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeHostReservationOfferings", arg0)
+}
+
+func (_m *MockEC2API) DescribeHostReservationOfferingsRequest(_param0 *ec2.DescribeHostReservationOfferingsInput) (*request.Request, *ec2.DescribeHostReservationOfferingsOutput) {
+	ret := _m.ctrl.Call(_m, "DescribeHostReservationOfferingsRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.DescribeHostReservationOfferingsOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeHostReservationOfferingsRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeHostReservationOfferingsRequest", arg0)
+}
+
+func (_m *MockEC2API) DescribeHostReservations(_param0 *ec2.DescribeHostReservationsInput) (*ec2.DescribeHostReservationsOutput, error) {
+	ret := _m.ctrl.Call(_m, "DescribeHostReservations", _param0)
+	ret0, _ := ret[0].(*ec2.DescribeHostReservationsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeHostReservations(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeHostReservations", arg0)
+}
+
+func (_m *MockEC2API) DescribeHostReservationsRequest(_param0 *ec2.DescribeHostReservationsInput) (*request.Request, *ec2.DescribeHostReservationsOutput) {
+	ret := _m.ctrl.Call(_m, "DescribeHostReservationsRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.DescribeHostReservationsOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeHostReservationsRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeHostReservationsRequest", arg0)
+}
+
 func (_m *MockEC2API) DescribeHosts(_param0 *ec2.DescribeHostsInput) (*ec2.DescribeHostsOutput, error) {
 	ret := _m.ctrl.Call(_m, "DescribeHosts", _param0)
 	ret0, _ := ret[0].(*ec2.DescribeHostsOutput)
@@ -3540,6 +3584,28 @@ func (_mr *_MockEC2APIRecorder) GetConsoleScreenshotRequest(arg0 interface{}) *g
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetConsoleScreenshotRequest", arg0)
 }
 
+func (_m *MockEC2API) GetHostReservationPurchasePreview(_param0 *ec2.GetHostReservationPurchasePreviewInput) (*ec2.GetHostReservationPurchasePreviewOutput, error) {
+	ret := _m.ctrl.Call(_m, "GetHostReservationPurchasePreview", _param0)
+	ret0, _ := ret[0].(*ec2.GetHostReservationPurchasePreviewOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) GetHostReservationPurchasePreview(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetHostReservationPurchasePreview", arg0)
+}
+
+func (_m *MockEC2API) GetHostReservationPurchasePreviewRequest(_param0 *ec2.GetHostReservationPurchasePreviewInput) (*request.Request, *ec2.GetHostReservationPurchasePreviewOutput) {
+	ret := _m.ctrl.Call(_m, "GetHostReservationPurchasePreviewRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.GetHostReservationPurchasePreviewOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) GetHostReservationPurchasePreviewRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetHostReservationPurchasePreviewRequest", arg0)
+}
+
 func (_m *MockEC2API) GetPasswordData(_param0 *ec2.GetPasswordDataInput) (*ec2.GetPasswordDataOutput, error) {
 	ret := _m.ctrl.Call(_m, "GetPasswordData", _param0)
 	ret0, _ := ret[0].(*ec2.GetPasswordDataOutput)
@@ -4044,6 +4110,28 @@ func (_m *MockEC2API) MoveAddressToVpcRequest(_param0 *ec2.MoveAddressToVpcInput
 
 func (_mr *_MockEC2APIRecorder) MoveAddressToVpcRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "MoveAddressToVpcRequest", arg0)
+}
+
+func (_m *MockEC2API) PurchaseHostReservation(_param0 *ec2.PurchaseHostReservationInput) (*ec2.PurchaseHostReservationOutput, error) {
+	ret := _m.ctrl.Call(_m, "PurchaseHostReservation", _param0)
+	ret0, _ := ret[0].(*ec2.PurchaseHostReservationOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) PurchaseHostReservation(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PurchaseHostReservation", arg0)
+}
+
+func (_m *MockEC2API) PurchaseHostReservationRequest(_param0 *ec2.PurchaseHostReservationInput) (*request.Request, *ec2.PurchaseHostReservationOutput) {
+	ret := _m.ctrl.Call(_m, "PurchaseHostReservationRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.PurchaseHostReservationOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) PurchaseHostReservationRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PurchaseHostReservationRequest", arg0)
 }
 
 func (_m *MockEC2API) PurchaseReservedInstancesOffering(_param0 *ec2.PurchaseReservedInstancesOfferingInput) (*ec2.PurchaseReservedInstancesOfferingOutput, error) {

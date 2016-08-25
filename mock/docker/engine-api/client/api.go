@@ -629,14 +629,14 @@ func (_mr *_MockAPIClientRecorder) NodeList(arg0, arg1 interface{}) *gomock.Call
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "NodeList", arg0, arg1)
 }
 
-func (_m *MockAPIClient) NodeRemove(_param0 context.Context, _param1 string, _param2 types.NodeRemoveOptions) error {
-	ret := _m.ctrl.Call(_m, "NodeRemove", _param0, _param1, _param2)
+func (_m *MockAPIClient) NodeRemove(_param0 context.Context, _param1 string) error {
+	ret := _m.ctrl.Call(_m, "NodeRemove", _param0, _param1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockAPIClientRecorder) NodeRemove(arg0, arg1, arg2 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "NodeRemove", arg0, arg1, arg2)
+func (_mr *_MockAPIClientRecorder) NodeRemove(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "NodeRemove", arg0, arg1)
 }
 
 func (_m *MockAPIClient) NodeUpdate(_param0 context.Context, _param1 string, _param2 swarm.Version, _param3 swarm.NodeSpec) error {
