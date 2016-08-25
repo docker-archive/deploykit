@@ -26,7 +26,7 @@ func NewQuorum(
 	provisionTemplate string,
 	ipAddresses []string) (util.RunStop, error) {
 
-	group, err := util.GroupFromRequest(provisionTemplate)
+	group, _, err := util.GroupAndCountFromRequest(provisionTemplate)
 	if err != nil {
 		return nil, err
 	}

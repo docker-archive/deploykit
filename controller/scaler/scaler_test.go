@@ -1,16 +1,13 @@
 package scaler
 
 import (
+	"fmt"
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
-)
-
-const (
-	testRequest = `{"Group": "test-group"}`
 )
 
 var (
@@ -20,6 +17,10 @@ var (
 	c     = instance.ID("c")
 	d     = instance.ID("d")
 )
+
+func testRequest(count uint) string {
+	return fmt.Sprintf(`{"Group": "test-group", "Count":%d}`, count)
+}
 
 func desc(ids []instance.ID) []instance.Description {
 	descriptions := []instance.Description{}
@@ -37,8 +38,7 @@ func TestScaleUp(t *testing.T) {
 	scaler, err := NewFixedScaler(
 		1*time.Millisecond,
 		provisioner,
-		testRequest,
-		uint(3),
+		testRequest(uint(3)),
 	)
 	require.NoError(t, err)
 
@@ -65,9 +65,7 @@ func TestScaleDown(t *testing.T) {
 	scaler, err := NewFixedScaler(
 		1*time.Millisecond,
 		provisioner,
-		testRequest,
-		uint(2),
-	)
+		testRequest(uint(2)))
 	require.NoError(t, err)
 
 	gomock.InOrder(

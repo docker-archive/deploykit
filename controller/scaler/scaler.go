@@ -1,6 +1,8 @@
 package scaler
 
 import (
+	"encoding/json"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
 	"github.com/docker/libmachete/spi/instance"
@@ -8,6 +10,11 @@ import (
 	"sync"
 	"time"
 )
+
+type Scaler interface {
+	util.RunStop
+	GetState() (json.RawMessage, error)
+}
 
 type scaler struct {
 	pollInterval     time.Duration
@@ -18,19 +25,18 @@ type scaler struct {
 	stop             chan bool
 }
 
-type provisionRequest struct {
-	Group instance.GroupID `json:"group"`
-}
+// type provisionRequest struct {
+// 	Group instance.GroupID `json:"group"`
+// }
 
 // NewFixedScaler creates a RunStop that monitors a group of instances on a provisioner, attempting to maintain a
 // fixed count.
 func NewFixedScaler(
 	pollInterval time.Duration,
 	provisioner instance.Provisioner,
-	request string,
-	count uint) (util.RunStop, error) {
+	request string) (Scaler, error) {
 
-	group, err := util.GroupFromRequest(request)
+	group, count, err := util.GroupAndCountFromRequest(request)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +63,11 @@ func (n sortByID) Swap(i, j int) {
 
 func (n sortByID) Less(i, j int) bool {
 	return n[i].ID < n[j].ID
+}
+
+// GetState returns a raw json of the state, including configuration
+func (s *scaler) GetState() (json.RawMessage, error) {
+	return nil, fmt.Errorf("not-implemented")
 }
 
 func (s *scaler) checkState() {

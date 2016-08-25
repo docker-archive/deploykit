@@ -137,8 +137,7 @@ func TestScalerIntegration(t *testing.T) {
 		watcher, err := NewFixedScaler(
 			10*time.Millisecond,
 			client.NewInstanceProvisioner(r.Url("")),
-			fmt.Sprintf(`{"Group": "%s"}`, group),
-			uint(target))
+			fmt.Sprintf(`{"Group": "%s", "Count":%d}`, group, uint(target)))
 		require.NoError(t, err)
 
 		go watcher.Run()
