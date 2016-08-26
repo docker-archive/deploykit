@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
 	"io/ioutil"
@@ -70,14 +71,25 @@ func (c instanceClient) sendRequest(method, path, body string) ([]byte, error) {
 	return data, err
 }
 
-func (c instanceClient) Provision(request string) (*instance.ID, error) {
-	data, apiErr := c.sendRequest("POST", "instance/", request)
+func (c instanceClient) Provision(request string, volume *instance.VolumeID) (*instance.ID, error) {
+	req := json.RawMessage(request)
+	payload := api.ProvisionRequest{
+		Request: &req,
+		Volume:  volume,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	data, apiErr := c.sendRequest("POST", "instance/", string(body))
 	if apiErr != nil {
 		return nil, apiErr
 	}
 
 	var idString string
-	err := json.Unmarshal(data, &idString)
+	err = json.Unmarshal(data, &idString)
 	if err != nil {
 		return nil, err
 	}

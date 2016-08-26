@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
+	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/drewolson/testflight"
@@ -70,11 +71,20 @@ func TestProvision(t *testing.T) {
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		id := instance.ID("instance-id")
+
 		request := "{}"
+		volume := instance.VolumeID("volume")
 
-		provisioner.EXPECT().Provision(request).Return(&id, nil)
+		provisioner.EXPECT().Provision(request, &volume).Return(&id, nil)
 
-		response := r.Post("/instance/", "application/json", request)
+		payload := json.RawMessage(request)
+		body, err := json.Marshal(api.ProvisionRequest{
+			Request: &payload,
+			Volume:  &volume,
+		})
+		require.NoError(t, err)
+
+		response := r.Post("/instance/", "application/json", string(body))
 		require.Equal(t, 201, response.StatusCode)
 		var result instance.ID
 		require.NoError(t, json.Unmarshal([]byte(response.Body), &result))
@@ -90,8 +100,13 @@ func TestProvisionError(t *testing.T) {
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		request := "{}"
-		provisioner.EXPECT().Provision(request).Return(nil, BadInputError)
-		expectBadInputError(t, r.Post("/instance/", "application/json", request))
+		provisioner.EXPECT().Provision(request, nil).Return(nil, BadInputError)
+
+		payload := json.RawMessage(request)
+		body, err := json.Marshal(api.ProvisionRequest{Request: &payload})
+		require.NoError(t, err)
+
+		expectBadInputError(t, r.Post("/instance/", "application/json", string(body)))
 	})
 }
 

@@ -108,7 +108,8 @@ func ProvisionManager(provisioner instance.Provisioner, provisionTemplate *templ
 		return fmt.Errorf("Failed to create provision request: %s", err)
 	}
 
-	id, err := provisioner.Provision(buffer.String())
+	volume := instance.VolumeID(ip)
+	id, err := provisioner.Provision(buffer.String(), &volume)
 	if err != nil {
 		return fmt.Errorf("Failed to provision: %s", err)
 	}

@@ -58,7 +58,7 @@ func TestInstanceLifecycle(t *testing.T) {
 	}
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
-	id, err := provisioner.Provision(inputJSON)
+	id, err := provisioner.Provision(inputJSON, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
@@ -95,7 +95,7 @@ func TestCreateInstanceRequiresGroup(t *testing.T) {
 	clientMock := mock_ec2.NewMockEC2API(ctrl)
 
 	provisioner := NewInstanceProvisioner(clientMock, testCluster)
-	_, err := provisioner.Provision("{}")
+	_, err := provisioner.Provision("{}", nil)
 	require.Error(t, err)
 	require.Equal(t, spi.ErrBadInput, spi.CodeFromError(err))
 }
@@ -110,7 +110,7 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := NewInstanceProvisioner(clientMock, testCluster)
-	id, err := provisioner.Provision(`{"Group": "a"}`)
+	id, err := provisioner.Provision(`{"Group": "a"}`, nil)
 
 	require.Error(t, err)
 	require.Nil(t, id)
