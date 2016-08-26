@@ -24,11 +24,22 @@ var (
 type Registry struct {
 	drivers    map[string]*Controller
 	namespaces map[string]*Controller
+	names      map[string]*Controller
 }
 
 // Namespaces return a map of namespace to Controller
 func (r *Registry) Namespaces() map[string]*Controller {
 	return r.namespaces
+}
+
+// Names return a map of names to Controller
+func (r *Registry) Names() map[string]*Controller {
+	return r.names
+}
+
+// GetControllerByName returns a controller by name
+func (r *Registry) GetControllerByName(name string) *Controller {
+	return r.names[name]
 }
 
 // ForEachControllerCapable visits all the controllers that are capable of doing a task or for a lifecycle phase.
@@ -63,6 +74,7 @@ func NewRegistry(dir string) (*Registry, error) {
 	registry = &Registry{
 		drivers:    map[string]*Controller{},
 		namespaces: map[string]*Controller{},
+		names:      map[string]*Controller{},
 	}
 
 	for _, entry := range entries {
@@ -78,6 +90,7 @@ func NewRegistry(dir string) (*Registry, error) {
 			log.Infoln("driver info=", info)
 			registry.drivers[socket] = info
 			registry.namespaces[info.Namespace] = info
+			registry.names[info.DriverName] = info
 		}
 	}
 	return registry, nil
@@ -157,6 +170,12 @@ func (d *ControllerClient) Call(op string, req interface{}) error {
 		return err
 	}
 	buff, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 	log.Infoln("Resp", string(buff))
-	return err
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("error from controller:%d, msg=%s", resp.StatusCode, string(buff))
+	}
+	return nil
 }
