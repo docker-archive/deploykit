@@ -10,10 +10,10 @@ MACHETE_PORT=8888
 wget -O config.swim $SWIM_URL
 CLUSTER_NAME=$(jq -r '.ClusterName' config.swim)
 MANAGER_IPS=$(jq -c '.ManagerIPs' config.swim | tr -d '"' | tr -d '[' | tr -d ']')
-NUM_WORKERS=$(jq -r '.NumWorkers' config.swim)
-DRIVER_AND_ARGS=$(jq -r '.Driver' config.swim)
-jq '.ManagerInstance' config.swim > /scratch/manager-request.swpt
-jq '.WorkerInstance' config.swim > /scratch/worker-request.swpt
+NUM_WORKERS=$(jq -r '.Groups[] | select(.Type == "worker") | .Size' config.swim)
+DRIVER=$(jq -r '.Driver' config.swim)
+jq '.Groups[] | select(.Type == "manager") | .Config' config.swim > /scratch/manager-request.swpt
+jq '.Groups[] | select(.Type == "worker") | .Config' config.swim > /scratch/worker-request.swpt
 
 # Machete API server.
 docker run \
@@ -23,7 +23,7 @@ docker run \
   --restart always \
   --publish $MACHETE_PORT:$MACHETE_PORT \
   wfarner/machete \
-  --cluster "$CLUSTER_NAME" --port $MACHETE_PORT $DRIVER_AND_ARGS
+  --cluster "$CLUSTER_NAME" --port $MACHETE_PORT $DRIVER
 
 # Serves swarm join tokens.
 docker run \
