@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/controller"
 	"github.com/docker/libmachete/controller/util"
 	"github.com/gorilla/mux"
 	"io/ioutil"
@@ -60,6 +61,12 @@ func noError(err error, resp http.ResponseWriter) bool {
 	return true
 }
 
+type info struct {
+	controller.Info
+	Running bool            `json:"running"`
+	Config  json.RawMessage `json:"config"`
+}
+
 // handler returns a http handler
 func handlers(backend *backend) http.Handler {
 	router := mux.NewRouter()
@@ -67,19 +74,45 @@ func handlers(backend *backend) http.Handler {
 	// Get the info
 	router.HandleFunc("/v1/info",
 		func(resp http.ResponseWriter, req *http.Request) {
-			buff, err := json.Marshal(map[string]interface{}{
-				"version":  Version,
-				"revision": Revision,
-				"scaler":   backend.scaler,
-				"running":  backend.scaler != nil,
-				"config":   json.RawMessage(backend.request),
-			})
+			log.Infoln("Request for info")
+			info := info{
+				Info: controller.Info{
+					// Name is the driver friendly name
+					Name: "aws scaler",
+					// DriverName is the name used in the RPC url call.  For example, 'scaler' in /v1/scaler.Start
+					DriverName: "aws",
+					// Version is the version string
+					Version: Version,
+					// Revision is the revision
+					Revision: Revision,
+					// Description friendly description
+					Description: "Docker-implemented scaler for managing groups of nodes in swarm.",
+					// Namespace used in the swim config
+					Namespace: "aws",
+					// Image is the container image
+					Image: "libmachete/scaler", // TODO(chungers) - externalize this as a flag
+					// Capabilities is a list of capabilities such as 'bootstrap', 'runtime', 'teardown'
+					Capabilities: []string{
+						"runtime",
+					},
+				},
+				Running: backend.scaler != nil,
+			}
+
+			if len(backend.request) > 0 {
+				info.Config = json.RawMessage(backend.request)
+			} else {
+				info.Config = json.RawMessage([]byte("{}"))
+			}
+
+			buff, err := json.Marshal(&info)
 			if noError(err, resp) {
 				_, err = resp.Write(buff)
 				if noError(err, resp) {
 					return
 				}
 			}
+			log.Warningln("err=", err)
 			return
 		}).Methods("GET")
 
