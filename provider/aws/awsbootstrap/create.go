@@ -460,7 +460,7 @@ then
 fi
 
 mkdir -p /var/lib/docker
-echo "$unmounted /dev/xvdf /var/lib/docker ext4 defaults,nofail 0 2" > /etc/fstab
+echo "$unmounted /var/lib/docker ext4 defaults,nofail 0 2" > /etc/fstab
 mount -a
 `
 
