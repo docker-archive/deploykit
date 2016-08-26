@@ -79,8 +79,10 @@ func handlers(backend *backend) http.Handler {
 				Info: controller.Info{
 					// Name is the driver friendly name
 					Name: "aws scaler",
-					// DriverName is the name used in the RPC url call.  For example, 'scaler' in /v1/scaler.Start
+					// DriverName is the name of the driver
 					DriverName: "aws",
+					// DriverType is the name used in the RPC url call.  For example, 'scaler' in /v1/scaler.Start
+					DriverType: "scaler",
 					// Version is the version string
 					Version: Version,
 					// Revision is the revision
