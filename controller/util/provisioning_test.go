@@ -7,12 +7,12 @@ import (
 )
 
 func TestGroupFromRequest(t *testing.T) {
-	group, err := GroupFromRequest(`{"Group": "managers"}`)
+	group, _, err := GroupAndCountFromRequest(`{"Group": "managers"}`)
 	require.NoError(t, err)
 	require.Equal(t, instance.GroupID("managers"), *group)
 
 	requireFailsWithRequest := func(request string) {
-		group, err := GroupFromRequest(request)
+		group, _, err := GroupAndCountFromRequest(request)
 		require.Error(t, err)
 		require.Nil(t, group)
 	}

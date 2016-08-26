@@ -8,19 +8,20 @@ import (
 
 type provisionRequest struct {
 	Group instance.GroupID `json:"group"`
+	Count uint             `json:"count"`
 }
 
-// GroupFromRequest extracts the group ID from an otherwise opaque provisioning request.
-func GroupFromRequest(request string) (*instance.GroupID, error) {
+// GroupAndCountFromRequest extracts the group ID and count from an otherwise opaque provisioning request.
+func GroupAndCountFromRequest(request string) (*instance.GroupID, uint, error) {
 	req := provisionRequest{}
 	err := json.Unmarshal([]byte(request), &req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if req.Group == "" {
-		return nil, errors.New("Group must not be empty")
+		return nil, 0, errors.New("Group must not be empty")
 	}
 
-	return &req.Group, nil
+	return &req.Group, req.Count, nil
 }
