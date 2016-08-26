@@ -46,7 +46,7 @@ func TestScaleUp(t *testing.T) {
 		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b, c}), nil),
 		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b, c}), nil),
 		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b}), nil),
-		provisioner.EXPECT().Provision(testRequest).Return(&d, nil),
+		provisioner.EXPECT().Provision(testRequest(uint(3))).Return(&d, nil),
 		provisioner.EXPECT().DescribeInstances(group).Do(func(_ instance.GroupID) {
 			go scaler.Stop()
 		}).Return(desc([]instance.ID{a, b, c}), nil),
