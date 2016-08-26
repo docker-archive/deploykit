@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/ssh"
 	"sort"
+	"time"
 )
 
 const (
@@ -160,19 +161,21 @@ func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance
 	if awsVolumeID != nil {
 		log.Infof("Waiting for instance %s to enter running state before attaching volume", *id)
 		for {
+			time.Sleep(10 * time.Second)
+
 			instance, err := p.Client.DescribeInstances(&ec2.DescribeInstancesInput{
 				InstanceIds: []*string{ec2Instance.InstanceId},
 			})
-			if err != nil {
-				if awsErr, ok := err.(awserr.Error); ok {
-					if awsErr.Code() == "InvalidInstanceID.NotFound" {
-						return id, nil
-					}
+			if err == nil {
+				if *instance.Reservations[0].Instances[0].State.Name == ec2.InstanceStateNameRunning {
+					break
+				}
+			} else if awsErr, ok := err.(awserr.Error); ok {
+				if awsErr.Code() == "InvalidInstanceID.NotFound" {
+					return id, nil
 				}
 			}
-			if *instance.Reservations[0].Instances[0].State.Name == ec2.InstanceStateNameRunning {
-				break
-			}
+
 		}
 
 		_, err := p.Client.AttachVolume(&ec2.AttachVolumeInput{
