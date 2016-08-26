@@ -7,8 +7,9 @@ import (
 )
 
 type poc2scalerRequest struct {
-	Group string `json:"group"`
-	Count int    `json:"count"`
+	Group             string                 `json:"group"`
+	Count             int                    `json:"count"`
+	RunInstancesInput map[string]interface{} `json:"run_instances_input"`
 }
 
 type poc2schema struct {
@@ -18,17 +19,6 @@ type poc2schema struct {
 		Size   int
 		Type   string
 	}
-}
-
-// POC2ImageToConnectionString returns the connection string used by the client to
-// configure the driver.
-// TODO(chungers) -- Need to integrate this with Plugin Discovery in the Engine.
-func POC2ImageToConnectionString(controllerImage string) string {
-	switch controllerImage {
-	case "libmachete/scaler":
-		return "localhost:9090" // TODO(chungers) - won't work if watcher runs in container.
-	}
-	return ""
 }
 
 // POC2ControllerNamesFromSWIM parses the swim file to determine the images to restart
