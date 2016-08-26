@@ -93,10 +93,6 @@ func handlers(backend *backend) http.Handler {
 					Namespace: "aws",
 					// Image is the container image
 					Image: "libmachete/scaler", // TODO(chungers) - externalize this as a flag
-					// Capabilities is a list of capabilities such as 'bootstrap', 'runtime', 'teardown'
-					Capabilities: []string{
-						"runtime",
-					},
 				},
 				Running: backend.scaler != nil,
 			}
