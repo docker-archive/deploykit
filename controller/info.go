@@ -26,7 +26,4 @@ type Info struct {
 
 	// Image is the container image
 	Image string
-
-	// Capabilities is a list of capabilities such as 'bootstrap', 'runtime', 'teardown'
-	Capabilities []string
 }

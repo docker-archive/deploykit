@@ -7,10 +7,7 @@ import (
 	"github.com/docker/libmachete/controller/scaler"
 	"github.com/docker/libmachete/controller/util/cli"
 	"github.com/spf13/cobra"
-	"io/ioutil"
 	"os"
-	"os/signal"
-	"strconv"
 	"time"
 )
 
@@ -21,6 +18,15 @@ var (
 	// Revision is the build source control revision.
 	Revision = "Unspecified"
 )
+
+// for hooking up the http server with the scaler object
+type backend struct {
+	scaler  scaler.Scaler
+	config  chan<- []byte
+	stop    chan<- struct{}
+	done    chan struct{}
+	request []byte
+}
 
 func main() {
 	rootCmd := &cobra.Command{
@@ -35,52 +41,86 @@ func main() {
 		},
 	})
 
-	runCmd := cobra.Command{Use: "run <machete address> <target count> <config path>"}
+	runCmd := cobra.Command{Use: "run <machete address>"}
 
 	runWhenLeading := cli.LeaderCmd(runCmd)
 
+	driverDir := "/tmp/machete"
+	listen := ":9090"
+
+	runCmd.Flags().StringVar(&driverDir, "driver_dir", driverDir, "driver directory")
+	runCmd.Flags().StringVar(&listen, "listen", listen, "listen address (unix or tcp)")
+
 	runCmd.Run = func(cmd *cobra.Command, args []string) {
-		if len(args) != 3 {
+		if len(args) != 1 {
 			cmd.Usage()
 			return
 		}
 
 		macheteAddress := args[0]
 
-		targetCount, err := strconv.ParseUint(args[1], 10, 32)
-		if err != nil {
-			log.Error("Invalid target count", err)
-			os.Exit(1)
+		// channel from which the configuration will be read.
+		start := make(chan []byte)
+		running := make(chan scaler.Scaler)
+		done := make(chan struct{})
+
+		backend := &backend{
+			done:   done,
+			config: start,
 		}
 
-		configPath := args[2]
+		log.Infoln("Starting httpd")
 
-		requestData, err := ioutil.ReadFile(configPath)
+		// Now start the http server with proper handling of signals
+		stopHTTP, wait, err := runHTTP(driverDir, listen, backend)
 		if err != nil {
-			log.Error(err)
-			os.Exit(1)
+			panic(err)
 		}
+		log.Infoln("Started httpd")
+		backend.stop = stopHTTP
 
-		instanceWatcher, err := scaler.NewFixedScaler(
-			5*time.Second,
-			client.NewInstanceProvisioner(macheteAddress),
-			string(requestData),
-			uint(targetCount))
-		if err != nil {
-			log.Error(err)
-			os.Exit(1)
-		}
+		shutdown := make(chan struct{}) // for notifying this method that the server has shutdown before activated.
 
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
 		go func() {
-			for range c {
-				log.Info("Stopping scaler")
-				instanceWatcher.Stop()
+			log.Infoln("Starting scaler core")
+		input:
+			for {
+				log.Infoln("Waiting for config.")
+				select {
+				case <-wait:
+					log.Infoln("httpd stopped. Bye.")
+					close(shutdown)
+					return
+
+				case requestData := <-start:
+					backend.request = requestData
+					log.Infoln("Begin running the scaler with configuration:", string(requestData))
+					instanceWatcher, err := scaler.NewFixedScaler(
+						5*time.Second,
+						client.NewInstanceProvisioner(macheteAddress),
+						string(requestData))
+					if err != nil {
+						log.Warningln("Scaler cannot run:", err, "with config=", string(requestData))
+						continue input
+					}
+					running <- instanceWatcher
+					log.Infoln("Running the instance watcher.")
+					runWhenLeading(instanceWatcher)
+					log.Infoln("Instance watcher stopped.")
+					close(done)
+				}
 			}
 		}()
 
-		runWhenLeading(instanceWatcher)
+		select {
+		case s := <-running:
+			log.Infoln("instanceWatcher running:", s)
+			backend.scaler = s
+		case <-shutdown:
+			log.Infoln("shutting down. bye.")
+		}
+
+		<-wait // for httpd to stop
 	}
 
 	rootCmd.AddCommand(&runCmd)
