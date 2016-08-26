@@ -81,7 +81,7 @@ func NewRegistry(dir string) (*Registry, error) {
 		if !entry.IsDir() {
 			socket := filepath.Join(dir, entry.Name())
 			log.Infoln("Found driver at socket=", socket)
-			driverClient := NewControllerClient(socket)
+			driverClient := NewClient(socket)
 			info, err := driverClient.GetInfo()
 			if err != nil {
 				log.Warningln("Error from driver", err)
@@ -102,18 +102,18 @@ func NewRegistry(dir string) (*Registry, error) {
 // supported.  Phases are 'bootstrap', 'running', 'teardown'.
 type Controller struct {
 	Info
-	Client *ControllerClient
+	Client *Client
 }
 
-// ControllerClient is the client that can access the driver either via tcp or unix
-type ControllerClient struct {
+// Client is the client that can access the driver either via tcp or unix
+type Client struct {
 	UnixSocket string
 	c          *http.Client
 	Host       string
 }
 
-// NewControllerClient creates a client to the controller
-func NewControllerClient(socket string) *ControllerClient {
+// NewClient creates a client to the controller
+func NewClient(socket string) *Client {
 	client := &http.Client{}
 
 	host := filepath.Base(socket) // for host name in case it's tcp
@@ -129,7 +129,7 @@ func NewControllerClient(socket string) *ControllerClient {
 		}
 		host = "local" // dummy host for unix socket
 	}
-	return &ControllerClient{
+	return &Client{
 		UnixSocket: socket,
 		c:          client,
 		Host:       host,
@@ -137,7 +137,7 @@ func NewControllerClient(socket string) *ControllerClient {
 }
 
 // GetInfo returns information about the controller / driver
-func (d *ControllerClient) GetInfo() (*Controller, error) {
+func (d *Client) GetInfo() (*Controller, error) {
 	resp, err := d.c.Get("http://" + d.Host + "/v1/info")
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (d *ControllerClient) GetInfo() (*Controller, error) {
 }
 
 // Call makes a POST call of the form of /v1/{op}.  For example  /v1/scaler.Start
-func (d *ControllerClient) Call(op string, req interface{}) error {
+func (d *Client) Call(op string, req interface{}) error {
 	buff, err := json.Marshal(req)
 	if err != nil {
 		return err

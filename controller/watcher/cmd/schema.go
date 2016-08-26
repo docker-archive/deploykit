@@ -35,7 +35,7 @@ func POC2ControllerNamesFromSWIM(buff []byte) ([]string, error) {
 	return images, nil
 }
 
-// POC2ConfigFromSWIM
+// POC2ConfigFromSWIM returns the config for the controller, given its namespace
 func POC2ConfigFromSWIM(buff []byte, controllerNamespace string) (interface{}, error) {
 
 	// This schema is a simplified schema that has only one driver. For the config,
@@ -62,7 +62,7 @@ func POC2ConfigFromSWIM(buff []byte, controllerNamespace string) (interface{}, e
 	return group.Config, nil
 }
 
-// POC1ConfigFromSWIM
+// POC1ConfigFromSWIM parses the swim file to return the config for the controller
 func POC1ConfigFromSWIM(buff []byte, controllerNamespace string) (interface{}, error) {
 	// Get the controllers
 	swim := map[string]interface{}{}
