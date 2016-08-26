@@ -1,0 +1,25 @@
+{
+    "workers" : {
+        "count" : 3,
+        "driver" : {
+            "name" : "aws",
+            "image" : "docker4x/scaler",
+            "properties" : {
+                "InstanceType" : "m4-xlarge"
+            }
+        }
+    },
+
+    "address" : {
+        "driver" : {
+            "name" : "aws",
+            "image" : "docker4x/controller",
+            "properties" : {
+                "vhosts" : {
+                    "foo.com" : "TestELB",
+                    "bar.com" : "InternalELB"
+                }
+            }
+        }
+    }
+}

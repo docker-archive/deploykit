@@ -1,11 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/go-connections/tlsconfig"
+	"github.com/docker/libmachete/controller"
 	"github.com/docker/libmachete/controller/watcher"
 	"github.com/spf13/cobra"
 )
@@ -19,6 +19,7 @@ var (
 	tlsOptions = tlsconfig.Options{}
 	logLevel   = len(log.AllLevels) - 2
 	host       = defaultHost
+	driverDir  = "/tmp/machete"
 
 	// Version is the build release identifier.
 	Version = "Unspecified"
@@ -38,6 +39,9 @@ func dockerClient() client.APIClient {
 // Singleton initialzed in the start up
 var docker client.APIClient
 
+// The controller registry.  For discovering how to connect to what drivers.
+var registry *controller.Registry
+
 func main() {
 
 	cmd := &cobra.Command{
@@ -51,6 +55,14 @@ func main() {
 			}
 			log.SetLevel(log.AllLevels[logLevel])
 
+			// Populate the registry of drivers
+			r, err := controller.NewRegistry(driverDir)
+			if err != nil {
+				return err
+			}
+
+			// Sets up global singleton
+			registry = r
 			docker = dockerClient()
 			return nil
 		},
@@ -66,6 +78,7 @@ func main() {
 
 	var host string
 
+	cmd.PersistentFlags().StringVar(&driverDir, "driver_dir", driverDir, "Directory for driver/plugin discovery")
 	cmd.PersistentFlags().StringVar(&host, "host", defaultHost, "Docker host")
 	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
 	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
@@ -78,52 +91,5 @@ func main() {
 	err := cmd.Execute()
 	if err != nil {
 		panic(err)
-	}
-}
-
-func getMap(v interface{}, key string) map[string]interface{} {
-	if m, ok := v.(map[string]interface{}); ok {
-		if mm, ok := m[key]; ok {
-			if r, ok := mm.(map[string]interface{}); ok {
-				return r
-			}
-		}
-	}
-	return nil
-}
-
-// RestartControllers restart the controllers in the swim file.
-// Given the config data, restart any active containers as necessary.
-// Initially we assume a simple config that lists the controllers to restart.
-// In reality, it's more complicated -- we would parse the swim config and analyze
-// to determine the list of controllers that should be running (if new) and which ones
-// should be updated.
-func RestartControllers(buff []byte) {
-
-	log.Infoln("Change detected. Restarting controllers")
-
-	// Get the controllers
-	swim := map[string]interface{}{}
-	if err := json.Unmarshal(buff, &swim); err != nil {
-		log.Warningln("Error unmarshaling swim:", err, ", No action.")
-		return
-	}
-
-	images := []string{}
-
-	for resource, block := range swim {
-		if driver := getMap(block, "driver"); driver != nil {
-			if image, ok := driver["image"]; ok {
-				if i, ok := image.(string); ok {
-					images = append(images, i)
-					log.Infoln("controller image", i, "found for resource", resource)
-				}
-			}
-		}
-	}
-
-	for _, image := range images {
-		restart := watcher.Restart(docker, image)
-		restart.Run()
 	}
 }

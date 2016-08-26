@@ -59,7 +59,21 @@ func watchURL() *cobra.Command {
 						}
 					}
 				},
-				RestartControllers)
+				func(buff []byte) {
+					log.Infoln("Change detected. Restarting controllers")
+					images, err := POC2ImagesFromSWIM(buff)
+					if err != nil {
+						log.Warningln("Cannot parse input.", err)
+						return
+					}
+					for _, image := range images {
+						restart := watcher.Restart(docker, image)
+						restart.Run()
+					}
+
+					// reconfigure
+
+				})
 
 			<-w.Run()
 

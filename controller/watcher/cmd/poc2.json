@@ -1,0 +1,122 @@
+{
+    "ClusterName": "bill-testing",
+    "Driver": "aws",
+    "Groups": {
+        "Managers": {
+            "Config": {
+                "group": "manager",
+                "run_instances_input": {
+                    "AdditionalInfo": null,
+                    "BlockDeviceMappings": null,
+                    "ClientToken": null,
+                    "DisableApiTermination": null,
+                    "DryRun": null,
+                    "EbsOptimized": null,
+                    "IamInstanceProfile": {
+                        "Arn": "arn:aws:iam::041673875206:instance-profile/bill-testing-ManagerProfile",
+                        "Name": null
+                    },
+                    "ImageId": "ami-f701cb97",
+                    "InstanceInitiatedShutdownBehavior": null,
+                    "InstanceType": "t2.micro",
+                    "KernelId": null,
+                    "KeyName": "bill-laptop",
+                    "MaxCount": null,
+                    "MinCount": null,
+                    "Monitoring": null,
+                    "NetworkInterfaces": [
+                        {
+                            "AssociatePublicIpAddress": true,
+                            "DeleteOnTermination": true,
+                            "Description": null,
+                            "DeviceIndex": 0,
+                            "Groups": [
+                                "sg-5b948b3d"
+                            ],
+                            "NetworkInterfaceId": null,
+                            "PrivateIpAddress": "{{.IP}}",
+                            "PrivateIpAddresses": null,
+                            "SecondaryPrivateIpAddressCount": null,
+                            "SubnetId": "subnet-920875e4"
+                        }
+                    ],
+                    "Placement": {
+                        "Affinity": null,
+                        "AvailabilityZone": "us-west-2a",
+                        "GroupName": null,
+                        "HostId": null,
+                        "Tenancy": null
+                    },
+                    "PrivateIpAddress": null,
+                    "RamdiskId": null,
+                    "SecurityGroupIds": null,
+                    "SecurityGroups": null,
+                    "SubnetId": null,
+                    "UserData": "IyEvdXNyL2Jpbi9lbnYgYmFzaAoKc2V0IC1vIGVycmV4aXQKc2V0IC1vIG5vdW5zZXQKc2V0IC1vIHBpcGVmYWlsCnN0YXJ0X2luc3RhbGwoKSB7CiAgaWYgY29tbWFuZCAtdiBkb2NrZXIgPi9kZXYvbnVsbAogIHRoZW4KICAgIGVjaG8gJ0RldGVjdGVkIGV4aXN0aW5nIERvY2tlciBpbnN0YWxsYXRpb24nCiAgZWxzZQogICAgc2xlZXAgNQogICAgY3VybCAtc1NMIGh0dHBzOi8vZ2V0LmRvY2tlci5jb20vIHwgc2gKICBmaQoKICBkb2NrZXIgcnVuIFwKICAgIC0tZGV0YWNoIFwKICAgIC0tdm9sdW1lIC92YXIvcnVuL2RvY2tlci5zb2NrOi92YXIvcnVuL2RvY2tlci5zb2NrIFwKICAgIC0tdm9sdW1lIC9zY3JhdGNoOi9zY3JhdGNoIFwKICAgIHdmYXJuZXIvc3dhcm1ib290IHJ1biAkKGhvc3RuYW1lIC1pKSBodHRwczovL2RvY2tlci1tYWNoZXRlLnMzLXVzLXdlc3QtMi5hbWF6b25hd3MuY29tL2JpbGwtdGVzdGluZy9jb25maWcuc3dpbQp9CgojIFNlZSBodHRwczovL2dpdGh1Yi5jb20vZG9ja2VyL2RvY2tlci9pc3N1ZXMvMjM3OTMjaXNzdWVjb21tZW50LTIzNzczNTgzNSBmb3IKIyBkZXRhaWxzIG9uIHdoeSB3ZSBiYWNrZ3JvdW5kL3NsZWVwLgpzdGFydF9pbnN0YWxsICYK"
+                },
+                "tags": null
+            },
+            "Size": 3,
+            "Type": "manager"
+        },
+        "Workers": {
+            "Config": {
+                "group": "worker",
+                "run_instances_input": {
+                    "AdditionalInfo": null,
+                    "BlockDeviceMappings": null,
+                    "ClientToken": null,
+                    "DisableApiTermination": null,
+                    "DryRun": null,
+                    "EbsOptimized": null,
+                    "IamInstanceProfile": null,
+                    "ImageId": "ami-f701cb97",
+                    "InstanceInitiatedShutdownBehavior": null,
+                    "InstanceType": "t2.micro",
+                    "KernelId": null,
+                    "KeyName": "bill-laptop",
+                    "MaxCount": null,
+                    "MinCount": null,
+                    "Monitoring": null,
+                    "NetworkInterfaces": [
+                        {
+                            "AssociatePublicIpAddress": true,
+                            "DeleteOnTermination": true,
+                            "Description": null,
+                            "DeviceIndex": 0,
+                            "Groups": [
+                                "sg-5a948b3c"
+                            ],
+                            "NetworkInterfaceId": null,
+                            "PrivateIpAddress": null,
+                            "PrivateIpAddresses": null,
+                            "SecondaryPrivateIpAddressCount": null,
+                            "SubnetId": "subnet-950875e3"
+                        }
+                    ],
+                    "Placement": {
+                        "Affinity": null,
+                        "AvailabilityZone": "us-west-2a",
+                        "GroupName": null,
+                        "HostId": null,
+                        "Tenancy": null
+                    },
+                    "PrivateIpAddress": null,
+                    "RamdiskId": null,
+                    "SecurityGroupIds": null,
+                    "SecurityGroups": null,
+                    "SubnetId": null,
+                    "UserData": "IyEvdXNyL2Jpbi9lbnYgYmFzaAoKc2V0IC1vIGVycmV4aXQKc2V0IC1vIG5vdW5zZXQKc2V0IC1vIHBpcGVmYWlsCnN0YXJ0X2luc3RhbGwoKSB7CiAgaWYgY29tbWFuZCAtdiBkb2NrZXIgPi9kZXYvbnVsbAogIHRoZW4KICAgIGVjaG8gJ0RldGVjdGVkIGV4aXN0aW5nIERvY2tlciBpbnN0YWxsYXRpb24nCiAgZWxzZQogICAgc2xlZXAgNQogICAgY3VybCAtc1NMIGh0dHBzOi8vZ2V0LmRvY2tlci5jb20vIHwgc2gKICBmaQoKICBkb2NrZXIgcnVuIFwKICAgIC0tZGV0YWNoIFwKICAgIC0tdm9sdW1lIC92YXIvcnVuL2RvY2tlci5zb2NrOi92YXIvcnVuL2RvY2tlci5zb2NrIFwKICAgIC0tdm9sdW1lIC9zY3JhdGNoOi9zY3JhdGNoIFwKICAgIHdmYXJuZXIvc3dhcm1ib290IHJ1biAkKGhvc3RuYW1lIC1pKSBodHRwczovL2RvY2tlci1tYWNoZXRlLnMzLXVzLXdlc3QtMi5hbWF6b25hd3MuY29tL2JpbGwtdGVzdGluZy9jb25maWcuc3dpbQp9CgojIFNlZSBodHRwczovL2dpdGh1Yi5jb20vZG9ja2VyL2RvY2tlci9pc3N1ZXMvMjM3OTMjaXNzdWVjb21tZW50LTIzNzczNTgzNSBmb3IKIyBkZXRhaWxzIG9uIHdoeSB3ZSBiYWNrZ3JvdW5kL3NsZWVwLgpzdGFydF9pbnN0YWxsICYK"
+                },
+                "tags": null
+            },
+            "Size": 3,
+            "Type": "worker"
+        }
+    },
+    "ManagerIPs": [
+        "192.168.33.4",
+        "192.168.33.5",
+        "192.168.33.6"
+    ]
+}
