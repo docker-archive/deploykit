@@ -42,19 +42,6 @@ func (r *Registry) GetControllerByName(name string) *Controller {
 	return r.names[name]
 }
 
-// ForEachControllerCapable visits all the controllers that are capable of doing a task or for a lifecycle phase.
-func (r *Registry) ForEachControllerCapable(cap string, f func(string, *Controller)) {
-nextController:
-	for ns, info := range r.namespaces {
-		for _, c := range info.Capabilities {
-			if cap == c {
-				f(ns, info)
-				continue nextController
-			}
-		}
-	}
-}
-
 // NewRegistry creates a registry instance with the given file directory path.  The entries in the directory
 // are either unix socket files or a flat file indicating the tcp port.
 func NewRegistry(dir string) (*Registry, error) {

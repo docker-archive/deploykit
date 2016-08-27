@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -31,5 +32,7 @@ func TestWatchRunAndStopProperly(t *testing.T) {
 			}
 		})
 
-	<-w.Run() // hangs indefinitely until the Stop is called in another goroutine.
+	wait, err := w.Run()
+	require.NoError(t, err)
+	<-wait // hangs indefinitely until the Stop is called in another goroutine.
 }

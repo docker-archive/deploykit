@@ -20,6 +20,7 @@ var (
 	logLevel   = len(log.AllLevels) - 2
 	host       = defaultHost
 	driverDir  = "/tmp/machete"
+	listen     = ":9091"
 
 	// Version is the build release identifier.
 	Version = "Unspecified"
@@ -28,26 +29,27 @@ var (
 	Revision = "Unspecified"
 )
 
-func dockerClient() client.APIClient {
-	client, err := watcher.NewDockerClient(host, &tlsOptions)
-	if err != nil {
-		panic(err)
-	}
-	return client
+type backend struct {
+	docker      client.APIClient
+	registry    *controller.Registry
+	watcher     *watcher.Watcher
+	watcherDone <-chan struct{}
+	data        chan<- []byte
 }
 
-// Singleton initialzed in the start up
-var docker client.APIClient
-
-// The controller registry.  For discovering how to connect to what drivers.
-var registry *controller.Registry
-
 func main() {
+
+	backend := &backend{}
+
+	// Top level main command...  all subcommands are designed to create the watch function
+	// for the watcher, except 'version' subcommand.  After the subcommand completes, the
+	// post run then begins execution of the actual watcher.
 
 	cmd := &cobra.Command{
 		Use:   "watcher",
 		Short: "Watches for change of some resource and performs some action.",
-		PersistentPreRunE: func(_ *cobra.Command, args []string) error {
+		PersistentPreRunE: func(c *cobra.Command, args []string) error {
+
 			if logLevel > len(log.AllLevels)-1 {
 				logLevel = len(log.AllLevels) - 1
 			} else if logLevel < 0 {
@@ -55,15 +57,59 @@ func main() {
 			}
 			log.SetLevel(log.AllLevels[logLevel])
 
+			if c.Use == "version" {
+				return nil
+			}
+
 			// Populate the registry of drivers
 			r, err := controller.NewRegistry(driverDir)
 			if err != nil {
 				return err
 			}
+			backend.registry = r
 
-			// Sets up global singleton
-			registry = r
-			docker = dockerClient()
+			// Docker client
+			d, err := watcher.NewDockerClient(host, &tlsOptions)
+			if err != nil {
+				return err
+			}
+
+			backend.docker = d
+
+			// watcher -- the watch function will be set by the user's choice of subcommands (except version)
+			backend.watcher = watcher.New(nil, backend.POC2Reactor)
+
+			// make a new channel to send data in, in addition to the one allocated for the watch function
+			inbound := make(chan []byte)
+			backend.data = inbound
+			backend.watcher.AddInbound(inbound)
+
+			return nil
+		},
+
+		// After the subcommand completed we start the main part...
+		PersistentPostRunE: func(c *cobra.Command, args []string) error {
+			if c.Use == "version" {
+				return nil
+			}
+
+			log.Infoln("Starting httpd")
+			_, waitHTTP, err := runHTTP(driverDir, listen, backend)
+			if err != nil {
+				panic(err)
+			}
+			log.Infoln("Started httpd")
+
+			log.Infoln("Starting watcher")
+			w, err := backend.watcher.Run()
+			if err != nil {
+				return err
+			}
+			log.Infoln("Started watcher")
+
+			backend.watcherDone = w
+
+			<-waitHTTP
 			return nil
 		},
 	}
@@ -76,9 +122,8 @@ func main() {
 		},
 	})
 
-	var host string
-
 	cmd.PersistentFlags().StringVar(&driverDir, "driver_dir", driverDir, "Directory for driver/plugin discovery")
+	cmd.PersistentFlags().StringVar(&listen, "listen", listen, "listen address (unix or tcp)")
 	cmd.PersistentFlags().StringVar(&host, "host", defaultHost, "Docker host")
 	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
 	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
@@ -86,7 +131,8 @@ func main() {
 	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
-	cmd.AddCommand(watchURL())
+	// The subcommand is run only to set up the data source.
+	cmd.AddCommand(watchURL(backend))
 
 	err := cmd.Execute()
 	if err != nil {
