@@ -22,35 +22,41 @@ var (
 // Registry is a service for finding out controllers we have access to.
 // TODO(chungers) - this is the integration point with the Plugin system in Docker Engine.
 type Registry struct {
-	drivers    map[string]*Controller
-	namespaces map[string]*Controller
-	names      map[string]*Controller
+	controllers []*Controller
 }
 
-// Namespaces return a map of namespace to Controller
-func (r *Registry) Namespaces() map[string]*Controller {
-	return r.namespaces
-}
-
-// Names return a map of names to Controller
-func (r *Registry) Names() map[string]*Controller {
-	return r.names
+func (r *Registry) findBy(f func(*Controller) bool) *Controller {
+	for _, c := range r.controllers {
+		if f(c) {
+			return c
+		}
+	}
+	return nil
 }
 
 // GetControllerByName returns a controller by name
 func (r *Registry) GetControllerByName(name string) *Controller {
-	return r.names[name]
+	return r.findBy(func(c *Controller) bool {
+		return c.Info.Name == name
+	})
+}
+
+// GetControllerByNamespace returns the controller matching the namespace in the swim config
+func (r *Registry) GetControllerByNamespace(namespace string) *Controller {
+	return r.findBy(func(c *Controller) bool {
+		return c.Info.Namespace == namespace
+	})
 }
 
 // NewRegistry creates a registry instance with the given file directory path.  The entries in the directory
 // are either unix socket files or a flat file indicating the tcp port.
 func NewRegistry(dir string) (*Registry, error) {
+	registryLock.Lock()
+	defer registryLock.Unlock()
+
 	if registry != nil {
 		return registry, nil
 	}
-
-	registryLock.Lock()
-	defer registryLock.Unlock()
 
 	log.Infoln("Opening:", dir)
 	entries, err := ioutil.ReadDir(dir)
@@ -59,9 +65,7 @@ func NewRegistry(dir string) (*Registry, error) {
 	}
 
 	registry = &Registry{
-		drivers:    map[string]*Controller{},
-		namespaces: map[string]*Controller{},
-		names:      map[string]*Controller{},
+		controllers: []*Controller{},
 	}
 
 	for _, entry := range entries {
@@ -69,24 +73,19 @@ func NewRegistry(dir string) (*Registry, error) {
 			socket := filepath.Join(dir, entry.Name())
 			log.Infoln("Found driver at socket=", socket)
 			driverClient := NewClient(socket)
-			info, err := driverClient.GetInfo()
+			controller, err := driverClient.Controller()
 			if err != nil {
 				log.Warningln("Error from driver", err)
 				continue
 			}
-			log.Infoln("driver info=", info)
-			registry.drivers[socket] = info
-			registry.namespaces[info.Namespace] = info
-			registry.names[info.DriverName] = info
+			log.Infoln("driver controller=", controller.Info)
+			registry.controllers = append(registry.controllers, controller)
 		}
 	}
 	return registry, nil
 }
 
 // Controller is a struct that has the metadata and client for accessing a controller.
-// First discover by scanning all files in a directory for all the unix sockets
-// then connect to each one to introspect and ask for name, namespace, and phases
-// supported.  Phases are 'bootstrap', 'running', 'teardown'.
 type Controller struct {
 	Info
 	Client *Client
@@ -104,7 +103,7 @@ func NewClient(socket string) *Client {
 	client := &http.Client{}
 
 	host := filepath.Base(socket) // for host name in case it's tcp
-	if strings.Index(host, ":") == 0 {
+	if strings.Contains(host, ":") {
 		host = "localhost" + host
 	}
 
@@ -123,8 +122,8 @@ func NewClient(socket string) *Client {
 	}
 }
 
-// GetInfo returns information about the controller / driver
-func (d *Client) GetInfo() (*Controller, error) {
+// Controller returns a reference to the controller
+func (d *Client) Controller() (*Controller, error) {
 	resp, err := d.c.Get("http://" + d.Host + "/v1/info")
 	if err != nil {
 		return nil, err

@@ -15,11 +15,12 @@ type poc2scalerRequest struct {
 }
 
 type poc2schema struct {
-	Driver string
-	Groups map[string]struct {
+	ClusterName string
+	Driver      string
+	Groups      map[string]struct {
 		Config poc2scalerRequest
 		Size   int
-		Type   string
+		Type   string // manager | worker
 	}
 }
 

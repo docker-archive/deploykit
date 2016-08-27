@@ -34,7 +34,7 @@ func New(f WatchFunc, r ReactFunc) *Watcher {
 	return new(Watcher).SetWatch(f).SetReact(r)
 }
 
-// Inbound returns the inbound channel
+// AddInbound adds the second inbound channel
 func (w *Watcher) AddInbound(c <-chan []byte) *Watcher {
 	w.inbound2 = c
 	return w
@@ -101,8 +101,13 @@ func (w *Watcher) Run() (<-chan struct{}, error) {
 
 	done := make(chan struct{})
 	go func() {
-		defer close(done)
 		w.lock.Lock()
+		defer func() {
+			close(done)
+			w.running = false
+			w.lock.Unlock()
+		}()
+
 		w.running = true
 		for {
 			select {
@@ -120,6 +125,9 @@ func (w *Watcher) Run() (<-chan struct{}, error) {
 				w.current = newData
 
 			case newData := <-w.inbound2:
+				// receive on nil channel blocks forever.  so if nothing is set via the AddInbound then this just
+				// blocks and leave the other two channels in play, which are guaranteed not nil by code block above.
+				//
 				// This channel is for direct input via post etc. We don't want to
 				// miss processing the first post when server starts
 				if !w.equal(w.current, newData) {
@@ -128,8 +136,6 @@ func (w *Watcher) Run() (<-chan struct{}, error) {
 				w.current = newData
 			}
 		}
-		w.running = false
-		w.lock.Unlock()
 	}()
 	return done, nil
 }

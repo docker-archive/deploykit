@@ -60,6 +60,9 @@ func (r *Restarter) findContainer() (*types.Container, error) {
 		}
 	}
 
+	// TODO(chungers) -- this needs to be replaced by some means of identifying the
+	// exact instance via the plugin manager API.  In that case, we will not be looking
+	// for containers but rather specific plugin instances.
 	switch len(matches) {
 	case 0:
 		return nil, nil
