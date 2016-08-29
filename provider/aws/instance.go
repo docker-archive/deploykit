@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/ssh"
 	"sort"
+	"encoding/base64"
 	"time"
 )
 
@@ -94,6 +95,9 @@ func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance
 
 	request.RunInstancesInput.MinCount = aws.Int64(1)
 	request.RunInstancesInput.MaxCount = aws.Int64(1)
+
+	request.RunInstancesInput.UserData = aws.String(
+		base64.StdEncoding.EncodeToString([]byte(*request.RunInstancesInput.UserData)))
 
 	var awsVolumeID *string
 	if volume != nil {
