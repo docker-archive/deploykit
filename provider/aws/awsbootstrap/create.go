@@ -562,6 +562,13 @@ func bootstrap(swim fakeSWIMSchema) error {
 		return err
 	}
 
+	// Apply default instance name tags for nicer display in the AWS console.
+	swim.mutateGroups(func(name string, group *instanceGroup) {
+		if _, exists := group.Config.Tags["Name"]; !exists {
+			group.Config.Tags["Name"] = fmt.Sprintf("%s %s", swim.ClusterName, group.Type)
+		}
+	})
+
 	err = createEBSVolumes(sess, swim)
 	if err != nil {
 		return err
