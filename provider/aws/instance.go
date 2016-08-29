@@ -96,8 +96,10 @@ func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance
 	request.RunInstancesInput.MinCount = aws.Int64(1)
 	request.RunInstancesInput.MaxCount = aws.Int64(1)
 
-	request.RunInstancesInput.UserData = aws.String(
-		base64.StdEncoding.EncodeToString([]byte(*request.RunInstancesInput.UserData)))
+	if request.RunInstancesInput.UserData != nil {
+		request.RunInstancesInput.UserData = aws.String(
+			base64.StdEncoding.EncodeToString([]byte(*request.RunInstancesInput.UserData)))
+	}
 
 	var awsVolumeID *string
 	if volume != nil {
