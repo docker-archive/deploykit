@@ -7,10 +7,12 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	"github.com/spf13/cobra"
+	"golang.org/x/net/context"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 var (
@@ -21,32 +23,38 @@ var (
 	Revision = "Unspecified"
 )
 
-type swimPart struct {
-	ManagerIPs []string
+type instanceConfig struct {
+	Type   string
+	Config json.RawMessage
 }
 
-func fetchSWIM(url string) (*swimPart, error) {
+type swimPart struct {
+	ManagerIPs []string
+	Groups     map[string]instanceConfig
+}
+
+func fetchSWIM(url string) ([]byte, *swimPart, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to fetch SWIM file: %s", err)
+		return nil, nil, fmt.Errorf("Failed to fetch SWIM file: %s", err)
 	}
 
 	swimData, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read SWIM data: %s", err)
+		return nil, nil, fmt.Errorf("Failed to read SWIM data: %s", err)
 	}
 
 	swim := swimPart{}
 	err = json.Unmarshal(swimData, &swim)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal SWIM data: %s", err)
+		return nil, nil, fmt.Errorf("Failed to unmarshal SWIM data: %s", err)
 	}
 
 	if swim.ManagerIPs == nil || len(swim.ManagerIPs) == 0 {
-		return nil, errors.New("SWIM file does not list any ManagerIPs")
+		return nil, nil, errors.New("SWIM file does not list any ManagerIPs")
 	}
 
-	return &swim, nil
+	return swimData, &swim, nil
 }
 
 func main() {
@@ -68,6 +76,7 @@ func main() {
 			map[string]string{})
 	}
 
+	var joinToken string
 	runCmd := cobra.Command{
 		Use:   "run <MY IP> <SWIM URL>",
 		Short: "join or initialize a swarm cluster",
@@ -83,7 +92,13 @@ func main() {
 			myIP := args[0]
 			swimURL := args[1]
 
-			swim, err := fetchSWIM(swimURL)
+			swimData, swim, err := fetchSWIM(swimURL)
+			if err != nil {
+				log.Fatal(err)
+				os.Exit(1)
+			}
+
+			err = ioutil.WriteFile("config.swim", swimData, 0660)
 			if err != nil {
 				log.Fatal(err)
 				os.Exit(1)
@@ -112,7 +127,12 @@ func main() {
 					os.Exit(1)
 				}
 			} else {
-				err = joinSwarm(localDocker, bootLeaderIP, manager)
+				if joinToken == "" {
+					log.Fatal("This node is not the boot leader, so --join-token must be non-empty")
+					os.Exit(1)
+				}
+
+				err = joinSwarm(localDocker, bootLeaderIP, joinToken)
 				if err != nil {
 					log.Fatal(err)
 					os.Exit(1)
@@ -120,11 +140,42 @@ func main() {
 			}
 
 			if manager {
-				cmd := exec.Command("/bin/sh", "manager-containers.sh")
-				cmd.Env = []string{
-					fmt.Sprintf("SWIM_URL=%s", swimURL),
-					fmt.Sprintf("LOCAL_IP=%s", myIP),
+				swarmStatus, err := localDocker.SwarmInspect(context.Background())
+
+				// TODO(wfarner): This will need to change if/when we support multiple groups of the
+				// same type.
+				for _, config := range swim.Groups {
+					var token string
+					switch config.Type {
+					case "manager":
+						token = swarmStatus.JoinTokens.Manager
+
+					case "worker":
+						token = swarmStatus.JoinTokens.Worker
+
+					default:
+						log.Errorf("Unknown group type %s", config.Type)
+						os.Exit(1)
+					}
+
+					result := strings.Replace(
+						string(config.Config),
+						"{{.JOIN_TOKEN_ARG}}",
+						fmt.Sprintf("--join-token %s", token),
+						-1)
+
+					err = ioutil.WriteFile(
+						fmt.Sprintf("/scratch/%s-request.swpt", config.Type),
+						[]byte(result),
+						0660)
+					if err != nil {
+						log.Fatal(err)
+						os.Exit(1)
+					}
 				}
+
+				cmd := exec.Command("/bin/sh", "manager-containers.sh")
+				cmd.Env = []string{fmt.Sprintf("LOCAL_IP=%s", myIP)}
 
 				output, err := cmd.CombinedOutput()
 				if err != nil {
@@ -138,6 +189,11 @@ func main() {
 		},
 	}
 	runCmd.Flags().StringVar(&dockerSocket, "docker-socket", "/var/run/docker.sock", "Docker daemon socket path")
+	runCmd.Flags().StringVar(
+		&joinToken,
+		"join-token",
+		"",
+		"The Swarm cluster join token. Must be set if this node is not a boot leader.")
 
 	rootCmd.AddCommand(&runCmd)
 	rootCmd.AddCommand(&cobra.Command{

@@ -2,7 +2,6 @@ package awsbootstrap
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -14,6 +13,7 @@ import (
 	"github.com/docker/libmachete/controller/quorum"
 	machete_aws "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/spi"
+	"strings"
 	"text/template"
 	"time"
 )
@@ -432,7 +432,7 @@ func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) erro
 		return err
 	}
 
-	parsed, err := template.New("test").Parse(string(managerConfig))
+	parsed, err := template.New("test").Parse(strings.Replace(string(managerConfig), "{{.JOIN_TOKEN_ARG}}", "", -1))
 	if err != nil {
 		return err
 	}
@@ -486,7 +486,7 @@ start_install() {
     --detach \
     --volume /var/run/docker.sock:/var/run/docker.sock \
     --volume /scratch:/scratch \
-    wfarner/swarmboot run $(hostname -i) {{.SWIM_URL}}
+    wfarner/swarmboot run $(hostname -i) {{.SWIM_URL}} {{.JOIN_TOKEN_ARG}}
 }
 
 # See https://github.com/docker/docker/issues/23793#issuecomment-237735835 for
@@ -500,12 +500,15 @@ func generateUserData(t *template.Template, swim *fakeSWIMSchema, hostConfigureS
 	err := t.Execute(&buffer, map[string]string{
 		"SWIM_URL":       swim.cluster().url(),
 		"CONFIGURE_HOST": hostConfigureScript,
+		// Since the join token is not yet known, we re-apply a templated variable, to be filled in by
+		// managers when they are creating instances.
+		"JOIN_TOKEN_ARG": "{{.JOIN_TOKEN_ARG}}",
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	return base64.StdEncoding.EncodeToString(buffer.Bytes())
+	return string(buffer.Bytes())
 }
 
 func injectUserData(swim *fakeSWIMSchema) error {
