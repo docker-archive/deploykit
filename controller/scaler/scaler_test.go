@@ -18,7 +18,7 @@ var (
 	d     = instance.ID("d")
 )
 
-func testRequest(count uint) string {
+func testRequest(count int) string {
 	return fmt.Sprintf(`{"Group": "test-group", "Count":%d}`, count)
 }
 
@@ -38,7 +38,7 @@ func TestScaleUp(t *testing.T) {
 	scaler, err := NewFixedScaler(
 		1*time.Millisecond,
 		provisioner,
-		testRequest(uint(3)),
+		testRequest(3),
 	)
 	require.NoError(t, err)
 
@@ -46,7 +46,7 @@ func TestScaleUp(t *testing.T) {
 		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b, c}), nil),
 		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b, c}), nil),
 		provisioner.EXPECT().DescribeInstances(group).Return(desc([]instance.ID{a, b}), nil),
-		provisioner.EXPECT().Provision(testRequest(uint(3))).Return(&d, nil),
+		provisioner.EXPECT().Provision(testRequest(3), nil).Return(&d, nil),
 		provisioner.EXPECT().DescribeInstances(group).Do(func(_ instance.GroupID) {
 			go scaler.Stop()
 		}).Return(desc([]instance.ID{a, b, c}), nil),
@@ -65,7 +65,7 @@ func TestScaleDown(t *testing.T) {
 	scaler, err := NewFixedScaler(
 		1*time.Millisecond,
 		provisioner,
-		testRequest(uint(2)))
+		testRequest(2))
 	require.NoError(t, err)
 
 	gomock.InOrder(

@@ -131,7 +131,7 @@ func (s *scaler) checkState() {
 			go func() {
 				defer group.Done()
 
-				id, err := s.provisioner.Provision(s.provisionRequest)
+				id, err := s.provisioner.Provision(s.provisionRequest, nil)
 
 				if err != nil {
 					log.Errorf("Failed to grow group %s: %s", s.group, err)
