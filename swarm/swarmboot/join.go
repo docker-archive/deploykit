@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	joinRetries     = 5
-	joinRetryWait   = 10 * time.Second
+	joinRetries   = 5
+	joinRetryWait = 10 * time.Second
 )
 
 func joinSwarm(localDocker *client.Client, joinIP string, joinToken string) error {

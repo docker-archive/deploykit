@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -14,7 +15,6 @@ import (
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/ssh"
 	"sort"
-	"encoding/base64"
 	"time"
 )
 

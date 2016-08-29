@@ -13,9 +13,9 @@ import (
 	"github.com/docker/libmachete/controller/quorum"
 	machete_aws "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/spi"
+	"strings"
 	"text/template"
 	"time"
-	"strings"
 )
 
 func createEBSVolumes(config client.ConfigProvider, swim fakeSWIMSchema) error {
