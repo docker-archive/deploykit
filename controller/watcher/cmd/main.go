@@ -22,6 +22,11 @@ var (
 	driverDir  = "/tmp/machete"
 	listen     = ":9091"
 
+	// Running state is used to tell the watcher if it's in a special state of running
+	// when it comes up the first time in the vpc -- so it will restart the controllers
+	// with the first config it detected.
+	state = ""
+
 	// Version is the build release identifier.
 	Version = "Unspecified"
 
@@ -101,6 +106,9 @@ func main() {
 			log.Infoln("Started httpd")
 
 			log.Infoln("Starting watcher")
+			if state == "running" {
+				backend.watcher.ReactOnStart(true)
+			}
 			w, err := backend.watcher.Run()
 			if err != nil {
 				return err
@@ -130,6 +138,7 @@ func main() {
 	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")
 	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
+	cmd.PersistentFlags().StringVar(&state, "state", state, "set to 'running' will immediately update all controllers on restart")
 
 	// The subcommand is run only to set up the data source.
 	cmd.AddCommand(watchURL(backend))

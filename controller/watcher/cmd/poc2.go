@@ -38,7 +38,8 @@ func (b *backend) POC2Reactor(buff []byte) {
 
 	for _, name := range names {
 
-		controller := b.registry.GetControllerByName(name)
+		// Namespace is more appropriate.  TODO(chungers) - remove name as it is redundant
+		controller := b.registry.GetControllerByNamespace(name)
 		if controller == nil {
 			log.Warningln("No controller found for name=", name, "Do nothing.")
 			return
