@@ -33,6 +33,13 @@ func (b *backend) POC2Reactor(buff []byte) {
 		return
 	}
 
+	log.Infoln("Found names in config:", names)
+	err = b.registry.Refresh()
+	if err != nil {
+		log.Warningln("Cannot discover plugins:", err)
+		return
+	}
+
 	// get the configs for all the controllers -- map of controller to config
 	changeSet := map[*controller.Controller]interface{}{}
 

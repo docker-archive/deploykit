@@ -20,7 +20,8 @@ var (
 	logLevel   = len(log.AllLevels) - 2
 	host       = defaultHost
 	driverDir  = "/tmp/machete"
-	listen     = ":9091"
+	listen     = ""
+	discovery  = []string{} // forced discovery... this is usally a list of ip:port
 
 	// Running state is used to tell the watcher if it's in a special state of running
 	// when it comes up the first time in the vpc -- so it will restart the controllers
@@ -71,6 +72,8 @@ func main() {
 			if err != nil {
 				return err
 			}
+			r.SetDiscovery(discovery)
+
 			backend.registry = r
 
 			// Docker client
@@ -139,6 +142,7 @@ func main() {
 	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.PersistentFlags().StringVar(&state, "state", state, "set to 'running' will immediately update all controllers on restart")
+	cmd.PersistentFlags().StringSliceVar(&discovery, "discovery", discovery, "Force discovery from flag")
 
 	// The subcommand is run only to set up the data source.
 	cmd.AddCommand(watchURL(backend))
