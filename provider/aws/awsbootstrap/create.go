@@ -483,8 +483,8 @@ func injectUserData(swim *fakeSWIMSchema) error {
 	return nil
 }
 
-func bootstrap(swim fakeSWIMSchema) error {
-	sess := swim.cluster().getAWSClient()
+func bootstrap(swim fakeSWIMSchema, apiKey, apiSecret string) error {
+	sess := swim.cluster().getAWSClient(apiKey, apiSecret)
 
 	// TODO(wfarner): Integrate setup and attachment of EBS volumes.
 	// TODO(wfarner): Figure out a way to format them during bootstrapping as well, since it would be unsafe
@@ -524,7 +524,7 @@ func bootstrap(swim fakeSWIMSchema) error {
 		return err
 	}
 
-	err = swim.push()
+	err = swim.push(apiKey, apiSecret)
 	if err != nil {
 		return err
 	}

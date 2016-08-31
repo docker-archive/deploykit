@@ -10,7 +10,8 @@ import (
 	"os"
 )
 
-func scale(cluster clusterID, groupName string, count int) error {
+func scale(cluster clusterID, groupName string, count int) (*fakeSWIMSchema, error) {
+	log.Infoln("Fetching from", cluster.url())
 	resp, err := http.Get(cluster.url())
 	if err != nil {
 		abort("Failed to fetch current configuration: %s", err)
@@ -18,16 +19,16 @@ func scale(cluster clusterID, groupName string, count int) error {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("Failed to read response when fetching configuration: %s", err)
+		return nil, fmt.Errorf("Failed to read response when fetching configuration: %s", err)
 	}
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("Failed to fetch current configuration: %s", string(body))
+		return nil, fmt.Errorf("Failed to fetch current configuration: %s", string(body))
 	}
 
 	swim := fakeSWIMSchema{}
 	err = json.Unmarshal(body, &swim)
 	if err != nil {
-		return fmt.Errorf("Failed to parse existing configuration: %s", err)
+		return nil, fmt.Errorf("Failed to parse existing configuration: %s", err)
 	}
 
 	matched := false
@@ -42,7 +43,7 @@ func scale(cluster clusterID, groupName string, count int) error {
 		}
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !matched {
@@ -50,11 +51,11 @@ func scale(cluster clusterID, groupName string, count int) error {
 		os.Exit(1)
 	}
 
-	err = swim.push()
+	err = swim.push("", "") // Scale is executed in the cluster and we should have IAM role here. No need for api key
 	if err != nil {
-		return fmt.Errorf("Failed to push config: %s", err)
+		return nil, fmt.Errorf("Failed to push config: %s", err)
 	}
 
 	log.Infof("Target count for group %s is now %d", groupName, count)
-	return nil
+	return &swim, nil
 }

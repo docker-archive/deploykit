@@ -202,8 +202,8 @@ func destroyNetwork(config client.ConfigProvider, cluster clusterID, vpcID strin
 	}
 }
 
-func destroy(cluster clusterID) error {
-	sess := cluster.getAWSClient()
+func destroy(cluster clusterID, apiKey, apiSecret string) error {
+	sess := cluster.getAWSClient(apiKey, apiSecret)
 	ec2Client := ec2.New(sess)
 
 	vpcs, err := ec2Client.DescribeVpcs(&ec2.DescribeVpcsInput{Filters: []*ec2.Filter{cluster.clusterFilter()}})
