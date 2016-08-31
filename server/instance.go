@@ -1,6 +1,9 @@
 package server
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/gorilla/mux"
@@ -28,10 +31,16 @@ func (h *instanceHandler) describe(req *http.Request) (interface{}, error) {
 func (h *instanceHandler) provision(req *http.Request) (interface{}, error) {
 	buff, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return nil, spi.NewError(spi.ErrBadInput, "Failed to read request input")
+		return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Failed to read request input: %s", err))
 	}
 
-	return h.provisioner.Provision(string(buff))
+	request := api.ProvisionRequest{}
+	err = json.Unmarshal(buff, &request)
+	if err != nil {
+		return nil, spi.NewError(spi.ErrUnknown, fmt.Sprintf("Failed to unmarshal response: %s", err))
+	}
+
+	return h.provisioner.Provision(string(*request.Request), request.Volume)
 }
 
 func (h *instanceHandler) destroy(req *http.Request) (interface{}, error) {

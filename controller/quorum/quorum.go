@@ -103,22 +103,19 @@ func (q *quorum) checkState() {
 // ProvisionManager creates a single manager instance, replacing the IP address wildcard with the provided IP.
 func ProvisionManager(provisioner instance.Provisioner, provisionTemplate *template.Template, ip string) error {
 	buffer := bytes.Buffer{}
-	err := provisionTemplate.Execute(&buffer, templateInput{IP: ip})
+	err := provisionTemplate.Execute(&buffer, map[string]string{"IP": ip})
 	if err != nil {
 		return fmt.Errorf("Failed to create provision request: %s", err)
 	}
 
-	id, err := provisioner.Provision(buffer.String())
+	volume := instance.VolumeID(ip)
+	id, err := provisioner.Provision(buffer.String(), &volume)
 	if err != nil {
 		return fmt.Errorf("Failed to provision: %s", err)
 	}
 
 	log.Infof("Provisioned instance %s with IP %s", *id, ip)
 	return nil
-}
-
-type templateInput struct {
-	IP string
 }
 
 func (q *quorum) Run() {

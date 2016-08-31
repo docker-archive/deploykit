@@ -2,7 +2,6 @@ package awsbootstrap
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -14,30 +13,34 @@ import (
 	"github.com/docker/libmachete/controller/quorum"
 	machete_aws "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/spi"
+	"strings"
 	"text/template"
 	"time"
 )
 
 func createEBSVolumes(config client.ConfigProvider, swim fakeSWIMSchema) error {
+	log.Info("Creating EBS volumes")
 	ec2Client := ec2.New(config)
 
+	volumeIDs := []*string{}
 	for _, managerIP := range swim.ManagerIPs {
 		volume, err := ec2Client.CreateVolume(&ec2.CreateVolumeInput{
 			AvailabilityZone: aws.String(swim.availabilityZone()),
 			Size:             aws.Int64(4),
 		})
+		volumeIDs = append(volumeIDs, volume.VolumeId)
 		if err != nil {
 			return err
 		}
 
-		log.Infof("Created volume %s", *volume.VolumeId)
+		log.Infof("  %s", *volume.VolumeId)
 
 		_, err = ec2Client.CreateTags(&ec2.CreateTagsInput{
 			Resources: []*string{volume.VolumeId},
 			Tags: []*ec2.Tag{
 				swim.cluster().resourceTag(),
 				{
-					Key:   aws.String("manager"),
+					Key:   aws.String(machete_aws.VolumeTag),
 					Value: aws.String(managerIP),
 				},
 			},
@@ -47,7 +50,7 @@ func createEBSVolumes(config client.ConfigProvider, swim fakeSWIMSchema) error {
 		}
 	}
 
-	return nil
+	return formatVolumes(config, swim, volumeIDs)
 }
 
 func applySubnetAndSecurityGroups(run *ec2.RunInstancesInput, subnetID *string, securityGroupIDs ...*string) {
@@ -86,13 +89,13 @@ func createRouteTable(
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("Created internet gateway %s", *internetGateway.InternetGatewayId)
+	log.Infof("  internet gateway %s", *internetGateway.InternetGatewayId)
 
 	routeTable, err := ec2Client.CreateRouteTable(&ec2.CreateRouteTableInput{VpcId: aws.String(vpcID)})
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("Created route table %s", *routeTable.RouteTable.RouteTableId)
+	log.Infof("  route table %s", *routeTable.RouteTable.RouteTableId)
 
 	// Route to the internet via the internet gateway.
 	_, err = ec2Client.CreateRoute(&ec2.CreateRouteInput{
@@ -108,6 +111,7 @@ func createRouteTable(
 }
 
 func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, error) {
+	log.Info("Creating network resources")
 
 	// Apply the private IP address wildcard to the manager.
 	swim.mutateManagers(func(name string, managers *instanceGroup) {
@@ -128,7 +132,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	}
 	vpcID := *vpc.Vpc.VpcId
 
-	log.Infof("Waiting until VPC %s is available", vpcID)
+	log.Infof("  VPC %s, waiting for it to become available", vpcID)
 	vpcDescribe := ec2.DescribeVpcsInput{VpcIds: []*string{vpc.Vpc.VpcId}}
 	err = ec2Client.WaitUntilVpcExists(&vpcDescribe)
 	if err != nil {
@@ -166,7 +170,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	if err != nil {
 		return "", err
 	}
-	log.Infof("Created worker subnet %s", *workerSubnet.Subnet.SubnetId)
+	log.Infof("  worker subnet %s", *workerSubnet.Subnet.SubnetId)
 
 	managerSubnet, err := ec2Client.CreateSubnet(&ec2.CreateSubnetInput{
 		VpcId:            aws.String(vpcID),
@@ -176,7 +180,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	if err != nil {
 		return "", err
 	}
-	log.Infof("Created manager subnet %s", *managerSubnet.Subnet.SubnetId)
+	log.Infof("  manager subnet %s", *managerSubnet.Subnet.SubnetId)
 
 	workerGroupRequest := ec2.CreateSecurityGroupInput{
 		GroupName:   aws.String("WorkerSecurityGroup"),
@@ -187,7 +191,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	if err != nil {
 		return "", err
 	}
-	log.Infof("Created worker security group %s", *workerSecurityGroup.GroupId)
+	log.Infof("  worker security group %s", *workerSecurityGroup.GroupId)
 
 	managerGroupRequest := ec2.CreateSecurityGroupInput{
 		GroupName:   aws.String("ManagerSecurityGroup"),
@@ -198,7 +202,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	if err != nil {
 		return "", err
 	}
-	log.Infof("Created manager security group %s", *managerSecurityGroup.GroupId)
+	log.Infof("  manager security group %s", *managerSecurityGroup.GroupId)
 
 	err = configureManagerSecurityGroup(
 		ec2Client,
@@ -270,6 +274,8 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 }
 
 func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error {
+	log.Info("Creating IAM resources")
+
 	iamClient := iam.New(config)
 
 	// TODO(wfarner): IAM roles are a global concept in AWS, meaning we will probably need to include region
@@ -291,7 +297,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 		return err
 	}
 
-	log.Infof("Created IAM role %s (id %s)", *role.Role.RoleName, *role.Role.RoleId)
+	log.Infof("  role %s (id %s)", *role.Role.RoleName, *role.Role.RoleId)
 
 	policy, err := iamClient.CreatePolicy(&iam.CreatePolicyInput{
 		PolicyName: aws.String(swim.cluster().managerPolicyName()),
@@ -308,7 +314,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 	if err != nil {
 		return err
 	}
-	log.Infof("Created IAM policy %s (id %s)", *policy.Policy.PolicyName, *policy.Policy.PolicyId)
+	log.Infof("  policy %s (id %s)", *policy.Policy.PolicyName, *policy.Policy.PolicyId)
 
 	_, err = iamClient.AttachRolePolicy(&iam.AttachRolePolicyInput{
 		RoleName:  role.Role.RoleName,
@@ -322,7 +328,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 		return err
 	}
 	log.Infof(
-		"Created IAM instance profile %s (id %s)",
+		"  instance profile %s (id %s), waiting for it to exist",
 		*instanceProfile.InstanceProfile.InstanceProfileName,
 		*instanceProfile.InstanceProfile.InstanceProfileId)
 
@@ -414,6 +420,7 @@ func configureWorkerSecurityGroup(ec2Client ec2iface.EC2API, groupID string, man
 }
 
 func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) error {
+	log.Info("Starting cluster boot leader instance")
 	builder := machete_aws.Builder{Config: config}
 	provisioner, err := builder.BuildInstanceProvisioner(spi.ClusterID(swim.ClusterName))
 	if err != nil {
@@ -425,7 +432,7 @@ func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) erro
 		return err
 	}
 
-	parsed, err := template.New("test").Parse(string(managerConfig))
+	parsed, err := template.New("test").Parse(strings.Replace(string(managerConfig), "{{.JOIN_TOKEN_ARG}}", "", -1))
 	if err != nil {
 		return err
 	}
@@ -433,11 +440,39 @@ func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) erro
 	return quorum.ProvisionManager(provisioner, parsed, swim.ManagerIPs[0])
 }
 
-const machineBootCommand = `#!/usr/bin/env bash
+const (
+	mountEBSVolume = `
+# This technique may be brittle.  If it proves insufficient, we may want to consider putting the EBS device name
+# in the SWIM config, but this places the burden on the user.
+unmounted=$(blkid -o list | grep '/dev' | grep 'not mounted' | cut -d' ' -f1)
+
+if [ "$unmounted" = "" ]
+then
+  echo 'Did not find an unmounted block device'
+  exit 1
+fi
+
+count=$(echo "$unmounted" | wc -l)
+if [ $count != 1 ]
+then
+  echo "Expected exactly 1 unmounted disk, found $count"
+  exit 1
+fi
+
+mkdir -p /var/lib/docker
+echo "$unmounted /var/lib/docker ext4 defaults,nofail 0 2" > /etc/fstab
+mount -a
+`
+
+	machineBootCommand = `#!/usr/bin/env bash
 
 set -o errexit
 set -o nounset
 set -o pipefail
+set -o xtrace
+
+{{.CONFIGURE_HOST}}
+
 start_install() {
   if command -v docker >/dev/null
   then
@@ -455,29 +490,46 @@ start_install() {
     --volume /var/run/docker.sock:/var/run/docker.sock \
     --volume /var/run/machete/:/var/run/machete/ \
     --volume /scratch:/scratch \
-    libmachete/swarmboot run $(hostname -i) {{.SWIM_URL}}
+    libmachete/swarmboot run $(hostname -i) {{.SWIM_URL}} {{.JOIN_TOKEN_ARG}}
 }
 
 # See https://github.com/docker/docker/issues/23793#issuecomment-237735835 for
 # details on why we background/sleep.
 start_install &
 `
+)
+
+func generateUserData(t *template.Template, swim *fakeSWIMSchema, hostConfigureScript string) string {
+	buffer := bytes.Buffer{}
+	err := t.Execute(&buffer, map[string]string{
+		"SWIM_URL":       swim.cluster().url(),
+		"CONFIGURE_HOST": hostConfigureScript,
+		// Since the join token is not yet known, we re-apply a templated variable, to be filled in by
+		// managers when they are creating instances.
+		"JOIN_TOKEN_ARG": "{{.JOIN_TOKEN_ARG}}",
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return string(buffer.Bytes())
+}
 
 func injectUserData(swim *fakeSWIMSchema) error {
-	userDataTemplate, err := template.New("userdata").Parse(machineBootCommand)
+	t, err := template.New("userdata").Parse(machineBootCommand)
 	if err != nil {
 		return fmt.Errorf("Internal UserData template is invalid: %s", err)
 	}
 
-	buffer := bytes.Buffer{}
-	err = userDataTemplate.Execute(&buffer, map[string]string{"SWIM_URL": swim.cluster().url()})
-	if err != nil {
-		return fmt.Errorf("Failed to populate internal UserData template: %s", err)
-	}
-
-	userData := base64.StdEncoding.EncodeToString(buffer.Bytes())
 	swim.mutateGroups(func(name string, group *instanceGroup) {
-		group.Config.RunInstancesInput.UserData = &userData
+		var configureHost string
+		if group.isManager() {
+			configureHost = generateUserData(t, swim, mountEBSVolume)
+		} else {
+			configureHost = generateUserData(t, swim, "")
+		}
+
+		group.Config.RunInstancesInput.UserData = aws.String(configureHost)
 	})
 
 	return nil
@@ -485,16 +537,6 @@ func injectUserData(swim *fakeSWIMSchema) error {
 
 func bootstrap(swim fakeSWIMSchema, apiKey, apiSecret string) error {
 	sess := swim.cluster().getAWSClient(apiKey, apiSecret)
-
-	// TODO(wfarner): Integrate setup and attachment of EBS volumes.
-	// TODO(wfarner): Figure out a way to format them during bootstrapping as well, since it would be unsafe
-	// for the manager nodes to determine whether they should be formatted.
-	/*
-		err = createEBSVolumes(sess, swimConfig)
-		if err != nil {
-			return err
-		}
-	*/
 
 	keyNames := []*string{}
 	for _, group := range swim.Groups {
@@ -520,6 +562,11 @@ func bootstrap(swim fakeSWIMSchema, apiKey, apiSecret string) error {
 	}
 
 	err = injectUserData(&swim)
+	if err != nil {
+		return err
+	}
+
+	err = createEBSVolumes(sess, swim)
 	if err != nil {
 		return err
 	}
@@ -586,7 +633,7 @@ func bootstrap(swim fakeSWIMSchema, apiKey, apiSecret string) error {
 		log.Infof("")
 		log.Infof("It may take a few more minutes for the cluster to be ready, at which point you can SSH")
 		log.Infof("to %s using the default login user for the AMI, and the private", *leader.PublicIpAddress)
-		log.Infof("SSH key associated with the public key '%s' in AWS", *leader.KeyName)
+		log.Infof("SSH key associated with the public key '%s' in AWS.", *leader.KeyName)
 		log.Infof("You can see other nodes tha thave joined the cluster by running 'docker node ls'")
 	}
 

@@ -23,9 +23,10 @@ func TestClientServerRelay(t *testing.T) {
 
 		id := instance.ID("instance-1")
 
-		provisionData := "provision request"
-		backend.EXPECT().Provision(provisionData).Return(&id, nil)
-		returnedID, err := client.Provision(provisionData)
+		provisionData := "{}"
+		volume := instance.VolumeID("volume")
+		backend.EXPECT().Provision(provisionData, &volume).Return(&id, nil)
+		returnedID, err := client.Provision(provisionData, &volume)
 		require.NoError(t, err)
 		require.Equal(t, id, *returnedID)
 

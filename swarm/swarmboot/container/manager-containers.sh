@@ -6,8 +6,13 @@ set -o pipefail
 
 MACHETE_PORT=8888
 
+if [ ! -f config.swim ]
+then
+  echo 'Config.swim must exist'
+  exit 1
+fi
+
 # TODO(wfarner): Move this to go code for nicer error handling at the very least.
-wget -O config.swim $SWIM_URL
 CLUSTER_NAME=$(jq -r '.ClusterName' config.swim)
 MANAGER_IPS=$(jq -c '.ManagerIPs' config.swim | tr -d '"' | tr -d '[' | tr -d ']')
 NUM_WORKERS=$(jq -r '.Groups[] | select(.Type == "worker") | .Size' config.swim)
@@ -23,16 +28,6 @@ docker run \
   --publish $MACHETE_PORT:$MACHETE_PORT \
   libmachete/machete-aws \
   --cluster "$CLUSTER_NAME" --port $MACHETE_PORT $DRIVER
-
-# Serves swarm join tokens.
-docker run \
-  --detach \
-  --name token-server \
-  --volume /var/run/docker.sock:/var/run/docker.sock \
-  --restart always \
-  --publish 8889:8889 \
-  wfarner/tokenserver \
-  run
 
 # Maintains manager node pool (managers 'watch' each other).
 # TODO(wfarner): Join machete/quorum/scaler on a network to avoid

@@ -1,9 +1,12 @@
 package aws
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/spi"
@@ -12,6 +15,7 @@ import (
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/ssh"
 	"sort"
+	"time"
 )
 
 const (
@@ -20,6 +24,9 @@ const (
 
 	// GroupTag is the AWS tag name used to track instances included in a group.
 	GroupTag = "machete-group"
+
+	// VolumeTag is the AWS tag name used to associate unique identifiers (instance.VolumeID) with volumes.
+	VolumeTag = "docker-machete-volume"
 )
 
 // Provisioner is an instance provisioner for AWS.
@@ -75,7 +82,7 @@ type CreateInstanceRequest struct {
 }
 
 // Provision creates a new instance.
-func (p Provisioner) Provision(req string) (*instance.ID, error) {
+func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance.ID, error) {
 	request := CreateInstanceRequest{}
 	err := json.Unmarshal([]byte(req), &request)
 	if err != nil {
@@ -88,6 +95,36 @@ func (p Provisioner) Provision(req string) (*instance.ID, error) {
 
 	request.RunInstancesInput.MinCount = aws.Int64(1)
 	request.RunInstancesInput.MaxCount = aws.Int64(1)
+
+	if request.RunInstancesInput.UserData != nil {
+		request.RunInstancesInput.UserData = aws.String(
+			base64.StdEncoding.EncodeToString([]byte(*request.RunInstancesInput.UserData)))
+	}
+
+	var awsVolumeID *string
+	if volume != nil {
+		volumes, err := p.Client.DescribeVolumes(&ec2.DescribeVolumesInput{
+			Filters: []*ec2.Filter{
+				clusterFilter(p.Cluster),
+				{
+					Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
+					Values: []*string{aws.String(string(*volume))},
+				},
+			},
+		})
+		if err != nil {
+			return nil, spi.NewError(spi.ErrUnknown, "Failed while looking up volume")
+		}
+
+		switch len(volumes.Volumes) {
+		case 0:
+			return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Volume %s does not exist", *volume))
+		case 1:
+			awsVolumeID = volumes.Volumes[0].VolumeId
+		default:
+			return nil, spi.NewError(spi.ErrBadInput, "Multiple volume matches found")
+		}
+	}
 
 	if request.RunInstancesInput.KeyName == nil || *request.RunInstancesInput.KeyName == "" {
 		// A custom key was not specified, create one and manage it locally.
@@ -127,6 +164,36 @@ func (p Provisioner) Provision(req string) (*instance.ID, error) {
 		return id, err
 	}
 
+	if awsVolumeID != nil {
+		log.Infof("Waiting for instance %s to enter running state before attaching volume", *id)
+		for {
+			time.Sleep(10 * time.Second)
+
+			instance, err := p.Client.DescribeInstances(&ec2.DescribeInstancesInput{
+				InstanceIds: []*string{ec2Instance.InstanceId},
+			})
+			if err == nil {
+				if *instance.Reservations[0].Instances[0].State.Name == ec2.InstanceStateNameRunning {
+					break
+				}
+			} else if awsErr, ok := err.(awserr.Error); ok {
+				if awsErr.Code() == "InvalidInstanceID.NotFound" {
+					return id, nil
+				}
+			}
+
+		}
+
+		_, err := p.Client.AttachVolume(&ec2.AttachVolumeInput{
+			InstanceId: ec2Instance.InstanceId,
+			VolumeId:   awsVolumeID,
+			Device:     aws.String("/dev/sdf"),
+		})
+		if err != nil {
+			return id, err
+		}
+	}
+
 	return id, nil
 }
 
@@ -163,14 +230,19 @@ func (p Provisioner) Destroy(id instance.ID) error {
 	return nil
 }
 
+func clusterFilter(cluster spi.ClusterID) *ec2.Filter {
+	// TODO(wfarner): Share these filter definitions with the bootstrap routine.
+	return &ec2.Filter{
+		Name:   aws.String(fmt.Sprintf("tag:%s", ClusterTag)),
+		Values: []*string{aws.String(string(cluster))},
+	}
+}
+
 func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken *string) *ec2.DescribeInstancesInput {
 	return &ec2.DescribeInstancesInput{
 		NextToken: nextToken,
 		Filters: []*ec2.Filter{
-			{
-				Name:   aws.String(fmt.Sprintf("tag:%s", ClusterTag)),
-				Values: []*string{aws.String(string(cluster))},
-			},
+			clusterFilter(cluster),
 			{
 				Name:   aws.String(fmt.Sprintf("tag:%s", GroupTag)),
 				Values: []*string{aws.String(string(id))},

@@ -65,11 +65,12 @@ func TestRestoreQuorum(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	volume := instance.VolumeID("10.0.0.4")
 	gomock.InOrder(
 		provisioner.EXPECT().DescribeInstances(group).Return([]instance.Description{a, b, c}, nil),
 		provisioner.EXPECT().DescribeInstances(group).Return([]instance.Description{a, b, c}, nil),
 		provisioner.EXPECT().DescribeInstances(group).Return([]instance.Description{a, b}, nil),
-		provisioner.EXPECT().Provision(`{"Group": "test-group", "IP": "10.0.0.4"}`).Return(&c.ID, nil),
+		provisioner.EXPECT().Provision(`{"Group": "test-group", "IP": "10.0.0.4"}`, &volume).Return(&c.ID, nil),
 		provisioner.EXPECT().DescribeInstances(group).Do(func(_ instance.GroupID) {
 			go quorum.Stop()
 		}).Return([]instance.Description{a, b, c}, nil),
