@@ -92,4 +92,3 @@ containers:
 	cd controller/quorum/container && make container
 	cd controller/scaler/container && make container
 	cd swarm/swarmboot/container && make container
-	cd swarm/tokenserver/container && make container
