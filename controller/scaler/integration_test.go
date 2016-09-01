@@ -7,14 +7,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/client"
-	mock_ssh_util "github.com/docker/libmachete/mock/spi/util/sshutil"
 	aws_provider "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/server"
 	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/util/sshutil"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"strconv"
 	"sync"
@@ -42,9 +39,10 @@ func (e *fakeEc2) DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeI
 
 	instances := []*ec2.Instance{}
 	for _, id := range e.instanceIds {
-		copy := id
+		idCopy := id
 		instances = append(instances, &ec2.Instance{
-			InstanceId: &copy, KeyName: aws.String("key"),
+			InstanceId:       &idCopy,
+			KeyName:          aws.String("key"),
 			PrivateIpAddress: aws.String("10.0.0.3"),
 		})
 	}
@@ -122,13 +120,9 @@ func TestScalerIntegration(t *testing.T) {
 	defer ctrl.Finish()
 
 	backend := &fakeEc2{}
-	runnerMock := mock_ssh_util.NewMockCommandRunner(ctrl)
-
 	provisioner := aws_provider.Provisioner{
-		Client:        backend,
-		Cluster:       spi.ClusterID("test-cluster"),
-		CommandRunner: runnerMock,
-		KeyStore:      sshutil.FileSystemKeyStore(afero.NewMemMapFs(), "/"),
+		Client:  backend,
+		Cluster: spi.ClusterID("test-cluster"),
 	}
 
 	testflight.WithServer(server.NewHandler(provisioner), func(r *testflight.Requester) {

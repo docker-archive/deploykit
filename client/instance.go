@@ -117,24 +117,3 @@ func (c instanceClient) DescribeInstances(group instance.GroupID) ([]instance.De
 
 	return descriptions, nil
 }
-
-func (c instanceClient) ShellExec(id instance.ID, shellCode string) (*string, error) {
-	// When valid response data is available, always return it along with the error.
-	data, apiErr := c.sendRequest("PUT", fmt.Sprintf("instance/%s/exec", id), shellCode)
-	if data == nil {
-		return nil, apiErr
-	}
-
-	var dataString string
-	unmarshalErr := json.Unmarshal(data, &dataString)
-
-	var returnErr error
-	switch {
-	case apiErr != nil:
-		returnErr = apiErr
-	case unmarshalErr != nil:
-		returnErr = unmarshalErr
-	}
-
-	return &dataString, returnErr
-}

@@ -47,18 +47,8 @@ func (h *instanceHandler) destroy(req *http.Request) (interface{}, error) {
 	return nil, h.provisioner.Destroy(getInstanceID(req))
 }
 
-func (h *instanceHandler) shellExec(req *http.Request) (interface{}, error) {
-	buff, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return nil, spi.NewError(spi.ErrBadInput, "Failed to read request input")
-	}
-
-	return h.provisioner.ShellExec(getInstanceID(req), string(buff))
-}
-
 func (h *instanceHandler) attachTo(router *mux.Router) {
 	router.HandleFunc("/", outputHandler(h.describe)).Methods("GET")
 	router.HandleFunc("/", outputHandler(h.provision)).Methods("POST")
 	router.HandleFunc("/{key}", outputHandler(h.destroy)).Methods("DELETE")
-	router.HandleFunc("/{key}/exec", outputHandler(h.shellExec)).Methods("PUT")
 }

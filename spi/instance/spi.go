@@ -10,7 +10,4 @@ type Provisioner interface {
 
 	// DescribeInstances returns descriptions of all instances included in a group.
 	DescribeInstances(group GroupID) ([]Description, error)
-
-	// ShellExec executes a shell command on an instance, and returns the combined (stderr and stdout) output.
-	ShellExec(id ID, shellCode string) (*string, error)
 }
