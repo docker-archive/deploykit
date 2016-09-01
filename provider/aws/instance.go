@@ -11,9 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
-	"github.com/docker/libmachete/spi/util/sshutil"
-	"github.com/spf13/afero"
-	"golang.org/x/crypto/ssh"
 	"sort"
 	"time"
 )
@@ -31,19 +28,15 @@ const (
 
 // Provisioner is an instance provisioner for AWS.
 type Provisioner struct {
-	Client        ec2iface.EC2API
-	Cluster       spi.ClusterID
-	CommandRunner sshutil.CommandRunner
-	KeyStore      sshutil.KeyStore
+	Client  ec2iface.EC2API
+	Cluster spi.ClusterID
 }
 
 // NewInstanceProvisioner creates a new provisioner using an SSH command runner and local private key storage.
 func NewInstanceProvisioner(client ec2iface.EC2API, cluster spi.ClusterID) instance.Provisioner {
 	return &Provisioner{
-		Client:        client,
-		Cluster:       cluster,
-		CommandRunner: sshutil.NewCommandRunner(),
-		KeyStore:      sshutil.FileSystemKeyStore(afero.NewOsFs(), "./"),
+		Client:  client,
+		Cluster: cluster,
 	}
 }
 
@@ -126,29 +119,8 @@ func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance
 		}
 	}
 
-	if request.RunInstancesInput.KeyName == nil || *request.RunInstancesInput.KeyName == "" {
-		// A custom key was not specified, create one and manage it locally.
-
-		request.RunInstancesInput.KeyName = aws.String(fmt.Sprintf("machete-%s", randomString(5)))
-
-		result, err := p.Client.CreateKeyPair(
-			&ec2.CreateKeyPairInput{KeyName: request.RunInstancesInput.KeyName})
-		if err != nil {
-			return nil, err
-		}
-
-		// TODO(wfarner): Need to re-evaluate code paths where keys should be deleted.
-		err = p.KeyStore.Write(*request.RunInstancesInput.KeyName, []byte(*result.KeyMaterial))
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	reservation, err := p.Client.RunInstances(&request.RunInstancesInput)
 	if err != nil {
-		// TODO(wfarner): Need to disambiguate between error types.  If there is uncertainty over whether the
-		// instance was _actually_ created, we should not delete the key.
-		p.KeyStore.Delete(*request.RunInstancesInput.KeyName)
 		return nil, err
 	}
 
@@ -169,11 +141,11 @@ func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance
 		for {
 			time.Sleep(10 * time.Second)
 
-			instance, err := p.Client.DescribeInstances(&ec2.DescribeInstancesInput{
+			inst, err := p.Client.DescribeInstances(&ec2.DescribeInstancesInput{
 				InstanceIds: []*string{ec2Instance.InstanceId},
 			})
 			if err == nil {
-				if *instance.Reservations[0].Instances[0].State.Name == ec2.InstanceStateNameRunning {
+				if *inst.Reservations[0].Instances[0].State.Name == ec2.InstanceStateNameRunning {
 					break
 				}
 			} else if awsErr, ok := err.(awserr.Error); ok {
@@ -199,22 +171,6 @@ func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance
 
 // Destroy terminates an existing instance.
 func (p Provisioner) Destroy(id instance.ID) error {
-	describeResult, err := p.describeInstance(id)
-	if err != nil {
-		return err
-	}
-
-	// Only delete the remote key pair if the key is available locally.
-	// This enables use of custom or shared keys that are not managed by machete.
-	err = p.KeyStore.Delete(*describeResult.KeyName)
-	if err == nil {
-		_, err = p.Client.DeleteKeyPair(
-			&ec2.DeleteKeyPairInput{KeyName: describeResult.KeyName})
-		if err != nil {
-			return err
-		}
-	}
-
 	result, err := p.Client.TerminateInstances(&ec2.TerminateInstancesInput{
 		InstanceIds: []*string{aws.String(string(id))}})
 
@@ -304,33 +260,4 @@ func (p Provisioner) describeInstance(id instance.ID) (*ec2.Instance, error) {
 	}
 
 	return result.Reservations[0].Instances[0], nil
-}
-
-// ShellExec implements instance.ShellExec.
-func (p Provisioner) ShellExec(id instance.ID, shellCode string) (*string, error) {
-	instance, err := p.describeInstance(id)
-	if err != nil {
-		return nil, err
-	}
-
-	privateKeyData, err := p.KeyStore.Read(*instance.KeyName)
-	if err != nil {
-		return nil, err
-	}
-
-	signer, err := ssh.ParsePrivateKey(privateKeyData)
-	if err != nil {
-		fmt.Println("Invalid key", string(privateKeyData))
-		return nil, err
-	}
-
-	config := &ssh.ClientConfig{
-		// TODO(wfarner): Figure out how to use the user appropriate for the machine/image.
-		User: "ubuntu",
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
-	}
-
-	// TODO(wfarner): We probably want the private IP in most cases (and may have no choice, if the host
-	// only has a private IP).  Need to figure out what to do here and whether the caller should choose.
-	return p.CommandRunner.Exec(fmt.Sprintf("%s:22", *instance.PublicIpAddress), config, shellCode)
 }
