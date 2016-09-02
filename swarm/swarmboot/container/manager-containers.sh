@@ -17,7 +17,6 @@ CLUSTER_NAME=$(jq -r '.ClusterName' config.swim)
 MANAGER_IPS=$(jq -c '.ManagerIPs' config.swim | tr -d '"' | tr -d '[' | tr -d ']')
 NUM_WORKERS=$(jq -r '.Groups[] | select(.Type == "worker") | .Size' config.swim)
 DRIVER=$(jq -r '.Driver' config.swim)
-jq '.Groups[] | select(.Type == "manager") | .Config' config.swim > /scratch/manager-request.swpt
 
 # Machete API server.
 docker run \
