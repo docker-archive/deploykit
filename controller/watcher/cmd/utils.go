@@ -25,10 +25,11 @@ func getMap(v interface{}, key string) map[string]interface{} {
 func getWorkerJoinToken(docker client.APIClient) (string, error) {
 	tick := time.Tick(1 * time.Second)
 	deadline := time.After(1 * time.Hour)
+retries:
 	for {
 		select {
 		case <-deadline:
-			break
+			break retries
 		case <-tick:
 			swarmStatus, err := docker.SwarmInspect(context.Background())
 			if err != nil {
