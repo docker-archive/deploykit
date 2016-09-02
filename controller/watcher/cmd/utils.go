@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	"golang.org/x/net/context"
 	"text/template"
+	"time"
 )
 
 func getMap(v interface{}, key string) map[string]interface{} {
@@ -21,11 +23,22 @@ func getMap(v interface{}, key string) map[string]interface{} {
 }
 
 func getWorkerJoinToken(docker client.APIClient) (string, error) {
-	swarmStatus, err := docker.SwarmInspect(context.Background())
-	if err != nil {
-		return "", err
+	tick := time.Tick(1 * time.Second)
+	deadline := time.After(1 * time.Hour)
+	for {
+		select {
+		case <-deadline:
+			break
+		case <-tick:
+			swarmStatus, err := docker.SwarmInspect(context.Background())
+			if err != nil {
+				log.Warningln("Error getting join token.  Will retry. Err=", err)
+			} else {
+				return swarmStatus.JoinTokens.Worker, nil
+			}
+		}
 	}
-	return swarmStatus.JoinTokens.Worker, nil
+	return "", errors.New("deadline-exceeded: get join token")
 }
 
 func evaluateFieldsAsTemplate(obj interface{}, ctx interface{}) interface{} {
@@ -38,7 +51,7 @@ func evaluateFieldsAsTemplate(obj interface{}, ctx interface{}) interface{} {
 	output := map[string]interface{}{}
 	for key, value := range configAsMap {
 		output[key] = value
-		log.Debugln("Processing key", key, "value=", value)
+		log.Debugln("Context=", ctx, " == Processing key", key, "value=", value)
 		switch value := value.(type) {
 		case string:
 
@@ -70,6 +83,8 @@ func evaluateFieldsAsTemplate(obj interface{}, ctx interface{}) interface{} {
 			} else {
 				output[key] = string(buff.Bytes())
 			}
+			log.Debugln("Updated key=", key, "to value", output[key])
+
 		case []interface{}:
 			ar := []interface{}{}
 			for _, obj := range value {

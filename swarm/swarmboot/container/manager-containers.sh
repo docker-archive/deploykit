@@ -62,4 +62,5 @@ docker run \
   --discovery $LOCAL_IP:9091 \
   --listen :9090 \
   --state running \
+  --log 5 \
   url $SWIM_URL

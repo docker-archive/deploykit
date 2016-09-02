@@ -51,6 +51,7 @@ func (b *backend) POC2Reactor(buff []byte) {
 		log.Warningln("Problem getting the worker join token. Do nothing. Err=", err)
 		return
 	}
+	log.Infoln("Acquired join token.  Applying to templated config")
 
 	runningContext := map[string]interface{}{
 		"JOIN_TOKEN_ARG": fmt.Sprintf("--join-token %s", joinToken),
@@ -78,6 +79,9 @@ func (b *backend) POC2Reactor(buff []byte) {
 		// TODO(chungers) -- think about this case... no config we assume no change / no need to restart.
 
 		if config != nil {
+
+			log.Infoln("Another iteration of evaluating the template in the running context. Config=", config, "name=", name)
+
 			// This is where we'd evaluate any templates in the config...
 			// One of the config sections for the scaler will have information on setting the UserData for the
 			// instance.  The instance uses swarmboot to boot up and swarmboot accepts the join token in its
@@ -90,6 +94,7 @@ func (b *backend) POC2Reactor(buff []byte) {
 
 			// TOOD(chungers) - there are other types. this poc only covers scaler
 			poc2Request, ok := config.(poc2scalerRequest)
+			log.Infoln("is a poc2 schema scaler request", poc2Request, ok)
 			if ok {
 				poc2Request.RunInstancesInput = evaluateFieldsAsTemplate(poc2Request.RunInstancesInput, runningContext).(map[string]interface{})
 				changeSet[controller] = poc2Request
