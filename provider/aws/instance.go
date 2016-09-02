@@ -7,9 +7,14 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/libmachete/spi"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sort"
 	"time"
@@ -32,58 +37,91 @@ type Provisioner struct {
 	Cluster spi.ClusterID
 }
 
-// NewInstanceProvisioner creates a new provisioner using an SSH command runner and local private key storage.
-func NewInstanceProvisioner(client ec2iface.EC2API, cluster spi.ClusterID) instance.Provisioner {
+type properties struct {
+	Region   string
+	Retries  int
+	Cluster  spi.ClusterID
+	Instance json.RawMessage
+}
+
+// NewPluginFromProperties creates a new AWS plugin based on a JSON configuration.
+func NewPluginFromProperties(pluginProperties json.RawMessage) (instance.Plugin, string, error) {
+	props := properties{Retries: 5}
+	err := json.Unmarshal([]byte(pluginProperties), &props)
+	if err != nil {
+		return nil, "", err
+	}
+
+	providers := []credentials.Provider{
+		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
+		&credentials.EnvProvider{},
+		&credentials.SharedCredentialsProvider{},
+	}
+
+	client := session.New(aws.NewConfig().
+		WithRegion(props.Region).
+		WithCredentials(credentials.NewChainCredentials(providers)).
+		WithLogger(getLogger()).
+		WithMaxRetries(props.Retries))
+
+	instancePlugin := NewInstancePlugin(ec2.New(client), props.Cluster)
+
+	// TODO(wfarner): Provide a way for the plugin to validate an instance request to identify bad configurations
+	// more quickly.
+	return instancePlugin, string(props.Instance), nil
+}
+
+// NewInstancePlugin creates a new plugin that creates instances in AWS EC2.
+func NewInstancePlugin(client ec2iface.EC2API, cluster spi.ClusterID) instance.Plugin {
 	return &Provisioner{
 		Client:  client,
 		Cluster: cluster,
 	}
 }
 
-func (p Provisioner) tagInstance(request CreateInstanceRequest, instance *ec2.Instance) error {
-	tags := []*ec2.Tag{}
+func (p Provisioner) tagInstance(gid group.ID, tags map[string]string, instance *ec2.Instance) error {
+	ec2Tags := []*ec2.Tag{}
 
 	// Gather the tag keys in sorted order, to provide predictable tag order.  This is
 	// particularly useful for tests.
 	var keys []string
-	for k := range request.Tags {
+	for k := range tags {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
 	for _, k := range keys {
 		key := k
-		value := request.Tags[key]
-		tags = append(tags, &ec2.Tag{Key: &key, Value: &value})
+		value := tags[key]
+		ec2Tags = append(ec2Tags, &ec2.Tag{Key: &key, Value: &value})
 	}
 
 	// Add cluster and group tags
-	tags = append(
-		tags,
+	ec2Tags = append(
+		ec2Tags,
 		&ec2.Tag{Key: aws.String(ClusterTag), Value: aws.String(string(p.Cluster))},
-		&ec2.Tag{Key: aws.String(GroupTag), Value: aws.String(string(request.Group))})
+		&ec2.Tag{Key: aws.String(GroupTag), Value: aws.String(string(gid))})
 
-	_, err := p.Client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{instance.InstanceId}, Tags: tags})
+	_, err := p.Client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{instance.InstanceId}, Tags: ec2Tags})
 	return err
 }
 
 // CreateInstanceRequest is the concrete provision request type.
 type CreateInstanceRequest struct {
-	Group             instance.GroupID      `json:"group"`
 	Tags              map[string]string     `json:"tags"`
 	RunInstancesInput ec2.RunInstancesInput `json:"run_instances_input"`
 }
 
 // Provision creates a new instance.
-func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance.ID, error) {
+func (p Provisioner) Provision(gid group.ID, req string, volume *instance.VolumeID) (*instance.ID, error) {
+	if gid == "" {
+		return nil, spi.NewError(spi.ErrBadInput, "'group' field must not be blank")
+	}
+
 	request := CreateInstanceRequest{}
 	err := json.Unmarshal([]byte(req), &request)
 	if err != nil {
 		return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Invalid input formatting: %s", err))
-	}
-
-	if request.Group == "" {
-		return nil, spi.NewError(spi.ErrBadInput, "'group' field must not be blank")
 	}
 
 	request.RunInstancesInput.MinCount = aws.Int64(1)
@@ -131,7 +169,7 @@ func (p Provisioner) Provision(req string, volume *instance.VolumeID) (*instance
 
 	id := (*instance.ID)(ec2Instance.InstanceId)
 
-	err = p.tagInstance(request, ec2Instance)
+	err = p.tagInstance(gid, request.Tags, ec2Instance)
 	if err != nil {
 		return id, err
 	}
@@ -194,7 +232,7 @@ func clusterFilter(cluster spi.ClusterID) *ec2.Filter {
 	}
 }
 
-func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken *string) *ec2.DescribeInstancesInput {
+func describeGroupRequest(cluster spi.ClusterID, id group.ID, nextToken *string) *ec2.DescribeInstancesInput {
 	return &ec2.DescribeInstancesInput{
 		NextToken: nextToken,
 		Filters: []*ec2.Filter{
@@ -214,7 +252,7 @@ func describeGroupRequest(cluster spi.ClusterID, id instance.GroupID, nextToken 
 	}
 }
 
-func (p Provisioner) describeInstances(group instance.GroupID, nextToken *string) ([]instance.Description, error) {
+func (p Provisioner) describeInstances(group group.ID, nextToken *string) ([]instance.Description, error) {
 	result, err := p.Client.DescribeInstances(describeGroupRequest(p.Cluster, group, nextToken))
 	if err != nil {
 		return nil, err
@@ -244,7 +282,7 @@ func (p Provisioner) describeInstances(group instance.GroupID, nextToken *string
 }
 
 // DescribeInstances implements instance.Provisioner.DescribeInstances.
-func (p Provisioner) DescribeInstances(group instance.GroupID) ([]instance.Description, error) {
+func (p Provisioner) DescribeInstances(group group.ID) ([]instance.Description, error) {
 	return p.describeInstances(group, nil)
 }
 

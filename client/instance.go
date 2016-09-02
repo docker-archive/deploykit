@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"io/ioutil"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 )
 
 // NewInstanceProvisioner creates a remote provisioner and communicates using the HTTP API.
-func NewInstanceProvisioner(host string) instance.Provisioner {
+func NewInstanceProvisioner(host string) instance.Plugin {
 	return &instanceClient{host: host}
 }
 
@@ -71,9 +72,10 @@ func (c instanceClient) sendRequest(method, path, body string) ([]byte, error) {
 	return data, err
 }
 
-func (c instanceClient) Provision(request string, volume *instance.VolumeID) (*instance.ID, error) {
+func (c instanceClient) Provision(gid group.ID, request string, volume *instance.VolumeID) (*instance.ID, error) {
 	req := json.RawMessage(request)
 	payload := api.ProvisionRequest{
+		Group:   gid,
 		Request: &req,
 		Volume:  volume,
 	}
@@ -103,8 +105,8 @@ func (c instanceClient) Destroy(instance instance.ID) error {
 	return apiErr
 }
 
-func (c instanceClient) DescribeInstances(group instance.GroupID) ([]instance.Description, error) {
-	data, apiErr := c.sendRequest("GET", fmt.Sprintf("instance/?group=%s", group), "")
+func (c instanceClient) DescribeInstances(gid group.ID) ([]instance.Description, error) {
+	data, apiErr := c.sendRequest("GET", fmt.Sprintf("instance/?group=%s", gid), "")
 	if apiErr != nil {
 		return nil, apiErr
 	}

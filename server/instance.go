@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/gorilla/mux"
 	"io/ioutil"
@@ -12,7 +13,7 @@ import (
 )
 
 type instanceHandler struct {
-	provisioner instance.Provisioner
+	provisioner instance.Plugin
 }
 
 func getInstanceID(req *http.Request) instance.ID {
@@ -20,12 +21,12 @@ func getInstanceID(req *http.Request) instance.ID {
 }
 
 func (h *instanceHandler) describe(req *http.Request) (interface{}, error) {
-	group := req.URL.Query().Get("group")
-	if len(group) == 0 {
+	gid := req.URL.Query().Get("group")
+	if len(gid) == 0 {
 		return nil, spi.NewError(spi.ErrBadInput, "Group must be specified")
 	}
 
-	return h.provisioner.DescribeInstances(instance.GroupID(group))
+	return h.provisioner.DescribeInstances(group.ID(gid))
 }
 
 func (h *instanceHandler) provision(req *http.Request) (interface{}, error) {
@@ -40,7 +41,7 @@ func (h *instanceHandler) provision(req *http.Request) (interface{}, error) {
 		return nil, spi.NewError(spi.ErrUnknown, fmt.Sprintf("Failed to unmarshal response: %s", err))
 	}
 
-	return h.provisioner.Provision(string(*request.Request), request.Volume)
+	return h.provisioner.Provision(request.Group, string(*request.Request), request.Volume)
 }
 
 func (h *instanceHandler) destroy(req *http.Request) (interface{}, error) {
@@ -48,7 +49,7 @@ func (h *instanceHandler) destroy(req *http.Request) (interface{}, error) {
 }
 
 func (h *instanceHandler) attachTo(router *mux.Router) {
-	router.HandleFunc("/", outputHandler(h.describe)).Methods("GET")
-	router.HandleFunc("/", outputHandler(h.provision)).Methods("POST")
-	router.HandleFunc("/{key}", outputHandler(h.destroy)).Methods("DELETE")
+	router.HandleFunc("/", OutputHandler(h.describe)).Methods("GET")
+	router.HandleFunc("/", OutputHandler(h.provision)).Methods("POST")
+	router.HandleFunc("/{key}", OutputHandler(h.destroy)).Methods("DELETE")
 }

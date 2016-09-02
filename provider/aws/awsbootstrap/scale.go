@@ -31,8 +31,8 @@ func scale(cluster clusterID, groupName string, count int) error {
 	}
 
 	matched := false
-	swim.mutateGroups(func(name string, group *instanceGroup) {
-		if name == groupName {
+	swim.mutateGroups(func(group *instanceGroup) {
+		if string(group.Name) == groupName {
 			matched = true
 			if group.isManager() {
 				err = errors.New("A manager group may not be scaled")
