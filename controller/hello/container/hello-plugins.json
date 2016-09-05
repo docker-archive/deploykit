@@ -43,8 +43,7 @@
         "Entrypoint": [
           "hello",
           "run",
-          "--listen=/run/docker/plugins/hello.sock",
-          "--name=hello"
+          "--listen=/run/docker/plugins/hello.sock"
         ],
         "Workdir": "",
         "User": {},

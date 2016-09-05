@@ -2,7 +2,7 @@
     "manifestVersion": "v0.1",
     "description": "world test",
     "documentation": "https://docs.docker.com/engine/extend/plugins/",
-    "entrypoint": ["hello", "run", "--listen=/run/docker/plugins/world.sock", "--name=world" ],
+    "entrypoint": ["hello", "run", "--listen=/run/docker/plugins/world.sock"],
     "network": {
         "type": "host"
     },

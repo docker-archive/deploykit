@@ -2,7 +2,7 @@
     "manifestVersion": "v0.1",
     "description": "hello test",
     "documentation": "https://docs.docker.com/engine/extend/plugins/",
-    "entrypoint": ["hello", "run", "--listen=/run/docker/plugins/hello.sock", "--name=hello" ],
+    "entrypoint": ["hello", "run", "--listen=/run/docker/plugins/hello.sock"],
     "network": {
         "type": "host"
     },

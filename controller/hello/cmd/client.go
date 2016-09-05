@@ -75,7 +75,18 @@ func clientCommand(backend *backend) *cobra.Command {
 				}
 				log.Infoln("Info:", info)
 			default:
-				return client.Call(op, req, nil) // will log to stdout
+				result := map[string]interface{}{}
+				err = client.Call(op, req, &result)
+				if err != nil {
+					return err
+				}
+				// dump out as json
+				buff, err := json.MarshalIndent(result, "  ", "  ")
+				if err != nil {
+					return err
+				}
+				fmt.Println(string(buff))
+				return nil
 			}
 			return nil
 		},

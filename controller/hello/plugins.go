@@ -22,8 +22,8 @@ type PluginDiscovery struct {
 // PluginCall is a composite of discovered plugin with operation and arg
 type PluginCall struct {
 	PluginDiscovery
-	Op  string          `json:"operation,omitempty"`
-	Arg json.RawMessage `json:"arg,omitempty"`
+	Op  string           `json:"operation,omitempty"`
+	Arg *json.RawMessage `json:"arg,omitempty"`
 }
 
 // DiscoverPlugin uses the docker engine api to discover plugin specified
@@ -66,12 +66,15 @@ func (h *Server) CallPlugin(call PluginCall) (interface{}, error) {
 	// now connect -- this assumes the volume is bind mounted...
 	client := controller.NewClient(call.PluginDiscovery.Socket)
 
-	arg := map[string]interface{}{}
-	err := json.Unmarshal(call.Arg, &arg)
-	if err != nil {
-		return nil, err
+	var arg interface{}
+	if call.Arg != nil {
+		arg = map[string]interface{}{}
+		err := json.Unmarshal(*call.Arg, &arg)
+		if err != nil {
+			return nil, err
+		}
 	}
 	result := map[string]interface{}{}
-	err = client.Call(call.Op, arg, &result)
+	err := client.Call(call.Op, arg, &result)
 	return result, err
 }

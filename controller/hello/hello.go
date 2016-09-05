@@ -21,6 +21,7 @@ type Service interface {
 
 // Simple object that checks docker to see if it's running on a leader.
 type Server struct {
+	name    string
 	lock    sync.Mutex
 	options Options
 	docker  client.APIClient
@@ -43,8 +44,9 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"Interval to poll for leader status")
 }
 
-func New(options Options, config <-chan []byte, docker client.APIClient) Service {
+func New(name string, options Options, config <-chan []byte, docker client.APIClient) Service {
 	return &Server{
+		name:    name,
 		docker:  docker,
 		config:  config,
 		options: options,
@@ -102,6 +104,7 @@ func (h *Server) GetState() (interface{}, error) {
 	leader, _ := h.CheckLeader(context.Background())
 
 	return map[string]interface{}{
+		"name":    h.name,
 		"running": h.stop != nil,
 		"leader":  leader,
 	}, nil

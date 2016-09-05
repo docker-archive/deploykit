@@ -31,7 +31,7 @@ clean:
 container: clean
 	@echo "+ $@"
 	mkdir -p bin
-	cd ../../.. && LDFLAGS="-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" \
+	cd ../../.. && LDFLAGS="-X main.Version=$(VERSION) -X main.Revision=$(REVISION) -X main.Name=$(NAME)" \
 	  ./scripts/build-in-docker 'controller/hello/cmd/*.go' controller/hello/container/bin/hello
 	docker build -t $(DOCKER_IMAGE) -t $(DOCKER_REPO):latest -t $(DOCKER_REPO):$(VERSION) .
 
@@ -43,8 +43,10 @@ endif
 endif
 
 # Must run on a clean linux host -- pinata does not expose /var/lib/docker/plugins
-PLUGIN?=hello
-PLUGIN_ID?=hello-instance
+# Note the manifest.json still has the name (repo name) of the plugin. So this is not totally parameterized.
+NAME?=hello
+PLUGIN?=$(NAME)
+PLUGIN_ID?=$(PLUGIN)-instance
 SSH?=ubuntu@54.67.4.42
 plugin: container
 	ssh ${SSH} 'sudo docker ps -aq | xargs docker rm'

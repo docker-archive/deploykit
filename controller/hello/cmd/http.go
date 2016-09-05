@@ -52,14 +52,14 @@ func handlers(backend *backend) http.Handler {
 			state, _ := backend.service.GetState()
 			info := info{
 				Info: controller.Info{
-					Name:        backend.name,
-					DriverName:  backend.name,
-					DriverType:  backend.name,
+					Name:        Name,
+					DriverName:  Name,
+					DriverType:  Name,
 					Version:     Version,
 					Revision:    Revision,
-					Description: backend.name,
-					Namespace:   backend.name,
-					Image:       "libmachete/" + backend.name,
+					Description: Name,
+					Namespace:   Name,
+					Image:       "libmachete/" + Name,
 				},
 				Running: backend.service != nil,
 				State:   state,
@@ -78,9 +78,9 @@ func handlers(backend *backend) http.Handler {
 	// RPC - style API like Docker Plugins
 
 	// Start begins actual work
-	router.HandleFunc("/v1/"+backend.name+".Update",
+	router.HandleFunc("/v1/"+Name+".Update",
 		func(resp http.ResponseWriter, req *http.Request) {
-			log.Infoln("Update requested via http")
+			log.Infoln(Name, " - Update requested via http")
 			buff, err := ioutil.ReadAll(req.Body)
 			if noError(err, resp) {
 				if backend.data != nil {
@@ -94,9 +94,9 @@ func handlers(backend *backend) http.Handler {
 		}).Methods("POST")
 
 	// GetState - returns current state
-	router.HandleFunc("/v1/"+backend.name+".GetState",
+	router.HandleFunc("/v1/"+Name+".GetState",
 		func(resp http.ResponseWriter, req *http.Request) {
-			log.Infoln("State requested via http")
+			log.Infoln(Name, "- State requested via http")
 			if backend.service != nil {
 				if state, err := backend.service.GetState(); noError(err, resp) {
 					buff, err := json.MarshalIndent(state, "  ", "  ")
@@ -111,8 +111,9 @@ func handlers(backend *backend) http.Handler {
 		}).Methods("POST")
 
 	// Discover another plugin
-	router.HandleFunc("/v1/"+backend.name+".Discover",
+	router.HandleFunc("/v1/"+Name+".Discover",
 		func(resp http.ResponseWriter, req *http.Request) {
+			log.Infoln(Name, "- Discover requested via http")
 			buff, err := ioutil.ReadAll(req.Body)
 			if noError(err, resp) {
 				p := &hello.Plugin{}
@@ -132,9 +133,11 @@ func handlers(backend *backend) http.Handler {
 		}).Methods("POST")
 
 	// Call another plugin
-	router.HandleFunc("/v1/"+backend.name+".Call",
+	router.HandleFunc("/v1/"+Name+".Call",
 		func(resp http.ResponseWriter, req *http.Request) {
 			buff, err := ioutil.ReadAll(req.Body)
+			log.Infoln(Name, "- Call requested via http")
+			log.Debugln(Name, " - Call: input=", string(buff), "err=", err)
 			if noError(err, resp) {
 				call := &hello.PluginCall{}
 				err = json.Unmarshal(buff, call)
