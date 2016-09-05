@@ -18,15 +18,16 @@ type ReactFunc func(newData []byte)
 
 // Watcher is the engine for detecting change in resource and performs some prescribed actions on change.
 type Watcher struct {
-	inbound  <-chan []byte
-	inbound2 <-chan []byte
-	current  []byte
-	stop     chan struct{}
-	watch    WatchFunc
-	equal    EqualFunc
-	react    ReactFunc
-	running  bool
-	lock     sync.Mutex
+	inbound      <-chan []byte
+	inbound2     <-chan []byte
+	current      []byte
+	stop         chan struct{}
+	watch        WatchFunc
+	equal        EqualFunc
+	react        ReactFunc
+	running      bool
+	lock         sync.Mutex
+	reactOnStart bool
 }
 
 // New creates a watcher
@@ -37,6 +38,12 @@ func New(f WatchFunc, r ReactFunc) *Watcher {
 // AddInbound adds the second inbound channel
 func (w *Watcher) AddInbound(c <-chan []byte) *Watcher {
 	w.inbound2 = c
+	return w
+}
+
+// ReactOnStart tells the watcher to react immediately when a first config is read.
+func (w *Watcher) ReactOnStart(b bool) *Watcher {
+	w.reactOnStart = b
 	return w
 }
 
@@ -116,11 +123,19 @@ func (w *Watcher) Run() (<-chan struct{}, error) {
 				return
 
 			case newData := <-w.inbound:
-				// Note that if the current value is nil, it's because it's the first
-				// run. We should not react unless we actually see an observed change.
-				// This will prevent unwanted side effects when the watcher is restarted.
-				if w.current != nil && !w.equal(w.current, newData) {
+
+				switch {
+
+				case w.reactOnStart && w.current == nil:
+					// In this case we just reconfigure on any new data that comes in on startup
 					w.react(newData)
+
+				case w.current != nil && !w.equal(w.current, newData):
+					// Note that if the current value is nil, it's because it's the first
+					// run. We should not react unless we actually see an observed change.
+					// This will prevent unwanted side effects when the watcher is restarted.
+					w.react(newData)
+
 				}
 				w.current = newData
 

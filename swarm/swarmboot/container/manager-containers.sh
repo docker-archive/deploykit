@@ -25,7 +25,7 @@ docker run \
   --volume /var/run/docker.sock:/var/run/docker.sock \
   --restart always \
   --publish $MACHETE_PORT:$MACHETE_PORT \
-  wfarner/machete \
+  libmachete/machete-aws \
   --cluster "$CLUSTER_NAME" --port $MACHETE_PORT $DRIVER
 
 # Maintains manager node pool (managers 'watch' each other).
@@ -36,16 +36,31 @@ docker run \
   --volume /var/run/docker.sock:/var/run/docker.sock \
   --volume /scratch/manager-request.swpt:/manager-request.swpt:ro \
   --restart always \
-  wfarner/quorum \
+  libmachete/quorum \
   run \
   $LOCAL_IP:$MACHETE_PORT $MANAGER_IPS /manager-request.swpt
 
-# Maintains worker node pool.
+# Maintains worker node pool. Use tcp listener and force discovery via flag
 docker run \
-  --detach \
+  --detach --restart always \
   --volume /var/run/docker.sock:/var/run/docker.sock \
-  --volume /scratch/worker-request.swpt:/worker-request.swpt:ro \
-  --restart always \
-  wfarner/scaler \
-  run \
-  $LOCAL_IP:$MACHETE_PORT $NUM_WORKERS /worker-request.swpt
+  --volume /var/run/machete/:/var/run/machete/ \
+  --publish 9091:9091 \
+  libmachete/scaler \
+  --driver_dir /var/run/machete \
+  --listen :9091 \
+  run $LOCAL_IP:$MACHETE_PORT
+
+# Watcher detects changes updates the scaler. Use tcp listener and force discovery via flag
+docker run \
+  --detach   --restart always \
+  --volume /var/run/docker.sock:/var/run/docker.sock \
+  --volume /var/run/matchete/:/var/run/machete/ \
+  --publish 9090:9090 \
+  libmachete/watcher \
+  --driver_dir /var/run/machete \
+  --discovery $LOCAL_IP:9091 \
+  --listen :9090 \
+  --state running \
+  --log 5 \
+  url $SWIM_URL
