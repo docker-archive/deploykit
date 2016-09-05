@@ -51,7 +51,7 @@ func scale(cluster clusterID, groupName string, count int) (*fakeSWIMSchema, err
 		os.Exit(1)
 	}
 
-	err = swim.push("", "") // Scale is executed in the cluster and we should have IAM role here. No need for api key
+	err = swim.push()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to push config: %s", err)
 	}

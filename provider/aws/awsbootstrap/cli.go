@@ -73,9 +73,6 @@ func (a awsBootstrap) Command() *cobra.Command {
 
 	var keyName string
 
-	// Create and destroy are executed on the origin node -- away from the swarm.  Therefore we need credentials
-	apiKey := ""
-	apiSecret := ""
 	workerSize := 3
 
 	createCmd := cobra.Command{
@@ -134,7 +131,7 @@ func (a awsBootstrap) Command() *cobra.Command {
 				swim.applyDefaults()
 			}
 
-			err := bootstrap(swim, apiKey, apiSecret)
+			err := bootstrap(swim)
 			if err != nil {
 				abort(err.Error())
 			}
@@ -142,8 +139,6 @@ func (a awsBootstrap) Command() *cobra.Command {
 	}
 	createCmd.Flags().AddFlagSet(cluster.flags())
 	createCmd.Flags().StringVar(&keyName, "key", "", "The existing SSH key in AWS to use for provisioned instances")
-	createCmd.Flags().StringVar(&apiKey, "api_key", apiKey, "Api Key")
-	createCmd.Flags().StringVar(&apiSecret, "api_secret", apiSecret, "Api Secret")
 	createCmd.Flags().IntVar(&workerSize, "worker_size", workerSize, "Size of worker group")
 
 	cmd.AddCommand(&createCmd)
@@ -171,15 +166,13 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 				id = swim.cluster()
 			}
 
-			err := destroy(id, apiKey, apiSecret)
+			err := destroy(id)
 			if err != nil {
 				abort(err.Error())
 			}
 		},
 	}
 	destroyCmd.Flags().StringVar(&swimFile, "config", "", "A SWIM file")
-	destroyCmd.Flags().StringVar(&apiKey, "api_key", apiKey, "Api Key")
-	destroyCmd.Flags().StringVar(&apiSecret, "api_secret", apiSecret, "Api Secret")
 
 	destroyCmd.Flags().AddFlagSet(cluster.flags())
 	cmd.AddCommand(&destroyCmd)
@@ -247,7 +240,7 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 
 			// TODO(wfarner): Fetch the existing config and check that the requested change is possible.
 
-			err = swim.push("", "") // reconfigure is run on the swarm.  No need to provide api key because of instance IAM
+			err = swim.push()
 			if err != nil {
 				abort("Failed to push config: %s", err)
 			}

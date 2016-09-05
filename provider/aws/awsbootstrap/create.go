@@ -535,8 +535,8 @@ func injectUserData(swim *fakeSWIMSchema) error {
 	return nil
 }
 
-func bootstrap(swim fakeSWIMSchema, apiKey, apiSecret string) error {
-	sess := swim.cluster().getAWSClient(apiKey, apiSecret)
+func bootstrap(swim fakeSWIMSchema) error {
+	sess := swim.cluster().getAWSClient()
 
 	keyNames := []*string{}
 	for _, group := range swim.Groups {
@@ -571,7 +571,7 @@ func bootstrap(swim fakeSWIMSchema, apiKey, apiSecret string) error {
 		return err
 	}
 
-	err = swim.push(apiKey, apiSecret)
+	err = swim.push()
 	if err != nil {
 		return err
 	}

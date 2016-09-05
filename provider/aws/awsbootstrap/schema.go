@@ -29,15 +29,11 @@ type clusterID struct {
 	name   string
 }
 
-func (c clusterID) getAWSClient(apiKey, apiSecret string) client.ConfigProvider {
+func (c clusterID) getAWSClient() client.ConfigProvider {
 	providers := []credentials.Provider{
 		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
 		&credentials.EnvProvider{},
 		&credentials.SharedCredentialsProvider{},
-		&machete_aws.Credential{
-			AccessKeyID:     apiKey,
-			SecretAccessKey: apiSecret,
-		},
 	}
 
 	return session.New(aws.NewConfig().
@@ -114,13 +110,13 @@ func (s *fakeSWIMSchema) cluster() clusterID {
 	return clusterID{region: az[:len(az)-1], name: s.ClusterName}
 }
 
-func (s *fakeSWIMSchema) push(apiKey, apiSecret string) error {
+func (s *fakeSWIMSchema) push() error {
 	swimData, err := json.Marshal(*s)
 	if err != nil {
 		return err
 	}
 
-	s3Client := s3.New(s.cluster().getAWSClient(apiKey, apiSecret))
+	s3Client := s3.New(s.cluster().getAWSClient())
 
 	bucket := aws.String(machete_aws.ClusterTag)
 	head := &s3.HeadBucketInput{Bucket: bucket}
