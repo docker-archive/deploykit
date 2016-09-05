@@ -166,7 +166,7 @@ func (d *Client) Info() (map[string]interface{}, error) {
 }
 
 // Call makes a POST call of the form of /v1/{op}.  For example  /v1/scaler.Start
-func (d *Client) Call(op string, req interface{}) error {
+func (d *Client) Call(op string, req interface{}, out interface{}) error {
 	var resp *http.Response
 	var err error
 	if req != nil {
@@ -196,6 +196,9 @@ func (d *Client) Call(op string, req interface{}) error {
 		log.Infoln("Resp", string(buff))
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("error from controller:%d, msg=%s", resp.StatusCode, string(buff))
+		}
+		if out != nil {
+			return json.Unmarshal(buff, out)
 		}
 	}
 	return nil
