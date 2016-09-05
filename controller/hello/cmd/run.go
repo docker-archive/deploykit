@@ -23,7 +23,7 @@ func runCommand(backend *backend) *cobra.Command {
 			backend.service = hello.New(backend.options, data, backend.docker)
 
 			go backend.service.Run()
-			log.Infoln("hello started")
+			log.Infoln(backend.name, "started")
 			return nil
 		},
 	}

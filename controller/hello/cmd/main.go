@@ -29,6 +29,7 @@ var (
 )
 
 type backend struct {
+	name    string
 	docker  client.APIClient
 	service hello.Service
 	options hello.Options
@@ -38,8 +39,9 @@ type backend struct {
 func main() {
 
 	backend := &backend{
+		name: "hello",
 		options: hello.Options{
-			CheckLeaderInterval: 5 * time.Second,
+			CheckLeaderInterval: 10 * time.Second,
 		},
 	}
 
@@ -47,7 +49,7 @@ func main() {
 	// for the watcher, except 'version' subcommand.  After the subcommand completes, the
 	// post run then begins execution of the actual watcher.
 	cmd := &cobra.Command{
-		Use:   "hello",
+		Use:   backend.name,
 		Short: "test plugin",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 
@@ -102,6 +104,10 @@ func main() {
 			fmt.Printf("%s (revision %s)\n", Version, Revision)
 		},
 	})
+
+	// This tester is used to build TWO different plugins. So we pass the name from the command line to make it
+	// easy to tell which is which.
+	cmd.PersistentFlags().StringVar(&backend.name, "name", backend.name, "name of the plugin")
 
 	cmd.PersistentFlags().StringVar(&listen, "listen", listen, "listen address (unix or tcp)")
 	cmd.PersistentFlags().StringVar(&dockerEngineAddress, "dockerEngineAddress", defaultDockerEngineAddress, "Docker dockerEngineAddress")

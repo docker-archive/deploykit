@@ -43,17 +43,39 @@ endif
 endif
 
 # Must run on a clean linux host -- pinata does not expose /var/lib/docker/plugins
-PLUGIN_ID?="hello-plugin-instance"
+PLUGIN?=hello
+PLUGIN_ID?=hello-instance
+SSH?=ubuntu@54.67.4.42
 plugin: container
+	ssh ${SSH} 'sudo docker ps -aq | xargs docker rm'
+	ssh ${SSH} sudo docker rmi ${DOCKER_REPO}
 	@echo "making rootfs"
-	docker export $(docker run ${DOCKER_REPO} -h) --output /var/lib/docker/plugins/$(PLUGIN_ID)/rootfs.tar
-	tar xvf /var/lib/docker/plugins/$(PLUGIN_ID)/rootfs.tar -C /var/lib/docker/plugins/$(PLUGIN_ID)/rootfs/
-	cp ./manifest.json  /var/lib/docker/plugins/$(PLUGIN_ID)/
-	cp ./plugin-config.json  /var/lib/docker/plugins/$(PLUGIN_ID)/
-	sed -e 's/@PLUGIN_ID@/$$PLUGIN_ID/g' ./plugins.json /var/lib/docker/plugins/
-	@echo "stop docker"
-	stop docker  # on ubuntu / upstart
-	start docker # on ubuntu / upstart
-	docker plugin ls
-	docker plugin push $(DOCKER_REPO)-plugin:latest
-
+	ssh ${SSH} sudo docker run ${DOCKER_REPO} -h
+	@echo "stopping docker"
+	ssh ${SSH} sudo stop docker
+	ssh ${SSH} sudo rm -rf /var/lib/docker/plugins/${PLUGIN_ID}
+	ssh ${SSH} sudo mkdir -p /var/lib/docker/plugins/${PLUGIN_ID}/rootfs/
+	ssh ${SSH} sudo mkdir -p /var/lib/docker/plugins/${PLUGIN_ID}/rootfs/run/docker/plugins
+	@echo "starting docker"
+	ssh ${SSH} sudo start docker
+	ssh ${SSH} "sudo docker ps -aq | head -1 | xargs sudo docker export --output /var/lib/docker/plugins/${PLUGIN_ID}/rootfs.tar"
+	ssh ${SSH} "sudo tar xvf /var/lib/docker/plugins/${PLUGIN_ID}/rootfs.tar -C /var/lib/docker/plugins/${PLUGIN_ID}/rootfs/"
+	@echo "copying manifest.json"
+	scp ./${PLUGIN}-manifest.json ${SSH}:/tmp/manifest.json
+	ssh ${SSH} sudo cp /tmp/manifest.json /var/lib/docker/plugins/${PLUGIN_ID}/manifest.json
+	@echo "copying plugin-config.json"
+	scp ./plugin-config.json ${SSH}:/tmp/plugin-config.json
+	ssh ${SSH} sudo cp /tmp/plugin-config.json /var/lib/docker/plugins/${PLUGIN_ID}/plugin-config.json
+	@echo "copying plugins.json"
+	sed -e 's/@PLUGIN_ID@/${PLUGIN_ID}/g' ./${PLUGIN}-plugins.json > /tmp/plugins.json
+	scp /tmp/plugins.json ${SSH}:/tmp/plugins.json
+	ssh ${SSH} sudo cp /tmp/plugins.json /var/lib/docker/plugins/plugins.json
+	@echo "stopping docker"
+	ssh ${SSH} sudo stop docker
+	@echo "starting docker backup"
+	ssh ${SSH} sudo start docker
+	@echo "checking docker log"
+	ssh ${SSH} sudo cat /var/log/upstart/docker.log
+	@echo "checking plugin"
+	ssh ${SSH} sudo docker plugin ls
+	@echo "push the plugin from the host"

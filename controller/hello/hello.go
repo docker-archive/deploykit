@@ -15,6 +15,8 @@ type Service interface {
 	Stop()
 	Wait()
 	GetState() (interface{}, error)
+	DiscoverPlugin(Plugin) (*PluginDiscovery, error)
+	CallPlugin(PluginCall) (interface{}, error)
 }
 
 // Simple object that checks docker to see if it's running on a leader.
@@ -124,7 +126,7 @@ func (h *Server) connectDocker() error {
 func (h *Server) CheckLeader(ctx context.Context) (bool, error) {
 	info, err := h.docker.Info(ctx)
 
-	log.Infoln("check-leader: info=", info, "err=", err)
+	log.Debugln("check-leader: info=", info, "err=", err)
 
 	switch {
 	case err == nil:
@@ -150,12 +152,9 @@ func (h *Server) CheckLeader(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	log.Infoln("manager=", node.ManagerStatus)
-
 	if node.ManagerStatus == nil {
 		return false, nil
 	}
-
 	log.Infoln("leader=", node.ManagerStatus.Leader)
 
 	return node.ManagerStatus.Leader, nil

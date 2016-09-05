@@ -1,0 +1,86 @@
+{
+  "@PLUGIN_ID@": {
+    "plugin": {
+      "Manifest": {
+        "Args": {
+          "Value": null,
+          "Settable": null,
+          "Description": "",
+          "Name": ""
+        },
+        "Env": null,
+        "Devices": null,
+        "Mounts": [
+          {
+            "Options": null,
+            "Type": "bind",
+            "Destination": "/var/run",
+            "Source": "/var/run",
+            "Settable": null,
+            "Description": "docker socket",
+            "Name": ""
+          },
+          {
+            "Options": null,
+            "Type": "bind",
+            "Destination": "/run/docker",
+            "Source": "/run/docker",
+            "Settable": null,
+            "Description": "plugins socket",
+            "Name": ""
+          }
+        ],
+        "Capabilities": null,
+        "ManifestVersion": "v0.1",
+        "Description": "world test",
+        "Documentation": "https://docs.docker.com/engine/extend/plugins/",
+        "Interface": {
+          "Socket": "world.sock",
+          "Types": [
+            "docker.worlddriver/1.0"
+          ]
+        },
+        "Entrypoint": [
+          "hello",
+          "run",
+          "--listen=/run/docker/plugins/world.sock",
+          "--name=world"
+        ],
+        "Workdir": "",
+        "User": {},
+        "Network": {
+          "Type": "host"
+        }
+      },
+      "Config": {
+        "Devices": null,
+        "Args": null,
+        "Env": [],
+        "Mounts": [
+          {
+            "Options": null,
+            "Type": "bind",
+            "Destination": "/var/run",
+            "Source": "/var/run",
+            "Settable": null,
+            "Description": "docker socket",
+            "Name": ""
+          },
+          {
+            "Options": null,
+            "Type": "bind",
+            "Destination": "/run/docker",
+            "Source": "/run/docker",
+            "Settable": null,
+            "Description": "plugins socket",
+            "Name": ""
+          }
+        ]
+      },
+      "Active": true,
+      "Tag": "latest",
+      "Name": "chungers/world-plugin",
+      "Id": "@PLUGIN_ID@"
+    }
+  }
+}

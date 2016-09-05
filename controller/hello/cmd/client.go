@@ -75,7 +75,7 @@ func clientCommand(backend *backend) *cobra.Command {
 				}
 				log.Infoln("Info:", info)
 			default:
-				return client.Call(op, req)
+				return client.Call(op, req, nil) // will log to stdout
 			}
 			return nil
 		},
