@@ -15,7 +15,9 @@ type Service interface {
 	Stop()
 	Wait()
 	GetState() (interface{}, error)
-	DiscoverPlugin(Plugin) (*PluginDiscovery, error)
+	DiscoverPlugin(Plugin) (*PluginRef, error)
+	InstallPlugin(Plugin) (*PluginRef, error)
+	RemovePlugin(PluginRef) error
 	CallPlugin(PluginCall) (interface{}, error)
 }
 

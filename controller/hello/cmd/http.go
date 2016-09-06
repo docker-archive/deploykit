@@ -132,6 +132,46 @@ func handlers(backend *backend) http.Handler {
 			return
 		}).Methods("POST")
 
+	// Install and run another plugin
+	router.HandleFunc("/v1/"+Name+".Install",
+		func(resp http.ResponseWriter, req *http.Request) {
+			log.Infoln(Name, "- Install requested via http")
+			buff, err := ioutil.ReadAll(req.Body)
+			if noError(err, resp) {
+				p := &hello.Plugin{}
+				err = json.Unmarshal(buff, p)
+				if noError(err, resp) {
+					installed, err := backend.service.InstallPlugin(*p)
+					if noError(err, resp) {
+						buff, err = json.MarshalIndent(installed, "  ", "  ")
+						if noError(err, resp) {
+							resp.Write(buff)
+							return
+						}
+					}
+				}
+			}
+			return
+		}).Methods("POST")
+
+	// Removes a running plugin
+	router.HandleFunc("/v1/"+Name+".Remove",
+		func(resp http.ResponseWriter, req *http.Request) {
+			log.Infoln(Name, "- Remove requested via http")
+			buff, err := ioutil.ReadAll(req.Body)
+			if noError(err, resp) {
+				p := &hello.PluginRef{}
+				err = json.Unmarshal(buff, p)
+				if noError(err, resp) {
+					err := backend.service.RemovePlugin(*p)
+					if noError(err, resp) {
+						return
+					}
+				}
+			}
+			return
+		}).Methods("POST")
+
 	// Call another plugin
 	router.HandleFunc("/v1/"+Name+".Call",
 		func(resp http.ResponseWriter, req *http.Request) {

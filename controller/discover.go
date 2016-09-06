@@ -188,11 +188,11 @@ func (d *Client) Call(op string, req interface{}, out interface{}) error {
 			return err
 		}
 	}
-	if resp != nil {
-		buff, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
+	buff, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if len(buff) > 0 {
 		log.Infoln("Resp", string(buff))
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("error from controller:%d, msg=%s", resp.StatusCode, string(buff))
