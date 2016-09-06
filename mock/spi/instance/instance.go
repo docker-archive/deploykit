@@ -4,7 +4,6 @@
 package instance
 
 import (
-	group "github.com/docker/libmachete/spi/group"
 	instance "github.com/docker/libmachete/spi/instance"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -30,7 +29,7 @@ func (_m *MockPlugin) EXPECT() *_MockPluginRecorder {
 	return _m.recorder
 }
 
-func (_m *MockPlugin) DescribeInstances(_param0 group.ID) ([]instance.Description, error) {
+func (_m *MockPlugin) DescribeInstances(_param0 map[string]string) ([]instance.Description, error) {
 	ret := _m.ctrl.Call(_m, "DescribeInstances", _param0)
 	ret0, _ := ret[0].([]instance.Description)
 	ret1, _ := ret[1].(error)
@@ -51,7 +50,7 @@ func (_mr *_MockPluginRecorder) Destroy(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
 }
 
-func (_m *MockPlugin) Provision(_param0 group.ID, _param1 string, _param2 *instance.VolumeID) (*instance.ID, error) {
+func (_m *MockPlugin) Provision(_param0 string, _param1 *instance.VolumeID, _param2 map[string]string) (*instance.ID, error) {
 	ret := _m.ctrl.Call(_m, "Provision", _param0, _param1, _param2)
 	ret0, _ := ret[0].(*instance.ID)
 	ret1, _ := ret[1].(error)

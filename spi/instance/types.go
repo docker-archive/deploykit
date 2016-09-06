@@ -10,4 +10,5 @@ type VolumeID string
 type Description struct {
 	ID               ID
 	PrivateIPAddress string
+	Tags             map[string]string
 }

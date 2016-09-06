@@ -2,6 +2,7 @@ package group
 
 import (
 	"encoding/json"
+	"github.com/docker/libmachete/spi/instance"
 )
 
 // Plugin defines the functions for a Group plugin.
@@ -30,4 +31,5 @@ type Configuration struct {
 
 // Description is a placeholder for the reported state of a Group.
 type Description struct {
+	Instances []instance.Description
 }

@@ -4,7 +4,6 @@ import (
 	"github.com/docker/libmachete/client"
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
 	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
@@ -21,13 +20,13 @@ func TestClientServerRelay(t *testing.T) {
 	testflight.WithServer(NewHandler(backend), func(r *testflight.Requester) {
 		client := client.NewInstanceProvisioner(r.Url(""))
 
-		gid := group.ID("group-1")
+		tags := map[string]string{"a": "b", "c": "d"}
 		id := instance.ID("instance-1")
 
 		provisionData := "{}"
 		volume := instance.VolumeID("volume")
-		backend.EXPECT().Provision(gid, provisionData, &volume).Return(&id, nil)
-		returnedID, err := client.Provision(gid, provisionData, &volume)
+		backend.EXPECT().Provision(provisionData, &volume, tags).Return(&id, nil)
+		returnedID, err := client.Provision(provisionData, &volume, tags)
 		require.NoError(t, err)
 		require.Equal(t, id, *returnedID)
 
@@ -39,8 +38,8 @@ func TestClientServerRelay(t *testing.T) {
 			{ID: id, PrivateIPAddress: "10.0.0.2"},
 			{ID: instance.ID("instance-2"), PrivateIPAddress: "10.0.0.3"}}
 
-		backend.EXPECT().DescribeInstances(gid).Return(descriptions, nil)
-		returnedDescriptions, err := client.DescribeInstances(gid)
+		backend.EXPECT().DescribeInstances(tags).Return(descriptions, nil)
+		returnedDescriptions, err := client.DescribeInstances(tags)
 		require.NoError(t, err)
 		require.Equal(t, descriptions, returnedDescriptions)
 	})
@@ -55,10 +54,10 @@ func TestErrorMapping(t *testing.T) {
 	testflight.WithServer(NewHandler(backend), func(r *testflight.Requester) {
 		frontend := client.NewInstanceProvisioner(r.Url(""))
 		backendErr := spi.NewError(spi.ErrBadInput, "Bad")
-		gid := group.ID("group")
+		tags := map[string]string{"a": "b", "c": "d"}
 
-		backend.EXPECT().Provision(gid, "{}", nil).Return(nil, backendErr)
-		id, err := frontend.Provision(gid, "{}", nil)
+		backend.EXPECT().Provision("{}", nil, tags).Return(nil, backendErr)
+		id, err := frontend.Provision("{}", nil, tags)
 		require.Equal(t, backendErr, err)
 		require.Nil(t, id)
 	})

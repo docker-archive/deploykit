@@ -1,14 +1,13 @@
 package scaler
 
 import (
-	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -16,7 +15,9 @@ import (
 // of an autoscaling group / scale set on AWS or Azure.
 type Scaler interface {
 	util.RunStop
-	GetState() (json.RawMessage, error)
+	GetSize() uint32
+	SetSize(size uint32)
+	Describe() ([]instance.Description, error)
 	Destroy() error
 }
 
@@ -24,16 +25,16 @@ type scaler struct {
 	pollInterval     time.Duration
 	provisioner      instance.Plugin
 	provisionRequest string
-	group            group.ID
-	count            uint
+	tags             map[string]string
+	size             uint32
 	stop             chan bool
 }
 
 // NewFixedScaler creates a RunStop that monitors a group of instances on a provisioner, attempting to maintain a
-// fixed count.
+// fixed size.
 func NewFixedScaler(
-	grp group.ID,
-	count uint,
+	tags map[string]string,
+	size uint32,
 	pollInterval time.Duration,
 	provisioner instance.Plugin,
 	request string) (Scaler, error) {
@@ -42,8 +43,8 @@ func NewFixedScaler(
 		pollInterval:     pollInterval,
 		provisioner:      provisioner,
 		provisionRequest: request,
-		group:            grp,
-		count:            count,
+		tags:             tags,
+		size:             size,
 		stop:             make(chan bool),
 	}, nil
 }
@@ -62,47 +63,50 @@ func (n sortByID) Less(i, j int) bool {
 	return n[i].ID < n[j].ID
 }
 
-// GetState returns a raw json of the state, including configuration
-func (s *scaler) GetState() (json.RawMessage, error) {
-	out := map[string]interface{}{
-		"config": s.provisionRequest,
-		"count":  s.count,
-	}
-	buff, err := json.Marshal(out)
-	return json.RawMessage(buff), err
+func (s *scaler) GetSize() uint32 {
+	return s.size
+}
+
+func (s *scaler) SetSize(size uint32) {
+	log.Infof("Set target size for group %v to %d", s.tags, size)
+	atomic.StoreUint32(&s.size, size)
+}
+
+func (s *scaler) Describe() ([]instance.Description, error) {
+	return s.provisioner.DescribeInstances(s.tags)
 }
 
 func (s *scaler) checkState() {
-	log.Debugf("Checking instance count for group %s", s.group)
-	descriptions, err := s.provisioner.DescribeInstances(s.group)
+	log.Debugf("Checking instance size for group %v", s.tags)
+	descriptions, err := s.provisioner.DescribeInstances(s.tags)
 	if err != nil {
-		log.Infof("Failed to check count of %s: %s", s.group, err)
+		log.Infof("Failed to check size of %v: %s", s.tags, err)
 		return
 	}
 
 	log.Debugf("Found existing instances: %v", descriptions)
 
-	actualCount := uint(len(descriptions))
+	actualSize := uint32(len(descriptions))
 
 	switch {
-	case actualCount == s.count:
-		log.Infof("Group %s has %d instances, no action is needed", s.group, s.count)
+	case actualSize == s.size:
+		log.Debugf("Group %v has %d instances, no action is needed", s.tags, s.size)
 
-	case actualCount > s.count:
-		remove := actualCount - s.count
-		log.Infof("Removing %d instances from group %s to reach desired %d", remove, s.group, s.count)
+	case actualSize > s.size:
+		remove := actualSize - s.size
+		log.Infof("Removing %d instances from group %v to reach desired %d", remove, s.tags, s.size)
 
 		// Sorting first ensures that redundant operations are non-destructive.
 		sort.Sort(sortByID(descriptions))
 
 		toRemove := descriptions[:remove]
 
-		group := sync.WaitGroup{}
+		grp := sync.WaitGroup{}
 		for _, description := range toRemove {
-			group.Add(1)
+			grp.Add(1)
 			destroyID := description.ID
 			go func() {
-				defer group.Done()
+				defer grp.Done()
 
 				err := s.provisioner.Destroy(destroyID)
 				if err != nil {
@@ -117,43 +121,43 @@ func (s *scaler) checkState() {
 		// (within this process or another) since the selection of removal candidates is stable.
 		// However, we do so here to mitigate redundant work and avoidable benign (but confusing) errors
 		// when overlaps happen.
-		group.Wait()
+		grp.Wait()
 
-	case actualCount < s.count:
-		add := s.count - actualCount
-		log.Infof("Adding %d instances to group %s to reach desired %d", add, s.group, s.count)
+	case actualSize < s.size:
+		add := s.size - actualSize
+		log.Infof("Adding %d instances to group %v to reach desired %d", add, s.tags, s.size)
 
-		group := sync.WaitGroup{}
+		grp := sync.WaitGroup{}
 		for i := 0; i < int(add); i++ {
-			group.Add(1)
+			grp.Add(1)
 			go func() {
-				defer group.Done()
+				defer grp.Done()
 
-				id, err := s.provisioner.Provision(s.group, s.provisionRequest, nil)
+				id, err := s.provisioner.Provision(s.provisionRequest, nil, s.tags)
 
 				if err != nil {
-					log.Errorf("Failed to grow group %s: %s", s.group, err)
+					log.Errorf("Failed to grow group %v: %s", s.tags, err)
 				} else {
 					log.Infof("Created instance %s", *id)
 				}
 			}()
 		}
 
-		group.Wait()
+		grp.Wait()
 	}
 }
 
 func (s *scaler) Destroy() error {
-	descriptions, err := s.provisioner.DescribeInstances(s.group)
+	descriptions, err := s.provisioner.DescribeInstances(s.tags)
 	if err != nil {
-		return fmt.Errorf("Failed to check count of %s: %s", s.group, err)
+		return fmt.Errorf("Failed to check size of %v: %s", s.tags, err)
 	}
 
-	for _, instance := range descriptions {
-		log.Infof("Destroying instance %s", instance.ID)
-		err := s.provisioner.Destroy(instance.ID)
+	for _, inst := range descriptions {
+		log.Infof("Destroying instance %s", inst.ID)
+		err := s.provisioner.Destroy(inst.ID)
 		if err != nil {
-			return fmt.Errorf("Failed to destroy %s: %s", instance.ID, err)
+			return fmt.Errorf("Failed to destroy %s: %s", inst.ID, err)
 		}
 	}
 

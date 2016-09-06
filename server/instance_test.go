@@ -6,7 +6,6 @@ import (
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
 	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
@@ -23,16 +22,16 @@ func TestListGroup(t *testing.T) {
 	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
-		gid := group.ID("worker-nodes")
+		tags := map[string]string{"a": "b", "c": "d"}
 		descriptions := []instance.Description{
 			{ID: instance.ID("a"), PrivateIPAddress: "10.0.0.3"},
 			{ID: instance.ID("b"), PrivateIPAddress: "10.0.0.4"},
 			{ID: instance.ID("c"), PrivateIPAddress: "10.0.0.5"},
 		}
 
-		provisioner.EXPECT().DescribeInstances(gid).Return(descriptions, nil)
+		provisioner.EXPECT().DescribeInstances(tags).Return(descriptions, nil)
 
-		response := r.Get(fmt.Sprintf("/instance/?group=%s", gid))
+		response := r.Get("/instance/?a=b&c=d")
 		require.Equal(t, 200, response.StatusCode)
 		result := []instance.Description{}
 		require.NoError(t, json.Unmarshal([]byte(response.Body), &result))
@@ -54,13 +53,13 @@ func TestListGroupError(t *testing.T) {
 	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
-		// A group filter must be included.
+		provisioner.EXPECT().DescribeInstances(map[string]string{}).Return(nil, BadInputError)
 		response := r.Get("/instance/")
 		require.Equal(t, 400, response.StatusCode)
 
-		gid := group.ID("worker-nodes")
-		provisioner.EXPECT().DescribeInstances(gid).Return(nil, BadInputError)
-		expectBadInputError(t, r.Get(fmt.Sprintf("/instance/?group=%s", gid)))
+		tags := map[string]string{"a": "b", "c": "d"}
+		provisioner.EXPECT().DescribeInstances(tags).Return(nil, BadInputError)
+		expectBadInputError(t, r.Get("/instance/?a=b&c=d"))
 	})
 }
 
@@ -71,19 +70,19 @@ func TestProvision(t *testing.T) {
 	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
-		gid := group.ID("workers")
+		tags := map[string]string{"a": "b", "c": "d"}
 		id := instance.ID("instance-id")
 
 		request := "{}"
 		volume := instance.VolumeID("volume")
 
-		provisioner.EXPECT().Provision(gid, request, &volume).Return(&id, nil)
+		provisioner.EXPECT().Provision(request, &volume, tags).Return(&id, nil)
 
 		payload := json.RawMessage(request)
 		body, err := json.Marshal(api.ProvisionRequest{
-			Group:   gid,
 			Request: &payload,
 			Volume:  &volume,
+			Tags:    tags,
 		})
 		require.NoError(t, err)
 
@@ -102,12 +101,12 @@ func TestProvisionError(t *testing.T) {
 	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
-		gid := group.ID("workers")
+		tags := map[string]string{"a": "b", "c": "d"}
 		request := "{}"
-		provisioner.EXPECT().Provision(gid, request, nil).Return(nil, BadInputError)
+		provisioner.EXPECT().Provision(request, nil, tags).Return(nil, BadInputError)
 
 		payload := json.RawMessage(request)
-		body, err := json.Marshal(api.ProvisionRequest{Group: gid, Request: &payload})
+		body, err := json.Marshal(api.ProvisionRequest{Tags: tags, Request: &payload})
 		require.NoError(t, err)
 
 		expectBadInputError(t, r.Post("/instance/", "application/json", string(body)))
