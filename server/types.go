@@ -51,7 +51,8 @@ func errorBody(err error) interface{} {
 	return map[string]string{"error": err.Error()}
 }
 
-func outputHandler(handler SimpleHandler) Handler {
+// OutputHandler is a convenience function to provide standard HTTP response behavior.
+func OutputHandler(handler SimpleHandler) Handler {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		// Handle panics cleanly.
 		defer func() {
@@ -93,5 +94,5 @@ func outputHandler(handler SimpleHandler) Handler {
 type ProvisionerBuilder interface {
 	Flags() *pflag.FlagSet
 
-	BuildInstanceProvisioner(cluster spi.ClusterID) (instance.Provisioner, error)
+	BuildInstanceProvisioner(cluster spi.ClusterID) (instance.Plugin, error)
 }

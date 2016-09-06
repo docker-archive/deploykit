@@ -6,6 +6,7 @@ import (
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
 	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
@@ -19,19 +20,19 @@ func TestListGroup(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_instance.NewMockProvisioner(ctrl)
+	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
-		group := "worker-nodes"
+		gid := group.ID("worker-nodes")
 		descriptions := []instance.Description{
 			{ID: instance.ID("a"), PrivateIPAddress: "10.0.0.3"},
 			{ID: instance.ID("b"), PrivateIPAddress: "10.0.0.4"},
 			{ID: instance.ID("c"), PrivateIPAddress: "10.0.0.5"},
 		}
 
-		provisioner.EXPECT().DescribeInstances(instance.GroupID(group)).Return(descriptions, nil)
+		provisioner.EXPECT().DescribeInstances(gid).Return(descriptions, nil)
 
-		response := r.Get(fmt.Sprintf("/instance/?group=%s", group))
+		response := r.Get(fmt.Sprintf("/instance/?group=%s", gid))
 		require.Equal(t, 200, response.StatusCode)
 		result := []instance.Description{}
 		require.NoError(t, json.Unmarshal([]byte(response.Body), &result))
@@ -50,16 +51,16 @@ func TestListGroupError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_instance.NewMockProvisioner(ctrl)
+	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		// A group filter must be included.
 		response := r.Get("/instance/")
 		require.Equal(t, 400, response.StatusCode)
 
-		group := "worker-nodes"
-		provisioner.EXPECT().DescribeInstances(instance.GroupID(group)).Return(nil, BadInputError)
-		expectBadInputError(t, r.Get(fmt.Sprintf("/instance/?group=%s", group)))
+		gid := group.ID("worker-nodes")
+		provisioner.EXPECT().DescribeInstances(gid).Return(nil, BadInputError)
+		expectBadInputError(t, r.Get(fmt.Sprintf("/instance/?group=%s", gid)))
 	})
 }
 
@@ -67,18 +68,20 @@ func TestProvision(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_instance.NewMockProvisioner(ctrl)
+	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
+		gid := group.ID("workers")
 		id := instance.ID("instance-id")
 
 		request := "{}"
 		volume := instance.VolumeID("volume")
 
-		provisioner.EXPECT().Provision(request, &volume).Return(&id, nil)
+		provisioner.EXPECT().Provision(gid, request, &volume).Return(&id, nil)
 
 		payload := json.RawMessage(request)
 		body, err := json.Marshal(api.ProvisionRequest{
+			Group:   gid,
 			Request: &payload,
 			Volume:  &volume,
 		})
@@ -96,14 +99,15 @@ func TestProvisionError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_instance.NewMockProvisioner(ctrl)
+	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
+		gid := group.ID("workers")
 		request := "{}"
-		provisioner.EXPECT().Provision(request, nil).Return(nil, BadInputError)
+		provisioner.EXPECT().Provision(gid, request, nil).Return(nil, BadInputError)
 
 		payload := json.RawMessage(request)
-		body, err := json.Marshal(api.ProvisionRequest{Request: &payload})
+		body, err := json.Marshal(api.ProvisionRequest{Group: gid, Request: &payload})
 		require.NoError(t, err)
 
 		expectBadInputError(t, r.Post("/instance/", "application/json", string(body)))
@@ -114,7 +118,7 @@ func TestDestroy(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_instance.NewMockProvisioner(ctrl)
+	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		id := instance.ID("instance-id")
@@ -129,7 +133,7 @@ func TestDestroyError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	provisioner := mock_instance.NewMockProvisioner(ctrl)
+	provisioner := mock_instance.NewMockPlugin(ctrl)
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		id := instance.ID("instance-id")
