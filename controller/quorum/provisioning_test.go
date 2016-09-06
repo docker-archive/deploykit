@@ -1,18 +1,18 @@
-package util
+package quorum
 
 import (
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func TestGroupFromRequest(t *testing.T) {
-	group, _, err := GroupAndCountFromRequest(`{"Group": "managers"}`)
+	gid, _, err := groupAndCountFromRequest(`{"Group": "managers"}`)
 	require.NoError(t, err)
-	require.Equal(t, instance.GroupID("managers"), *group)
+	require.Equal(t, group.ID("managers"), *gid)
 
 	requireFailsWithRequest := func(request string) {
-		group, _, err := GroupAndCountFromRequest(request)
+		group, _, err := groupAndCountFromRequest(request)
 		require.Error(t, err)
 		require.Nil(t, group)
 	}

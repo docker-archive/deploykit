@@ -22,7 +22,10 @@ var (
 // Registry is a service for finding out controllers we have access to.
 // TODO(chungers) - this is the integration point with the Plugin system in Docker Engine.
 type Registry struct {
+	dir         string
+	sockets     []string // preset discovered connection strings
 	controllers []*Controller
+	lock        sync.Mutex
 }
 
 func (r *Registry) findBy(f func(*Controller) bool) *Controller {
@@ -57,20 +60,36 @@ func NewRegistry(dir string) (*Registry, error) {
 	if registry != nil {
 		return registry, nil
 	}
-
-	log.Infoln("Opening:", dir)
-	entries, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
 	registry = &Registry{
 		controllers: []*Controller{},
+		dir:         dir,
+		sockets:     []string{},
+	}
+	return registry, registry.Refresh()
+}
+
+// SetDiscovery forces the discovery using the input array of connection strings
+// Each element of the slice is the connection string that is normally discovered via scanning the driver dir.
+func (r *Registry) SetDiscovery(sockets []string) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.sockets = sockets
+}
+
+// Refresh rescans the driver directory to see what drivers are there.
+func (r *Registry) Refresh() error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	log.Infoln("Opening:", r.dir)
+	entries, err := ioutil.ReadDir(r.dir)
+	if err != nil {
+		return err
 	}
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			socket := filepath.Join(dir, entry.Name())
+			socket := filepath.Join(r.dir, entry.Name())
 			log.Infoln("Found driver at socket=", socket)
 			driverClient := NewClient(socket)
 			controller, err := driverClient.Controller()
@@ -79,10 +98,23 @@ func NewRegistry(dir string) (*Registry, error) {
 				continue
 			}
 			log.Infoln("driver controller=", controller.Info)
-			registry.controllers = append(registry.controllers, controller)
+			r.controllers = append(r.controllers, controller)
 		}
 	}
-	return registry, nil
+
+	log.Infoln("Using presets:", r.sockets)
+	for _, socket := range r.sockets {
+		log.Infoln("Forcing discovery of driver at socket=", socket)
+		driverClient := NewClient(socket)
+		controller, err := driverClient.Controller()
+		if err != nil {
+			log.Warningln("Error from driver", err)
+			continue
+		}
+		log.Infoln("driver controller=", controller.Info)
+		r.controllers = append(r.controllers, controller)
+	}
+	return nil
 }
 
 // Controller is a struct that has the metadata and client for accessing a controller.
@@ -103,7 +135,9 @@ func NewClient(socket string) *Client {
 	client := &http.Client{}
 
 	host := filepath.Base(socket) // for host name in case it's tcp
-	if strings.Contains(host, ":") {
+	index := strings.Index(host, ":")
+	if index == 0 {
+		// e.g. :9090 ==> change to localhost:9090, otherwise take the host:port as is.
 		host = "localhost" + host
 	}
 

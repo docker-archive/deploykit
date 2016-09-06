@@ -114,7 +114,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	log.Info("Creating network resources")
 
 	// Apply the private IP address wildcard to the manager.
-	swim.mutateManagers(func(name string, managers *instanceGroup) {
+	swim.mutateManagers(func(managers *instanceGroup) {
 		if managers.Config.RunInstancesInput.NetworkInterfaces == nil ||
 			len(managers.Config.RunInstancesInput.NetworkInterfaces) == 0 {
 
@@ -256,7 +256,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		return "", err
 	}
 
-	swim.mutateGroups(func(name string, group *instanceGroup) {
+	swim.mutateGroups(func(group *instanceGroup) {
 		if group.isManager() {
 			applySubnetAndSecurityGroups(
 				&group.Config.RunInstancesInput,
@@ -355,7 +355,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 	// Looks like we may need to poll for the role association as well.
 	time.Sleep(10 * time.Second)
 
-	swim.mutateManagers(func(name string, managers *instanceGroup) {
+	swim.mutateManagers(func(managers *instanceGroup) {
 		managers.Config.RunInstancesInput.IamInstanceProfile = &ec2.IamInstanceProfileSpecification{
 			Arn: instanceProfile.InstanceProfile.Arn,
 		}
@@ -427,17 +427,19 @@ func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) erro
 		return err
 	}
 
-	managerConfig, err := json.Marshal(swim.managers().Config)
+	managerGroup := swim.managers()
+
+	rawConfig, err := json.Marshal(managerGroup.Config)
 	if err != nil {
 		return err
 	}
 
-	parsed, err := template.New("test").Parse(strings.Replace(string(managerConfig), "{{.JOIN_TOKEN_ARG}}", "", -1))
+	parsed, err := template.New("test").Parse(strings.Replace(string(rawConfig), "{{.JOIN_TOKEN_ARG}}", "", -1))
 	if err != nil {
 		return err
 	}
 
-	return quorum.ProvisionManager(provisioner, parsed, swim.ManagerIPs[0])
+	return quorum.ProvisionManager(provisioner, managerGroup.Name, parsed, swim.ManagerIPs[0])
 }
 
 const (
@@ -482,11 +484,15 @@ start_install() {
     curl -sSL https://get.docker.com/ | sh
   fi
 
+  echo "Bootstrap -- Creating /var/run/machete"
+  mkdir -p /var/run/machete/
+
   docker run \
     --detach \
     --volume /var/run/docker.sock:/var/run/docker.sock \
+    --volume /var/run/machete/:/var/run/machete/ \
     --volume /scratch:/scratch \
-    wfarner/swarmboot run $(hostname -i) {{.SWIM_URL}} {{.JOIN_TOKEN_ARG}}
+    libmachete/swarmboot run $(hostname -i) {{.SWIM_URL}} {{.JOIN_TOKEN_ARG}}
 }
 
 # See https://github.com/docker/docker/issues/23793#issuecomment-237735835 for
@@ -517,7 +523,7 @@ func injectUserData(swim *fakeSWIMSchema) error {
 		return fmt.Errorf("Internal UserData template is invalid: %s", err)
 	}
 
-	swim.mutateGroups(func(name string, group *instanceGroup) {
+	swim.mutateGroups(func(group *instanceGroup) {
 		var configureHost string
 		if group.isManager() {
 			configureHost = generateUserData(t, swim, mountEBSVolume)

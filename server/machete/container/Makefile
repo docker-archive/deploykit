@@ -1,8 +1,8 @@
 VERSION?=0.0-snapshot
 REVISION=$(shell git rev-list -1 HEAD)
 
-DOCKER_REPO_OWNER?=machete
-DOCKER_REPO?=${DOCKER_REPO_OWNER}/machete
+DOCKER_REPO_OWNER?=libmachete
+DOCKER_REPO?=${DOCKER_REPO_OWNER}/machete-aws
 DOCKER_TAG?=dev
 DOCKER_IMAGE=${DOCKER_REPO}:${DOCKER_TAG}
 
