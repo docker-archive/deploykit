@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller"
 	"github.com/docker/libmachete/controller/watcher"
@@ -33,12 +34,36 @@ func (b *backend) POC2Reactor(buff []byte) {
 		return
 	}
 
+	log.Infoln("Found names in config:", names)
+	err = b.registry.Refresh()
+	if err != nil {
+		log.Warningln("Cannot discover plugins:", err)
+		return
+	}
+
+	// This is an extra phase in the processing of configs for each controller.
+	// In CFN -- this is modeled as dependencies of resources and their ids (which become available as resources
+	// are provisioned.  Think of configs as a document that is iteratively evaluated where references are progressively
+	// replaced by actual values of provisioned resources or computed values.
+	// Here we just pretend and add another round of computation on the configs
+	joinToken, err := getWorkerJoinToken(b.docker)
+	if err != nil {
+		log.Warningln("Problem getting the worker join token. Do nothing. Err=", err)
+		return
+	}
+	log.Infoln("Acquired join token.  Applying to templated config")
+
+	runningContext := map[string]interface{}{
+		"JOIN_TOKEN_ARG": fmt.Sprintf("--join-token %s", joinToken),
+	}
+
 	// get the configs for all the controllers -- map of controller to config
 	changeSet := map[*controller.Controller]interface{}{}
 
 	for _, name := range names {
 
-		controller := b.registry.GetControllerByName(name)
+		// Namespace is more appropriate.  TODO(chungers) - remove name as it is redundant
+		controller := b.registry.GetControllerByNamespace(name)
 		if controller == nil {
 			log.Warningln("No controller found for name=", name, "Do nothing.")
 			return
@@ -54,13 +79,33 @@ func (b *backend) POC2Reactor(buff []byte) {
 		// TODO(chungers) -- think about this case... no config we assume no change / no need to restart.
 
 		if config != nil {
-			changeSet[controller] = config
+
+			log.Infoln("Another iteration of evaluating the template in the running context. Config=", config, "name=", name)
+
+			// This is where we'd evaluate any templates in the config...
+			// One of the config sections for the scaler will have information on setting the UserData for the
+			// instance.  The instance uses swarmboot to boot up and swarmboot accepts the join token in its
+			// command line arg (see provider/aws/awsbootstrap/create.go).
+
+			// By the the config is parsed from the json as an interface{}.  We check for the type to be map[string]interface{}
+			// and then evaluate each string field as if it were a template.
+			// There's already a templating engine in the swarm config poc repo for this but here let's hack together
+			// a simple template execute.
+
+			// TOOD(chungers) - there are other types. this poc only covers scaler
+			poc2Request, ok := config.(poc2scalerRequest)
+			log.Infoln("is a poc2 schema scaler request", poc2Request, ok)
+			if ok {
+				poc2Request.RunInstancesInput = evaluateFieldsAsTemplate(poc2Request.RunInstancesInput, runningContext).(map[string]interface{})
+				changeSet[controller] = poc2Request
+			} else {
+				changeSet[controller] = config
+			}
 		}
 	}
 
 	// Now run the changes
 	// Note there's no specific ordering.  If we are smart we could build dependency into the swim like CFN ;)
-
 	for controller := range changeSet {
 
 		log.Infoln("Restarting controller", controller.Info.Name)

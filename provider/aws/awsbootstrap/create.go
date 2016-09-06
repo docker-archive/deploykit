@@ -484,11 +484,15 @@ start_install() {
     curl -sSL https://get.docker.com/ | sh
   fi
 
+  echo "Bootstrap -- Creating /var/run/machete"
+  mkdir -p /var/run/machete/
+
   docker run \
     --detach \
     --volume /var/run/docker.sock:/var/run/docker.sock \
+    --volume /var/run/machete/:/var/run/machete/ \
     --volume /scratch:/scratch \
-    wfarner/swarmboot run $(hostname -i) {{.SWIM_URL}} {{.JOIN_TOKEN_ARG}}
+    libmachete/swarmboot run $(hostname -i) {{.SWIM_URL}} {{.JOIN_TOKEN_ARG}}
 }
 
 # See https://github.com/docker/docker/issues/23793#issuecomment-237735835 for

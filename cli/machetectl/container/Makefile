@@ -1,4 +1,4 @@
-# Makefile for building the loadbalancer controller
+# Makefile for building the watcher controller
 #
 # We use a container to compile the binary, and in
 # the container we use govendor to fetch all the versioned
@@ -13,7 +13,7 @@ VERSION?=0.0-snapshot
 REVISION=$(shell git rev-list -1 HEAD)
 
 DOCKER_REPO_OWNER?=libmachete
-DOCKER_REPO?=${DOCKER_REPO_OWNER}/l4controller
+DOCKER_REPO?=${DOCKER_REPO_OWNER}/machetectl
 DOCKER_TAG?=dev
 DOCKER_IMAGE=${DOCKER_REPO}:${DOCKER_TAG}
 
@@ -32,7 +32,7 @@ container: clean
 	@echo "+ $@"
 	mkdir -p bin
 	cd ../../.. && LDFLAGS="-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" \
-	  ./scripts/build-in-docker 'controller/loadbalancer/cmd/*.go' controller/loadbalancer/container/bin/loadbalancer
+	  ./scripts/build-in-docker 'cli/machetectl/*.go' cli/machetectl/container/bin/matchetectl
 	docker build -t $(DOCKER_IMAGE) -t $(DOCKER_REPO):latest -t $(DOCKER_REPO):$(VERSION) .
 
 ifeq (${DOCKER_PUSH},true)

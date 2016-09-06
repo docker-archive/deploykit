@@ -6,6 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/docker/libmachete/controller"
 	machete_aws "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/spi/cli"
 	"github.com/docker/libmachete/spi/group"
@@ -72,6 +73,9 @@ func (a awsBootstrap) Command() *cobra.Command {
 	cluster := clusterIDFlags{}
 
 	var keyName string
+
+	workerSize := 3
+
 	createCmd := cobra.Command{
 		Use:   "create [<swim config>]",
 		Short: "create a swarm cluster",
@@ -116,7 +120,7 @@ func (a awsBootstrap) Command() *cobra.Command {
 						{
 							Name:   group.ID("Workers"),
 							Type:   workerType,
-							Size:   3,
+							Size:   workerSize,
 							Config: instanceConfig,
 						},
 					},
@@ -138,6 +142,7 @@ func (a awsBootstrap) Command() *cobra.Command {
 	}
 	createCmd.Flags().AddFlagSet(cluster.flags())
 	createCmd.Flags().StringVar(&keyName, "key", "", "The existing SSH key in AWS to use for provisioned instances")
+	createCmd.Flags().IntVar(&workerSize, "worker_size", workerSize, "Size of worker group")
 
 	cmd.AddCommand(&createCmd)
 
@@ -171,8 +176,15 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 		},
 	}
 	destroyCmd.Flags().StringVar(&swimFile, "config", "", "A SWIM file")
+
 	destroyCmd.Flags().AddFlagSet(cluster.flags())
 	cmd.AddCommand(&destroyCmd)
+
+	// Commands that are to be executed ON THE SWARM
+	// So in these cases we allow specification of a local api server which can trigger updates.
+	// TODO(chungers) -- the api server will basically become the docker engine subsystem later.
+
+	apiEndpoint := ""
 
 	scaleCmd := cobra.Command{
 		Use:   "scale <region> <cluster> <group> <target count>",
@@ -196,15 +208,27 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 				abort("target count must be greater than zero")
 			}
 
-			err = scale(cluster, groupName, targetCount)
+			swim, err := scale(cluster, groupName, targetCount)
 			if err != nil {
 				abort(err.Error())
 			}
+
+			if apiEndpoint != "" {
+
+				api := controller.NewClient(apiEndpoint)
+				log.Infoln("Calling api at", apiEndpoint)
+
+				err = api.Call("watcher.Update", swim)
+				if err != nil {
+					abort(err.Error())
+				}
+			}
 		},
 	}
+	scaleCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Machete subsystem api endpoint")
 	cmd.AddCommand(&scaleCmd)
 
-	cmd.AddCommand(&cobra.Command{
+	reconfigureCmd := &cobra.Command{
 		Use: "reconfigure <swim config>",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
@@ -225,9 +249,11 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 			}
 			log.Infof("Configuration pushed")
 		},
-	})
+	}
+	reconfigureCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Machete subsystem api endpoint")
+	cmd.AddCommand(reconfigureCmd)
 
-	cmd.AddCommand(&cobra.Command{
+	describeCmd := &cobra.Command{
 		Use: "describe <swim config>",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
@@ -247,9 +273,11 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 
 			log.Infof("Groups: %s", groups)
 		},
-	})
+	}
+	describeCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Machete subsystem api endpoint")
+	cmd.AddCommand(describeCmd)
 
-	cmd.AddCommand(&cobra.Command{
+	statusCmd := &cobra.Command{
 		Use: "status",
 		Run: func(cmd *cobra.Command, args []string) {
 			// TODO(wfarner): Implement.
@@ -257,7 +285,9 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 			log.Infof("Managers: 3 instances")
 			log.Infof("Workers: 5 instances")
 		},
-	})
+	}
+	statusCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Machete subsystem api endpoint")
+	cmd.AddCommand(statusCmd)
 
 	return &cmd
 }

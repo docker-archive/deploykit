@@ -175,7 +175,10 @@ func main() {
 				}
 
 				cmd := exec.Command("/bin/sh", "manager-containers.sh")
-				cmd.Env = []string{fmt.Sprintf("LOCAL_IP=%s", myIP)}
+				cmd.Env = []string{
+					fmt.Sprintf("LOCAL_IP=%s", myIP),
+					fmt.Sprintf("SWIM_URL=%s", swimURL),
+				}
 
 				output, err := cmd.CombinedOutput()
 				if err != nil {
