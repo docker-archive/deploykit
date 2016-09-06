@@ -9,6 +9,7 @@ import (
 	"github.com/docker/libmachete/controller"
 	machete_aws "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/spi/cli"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"io/ioutil"
@@ -109,13 +110,15 @@ func (a awsBootstrap) Command() *cobra.Command {
 				swim = fakeSWIMSchema{
 					Driver:      "aws",
 					ClusterName: cluster.ID.name,
-					Groups: map[string]instanceGroup{
-						"Managers": {
+					Groups: []instanceGroup{
+						{
+							Name:   group.ID("Managers"),
 							Type:   managerType,
 							Size:   3,
 							Config: instanceConfig,
 						},
-						"Workers": {
+						{
+							Name:   group.ID("Workers"),
 							Type:   workerType,
 							Size:   workerSize,
 							Config: instanceConfig,
@@ -264,8 +267,8 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 			}
 
 			groups := []string{}
-			for name := range swim.Groups {
-				groups = append(groups, name)
+			for _, group := range swim.Groups {
+				groups = append(groups, string(group.Name))
 			}
 
 			log.Infof("Groups: %s", groups)
