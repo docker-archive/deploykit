@@ -85,11 +85,11 @@ func (h *Server) RemovePlugin(p PluginRef) error {
 		return err
 	}
 	if running == nil {
-		return fmt.Errorf("plugin not running", p)
+		return fmt.Errorf("plugin not running: %v", p)
 	}
 
 	if running.Socket != p.Socket {
-		return fmt.Errorf("mismatch socket / instance", running.Socket, "vs", p.Socket, "plugin=", p)
+		return fmt.Errorf("mismatch socket / instance: %s vs %s for plugin %v", running.Socket, p.Socket, p)
 	}
 
 	ctx := context.Background()
