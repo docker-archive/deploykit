@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/gorilla/mux"
 	"io/ioutil"
@@ -21,12 +20,15 @@ func getInstanceID(req *http.Request) instance.ID {
 }
 
 func (h *instanceHandler) describe(req *http.Request) (interface{}, error) {
-	gid := req.URL.Query().Get("group")
-	if len(gid) == 0 {
-		return nil, spi.NewError(spi.ErrBadInput, "Group must be specified")
+	tags := map[string]string{}
+	for key, values := range req.URL.Query() {
+		for _, value := range values {
+			tags[key] = value
+			break
+		}
 	}
 
-	return h.provisioner.DescribeInstances(group.ID(gid))
+	return h.provisioner.DescribeInstances(tags)
 }
 
 func (h *instanceHandler) provision(req *http.Request) (interface{}, error) {
@@ -41,7 +43,7 @@ func (h *instanceHandler) provision(req *http.Request) (interface{}, error) {
 		return nil, spi.NewError(spi.ErrUnknown, fmt.Sprintf("Failed to unmarshal response: %s", err))
 	}
 
-	return h.provisioner.Provision(request.Group, string(*request.Request), request.Volume)
+	return h.provisioner.Provision(string(*request.Request), request.Volume, request.Tags)
 }
 
 func (h *instanceHandler) destroy(req *http.Request) (interface{}, error) {

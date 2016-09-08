@@ -439,7 +439,7 @@ func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) erro
 		return err
 	}
 
-	return quorum.ProvisionManager(provisioner, managerGroup.Name, parsed, swim.ManagerIPs[0])
+	return quorum.ProvisionManager(provisioner, quorum.InstanceTags(managerGroup.Name), parsed, swim.ManagerIPs[0])
 }
 
 const (
