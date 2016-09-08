@@ -87,9 +87,4 @@ vendor-check:
 
 containers:
 	@echo "+ $@"
-	cd server/machete/container && make container
-	cd cli/machetectl/container && make container
-	cd controller/loadbalancer/container && make container
-	cd controller/quorum/container && make container
-	cd controller/scaler/container && make container
 	cd swarm/swarmboot/container && make container

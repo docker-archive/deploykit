@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"strconv"
@@ -30,9 +29,6 @@ type managedGroup struct {
 func getInstancePlugin(properties groupProperties) (instance.Plugin, string, error) {
 	// TODO(wfarner): This will change to use plugin discovery once available.
 	switch properties.InstancePlugin {
-	case "aws":
-		return aws.NewPluginFromProperties(properties.InstancePluginProperties)
-
 	case "demo":
 		return newDemoPlugin(), "nothing", nil
 	default:
