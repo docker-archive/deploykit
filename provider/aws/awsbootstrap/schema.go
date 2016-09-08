@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/s3"
 	machete_aws "github.com/docker/libmachete/provider/aws"
+	"github.com/docker/libmachete/spi/group"
 	"strings"
 )
 
@@ -89,6 +90,7 @@ func (c clusterID) resourceTag() *ec2.Tag {
 }
 
 type instanceGroup struct {
+	Name   group.ID
 	Type   string
 	Size   int
 	Config machete_aws.CreateInstanceRequest
@@ -102,7 +104,7 @@ type fakeSWIMSchema struct {
 	Driver      string
 	ClusterName string
 	ManagerIPs  []string
-	Groups      map[string]instanceGroup
+	Groups      []instanceGroup
 }
 
 func (s *fakeSWIMSchema) cluster() clusterID {
@@ -176,18 +178,18 @@ func (s *fakeSWIMSchema) managers() instanceGroup {
 	panic("No manager group found")
 }
 
-func (s *fakeSWIMSchema) mutateManagers(op func(string, *instanceGroup)) {
-	s.mutateGroups(func(name string, group *instanceGroup) {
+func (s *fakeSWIMSchema) mutateManagers(op func(*instanceGroup)) {
+	s.mutateGroups(func(group *instanceGroup) {
 		if group.isManager() {
-			op(name, group)
+			op(group)
 		}
 	})
 }
 
-func (s *fakeSWIMSchema) mutateGroups(op func(string, *instanceGroup)) {
-	for name, group := range s.Groups {
-		op(name, &group)
-		s.Groups[name] = group
+func (s *fakeSWIMSchema) mutateGroups(op func(*instanceGroup)) {
+	for i, group := range s.Groups {
+		op(&group)
+		s.Groups[i] = group
 	}
 }
 
@@ -208,13 +210,8 @@ func applyInstanceDefaults(r *ec2.RunInstancesInput) {
 }
 
 func (s *fakeSWIMSchema) applyDefaults() {
-	s.mutateGroups(func(name string, group *instanceGroup) {
-		switch group.Type {
-		case workerType:
-			group.Config.Group = workerType
-		case managerType:
-			group.Config.Group = managerType
-
+	s.mutateGroups(func(group *instanceGroup) {
+		if group.Type == managerType {
 			bootLeaderLastOctet := 4
 			s.ManagerIPs = []string{}
 			for i := 0; i < group.Size; i++ {
@@ -264,20 +261,20 @@ func (s *fakeSWIMSchema) validate() error {
 		addError("Must specify ClusterName")
 	}
 
-	for name, group := range s.Groups {
+	for _, group := range s.Groups {
 		if group.isManager() {
 			if group.Size != 1 && group.Size != 3 && group.Size != 5 {
-				addError("Group %s Size must be 1, 3, or 5", name)
+				addError("Group %s Size must be 1, 3, or 5", group.Name)
 			}
 		} else {
 			if group.Size < 1 {
-				addError("Group %s Size must be at least 1", name)
+				addError("Group %s Size must be at least 1", group.Name)
 			}
 		}
 	}
 
-	validateGroup := func(name string, group instanceGroup) {
-		errorPrefix := fmt.Sprintf("In group %s: ", name)
+	validateGroup := func(gid group.ID, group instanceGroup) {
+		errorPrefix := fmt.Sprintf("In group %s: ", gid)
 
 		if group.Config.RunInstancesInput.Placement == nil {
 			addError(errorPrefix + "run_instance_input.Placement must be set")
@@ -290,8 +287,8 @@ func (s *fakeSWIMSchema) validate() error {
 
 	// MVP restriction - all groups must be in the same Availability Zone.
 	firstAz := ""
-	for name, group := range s.Groups {
-		validateGroup(name, group)
+	for _, group := range s.Groups {
+		validateGroup(group.Name, group)
 
 		if group.Config.RunInstancesInput.Placement != nil {
 			az := *group.Config.RunInstancesInput.Placement.AvailabilityZone

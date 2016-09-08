@@ -2,8 +2,10 @@ package scaler
 
 import (
 	"encoding/json"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sort"
 	"sync"
@@ -15,13 +17,14 @@ import (
 type Scaler interface {
 	util.RunStop
 	GetState() (json.RawMessage, error)
+	Destroy() error
 }
 
 type scaler struct {
 	pollInterval     time.Duration
-	provisioner      instance.Provisioner
+	provisioner      instance.Plugin
 	provisionRequest string
-	group            instance.GroupID
+	group            group.ID
 	count            uint
 	stop             chan bool
 }
@@ -29,22 +32,17 @@ type scaler struct {
 // NewFixedScaler creates a RunStop that monitors a group of instances on a provisioner, attempting to maintain a
 // fixed count.
 func NewFixedScaler(
+	grp group.ID,
+	count uint,
 	pollInterval time.Duration,
-	provisioner instance.Provisioner,
+	provisioner instance.Plugin,
 	request string) (Scaler, error) {
-
-	group, count, err := util.GroupAndCountFromRequest(request)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Infoln("FixedScaler with group=", group, "count=", count)
 
 	return &scaler{
 		pollInterval:     pollInterval,
 		provisioner:      provisioner,
 		provisionRequest: request,
-		group:            *group,
+		group:            grp,
 		count:            count,
 		stop:             make(chan bool),
 	}, nil
@@ -131,7 +129,7 @@ func (s *scaler) checkState() {
 			go func() {
 				defer group.Done()
 
-				id, err := s.provisioner.Provision(s.provisionRequest, nil)
+				id, err := s.provisioner.Provision(s.group, s.provisionRequest, nil)
 
 				if err != nil {
 					log.Errorf("Failed to grow group %s: %s", s.group, err)
@@ -143,6 +141,23 @@ func (s *scaler) checkState() {
 
 		group.Wait()
 	}
+}
+
+func (s *scaler) Destroy() error {
+	descriptions, err := s.provisioner.DescribeInstances(s.group)
+	if err != nil {
+		return fmt.Errorf("Failed to check count of %s: %s", s.group, err)
+	}
+
+	for _, instance := range descriptions {
+		log.Infof("Destroying instance %s", instance.ID)
+		err := s.provisioner.Destroy(instance.ID)
+		if err != nil {
+			return fmt.Errorf("Failed to destroy %s: %s", instance.ID, err)
+		}
+	}
+
+	return nil
 }
 
 func (s *scaler) Run() {

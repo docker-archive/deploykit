@@ -2,7 +2,6 @@ package scaler
 
 import (
 	"errors"
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
@@ -10,6 +9,7 @@ import (
 	aws_provider "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/server"
 	"github.com/docker/libmachete/spi"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -127,11 +127,12 @@ func TestScalerIntegration(t *testing.T) {
 
 	testflight.WithServer(server.NewHandler(provisioner), func(r *testflight.Requester) {
 		target := 3
-		group := "integration-test-manager"
 		watcher, err := NewFixedScaler(
+			group.ID("integration-test-manager"),
+			uint(target),
 			10*time.Millisecond,
 			client.NewInstanceProvisioner(r.Url("")),
-			fmt.Sprintf(`{"Group": "%s", "Count":%d}`, group, uint(target)))
+			"{}")
 		require.NoError(t, err)
 
 		go watcher.Run()

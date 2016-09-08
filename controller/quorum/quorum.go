@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"text/template"
 	"time"
@@ -12,9 +13,9 @@ import (
 
 type quorum struct {
 	pollInterval      time.Duration
-	provisioner       instance.Provisioner
+	provisioner       instance.Plugin
 	provisionTemplate *template.Template
-	group             instance.GroupID
+	group             group.ID
 	ipAddresses       []string
 	stop              chan bool
 }
@@ -22,11 +23,11 @@ type quorum struct {
 // NewQuorum creates a RunStop that manages a quorum on a provisioner, attempting to maintain a fixed count.
 func NewQuorum(
 	pollInterval time.Duration,
-	provisioner instance.Provisioner,
+	provisioner instance.Plugin,
 	provisionTemplate string,
 	ipAddresses []string) (util.RunStop, error) {
 
-	group, _, err := util.GroupAndCountFromRequest(provisionTemplate)
+	group, _, err := groupAndCountFromRequest(provisionTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func (q *quorum) checkState() {
 
 	for _, missingIP := range missingIPs {
 		log.Infof("IP %s is missing, provisioning new instance", missingIP)
-		err := ProvisionManager(q.provisioner, q.provisionTemplate, missingIP)
+		err := ProvisionManager(q.provisioner, q.group, q.provisionTemplate, missingIP)
 		if err != nil {
 			log.Error(err)
 			continue
@@ -101,7 +102,7 @@ func (q *quorum) checkState() {
 }
 
 // ProvisionManager creates a single manager instance, replacing the IP address wildcard with the provided IP.
-func ProvisionManager(provisioner instance.Provisioner, provisionTemplate *template.Template, ip string) error {
+func ProvisionManager(provisioner instance.Plugin, gid group.ID, provisionTemplate *template.Template, ip string) error {
 	buffer := bytes.Buffer{}
 	err := provisionTemplate.Execute(&buffer, map[string]string{"IP": ip})
 	if err != nil {
@@ -109,7 +110,7 @@ func ProvisionManager(provisioner instance.Provisioner, provisionTemplate *templ
 	}
 
 	volume := instance.VolumeID(ip)
-	id, err := provisioner.Provision(buffer.String(), &volume)
+	id, err := provisioner.Provision(gid, buffer.String(), &volume)
 	if err != nil {
 		return fmt.Errorf("Failed to provision: %s", err)
 	}

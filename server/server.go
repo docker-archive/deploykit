@@ -12,7 +12,7 @@ type routerAttachment interface {
 }
 
 // NewHandler creates an HTTP handler for the machete server.
-func NewHandler(instanceProvisioner instance.Provisioner) http.Handler {
+func NewHandler(instanceProvisioner instance.Plugin) http.Handler {
 	// TODO(wfarner): As more provisioner types are added, consider optionally mounting them to allow serving
 	// partial SPI implementations (e.g. network-only provisioner).
 
@@ -31,7 +31,7 @@ func NewHandler(instanceProvisioner instance.Provisioner) http.Handler {
 }
 
 // RunServer starts an API server that delegates operations to a provisioner implementation.
-func RunServer(port uint, instanceProvisioner instance.Provisioner) error {
+func RunServer(port uint, instanceProvisioner instance.Plugin) error {
 	handler := NewHandler(instanceProvisioner)
 	http.Handle("/", handler)
 	return http.ListenAndServe(fmt.Sprintf(":%v", port), handler)
