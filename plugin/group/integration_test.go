@@ -9,7 +9,6 @@ import (
 	aws_provider "github.com/docker/libmachete/provider/aws"
 	"github.com/docker/libmachete/server"
 	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/drewolson/testflight"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -113,8 +112,8 @@ func resetAtTarget(backend *fakeEc2, target int, newIds []string) {
 	}
 }
 
-// TestScalerIntegration combines a scaler, HTTP client, machete server, and provisioner backend to ensure all components
-// work together.
+// TestScalerIntegration combines a scaler, HTTP client, machete server, and provisioner backend to ensure all
+// components work together.
 func TestScalerIntegration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -128,8 +127,8 @@ func TestScalerIntegration(t *testing.T) {
 	testflight.WithServer(server.NewHandler(provisioner), func(r *testflight.Requester) {
 		target := 3
 		watcher, err := NewFixedScaler(
-			group.ID("integration-test-manager"),
-			uint(target),
+			map[string]string{"label": "custom"},
+			uint32(target),
 			10*time.Millisecond,
 			client.NewInstanceProvisioner(r.Url("")),
 			"{}")

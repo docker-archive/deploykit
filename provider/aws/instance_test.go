@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	mock_ec2 "github.com/docker/libmachete/mock/ec2"
 	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -15,9 +14,11 @@ import (
 )
 
 const (
-	gid         = group.ID("workers")
 	testCluster = spi.ClusterID("test-cluster")
-	ipAddress   = "256.256.256.256"
+)
+
+var (
+	tags = map[string]string{"group": "workers"}
 )
 
 func TestInstanceLifecycle(t *testing.T) {
@@ -40,14 +41,14 @@ func TestInstanceLifecycle(t *testing.T) {
 	tagRequest := ec2.CreateTagsInput{
 		Resources: []*string{&instanceID},
 		Tags: []*ec2.Tag{
-			{Key: aws.String("test"), Value: aws.String("aws-create-test")},
 			{Key: aws.String(ClusterTag), Value: aws.String(string(testCluster))},
-			{Key: aws.String(GroupTag), Value: aws.String(string(gid))},
+			{Key: aws.String("group"), Value: aws.String("workers")},
+			{Key: aws.String("test"), Value: aws.String("aws-create-test")},
 		},
 	}
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
-	id, err := provisioner.Provision(gid, inputJSON, nil)
+	id, err := provisioner.Provision(inputJSON, nil, tags)
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
@@ -62,17 +63,6 @@ func TestInstanceLifecycle(t *testing.T) {
 	require.NoError(t, provisioner.Destroy(instance.ID(instanceID)))
 }
 
-func TestCreateInstanceRequiresGroup(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	clientMock := mock_ec2.NewMockEC2API(ctrl)
-
-	provisioner := NewInstancePlugin(clientMock, testCluster)
-	_, err := provisioner.Provision(group.ID(""), "{}", nil)
-	require.Error(t, err)
-	require.Equal(t, spi.ErrBadInput, spi.CodeFromError(err))
-}
-
 func TestCreateInstanceError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -82,7 +72,7 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := NewInstancePlugin(clientMock, testCluster)
-	id, err := provisioner.Provision(gid, "{}", nil)
+	id, err := provisioner.Provision("{}", nil, tags)
 
 	require.Error(t, err)
 	require.Nil(t, id)
@@ -103,7 +93,16 @@ func TestDestroyInstanceError(t *testing.T) {
 	require.Error(t, provisioner.Destroy(instance.ID(instanceID)))
 }
 
-func describeInstancesResponse(instanceIds [][]string, nextToken *string) *ec2.DescribeInstancesOutput {
+func describeInstancesResponse(
+	instanceIds [][]string,
+	tags map[string]string,
+	nextToken *string) *ec2.DescribeInstancesOutput {
+
+	ec2Tags := []*ec2.Tag{}
+	for key, value := range tags {
+		ec2Tags = append(ec2Tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(value)})
+	}
+
 	reservations := []*ec2.Reservation{}
 	for _, ids := range instanceIds {
 		instances := []*ec2.Instance{}
@@ -111,6 +110,7 @@ func describeInstancesResponse(instanceIds [][]string, nextToken *string) *ec2.D
 			instances = append(instances, &ec2.Instance{
 				InstanceId:       aws.String(id),
 				PrivateIpAddress: aws.String("127.0.0.1"),
+				Tags:             ec2Tags,
 			})
 		}
 		reservations = append(reservations, &ec2.Reservation{Instances: instances})
@@ -123,10 +123,8 @@ func TestDescribeInstancesRequest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	gid := group.ID("manager-nodes")
-
 	var nextToken *string
-	request := describeGroupRequest(testCluster, gid, nextToken)
+	request := describeGroupRequest(testCluster, tags, nextToken)
 
 	require.Equal(t, nextToken, request.NextToken)
 
@@ -144,10 +142,12 @@ func TestDescribeInstancesRequest(t *testing.T) {
 		require.Fail(t, fmt.Sprintf("Did not have filter %s/%s", name, value))
 	}
 	requireFilter("tag:docker-machete", string(testCluster))
-	requireFilter("tag:machete-group", string(gid))
+	for key, value := range tags {
+		requireFilter(fmt.Sprintf("tag:%s", key), value)
+	}
 
 	nextToken = aws.String("page-2")
-	request = describeGroupRequest(testCluster, gid, nextToken)
+	request = describeGroupRequest(testCluster, tags, nextToken)
 	require.Equal(t, nextToken, request.NextToken)
 }
 
@@ -156,41 +156,32 @@ func TestListGroup(t *testing.T) {
 	defer ctrl.Finish()
 	clientMock := mock_ec2.NewMockEC2API(ctrl)
 
-	gid := group.ID("manager-nodes")
 	page2Token := "page2"
 
 	// Split instance IDs across multiple reservations and request pages.
 	gomock.InOrder(
-		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testCluster, gid, nil)).
+		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testCluster, tags, nil)).
 			Return(describeInstancesResponse([][]string{
 				{"a", "b", "c"},
 				{"d", "e"},
-			}, &page2Token), nil),
-		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testCluster, gid, &page2Token)).
-			Return(describeInstancesResponse([][]string{{"f", "g"}}, nil), nil),
+			}, tags, &page2Token), nil),
+		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testCluster, tags, &page2Token)).
+			Return(describeInstancesResponse([][]string{{"f", "g"}}, tags, nil), nil),
 	)
 
 	provisioner := NewInstancePlugin(clientMock, testCluster)
-	descriptions, err := provisioner.DescribeInstances(gid)
+	descriptions, err := provisioner.DescribeInstances(tags)
 
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{
-		{ID: "a", PrivateIPAddress: "127.0.0.1"},
-		{ID: "b", PrivateIPAddress: "127.0.0.1"},
-		{ID: "c", PrivateIPAddress: "127.0.0.1"},
-		{ID: "d", PrivateIPAddress: "127.0.0.1"},
-		{ID: "e", PrivateIPAddress: "127.0.0.1"},
-		{ID: "f", PrivateIPAddress: "127.0.0.1"},
-		{ID: "g", PrivateIPAddress: "127.0.0.1"},
+		{ID: "a", PrivateIPAddress: "127.0.0.1", Tags: tags},
+		{ID: "b", PrivateIPAddress: "127.0.0.1", Tags: tags},
+		{ID: "c", PrivateIPAddress: "127.0.0.1", Tags: tags},
+		{ID: "d", PrivateIPAddress: "127.0.0.1", Tags: tags},
+		{ID: "e", PrivateIPAddress: "127.0.0.1", Tags: tags},
+		{ID: "f", PrivateIPAddress: "127.0.0.1", Tags: tags},
+		{ID: "g", PrivateIPAddress: "127.0.0.1", Tags: tags},
 	}, descriptions)
-}
-
-func expectDescribeInstance(t *testing.T, clientMock *mock_ec2.MockEC2API, id string) *gomock.Call {
-	return clientMock.EXPECT().DescribeInstances(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(id)},
-	}).Return(&ec2.DescribeInstancesOutput{Reservations: []*ec2.Reservation{
-		{Instances: []*ec2.Instance{{PublicIpAddress: aws.String(ipAddress)}}},
-	}}, nil)
 }
 
 const (

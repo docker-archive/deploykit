@@ -2,7 +2,6 @@ package scaler
 
 import (
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -11,11 +10,11 @@ import (
 )
 
 var (
-	gid = group.ID("test-group")
-	a   = instance.ID("a")
-	b   = instance.ID("b")
-	c   = instance.ID("c")
-	d   = instance.ID("d")
+	tags = map[string]string{"a": "b", "c": "d"}
+	a    = instance.ID("a")
+	b    = instance.ID("b")
+	c    = instance.ID("c")
+	d    = instance.ID("d")
 )
 
 func desc(ids []instance.ID) []instance.Description {
@@ -32,7 +31,7 @@ func TestScaleUp(t *testing.T) {
 
 	provisioner := mock_instance.NewMockPlugin(ctrl)
 	scaler, err := NewFixedScaler(
-		gid,
+		tags,
 		3,
 		1*time.Millisecond,
 		provisioner,
@@ -41,15 +40,15 @@ func TestScaleUp(t *testing.T) {
 	require.NoError(t, err)
 
 	gomock.InOrder(
-		provisioner.EXPECT().DescribeInstances(gid).Return(desc([]instance.ID{a, b, c}), nil),
-		provisioner.EXPECT().DescribeInstances(gid).Return(desc([]instance.ID{a, b, c}), nil),
-		provisioner.EXPECT().DescribeInstances(gid).Return(desc([]instance.ID{a, b}), nil),
-		provisioner.EXPECT().Provision(gid, "{}", nil).Return(&d, nil),
-		provisioner.EXPECT().DescribeInstances(gid).Do(func(_ group.ID) {
+		provisioner.EXPECT().DescribeInstances(tags).Return(desc([]instance.ID{a, b, c}), nil),
+		provisioner.EXPECT().DescribeInstances(tags).Return(desc([]instance.ID{a, b, c}), nil),
+		provisioner.EXPECT().DescribeInstances(tags).Return(desc([]instance.ID{a, b}), nil),
+		provisioner.EXPECT().Provision("{}", nil, tags).Return(&d, nil),
+		provisioner.EXPECT().DescribeInstances(tags).Do(func(_ map[string]string) {
 			go scaler.Stop()
 		}).Return(desc([]instance.ID{a, b, c}), nil),
 		// Allow subsequent calls to DescribeInstances() to mitigate ordering flakiness of async Stop() call.
-		provisioner.EXPECT().DescribeInstances(gid).Return(desc([]instance.ID{a, b, c, d}), nil).AnyTimes(),
+		provisioner.EXPECT().DescribeInstances(tags).Return(desc([]instance.ID{a, b, c, d}), nil).AnyTimes(),
 	)
 
 	scaler.Run()
@@ -61,7 +60,7 @@ func TestScaleDown(t *testing.T) {
 
 	provisioner := mock_instance.NewMockPlugin(ctrl)
 	scaler, err := NewFixedScaler(
-		gid,
+		tags,
 		2,
 		1*time.Millisecond,
 		provisioner,
@@ -69,13 +68,13 @@ func TestScaleDown(t *testing.T) {
 	require.NoError(t, err)
 
 	gomock.InOrder(
-		provisioner.EXPECT().DescribeInstances(gid).Return(desc([]instance.ID{c, b}), nil),
-		provisioner.EXPECT().DescribeInstances(gid).Return(desc([]instance.ID{c, a, d, b}), nil),
-		provisioner.EXPECT().DescribeInstances(gid).Do(func(_ group.ID) {
+		provisioner.EXPECT().DescribeInstances(tags).Return(desc([]instance.ID{c, b}), nil),
+		provisioner.EXPECT().DescribeInstances(tags).Return(desc([]instance.ID{c, a, d, b}), nil),
+		provisioner.EXPECT().DescribeInstances(tags).Do(func(_ map[string]string) {
 			go scaler.Stop()
 		}).Return(desc([]instance.ID{a, b}), nil),
 		// Allow subsequent calls to DescribeInstances() to mitigate ordering flakiness of async Stop() call.
-		provisioner.EXPECT().DescribeInstances(gid).Return(desc([]instance.ID{c, d}), nil).AnyTimes(),
+		provisioner.EXPECT().DescribeInstances(tags).Return(desc([]instance.ID{c, d}), nil).AnyTimes(),
 	)
 
 	provisioner.EXPECT().Destroy(a).Return(nil)

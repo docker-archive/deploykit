@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/docker/libmachete/server/api"
 	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"io/ioutil"
 	"net/http"
@@ -72,12 +71,16 @@ func (c instanceClient) sendRequest(method, path, body string) ([]byte, error) {
 	return data, err
 }
 
-func (c instanceClient) Provision(gid group.ID, request string, volume *instance.VolumeID) (*instance.ID, error) {
+func (c instanceClient) Provision(
+	request string,
+	volume *instance.VolumeID,
+	tags map[string]string) (*instance.ID, error) {
+
 	req := json.RawMessage(request)
 	payload := api.ProvisionRequest{
-		Group:   gid,
 		Request: &req,
 		Volume:  volume,
+		Tags:    tags,
 	}
 
 	body, err := json.Marshal(payload)
@@ -105,8 +108,13 @@ func (c instanceClient) Destroy(instance instance.ID) error {
 	return apiErr
 }
 
-func (c instanceClient) DescribeInstances(gid group.ID) ([]instance.Description, error) {
-	data, apiErr := c.sendRequest("GET", fmt.Sprintf("instance/?group=%s", gid), "")
+func (c instanceClient) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+	queryParts := []string{}
+	for key, value := range tags {
+		queryParts = append(queryParts, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	data, apiErr := c.sendRequest("GET", fmt.Sprintf("instance/?%s", strings.Join(queryParts, "&")), "")
 	if apiErr != nil {
 		return nil, apiErr
 	}
