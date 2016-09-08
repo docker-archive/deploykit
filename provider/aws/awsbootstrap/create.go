@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/docker/libmachete/controller/quorum"
 	machete_aws "github.com/docker/libmachete/provider/aws"
-	"github.com/docker/libmachete/spi"
 	"strings"
 	"text/template"
 	"time"
@@ -422,7 +421,7 @@ func configureWorkerSecurityGroup(ec2Client ec2iface.EC2API, groupID string, man
 func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) error {
 	log.Info("Starting cluster boot leader instance")
 	builder := machete_aws.Builder{Config: config}
-	provisioner, err := builder.BuildInstanceProvisioner(spi.ClusterID(swim.ClusterName))
+	provisioner, err := builder.BuildInstanceProvisioner()
 	if err != nil {
 		return err
 	}
