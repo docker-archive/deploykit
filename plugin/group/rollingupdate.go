@@ -18,8 +18,6 @@ func (r *rollingupdate) Run() {
 	}
 
 	workpool.Run()
-
-	// TODO(wfarner): Handle adjusting the group size in conjunction with the update.
 }
 
 func (r *rollingupdate) Proceed() {
