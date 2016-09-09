@@ -8,3 +8,6 @@ coverage.txt
 
 # Vendored sources.  These are synced during the build by govendor.
 vendor/*/
+
+# Binaries from builds
+plugin/*/container/bin/
