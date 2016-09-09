@@ -1,0 +1,14 @@
+{
+    "manifestVersion": "v0.1",
+    "description": "machete instance driver for aws",
+    "documentation": "https://docs.docker.com/engine/extend/plugins/",
+    "entrypoint": ["driver", "--listen=/run/docker/plugins/aws-instance.sock"],
+    "network": {
+        "type": "host"
+    },
+    "interface" : {
+        "types": ["docker.instanceDriver/1.0"],
+        "socket": "aws-instance.sock"
+    },
+    "mounts":[]
+}
