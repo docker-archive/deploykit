@@ -10,4 +10,5 @@ coverage.txt
 vendor/*/
 
 # Binaries from builds
+controller/*/container/bin/
 plugin/*/container/bin/
