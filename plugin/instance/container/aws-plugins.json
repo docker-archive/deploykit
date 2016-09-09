@@ -40,7 +40,7 @@
                         "docker.instanceDriver/1.0"
                     ]
                 },
-                "Entrypoint": [ "driver", "aws", "--listen=/run/docker/plugins/aws-instance.sock" ],
+                "Entrypoint": [ "driver", "--listen=/run/docker/plugins/aws-instance.sock" ],
                 "Workdir": "",
                 "User": {},
                 "Network": {

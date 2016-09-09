@@ -6,7 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
 	plugin "github.com/docker/libmachete/plugin/instance"
-	instanceSpi "github.com/docker/libmachete/spi/instance"
+	"github.com/docker/libmachete/provider/aws"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -25,10 +25,6 @@ var (
 	Revision = "Unspecified"
 )
 
-type backend struct {
-	plugin instanceSpi.Plugin
-}
-
 func info() interface{} {
 	return map[string]interface{}{
 		"name":       Name,
@@ -41,7 +37,7 @@ func info() interface{} {
 
 func main() {
 
-	backend := &backend{}
+	builder := &aws.Builder{}
 
 	// Top level main command...  all subcommands are designed to create the watch function
 	// for the watcher, except 'version' subcommand.  After the subcommand completes, the
@@ -49,7 +45,7 @@ func main() {
 	cmd := &cobra.Command{
 		Use:   "driver",
 		Short: "Instance plugin for provisioning instances",
-		PersistentPreRunE: func(c *cobra.Command, args []string) error {
+		RunE: func(c *cobra.Command, args []string) error {
 
 			if logLevel > len(log.AllLevels)-1 {
 				logLevel = len(log.AllLevels) - 1
@@ -61,26 +57,16 @@ func main() {
 			if c.Use == "version" {
 				return nil
 			}
-			return nil
-		},
-
-		// After the subcommand completed we start the main part...
-		PersistentPostRunE: func(c *cobra.Command, args []string) error {
-			switch c.Use {
-			case "version":
-				return nil
-			default:
-			}
-
-			// Subcommands should initialize the backend.plugin
-			if backend.plugin == nil {
-				return fmt.Errorf("plugin backend not initialized")
+			provisioner, err := builder.BuildInstanceProvisioner()
+			if err != nil {
+				log.Error(err)
+				return err
 			}
 
 			log.Infoln("Starting httpd")
 			log.Infoln("Listening on:", listen)
 
-			_, waitHTTP, err := util.StartServer(listen, plugin.NewHandler(backend.plugin, info),
+			_, waitHTTP, err := util.StartServer(listen, plugin.NewHandler(provisioner, info),
 				func() error {
 					log.Infoln("Shutting down.")
 					return nil
@@ -111,12 +97,9 @@ func main() {
 	cmd.PersistentFlags().StringVar(&listen, "listen", listen, "listen address (unix or tcp)")
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
-	// The subcommand initializes the platform specific provisioner, e.g. aws for AWS, azure for azure
-	aws := awsCommand(backend)
-
-	// TODO(chungers) - add azure
-
-	cmd.AddCommand(aws)
+	// TODO(chungers) - the exposed flags here won't be set in plugins, because plugin install doesn't allow
+	// user to pass in command line args like containers with entrypoint.
+	cmd.Flags().AddFlagSet(builder.Flags())
 
 	err := cmd.Execute()
 	if err != nil {
