@@ -1,141 +1,275 @@
 package scaler
 
 import (
-	"errors"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	"github.com/docker/libmachete/client"
-	aws_provider "github.com/docker/libmachete/provider/aws"
-	"github.com/docker/libmachete/server"
-	"github.com/drewolson/testflight"
+	"encoding/json"
+	"fmt"
+	mock_instance "github.com/docker/libmachete/mock/spi/instance"
+	"github.com/docker/libmachete/spi/group"
+	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"strconv"
-	"sync"
 	"testing"
 	"time"
 )
 
-// fakeEc2 is a partial implementation of EC2API that pretends to run and terminate instances.
-type fakeEc2 struct {
-	ec2iface.EC2API
+const (
+	id         = group.ID("testGroup")
+	pluginName = "test"
+)
 
-	nextID      int
-	instanceIds []string
-	lock        sync.Mutex
+var config = group.Configuration{
+	ID:         id,
+	Properties: propertiesConfig(3, "data"),
 }
 
-func (e *fakeEc2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
-	// No-op
-	return nil, nil
+func propertiesConfig(instances int, data string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+	  "Size": %d,
+	  "InstancePlugin": "test",
+	  "InstancePluginProperties": {
+	    "OpaqueValue": "%s"
+	  }
+	}`, instances, data))
 }
 
-func (e *fakeEc2) DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	instances := []*ec2.Instance{}
-	for _, id := range e.instanceIds {
-		idCopy := id
-		instances = append(instances, &ec2.Instance{
-			InstanceId:       &idCopy,
-			KeyName:          aws.String("key"),
-			PrivateIpAddress: aws.String("10.0.0.3"),
-		})
-	}
-
-	return &ec2.DescribeInstancesOutput{Reservations: []*ec2.Reservation{{Instances: instances}}}, nil
+func mockedPluginGroup(ctrl *gomock.Controller) (*mock_instance.MockPlugin, group.Plugin) {
+	plugin := mock_instance.NewMockPlugin(ctrl)
+	// TODO(wfarner): Wire a 'ticker factory' through to take the time element out of tests, and allow tests
+	// to define when state course-correction happens.
+	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Hour)
+	return plugin, grp
 }
 
-func (e *fakeEc2) RunInstances(*ec2.RunInstancesInput) (*ec2.Reservation, error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	e.nextID++
-	id := strconv.Itoa(e.nextID)
-	e.instanceIds = append(e.instanceIds, id)
-	return &ec2.Reservation{Instances: []*ec2.Instance{{InstanceId: &id}}}, nil
-}
-
-func (e *fakeEc2) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	id := *input.InstanceIds[0]
-	position := -1
-	for i := range e.instanceIds {
-		if e.instanceIds[i] == id {
-			position = i
-			break
-		}
-	}
-	if position == -1 {
-		return nil, errors.New("Instance nt found")
-	}
-
-	e.instanceIds = append(e.instanceIds[:position], e.instanceIds[position+1:]...)
-	return &ec2.TerminateInstancesOutput{TerminatingInstances: []*ec2.InstanceStateChange{{}}}, nil
-}
-
-func (e *fakeEc2) CreateKeyPair(*ec2.CreateKeyPairInput) (*ec2.CreateKeyPairOutput, error) {
-	return &ec2.CreateKeyPairOutput{KeyMaterial: aws.String("fake key data")}, nil
-}
-
-func (e *fakeEc2) DeleteKeyPair(*ec2.DeleteKeyPairInput) (*ec2.DeleteKeyPairOutput, error) {
-	return &ec2.DeleteKeyPairOutput{}, nil
-}
-
-func (e *fakeEc2) maybeResetIds(newIds []string, predicate func([]string) bool) bool {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	if predicate(e.instanceIds) {
-		e.instanceIds = newIds
-		return true
-	}
-
-	return false
-}
-
-func resetAtTarget(backend *fakeEc2, target int, newIds []string) {
-	metTargetLength := func(currentIds []string) bool {
-		return len(currentIds) == target
-	}
-
-	for {
-		if backend.maybeResetIds(newIds, metTargetLength) {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
-// TestScalerIntegration combines a scaler, HTTP client, machete server, and provisioner backend to ensure all
-// components work together.
-func TestScalerIntegration(t *testing.T) {
+func TestInvalidGroupCalls(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+	_, grp := mockedPluginGroup(ctrl)
 
-	backend := &fakeEc2{}
-	provisioner := aws_provider.Provisioner{Client: backend}
+	require.Error(t, grp.DestroyGroup(id))
+	_, err := grp.InspectGroup(id)
+	require.Error(t, err)
+	require.Error(t, grp.UnwatchGroup(id))
+	_, err = grp.DescribeUpdate(config)
+	require.Error(t, err)
+	require.Error(t, grp.UpdateGroup(config))
+}
 
-	testflight.WithServer(server.NewHandler(provisioner), func(r *testflight.Requester) {
-		target := 3
-		watcher, err := NewFixedScaler(
-			map[string]string{"label": "custom"},
-			uint32(target),
-			10*time.Millisecond,
-			client.NewInstanceProvisioner(r.Url("")),
-			"{}")
-		require.NoError(t, err)
+func instanceProperties(config group.Configuration) json.RawMessage {
+	groupProperties := map[string]json.RawMessage{}
+	err := json.Unmarshal(config.Properties, &groupProperties)
+	if err != nil {
+		panic(err)
+	}
+	return groupProperties["InstancePluginProperties"]
+}
 
-		go watcher.Run()
+func expectValidate(plugin *mock_instance.MockPlugin, config group.Configuration) *gomock.Call {
+	return plugin.EXPECT().Validate(instanceProperties(config))
+}
 
-		// Simulate course corrections needed by the scaler.
-		resetAtTarget(backend, target, []string{"a"})
-		resetAtTarget(backend, target, []string{"a", "b", "c", "d", "e", "f", "g"})
-		resetAtTarget(backend, target, []string{"a", "b", "c"})
-		watcher.Stop()
-	})
+func expectDescribe(plugin *mock_instance.MockPlugin, id group.ID) *gomock.Call {
+	return plugin.EXPECT().DescribeInstances(map[string]string{groupTag: string(id)})
+}
+
+func fakeInstance(config group.Configuration, id string) instance.Description {
+	return instance.Description{
+		ID: instance.ID(id),
+		Tags: map[string]string{
+			groupTag:  string(config.ID),
+			configTag: instanceConfigHash(instanceProperties(config)),
+			"other":   "ignored",
+		},
+	}
+}
+
+func TestNoopUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	plugin, grp := mockedPluginGroup(ctrl)
+
+	expectValidate(plugin, config).Return(nil)
+	require.NoError(t, grp.WatchGroup(config))
+
+	expectValidate(plugin, config).Return(nil).Times(2)
+	expectDescribe(plugin, id).Return([]instance.Description{
+		fakeInstance(config, "a"),
+		fakeInstance(config, "b"),
+		fakeInstance(config, "c"),
+	}, nil).Times(2)
+
+	desc, err := grp.DescribeUpdate(config)
+	require.NoError(t, err)
+	require.Equal(t, "Noop", desc)
+
+	require.NoError(t, grp.UpdateGroup(config))
+}
+
+func TestRollingUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	plugin, grp := mockedPluginGroup(ctrl)
+
+	expectValidate(plugin, config).Return(nil)
+	require.NoError(t, grp.WatchGroup(config))
+
+	updated := group.Configuration{
+		ID:         id,
+		Properties: propertiesConfig(3, "data2"),
+	}
+
+	expectValidate(plugin, updated).Return(nil)
+	expectDescribe(plugin, id).Return([]instance.Description{
+		fakeInstance(config, "a"),
+		fakeInstance(config, "b"),
+		fakeInstance(config, "c"),
+	}, nil)
+
+	desc, err := grp.DescribeUpdate(updated)
+	require.NoError(t, err)
+	require.Equal(t, "Performs a rolling update on 3 instances", desc)
+
+	// TODO(wfarner): This test is slow due to sleeps during the rolling update.  This will
+	// be addressed when updates are gated based on 'health' rather than arbitrary time.
+
+	// TODO(wfarner): Since the scaler is effectively disabled, instances are not created during this rolling
+	// update.  Once the scaler can be predictably controlled from tests, 'tick' it to induce creation of instances.
+
+	expectValidate(plugin, updated).Return(nil)
+	gomock.InOrder(
+		expectDescribe(plugin, id).Return([]instance.Description{
+			fakeInstance(config, "a"),
+			fakeInstance(config, "b"),
+			fakeInstance(config, "c"),
+		}, nil),
+		expectDescribe(plugin, id).Return([]instance.Description{
+			fakeInstance(config, "a"),
+			fakeInstance(config, "b"),
+			fakeInstance(config, "c"),
+		}, nil),
+		plugin.EXPECT().Destroy(instance.ID("a")).Return(nil),
+		expectDescribe(plugin, id).Return([]instance.Description{
+			fakeInstance(config, "b"),
+			fakeInstance(config, "c"),
+		}, nil),
+		plugin.EXPECT().Destroy(instance.ID("b")).Return(nil),
+		expectDescribe(plugin, id).Return([]instance.Description{
+			fakeInstance(config, "c"),
+		}, nil),
+		plugin.EXPECT().Destroy(instance.ID("c")).Return(nil),
+		expectDescribe(plugin, id).Return([]instance.Description{}, nil),
+	)
+	require.NoError(t, grp.UpdateGroup(updated))
+}
+
+func TestRollAndAdjustScale(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	plugin, grp := mockedPluginGroup(ctrl)
+
+	expectValidate(plugin, config).Return(nil)
+	require.NoError(t, grp.WatchGroup(config))
+
+	updated := group.Configuration{
+		ID:         id,
+		Properties: propertiesConfig(8, "data2"),
+	}
+
+	expectValidate(plugin, updated).Return(nil)
+	expectDescribe(plugin, id).Return([]instance.Description{
+		fakeInstance(config, "a"),
+		fakeInstance(config, "b"),
+		fakeInstance(config, "c"),
+	}, nil)
+
+	desc, err := grp.DescribeUpdate(updated)
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		"Performs a rolling update on 3 instances, then adds 5 instances to increase the group size to 8",
+		desc)
+}
+
+func TestScaleIncrease(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	plugin, grp := mockedPluginGroup(ctrl)
+
+	expectValidate(plugin, config).Return(nil)
+	require.NoError(t, grp.WatchGroup(config))
+
+	newConfig := group.Configuration{
+		ID:         id,
+		Properties: propertiesConfig(6, "data"),
+	}
+
+	expectValidate(plugin, newConfig).Return(nil)
+	expectDescribe(plugin, id).Return([]instance.Description{
+		fakeInstance(config, "a"),
+		fakeInstance(config, "b"),
+		fakeInstance(config, "c"),
+	}, nil)
+
+	desc, err := grp.DescribeUpdate(newConfig)
+	require.NoError(t, err)
+	require.Equal(t, "Adds 3 instances to increase the group size to 6", desc)
+
+	// TODO(wfarner): Tick scaler and observe 3 instances created.
+}
+
+func TestScaleDecrease(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	plugin, grp := mockedPluginGroup(ctrl)
+
+	expectValidate(plugin, config).Return(nil)
+	require.NoError(t, grp.WatchGroup(config))
+
+	newConfig := group.Configuration{
+		ID:         id,
+		Properties: propertiesConfig(1, "data"),
+	}
+
+	expectValidate(plugin, newConfig).Return(nil)
+	expectDescribe(plugin, id).Return([]instance.Description{
+		fakeInstance(config, "a"),
+		fakeInstance(config, "b"),
+		fakeInstance(config, "c"),
+	}, nil)
+
+	desc, err := grp.DescribeUpdate(newConfig)
+	require.NoError(t, err)
+	require.Equal(t, "Terminates 2 instances to reduce the group size to 1", desc)
+
+	// TODO(wfarner): Tick scaler and observe 3 instances created.
+}
+
+func TestUnwatchGroup(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	plugin, grp := mockedPluginGroup(ctrl)
+
+	expectValidate(plugin, config).Return(nil)
+	require.NoError(t, grp.WatchGroup(config))
+
+	require.NoError(t, grp.UnwatchGroup(id))
+}
+
+func TestDestroyGroup(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	plugin, grp := mockedPluginGroup(ctrl)
+
+	expectValidate(plugin, config).Return(nil)
+	require.NoError(t, grp.WatchGroup(config))
+
+	expectDescribe(plugin, id).Return([]instance.Description{
+		fakeInstance(config, "a"),
+		fakeInstance(config, "b"),
+		fakeInstance(config, "c"),
+	}, nil)
+	plugin.EXPECT().Destroy(instance.ID("a")).Return(nil)
+	plugin.EXPECT().Destroy(instance.ID("b")).Return(nil)
+	plugin.EXPECT().Destroy(instance.ID("c")).Return(nil)
+
+	require.NoError(t, grp.DestroyGroup(id))
 }

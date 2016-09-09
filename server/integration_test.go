@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"github.com/docker/libmachete/client"
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
 	"github.com/docker/libmachete/spi"
@@ -10,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"testing"
 )
+
+var provisionData = json.RawMessage("{}")
 
 func TestClientServerRelay(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -23,7 +26,6 @@ func TestClientServerRelay(t *testing.T) {
 		tags := map[string]string{"a": "b", "c": "d"}
 		id := instance.ID("instance-1")
 
-		provisionData := "{}"
 		volume := instance.VolumeID("volume")
 		backend.EXPECT().Provision(provisionData, &volume, tags).Return(&id, nil)
 		returnedID, err := client.Provision(provisionData, &volume, tags)
@@ -56,8 +58,8 @@ func TestErrorMapping(t *testing.T) {
 		backendErr := spi.NewError(spi.ErrBadInput, "Bad")
 		tags := map[string]string{"a": "b", "c": "d"}
 
-		backend.EXPECT().Provision("{}", nil, tags).Return(nil, backendErr)
-		id, err := frontend.Provision("{}", nil, tags)
+		backend.EXPECT().Provision(provisionData, nil, tags).Return(nil, backendErr)
+		id, err := frontend.Provision(provisionData, nil, tags)
 		require.Equal(t, backendErr, err)
 		require.Nil(t, id)
 	})

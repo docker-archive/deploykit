@@ -1,6 +1,7 @@
 package quorum
 
 import (
+	"encoding/json"
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
@@ -71,7 +72,7 @@ func TestRestoreQuorum(t *testing.T) {
 		provisioner.EXPECT().DescribeInstances(tags).Return([]instance.Description{a, b, c}, nil),
 		provisioner.EXPECT().DescribeInstances(tags).Return([]instance.Description{a, b}, nil),
 		provisioner.EXPECT().Provision(
-			`{"Group": "test-group", "IP": "10.0.0.4"}`, &volume, tags).Return(&c.ID, nil),
+			json.RawMessage(`{"Group": "test-group", "IP": "10.0.0.4"}`), &volume, tags).Return(&c.ID, nil),
 		provisioner.EXPECT().DescribeInstances(tags).Do(func(_ map[string]string) {
 			go quorum.Stop()
 		}).Return([]instance.Description{a, b, c}, nil),

@@ -1,6 +1,7 @@
 package scaler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/docker/libmachete/spi/instance"
@@ -8,7 +9,12 @@ import (
 	"sync"
 )
 
-type demoplugin struct {
+// NewTestInstancePlugin creates a new instance plugin for use in testing and development.
+func NewTestInstancePlugin() instance.Plugin {
+	return &testplugin{idPrefix: randString(4), instances: map[instance.ID]map[string]string{}}
+}
+
+type testplugin struct {
 	lock      sync.Mutex
 	idPrefix  string
 	nextID    int
@@ -25,11 +31,15 @@ func randString(n int) string {
 	return string(b)
 }
 
-func newDemoPlugin() instance.Plugin {
-	return &demoplugin{idPrefix: randString(4), instances: map[instance.ID]map[string]string{}}
+func (d *testplugin) Validate(req json.RawMessage) error {
+	return nil
 }
 
-func (d *demoplugin) Provision(req string, volume *instance.VolumeID, tags map[string]string) (*instance.ID, error) {
+func (d *testplugin) Provision(
+	req json.RawMessage,
+	volume *instance.VolumeID,
+	tags map[string]string) (*instance.ID, error) {
+
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -40,7 +50,7 @@ func (d *demoplugin) Provision(req string, volume *instance.VolumeID, tags map[s
 	return &id, nil
 }
 
-func (d *demoplugin) Destroy(id instance.ID) error {
+func (d *testplugin) Destroy(id instance.ID) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -53,7 +63,7 @@ func (d *demoplugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (d *demoplugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

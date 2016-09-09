@@ -73,7 +73,7 @@ func TestProvision(t *testing.T) {
 		tags := map[string]string{"a": "b", "c": "d"}
 		id := instance.ID("instance-id")
 
-		request := "{}"
+		request := json.RawMessage("{}")
 		volume := instance.VolumeID("volume")
 
 		provisioner.EXPECT().Provision(request, &volume, tags).Return(&id, nil)
@@ -102,7 +102,7 @@ func TestProvisionError(t *testing.T) {
 
 	testflight.WithServer(NewHandler(provisioner), func(r *testflight.Requester) {
 		tags := map[string]string{"a": "b", "c": "d"}
-		request := "{}"
+		request := json.RawMessage("{}")
 		provisioner.EXPECT().Provision(request, nil, tags).Return(nil, BadInputError)
 
 		payload := json.RawMessage(request)

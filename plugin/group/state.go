@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/spi/group"
+	"github.com/docker/libmachete/spi/instance"
+	"sync"
 )
 
 type groupProperties struct {
@@ -12,78 +14,63 @@ type groupProperties struct {
 	InstancePluginProperties json.RawMessage
 }
 
-type physicalGroup struct {
-	properties *groupProperties
-	scaler     Scaler
+type groupContext struct {
+	properties     *groupProperties
+	instancePlugin instance.Plugin
+	scaler         Scaler
+	scaled         *scaledGroup
+	lock           sync.Mutex
 }
 
-func (p *physicalGroup) setSize(size uint32) {
-	p.properties.Size = size
-	p.scaler.SetSize(size)
-}
+func (c *groupContext) setProperties(properties *groupProperties) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
-type physicalGroupID struct {
-	gid   group.ID
-	phyID int
-}
-
-type logicalGroup struct {
-	phys map[int]*physicalGroup
-}
-
-func (l *logicalGroup) getPhy(id int) (*physicalGroup, bool) {
-	phy, exists := l.phys[id]
-	return phy, exists
-}
-
-func (l *logicalGroup) deletePhy(id int) {
-	delete(l.phys, id)
-}
-
-func (l *logicalGroup) getOnlyPhy() (int, *physicalGroup, error) {
-	if len(l.phys) == 1 {
-		for id, gen := range l.phys {
-			return id, gen, nil
-		}
-	}
-
-	return -1, nil, fmt.Errorf("Logical group has %d physical groups, expected 1", len(l.phys))
+	c.properties = properties
 }
 
 type groups struct {
-	logical map[group.ID]*logicalGroup
+	contexts map[group.ID]*groupContext
+	lock     sync.Mutex
 }
 
-func (g *groups) deleteLogical(id group.ID) {
-	delete(g.logical, id)
+func (g *groups) del(id group.ID) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	delete(g.contexts, id)
 }
 
-func (g *groups) get(id group.ID) (*logicalGroup, bool) {
-	logical, exists := g.logical[id]
+func (g *groups) get(id group.ID) (*groupContext, bool) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	logical, exists := g.contexts[id]
 	return logical, exists
 }
 
-func (g *groups) putPhy(id physicalGroupID, phy *physicalGroup) {
-	logical, exists := g.logical[id.gid]
-	if !exists {
-		logical = &logicalGroup{phys: map[int]*physicalGroup{}}
-		g.logical[id.gid] = logical
-	}
+func (g *groups) put(id group.ID, context *groupContext) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
 
-	_, exists = logical.phys[id.phyID]
+	_, exists := g.contexts[id]
 	if exists {
-		panic(fmt.Sprintf("Attempt to overwrite physical group %v", id))
+		panic(fmt.Sprintf("Attempt to overwrite group %v", id))
 	}
 
-	logical.phys[id.phyID] = phy
+	g.contexts[id] = context
 }
 
-func (g *groups) getPhy(id physicalGroupID) (*physicalGroup, bool) {
-	logical, exists := g.logical[id.gid]
-	if !exists {
-		return nil, false
-	}
+type sortByID []instance.ID
 
-	phy, exists := logical.phys[id.phyID]
-	return phy, exists
+func (n sortByID) Len() int {
+	return len(n)
+}
+
+func (n sortByID) Swap(i, j int) {
+	n[i], n[j] = n[j], n[i]
+}
+
+func (n sortByID) Less(i, j int) bool {
+	return n[i] < n[j]
 }

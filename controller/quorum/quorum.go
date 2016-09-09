@@ -2,6 +2,7 @@ package quorum
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
@@ -120,7 +121,7 @@ func ProvisionManager(
 	}
 
 	volume := instance.VolumeID(ip)
-	id, err := provisioner.Provision(buffer.String(), &volume, tags)
+	id, err := provisioner.Provision(json.RawMessage(buffer.Bytes()), &volume, tags)
 	if err != nil {
 		return fmt.Errorf("Failed to provision: %s", err)
 	}
