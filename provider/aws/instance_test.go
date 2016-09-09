@@ -6,15 +6,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	mock_ec2 "github.com/docker/libmachete/mock/ec2"
-	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"testing"
-)
-
-const (
-	testCluster = spi.ClusterID("test-cluster")
 )
 
 var (
@@ -26,10 +21,7 @@ func TestInstanceLifecycle(t *testing.T) {
 	defer ctrl.Finish()
 
 	clientMock := mock_ec2.NewMockEC2API(ctrl)
-	provisioner := Provisioner{
-		Client:  clientMock,
-		Cluster: testCluster,
-	}
+	provisioner := Provisioner{Client: clientMock}
 
 	// Create an instance.
 
@@ -41,7 +33,6 @@ func TestInstanceLifecycle(t *testing.T) {
 	tagRequest := ec2.CreateTagsInput{
 		Resources: []*string{&instanceID},
 		Tags: []*ec2.Tag{
-			{Key: aws.String(ClusterTag), Value: aws.String(string(testCluster))},
 			{Key: aws.String("group"), Value: aws.String("workers")},
 			{Key: aws.String("test"), Value: aws.String("aws-create-test")},
 		},
@@ -71,7 +62,7 @@ func TestCreateInstanceError(t *testing.T) {
 	runError := errors.New("request failed")
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
-	provisioner := NewInstancePlugin(clientMock, testCluster)
+	provisioner := NewInstancePlugin(clientMock)
 	id, err := provisioner.Provision("{}", nil, tags)
 
 	require.Error(t, err)
@@ -89,7 +80,7 @@ func TestDestroyInstanceError(t *testing.T) {
 	clientMock.EXPECT().TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: []*string{&instanceID}}).
 		Return(nil, runError)
 
-	provisioner := NewInstancePlugin(clientMock, testCluster)
+	provisioner := NewInstancePlugin(clientMock)
 	require.Error(t, provisioner.Destroy(instance.ID(instanceID)))
 }
 
@@ -124,7 +115,7 @@ func TestDescribeInstancesRequest(t *testing.T) {
 	defer ctrl.Finish()
 
 	var nextToken *string
-	request := describeGroupRequest(testCluster, tags, nextToken)
+	request := describeGroupRequest(tags, nextToken)
 
 	require.Equal(t, nextToken, request.NextToken)
 
@@ -141,13 +132,12 @@ func TestDescribeInstancesRequest(t *testing.T) {
 		}
 		require.Fail(t, fmt.Sprintf("Did not have filter %s/%s", name, value))
 	}
-	requireFilter("tag:docker-machete", string(testCluster))
 	for key, value := range tags {
 		requireFilter(fmt.Sprintf("tag:%s", key), value)
 	}
 
 	nextToken = aws.String("page-2")
-	request = describeGroupRequest(testCluster, tags, nextToken)
+	request = describeGroupRequest(tags, nextToken)
 	require.Equal(t, nextToken, request.NextToken)
 }
 
@@ -160,16 +150,16 @@ func TestListGroup(t *testing.T) {
 
 	// Split instance IDs across multiple reservations and request pages.
 	gomock.InOrder(
-		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testCluster, tags, nil)).
+		clientMock.EXPECT().DescribeInstances(describeGroupRequest(tags, nil)).
 			Return(describeInstancesResponse([][]string{
 				{"a", "b", "c"},
 				{"d", "e"},
 			}, tags, &page2Token), nil),
-		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testCluster, tags, &page2Token)).
+		clientMock.EXPECT().DescribeInstances(describeGroupRequest(tags, &page2Token)).
 			Return(describeInstancesResponse([][]string{{"f", "g"}}, tags, nil), nil),
 	)
 
-	provisioner := NewInstancePlugin(clientMock, testCluster)
+	provisioner := NewInstancePlugin(clientMock)
 	descriptions, err := provisioner.DescribeInstances(tags)
 
 	require.NoError(t, err)

@@ -94,5 +94,5 @@ func OutputHandler(handler SimpleHandler) Handler {
 type ProvisionerBuilder interface {
 	Flags() *pflag.FlagSet
 
-	BuildInstanceProvisioner(cluster spi.ClusterID) (instance.Plugin, error)
+	BuildInstanceProvisioner() (instance.Plugin, error)
 }

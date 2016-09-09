@@ -46,8 +46,7 @@ func (c clusterID) getAWSClient() client.ConfigProvider {
 
 func (c clusterID) url() string {
 	return fmt.Sprintf(
-		"https://%s.s3-%s.amazonaws.com/%s/%s",
-		machete_aws.ClusterTag,
+		"https://machete-cluster.s3-%s.amazonaws.com/%s/%s",
 		c.region,
 		c.name,
 		s3File)
@@ -65,7 +64,7 @@ func (c clusterID) resourceFilter(vpcID string) []*ec2.Filter {
 
 func (c clusterID) clusterFilter() *ec2.Filter {
 	return &ec2.Filter{
-		Name:   aws.String(fmt.Sprintf("tag:%s", machete_aws.ClusterTag)),
+		Name:   aws.String("tag:machete-cluster"),
 		Values: []*string{aws.String(c.name)},
 	}
 }
@@ -84,7 +83,7 @@ func (c clusterID) instanceProfileName() string {
 
 func (c clusterID) resourceTag() *ec2.Tag {
 	return &ec2.Tag{
-		Key:   aws.String(machete_aws.ClusterTag),
+		Key:   aws.String("machete-cluster"),
 		Value: aws.String(c.name),
 	}
 }
@@ -120,7 +119,7 @@ func (s *fakeSWIMSchema) push() error {
 
 	s3Client := s3.New(s.cluster().getAWSClient())
 
-	bucket := aws.String(machete_aws.ClusterTag)
+	bucket := aws.String("machete-cluster")
 	head := &s3.HeadBucketInput{Bucket: bucket}
 
 	_, err = s3Client.HeadBucket(head)
