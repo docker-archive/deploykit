@@ -20,23 +20,18 @@ import (
 )
 
 const (
-	// ClusterTag is the AWS tag name used to track instances managed by this machete instance.
-	ClusterTag = "docker-machete"
-
 	// VolumeTag is the AWS tag name used to associate unique identifiers (instance.VolumeID) with volumes.
 	VolumeTag = "docker-machete-volume"
 )
 
 // Provisioner is an instance provisioner for AWS.
 type Provisioner struct {
-	Client  ec2iface.EC2API
-	Cluster spi.ClusterID
+	Client ec2iface.EC2API
 }
 
 type properties struct {
 	Region   string
 	Retries  int
-	Cluster  spi.ClusterID
 	Instance json.RawMessage
 }
 
@@ -60,7 +55,7 @@ func NewPluginFromProperties(pluginProperties json.RawMessage) (instance.Plugin,
 		WithLogger(getLogger()).
 		WithMaxRetries(props.Retries))
 
-	instancePlugin := NewInstancePlugin(ec2.New(client), props.Cluster)
+	instancePlugin := NewInstancePlugin(ec2.New(client))
 
 	// TODO(wfarner): Provide a way for the plugin to validate an instance request to identify bad configurations
 	// more quickly.
@@ -68,11 +63,8 @@ func NewPluginFromProperties(pluginProperties json.RawMessage) (instance.Plugin,
 }
 
 // NewInstancePlugin creates a new plugin that creates instances in AWS EC2.
-func NewInstancePlugin(client ec2iface.EC2API, cluster spi.ClusterID) instance.Plugin {
-	return &Provisioner{
-		Client:  client,
-		Cluster: cluster,
-	}
+func NewInstancePlugin(client ec2iface.EC2API) instance.Plugin {
+	return &Provisioner{Client: client}
 }
 
 func (p Provisioner) tagInstance(
@@ -80,9 +72,7 @@ func (p Provisioner) tagInstance(
 	systemTags map[string]string,
 	userTags map[string]string) error {
 
-	ec2Tags := []*ec2.Tag{
-		{Key: aws.String(ClusterTag), Value: aws.String(string(p.Cluster))},
-	}
+	ec2Tags := []*ec2.Tag{}
 
 	// Gather the tag keys in sorted order, to provide predictable tag order.  This is
 	// particularly useful for tests.
@@ -139,7 +129,9 @@ func (p Provisioner) Provision(req string, volume *instance.VolumeID, tags map[s
 	if volume != nil {
 		volumes, err := p.Client.DescribeVolumes(&ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{
-				clusterFilter(p.Cluster),
+				// TODO(wfarner): Need a way to disambiguate between volumes associated with different
+				// clusters.  Currently, volume IDs are private IP addresses, which are not guaranteed
+				// unique in separate VPCs.
 				{
 					Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
 					Values: []*string{aws.String(string(*volume))},
@@ -227,21 +219,9 @@ func (p Provisioner) Destroy(id instance.ID) error {
 	return nil
 }
 
-func clusterFilter(cluster spi.ClusterID) *ec2.Filter {
-	// TODO(wfarner): Share these filter definitions with the bootstrap routine.
-	return &ec2.Filter{
-		Name:   aws.String(fmt.Sprintf("tag:%s", ClusterTag)),
-		Values: []*string{aws.String(string(cluster))},
-	}
-}
-
-func describeGroupRequest(
-	cluster spi.ClusterID,
-	tags map[string]string,
-	nextToken *string) *ec2.DescribeInstancesInput {
+func describeGroupRequest(tags map[string]string, nextToken *string) *ec2.DescribeInstancesInput {
 
 	filters := []*ec2.Filter{
-		clusterFilter(cluster),
 		{
 			Name: aws.String("instance-state-name"),
 			Values: []*string{
@@ -261,7 +241,7 @@ func describeGroupRequest(
 }
 
 func (p Provisioner) describeInstances(tags map[string]string, nextToken *string) ([]instance.Description, error) {
-	result, err := p.Client.DescribeInstances(describeGroupRequest(p.Cluster, tags, nextToken))
+	result, err := p.Client.DescribeInstances(describeGroupRequest(tags, nextToken))
 	if err != nil {
 		return nil, err
 	}
