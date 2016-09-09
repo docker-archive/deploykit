@@ -33,6 +33,8 @@ type scaler struct {
 // NewFixedScaler creates a RunStop that monitors a group of instances on a provisioner, attempting to maintain a
 // fixed size.
 func NewFixedScaler(
+	// TODO(wfarner): Instances need to be tagged with the swarm ID to prevent interference with scalers for
+	// different clusters.
 	tags map[string]string,
 	size uint32,
 	pollInterval time.Duration,
