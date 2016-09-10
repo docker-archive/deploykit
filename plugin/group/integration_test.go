@@ -34,9 +34,7 @@ func propertiesConfig(instances int, data string) json.RawMessage {
 
 func mockedPluginGroup(ctrl *gomock.Controller) (*mock_instance.MockPlugin, group.Plugin) {
 	plugin := mock_instance.NewMockPlugin(ctrl)
-	// TODO(wfarner): Wire a 'ticker factory' through to take the time element out of tests, and allow tests
-	// to define when state course-correction happens.
-	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Hour)
+	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
 	return plugin, grp
 }
 
@@ -49,6 +47,7 @@ func TestInvalidGroupCalls(t *testing.T) {
 	_, err := grp.InspectGroup(id)
 	require.Error(t, err)
 	require.Error(t, grp.UnwatchGroup(id))
+	require.Error(t, grp.StopUpdate(id))
 	_, err = grp.DescribeUpdate(config)
 	require.Error(t, err)
 	require.Error(t, grp.UpdateGroup(config))
@@ -67,119 +66,90 @@ func expectValidate(plugin *mock_instance.MockPlugin, config group.Configuration
 	return plugin.EXPECT().Validate(instanceProperties(config))
 }
 
+func memberTags(id group.ID) map[string]string {
+	return map[string]string{groupTag: string(id)}
+}
+
 func expectDescribe(plugin *mock_instance.MockPlugin, id group.ID) *gomock.Call {
-	return plugin.EXPECT().DescribeInstances(map[string]string{groupTag: string(id)})
+	return plugin.EXPECT().DescribeInstances(memberTags(id))
+}
+
+func provisionTags(config group.Configuration) map[string]string {
+	tags := memberTags(config.ID)
+	tags[configTag] = instanceConfigHash(instanceProperties(config))
+	return tags
 }
 
 func fakeInstance(config group.Configuration, id string) instance.Description {
-	return instance.Description{
-		ID: instance.ID(id),
-		Tags: map[string]string{
-			groupTag:  string(config.ID),
-			configTag: instanceConfigHash(instanceProperties(config)),
-			"other":   "ignored",
-		},
-	}
+	tags := provisionTags(config)
+	// Inject another tag to simulate instances being tagged out-of-band.  Our implementation should ignore tags
+	// we did not create.
+	tags["other"] = "ignored"
+
+	return instance.Description{ID: instance.ID(id), Tags: provisionTags(config)}
 }
 
 func TestNoopUpdate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	plugin, grp := mockedPluginGroup(ctrl)
+	plugin := NewTestInstancePlugin(
+		provisionTags(config),
+		provisionTags(config),
+		provisionTags(config),
+	)
+	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
 
-	expectValidate(plugin, config).Return(nil)
 	require.NoError(t, grp.WatchGroup(config))
-
-	expectValidate(plugin, config).Return(nil).Times(2)
-	expectDescribe(plugin, id).Return([]instance.Description{
-		fakeInstance(config, "a"),
-		fakeInstance(config, "b"),
-		fakeInstance(config, "c"),
-	}, nil).Times(2)
 
 	desc, err := grp.DescribeUpdate(config)
 	require.NoError(t, err)
 	require.Equal(t, "Noop", desc)
 
 	require.NoError(t, grp.UpdateGroup(config))
+
+	instances, err := plugin.DescribeInstances(memberTags(config.ID))
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+	for _, i := range instances {
+		require.Equal(t, provisionTags(config), i.Tags)
+	}
 }
 
 func TestRollingUpdate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	plugin, grp := mockedPluginGroup(ctrl)
+	plugin := NewTestInstancePlugin(
+		provisionTags(config),
+		provisionTags(config),
+		provisionTags(config),
+	)
+	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
 
-	expectValidate(plugin, config).Return(nil)
 	require.NoError(t, grp.WatchGroup(config))
 
-	updated := group.Configuration{
-		ID:         id,
-		Properties: propertiesConfig(3, "data2"),
-	}
-
-	expectValidate(plugin, updated).Return(nil)
-	expectDescribe(plugin, id).Return([]instance.Description{
-		fakeInstance(config, "a"),
-		fakeInstance(config, "b"),
-		fakeInstance(config, "c"),
-	}, nil)
+	updated := group.Configuration{ID: id, Properties: propertiesConfig(3, "data2")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
 	require.Equal(t, "Performs a rolling update on 3 instances", desc)
 
-	// TODO(wfarner): This test is slow due to sleeps during the rolling update.  This will
-	// be addressed when updates are gated based on 'health' rather than arbitrary time.
-
-	// TODO(wfarner): Since the scaler is effectively disabled, instances are not created during this rolling
-	// update.  Once the scaler can be predictably controlled from tests, 'tick' it to induce creation of instances.
-
-	expectValidate(plugin, updated).Return(nil)
-	gomock.InOrder(
-		expectDescribe(plugin, id).Return([]instance.Description{
-			fakeInstance(config, "a"),
-			fakeInstance(config, "b"),
-			fakeInstance(config, "c"),
-		}, nil),
-		expectDescribe(plugin, id).Return([]instance.Description{
-			fakeInstance(config, "a"),
-			fakeInstance(config, "b"),
-			fakeInstance(config, "c"),
-		}, nil),
-		plugin.EXPECT().Destroy(instance.ID("a")).Return(nil),
-		expectDescribe(plugin, id).Return([]instance.Description{
-			fakeInstance(config, "b"),
-			fakeInstance(config, "c"),
-		}, nil),
-		plugin.EXPECT().Destroy(instance.ID("b")).Return(nil),
-		expectDescribe(plugin, id).Return([]instance.Description{
-			fakeInstance(config, "c"),
-		}, nil),
-		plugin.EXPECT().Destroy(instance.ID("c")).Return(nil),
-		expectDescribe(plugin, id).Return([]instance.Description{}, nil),
-	)
 	require.NoError(t, grp.UpdateGroup(updated))
+
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+	for _, i := range instances {
+		require.Equal(t, provisionTags(updated), i.Tags)
+	}
 }
 
 func TestRollAndAdjustScale(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	plugin, grp := mockedPluginGroup(ctrl)
+	plugin := NewTestInstancePlugin(
+		provisionTags(config),
+		provisionTags(config),
+		provisionTags(config),
+	)
+	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
 
-	expectValidate(plugin, config).Return(nil)
 	require.NoError(t, grp.WatchGroup(config))
 
-	updated := group.Configuration{
-		ID:         id,
-		Properties: propertiesConfig(8, "data2"),
-	}
-
-	expectValidate(plugin, updated).Return(nil)
-	expectDescribe(plugin, id).Return([]instance.Description{
-		fakeInstance(config, "a"),
-		fakeInstance(config, "b"),
-		fakeInstance(config, "c"),
-	}, nil)
+	updated := group.Configuration{ID: id, Properties: propertiesConfig(8, "data2")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -187,60 +157,76 @@ func TestRollAndAdjustScale(t *testing.T) {
 		t,
 		"Performs a rolling update on 3 instances, then adds 5 instances to increase the group size to 8",
 		desc)
+
+	require.NoError(t, grp.UpdateGroup(updated))
+
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	require.NoError(t, err)
+	// TODO(wfarner): The updater currently exits as soon as the scaler is adjusted, before action has been
+	// taken.  This means the number of instances cannot be precisely checked here as the scaler has not necessarily
+	// quiesced.
+	require.True(t, len(instances) >= 3)
+	for _, i := range instances {
+		require.Equal(t, provisionTags(updated), i.Tags)
+	}
 }
 
 func TestScaleIncrease(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	plugin, grp := mockedPluginGroup(ctrl)
+	plugin := NewTestInstancePlugin(
+		provisionTags(config),
+		provisionTags(config),
+		provisionTags(config),
+	)
+	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
 
-	expectValidate(plugin, config).Return(nil)
 	require.NoError(t, grp.WatchGroup(config))
 
-	newConfig := group.Configuration{
-		ID:         id,
-		Properties: propertiesConfig(6, "data"),
-	}
+	updated := group.Configuration{ID: id, Properties: propertiesConfig(8, "data")}
 
-	expectValidate(plugin, newConfig).Return(nil)
-	expectDescribe(plugin, id).Return([]instance.Description{
-		fakeInstance(config, "a"),
-		fakeInstance(config, "b"),
-		fakeInstance(config, "c"),
-	}, nil)
-
-	desc, err := grp.DescribeUpdate(newConfig)
+	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
-	require.Equal(t, "Adds 3 instances to increase the group size to 6", desc)
+	require.Equal(t, "Adds 5 instances to increase the group size to 8", desc)
 
-	// TODO(wfarner): Tick scaler and observe 3 instances created.
+	require.NoError(t, grp.UpdateGroup(updated))
+
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	require.NoError(t, err)
+	// TODO(wfarner): The updater currently exits as soon as the scaler is adjusted, before action has been
+	// taken.  This means the number of instances cannot be precisely checked here as the scaler has not necessarily
+	// quiesced.
+	require.True(t, len(instances) >= 3)
+	for _, i := range instances {
+		require.Equal(t, provisionTags(updated), i.Tags)
+	}
 }
 
 func TestScaleDecrease(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	plugin, grp := mockedPluginGroup(ctrl)
+	plugin := NewTestInstancePlugin(
+		provisionTags(config),
+		provisionTags(config),
+		provisionTags(config),
+	)
+	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
 
-	expectValidate(plugin, config).Return(nil)
 	require.NoError(t, grp.WatchGroup(config))
 
-	newConfig := group.Configuration{
-		ID:         id,
-		Properties: propertiesConfig(1, "data"),
-	}
+	updated := group.Configuration{ID: id, Properties: propertiesConfig(1, "data")}
 
-	expectValidate(plugin, newConfig).Return(nil)
-	expectDescribe(plugin, id).Return([]instance.Description{
-		fakeInstance(config, "a"),
-		fakeInstance(config, "b"),
-		fakeInstance(config, "c"),
-	}, nil)
-
-	desc, err := grp.DescribeUpdate(newConfig)
+	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
 	require.Equal(t, "Terminates 2 instances to reduce the group size to 1", desc)
 
-	// TODO(wfarner): Tick scaler and observe 3 instances created.
+	require.NoError(t, grp.UpdateGroup(updated))
+
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	require.NoError(t, err)
+	// TODO(wfarner): The updater currently exits as soon as the scaler is adjusted, before action has been
+	// taken.  This means the number of instances cannot be precisely checked here as the scaler has not necessarily
+	// quiesced.
+	require.True(t, len(instances) <= 3)
+	for _, i := range instances {
+		require.Equal(t, provisionTags(updated), i.Tags)
+	}
 }
 
 func TestUnwatchGroup(t *testing.T) {
@@ -255,21 +241,48 @@ func TestUnwatchGroup(t *testing.T) {
 }
 
 func TestDestroyGroup(t *testing.T) {
+	plugin := NewTestInstancePlugin(
+		provisionTags(config),
+		provisionTags(config),
+		provisionTags(config),
+	)
+	grp := NewGroup(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+
+	require.NoError(t, grp.WatchGroup(config))
+	require.NoError(t, grp.DestroyGroup(config.ID))
+
+	instances, err := plugin.DescribeInstances(memberTags(config.ID))
+	require.NoError(t, err)
+	require.Equal(t, 0, len(instances))
+}
+
+func TestStopUpdate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	plugin, grp := mockedPluginGroup(ctrl)
 
-	expectValidate(plugin, config).Return(nil)
+	plugin.EXPECT().Validate(gomock.Any()).AnyTimes().Return(nil)
+
 	require.NoError(t, grp.WatchGroup(config))
 
-	expectDescribe(plugin, id).Return([]instance.Description{
-		fakeInstance(config, "a"),
-		fakeInstance(config, "b"),
-		fakeInstance(config, "c"),
-	}, nil)
-	plugin.EXPECT().Destroy(instance.ID("a")).Return(nil)
-	plugin.EXPECT().Destroy(instance.ID("b")).Return(nil)
-	plugin.EXPECT().Destroy(instance.ID("c")).Return(nil)
+	updated := group.Configuration{ID: id, Properties: propertiesConfig(3, "data2")}
 
-	require.NoError(t, grp.DestroyGroup(id))
+	partialUpdate := make(chan bool)
+
+	gomock.InOrder(
+		expectDescribe(plugin, id).Return([]instance.Description{
+			fakeInstance(config, "a"),
+			fakeInstance(config, "b"),
+			fakeInstance(config, "c"),
+		}, nil).MinTimes(1),
+		plugin.EXPECT().Destroy(instance.ID("a")).Do(func(_ instance.ID) {
+			partialUpdate <- true
+		}).Return(nil),
+	)
+
+	go grp.UpdateGroup(updated)
+	<-partialUpdate
+	require.NoError(t, grp.StopUpdate(id))
+	require.Error(t, grp.StopUpdate(id))
+	require.NoError(t, grp.UnwatchGroup(id))
 }

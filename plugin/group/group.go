@@ -159,35 +159,42 @@ func toProperties(properties json.RawMessage) (groupProperties, error) {
 	return props, err
 }
 
-type updatePlan struct {
-	desc    string
-	execute func() error
+type updatePlan interface {
+	Explain() string
+	Run(pollInterval time.Duration) error
+	Stop()
 }
 
-func (m *managedGroup) getContext(id group.ID) (*groupContext, bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+type noexecUpdate struct {
+	desc string
+}
 
-	context, exists := m.groups.get(id)
-	return context, exists
+func (n noexecUpdate) Explain() string {
+	return n.desc
+}
+
+func (n noexecUpdate) Run(_ time.Duration) error {
+	return nil
+}
+
+func (n noexecUpdate) Stop() {
 }
 
 func (m *managedGroup) planUpdate(updated group.Configuration) (updatePlan, error) {
-	plan := updatePlan{}
 
-	context, exists := m.getContext(updated.ID)
+	context, exists := m.groups.get(updated.ID)
 	if !exists {
-		return plan, fmt.Errorf("Group '%s' is not being watched", updated.ID)
+		return nil, fmt.Errorf("Group '%s' is not being watched", updated.ID)
 	}
 
 	newProps, err := toProperties(updated.Properties)
 	if err != nil {
-		return plan, err
+		return nil, err
 	}
 
 	err = context.instancePlugin.Validate(newProps.InstancePluginProperties)
 	if err != nil {
-		return plan, err
+		return nil, err
 	}
 
 	return planRollingUpdate(updated.ID, context, newProps)
@@ -199,7 +206,7 @@ func (m *managedGroup) DescribeUpdate(updated group.Configuration) (string, erro
 		return "", err
 	}
 
-	return plan.desc, nil
+	return plan.Explain(), nil
 }
 
 func (m *managedGroup) UpdateGroup(updated group.Configuration) error {
@@ -208,9 +215,33 @@ func (m *managedGroup) UpdateGroup(updated group.Configuration) error {
 		return err
 	}
 
-	log.Infof("Executing update plan for '%s': %s", updated.ID, plan.desc)
+	grp, _ := m.groups.get(updated.ID)
+	grp.setUpdate(plan)
+
+	log.Infof("Executing update plan for '%s': %s", updated.ID, plan.Explain())
 	// TODO(wfarner): While an update is in progress, lock the group to ensure other operations do not interfere.
-	return plan.execute()
+	err = plan.Run(m.pollInterval)
+	log.Infof("Finished updating group %s", updated.ID)
+	return err
+}
+
+func (m *managedGroup) StopUpdate(gid group.ID) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	grp, exists := m.groups.get(gid)
+	if !exists {
+		return fmt.Errorf("Group '%s' is not being watched", gid)
+	}
+	update := grp.getUpdate()
+	if update == nil {
+		return fmt.Errorf("Group '%s' is not being updated", gid)
+	}
+
+	grp.setUpdate(nil)
+	update.Stop()
+
+	return nil
 }
 
 func (m *managedGroup) DestroyGroup(gid group.ID) error {

@@ -22,6 +22,7 @@ type Scaled interface {
 // of an autoscaling group / scale set on AWS or Azure.
 type Scaler interface {
 	util.RunStop
+	GetSize() uint32
 	SetSize(size uint32)
 }
 
@@ -42,6 +43,13 @@ func NewAdjustableScaler(scaled Scaled, size uint32, pollInterval time.Duration)
 		pollInterval: pollInterval,
 		stop:         make(chan bool),
 	}
+}
+
+func (s *scaler) GetSize() uint32 {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.size
 }
 
 func (s *scaler) SetSize(size uint32) {
