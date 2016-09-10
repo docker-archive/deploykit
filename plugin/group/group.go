@@ -38,8 +38,22 @@ type managedGroup struct {
 }
 
 func instanceConfigHash(instanceProperties json.RawMessage) string {
+	// First unmarshal and marshal the JSON to ensure stable key ordering.  This allows structurally-identical
+	// JSON to yield the same hash even if the fields are reordered.
+
+	props := map[string]interface{}{}
+	err := json.Unmarshal(instanceProperties, &props)
+	if err != nil {
+		panic(err)
+	}
+
+	stable, err := json.Marshal(props)
+	if err != nil {
+		panic(err)
+	}
+
 	hasher := sha1.New()
-	hasher.Write(instanceProperties)
+	hasher.Write(stable)
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
