@@ -10,8 +10,13 @@ import (
 )
 
 // NewTestInstancePlugin creates a new instance plugin for use in testing and development.
-func NewTestInstancePlugin() instance.Plugin {
-	return &testplugin{idPrefix: randString(4), instances: map[instance.ID]map[string]string{}}
+func NewTestInstancePlugin(seedInstances ...map[string]string) instance.Plugin {
+	plugin := testplugin{idPrefix: randString(4), instances: map[instance.ID]map[string]string{}}
+	for _, i := range seedInstances {
+		plugin.addInstance(i)
+	}
+
+	return &plugin
 }
 
 type testplugin struct {
@@ -35,18 +40,22 @@ func (d *testplugin) Validate(req json.RawMessage) error {
 	return nil
 }
 
+func (d *testplugin) addInstance(tags map[string]string) instance.ID {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	d.nextID++
+	id := instance.ID(fmt.Sprintf("%s-%d", d.idPrefix, d.nextID))
+	d.instances[id] = tags
+	return id
+}
+
 func (d *testplugin) Provision(
 	req json.RawMessage,
 	volume *instance.VolumeID,
 	tags map[string]string) (*instance.ID, error) {
 
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	d.nextID++
-
-	id := instance.ID(fmt.Sprintf("%s-%d", d.idPrefix, d.nextID))
-	d.instances[id] = tags
+	id := d.addInstance(tags)
 	return &id, nil
 }
 

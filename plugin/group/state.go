@@ -19,7 +19,22 @@ type groupContext struct {
 	instancePlugin instance.Plugin
 	scaler         Scaler
 	scaled         *scaledGroup
+	update         updatePlan
 	lock           sync.Mutex
+}
+
+func (c *groupContext) setUpdate(plan updatePlan) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.update = plan
+}
+
+func (c *groupContext) getUpdate() updatePlan {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.update
 }
 
 func (c *groupContext) setProperties(properties *groupProperties) {
