@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
@@ -63,7 +64,7 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := NewInstancePlugin(clientMock)
-	id, err := provisioner.Provision("{}", nil, tags)
+	id, err := provisioner.Provision(json.RawMessage("{}"), nil, tags)
 
 	require.Error(t, err)
 	require.Nil(t, id)
@@ -174,9 +175,7 @@ func TestListGroup(t *testing.T) {
 	}, descriptions)
 }
 
-const (
-	inputJSON = `
-{
+var inputJSON = json.RawMessage(`{
     "tags": {"test": "aws-create-test"},
     "run_instances_input": {
         "BlockDeviceMappings": [
@@ -212,5 +211,4 @@ const (
         "UserData": "A string; which must && be base64 encoded"
     }
 }
-`
-)
+`)
