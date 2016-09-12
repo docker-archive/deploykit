@@ -71,12 +71,16 @@ func (c instanceClient) sendRequest(method, path, body string) ([]byte, error) {
 	return data, err
 }
 
+func (c instanceClient) Validate(req json.RawMessage) error {
+	// TODO(wfarner): Implement.
+	return nil
+}
+
 func (c instanceClient) Provision(
-	request string,
+	req json.RawMessage,
 	volume *instance.VolumeID,
 	tags map[string]string) (*instance.ID, error) {
 
-	req := json.RawMessage(request)
 	payload := api.ProvisionRequest{
 		Request: &req,
 		Volume:  volume,

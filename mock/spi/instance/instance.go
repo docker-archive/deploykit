@@ -4,6 +4,7 @@
 package instance
 
 import (
+	json "encoding/json"
 	instance "github.com/docker/libmachete/spi/instance"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -50,7 +51,7 @@ func (_mr *_MockPluginRecorder) Destroy(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
 }
 
-func (_m *MockPlugin) Provision(_param0 string, _param1 *instance.VolumeID, _param2 map[string]string) (*instance.ID, error) {
+func (_m *MockPlugin) Provision(_param0 json.RawMessage, _param1 *instance.VolumeID, _param2 map[string]string) (*instance.ID, error) {
 	ret := _m.ctrl.Call(_m, "Provision", _param0, _param1, _param2)
 	ret0, _ := ret[0].(*instance.ID)
 	ret1, _ := ret[1].(error)
@@ -59,4 +60,14 @@ func (_m *MockPlugin) Provision(_param0 string, _param1 *instance.VolumeID, _par
 
 func (_mr *_MockPluginRecorder) Provision(arg0, arg1, arg2 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Provision", arg0, arg1, arg2)
+}
+
+func (_m *MockPlugin) Validate(_param0 json.RawMessage) error {
+	ret := _m.ctrl.Call(_m, "Validate", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockPluginRecorder) Validate(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Validate", arg0)
 }

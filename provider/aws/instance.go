@@ -108,11 +108,20 @@ type CreateInstanceRequest struct {
 	RunInstancesInput ec2.RunInstancesInput `json:"run_instances_input"`
 }
 
+// Validate performs local checks to determine if the request is valid.
+func (p Provisioner) Validate(req json.RawMessage) error {
+	// TODO(wfarner): Implement
+	return nil
+}
+
 // Provision creates a new instance.
-func (p Provisioner) Provision(req string, volume *instance.VolumeID, tags map[string]string) (*instance.ID, error) {
+func (p Provisioner) Provision(
+	req json.RawMessage,
+	volume *instance.VolumeID,
+	tags map[string]string) (*instance.ID, error) {
 
 	request := CreateInstanceRequest{}
-	err := json.Unmarshal([]byte(req), &request)
+	err := json.Unmarshal(req, &request)
 	if err != nil {
 		return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Invalid input formatting: %s", err))
 	}
