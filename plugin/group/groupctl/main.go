@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin/group"
+	group_plugin "github.com/docker/libmachete/plugin/group"
 	"github.com/docker/libmachete/server"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/group"
@@ -124,8 +124,8 @@ func main() {
 		router := mux.NewRouter()
 		router.StrictSlash(true)
 
-		grp := scaler.NewGroup(
-			map[string]instance.Plugin{"test": scaler.NewTestInstancePlugin()},
+		grp := group_plugin.NewGroupPlugin(
+			map[string]instance.Plugin{"test": group_plugin.NewTestInstancePlugin()},
 			1*time.Second)
 
 		adapter := httpAdapter{plugin: grp}

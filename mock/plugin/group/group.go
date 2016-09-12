@@ -29,27 +29,25 @@ func (_m *MockScaled) EXPECT() *_MockScaledRecorder {
 	return _m.recorder
 }
 
-func (_m *MockScaled) CreateOne() {
-	_m.ctrl.Call(_m, "CreateOne")
+func (_m *MockScaled) CreateOne(_param0 interface{}, _param1 *instance.VolumeID) {
+	_m.ctrl.Call(_m, "CreateOne", _param0, _param1)
 }
 
-func (_mr *_MockScaledRecorder) CreateOne() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateOne")
+func (_mr *_MockScaledRecorder) CreateOne(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateOne", arg0, arg1)
 }
 
-func (_m *MockScaled) Destroy(_param0 instance.ID) error {
-	ret := _m.ctrl.Call(_m, "Destroy", _param0)
-	ret0, _ := ret[0].(error)
-	return ret0
+func (_m *MockScaled) Destroy(_param0 instance.ID) {
+	_m.ctrl.Call(_m, "Destroy", _param0)
 }
 
 func (_mr *_MockScaledRecorder) Destroy(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
 }
 
-func (_m *MockScaled) List() ([]instance.ID, error) {
+func (_m *MockScaled) List() ([]instance.Description, error) {
 	ret := _m.ctrl.Call(_m, "List")
-	ret0, _ := ret[0].([]instance.ID)
+	ret0, _ := ret[0].([]instance.Description)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
