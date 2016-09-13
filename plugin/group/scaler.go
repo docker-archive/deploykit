@@ -1,28 +1,19 @@
-package scaler
+package group
 
 import (
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
-	"github.com/docker/libmachete/spi/instance"
 	"sort"
 	"sync"
 	"time"
 )
 
-// Scaled is a collection of instances that can be scaled up and down.
-type Scaled interface {
-	CreateOne()
-
-	Destroy(id instance.ID) error
-
-	List() ([]instance.ID, error)
-}
-
 // Scaler is the spi of the scaler controller which mimics the behavior
 // of an autoscaling group / scale set on AWS or Azure.
 type Scaler interface {
 	util.RunStop
-	GetSize() uint32
+	Size() uint32
 	SetSize(size uint32)
 }
 
@@ -34,9 +25,9 @@ type scaler struct {
 	stop         chan bool
 }
 
-// NewAdjustableScaler creates a RunStop that monitors a group of instances on a provisioner, attempting to maintain a
+// NewScalingGroup creates a supervisor that monitors a group of instances on a provisioner, attempting to maintain a
 // desired size.
-func NewAdjustableScaler(scaled Scaled, size uint32, pollInterval time.Duration) Scaler {
+func NewScalingGroup(scaled Scaled, size uint32, pollInterval time.Duration) Supervisor {
 	return &scaler{
 		scaled:       scaled,
 		size:         size,
@@ -45,11 +36,131 @@ func NewAdjustableScaler(scaled Scaled, size uint32, pollInterval time.Duration)
 	}
 }
 
-func (s *scaler) GetSize() uint32 {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings groupSettings) (updatePlan, error) {
 
-	return s.size
+	sizeChange := int(newSettings.config.Size) - int(settings.config.Size)
+
+	instances, err := scaled.List()
+	if err != nil {
+		return nil, err
+	}
+
+	desired, undesired := desiredAndUndesiredInstances(instances, newSettings)
+
+	plan := scalerUpdatePlan{
+		originalSize: settings.config.Size,
+		newSize:      newSettings.config.Size,
+		scaler:       s,
+		rollingPlan:  noopUpdate{},
+	}
+
+	switch {
+	case sizeChange == 0:
+		rollCount := len(undesired)
+
+		if rollCount == 0 {
+			if settings.config.instanceHash() == newSettings.config.instanceHash() {
+
+				// This is a no-op update because:
+				//  - the instance configuration is unchanged
+				//  - the group contains no instances with an undesired state
+				//  - the group size is unchanged
+				return &noopUpdate{}, nil
+			}
+
+			// This case likely occurs because a group was created in a way that no instances are being
+			// created. We proceed with the update here, which will likely only change the target
+			// configuration in the scaler.
+
+			plan.desc = "Adjusts the instance configuration, no restarts necessary"
+			return &plan, nil
+		}
+
+		plan.desc = fmt.Sprintf("Performs a rolling update on %d instances", rollCount)
+
+	case sizeChange < 0:
+		rollCount := int(newSettings.config.Size) - len(desired)
+		if rollCount < 0 {
+			rollCount = 0
+		}
+
+		if rollCount == 0 {
+			plan.desc = fmt.Sprintf(
+				"Terminates %d instances to reduce the group size to %d",
+				int(sizeChange)*-1,
+				newSettings.config.Size)
+		} else {
+			plan.desc = fmt.Sprintf(
+				"Terminates %d instances to reduce the group size to %d, "+
+					" then performs a rolling update on %d instances",
+				int(sizeChange)*-1,
+				newSettings.config.Size,
+				rollCount)
+		}
+
+	case sizeChange > 0:
+		rollCount := len(undesired)
+
+		if rollCount == 0 {
+			plan.desc = fmt.Sprintf(
+				"Adds %d instances to increase the group size to %d",
+				sizeChange,
+				newSettings.config.Size)
+		} else {
+			plan.desc = fmt.Sprintf(
+				"Performs a rolling update on %d instances,"+
+					" then adds %d instances to increase the group size to %d",
+				rollCount,
+				sizeChange,
+				newSettings.config.Size)
+		}
+	}
+
+	plan.rollingPlan = &rollingupdate{
+		scaled:     scaled,
+		updatingTo: newSettings,
+		stop:       make(chan bool),
+	}
+
+	return plan, nil
+}
+
+type scalerUpdatePlan struct {
+	desc         string
+	originalSize uint32
+	newSize      uint32
+	rollingPlan  updatePlan
+	scaler       *scaler
+}
+
+func (s scalerUpdatePlan) Explain() string {
+	return s.desc
+}
+
+func (s scalerUpdatePlan) Run(pollInterval time.Duration) error {
+
+	// If the number of instances is being decreased, first lower the group size.  This eliminates
+	// instances that would otherwise be rolled first, avoiding unnecessary work.
+	// We could further optimize by selecting undesired instances to destroy, for example if the
+	// scaler already has a mix of desired and undesired instances.
+	if s.newSize < s.originalSize {
+		s.scaler.SetSize(s.newSize)
+	}
+
+	if err := s.rollingPlan.Run(pollInterval); err != nil {
+		return err
+	}
+
+	// Rolling has completed.  If the update included a group size increase, perform that now.
+	if s.newSize > s.originalSize {
+		s.scaler.SetSize(s.newSize)
+	}
+
+	return nil
+}
+
+func (s scalerUpdatePlan) Stop() {
+	s.rollingPlan.Stop()
 }
 
 func (s *scaler) SetSize(size uint32) {
@@ -77,16 +188,7 @@ func (s *scaler) Run() {
 	for {
 		select {
 		case <-ticker.C:
-			ids, err := s.scaled.List()
-			if err != nil {
-				log.Infof("Failed to check size of group: %s", err)
-				return
-			}
-
-			log.Debugf("Found existing instances: %v", ids)
-
-			s.convergeOnce(ids)
-
+			s.converge()
 		case <-s.stop:
 			ticker.Stop()
 			return
@@ -94,10 +196,18 @@ func (s *scaler) Run() {
 	}
 }
 
-func (s *scaler) convergeOnce(ids []instance.ID) {
+func (s *scaler) converge() {
+	descriptions, err := s.scaled.List()
+	if err != nil {
+		log.Infof("Failed to check size of group: %s", err)
+		return
+	}
+
+	log.Debugf("Found existing instances: %v", descriptions)
+
 	grp := sync.WaitGroup{}
 
-	actualSize := uint32(len(ids))
+	actualSize := uint32(len(descriptions))
 	desiredSize := s.getSize()
 	switch {
 	case actualSize == desiredSize:
@@ -108,11 +218,13 @@ func (s *scaler) convergeOnce(ids []instance.ID) {
 		log.Infof("Removing %d instances from group to reach desired %d", remove, desiredSize)
 
 		// Sorting first ensures that redundant operations are non-destructive.
-		sort.Sort(sortByID(ids))
+		sort.Sort(sortByID(descriptions))
 
-		for _, id := range ids[:remove] {
+		// TODO(wfarner): Consider favoring removal of instances that do not match the desired configuration by
+		// injecting a sorter.
+		for _, toDestroy := range descriptions[:remove] {
 			grp.Add(1)
-			destroy := id
+			destroy := toDestroy.ID
 			go func() {
 				defer grp.Done()
 				s.scaled.Destroy(destroy)
@@ -128,7 +240,7 @@ func (s *scaler) convergeOnce(ids []instance.ID) {
 			go func() {
 				defer grp.Done()
 
-				s.scaled.CreateOne()
+				s.scaled.CreateOne(nil, nil)
 			}()
 		}
 	}

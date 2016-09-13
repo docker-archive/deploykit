@@ -1,8 +1,6 @@
-package scaler
+package group
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,73 +16,92 @@ const (
 	configTag = "machete.config_sha"
 )
 
-// NewGroup creates a new group plugin.
-func NewGroup(
-	plugins map[string]instance.Plugin,
-	pollInterval time.Duration) group.Plugin {
+const (
+	roleWorker  = "worker"
+	roleManager = "manager"
+)
 
-	return &managedGroup{
+// NewGroupPlugin creates a new group plugin.
+func NewGroupPlugin(plugins map[string]instance.Plugin, pollInterval time.Duration) group.Plugin {
+	return &plugin{
 		plugins:      plugins,
 		pollInterval: pollInterval,
-		groups:       groups{contexts: map[group.ID]*groupContext{}},
+		groups:       groups{byID: map[group.ID]*groupContext{}},
 	}
 }
 
-type managedGroup struct {
+type plugin struct {
 	plugins      map[string]instance.Plugin
 	pollInterval time.Duration
 	lock         sync.Mutex
 	groups       groups
 }
 
-func instanceConfigHash(instanceProperties json.RawMessage) string {
-	// First unmarshal and marshal the JSON to ensure stable key ordering.  This allows structurally-identical
-	// JSON to yield the same hash even if the fields are reordered.
+func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
+	// TODO(wfarner): Return only state, not behavior (e.g. no scaledGroup)
 
-	props := map[string]interface{}{}
-	err := json.Unmarshal(instanceProperties, &props)
-	if err != nil {
-		panic(err)
-	}
-
-	stable, err := json.Marshal(props)
-	if err != nil {
-		panic(err)
-	}
-
-	hasher := sha1.New()
-	hasher.Write(stable)
-	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
-}
-
-func identityTags(properties groupProperties) map[string]string {
-	// Instances are tagged with a SHA of the entire instance configuration to support change detection.
-	return map[string]string{configTag: instanceConfigHash(properties.InstancePluginProperties)}
-}
-
-func (m *managedGroup) WatchGroup(config group.Configuration) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	noSettings := groupSettings{}
 
 	if config.ID == "" {
-		return errors.New("Group ID must not be blank")
+		return noSettings, errors.New("Group ID must not be blank")
 	}
 
-	if _, exists := m.groups.get(config.ID); exists {
-		return fmt.Errorf("Already watching group '%s'", config.ID)
+	if config.Role == "" {
+		return noSettings, errors.New("Group Role must not be blank")
 	}
 
-	properties, err := toProperties(config.Properties)
-	if err != nil {
-		return err
+	if config.Role != roleManager && config.Role != roleWorker {
+		return noSettings, fmt.Errorf("Group Role must be %s or %s", roleWorker, roleManager)
 	}
 
-	instancePlugin, exists := m.plugins[properties.InstancePlugin]
+	parsed := configSchema{}
+	if err := json.Unmarshal([]byte(config.Properties), &parsed); err != nil {
+		return noSettings, fmt.Errorf("Invalid properties: %s", err)
+	}
+
+	switch config.Role {
+	case roleManager:
+		if len(parsed.IPs) != 3 && len(parsed.IPs) != 5 {
+			return noSettings, errors.New("Manager groups must have 3 or 5 IP addresses")
+		}
+		if parsed.Size != 0 {
+			return noSettings, errors.New("Size is unsupported for manager groups, use IPs instead")
+		}
+	case roleWorker:
+		if len(parsed.IPs) != 0 {
+			return noSettings, errors.New("IPs is unsupported for worker groups, use Size instead")
+		}
+	default:
+		return noSettings, errors.New("Unsupported Role type")
+	}
+
+	instancePlugin, exists := p.plugins[parsed.InstancePlugin]
 	if !exists {
-		return fmt.Errorf("Instance plugin '%s' is not available", properties.InstancePlugin)
+		return noSettings, fmt.Errorf("Instance plugin '%s' is not available", parsed.InstancePlugin)
 	}
 
-	err = instancePlugin.Validate(properties.InstancePluginProperties)
+	if err := instancePlugin.Validate(parsed.InstancePluginProperties); err != nil {
+		return noSettings, err
+	}
+
+	settings := groupSettings{
+		role:   config.Role,
+		plugin: instancePlugin,
+		config: parsed,
+	}
+
+	if _, err := settings.instanceTemplate(); err != nil {
+		return noSettings, err
+	}
+
+	return settings, nil
+}
+
+func (p *plugin) WatchGroup(config group.Configuration) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	settings, err := p.validate(config)
 	if err != nil {
 		return err
 	}
@@ -94,69 +111,67 @@ func (m *managedGroup) WatchGroup(config group.Configuration) error {
 	// membership tags but different generation-specific tags.  In practice, we use this the additional tags to
 	// attach a config SHA to instances for config change detection.
 	scaled := &scaledGroup{
-		instancePlugin: instancePlugin,
+		instancePlugin: settings.plugin,
 		// TODO(wfarner): Members will also need to be tagged with the Swarm cluster UUID.
-		memberTags:       map[string]string{groupTag: string(config.ID)},
-		provisionRequest: properties.InstancePluginProperties,
+		memberTags: map[string]string{groupTag: string(config.ID)},
 	}
-	scaled.setAdditionalTags(identityTags(properties))
+	scaled.changeSettings(settings)
 
-	scaler := NewAdjustableScaler(scaled, properties.Size, m.pollInterval)
+	// TODO(wfarner): Construct a scaler matching the role type.
+	var supervisor Supervisor
+	switch config.Role {
+	case roleWorker:
+		supervisor = NewScalingGroup(scaled, settings.config.Size, p.pollInterval)
+	case roleManager:
+		supervisor = NewQuorum(scaled, settings.config.IPs, p.pollInterval)
+	default:
+		panic("Unhandled Role type")
+	}
 
-	m.groups.put(config.ID, &groupContext{
-		properties:     &properties,
-		instancePlugin: instancePlugin,
-		scaler:         scaler,
-		scaled:         scaled})
+	if _, exists := p.groups.get(config.ID); exists {
+		return fmt.Errorf("Already watching group '%s'", config.ID)
+	}
+
+	p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
 
 	// TODO(wfarner): Consider changing Run() to not block.
-	go scaler.Run()
+	go supervisor.Run()
 	log.Infof("Watching group '%v'", config.ID)
 
 	return nil
 }
 
-func (m *managedGroup) UnwatchGroup(id group.ID) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (p *plugin) UnwatchGroup(id group.ID) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
-	grp, exists := m.groups.get(id)
+	grp, exists := p.groups.get(id)
 	if !exists {
 		return fmt.Errorf("Group '%s' is not being watched", id)
 	}
 
-	grp.scaler.Stop()
+	grp.supervisor.Stop()
 
-	m.groups.del(id)
+	p.groups.del(id)
 	log.Infof("Stopped watching group '%s'", id)
 	return nil
 }
 
-func (m *managedGroup) InspectGroup(id group.ID) (group.Description, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (p *plugin) InspectGroup(id group.ID) (group.Description, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
-	context, exists := m.groups.get(id)
+	context, exists := p.groups.get(id)
 	if !exists {
 		return group.Description{}, fmt.Errorf("Group '%s' is not being watched", id)
 	}
 
-	instances, err := context.scaled.describe()
+	instances, err := context.scaled.List()
 	if err != nil {
 		return group.Description{}, err
 	}
 
 	return group.Description{Instances: instances}, nil
-}
-
-func toProperties(properties json.RawMessage) (groupProperties, error) {
-	props := groupProperties{}
-	err := json.Unmarshal([]byte(properties), &props)
-	if err != nil {
-		err = fmt.Errorf("Invalid properties: %s", err)
-	}
-
-	return props, err
 }
 
 type updatePlan interface {
@@ -165,43 +180,41 @@ type updatePlan interface {
 	Stop()
 }
 
-type noexecUpdate struct {
-	desc string
+type noopUpdate struct {
 }
 
-func (n noexecUpdate) Explain() string {
-	return n.desc
+func (n noopUpdate) Explain() string {
+	return "Noop"
 }
 
-func (n noexecUpdate) Run(_ time.Duration) error {
+func (n noopUpdate) Run(_ time.Duration) error {
 	return nil
 }
 
-func (n noexecUpdate) Stop() {
+func (n noopUpdate) Stop() {
 }
 
-func (m *managedGroup) planUpdate(updated group.Configuration) (updatePlan, error) {
+func (p *plugin) planUpdate(id group.ID, updatedSettings groupSettings) (updatePlan, error) {
 
-	context, exists := m.groups.get(updated.ID)
+	context, exists := p.groups.get(id)
 	if !exists {
-		return nil, fmt.Errorf("Group '%s' is not being watched", updated.ID)
+		return nil, fmt.Errorf("Group '%s' is not being watched", id)
 	}
 
-	newProps, err := toProperties(updated.Properties)
-	if err != nil {
-		return nil, err
+	if context.settings.role != updatedSettings.role {
+		return nil, errors.New("A group's role cannot be changed")
 	}
 
-	err = context.instancePlugin.Validate(newProps.InstancePluginProperties)
-	if err != nil {
-		return nil, err
-	}
-
-	return planRollingUpdate(updated.ID, context, newProps)
+	return context.supervisor.PlanUpdate(context.scaled, context.settings, updatedSettings)
 }
 
-func (m *managedGroup) DescribeUpdate(updated group.Configuration) (string, error) {
-	plan, err := m.planUpdate(updated)
+func (p *plugin) DescribeUpdate(updated group.Configuration) (string, error) {
+	updatedSettings, err := p.validate(updated)
+	if err != nil {
+		return "", err
+	}
+
+	plan, err := p.planUpdate(updated.ID, updatedSettings)
 	if err != nil {
 		return "", err
 	}
@@ -209,27 +222,47 @@ func (m *managedGroup) DescribeUpdate(updated group.Configuration) (string, erro
 	return plan.Explain(), nil
 }
 
-func (m *managedGroup) UpdateGroup(updated group.Configuration) error {
-	plan, err := m.planUpdate(updated)
+func (p *plugin) initiateUpdate(id group.ID, updatedSettings groupSettings) (updatePlan, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	plan, err := p.planUpdate(id, updatedSettings)
+	if err != nil {
+		return nil, err
+	}
+
+	grp, _ := p.groups.get(id)
+	if grp.getUpdate() != nil {
+		return nil, errors.New("Update already in progress for this group")
+	}
+
+	grp.setUpdate(plan)
+	grp.changeSettings(updatedSettings)
+	log.Infof("Executing update plan for '%s': %s", id, plan.Explain())
+	return plan, nil
+}
+
+func (p *plugin) UpdateGroup(updated group.Configuration) error {
+	updatedSettings, err := p.validate(updated)
 	if err != nil {
 		return err
 	}
 
-	grp, _ := m.groups.get(updated.ID)
-	grp.setUpdate(plan)
+	plan, err := p.initiateUpdate(updated.ID, updatedSettings)
+	if err != nil {
+		return err
+	}
 
-	log.Infof("Executing update plan for '%s': %s", updated.ID, plan.Explain())
-	// TODO(wfarner): While an update is in progress, lock the group to ensure other operations do not interfere.
-	err = plan.Run(m.pollInterval)
+	err = plan.Run(p.pollInterval)
 	log.Infof("Finished updating group %s", updated.ID)
 	return err
 }
 
-func (m *managedGroup) StopUpdate(gid group.ID) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (p *plugin) StopUpdate(gid group.ID) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
-	grp, exists := m.groups.get(gid)
+	grp, exists := p.groups.get(gid)
 	if !exists {
 		return fmt.Errorf("Group '%s' is not being watched", gid)
 	}
@@ -244,30 +277,27 @@ func (m *managedGroup) StopUpdate(gid group.ID) error {
 	return nil
 }
 
-func (m *managedGroup) DestroyGroup(gid group.ID) error {
-	m.lock.Lock()
+func (p *plugin) DestroyGroup(gid group.ID) error {
+	p.lock.Lock()
 
-	context, exists := m.groups.get(gid)
+	context, exists := p.groups.get(gid)
 	if !exists {
-		m.lock.Unlock()
+		p.lock.Unlock()
 		return fmt.Errorf("Group '%s' is not being watched", gid)
 	}
 
 	// The lock is released before performing blocking operations.
-	m.groups.del(gid)
-	m.lock.Unlock()
+	p.groups.del(gid)
+	p.lock.Unlock()
 
-	context.scaler.Stop()
-	ids, err := context.scaled.List()
+	context.supervisor.Stop()
+	descriptions, err := context.scaled.List()
 	if err != nil {
 		return err
 	}
 
-	for _, id := range ids {
-		err = context.instancePlugin.Destroy(id)
-		if err != nil {
-			return err
-		}
+	for _, desc := range descriptions {
+		context.scaled.Destroy(desc.ID)
 	}
 
 	return nil
