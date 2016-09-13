@@ -27,7 +27,14 @@ type ID string
 
 // Configuration is the schema for a Group.  The full schema for a Group is defined by the plugin.
 type Configuration struct {
-	ID         ID
+	// ID is the unique identifier for the group.
+	ID ID
+
+	// Role designates the type of group, which may alter how the group is managed.  The behavior of different
+	// group roles is defined by the plugin.
+	Role string
+
+	// Properties is the configuration for the group.
 	Properties json.RawMessage
 }
 

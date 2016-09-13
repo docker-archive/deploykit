@@ -1,4 +1,4 @@
-package scaler
+package group
 
 import (
 	"encoding/json"
@@ -9,11 +9,16 @@ import (
 	"sync"
 )
 
+type fakeInstance struct {
+	ip   string
+	tags map[string]string
+}
+
 // NewTestInstancePlugin creates a new instance plugin for use in testing and development.
 func NewTestInstancePlugin(seedInstances ...map[string]string) instance.Plugin {
-	plugin := testplugin{idPrefix: randString(4), instances: map[instance.ID]map[string]string{}}
+	plugin := testplugin{idPrefix: randString(4), instances: map[instance.ID]fakeInstance{}}
 	for _, i := range seedInstances {
-		plugin.addInstance(i)
+		plugin.addInstance(fakeInstance{tags: i})
 	}
 
 	return &plugin
@@ -23,8 +28,13 @@ type testplugin struct {
 	lock      sync.Mutex
 	idPrefix  string
 	nextID    int
-	instances map[instance.ID]map[string]string
+	instances map[instance.ID]fakeInstance
 }
+
+const testpluginSchema = `{
+	"IP": "{{.IP}}",
+	"Data": "%s"
+}`
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -40,13 +50,13 @@ func (d *testplugin) Validate(req json.RawMessage) error {
 	return nil
 }
 
-func (d *testplugin) addInstance(tags map[string]string) instance.ID {
+func (d *testplugin) addInstance(inst fakeInstance) instance.ID {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
 	d.nextID++
 	id := instance.ID(fmt.Sprintf("%s-%d", d.idPrefix, d.nextID))
-	d.instances[id] = tags
+	d.instances[id] = inst
 	return id
 }
 
@@ -55,7 +65,12 @@ func (d *testplugin) Provision(
 	volume *instance.VolumeID,
 	tags map[string]string) (*instance.ID, error) {
 
-	id := d.addInstance(tags)
+	fields := map[string]string{}
+	if err := json.Unmarshal(req, &fields); err != nil {
+		return nil, err
+	}
+
+	id := d.addInstance(fakeInstance{ip: fields["IP"], tags: tags})
 	return &id, nil
 }
 
@@ -77,10 +92,10 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 	defer d.lock.Unlock()
 
 	desc := []instance.Description{}
-	for id, instanceTags := range d.instances {
+	for id, inst := range d.instances {
 		allMatched := true
 		for searchKey, searchValue := range tags {
-			tagValue, has := instanceTags[searchKey]
+			tagValue, has := inst.tags[searchKey]
 			if !has || searchValue != tagValue {
 				allMatched = false
 			}
@@ -88,8 +103,8 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 		if allMatched {
 			desc = append(desc, instance.Description{
 				ID:               id,
-				PrivateIPAddress: "none",
-				Tags:             instanceTags,
+				PrivateIPAddress: inst.ip,
+				Tags:             inst.tags,
 			})
 		}
 	}
