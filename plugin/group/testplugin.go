@@ -10,7 +10,7 @@ import (
 )
 
 type fakeInstance struct {
-	ip   string
+	ip   *string
 	tags map[string]string
 }
 
@@ -30,11 +30,6 @@ type testplugin struct {
 	nextID    int
 	instances map[instance.ID]fakeInstance
 }
-
-const testpluginSchema = `{
-	"IP": "{{.IP}}",
-	"Data": "%s"
-}`
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -62,15 +57,11 @@ func (d *testplugin) addInstance(inst fakeInstance) instance.ID {
 
 func (d *testplugin) Provision(
 	req json.RawMessage,
-	volume *instance.VolumeID,
-	tags map[string]string) (*instance.ID, error) {
+	tags map[string]string,
+	privateIP *string,
+	volume *instance.VolumeID) (*instance.ID, error) {
 
-	fields := map[string]string{}
-	if err := json.Unmarshal(req, &fields); err != nil {
-		return nil, err
-	}
-
-	id := d.addInstance(fakeInstance{ip: fields["IP"], tags: tags})
+	id := d.addInstance(fakeInstance{ip: privateIP, tags: tags})
 	return &id, nil
 }
 
@@ -101,9 +92,14 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 			}
 		}
 		if allMatched {
+			ip := ""
+			if inst.ip != nil {
+				ip = *inst.ip
+			}
+
 			desc = append(desc, instance.Description{
 				ID:               id,
-				PrivateIPAddress: inst.ip,
+				PrivateIPAddress: ip,
 				Tags:             inst.tags,
 			})
 		}

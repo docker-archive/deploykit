@@ -104,7 +104,8 @@ func (q *quorum) converge() {
 
 	for _, missingIP := range missingIPs {
 		log.Infof("IP %s is missing, provisioning new instance", missingIP)
+		ip := missingIP
 		volume := instance.VolumeID(missingIP)
-		q.scaled.CreateOne(map[string]string{"IP": missingIP}, &volume)
+		q.scaled.CreateOne(&ip, &volume)
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
-	"text/template"
 )
 
 // Supervisor watches over a group of instances.
@@ -54,10 +53,6 @@ type groupSettings struct {
 	role   string
 	plugin instance.Plugin
 	config configSchema
-}
-
-func (g groupSettings) instanceTemplate() (*template.Template, error) {
-	return template.New("").Parse(string(g.config.InstancePluginProperties))
 }
 
 type groupContext struct {

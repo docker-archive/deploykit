@@ -84,17 +84,11 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, err
 	}
 
-	settings := groupSettings{
+	return groupSettings{
 		role:   config.Role,
 		plugin: instancePlugin,
 		config: parsed,
-	}
-
-	if _, err := settings.instanceTemplate(); err != nil {
-		return noSettings, err
-	}
-
-	return settings, nil
+	}, nil
 }
 
 func (p *plugin) WatchGroup(config group.Configuration) error {
@@ -110,6 +104,7 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	// newly-created instances.  This allows the scaler to collect and report members of a group which have
 	// membership tags but different generation-specific tags.  In practice, we use this the additional tags to
 	// attach a config SHA to instances for config change detection.
+	// TODO(wfarner): Configure with bootScript.
 	scaled := &scaledGroup{
 		instancePlugin: settings.plugin,
 		// TODO(wfarner): Members will also need to be tagged with the Swarm cluster UUID.
@@ -117,7 +112,6 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	}
 	scaled.changeSettings(settings)
 
-	// TODO(wfarner): Construct a scaler matching the role type.
 	var supervisor Supervisor
 	switch config.Role {
 	case roleWorker:
