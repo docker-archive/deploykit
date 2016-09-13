@@ -5,7 +5,6 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	group_plugin "github.com/docker/libmachete/plugin/group"
-	"github.com/docker/libmachete/server"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
@@ -14,6 +13,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
+	"runtime/debug"
 	"time"
 )
 
@@ -130,12 +131,12 @@ func main() {
 
 		adapter := httpAdapter{plugin: grp}
 
-		router.HandleFunc("/Watch", server.OutputHandler(adapter.watch)).Methods("POST")
-		router.HandleFunc("/Unwatch/{id}", server.OutputHandler(adapter.unwatch)).Methods("POST")
-		router.HandleFunc("/Inspect/{id}", server.OutputHandler(adapter.inspect)).Methods("POST")
-		router.HandleFunc("/DescribeUpdate", server.OutputHandler(adapter.describeUpdate)).Methods("POST")
-		router.HandleFunc("/UpdateGroup", server.OutputHandler(adapter.updateGroup)).Methods("POST")
-		router.HandleFunc("/DestroyGroup/{id}", server.OutputHandler(adapter.destroyGroup)).Methods("POST")
+		router.HandleFunc("/Watch", outputHandler(adapter.watch)).Methods("POST")
+		router.HandleFunc("/Unwatch/{id}", outputHandler(adapter.unwatch)).Methods("POST")
+		router.HandleFunc("/Inspect/{id}", outputHandler(adapter.inspect)).Methods("POST")
+		router.HandleFunc("/DescribeUpdate", outputHandler(adapter.describeUpdate)).Methods("POST")
+		router.HandleFunc("/UpdateGroup", outputHandler(adapter.updateGroup)).Methods("POST")
+		router.HandleFunc("/DestroyGroup/{id}", outputHandler(adapter.destroyGroup)).Methods("POST")
 
 		http.Handle("/", router)
 		err := http.ListenAndServe(fmt.Sprintf(":%v", port), router)
@@ -150,5 +151,81 @@ func main() {
 	if err != nil {
 		log.Error(err)
 		os.Exit(-1)
+	}
+}
+
+// Handler is shorthand for an HTTP request handler function.
+type Handler func(resp http.ResponseWriter, req *http.Request)
+
+// Counterpart to the inverse map on the client side.
+var spiErrorToHTTPStatus = map[int]int{
+	spi.ErrBadInput:  http.StatusBadRequest,
+	spi.ErrUnknown:   http.StatusInternalServerError,
+	spi.ErrDuplicate: http.StatusConflict,
+	spi.ErrNotFound:  http.StatusNotFound,
+}
+
+func getStatusCode(err error) int {
+	status, mapped := spiErrorToHTTPStatus[spi.CodeFromError(err)]
+	if !mapped {
+		status = http.StatusInternalServerError
+	}
+	return status
+}
+
+type simpleHandler func(req *http.Request) (interface{}, error)
+
+func sendResponse(status int, body interface{}, resp http.ResponseWriter) {
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		status = http.StatusInternalServerError
+		bodyJSON = []byte(`{"error": "Internal error"`)
+		log.Warn("Failed to marshal response body %v: %s", body, err.Error())
+	}
+
+	resp.WriteHeader(status)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Write(bodyJSON)
+}
+
+func errorBody(err error) interface{} {
+	return map[string]string{"error": err.Error()}
+}
+
+func outputHandler(handler simpleHandler) Handler {
+	return func(resp http.ResponseWriter, req *http.Request) {
+		// Handle panics cleanly.
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("%s: %s", err, debug.Stack())
+				sendResponse(
+					http.StatusInternalServerError,
+					errorBody(fmt.Errorf("Panic: %s", err)),
+					resp)
+			}
+		}()
+
+		responseBody, err := handler(req)
+
+		var status int
+		if err == nil {
+			switch req.Method {
+			case "POST":
+				status = http.StatusCreated
+			default:
+				status = http.StatusOK
+			}
+		} else {
+			log.Warn("Request failed: ", err)
+			status = getStatusCode(err)
+
+			// Only use the error to define the response body if there was no result from the handler.
+			if responseBody == nil || reflect.ValueOf(responseBody).IsNil() {
+				// Use the error to define the response
+				responseBody = errorBody(err)
+			}
+		}
+
+		sendResponse(status, responseBody, resp)
 	}
 }
