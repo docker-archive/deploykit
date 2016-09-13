@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/docker/libmachete/controller/quorum"
 	machete_aws "github.com/docker/libmachete/provider/aws"
+	"github.com/docker/libmachete/spi/instance"
 	"strings"
 	"text/template"
 	"time"
@@ -438,7 +438,20 @@ func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) erro
 		return err
 	}
 
-	return quorum.ProvisionManager(provisioner, quorum.InstanceTags(managerGroup.Name), parsed, swim.ManagerIPs[0])
+	buffer := bytes.Buffer{}
+	if err := parsed.Execute(&buffer, map[string]string{"IP": swim.ManagerIPs[0]}); err != nil {
+		return fmt.Errorf("Failed to create provision request: %s", err)
+	}
+
+	volume := instance.VolumeID(swim.ManagerIPs[0])
+	id, err := provisioner.Provision(
+		json.RawMessage(buffer.Bytes()),
+		&volume,
+		map[string]string{"machete.group": string(managerGroup.Name)})
+	if err != nil {
+		log.Infof("Created boot leader instance %s", id)
+	}
+	return err
 }
 
 const (
