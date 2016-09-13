@@ -17,6 +17,8 @@ type Plugin interface {
 
 	UpdateGroup(updated Configuration) error
 
+	StopUpdate(id ID) error
+
 	DestroyGroup(id ID) error
 }
 

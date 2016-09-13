@@ -7,6 +7,7 @@ import (
 	"github.com/docker/libmachete/plugin/group"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/group"
+	"github.com/docker/libmachete/spi/instance"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"reflect"
 	"runtime/debug"
+	"time"
 )
 
 type httpAdapter struct {
@@ -123,11 +125,9 @@ func main() {
 		router := mux.NewRouter()
 		router.StrictSlash(true)
 
-		grp, err := scaler.NewGroup()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		grp := scaler.NewGroup(
+			map[string]instance.Plugin{"test": scaler.NewTestInstancePlugin()},
+			1*time.Second)
 
 		adapter := httpAdapter{plugin: grp}
 
@@ -139,7 +139,7 @@ func main() {
 		router.HandleFunc("/DestroyGroup/{id}", outputHandler(adapter.destroyGroup)).Methods("POST")
 
 		http.Handle("/", router)
-		err = http.ListenAndServe(fmt.Sprintf(":%v", port), router)
+		err := http.ListenAndServe(fmt.Sprintf(":%v", port), router)
 		if err != nil {
 			log.Error(err)
 		}
