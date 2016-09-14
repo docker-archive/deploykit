@@ -29,7 +29,7 @@ func (_m *MockScaled) EXPECT() *_MockScaledRecorder {
 	return _m.recorder
 }
 
-func (_m *MockScaled) CreateOne(_param0 interface{}, _param1 *instance.VolumeID) {
+func (_m *MockScaled) CreateOne(_param0 *string, _param1 *instance.VolumeID) {
 	_m.ctrl.Call(_m, "CreateOne", _param0, _param1)
 }
 

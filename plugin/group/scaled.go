@@ -1,20 +1,18 @@
 package group
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
-	"text/template"
 )
 
 // Scaled is a collection of instances that can be scaled up and down.
 type Scaled interface {
 	// CreateOne creates a single instance in the scaled group.  Parameters may be provided to customize behavior
 	// of the instance.
-	CreateOne(params interface{}, volume *instance.VolumeID)
+	CreateOne(privateIP *string, volume *instance.VolumeID)
 
 	// Destroy destroys a single instance.
 	Destroy(id instance.ID)
@@ -24,24 +22,18 @@ type Scaled interface {
 }
 
 type scaledGroup struct {
-	instancePlugin    instance.Plugin
-	memberTags        map[string]string
-	provisionTemplate template.Template
-	provisionTags     map[string]string
-	lock              sync.Mutex
+	instancePlugin   instance.Plugin
+	memberTags       map[string]string
+	provisionRequest json.RawMessage
+	provisionTags    map[string]string
+	lock             sync.Mutex
 }
 
 func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.lock.Lock()
 	s.lock.Unlock()
 
-	templ, err := settings.instanceTemplate()
-	if err != nil {
-		panic(err)
-	}
-
-	s.provisionTemplate = *templ
-
+	s.provisionRequest = settings.config.InstancePluginProperties
 	tags := map[string]string{}
 	for k, v := range s.memberTags {
 		tags[k] = v
@@ -53,15 +45,9 @@ func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.provisionTags = tags
 }
 
-func (s *scaledGroup) CreateOne(params interface{}, volume *instance.VolumeID) {
+func (s *scaledGroup) CreateOne(privateIP *string, volume *instance.VolumeID) {
 
-	buffer := bytes.Buffer{}
-	if err := s.provisionTemplate.Execute(&buffer, params); err != nil {
-		log.Errorf("Failed to create provision request: %s", err)
-		return
-	}
-
-	id, err := s.instancePlugin.Provision(json.RawMessage(buffer.Bytes()), volume, s.provisionTags)
+	id, err := s.instancePlugin.Provision(s.provisionRequest, s.provisionTags, privateIP, volume)
 	if err != nil {
 		log.Errorf("Failed to provision: %s", err)
 		return

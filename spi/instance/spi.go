@@ -8,7 +8,11 @@ type Plugin interface {
 	Validate(req json.RawMessage) error
 
 	// Provision creates a new instance.
-	Provision(req json.RawMessage, volume *VolumeID, tags map[string]string) (*ID, error)
+	Provision(
+		req json.RawMessage,
+		tags map[string]string,
+		privateIP *string,
+		volume *VolumeID) (*ID, error)
 
 	// Destroy terminates an existing instance.
 	Destroy(instance ID) error
