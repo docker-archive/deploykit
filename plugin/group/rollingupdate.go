@@ -76,7 +76,7 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 
 			log.Info("Waiting for scaler to quiesce")
 
-			// TODO(wfarner): Provide a mechanism for health feedback.
+			// TODO(wfarner): Poll ProvisionHelper.Healthy here.
 
 		case <-r.stop:
 			ticker.Stop()

@@ -6,6 +6,7 @@ package types
 import (
 	types "github.com/docker/libmachete/plugin/group/types"
 	group "github.com/docker/libmachete/spi/group"
+	instance "github.com/docker/libmachete/spi/instance"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -39,6 +40,17 @@ func (_m *MockProvisionHelper) GroupKind(_param0 string) (types.GroupKind, error
 
 func (_mr *_MockProvisionHelperRecorder) GroupKind(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GroupKind", arg0)
+}
+
+func (_m *MockProvisionHelper) Healthy(_param0 instance.Description) (bool, error) {
+	ret := _m.ctrl.Call(_m, "Healthy", _param0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockProvisionHelperRecorder) Healthy(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Healthy", arg0)
 }
 
 func (_m *MockProvisionHelper) PreProvision(_param0 group.Configuration, _param1 types.ProvisionDetails) (types.ProvisionDetails, error) {

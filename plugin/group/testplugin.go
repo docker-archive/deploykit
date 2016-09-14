@@ -114,14 +114,14 @@ func (t testProvisionHelper) Validate(config group.Configuration, parsed types.S
 	return nil
 }
 
-func (t testProvisionHelper) GroupKind(roleName string) (types.GroupKind, error) {
+func (t testProvisionHelper) GroupKind(roleName string) types.GroupKind {
 	switch roleName {
 	case roleMinions:
-		return types.KindDynamicIP, nil
+		return types.KindDynamicIP
 	case roleLeaders:
-		return types.KindStaticIP, nil
+		return types.KindStaticIP
 	default:
-		return types.KindNone, errors.New("Unknown role type")
+		return types.KindUnknown
 	}
 }
 
@@ -134,4 +134,8 @@ func (t testProvisionHelper) PreProvision(
 		details.Tags[k] = v
 	}
 	return details, nil
+}
+
+func (t testProvisionHelper) Healthy(inst instance.Description) (bool, error) {
+	return true, nil
 }

@@ -22,12 +22,12 @@ const (
 )
 
 // NewSwarmProvisionHelper creates a ProvisionHelper that creates manager and worker nodes connected in a swarm.
-func NewSwarmProvisionHelper() types.ProvisionHelper {
-	return &swarmProvisioner{}
+func NewSwarmProvisionHelper(dockerClient client.APIClient) types.ProvisionHelper {
+	return &swarmProvisioner{client: dockerClient}
 }
 
 type swarmProvisioner struct {
-	dockerClient client.Client
+	client client.APIClient
 }
 
 // TODO(wfarner): Tag instances with a UUID, and tag the Docker engine with the same UUID.  We will use this to
@@ -45,14 +45,14 @@ func (s swarmProvisioner) Validate(config group.Configuration, parsed types.Sche
 	return nil
 }
 
-func (s swarmProvisioner) GroupKind(roleName string) (types.GroupKind, error) {
+func (s swarmProvisioner) GroupKind(roleName string) types.GroupKind {
 	switch roleName {
 	case roleWorker:
-		return types.KindDynamicIP, nil
+		return types.KindDynamicIP
 	case roleManager:
-		return types.KindStaticIP, nil
+		return types.KindStaticIP
 	default:
-		return types.KindNone, errors.New("Unsupported role type")
+		return types.KindUnknown
 	}
 }
 
@@ -61,7 +61,7 @@ const (
 	associationTag = "swarm-association-id"
 
 	// bootScript is used to generate node boot scripts.
-	bootScript = fmt.Sprintf(`#!/bin/sh
+	bootScript = `#!/bin/sh
 set -o errexit
 set -o nounset
 set -o xtrace
@@ -69,12 +69,12 @@ set -o xtrace
 mkdir -p /etc/docker
 cat << EOF > /etc/docker/daemon.json
 {
-  "labels": ["%s={{.ASSOCIATION_ID}}"],
+  "labels": ["swarm-association-id={{.ASSOCIATION_ID}}"],
 }
 EOF
 
 docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
-`, associationTag)
+`
 )
 
 func generateBootScript(joinIP, joinToken, associationID string) string {
@@ -103,7 +103,7 @@ func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
 	filter := filters.NewArgs()
 	filter.Add("label", fmt.Sprintf("%s=%s", associationTag, associationID))
 
-	nodes, err := s.dockerClient.NodeList(context.Background(), docker_types.NodeListOptions{Filter: filter})
+	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filter: filter})
 	if err != nil {
 		return false, err
 	}
@@ -112,6 +112,7 @@ func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
 		log.Warnf("Expected at most one node with label %s, but found %s", associationID, nodes)
 	}
 
+	// If a node was returned from the query, the association ID is present and the node is healthy.
 	return len(nodes) == 1, nil
 }
 
@@ -119,13 +120,12 @@ func (s swarmProvisioner) PreProvision(
 	config group.Configuration,
 	details types.ProvisionDetails) (types.ProvisionDetails, error) {
 
-	ctx := context.Background()
-	swarmStatus, err := s.dockerClient.SwarmInspect(ctx)
+	swarmStatus, err := s.client.SwarmInspect(context.Background())
 	if err != nil {
 		return details, fmt.Errorf("Failed to fetch Swarm join tokens: %s", err)
 	}
 
-	self, _, err := s.dockerClient.NodeInspectWithRaw(ctx, "self")
+	self, _, err := s.client.NodeInspectWithRaw(context.Background(), "self")
 	if err != nil {
 		return details, fmt.Errorf("Failed to fetch Swarm node status: %s", err)
 	}
@@ -162,7 +162,8 @@ func (s swarmProvisioner) PreProvision(
 		return details, errors.New("Unsupported role type")
 	}
 
-	// TODO(wfarner): Tag with with the Swarm cluster UUID for scoping.
+	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
+	// swarm.  This will require plumbing back to Scaled (membership tags).
 	details.Tags["swarm-id"] = swarmStatus.ID
 
 	return details, nil

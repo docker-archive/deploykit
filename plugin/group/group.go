@@ -50,9 +50,9 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, errors.New("Group Role must not be blank")
 	}
 
-	roleType, err := p.provisionHelper.GroupKind(config.Role)
-	if err != nil {
-		return noSettings, err
+	groupKind := p.provisionHelper.GroupKind(config.Role)
+	if groupKind == types.KindUnknown {
+		return noSettings, errors.New("Unrecognized group Role")
 	}
 
 	parsed, err := types.ParseProperties(config)
@@ -60,7 +60,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, err
 	}
 
-	switch roleType {
+	switch groupKind {
 	case types.KindStaticIP:
 		if parsed.Size != 0 {
 			return noSettings, errors.New("Size is unsupported for static IP groups, use IPs instead")
@@ -114,7 +114,7 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	scaled.changeSettings(settings)
 
 	var supervisor Supervisor
-	switch roleType, _ := p.provisionHelper.GroupKind(config.Role); roleType {
+	switch groupKind := p.provisionHelper.GroupKind(config.Role); groupKind {
 	case types.KindDynamicIP:
 		supervisor = NewScalingGroup(scaled, settings.config.Size, p.pollInterval)
 	case types.KindStaticIP:

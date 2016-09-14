@@ -54,6 +54,13 @@ func (s *scaledGroup) CreateOne(privateIP *string) {
 	details := types.ProvisionDetails{Tags: s.provisionTags, PrivateIP: privateIP}
 
 	if s.provisionHelper != nil {
+		// Copy tags to prevent concurrency issues if modified.
+		tags := map[string]string{}
+		for k, v := range details.Tags {
+			tags[k] = v
+		}
+		details.Tags = tags
+
 		var err error
 		details, err = s.provisionHelper.PreProvision(s.config, details)
 		if err != nil {
