@@ -1,11 +1,9 @@
 package group
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/controller/util"
+	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
@@ -18,41 +16,10 @@ type Supervisor interface {
 	PlanUpdate(scaled Scaled, settings groupSettings, newSettings groupSettings) (updatePlan, error)
 }
 
-type configSchema struct {
-	Size                     uint32
-	IPs                      []string
-	InstancePlugin           string
-	InstancePluginProperties json.RawMessage
-}
-
-func instanceHash(config json.RawMessage) string {
-	// First unmarshal and marshal the JSON to ensure stable key ordering.  This allows structurally-identical
-	// JSON to yield the same hash even if the fields are reordered.
-
-	props := map[string]interface{}{}
-	err := json.Unmarshal(config, &props)
-	if err != nil {
-		panic(err)
-	}
-
-	stable, err := json.Marshal(props)
-	if err != nil {
-		panic(err)
-	}
-
-	hasher := sha1.New()
-	hasher.Write(stable)
-	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
-}
-
-func (c configSchema) instanceHash() string {
-	return instanceHash(c.InstancePluginProperties)
-}
-
 type groupSettings struct {
 	role   string
 	plugin instance.Plugin
-	config configSchema
+	config types.Schema
 }
 
 type groupContext struct {

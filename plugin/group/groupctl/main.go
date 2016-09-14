@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/controller/watcher"
 	group_plugin "github.com/docker/libmachete/plugin/group"
+	"github.com/docker/libmachete/plugin/group/swarm"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
@@ -125,8 +127,14 @@ func main() {
 		router := mux.NewRouter()
 		router.StrictSlash(true)
 
+		dockerClient, err := watcher.NewDockerClient("localhost", nil)
+		if err != nil {
+			log.Error(err)
+		}
+
 		grp := group_plugin.NewGroupPlugin(
 			map[string]instance.Plugin{"test": group_plugin.NewTestInstancePlugin()},
+			swarm.NewSwarmProvisionHelper(dockerClient),
 			1*time.Second)
 
 		adapter := httpAdapter{plugin: grp}
@@ -139,8 +147,8 @@ func main() {
 		router.HandleFunc("/DestroyGroup/{id}", outputHandler(adapter.destroyGroup)).Methods("POST")
 
 		http.Handle("/", router)
-		err := http.ListenAndServe(fmt.Sprintf(":%v", port), router)
-		if err != nil {
+
+		if err := http.ListenAndServe(fmt.Sprintf(":%v", port), router); err != nil {
 			log.Error(err)
 		}
 	}

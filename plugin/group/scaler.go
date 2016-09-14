@@ -59,7 +59,7 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 		rollCount := len(undesired)
 
 		if rollCount == 0 {
-			if settings.config.instanceHash() == newSettings.config.instanceHash() {
+			if settings.config.InstanceHash() == newSettings.config.InstanceHash() {
 
 				// This is a no-op update because:
 				//  - the instance configuration is unchanged
@@ -240,7 +240,7 @@ func (s *scaler) converge() {
 			go func() {
 				defer grp.Done()
 
-				s.scaled.CreateOne(nil, nil)
+				s.scaled.CreateOne(nil)
 			}()
 		}
 	}
