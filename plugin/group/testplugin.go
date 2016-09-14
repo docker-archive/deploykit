@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/libmachete/plugin/group/types"
+	"github.com/docker/libmachete/plugin/group/util"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
-	"math/rand"
 	"sync"
 )
 
@@ -18,7 +18,7 @@ type fakeInstance struct {
 
 // NewTestInstancePlugin creates a new instance plugin for use in testing and development.
 func NewTestInstancePlugin(seedInstances ...map[string]string) instance.Plugin {
-	plugin := testplugin{idPrefix: randString(4), instances: map[instance.ID]fakeInstance{}}
+	plugin := testplugin{idPrefix: util.RandomAlphaNumericString(4), instances: map[instance.ID]fakeInstance{}}
 	for _, i := range seedInstances {
 		plugin.addInstance(fakeInstance{tags: i})
 	}
@@ -31,16 +31,6 @@ type testplugin struct {
 	idPrefix  string
 	nextID    int
 	instances map[instance.ID]fakeInstance
-}
-
-const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func randString(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }
 
 func (d *testplugin) Validate(req json.RawMessage) error {
