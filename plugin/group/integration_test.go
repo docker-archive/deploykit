@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	mock_instance "github.com/docker/libmachete/mock/spi/instance"
+	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
@@ -18,22 +19,24 @@ const (
 )
 
 var (
-	workers = group.Configuration{
+	minions = group.Configuration{
 		ID:         id,
-		Role:       roleWorker,
-		Properties: workerProperties(3, "data"),
+		Role:       "minions",
+		Properties: minionProperties(3, "data"),
 	}
 
-	managers = group.Configuration{
+	leaders = group.Configuration{
 		ID:         id,
-		Role:       roleManager,
-		Properties: managerProperties(managerIPs, "data"),
+		Role:       "leaders",
+		Properties: leaderProperties(managerIPs, "data"),
 	}
 
 	managerIPs = []string{"192.168.0.4", "192.168.0.5", "192.168.0.6"}
+
+	provisionHelper = testProvisionHelper{tags: map[string]string{"custom": "value"}}
 )
 
-func workerProperties(instances int, data string) json.RawMessage {
+func minionProperties(instances int, data string) json.RawMessage {
 	return json.RawMessage(fmt.Sprintf(`{
 	  "Size": %d,
 	  "InstancePlugin": "test",
@@ -43,7 +46,7 @@ func workerProperties(instances int, data string) json.RawMessage {
 	}`, instances, data))
 }
 
-func managerProperties(ips []string, data string) json.RawMessage {
+func leaderProperties(ips []string, data string) json.RawMessage {
 	ipValue, err := json.Marshal(ips)
 	if err != nil {
 		panic(err)
@@ -60,7 +63,7 @@ func managerProperties(ips []string, data string) json.RawMessage {
 
 func mockedPluginGroup(ctrl *gomock.Controller) (*mock_instance.MockPlugin, group.Plugin) {
 	plugin := mock_instance.NewMockPlugin(ctrl)
-	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, &provisionHelper, 1*time.Millisecond)
 	return plugin, grp
 }
 
@@ -74,10 +77,10 @@ func TestInvalidGroupCalls(t *testing.T) {
 	require.Error(t, err)
 	require.Error(t, grp.UnwatchGroup(id))
 	require.Error(t, grp.StopUpdate(id))
-	expectValidate(plugin, workers).Return(nil).MinTimes(1)
-	_, err = grp.DescribeUpdate(workers)
+	expectValidate(plugin, minions).Return(nil).MinTimes(1)
+	_, err = grp.DescribeUpdate(minions)
 	require.Error(t, err)
-	require.Error(t, grp.UpdateGroup(workers))
+	require.Error(t, grp.UpdateGroup(minions))
 }
 
 func instanceProperties(config group.Configuration) json.RawMessage {
@@ -103,7 +106,12 @@ func expectDescribe(plugin *mock_instance.MockPlugin, id group.ID) *gomock.Call 
 
 func provisionTags(config group.Configuration) map[string]string {
 	tags := memberTags(config.ID)
-	tags[configTag] = instanceHash(instanceProperties(config))
+	tags[configTag] = types.MustParse(types.ParseProperties(config)).InstanceHash()
+
+	for k, v := range provisionHelper.tags {
+		tags[k] = v
+	}
+
 	return tags
 }
 
@@ -118,39 +126,39 @@ func createFake(config group.Configuration, id string) instance.Description {
 
 func TestNoopUpdate(t *testing.T) {
 	plugin := NewTestInstancePlugin(
-		provisionTags(workers),
-		provisionTags(workers),
-		provisionTags(workers),
+		provisionTags(minions),
+		provisionTags(minions),
+		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, &provisionHelper, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(workers))
+	require.NoError(t, grp.WatchGroup(minions))
 
-	desc, err := grp.DescribeUpdate(workers)
+	desc, err := grp.DescribeUpdate(minions)
 	require.NoError(t, err)
 	require.Equal(t, "Noop", desc)
 
-	require.NoError(t, grp.UpdateGroup(workers))
+	require.NoError(t, grp.UpdateGroup(minions))
 
-	instances, err := plugin.DescribeInstances(memberTags(workers.ID))
+	instances, err := plugin.DescribeInstances(memberTags(minions.ID))
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
-		require.Equal(t, provisionTags(workers), i.Tags)
+		require.Equal(t, provisionTags(minions), i.Tags)
 	}
 }
 
 func TestRollingUpdate(t *testing.T) {
 	plugin := NewTestInstancePlugin(
-		provisionTags(workers),
-		provisionTags(workers),
-		provisionTags(workers),
+		provisionTags(minions),
+		provisionTags(minions),
+		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, &provisionHelper, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(workers))
+	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Role: roleWorker, Properties: workerProperties(3, "data2")}
+	updated := group.Configuration{ID: id, Role: minions.Role, Properties: minionProperties(3, "data2")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -168,15 +176,15 @@ func TestRollingUpdate(t *testing.T) {
 
 func TestRollAndAdjustScale(t *testing.T) {
 	plugin := NewTestInstancePlugin(
-		provisionTags(workers),
-		provisionTags(workers),
-		provisionTags(workers),
+		provisionTags(minions),
+		provisionTags(minions),
+		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, &provisionHelper, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(workers))
+	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Role: roleWorker, Properties: workerProperties(8, "data2")}
+	updated := group.Configuration{ID: id, Role: minions.Role, Properties: minionProperties(8, "data2")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -200,15 +208,15 @@ func TestRollAndAdjustScale(t *testing.T) {
 
 func TestScaleIncrease(t *testing.T) {
 	plugin := NewTestInstancePlugin(
-		provisionTags(workers),
-		provisionTags(workers),
-		provisionTags(workers),
+		provisionTags(minions),
+		provisionTags(minions),
+		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, &provisionHelper, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(workers))
+	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Role: roleWorker, Properties: workerProperties(8, "data")}
+	updated := group.Configuration{ID: id, Role: minions.Role, Properties: minionProperties(8, "data")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -229,15 +237,15 @@ func TestScaleIncrease(t *testing.T) {
 
 func TestScaleDecrease(t *testing.T) {
 	plugin := NewTestInstancePlugin(
-		provisionTags(workers),
-		provisionTags(workers),
-		provisionTags(workers),
+		provisionTags(minions),
+		provisionTags(minions),
+		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, &provisionHelper, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(workers))
+	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Role: roleWorker, Properties: workerProperties(1, "data")}
+	updated := group.Configuration{ID: id, Role: minions.Role, Properties: minionProperties(1, "data")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -263,25 +271,25 @@ func TestPreventsDuplicateUpdate(t *testing.T) {
 
 	plugin.EXPECT().Validate(gomock.Any()).AnyTimes().Return(nil)
 
-	require.NoError(t, grp.WatchGroup(workers))
+	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Role: roleWorker, Properties: workerProperties(3, "data2")}
+	updated := group.Configuration{ID: id, Role: minions.Role, Properties: minionProperties(3, "data2")}
 
 	partialUpdate := make(chan bool)
 
 	gomock.InOrder(
 		expectDescribe(plugin, id).Return([]instance.Description{
-			createFake(workers, "a"),
-			createFake(workers, "b"),
-			createFake(workers, "c"),
+			createFake(minions, "a"),
+			createFake(minions, "b"),
+			createFake(minions, "c"),
 		}, nil).MinTimes(1),
 		plugin.EXPECT().Destroy(instance.ID("a")).Do(func(_ instance.ID) {
 			partialUpdate <- true
 		}).Return(nil),
 		expectDescribe(plugin, id).Return([]instance.Description{
-			createFake(workers, "a"),
-			createFake(workers, "b"),
-			createFake(workers, "c"),
+			createFake(minions, "a"),
+			createFake(minions, "b"),
+			createFake(minions, "c"),
 		}, nil).AnyTimes(),
 	)
 
@@ -299,24 +307,24 @@ func TestUnwatchGroup(t *testing.T) {
 	defer ctrl.Finish()
 	plugin, grp := mockedPluginGroup(ctrl)
 
-	expectValidate(plugin, workers).Return(nil)
-	require.NoError(t, grp.WatchGroup(workers))
+	expectValidate(plugin, minions).Return(nil)
+	require.NoError(t, grp.WatchGroup(minions))
 
 	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestDestroyGroup(t *testing.T) {
 	plugin := NewTestInstancePlugin(
-		provisionTags(workers),
-		provisionTags(workers),
-		provisionTags(workers),
+		provisionTags(minions),
+		provisionTags(minions),
+		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, &provisionHelper, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(workers))
-	require.NoError(t, grp.DestroyGroup(workers.ID))
+	require.NoError(t, grp.WatchGroup(minions))
+	require.NoError(t, grp.DestroyGroup(minions.ID))
 
-	instances, err := plugin.DescribeInstances(memberTags(workers.ID))
+	instances, err := plugin.DescribeInstances(memberTags(minions.ID))
 	require.NoError(t, err)
 	require.Equal(t, 0, len(instances))
 }
@@ -328,17 +336,17 @@ func TestStopUpdate(t *testing.T) {
 
 	plugin.EXPECT().Validate(gomock.Any()).AnyTimes().Return(nil)
 
-	require.NoError(t, grp.WatchGroup(workers))
+	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Role: roleWorker, Properties: workerProperties(3, "data2")}
+	updated := group.Configuration{ID: id, Role: minions.Role, Properties: minionProperties(3, "data2")}
 
 	partialUpdate := make(chan bool)
 
 	gomock.InOrder(
 		expectDescribe(plugin, id).Return([]instance.Description{
-			createFake(workers, "a"),
-			createFake(workers, "b"),
-			createFake(workers, "c"),
+			createFake(minions, "a"),
+			createFake(minions, "b"),
+			createFake(minions, "c"),
 		}, nil).MinTimes(1),
 		plugin.EXPECT().Destroy(instance.ID("a")).Do(func(_ instance.ID) {
 			partialUpdate <- true
@@ -355,15 +363,15 @@ func TestStopUpdate(t *testing.T) {
 func TestSuperviseQuorum(t *testing.T) {
 	// TODO(wfarner): This is not including IP addresses, so the quorum controller immediately destroys them.
 	plugin := NewTestInstancePlugin(
-		provisionTags(managers),
-		provisionTags(managers),
-		provisionTags(managers),
+		provisionTags(leaders),
+		provisionTags(leaders),
+		provisionTags(leaders),
 	)
-	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, 1*time.Millisecond)
+	grp := NewGroupPlugin(map[string]instance.Plugin{pluginName: plugin}, &provisionHelper, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(managers))
+	require.NoError(t, grp.WatchGroup(leaders))
 
-	updated := group.Configuration{ID: id, Role: roleManager, Properties: managerProperties(managerIPs, "data2")}
+	updated := group.Configuration{ID: id, Role: leaders.Role, Properties: leaderProperties(managerIPs, "data2")}
 
 	time.Sleep(1 * time.Second)
 

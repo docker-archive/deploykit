@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	group_plugin "github.com/docker/libmachete/plugin/group"
+	"github.com/docker/libmachete/plugin/group/swarm"
 	"github.com/docker/libmachete/spi"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
@@ -127,6 +128,7 @@ func main() {
 
 		grp := group_plugin.NewGroupPlugin(
 			map[string]instance.Plugin{"test": group_plugin.NewTestInstancePlugin()},
+			swarm.NewSwarmProvisionHelper(),
 			1*time.Second)
 
 		adapter := httpAdapter{plugin: grp}

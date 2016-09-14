@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/libmachete/plugin/group/types"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"math/rand"
 	"sync"
@@ -58,6 +60,7 @@ func (d *testplugin) addInstance(inst fakeInstance) instance.ID {
 func (d *testplugin) Provision(
 	req json.RawMessage,
 	tags map[string]string,
+	bootScript string,
 	privateIP *string,
 	volume *instance.VolumeID) (*instance.ID, error) {
 
@@ -106,4 +109,39 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 	}
 
 	return desc, nil
+}
+
+const (
+	roleMinions = "minions"
+	roleLeaders = "leaders"
+)
+
+type testProvisionHelper struct {
+	tags map[string]string
+}
+
+func (t testProvisionHelper) Validate(config group.Configuration, parsed types.Schema) error {
+	return nil
+}
+
+func (t testProvisionHelper) GroupKind(roleName string) (types.GroupKind, error) {
+	switch roleName {
+	case roleMinions:
+		return types.KindDynamicIP, nil
+	case roleLeaders:
+		return types.KindStaticIP, nil
+	default:
+		return types.KindNone, errors.New("Unknown role type")
+	}
+}
+
+func (t testProvisionHelper) PreProvision(
+	config group.Configuration,
+	details types.ProvisionDetails) (types.ProvisionDetails, error) {
+
+	details.BootScript = "echo hello"
+	for k, v := range t.tags {
+		details.Tags[k] = v
+	}
+	return details, nil
 }

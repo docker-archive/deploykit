@@ -11,6 +11,7 @@ type Plugin interface {
 	Provision(
 		req json.RawMessage,
 		tags map[string]string,
+		bootScript string,
 		privateIP *string,
 		volume *VolumeID) (*ID, error)
 

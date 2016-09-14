@@ -18,7 +18,7 @@ func minInt(a, b int) int {
 func desiredAndUndesiredInstances(
 	instances []instance.Description, settings groupSettings) ([]instance.Description, []instance.Description) {
 
-	desiredHash := settings.config.instanceHash()
+	desiredHash := settings.config.InstanceHash()
 	desired := []instance.Description{}
 	undesired := []instance.Description{}
 	for _, inst := range instances {

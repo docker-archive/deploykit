@@ -48,12 +48,11 @@ func TestRestoreQuorum(t *testing.T) {
 	quorum := NewQuorum(scaled, quorumAddresses, 1*time.Millisecond)
 
 	ip := "10.0.0.4"
-	volume := instance.VolumeID(ip)
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
 		scaled.EXPECT().List().Return([]instance.Description{a, b}, nil),
-		scaled.EXPECT().CreateOne(&ip, &volume),
+		scaled.EXPECT().CreateOne(&ip),
 		scaled.EXPECT().List().Do(func() {
 			go quorum.Stop()
 		}).Return([]instance.Description{a, b, c}, nil),
