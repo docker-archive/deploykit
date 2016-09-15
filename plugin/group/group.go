@@ -18,7 +18,7 @@ const (
 
 // NewGroupPlugin creates a new group plugin.
 func NewGroupPlugin(
-	plugins map[string]instance.Plugin,
+	plugins func() map[string]instance.Plugin,
 	provisionHelper types.ProvisionHelper,
 	pollInterval time.Duration) group.Plugin {
 
@@ -31,7 +31,7 @@ func NewGroupPlugin(
 }
 
 type plugin struct {
-	plugins         map[string]instance.Plugin
+	plugins         func() map[string]instance.Plugin
 	provisionHelper types.ProvisionHelper
 	pollInterval    time.Duration
 	lock            sync.Mutex
@@ -77,7 +77,12 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, err
 	}
 
-	instancePlugin, exists := p.plugins[parsed.InstancePlugin]
+	pluginMap := p.plugins()
+	if pluginMap == nil {
+		return noSettings, fmt.Errorf("No instance plugins installed")
+	}
+
+	instancePlugin, exists := pluginMap[parsed.InstancePlugin]
 	if !exists {
 		return noSettings, fmt.Errorf("Instance plugin '%s' is not available", parsed.InstancePlugin)
 	}
