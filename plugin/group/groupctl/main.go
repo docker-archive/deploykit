@@ -133,9 +133,12 @@ func main() {
 		}
 
 		grp := group_plugin.NewGroupPlugin(
-			map[string]instance.Plugin{"test": group_plugin.NewTestInstancePlugin()},
-			swarm.NewSwarmProvisionHelper(dockerClient),
-			1*time.Second)
+			func(key string) (instance.Plugin, error) {
+				if key == "test" {
+					return group_plugin.NewTestInstancePlugin(), nil
+				}
+				return nil, nil
+			}, swarm.NewSwarmProvisionHelper(dockerClient), 1*time.Second)
 
 		adapter := httpAdapter{plugin: grp}
 
