@@ -16,9 +16,12 @@ const (
 	configTag = "machete.config_sha"
 )
 
+// InstancePluginLookup helps with looking up an instance plugin by name
+type InstancePluginLookup func(string) (instance.Plugin, error)
+
 // NewGroupPlugin creates a new group plugin.
 func NewGroupPlugin(
-	plugins func() map[string]instance.Plugin,
+	plugins InstancePluginLookup,
 	provisionHelper types.ProvisionHelper,
 	pollInterval time.Duration) group.Plugin {
 
@@ -31,7 +34,7 @@ func NewGroupPlugin(
 }
 
 type plugin struct {
-	plugins         func() map[string]instance.Plugin
+	plugins         InstancePluginLookup
 	provisionHelper types.ProvisionHelper
 	pollInterval    time.Duration
 	lock            sync.Mutex
@@ -77,13 +80,16 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, err
 	}
 
-	pluginMap := p.plugins()
-	if pluginMap == nil {
+	if p.plugins == nil {
 		return noSettings, fmt.Errorf("No instance plugins installed")
 	}
 
-	instancePlugin, exists := pluginMap[parsed.InstancePlugin]
-	if !exists {
+	instancePlugin, err := p.plugins(parsed.InstancePlugin)
+	if err != nil {
+		return noSettings, fmt.Errorf("Err looking up Instance plugin '%s':%v",
+			parsed.InstancePlugin, err)
+	}
+	if instancePlugin == nil {
 		return noSettings, fmt.Errorf("Instance plugin '%s' is not available", parsed.InstancePlugin)
 	}
 
