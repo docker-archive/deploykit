@@ -9,7 +9,9 @@ import (
 
 // ProvisionRequest is the JSON format for calls to Provision.
 type ProvisionRequest struct {
-	Request *json.RawMessage
-	Volume  *instance.VolumeID
-	Tags    map[string]string
+	Request    *json.RawMessage
+	Tags       map[string]string
+	BootScript string
+	PrivateIP  *string
+	Volume     *instance.VolumeID
 }
