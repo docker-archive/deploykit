@@ -1,0 +1,27 @@
+{
+    "manifestVersion": "v0.1",
+    "description": "world test",
+    "documentation": "https://docs.docker.com/engine/extend/plugins/",
+    "entrypoint": ["hello", "run", "--listen=/run/docker/plugins/world.sock"],
+    "network": {
+        "type": "host"
+    },
+    "interface" : {
+        "types": ["docker.worlddriver/1.0"],
+        "socket": "world.sock"
+    },
+    "mounts":[
+        {
+            "Type": "bind",
+            "Destination": "/var/run",
+            "Source": "/var/run",
+            "Description": "docker socket"
+        },
+        {
+            "Type": "bind",
+            "Destination": "/run/docker",
+            "Source": "/run/docker",
+            "Description": "plugins socket"
+        }
+    ]
+}

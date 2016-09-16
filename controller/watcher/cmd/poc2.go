@@ -129,7 +129,7 @@ func (b *backend) POC2Reactor(buff []byte) {
 
 		log.Infoln("Configuring controller", controller.Info.Name, "with config", config)
 
-		err := controller.Client.Call(controller.Info.DriverType+".Start", config)
+		err := controller.Client.Call(controller.Info.DriverType+".Start", config, nil)
 		if err != nil {
 			// BAD NEWS -- here we cannot get consistency now since one of the controller cannot
 			// be updated.  Should we punt -- roll back is impossible at the moment

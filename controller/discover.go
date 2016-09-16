@@ -178,24 +178,62 @@ func (d *Client) Controller() (*Controller, error) {
 	}, nil
 }
 
-// Call makes a POST call of the form of /v1/{op}.  For example  /v1/scaler.Start
-func (d *Client) Call(op string, req interface{}) error {
-	buff, err := json.Marshal(req)
+// Info calls the /v1/info endpoint
+func (d *Client) Info() (map[string]interface{}, error) {
+	url := fmt.Sprintf("http://%s/v1/info", d.Host)
+	resp, err := d.c.Get(url)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	url := fmt.Sprintf("http://%s/v1/%s", d.Host, op)
-	resp, err := d.c.Post(url, "application/json", bytes.NewBuffer(buff))
+	buff, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
-	}
-	buff, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Infoln("Resp", string(buff))
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("error from controller:%d, msg=%s", resp.StatusCode, string(buff))
+		return nil, fmt.Errorf("error from controller:%d, msg=%s", resp.StatusCode, string(buff))
+	}
+
+	out := map[string]interface{}{}
+	err = json.Unmarshal(buff, &out)
+	return out, err
+}
+
+// Call makes a POST call of the form of /v1/{op}.  For example  /v1/scaler.Start
+func (d *Client) Call(op string, req interface{}, out interface{}) error {
+	var resp *http.Response
+	var err error
+	if req != nil {
+		buff, err := json.Marshal(req)
+		if err != nil {
+			return err
+		}
+		url := fmt.Sprintf("http://%s/v1/%s", d.Host, op)
+		log.Infoln("Calling", url, "via POST")
+		resp, err = d.c.Post(url, "application/json", bytes.NewBuffer(buff))
+		if err != nil {
+			return err
+		}
+	} else {
+		url := fmt.Sprintf("http://%s/v1/%s", d.Host, op)
+		log.Infoln("Calling", url, "via POST")
+		resp, err = d.c.Post(url, "application/json", nil)
+		if err != nil {
+			return err
+		}
+	}
+	buff, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if len(buff) > 0 {
+		log.Infoln("Resp", string(buff))
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("error from controller:%d, msg=%s", resp.StatusCode, string(buff))
+		}
+		if out != nil {
+			return json.Unmarshal(buff, out)
+		}
 	}
 	return nil
 }

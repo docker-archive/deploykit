@@ -1,0 +1,27 @@
+{
+    "manifestVersion": "v0.1",
+    "description": "hello test",
+    "documentation": "https://docs.docker.com/engine/extend/plugins/",
+    "entrypoint": ["hello", "run", "--listen=/run/docker/plugins/hello.sock"],
+    "network": {
+        "type": "host"
+    },
+    "interface" : {
+        "types": ["docker.hellodriver/1.0"],
+        "socket": "hello.sock"
+    },
+    "mounts":[
+        {
+            "Type": "bind",
+            "Destination": "/var/run",
+            "Source": "/var/run",
+            "Description": "docker socket"
+        },
+        {
+            "Type": "bind",
+            "Destination": "/run/docker",
+            "Source": "/run/docker",
+            "Description": "plugins socket"
+        }
+    ]
+}

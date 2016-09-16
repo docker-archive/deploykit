@@ -1,0 +1,19 @@
+{
+    "mounts":[
+          {
+            "Type": "bind",
+            "Destination": "/var/run",
+            "Source": "/var/run",
+            "Description": "docker socket"
+          },
+          {
+            "Type": "bind",
+            "Destination": "/run/docker",
+            "Source": "/run/docker",
+            "Description": "plugins socket"
+          }
+    ],
+    "env":[],
+    "args":null,
+    "devices":null
+}
