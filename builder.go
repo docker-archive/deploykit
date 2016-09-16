@@ -41,7 +41,7 @@ func (b *Builder) Flags() *pflag.FlagSet {
 }
 
 // BuildInstanceProvisioner creates an instance Provisioner configured with the Flags.
-func (b *Builder) BuildInstanceProvisioner() (instance.Plugin, error) {
+func (b *Builder) BuildInstancePlugin() (instance.Plugin, error) {
 	if b.Config == nil {
 		providers := []credentials.Provider{
 			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},

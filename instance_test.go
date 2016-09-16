@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	mock_ec2 "github.com/docker/libmachete/mock/ec2"
+	mock_ec2 "github.com/docker/libmachete.aws/mock/ec2"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -40,7 +40,8 @@ func TestInstanceLifecycle(t *testing.T) {
 	}
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
-	id, err := provisioner.Provision(inputJSON, nil, tags)
+	// TODO(wfarner): Test user-data and private IP plumbing.
+	id, err := provisioner.Provision(inputJSON, tags, "", nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
@@ -64,7 +65,7 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := NewInstancePlugin(clientMock)
-	id, err := provisioner.Provision(json.RawMessage("{}"), nil, tags)
+	id, err := provisioner.Provision(json.RawMessage("{}"), tags, "", nil, nil)
 
 	require.Error(t, err)
 	require.Nil(t, id)

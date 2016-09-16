@@ -117,8 +117,10 @@ func (p Provisioner) Validate(req json.RawMessage) error {
 // Provision creates a new instance.
 func (p Provisioner) Provision(
 	req json.RawMessage,
-	volume *instance.VolumeID,
-	tags map[string]string) (*instance.ID, error) {
+	tags map[string]string,
+	bootScript string,
+	privateIP *string,
+	volume *instance.VolumeID) (*instance.ID, error) {
 
 	request := CreateInstanceRequest{}
 	err := json.Unmarshal(req, &request)
