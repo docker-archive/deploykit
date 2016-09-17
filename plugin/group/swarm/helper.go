@@ -77,7 +77,7 @@ docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
 `
 )
 
-func generateBootScript(joinIP, joinToken, associationID string) string {
+func generateInitScript(joinIP, joinToken, associationID string) string {
 	buffer := bytes.Buffer{}
 	templ := template.Must(template.New("").Parse(bootScript))
 	err := templ.Execute(&buffer, map[string]string{
@@ -116,55 +116,53 @@ func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
 	return len(nodes) == 1, nil
 }
 
-func (s swarmProvisioner) PreProvision(
-	config group.Configuration,
-	details types.ProvisionDetails) (types.ProvisionDetails, error) {
+func (s swarmProvisioner) PreProvision(config group.Configuration, spec instance.Spec) (instance.Spec, error) {
 
 	swarmStatus, err := s.client.SwarmInspect(context.Background())
 	if err != nil {
-		return details, fmt.Errorf("Failed to fetch Swarm join tokens: %s", err)
+		return spec, fmt.Errorf("Failed to fetch Swarm join tokens: %s", err)
 	}
 
 	self, _, err := s.client.NodeInspectWithRaw(context.Background(), "self")
 	if err != nil {
-		return details, fmt.Errorf("Failed to fetch Swarm node status: %s", err)
+		return spec, fmt.Errorf("Failed to fetch Swarm node status: %s", err)
 	}
 
 	if self.ManagerStatus == nil {
-		return details, errors.New(
+		return spec, errors.New(
 			"Swarm node status did not include manager status.  Need to run 'docker swarm init`?")
 	}
 
 	associationID := util.RandomAlphaNumericString(8)
-	details.Tags[associationTag] = associationID
+	spec.Tags[associationTag] = associationID
 
 	switch config.Role {
 	case roleWorker:
-		details.BootScript = generateBootScript(
+		spec.InitScript = generateInitScript(
 			self.ManagerStatus.Addr,
 			swarmStatus.JoinTokens.Worker,
 			associationID)
 
 	case roleManager:
-		if details.PrivateIP == nil {
-			return details, errors.New("Manager nodes require an assigned private IP address")
+		if spec.PrivateIPAddress == nil {
+			return spec, errors.New("Manager nodes require an assigned private IP address")
 		}
 
-		details.BootScript = generateBootScript(
+		spec.InitScript = generateInitScript(
 			self.ManagerStatus.Addr,
 			swarmStatus.JoinTokens.Manager,
 			associationID)
 
-		volume := instance.VolumeID(*details.PrivateIP)
-		details.Volume = &volume
+		volume := instance.VolumeID(*spec.PrivateIPAddress)
+		spec.Volume = &volume
 
 	default:
-		return details, errors.New("Unsupported role type")
+		return spec, errors.New("Unsupported role type")
 	}
 
 	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
 	// swarm.  This will require plumbing back to Scaled (membership tags).
-	details.Tags["swarm-id"] = swarmStatus.ID
+	spec.Tags["swarm-id"] = swarmStatus.ID
 
-	return details, nil
+	return spec, nil
 }

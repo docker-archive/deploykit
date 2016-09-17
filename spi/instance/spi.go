@@ -7,13 +7,8 @@ type Plugin interface {
 	// Validate performs local validation on a provision request.
 	Validate(req json.RawMessage) error
 
-	// Provision creates a new instance.
-	Provision(
-		req json.RawMessage,
-		tags map[string]string,
-		bootScript string,
-		privateIP *string,
-		volume *VolumeID) (*ID, error)
+	// Provision creates a new instance based on the spec.
+	Provision(spec Spec) (*ID, error)
 
 	// Destroy terminates an existing instance.
 	Destroy(instance ID) error

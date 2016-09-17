@@ -51,41 +51,38 @@ func (s *scaledGroup) changeSettings(settings groupSettings) {
 
 func (s *scaledGroup) CreateOne(privateIP *string) {
 
-	details := types.ProvisionDetails{Tags: s.provisionTags, PrivateIP: privateIP}
+	spec := instance.Spec{Tags: s.provisionTags, PrivateIPAddress: privateIP}
 
 	if s.provisionHelper != nil {
 		// Copy tags to prevent concurrency issues if modified.
 		tags := map[string]string{}
-		for k, v := range details.Tags {
+		for k, v := range spec.Tags {
 			tags[k] = v
 		}
-		details.Tags = tags
+		spec.Tags = tags
 
 		var err error
-		details, err = s.provisionHelper.PreProvision(s.config, details)
+		spec, err = s.provisionHelper.PreProvision(s.config, spec)
 		if err != nil {
 			log.Errorf("Pre-provision failed: %s", err)
 			return
 		}
 	}
 
-	id, err := s.instancePlugin.Provision(
-		s.provisionRequest,
-		details.Tags,
-		details.BootScript,
-		details.PrivateIP,
-		details.Volume)
+	spec.Properties = s.provisionRequest
+
+	id, err := s.instancePlugin.Provision(spec)
 	if err != nil {
 		log.Errorf("Failed to provision: %s", err)
 		return
 	}
 
 	volumeDesc := ""
-	if details.Volume != nil {
-		volumeDesc = fmt.Sprintf(" and volume %s", *details.Volume)
+	if spec.Volume != nil {
+		volumeDesc = fmt.Sprintf(" and volume %s", *spec.Volume)
 	}
 
-	log.Infof("Created instance %s with tags %v%s", *id, details.Tags, volumeDesc)
+	log.Infof("Created instance %s with tags %v%s", *id, spec.Tags, volumeDesc)
 }
 
 func (s *scaledGroup) Destroy(id instance.ID) {
