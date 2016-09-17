@@ -61,7 +61,7 @@ test: vendor-sync
 coverage: vendor-sync
 	@echo "+ $@"
 	@for pkg in $(PKGS); do \
-	  go test -test.short -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
+	  go test -test.short -race -v -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 
 test-full: vendor-sync
