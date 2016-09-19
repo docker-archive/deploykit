@@ -46,17 +46,17 @@ func TestAssociation(t *testing.T) {
 
 	details, err := helper.PreProvision(
 		group.Configuration{Role: "worker"},
-		types.ProvisionDetails{Tags: map[string]string{"a": "b"}})
+		instance.Spec{Tags: map[string]string{"a": "b"}})
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
 	associationID := details.Tags[associationTag]
 	require.NotEqual(t, "", associationID)
 
-	// Perform a rudimentary check to ensure that the expected fields are in the BootScript, without having any
+	// Perform a rudimentary check to ensure that the expected fields are in the InitScript, without having any
 	// other knowledge about the script structure.
-	require.Contains(t, details.BootScript, associationID)
-	require.Contains(t, details.BootScript, swarmInfo.JoinTokens.Worker)
-	require.Contains(t, details.BootScript, nodeInfo.ManagerStatus.Addr)
+	require.Contains(t, details.InitScript, associationID)
+	require.Contains(t, details.InitScript, swarmInfo.JoinTokens.Worker)
+	require.Contains(t, details.InitScript, nodeInfo.ManagerStatus.Addr)
 
 	// An instance with no association information is considered unhealthy.
 	healthy, err := helper.Healthy(instance.Description{})

@@ -31,11 +31,10 @@ func (_m *MockProvisionHelper) EXPECT() *_MockProvisionHelperRecorder {
 	return _m.recorder
 }
 
-func (_m *MockProvisionHelper) GroupKind(_param0 string) (types.GroupKind, error) {
+func (_m *MockProvisionHelper) GroupKind(_param0 string) types.GroupKind {
 	ret := _m.ctrl.Call(_m, "GroupKind", _param0)
 	ret0, _ := ret[0].(types.GroupKind)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	return ret0
 }
 
 func (_mr *_MockProvisionHelperRecorder) GroupKind(arg0 interface{}) *gomock.Call {
@@ -53,9 +52,9 @@ func (_mr *_MockProvisionHelperRecorder) Healthy(arg0 interface{}) *gomock.Call 
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Healthy", arg0)
 }
 
-func (_m *MockProvisionHelper) PreProvision(_param0 group.Configuration, _param1 types.ProvisionDetails) (types.ProvisionDetails, error) {
+func (_m *MockProvisionHelper) PreProvision(_param0 group.Configuration, _param1 instance.Spec) (instance.Spec, error) {
 	ret := _m.ctrl.Call(_m, "PreProvision", _param0, _param1)
-	ret0, _ := ret[0].(types.ProvisionDetails)
+	ret0, _ := ret[0].(instance.Spec)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

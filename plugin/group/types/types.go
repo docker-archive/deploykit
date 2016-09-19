@@ -21,14 +21,6 @@ const (
 	KindStaticIP  GroupKind = iota
 )
 
-// ProvisionDetails are the parameters that will be used to provision a machine.
-type ProvisionDetails struct {
-	BootScript string
-	Tags       map[string]string
-	PrivateIP  *string
-	Volume     *instance.VolumeID
-}
-
 // A ProvisionHelper defines custom behavior for provisioning instances.
 type ProvisionHelper interface {
 
@@ -42,7 +34,7 @@ type ProvisionHelper interface {
 	// PreProvision allows the helper to modify the provisioning instructions for an instance.  For example, a
 	// helper could be used to place additional tags on the machine, or generate a specialized BootScript based on
 	// the machine configuration.
-	PreProvision(config group.Configuration, details ProvisionDetails) (ProvisionDetails, error)
+	PreProvision(config group.Configuration, spec instance.Spec) (instance.Spec, error)
 
 	// Healthy determines whether an instance is healthy.
 	Healthy(inst instance.Description) (bool, error)
@@ -89,7 +81,7 @@ func instanceHash(config json.RawMessage) string {
 		panic(err)
 	}
 
-	stable, err := json.Marshal(props)
+	stable, err := json.MarshalIndent(props, "  ", "  ") // sorts the fields
 	if err != nil {
 		panic(err)
 	}

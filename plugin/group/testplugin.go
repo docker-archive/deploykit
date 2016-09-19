@@ -47,14 +47,9 @@ func (d *testplugin) addInstance(inst fakeInstance) instance.ID {
 	return id
 }
 
-func (d *testplugin) Provision(
-	req json.RawMessage,
-	tags map[string]string,
-	bootScript string,
-	privateIP *string,
-	volume *instance.VolumeID) (*instance.ID, error) {
+func (d *testplugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
-	id := d.addInstance(fakeInstance{ip: privateIP, tags: tags})
+	id := d.addInstance(fakeInstance{ip: spec.PrivateIPAddress, tags: spec.Tags})
 	return &id, nil
 }
 
@@ -126,14 +121,13 @@ func (t testProvisionHelper) GroupKind(roleName string) types.GroupKind {
 }
 
 func (t testProvisionHelper) PreProvision(
-	config group.Configuration,
-	details types.ProvisionDetails) (types.ProvisionDetails, error) {
+	config group.Configuration, spec instance.Spec) (instance.Spec, error) {
 
-	details.BootScript = "echo hello"
+	spec.InitScript = "echo hello"
 	for k, v := range t.tags {
-		details.Tags[k] = v
+		spec.Tags[k] = v
 	}
-	return details, nil
+	return spec, nil
 }
 
 func (t testProvisionHelper) Healthy(inst instance.Description) (bool, error) {
