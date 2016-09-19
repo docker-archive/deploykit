@@ -69,11 +69,25 @@ set -o xtrace
 mkdir -p /etc/docker
 cat << EOF > /etc/docker/daemon.json
 {
-  "labels": ["swarm-association-id={{.ASSOCIATION_ID}}"],
+  "labels": ["swarm-association-id={{.ASSOCIATION_ID}}"]
 }
 EOF
 
-docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
+start_install() {
+  if command -v docker >/dev/null
+  then
+    echo 'Detected existing Docker installation, will not attempt to install or update'
+  else
+    sleep 5
+    wget -qO- https://get.docker.com/ | sh
+  fi
+
+  docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
+}
+
+# See https://github.com/docker/docker/issues/23793#issuecomment-237735835 for
+# details on why we background/sleep.
+start_install &
 `
 )
 
@@ -123,7 +137,12 @@ func (s swarmProvisioner) PreProvision(config group.Configuration, spec instance
 		return spec, fmt.Errorf("Failed to fetch Swarm join tokens: %s", err)
 	}
 
-	self, _, err := s.client.NodeInspectWithRaw(context.Background(), "self")
+	nodeInfo, err := s.client.Info(context.Background())
+	if err != nil {
+		return spec, fmt.Errorf("Failed to fetch node self info: %s", err)
+	}
+
+	self, _, err := s.client.NodeInspectWithRaw(context.Background(), nodeInfo.Swarm.NodeID)
 	if err != nil {
 		return spec, fmt.Errorf("Failed to fetch Swarm node status: %s", err)
 	}

@@ -41,8 +41,11 @@ func TestAssociation(t *testing.T) {
 		},
 	}
 	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarmInfo, nil)
+
+	client.EXPECT().Info(gomock.Any()).Return(docker_types.Info{Swarm: swarm.Info{NodeID: "my-node-id"}}, nil)
+
 	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
-	client.EXPECT().NodeInspectWithRaw(gomock.Any(), "self").Return(nodeInfo, nil, nil)
+	client.EXPECT().NodeInspectWithRaw(gomock.Any(), "my-node-id").Return(nodeInfo, nil, nil)
 
 	details, err := helper.PreProvision(
 		group.Configuration{Role: "worker"},
