@@ -9,6 +9,7 @@ set -o pipefail
 
 LDFLAGS=${LDFLAGS:-}
 REBUILD_VENDOR=${REBUILD_VENDOR:-true}
+BUILD_TAGS=${BUILD_TAGS:-experimental}
 
 if [[ $# -ne 2 ]]
 then
@@ -53,8 +54,8 @@ echo 'Building'
 container_id=$(docker run --detach \
   -v "$PWD":/go/src/github.com/docker/libmachete \
   -w /go/src/github.com/docker/libmachete \
-  golang:1.6-alpine \
-  go build -ldflags "$LDFLAGS" -o /build/$BIN_NAME $PACKAGES)
+  golang:1.7-alpine \
+  go build --tags "$BUILD_TAGS" -ldflags "$LDFLAGS" -o /build/$BIN_NAME $PACKAGES)
 
 exit_code=$(docker wait $container_id)
 if [[ "$exit_code" != "0" ]]

@@ -34,6 +34,12 @@
 			"revisionTime": "2016-08-02T16:15:23Z"
 		},
 		{
+			"checksumSHA1": "MmGovHdbIs1TkEdSWctvMTdRs8c=",
+			"path": "github.com/docker/engine-api",
+			"revision": "611c63f5121770f6d0db2f9988458310ccbfbe74",
+			"revisionTime": "2016-09-03T00:12:24Z"
+		},
+		{
 			"checksumSHA1": "eTDiSq90I43NEMwYVrlgBVs/1tk=",
 			"path": "github.com/docker/engine-api/client",
 			"revision": "603ec41824c63d1e6498a22271987fa1f268c0c0",
@@ -118,22 +124,28 @@
 			"revisionTime": "2016-08-02T21:24:09Z"
 		},
 		{
-			"checksumSHA1": "lEqVJt7+iIa0nMKYWIUoQhh9VTM=",
+			"checksumSHA1": "A8VxLRXmcn9JgUvWv36Wad1SD1Q=",
+			"path": "github.com/docker/go-connections",
+			"revision": "988efe982fdecb46f01d53465878ff1f2ff411ce",
+			"revisionTime": "2016-09-03T00:06:09Z"
+		},
+		{
+			"checksumSHA1": "42YGW0xAQT+pnQ2s8A9tYgfQhAg=",
 			"path": "github.com/docker/go-connections/nat",
-			"revision": "990a1a1a70b0da4c4cb70e117971a4f0babfbf1a",
-			"revisionTime": "2016-06-08T02:44:54Z"
+			"revision": "988efe982fdecb46f01d53465878ff1f2ff411ce",
+			"revisionTime": "2016-09-03T00:06:09Z"
 		},
 		{
 			"checksumSHA1": "3sQ35fcqLJRnyTqaZn8Zb9l97uk=",
 			"path": "github.com/docker/go-connections/sockets",
-			"revision": "990a1a1a70b0da4c4cb70e117971a4f0babfbf1a",
-			"revisionTime": "2016-06-08T02:44:54Z"
+			"revision": "988efe982fdecb46f01d53465878ff1f2ff411ce",
+			"revisionTime": "2016-09-03T00:06:09Z"
 		},
 		{
-			"checksumSHA1": "xGJFkVcAiqRU53KFeF9tJuHUiJY=",
+			"checksumSHA1": "acyHmsV4QAeJGUQaOGsO9qHmMG0=",
 			"path": "github.com/docker/go-connections/tlsconfig",
-			"revision": "990a1a1a70b0da4c4cb70e117971a4f0babfbf1a",
-			"revisionTime": "2016-06-08T02:44:54Z"
+			"revision": "988efe982fdecb46f01d53465878ff1f2ff411ce",
+			"revisionTime": "2016-09-03T00:06:09Z"
 		},
 		{
 			"checksumSHA1": "KbWP8VsU9gVoZm9pCqe79AkfDmk=",
