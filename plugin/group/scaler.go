@@ -4,6 +4,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
+	"github.com/docker/libmachete/spi/instance"
 	"sort"
 	"sync"
 	"time"
@@ -217,12 +218,15 @@ func (s *scaler) converge() {
 		remove := actualSize - desiredSize
 		log.Infof("Removing %d instances from group to reach desired %d", remove, desiredSize)
 
+		sorted := make([]instance.Description, len(descriptions))
+		copy(sorted, descriptions)
+
 		// Sorting first ensures that redundant operations are non-destructive.
-		sort.Sort(sortByID(descriptions))
+		sort.Sort(sortByID(sorted))
 
 		// TODO(wfarner): Consider favoring removal of instances that do not match the desired configuration by
 		// injecting a sorter.
-		for _, toDestroy := range descriptions[:remove] {
+		for _, toDestroy := range sorted[:remove] {
 			grp.Add(1)
 			destroy := toDestroy.ID
 			go func() {

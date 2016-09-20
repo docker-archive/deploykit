@@ -81,7 +81,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 	}
 
 	if p.plugins == nil {
-		return noSettings, fmt.Errorf("No instance plugins installed")
+		return noSettings, errors.New("No instance plugins installed")
 	}
 
 	instancePlugin, err := p.plugins(parsed.InstancePlugin)
@@ -118,6 +118,7 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	// membership tags but different generation-specific tags.  In practice, we use this the additional tags to
 	// attach a config SHA to instances for config change detection.
 	scaled := &scaledGroup{
+		config:          config,
 		instancePlugin:  settings.plugin,
 		provisionHelper: p.provisionHelper,
 		memberTags:      map[string]string{groupTag: string(config.ID)},

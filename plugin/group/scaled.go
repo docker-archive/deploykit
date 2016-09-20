@@ -35,7 +35,7 @@ type scaledGroup struct {
 
 func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.lock.Lock()
-	s.lock.Unlock()
+	defer s.lock.Unlock()
 
 	s.provisionRequest = settings.config.InstancePluginProperties
 	tags := map[string]string{}
@@ -49,9 +49,15 @@ func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.provisionTags = tags
 }
 
-func (s *scaledGroup) CreateOne(privateIP *string) {
+func (s *scaledGroup) getSpec(privateIP *string) (instance.Spec, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
-	spec := instance.Spec{Tags: s.provisionTags, PrivateIPAddress: privateIP}
+	spec := instance.Spec{
+		Tags:             s.provisionTags,
+		PrivateIPAddress: privateIP,
+		Properties:       s.provisionRequest,
+	}
 
 	if s.provisionHelper != nil {
 		// Copy tags to prevent concurrency issues if modified.
@@ -64,12 +70,19 @@ func (s *scaledGroup) CreateOne(privateIP *string) {
 		var err error
 		spec, err = s.provisionHelper.PreProvision(s.config, spec)
 		if err != nil {
-			log.Errorf("Pre-provision failed: %s", err)
-			return
+			return spec, err
 		}
 	}
 
-	spec.Properties = s.provisionRequest
+	return spec, nil
+}
+
+func (s *scaledGroup) CreateOne(privateIP *string) {
+	spec, err := s.getSpec(privateIP)
+	if err != nil {
+		log.Errorf("Pre-provision failed: %s", err)
+		return
+	}
 
 	id, err := s.instancePlugin.Provision(spec)
 	if err != nil {
