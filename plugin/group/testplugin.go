@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/libmachete/plugin/group/types"
+	"github.com/docker/libmachete/plugin/group/util"
+	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
-	"math/rand"
 	"sync"
 )
 
@@ -16,7 +18,7 @@ type fakeInstance struct {
 
 // NewTestInstancePlugin creates a new instance plugin for use in testing and development.
 func NewTestInstancePlugin(seedInstances ...map[string]string) instance.Plugin {
-	plugin := testplugin{idPrefix: randString(4), instances: map[instance.ID]fakeInstance{}}
+	plugin := testplugin{idPrefix: util.RandomAlphaNumericString(4), instances: map[instance.ID]fakeInstance{}}
 	for _, i := range seedInstances {
 		plugin.addInstance(fakeInstance{tags: i})
 	}
@@ -29,16 +31,6 @@ type testplugin struct {
 	idPrefix  string
 	nextID    int
 	instances map[instance.ID]fakeInstance
-}
-
-const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func randString(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }
 
 func (d *testplugin) Validate(req json.RawMessage) error {
@@ -55,13 +47,9 @@ func (d *testplugin) addInstance(inst fakeInstance) instance.ID {
 	return id
 }
 
-func (d *testplugin) Provision(
-	req json.RawMessage,
-	tags map[string]string,
-	privateIP *string,
-	volume *instance.VolumeID) (*instance.ID, error) {
+func (d *testplugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
-	id := d.addInstance(fakeInstance{ip: privateIP, tags: tags})
+	id := d.addInstance(fakeInstance{ip: spec.PrivateIPAddress, tags: spec.Tags})
 	return &id, nil
 }
 
@@ -106,4 +94,42 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 	}
 
 	return desc, nil
+}
+
+const (
+	roleMinions = "minions"
+	roleLeaders = "leaders"
+)
+
+type testProvisionHelper struct {
+	tags map[string]string
+}
+
+func (t testProvisionHelper) Validate(config group.Configuration, parsed types.Schema) error {
+	return nil
+}
+
+func (t testProvisionHelper) GroupKind(roleName string) types.GroupKind {
+	switch roleName {
+	case roleMinions:
+		return types.KindDynamicIP
+	case roleLeaders:
+		return types.KindStaticIP
+	default:
+		return types.KindUnknown
+	}
+}
+
+func (t testProvisionHelper) PreProvision(
+	config group.Configuration, spec instance.Spec) (instance.Spec, error) {
+
+	spec.InitScript = "echo hello"
+	for k, v := range t.tags {
+		spec.Tags[k] = v
+	}
+	return spec, nil
+}
+
+func (t testProvisionHelper) Healthy(inst instance.Description) (bool, error) {
+	return true, nil
 }

@@ -1,10 +1,10 @@
 package group
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
@@ -16,29 +16,32 @@ const (
 	configTag = "machete.config_sha"
 )
 
-const (
-	roleWorker  = "worker"
-	roleManager = "manager"
-)
+// InstancePluginLookup helps with looking up an instance plugin by name
+type InstancePluginLookup func(string) (instance.Plugin, error)
 
 // NewGroupPlugin creates a new group plugin.
-func NewGroupPlugin(plugins map[string]instance.Plugin, pollInterval time.Duration) group.Plugin {
+func NewGroupPlugin(
+	plugins InstancePluginLookup,
+	provisionHelper types.ProvisionHelper,
+	pollInterval time.Duration) group.Plugin {
+
 	return &plugin{
-		plugins:      plugins,
-		pollInterval: pollInterval,
-		groups:       groups{byID: map[group.ID]*groupContext{}},
+		plugins:         plugins,
+		provisionHelper: provisionHelper,
+		pollInterval:    pollInterval,
+		groups:          groups{byID: map[group.ID]*groupContext{}},
 	}
 }
 
 type plugin struct {
-	plugins      map[string]instance.Plugin
-	pollInterval time.Duration
-	lock         sync.Mutex
-	groups       groups
+	plugins         InstancePluginLookup
+	provisionHelper types.ProvisionHelper
+	pollInterval    time.Duration
+	lock            sync.Mutex
+	groups          groups
 }
 
 func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
-	// TODO(wfarner): Return only state, not behavior (e.g. no scaledGroup)
 
 	noSettings := groupSettings{}
 
@@ -50,33 +53,43 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, errors.New("Group Role must not be blank")
 	}
 
-	if config.Role != roleManager && config.Role != roleWorker {
-		return noSettings, fmt.Errorf("Group Role must be %s or %s", roleWorker, roleManager)
+	groupKind := p.provisionHelper.GroupKind(config.Role)
+	if groupKind == types.KindUnknown {
+		return noSettings, errors.New("Unrecognized group Role")
 	}
 
-	parsed := configSchema{}
-	if err := json.Unmarshal([]byte(config.Properties), &parsed); err != nil {
-		return noSettings, fmt.Errorf("Invalid properties: %s", err)
+	parsed, err := types.ParseProperties(config)
+	if err != nil {
+		return noSettings, err
 	}
 
-	switch config.Role {
-	case roleManager:
-		if len(parsed.IPs) != 3 && len(parsed.IPs) != 5 {
-			return noSettings, errors.New("Manager groups must have 3 or 5 IP addresses")
-		}
+	switch groupKind {
+	case types.KindStaticIP:
 		if parsed.Size != 0 {
-			return noSettings, errors.New("Size is unsupported for manager groups, use IPs instead")
+			return noSettings, errors.New("Size is unsupported for static IP groups, use IPs instead")
 		}
-	case roleWorker:
+	case types.KindDynamicIP:
 		if len(parsed.IPs) != 0 {
-			return noSettings, errors.New("IPs is unsupported for worker groups, use Size instead")
+			return noSettings, errors.New("IPs is unsupported for dynamic IP groups, use Size instead")
 		}
 	default:
 		return noSettings, errors.New("Unsupported Role type")
 	}
 
-	instancePlugin, exists := p.plugins[parsed.InstancePlugin]
-	if !exists {
+	if err := p.provisionHelper.Validate(config, parsed); err != nil {
+		return noSettings, err
+	}
+
+	if p.plugins == nil {
+		return noSettings, fmt.Errorf("No instance plugins installed")
+	}
+
+	instancePlugin, err := p.plugins(parsed.InstancePlugin)
+	if err != nil {
+		return noSettings, fmt.Errorf("Err looking up Instance plugin '%s':%v",
+			parsed.InstancePlugin, err)
+	}
+	if instancePlugin == nil {
 		return noSettings, fmt.Errorf("Instance plugin '%s' is not available", parsed.InstancePlugin)
 	}
 
@@ -104,19 +117,18 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	// newly-created instances.  This allows the scaler to collect and report members of a group which have
 	// membership tags but different generation-specific tags.  In practice, we use this the additional tags to
 	// attach a config SHA to instances for config change detection.
-	// TODO(wfarner): Configure with bootScript.
 	scaled := &scaledGroup{
-		instancePlugin: settings.plugin,
-		// TODO(wfarner): Members will also need to be tagged with the Swarm cluster UUID.
-		memberTags: map[string]string{groupTag: string(config.ID)},
+		instancePlugin:  settings.plugin,
+		provisionHelper: p.provisionHelper,
+		memberTags:      map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)
 
 	var supervisor Supervisor
-	switch config.Role {
-	case roleWorker:
+	switch groupKind := p.provisionHelper.GroupKind(config.Role); groupKind {
+	case types.KindDynamicIP:
 		supervisor = NewScalingGroup(scaled, settings.config.Size, p.pollInterval)
-	case roleManager:
+	case types.KindStaticIP:
 		supervisor = NewQuorum(scaled, settings.config.IPs, p.pollInterval)
 	default:
 		panic("Unhandled Role type")

@@ -51,15 +51,15 @@ func (_mr *_MockPluginRecorder) Destroy(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
 }
 
-func (_m *MockPlugin) Provision(_param0 json.RawMessage, _param1 map[string]string, _param2 *string, _param3 *instance.VolumeID) (*instance.ID, error) {
-	ret := _m.ctrl.Call(_m, "Provision", _param0, _param1, _param2, _param3)
+func (_m *MockPlugin) Provision(_param0 instance.Spec) (*instance.ID, error) {
+	ret := _m.ctrl.Call(_m, "Provision", _param0)
 	ret0, _ := ret[0].(*instance.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-func (_mr *_MockPluginRecorder) Provision(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Provision", arg0, arg1, arg2, arg3)
+func (_mr *_MockPluginRecorder) Provision(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Provision", arg0)
 }
 
 func (_m *MockPlugin) Validate(_param0 json.RawMessage) error {

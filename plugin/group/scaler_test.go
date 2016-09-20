@@ -19,7 +19,7 @@ func TestScaleUp(t *testing.T) {
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
 		scaled.EXPECT().List().Return([]instance.Description{a, b}, nil),
-		scaled.EXPECT().CreateOne(nil, nil).Return(),
+		scaled.EXPECT().CreateOne(nil).Return(),
 		scaled.EXPECT().List().Do(func() {
 			go scaler.Stop()
 		}).Return([]instance.Description{a, b, c}, nil),
