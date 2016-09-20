@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/controller/watcher"
 	group_plugin "github.com/docker/libmachete/plugin/group"
 	"github.com/docker/libmachete/plugin/group/swarm"
 	"github.com/docker/libmachete/spi"
@@ -127,7 +126,7 @@ func main() {
 		router := mux.NewRouter()
 		router.StrictSlash(true)
 
-		dockerClient, err := watcher.NewDockerClient("localhost", nil)
+		dockerClient, err := newDockerClient("localhost", nil)
 		if err != nil {
 			log.Error(err)
 		}
