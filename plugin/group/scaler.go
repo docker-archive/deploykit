@@ -4,10 +4,10 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/controller/util"
+	"github.com/docker/libmachete/spi/instance"
 	"sort"
 	"sync"
 	"time"
-	"github.com/docker/libmachete/spi/instance"
 )
 
 // Scaler is the spi of the scaler controller which mimics the behavior
