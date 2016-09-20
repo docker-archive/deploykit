@@ -130,7 +130,7 @@ func createFake(config group.Configuration, id string) instance.Description {
 	// we did not create.
 	tags["other"] = "ignored"
 
-	return instance.Description{ID: instance.ID(id), Tags: provisionTags(config)}
+	return instance.Description{ID: instance.ID(id), Tags: tags}
 }
 
 func TestNoopUpdate(t *testing.T) {
@@ -271,44 +271,6 @@ func TestScaleDecrease(t *testing.T) {
 	for _, i := range instances {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
-}
-
-func TestPreventsDuplicateUpdate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	plugin, grp := mockedPluginGroup(ctrl)
-
-	plugin.EXPECT().Validate(gomock.Any()).AnyTimes().Return(nil)
-
-	require.NoError(t, grp.WatchGroup(minions))
-
-	updated := group.Configuration{ID: id, Role: minions.Role, Properties: minionProperties(3, "data2")}
-
-	partialUpdate := make(chan bool)
-
-	gomock.InOrder(
-		expectDescribe(plugin, id).Return([]instance.Description{
-			createFake(minions, "a"),
-			createFake(minions, "b"),
-			createFake(minions, "c"),
-		}, nil).MinTimes(1),
-		plugin.EXPECT().Destroy(instance.ID("a")).Do(func(_ instance.ID) {
-			partialUpdate <- true
-		}).Return(nil),
-		expectDescribe(plugin, id).Return([]instance.Description{
-			createFake(minions, "a"),
-			createFake(minions, "b"),
-			createFake(minions, "c"),
-		}, nil).AnyTimes(),
-	)
-
-	go grp.UpdateGroup(updated)
-	<-partialUpdate
-
-	// UpdateGroup is not allowed while an update is in progress.
-	require.Error(t, grp.UpdateGroup(updated))
-
-	require.NoError(t, grp.StopUpdate(id))
 }
 
 func TestUnwatchGroup(t *testing.T) {
