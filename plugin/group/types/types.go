@@ -6,39 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/spi/group"
-	"github.com/docker/libmachete/spi/instance"
 )
 
 // These types are declared in a separate package to break an import cycle between group (test) -> mock -> group.
-
-// GroupKind is the identifier for the type of supervision needed by a group.
-type GroupKind int
-
-// Definitions of supported role types.
-const (
-	KindUnknown   GroupKind = iota
-	KindDynamicIP GroupKind = iota
-	KindStaticIP  GroupKind = iota
-)
-
-// A ProvisionHelper defines custom behavior for provisioning instances.
-type ProvisionHelper interface {
-
-	// Validate checks whether the helper can support a configuration.
-	Validate(config group.Configuration, parsed Schema) error
-
-	// GroupKind translates the helper's role names into Roles that define how the group is managed.  This allows
-	// a helper to define specialized roles and customize those machines accordingly in PreProvision().
-	GroupKind(roleName string) GroupKind
-
-	// PreProvision allows the helper to modify the provisioning instructions for an instance.  For example, a
-	// helper could be used to place additional tags on the machine, or generate a specialized BootScript based on
-	// the machine configuration.
-	PreProvision(config group.Configuration, spec instance.Spec) (instance.Spec, error)
-
-	// Healthy determines whether an instance is healthy.
-	Healthy(inst instance.Description) (bool, error)
-}
 
 // ParseProperties parses the group plugin properties JSON document in a group configuration.
 func ParseProperties(config group.Configuration) (Schema, error) {

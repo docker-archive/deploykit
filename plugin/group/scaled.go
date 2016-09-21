@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin/group/types"
+	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
@@ -27,7 +27,7 @@ type scaledGroup struct {
 	instancePlugin   instance.Plugin
 	memberTags       map[string]string
 	config           group.Configuration
-	provisionHelper  types.ProvisionHelper
+	flavorPlugin     flavor.Plugin
 	provisionRequest json.RawMessage
 	provisionTags    map[string]string
 	lock             sync.Mutex
@@ -59,7 +59,7 @@ func (s *scaledGroup) getSpec(privateIP *string) (instance.Spec, error) {
 		Properties:       s.provisionRequest,
 	}
 
-	if s.provisionHelper != nil {
+	if s.flavorPlugin != nil {
 		// Copy tags to prevent concurrency issues if modified.
 		tags := map[string]string{}
 		for k, v := range spec.Tags {
@@ -68,7 +68,7 @@ func (s *scaledGroup) getSpec(privateIP *string) (instance.Spec, error) {
 		spec.Tags = tags
 
 		var err error
-		spec, err = s.provisionHelper.PreProvision(s.config, spec)
+		spec, err = s.flavorPlugin.PreProvision(s.config, spec)
 		if err != nil {
 			return spec, err
 		}
