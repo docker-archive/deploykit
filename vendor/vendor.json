@@ -118,10 +118,6 @@
 			"revisionTime": "2016-09-20T21:26:56Z"
 		},
 		{
-			"path": "github.com/docker/docker/types/swarm",
-			"revision": ""
-		},
-		{
 			"checksumSHA1": "eTDiSq90I43NEMwYVrlgBVs/1tk=",
 			"path": "github.com/docker/engine-api/client",
 			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
