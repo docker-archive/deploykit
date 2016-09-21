@@ -6,7 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete.aws"
 	plugin "github.com/docker/libmachete.aws/plugin/instance"
-	"github.com/docker/libmachete/controller/util"
+	"github.com/docker/libmachete/plugin/util"
 	"github.com/spf13/cobra"
 	"os"
 )
