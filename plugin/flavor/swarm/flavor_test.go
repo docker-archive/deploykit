@@ -6,7 +6,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	mock_client "github.com/docker/libmachete/mock/docker/docker/client"
-	"github.com/docker/libmachete/plugin/group/types"
+	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
@@ -18,11 +18,11 @@ func TestGroupKind(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	helper := NewSwarmProvisionHelper(mock_client.NewMockAPIClient(ctrl))
+	helper := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl))
 
-	require.Equal(t, types.KindDynamicIP, helper.GroupKind("worker"))
-	require.Equal(t, types.KindStaticIP, helper.GroupKind("manager"))
-	require.Equal(t, types.KindUnknown, helper.GroupKind("other"))
+	require.Equal(t, flavor.DynamicIP, helper.FlavorOf("worker"))
+	require.Equal(t, flavor.StaticIP, helper.FlavorOf("manager"))
+	require.Equal(t, flavor.Unknown, helper.FlavorOf("other"))
 }
 
 func TestAssociation(t *testing.T) {
@@ -31,7 +31,7 @@ func TestAssociation(t *testing.T) {
 
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	helper := NewSwarmProvisionHelper(client)
+	helper := NewSwarmFlavor(client)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},

@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/plugin/group/util"
+	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"golang.org/x/net/context"
@@ -21,8 +22,8 @@ const (
 	roleManager = "manager"
 )
 
-// NewSwarmProvisionHelper creates a ProvisionHelper that creates manager and worker nodes connected in a swarm.
-func NewSwarmProvisionHelper(dockerClient client.APIClient) types.ProvisionHelper {
+// NewSwarmFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
+func NewSwarmFlavor(dockerClient client.APIClient) flavor.Plugin {
 	return &swarmProvisioner{client: dockerClient}
 }
 
@@ -45,14 +46,14 @@ func (s swarmProvisioner) Validate(config group.Configuration, parsed types.Sche
 	return nil
 }
 
-func (s swarmProvisioner) GroupKind(roleName string) types.GroupKind {
+func (s swarmProvisioner) FlavorOf(roleName string) flavor.GroupFlavor {
 	switch roleName {
 	case roleWorker:
-		return types.KindDynamicIP
+		return flavor.DynamicIP
 	case roleManager:
-		return types.KindStaticIP
+		return flavor.StaticIP
 	default:
-		return types.KindUnknown
+		return flavor.Unknown
 	}
 }
 

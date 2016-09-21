@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/plugin/group/util"
+	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
@@ -101,26 +102,26 @@ const (
 	roleLeaders = "leaders"
 )
 
-type testProvisionHelper struct {
+type testFlavor struct {
 	tags map[string]string
 }
 
-func (t testProvisionHelper) Validate(config group.Configuration, parsed types.Schema) error {
+func (t testFlavor) Validate(config group.Configuration, parsed types.Schema) error {
 	return nil
 }
 
-func (t testProvisionHelper) GroupKind(roleName string) types.GroupKind {
+func (t testFlavor) FlavorOf(roleName string) flavor.GroupFlavor {
 	switch roleName {
 	case roleMinions:
-		return types.KindDynamicIP
+		return flavor.DynamicIP
 	case roleLeaders:
-		return types.KindStaticIP
+		return flavor.StaticIP
 	default:
-		return types.KindUnknown
+		return flavor.Unknown
 	}
 }
 
-func (t testProvisionHelper) PreProvision(
+func (t testFlavor) PreProvision(
 	config group.Configuration, spec instance.Spec) (instance.Spec, error) {
 
 	spec.InitScript = "echo hello"
@@ -130,6 +131,6 @@ func (t testProvisionHelper) PreProvision(
 	return spec, nil
 }
 
-func (t testProvisionHelper) Healthy(inst instance.Description) (bool, error) {
+func (t testFlavor) Healthy(inst instance.Description) (bool, error) {
 	return true, nil
 }
