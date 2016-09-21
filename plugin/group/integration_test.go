@@ -33,7 +33,7 @@ var (
 
 	managerIPs = []string{"192.168.0.4", "192.168.0.5", "192.168.0.6"}
 
-	provisionHelper = testProvisionHelper{tags: map[string]string{"custom": "value"}}
+	flavorPlugin = testFlavor{tags: map[string]string{"custom": "value"}}
 )
 
 func minionProperties(instances int, data string) json.RawMessage {
@@ -72,7 +72,7 @@ func fakeInstancePluginLookup(pluginName string, plugin instance.Plugin) Instanc
 
 func mockedPluginGroup(ctrl *gomock.Controller) (*mock_instance.MockPlugin, group.Plugin) {
 	plugin := mock_instance.NewMockPlugin(ctrl)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &provisionHelper, 1*time.Millisecond)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &flavorPlugin, 1*time.Millisecond)
 	return plugin, grp
 }
 
@@ -117,7 +117,7 @@ func provisionTags(config group.Configuration) map[string]string {
 	tags := memberTags(config.ID)
 	tags[configTag] = types.MustParse(types.ParseProperties(config)).InstanceHash()
 
-	for k, v := range provisionHelper.tags {
+	for k, v := range flavorPlugin.tags {
 		tags[k] = v
 	}
 
@@ -139,7 +139,7 @@ func TestNoopUpdate(t *testing.T) {
 		provisionTags(minions),
 		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &provisionHelper, 1*time.Millisecond)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &flavorPlugin, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -163,7 +163,7 @@ func TestRollingUpdate(t *testing.T) {
 		provisionTags(minions),
 		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &provisionHelper, 1*time.Millisecond)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &flavorPlugin, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -189,7 +189,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 		provisionTags(minions),
 		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &provisionHelper, 1*time.Millisecond)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &flavorPlugin, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -221,7 +221,7 @@ func TestScaleIncrease(t *testing.T) {
 		provisionTags(minions),
 		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &provisionHelper, 1*time.Millisecond)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &flavorPlugin, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -250,7 +250,7 @@ func TestScaleDecrease(t *testing.T) {
 		provisionTags(minions),
 		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &provisionHelper, 1*time.Millisecond)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &flavorPlugin, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -290,7 +290,7 @@ func TestDestroyGroup(t *testing.T) {
 		provisionTags(minions),
 		provisionTags(minions),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &provisionHelper, 1*time.Millisecond)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &flavorPlugin, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 	require.NoError(t, grp.DestroyGroup(minions.ID))
@@ -338,7 +338,7 @@ func TestSuperviseQuorum(t *testing.T) {
 		provisionTags(leaders),
 		provisionTags(leaders),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &provisionHelper, 1*time.Millisecond)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), &flavorPlugin, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(leaders))
 

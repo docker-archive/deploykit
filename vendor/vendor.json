@@ -118,90 +118,6 @@
 			"revisionTime": "2016-09-20T21:26:56Z"
 		},
 		{
-			"checksumSHA1": "eTDiSq90I43NEMwYVrlgBVs/1tk=",
-			"path": "github.com/docker/engine-api/client",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "RcYDLK+XW1lSLDMSsLVQwepjV3Y=",
-			"path": "github.com/docker/engine-api/client/transport",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "dxUuki/mVVBKqsZ1n3RkBt+/cQM=",
-			"path": "github.com/docker/engine-api/client/transport/cancellable",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "i7+jf4KGYi44xEzagx69j82galk=",
-			"path": "github.com/docker/engine-api/types",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "ry5lgawDzJEEFNOgiLkAj7yJH6E=",
-			"path": "github.com/docker/engine-api/types/blkiodev",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "tfdtNIft76G0i5gU/3LHtpHLIxQ=",
-			"path": "github.com/docker/engine-api/types/container",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "hZV62Xzt/i0e/WBKWww3rpkRAR4=",
-			"path": "github.com/docker/engine-api/types/filters",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "Khzf7tXOZxxJy/5BCHD3aINtyU8=",
-			"path": "github.com/docker/engine-api/types/network",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "DrGaE4uA19LswH15o/LVYxs7TgE=",
-			"path": "github.com/docker/engine-api/types/reference",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "Yto1DJP+S7aiRrNiEqDDqxe+mSo=",
-			"path": "github.com/docker/engine-api/types/registry",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "Mgvb6aJiQKpzcOQy5LpfpWrM5L0=",
-			"path": "github.com/docker/engine-api/types/strslice",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "L1FtVN7cfHzjcSSkW/EkwQEVDuM=",
-			"path": "github.com/docker/engine-api/types/swarm",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "NXxuzwsg/CA+CM56b+ViwOdO9T0=",
-			"path": "github.com/docker/engine-api/types/time",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
-			"checksumSHA1": "AE3TTpPWvv9ic71FiF0HnRr46mE=",
-			"path": "github.com/docker/engine-api/types/versions",
-			"revision": "16c66e864c3c2f2dc8c35276232aafe9828c88bc",
-			"revisionTime": "2016-08-03T14:39:42Z"
-		},
-		{
 			"checksumSHA1": "42YGW0xAQT+pnQ2s8A9tYgfQhAg=",
 			"path": "github.com/docker/go-connections/nat",
 			"revision": "988efe982fdecb46f01d53465878ff1f2ff411ce",
@@ -244,12 +160,6 @@
 			"revisionTime": "2016-08-01T17:00:46Z"
 		},
 		{
-			"checksumSHA1": "40vJyUB4ezQSn/NSadsKEOrudMc=",
-			"path": "github.com/inconshreveable/mousetrap",
-			"revision": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75",
-			"revisionTime": "2014-10-17T20:07:13Z"
-		},
-		{
 			"checksumSHA1": "3AoPMXlmVq2+iWMpsdJZkcUKHB8=",
 			"path": "github.com/opencontainers/runc/libcontainer/user",
 			"revision": "ce5d8cf94124a683af6a874f343375d3ec9230b4",
@@ -267,18 +177,6 @@
 			"path": "github.com/pmezard/go-difflib/difflib",
 			"revision": "d77da356e56a7428ad25149ca77381849a6a5232",
 			"revisionTime": "2016-06-15T09:26:46Z"
-		},
-		{
-			"checksumSHA1": "hvkXE4HQ2zgWaCkt3CQTki5hvqc=",
-			"path": "github.com/spf13/cobra",
-			"revision": "7c674d9e72017ed25f6d2b5e497a1368086b6a6f",
-			"revisionTime": "2016-08-02T22:37:37Z"
-		},
-		{
-			"checksumSHA1": "45OZzM/Hyc8mwjG2zn38n6bKZws=",
-			"path": "github.com/spf13/pflag",
-			"revision": "1560c1005499d61b80f865c04d39ca7505bf7f0b",
-			"revisionTime": "2016-07-18T21:50:57Z"
 		},
 		{
 			"checksumSHA1": "iydUphwYqZRq3WhstEdGsbvBAKs=",

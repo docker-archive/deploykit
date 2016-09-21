@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/plugin/group/types"
+	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
@@ -22,20 +23,20 @@ type InstancePluginLookup func(string) (instance.Plugin, error)
 // NewGroupPlugin creates a new group plugin.
 func NewGroupPlugin(
 	plugins InstancePluginLookup,
-	provisionHelper types.ProvisionHelper,
+	flavorPlugin flavor.Plugin,
 	pollInterval time.Duration) group.Plugin {
 
 	return &plugin{
-		plugins:         plugins,
-		provisionHelper: provisionHelper,
+		instancePlugins: plugins,
+		flavorPlugin:    flavorPlugin,
 		pollInterval:    pollInterval,
 		groups:          groups{byID: map[group.ID]*groupContext{}},
 	}
 }
 
 type plugin struct {
-	plugins         InstancePluginLookup
-	provisionHelper types.ProvisionHelper
+	instancePlugins InstancePluginLookup
+	flavorPlugin    flavor.Plugin
 	pollInterval    time.Duration
 	lock            sync.Mutex
 	groups          groups
@@ -53,8 +54,8 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, errors.New("Group Role must not be blank")
 	}
 
-	groupKind := p.provisionHelper.GroupKind(config.Role)
-	if groupKind == types.KindUnknown {
+	groupFlavor := p.flavorPlugin.FlavorOf(config.Role)
+	if groupFlavor == flavor.Unknown {
 		return noSettings, errors.New("Unrecognized group Role")
 	}
 
@@ -63,28 +64,28 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, err
 	}
 
-	switch groupKind {
-	case types.KindStaticIP:
+	switch groupFlavor {
+	case flavor.StaticIP:
 		if parsed.Size != 0 {
-			return noSettings, errors.New("Size is unsupported for static IP groups, use IPs instead")
+			return noSettings, errors.New("Size is unsupported for static IP flavors, use IPs instead")
 		}
-	case types.KindDynamicIP:
+	case flavor.DynamicIP:
 		if len(parsed.IPs) != 0 {
-			return noSettings, errors.New("IPs is unsupported for dynamic IP groups, use Size instead")
+			return noSettings, errors.New("IPs is unsupported for dynamic IP flavors, use Size instead")
 		}
 	default:
 		return noSettings, errors.New("Unsupported Role type")
 	}
 
-	if err := p.provisionHelper.Validate(config, parsed); err != nil {
+	if err := p.flavorPlugin.Validate(config, parsed); err != nil {
 		return noSettings, err
 	}
 
-	if p.plugins == nil {
+	if p.instancePlugins == nil {
 		return noSettings, errors.New("No instance plugins installed")
 	}
 
-	instancePlugin, err := p.plugins(parsed.InstancePlugin)
+	instancePlugin, err := p.instancePlugins(parsed.InstancePlugin)
 	if err != nil {
 		return noSettings, fmt.Errorf("Err looking up Instance plugin '%s':%v",
 			parsed.InstancePlugin, err)
@@ -118,18 +119,18 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	// membership tags but different generation-specific tags.  In practice, we use this the additional tags to
 	// attach a config SHA to instances for config change detection.
 	scaled := &scaledGroup{
-		config:          config,
-		instancePlugin:  settings.plugin,
-		provisionHelper: p.provisionHelper,
-		memberTags:      map[string]string{groupTag: string(config.ID)},
+		config:         config,
+		instancePlugin: settings.plugin,
+		flavorPlugin:   p.flavorPlugin,
+		memberTags:     map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)
 
 	var supervisor Supervisor
-	switch groupKind := p.provisionHelper.GroupKind(config.Role); groupKind {
-	case types.KindDynamicIP:
+	switch groupFlavor := p.flavorPlugin.FlavorOf(config.Role); groupFlavor {
+	case flavor.DynamicIP:
 		supervisor = NewScalingGroup(scaled, settings.config.Size, p.pollInterval)
-	case types.KindStaticIP:
+	case flavor.StaticIP:
 		supervisor = NewQuorum(scaled, settings.config.IPs, p.pollInterval)
 	default:
 		panic("Unhandled Role type")
