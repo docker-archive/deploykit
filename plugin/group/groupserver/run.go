@@ -3,7 +3,6 @@ package groupserver
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/controller/watcher"
 	group_plugin "github.com/docker/libmachete/plugin/group"
 	"github.com/docker/libmachete/plugin/group/swarm"
 	"github.com/docker/libmachete/spi/instance"
@@ -34,7 +33,7 @@ func Run(pluginLookup func(string) (instance.Plugin, error)) {
 		router := mux.NewRouter()
 		router.StrictSlash(true)
 
-		dockerClient, err := watcher.NewDockerClient("unix:///var/run/docker.sock", nil)
+		dockerClient, err := newDockerClient("unix:///var/run/docker.sock", nil)
 		if err != nil {
 			log.Error(err)
 		}

@@ -1,4 +1,4 @@
-package watcher
+package groupserver
 
 import (
 	"crypto/tls"
@@ -16,8 +16,7 @@ const (
 	clientVersion = "1.24"
 )
 
-// NewDockerClient creates a new API client.
-func NewDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, error) {
+func newDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, error) {
 	tlsOptions := tls
 	if tls == nil || tls.KeyFile == "" || tls.CAFile == "" || tls.CertFile == "" {
 		// The api doesn't like it when you pass in not nil but with zero field values...
