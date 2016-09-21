@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/controller/util"
+	"github.com/docker/libmachete/plugin/util"
 	"io/ioutil"
 	"net"
 	"net/http"
