@@ -42,13 +42,13 @@ func (h *instanceHandler) provision(req *http.Request) (interface{}, error) {
 		return nil, spi.NewError(spi.ErrUnknown, fmt.Sprintf("Failed to unmarshal response: %s", err))
 	}
 
-	return h.provisioner.Provision(
-		*request.Request,
-		request.Tags,
-		request.BootScript,
-		request.PrivateIP,
-		request.Volume,
-	)
+	return h.provisioner.Provision(instance.Spec{
+		Properties:       *request.Request,
+		Tags:             request.Tags,
+		InitScript:       request.InitScript,
+		PrivateIPAddress: request.PrivateIP,
+		Volume:           request.Volume,
+	})
 }
 
 func (h *instanceHandler) destroy(req *http.Request) (interface{}, error) {

@@ -11,7 +11,7 @@ import (
 type ProvisionRequest struct {
 	Request    *json.RawMessage
 	Tags       map[string]string
-	BootScript string
+	InitScript string
 	PrivateIP  *string
 	Volume     *instance.VolumeID
 }
