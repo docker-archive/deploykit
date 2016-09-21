@@ -52,7 +52,7 @@ func NewPluginFromProperties(pluginProperties json.RawMessage) (instance.Plugin,
 	client := session.New(aws.NewConfig().
 		WithRegion(props.Region).
 		WithCredentials(credentials.NewChainCredentials(providers)).
-		WithLogger(getLogger()).
+		WithLogger(GetLogger()).
 		WithMaxRetries(props.Retries))
 
 	instancePlugin := NewInstancePlugin(ec2.New(client))
@@ -104,8 +104,8 @@ func (p Provisioner) tagInstance(
 
 // CreateInstanceRequest is the concrete provision request type.
 type CreateInstanceRequest struct {
-	Tags              map[string]string     `json:"tags"`
-	RunInstancesInput ec2.RunInstancesInput `json:"run_instances_input"`
+	Tags              map[string]string
+	RunInstancesInput ec2.RunInstancesInput
 }
 
 // Validate performs local checks to determine if the request is valid.
@@ -115,15 +115,10 @@ func (p Provisioner) Validate(req json.RawMessage) error {
 }
 
 // Provision creates a new instance.
-func (p Provisioner) Provision(
-	req json.RawMessage,
-	tags map[string]string,
-	bootScript string,
-	privateIP *string,
-	volume *instance.VolumeID) (*instance.ID, error) {
+func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	request := CreateInstanceRequest{}
-	err := json.Unmarshal(req, &request)
+	err := json.Unmarshal(spec.Properties, &request)
 	if err != nil {
 		return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Invalid input formatting: %s", err))
 	}
@@ -131,13 +126,25 @@ func (p Provisioner) Provision(
 	request.RunInstancesInput.MinCount = aws.Int64(1)
 	request.RunInstancesInput.MaxCount = aws.Int64(1)
 
+	if spec.PrivateIPAddress != nil {
+		if len(request.RunInstancesInput.NetworkInterfaces) > 0 {
+			request.RunInstancesInput.NetworkInterfaces[0].PrivateIpAddress = spec.PrivateIPAddress
+		} else {
+			request.RunInstancesInput.PrivateIpAddress = spec.PrivateIPAddress
+		}
+	}
+
+	if spec.InitScript != "" {
+		request.RunInstancesInput.UserData = aws.String(spec.InitScript)
+	}
+
 	if request.RunInstancesInput.UserData != nil {
 		request.RunInstancesInput.UserData = aws.String(
 			base64.StdEncoding.EncodeToString([]byte(*request.RunInstancesInput.UserData)))
 	}
 
 	var awsVolumeID *string
-	if volume != nil {
+	if spec.Volume != nil {
 		volumes, err := p.Client.DescribeVolumes(&ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{
 				// TODO(wfarner): Need a way to disambiguate between volumes associated with different
@@ -145,7 +152,7 @@ func (p Provisioner) Provision(
 				// unique in separate VPCs.
 				{
 					Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
-					Values: []*string{aws.String(string(*volume))},
+					Values: []*string{aws.String(string(*spec.Volume))},
 				},
 			},
 		})
@@ -155,7 +162,7 @@ func (p Provisioner) Provision(
 
 		switch len(volumes.Volumes) {
 		case 0:
-			return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Volume %s does not exist", *volume))
+			return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Volume %s does not exist", *spec.Volume))
 		case 1:
 			awsVolumeID = volumes.Volumes[0].VolumeId
 		default:
@@ -175,7 +182,7 @@ func (p Provisioner) Provision(
 
 	id := (*instance.ID)(ec2Instance.InstanceId)
 
-	err = p.tagInstance(ec2Instance, tags, request.Tags)
+	err = p.tagInstance(ec2Instance, spec.Tags, request.Tags)
 	if err != nil {
 		return id, err
 	}

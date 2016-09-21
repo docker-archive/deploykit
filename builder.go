@@ -40,7 +40,7 @@ func (b *Builder) Flags() *pflag.FlagSet {
 	return flags
 }
 
-// BuildInstanceProvisioner creates an instance Provisioner configured with the Flags.
+// BuildInstancePlugin creates an instance Provisioner configured with the Flags.
 func (b *Builder) BuildInstancePlugin() (instance.Plugin, error) {
 	if b.Config == nil {
 		providers := []credentials.Provider{
@@ -74,7 +74,7 @@ func (b *Builder) BuildInstancePlugin() (instance.Plugin, error) {
 		b.Config = session.New(aws.NewConfig().
 			WithRegion(b.options.region).
 			WithCredentials(credentials.NewChainCredentials(providers)).
-			WithLogger(getLogger()).
+			WithLogger(GetLogger()).
 			//WithLogLevel(aws.LogDebugWithRequestErrors).
 			WithMaxRetries(b.options.retries))
 	}
@@ -90,7 +90,8 @@ func (l logger) Log(args ...interface{}) {
 	l.logger.Println(args...)
 }
 
-func getLogger() aws.Logger {
+// GetLogger gets a logger that can be used with the AWS SDK.
+func GetLogger() aws.Logger {
 	return &logger{
 		logger: log.New(os.Stderr, "", log.LstdFlags),
 	}

@@ -41,7 +41,7 @@ func TestInstanceLifecycle(t *testing.T) {
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
 	// TODO(wfarner): Test user-data and private IP plumbing.
-	id, err := provisioner.Provision(inputJSON, tags, "", nil, nil)
+	id, err := provisioner.Provision(instance.Spec{Properties: inputJSON, Tags: tags})
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
@@ -65,7 +65,7 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := NewInstancePlugin(clientMock)
-	id, err := provisioner.Provision(json.RawMessage("{}"), tags, "", nil, nil)
+	id, err := provisioner.Provision(instance.Spec{Properties: json.RawMessage("{}"), Tags: tags})
 
 	require.Error(t, err)
 	require.Nil(t, id)
