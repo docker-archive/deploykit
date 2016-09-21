@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/engine-api/client"
+	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
 	"net/http"
