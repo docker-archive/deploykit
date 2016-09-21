@@ -3,8 +3,8 @@ package groupserver
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/plugin/flavor/swarm"
 	group_plugin "github.com/docker/libmachete/plugin/group"
-	"github.com/docker/libmachete/plugin/group/swarm"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/gorilla/mux"
 	"net/http"
@@ -25,7 +25,7 @@ func Run(port uint, pluginLookup func(string) (instance.Plugin, error)) {
 
 	grp := group_plugin.NewGroupPlugin(
 		pluginLookup,
-		swarm.NewSwarmProvisionHelper(dockerClient),
+		swarm.NewSwarmFlavor(dockerClient),
 		10*time.Second)
 
 	adapter := httpAdapter{plugin: grp}
