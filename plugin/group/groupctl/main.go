@@ -17,5 +17,5 @@ func main() {
 		}
 	}
 
-	groupserver.Run(pluginLookup)
+	groupserver.Run(8888, pluginLookup)
 }
