@@ -2,10 +2,10 @@ package swarm
 
 import (
 	"fmt"
-	docker_types "github.com/docker/engine-api/types"
-	"github.com/docker/engine-api/types/filters"
-	"github.com/docker/engine-api/types/swarm"
-	mock_client "github.com/docker/libmachete/mock/docker/engine-api/client"
+	docker_types "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/swarm"
+	mock_client "github.com/docker/libmachete/mock/docker/docker/client"
 	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
