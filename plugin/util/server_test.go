@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -25,7 +27,8 @@ func TestStartServer(t *testing.T) {
 	})
 	ranShutdown := make(chan struct{})
 
-	stop, errors, err := StartServer(":4321", router, func() error {
+	dir := os.TempDir()
+	stop, errors, err := StartServer("tcp://:4321"+dir, router, func() error {
 		close(ranShutdown)
 		return nil
 	})
@@ -41,9 +44,13 @@ func TestStartServer(t *testing.T) {
 
 	<-servedCall
 
-	// Check the pid file exists
-	_, err = os.Open(fmt.Sprintf("%s.pid", filepath.Base(os.Args[0])))
+	pidfile := filepath.Join(dir, "tcp::4321")
+	// check that the pid files exist:
+	pid, err := ioutil.ReadFile(pidfile)
 	require.NoError(t, err)
+
+	t.Log("pid=", string(pid))
+	require.NotEqual(t, 0, pid)
 
 	// Now we stop the server
 	close(stop)
@@ -51,6 +58,10 @@ func TestStartServer(t *testing.T) {
 
 	// We shouldn't block here.
 	<-errors
+
+	// ensure cleaning up of pidfile
+	_, err = os.Stat(pidfile)
+	require.True(t, os.IsNotExist(err))
 }
 
 func TestStartServerUnixSocket(t *testing.T) {
@@ -65,7 +76,7 @@ func TestStartServerUnixSocket(t *testing.T) {
 	ranShutdown := make(chan struct{})
 
 	socket := filepath.Join(os.TempDir(), fmt.Sprintf("%d.sock", time.Now().Unix()))
-	stop, _, err := StartServer(socket, router, func() error {
+	stop, errors, err := StartServer("unix://"+socket, router, func() error {
 		close(ranShutdown)
 		return nil
 	})
@@ -85,7 +96,22 @@ func TestStartServerUnixSocket(t *testing.T) {
 
 	<-servedCall
 
+	// check that the pid files exist:
+	pidfile := strings.Split(socket, ".sock")[0] + ".pid"
+	pid, err := ioutil.ReadFile(pidfile)
+	require.NoError(t, err)
+
+	t.Log("pid=", string(pid))
+	require.NotEqual(t, 0, pid)
+
 	// Now we stop the server
 	close(stop)
 	<-ranShutdown
+
+	// We shouldn't block here.
+	<-errors
+
+	// ensure cleaning up of pidfile
+	_, err = os.Stat(pidfile)
+	require.True(t, os.IsNotExist(err))
 }

@@ -2,25 +2,43 @@ package util
 
 import (
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
+	"strings"
 	"syscall"
 )
 
-// StartServer starts a server listening at addr.  Addr can be a path (for unix socket) or of the form ip:port
+// StartServer starts a server listening at addr.  Addr follows the format of a URL.  The scheme of the URL
+// is used to control the behavior of the listener.  Use tcp:// or unix://
+// For tcp://host:port/path, the server will place a pid file with path, /path/host:port with the content being the
+// value of the process id.  For unix:///path, the server will listen on a socket file at the given path and create
+// a pid file at the parent directory of the socket file.
 // Returns a channel to signal stop when closed, a channel to block on stopping, and an error if occurs.
 func StartServer(addr string, endpoint http.Handler, shutdown ...func() error) (chan<- struct{}, <-chan error, error) {
+
+	listenURL, err := url.Parse(addr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	serverAddr := listenURL.Host // host or host:port
+
+	if listenURL.Scheme == "unix" {
+		serverAddr = listenURL.Path
+	}
+
 	shutdownTasks := []func() error{}
 
 	for _, onShutdown := range shutdown {
 		shutdownTasks = append(shutdownTasks, onShutdown)
 	}
 
-	engineStop, engineStopped, err := runHTTP(&http.Server{Handler: endpoint, Addr: addr})
+	engineStop, engineStopped, err := runHTTP(listenURL, &http.Server{Handler: endpoint, Addr: serverAddr})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -33,7 +51,7 @@ func StartServer(addr string, endpoint http.Handler, shutdown ...func() error) (
 	})
 
 	// Pid file
-	if pid, pidErr := savePidFile(); pidErr == nil {
+	if pid, pidErr := savePidFile(listenURL); pidErr == nil {
 		shutdownTasks = append(shutdownTasks, func() error {
 			// remove pid file
 			os.Remove(pid)
@@ -72,25 +90,16 @@ func StartServer(addr string, endpoint http.Handler, shutdown ...func() error) (
 	return fromUser, stopped, nil
 }
 
-// ProtocolFromListenString checks the format of the input listen string
-// to see if it should be a tcp or unix socket protcol. For example,
-// --listen :8080 is tcp, while --listen /path/to/uds/file is unix
-func ProtocolFromListenString(listen string) string {
-	protocol := "tcp"
-	// e.g. 0.0.0.0:80 or :80 or :8080
-	if match, _ := regexp.MatchString("[a-zA-Z0-9\\.]*:[0-9]{2,}", listen); !match {
-		protocol = "unix"
-	}
-	return protocol
-}
-
 // Runs the http server.  This server offers more control than the standard go's default http server.
 // When the returned stop channel is closed, a clean shutdown and shutdown tasks are executed.
 // The return value is a channel that can be used to block on.  An error is received if server shuts
 // down in error; or a nil is received on a clean signalled shutdown.
-func runHTTP(server *http.Server) (chan<- struct{}, <-chan error, error) {
-	protocol := ProtocolFromListenString(server.Addr)
+func runHTTP(listenURL *url.URL, server *http.Server) (chan<- struct{}, <-chan error, error) {
+	protocol := listenURL.Scheme
 	listener, err := net.Listen(protocol, server.Addr)
+
+	log.Infoln("listener protocol=", protocol, "addr=", server.Addr, "err=", err)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -134,13 +143,22 @@ func runHTTP(server *http.Server) (chan<- struct{}, <-chan error, error) {
 	return stop, stopped, nil
 }
 
-func savePidFile() (string, error) {
-	cmd := filepath.Base(os.Args[0])
-	pidFile, err := os.Create(fmt.Sprintf("%s.pid", cmd))
+func savePidFile(listenURL *url.URL) (string, error) {
+	pidPath := listenURL.Path
+	if listenURL.Scheme == "unix" {
+		pidPath = strings.Split(filepath.Base(pidPath), ".sock")[0] + ".pid"
+	} else {
+		pidPath = listenURL.Scheme + ":" + listenURL.Host
+	}
+
+	f := filepath.Join(filepath.Dir(listenURL.Path), pidPath)
+	pidFile, err := os.Create(f)
 	if err != nil {
 		return "", err
 	}
 	defer pidFile.Close()
 	fmt.Fprintf(pidFile, "%d", os.Getpid())
+	log.Infoln("pid file written to", f)
+
 	return pidFile.Name(), nil
 }
