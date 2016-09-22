@@ -30,10 +30,6 @@ type Configuration struct {
 	// ID is the unique identifier for the group.
 	ID ID
 
-	// Role designates the type of group, which may alter how the group is managed.  The behavior of different
-	// group roles is defined by the plugin.
-	Role string
-
 	// Properties is the configuration for the group.
 	Properties json.RawMessage
 }

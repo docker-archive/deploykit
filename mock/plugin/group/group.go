@@ -29,7 +29,7 @@ func (_m *MockScaled) EXPECT() *_MockScaledRecorder {
 	return _m.recorder
 }
 
-func (_m *MockScaled) CreateOne(_param0 *string) {
+func (_m *MockScaled) CreateOne(_param0 *instance.LogicalID) {
 	_m.ctrl.Call(_m, "CreateOne", _param0)
 }
 
