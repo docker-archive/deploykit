@@ -46,7 +46,7 @@ commands to run services, and check the health of those services.
 | plugin| description                  |
 |:------|:-----------------------------|
 | etcd | TODO: implement |
-| [swarm](https://github.com/docker/libmachete/plugin/group/swarm) | configures instances with Docker in Swarm mode |
+| [swarm](plugin/group/swarm) | configures instances with Docker in Swarm mode |
 | zookeeper | TODO: implement |
 
 
@@ -67,7 +67,7 @@ different infrastructure using the same interface.
 
 | plugin| description                  |
 |:------|:-----------------------------|
-| [libmachete-group](https://github.com/docker/libmachete/plugin/group/group.go) | supports Instance and Flavor plugins, rolling updates |
+| [libmachete-group](plugin/group) | supports Instance and Flavor plugins, rolling updates |
 
 
 ### Building
