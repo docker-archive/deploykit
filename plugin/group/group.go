@@ -20,15 +20,18 @@ const (
 // InstancePluginLookup helps with looking up an instance plugin by name
 type InstancePluginLookup func(string) (instance.Plugin, error)
 
+// FlavorPluginLookup helps with looking up a flavor plugin by name
+type FlavorPluginLookup func(string) (flavor.Plugin, error)
+
 // NewGroupPlugin creates a new group plugin.
 func NewGroupPlugin(
-	plugins InstancePluginLookup,
-	flavorPlugin flavor.Plugin,
+	instancePlugins InstancePluginLookup,
+	flavorPlugins FlavorPluginLookup,
 	pollInterval time.Duration) group.Plugin {
 
 	return &plugin{
-		instancePlugins: plugins,
-		flavorPlugin:    flavorPlugin,
+		instancePlugins: instancePlugins,
+		flavorPlugins:   flavorPlugins,
 		pollInterval:    pollInterval,
 		groups:          groups{byID: map[group.ID]*groupContext{}},
 	}
@@ -36,7 +39,7 @@ func NewGroupPlugin(
 
 type plugin struct {
 	instancePlugins InstancePluginLookup
-	flavorPlugin    flavor.Plugin
+	flavorPlugins   FlavorPluginLookup
 	pollInterval    time.Duration
 	lock            sync.Mutex
 	groups          groups
@@ -54,14 +57,19 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, errors.New("Group Role must not be blank")
 	}
 
-	groupFlavor := p.flavorPlugin.FlavorOf(config.Role)
-	if groupFlavor == flavor.Unknown {
-		return noSettings, errors.New("Unrecognized group Role")
-	}
-
 	parsed, err := types.ParseProperties(config)
 	if err != nil {
 		return noSettings, err
+	}
+
+	flavorPlugin, err := p.flavorPlugins(parsed.FlavorPlugin)
+	if err != nil {
+		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.FlavorPlugin, err)
+	}
+
+	groupFlavor := flavorPlugin.FlavorOf(config.Role)
+	if groupFlavor == flavor.Unknown {
+		return noSettings, errors.New("Unrecognized group Role")
 	}
 
 	switch groupFlavor {
@@ -77,21 +85,13 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, errors.New("Unsupported Role type")
 	}
 
-	if err := p.flavorPlugin.Validate(config, parsed); err != nil {
+	if err := flavorPlugin.Validate(config, parsed); err != nil {
 		return noSettings, err
-	}
-
-	if p.instancePlugins == nil {
-		return noSettings, errors.New("No instance plugins installed")
 	}
 
 	instancePlugin, err := p.instancePlugins(parsed.InstancePlugin)
 	if err != nil {
-		return noSettings, fmt.Errorf("Err looking up Instance plugin '%s':%v",
-			parsed.InstancePlugin, err)
-	}
-	if instancePlugin == nil {
-		return noSettings, fmt.Errorf("Instance plugin '%s' is not available", parsed.InstancePlugin)
+		return noSettings, fmt.Errorf("Failed to find Instance plugin '%s':%v", parsed.InstancePlugin, err)
 	}
 
 	if err := instancePlugin.Validate(parsed.InstancePluginProperties); err != nil {
@@ -99,9 +99,10 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 	}
 
 	return groupSettings{
-		role:   config.Role,
-		plugin: instancePlugin,
-		config: parsed,
+		role:           config.Role,
+		instancePlugin: instancePlugin,
+		flavorPlugin:   flavorPlugin,
+		config:         parsed,
 	}, nil
 }
 
@@ -120,14 +121,14 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	// attach a config SHA to instances for config change detection.
 	scaled := &scaledGroup{
 		config:         config,
-		instancePlugin: settings.plugin,
-		flavorPlugin:   p.flavorPlugin,
+		instancePlugin: settings.instancePlugin,
+		flavorPlugin:   settings.flavorPlugin,
 		memberTags:     map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)
 
 	var supervisor Supervisor
-	switch groupFlavor := p.flavorPlugin.FlavorOf(config.Role); groupFlavor {
+	switch groupFlavor := settings.flavorPlugin.FlavorOf(config.Role); groupFlavor {
 	case flavor.DynamicIP:
 		supervisor = NewScalingGroup(scaled, settings.config.Size, p.pollInterval)
 	case flavor.StaticIP:

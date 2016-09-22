@@ -44,7 +44,7 @@ func (q *quorum) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 }
 
 func (q *quorum) Stop() {
-	q.stop <- true
+	close(q.stop)
 }
 
 func (q *quorum) Run() {
