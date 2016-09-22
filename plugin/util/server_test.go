@@ -9,14 +9,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
 
 type handler int
 
-func TestStartServer(t *testing.T) {
+func TestTCPServer(t *testing.T) {
 
 	servedCall := make(chan struct{})
 
@@ -28,7 +27,10 @@ func TestStartServer(t *testing.T) {
 	ranShutdown := make(chan struct{})
 
 	dir := os.TempDir()
-	stop, errors, err := StartServer("tcp://:4321"+dir, router, func() error {
+	name := "test-tcp-server"
+
+	listen := "tcp://:4321" + filepath.Join(dir, name)
+	stop, errors, err := StartServer(listen, router, func() error {
 		close(ranShutdown)
 		return nil
 	})
@@ -44,13 +46,13 @@ func TestStartServer(t *testing.T) {
 
 	<-servedCall
 
-	pidfile := filepath.Join(dir, "tcp::4321")
+	crumbFile := filepath.Join(dir, name)
 	// check that the pid files exist:
-	pid, err := ioutil.ReadFile(pidfile)
+	urlString, err := ioutil.ReadFile(crumbFile)
 	require.NoError(t, err)
 
-	t.Log("pid=", string(pid))
-	require.NotEqual(t, 0, pid)
+	t.Log("url=", string(urlString))
+	require.Equal(t, listen, string(urlString))
 
 	// Now we stop the server
 	close(stop)
@@ -60,11 +62,11 @@ func TestStartServer(t *testing.T) {
 	<-errors
 
 	// ensure cleaning up of pidfile
-	_, err = os.Stat(pidfile)
+	_, err = os.Stat(crumbFile)
 	require.True(t, os.IsNotExist(err))
 }
 
-func TestStartServerUnixSocket(t *testing.T) {
+func TestUnixSocketServer(t *testing.T) {
 
 	servedCall := make(chan struct{})
 
@@ -96,22 +98,10 @@ func TestStartServerUnixSocket(t *testing.T) {
 
 	<-servedCall
 
-	// check that the pid files exist:
-	pidfile := strings.Split(socket, ".sock")[0] + ".pid"
-	pid, err := ioutil.ReadFile(pidfile)
-	require.NoError(t, err)
-
-	t.Log("pid=", string(pid))
-	require.NotEqual(t, 0, pid)
-
 	// Now we stop the server
 	close(stop)
 	<-ranShutdown
 
 	// We shouldn't block here.
 	<-errors
-
-	// ensure cleaning up of pidfile
-	_, err = os.Stat(pidfile)
-	require.True(t, os.IsNotExist(err))
 }

@@ -8,8 +8,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 )
 
@@ -50,11 +48,11 @@ func StartServer(addr string, endpoint http.Handler, shutdown ...func() error) (
 		return err
 	})
 
-	// Pid file
-	if pid, pidErr := savePidFile(listenURL); pidErr == nil {
+	// leave a crumb to be discovered
+	if crumbPath, crumbErr := saveCrumbFile(listenURL); crumbErr == nil {
 		shutdownTasks = append(shutdownTasks, func() error {
-			// remove pid file
-			os.Remove(pid)
+			// remove crumb file
+			os.Remove(crumbPath)
 			return nil
 		})
 	}
@@ -143,22 +141,21 @@ func runHTTP(listenURL *url.URL, server *http.Server) (chan<- struct{}, <-chan e
 	return stop, stopped, nil
 }
 
-func savePidFile(listenURL *url.URL) (string, error) {
-	pidPath := listenURL.Path
+func saveCrumbFile(listenURL *url.URL) (string, error) {
 	if listenURL.Scheme == "unix" {
-		pidPath = strings.Split(filepath.Base(pidPath), ".sock")[0] + ".pid"
-	} else {
-		pidPath = listenURL.Scheme + ":" + listenURL.Host
+		return listenURL.Path, nil // nothing to do
 	}
 
-	f := filepath.Join(filepath.Dir(listenURL.Path), pidPath)
-	pidFile, err := os.Create(f)
+	crumbPath := listenURL.Path
+	crumbFile, err := os.Create(crumbPath)
 	if err != nil {
 		return "", err
 	}
-	defer pidFile.Close()
-	fmt.Fprintf(pidFile, "%d", os.Getpid())
-	log.Infoln("pid file written to", f)
+	defer crumbFile.Close()
 
-	return pidFile.Name(), nil
+	fmt.Fprintf(crumbFile, "%s", listenURL.String())
+
+	log.Infoln("crumb file written to", crumbPath)
+
+	return crumbPath, nil
 }
