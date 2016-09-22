@@ -180,7 +180,7 @@ func (s *scaler) getSize() uint32 {
 }
 
 func (s *scaler) Stop() {
-	s.stop <- true
+	close(s.stop)
 }
 
 func (s *scaler) Run() {
