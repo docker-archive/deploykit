@@ -131,14 +131,14 @@ For development, it's typically easiest to use the Vagrant Instance plugin.  We 
 $ cat zk.conf
 {
   "id": "zk",
-  “plugin”: “group”,
-  “properties”: {
-    “ips”: [“192.168.0.4”, “192.168.0.5”, “192.168.0.6”],
-    “instance”: {
-      “plugin”: “vagrant”
+  "plugin": "group",
+  "properties": {
+    "ips": ["192.168.0.4", "192.168.0.5", "192.168.0.6"],
+    "instance": {
+      "plugin": "vagrant"
     },
-    “flavor”: {
-      “plugin”: “zookeeper”
+    "flavor": {
+      "plugin": "zookeeper"
     }
   }
 }
@@ -162,17 +162,17 @@ Since we have not edited `zk.conf`, there are no changes to be made.  First, let
 $ cat zk.conf
 {
   "id": "zk",
-  “plugin”: “group”,
-  “properties”: {
-    “ips”: [“192.168.0.4”, “192.168.0.5”, “192.168.0.6”],
-    “instance”: {
-      “plugin”: “vagrant”,
+  "plugin": "group",
+  "properties": {
+    "ips": ["192.168.0.4", "192.168.0.5", "192.168.0.6"],
+    "instance": {
+      "plugin": "vagrant",
       "properties": {
         "cpu": 2
       }
     },
-    “flavor”: {
-      “plugin”: “zookeeper”
+    "flavor": {
+      "plugin": "zookeeper"
     }
   }
 }
@@ -191,14 +191,14 @@ For high-traffic clusters, ZooKeeper supports Observer nodes.  We can add anothe
 $ cat zk-observer.conf
 {
   "id": "zk-observers",
-  “plugin”: “group”,
-  “properties”: {
+  "plugin": "group",
+  "properties": {
     "size": 3,
-    “instance”: {
-      “plugin”: “vagrant”
+    "instance": {
+      "plugin": "vagrant"
     },
-    “flavor”: {
-      “plugin”: “zookeeper”,
+    "flavor": {
+      "plugin": "zookeeper",
       "properties": {
         "mode": "observer"
       }
