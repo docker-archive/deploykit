@@ -3,8 +3,8 @@ package groupserver
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin/flavor/swarm"
 	group_plugin "github.com/docker/libmachete/plugin/group"
+	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/gorilla/mux"
 	"net/http"
@@ -12,22 +12,17 @@ import (
 )
 
 // Run starts the group server, blocking until it exits.
-func Run(port uint, pluginLookup func(string) (instance.Plugin, error)) {
+func Run(
+	port uint,
+	instancePluginLookup func(string) (instance.Plugin, error),
+	flavorPluginLookup func(string) (flavor.Plugin, error)) {
+
 	log.Infoln("Starting server on port", port)
 
 	router := mux.NewRouter()
 	router.StrictSlash(true)
 
-	dockerClient, err := newDockerClient("unix:///var/run/docker.sock", nil)
-	if err != nil {
-		log.Error(err)
-	}
-
-	grp := group_plugin.NewGroupPlugin(
-		pluginLookup,
-		swarm.NewSwarmFlavor(dockerClient),
-		10*time.Second)
-
+	grp := group_plugin.NewGroupPlugin(instancePluginLookup, flavorPluginLookup, 10*time.Second)
 	adapter := httpAdapter{plugin: grp}
 
 	router.HandleFunc("/Watch", outputHandler(adapter.watch)).Methods("POST")

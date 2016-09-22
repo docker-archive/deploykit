@@ -33,6 +33,7 @@ type Schema struct {
 	IPs                      []string
 	InstancePlugin           string
 	InstancePluginProperties json.RawMessage
+	FlavorPlugin             string
 }
 
 // InstanceHash computes a stable hash of the document in InstancePluginProperties.
