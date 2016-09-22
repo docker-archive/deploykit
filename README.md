@@ -40,7 +40,7 @@ and nothing about Groups.  Instance is technically defined by the plugin, and ne
 
 
 #### Flavor
-A [flavor plugin](plugin/group/types/types.go) defines what runs on an Instance.  It is responsible for dictating
+A [flavor plugin](spi/flavor/spi.go) defines what runs on an Instance.  It is responsible for dictating
 commands to run services, and check the health of those services.
 
 | plugin| description                  |
@@ -54,7 +54,7 @@ commands to run services, and check the health of those services.
 A [group plugin](spi/group/spi.go) manages Groups of Instances.  This is actually the only plugin type that _InfraKit_
 directly interfaces with.
 
-Group plugins authored in Go may use our [scaffolding](plugin/groupserver/run.go) to expose plugin operations via HTTP.
+Group plugins authored in Go may use our [scaffolding](plugin/group/groupserver/run.go) to expose plugin operations via HTTP.
 
 ##### Default Group plugin
 _InfraKit_ provides a default Group plugin implementation, intended to suit common use cases.  The default Group plugin
@@ -67,7 +67,7 @@ different infrastructure using the same interface.
 
 | plugin| description                  |
 |:------|:-----------------------------|
-| [libmachete](https://github.com/docker/libmachete) | supports Instance and Flavor plugins, rolling updates |
+| [libmachete-group](https://github.com/docker/libmachete/plugin/group) | supports Instance and Flavor plugins, rolling updates |
 
 
 ### Building
