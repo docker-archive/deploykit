@@ -53,10 +53,6 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, errors.New("Group ID must not be blank")
 	}
 
-	if config.Role == "" {
-		return noSettings, errors.New("Group Role must not be blank")
-	}
-
 	parsed, err := types.ParseProperties(config)
 	if err != nil {
 		return noSettings, err
@@ -67,26 +63,26 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.FlavorPlugin, err)
 	}
 
-	groupFlavor := flavorPlugin.FlavorOf(config.Role)
-	if groupFlavor == flavor.Unknown {
-		return noSettings, errors.New("Unrecognized group Role")
+	allocation, err := flavorPlugin.Validate(parsed.FlavorPluginProperties, parsed)
+	if err != nil {
+		return noSettings, err
 	}
 
-	switch groupFlavor {
-	case flavor.StaticIP:
+	if allocation == flavor.IDKindUnknown {
+		return noSettings, errors.New("Unrecognized group ID kind")
+	}
+
+	switch allocation {
+	case flavor.IDKindPhysicalWithLogical:
 		if parsed.Size != 0 {
 			return noSettings, errors.New("Size is unsupported for static IP flavors, use IPs instead")
 		}
-	case flavor.DynamicIP:
-		if len(parsed.IPs) != 0 {
+	case flavor.IDKindPhysical:
+		if len(parsed.LogicalIDs) != 0 {
 			return noSettings, errors.New("IPs is unsupported for dynamic IP flavors, use Size instead")
 		}
 	default:
 		return noSettings, errors.New("Unsupported Role type")
-	}
-
-	if err := flavorPlugin.Validate(config, parsed); err != nil {
-		return noSettings, err
 	}
 
 	instancePlugin, err := p.instancePlugins(parsed.InstancePlugin)
@@ -99,7 +95,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 	}
 
 	return groupSettings{
-		role:           config.Role,
+		allocation:     allocation,
 		instancePlugin: instancePlugin,
 		flavorPlugin:   flavorPlugin,
 		config:         parsed,
@@ -120,19 +116,19 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	// membership tags but different generation-specific tags.  In practice, we use this the additional tags to
 	// attach a config SHA to instances for config change detection.
 	scaled := &scaledGroup{
-		config:         config,
-		instancePlugin: settings.instancePlugin,
-		flavorPlugin:   settings.flavorPlugin,
-		memberTags:     map[string]string{groupTag: string(config.ID)},
+		instancePlugin:   settings.instancePlugin,
+		flavorPlugin:     settings.flavorPlugin,
+		flavorProperties: settings.config.FlavorPluginProperties,
+		memberTags:       map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)
 
 	var supervisor Supervisor
-	switch groupFlavor := settings.flavorPlugin.FlavorOf(config.Role); groupFlavor {
-	case flavor.DynamicIP:
+	switch settings.allocation {
+	case flavor.IDKindPhysical:
 		supervisor = NewScalingGroup(scaled, settings.config.Size, p.pollInterval)
-	case flavor.StaticIP:
-		supervisor = NewQuorum(scaled, settings.config.IPs, p.pollInterval)
+	case flavor.IDKindPhysicalWithLogical:
+		supervisor = NewQuorum(scaled, settings.config.LogicalIDs, p.pollInterval)
 	default:
 		panic("Unhandled Role type")
 	}
@@ -210,8 +206,8 @@ func (p *plugin) planUpdate(id group.ID, updatedSettings groupSettings) (updateP
 		return nil, fmt.Errorf("Group '%s' is not being watched", id)
 	}
 
-	if context.settings.role != updatedSettings.role {
-		return nil, errors.New("A group's role cannot be changed")
+	if context.settings.allocation != updatedSettings.allocation {
+		return nil, errors.New("A group's allocation kind cannot be changed")
 	}
 
 	return context.supervisor.PlanUpdate(context.scaled, context.settings, updatedSettings)

@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -11,7 +12,6 @@ import (
 	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/plugin/group/util"
 	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"golang.org/x/net/context"
 	"text/template"
@@ -31,29 +31,38 @@ type swarmProvisioner struct {
 	client client.APIClient
 }
 
-// TODO(wfarner): Tag instances with a UUID, and tag the Docker engine with the same UUID.  We will use this to
-// associate swarm nodes with instances.
-
 // TODO(wfarner): Add a ProvisionHelper function to check the health of an instance.  Use the Swarm node association
 // (see TODO above) to provide this.
 
-func (s swarmProvisioner) Validate(config group.Configuration, parsed types.Schema) error {
-	if config.Role == roleManager {
-		if len(parsed.IPs) != 1 && len(parsed.IPs) != 3 && len(parsed.IPs) != 5 {
-			return errors.New("Must have 1, 3, or 5 managers")
-		}
+func nodeTypeFromProperties(flavorProperties json.RawMessage) (string, error) {
+	properties := map[string]string{}
+
+	if err := json.Unmarshal(flavorProperties, &properties); err != nil {
+		return "", err
 	}
-	return nil
+
+	return properties["type"], nil
 }
 
-func (s swarmProvisioner) FlavorOf(roleName string) flavor.GroupFlavor {
-	switch roleName {
+func (s swarmProvisioner) Validate(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error) {
+	nodeType, err := nodeTypeFromProperties(flavorProperties)
+	if err != nil {
+		return flavor.IDKindUnknown, err
+	}
+
+	if nodeType == roleManager {
+		if len(parsed.LogicalIDs) != 1 && len(parsed.LogicalIDs) != 3 && len(parsed.LogicalIDs) != 5 {
+			return flavor.IDKindUnknown, errors.New("Must have 1, 3, or 5 managers")
+		}
+	}
+
+	switch nodeType {
 	case roleWorker:
-		return flavor.DynamicIP
+		return flavor.IDKindPhysical, nil
 	case roleManager:
-		return flavor.StaticIP
+		return flavor.IDKindPhysicalWithLogical, nil
 	default:
-		return flavor.Unknown
+		return flavor.IDKindUnknown, nil
 	}
 }
 
@@ -131,7 +140,12 @@ func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
 	return len(nodes) == 1, nil
 }
 
-func (s swarmProvisioner) PreProvision(config group.Configuration, spec instance.Spec) (instance.Spec, error) {
+func (s swarmProvisioner) PreProvision(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+
+	nodeType, err := nodeTypeFromProperties(flavorProperties)
+	if err != nil {
+		return spec, err
+	}
 
 	swarmStatus, err := s.client.SwarmInspect(context.Background())
 	if err != nil {
@@ -156,25 +170,24 @@ func (s swarmProvisioner) PreProvision(config group.Configuration, spec instance
 	associationID := util.RandomAlphaNumericString(8)
 	spec.Tags[associationTag] = associationID
 
-	switch config.Role {
+	switch nodeType {
 	case roleWorker:
-		spec.InitScript = generateInitScript(
+		spec.Init = generateInitScript(
 			self.ManagerStatus.Addr,
 			swarmStatus.JoinTokens.Worker,
 			associationID)
 
 	case roleManager:
-		if spec.PrivateIPAddress == nil {
+		if spec.LogicalID == nil {
 			return spec, errors.New("Manager nodes require an assigned private IP address")
 		}
 
-		spec.InitScript = generateInitScript(
+		spec.Init = generateInitScript(
 			self.ManagerStatus.Addr,
 			swarmStatus.JoinTokens.Manager,
 			associationID)
 
-		volume := instance.VolumeID(*spec.PrivateIPAddress)
-		spec.Volume = &volume
+		spec.Attachments = []instance.Attachment{instance.Attachment(*spec.LogicalID)}
 
 	default:
 		return spec, errors.New("Unsupported role type")
