@@ -67,7 +67,7 @@ different infrastructure using the same interface.
 
 | plugin| description                  |
 |:------|:-----------------------------|
-| [libmachete-group](https://github.com/docker/libmachete/plugin/group) | supports Instance and Flavor plugins, rolling updates |
+| [libmachete-group](https://github.com/docker/libmachete/plugin/group/group.go) | supports Instance and Flavor plugins, rolling updates |
 
 
 ### Building
