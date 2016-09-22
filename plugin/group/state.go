@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/plugin/group/util"
+	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
@@ -17,9 +18,10 @@ type Supervisor interface {
 }
 
 type groupSettings struct {
-	role   string
-	plugin instance.Plugin
-	config types.Schema
+	role           string
+	instancePlugin instance.Plugin
+	flavorPlugin   flavor.Plugin
+	config         types.Schema
 }
 
 type groupContext struct {
