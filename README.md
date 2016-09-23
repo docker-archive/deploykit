@@ -97,7 +97,7 @@ write a custom Group plugin for ultimate customizability.  The most concise conf
 }
 ````
 
-However, you would likey prefer to use the default Group plugin and implement a Flavor plugin to focus on
+However, you would likely prefer to use the default Group plugin and implement a Flavor plugin to focus on
 application-specific behavior.  This gives you immediate support for any infrastructure that has an Instance plugin.
 Your resulting configuration might look something like this:
 
