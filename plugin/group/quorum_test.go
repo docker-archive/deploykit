@@ -9,24 +9,29 @@ import (
 )
 
 var (
-	a = instance.Description{ID: instance.ID("a"), PrivateIPAddress: "10.0.0.2"}
-	b = instance.Description{ID: instance.ID("b"), PrivateIPAddress: "10.0.0.3"}
-	c = instance.Description{ID: instance.ID("c"), PrivateIPAddress: "10.0.0.4"}
-	d = instance.Description{ID: instance.ID("d"), PrivateIPAddress: "10.0.0.5"}
+	a = instance.Description{ID: instance.ID("a"), LogicalID: logicalID("one")}
+	b = instance.Description{ID: instance.ID("b"), LogicalID: logicalID("two")}
+	c = instance.Description{ID: instance.ID("c"), LogicalID: logicalID("three")}
+	d = instance.Description{ID: instance.ID("d"), LogicalID: logicalID("four")}
 
-	quorumAddresses = []string{
-		a.PrivateIPAddress,
-		b.PrivateIPAddress,
-		c.PrivateIPAddress,
+	logicalIDs = []instance.LogicalID{
+		*a.LogicalID,
+		*b.LogicalID,
+		*c.LogicalID,
 	}
 )
+
+func logicalID(value string) *instance.LogicalID {
+	id := instance.LogicalID(value)
+	return &id
+}
 
 func TestQuorumOK(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	scaled := mock_group.NewMockScaled(ctrl)
-	quorum := NewQuorum(scaled, quorumAddresses, 1*time.Millisecond)
+	quorum := NewQuorum(scaled, logicalIDs, 1*time.Millisecond)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
@@ -45,14 +50,14 @@ func TestRestoreQuorum(t *testing.T) {
 	defer ctrl.Finish()
 
 	scaled := mock_group.NewMockScaled(ctrl)
-	quorum := NewQuorum(scaled, quorumAddresses, 1*time.Millisecond)
+	quorum := NewQuorum(scaled, logicalIDs, 1*time.Millisecond)
 
-	ip := "10.0.0.4"
+	logicalID := *c.LogicalID
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
 		scaled.EXPECT().List().Return([]instance.Description{a, b}, nil),
-		scaled.EXPECT().CreateOne(&ip),
+		scaled.EXPECT().CreateOne(&logicalID),
 		scaled.EXPECT().List().Do(func() {
 			go quorum.Stop()
 		}).Return([]instance.Description{a, b, c}, nil),
@@ -68,7 +73,7 @@ func TestRemoveUnknown(t *testing.T) {
 	defer ctrl.Finish()
 
 	scaled := mock_group.NewMockScaled(ctrl)
-	quorum := NewQuorum(scaled, quorumAddresses, 1*time.Millisecond)
+	quorum := NewQuorum(scaled, logicalIDs, 1*time.Millisecond)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, c, b}, nil),

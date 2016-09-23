@@ -7,21 +7,20 @@ import (
 	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/plugin/group/util"
 	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
 )
 
 type fakeInstance struct {
-	ip   *string
-	tags map[string]string
+	logicalID *instance.LogicalID
+	tags      map[string]string
 }
 
 // NewTestInstancePlugin creates a new instance plugin for use in testing and development.
-func NewTestInstancePlugin(seedInstances ...map[string]string) instance.Plugin {
+func NewTestInstancePlugin(seedInstances ...fakeInstance) instance.Plugin {
 	plugin := testplugin{idPrefix: util.RandomAlphaNumericString(4), instances: map[instance.ID]fakeInstance{}}
-	for _, i := range seedInstances {
-		plugin.addInstance(fakeInstance{tags: i})
+	for _, inst := range seedInstances {
+		plugin.addInstance(inst)
 	}
 
 	return &plugin
@@ -50,7 +49,7 @@ func (d *testplugin) addInstance(inst fakeInstance) instance.ID {
 
 func (d *testplugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
-	id := d.addInstance(fakeInstance{ip: spec.PrivateIPAddress, tags: spec.Tags})
+	id := d.addInstance(fakeInstance{logicalID: spec.LogicalID, tags: spec.Tags})
 	return &id, nil
 }
 
@@ -81,15 +80,10 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 			}
 		}
 		if allMatched {
-			ip := ""
-			if inst.ip != nil {
-				ip = *inst.ip
-			}
-
 			desc = append(desc, instance.Description{
-				ID:               id,
-				PrivateIPAddress: ip,
-				Tags:             inst.tags,
+				ID:        id,
+				LogicalID: inst.logicalID,
+				Tags:      inst.tags,
 			})
 		}
 	}
@@ -98,33 +92,34 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 }
 
 const (
-	roleMinions = "minions"
-	roleLeaders = "leaders"
+	typeMinion = "minion"
+	typeLeader = "leader"
 )
 
 type testFlavor struct {
 	tags map[string]string
 }
 
-func (t testFlavor) Validate(config group.Configuration, parsed types.Schema) error {
-	return nil
-}
+func (t testFlavor) Validate(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error) {
 
-func (t testFlavor) FlavorOf(roleName string) flavor.GroupFlavor {
-	switch roleName {
-	case roleMinions:
-		return flavor.DynamicIP
-	case roleLeaders:
-		return flavor.StaticIP
+	properties := map[string]string{}
+	err := json.Unmarshal(flavorProperties, &properties)
+	if err != nil {
+		return flavor.IDKindUnknown, nil
+	}
+
+	switch properties["type"] {
+	case typeMinion:
+		return flavor.IDKindPhysical, nil
+	case typeLeader:
+		return flavor.IDKindPhysicalWithLogical, nil
 	default:
-		return flavor.Unknown
+		return flavor.IDKindUnknown, nil
 	}
 }
 
-func (t testFlavor) PreProvision(
-	config group.Configuration, spec instance.Spec) (instance.Spec, error) {
-
-	spec.InitScript = "echo hello"
+func (t testFlavor) PreProvision(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+	spec.Init = "echo hello"
 	for k, v := range t.tags {
 		spec.Tags[k] = v
 	}
