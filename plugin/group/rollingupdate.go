@@ -56,7 +56,7 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 			// Gather instances in the scaler with the desired state
 			// Check:
 			//   - that the scaler has the expected number of instances
-			//   - instances with the desired config are healthy (e.g. represented in `swarm node ls`)
+			//   - instances with the desired config are healthy
 
 			// TODO(wfarner): Get this information from the scaler to reduce redundant network calls.
 			instances, err := r.scaled.List()
@@ -99,7 +99,9 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 	expectedNewInstances := len(desired)
 
 	for {
-		err := r.waitUntilQuiesced(pollInterval, minInt(expectedNewInstances, int(r.updatingTo.config.Size)))
+		err := r.waitUntilQuiesced(
+			pollInterval,
+			minInt(expectedNewInstances, int(r.updatingTo.allocation.Size)))
 		if err != nil {
 			return err
 		}
@@ -122,7 +124,7 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		sort.Sort(sortByID(undesiredInstances))
 
 		// TODO(wfarner): Provide a mechanism to gracefully drain instances.
-		// TODO(wfarner): Make the 'batch size' configurable, but not for manager role groups.
+		// TODO(wfarner): Make the 'batch size' configurable.
 		r.scaled.Destroy(undesiredInstances[0].ID)
 
 		expectedNewInstances++

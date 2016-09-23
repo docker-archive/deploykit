@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/instance"
 	"text/template"
@@ -14,35 +13,37 @@ const (
 	roleMember = "member"
 )
 
-// NewPlugin creates a ProvisionHelper that creates manager and worker nodes connected in a swarm.
+// NewPlugin creates a ProvisionHelper that creates manager and worker nodes connected in a ZooKeeper quorum.
 func NewPlugin() flavor.Plugin {
-	return &swarmProvisioner{}
+	return &zkFlavor{}
 }
 
-type swarmProvisioner struct {
+type zkFlavor struct {
 }
 
-func nodeTypeFromProperties(flavorProperties json.RawMessage) (string, error) {
-	properties := map[string]string{}
-
-	if err := json.Unmarshal(flavorProperties, &properties); err != nil {
-		return "", err
-	}
-
-	return properties["type"], nil
+type schema struct {
+	Type string
+	Size uint
+	IPs  []instance.LogicalID
 }
 
-func (s swarmProvisioner) Validate(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error) {
-	nodeType, err := nodeTypeFromProperties(flavorProperties)
+func parseProperties(flavorProperties json.RawMessage) (schema, error) {
+	s := schema{}
+	err := json.Unmarshal(flavorProperties, &s)
+	return s, err
+}
+
+func (s zkFlavor) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
+	properties, err := parseProperties(flavorProperties)
 	if err != nil {
-		return flavor.IDKindUnknown, err
+		return flavor.AllocationMethod{}, err
 	}
 
-	switch nodeType {
+	switch properties.Type {
 	case roleMember:
-		return flavor.IDKindPhysicalWithLogical, nil
+		return flavor.AllocationMethod{LogicalIDs: properties.IPs}, nil
 	default:
-		return flavor.IDKindUnknown, nil
+		return flavor.AllocationMethod{}, errors.New("Unrecognized node Type")
 	}
 }
 
@@ -79,25 +80,25 @@ func generateBootScript(servers []string) string {
 	return buffer.String()
 }
 
-// Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
-// Swarm.
-func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
+// Healthy determines whether an instance is healthy.
+func (s zkFlavor) Healthy(inst instance.Description) (bool, error) {
+	// TODO(wfarner): Implement.
 	return true, nil
 }
 
-func (s swarmProvisioner) PreProvision(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
-	nodeType, err := nodeTypeFromProperties(flavorProperties)
+func (s zkFlavor) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return spec, err
 	}
 
-	switch nodeType {
+	switch properties.Type {
 	case roleMember:
 		if spec.LogicalID == nil {
 			return spec, errors.New("Manager nodes require an assigned private IP address")
 		}
 
-		// TODO(wfarner): Need access to the parsed group properties.
+		// TODO(wfarner): Use the node ID's position within schema.IPs as the myid value.
 		spec.Init = generateBootScript([]string{string(*spec.LogicalID)})
 
 	default:

@@ -27,16 +27,15 @@ func NewQuorum(scaled Scaled, logicalIDs []instance.LogicalID, pollInterval time
 }
 
 func (q *quorum) PlanUpdate(scaled Scaled, settings groupSettings, newSettings groupSettings) (updatePlan, error) {
-	if settings.config.Size != newSettings.config.Size {
-		return nil, errors.New("A quorum group cannot be resized")
-	}
 
-	if !reflect.DeepEqual(settings.config.LogicalIDs, newSettings.config.LogicalIDs) {
+	if !reflect.DeepEqual(settings.allocation.LogicalIDs, newSettings.allocation.LogicalIDs) {
 		return nil, errors.New("Logical ID changes to a quorum is not currently supported")
 	}
 
 	return &rollingupdate{
-		desc:       fmt.Sprintf("Performs a rolling update on %d instances", len(settings.config.LogicalIDs)),
+		desc: fmt.Sprintf(
+			"Performs a rolling update on %d instances",
+			len(settings.allocation.LogicalIDs)),
 		scaled:     scaled,
 		updatingTo: newSettings,
 		stop:       make(chan bool),
