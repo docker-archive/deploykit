@@ -34,10 +34,12 @@ func TestDirDiscovery(t *testing.T) {
 	discover, err := NewDir(dir)
 	require.NoError(t, err)
 
-	p := discover.PluginByName(name1)
+	p, err := discover.PluginByName(name1)
+	require.NoError(t, err)
 	require.NotNil(t, p)
 
-	p = discover.PluginByName(name2)
+	p, err = discover.PluginByName(name2)
+	require.NoError(t, err)
 	require.NotNil(t, p)
 
 	// Now we stop the servers
@@ -49,10 +51,12 @@ func TestDirDiscovery(t *testing.T) {
 	err = discover.Refresh()
 	require.Nil(t, err)
 
-	p = discover.PluginByName(name1)
+	p, err = discover.PluginByName(name1)
+	require.NoError(t, err)
 	require.Nil(t, p)
 
-	p = discover.PluginByName(name2)
+	p, err = discover.PluginByName(name2)
+	require.NoError(t, err)
 	require.NotNil(t, p)
 
 	close(stop2)
@@ -63,9 +67,15 @@ func TestDirDiscovery(t *testing.T) {
 	err = discover.Refresh()
 	require.Nil(t, err)
 
-	p = discover.PluginByName(name1)
+	p, err = discover.PluginByName(name1)
+	require.NoError(t, err)
 	require.Nil(t, p)
 
-	p = discover.PluginByName(name2)
+	p, err = discover.PluginByName(name2)
+	require.NoError(t, err)
 	require.Nil(t, p)
+
+	list, err := discover.List()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(list))
 }

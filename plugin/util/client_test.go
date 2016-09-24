@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func respond(t *testing.T, resp http.ResponseWriter, obj interface{}) {
+func testRespond(t *testing.T, resp http.ResponseWriter, obj interface{}) {
 	buff, err := json.Marshal(obj)
 	require.NoError(t, err)
 	resp.Write(buff)
@@ -53,7 +53,7 @@ func TestTCPClient(t *testing.T) {
 		read(t, req, &input)
 		require.Equal(t, serverReq, input)
 
-		respond(t, resp, serverResp)
+		testRespond(t, resp, serverResp)
 		return
 	}).Methods("POST")
 
@@ -68,7 +68,7 @@ func TestTCPClient(t *testing.T) {
 	require.NoError(t, err)
 
 	response := testResponse{}
-	_, err = client.Call("post", "/test", serverReq, &response)
+	_, err = client.Call(&HTTPEndpoint{Method: "post", Path: "/test"}, serverReq, &response)
 
 	require.NoError(t, err)
 	require.Equal(t, serverResp, response)
@@ -96,7 +96,7 @@ func TestUnixClient(t *testing.T) {
 		read(t, req, &input)
 		require.Equal(t, serverReq, input)
 
-		respond(t, resp, serverResp)
+		testRespond(t, resp, serverResp)
 		return
 	}).Methods("POST")
 
@@ -112,7 +112,7 @@ func TestUnixClient(t *testing.T) {
 	require.NoError(t, err)
 
 	response := testResponse{}
-	_, err = client.Call("post", "/test", serverReq, &response)
+	_, err = client.Call(&HTTPEndpoint{Method: "post", Path: "/test"}, serverReq, &response)
 
 	require.NoError(t, err)
 	require.Equal(t, serverResp, response)

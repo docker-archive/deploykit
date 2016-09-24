@@ -1,4 +1,4 @@
-package groupserver
+package main
 
 import (
 	"crypto/tls"

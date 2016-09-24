@@ -4,14 +4,38 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/Sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/plugin"
 )
+
+type HTTPEndpoint struct {
+	Method string
+	Path   string
+}
+
+func (h *HTTPEndpoint) String() string {
+	return "http:" + h.Method + ":" + h.Path
+}
+
+// GetHTTPEndpoint returns an http endpoint if the input endpoint is a supported http endpoint.
+func GetHTTPEndpoint(endpoint plugin.Endpoint) (*HTTPEndpoint, error) {
+	ep, ok := endpoint.(*HTTPEndpoint)
+	if !ok {
+		return nil, fmt.Errorf("unsupported endpoint: %v", endpoint)
+	}
+
+	if ep.Method == "" || ep.Path == "" {
+		return nil, fmt.Errorf("invalid http endpoint:%v", endpoint)
+	}
+	return ep, nil
+}
 
 // Client is the client that can access the driver either via tcp or unix
 type Client struct {
@@ -71,11 +95,17 @@ func (d *Client) GetEndpoint() *url.URL {
 	return &copy
 }
 
-// Call makes a call of the form of {op}.  For example op can be /v1/scaler.Start
-// Returns the raw bytes and error and unmarshals to result if result is not nil
-func (d *Client) Call(method, op string, message, result interface{}) ([]byte, error) {
-	m := strings.ToUpper(method)
-	url := fmt.Sprintf("http://%s%s", d.endpoint.Host, op)
+// Call implements the Callable interface.  Makes a call to a supported endpoint.
+func (d *Client) Call(endpoint plugin.Endpoint, message, result interface{}) ([]byte, error) {
+
+	// We only support http here.
+	ep, err := GetHTTPEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	m := strings.ToUpper(ep.Method)
+	url := fmt.Sprintf("http://%s%s", d.endpoint.Host, ep.Path)
 
 	var payload io.Reader
 	if message != nil {
@@ -93,7 +123,7 @@ func (d *Client) Call(method, op string, message, result interface{}) ([]byte, e
 	}
 	resp, err := d.c.Do(request)
 
-	logrus.Debugln("Call", d.endpoint.String(), "url=", url, "method=", m, "request=", string(tee.Bytes()), "err=", err)
+	logrus.Debugln("REQ --", d.endpoint.String(), "url=", url, "method=", m, "request=", string(tee.Bytes()), "err=", err)
 
 	if err != nil {
 		return nil, err
@@ -102,7 +132,7 @@ func (d *Client) Call(method, op string, message, result interface{}) ([]byte, e
 	defer resp.Body.Close()
 	buff, err := ioutil.ReadAll(resp.Body)
 
-	logrus.Debugln("Call", d.endpoint.String(), "url=", url, "method=", m, "response=", string(buff), "err=", err)
+	logrus.Debugln("RESP -", d.endpoint.String(), "url=", url, "method=", m, "response=", string(buff), "err=", err)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error:%d, msg=%s", resp.StatusCode, string(buff))

@@ -1,24 +1,26 @@
 package discovery
 
 import (
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/api/types"
-	plugin "github.com/docker/libmachete/plugin/util"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/plugin"
+	"github.com/docker/libmachete/plugin/util"
 )
 
 type pluginInstance struct {
-	types.Plugin
-	client *plugin.Client
+	name     string
+	endpoint string
+	client   *util.Client
 }
 
 // Call calls the plugin with some message
-func (i *pluginInstance) Call(method, op string, message, result interface{}) ([]byte, error) {
-	return i.client.Call(method, op, message, result)
+func (i *pluginInstance) Call(endpoint plugin.Endpoint, message, result interface{}) ([]byte, error) {
+	return i.client.Call(endpoint, message, result)
 }
 
 // Dir is an object for finding out what plugins we have access to.
@@ -29,14 +31,30 @@ type Dir struct {
 }
 
 // PluginByName returns a plugin by name
-func (r *Dir) PluginByName(name string) types.Callable {
+func (r *Dir) PluginByName(name string) (plugin.Callable, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	if instance, has := r.plugins[name]; has {
-		return instance
+		return instance, nil
 	}
-	return nil
+
+	// not there. try to load this..
+	entry, err := os.Stat(filepath.Join(r.dir, name))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	instance, err := r.dirLookup(entry)
+	if err != nil {
+		return nil, err
+	}
+
+	r.plugins[instance.name] = instance
+	return instance, nil
 }
 
 // NewDir creates a registry instance with the given file directory path.  The entries in the directory
@@ -47,6 +65,33 @@ func NewDir(dir string) (*Dir, error) {
 		dir:     dir,
 	}
 	return registry, registry.Refresh()
+}
+
+func (r *Dir) dirLookup(entry os.FileInfo) (*pluginInstance, error) {
+	var listenerURL string
+	if entry.Mode()&os.ModeSocket != 0 {
+		listenerURL = "unix://" + filepath.Join(r.dir, entry.Name())
+	} else {
+		// content is the url, name is the plugin name
+		f := filepath.Join(r.dir, entry.Name())
+		buff, err := ioutil.ReadFile(f)
+		if err != nil {
+			return nil, err
+		}
+		listenerURL = string(buff)
+	}
+
+	client, err := util.NewClient(listenerURL)
+	if err != nil {
+		log.Warningln("Not valid:", listenerURL, "dir=", r.dir, "file=", entry.Name())
+		return nil, err
+	}
+
+	return &pluginInstance{
+		endpoint: listenerURL,
+		name:     strings.Split(entry.Name(), ".")[0], // no file extension like .sock
+		client:   client,
+	}, nil
 }
 
 // Refresh rescans the driver directory to see what drivers are there.
@@ -66,36 +111,14 @@ entries:
 	for _, entry := range entries {
 		if !entry.IsDir() {
 
-			var listenerURL string
-
-			if entry.Mode()&os.ModeSocket != 0 {
-				listenerURL = "unix://" + filepath.Join(r.dir, entry.Name())
-			} else {
-				// content is the url, name is the plugin name
-				f := filepath.Join(r.dir, entry.Name())
-				log.Debugln("reading", f)
-				buff, err := ioutil.ReadFile(f)
-				if err != nil {
-					log.Warningln("cannot read", f)
-					continue entries
-				}
-				listenerURL = string(buff)
-			}
-
-			client, err := plugin.NewClient(listenerURL)
-			if err != nil {
-				log.Warningln("Not valid:", listenerURL, "dir=", r.dir, "file=", entry.Name())
+			instance, err := r.dirLookup(entry)
+			if err != nil || instance == nil {
+				log.Warningln("Loading plugin instance err=", err)
 				continue entries
 			}
 
-			log.Infoln("Discovered plugin at", listenerURL)
-			instance := &pluginInstance{
-				Plugin: types.Plugin{
-					Name: strings.Split(entry.Name(), ".")[0], // no file extension like .sock
-				},
-				client: client,
-			}
-			found[instance.Plugin.Name] = instance
+			log.Infoln("Discovered plugin at", instance.endpoint)
+			found[instance.name] = instance
 		}
 	}
 
@@ -103,4 +126,19 @@ entries:
 	r.plugins = found
 
 	return nil
+}
+
+// List returns a list of plugins known, keyed by the name
+func (r *Dir) List() (map[string]plugin.Callable, error) {
+	err := r.Refresh()
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]plugin.Callable{}
+
+	for k, v := range r.plugins {
+		result[k] = plugin.Callable(v)
+	}
+	return result, nil
 }
