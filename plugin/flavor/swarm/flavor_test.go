@@ -1,28 +1,43 @@
 package swarm
 
 import (
+	"encoding/json"
 	"fmt"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	mock_client "github.com/docker/libmachete/mock/docker/docker/client"
+	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func TestGroupKind(t *testing.T) {
+func TestValidate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	helper := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl))
+	swarmFlavor := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl))
 
-	require.Equal(t, flavor.DynamicIP, helper.FlavorOf("worker"))
-	require.Equal(t, flavor.StaticIP, helper.FlavorOf("manager"))
-	require.Equal(t, flavor.Unknown, helper.FlavorOf("other"))
+	kind, err := swarmFlavor.Validate(
+		json.RawMessage(`{"type": "worker"}`),
+		types.Schema{LogicalIDs: []instance.LogicalID{"one"}})
+	require.NoError(t, err)
+	require.Equal(t, flavor.IDKindPhysical, kind)
+
+	kind, err = swarmFlavor.Validate(
+		json.RawMessage(`{"type": "manager"}`),
+		types.Schema{LogicalIDs: []instance.LogicalID{"one"}})
+	require.NoError(t, err)
+	require.Equal(t, flavor.IDKindPhysicalWithLogical, kind)
+
+	kind, err = swarmFlavor.Validate(
+		json.RawMessage(`{"type": "other"}`),
+		types.Schema{LogicalIDs: []instance.LogicalID{"one"}})
+	require.NoError(t, err)
+	require.Equal(t, flavor.IDKindUnknown, kind)
 }
 
 func TestAssociation(t *testing.T) {
@@ -48,7 +63,7 @@ func TestAssociation(t *testing.T) {
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), "my-node-id").Return(nodeInfo, nil, nil)
 
 	details, err := helper.PreProvision(
-		group.Configuration{Role: "worker"},
+		json.RawMessage(`{"type": "worker"}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}})
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
@@ -57,9 +72,9 @@ func TestAssociation(t *testing.T) {
 
 	// Perform a rudimentary check to ensure that the expected fields are in the InitScript, without having any
 	// other knowledge about the script structure.
-	require.Contains(t, details.InitScript, associationID)
-	require.Contains(t, details.InitScript, swarmInfo.JoinTokens.Worker)
-	require.Contains(t, details.InitScript, nodeInfo.ManagerStatus.Addr)
+	require.Contains(t, details.Init, associationID)
+	require.Contains(t, details.Init, swarmInfo.JoinTokens.Worker)
+	require.Contains(t, details.Init, nodeInfo.ManagerStatus.Addr)
 
 	// An instance with no association information is considered unhealthy.
 	healthy, err := helper.Healthy(instance.Description{})

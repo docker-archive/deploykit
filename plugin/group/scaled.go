@@ -5,7 +5,6 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
 )
@@ -14,7 +13,7 @@ import (
 type Scaled interface {
 	// CreateOne creates a single instance in the scaled group.  Parameters may be provided to customize behavior
 	// of the instance.
-	CreateOne(privateIP *string)
+	CreateOne(id *instance.LogicalID)
 
 	// Destroy destroys a single instance.
 	Destroy(id instance.ID)
@@ -26,8 +25,8 @@ type Scaled interface {
 type scaledGroup struct {
 	instancePlugin   instance.Plugin
 	memberTags       map[string]string
-	config           group.Configuration
 	flavorPlugin     flavor.Plugin
+	flavorProperties json.RawMessage
 	provisionRequest json.RawMessage
 	provisionTags    map[string]string
 	lock             sync.Mutex
@@ -49,14 +48,14 @@ func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.provisionTags = tags
 }
 
-func (s *scaledGroup) getSpec(privateIP *string) (instance.Spec, error) {
+func (s *scaledGroup) getSpec(logicalID *instance.LogicalID) (instance.Spec, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	spec := instance.Spec{
-		Tags:             s.provisionTags,
-		PrivateIPAddress: privateIP,
-		Properties:       s.provisionRequest,
+		Tags:       s.provisionTags,
+		LogicalID:  logicalID,
+		Properties: s.provisionRequest,
 	}
 
 	if s.flavorPlugin != nil {
@@ -68,7 +67,7 @@ func (s *scaledGroup) getSpec(privateIP *string) (instance.Spec, error) {
 		spec.Tags = tags
 
 		var err error
-		spec, err = s.flavorPlugin.PreProvision(s.config, spec)
+		spec, err = s.flavorPlugin.PreProvision(s.flavorProperties, spec)
 		if err != nil {
 			return spec, err
 		}
@@ -77,8 +76,8 @@ func (s *scaledGroup) getSpec(privateIP *string) (instance.Spec, error) {
 	return spec, nil
 }
 
-func (s *scaledGroup) CreateOne(privateIP *string) {
-	spec, err := s.getSpec(privateIP)
+func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
+	spec, err := s.getSpec(logicalID)
 	if err != nil {
 		log.Errorf("Pre-provision failed: %s", err)
 		return
@@ -91,8 +90,8 @@ func (s *scaledGroup) CreateOne(privateIP *string) {
 	}
 
 	volumeDesc := ""
-	if spec.Volume != nil {
-		volumeDesc = fmt.Sprintf(" and volume %s", *spec.Volume)
+	if len(spec.Attachments) > 0 {
+		volumeDesc = fmt.Sprintf(" and attachments %s", spec.Attachments)
 	}
 
 	log.Infof("Created instance %s with tags %v%s", *id, spec.Tags, volumeDesc)
