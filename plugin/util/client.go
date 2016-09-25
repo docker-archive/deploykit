@@ -15,6 +15,7 @@ import (
 	"github.com/docker/libmachete/plugin"
 )
 
+// HTTPEndpoint is a specialization of an endpoint. It implements the Endpoint interface
 type HTTPEndpoint struct {
 	Method string
 	Path   string

@@ -38,12 +38,12 @@ func PluginClient(c plugin.Callable) instance.Plugin {
 }
 
 func (c *client) Validate(req json.RawMessage) error {
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Validate"}, nil, nil)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Instance.Validate"}, &req, nil)
 	return err
 }
 
 func (s *server) validate() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/Validate"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Instance.Validate"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			buff, err := ioutil.ReadAll(body)
@@ -60,12 +60,12 @@ func (c *client) Provision(spec instance.Spec) (*instance.ID, error) {
 	envelope := struct {
 		ID *instance.ID
 	}{}
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Provision"}, spec, &envelope)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Instance.Provision"}, spec, &envelope)
 	return envelope.ID, err
 }
 
 func (s *server) provision() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/Provision"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Instance.Provision"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			spec := instance.Spec{}
@@ -79,12 +79,12 @@ func (s *server) provision() (plugin.Endpoint, plugin.Handler) {
 }
 
 func (c *client) Destroy(instance instance.ID) error {
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/Destroy/%v", instance)}, nil, nil)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/Instance.Destroy/%v", instance)}, nil, nil)
 	return err
 }
 
 func (s *server) destroy() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/Destroy/{id}"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Instance.Destroy/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			err = s.plugin.Destroy(instance.ID(vars["id"]))
@@ -94,13 +94,13 @@ func (s *server) destroy() (plugin.Endpoint, plugin.Handler) {
 
 func (c *client) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
 	result := []instance.Description{}
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/DescribeInstances"}, tags, &result)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Instance.DescribeInstances"}, tags, &result)
 	return result, err
 
 }
 
 func (s *server) describeInstances() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/DescribeInstances"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Instance.DescribeInstances"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			tags := map[string]string{}

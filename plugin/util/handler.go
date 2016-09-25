@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// BuildHandler returns a http handler from a list of functions that return an endpoint and handler pair.
 func BuildHandler(endpoints []func() (plugin.Endpoint, plugin.Handler)) http.Handler {
 
 	router := mux.NewRouter()

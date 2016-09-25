@@ -40,12 +40,12 @@ func PluginServer(p group.Plugin) http.Handler {
 }
 
 func (c *client) WatchGroup(grp group.Configuration) error {
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Watch"}, grp, nil)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Group.Watch"}, grp, nil)
 	return err
 }
 
 func (s *server) watchGroup() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/Watch"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Watch"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			config := group.Configuration{}
@@ -59,12 +59,12 @@ func (s *server) watchGroup() (plugin.Endpoint, plugin.Handler) {
 }
 
 func (c *client) UnwatchGroup(id group.ID) error {
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/Unwatch/%v", id)}, nil, nil)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/Group.Unwatch/%v", id)}, nil, nil)
 	return err
 }
 
 func (s *server) unwatchGroup() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/Unwatch/{id}"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Unwatch/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			err = s.plugin.UnwatchGroup(group.ID(vars["id"]))
@@ -74,12 +74,12 @@ func (s *server) unwatchGroup() (plugin.Endpoint, plugin.Handler) {
 
 func (c *client) InspectGroup(id group.ID) (group.Description, error) {
 	description := group.Description{}
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/Inspect/%v", id)}, nil, &description)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/Group.Inspect/%v", id)}, nil, &description)
 	return description, err
 }
 
 func (s *server) inspectGroup() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/Inspect/{id}"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Inspect/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			return s.plugin.InspectGroup(group.ID(vars["id"]))
@@ -88,12 +88,12 @@ func (s *server) inspectGroup() (plugin.Endpoint, plugin.Handler) {
 
 func (c *client) DescribeUpdate(updated group.Configuration) (string, error) {
 	envelope := map[string]string{}
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/DescribeUpdate"}, updated, &envelope)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Group.DescribeUpdate"}, updated, &envelope)
 	return envelope["message"], err
 }
 
 func (s *server) describeUpdate() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/DescribeUpdate"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.DescribeUpdate"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			updated := group.Configuration{}
@@ -113,12 +113,12 @@ func (s *server) describeUpdate() (plugin.Endpoint, plugin.Handler) {
 }
 
 func (c *client) UpdateGroup(updated group.Configuration) error {
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/UpdateGroup"}, updated, nil)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Group.Update"}, updated, nil)
 	return err
 }
 
 func (s *server) updateGroup() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/UpdateGroup"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Update"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			updated := group.Configuration{}
@@ -132,12 +132,12 @@ func (s *server) updateGroup() (plugin.Endpoint, plugin.Handler) {
 }
 
 func (c *client) StopUpdate(id group.ID) error {
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/StopUpdate/%v", id)}, nil, nil)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/Group.StopUpdate/%v", id)}, nil, nil)
 	return err
 }
 
 func (s *server) stopUpdate() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/StopUpdate"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.StopUpdate"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			err = s.plugin.StopUpdate(group.ID(vars["id"]))
@@ -146,12 +146,12 @@ func (s *server) stopUpdate() (plugin.Endpoint, plugin.Handler) {
 }
 
 func (c *client) DestroyGroup(id group.ID) error {
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/DestroyGroup/%v", id)}, nil, nil)
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: fmt.Sprintf("/Group.Destroy/%v", id)}, nil, nil)
 	return err
 }
 
 func (s *server) destroyGroup() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/DestroyGroup/{id}"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Destroy/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			err = s.plugin.DestroyGroup(group.ID(vars["id"]))

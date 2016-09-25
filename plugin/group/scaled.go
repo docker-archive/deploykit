@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/instance"
 	"sync"
@@ -36,7 +37,7 @@ func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.provisionRequest = settings.config.InstancePluginProperties
+	s.provisionRequest = types.RawMessage(settings.config.InstancePluginProperties)
 	tags := map[string]string{}
 	for k, v := range s.memberTags {
 		tags[k] = v

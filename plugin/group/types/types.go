@@ -33,15 +33,26 @@ type Schema struct {
 	Size                     uint32
 	LogicalIDs               []instance.LogicalID
 	InstancePlugin           string
-	InstancePluginProperties json.RawMessage
+	InstancePluginProperties *json.RawMessage
 	FlavorPlugin             string
-	FlavorPluginProperties   json.RawMessage
+	FlavorPluginProperties   *json.RawMessage
 }
 
 // InstanceHash computes a stable hash of the document in InstancePluginProperties.
 func (c Schema) InstanceHash() string {
 	// TODO(wfarner): This does not take ProvisionHelper augmentations (e.g. tags, bootScript) into consideration.
-	return instanceHash(c.InstancePluginProperties)
+	return instanceHash(RawMessage(c.InstancePluginProperties))
+}
+
+// RawMessage converts a pointer to a raw message to a copy of the value. If the pointer is nil, it returns
+// an empty raw message.  This is useful for structs where fields are json.RawMessage pointers for bi-directional
+// marshal and unmarshal (value receivers will encode base64 instead of raw json when marshaled), so bi-directional
+// structs should use pointer fields.
+func RawMessage(r *json.RawMessage) (raw json.RawMessage) {
+	if r != nil {
+		raw = *r
+	}
+	return
 }
 
 func instanceHash(config json.RawMessage) string {

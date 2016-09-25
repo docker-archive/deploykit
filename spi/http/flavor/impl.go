@@ -1,10 +1,14 @@
 package flavor
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
+
 	"github.com/docker/libmachete/plugin"
 	"github.com/docker/libmachete/plugin/group/types"
+	"github.com/docker/libmachete/plugin/util"
 	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/group"
 	"github.com/docker/libmachete/spi/instance"
 )
 
@@ -12,31 +16,114 @@ type client struct {
 	c plugin.Callable
 }
 
+type server struct {
+	plugin flavor.Plugin
+}
+
 // PluginClient returns an instance of the Plugin
 func PluginClient(c plugin.Callable) flavor.Plugin {
 	return &client{c: c}
 }
 
-// Validate checks whether the helper can support a configuration.
-func (c *client) Validate(config group.Configuration, parsed types.Schema) error {
-	return nil
+// PluginServer returns an instance of the Plugin
+func PluginServer(p flavor.Plugin) http.Handler {
+
+	server := &server{plugin: p}
+	return util.BuildHandler([]func() (plugin.Endpoint, plugin.Handler){
+		server.validate,
+		server.preProvision,
+		server.healthy,
+	})
 }
 
-// FlavorOf translates the helper's role names into Roles that define how the group is managed.  This allows
-// a helper to define specialized roles and customize those machines accordingly in PreProvision().
-// TODO(wfarner): Consider removing this once FlavorPlugin is a first-class configuration entity.
-func (c *client) FlavorOf(roleName string) flavor.GroupFlavor {
-	return flavor.Unknown
+type validateRequest struct {
+	Properties *json.RawMessage
+	GroupSpec  types.Schema
 }
 
-// PreProvision allows the helper to modify the provisioning instructions for an instance.  For example, a
-// helper could be used to place additional tags on the machine, or generate a specialized BootScript based on
-// the machine configuration.
-func (c *client) PreProvision(config group.Configuration, spec instance.Spec) (instance.Spec, error) {
-	return spec, nil
+type validateResponse struct {
+	InstanceIDKind flavor.InstanceIDKind
 }
 
-// Healthy determines whether an instance is healthy.
+func (c *client) Validate(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error) {
+	request := validateRequest{Properties: &flavorProperties, GroupSpec: parsed}
+	response := validateResponse{}
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Validate"}, request, &response)
+	return response.InstanceIDKind, err
+}
+
+func (s *server) validate() (plugin.Endpoint, plugin.Handler) {
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Validate"},
+
+		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
+			request := validateRequest{}
+			err = json.NewDecoder(body).Decode(&request)
+			if err != nil {
+				return nil, err
+			}
+
+			var arg1 json.RawMessage
+			if request.Properties != nil {
+				arg1 = *request.Properties
+			}
+
+			kind, err := s.plugin.Validate(arg1, request.GroupSpec)
+			return validateResponse{InstanceIDKind: kind}, err
+		}
+}
+
+type preProvisionRequest struct {
+	Properties   *json.RawMessage
+	InstanceSpec instance.Spec
+}
+
+func (c *client) PreProvision(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+	request := preProvisionRequest{Properties: &flavorProperties, InstanceSpec: spec}
+	instanceSpec := instance.Spec{}
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.PreProvision"}, request, &instanceSpec)
+	return instanceSpec, err
+}
+
+func (s *server) preProvision() (plugin.Endpoint, plugin.Handler) {
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.PreProvision"},
+
+		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
+			request := preProvisionRequest{}
+			err = json.NewDecoder(body).Decode(&request)
+			if err != nil {
+				return nil, err
+			}
+
+			var arg1 json.RawMessage
+			if request.Properties != nil {
+				arg1 = *request.Properties
+			}
+
+			return s.plugin.PreProvision(arg1, request.InstanceSpec)
+		}
+}
+
+type healthResponse struct {
+	Healthy  bool
+	Instance instance.Description
+}
+
 func (c *client) Healthy(inst instance.Description) (bool, error) {
-	return true, nil
+	response := healthResponse{}
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Healthy"}, inst, &response)
+	return response.Healthy, err
+}
+
+func (s *server) healthy() (plugin.Endpoint, plugin.Handler) {
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Healthy"},
+
+		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
+			inst := instance.Description{}
+			err = json.NewDecoder(body).Decode(&inst)
+			if err != nil {
+				return nil, err
+			}
+			healthy, err := s.plugin.Healthy(inst)
+			return healthResponse{Healthy: healthy, Instance: inst}, err
+		}
 }

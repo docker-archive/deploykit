@@ -63,7 +63,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.FlavorPlugin, err)
 	}
 
-	allocation, err := flavorPlugin.Validate(parsed.FlavorPluginProperties, parsed)
+	allocation, err := flavorPlugin.Validate(types.RawMessage(parsed.FlavorPluginProperties), parsed)
 	if err != nil {
 		return noSettings, err
 	}
@@ -90,7 +90,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Instance plugin '%s':%v", parsed.InstancePlugin, err)
 	}
 
-	if err := instancePlugin.Validate(parsed.InstancePluginProperties); err != nil {
+	if err := instancePlugin.Validate(types.RawMessage(parsed.InstancePluginProperties)); err != nil {
 		return noSettings, err
 	}
 
@@ -118,7 +118,7 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	scaled := &scaledGroup{
 		instancePlugin:   settings.instancePlugin,
 		flavorPlugin:     settings.flavorPlugin,
-		flavorProperties: settings.config.FlavorPluginProperties,
+		flavorProperties: types.RawMessage(settings.config.FlavorPluginProperties),
 		memberTags:       map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)
