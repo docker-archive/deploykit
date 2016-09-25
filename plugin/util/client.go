@@ -109,17 +109,18 @@ func (d *Client) Call(endpoint plugin.Endpoint, message, result interface{}) ([]
 	m := strings.ToUpper(ep.Method)
 	url := fmt.Sprintf("http://%s%s", d.endpoint.Host, ep.Path)
 
-	var payload io.Reader
+	tee := new(bytes.Buffer)
+	var payload, body io.Reader
 	if message != nil {
 		if buff, err := json.Marshal(message); err == nil {
 			payload = bytes.NewBuffer(buff)
 		} else {
 			return nil, err
 		}
+		body = io.TeeReader(payload, tee)
 	}
 
-	tee := new(bytes.Buffer)
-	request, err := http.NewRequest(m, url, io.TeeReader(payload, tee))
+	request, err := http.NewRequest(m, url, body)
 	if err != nil {
 		return nil, err
 	}

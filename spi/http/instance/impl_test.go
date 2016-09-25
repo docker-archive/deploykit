@@ -34,7 +34,7 @@ func (t *testPlugin) Destroy(instance instance.ID) error {
 	return t.DoDestroy(instance)
 }
 func (t *testPlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
-	return t.DescribeInstances(tags)
+	return t.DoDescribeInstances(tags)
 }
 
 func TestInstancePluginValidate(t *testing.T) {
@@ -72,9 +72,7 @@ func TestInstancePluginValidate(t *testing.T) {
 func TestInstancePluginValidateError(t *testing.T) {
 
 	listen := "tcp://:4321"
-
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
-
 	rawActual := make(chan json.RawMessage, 1)
 
 	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
@@ -99,4 +97,240 @@ func TestInstancePluginValidateError(t *testing.T) {
 
 	close(stop)
 	require.Equal(t, raw, <-rawActual)
+}
+
+func TestInstancePluginProvisionNil(t *testing.T) {
+	listen := "tcp://:4321"
+
+	raw := json.RawMessage([]byte(`{"test":"foo"}`))
+	specActual := make(chan instance.Spec, 1)
+	spec := instance.Spec{
+		Properties: &raw,
+	}
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoProvision: func(req instance.Spec) (*instance.ID, error) {
+			specActual <- req
+			return nil, nil
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	var id *instance.ID
+	id, err = instancePluginClient.Provision(spec)
+	require.NoError(t, err)
+	require.Nil(t, id)
+
+	close(stop)
+
+	require.Equal(t, spec, <-specActual)
+}
+
+func TestInstancePluginProvision(t *testing.T) {
+	listen := "tcp://:4321"
+
+	raw := json.RawMessage([]byte(`{"test":"foo"}`))
+	specActual := make(chan instance.Spec, 1)
+	spec := instance.Spec{
+		Properties: &raw,
+	}
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoProvision: func(req instance.Spec) (*instance.ID, error) {
+			specActual <- req
+			v := instance.ID("test")
+			return &v, nil
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	var id *instance.ID
+	id, err = instancePluginClient.Provision(spec)
+	require.NoError(t, err)
+	require.Equal(t, "test", string(*id))
+
+	close(stop)
+
+	require.Equal(t, spec, <-specActual)
+}
+
+func TestInstancePluginProvisionError(t *testing.T) {
+	listen := "tcp://:4321"
+
+	raw := json.RawMessage([]byte(`{"test":"foo"}`))
+	specActual := make(chan instance.Spec, 1)
+	spec := instance.Spec{
+		Properties: &raw,
+	}
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoProvision: func(req instance.Spec) (*instance.ID, error) {
+			specActual <- req
+			return nil, errors.New("nope")
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	_, err = instancePluginClient.Provision(spec)
+	require.Error(t, err)
+	require.Equal(t, "nope", err.Error())
+
+	close(stop)
+
+	require.Equal(t, spec, <-specActual)
+}
+
+func TestInstancePluginDestroy(t *testing.T) {
+	listen := "tcp://:4321"
+
+	inst := instance.ID("hello")
+	instActual := make(chan instance.ID, 1)
+
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoDestroy: func(req instance.ID) error {
+			instActual <- req
+			return nil
+		},
+	}))
+	require.NoError(t, err)
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	err = instancePluginClient.Destroy(inst)
+	require.NoError(t, err)
+
+	close(stop)
+
+	require.Equal(t, inst, <-instActual)
+}
+
+func TestInstancePluginDestroyError(t *testing.T) {
+	listen := "tcp://:4321"
+
+	inst := instance.ID("hello")
+	instActual := make(chan instance.ID, 1)
+
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoDestroy: func(req instance.ID) error {
+			instActual <- req
+			return errors.New("can't do")
+		},
+	}))
+	require.NoError(t, err)
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	err = instancePluginClient.Destroy(inst)
+	require.Error(t, err)
+	require.Equal(t, "can't do", err.Error())
+
+	close(stop)
+	require.Equal(t, inst, <-instActual)
+}
+
+func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
+	listen := "tcp://:4321"
+
+	var tags map[string]string
+	tagsActual := make(chan map[string]string, 1)
+	list := []instance.Description{
+		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
+	}
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+			tagsActual <- req
+			return list, nil
+		},
+	}))
+	require.NoError(t, err)
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	l, err := instancePluginClient.DescribeInstances(tags)
+	require.NoError(t, err)
+	require.Equal(t, list, l)
+
+	close(stop)
+	require.Equal(t, tags, <-tagsActual)
+}
+
+func TestInstancePluginDescribeInstances(t *testing.T) {
+	listen := "tcp://:4321"
+
+	tags := map[string]string{
+		"foo": "bar",
+	}
+	tagsActual := make(chan map[string]string, 1)
+	list := []instance.Description{
+		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
+	}
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+			tagsActual <- req
+			return list, nil
+		},
+	}))
+	require.NoError(t, err)
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	l, err := instancePluginClient.DescribeInstances(tags)
+	require.NoError(t, err)
+	require.Equal(t, list, l)
+
+	close(stop)
+	require.Equal(t, tags, <-tagsActual)
+}
+
+func TestInstancePluginDescribeInstancesError(t *testing.T) {
+	listen := "tcp://:4321"
+
+	tags := map[string]string{
+		"foo": "bar",
+	}
+	tagsActual := make(chan map[string]string, 1)
+	list := []instance.Description{
+		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
+	}
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+			tagsActual <- req
+			return list, errors.New("bad!!")
+		},
+	}))
+	require.NoError(t, err)
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	_, err = instancePluginClient.DescribeInstances(tags)
+	require.Error(t, err)
+	require.Equal(t, "bad!!", err.Error())
+
+	close(stop)
+	require.Equal(t, tags, <-tagsActual)
 }
