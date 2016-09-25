@@ -45,7 +45,7 @@ type plugin struct {
 	groups          groups
 }
 
-func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
+func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 
 	noSettings := groupSettings{}
 
@@ -102,7 +102,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 	}, nil
 }
 
-func (p *plugin) WatchGroup(config group.Configuration) error {
+func (p *plugin) WatchGroup(config group.Spec) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -213,7 +213,7 @@ func (p *plugin) planUpdate(id group.ID, updatedSettings groupSettings) (updateP
 	return context.supervisor.PlanUpdate(context.scaled, context.settings, updatedSettings)
 }
 
-func (p *plugin) DescribeUpdate(updated group.Configuration) (string, error) {
+func (p *plugin) DescribeUpdate(updated group.Spec) (string, error) {
 	updatedSettings, err := p.validate(updated)
 	if err != nil {
 		return "", err
@@ -247,7 +247,7 @@ func (p *plugin) initiateUpdate(id group.ID, updatedSettings groupSettings) (upd
 	return plan, nil
 }
 
-func (p *plugin) UpdateGroup(updated group.Configuration) error {
+func (p *plugin) UpdateGroup(updated group.Spec) error {
 	updatedSettings, err := p.validate(updated)
 	if err != nil {
 		return err

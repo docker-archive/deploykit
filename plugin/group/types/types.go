@@ -12,9 +12,9 @@ import (
 // These types are declared in a separate package to break an import cycle between group (test) -> mock -> group.
 
 // ParseProperties parses the group plugin properties JSON document in a group configuration.
-func ParseProperties(config group.Configuration) (Schema, error) {
+func ParseProperties(config group.Spec) (Schema, error) {
 	parsed := Schema{}
-	if err := json.Unmarshal([]byte(config.Properties), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(RawMessage(config.Properties)), &parsed); err != nil {
 		return parsed, fmt.Errorf("Invalid properties: %s", err)
 	}
 	return parsed, nil
@@ -28,7 +28,7 @@ func MustParse(s Schema, e error) Schema {
 	return s
 }
 
-// Schema is the document schema for the plugin, provided in group.Configuration.
+// Schema is the document schema for the plugin, provided in group.Spec.
 type Schema struct {
 	Size                     uint32
 	LogicalIDs               []instance.LogicalID

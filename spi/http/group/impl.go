@@ -39,7 +39,7 @@ func PluginServer(p group.Plugin) http.Handler {
 	})
 }
 
-func (c *client) WatchGroup(grp group.Configuration) error {
+func (c *client) WatchGroup(grp group.Spec) error {
 	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Group.Watch"}, grp, nil)
 	return err
 }
@@ -48,7 +48,7 @@ func (s *server) watchGroup() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Watch"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
-			config := group.Configuration{}
+			config := group.Spec{}
 			err = json.NewDecoder(body).Decode(&config)
 			if err != nil {
 				return nil, err
@@ -86,7 +86,7 @@ func (s *server) inspectGroup() (plugin.Endpoint, plugin.Handler) {
 		}
 }
 
-func (c *client) DescribeUpdate(updated group.Configuration) (string, error) {
+func (c *client) DescribeUpdate(updated group.Spec) (string, error) {
 	envelope := map[string]string{}
 	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Group.DescribeUpdate"}, updated, &envelope)
 	return envelope["message"], err
@@ -96,7 +96,7 @@ func (s *server) describeUpdate() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.DescribeUpdate"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
-			updated := group.Configuration{}
+			updated := group.Spec{}
 			err = json.NewDecoder(body).Decode(&updated)
 			if err != nil {
 				return nil, err
@@ -112,7 +112,7 @@ func (s *server) describeUpdate() (plugin.Endpoint, plugin.Handler) {
 		}
 }
 
-func (c *client) UpdateGroup(updated group.Configuration) error {
+func (c *client) UpdateGroup(updated group.Spec) error {
 	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Group.Update"}, updated, nil)
 	return err
 }
@@ -121,7 +121,7 @@ func (s *server) updateGroup() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Update"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
-			updated := group.Configuration{}
+			updated := group.Spec{}
 			err = json.NewDecoder(body).Decode(&updated)
 			if err != nil {
 				return nil, err
@@ -137,7 +137,7 @@ func (c *client) StopUpdate(id group.ID) error {
 }
 
 func (s *server) stopUpdate() (plugin.Endpoint, plugin.Handler) {
-	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.StopUpdate"},
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.StopUpdate/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			err = s.plugin.StopUpdate(group.ID(vars["id"]))

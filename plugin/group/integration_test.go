@@ -20,12 +20,12 @@ const (
 )
 
 var (
-	minions = group.Configuration{
+	minions = group.Spec{
 		ID:         id,
 		Properties: minionProperties(3, "data"),
 	}
 
-	leaders = group.Configuration{
+	leaders = group.Spec{
 		ID:         id,
 		Properties: leaderProperties(leaderIDs, "data"),
 	}
@@ -39,8 +39,8 @@ func flavorPluginLookup(_ string) (flavor.Plugin, error) {
 	return &flavorPlugin, nil
 }
 
-func minionProperties(instances int, data string) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(`{
+func minionProperties(instances int, data string) *json.RawMessage {
+	r := json.RawMessage(fmt.Sprintf(`{
 	  "Size": %d,
 	  "InstancePlugin": "test",
 	  "InstancePluginProperties": {
@@ -51,15 +51,16 @@ func minionProperties(instances int, data string) json.RawMessage {
 	    "type": "minion"
 	  }
 	}`, instances, data))
+	return &r
 }
 
-func leaderProperties(logicalIDs []instance.LogicalID, data string) json.RawMessage {
+func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMessage {
 	idsValue, err := json.Marshal(logicalIDs)
 	if err != nil {
 		panic(err)
 	}
 
-	return json.RawMessage(fmt.Sprintf(`{
+	r := json.RawMessage(fmt.Sprintf(`{
 	  "LogicalIDs": %s,
 	  "InstancePlugin": "test",
 	  "InstancePluginProperties": {
@@ -70,6 +71,7 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) json.RawMess
 	    "type": "leader"
 	  }
 	}`, idsValue, data))
+	return &r
 }
 
 func fakeInstancePluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLookup {
@@ -103,16 +105,16 @@ func TestInvalidGroupCalls(t *testing.T) {
 	require.Error(t, grp.UpdateGroup(minions))
 }
 
-func instanceProperties(config group.Configuration) json.RawMessage {
+func instanceProperties(config group.Spec) json.RawMessage {
 	groupProperties := map[string]json.RawMessage{}
-	err := json.Unmarshal(config.Properties, &groupProperties)
+	err := json.Unmarshal(*config.Properties, &groupProperties)
 	if err != nil {
 		panic(err)
 	}
 	return groupProperties["InstancePluginProperties"]
 }
 
-func expectValidate(plugin *mock_instance.MockPlugin, config group.Configuration) *gomock.Call {
+func expectValidate(plugin *mock_instance.MockPlugin, config group.Spec) *gomock.Call {
 	return plugin.EXPECT().Validate(instanceProperties(config))
 }
 
@@ -120,7 +122,7 @@ func memberTags(id group.ID) map[string]string {
 	return map[string]string{groupTag: string(id)}
 }
 
-func provisionTags(config group.Configuration) map[string]string {
+func provisionTags(config group.Spec) map[string]string {
 	tags := memberTags(config.ID)
 	tags[configTag] = types.MustParse(types.ParseProperties(config)).InstanceHash()
 
@@ -131,7 +133,7 @@ func provisionTags(config group.Configuration) map[string]string {
 	return tags
 }
 
-func newFakeInstance(config group.Configuration, logicalID *instance.LogicalID) fakeInstance {
+func newFakeInstance(config group.Spec, logicalID *instance.LogicalID) fakeInstance {
 	// Inject another tag to simulate instances being tagged out-of-band.  Our implementation should ignore tags
 	// we did not create.
 	tags := map[string]string{"other": "ignored"}
@@ -179,7 +181,7 @@ func TestRollingUpdate(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Properties: minionProperties(3, "data2")}
+	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -205,7 +207,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Properties: minionProperties(8, "data2")}
+	updated := group.Spec{ID: id, Properties: minionProperties(8, "data2")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -237,7 +239,7 @@ func TestScaleIncrease(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Properties: minionProperties(8, "data")}
+	updated := group.Spec{ID: id, Properties: minionProperties(8, "data")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -266,7 +268,7 @@ func TestScaleDecrease(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Configuration{ID: id, Properties: minionProperties(1, "data")}
+	updated := group.Spec{ID: id, Properties: minionProperties(1, "data")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -322,7 +324,7 @@ func TestSuperviseQuorum(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(leaders))
 
-	updated := group.Configuration{ID: id, Properties: leaderProperties(leaderIDs, "data2")}
+	updated := group.Spec{ID: id, Properties: leaderProperties(leaderIDs, "data2")}
 
 	time.Sleep(1 * time.Second)
 
