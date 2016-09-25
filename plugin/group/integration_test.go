@@ -71,7 +71,7 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMes
 	    "Shards": %s
 	  }
 	}`, data, idsValue))
-	return *r
+	return &r
 }
 
 func fakeInstancePluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLookup {

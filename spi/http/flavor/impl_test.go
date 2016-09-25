@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/plugin/util"
 	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/instance"
@@ -19,16 +18,16 @@ func listenAddr() string {
 }
 
 type testPlugin struct {
-	DoValidate     func(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error)
-	DoPreProvision func(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error)
-	DoHealthy      func(inst instance.Description) (bool, error)
+	DoValidate func(flavorProperties json.RawMessage) (flavor.AllocationMethod, error)
+	DoPrepare  func(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error)
+	DoHealthy  func(inst instance.Description) (bool, error)
 }
 
-func (t *testPlugin) Validate(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error) {
-	return t.DoValidate(flavorProperties, parsed)
+func (t *testPlugin) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
+	return t.DoValidate(flavorProperties)
 }
-func (t *testPlugin) PreProvision(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
-	return t.DoPreProvision(flavorProperties, spec)
+func (t *testPlugin) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+	return t.DoPrepare(flavorProperties, spec)
 }
 func (t *testPlugin) Healthy(inst instance.Description) (bool, error) {
 	return t.DoHealthy(inst)
@@ -39,24 +38,14 @@ func TestFlavorPluginValidate(t *testing.T) {
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
-	inputGroupSpecActual := make(chan types.Schema, 1)
-	inputGroupSpec := types.Schema{
-		Size:                   1,
-		LogicalIDs:             []instance.LogicalID{instance.LogicalID("overlord")},
-		FlavorPlugin:           "zookeeper",
-		FlavorPluginProperties: &inputFlavorProperties,
+
+	allocation := flavor.AllocationMethod{
+		Size: 10,
 	}
-
-	instanceIDKind := flavor.IDKindPhysical
-
 	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
-		DoValidate: func(flavorProperties json.RawMessage, groupSpec types.Schema) (flavor.InstanceIDKind, error) {
-
-			t.Log("Received:", string(flavorProperties), groupSpec)
+		DoValidate: func(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
 			inputFlavorPropertiesActual <- flavorProperties
-			inputGroupSpecActual <- groupSpec
-
-			return instanceIDKind, nil
+			return allocation, nil
 		},
 	}))
 	require.NoError(t, err)
@@ -67,14 +56,13 @@ func TestFlavorPluginValidate(t *testing.T) {
 	flavorPluginClient := PluginClient(callable)
 
 	// Make call
-	kind, err := flavorPluginClient.Validate(inputFlavorProperties, inputGroupSpec)
+	alloc, err := flavorPluginClient.Validate(inputFlavorProperties)
 	require.NoError(t, err)
-	require.Equal(t, instanceIDKind, kind)
+	require.Equal(t, allocation, alloc)
 
 	close(stop)
 
 	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
-	require.Equal(t, inputGroupSpec, <-inputGroupSpecActual)
 }
 
 func TestFlavorPluginValidateError(t *testing.T) {
@@ -82,19 +70,15 @@ func TestFlavorPluginValidateError(t *testing.T) {
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
-	inputGroupSpecActual := make(chan types.Schema, 1)
-	inputGroupSpec := types.Schema{
-		Size:                   1,
-		LogicalIDs:             []instance.LogicalID{instance.LogicalID("overlord")},
-		FlavorPlugin:           "zookeeper",
-		FlavorPluginProperties: &inputFlavorProperties,
+	allocation := flavor.AllocationMethod{
+		Size:       1,
+		LogicalIDs: []instance.LogicalID{instance.LogicalID("overlord")},
 	}
 
 	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
-		DoValidate: func(flavorProperties json.RawMessage, groupSpec types.Schema) (flavor.InstanceIDKind, error) {
+		DoValidate: func(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
 			inputFlavorPropertiesActual <- flavorProperties
-			inputGroupSpecActual <- groupSpec
-			return flavor.IDKindUnknown, errors.New("something-went-wrong")
+			return allocation, errors.New("something-went-wrong")
 		},
 	}))
 	require.NoError(t, err)
@@ -105,17 +89,15 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	flavorPluginClient := PluginClient(callable)
 
 	// Make call
-	_, err = flavorPluginClient.Validate(inputFlavorProperties, inputGroupSpec)
+	_, err = flavorPluginClient.Validate(inputFlavorProperties)
 	require.Error(t, err)
 	require.Equal(t, "something-went-wrong", err.Error())
 
 	close(stop)
-
 	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
-	require.Equal(t, inputGroupSpec, <-inputGroupSpecActual)
 }
 
-func TestFlavorPluginPreProvision(t *testing.T) {
+func TestFlavorPluginPrepare(t *testing.T) {
 	listen := listenAddr()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
@@ -127,7 +109,7 @@ func TestFlavorPluginPreProvision(t *testing.T) {
 	}
 
 	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
-		DoPreProvision: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
+		DoPrepare: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
 			inputInstanceSpecActual <- instanceSpec
@@ -143,7 +125,7 @@ func TestFlavorPluginPreProvision(t *testing.T) {
 	flavorPluginClient := PluginClient(callable)
 
 	// Make call
-	spec, err := flavorPluginClient.PreProvision(inputFlavorProperties, inputInstanceSpec)
+	spec, err := flavorPluginClient.Prepare(inputFlavorProperties, inputInstanceSpec)
 	require.NoError(t, err)
 	require.Equal(t, inputInstanceSpec, spec)
 
@@ -153,7 +135,7 @@ func TestFlavorPluginPreProvision(t *testing.T) {
 	require.Equal(t, inputInstanceSpec, <-inputInstanceSpecActual)
 }
 
-func TestFlavorPluginPreProvisionError(t *testing.T) {
+func TestFlavorPluginPrepareError(t *testing.T) {
 	listen := listenAddr()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
@@ -165,7 +147,7 @@ func TestFlavorPluginPreProvisionError(t *testing.T) {
 	}
 
 	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
-		DoPreProvision: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
+		DoPrepare: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
 			inputInstanceSpecActual <- instanceSpec
@@ -181,7 +163,7 @@ func TestFlavorPluginPreProvisionError(t *testing.T) {
 	flavorPluginClient := PluginClient(callable)
 
 	// Make call
-	_, err = flavorPluginClient.PreProvision(inputFlavorProperties, inputInstanceSpec)
+	_, err = flavorPluginClient.Prepare(inputFlavorProperties, inputInstanceSpec)
 	require.Error(t, err)
 	require.Equal(t, "bad-thing-happened", err.Error())
 
