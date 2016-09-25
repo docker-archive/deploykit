@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -135,13 +136,24 @@ func (d *Client) Call(endpoint plugin.Endpoint, message, result interface{}) ([]
 
 	logrus.Debugln("RESP -", d.endpoint.String(), "url=", url, "method=", m, "response=", string(buff), "err=", err)
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error:%d, msg=%s", resp.StatusCode, string(buff))
-	}
+	switch resp.StatusCode {
 
-	if result != nil {
-		err = json.Unmarshal(buff, result)
-	}
+	case http.StatusOK:
+		if result != nil {
+			err = json.Unmarshal(buff, result)
+		}
+		return buff, err
 
-	return buff, err
+	case http.StatusBadRequest:
+		// try to unmarshal an error structure
+		m := struct {
+			Error string `json:"error,omitempty"`
+		}{}
+		err = json.Unmarshal(buff, &m)
+		if err == nil && m.Error != "" {
+			// found error message
+			return nil, errors.New(m.Error)
+		}
+	}
+	return nil, fmt.Errorf("error:%d, msg=%s", resp.StatusCode, string(buff))
 }

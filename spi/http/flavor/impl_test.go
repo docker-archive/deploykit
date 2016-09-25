@@ -2,6 +2,7 @@ package flavor
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/docker/libmachete/plugin/group/types"
@@ -63,6 +64,44 @@ func TestFlavorPluginValidate(t *testing.T) {
 	kind, err := flavorPluginClient.Validate(inputFlavorProperties, inputGroupSpec)
 	require.NoError(t, err)
 	require.Equal(t, instanceIDKind, kind)
+
+	close(stop)
+
+	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
+	require.Equal(t, inputGroupSpec, <-inputGroupSpecActual)
+}
+
+func TestFlavorPluginValidateError(t *testing.T) {
+	listen := "tcp://:4322"
+
+	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
+	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputGroupSpecActual := make(chan types.Schema, 1)
+	inputGroupSpec := types.Schema{
+		Size:                   1,
+		LogicalIDs:             []instance.LogicalID{instance.LogicalID("overlord")},
+		FlavorPlugin:           "zookeeper",
+		FlavorPluginProperties: &inputFlavorProperties,
+	}
+
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoValidate: func(flavorProperties json.RawMessage, groupSpec types.Schema) (flavor.InstanceIDKind, error) {
+			inputFlavorPropertiesActual <- flavorProperties
+			inputGroupSpecActual <- groupSpec
+			return flavor.IDKindUnknown, errors.New("something-went-wrong")
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	flavorPluginClient := PluginClient(callable)
+
+	// Make call
+	_, err = flavorPluginClient.Validate(inputFlavorProperties, inputGroupSpec)
+	require.Error(t, err)
+	require.Equal(t, "something-went-wrong", err.Error())
 
 	close(stop)
 
