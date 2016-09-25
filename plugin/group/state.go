@@ -18,7 +18,7 @@ type Supervisor interface {
 }
 
 type groupSettings struct {
-	allocation     flavor.InstanceIDKind
+	allocation     flavor.AllocationMethod
 	instancePlugin instance.Plugin
 	flavorPlugin   flavor.Plugin
 	config         types.Schema
