@@ -3,6 +3,8 @@ package flavor
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/docker/libmachete/plugin/group/types"
@@ -11,6 +13,10 @@ import (
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/stretchr/testify/require"
 )
+
+func listenAddr() string {
+	return fmt.Sprintf("tcp://:%d", rand.Int()%10000+1000)
+}
 
 type testPlugin struct {
 	DoValidate     func(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error)
@@ -29,7 +35,7 @@ func (t *testPlugin) Healthy(inst instance.Description) (bool, error) {
 }
 
 func TestFlavorPluginValidate(t *testing.T) {
-	listen := "tcp://:4322"
+	listen := listenAddr()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -72,7 +78,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 }
 
 func TestFlavorPluginValidateError(t *testing.T) {
-	listen := "tcp://:4322"
+	listen := listenAddr()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -110,7 +116,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 }
 
 func TestFlavorPluginPreProvision(t *testing.T) {
-	listen := "tcp://:4322"
+	listen := listenAddr()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -148,7 +154,7 @@ func TestFlavorPluginPreProvision(t *testing.T) {
 }
 
 func TestFlavorPluginPreProvisionError(t *testing.T) {
-	listen := "tcp://:4322"
+	listen := listenAddr()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -186,7 +192,7 @@ func TestFlavorPluginPreProvisionError(t *testing.T) {
 }
 
 func TestFlavorPluginHealthy(t *testing.T) {
-	listen := "tcp://:4322"
+	listen := listenAddr()
 
 	inputInstanceActual := make(chan instance.Description, 1)
 	inputInstance := instance.Description{
@@ -216,7 +222,7 @@ func TestFlavorPluginHealthy(t *testing.T) {
 }
 
 func TestFlavorPluginHealthyError(t *testing.T) {
-	listen := "tcp://:4322"
+	listen := listenAddr()
 
 	inputInstanceActual := make(chan instance.Description, 1)
 	inputInstance := instance.Description{

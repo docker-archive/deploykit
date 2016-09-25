@@ -3,12 +3,18 @@ package instance
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/docker/libmachete/plugin/util"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/stretchr/testify/require"
 )
+
+func listenAddr() string {
+	return fmt.Sprintf("tcp://:%d", rand.Int()%10000+1000)
+}
 
 type testPlugin struct {
 	// Validate performs local validation on a provision request.
@@ -39,7 +45,7 @@ func (t *testPlugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 
 func TestInstancePluginValidate(t *testing.T) {
 
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 
@@ -71,7 +77,7 @@ func TestInstancePluginValidate(t *testing.T) {
 
 func TestInstancePluginValidateError(t *testing.T) {
 
-	listen := "tcp://:4321"
+	listen := listenAddr()
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 	rawActual := make(chan json.RawMessage, 1)
 
@@ -100,7 +106,7 @@ func TestInstancePluginValidateError(t *testing.T) {
 }
 
 func TestInstancePluginProvisionNil(t *testing.T) {
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -132,7 +138,7 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 }
 
 func TestInstancePluginProvision(t *testing.T) {
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -165,7 +171,7 @@ func TestInstancePluginProvision(t *testing.T) {
 }
 
 func TestInstancePluginProvisionError(t *testing.T) {
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -196,7 +202,7 @@ func TestInstancePluginProvisionError(t *testing.T) {
 }
 
 func TestInstancePluginDestroy(t *testing.T) {
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
@@ -222,7 +228,7 @@ func TestInstancePluginDestroy(t *testing.T) {
 }
 
 func TestInstancePluginDestroyError(t *testing.T) {
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
@@ -248,7 +254,7 @@ func TestInstancePluginDestroyError(t *testing.T) {
 }
 
 func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	var tags map[string]string
 	tagsActual := make(chan map[string]string, 1)
@@ -276,7 +282,7 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 }
 
 func TestInstancePluginDescribeInstances(t *testing.T) {
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	tags := map[string]string{
 		"foo": "bar",
@@ -306,7 +312,7 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 }
 
 func TestInstancePluginDescribeInstancesError(t *testing.T) {
-	listen := "tcp://:4321"
+	listen := listenAddr()
 
 	tags := map[string]string{
 		"foo": "bar",
