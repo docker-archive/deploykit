@@ -56,7 +56,7 @@ func (s *scaledGroup) getSpec(logicalID *instance.LogicalID) (instance.Spec, err
 	spec := instance.Spec{
 		Tags:       s.provisionTags,
 		LogicalID:  logicalID,
-		Properties: s.provisionRequest,
+		Properties: &s.provisionRequest,
 	}
 
 	if s.flavorPlugin != nil {

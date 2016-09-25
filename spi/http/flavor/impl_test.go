@@ -108,3 +108,139 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
 	require.Equal(t, inputGroupSpec, <-inputGroupSpecActual)
 }
+
+func TestFlavorPluginPreProvision(t *testing.T) {
+	listen := "tcp://:4322"
+
+	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
+	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputInstanceSpecActual := make(chan instance.Spec, 1)
+	inputInstanceSpec := instance.Spec{
+		Properties: &inputFlavorProperties,
+		Tags:       map[string]string{"foo": "bar"},
+	}
+
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoPreProvision: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
+
+			inputFlavorPropertiesActual <- flavorProperties
+			inputInstanceSpecActual <- instanceSpec
+
+			return instanceSpec, nil
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	flavorPluginClient := PluginClient(callable)
+
+	// Make call
+	spec, err := flavorPluginClient.PreProvision(inputFlavorProperties, inputInstanceSpec)
+	require.NoError(t, err)
+	require.Equal(t, inputInstanceSpec, spec)
+
+	close(stop)
+
+	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
+	require.Equal(t, inputInstanceSpec, <-inputInstanceSpecActual)
+}
+
+func TestFlavorPluginPreProvisionError(t *testing.T) {
+	listen := "tcp://:4322"
+
+	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
+	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputInstanceSpecActual := make(chan instance.Spec, 1)
+	inputInstanceSpec := instance.Spec{
+		Properties: &inputFlavorProperties,
+		Tags:       map[string]string{"foo": "bar"},
+	}
+
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoPreProvision: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
+
+			inputFlavorPropertiesActual <- flavorProperties
+			inputInstanceSpecActual <- instanceSpec
+
+			return instanceSpec, errors.New("bad-thing-happened")
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	flavorPluginClient := PluginClient(callable)
+
+	// Make call
+	_, err = flavorPluginClient.PreProvision(inputFlavorProperties, inputInstanceSpec)
+	require.Error(t, err)
+	require.Equal(t, "bad-thing-happened", err.Error())
+
+	close(stop)
+
+	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
+	require.Equal(t, inputInstanceSpec, <-inputInstanceSpecActual)
+}
+
+func TestFlavorPluginHealthy(t *testing.T) {
+	listen := "tcp://:4322"
+
+	inputInstanceActual := make(chan instance.Description, 1)
+	inputInstance := instance.Description{
+		ID:   instance.ID("foo"),
+		Tags: map[string]string{"foo": "bar"},
+	}
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoHealthy: func(inst instance.Description) (bool, error) {
+			inputInstanceActual <- inst
+			return true, nil
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	flavorPluginClient := PluginClient(callable)
+
+	// Make call
+	healthy, err := flavorPluginClient.Healthy(inputInstance)
+	require.NoError(t, err)
+	require.True(t, healthy)
+
+	require.Equal(t, inputInstance, <-inputInstanceActual)
+	close(stop)
+}
+
+func TestFlavorPluginHealthyError(t *testing.T) {
+	listen := "tcp://:4322"
+
+	inputInstanceActual := make(chan instance.Description, 1)
+	inputInstance := instance.Description{
+		ID:   instance.ID("foo"),
+		Tags: map[string]string{"foo": "bar"},
+	}
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoHealthy: func(inst instance.Description) (bool, error) {
+			inputInstanceActual <- inst
+			return true, errors.New("oh-noes")
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	flavorPluginClient := PluginClient(callable)
+
+	// Make call
+	_, err = flavorPluginClient.Healthy(inputInstance)
+	require.Error(t, err)
+	require.Equal(t, "oh-noes", err.Error())
+
+	require.Equal(t, inputInstance, <-inputInstanceActual)
+	close(stop)
+}

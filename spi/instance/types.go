@@ -22,7 +22,7 @@ type Attachment string
 
 // Spec is a specification of an instance to be provisioned
 type Spec struct {
-	Properties  json.RawMessage
+	Properties  *json.RawMessage
 	Tags        map[string]string
 	Init        string
 	LogicalID   *LogicalID
