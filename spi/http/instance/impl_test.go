@@ -318,7 +318,7 @@ func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
 		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 			tagsActual <- req
-			return list, errors.New("bad!!")
+			return list, errors.New("bad")
 		},
 	}))
 	require.NoError(t, err)
@@ -329,7 +329,7 @@ func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	// Make call
 	_, err = instancePluginClient.DescribeInstances(tags)
 	require.Error(t, err)
-	require.Equal(t, "bad!!", err.Error())
+	require.Equal(t, "bad", err.Error())
 
 	close(stop)
 	require.Equal(t, tags, <-tagsActual)
