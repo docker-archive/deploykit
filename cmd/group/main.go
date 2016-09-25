@@ -34,15 +34,6 @@ var (
 	Revision = "Unspecified"
 )
 
-func info() interface{} {
-	return map[string]interface{}{
-		"name":     PluginName,
-		"type":     PluginType,
-		"version":  Version,
-		"revision": Revision,
-	}
-}
-
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
@@ -121,7 +112,12 @@ func main() {
 		Use:   "version",
 		Short: "print build version information",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			buff, err := json.MarshalIndent(info(), "  ", "  ")
+			buff, err := json.MarshalIndent(map[string]interface{}{
+				"name":     PluginName,
+				"type":     PluginType,
+				"version":  Version,
+				"revision": Revision,
+			}, "  ", "  ")
 			if err != nil {
 				return err
 			}
