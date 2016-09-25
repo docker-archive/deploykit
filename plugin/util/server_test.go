@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -14,7 +15,7 @@ import (
 
 type handler int
 
-func TestStartServer(t *testing.T) {
+func TestTCPServer(t *testing.T) {
 
 	servedCall := make(chan struct{})
 
@@ -25,7 +26,11 @@ func TestStartServer(t *testing.T) {
 	})
 	ranShutdown := make(chan struct{})
 
-	stop, errors, err := StartServer(":4321", router, func() error {
+	dir := os.TempDir()
+	name := "test-tcp-server"
+
+	listen := "tcp://:4321" + filepath.Join(dir, name)
+	stop, errors, err := StartServer(listen, router, func() error {
 		close(ranShutdown)
 		return nil
 	})
@@ -41,9 +46,13 @@ func TestStartServer(t *testing.T) {
 
 	<-servedCall
 
-	// Check the pid file exists
-	_, err = os.Open(fmt.Sprintf("%s.pid", filepath.Base(os.Args[0])))
+	crumbFile := filepath.Join(dir, name)
+	// check that the pid files exist:
+	urlString, err := ioutil.ReadFile(crumbFile)
 	require.NoError(t, err)
+
+	t.Log("url=", string(urlString))
+	require.Equal(t, listen, string(urlString))
 
 	// Now we stop the server
 	close(stop)
@@ -51,9 +60,13 @@ func TestStartServer(t *testing.T) {
 
 	// We shouldn't block here.
 	<-errors
+
+	// ensure cleaning up of pidfile
+	_, err = os.Stat(crumbFile)
+	require.True(t, os.IsNotExist(err))
 }
 
-func TestStartServerUnixSocket(t *testing.T) {
+func TestUnixSocketServer(t *testing.T) {
 
 	servedCall := make(chan struct{})
 
@@ -65,7 +78,7 @@ func TestStartServerUnixSocket(t *testing.T) {
 	ranShutdown := make(chan struct{})
 
 	socket := filepath.Join(os.TempDir(), fmt.Sprintf("%d.sock", time.Now().Unix()))
-	stop, _, err := StartServer(socket, router, func() error {
+	stop, errors, err := StartServer("unix://"+socket, router, func() error {
 		close(ranShutdown)
 		return nil
 	})
@@ -88,4 +101,7 @@ func TestStartServerUnixSocket(t *testing.T) {
 	// Now we stop the server
 	close(stop)
 	<-ranShutdown
+
+	// We shouldn't block here.
+	<-errors
 }

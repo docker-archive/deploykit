@@ -45,7 +45,7 @@ type plugin struct {
 	groups          groups
 }
 
-func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
+func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 
 	noSettings := groupSettings{}
 
@@ -63,7 +63,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.FlavorPlugin, err)
 	}
 
-	allocation, err := flavorPlugin.Validate(parsed.FlavorPluginProperties)
+	allocation, err := flavorPlugin.Validate(types.RawMessage(parsed.FlavorPluginProperties))
 	if err != nil {
 		return noSettings, err
 	}
@@ -77,7 +77,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Instance plugin '%s':%v", parsed.InstancePlugin, err)
 	}
 
-	if err := instancePlugin.Validate(parsed.InstancePluginProperties); err != nil {
+	if err := instancePlugin.Validate(types.RawMessage(parsed.InstancePluginProperties)); err != nil {
 		return noSettings, err
 	}
 
@@ -89,7 +89,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 	}, nil
 }
 
-func (p *plugin) WatchGroup(config group.Configuration) error {
+func (p *plugin) WatchGroup(config group.Spec) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -105,7 +105,7 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	scaled := &scaledGroup{
 		instancePlugin:   settings.instancePlugin,
 		flavorPlugin:     settings.flavorPlugin,
-		flavorProperties: settings.config.FlavorPluginProperties,
+		flavorProperties: types.RawMessage(settings.config.FlavorPluginProperties),
 		memberTags:       map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)
@@ -194,7 +194,7 @@ func (p *plugin) planUpdate(id group.ID, updatedSettings groupSettings) (updateP
 	return context.supervisor.PlanUpdate(context.scaled, context.settings, updatedSettings)
 }
 
-func (p *plugin) DescribeUpdate(updated group.Configuration) (string, error) {
+func (p *plugin) DescribeUpdate(updated group.Spec) (string, error) {
 	updatedSettings, err := p.validate(updated)
 	if err != nil {
 		return "", err
@@ -228,7 +228,7 @@ func (p *plugin) initiateUpdate(id group.ID, updatedSettings groupSettings) (upd
 	return plan, nil
 }
 
-func (p *plugin) UpdateGroup(updated group.Configuration) error {
+func (p *plugin) UpdateGroup(updated group.Spec) error {
 	updatedSettings, err := p.validate(updated)
 	if err != nil {
 		return err
