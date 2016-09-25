@@ -7,7 +7,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	mock_client "github.com/docker/libmachete/mock/docker/docker/client"
-	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/instance"
 	"github.com/golang/mock/gomock"
@@ -21,23 +20,16 @@ func TestValidate(t *testing.T) {
 
 	swarmFlavor := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl))
 
-	kind, err := swarmFlavor.Validate(
-		json.RawMessage(`{"type": "worker"}`),
-		types.Schema{LogicalIDs: []instance.LogicalID{"one"}})
+	allocation, err := swarmFlavor.Validate(json.RawMessage(`{"type": "worker", "Size": 5}`))
 	require.NoError(t, err)
-	require.Equal(t, flavor.IDKindPhysical, kind)
+	require.Equal(t, flavor.AllocationMethod{Size: 5}, allocation)
 
-	kind, err = swarmFlavor.Validate(
-		json.RawMessage(`{"type": "manager"}`),
-		types.Schema{LogicalIDs: []instance.LogicalID{"one"}})
+	allocation, err = swarmFlavor.Validate(json.RawMessage(`{"type": "manager", "IPs": ["127.0.0.1"]}`))
 	require.NoError(t, err)
-	require.Equal(t, flavor.IDKindPhysicalWithLogical, kind)
+	require.Equal(t, flavor.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}, allocation)
 
-	kind, err = swarmFlavor.Validate(
-		json.RawMessage(`{"type": "other"}`),
-		types.Schema{LogicalIDs: []instance.LogicalID{"one"}})
-	require.NoError(t, err)
-	require.Equal(t, flavor.IDKindUnknown, kind)
+	allocation, err = swarmFlavor.Validate(json.RawMessage(`{"type": "other"}`))
+	require.Error(t, err)
 }
 
 func TestAssociation(t *testing.T) {
@@ -62,7 +54,7 @@ func TestAssociation(t *testing.T) {
 	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), "my-node-id").Return(nodeInfo, nil, nil)
 
-	details, err := helper.PreProvision(
+	details, err := helper.Prepare(
 		json.RawMessage(`{"type": "worker"}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}})
 	require.NoError(t, err)

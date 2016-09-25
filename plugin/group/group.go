@@ -63,26 +63,13 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.FlavorPlugin, err)
 	}
 
-	allocation, err := flavorPlugin.Validate(types.RawMessage(parsed.FlavorPluginProperties), parsed)
+	allocation, err := flavorPlugin.Validate(types.RawMessage(parsed.FlavorPluginProperties))
 	if err != nil {
 		return noSettings, err
 	}
 
-	if allocation == flavor.IDKindUnknown {
-		return noSettings, errors.New("Unrecognized group ID kind")
-	}
-
-	switch allocation {
-	case flavor.IDKindPhysicalWithLogical:
-		if parsed.Size != 0 {
-			return noSettings, errors.New("Size is unsupported for static IP flavors, use IPs instead")
-		}
-	case flavor.IDKindPhysical:
-		if len(parsed.LogicalIDs) != 0 {
-			return noSettings, errors.New("IPs is unsupported for dynamic IP flavors, use Size instead")
-		}
-	default:
-		return noSettings, errors.New("Unsupported Role type")
+	if allocation.Size == 0 && (allocation.LogicalIDs == nil || len(allocation.LogicalIDs) == 0) {
+		return noSettings, errors.New("Invalid allocation method")
 	}
 
 	instancePlugin, err := p.instancePlugins(parsed.InstancePlugin)
@@ -124,13 +111,12 @@ func (p *plugin) WatchGroup(config group.Spec) error {
 	scaled.changeSettings(settings)
 
 	var supervisor Supervisor
-	switch settings.allocation {
-	case flavor.IDKindPhysical:
-		supervisor = NewScalingGroup(scaled, settings.config.Size, p.pollInterval)
-	case flavor.IDKindPhysicalWithLogical:
-		supervisor = NewQuorum(scaled, settings.config.LogicalIDs, p.pollInterval)
-	default:
-		panic("Unhandled Role type")
+	if settings.allocation.Size != 0 {
+		supervisor = NewScalingGroup(scaled, settings.allocation.Size, p.pollInterval)
+	} else if len(settings.allocation.LogicalIDs) > 0 {
+		supervisor = NewQuorum(scaled, settings.allocation.LogicalIDs, p.pollInterval)
+	} else {
+		panic("Invalid empty allocation method")
 	}
 
 	if _, exists := p.groups.get(config.ID); exists {
@@ -139,7 +125,6 @@ func (p *plugin) WatchGroup(config group.Spec) error {
 
 	p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
 
-	// TODO(wfarner): Consider changing Run() to not block.
 	go supervisor.Run()
 	log.Infof("Watching group '%v'", config.ID)
 
@@ -204,10 +189,6 @@ func (p *plugin) planUpdate(id group.ID, updatedSettings groupSettings) (updateP
 	context, exists := p.groups.get(id)
 	if !exists {
 		return nil, fmt.Errorf("Group '%s' is not being watched", id)
-	}
-
-	if context.settings.allocation != updatedSettings.allocation {
-		return nil, errors.New("A group's allocation kind cannot be changed")
 	}
 
 	return context.supervisor.PlanUpdate(context.scaled, context.settings, updatedSettings)

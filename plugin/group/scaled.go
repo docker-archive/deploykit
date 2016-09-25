@@ -68,7 +68,7 @@ func (s *scaledGroup) getSpec(logicalID *instance.LogicalID) (instance.Spec, err
 		spec.Tags = tags
 
 		var err error
-		spec, err = s.flavorPlugin.PreProvision(s.flavorProperties, spec)
+		spec, err = s.flavorPlugin.Prepare(s.flavorProperties, spec)
 		if err != nil {
 			return spec, err
 		}

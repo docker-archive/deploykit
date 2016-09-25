@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/libmachete/spi/group"
-	"github.com/docker/libmachete/spi/instance"
 )
 
 // These types are declared in a separate package to break an import cycle between group (test) -> mock -> group.
@@ -30,8 +29,6 @@ func MustParse(s Schema, e error) Schema {
 
 // Schema is the document schema for the plugin, provided in group.Spec.
 type Schema struct {
-	Size                     uint32
-	LogicalIDs               []instance.LogicalID
 	InstancePlugin           string
 	InstancePluginProperties *json.RawMessage
 	FlavorPlugin             string
