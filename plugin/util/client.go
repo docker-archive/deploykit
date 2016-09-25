@@ -106,7 +106,6 @@ func (d *Client) Call(endpoint plugin.Endpoint, message, result interface{}) ([]
 		return nil, err
 	}
 
-	m := strings.ToUpper(ep.Method)
 	url := fmt.Sprintf("http://%s%s", d.endpoint.Host, ep.Path)
 
 	tee := new(bytes.Buffer)
@@ -120,13 +119,13 @@ func (d *Client) Call(endpoint plugin.Endpoint, message, result interface{}) ([]
 		body = io.TeeReader(payload, tee)
 	}
 
-	request, err := http.NewRequest(m, url, body)
+	request, err := http.NewRequest(strings.ToUpper(ep.Method), url, body)
 	if err != nil {
 		return nil, err
 	}
 	resp, err := d.c.Do(request)
 
-	logrus.Debugln("REQ --", d.endpoint.String(), "url=", url, "method=", m, "request=", string(tee.Bytes()), "err=", err)
+	logrus.Debugln("REQ --", d.endpoint.String(), "url=", url, "request=", string(tee.Bytes()), "err=", err)
 
 	if err != nil {
 		return nil, err
@@ -135,7 +134,7 @@ func (d *Client) Call(endpoint plugin.Endpoint, message, result interface{}) ([]
 	defer resp.Body.Close()
 	buff, err := ioutil.ReadAll(resp.Body)
 
-	logrus.Debugln("RESP -", d.endpoint.String(), "url=", url, "method=", m, "response=", string(buff), "err=", err)
+	logrus.Debugln("RESP -", d.endpoint.String(), "url=", url, "response=", string(buff), "err=", err)
 
 	switch resp.StatusCode {
 

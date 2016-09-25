@@ -2,13 +2,14 @@ package util
 
 import (
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 // StartServer starts a server listening at addr.  Addr follows the format of a URL.  The scheme of the URL
@@ -55,6 +56,8 @@ func StartServer(addr string, endpoint http.Handler, shutdown ...func() error) (
 			os.Remove(crumbPath)
 			return nil
 		})
+	} else {
+		panic(crumbErr) // irreconverable error
 	}
 
 	// Triggers to start shutdown sequence
@@ -147,6 +150,15 @@ func saveCrumbFile(listenURL *url.URL) (string, error) {
 	}
 
 	crumbPath := listenURL.Path
+	if crumbPath == "" {
+		crumbPath = "./server"
+	} else {
+		// make sure it's not a directory...
+		f, err := os.Stat(crumbPath)
+		if err == nil && f.IsDir() {
+			crumbPath = crumbPath + "/server"
+		}
+	}
 	crumbFile, err := os.Create(crumbPath)
 	if err != nil {
 		return "", err
