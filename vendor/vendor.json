@@ -180,10 +180,16 @@
 		},
 		{
 			"checksumSHA1": "fEGgcE+iSzLkxdrbRj7j/vV7a7E=",
-			"origin": "github.com/docker/libmachete/vendor/github.com/spf13/cobra",
 			"path": "github.com/spf13/cobra",
 			"revision": "9c28e4bbd74e5c3ed7aacbc552b2cab7cfdfe744",
 			"revisionTime": "2016-08-30T17:49:25Z"
+		},
+		{
+			"checksumSHA1": "b1FgvXRMwcr3D1litcrDNxgowBw=",
+			"origin": "github.com/docker/libmachete/vendor/github.com/spf13/pflag",
+			"path": "github.com/spf13/pflag",
+			"revision": "c7e63cf4530bcd3ba943729cee0efeff2ebea63f",
+			"revisionTime": "2016-09-15T15:31:01Z"
 		},
 		{
 			"checksumSHA1": "iydUphwYqZRq3WhstEdGsbvBAKs=",

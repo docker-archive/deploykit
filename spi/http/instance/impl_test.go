@@ -2,6 +2,7 @@ package instance
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/docker/libmachete/plugin/util"
@@ -65,5 +66,37 @@ func TestInstancePluginValidate(t *testing.T) {
 
 	close(stop)
 
+	require.Equal(t, raw, <-rawActual)
+}
+
+func TestInstancePluginValidateError(t *testing.T) {
+
+	listen := "tcp://:4321"
+
+	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
+
+	rawActual := make(chan json.RawMessage, 1)
+
+	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+		DoValidate: func(req json.RawMessage) error {
+
+			rawActual <- req
+
+			return errors.New("whoops")
+		},
+	}))
+	require.NoError(t, err)
+
+	callable, err := util.NewClient(listen)
+	require.NoError(t, err)
+
+	instancePluginClient := PluginClient(callable)
+
+	// Make call
+	err = instancePluginClient.Validate(raw)
+	require.Error(t, err)
+	require.Equal(t, "whoops", err.Error())
+
+	close(stop)
 	require.Equal(t, raw, <-rawActual)
 }
