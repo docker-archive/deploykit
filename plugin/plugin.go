@@ -18,6 +18,10 @@ type Handler func(vars map[string]string, body io.Reader) (result interface{}, e
 
 // Callable makes something callable in a rpc context
 type Callable interface {
+
+	// String returns a string representation of the callable
+
+	String() string
 	// Call makes a call to the plugin using http method, at op (endpoint), with message and result structs
 	Call(endpoint Endpoint, message, result interface{}) (raw []byte, err error)
 }

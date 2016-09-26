@@ -52,6 +52,7 @@ func StartServer(addr string, endpoint http.Handler, shutdown ...func() error) (
 	// leave a crumb to be discovered
 	if crumbPath, crumbErr := saveCrumbFile(listenURL); crumbErr == nil {
 		shutdownTasks = append(shutdownTasks, func() error {
+			log.Infoln("Server stopping")
 			// remove crumb file
 			os.Remove(crumbPath)
 			return nil

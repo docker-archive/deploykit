@@ -6,5 +6,8 @@
 *.iml
 coverage.txt
 
+# Build binaries
+infrakit/*
+
 # Vendored sources.  These are synced during the build by govendor.
 vendor/*/

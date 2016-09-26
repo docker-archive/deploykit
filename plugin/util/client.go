@@ -97,6 +97,11 @@ func (d *Client) GetEndpoint() *url.URL {
 	return &copy
 }
 
+// String returns a string representation
+func (d *Client) String() string {
+	return d.GetEndpoint().String()
+}
+
 // Call implements the Callable interface.  Makes a call to a supported endpoint.
 func (d *Client) Call(endpoint plugin.Endpoint, message, result interface{}) ([]byte, error) {
 
