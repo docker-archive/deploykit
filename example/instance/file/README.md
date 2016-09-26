@@ -74,4 +74,4 @@ mkdir -p /run/infrakit/plugins
 chmod 777 /run/infrakit/plugins
 ```
 
-See the [CLI Doc](../cli/README.md) for details on accessing the instance plugin via CLI.
+See the [CLI Doc](../../../cli/README.md) for details on accessing the instance plugin via CLI.
