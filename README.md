@@ -105,6 +105,7 @@ however, the members may require special handling and demand stronger notions of
 
 
 ### Building
+
 #### Binaries
 ```shell
 $ make -k infrakit
@@ -127,8 +128,70 @@ Several binaries are available. More detailed documentations can be found here
   + [`infrakit/zookeeper`](./example/flavor/zookeeper), a flavor plugin for zookeeper ensemble members
   + [`infrakit/swarm`](./example/flavor/swarm), a flavor plugin for Docker Swarm managers and workers.
 
+### Plugin Discovery
 
-#### Configuration
+_InfraKit_ plugins collaborate with each other to accomplish a set of objectives.  Therefore, they
+need to be able to talk to one another.  While many different discovery methods are available, this
+toolkit implements a simple file-based discovery system the names of the unix socket files in a common
+directory represents the _name_ of the plugin.
+
+By default the common directory for unix sockets is located at `/run/infrakit/plugins`.
+Make sure this directory exists on your host:
+
+```
+mkdir -p /run/infrakit/plugins
+chmod 777 /run/infrakit/plugins
+```
+
+Note that a plugin's name is separate from the _type_ of the plugin, so it's possible to have two
+_file_ instance plugins running but with different names and configurations (for
+what they _provision_ or the content they write to disk).  For example:
+
+```
+$ ./infrakit/file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
+INFO[0000] Starting plugin
+INFO[0000] Listening on: unix:///run/infrakit/plugins/another-file.sock
+INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock err= <nil>
+```
+
+Using the CLI, it you will see
+
+```
+$ ./infrakit/cli plugin ls
+Plugins:
+NAME                	LISTEN
+instance-file       	unix:///run/infrakit/plugins/instance-file.sock
+another-file        	unix:///run/infrakit/plugins/another-file.sock
+```
+
+For each binary, you can find out more about it by using the `version` verb in the command line:
+
+```
+$ ./infrakit/group version
+{
+    "name": "GroupPlugin",
+    "revision": "75d7f4dbc17dbc48aadb9a4abfd87d57fbd7e1f8",
+    "type": "infra.GroupPlugin/1.0",
+    "version": "75d7f4d.m"
+  }
+```
+
+or
+```
+$ ./infrakit/file version
+{
+    "name": "FileInstance",
+    "revision": "75d7f4dbc17dbc48aadb9a4abfd87d57fbd7e1f8",
+    "type": "infrakit.InstancePlugin/1.0",
+    "version": "75d7f4d.m"
+  }
+```
+
+So you can have different plugins of the same type (e.g. `infrakit.InstancePlugin/1.0`) subject to the naming restrictions
+of the files in the common plugin directory.
+
+
+### Configuration
 _InfraKit_ uses JSON for configuration.  As an example, if you wanted to manage a Group of NGINX servers, you could
 write a custom Group plugin for ultimate customizability.  The most concise configuration looks something like this:
 
