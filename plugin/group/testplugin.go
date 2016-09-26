@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/plugin/group/util"
 	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/instance"
@@ -100,25 +99,31 @@ type testFlavor struct {
 	tags map[string]string
 }
 
-func (t testFlavor) Validate(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error) {
+type schema struct {
+	Type   string
+	Size   uint
+	Shards []instance.LogicalID
+}
 
-	properties := map[string]string{}
-	err := json.Unmarshal(flavorProperties, &properties)
+func (t testFlavor) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
+
+	s := schema{}
+	err := json.Unmarshal(flavorProperties, &s)
 	if err != nil {
-		return flavor.IDKindUnknown, nil
+		return flavor.AllocationMethod{}, nil
 	}
 
-	switch properties["type"] {
+	switch s.Type {
 	case typeMinion:
-		return flavor.IDKindPhysical, nil
+		return flavor.AllocationMethod{Size: s.Size}, nil
 	case typeLeader:
-		return flavor.IDKindPhysicalWithLogical, nil
+		return flavor.AllocationMethod{LogicalIDs: s.Shards}, nil
 	default:
-		return flavor.IDKindUnknown, nil
+		return flavor.AllocationMethod{}, errors.New("Unrecognized node type")
 	}
 }
 
-func (t testFlavor) PreProvision(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+func (t testFlavor) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
 	spec.Init = "echo hello"
 	for k, v := range t.tags {
 		spec.Tags[k] = v

@@ -9,7 +9,6 @@ import (
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/docker/libmachete/plugin/group/types"
 	"github.com/docker/libmachete/plugin/group/util"
 	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/instance"
@@ -31,38 +30,35 @@ type swarmProvisioner struct {
 	client client.APIClient
 }
 
-// TODO(wfarner): Add a ProvisionHelper function to check the health of an instance.  Use the Swarm node association
-// (see TODO above) to provide this.
-
-func nodeTypeFromProperties(flavorProperties json.RawMessage) (string, error) {
-	properties := map[string]string{}
-
-	if err := json.Unmarshal(flavorProperties, &properties); err != nil {
-		return "", err
-	}
-
-	return properties["type"], nil
+type schema struct {
+	Type string
+	Size uint
+	IPs  []instance.LogicalID
 }
 
-func (s swarmProvisioner) Validate(flavorProperties json.RawMessage, parsed types.Schema) (flavor.InstanceIDKind, error) {
-	nodeType, err := nodeTypeFromProperties(flavorProperties)
+func parseProperties(flavorProperties json.RawMessage) (schema, error) {
+	s := schema{}
+	err := json.Unmarshal(flavorProperties, &s)
+	return s, err
+}
+
+func (s swarmProvisioner) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
+	properties, err := parseProperties(flavorProperties)
 	if err != nil {
-		return flavor.IDKindUnknown, err
+		return flavor.AllocationMethod{}, err
 	}
 
-	if nodeType == roleManager {
-		if len(parsed.LogicalIDs) != 1 && len(parsed.LogicalIDs) != 3 && len(parsed.LogicalIDs) != 5 {
-			return flavor.IDKindUnknown, errors.New("Must have 1, 3, or 5 managers")
-		}
-	}
-
-	switch nodeType {
+	switch properties.Type {
 	case roleWorker:
-		return flavor.IDKindPhysical, nil
+		return flavor.AllocationMethod{Size: properties.Size}, nil
 	case roleManager:
-		return flavor.IDKindPhysicalWithLogical, nil
+		if len(properties.IPs) != 1 && len(properties.IPs) != 3 && len(properties.IPs) != 5 {
+			return flavor.AllocationMethod{}, errors.New("Must have 1, 3, or 5 managers")
+		}
+
+		return flavor.AllocationMethod{LogicalIDs: properties.IPs}, nil
 	default:
-		return flavor.IDKindUnknown, nil
+		return flavor.AllocationMethod{}, errors.New("Unrecognized node Type")
 	}
 }
 
@@ -140,9 +136,8 @@ func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
 	return len(nodes) == 1, nil
 }
 
-func (s swarmProvisioner) PreProvision(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
-
-	nodeType, err := nodeTypeFromProperties(flavorProperties)
+func (s swarmProvisioner) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return spec, err
 	}
@@ -170,7 +165,7 @@ func (s swarmProvisioner) PreProvision(flavorProperties json.RawMessage, spec in
 	associationID := util.RandomAlphaNumericString(8)
 	spec.Tags[associationTag] = associationID
 
-	switch nodeType {
+	switch properties.Type {
 	case roleWorker:
 		spec.Init = generateInitScript(
 			self.ManagerStatus.Addr,

@@ -45,7 +45,7 @@ type plugin struct {
 	groups          groups
 }
 
-func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
+func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 
 	noSettings := groupSettings{}
 
@@ -63,26 +63,13 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.FlavorPlugin, err)
 	}
 
-	allocation, err := flavorPlugin.Validate(parsed.FlavorPluginProperties, parsed)
+	allocation, err := flavorPlugin.Validate(types.RawMessage(parsed.FlavorPluginProperties))
 	if err != nil {
 		return noSettings, err
 	}
 
-	if allocation == flavor.IDKindUnknown {
-		return noSettings, errors.New("Unrecognized group ID kind")
-	}
-
-	switch allocation {
-	case flavor.IDKindPhysicalWithLogical:
-		if parsed.Size != 0 {
-			return noSettings, errors.New("Size is unsupported for static IP flavors, use IPs instead")
-		}
-	case flavor.IDKindPhysical:
-		if len(parsed.LogicalIDs) != 0 {
-			return noSettings, errors.New("IPs is unsupported for dynamic IP flavors, use Size instead")
-		}
-	default:
-		return noSettings, errors.New("Unsupported Role type")
+	if allocation.Size == 0 && (allocation.LogicalIDs == nil || len(allocation.LogicalIDs) == 0) {
+		return noSettings, errors.New("Invalid allocation method")
 	}
 
 	instancePlugin, err := p.instancePlugins(parsed.InstancePlugin)
@@ -90,7 +77,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Instance plugin '%s':%v", parsed.InstancePlugin, err)
 	}
 
-	if err := instancePlugin.Validate(parsed.InstancePluginProperties); err != nil {
+	if err := instancePlugin.Validate(types.RawMessage(parsed.InstancePluginProperties)); err != nil {
 		return noSettings, err
 	}
 
@@ -102,7 +89,7 @@ func (p *plugin) validate(config group.Configuration) (groupSettings, error) {
 	}, nil
 }
 
-func (p *plugin) WatchGroup(config group.Configuration) error {
+func (p *plugin) WatchGroup(config group.Spec) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -118,19 +105,18 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 	scaled := &scaledGroup{
 		instancePlugin:   settings.instancePlugin,
 		flavorPlugin:     settings.flavorPlugin,
-		flavorProperties: settings.config.FlavorPluginProperties,
+		flavorProperties: types.RawMessage(settings.config.FlavorPluginProperties),
 		memberTags:       map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)
 
 	var supervisor Supervisor
-	switch settings.allocation {
-	case flavor.IDKindPhysical:
-		supervisor = NewScalingGroup(scaled, settings.config.Size, p.pollInterval)
-	case flavor.IDKindPhysicalWithLogical:
-		supervisor = NewQuorum(scaled, settings.config.LogicalIDs, p.pollInterval)
-	default:
-		panic("Unhandled Role type")
+	if settings.allocation.Size != 0 {
+		supervisor = NewScalingGroup(scaled, settings.allocation.Size, p.pollInterval)
+	} else if len(settings.allocation.LogicalIDs) > 0 {
+		supervisor = NewQuorum(scaled, settings.allocation.LogicalIDs, p.pollInterval)
+	} else {
+		panic("Invalid empty allocation method")
 	}
 
 	if _, exists := p.groups.get(config.ID); exists {
@@ -139,7 +125,6 @@ func (p *plugin) WatchGroup(config group.Configuration) error {
 
 	p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
 
-	// TODO(wfarner): Consider changing Run() to not block.
 	go supervisor.Run()
 	log.Infof("Watching group '%v'", config.ID)
 
@@ -206,14 +191,10 @@ func (p *plugin) planUpdate(id group.ID, updatedSettings groupSettings) (updateP
 		return nil, fmt.Errorf("Group '%s' is not being watched", id)
 	}
 
-	if context.settings.allocation != updatedSettings.allocation {
-		return nil, errors.New("A group's allocation kind cannot be changed")
-	}
-
 	return context.supervisor.PlanUpdate(context.scaled, context.settings, updatedSettings)
 }
 
-func (p *plugin) DescribeUpdate(updated group.Configuration) (string, error) {
+func (p *plugin) DescribeUpdate(updated group.Spec) (string, error) {
 	updatedSettings, err := p.validate(updated)
 	if err != nil {
 		return "", err
@@ -247,7 +228,7 @@ func (p *plugin) initiateUpdate(id group.ID, updatedSettings groupSettings) (upd
 	return plan, nil
 }
 
-func (p *plugin) UpdateGroup(updated group.Configuration) error {
+func (p *plugin) UpdateGroup(updated group.Spec) error {
 	updatedSettings, err := p.validate(updated)
 	if err != nil {
 		return err

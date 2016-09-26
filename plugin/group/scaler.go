@@ -14,13 +14,13 @@ import (
 // of an autoscaling group / scale set on AWS or Azure.
 type Scaler interface {
 	util.RunStop
-	Size() uint32
-	SetSize(size uint32)
+	Size() uint
+	SetSize(size uint)
 }
 
 type scaler struct {
 	scaled       Scaled
-	size         uint32
+	size         uint
 	pollInterval time.Duration
 	lock         sync.Mutex
 	stop         chan bool
@@ -28,7 +28,7 @@ type scaler struct {
 
 // NewScalingGroup creates a supervisor that monitors a group of instances on a provisioner, attempting to maintain a
 // desired size.
-func NewScalingGroup(scaled Scaled, size uint32, pollInterval time.Duration) Supervisor {
+func NewScalingGroup(scaled Scaled, size uint, pollInterval time.Duration) Supervisor {
 	return &scaler{
 		scaled:       scaled,
 		size:         size,
@@ -39,7 +39,7 @@ func NewScalingGroup(scaled Scaled, size uint32, pollInterval time.Duration) Sup
 
 func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings groupSettings) (updatePlan, error) {
 
-	sizeChange := int(newSettings.config.Size) - int(settings.config.Size)
+	sizeChange := int(newSettings.allocation.Size) - int(settings.allocation.Size)
 
 	instances, err := scaled.List()
 	if err != nil {
@@ -49,8 +49,8 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 	desired, undesired := desiredAndUndesiredInstances(instances, newSettings)
 
 	plan := scalerUpdatePlan{
-		originalSize: settings.config.Size,
-		newSize:      newSettings.config.Size,
+		originalSize: settings.allocation.Size,
+		newSize:      newSettings.allocation.Size,
 		scaler:       s,
 		rollingPlan:  noopUpdate{},
 	}
@@ -80,7 +80,7 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 		plan.desc = fmt.Sprintf("Performs a rolling update on %d instances", rollCount)
 
 	case sizeChange < 0:
-		rollCount := int(newSettings.config.Size) - len(desired)
+		rollCount := int(newSettings.allocation.Size) - len(desired)
 		if rollCount < 0 {
 			rollCount = 0
 		}
@@ -89,13 +89,13 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 			plan.desc = fmt.Sprintf(
 				"Terminates %d instances to reduce the group size to %d",
 				int(sizeChange)*-1,
-				newSettings.config.Size)
+				newSettings.allocation.Size)
 		} else {
 			plan.desc = fmt.Sprintf(
 				"Terminates %d instances to reduce the group size to %d, "+
 					" then performs a rolling update on %d instances",
 				int(sizeChange)*-1,
-				newSettings.config.Size,
+				newSettings.allocation.Size,
 				rollCount)
 		}
 
@@ -106,14 +106,14 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 			plan.desc = fmt.Sprintf(
 				"Adds %d instances to increase the group size to %d",
 				sizeChange,
-				newSettings.config.Size)
+				newSettings.allocation.Size)
 		} else {
 			plan.desc = fmt.Sprintf(
 				"Performs a rolling update on %d instances,"+
 					" then adds %d instances to increase the group size to %d",
 				rollCount,
 				sizeChange,
-				newSettings.config.Size)
+				newSettings.allocation.Size)
 		}
 	}
 
@@ -128,8 +128,8 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 
 type scalerUpdatePlan struct {
 	desc         string
-	originalSize uint32
-	newSize      uint32
+	originalSize uint
+	newSize      uint
 	rollingPlan  updatePlan
 	scaler       *scaler
 }
@@ -164,7 +164,7 @@ func (s scalerUpdatePlan) Stop() {
 	s.rollingPlan.Stop()
 }
 
-func (s *scaler) SetSize(size uint32) {
+func (s *scaler) SetSize(size uint) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -172,7 +172,7 @@ func (s *scaler) SetSize(size uint32) {
 	s.size = size
 }
 
-func (s *scaler) getSize() uint32 {
+func (s *scaler) getSize() uint {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -208,7 +208,7 @@ func (s *scaler) converge() {
 
 	grp := sync.WaitGroup{}
 
-	actualSize := uint32(len(descriptions))
+	actualSize := uint(len(descriptions))
 	desiredSize := s.getSize()
 	switch {
 	case actualSize == desiredSize:
