@@ -78,7 +78,7 @@ func main() {
 		return pd
 
 	}
-	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f))
+	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
 
 	cmd.PersistentFlags().StringVar(&discoveryDir, "dir", discoveryDir, "Dir path for plugin discovery")
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")

@@ -6,17 +6,19 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/go-connections/tlsconfig"
+	"github.com/docker/libmachete/plugin/flavor/swarm"
 	"github.com/docker/libmachete/plugin/util"
-	instance_plugin "github.com/docker/libmachete/spi/http/instance"
+	flavor_plugin "github.com/docker/libmachete/spi/http/flavor"
 	"github.com/spf13/cobra"
 )
 
 var (
 	// PluginName is the name of the plugin in the Docker Hub / registry
-	PluginName = "FileInstance"
+	PluginName = "SwarmFlavor"
 
 	// PluginType is the type / interface it supports
-	PluginType = "infrakit.InstancePlugin/1.0"
+	PluginType = "infrakit.FlavorPlugin/1.0"
 
 	// Version is the build release identifier.
 	Version = "Unspecified"
@@ -28,12 +30,14 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/instance-file.sock"
-	dir := os.TempDir()
+	listen := "unix:///run/infrakit/plugins/flavor-swarm.sock"
+
+	tlsOptions := tlsconfig.Options{}
+	host := "unix:///var/run/docker.sock"
 
 	cmd := &cobra.Command{
-		Use:   "file",
-		Short: "File instance plugin",
+		Use:   "swarm",
+		Short: "Docker Swarm flavor plugin",
 		RunE: func(c *cobra.Command, args []string) error {
 
 			if logLevel > len(log.AllLevels)-1 {
@@ -47,11 +51,16 @@ func main() {
 				return nil
 			}
 
+			dockerClient, err := NewDockerClient(host, &tlsOptions)
+			log.Infoln("Connect to docker", host, "err=", err)
+			if err != nil {
+				return err
+			}
+
 			log.Infoln("Starting plugin")
 			log.Infoln("Listening on:", listen)
 
-			_, stopped, err := util.StartServer(listen, instance_plugin.PluginServer(
-				NewFileInstancePlugin(dir)))
+			_, stopped, err := util.StartServer(listen, flavor_plugin.PluginServer(swarm.NewSwarmFlavor(dockerClient)))
 
 			if err != nil {
 				log.Error(err)
@@ -81,9 +90,14 @@ func main() {
 		},
 	})
 
-	cmd.Flags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
-	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
-	cmd.Flags().StringVar(&dir, "dir", dir, "Dir for storing the files")
+	cmd.PersistentFlags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
+
+	cmd.PersistentFlags().StringVar(&host, "host", host, "Docker host")
+	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
+	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
+	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")
+	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
 
 	err := cmd.Execute()
 	if err != nil {

@@ -32,9 +32,9 @@ func pluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 				}
 
 				fmt.Println("Plugins:")
-				fmt.Printf("%-10s\t%-s\n", "name", "URL")
+				fmt.Printf("%-20s\t%-s\n", "NAME", "LISTEN")
 				for k, v := range entries {
-					fmt.Printf("%-10s\t%-s\n", k, v.String())
+					fmt.Printf("%-20s\t%-s\n", k, v.String())
 				}
 
 			default:
