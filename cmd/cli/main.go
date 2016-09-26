@@ -48,7 +48,7 @@ func main() {
 
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
-		Short: "print build version information",
+		Short: "Print build version information",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			buff, err := json.MarshalIndent(map[string]interface{}{
 				"description": "infrakit cli",

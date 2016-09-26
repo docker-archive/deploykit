@@ -17,7 +17,7 @@ import (
 const vagrantFile = `
 Vagrant.configure("2") do |config|
   config.vm.box = "bento/ubuntu-14.04"
-  config.vm.hostname = "machete.box"
+  config.vm.hostname = "infrakit.box"
   config.vm.network "private_network"{{.NETWORK_OPTIONS}}
 
   config.vm.provision :shell, inline: "{{.BOOT_SCRIPT}}"
@@ -72,7 +72,7 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	machineDir, err := ioutil.TempDir(v.VagrantfilesDir, "machete-")
+	machineDir, err := ioutil.TempDir(v.VagrantfilesDir, "infrakit-")
 	if err != nil {
 		return nil, err
 	}
