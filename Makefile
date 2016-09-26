@@ -3,6 +3,7 @@ PREFIX?=$(shell pwd -L)
 
 # Used to populate version variable in main package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+REVISION=$(shell git rev-list -1 HEAD)
 
 # Allow turning off function inlining and variable registerization
 ifeq (${DISABLE_OPTIMIZATION},true)
@@ -12,7 +13,7 @@ endif
 
 .PHONY: clean all fmt vet lint build test vendor-sync containers
 .DEFAULT: all
-all: fmt vet lint build test
+all: clean fmt vet lint build test infrakit
 
 ci: fmt vet lint vendor-sync vendor-check coverage
 
@@ -20,8 +21,9 @@ AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
 
 # Package list
-PKGS_AND_MOCKS := $(shell go list ./... | grep -v ^github.com/docker/libmachete/vendor/)
+PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor)
 PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
+BINARIES := $(shell go list ./cmd/... ./example/... | grep -v /vendor)
 
 vet:
 	@echo "+ $@"
@@ -45,6 +47,19 @@ lint:
 build: vendor-sync
 	@echo "+ $@"
 	@go build ${GO_LDFLAGS} $(PKGS)
+
+clean:
+	@echo "+ $@"
+	-mkdir -p ./infrakit
+	-rm -rf ./infrakit/*
+
+infrakit: clean build
+	@echo "+ $@"
+	@for bin in $(BINARIES); do \
+	  go build -o ./infrakit/$$( echo $${bin} | awk -F '/' '{print $$NF}') \
+		 -ldflags "-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" $${bin} || exit 1; \
+	done
+
 
 install: vendor-sync
 	@echo "+ $@"

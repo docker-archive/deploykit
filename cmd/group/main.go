@@ -22,7 +22,7 @@ import (
 
 var (
 	// PluginName is the name of the plugin in the Docker Hub / registry
-	PluginName = "NoPluginName"
+	PluginName = "GroupPlugin"
 
 	// PluginType is the type / interface it supports
 	PluginType = "infra.GroupPlugin/1.0"
@@ -43,7 +43,7 @@ func main() {
 	pollInterval := 10 * time.Second
 
 	cmd := &cobra.Command{
-		Use:   "group",
+		Use:   os.Args[0],
 		Short: "Group server",
 		RunE: func(c *cobra.Command, args []string) error {
 
@@ -104,6 +104,7 @@ func main() {
 
 			<-stopped // block until done
 
+			log.Infoln("Server stopped")
 			return nil
 		},
 	}
@@ -135,5 +136,4 @@ func main() {
 		log.Error(err)
 		os.Exit(1)
 	}
-	log.Infoln("Server stopped")
 }

@@ -32,7 +32,7 @@ func main() {
 	listen := "unix:///run/infrakit/plugins/flavor-zookeeper.sock"
 
 	cmd := &cobra.Command{
-		Use:   "zookeeper",
+		Use:   os.Args[0],
 		Short: "Zookeeper flavor plugin",
 		RunE: func(c *cobra.Command, args []string) error {
 
@@ -58,6 +58,7 @@ func main() {
 
 			<-stopped // block until done
 
+			log.Infoln("Server stopped")
 			return nil
 		},
 	}
@@ -88,5 +89,4 @@ func main() {
 		log.Error(err)
 		os.Exit(1)
 	}
-	log.Infoln("Server stopped")
 }

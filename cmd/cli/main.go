@@ -28,7 +28,7 @@ func main() {
 	discoveryDir := "/run/infrakit/plugins"
 
 	cmd := &cobra.Command{
-		Use:   "infra",
+		Use:   os.Args[0],
 		Short: "infrakit cli",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 			if logLevel > len(log.AllLevels)-1 {

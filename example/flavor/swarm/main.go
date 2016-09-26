@@ -36,7 +36,7 @@ func main() {
 	host := "unix:///var/run/docker.sock"
 
 	cmd := &cobra.Command{
-		Use:   "swarm",
+		Use:   os.Args[0],
 		Short: "Docker Swarm flavor plugin",
 		RunE: func(c *cobra.Command, args []string) error {
 
@@ -68,6 +68,7 @@ func main() {
 
 			<-stopped // block until done
 
+			log.Infoln("Server stopped")
 			return nil
 		},
 	}
@@ -104,5 +105,4 @@ func main() {
 		log.Error(err)
 		os.Exit(1)
 	}
-	log.Infoln("Server stopped")
 }

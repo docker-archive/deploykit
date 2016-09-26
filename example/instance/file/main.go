@@ -32,7 +32,7 @@ func main() {
 	dir := os.TempDir()
 
 	cmd := &cobra.Command{
-		Use:   "file",
+		Use:   os.Args[0],
 		Short: "File instance plugin",
 		RunE: func(c *cobra.Command, args []string) error {
 
@@ -59,6 +59,7 @@ func main() {
 
 			<-stopped // block until done
 
+			log.Infoln("Server stopped")
 			return nil
 		},
 	}
@@ -90,5 +91,4 @@ func main() {
 		log.Error(err)
 		os.Exit(1)
 	}
-	log.Infoln("Server stopped")
 }
