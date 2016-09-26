@@ -18,6 +18,11 @@ type pluginInstance struct {
 	client   *util.Client
 }
 
+// String returns a string representation of the callable.
+func (i *pluginInstance) String() string {
+	return i.endpoint
+}
+
 // Call calls the plugin with some message
 func (i *pluginInstance) Call(endpoint plugin.Endpoint, message, result interface{}) ([]byte, error) {
 	return i.client.Call(endpoint, message, result)
@@ -99,7 +104,7 @@ func (r *Dir) Refresh() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	log.Infoln("Opening:", r.dir)
+	log.Debugln("Opening:", r.dir)
 	entries, err := ioutil.ReadDir(r.dir)
 	if err != nil {
 		return err
@@ -117,7 +122,7 @@ entries:
 				continue entries
 			}
 
-			log.Infoln("Discovered plugin at", instance.endpoint)
+			log.Debugln("Discovered plugin at", instance.endpoint)
 			found[instance.name] = instance
 		}
 	}
