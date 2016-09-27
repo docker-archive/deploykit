@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -52,7 +53,15 @@ func (r *Dir) PluginByName(name string) (plugin.Callable, error) {
 	if err := r.Refresh(); err != nil {
 		return nil, err
 	}
-	return r.plugins[name], nil
+
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	inst, has := r.plugins[name]
+	if !has {
+		return nil, fmt.Errorf("not-found:%s", name)
+	}
+
+	return inst, nil
 }
 
 // NewDir creates a registry instance with the given file directory path.  The entries in the directory
