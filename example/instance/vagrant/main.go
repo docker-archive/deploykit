@@ -29,12 +29,12 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/instance-zookeeper.sock"
+	listen := "unix:///run/infrakit/plugins/instance-vagrant.sock"
 	dir, _ := os.Getwd()
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Zookeeper instance plugin",
+		Short: "Vagrant instance plugin",
 		RunE: func(c *cobra.Command, args []string) error {
 
 			if logLevel > len(log.AllLevels)-1 {
