@@ -317,16 +317,27 @@ func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Descripti
 	re := regexp.MustCompile(".*\\.(instance-[0-9]+)")
 	result := []instance.Description{}
 	// now we scan for <instance_type.instance-<timestamp> as keys
+scan:
 	for k, v := range show {
 		matches := re.FindStringSubmatch(k)
 		if len(matches) == 2 {
 			id := matches[1]
-			// now find all tags
-			result = append(result, instance.Description{
+
+			inst := instance.Description{
 				Tags:      terraformTags(v, "tags"),
 				ID:        instance.ID(id),
 				LogicalID: terraformLogicalID(v),
-			})
+			}
+			if len(tags) == 0 {
+				result = append(result, inst)
+			} else {
+				for k, v := range tags {
+					if inst.Tags[k] != v {
+						continue scan // we implement AND
+					}
+				}
+				result = append(result, inst)
+			}
 		}
 	}
 	return result, nil
