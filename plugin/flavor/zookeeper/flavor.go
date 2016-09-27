@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"github.com/docker/libmachete/spi/flavor"
 	"github.com/docker/libmachete/spi/instance"
-	"text/template"
 	"strings"
+	"text/template"
 )
 
 const (
@@ -105,20 +105,20 @@ func generateInitScript(useDocker bool, servers []instance.LogicalID, id instanc
 	}
 
 	var templateText string
-	params := map[string]interface{} {
-		"MyID":    myID,
+	params := map[string]interface{}{
+		"MyID": myID,
 	}
 	if useDocker {
 		templateText = initScriptDocker
 		serverStrings := []string{}
 		for i, server := range servers {
-			serverStrings = append(serverStrings, fmt.Sprintf("server.%d=%s:2888:3888", i + 1, server))
+			serverStrings = append(serverStrings, fmt.Sprintf("server.%d=%s:2888:3888", i+1, server))
 		}
 
-		params ["ServersList"] = strings.Join(serverStrings, " ")
+		params["ServersList"] = strings.Join(serverStrings, " ")
 	} else {
 		templateText = initScript
-		params ["Servers"] = servers
+		params["Servers"] = servers
 	}
 
 	funcs := template.FuncMap{
