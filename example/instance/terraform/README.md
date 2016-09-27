@@ -236,7 +236,10 @@ ID                            	LOGICAL                       	TAGS
 instance-1475004829           	  -                           	other=values,provisioner=infrakit-terraform-example,InstancePlugin=terraform,Name=instance-1475004829,Tier=web
 ```
 
-You should verify that the instances are indeed created in the AWS Console. ![RSG Screenshot](./example.png)
+You should verify that the instances are indeed created in the AWS Console.
+In AWS Console you can filter by tag `provisioner` with value `infrakit-terraform-example`:
+
+![RSG Screenshot](./example.png)
 
 Now destroy the instance:
 
@@ -247,6 +250,4 @@ $ infrakit/cli instance --name instance-terraform describe
 ID                            	LOGICAL                       	TAGS
 ```
 
-On AWS -- you can filter by tag `provisioner` with value `infrakit-terraform-example`:
-
-![RSG Screenshot)(./terminated.png)
+![RSG Screenshot](./terminated.png)
