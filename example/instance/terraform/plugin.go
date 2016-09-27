@@ -235,6 +235,12 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	id := instance.ID(name)
 
 	// set the tags.
+	// add a name
+	if spec.Tags != nil {
+		if _, has := spec.Tags["Name"]; !has {
+			spec.Tags["Name"] = string(id)
+		}
+	}
 	switch properties.Type {
 	case "aws_instance", "azurerm_virtual_machine", "digitalocean_droplet", "google_compute_instance":
 		if t, exists := properties.Value["tags"]; !exists {

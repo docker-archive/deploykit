@@ -6,11 +6,17 @@ provider "aws" {
 # Create a VPC to launch our instances into
 resource "aws_vpc" "default" {
   cidr_block = "10.0.0.0/16"
+  tags {
+     provisioner = "infrakit-terraform-example"
+  }
 }
 
 # Create an internet gateway to give our subnet access to the outside world
 resource "aws_internet_gateway" "default" {
   vpc_id = "${aws_vpc.default.id}"
+  tags {
+     provisioner = "infrakit-terraform-example"
+  }
 }
 
 # Grant the VPC internet access on its main route table
@@ -25,6 +31,9 @@ resource "aws_subnet" "default" {
   vpc_id                  = "${aws_vpc.default.id}"
   cidr_block              = "10.0.1.0/24"
   map_public_ip_on_launch = true
+  tags {
+     provisioner = "infrakit-terraform-example"
+  }
 }
 
 # Our default security group to access
@@ -56,5 +65,9 @@ resource "aws_security_group" "default" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags {
+     provisioner = "infrakit-terraform-example"
   }
 }
