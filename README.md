@@ -77,8 +77,9 @@ need not be a physical machine at all.
 | plugin| description                  |
 |:------|:-----------------------------|
 |[infrakit/file](./example/instance/file)   | A simple plugin for development and testing.  Uses local disk file as instance. |
-|[infrakit/vagrant](./example/instance/vagrant) | A plugin where instances are vagrant machine instances |
-|[libmachete.aws](https://github.com/docker/libmachete.aws) | Instances of Amazon EC2 instances |
+|[infrakit/terraform](./example/instance/terraform) | A plugin to provision using terraform |
+|[infrakit/vagrant](./example/instance/vagrant) | A plugin that provisions vagrant vm's |
+
 
 
 For compute, for example, instances can be VM instances of identical spec. Instances
@@ -103,6 +104,10 @@ however, the members may require special handling and demand stronger notions of
 | [swarm](plugin/flavor/swarm) | configures instances with Docker in Swarm mode [binary](example/flavor/swarm) |
 | etcd | TODO: implement |
 
+
+## Docs
+
+Design docs can be found [here](./docs).
 
 ## Building
 
@@ -297,10 +302,10 @@ $ cat zk.conf
 ```
 
 ```shell
-$ infrakit update zk.conf --describe
+$ infrakit/cli group --name group describe zk.conf
 Performs a rolling update of 3 instances
 
-$ infrakit update zk.conf
+$ infrakit/cli group --name group update zk.conf
 ```
 
 For high-traffic clusters, ZooKeeper supports Observer nodes.  We can add another Group to include Observers:
@@ -324,13 +329,13 @@ $ cat zk-observer.conf
   }
 }
 
-$ infrakit watch zk-observer.conf
+$ infrakit/cli group --name group watch zk-observer.conf
 ```
 
 Finally, we can terminate the instances when finished with them:
 
 ```shell
-$ infrakit destroy zk
-$ infrakit destroy zk-observers
+$ infrakit/cli group --name group destroy zk
+$ infrakit/cli group --name group destroy zk-observers
 
 ```
