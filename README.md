@@ -204,7 +204,8 @@ There are few examples of _InfraKit_ plugins:
     - [README](./example/instance/terraform/README.md)
     - [Code] (./example/instance/terraform/plugin.go) and [configs](./example/instance/terraform/aws-two-tier)
   + Zookeeper / Vagrant
-
+    - [README](./example/flavor/zookeeper/README.md)
+    - [Code] (./plugin/flavor/zookeeper)
 
 ## Configuration
 _InfraKit_ uses JSON for configuration.  As an example, if you wanted to manage a Group of NGINX servers, you could
