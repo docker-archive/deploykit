@@ -104,26 +104,27 @@ however, the members may require special handling and demand stronger notions of
 | etcd | TODO: implement |
 
 
-### Building
+## Building
 
-#### Binaries
+### Binaries
 ```shell
 $ make -k infrakit
 ```
 This will create a directory, `./infrakit` in the project directory.  The executables can be found here.
 
-#### Running tests
+### Running tests
 ```shell
 $ make ci
 ```
 
-### Using the binaries
+## Using the binaries
 
 Several binaries are available. More detailed documentations can be found here
 
   + [`infrakit/cli`](./cmd/cli/README.md), the command line interface
   + [`infrakit/group`](./cmd/group/README.md), the default [group plugin](./spi/group)
   + [`infrakit/file`](./example/instance/file), an instance plugin using files
+  + [`infrakit/terraform`](./example/instance/terraform), an instance plugin integrating [Terraform](https://www.terraform.io)
   + [`infrakit/vagrant`](./example/instance/vagrant), an instance plugin using vagrant
   + [`infrakit/zookeeper`](./example/flavor/zookeeper), a flavor plugin for zookeeper ensemble members
   + [`infrakit/swarm`](./example/flavor/swarm), a flavor plugin for Docker Swarm managers and workers.
@@ -191,7 +192,16 @@ So you can have different plugins of the same type (e.g. `infrakit.InstancePlugi
 of the files in the common plugin directory.
 
 
-### Configuration
+## Examples
+There are few examples of _InfraKit_ plugins:
+
+  + Terraform Instance Plugin
+    - [README](./example/instance/terraform/README.md)
+    - [Code] (./example/instance/terraform/plugin.go) and [configs](./example/instance/terraform/aws-two-tier)
+  + Zookeeper / Vagrant
+
+
+## Configuration
 _InfraKit_ uses JSON for configuration.  As an example, if you wanted to manage a Group of NGINX servers, you could
 write a custom Group plugin for ultimate customizability.  The most concise configuration looks something like this:
 
