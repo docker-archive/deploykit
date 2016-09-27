@@ -247,5 +247,6 @@ $ infrakit/cli instance --name instance-terraform describe
 ID                            	LOGICAL                       	TAGS
 ```
 
-On AWS
+On AWS -- you can filter by tag `provisioner` with value `infrakit-terraform-example`:
+
 ![RSG Screenshot)(./terminated.png)
