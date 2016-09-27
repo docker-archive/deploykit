@@ -124,6 +124,7 @@ Several binaries are available. More detailed documentations can be found here
   + [`infrakit/cli`](./cmd/cli/README.md), the command line interface
   + [`infrakit/group`](./cmd/group/README.md), the default [group plugin](./spi/group)
   + [`infrakit/file`](./example/instance/file), an instance plugin using files
+  + [`infrakit/terraform`](./example/instance/terraform), an instance plugin integrating [Terraform](https://www.terraform.io)
   + [`infrakit/vagrant`](./example/instance/vagrant), an instance plugin using vagrant
   + [`infrakit/zookeeper`](./example/flavor/zookeeper), a flavor plugin for zookeeper ensemble members
   + [`infrakit/swarm`](./example/flavor/swarm), a flavor plugin for Docker Swarm managers and workers.
