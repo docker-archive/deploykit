@@ -35,8 +35,8 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
 
 	watch := &cobra.Command{
-		Use:   "watch",
-		Short: "watch the group",
+		Use:   "watch <group configuration>",
+		Short: "watch a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
@@ -56,8 +56,8 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 	}
 
 	unwatch := &cobra.Command{
-		Use:   "unwatch",
-		Short: "unwatch the group",
+		Use:   "unwatch [group ID]",
+		Short: "unwatch a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
@@ -76,8 +76,8 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 	}
 
 	inspect := &cobra.Command{
-		Use:   "inspect",
-		Short: "inspect the group",
+		Use:   "inspect [group ID]",
+		Short: "inspect a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
@@ -132,7 +132,7 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 	}
 
 	update := &cobra.Command{
-		Use:   "update",
+		Use:   "update [group configuration]",
 		Short: "update group (update < file or update filename)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
@@ -153,8 +153,8 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 	}
 
 	stop := &cobra.Command{
-		Use:   "stop",
-		Short: "stop updating the group",
+		Use:   "stop [group ID]",
+		Short: "stop updating a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
@@ -173,8 +173,8 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 	}
 
 	destroy := &cobra.Command{
-		Use:   "destroy",
-		Short: "destroy the group",
+		Use:   "destroy [group ID]",
+		Short: "destroy a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 

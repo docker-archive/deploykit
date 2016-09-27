@@ -10,21 +10,20 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strings"
 	"text/template"
 )
 
 const vagrantFile = `
 Vagrant.configure("2") do |config|
-  config.vm.box = "bento/ubuntu-14.04"
+  config.vm.box = "{{.Properties.Box}}"
   config.vm.hostname = "infrakit.box"
-  config.vm.network "private_network"{{.NETWORK_OPTIONS}}
+  config.vm.network "private_network"{{.NetworkOptions}}
 
-  config.vm.provision :shell, inline: "{{.BOOT_SCRIPT}}"
+  config.vm.provision :shell, path: "boot.sh"
 
   config.vm.provider :virtualbox do |vb|
-    vb.memory = 1024
-    vb.cpus = 2
+    vb.memory = {{.Properties.Memory}}
+    vb.cpus = {{.Properties.CPUs}}
   end
 end`
 
@@ -51,8 +50,28 @@ func inheritedEnvCommand(cmdAndArgs []string, extraEnv ...string) (string, error
 	return string(output), err
 }
 
+type schema struct {
+	Box    string
+	Memory int
+	CPUs   int
+}
+
 // Provision creates a new instance.
 func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
+
+	properties := schema{
+		Memory: 1024,
+		CPUs:   2,
+	}
+	if spec.Properties != nil {
+		if err := json.Unmarshal(*spec.Properties, &properties); err != nil {
+			return nil, fmt.Errorf("Invalid instance properties: %s", err)
+		}
+	}
+
+	if properties.Box == "" {
+		return nil, errors.New("Property 'Box' must be set")
+	}
 
 	templ := template.Must(template.New("").Parse(vagrantFile))
 	networkOptions := `, type: "dhcp"`
@@ -62,11 +81,9 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	config := bytes.Buffer{}
 
-	bootScriptEscaped := strings.Replace(spec.Init, `"`, `\"`, -1)
-
-	params := map[string]string{
-		"NETWORK_OPTIONS": networkOptions,
-		"BOOT_SCRIPT":     bootScriptEscaped,
+	params := map[string]interface{}{
+		"NetworkOptions": networkOptions,
+		"Properties":     properties,
 	}
 	if err := templ.Execute(&config, params); err != nil {
 		return nil, err
@@ -74,6 +91,10 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	machineDir, err := ioutil.TempDir(v.VagrantfilesDir, "infrakit-")
 	if err != nil {
+		return nil, err
+	}
+
+	if err := ioutil.WriteFile(path.Join(machineDir, "boot.sh"), []byte(spec.Init), 0755); err != nil {
 		return nil, err
 	}
 

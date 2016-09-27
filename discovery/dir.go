@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/plugin"
 	"github.com/docker/libmachete/plugin/util"
@@ -48,7 +49,7 @@ func (r *Dir) PluginByName(name string) (plugin.Callable, error) {
 	entry, err := os.Stat(filepath.Join(r.dir, name))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil, fmt.Errorf("Plugin %s is not loaded", name)
 		}
 		return nil, err
 	}
