@@ -52,8 +52,7 @@ func TestDirDiscovery(t *testing.T) {
 	require.Nil(t, err)
 
 	p, err = discover.PluginByName(name1)
-	require.NoError(t, err)
-	require.Nil(t, p)
+	require.Error(t, err)
 
 	p, err = discover.PluginByName(name2)
 	require.NoError(t, err)
@@ -68,12 +67,10 @@ func TestDirDiscovery(t *testing.T) {
 	require.Nil(t, err)
 
 	p, err = discover.PluginByName(name1)
-	require.NoError(t, err)
-	require.Nil(t, p)
+	require.Error(t, err)
 
 	p, err = discover.PluginByName(name2)
-	require.NoError(t, err)
-	require.Nil(t, p)
+	require.Error(t, err)
 
 	list, err := discover.List()
 	require.NoError(t, err)
