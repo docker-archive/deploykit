@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libmachete/plugin"
 	"github.com/docker/libmachete/plugin/util"
@@ -38,29 +37,22 @@ type Dir struct {
 
 // PluginByName returns a plugin by name
 func (r *Dir) PluginByName(name string) (plugin.Callable, error) {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
 
-	if instance, has := r.plugins[name]; has {
+	r.lock.RLock()
+	instance, has := r.plugins[name]
+	r.lock.RUnlock()
+
+	if has {
 		return instance, nil
 	}
 
-	// not there. try to load this..
-	entry, err := os.Stat(filepath.Join(r.dir, name))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("Plugin %s is not loaded", name)
-		}
+	log.Debugln("Can't find plugin", name, "rescanning.")
+
+	// We don't assume the naming of the files so just scan the whole thing and rebuild the index.
+	if err := r.Refresh(); err != nil {
 		return nil, err
 	}
-
-	instance, err := r.dirLookup(entry)
-	if err != nil {
-		return nil, err
-	}
-
-	r.plugins[instance.name] = instance
-	return instance, nil
+	return r.plugins[name], nil
 }
 
 // NewDir creates a registry instance with the given file directory path.  The entries in the directory
