@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/docker/infrakit/discovery"
 	"github.com/docker/infrakit/spi/group"
@@ -93,15 +95,14 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 					if d.LogicalID != nil {
 						logical = string(*d.LogicalID)
 					}
-					tagstr := ""
+
+					printTags := []string{}
 					for k, v := range d.Tags {
-						sep := ""
-						if tagstr != "" {
-							sep = ","
-						}
-						tagstr = tagstr + sep + fmt.Sprintf("%s=%s", k, v)
+						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
 					}
-					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, tagstr)
+					sort.Strings(printTags)
+
+					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
 				}
 			}
 			return err
@@ -142,9 +143,10 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 				return err
 			}
 
+			// TODO - make this not block, but how to get status?
 			err = groupPlugin.UpdateGroup(spec)
 			if err == nil {
-				fmt.Println("update", spec.ID, "initiated")
+				fmt.Println("update", spec.ID, "completed")
 			}
 			return err
 		},

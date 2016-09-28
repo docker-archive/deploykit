@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/docker/infrakit/discovery"
@@ -114,16 +115,14 @@ func instancePluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 					if d.LogicalID != nil {
 						logical = string(*d.LogicalID)
 					}
-					tagstr := ""
-					for k, v := range d.Tags {
-						sep := ""
-						if tagstr != "" {
-							sep = ","
-						}
-						tagstr = tagstr + sep + fmt.Sprintf("%s=%s", k, v)
-					}
 
-					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, tagstr)
+					printTags := []string{}
+					for k, v := range d.Tags {
+						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
+					}
+					sort.Strings(printTags)
+
+					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
 				}
 			}
 

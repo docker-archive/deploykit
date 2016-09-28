@@ -34,7 +34,7 @@ _InfraKit_ supports these primitives: groups, instances, and flavors.  They are 
 #### Groups
 When managing infrastructure like computing clusters, Groups make good abstraction, and working with groups is easier
 than managing individual instances. For example, a group can be made up of a collection
-of machines as individual instances. The machines in a group can have identical configurations (replicas, or cattles).
+of machines as individual instances. The machines in a group can have identical configurations (replicas, or cattle).
 They can also have slightly different properties like identity and ordering (as members of a quorum or pets).
 
 _InfraKit_ provides primitives to manage Groups: a group has a given size and can shrink or grow based on some specification,
@@ -95,15 +95,15 @@ Flavors help distinguish members of one group from another by describing how the
 A [flavor plugin](spi/flavor/spi.go) can be thought of as defining what runs on an Instance.
 It is responsible for dictating commands to run services, and check the health of those services.
 
-Flavors allow a group of instances to have different characteristics.  In a group of cattles,
+Flavors allow a group of instances to have different characteristics.  In a group of cattle,
 all members are treated identically and individual members do not have strong identity.  In a group of pets,
 however, the members may require special handling and demand stronger notions of identity and state.
 
 | plugin| description                  |
 |:------|:-----------------------------|
-| [zookeeper](plugin/flavor/zookeeper) | For handling of zookeeper ensemble members [binary](example/flavor/zookeeper) |
-| [swarm](plugin/flavor/swarm) | configures instances with Docker in Swarm mode [binary](example/flavor/swarm) |
-| etcd | TODO: implement |
+| [vanilla](plugin/flavor/vanilla) | A vanilla flavor that lets you configure by user data and labels |
+| [zookeeper](plugin/flavor/zookeeper) | For handling of zookeeper ensemble members |
+| [swarm](plugin/flavor/swarm) | configures instances with Docker in Swarm mode |
 
 
 ## Docs
@@ -112,30 +112,404 @@ Design docs can be found [here](./docs).
 
 ## Building
 
-### Binaries
-```shell
-$ make -k infrakit
-```
-This will create a directory, `./infrakit` in the project directory.  The executables can be found here.
-
 ### Running tests
 ```shell
 $ make ci
 ```
 
-## Using the binaries
-
-Several binaries are available. More detailed documentations can be found here
+### Binaries
+```shell
+$ make -k infrakit
+```
+This will create a directory, `./infrakit` in the project directory.  The executables can be found here.
+Currently, several binaries are available. More detailed documentations can be found here
 
   + [`infrakit/cli`](./cmd/cli/README.md), the command line interface
   + [`infrakit/group`](./cmd/group/README.md), the default [group plugin](./spi/group)
   + [`infrakit/file`](./example/instance/file), an instance plugin using files
   + [`infrakit/terraform`](./example/instance/terraform), an instance plugin integrating [Terraform](https://www.terraform.io)
   + [`infrakit/vagrant`](./example/instance/vagrant), an instance plugin using vagrant
+  + [`infrakit/vanilla`](./example/flavor/vanilla), a flavor plugin for plain vanilla set up with user data and labels
   + [`infrakit/zookeeper`](./example/flavor/zookeeper), a flavor plugin for zookeeper ensemble members
   + [`infrakit/swarm`](./example/flavor/swarm), a flavor plugin for Docker Swarm managers and workers.
 
-### Plugin Discovery
+
+## Examples
+There are few examples of _InfraKit_ plugins:
+
+  + Terraform Instance Plugin
+    - [README](./example/instance/terraform/README.md)
+    - [Code] (./example/instance/terraform/plugin.go) and [configs](./example/instance/terraform/aws-two-tier)
+  + Zookeeper / Vagrant
+    - [README](./example/flavor/zookeeper/README.md)
+    - [Code] (./plugin/flavor/zookeeper)
+
+
+## A Quick Tutorial
+
+To illustrate the concept of working with Group, Flavor, and Instance plugins, we use a simple setup composed of
+  + The default `group` plugin - to manage a collection of instances
+  + The `file` instance plugin - to provision instances by writing files to disk
+  + The `vanilla` flavor plugin - to provide context/ flavor to the configuration of the instances
+
+1. Start the plugins
+
+```shell
+# Make sure directory exists for plugins to discover each other
+$ mkdir -p /run/infrakit/plugins/
+```
+
+Start the group plugin
+
+```shell
+$ ./infrakit/group --log=5
+INFO[0000] Starting discovery
+DEBU[0000] Opening: /run/infrakit/plugins
+INFO[0000] Starting plugin
+INFO[0000] Starting
+INFO[0000] Listening on: unix:///run/infrakit/plugins/group.sock
+INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <nil>
+```
+
+Start the file instance plugin
+
+```shell
+$ infrakit/file --log 5 --dir ./tutorial/
+INFO[0000] Starting plugin
+INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
+DEBU[0000] file instance plugin. dir= ./tutorial/
+INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-file.sock err= <nil>
+```
+Note the directory `./tutorial` where the plugin will store the instances as they are provisioned.
+We can look at the files here to see what's being created and how they are configured.
+
+Start the vanilla flavor plugin
+
+```shell
+$ ./infrakit/vanilla --log 5
+INFO[0000] Starting plugin
+INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-vanilla.sock
+INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.sock err= <nil>
+```
+
+Show the plugins:
+
+```shell
+$ infrakit/cli plugin ls
+Plugins:
+NAME                	LISTEN
+flavor-vanilla      	unix:///run/infrakit/plugins/flavor-vanilla.sock
+group               	unix:///run/infrakit/plugins/group.sock
+instance-file       	unix:///run/infrakit/plugins/instance-file.sock
+```
+
+Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
+
+Here we have a configuration JSON for the group named `cattle`.  Note there are two sections under `Properties`:
+`InstancePluginProperties` and `FlavorPluginProperties`. In each respective `Properties` are the configurations
+for the plugins.
+
+```json
+{
+    "ID": "cattle",
+    "Properties": {
+        "InstancePlugin": "instance-file",
+        "InstancePluginProperties": {
+            "Note": "Instance properties version 1.0"
+        },
+        "FlavorPlugin": "flavor-vanilla",
+        "FlavorPluginProperties": {
+            "Size" : 5,
+
+            "UserData" : [
+                "sudo apt-get update -y",
+                "sudo apt-get install -y nginx",
+                "sudo service nginx start"
+            ],
+
+            "Labels" : {
+                "tier" : "web",
+                "project" : "infrakit"
+            }
+        }
+    }
+}
+```
+The Instance Plugin configuration specifies the use of the `instance-file` plugin (by name)
+and has some configuration like `Note`.
+
+The Flavor Plugin configuration says to use the `flavor-vanilla` plugin and has configurations like `UserData` and `Labels`
+to apply to each instance.
+
+Note that we specify the number of instances via the `Size` parameter in the `flavor-vanilla` plugin.  It's possible
+that a specialized flavor plugin doesn't even accept a size for the group, but rather computes the optimal size based on
+some criteria.
+
+Check the file store:
+```shell
+$ ls -al ./tutorial/
+total 0
+drwxr-xr-x   2 davidchung  staff    68 Sep 27 22:54 .
+drwxr-xr-x  35 davidchung  staff  1190 Sep 27 23:46 ..
+```
+
+Or via the CLI:
+
+```shell
+$ infrakit/cli instance --name instance-file describe
+ID                            	LOGICAL                       	TAGS
+
+```
+
+Now we tell the group plugin to make our specification (the config JSON) a reality by `watching` the group in the
+config JSON:
+
+```shell
+$ infrakit/cli group --name group watch <<EOF
+> {
+>     "ID": "cattle",
+>     "Properties": {
+>         "InstancePlugin": "instance-file",
+>         "InstancePluginProperties": {
+>             "Note": "Instance properties version 1.0"
+>         },
+>         "FlavorPlugin": "flavor-vanilla",
+>         "FlavorPluginProperties": {
+>             "Size" : 5,
+> 
+>             "UserData" : [
+>                 "sudo apt-get update -y",
+>                 "sudo apt-get install -y nginx",
+>                 "sudo service nginx start"
+>             ],
+> 
+>             "Labels" : {
+>                 "tier" : "web",
+>                 "project" : "infrakit"
+>             }
+>         }
+>     }
+> }
+> EOF
+watching cattle
+```
+
+After a short while, we should see 5 instances:
+
+```shell
+$ infrakit/cli group --name group inspect cattle
+ID                            	LOGICAL         TAGS
+instance-1475045378           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045388           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045398           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045408           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045418           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+```
+
+Quickly we can verify looking at the directory:
+
+```shell
+$ ls -al tutorial/
+total 40
+drwxr-xr-x   7 davidchung  staff   238 Sep 27 23:50 .
+drwxr-xr-x  36 davidchung  staff  1224 Sep 27 23:47 ..
+-rw-r--r--   1 davidchung  staff   654 Sep 27 23:49 instance-1475045378
+-rw-r--r--   1 davidchung  staff   654 Sep 27 23:49 instance-1475045388
+-rw-r--r--   1 davidchung  staff   654 Sep 27 23:49 instance-1475045398
+-rw-r--r--   1 davidchung  staff   654 Sep 27 23:50 instance-1475045408
+-rw-r--r--   1 davidchung  staff   654 Sep 27 23:50 instance-1475045418
+
+```
+
+The Instance Plugin can also report instances, it will report all instances across all groups.
+
+```shell
+$ infrakit/cli instance --name instance-file describe
+ID                            	LOGICAL         TAGS
+instance-1475045378           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045388           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045398           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045408           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045418           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+```
+
+We can look at the contents of the instance provisioned:
+
+```shell
+
+$ cat tutorial/instance-1475045378
+{
+    "ID": "instance-1475045378",
+    "LogicalID": null,
+    "Tags": {
+      "infrakit.config_sha": "Y23cKqyRpkQ_M60vIq7CufFmQWk=",
+      "infrakit.group": "cattle",
+      "project": "infrakit",
+      "tier": "web"
+    },
+    "Spec": {
+      "Properties": {
+        "Note": "Instance properties version 1.0"
+      },
+      "Tags": {
+        "infrakit.config_sha": "Y23cKqyRpkQ_M60vIq7CufFmQWk=",
+        "infrakit.group": "cattle",
+        "project": "infrakit",
+        "tier": "web"
+      },
+      "Init": "\nsudo apt-get update -y\nsudo apt-get install -y nginx\nsudo service nginx start",
+      "LogicalID": null,
+      "Attachments": null
+    }
+
+```
+Note that the instances now have tags that indicated the SHA of the configuration.  Also, the instance has
+the properties we set earlier in the JSON (e.g. the `Note` field saying it's version `1.0`.)
+
+Now let's update the configuration by changing the size of the group and a property of the instance:
+
+```json
+{
+    "ID": "cattle",
+    "Properties": {
+        "InstancePlugin": "instance-file",
+        "InstancePluginProperties": {
+            "Note": "Instance properties version 2.0 -- CHANGED"
+        },
+        "FlavorPlugin": "flavor-vanilla",
+        "FlavorPluginProperties": {
+            "Size" : 3,
+
+            "UserData" : [
+                "sudo apt-get update -y",
+                "sudo apt-get install -y nginx",
+                "sudo service nginx start"
+            ],
+
+            "Labels" : {
+                "tier" : "web",
+                "project" : "infrakit"
+            }
+        }
+    }
+}
+```
+
+Let's apply the new config:
+
+```shell
+$ infrakit/cli group --name group update <<EOF
+> {
+>     "ID": "cattle",
+>     "Properties": {
+>         "InstancePlugin": "instance-file",
+>         "InstancePluginProperties": {
+>             "Note": "Instance properties version 2.0 -- CHANGED"
+>         },
+>         "FlavorPlugin": "flavor-vanilla",
+>         "FlavorPluginProperties": {
+>             "Size" : 3,
+> 
+>             "UserData" : [
+>                 "sudo apt-get update -y",
+>                 "sudo apt-get install -y nginx",
+>                 "sudo service nginx start"
+>             ],
+> 
+>             "Labels" : {
+>                 "tier" : "web",
+>                 "project" : "infrakit"
+>             }
+>         }
+>     }
+> }
+> EOF
+
+```
+
+The command will block until the update is complete.
+
+Now we can check:
+
+```shell
+$ infrakit/cli group --name group inspect cattle
+ID                            	LOGICAL         TAGS
+instance-1475045988           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045998           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475046008           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+
+```
+
+Also by filesystem:
+
+```shell
+$ ls -al tutorial/
+total 24
+drwxr-xr-x   5 davidchung  staff   170 Sep 28 00:00 .
+drwxr-xr-x  36 davidchung  staff  1224 Sep 27 23:58 ..
+-rw-r--r--   1 davidchung  staff   665 Sep 27 23:59 instance-1475045988
+-rw-r--r--   1 davidchung  staff   665 Sep 27 23:59 instance-1475045998
+-rw-r--r--   1 davidchung  staff   665 Sep 28 00:00 instance-1475046008
+
+```
+
+Note the new timesstamps and the total of three instances.  More important, the instances now have a new SHA `KSh4RpuYaDYQsYv77cimBZ8ZhHU=`
+
+We can also verify and see that the instances have the new configurations:
+```shell
+
+$ cat tutorial/instance-1475046008 
+{
+    "ID": "instance-1475046008",
+    "LogicalID": null,
+    "Tags": {
+      "infrakit.config_sha": "KSh4RpuYaDYQsYv77cimBZ8ZhHU=",
+      "infrakit.group": "cattle",
+      "project": "infrakit",
+      "tier": "web"
+    },
+    "Spec": {
+      "Properties": {
+        "Note": "Instance properties version 2.0 -- CHANGED"
+      },
+      "Tags": {
+        "infrakit.config_sha": "KSh4RpuYaDYQsYv77cimBZ8ZhHU=",
+        "infrakit.group": "cattle",
+        "project": "infrakit",
+        "tier": "web"
+      },
+      "Init": "\nsudo apt-get update -y\nsudo apt-get install -y nginx\nsudo service nginx start",
+      "LogicalID": null,
+      "Attachments": null
+    }
+  }
+```
+
+To see that the Group plugin can enforce the size of the group, let's kill an instance.
+
+```shell
+$ rm tutorial/instance-1475046008
+$ ls -al tutorial/
+total 24
+drwxr-xr-x   5 davidchung  staff   170 Sep 28 00:05 .
+drwxr-xr-x  36 davidchung  staff  1224 Sep 28 00:05 ..
+-rw-r--r--   1 davidchung  staff   665 Sep 27 23:59 instance-1475045988
+-rw-r--r--   1 davidchung  staff   665 Sep 27 23:59 instance-1475045998
+-rw-r--r--   1 davidchung  staff   665 Sep 28 00:05 instance-1475046358 <--- new instance
+```
+
+We see that a new instance has been created to match our original specification of 3 instances.
+
+This concludes our quick tutorial.  In this tutorial we have
+  + Started the plugins and learned to access them
+  + Created a configuration for a group we want to watch
+  + See the instances created to match the specifications
+  + Updated the configurations across the group
+  + Removed some instances and see that the group self-healed
+
+
+
+## Plugin Discovery
 
 _InfraKit_ plugins collaborate with each other to accomplish a set of objectives.  Therefore, they
 need to be able to talk to one another.  While many different discovery methods are available, this
@@ -163,7 +537,7 @@ INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock
 
 Using the CLI, it you will see
 
-```
+```shell
 $ ./infrakit/cli plugin ls
 Plugins:
 NAME                	LISTEN
@@ -171,9 +545,9 @@ instance-file       	unix:///run/infrakit/plugins/instance-file.sock
 another-file        	unix:///run/infrakit/plugins/another-file.sock
 ```
 
-For each binary, you can find out more about it by using the `version` verb in the command line:
+For each binary, you can find out more about it by using the `version` verb in the command line. For example:
 
-```
+```shell
 $ ./infrakit/group version
 {
     "name": "GroupPlugin",
@@ -183,30 +557,10 @@ $ ./infrakit/group version
   }
 ```
 
-or
-```
-$ ./infrakit/file version
-{
-    "name": "FileInstance",
-    "revision": "75d7f4dbc17dbc48aadb9a4abfd87d57fbd7e1f8",
-    "type": "infrakit.InstancePlugin/1.0",
-    "version": "75d7f4d.m"
-  }
-```
-
 So you can have different plugins of the same type (e.g. `infrakit.InstancePlugin/1.0`) subject to the naming restrictions
 of the files in the common plugin directory.
 
 
-## Examples
-There are few examples of _InfraKit_ plugins:
-
-  + Terraform Instance Plugin
-    - [README](./example/instance/terraform/README.md)
-    - [Code] (./example/instance/terraform/plugin.go) and [configs](./example/instance/terraform/aws-two-tier)
-  + Zookeeper / Vagrant
-    - [README](./example/flavor/zookeeper/README.md)
-    - [Code] (./plugin/flavor/zookeeper)
 
 ## Configuration
 _InfraKit_ uses JSON for configuration.  As an example, if you wanted to manage a Group of NGINX servers, you could
@@ -270,14 +624,14 @@ $ cat zk.conf
 ```
 
 ```shell
-$ infrakit watch zk.conf
+$ infrakit/cli group --name group watch zk.conf
 ```
 
 To perform a rolling update to the Group, we use the `update` command.  First, it's a good idea to describe the proposed
 update to ensure the expected operations will be performed:
 
 ```shell
-$ infrakit update zk.conf --describe
+$ infrakit/cli group --name group describe zk.conf
 Noop
 ```
 
