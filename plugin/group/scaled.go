@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin/group/types"
-	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/plugin/group/types"
+	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/spi/instance"
 	"sync"
 )
 

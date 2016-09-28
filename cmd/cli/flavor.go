@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/libmachete/discovery"
-	"github.com/docker/libmachete/spi/flavor"
-	flavor_plugin "github.com/docker/libmachete/spi/http/flavor"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/discovery"
+	"github.com/docker/infrakit/spi/flavor"
+	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
+	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/cobra"
 )
 

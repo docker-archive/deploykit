@@ -113,16 +113,16 @@ $ ./infrakit/cli instance --name instance-file validate << EOF
 >         "version" : "v0.0.1",
 >         "groups" : {
 >             "managers" : {
->                 "driver" : "machete/quorum"
+>                 "driver" : "infrakit/quorum"
 >             },
 >             "small" : {
->                 "driver" : "machete/scaler",
+>                 "driver" : "infrakit/scaler",
 >                 "properties" : {
 >                     "size" : 3
 >                 }
 >             },
 >             "large" : {
->                 "driver" : "machete/scaler",
+>                 "driver" : "infrakit/scaler",
 >                 "properties" : {
 >                     "size" : 3
 >                 }
@@ -149,16 +149,16 @@ $ ./infrakit/cli instance --name instance-file provision << EOF
 >         "version" : "v0.0.1",
 >         "groups" : {
 >             "managers" : {
->                 "driver" : "machete/quorum"
+>                 "driver" : "infrakit/quorum"
 >             },
 >             "small" : {
->                 "driver" : "machete/scaler",
+>                 "driver" : "infrakit/scaler",
 >                 "properties" : {
 >                     "size" : 3
 >                 }
 >             },
 >             "large" : {
->                 "driver" : "machete/scaler",
+>                 "driver" : "infrakit/scaler",
 >                 "properties" : {
 >                     "size" : 3
 >                 }

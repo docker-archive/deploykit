@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/docker/libmachete/spi/group"
+	"github.com/docker/infrakit/spi/group"
 )
 
 // These types are declared in a separate package to break an import cycle between group (test) -> mock -> group.

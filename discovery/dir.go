@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin"
-	"github.com/docker/libmachete/plugin/util"
+	"github.com/docker/infrakit/plugin"
+	"github.com/docker/infrakit/plugin/util"
 )
 
 type pluginInstance struct {

@@ -4,17 +4,17 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin/group/types"
-	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/group"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/plugin/group/types"
+	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/spi/group"
+	"github.com/docker/infrakit/spi/instance"
 	"sync"
 	"time"
 )
 
 const (
-	groupTag  = "machete.group"
-	configTag = "machete.config_sha"
+	groupTag  = "infrakit.group"
+	configTag = "infrakit.config_sha"
 )
 
 // InstancePluginLookup helps with looking up an instance plugin by name

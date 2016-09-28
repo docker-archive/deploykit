@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/docker/libmachete/discovery"
-	"github.com/docker/libmachete/spi/group"
-	group_plugin "github.com/docker/libmachete/spi/http/group"
+	"github.com/docker/infrakit/discovery"
+	"github.com/docker/infrakit/spi/group"
+	group_plugin "github.com/docker/infrakit/spi/http/group"
 	"github.com/spf13/cobra"
 )
 

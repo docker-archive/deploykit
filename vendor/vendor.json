@@ -52,6 +52,12 @@
 			"revisionTime": "2016-09-20T21:26:56Z"
 		},
 		{
+			"checksumSHA1": "fzeGodcTcWuV18AT0BcvB4EFByo=",
+			"path": "github.com/docker/docker/api/types/events",
+			"revision": "219f88364c7e06f3a122089d5997800b9e2fd04d",
+			"revisionTime": "2016-09-24T23:43:20Z"
+		},
+		{
 			"checksumSHA1": "lEiwS/Vd4Nm8EARk4RZxeinDWmo=",
 			"path": "github.com/docker/docker/api/types/filters",
 			"revision": "2a3205d7b770fec0eb1f8d90c5342f98a12a74a1",
@@ -106,10 +112,10 @@
 			"revisionTime": "2016-09-20T21:26:56Z"
 		},
 		{
-			"checksumSHA1": "aeMGuO44CmNGGZiFIexK6FN9/Ns=",
+			"checksumSHA1": "s4bVFRyLYDoo3cVKn7yhQ6+K33c=",
 			"path": "github.com/docker/docker/client",
-			"revision": "2a3205d7b770fec0eb1f8d90c5342f98a12a74a1",
-			"revisionTime": "2016-09-20T21:26:56Z"
+			"revision": "219f88364c7e06f3a122089d5997800b9e2fd04d",
+			"revisionTime": "2016-09-24T23:43:20Z"
 		},
 		{
 			"checksumSHA1": "9Lnzd9sA5deN/9BeNGWhFmSeudo=",
@@ -323,5 +329,5 @@
 			"revisionTime": "2016-09-22T05:42:04Z"
 		}
 	],
-	"rootPath": "github.com/docker/libmachete"
+	"rootPath": "github.com/docker/infrakit"
 }

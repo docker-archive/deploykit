@@ -7,9 +7,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/docker/libmachete/plugin/util"
-	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
 )
 

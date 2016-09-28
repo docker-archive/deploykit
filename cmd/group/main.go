@@ -9,14 +9,14 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/discovery"
-	"github.com/docker/libmachete/plugin/group"
-	"github.com/docker/libmachete/plugin/util"
-	"github.com/docker/libmachete/spi/flavor"
-	flavor_client "github.com/docker/libmachete/spi/http/flavor"
-	group_server "github.com/docker/libmachete/spi/http/group"
-	instance_client "github.com/docker/libmachete/spi/http/instance"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/discovery"
+	"github.com/docker/infrakit/plugin/group"
+	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/spi/flavor"
+	flavor_client "github.com/docker/infrakit/spi/http/flavor"
+	group_server "github.com/docker/infrakit/spi/http/group"
+	instance_client "github.com/docker/infrakit/spi/http/instance"
+	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/cobra"
 )
 

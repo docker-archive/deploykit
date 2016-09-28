@@ -6,9 +6,9 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
-	zk "github.com/docker/libmachete/plugin/flavor/zookeeper"
-	"github.com/docker/libmachete/plugin/util"
-	flavor_plugin "github.com/docker/libmachete/spi/http/flavor"
+	zk "github.com/docker/infrakit/plugin/flavor/zookeeper"
+	"github.com/docker/infrakit/plugin/util"
+	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/spf13/cobra"
 )
 

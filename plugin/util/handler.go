@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin"
+	"github.com/docker/infrakit/plugin"
 	"github.com/gorilla/mux"
 )
 

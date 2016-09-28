@@ -51,8 +51,8 @@ fi
 
 echo 'Building'
 container_id=$(docker run --detach \
-  -v "$PWD":/go/src/github.com/docker/libmachete \
-  -w /go/src/github.com/docker/libmachete \
+  -v "$PWD":/go/src/github.com/docker/infrakit \
+  -w /go/src/github.com/docker/infrakit \
   golang:1.6-alpine \
   go build -ldflags "$LDFLAGS" -o /build/$BIN_NAME $PACKAGES)
 

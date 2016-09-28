@@ -8,7 +8,7 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/discovery"
+	"github.com/docker/infrakit/discovery"
 	"github.com/spf13/cobra"
 )
 

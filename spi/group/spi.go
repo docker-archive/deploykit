@@ -2,7 +2,7 @@ package group
 
 import (
 	"encoding/json"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/spi/instance"
 )
 
 // Plugin defines the functions for a Group plugin.
