@@ -18,6 +18,9 @@ import (
 // DescribeInstances simply would list the files with the matching
 // tags.
 
+// Spec is just whatever that can be unmarshalled into a generic JSON map
+type Spec map[string]interface{}
+
 // fileInstance represents a single file instance on disk.
 type fileInstance struct {
 	instance.Description
@@ -41,6 +44,13 @@ func NewFileInstancePlugin(dir string) instance.Plugin {
 // Validate performs local validation on a provision request.
 func (p *plugin) Validate(req json.RawMessage) error {
 	log.Debugln("validate", string(req))
+
+	spec := Spec{}
+	if err := json.Unmarshal(req, &spec); err != nil {
+		return err
+	}
+
+	log.Debugln("Validated:", spec)
 	return nil
 }
 
