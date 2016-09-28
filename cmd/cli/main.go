@@ -63,20 +63,13 @@ func main() {
 		},
 	})
 
-	var pd *discovery.Dir
 	f := func() *discovery.Dir {
-		if pd != nil {
-			return pd
-		}
-
 		d, err := discovery.NewDir(discoveryDir)
 		if err != nil {
-			log.Warningln("err=", err)
-			return nil
+			log.Errorf("Failed to initialize plugin discovery: %s", err)
+			os.Exit(1)
 		}
-		pd = d
-		return pd
-
+		return d
 	}
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
 

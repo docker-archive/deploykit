@@ -1,31 +1,44 @@
 package discovery
 
 import (
-	"fmt"
 	"github.com/docker/libmachete/plugin/util"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
+func blockWhileFileExists(name string) {
+	for {
+		_, err := os.Stat(name)
+		if err != nil {
+			if os.IsNotExist(err) {
+				break
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestDirDiscovery(t *testing.T) {
 
-	dir := fmt.Sprintf("/tmp/plugins/%d", time.Now().Unix())
-	err := os.MkdirAll(dir, 0777)
+	dir, err := ioutil.TempDir("", "infrakit_dir_test")
 	require.NoError(t, err)
 
 	name1 := "test-tcp-server"
-	listen1 := "tcp://:4321" + filepath.Join(dir, name1)
+	path1 := filepath.Join(dir, name1)
+	listen1 := "tcp://:4321" + path1
 	stop1, errors1, err1 := util.StartServer(listen1, mux.NewRouter())
 	require.NoError(t, err1)
 	require.NotNil(t, stop1)
 	require.NotNil(t, errors1)
 
 	name2 := "test-unix-server"
-	listen2 := "unix://" + filepath.Join(dir, name2+".sock")
+	path2 := filepath.Join(dir, name2+".sock")
+	listen2 := "unix://" + path2
 	stop2, errors2, err2 := util.StartServer(listen2, mux.NewRouter())
 	require.NoError(t, err2)
 	require.NotNil(t, stop2)
@@ -44,12 +57,7 @@ func TestDirDiscovery(t *testing.T) {
 
 	// Now we stop the servers
 	close(stop1)
-
-	// wait for socket file to disappear
-	time.Sleep(100 * time.Millisecond)
-
-	err = discover.Refresh()
-	require.Nil(t, err)
+	blockWhileFileExists(path1)
 
 	p, err = discover.PluginByName(name1)
 	require.Error(t, err)
@@ -60,11 +68,7 @@ func TestDirDiscovery(t *testing.T) {
 
 	close(stop2)
 
-	// wait for socket file to disappear
-	time.Sleep(100 * time.Millisecond)
-
-	err = discover.Refresh()
-	require.Nil(t, err)
+	blockWhileFileExists(path2)
 
 	p, err = discover.PluginByName(name1)
 	require.Error(t, err)
