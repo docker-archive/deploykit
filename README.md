@@ -586,6 +586,107 @@ This concludes our quick tutorial.  In this tutorial we have
   + Removed some instances and see that the group self-healed
 
 
+# Design
+
+## Configuration
+
+## Configuration
+_InfraKit_ uses JSON for configuration because it is composable and widely accepted format for many
+infrastructure SDKs and tools.  Because the system is highly components-driven, our JSON format follow
+simple patterns to support composition of components.
+
+A common pattern for a JSON value looks like this:
+
+```json
+{
+   "SomeKey"        : "ValueForTheKey",
+   "Properties" : {
+        /* some raw json */
+   }
+}
+```
+
+There is only one `Properties` field in this struct and its value is a another raw JSON value. The opaque
+JSON value for `Properties` is decoded via the Go `Spec` struct defined within the package of the plugin --
+for example -- [`vanilla.Spec`](/plugin/flavor/vanilla/flavor.go).
+
+The JSON above is a _value_, but the type of the value belongs outside the structure.  For example, the
+default Group [Spec](/plugin/group/types/types.go) is composed of one instance and one flavor plugin:
+
+```json
+{
+    "ID": "name-of-the-group",
+    "Properties": {
+        "Instance" : {
+	   "Plugin" : "name-of-the-instance-plugin",
+	   "Properties" : {
+	   	/* the Spec of the instance plugin */
+	   }
+        },
+        "Flavor" : {
+	   "Plugin" : "name-of-the-flavor-plugin",
+	   "Properties" : {
+	   	/* the Spec of the flavor plugin */
+	   }
+        }
+    }
+}
+```
+The group's Spec has `Instance` and `Flavor` fields which are used to indicate the type, and the value of the
+fields follow the pattern of `<some_key>` and `Properties` as shown above.
+
+As an example, if you wanted to manage a Group of NGINX servers, you could
+write a custom Group plugin for ultimate customizability.  The most concise configuration looks something like this:
+
+```json
+{
+  "ID": "nginx",
+  "Plugin": "my-nginx-group-plugin",
+  "Properties": {
+    "port": 8080
+  }
+}
+````
+
+However, you would likely prefer to use the default Group plugin and implement a Flavor plugin to focus on
+application-specific behavior.  This gives you immediate support for any infrastructure that has an Instance plugin.
+Your resulting configuration might look something like this:
+
+```json
+{
+  "ID": "nginx",
+  "Plugin": "group",
+  "Properties": {
+    "Instance": {
+      "Plugin": "aws",
+      "Properties": {
+        "region": "us-west-2",
+        "ami": "ami-123456"
+      }
+    },
+    "Flavor": {
+      "Plugin": "nginx",
+      "Properties": {
+        "size": 10,
+        "port": 8080
+      }
+    }
+  }
+}
+```
+
+Once the configuration is ready, you will tell a Group plugin to
+  + watch it
+  + update it
+  + destroy it
+
+Watching the group as specified in the configuration means that the Group plugin will create
+the instances if they don't already exist.  New instances will be created if for any reason
+existing instances have disappered such that the state doesn't match your specifications.
+
+Updating the group tells the Group plugin that your configuration may have changed.  It will
+then determine the changes necessary to ensure the state of the infrastructure matches the new
+specification.
 
 ## Plugin Discovery
 
@@ -640,136 +741,3 @@ of the files in the common plugin directory.
 
 
 
-## Configuration
-_InfraKit_ uses JSON for configuration.  As an example, if you wanted to manage a Group of NGINX servers, you could
-write a custom Group plugin for ultimate customizability.  The most concise configuration looks something like this:
-
-```json
-{
-  "id": "nginx",
-  "plugin": "my-nginx-group-plugin",
-  "properties": {
-    "port": 8080
-  }
-}
-````
-
-However, you would likely prefer to use the default Group plugin and implement a Flavor plugin to focus on
-application-specific behavior.  This gives you immediate support for any infrastructure that has an Instance plugin.
-Your resulting configuration might look something like this:
-
-```json
-{
-  "id": "nginx",
-  "plugin": "group",
-  "properties": {
-    "size": 10,
-    "instance": {
-      "plugin": "aws",
-      "properties": {
-        "region": "us-west-2",
-        "ami": "ami-123456"
-      }
-    },
-    "flavor": {
-      "plugin": "nginx",
-      "properties": {
-        "port": 8080
-      }
-    }
-  }
-}
-```
-
-#### Create, update, and destroy a Group
-For development, it's typically easiest to use the Vagrant Instance plugin.  We will start with this configuration:
-
-```shell
-$ cat zk.conf
-{
-  "id": "zk",
-  "plugin": "group",
-  "properties": {
-    "ips": ["192.168.0.4", "192.168.0.5", "192.168.0.6"],
-    "instance": {
-      "plugin": "vagrant"
-    },
-    "flavor": {
-      "plugin": "zookeeper"
-    }
-  }
-}
-```
-
-```shell
-$ infrakit/cli group --name group watch zk.conf
-```
-
-To perform a rolling update to the Group, we use the `update` command.  First, it's a good idea to describe the proposed
-update to ensure the expected operations will be performed:
-
-```shell
-$ infrakit/cli group --name group describe zk.conf
-Noop
-```
-
-Since we have not edited `zk.conf`, there are no changes to be made.  First, let's edit the configuration:
-
-```shell
-$ cat zk.conf
-{
-  "id": "zk",
-  "plugin": "group",
-  "properties": {
-    "ips": ["192.168.0.4", "192.168.0.5", "192.168.0.6"],
-    "instance": {
-      "plugin": "vagrant",
-      "properties": {
-        "cpu": 2
-      }
-    },
-    "flavor": {
-      "plugin": "zookeeper"
-    }
-  }
-}
-```
-
-```shell
-$ infrakit/cli group --name group describe zk.conf
-Performs a rolling update of 3 instances
-
-$ infrakit/cli group --name group update zk.conf
-```
-
-For high-traffic clusters, ZooKeeper supports Observer nodes.  We can add another Group to include Observers:
-
-```shell
-$ cat zk-observer.conf
-{
-  "id": "zk-observers",
-  "plugin": "group",
-  "properties": {
-    "size": 3,
-    "instance": {
-      "plugin": "vagrant"
-    },
-    "flavor": {
-      "plugin": "zookeeper",
-      "properties": {
-        "mode": "observer"
-      }
-    }
-  }
-}
-
-$ infrakit/cli group --name group watch zk-observer.conf
-```
-
-Finally, we can terminate the instances when finished with them:
-
-```shell
-$ infrakit/cli group --name group destroy zk
-$ infrakit/cli group --name group destroy zk-observers
-
-```
