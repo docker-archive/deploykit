@@ -22,8 +22,6 @@ func instancePluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 		Short: "Access instance plugin",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 
-			assertNotNil("cannot lookup", pluginDir())
-
 			callable, err := pluginDir().PluginByName(name)
 			if err != nil {
 				return err
