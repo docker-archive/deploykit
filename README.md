@@ -205,9 +205,76 @@ instance-file       	unix:///run/infrakit/plugins/instance-file.sock
 
 Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
 
-Here we have a configuration JSON for the group named `cattle`.  Note there are two sections under `Properties`:
-`InstancePluginProperties` and `FlavorPluginProperties`. In each respective `Properties` are the configurations
-for the plugins.
+Here we have a configuration JSON for the group.  In general, the JSON structures follow a pattern:
+
+```json
+{
+   "SomeKey"        : "ValueForTheKey",
+   "Properties" : {
+        /* some raw json */
+   }
+}
+```
+
+The `Properties` field has a value of that is a opaque and correct JSON value.  This raw JSON value here
+will configure the plugin specified. 
+
+The plugins are free to define their own configuration schema.
+In our codebase, we follow a convention.  The values of the `Properties` field are decoded using
+a `Spec` Go struct.  The [`group.Spec`](/plugin/group/types/types.go) in the default Group plugin, and
+[`vanilla.Spec`](/plugin/flavor/vanilla/flavor.go) are examples of this pattern.
+
+For the File Instance Plugin, we have the spec:
+
+```json
+{
+    "Note": "Instance properties version 1.0"
+}
+```
+
+For the Vanilla Flavor Plugin, we have the spec:
+
+```json
+{
+    "Size" : 5,
+
+    "UserData" : [
+        "sudo apt-get update -y",
+        "sudo apt-get install -y nginx",
+        "sudo service nginx start"
+    ],
+
+    "Labels" : {
+        "tier" : "web",
+        "project" : "infrakit"
+    }
+}
+```
+
+The default Group plugin is a composition of the instance and flavor plugins and has the form:
+
+```json
+{
+    "Instance" : {
+        "Plugin" : "name of the instance plugin",
+        "Properties" : {
+            /* spec of the instance plugin */
+        }
+    },
+    "Flavor" : {
+        "Plugin" : "name of the flavor plugin",
+        "Properties" : {
+            /* spec of the flavor plugin */
+        }
+    }
+}
+```
+
+From listing the plugins earlier, we have two plugins running. `instance-file` is the name of the File Instance Plugin,
+and `flavor-vanilla` is the name of the Vanilla Flavor Plugin.
+So now we have the names of the plugins and their configurations.
+
+Putting everything together, we have the configuration to give to the default Group plugin:
 
 ```json
 {
@@ -239,11 +306,6 @@ for the plugins.
     }
 }
 ```
-The Instance Plugin configuration specifies the use of the `instance-file` plugin (by name)
-and has some configuration like `Note`.
-
-The Flavor Plugin configuration says to use the `flavor-vanilla` plugin and has configurations like `UserData` and `Labels`
-to apply to each instance.
 
 Note that we specify the number of instances via the `Size` parameter in the `flavor-vanilla` plugin.  It's possible
 that a specialized flavor plugin doesn't even accept a size for the group, but rather computes the optimal size based on
@@ -273,23 +335,27 @@ $ infrakit/cli group --name group watch <<EOF
 > {
 >     "ID": "cattle",
 >     "Properties": {
->         "InstancePlugin": "instance-file",
->         "InstancePluginProperties": {
->             "Note": "Instance properties version 1.0"
+>         "Instance" : {
+>             "Plugin": "instance-file",
+>             "Properties": {
+>                 "Note": "Instance properties version 1.0"
+>             }
 >         },
->         "FlavorPlugin": "flavor-vanilla",
->         "FlavorPluginProperties": {
->             "Size" : 5,
+>         "Flavor": {
+>             "Plugin" : "flavor-vanilla",
+>             "Properties": {
+>                 "Size" : 5,
 > 
->             "UserData" : [
->                 "sudo apt-get update -y",
->                 "sudo apt-get install -y nginx",
->                 "sudo service nginx start"
->             ],
+>                 "UserData" : [
+>                     "sudo apt-get update -y",
+>                     "sudo apt-get install -y nginx",
+>                     "sudo service nginx start"
+>                 ],
 > 
->             "Labels" : {
->                 "tier" : "web",
->                 "project" : "infrakit"
+>                 "Labels" : {
+>                     "tier" : "web",
+>                     "project" : "infrakit"
+>                 }
 >             }
 >         }
 >     }
