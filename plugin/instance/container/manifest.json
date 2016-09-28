@@ -1,6 +1,6 @@
 {
     "manifestVersion": "v0.1",
-    "description": "machete instance driver for aws",
+    "description": "infrakit instance driver for aws",
     "documentation": "https://docs.docker.com/engine/extend/plugins/",
     "entrypoint": ["driver", "--listen=/run/docker/plugins/aws-instance.sock"],
     "network": {

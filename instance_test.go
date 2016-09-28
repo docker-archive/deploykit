@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	mock_ec2 "github.com/docker/libmachete.aws/mock/ec2"
-	"github.com/docker/libmachete/spi/instance"
+	mock_ec2 "github.com/docker/infrakit.aws/mock/ec2"
+	"github.com/docker/infrakit/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -41,7 +41,7 @@ func TestInstanceLifecycle(t *testing.T) {
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
 	// TODO(wfarner): Test user-data and private IP plumbing.
-	id, err := provisioner.Provision(instance.Spec{Properties: inputJSON, Tags: tags})
+	id, err := provisioner.Provision(instance.Spec{Properties: &inputJSON, Tags: tags})
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
@@ -65,7 +65,8 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	provisioner := NewInstancePlugin(clientMock)
-	id, err := provisioner.Provision(instance.Spec{Properties: json.RawMessage("{}"), Tags: tags})
+	properties := json.RawMessage("{}")
+	id, err := provisioner.Provision(instance.Spec{Properties: &properties, Tags: tags})
 
 	require.Error(t, err)
 	require.Nil(t, id)
@@ -165,14 +166,15 @@ func TestListGroup(t *testing.T) {
 	descriptions, err := provisioner.DescribeInstances(tags)
 
 	require.NoError(t, err)
+	id := instance.LogicalID("127.0.0.1")
 	require.Equal(t, []instance.Description{
-		{ID: "a", PrivateIPAddress: "127.0.0.1", Tags: tags},
-		{ID: "b", PrivateIPAddress: "127.0.0.1", Tags: tags},
-		{ID: "c", PrivateIPAddress: "127.0.0.1", Tags: tags},
-		{ID: "d", PrivateIPAddress: "127.0.0.1", Tags: tags},
-		{ID: "e", PrivateIPAddress: "127.0.0.1", Tags: tags},
-		{ID: "f", PrivateIPAddress: "127.0.0.1", Tags: tags},
-		{ID: "g", PrivateIPAddress: "127.0.0.1", Tags: tags},
+		{ID: "a", LogicalID: &id, Tags: tags},
+		{ID: "b", LogicalID: &id, Tags: tags},
+		{ID: "c", LogicalID: &id, Tags: tags},
+		{ID: "d", LogicalID: &id, Tags: tags},
+		{ID: "e", LogicalID: &id, Tags: tags},
+		{ID: "f", LogicalID: &id, Tags: tags},
+		{ID: "g", LogicalID: &id, Tags: tags},
 	}, descriptions)
 }
 

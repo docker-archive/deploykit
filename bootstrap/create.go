@@ -10,9 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/iam"
-	machete_aws "github.com/docker/libmachete.aws"
-	"github.com/docker/libmachete/spi/group"
-	"github.com/docker/libmachete/spi/instance"
+	infrakit_aws "github.com/docker/infrakit.aws"
+	"github.com/docker/infrakit/spi/group"
+	"github.com/docker/infrakit/spi/instance"
 	"text/template"
 	"time"
 )
@@ -39,7 +39,7 @@ func createEBSVolumes(config client.ConfigProvider, swim fakeSWIMSchema) error {
 			Tags: []*ec2.Tag{
 				swim.cluster().resourceTag(),
 				{
-					Key:   aws.String(machete_aws.VolumeTag),
+					Key:   aws.String(infrakit_aws.VolumeTag),
 					Value: aws.String(managerIP),
 				},
 			},
@@ -425,13 +425,13 @@ func ProvisionManager(
 	provisionRequest json.RawMessage,
 	ip string) error {
 
-	volume := instance.VolumeID(ip)
+	logicalID := instance.LogicalID(ip)
 
 	id, err := provisioner.Provision(instance.Spec{
-		Properties:       provisionRequest,
-		Tags:             tags,
-		PrivateIPAddress: &ip,
-		Volume:           &volume,
+		Properties:  &provisionRequest,
+		Tags:        tags,
+		LogicalID:   &logicalID,
+		Attachments: []instance.Attachment{instance.Attachment(ip)},
 	})
 	if err != nil {
 		return fmt.Errorf("Failed to provision: %s", err)
@@ -451,7 +451,7 @@ func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
 
 func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) error {
 	log.Info("Starting cluster boot leader instance")
-	builder := machete_aws.Builder{Config: config}
+	builder := infrakit_aws.Builder{Config: config}
 	provisioner, err := builder.BuildInstancePlugin()
 	if err != nil {
 		return err

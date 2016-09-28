@@ -15,7 +15,6 @@ REVISION=$(shell git rev-list -1 HEAD)
 PLUGIN?=aws-instance
 PLUGIN_TYPE?=instanceDriver
 
-
 DOCKER_REPO_OWNER?=chungers
 DOCKER_TAG?=dev
 PLUGIN_TAG?=latest

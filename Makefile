@@ -1,5 +1,5 @@
 # REPO
-REPO?=github.com/docker/libmachete.aws
+REPO?=github.com/docker/infrakit.aws
 
 # Set an output prefix, which is the local directory if not specified
 PREFIX?=$(shell pwd -L)
@@ -87,12 +87,3 @@ vendor-save: check-govendor
 vendor-check:
 	@echo "+ $@"
 	@test -z "$$(govendor status | tee /dev/stderr)"
-
-containers:
-	@echo "+ $@"
-	cd server/machete/container && make container
-	cd cli/machetectl/container && make container
-	cd controller/loadbalancer/container && make container
-	cd controller/quorum/container && make container
-	cd controller/scaler/container && make container
-	cd swarm/swarmboot/container && make container

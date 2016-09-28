@@ -109,11 +109,11 @@ func formatVolumes(config client.ConfigProvider, swim fakeSWIMSchema, volumeIDs 
 			}
 
 			consoleText := string(consoleData)
-			if strings.Contains(consoleText, "MACHETE FORMATTING FINISHED: success") {
+			if strings.Contains(consoleText, "INFRAKIT FORMATTING FINISHED: success") {
 				log.Info("  formatting complete")
 				formattingFailed = false
 				break
-			} else if strings.Contains(consoleText, "MACHETE FORMATTING FINISHED: unexpected exit") {
+			} else if strings.Contains(consoleText, "INFRAKIT FORMATTING FINISHED: unexpected exit") {
 				log.Fatal("  failed to format EBS volumes.  See console output below.")
 				log.Fatal(consoleText)
 				break
@@ -151,9 +151,9 @@ completed=false
 onexit () {
   if [ "$completed" = true ]
   then
-    echo 'MACHETE FORMATTING FINISHED: success'
+    echo 'INFRAKIT FORMATTING FINISHED: success'
   else
-    echo 'MACHETE FORMATTING FINISHED: unexpected exit'
+    echo 'INFRAKIT FORMATTING FINISHED: unexpected exit'
   fi
 }
 

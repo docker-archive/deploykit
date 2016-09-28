@@ -3,7 +3,7 @@
 # Build a go binary in an alpine container, and extract the binary.
 # This is useful for a cross-compile step when preparing an alpine image that contains only the go binary.
 
-REPO=${REPO:-github.com/docker/libmachete.aws}
+REPO=${REPO:-github.com/docker/infrakit.aws}
 
 set -o errexit
 set -o nounset

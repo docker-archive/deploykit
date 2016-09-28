@@ -6,8 +6,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	machete_aws "github.com/docker/libmachete.aws"
-	"github.com/docker/libmachete/spi/group"
+	infrakit_aws "github.com/docker/infrakit.aws"
+	"github.com/docker/infrakit/spi/group"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"io/ioutil"
@@ -52,7 +52,7 @@ type clusterIDFlags struct {
 func (c *clusterIDFlags) flags() *pflag.FlagSet {
 	clusterIDFlags := pflag.NewFlagSet("cluster ID", pflag.ExitOnError)
 	clusterIDFlags.StringVar(&c.ID.region, "region", "", "AWS region")
-	clusterIDFlags.StringVar(&c.ID.name, "cluster", "", "Machete cluster name")
+	clusterIDFlags.StringVar(&c.ID.name, "cluster", "", "Infrakit cluster name")
 	return clusterIDFlags
 }
 
@@ -95,7 +95,7 @@ func (a *CLI) Command() *cobra.Command {
 					abort("When creating from flags, --key, --cluster, and --region must be provided")
 				}
 
-				instanceConfig := machete_aws.CreateInstanceRequest{
+				instanceConfig := infrakit_aws.CreateInstanceRequest{
 					RunInstancesInput: ec2.RunInstancesInput{
 						ImageId: aws.String("ami-2ef48339"),
 						KeyName: aws.String(keyName),
@@ -207,7 +207,7 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 			log.Infof("Configuration pushed")
 		},
 	}
-	reconfigureCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Machete subsystem api endpoint")
+	reconfigureCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Infrakit subsystem api endpoint")
 	cmd.AddCommand(reconfigureCmd)
 
 	describeCmd := &cobra.Command{
@@ -231,7 +231,7 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 			log.Infof("Groups: %s", groups)
 		},
 	}
-	describeCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Machete subsystem api endpoint")
+	describeCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Infrakit subsystem api endpoint")
 	cmd.AddCommand(describeCmd)
 
 	statusCmd := &cobra.Command{
@@ -243,7 +243,7 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 			log.Infof("Workers: 5 instances")
 		},
 	}
-	statusCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Machete subsystem api endpoint")
+	statusCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Infrakit subsystem api endpoint")
 	cmd.AddCommand(statusCmd)
 
 	return &cmd

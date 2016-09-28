@@ -13,7 +13,7 @@
                 "Mounts": [],
                 "Capabilities": null,
                 "ManifestVersion": "v0.1",
-                "Description": "machete instance driver for aws",
+                "Description": "infrakit instance driver for aws",
                 "Documentation": "https://docs.docker.com/engine/extend/plugins/",
                 "Interface": {
                     "Socket": "aws-instance.sock",

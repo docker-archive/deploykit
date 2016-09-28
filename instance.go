@@ -3,6 +3,7 @@ package aws
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
@@ -13,15 +14,14 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	"github.com/docker/libmachete/spi"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/spi/instance"
 	"sort"
 	"time"
 )
 
 const (
 	// VolumeTag is the AWS tag name used to associate unique identifiers (instance.VolumeID) with volumes.
-	VolumeTag = "docker-machete-volume"
+	VolumeTag = "docker-infrakit-volume"
 )
 
 // Provisioner is an instance provisioner for AWS.
@@ -117,25 +117,29 @@ func (p Provisioner) Validate(req json.RawMessage) error {
 // Provision creates a new instance.
 func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 
+	if spec.Properties == nil {
+		return nil, errors.New("Properties must be set")
+	}
+
 	request := CreateInstanceRequest{}
-	err := json.Unmarshal(spec.Properties, &request)
+	err := json.Unmarshal(*spec.Properties, &request)
 	if err != nil {
-		return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Invalid input formatting: %s", err))
+		return nil, fmt.Errorf("Invalid input formatting: %s", err)
 	}
 
 	request.RunInstancesInput.MinCount = aws.Int64(1)
 	request.RunInstancesInput.MaxCount = aws.Int64(1)
 
-	if spec.PrivateIPAddress != nil {
+	if spec.LogicalID != nil {
 		if len(request.RunInstancesInput.NetworkInterfaces) > 0 {
-			request.RunInstancesInput.NetworkInterfaces[0].PrivateIpAddress = spec.PrivateIPAddress
+			request.RunInstancesInput.NetworkInterfaces[0].PrivateIpAddress = (*string)(spec.LogicalID)
 		} else {
-			request.RunInstancesInput.PrivateIpAddress = spec.PrivateIPAddress
+			request.RunInstancesInput.PrivateIpAddress = (*string)(spec.LogicalID)
 		}
 	}
 
-	if spec.InitScript != "" {
-		request.RunInstancesInput.UserData = aws.String(spec.InitScript)
+	if spec.Init != "" {
+		request.RunInstancesInput.UserData = aws.String(spec.Init)
 	}
 
 	if request.RunInstancesInput.UserData != nil {
@@ -143,8 +147,14 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 			base64.StdEncoding.EncodeToString([]byte(*request.RunInstancesInput.UserData)))
 	}
 
-	var awsVolumeID *string
-	if spec.Volume != nil {
+	awsVolumeIDs := []*string{}
+	if spec.Attachments != nil && len(spec.Attachments) > 0 {
+		filterValues := []*string{}
+		for _, attachment := range spec.Attachments {
+			s := string(attachment)
+			filterValues = append(filterValues, &s)
+		}
+
 		volumes, err := p.Client.DescribeVolumes(&ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{
 				// TODO(wfarner): Need a way to disambiguate between volumes associated with different
@@ -152,21 +162,23 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 				// unique in separate VPCs.
 				{
 					Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
-					Values: []*string{aws.String(string(*spec.Volume))},
+					Values: filterValues,
 				},
 			},
 		})
 		if err != nil {
-			return nil, spi.NewError(spi.ErrUnknown, "Failed while looking up volume")
+			return nil, errors.New("Failed while looking up volume")
 		}
 
-		switch len(volumes.Volumes) {
-		case 0:
-			return nil, spi.NewError(spi.ErrBadInput, fmt.Sprintf("Volume %s does not exist", *spec.Volume))
-		case 1:
-			awsVolumeID = volumes.Volumes[0].VolumeId
-		default:
-			return nil, spi.NewError(spi.ErrBadInput, "Multiple volume matches found")
+		if len(volumes.Volumes) == len(spec.Attachments) {
+			for _, volume := range volumes.Volumes {
+				awsVolumeIDs = append(awsVolumeIDs, volume.VolumeId)
+			}
+		} else {
+			return nil, fmt.Errorf(
+				"Not all required volumes found to attach.  Wanted %s, found %s",
+				spec.Attachments,
+				volumes.Volumes)
 		}
 	}
 
@@ -176,7 +188,7 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	if reservation == nil || len(reservation.Instances) != 1 {
-		return nil, spi.NewError(spi.ErrUnknown, "Unexpected AWS API response")
+		return nil, errors.New("Unexpected AWS API response")
 	}
 	ec2Instance := reservation.Instances[0]
 
@@ -187,7 +199,7 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 		return id, err
 	}
 
-	if awsVolumeID != nil {
+	if len(awsVolumeIDs) > 0 {
 		log.Infof("Waiting for instance %s to enter running state before attaching volume", *id)
 		for {
 			time.Sleep(10 * time.Second)
@@ -207,13 +219,15 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 
 		}
 
-		_, err := p.Client.AttachVolume(&ec2.AttachVolumeInput{
-			InstanceId: ec2Instance.InstanceId,
-			VolumeId:   awsVolumeID,
-			Device:     aws.String("/dev/sdf"),
-		})
-		if err != nil {
-			return id, err
+		for _, awsVolumeID := range awsVolumeIDs {
+			_, err := p.Client.AttachVolume(&ec2.AttachVolumeInput{
+				InstanceId: ec2Instance.InstanceId,
+				VolumeId:   awsVolumeID,
+				Device:     aws.String("/dev/sdf"),
+			})
+			if err != nil {
+				return id, err
+			}
 		}
 	}
 
@@ -230,8 +244,7 @@ func (p Provisioner) Destroy(id instance.ID) error {
 	}
 
 	if len(result.TerminatingInstances) != 1 {
-		// There was no match for the instance ID.
-		return spi.NewError(spi.ErrBadInput, "No matching instance")
+		return errors.New("No matching instance")
 	}
 
 	return nil
@@ -277,9 +290,9 @@ func (p Provisioner) describeInstances(tags map[string]string, nextToken *string
 			}
 
 			descriptions = append(descriptions, instance.Description{
-				ID:               instance.ID(*ec2Instance.InstanceId),
-				PrivateIPAddress: *ec2Instance.PrivateIpAddress,
-				Tags:             tags,
+				ID:        instance.ID(*ec2Instance.InstanceId),
+				LogicalID: (*instance.LogicalID)(ec2Instance.PrivateIpAddress),
+				Tags:      tags,
 			})
 		}
 	}
@@ -310,7 +323,7 @@ func (p Provisioner) describeInstance(id instance.ID) (*ec2.Instance, error) {
 		return nil, err
 	}
 	if len(result.Reservations) == 0 || len(result.Reservations[0].Instances) == 0 {
-		return nil, spi.NewError(spi.ErrBadInput, "Instance not found")
+		return nil, errors.New("Instance not found")
 	}
 
 	return result.Reservations[0].Instances[0], nil

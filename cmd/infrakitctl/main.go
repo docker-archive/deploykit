@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete.aws/bootstrap"
+	"github.com/docker/infrakit.aws/bootstrap"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -26,7 +26,7 @@ func attachDriver(rootCmd *cobra.Command, cli *bootstrap.CLI, requiredName strin
 }
 
 func main() {
-	rootCmd := &cobra.Command{Use: "machetecli"}
+	rootCmd := &cobra.Command{Use: "infrakitcli"}
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",

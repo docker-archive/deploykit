@@ -14,8 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/s3"
-	machete_aws "github.com/docker/libmachete.aws"
-	"github.com/docker/libmachete/spi/group"
+	infrakit_aws "github.com/docker/infrakit.aws"
+	"github.com/docker/infrakit/spi/group"
 	"strings"
 )
 
@@ -46,7 +46,7 @@ func (c clusterID) getAWSClient() client.ConfigProvider {
 
 func (c clusterID) url() string {
 	return fmt.Sprintf(
-		"https://machete-cluster.s3-%s.amazonaws.com/%s/%s",
+		"https://infrakit-cluster.s3-%s.amazonaws.com/%s/%s",
 		c.region,
 		c.name,
 		s3File)
@@ -64,7 +64,7 @@ func (c clusterID) resourceFilter(vpcID string) []*ec2.Filter {
 
 func (c clusterID) clusterFilter() *ec2.Filter {
 	return &ec2.Filter{
-		Name:   aws.String("tag:machete-cluster"),
+		Name:   aws.String("tag:infrakit-cluster"),
 		Values: []*string{aws.String(c.name)},
 	}
 }
@@ -83,7 +83,7 @@ func (c clusterID) instanceProfileName() string {
 
 func (c clusterID) resourceTag() *ec2.Tag {
 	return &ec2.Tag{
-		Key:   aws.String("machete-cluster"),
+		Key:   aws.String("infrakit-cluster"),
 		Value: aws.String(c.name),
 	}
 }
@@ -92,7 +92,7 @@ type instanceGroup struct {
 	Name   group.ID
 	Type   string
 	Size   int
-	Config machete_aws.CreateInstanceRequest
+	Config infrakit_aws.CreateInstanceRequest
 }
 
 func (i instanceGroup) isManager() bool {
@@ -119,7 +119,7 @@ func (s *fakeSWIMSchema) push() error {
 
 	s3Client := s3.New(s.cluster().getAWSClient())
 
-	bucket := aws.String("machete-cluster")
+	bucket := aws.String("infrakit-cluster")
 	head := &s3.HeadBucketInput{Bucket: bucket}
 
 	_, err = s3Client.HeadBucket(head)
