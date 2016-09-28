@@ -133,13 +133,21 @@ Flags:
 Use "infrakit/vanilla [command] --help" for more information about a command.
 ```
 
-## Example with the [File Instance Plugin](/example/instance/file)
+## Example
 
-Using the File instance plugin, we can very quickly work with Groups -- the instances that
-are 'provisioned' are just files on disk and we can examine the result to see how the Group
-plugin and Flavor plugins work together to provision instances through the Instance plugin.
+This plugin will be called whenever you use a Flavor plugin and reference the plugin by name
+in your config JSON.  For instance, you may start up this plugin as `french-vanilla`:
 
+```shell
+$ infrakit/vanilla --listen=unix:///run/infrakit/plugins/french-vanilla.sock
+INFO[0000] Starting plugin                              
+INFO[0000] Listening on: unix:///run/infrakit/plugins/french-vanilla.sock 
+INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/french-vanilla.sock err= <nil> 
 ```
+
+Then in your JSON config for the default group plugin, you would reference it by name:
+
+```json
 {
     "ID": "cattle",
     "Properties": {
@@ -147,7 +155,7 @@ plugin and Flavor plugins work together to provision instances through the Insta
         "InstancePluginProperties": {
             "Note": "Here is a property that only the instance plugin cares about"
         },
-        "FlavorPlugin": "flavor-vanilla",
+        "FlavorPlugin": "french-vanilla",
         "FlavorPluginProperties": {
             "Size" : 5,
 
@@ -165,35 +173,7 @@ plugin and Flavor plugins work together to provision instances through the Insta
     }
 }
 
-```
-
-Start the plugins.
-
-```
-$ infrakit/file --log 5 --dir ./vanilla/
-INFO[0000] Starting plugin
-INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
-DEBU[0000] file instance plugin. dir= ./vanilla/
-INFO[0000] listener protocol= unix addr= /run/infrakit/
-```
-
-Look at our plugins:
-
-```
-$ infrakit/cli plugin ls
-Plugins:
-NAME                	LISTEN
-flavor-vanilla        	unix:///run/infrakit/plugins/flavor-vanilla.sock
-group               	unix:///run/infrakit/plugins/group.sock
-instance-file       	unix:///run/infrakit/plugins/instance-file.sock
-```
-
-See what instances are there:
-
-```
-$ infrakit/cli instance --name instance-file describe
-ID                            	LOGICAL                       	TAGS
-```
+Then when you watch a group with the config above (`cattle`), the cattle will be `french-vanilla` flavored.
 
 Watch this group....
 
@@ -206,7 +186,7 @@ $ infrakit/cli group --name group watch << EOF
 >         "InstancePluginProperties": {
 >             "Note": "Here is a property that only the instance plugin cares about"
 >         },
->         "FlavorPlugin": "flavor-vanilla",
+>         "FlavorPlugin": "french-vanilla",
 >         "FlavorPluginProperties": {
 >             "Size" : 5,
 >
@@ -226,83 +206,4 @@ $ infrakit/cli group --name group watch << EOF
 > EOF
 watching cattle
 
-```
-
-Now the Group plugin starts watching this group of `cattle` and will make sure there are
-five instances:
-
-```
-$ ls -al vanilla/
-total 40
-drwxr-xr-x   7 davidchung  staff   238 Sep 27 22:08 .
-drwxr-xr-x  38 davidchung  staff  1292 Sep 27 22:03 ..
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:07 instance-1475039263
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:07 instance-1475039273
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:08 instance-1475039283
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:08 instance-1475039293
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:08 instance-1475039303
-
-```
-
-Let's remove a couple of these:
-
-```
-$ rm vanilla/instance-1475039303 vanilla/instance-1475039293
-```
-
-and a short time, the Group plugin will create new instances to match the desired 5 instances:
-
-```
-ls -al vanilla
-total 40
-drwxr-xr-x   7 davidchung  staff   238 Sep 27 22:18 .
-drwxr-xr-x  38 davidchung  staff  1292 Sep 27 22:12 ..
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:07 instance-1475039263
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:07 instance-1475039273
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:08 instance-1475039283
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:18 instance-1475039923 <----- NEW
--rw-r--r--   1 davidchung  staff   681 Sep 27 22:18 instance-1475039933 <----- NEW
-```
-
-Now, let's change the configuration...
-
-```
-$ infrakit/cli group --name group update << EOF
-> {
->     "ID": "cattle",
->     "Properties": {
->         "InstancePlugin": "instance-file",
->         "InstancePluginProperties": {
->             "Note": "This is a new property"
->         },
->         "FlavorPlugin": "flavor-vanilla",
->         "FlavorPluginProperties": {
->             "Size" : 3,
->
->             "UserData" : [
->                 "sudo apt-get update -y",
->                 "sudo apt-get install -y nginx curl wget zookeeper",
->                 "sudo service nginx start"
->             ],
->
->             "Labels" : {
->                 "tier" : "web-new",
->                 "project" : "infrakit"
->             }
->         }
->     }
-> }
-> EOF
-```
-
-And now we have
-
-```
-$ ls -al vanilla
-total 24
-drwxr-xr-x   5 davidchung  staff   170 Sep 27 22:27 .
-drwxr-xr-x  38 davidchung  staff  1292 Sep 27 22:12 ..
--rw-r--r--   1 davidchung  staff   643 Sep 27 22:26 instance-1475040413
--rw-r--r--   1 davidchung  staff   643 Sep 27 22:27 instance-1475040423
--rw-r--r--   1 davidchung  staff   643 Sep 27 22:27 instance-1475040433
 ```

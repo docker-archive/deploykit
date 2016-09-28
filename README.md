@@ -298,12 +298,12 @@ After a short while, we should see 5 instances:
 
 ```shell
 $ infrakit/cli group --name group inspect cattle
-ID                            	LOGICAL                       	TAGS
-instance-1475045378           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045388           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045398           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045408           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045418           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+ID                            	LOGICAL         TAGS
+instance-1475045378           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045388           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045398           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045408           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045418           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
 Quickly we can verify looking at the directory:
@@ -325,12 +325,12 @@ The Instance Plugin can also report instances, it will report all instances acro
 
 ```shell
 $ infrakit/cli instance --name instance-file describe
-ID                            	LOGICAL                       	TAGS
-instance-1475045378           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045388           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045398           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045408           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045418           	  -                           	infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+ID                            	LOGICAL         TAGS
+instance-1475045378           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045388           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045398           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045408           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045418           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
 We can look at the contents of the instance provisioned:
@@ -433,10 +433,10 @@ Now we can check:
 
 ```shell
 $ infrakit/cli group --name group inspect cattle
-ID                            	LOGICAL                       	TAGS
-instance-1475045988           	  -                           	infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045998           	  -                           	infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475046008           	  -                           	infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+ID                            	LOGICAL         TAGS
+instance-1475045988           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045998           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475046008           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
 
 ```
 
@@ -453,9 +453,9 @@ drwxr-xr-x  36 davidchung  staff  1224 Sep 27 23:58 ..
 
 ```
 
-Note the new timesstamps and the total of three instances.  More important, the instance have a new SHA `KSh4RpuYaDYQsYv77cimBZ8ZhHU=`
+Note the new timesstamps and the total of three instances.  More important, the instances now have a new SHA `KSh4RpuYaDYQsYv77cimBZ8ZhHU=`
 
-We can also verify and see that the instances have the new configuration:
+We can also verify and see that the instances have the new configurations:
 ```shell
 
 $ cat tutorial/instance-1475046008 
@@ -624,14 +624,14 @@ $ cat zk.conf
 ```
 
 ```shell
-$ infrakit watch zk.conf
+$ infrakit/cli group --name group watch zk.conf
 ```
 
 To perform a rolling update to the Group, we use the `update` command.  First, it's a good idea to describe the proposed
 update to ensure the expected operations will be performed:
 
 ```shell
-$ infrakit update zk.conf --describe
+$ infrakit/cli group --name group describe zk.conf
 Noop
 ```
 
