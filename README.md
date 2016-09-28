@@ -145,7 +145,7 @@ There are few examples of _InfraKit_ plugins:
     - [Code] (./plugin/flavor/zookeeper)
 
 
-## A Quick Tutorial
+# A Quick Tutorial
 
 To illustrate the concept of working with Group, Flavor, and Instance plugins, we use a simple setup composed of
   + The default `group` plugin - to manage a collection of instances
