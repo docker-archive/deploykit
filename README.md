@@ -476,7 +476,7 @@ Now let's update the configuration by changing the size of the group and a prope
 (You can also save the edits in a new file, `group2.cfg`).
 
 ```shell
-$ diff tutorial/group.cfg tutorial/group2.cfg 
+$ diff group.cfg group2.cfg 
 7c7
 <                 "Note": "Instance properties version 1.0"
 ---
@@ -582,9 +582,6 @@ $ ls -al tutorial
 total 104
 drwxr-xr-x  15 davidchung  staff   510 Sep 28 16:40 .
 drwxr-xr-x  36 davidchung  staff  1224 Sep 28 16:39 ..
--rw-r--r--   1 davidchung  staff   688 Sep 28 16:32 group.cfg
--rw-r--r--   1 davidchung  staff   689 Sep 28 16:30 group.cfg~
--rw-r--r--   1 davidchung  staff   689 Sep 28 16:30 group2.cfg
 -rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105656
 -rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105666
 -rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105676
