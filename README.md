@@ -34,7 +34,7 @@ _InfraKit_ supports these primitives: groups, instances, and flavors.  They are 
 #### Groups
 When managing infrastructure like computing clusters, Groups make good abstraction, and working with groups is easier
 than managing individual instances. For example, a group can be made up of a collection
-of machines as individual instances. The machines in a group can have identical configurations (replicas, or cattles).
+of machines as individual instances. The machines in a group can have identical configurations (replicas, or cattle).
 They can also have slightly different properties like identity and ordering (as members of a quorum or pets).
 
 _InfraKit_ provides primitives to manage Groups: a group has a given size and can shrink or grow based on some specification,
@@ -95,15 +95,15 @@ Flavors help distinguish members of one group from another by describing how the
 A [flavor plugin](spi/flavor/spi.go) can be thought of as defining what runs on an Instance.
 It is responsible for dictating commands to run services, and check the health of those services.
 
-Flavors allow a group of instances to have different characteristics.  In a group of cattles,
+Flavors allow a group of instances to have different characteristics.  In a group of cattle,
 all members are treated identically and individual members do not have strong identity.  In a group of pets,
 however, the members may require special handling and demand stronger notions of identity and state.
 
 | plugin| description                  |
 |:------|:-----------------------------|
-| [zookeeper](plugin/flavor/zookeeper) | For handling of zookeeper ensemble members [binary](example/flavor/zookeeper) |
-| [swarm](plugin/flavor/swarm) | configures instances with Docker in Swarm mode [binary](example/flavor/swarm) |
-| etcd | TODO: implement |
+| [vanilla](plugin/flavor/vanilla) | A vanilla flavor that lets you configure by user data and labels |
+| [zookeeper](plugin/flavor/zookeeper) | For handling of zookeeper ensemble members |
+| [swarm](plugin/flavor/swarm) | configures instances with Docker in Swarm mode |
 
 
 ## Docs
@@ -132,6 +132,7 @@ Several binaries are available. More detailed documentations can be found here
   + [`infrakit/file`](./example/instance/file), an instance plugin using files
   + [`infrakit/terraform`](./example/instance/terraform), an instance plugin integrating [Terraform](https://www.terraform.io)
   + [`infrakit/vagrant`](./example/instance/vagrant), an instance plugin using vagrant
+  + [`infrakit/vanilla`](./example/flavor/vanilla), a flavor plugin for plain vanilla set up with user data and labels
   + [`infrakit/zookeeper`](./example/flavor/zookeeper), a flavor plugin for zookeeper ensemble members
   + [`infrakit/swarm`](./example/flavor/swarm), a flavor plugin for Docker Swarm managers and workers.
 
@@ -163,7 +164,7 @@ INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock
 
 Using the CLI, it you will see
 
-```
+```shell
 $ ./infrakit/cli plugin ls
 Plugins:
 NAME                	LISTEN
@@ -171,25 +172,14 @@ instance-file       	unix:///run/infrakit/plugins/instance-file.sock
 another-file        	unix:///run/infrakit/plugins/another-file.sock
 ```
 
-For each binary, you can find out more about it by using the `version` verb in the command line:
+For each binary, you can find out more about it by using the `version` verb in the command line. For example:
 
-```
+```shell
 $ ./infrakit/group version
 {
     "name": "GroupPlugin",
     "revision": "75d7f4dbc17dbc48aadb9a4abfd87d57fbd7e1f8",
     "type": "infra.GroupPlugin/1.0",
-    "version": "75d7f4d.m"
-  }
-```
-
-or
-```
-$ ./infrakit/file version
-{
-    "name": "FileInstance",
-    "revision": "75d7f4dbc17dbc48aadb9a4abfd87d57fbd7e1f8",
-    "type": "infrakit.InstancePlugin/1.0",
     "version": "75d7f4d.m"
   }
 ```
@@ -207,6 +197,7 @@ There are few examples of _InfraKit_ plugins:
   + Zookeeper / Vagrant
     - [README](./example/flavor/zookeeper/README.md)
     - [Code] (./plugin/flavor/zookeeper)
+
 
 ## Configuration
 _InfraKit_ uses JSON for configuration.  As an example, if you wanted to manage a Group of NGINX servers, you could
