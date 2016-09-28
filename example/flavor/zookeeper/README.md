@@ -74,43 +74,32 @@ group               	unix:///run/infrakit/plugins/group.sock
 instance-vagrant    	unix:///run/infrakit/plugins/instance-vagrant.sock
 ```
 
-Here's a JSON for the group we'd like to see:
+Here's a JSON for the group we'd like to see [vagrant-zk-example.json](./vagrant-zk-example.json):
 
 ```
 {
-  "ID": "zk",
-  "Properties": {
-    "InstancePlugin": "instance-vagrant",
-    "InstancePluginProperties": {
-      "Box": "bento/ubuntu-16.04"
-    },
-    "FlavorPlugin": "flavor-zookeeper",
-    "FlavorPluginProperties": {
-      "type": "member",
-      "IPs": ["192.168.1.200", "192.168.1.201", "192.168.1.202"]
+    "ID": "zk",
+    "Properties": {
+        "Instance" : {
+            "Plugin": "instance-vagrant",
+            "Properties": {
+                "Box": "bento/ubuntu-16.04"
+            }
+        }
+        "Flavor" : {
+            "Plugin": "flavor-zookeeper",
+            "Properties": {
+                "type": "member",
+                "IPs": ["192.168.1.200", "192.168.1.201", "192.168.1.202"]
+            }
+        }
     }
-  }
 }
 ```
 
 Now tell the group plugin to watch the zk group, create if necessary:
 
 ```
-infrakit/cli group --name group watch << EOF
-> {
->   "ID": "zk",
->   "Properties": {
->     "InstancePlugin": "instance-vagrant",
->     "InstancePluginProperties": {
->       "Box": "bento/ubuntu-16.04"
->     },
->     "FlavorPlugin": "flavor-zookeeper",
->     "FlavorPluginProperties": {
->       "type": "member",
->       "IPs": ["192.168.1.200", "192.168.1.201", "192.168.1.202"]
->     }
->   }
-> }
-> EOF
+infrakit/cli group --name group watch ./vagrant-zk-example.json
 watching zk
 ```

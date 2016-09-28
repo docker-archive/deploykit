@@ -37,7 +37,7 @@ func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.provisionRequest = types.RawMessage(settings.config.InstancePluginProperties)
+	s.provisionRequest = types.RawMessage(settings.config.Instance.Properties)
 	tags := map[string]string{}
 	for k, v := range s.memberTags {
 		tags[k] = v

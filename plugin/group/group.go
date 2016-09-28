@@ -58,12 +58,12 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 		return noSettings, err
 	}
 
-	flavorPlugin, err := p.flavorPlugins(parsed.FlavorPlugin)
+	flavorPlugin, err := p.flavorPlugins(parsed.Flavor.Plugin)
 	if err != nil {
-		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.FlavorPlugin, err)
+		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.Flavor.Plugin, err)
 	}
 
-	allocation, err := flavorPlugin.Validate(types.RawMessage(parsed.FlavorPluginProperties))
+	allocation, err := flavorPlugin.Validate(types.RawMessage(parsed.Flavor.Properties))
 	if err != nil {
 		return noSettings, err
 	}
@@ -72,12 +72,12 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 		return noSettings, errors.New("Invalid allocation method")
 	}
 
-	instancePlugin, err := p.instancePlugins(parsed.InstancePlugin)
+	instancePlugin, err := p.instancePlugins(parsed.Instance.Plugin)
 	if err != nil {
-		return noSettings, fmt.Errorf("Failed to find Instance plugin '%s':%v", parsed.InstancePlugin, err)
+		return noSettings, fmt.Errorf("Failed to find Instance plugin '%s':%v", parsed.Instance.Plugin, err)
 	}
 
-	if err := instancePlugin.Validate(types.RawMessage(parsed.InstancePluginProperties)); err != nil {
+	if err := instancePlugin.Validate(types.RawMessage(parsed.Instance.Properties)); err != nil {
 		return noSettings, err
 	}
 
@@ -105,7 +105,7 @@ func (p *plugin) WatchGroup(config group.Spec) error {
 	scaled := &scaledGroup{
 		instancePlugin:   settings.instancePlugin,
 		flavorPlugin:     settings.flavorPlugin,
-		flavorProperties: types.RawMessage(settings.config.FlavorPluginProperties),
+		flavorProperties: types.RawMessage(settings.config.Flavor.Properties),
 		memberTags:       map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)

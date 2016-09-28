@@ -41,15 +41,19 @@ func flavorPluginLookup(_ string) (flavor.Plugin, error) {
 
 func minionProperties(instances int, data string) *json.RawMessage {
 	r := json.RawMessage(fmt.Sprintf(`{
-	  "InstancePlugin": "test",
-	  "InstancePluginProperties": {
-	    "OpaqueValue": "%s"
-	  },
-	  "FlavorPlugin": "test",
-	  "FlavorPluginProperties": {
-	    "Type": "minion",
-	    "Size": %d
-	  }
+	  "Instance" : {
+              "Plugin": "test",
+	      "Properties": {
+	          "OpaqueValue": "%s"
+	      }
+          },
+	  "Flavor" : {
+              "Plugin" : "test",
+	      "Properties": {
+	          "Type": "minion",
+	          "Size": %d
+	      }
+          }
 	}`, data, instances))
 	return &r
 }
@@ -61,15 +65,19 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMes
 	}
 
 	r := json.RawMessage(fmt.Sprintf(`{
-	  "InstancePlugin": "test",
-	  "InstancePluginProperties": {
-	    "OpaqueValue": "%s"
-	  },
-	  "FlavorPlugin": "test",
-	  "FlavorPluginProperties": {
-	    "Type": "leader",
-	    "Shards": %s
-	  }
+	  "Instance" : {
+              "Plugin": "test",
+	      "Properties": {
+	          "OpaqueValue": "%s"
+	      }
+          },
+	  "Flavor" : {
+              "Plugin": "test",
+	      "Properties": {
+	         "Type": "leader",
+	         "Shards": %s
+	      }
+          }
 	}`, data, idsValue))
 	return &r
 }
@@ -106,12 +114,12 @@ func TestInvalidGroupCalls(t *testing.T) {
 }
 
 func instanceProperties(config group.Spec) json.RawMessage {
-	groupProperties := map[string]json.RawMessage{}
-	err := json.Unmarshal(*config.Properties, &groupProperties)
+	spec := types.Spec{}
+	err := json.Unmarshal(*config.Properties, &spec)
 	if err != nil {
 		panic(err)
 	}
-	return groupProperties["InstancePluginProperties"]
+	return *spec.Instance.Properties
 }
 
 func expectValidate(plugin *mock_instance.MockPlugin, config group.Spec) *gomock.Call {
