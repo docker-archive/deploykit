@@ -31,47 +31,34 @@ func (i *pluginInstance) Call(endpoint plugin.Endpoint, message, result interfac
 
 // Dir is an object for finding out what plugins we have access to.
 type Dir struct {
-	dir     string
-	plugins map[string]*pluginInstance
-	lock    sync.RWMutex
+	dir  string
+	lock sync.Mutex
 }
 
 // PluginByName returns a plugin by name
 func (r *Dir) PluginByName(name string) (plugin.Callable, error) {
 
-	r.lock.RLock()
-	instance, has := r.plugins[name]
-	r.lock.RUnlock()
-
-	if has {
-		return instance, nil
-	}
-
-	log.Debugln("Can't find plugin", name, "rescanning.")
-
-	// We don't assume the naming of the files so just scan the whole thing and rebuild the index.
-	if err := r.Refresh(); err != nil {
+	plugins, err := r.List()
+	if err != nil {
 		return nil, err
 	}
 
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-	inst, has := r.plugins[name]
-	if !has {
-		return nil, fmt.Errorf("not-found:%s", name)
+	p, exists := plugins[name]
+	if !exists {
+		return nil, fmt.Errorf("Plugin not found: %s", name)
 	}
 
-	return inst, nil
+	return p, nil
 }
 
 // NewDir creates a registry instance with the given file directory path.  The entries in the directory
 // are either unix socket files or a flat file indicating the tcp port.
 func NewDir(dir string) (*Dir, error) {
-	registry := &Dir{
-		plugins: map[string]*pluginInstance{},
-		dir:     dir,
-	}
-	return registry, registry.Refresh()
+	d := &Dir{dir: dir}
+
+	// Perform a dummy read to catch obvious issues early (such as the directory not existing).
+	_, err := d.List()
+	return d, err
 }
 
 func (r *Dir) dirLookup(entry os.FileInfo) (*pluginInstance, error) {
@@ -101,51 +88,33 @@ func (r *Dir) dirLookup(entry os.FileInfo) (*pluginInstance, error) {
 	}, nil
 }
 
-// Refresh rescans the driver directory to see what drivers are there.
-func (r *Dir) Refresh() error {
+// List returns a list of plugins known, keyed by the name
+func (r *Dir) List() (map[string]plugin.Callable, error) {
+
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
 	log.Debugln("Opening:", r.dir)
 	entries, err := ioutil.ReadDir(r.dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	found := map[string]*pluginInstance{}
+	plugins := map[string]plugin.Callable{}
 
-entries:
 	for _, entry := range entries {
 		if !entry.IsDir() {
 
 			instance, err := r.dirLookup(entry)
 			if err != nil || instance == nil {
-				log.Warningln("Loading plugin instance err=", err)
-				continue entries
+				log.Warningln("Loading plugin err=", err)
+				continue
 			}
 
 			log.Debugln("Discovered plugin at", instance.endpoint)
-			found[instance.name] = instance
+			plugins[instance.name] = plugin.Callable(instance)
 		}
 	}
 
-	// now update
-	r.plugins = found
-
-	return nil
-}
-
-// List returns a list of plugins known, keyed by the name
-func (r *Dir) List() (map[string]plugin.Callable, error) {
-	err := r.Refresh()
-	if err != nil {
-		return nil, err
-	}
-
-	result := map[string]plugin.Callable{}
-
-	for k, v := range r.plugins {
-		result[k] = plugin.Callable(v)
-	}
-	return result, nil
+	return plugins, nil
 }
