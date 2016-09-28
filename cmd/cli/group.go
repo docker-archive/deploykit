@@ -143,9 +143,10 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 				return err
 			}
 
+			// TODO - make this not block, but how to get status?
 			err = groupPlugin.UpdateGroup(spec)
 			if err == nil {
-				fmt.Println("update", spec.ID, "initiated")
+				fmt.Println("update", spec.ID, "completed")
 			}
 			return err
 		},
