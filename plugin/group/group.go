@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	groupTag  = "machete.group"
-	configTag = "machete.config_sha"
+	groupTag  = "infrakit.group"
+	configTag = "infrakit.config_sha"
 )
 
 // InstancePluginLookup helps with looking up an instance plugin by name

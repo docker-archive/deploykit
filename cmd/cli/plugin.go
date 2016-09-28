@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/docker/libmachete/discovery"
+	"github.com/docker/infrakit/discovery"
 	"github.com/spf13/cobra"
 )
 
