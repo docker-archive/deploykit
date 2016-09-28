@@ -106,10 +106,6 @@ however, the members may require special handling and demand stronger notions of
 | [swarm](plugin/flavor/swarm) | configures instances with Docker in Swarm mode |
 
 
-## Docs
-
-Design docs can be found [here](./docs).
-
 ## Building
 
 ### Running tests
@@ -737,5 +733,7 @@ $ ./infrakit/group version
 So you can have different plugins of the same type (e.g. `infrakit.InstancePlugin/1.0`) subject to the naming restrictions
 of the files in the common plugin directory.
 
+## Docs
 
+Design docs can be found [here](./docs).
 
