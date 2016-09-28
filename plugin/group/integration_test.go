@@ -114,12 +114,12 @@ func TestInvalidGroupCalls(t *testing.T) {
 }
 
 func instanceProperties(config group.Spec) json.RawMessage {
-	groupProperties := map[string]json.RawMessage{}
-	err := json.Unmarshal(*config.Properties, &groupProperties)
+	spec := types.Spec{}
+	err := json.Unmarshal(*config.Properties, &spec)
 	if err != nil {
 		panic(err)
 	}
-	return groupProperties["InstancePluginProperties"]
+	return *spec.Instance.Properties
 }
 
 func expectValidate(plugin *mock_instance.MockPlugin, config group.Spec) *gomock.Call {

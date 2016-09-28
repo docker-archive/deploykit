@@ -1,15 +1,19 @@
 {
-  "ID": "zk",
-  "Properties": {
-    "InstancePlugin": "instance-vagrant",
-    "InstancePluginProperties": {
-      "Box": "williamyeh/ubuntu-trusty64-docker"
-    },
-    "FlavorPlugin": "flavor-zookeeper",
-    "FlavorPluginProperties": {
-      "type": "member",
-      "IPs": ["192.168.1.200", "192.168.1.201", "192.168.1.202"],
-      "UseDocker": true
+    "ID": "zk",
+    "Properties": {
+        "Instance" : {
+            "Plugin": "instance-vagrant",
+            "Properties": {
+                "Box": "williamyeh/ubuntu-trusty64-docker"
+            }
+        },
+        "Flavor" : {
+            "Plugin": "flavor-zookeeper",
+            "Properties": {
+                "type": "member",
+                "IPs": ["192.168.1.200", "192.168.1.201", "192.168.1.202"],
+                "UseDocker": true
+            }
+        }
     }
-  }
 }

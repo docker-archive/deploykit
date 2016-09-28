@@ -151,28 +151,32 @@ Then in your JSON config for the default group plugin, you would reference it by
 {
     "ID": "cattle",
     "Properties": {
-        "InstancePlugin": "instance-file",
-        "InstancePluginProperties": {
-            "Note": "Here is a property that only the instance plugin cares about"
+        "Instance" : {
+            "Plugin": "instance-file",
+            "Properties": {
+                "Note": "Here is a property that only the instance plugin cares about"
+            }
         },
-        "FlavorPlugin": "french-vanilla",
-        "FlavorPluginProperties": {
-            "Size" : 5,
+        "Flavor": {
+            "Plugin" : "french-vanilla",
+            "Properties": {
+                "Size" : 5,
 
-            "UserData" : [
-                "sudo apt-get update -y",
-                "sudo apt-get install -y nginx",
-                "sudo service nginx start"
-            ],
+                "UserData" : [
+                    "sudo apt-get update -y",
+                    "sudo apt-get install -y nginx",
+                    "sudo service nginx start"
+                ],
 
-            "Labels" : {
-                "tier" : "web",
-                "project" : "infrakit"
+                "Labels" : {
+                    "tier" : "web",
+                    "project" : "infrakit"
+                }
             }
         }
     }
 }
-
+```
 Then when you watch a group with the config above (`cattle`), the cattle will be `french-vanilla` flavored.
 
 Watch this group....
@@ -182,23 +186,27 @@ $ infrakit/cli group --name group watch << EOF
 > {
 >     "ID": "cattle",
 >     "Properties": {
->         "InstancePlugin": "instance-file",
->         "InstancePluginProperties": {
->             "Note": "Here is a property that only the instance plugin cares about"
+>         "Instance" : {
+>             "Plugin": "instance-file",
+>             "Properties": {
+>                 "Note": "Here is a property that only the instance plugin cares about"
+>             }
 >         },
->         "FlavorPlugin": "french-vanilla",
->         "FlavorPluginProperties": {
->             "Size" : 5,
->
->             "UserData" : [
->                 "sudo apt-get update -y",
->                 "sudo apt-get install -y nginx",
->                 "sudo service nginx start"
->             ],
->
->             "Labels" : {
->                 "tier" : "web",
->                 "project" : "infrakit"
+>         "Flavor": {
+>             "Plugin" : "french-vanilla",
+>             "Properties": {
+>                 "Size" : 5,
+> 
+>                 "UserData" : [
+>                     "sudo apt-get update -y",
+>                     "sudo apt-get install -y nginx",
+>                     "sudo service nginx start"
+>                 ],
+> 
+>                 "Labels" : {
+>                     "tier" : "web",
+>                     "project" : "infrakit"
+>                 }
 >             }
 >         }
 >     }
