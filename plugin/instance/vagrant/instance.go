@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/spi/instance"
 	"io/ioutil"
 	"os"
 	"os/exec"

@@ -7,9 +7,9 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/go-connections/tlsconfig"
-	"github.com/docker/libmachete/plugin/flavor/swarm"
-	"github.com/docker/libmachete/plugin/util"
-	flavor_plugin "github.com/docker/libmachete/spi/http/flavor"
+	"github.com/docker/infrakit/plugin/flavor/swarm"
+	"github.com/docker/infrakit/plugin/util"
+	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/spf13/cobra"
 )
 

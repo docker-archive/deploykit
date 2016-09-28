@@ -3,8 +3,8 @@ package group
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin/group/util"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/plugin/group/util"
+	"github.com/docker/infrakit/spi/instance"
 	"sort"
 	"sync"
 	"time"

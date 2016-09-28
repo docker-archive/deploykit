@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/spi/instance"
 	"strings"
 	"text/template"
 )

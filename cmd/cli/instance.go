@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/libmachete/discovery"
-	instance_plugin "github.com/docker/libmachete/spi/http/instance"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/discovery"
+	instance_plugin "github.com/docker/infrakit/spi/http/instance"
+	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/cobra"
 )
 

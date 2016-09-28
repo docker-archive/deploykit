@@ -2,7 +2,7 @@ package discovery
 
 import (
 	"fmt"
-	"github.com/docker/libmachete/plugin/util"
+	"github.com/docker/infrakit/plugin/util"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 	"os"

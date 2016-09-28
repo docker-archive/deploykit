@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin"
+	"github.com/docker/infrakit/plugin"
 )
 
 // HTTPEndpoint is a specialization of an endpoint. It implements the Endpoint interface

@@ -6,10 +6,10 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/docker/libmachete/plugin"
-	"github.com/docker/libmachete/plugin/util"
-	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/plugin"
+	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/spi/instance"
 )
 
 type client struct {

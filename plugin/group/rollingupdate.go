@@ -3,7 +3,7 @@ package group
 import (
 	"errors"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/spi/instance"
 	"sort"
 	"time"
 )

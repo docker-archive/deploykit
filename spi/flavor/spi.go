@@ -2,7 +2,7 @@ package flavor
 
 import (
 	"encoding/json"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/spi/instance"
 )
 
 // AllocationMethod defines the type of allocation and supervision needed by a flavor's Group.

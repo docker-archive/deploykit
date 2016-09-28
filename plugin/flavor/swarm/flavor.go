@@ -9,9 +9,9 @@ import (
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/docker/libmachete/plugin/group/util"
-	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/plugin/group/util"
+	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/spi/instance"
 	"golang.org/x/net/context"
 	"text/template"
 )

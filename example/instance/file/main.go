@@ -6,8 +6,8 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/libmachete/plugin/util"
-	instance_plugin "github.com/docker/libmachete/spi/http/instance"
+	"github.com/docker/infrakit/plugin/util"
+	instance_plugin "github.com/docker/infrakit/spi/http/instance"
 	"github.com/spf13/cobra"
 )
 

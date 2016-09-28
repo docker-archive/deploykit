@@ -6,9 +6,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/docker/libmachete/plugin"
-	"github.com/docker/libmachete/plugin/util"
-	"github.com/docker/libmachete/spi/group"
+	"github.com/docker/infrakit/plugin"
+	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/spi/group"
 )
 
 type client struct {

@@ -1,8 +1,8 @@
 package group
 
 import (
-	mock_group "github.com/docker/libmachete/mock/plugin/group"
-	"github.com/docker/libmachete/spi/instance"
+	mock_group "github.com/docker/infrakit/mock/plugin/group"
+	"github.com/docker/infrakit/spi/instance"
 	"github.com/golang/mock/gomock"
 	"testing"
 	"time"

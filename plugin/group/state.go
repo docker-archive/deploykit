@@ -2,11 +2,11 @@ package group
 
 import (
 	"fmt"
-	"github.com/docker/libmachete/plugin/group/types"
-	"github.com/docker/libmachete/plugin/group/util"
-	"github.com/docker/libmachete/spi/flavor"
-	"github.com/docker/libmachete/spi/group"
-	"github.com/docker/libmachete/spi/instance"
+	"github.com/docker/infrakit/plugin/group/types"
+	"github.com/docker/infrakit/plugin/group/util"
+	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/spi/group"
+	"github.com/docker/infrakit/spi/instance"
 	"sync"
 )
 
