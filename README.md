@@ -213,23 +213,27 @@ for the plugins.
 {
     "ID": "cattle",
     "Properties": {
-        "InstancePlugin": "instance-file",
-        "InstancePluginProperties": {
-            "Note": "Instance properties version 1.0"
+        "Instance" : {
+            "Plugin": "instance-file",
+            "Properties": {
+                "Note": "Instance properties version 1.0"
+            }
         },
-        "FlavorPlugin": "flavor-vanilla",
-        "FlavorPluginProperties": {
-            "Size" : 5,
+        "Flavor": {
+            "Plugin" : "flavor-vanilla",
+            "Properties": {
+                "Size" : 5,
 
-            "UserData" : [
-                "sudo apt-get update -y",
-                "sudo apt-get install -y nginx",
-                "sudo service nginx start"
-            ],
+                "UserData" : [
+                    "sudo apt-get update -y",
+                    "sudo apt-get install -y nginx",
+                    "sudo service nginx start"
+                ],
 
-            "Labels" : {
-                "tier" : "web",
-                "project" : "infrakit"
+                "Labels" : {
+                    "tier" : "web",
+                    "project" : "infrakit"
+                }
             }
         }
     }
@@ -372,23 +376,27 @@ Now let's update the configuration by changing the size of the group and a prope
 {
     "ID": "cattle",
     "Properties": {
-        "InstancePlugin": "instance-file",
-        "InstancePluginProperties": {
-            "Note": "Instance properties version 2.0 -- CHANGED"
+        "Instance" : {
+            "Plugin": "instance-file",
+            "Properties": {
+                "Note": "Instance properties version 2.0 -- CHANGED"
+            }
         },
-        "FlavorPlugin": "flavor-vanilla",
-        "FlavorPluginProperties": {
-            "Size" : 3,
+        "Flavor": {
+            "Plugin" : "flavor-vanilla",
+            "Properties": {
+                "Size" : 3,
 
-            "UserData" : [
-                "sudo apt-get update -y",
-                "sudo apt-get install -y nginx",
-                "sudo service nginx start"
-            ],
+                "UserData" : [
+                    "sudo apt-get update -y",
+                    "sudo apt-get install -y nginx",
+                    "sudo service nginx start"
+                ],
 
-            "Labels" : {
-                "tier" : "web",
-                "project" : "infrakit"
+                "Labels" : {
+                    "tier" : "web",
+                    "project" : "infrakit"
+                }
             }
         }
     }
@@ -402,23 +410,27 @@ $ infrakit/cli group --name group update <<EOF
 > {
 >     "ID": "cattle",
 >     "Properties": {
->         "InstancePlugin": "instance-file",
->         "InstancePluginProperties": {
->             "Note": "Instance properties version 2.0 -- CHANGED"
+>         "Instance" : {
+>             "Plugin": "instance-file",
+>             "Properties": {
+>                 "Note": "Instance properties version 2.0 -- CHANGED"
+>             }
 >         },
->         "FlavorPlugin": "flavor-vanilla",
->         "FlavorPluginProperties": {
->             "Size" : 3,
+>         "Flavor": {
+>             "Plugin" : "flavor-vanilla",
+>             "Properties": {
+>                 "Size" : 3,
 > 
->             "UserData" : [
->                 "sudo apt-get update -y",
->                 "sudo apt-get install -y nginx",
->                 "sudo service nginx start"
->             ],
+>                 "UserData" : [
+>                     "sudo apt-get update -y",
+>                     "sudo apt-get install -y nginx",
+>                     "sudo service nginx start"
+>                 ],
 > 
->             "Labels" : {
->                 "tier" : "web",
->                 "project" : "infrakit"
+>                 "Labels" : {
+>                     "tier" : "web",
+>                     "project" : "infrakit"
+>                 }
 >             }
 >         }
 >     }
