@@ -197,10 +197,10 @@ Show the plugins:
 ```shell
 $ infrakit/cli plugin ls
 Plugins:
-NAME                	LISTEN
-flavor-vanilla      	unix:///run/infrakit/plugins/flavor-vanilla.sock
-group               	unix:///run/infrakit/plugins/group.sock
-instance-file       	unix:///run/infrakit/plugins/instance-file.sock
+NAME                    LISTEN
+flavor-vanilla          unix:///run/infrakit/plugins/flavor-vanilla.sock
+group                   unix:///run/infrakit/plugins/group.sock
+instance-file           unix:///run/infrakit/plugins/instance-file.sock
 ```
 
 Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
@@ -323,7 +323,7 @@ Or via the CLI:
 
 ```shell
 $ infrakit/cli instance --name instance-file describe
-ID                            	LOGICAL                       	TAGS
+ID                              LOGICAL                         TAGS
 
 ```
 
@@ -368,12 +368,12 @@ After a short while, we should see 5 instances:
 
 ```shell
 $ infrakit/cli group --name group inspect cattle
-ID                            	LOGICAL         TAGS
-instance-1475045378           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045388           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045398           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045408           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045418           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+ID                              LOGICAL         TAGS
+instance-1475045378               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045388               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045398               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045408               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045418               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
 Quickly we can verify looking at the directory:
@@ -395,12 +395,12 @@ The Instance Plugin can also report instances, it will report all instances acro
 
 ```shell
 $ infrakit/cli instance --name instance-file describe
-ID                            	LOGICAL         TAGS
-instance-1475045378           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045388           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045398           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045408           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045418           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+ID                              LOGICAL         TAGS
+instance-1475045378               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045388               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045398               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045408               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045418               -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
 We can look at the contents of the instance provisioned:
@@ -511,10 +511,10 @@ Now we can check:
 
 ```shell
 $ infrakit/cli group --name group inspect cattle
-ID                            	LOGICAL         TAGS
-instance-1475045988           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475045998           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475046008           	  -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+ID                              LOGICAL         TAGS
+instance-1475045988               -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475045998               -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1475046008               -             infrakit.config_sha=KSh4RpuYaDYQsYv77cimBZ8ZhHU=,infrakit.group=cattle,project=infrakit,tier=web
 
 ```
 
@@ -589,8 +589,6 @@ This concludes our quick tutorial.  In this tutorial we have
 # Design
 
 ## Configuration
-
-## Configuration
 _InfraKit_ uses JSON for configuration because it is composable and widely accepted format for many
 infrastructure SDKs and tools.  Because the system is highly components-driven, our JSON format follow
 simple patterns to support composition of components.
@@ -618,16 +616,16 @@ default Group [Spec](/plugin/group/types/types.go) is composed of one instance a
     "ID": "name-of-the-group",
     "Properties": {
         "Instance" : {
-	   "Plugin" : "name-of-the-instance-plugin",
-	   "Properties" : {
-	   	/* the Spec of the instance plugin */
-	   }
+           "Plugin" : "name-of-the-instance-plugin",
+           "Properties" : {
+                /* the Spec of the instance plugin */
+           }
         },
         "Flavor" : {
-	   "Plugin" : "name-of-the-flavor-plugin",
-	   "Properties" : {
-	   	/* the Spec of the flavor plugin */
-	   }
+           "Plugin" : "name-of-the-flavor-plugin",
+           "Properties" : {
+                /* the Spec of the flavor plugin */
+           }
         }
     }
 }
@@ -719,9 +717,9 @@ Using the CLI, it you will see
 ```shell
 $ ./infrakit/cli plugin ls
 Plugins:
-NAME                	LISTEN
-instance-file       	unix:///run/infrakit/plugins/instance-file.sock
-another-file        	unix:///run/infrakit/plugins/another-file.sock
+NAME                    LISTEN
+instance-file           unix:///run/infrakit/plugins/instance-file.sock
+another-file            unix:///run/infrakit/plugins/another-file.sock
 ```
 
 For each binary, you can find out more about it by using the `version` verb in the command line. For example:
