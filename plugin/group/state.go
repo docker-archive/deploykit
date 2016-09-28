@@ -21,7 +21,7 @@ type groupSettings struct {
 	allocation     flavor.AllocationMethod
 	instancePlugin instance.Plugin
 	flavorPlugin   flavor.Plugin
-	config         types.Schema
+	config         types.Spec
 }
 
 type groupContext struct {

@@ -41,15 +41,19 @@ func flavorPluginLookup(_ string) (flavor.Plugin, error) {
 
 func minionProperties(instances int, data string) *json.RawMessage {
 	r := json.RawMessage(fmt.Sprintf(`{
-	  "InstancePlugin": "test",
-	  "InstancePluginProperties": {
-	    "OpaqueValue": "%s"
-	  },
-	  "FlavorPlugin": "test",
-	  "FlavorPluginProperties": {
-	    "Type": "minion",
-	    "Size": %d
-	  }
+	  "Instance" : {
+              "Plugin": "test",
+	      "Properties": {
+	          "OpaqueValue": "%s"
+	      }
+          },
+	  "Flavor" : {
+              "Plugin" : "test",
+	      "Properties": {
+	          "Type": "minion",
+	          "Size": %d
+	      }
+          }
 	}`, data, instances))
 	return &r
 }
@@ -61,15 +65,19 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMes
 	}
 
 	r := json.RawMessage(fmt.Sprintf(`{
-	  "InstancePlugin": "test",
-	  "InstancePluginProperties": {
-	    "OpaqueValue": "%s"
-	  },
-	  "FlavorPlugin": "test",
-	  "FlavorPluginProperties": {
-	    "Type": "leader",
-	    "Shards": %s
-	  }
+	  "Instance" : {
+              "Plugin": "test",
+	      "Properties": {
+	          "OpaqueValue": "%s"
+	      }
+          },
+	  "Flavor" : {
+              "Plugin": "test",
+	      "Properties": {
+	         "Type": "leader",
+	         "Shards": %s
+	      }
+          }
 	}`, data, idsValue))
 	return &r
 }

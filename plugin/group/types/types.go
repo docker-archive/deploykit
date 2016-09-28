@@ -11,8 +11,8 @@ import (
 // These types are declared in a separate package to break an import cycle between group (test) -> mock -> group.
 
 // ParseProperties parses the group plugin properties JSON document in a group configuration.
-func ParseProperties(config group.Spec) (Schema, error) {
-	parsed := Schema{}
+func ParseProperties(config group.Spec) (Spec, error) {
+	parsed := Spec{}
 	if err := json.Unmarshal([]byte(RawMessage(config.Properties)), &parsed); err != nil {
 		return parsed, fmt.Errorf("Invalid properties: %s", err)
 	}
@@ -20,25 +20,35 @@ func ParseProperties(config group.Spec) (Schema, error) {
 }
 
 // MustParse can be wrapped over ParseProperties to panic if parsing fails.
-func MustParse(s Schema, e error) Schema {
+func MustParse(s Spec, e error) Spec {
 	if e != nil {
 		panic(e)
 	}
 	return s
 }
 
-// Schema is the document schema for the plugin, provided in group.Spec.
-type Schema struct {
-	InstancePlugin           string
-	InstancePluginProperties *json.RawMessage
-	FlavorPlugin             string
-	FlavorPluginProperties   *json.RawMessage
+// InstancePlugin is the structure that describes an instance plugin.
+type InstancePlugin struct {
+	Plugin     string
+	Properties *json.RawMessage // this will be the Spec of the plugin
+}
+
+// FlavorPlugin describes the flavor configuration
+type FlavorPlugin struct {
+	Plugin     string
+	Properties *json.RawMessage // this will be the Spec of the plugin
+}
+
+// Spec is the configuration schema for the plugin, provided in group.Spec.Properties
+type Spec struct {
+	Instance InstancePlugin
+	Flavor   FlavorPlugin
 }
 
 // InstanceHash computes a stable hash of the document in InstancePluginProperties.
-func (c Schema) InstanceHash() string {
+func (c Spec) InstanceHash() string {
 	// TODO(wfarner): This does not take ProvisionHelper augmentations (e.g. tags, bootScript) into consideration.
-	return instanceHash(RawMessage(c.InstancePluginProperties))
+	return instanceHash(RawMessage(c.Instance.Properties))
 }
 
 // RawMessage converts a pointer to a raw message to a copy of the value. If the pointer is nil, it returns
