@@ -8,7 +8,23 @@ import (
 	"github.com/docker/infrakit/spi/group"
 )
 
-// These types are declared in a separate package to break an import cycle between group (test) -> mock -> group.
+// Spec is the configuration schema for the plugin, provided in group.Spec.Properties
+type Spec struct {
+	Instance InstancePlugin
+	Flavor   FlavorPlugin
+}
+
+// InstancePlugin is the structure that describes an instance plugin.
+type InstancePlugin struct {
+	Plugin     string
+	Properties *json.RawMessage // this will be the Spec of the plugin
+}
+
+// FlavorPlugin describes the flavor configuration
+type FlavorPlugin struct {
+	Plugin     string
+	Properties *json.RawMessage // this will be the Spec of the plugin
+}
 
 // ParseProperties parses the group plugin properties JSON document in a group configuration.
 func ParseProperties(config group.Spec) (Spec, error) {
@@ -25,24 +41,6 @@ func MustParse(s Spec, e error) Spec {
 		panic(e)
 	}
 	return s
-}
-
-// InstancePlugin is the structure that describes an instance plugin.
-type InstancePlugin struct {
-	Plugin     string
-	Properties *json.RawMessage // this will be the Spec of the plugin
-}
-
-// FlavorPlugin describes the flavor configuration
-type FlavorPlugin struct {
-	Plugin     string
-	Properties *json.RawMessage // this will be the Spec of the plugin
-}
-
-// Spec is the configuration schema for the plugin, provided in group.Spec.Properties
-type Spec struct {
-	Instance InstancePlugin
-	Flavor   FlavorPlugin
 }
 
 // InstanceHash computes a stable hash of the document in InstancePluginProperties.
