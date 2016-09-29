@@ -112,6 +112,13 @@ func generateInitScript(useDocker bool, servers []instance.LogicalID, id instanc
 		templateText = initScriptDocker
 		serverStrings := []string{}
 		for i, server := range servers {
+			if server == id {
+				// ZooKeeper uses the matching server entry to determine the bind address for leader
+				// election.  We replace the 'self' entry with 0.0.0.0 to avoid trying to bind to the
+				// host's public IP, which will fail.
+				server = "0.0.0.0"
+			}
+
 			serverStrings = append(serverStrings, fmt.Sprintf("server.%d=%s:2888:3888", i+1, server))
 		}
 
