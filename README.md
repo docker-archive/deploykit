@@ -309,15 +309,7 @@ Note that we specify the number of instances via the `Size` parameter in the `fl
 that a specialized flavor plugin doesn't even accept a size for the group, but rather computes the optimal size based on
 some criteria.
 
-Check the file store:
-```shell
-$ ls -al ./tutorial/
-total 0
-drwxr-xr-x   2 davidchung  staff    68 Sep 27 22:54 .
-drwxr-xr-x  35 davidchung  staff  1190 Sep 27 23:46 ..
-```
-
-Or via the CLI:
+Checking for the instances via the CLI:
 
 ```shell
 $ infrakit/cli instance --name instance-file describe
@@ -325,8 +317,7 @@ ID                              LOGICAL                         TAGS
 
 ```
 
-Now we tell the group plugin to make our specification (the config JSON) a reality by `watching` the group in the
-config JSON:
+Let's tell the group plugin to `watch` our group by providing the group plugin with the configuration:
 
 ```shell
 $ infrakit/cli group --name group watch <<EOF
@@ -368,8 +359,9 @@ watching cattle
 infrakit/cli group --name group watch group.cfg
 ```
 
+The group plugin is responsible for ensuring that the infrastructure state matches with your specifications.  Since we
+started out with nothing, it will create 5 instances and maintain that state by monitoring the instances:
 
-After a short while, we should see 5 instances:
 
 ```shell
 $ infrakit/cli group --name group inspect cattle
@@ -379,20 +371,6 @@ instance-1475104936           	  -             infrakit.config_sha=Y23cKqyRpkQ_M
 instance-1475104946           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475104956           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475104966           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-```
-
-Quickly we can verify looking at the directory:
-
-```shell
-$ ls -al tutorial/
-total 56
-drwxr-xr-x   9 davidchung  staff   306 Sep 28 16:22 .
-drwxr-xr-x  34 davidchung  staff  1156 Sep 28 16:16 ..
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:22 instance-1475104926
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:22 instance-1475104936
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:22 instance-1475104946
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:22 instance-1475104956
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:22 instance-1475104966
 ```
 
 The Instance Plugin can also report instances, it will report all instances across all groups (not just `cattle`).
@@ -407,38 +385,9 @@ instance-1475104956           	  -             infrakit.config_sha=Y23cKqyRpkQ_M
 instance-1475104966           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
-We can look at the contents of the instance provisioned:
+We can look at the contents of the instance provisioned by examining one of the instances.
 
-```shell
-
-$ cat tutorial/instance-1475104966 
-{
-    "ID": "instance-1475104966",
-    "LogicalID": null,
-    "Tags": {
-      "infrakit.config_sha": "Y23cKqyRpkQ_M60vIq7CufFmQWk=",
-      "infrakit.group": "cattle",
-      "project": "infrakit",
-      "tier": "web"
-    },
-    "Spec": {
-      "Properties": {
-        "Note": "Instance properties version 1.0"
-      },
-      "Tags": {
-        "infrakit.config_sha": "Y23cKqyRpkQ_M60vIq7CufFmQWk=",
-        "infrakit.group": "cattle",
-        "project": "infrakit",
-        "tier": "web"
-      },
-      "Init": "\nsudo apt-get update -y\nsudo apt-get install -y nginx\nsudo service nginx start",
-      "LogicalID": null,
-      "Attachments": null
-    }
-  }
-```
-Note that the instances now have tags that indicated the SHA of the configuration.  Also, the instance has
-the properties we set earlier in the JSON (e.g. the `Note` field saying it's version `1.0`.)
+Note that the instances now have tags that indicated the SHA of the configuration.
 
 Now let's update the configuration by changing the size of the group and a property of the instance:
 
@@ -521,55 +470,9 @@ instance-1475105726           	  -             infrakit.config_sha=BXedrwY0GdZlH
 instance-1475105736           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
-Also by filesystem:
+Note the instances now have a new SHA `BXedrwY0GdZlHhgHmPAzxTN4oHM=` (vs `Y23cKqyRpkQ_M60vIq7CufFmQWk=` previously)
 
-```shell
-$ ls -al tutorial/
-total 104
-drwxr-xr-x  15 davidchung  staff   510 Sep 28 16:35 .
-drwxr-xr-x  35 davidchung  staff  1190 Sep 28 16:37 ..
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105646
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105656
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105666
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105676
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105686
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105696
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:35 instance-1475105706
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:35 instance-1475105716
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:35 instance-1475105726
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:35 instance-1475105736
-```
-
-Note the new timesstamps and the total of 10 instances.  More important, the instances now have a new SHA `BXedrwY0GdZlHhgHmPAzxTN4oHM=`
-
-We can also verify and see that the instances have the new configurations:
-```shell
-$ cat tutorial/instance-1475105646 
-{
-    "ID": "instance-1475105646",
-    "LogicalID": null,
-    "Tags": {
-      "infrakit.config_sha": "BXedrwY0GdZlHhgHmPAzxTN4oHM=",
-      "infrakit.group": "cattle",
-      "project": "infrakit",
-      "tier": "web"
-    },
-    "Spec": {
-      "Properties": {
-        "Note": "Instance properties version 2.0"
-      },
-      "Tags": {
-        "infrakit.config_sha": "BXedrwY0GdZlHhgHmPAzxTN4oHM=",
-        "infrakit.group": "cattle",
-        "project": "infrakit",
-        "tier": "web"
-      },
-      "Init": "\nsudo apt-get update -y\nsudo apt-get install -y nginx\nsudo service nginx start",
-      "LogicalID": null,
-      "Attachments": null
-    }
-  }
-```
+You can also verify and see that the instances have the new configurations by looking at the files.
 
 To see that the Group plugin can enforce the size of the group, let's kill an instance.
 
@@ -601,10 +504,6 @@ Finally, let's clean up:
 
 ```
 $ infrakit/cli group --name group destroy cattle
-$ ls -al tutorial/
-total 24
-drwxr-xr-x   5 davidchung  staff   170 Sep 28 16:47 .
-drwxr-xr-x  34 davidchung  staff  1156 Sep 28 16:44 ..
 ```
 
 This concludes our quick tutorial.  In this tutorial we have
