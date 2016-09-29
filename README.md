@@ -115,7 +115,10 @@ Make sure you check out the project following a convention for building Go proje
 ```shell
 
 # Install Go - https://golang.org/dl/
+# Assuming your go compiler is in /usr/local/go
+export PATH=/usr/local/go/bin:$PATH
 
+# Your dev environment
 mkdir -p ~/go
 export GOPATH=!$
 export PATH=$GOPATH/bin:$PATH
