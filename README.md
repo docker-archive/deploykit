@@ -108,6 +108,33 @@ however, the members may require special handling and demand stronger notions of
 
 ## Building
 
+### Your Environment
+
+Make sure you check out the project following a convention for building Go projects. For example,
+
+```shell
+
+# Install Go - https://golang.org/dl/
+
+mkdir -p ~/go
+export GOPATH=!$
+export PATH=$GOPATH/bin:$PATH
+
+mkdir -p ~/go/src/github.com/docker
+cd !$
+git clone git@github.com:chungers/infrakit.git
+cd infrakit
+
+```
+
+Also install a few tools
+
+```shell
+go get -u github.com/kardianos/govendor  # the dependency manager
+go get -u github.com/golang/lint/golint  # if you're running tests
+```
+Now you are ready to go.
+
 ### Running tests
 ```shell
 $ make ci
