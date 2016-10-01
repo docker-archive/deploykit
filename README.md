@@ -204,13 +204,11 @@ default Group [Spec](/plugin/group/types/types.go) is composed of one instance a
         "Instance" : {
            "Plugin" : "name-of-the-instance-plugin",
            "Properties" : {
-                /* the Spec of the instance plugin */
            }
         },
         "Flavor" : {
            "Plugin" : "name-of-the-flavor-plugin",
            "Properties" : {
-                /* the Spec of the flavor plugin */
            }
         }
     }
