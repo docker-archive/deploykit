@@ -22,7 +22,7 @@ const (
 var (
 	minions = group.Spec{
 		ID:         id,
-		Properties: minionProperties(3, "data"),
+		Properties: minionProperties(3, "data", "init"),
 	}
 
 	leaders = group.Spec{
@@ -31,15 +31,13 @@ var (
 	}
 
 	leaderIDs = []instance.LogicalID{"192.168.0.4", "192.168.0.5", "192.168.0.6"}
-
-	flavorPlugin = testFlavor{tags: map[string]string{"custom": "value"}}
 )
 
 func flavorPluginLookup(_ string) (flavor.Plugin, error) {
-	return &flavorPlugin, nil
+	return &testFlavor{}, nil
 }
 
-func minionProperties(instances int, data string) *json.RawMessage {
+func minionProperties(instances int, instanceData string, flavorInit string) *json.RawMessage {
 	r := json.RawMessage(fmt.Sprintf(`{
 	  "Instance" : {
               "Plugin": "test",
@@ -51,10 +49,11 @@ func minionProperties(instances int, data string) *json.RawMessage {
               "Plugin" : "test",
 	      "Properties": {
 	          "Type": "minion",
-	          "Size": %d
+	          "Size": %d,
+	          "Init": "%s"
 	      }
           }
-	}`, data, instances))
+	}`, instanceData, instances, flavorInit))
 	return &r
 }
 
@@ -134,14 +133,10 @@ func provisionTags(config group.Spec) map[string]string {
 	tags := memberTags(config.ID)
 	tags[configTag] = types.MustParse(types.ParseProperties(config)).InstanceHash()
 
-	for k, v := range flavorPlugin.tags {
-		tags[k] = v
-	}
-
 	return tags
 }
 
-func newFakeInstance(config group.Spec, logicalID *instance.LogicalID) fakeInstance {
+func newFakeInstance(config group.Spec, logicalID *instance.LogicalID) instance.Spec {
 	// Inject another tag to simulate instances being tagged out-of-band.  Our implementation should ignore tags
 	// we did not create.
 	tags := map[string]string{"other": "ignored"}
@@ -149,14 +144,14 @@ func newFakeInstance(config group.Spec, logicalID *instance.LogicalID) fakeInsta
 		tags[k] = v
 	}
 
-	return fakeInstance{
-		logicalID: logicalID,
-		tags:      provisionTags(config),
+	return instance.Spec{
+		LogicalID: logicalID,
+		Tags:      provisionTags(config),
 	}
 }
 
 func TestNoopUpdate(t *testing.T) {
-	plugin := NewTestInstancePlugin(
+	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
@@ -175,12 +170,12 @@ func TestNoopUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
-		require.Equal(t, newFakeInstance(minions, nil).tags, i.Tags)
+		require.Equal(t, newFakeInstance(minions, nil).Tags, i.Tags)
 	}
 }
 
 func TestRollingUpdate(t *testing.T) {
-	plugin := NewTestInstancePlugin(
+	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
@@ -189,7 +184,7 @@ func TestRollingUpdate(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2")}
+	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "flavor2")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -206,7 +201,7 @@ func TestRollingUpdate(t *testing.T) {
 }
 
 func TestRollAndAdjustScale(t *testing.T) {
-	plugin := NewTestInstancePlugin(
+	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
@@ -215,7 +210,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Spec{ID: id, Properties: minionProperties(8, "data2")}
+	updated := group.Spec{ID: id, Properties: minionProperties(8, "data2", "flavor2")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -238,7 +233,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 }
 
 func TestScaleIncrease(t *testing.T) {
-	plugin := NewTestInstancePlugin(
+	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
@@ -247,7 +242,7 @@ func TestScaleIncrease(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Spec{ID: id, Properties: minionProperties(8, "data")}
+	updated := group.Spec{ID: id, Properties: minionProperties(8, "data", "init")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -267,7 +262,7 @@ func TestScaleIncrease(t *testing.T) {
 }
 
 func TestScaleDecrease(t *testing.T) {
-	plugin := NewTestInstancePlugin(
+	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
@@ -276,7 +271,7 @@ func TestScaleDecrease(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Spec{ID: id, Properties: minionProperties(1, "data")}
+	updated := group.Spec{ID: id, Properties: minionProperties(1, "data", "flavorInit")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -307,7 +302,7 @@ func TestUnwatchGroup(t *testing.T) {
 }
 
 func TestDestroyGroup(t *testing.T) {
-	plugin := NewTestInstancePlugin(
+	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
@@ -323,7 +318,7 @@ func TestDestroyGroup(t *testing.T) {
 }
 
 func TestSuperviseQuorum(t *testing.T) {
-	plugin := NewTestInstancePlugin(
+	plugin := newTestInstancePlugin(
 		newFakeInstance(leaders, &leaderIDs[0]),
 		newFakeInstance(leaders, &leaderIDs[1]),
 		newFakeInstance(leaders, &leaderIDs[2]),
@@ -350,4 +345,71 @@ func TestSuperviseQuorum(t *testing.T) {
 	}
 
 	// TODO(wfarner): Validate logical IDs in created instances.
+}
+
+func TestUpdateCompletes(t *testing.T) {
+	// Tests that a completed update clears the 'update in progress state', allowing another update to commence.
+
+	plugin := newTestInstancePlugin()
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+
+	require.NoError(t, grp.WatchGroup(minions))
+
+	updated := group.Spec{ID: id, Properties: minionProperties(8, "data", "init")}
+	require.NoError(t, grp.UpdateGroup(updated))
+
+	updated = group.Spec{ID: id, Properties: minionProperties(5, "data", "init")}
+	require.NoError(t, grp.UpdateGroup(updated))
+}
+
+func TestInstanceAndFlavorChange(t *testing.T) {
+	// Tests that a change to the flavor configuration triggers an update.
+
+	plugin := newTestInstancePlugin(
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+	)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+
+	require.NoError(t, grp.WatchGroup(minions))
+
+	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "updated init")}
+
+	desc, err := grp.DescribeUpdate(updated)
+	require.NoError(t, err)
+
+	require.Equal(t, "Performs a rolling update on 3 instances", desc)
+
+	require.NoError(t, grp.UpdateGroup(updated))
+
+	for _, inst := range plugin.instancesCopy() {
+		require.Equal(t, "updated init", inst.Init)
+
+		properties := map[string]string{}
+		err = json.Unmarshal(types.RawMessage(inst.Properties), &properties)
+		require.NoError(t, err)
+		require.Equal(t, "data2", properties["OpaqueValue"])
+	}
+}
+
+func TestFlavorChange(t *testing.T) {
+	// Tests that a change to the flavor configuration triggers an update.
+
+	plugin := newTestInstancePlugin(
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+	)
+	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+
+	require.NoError(t, grp.WatchGroup(minions))
+
+	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "updated init")}
+
+	desc, err := grp.DescribeUpdate(updated)
+	require.NoError(t, err)
+
+	// TODO(wfarner): Update this test when addressing the TODO in Spec.InstanceHash().
+	require.Equal(t, "Noop", desc)
 }
