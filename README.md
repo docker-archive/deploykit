@@ -185,7 +185,6 @@ A common pattern for a JSON value looks like this:
 {
    "SomeKey"        : "ValueForTheKey",
    "Properties" : {
-        /* some raw json */
    }
 }
 ```
