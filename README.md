@@ -183,8 +183,8 @@ A common pattern for a JSON value looks like this:
 
 ```json
 {
-   "SomeKey"        : "ValueForTheKey",
-   "Properties" : {
+   "SomeKey": "ValueForTheKey",
+   "Properties": {
    }
 }
 ```
@@ -200,14 +200,14 @@ default Group [Spec](/plugin/group/types/types.go) is composed of one instance a
 {
     "ID": "name-of-the-group",
     "Properties": {
-        "Instance" : {
-           "Plugin" : "name-of-the-instance-plugin",
-           "Properties" : {
+        "Instance": {
+           "Plugin": "name-of-the-instance-plugin",
+           "Properties": {
            }
         },
-        "Flavor" : {
-           "Plugin" : "name-of-the-flavor-plugin",
-           "Properties" : {
+        "Flavor": {
+           "Plugin": "name-of-the-flavor-plugin",
+           "Properties": {
            }
         }
     }
