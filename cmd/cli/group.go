@@ -13,9 +13,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	// DefaultGroupPluginName specifies the default name of the group plugin if name flag isn't specified.
+	DefaultGroupPluginName = "group"
+)
+
 func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 
-	name := ""
+	name := DefaultGroupPluginName
 	var groupPlugin group.Plugin
 
 	cmd := &cobra.Command{
