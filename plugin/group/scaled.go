@@ -37,6 +37,8 @@ func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	// TODO(wfarner): Consider supporting changing the plugin names as well.
+	s.flavorProperties = types.RawMessage(settings.config.Flavor.Properties)
 	s.provisionRequest = types.RawMessage(settings.config.Instance.Properties)
 	tags := map[string]string{}
 	for k, v := range s.memberTags {

@@ -45,27 +45,23 @@ func MustParse(s Spec, e error) Spec {
 
 // InstanceHash computes a stable hash of the document in InstancePluginProperties.
 func (c Spec) InstanceHash() string {
-	// TODO(wfarner): This does not take ProvisionHelper augmentations (e.g. tags, bootScript) into consideration.
-	return instanceHash(RawMessage(c.Instance.Properties))
-}
+	// Marshal the JSON to ensure stable key ordering.  This allows structurally-identical JSON to yield the same
+	// hash even if the fields are reordered.
 
-// RawMessage converts a pointer to a raw message to a copy of the value. If the pointer is nil, it returns
-// an empty raw message.  This is useful for structs where fields are json.RawMessage pointers for bi-directional
-// marshal and unmarshal (value receivers will encode base64 instead of raw json when marshaled), so bi-directional
-// structs should use pointer fields.
-func RawMessage(r *json.RawMessage) (raw json.RawMessage) {
-	if r != nil {
-		raw = *r
+	// TODO(wfarner): This does not consider changes made by plugins that are not represented by user
+	// configuration changes, such as if a plugin is updated.
+
+	// TODO(wfarner): This does not consider flavor plugin and properties.  At present, since details like group
+	// size and logical IDs are extracted from opaque properties, there's no way to distinguish between a group size
+	// change and a change requiring a rolling update.
+
+	unstable, err := json.Marshal(c.Instance)
+	if err != nil {
+		panic(err)
 	}
-	return
-}
-
-func instanceHash(config json.RawMessage) string {
-	// First unmarshal and marshal the JSON to ensure stable key ordering.  This allows structurally-identical
-	// JSON to yield the same hash even if the fields are reordered.
 
 	props := map[string]interface{}{}
-	err := json.Unmarshal(config, &props)
+	err = json.Unmarshal(unstable, &props)
 	if err != nil {
 		panic(err)
 	}
@@ -78,4 +74,15 @@ func instanceHash(config json.RawMessage) string {
 	hasher := sha1.New()
 	hasher.Write(stable)
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+}
+
+// RawMessage converts a pointer to a raw message to a copy of the value. If the pointer is nil, it returns
+// an empty raw message.  This is useful for structs where fields are json.RawMessage pointers for bi-directional
+// marshal and unmarshal (value receivers will encode base64 instead of raw json when marshaled), so bi-directional
+// structs should use pointer fields.
+func RawMessage(r *json.RawMessage) (raw json.RawMessage) {
+	if r != nil {
+		raw = *r
+	}
+	return
 }

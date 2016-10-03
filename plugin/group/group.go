@@ -208,24 +208,24 @@ func (p *plugin) DescribeUpdate(updated group.Spec) (string, error) {
 	return plan.Explain(), nil
 }
 
-func (p *plugin) initiateUpdate(id group.ID, updatedSettings groupSettings) (updatePlan, error) {
+func (p *plugin) initiateUpdate(id group.ID, updatedSettings groupSettings) (*groupContext, updatePlan, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	plan, err := p.planUpdate(id, updatedSettings)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	grp, _ := p.groups.get(id)
 	if grp.getUpdate() != nil {
-		return nil, errors.New("Update already in progress for this group")
+		return nil, nil, errors.New("Update already in progress for this group")
 	}
 
 	grp.setUpdate(plan)
 	grp.changeSettings(updatedSettings)
 	log.Infof("Executing update plan for '%s': %s", id, plan.Explain())
-	return plan, nil
+	return grp, plan, nil
 }
 
 func (p *plugin) UpdateGroup(updated group.Spec) error {
@@ -234,12 +234,13 @@ func (p *plugin) UpdateGroup(updated group.Spec) error {
 		return err
 	}
 
-	plan, err := p.initiateUpdate(updated.ID, updatedSettings)
+	grp, plan, err := p.initiateUpdate(updated.ID, updatedSettings)
 	if err != nil {
 		return err
 	}
 
 	err = plan.Run(p.pollInterval)
+	grp.setUpdate(nil)
 	log.Infof("Finished updating group %s", updated.ID)
 	return err
 }
