@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/spi/instance"
+	"github.com/nightlyone/lockfile"
 	"github.com/spf13/afero"
 )
 
@@ -26,16 +28,23 @@ import (
 // tf.json file and call terra apply again.
 
 type plugin struct {
-	Dir string
-	fs  afero.Fs
+	Dir  string
+	fs   afero.Fs
+	lock lockfile.Lockfile
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
 func NewTerraformInstancePlugin(dir string) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
+	lock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
+	if err != nil {
+		panic(err)
+	}
+
 	return &plugin{
-		Dir: dir,
-		fs:  afero.NewOsFs(),
+		Dir:  dir,
+		fs:   afero.NewOsFs(),
+		lock: lock,
 	}
 }
 
@@ -154,9 +163,22 @@ func addUserData(m map[string]interface{}, key string, init string) {
 	}
 }
 
-func terraformApply(dir string) error {
+func (p *plugin) terraformApply() error {
+
+	for {
+		if err := p.lock.TryLock(); err == nil {
+			log.Infoln("Acquired lock.  Applying")
+			defer p.lock.Unlock()
+			return p.doTerraformApply()
+		}
+		log.Infoln("Can't acquire lock.  Wait.")
+		time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
+	}
+}
+
+func (p *plugin) doTerraformApply() error {
 	cmd := exec.Command("terraform", "apply")
-	cmd.Dir = dir
+	cmd.Dir = p.Dir
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -179,17 +201,17 @@ func terraformApply(dir string) error {
 	return cmd.Run() // blocks
 }
 
-func terraformShow(dir string) (map[string]interface{}, error) {
+func (p *plugin) terraformShow() (map[string]interface{}, error) {
 	// open the terraform.tfstate file
-	buff, err := ioutil.ReadFile(filepath.Join(dir, "terraform.tfstate"))
+	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, "terraform.tfstate"))
 	if err != nil {
 
 		// The tfstate file is not present this means we have to apply it first.
 		if os.IsNotExist(err) {
-			if err = terraformApply(dir); err != nil {
+			if err = p.terraformApply(); err != nil {
 				return nil, err
 			}
-			return terraformShow(dir)
+			return p.terraformShow()
 		}
 		return nil, err
 	}
@@ -228,7 +250,8 @@ func terraformShow(dir string) (map[string]interface{}, error) {
 func ensureUniqueFile(dir string) string {
 	n := fmt.Sprintf("instance-%d", time.Now().Unix())
 	// if we can open then we have to try again...  the file cannot exist currently
-	if _, err := os.Open(filepath.Join(dir, n)); err == nil {
+	if f, err := os.Open(filepath.Join(dir, n) + ".tf.json"); err == nil {
+		f.Close()
 		return ensureUniqueFile(dir)
 	}
 	return n
@@ -316,7 +339,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	return &id, terraformApply(p.Dir)
+	return &id, p.terraformApply()
 }
 
 // Destroy terminates an existing instance.
@@ -327,14 +350,14 @@ func (p *plugin) Destroy(instance instance.ID) error {
 	if err != nil {
 		return err
 	}
-	return terraformApply(p.Dir)
+	return p.terraformApply()
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 
-	show, err := terraformShow(p.Dir)
+	show, err := p.terraformShow()
 	if err != nil {
 		return nil, err
 	}
