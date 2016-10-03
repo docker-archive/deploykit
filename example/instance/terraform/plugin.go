@@ -201,19 +201,24 @@ func (p *plugin) doTerraformApply() error {
 }
 
 func (p *plugin) terraformShow() (map[string]interface{}, error) {
-	re := regexp.MustCompile(".*\\.(instance-[0-9]+)(.tf.json)")
+	re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
 
 	result := map[string]interface{}{}
 
 	fs := &afero.Afero{Fs: p.fs}
 	// just scan the directory for the instance-*.tf.json files
 	err := fs.Walk(p.Dir, func(path string, info os.FileInfo, err error) error {
+
+		log.Debugln("file=", info.Name())
+
 		matches := re.FindStringSubmatch(info.Name())
+
 		if len(matches) == 3 {
 			id := matches[1]
-			parse := map[string]map[string]map[string]interface{}{}
+			parse := map[string]interface{}{}
 
 			buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
+
 			if err != nil {
 				log.Warningln("Cannot parse:", err)
 				return err
@@ -224,11 +229,21 @@ func (p *plugin) terraformShow() (map[string]interface{}, error) {
 				return err
 			}
 
-			if res, has := parse["resource"]; has {
+			log.Debugln("parsed=", parse)
+			if res, has := parse["resource"].(map[string]interface{}); has {
+
+				log.Debugln("has resource, id=", id)
+
 				var first map[string]interface{}
+			res:
 				for _, r := range res {
-					first = r
-					break
+
+					log.Debugln(">>>> R=", r)
+
+					if f, ok := r.(map[string]interface{}); ok {
+						first = f
+						break res
+					}
 				}
 				if props, has := first[id]; has {
 					result[id] = props
@@ -237,6 +252,7 @@ func (p *plugin) terraformShow() (map[string]interface{}, error) {
 		}
 		return nil
 	})
+	log.Debugln("result=", result, err)
 	return result, err
 }
 
@@ -413,14 +429,14 @@ func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Descripti
 		return nil, err
 	}
 
-	re := regexp.MustCompile(".*\\.(instance-[0-9]+)")
+	re := regexp.MustCompile("(.*)(instance-[0-9]+)")
 	result := []instance.Description{}
 	// now we scan for <instance_type.instance-<timestamp> as keys
 scan:
 	for k, v := range show {
 		matches := re.FindStringSubmatch(k)
-		if len(matches) == 2 {
-			id := matches[1]
+		if len(matches) == 3 {
+			id := matches[2]
 
 			inst := instance.Description{
 				Tags:      terraformTags(v, "tags"),
