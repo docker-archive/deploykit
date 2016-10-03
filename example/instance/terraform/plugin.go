@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/spi/instance"
+	"github.com/nightlyone/lockfile"
 	"github.com/spf13/afero"
 )
 
@@ -25,16 +29,25 @@ import (
 // tf.json file and call terra apply again.
 
 type plugin struct {
-	Dir string
-	fs  afero.Fs
+	Dir       string
+	fs        afero.Fs
+	lock      lockfile.Lockfile
+	applying  bool
+	applyLock sync.Mutex
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
 func NewTerraformInstancePlugin(dir string) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
+	lock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
+	if err != nil {
+		panic(err)
+	}
+
 	return &plugin{
-		Dir: dir,
-		fs:  afero.NewOsFs(),
+		Dir:  dir,
+		fs:   afero.NewOsFs(),
+		lock: lock,
 	}
 }
 
@@ -153,9 +166,34 @@ func addUserData(m map[string]interface{}, key string, init string) {
 	}
 }
 
-func terraformApply(dir string) error {
+func (p *plugin) terraformApply() error {
+	p.applyLock.Lock()
+	defer p.applyLock.Unlock()
+
+	if p.applying {
+		return nil
+	}
+
+	go func() {
+		log.Infoln("Starting applying loop")
+
+		for {
+			if err := p.lock.TryLock(); err == nil {
+				log.Infoln("Acquired lock.  Applying")
+				defer p.lock.Unlock()
+				p.doTerraformApply()
+			}
+			log.Infoln("Can't acquire lock.  Wait.")
+			time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
+		}
+	}()
+	p.applying = true
+	return nil
+}
+
+func (p *plugin) doTerraformApply() error {
 	cmd := exec.Command("terraform", "apply")
-	cmd.Dir = dir
+	cmd.Dir = p.Dir
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -178,10 +216,63 @@ func terraformApply(dir string) error {
 	return cmd.Run() // blocks
 }
 
-func terraformShow(dir string) (map[string]interface{}, error) {
+func (p *plugin) terraformShow() (map[string]interface{}, error) {
+	re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
+
+	result := map[string]interface{}{}
+
+	fs := &afero.Afero{Fs: p.fs}
+	// just scan the directory for the instance-*.tf.json files
+	err := fs.Walk(p.Dir, func(path string, info os.FileInfo, err error) error {
+		matches := re.FindStringSubmatch(info.Name())
+
+		if len(matches) == 3 {
+			id := matches[1]
+			parse := map[string]interface{}{}
+
+			buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
+
+			if err != nil {
+				log.Warningln("Cannot parse:", err)
+				return err
+			}
+
+			err = json.Unmarshal(buff, &parse)
+			if err != nil {
+				return err
+			}
+
+			if res, has := parse["resource"].(map[string]interface{}); has {
+				var first map[string]interface{}
+			res:
+				for _, r := range res {
+					if f, ok := r.(map[string]interface{}); ok {
+						first = f
+						break res
+					}
+				}
+				if props, has := first[id]; has {
+					result[id] = props
+				}
+			}
+		}
+		return nil
+	})
+	return result, err
+}
+
+func (p *plugin) parseTfStateFile() (map[string]interface{}, error) {
 	// open the terraform.tfstate file
-	buff, err := ioutil.ReadFile(filepath.Join(dir, "terraform.tfstate"))
+	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, "terraform.tfstate"))
 	if err != nil {
+
+		// The tfstate file is not present this means we have to apply it first.
+		if os.IsNotExist(err) {
+			if err = p.terraformApply(); err != nil {
+				return nil, err
+			}
+			return p.terraformShow()
+		}
 		return nil, err
 	}
 
@@ -216,6 +307,28 @@ func terraformShow(dir string) (map[string]interface{}, error) {
 	return nil, nil
 }
 
+func (p *plugin) ensureUniqueFile() string {
+	for {
+		if err := p.lock.TryLock(); err == nil {
+			log.Infoln("Acquired lock.  Applying")
+			defer p.lock.Unlock()
+			return ensureUniqueFile(p.Dir)
+		}
+		log.Infoln("Can't acquire lock.  Wait.")
+		time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
+	}
+}
+
+func ensureUniqueFile(dir string) string {
+	n := fmt.Sprintf("instance-%d", time.Now().Unix())
+	// if we can open then we have to try again...  the file cannot exist currently
+	if f, err := os.Open(filepath.Join(dir, n) + ".tf.json"); err == nil {
+		f.Close()
+		return ensureUniqueFile(dir)
+	}
+	return n
+}
+
 // Provision creates a new instance based on the spec.
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// Simply writes a file and call terraform apply
@@ -231,7 +344,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	// use timestamp as instance id
-	name := fmt.Sprintf("instance-%d", time.Now().Unix())
+	name := p.ensureUniqueFile()
+
 	id := instance.ID(name)
 
 	// set the tags.
@@ -297,7 +411,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	return &id, terraformApply(p.Dir)
+	return &id, p.terraformApply()
 }
 
 // Destroy terminates an existing instance.
@@ -308,26 +422,26 @@ func (p *plugin) Destroy(instance instance.ID) error {
 	if err != nil {
 		return err
 	}
-	return terraformApply(p.Dir)
+	return p.terraformApply()
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 
-	show, err := terraformShow(p.Dir)
+	show, err := p.terraformShow()
 	if err != nil {
 		return nil, err
 	}
 
-	re := regexp.MustCompile(".*\\.(instance-[0-9]+)")
+	re := regexp.MustCompile("(.*)(instance-[0-9]+)")
 	result := []instance.Description{}
 	// now we scan for <instance_type.instance-<timestamp> as keys
 scan:
 	for k, v := range show {
 		matches := re.FindStringSubmatch(k)
-		if len(matches) == 2 {
-			id := matches[1]
+		if len(matches) == 3 {
+			id := matches[2]
 
 			inst := instance.Description{
 				Tags:      terraformTags(v, "tags"),
@@ -355,6 +469,12 @@ func terraformTags(v interface{}, key string) map[string]string {
 		return nil
 	}
 	tags := map[string]string{}
+	if mm, ok := m[key].(map[string]interface{}); ok {
+		for k, v := range mm {
+			tags[k] = fmt.Sprintf("%v", v)
+		}
+		return tags
+	}
 	for k, v := range m {
 		if k != "tags.%" && strings.Index(k, "tags.") == 0 {
 			n := k[len("tags."):]
