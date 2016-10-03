@@ -7,7 +7,7 @@ provider "aws" {
 resource "aws_vpc" "default" {
   cidr_block = "10.0.0.0/16"
   tags {
-     provisioner = "infrakit-terraform-example"
+     provisioner = "infrakit-terraform-demo"
   }
 }
 
@@ -15,7 +15,7 @@ resource "aws_vpc" "default" {
 resource "aws_internet_gateway" "default" {
   vpc_id = "${aws_vpc.default.id}"
   tags {
-     provisioner = "infrakit-terraform-example"
+     provisioner = "infrakit-terraform-demo"
   }
 }
 
@@ -32,7 +32,7 @@ resource "aws_subnet" "default" {
   cidr_block              = "10.0.1.0/24"
   map_public_ip_on_launch = true
   tags {
-     provisioner = "infrakit-terraform-example"
+     provisioner = "infrakit-terraform-demo"
   }
 }
 
@@ -68,6 +68,6 @@ resource "aws_security_group" "default" {
   }
 
   tags {
-     provisioner = "infrakit-terraform-example"
+     provisioner = "infrakit-terraform-demo"
   }
 }
