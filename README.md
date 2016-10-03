@@ -12,6 +12,8 @@ Although _InfraKit_ emphasizes primitives for building self-healing infrastructu
 
 To get started, try the [tutorial](docs/tutorial.md).
 
+![arch image](images/arch.png)
+
 ## Overview
 
 ### Plugins
