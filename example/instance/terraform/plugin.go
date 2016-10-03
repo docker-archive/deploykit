@@ -201,6 +201,46 @@ func (p *plugin) doTerraformApply() error {
 }
 
 func (p *plugin) terraformShow() (map[string]interface{}, error) {
+	re := regexp.MustCompile(".*\\.(instance-[0-9]+)(.tf.json)")
+
+	result := map[string]interface{}{}
+
+	fs := &afero.Afero{Fs: p.fs}
+	// just scan the directory for the instance-*.tf.json files
+	err := fs.Walk(p.Dir, func(path string, info os.FileInfo, err error) error {
+		matches := re.FindStringSubmatch(info.Name())
+		if len(matches) == 3 {
+			id := matches[1]
+			parse := map[string]map[string]map[string]interface{}{}
+
+			buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
+			if err != nil {
+				log.Warningln("Cannot parse:", err)
+				return err
+			}
+
+			err = json.Unmarshal(buff, &parse)
+			if err != nil {
+				return err
+			}
+
+			if res, has := parse["resource"]; has {
+				var first map[string]interface{}
+				for _, r := range res {
+					first = r
+					break
+				}
+				if props, has := first[id]; has {
+					result[id] = props
+				}
+			}
+		}
+		return nil
+	})
+	return result, err
+}
+
+func (p *plugin) terraformShow1() (map[string]interface{}, error) {
 	// open the terraform.tfstate file
 	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, "terraform.tfstate"))
 	if err != nil {
