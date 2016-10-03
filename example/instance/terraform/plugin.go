@@ -225,6 +225,15 @@ func terraformShow(dir string) (map[string]interface{}, error) {
 	return nil, nil
 }
 
+func ensureUniqueFile(dir string) string {
+	n := fmt.Sprintf("instance-%d", time.Now().Unix())
+	// if we can open then we have to try again...  the file cannot exist currently
+	if _, err := os.Open(filepath.Join(dir, n)); err == nil {
+		return ensureUniqueFile(dir)
+	}
+	return n
+}
+
 // Provision creates a new instance based on the spec.
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// Simply writes a file and call terraform apply
@@ -240,7 +249,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	// use timestamp as instance id
-	name := fmt.Sprintf("instance-%d", time.Now().Unix())
+	name := ensureUniqueFile(p.Dir)
+
 	id := instance.ID(name)
 
 	// set the tags.
