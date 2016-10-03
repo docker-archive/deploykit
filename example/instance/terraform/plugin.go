@@ -261,7 +261,7 @@ func (p *plugin) terraformShow() (map[string]interface{}, error) {
 	return result, err
 }
 
-func (p *plugin) terraformShow1() (map[string]interface{}, error) {
+func (p *plugin) parseTfStateFile() (map[string]interface{}, error) {
 	// open the terraform.tfstate file
 	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, "terraform.tfstate"))
 	if err != nil {
