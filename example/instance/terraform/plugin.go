@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -182,6 +183,14 @@ func terraformShow(dir string) (map[string]interface{}, error) {
 	// open the terraform.tfstate file
 	buff, err := ioutil.ReadFile(filepath.Join(dir, "terraform.tfstate"))
 	if err != nil {
+
+		// The tfstate file is not present this means we have to apply it first.
+		if os.IsNotExist(err) {
+			if err = terraformApply(dir); err != nil {
+				return nil, err
+			}
+			return terraformShow(dir)
+		}
 		return nil, err
 	}
 
