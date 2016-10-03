@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -28,9 +29,11 @@ import (
 // tf.json file and call terra apply again.
 
 type plugin struct {
-	Dir  string
-	fs   afero.Fs
-	lock lockfile.Lockfile
+	Dir       string
+	fs        afero.Fs
+	lock      lockfile.Lockfile
+	applying  bool
+	applyLock sync.Mutex
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
@@ -164,18 +167,28 @@ func addUserData(m map[string]interface{}, key string, init string) {
 }
 
 func (p *plugin) terraformApply() error {
-	if true {
+	p.applyLock.Lock()
+	defer p.applyLock.Unlock()
+
+	if p.applying {
 		return nil
 	}
-	for {
-		if err := p.lock.TryLock(); err == nil {
-			log.Infoln("Acquired lock.  Applying")
-			defer p.lock.Unlock()
-			return p.doTerraformApply()
+
+	go func() {
+		log.Infoln("Starting applying loop")
+
+		for {
+			if err := p.lock.TryLock(); err == nil {
+				log.Infoln("Acquired lock.  Applying")
+				defer p.lock.Unlock()
+				p.doTerraformApply()
+			}
+			log.Infoln("Can't acquire lock.  Wait.")
+			time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
 		}
-		log.Infoln("Can't acquire lock.  Wait.")
-		time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
-	}
+	}()
+	p.applying = true
+	return nil
 }
 
 func (p *plugin) doTerraformApply() error {
