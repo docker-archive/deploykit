@@ -10,14 +10,9 @@ import (
 	"sync"
 )
 
-type fakeInstance struct {
-	logicalID *instance.LogicalID
-	tags      map[string]string
-}
-
-// NewTestInstancePlugin creates a new instance plugin for use in testing and development.
-func NewTestInstancePlugin(seedInstances ...fakeInstance) instance.Plugin {
-	plugin := testplugin{idPrefix: util.RandomAlphaNumericString(4), instances: map[instance.ID]fakeInstance{}}
+// newTestInstancePlugin creates a new instance plugin for use in testing and development.
+func newTestInstancePlugin(seedInstances ...instance.Spec) *testplugin {
+	plugin := testplugin{idPrefix: util.RandomAlphaNumericString(4), instances: map[instance.ID]instance.Spec{}}
 	for _, inst := range seedInstances {
 		plugin.addInstance(inst)
 	}
@@ -29,26 +24,37 @@ type testplugin struct {
 	lock      sync.Mutex
 	idPrefix  string
 	nextID    int
-	instances map[instance.ID]fakeInstance
+	instances map[instance.ID]instance.Spec
+}
+
+func (d *testplugin) instancesCopy() map[instance.ID]instance.Spec {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	instances := map[instance.ID]instance.Spec{}
+	for k, v := range d.instances {
+		instances[k] = v
+	}
+	return instances
 }
 
 func (d *testplugin) Validate(req json.RawMessage) error {
 	return nil
 }
 
-func (d *testplugin) addInstance(inst fakeInstance) instance.ID {
+func (d *testplugin) addInstance(spec instance.Spec) instance.ID {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
 	d.nextID++
 	id := instance.ID(fmt.Sprintf("%s-%d", d.idPrefix, d.nextID))
-	d.instances[id] = inst
+	d.instances[id] = spec
 	return id
 }
 
 func (d *testplugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
-	id := d.addInstance(fakeInstance{logicalID: spec.LogicalID, tags: spec.Tags})
+	id := d.addInstance(spec)
 	return &id, nil
 }
 
@@ -73,7 +79,7 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 	for id, inst := range d.instances {
 		allMatched := true
 		for searchKey, searchValue := range tags {
-			tagValue, has := inst.tags[searchKey]
+			tagValue, has := inst.Tags[searchKey]
 			if !has || searchValue != tagValue {
 				allMatched = false
 			}
@@ -81,8 +87,8 @@ func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 		if allMatched {
 			desc = append(desc, instance.Description{
 				ID:        id,
-				LogicalID: inst.logicalID,
-				Tags:      inst.tags,
+				LogicalID: inst.LogicalID,
+				Tags:      inst.Tags,
 			})
 		}
 	}
@@ -96,13 +102,14 @@ const (
 )
 
 type testFlavor struct {
-	tags map[string]string
 }
 
 type schema struct {
 	Type   string
 	Size   uint
 	Shards []instance.LogicalID
+	Init   string
+	Tags   map[string]string
 }
 
 func (t testFlavor) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
@@ -110,7 +117,7 @@ func (t testFlavor) Validate(flavorProperties json.RawMessage) (flavor.Allocatio
 	s := schema{}
 	err := json.Unmarshal(flavorProperties, &s)
 	if err != nil {
-		return flavor.AllocationMethod{}, nil
+		return flavor.AllocationMethod{}, err
 	}
 
 	switch s.Type {
@@ -124,8 +131,14 @@ func (t testFlavor) Validate(flavorProperties json.RawMessage) (flavor.Allocatio
 }
 
 func (t testFlavor) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
-	spec.Init = "echo hello"
-	for k, v := range t.tags {
+	s := schema{}
+	err := json.Unmarshal(flavorProperties, &s)
+	if err != nil {
+		return spec, err
+	}
+
+	spec.Init = s.Init
+	for k, v := range s.Tags {
 		spec.Tags[k] = v
 	}
 	return spec, nil
