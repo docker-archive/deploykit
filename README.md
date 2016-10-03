@@ -10,9 +10,9 @@ It breaks infrastructure automation down into simple, pluggable components. Thes
 ensure the infrastructure state matches the user's specifications.
 Although _InfraKit_ emphasizes primitives for building self-healing infrastructure, it also can be used passively like conventional tools.
 
-To get started, try the [tutorial](docs/tutorial.md).
-
 ![arch image](images/arch.png)
+
+To get started, try the [tutorial](docs/tutorial.md).
 
 ## Overview
 
