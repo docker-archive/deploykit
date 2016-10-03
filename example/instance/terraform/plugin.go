@@ -283,7 +283,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	// use timestamp as instance id
-	name := ensureUniqueFile(p.Dir)
+	name := p.ensureUniqueFile()
 
 	id := instance.ID(name)
 
