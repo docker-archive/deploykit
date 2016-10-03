@@ -164,7 +164,6 @@ func addUserData(m map[string]interface{}, key string, init string) {
 }
 
 func (p *plugin) terraformApply() error {
-
 	for {
 		if err := p.lock.TryLock(); err == nil {
 			log.Infoln("Acquired lock.  Applying")
@@ -247,6 +246,18 @@ func (p *plugin) terraformShow() (map[string]interface{}, error) {
 	return nil, nil
 }
 
+func (p *plugin) ensureUniqueFile() string {
+	for {
+		if err := p.lock.TryLock(); err == nil {
+			log.Infoln("Acquired lock.  Applying")
+			defer p.lock.Unlock()
+			return ensureUniqueFile(p.Dir)
+		}
+		log.Infoln("Can't acquire lock.  Wait.")
+		time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
+	}
+}
+
 func ensureUniqueFile(dir string) string {
 	n := fmt.Sprintf("instance-%d", time.Now().Unix())
 	// if we can open then we have to try again...  the file cannot exist currently
@@ -272,7 +283,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	// use timestamp as instance id
-	name := ensureUniqueFile(p.Dir)
+	name := p.ensureUniqueFile()
 
 	id := instance.ID(name)
 
