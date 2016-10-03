@@ -164,6 +164,9 @@ func addUserData(m map[string]interface{}, key string, init string) {
 }
 
 func (p *plugin) terraformApply() error {
+	if true {
+		return nil
+	}
 	for {
 		if err := p.lock.TryLock(); err == nil {
 			log.Infoln("Acquired lock.  Applying")
@@ -208,9 +211,6 @@ func (p *plugin) terraformShow() (map[string]interface{}, error) {
 	fs := &afero.Afero{Fs: p.fs}
 	// just scan the directory for the instance-*.tf.json files
 	err := fs.Walk(p.Dir, func(path string, info os.FileInfo, err error) error {
-
-		log.Debugln("file=", info.Name())
-
 		matches := re.FindStringSubmatch(info.Name())
 
 		if len(matches) == 3 {
@@ -229,17 +229,10 @@ func (p *plugin) terraformShow() (map[string]interface{}, error) {
 				return err
 			}
 
-			log.Debugln("parsed=", parse)
 			if res, has := parse["resource"].(map[string]interface{}); has {
-
-				log.Debugln("has resource, id=", id)
-
 				var first map[string]interface{}
 			res:
 				for _, r := range res {
-
-					log.Debugln(">>>> R=", r)
-
 					if f, ok := r.(map[string]interface{}); ok {
 						first = f
 						break res
@@ -252,7 +245,6 @@ func (p *plugin) terraformShow() (map[string]interface{}, error) {
 		}
 		return nil
 	})
-	log.Debugln("result=", result, err)
 	return result, err
 }
 
@@ -464,6 +456,12 @@ func terraformTags(v interface{}, key string) map[string]string {
 		return nil
 	}
 	tags := map[string]string{}
+	if mm, ok := m[key].(map[string]interface{}); ok {
+		for k, v := range mm {
+			tags[k] = fmt.Sprintf("%v", v)
+		}
+		return tags
+	}
 	for k, v := range m {
 		if k != "tags.%" && strings.Index(k, "tags.") == 0 {
 			n := k[len("tags."):]
