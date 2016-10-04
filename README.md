@@ -128,7 +128,7 @@ export PATH=$GOPATH/bin:$PATH
 
 mkdir -p ~/go/src/github.com/docker
 cd !$
-git clone git@github.com:chungers/infrakit.git
+git clone git@github.com:docker/infrakit.git
 cd infrakit
 
 ```
