@@ -80,9 +80,9 @@ need not be a physical machine at all.
 
 | plugin| description                  |
 |:------|:-----------------------------|
-|[infrakit/file](./example/instance/file)   | A simple plugin for development and testing.  Uses local disk file as instance. |
-|[infrakit/terraform](./example/instance/terraform) | A plugin to provision using terraform |
-|[infrakit/vagrant](./example/instance/vagrant) | A plugin that provisions vagrant vm's |
+|[infrakit/file](./example/instance/file)   | A simple plugin for development and testing.  Uses a local disk file as instance. |
+|[infrakit/terraform](./example/instance/terraform) | A plugin to provision using Terraform |
+|[infrakit/vagrant](./example/instance/vagrant) | A plugin that provisions Vagrant VMs |
 
 
 
@@ -265,7 +265,7 @@ Once the configuration is ready, you will tell a Group plugin to
 
 Watching the group as specified in the configuration means that the Group plugin will create
 the instances if they don't already exist.  New instances will be created if for any reason
-existing instances have disappered such that the state doesn't match your specifications.
+existing instances have disappeared such that the state doesn't match your specifications.
 
 Updating the group tells the Group plugin that your configuration may have changed.  It will
 then determine the changes necessary to ensure the state of the infrastructure matches the new
