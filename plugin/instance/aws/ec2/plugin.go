@@ -38,9 +38,7 @@ type properties struct {
 
 // CreateInstanceRequest is the concrete provision request type.
 type CreateInstanceRequest struct {
-	// LocalNetwork tells the plugin to set subnet and security group using the
-	// metadata service for the instance (same subnet, same security groups)
-	LocalNetwork      bool
+	DiscoverDefaults  bool
 	Tags              map[string]string
 	RunInstancesInput ec2.RunInstancesInput
 }
@@ -118,6 +116,43 @@ func (p Provisioner) Validate(req json.RawMessage) error {
 	return nil
 }
 
+func setDiscoveredProperties(ri *ec2.RunInstancesInput) {
+	if ri.SubnetId == nil {
+		// No subnet specified... use the same subnet I am in.
+		subnetId, err := util.MetadataSubnetID()
+		if err == nil {
+			ri.SubnetId = &subnetId
+		}
+	}
+
+	if len(ri.SecurityGroups) == 0 && len(ri.SecurityGroupIds) == 0 {
+		// No security groups specified... let's use the same security group as host
+		sgs, err := util.MetadataSecurityGroupIDs()
+		if err == nil {
+			ids := []*string{}
+			for _, id := range sgs {
+				copy := id
+				ids = append(ids, &copy)
+			}
+			ri.SecurityGroupIds = ids
+		}
+	}
+
+	if ri.InstanceType == nil {
+		t, err := util.GetMetadata(util.MetadataInstanceType)
+		if err == nil {
+			ri.InstanceType = &t
+		}
+	}
+
+	if ri.ImageId == nil {
+		ami, err := util.GetMetadata(util.MetadataAmiID)
+		if err == nil {
+			ri.ImageId = &ami
+		}
+	}
+}
+
 // Provision creates a new instance.
 func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 
@@ -134,27 +169,9 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 	request.RunInstancesInput.MinCount = aws.Int64(1)
 	request.RunInstancesInput.MaxCount = aws.Int64(1)
 
-	if request.LocalNetwork {
-		if request.RunInstancesInput.SubnetId == nil {
-			// No subnet specified... use the same subnet I am in.
-			subnetId, err := util.MetadataSubnetID()
-			if err == nil {
-				request.RunInstancesInput.SubnetId = &subnetId
-			}
-		}
-
-		if len(request.RunInstancesInput.SecurityGroups) == 0 && len(request.RunInstancesInput.SecurityGroupIds) == 0 {
-			// No security groups specified... let's use the same security group as host
-			sgs, err := util.MetadataSecurityGroupIDs()
-			if err == nil {
-				ids := []*string{}
-				for _, id := range sgs {
-					copy := id
-					ids = append(ids, &copy)
-				}
-				request.RunInstancesInput.SecurityGroupIds = ids
-			}
-		}
+	// This will default some fields to be identical to the instance running the plugin
+	if request.DiscoverDefaults {
+		setDiscoveredProperties(&request.RunInstancesInput)
 	}
 
 	if spec.LogicalID != nil {
@@ -165,6 +182,7 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 	}
 
+	// TODO(chungers) - change this to merge...
 	if spec.Init != "" {
 		request.RunInstancesInput.UserData = aws.String(spec.Init)
 	}
