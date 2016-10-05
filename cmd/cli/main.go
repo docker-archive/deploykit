@@ -10,6 +10,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/discovery"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // This is a generic client for infrakit
@@ -64,7 +65,7 @@ func main() {
 	})
 
 	f := func() *discovery.Dir {
-		d, err := discovery.NewDir(discoveryDir)
+		d, err := discovery.NewDir(viper.GetString("dir"))
 		if err != nil {
 			log.Errorf("Failed to initialize plugin discovery: %s", err)
 			os.Exit(1)
@@ -73,7 +74,9 @@ func main() {
 	}
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
 
-	cmd.PersistentFlags().StringVar(&discoveryDir, "dir", discoveryDir, "Dir path for plugin discovery")
+	cmd.PersistentFlags().String("dir", discoveryDir, "Dir path for plugin discovery")
+	viper.BindEnv("dir", "INFRAKIT_PLUGINS_DIR")
+	viper.BindPFlag("dir", cmd.PersistentFlags().Lookup("dir"))
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()

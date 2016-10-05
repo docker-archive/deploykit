@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/plugin/util"
 	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -30,7 +31,8 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/flavor-swarm.sock"
+	listen := "unix:///run/infrakit/plugins/"
+	sock := "flavor-swarm.sock"
 
 	tlsOptions := tlsconfig.Options{}
 	host := "unix:///var/run/docker.sock"
@@ -91,7 +93,11 @@ func main() {
 		},
 	})
 
-	cmd.PersistentFlags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	cmd.PersistentFlags().String("listen", listen, "listen address (unix or tcp) for the control endpoint")
+	viper.BindEnv("listen", "INFRAKIT_PLUGINS_LISTEN")
+	viper.BindPFlag("listen", cmd.PersistentFlags().Lookup("listen"))
+	cmd.PersistentFlags().String("sock", sock, "listen socket for the control endpoint")
+	viper.BindPFlag("sock", cmd.PersistentFlags().Lookup("sock"))
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	cmd.PersistentFlags().StringVar(&host, "host", host, "Docker host")

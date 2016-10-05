@@ -3,13 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/plugin/flavor/vanilla"
 	"github.com/docker/infrakit/plugin/util"
 	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -29,7 +32,8 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/flavor-vanilla.sock"
+	listen := "unix:///run/infrakit/plugins/"
+	sock := "flavor-vanilla.sock"
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -47,10 +51,23 @@ func main() {
 				return nil
 			}
 
-			log.Infoln("Starting plugin")
-			log.Infoln("Listening on:", listen)
+			listen = viper.GetString("listen")
+			sock = viper.GetString("sock")
 
-			_, stopped, err := util.StartServer(listen, flavor_plugin.PluginServer(vanilla.NewPlugin()))
+			// parse the listen string
+			listenURL, err := url.Parse(listen)
+			if err != nil {
+				return err
+			}
+
+			if listenURL.Scheme == "unix" {
+				listenURL.Path = path.Join(listenURL.Path, sock)
+			}
+
+			log.Infoln("Starting plugin")
+			log.Infoln("Listening on:", listenURL.String())
+
+			_, stopped, err := util.StartServer(listenURL.String(), flavor_plugin.PluginServer(vanilla.NewPlugin()))
 
 			if err != nil {
 				log.Error(err)
@@ -81,7 +98,11 @@ func main() {
 		},
 	})
 
-	cmd.Flags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	cmd.Flags().String("listen", listen, "listen address (unix or tcp) for the control endpoint")
+	viper.BindEnv("listen", "INFRAKIT_PLUGINS_LISTEN")
+	viper.BindPFlag("listen", cmd.Flags().Lookup("listen"))
+	cmd.Flags().String("sock", sock, "listen socket for the control endpoint")
+	viper.BindPFlag("sock", cmd.Flags().Lookup("sock"))
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()

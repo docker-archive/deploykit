@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/plugin/util"
 	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -29,7 +30,8 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/flavor-zookeeper.sock"
+	listen := "unix:///run/infrakit/plugins/"
+	sock := "flavor-zookeeper.sock"
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -81,7 +83,11 @@ func main() {
 		},
 	})
 
-	cmd.Flags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	cmd.Flags().String("listen", listen, "listen address (unix or tcp) for the control endpoint")
+	viper.BindEnv("listen", "INFRAKIT_PLUGINS_LISTEN")
+	viper.BindPFlag("listen", cmd.Flags().Lookup("listen"))
+	cmd.Flags().String("sock", sock, "listen socket for the control endpoint")
+	viper.BindPFlag("sock", cmd.Flags().Lookup("sock"))
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()

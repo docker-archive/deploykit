@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	instance_client "github.com/docker/infrakit/spi/http/instance"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -38,7 +40,8 @@ func main() {
 
 	logLevel := len(log.AllLevels) - 2
 
-	listen := "unix:///run/infrakit/plugins/group.sock"
+	listen := "unix:///run/infrakit/plugins/"
+	sock := "group.sock"
 
 	pollInterval := 10 * time.Second
 
@@ -58,10 +61,20 @@ func main() {
 				return nil
 			}
 
+			listen = viper.GetString("listen")
+			sock = viper.GetString("sock")
+
+			log.Infof("Parsing url: %s - %s\n", listen, sock)
+
 			// parse the listen string
 			listenURL, err := url.Parse(listen)
 			if err != nil {
 				return err
+			}
+
+			if listenURL.Scheme == "unix" {
+				log.Info("Unix scheme detected")
+				listenURL.Path = path.Join(listenURL.Path, sock)
 			}
 
 			log.Infoln("Starting discovery")
@@ -90,9 +103,9 @@ func main() {
 			log.Infoln("Starting plugin")
 
 			log.Infoln("Starting")
-			log.Infoln("Listening on:", listen)
+			log.Infoln("Listening on:", listenURL.String())
 
-			_, stopped, err := util.StartServer(listen, group_server.PluginServer(
+			_, stopped, err := util.StartServer(listenURL.String(), group_server.PluginServer(
 				group.NewGroupPlugin(
 					instancePluginLookup,
 					flavorPluginLookup,
@@ -127,7 +140,16 @@ func main() {
 		},
 	})
 
-	cmd.Flags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	log.Info("Adding cmd binds")
+	cmd.Flags().String("listen", listen, "listen address (unix or tcp) for the control endpoint")
+	log.Info("Viper Bind listen")
+	// Bind env var for plugin listen address
+	viper.BindEnv("listen", "INFRAKIT_PLUGINS_LISTEN")
+	// Bind Pflags for cmd passed
+	viper.BindPFlag("listen", cmd.Flags().Lookup("listen"))
+	cmd.Flags().String("sock", sock, "listen socket for the control endpoint")
+	// Bind Pflags for cmd passed
+	viper.BindPFlag("sock", cmd.Flags().Lookup("sock"))
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.Flags().DurationVar(&pollInterval, "poll-interval", pollInterval, "Group polling interval")
 

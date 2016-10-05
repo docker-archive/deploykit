@@ -3,13 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/plugin/instance/vagrant"
 	"github.com/docker/infrakit/plugin/util"
 	instance_plugin "github.com/docker/infrakit/spi/http/instance"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -29,7 +32,8 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/instance-vagrant.sock"
+	listen := "unix:///run/infrakit/plugins/"
+	sock := "instance-vagrant.sock"
 	dir, _ := os.Getwd()
 
 	cmd := &cobra.Command{
@@ -48,10 +52,23 @@ func main() {
 				return nil
 			}
 
-			log.Infoln("Starting plugin")
-			log.Infoln("Listening on:", listen)
+			listen = viper.GetString("listen")
+			sock = viper.GetString("sock")
 
-			_, stopped, err := util.StartServer(listen, instance_plugin.PluginServer(vagrant.NewVagrantPlugin(dir)))
+			// parse the listen string
+			listenURL, err := url.Parse(listen)
+			if err != nil {
+				return err
+			}
+
+			if listenURL.Scheme == "unix" {
+				listenURL.Path = path.Join(listenURL.Path, sock)
+			}
+
+			log.Infoln("Starting plugin")
+			log.Infoln("Listening on:", listenURL.String())
+
+			_, stopped, err := util.StartServer(listenURL.String(), instance_plugin.PluginServer(vagrant.NewVagrantPlugin(dir)))
 
 			if err != nil {
 				log.Error(err)
@@ -82,7 +99,10 @@ func main() {
 		},
 	})
 
-	cmd.Flags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	cmd.Flags().String("listen", listen, "listen address (unix or tcp) for the control endpoint")
+	viper.BindEnv("listen", "INFRAKIT_PLUGINS_LISTEN")
+	viper.BindPFlag("listen", cmd.PersistentFlags().Lookup("listen"))
+	cmd.Flags().String("sock", sock, "listen socket for the control endpoint")
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.Flags().StringVar(&dir, "dir", dir, "Vagrant directory")
 
