@@ -5,15 +5,17 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
   + The `file` instance plugin - to provision instances by writing files to disk
   + The `vanilla` flavor plugin - to provide context/ flavor to the configuration of the instances
 
+All InfraKit plugins will by default open the unix socket located at /run/infrakit/plugins. Make sure this directory exists on your host:
+
 ```shell
-# Make sure directory exists for plugins to discover each other
 $ mkdir -p /run/infrakit/plugins/
+$ chmod 777 /run/infrakit/plugins
 ```
 
 Start the group plugin
 
 ```shell
-$ infrakit/group --log=5
+$ infrakit/group --log 5
 INFO[0000] Starting discovery
 DEBU[0000] Opening: /run/infrakit/plugins
 INFO[0000] Starting plugin
@@ -204,7 +206,7 @@ watching cattle
 **_NOTE:_** You can also specify a file name to load from instead of using stdin, like this:
 
 ```
-infrakit/cli group --name group watch group.json
+$ infrakit/cli group --name group watch group.json
 ```
 
 The group plugin is responsible for ensuring that the infrastructure state matches with your specifications.  Since we
