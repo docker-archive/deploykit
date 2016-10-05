@@ -39,6 +39,9 @@ func reflect() {
 func main() {
 
 	builder := &ec2.Builder{}
+
+	reflect()
+
 	logLevel := len(log.AllLevels) - 2
 	listen := "unix:///run/infrakit/plugins/aws-ec2.sock"
 

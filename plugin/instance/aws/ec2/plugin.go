@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
+	util "github.com/docker/infrakit/plugin/instance/aws"
 	"github.com/docker/infrakit/spi/instance"
 	"sort"
 	"time"
@@ -33,6 +34,15 @@ type properties struct {
 	Region   string
 	Retries  int
 	Instance json.RawMessage
+}
+
+// CreateInstanceRequest is the concrete provision request type.
+type CreateInstanceRequest struct {
+	// LocalNetwork tells the plugin to set subnet and security group using the
+	// metadata service for the instance (same subnet, same security groups)
+	LocalNetwork      bool
+	Tags              map[string]string
+	RunInstancesInput ec2.RunInstancesInput
 }
 
 // NewPluginFromProperties creates a new AWS plugin based on a JSON configuration.
@@ -102,12 +112,6 @@ func (p Provisioner) tagInstance(
 	return err
 }
 
-// CreateInstanceRequest is the concrete provision request type.
-type CreateInstanceRequest struct {
-	Tags              map[string]string
-	RunInstancesInput ec2.RunInstancesInput
-}
-
 // Validate performs local checks to determine if the request is valid.
 func (p Provisioner) Validate(req json.RawMessage) error {
 	// TODO(wfarner): Implement
@@ -129,6 +133,29 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	request.RunInstancesInput.MinCount = aws.Int64(1)
 	request.RunInstancesInput.MaxCount = aws.Int64(1)
+
+	if request.LocalNetwork {
+		if request.RunInstancesInput.SubnetId == nil {
+			// No subnet specified... use the same subnet I am in.
+			subnetId, err := util.MetadataSubnetID()
+			if err == nil {
+				request.RunInstancesInput.SubnetId = &subnetId
+			}
+		}
+
+		if len(request.RunInstancesInput.SecurityGroups) == 0 && len(request.RunInstancesInput.SecurityGroupIds) == 0 {
+			// No security groups specified... let's use the same security group as host
+			sgs, err := util.MetadataSecurityGroupIDs()
+			if err == nil {
+				ids := []*string{}
+				for _, id := range sgs {
+					copy := id
+					ids = append(ids, &copy)
+				}
+				request.RunInstancesInput.SecurityGroupIds = ids
+			}
+		}
+	}
 
 	if spec.LogicalID != nil {
 		if len(request.RunInstancesInput.NetworkInterfaces) > 0 {
