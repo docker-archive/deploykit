@@ -6,6 +6,7 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/plugin/instance/aws"
 	"github.com/docker/infrakit/plugin/instance/aws/ec2"
 	"github.com/docker/infrakit/plugin/util"
 	instance_plugin "github.com/docker/infrakit/spi/http/instance"
@@ -25,6 +26,15 @@ var (
 	// Revision is the build source control revision.
 	Revision = "Unspecified"
 )
+
+func reflect() {
+	if subnetid, err := aws.MetadataSubnetID(); err == nil {
+		log.Infoln("Running in subnet id=", subnetid)
+	}
+	if sgids, err := aws.MetadataSecurityGroupIDs(); err == nil {
+		log.Infoln("Running in security group ids:", sgids)
+	}
+}
 
 func main() {
 

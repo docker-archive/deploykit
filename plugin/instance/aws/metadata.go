@@ -1,8 +1,10 @@
 package aws
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 // MetadataKey is the identifier for a metadata entry.
@@ -14,6 +16,9 @@ const (
 
 	// MetadataInstanceID - Instance ID
 	MetadataInstanceID = MetadataKey("http://169.254.169.254/latest/meta-data/instance-id")
+
+	// MetadataMAC - the mac of eth0
+	MetadataMAC = MetadataKey("http://169.254.169.254/latest/meta-data/mac")
 
 	// MetadataInstanceType - Instance type
 	MetadataInstanceType = MetadataKey("http://169.254.169.254/latest/meta-data/instance-type")
@@ -29,7 +34,33 @@ const (
 
 	// MetadataAvailabilityZone - Availability zone
 	MetadataAvailabilityZone = MetadataKey("http://169.254.169.254/latest/meta-data/placement/availability-zone")
+
+	// Formats for building keys that are dependent on mac address
+	metadataSubnetID         = "http://169.254.169.254/latest/meta-data/network/interfaces/macs/%s/subnet-id"
+	metadataSecurityGroupIDs = "http://169.254.169.254/latest/meta-data/network/interfaces/macs/%s/security-group-ids"
 )
+
+// MetadataSubnetID returns the subnet id, which depends on the mac of the instance
+func MetadataSubnetID() (string, error) {
+	mac, err := GetMetadata(MetadataMAC)
+	if err != nil {
+		return "", err
+	}
+	return GetMetadata(MetadataKey(fmt.Sprintf(metadataSubnetID, mac)))
+}
+
+// MetadataSecurityGroupIDS returns the subnet id, which depends on the mac of the instance
+func MetadataSecurityGroupIDs() ([]string, error) {
+	mac, err := GetMetadata(MetadataMAC)
+	if err != nil {
+		return nil, err
+	}
+	str, err := GetMetadata(MetadataKey(fmt.Sprintf(metadataSecurityGroupIDs, mac)))
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(str, "\n"), nil
+}
 
 // GetMetadata returns the value of the metadata by key
 func GetMetadata(key MetadataKey) (string, error) {
