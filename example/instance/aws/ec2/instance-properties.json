@@ -1,0 +1,10 @@
+{
+    "DiscoverDefaults" : true,
+    "Tags" : {
+	"env" : "dev",
+	"instance-plugin" : "aws-ec2"
+    },
+    "RunInstancesInput" : {
+	"InstanceType" : "t2.nano"
+    }
+}
