@@ -10,7 +10,8 @@
                     "instance-plugin" : "aws-ec2"
                 },
                 "RunInstancesInput" : {
-                    "InstanceType" : "t2.micro"
+                    "InstanceType" : "t2.micro",
+                    "KeyName" : "some-key-name"
                 }
             }
         },

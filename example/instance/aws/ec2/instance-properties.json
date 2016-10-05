@@ -5,6 +5,7 @@
 	"instance-plugin" : "aws-ec2"
     },
     "RunInstancesInput" : {
-	"InstanceType" : "t2.nano"
+	"InstanceType" : "t2.nano",
+	"KeyName" : "some-key-name"
     }
 }
