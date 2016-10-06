@@ -6,7 +6,7 @@
             "Properties": {
                 "Box": "bento/ubuntu-16.04"
             }
-        }
+        },
         "Flavor" : {
             "Plugin": "flavor-zookeeper",
             "Properties": {
