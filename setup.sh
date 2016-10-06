@@ -1,26 +1,28 @@
 # Make sure that you have Go installed
 # https://golang.org/dl/
 
-# Substitute your development folder her
-DEVENV='/Users/jesse/Code/dkr_infrakit'
+# Set your development environment via environment variable, or use the default
+# E.g., `export DEVENV=/Users/yourname/Code/learn_infrakit`
+devenv=${DEVENV:-"/go"}
 
-# Check you go compiler
+# Set up the local go compiler
 export LOCALGO=`which go`
+export PATH=$LOCALGO/bin:$PATH
 
 # Set up Go PATH
-mkdir -p $DEVENV
-export PATH=$LOCALGO/bin:$PATH
-export GOPATH=!$
+mkdir -p ${devenv}
+export GOPATH=${devenv}
 export PATH=$GOPATH/bin:$PATH
 
 # Create dev environment
 # TODO: Do no clone or create directories if already existing
-mkdir -p $DEVENV/src/github.com/docker
-cd !$
+mkdir -p $devenv/src/github.com/docker
+cd $devenv/src/github.com/docker
 git clone git@github.com:docker/infrakit.git
 cd infrakit
 
 # Install supporting tools
 go get -u github.com/kardianos/govendor  # the dependency manager
 go get -u github.com/golang/lint/golint  # if you're running tests
+
 
