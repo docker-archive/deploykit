@@ -17,10 +17,18 @@ There are some minor changes:
 The entire integration can be seen in the file [`plugin.go`](./plugin.go).  Some interesting points:
 
   + Provisioning via Terraform is simply creating a `.tf.json` file on disk and calling `terraform apply`.
+  + `terraform apply` uses a local lock file to make sure only one process is access and updating the
+  `.tfstate` file.  This is to avoid concurrent access which can sometimes corrupt the state file.
+  In the end, the design is simplified:  we only need to write the files to disk and a dedicated
+  goroutine continuously calls `terraform apply`.  
   + The plugin auto-generates names for resources so user doesn't have to.
-  + Describing the instances parses the `.tfstate` file (which is JSON).  We scan for the `modules` and
-  `resources` sections and extract tags of resources that we created.
   + Destroying an instance is simply removing the `.tf.json` file and calling `terraform apply`.
+  + Describing instances simply go through all the `instance-X.tf.json` files on disk and returns them
+  as the result. This is a pretty simplistic integration but it is more correct than writing files
+  and then reading the `tfstate` file.  The generated tf json file instances are essentially
+  "promises" that terraform will eventually provision. A tighter integration is worth investigation.
+
+[Here](./cattle_demo.md) is a simple demo of using Terraform with group and Vanilla plugins.
 
 ## Configuration
 
@@ -90,9 +98,12 @@ above.  Note that there are two properties of importance: `type` and `value`.  `
 type in terraform (in this case `aws_instance`, but can also be other resource types, as long as it's
 something that makes sense with the environment provisioned in `main.tf`.
 
-When provisioning, the plugin assigns a name first and then generates a valid `tf.json`.
+When provisioning, the plugin assigns a name first and then generates a valid `tf.json`.  `terraform apply`
+is run continuously in the background so as soon as new files are deposited, Terraform will provision
+and update its state.  When an instance is removed, Terraform will do the same by destroying the instance
+and update its state.
 
-
+ 
 ## Building
 
 When you do `make -k all` in the top level directory, the CLI binary will be built and can be
