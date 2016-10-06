@@ -33,8 +33,26 @@
 			"revisionTime": "2016-09-29T23:03:56Z"
 		},
 		{
+			"checksumSHA1": "+q4vdl3l1Wom8K1wfIpJ4jlFsbY=",
+			"path": "github.com/aws/aws-sdk-go/aws/awsutil",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
 			"checksumSHA1": "H/tMKHZU+Qka6RtYiGB50s2uA0s=",
 			"path": "github.com/aws/aws-sdk-go/aws/client",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "ieAJ+Cvp/PKv1LpUEnUXpc3OI6E=",
+			"path": "github.com/aws/aws-sdk-go/aws/client/metadata",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "gNWirlrTfSLbOe421hISBAhTqa4=",
+			"path": "github.com/aws/aws-sdk-go/aws/corehandlers",
 			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
 			"revisionTime": "2016-09-29T23:03:56Z"
 		},
@@ -51,14 +69,56 @@
 			"revisionTime": "2016-09-29T23:03:56Z"
 		},
 		{
+			"checksumSHA1": "4Ipx+5xN0gso+cENC2MHMWmQlR4=",
+			"path": "github.com/aws/aws-sdk-go/aws/credentials/stscreds",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "nCMd1XKjgV21bEl7J8VZFqTV8PE=",
+			"path": "github.com/aws/aws-sdk-go/aws/defaults",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
 			"checksumSHA1": "U0SthWum+t9ACanK7SDJOg3dO6M=",
 			"path": "github.com/aws/aws-sdk-go/aws/ec2metadata",
 			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
 			"revisionTime": "2016-09-29T23:03:56Z"
 		},
 		{
+			"checksumSHA1": "UeUNU97No2/+pICBYrFevJAaShs=",
+			"path": "github.com/aws/aws-sdk-go/aws/request",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
 			"checksumSHA1": "BXuya7NrVg2BtHOM4ED5zAwDkg4=",
 			"path": "github.com/aws/aws-sdk-go/aws/session",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "9YaNtvwUeP1i0GLQ/gmGFS3VlDs=",
+			"path": "github.com/aws/aws-sdk-go/aws/signer/v4",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "wk7EyvDaHwb5qqoOP/4d3cV0708=",
+			"path": "github.com/aws/aws-sdk-go/private/protocol",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "uNmSKXAF8B9HWEciW+iyUwZ99qQ=",
+			"path": "github.com/aws/aws-sdk-go/private/protocol/ec2query",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "Eo9yODN5U99BK0pMzoqnBm7PCrY=",
+			"path": "github.com/aws/aws-sdk-go/private/waiter",
 			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
 			"revisionTime": "2016-09-29T23:03:56Z"
 		},
@@ -206,6 +266,12 @@
 			"path": "github.com/docker/go-units",
 			"revision": "f2145db703495b2e525c59662db69a7344b00bb8",
 			"revisionTime": "2016-09-08T21:06:52Z"
+		},
+		{
+			"checksumSHA1": "cVyhKIRI2gQrgpn5qrBeAqErmWM=",
+			"path": "github.com/go-ini/ini",
+			"revision": "6e4869b434bd001f6983749881c7ead3545887d8",
+			"revisionTime": "2016-08-27T06:11:18Z"
 		},
 		{
 			"checksumSHA1": "JSHl8b3nI8EWvzm+uyrIqj2Hiu4=",
