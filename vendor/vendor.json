@@ -129,6 +129,12 @@
 			"revisionTime": "2016-09-29T23:03:56Z"
 		},
 		{
+			"checksumSHA1": "isoix7lTx4qIq2zI2xFADtti5SI=",
+			"path": "github.com/aws/aws-sdk-go/private/protocol/query",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
 			"checksumSHA1": "5xzix1R8prUyWxgLnzUQoxTsfik=",
 			"path": "github.com/aws/aws-sdk-go/private/protocol/query/queryutil",
 			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
