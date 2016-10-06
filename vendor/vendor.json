@@ -21,6 +21,60 @@
 			"revisionTime": "2016-09-29T23:03:56Z"
 		},
 		{
+			"checksumSHA1": "dq1GRxE/Qsvp1pawHFQ3vaFoYX4=",
+			"path": "github.com/aws/aws-sdk-go/aws",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "Y9W+4GimK4Fuxq+vyIskVYFRnX4=",
+			"path": "github.com/aws/aws-sdk-go/aws/awserr",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "H/tMKHZU+Qka6RtYiGB50s2uA0s=",
+			"path": "github.com/aws/aws-sdk-go/aws/client",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "dNZNaOPfBPnzE2CBnfhXXZ9g9jU=",
+			"path": "github.com/aws/aws-sdk-go/aws/credentials",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "KQiUK/zr3mqnAXD7x/X55/iNme0=",
+			"path": "github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "U0SthWum+t9ACanK7SDJOg3dO6M=",
+			"path": "github.com/aws/aws-sdk-go/aws/ec2metadata",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "BXuya7NrVg2BtHOM4ED5zAwDkg4=",
+			"path": "github.com/aws/aws-sdk-go/aws/session",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "wo+0n7gevYlsXAb6gJmG3F/+7pg=",
+			"path": "github.com/aws/aws-sdk-go/service/ec2",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
+			"checksumSHA1": "/j/4fOwBA36420sWPlaO9xGozus=",
+			"path": "github.com/aws/aws-sdk-go/service/ec2/ec2iface",
+			"revision": "388802d0cf038f72020ee99b51781d181e894c1c",
+			"revisionTime": "2016-09-29T23:03:56Z"
+		},
+		{
 			"checksumSHA1": "5rPfda8jFccr3A6heL+JAmi9K9g=",
 			"origin": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
 			"path": "github.com/davecgh/go-spew/spew",
