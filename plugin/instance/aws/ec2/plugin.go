@@ -119,9 +119,9 @@ func (p Provisioner) Validate(req json.RawMessage) error {
 func setDiscoveredProperties(ri *ec2.RunInstancesInput) {
 	if ri.SubnetId == nil {
 		// No subnet specified... use the same subnet I am in.
-		subnetId, err := util.MetadataSubnetID()
+		subnetID, err := util.MetadataSubnetID()
 		if err == nil {
-			ri.SubnetId = &subnetId
+			ri.SubnetId = &subnetID
 		}
 	}
 

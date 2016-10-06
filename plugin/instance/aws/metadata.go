@@ -49,7 +49,7 @@ func MetadataSubnetID() (string, error) {
 	return GetMetadata(MetadataKey(fmt.Sprintf(metadataSubnetID, mac)))
 }
 
-// MetadataSecurityGroupIDS returns the subnet id, which depends on the mac of the instance
+// MetadataSecurityGroupIDs returns the subnet id, which depends on the mac of the instance
 func MetadataSecurityGroupIDs() ([]string, error) {
 	mac, err := GetMetadata(MetadataMAC)
 	if err != nil {
