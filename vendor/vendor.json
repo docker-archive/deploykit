@@ -196,7 +196,7 @@
 			"revisionTime": "2016-09-28T05:28:40Z"
 		},
 		{
-			"checksumSHA1": "O33dHwZMYBdVs5YXudGI+p/wvcU=",
+			"checksumSHA1": "ZNixlexkmQcU3mB/80DV45ZupNU=",
 			"path": "github.com/docker/infrakit/plugin/util",
 			"revision": "8670e7987441528655eb79976927f0c10d9d574b",
 			"revisionTime": "2016-09-28T05:28:40Z"
@@ -233,18 +233,16 @@
 			"revisionTime": "2016-01-21T18:51:14Z"
 		},
 		{
-			"checksumSHA1": "iIUYZyoanCQQTUaWsu8b+iOSPt4=",
-			"origin": "github.com/docker/infrakit/vendor/github.com/gorilla/context",
+			"checksumSHA1": "g/V4qrXjUGG9B+e3hB+4NAYJ5Gs=",
 			"path": "github.com/gorilla/context",
-			"revision": "8670e7987441528655eb79976927f0c10d9d574b",
-			"revisionTime": "2016-09-28T05:28:40Z"
+			"revision": "08b5f424b9271eedf6f9f0ce86cb9396ed337a42",
+			"revisionTime": "2016-08-17T18:46:32Z"
 		},
 		{
-			"checksumSHA1": "TfZ8ulM+No3vdOTjK6qF1y9yVlI=",
-			"origin": "github.com/docker/infrakit/vendor/github.com/gorilla/mux",
+			"checksumSHA1": "urMd7A9QPAJYY0GZJL9qBhlUmD8=",
 			"path": "github.com/gorilla/mux",
-			"revision": "8670e7987441528655eb79976927f0c10d9d574b",
-			"revisionTime": "2016-09-28T05:28:40Z"
+			"revision": "757bef944d0f21880861c2dd9c871ca543023cba",
+			"revisionTime": "2016-09-20T23:08:13Z"
 		},
 		{
 			"checksumSHA1": "40vJyUB4ezQSn/NSadsKEOrudMc=",
