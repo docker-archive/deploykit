@@ -50,13 +50,13 @@ build: vendor-sync
 
 clean:
 	@echo "+ $@"
-	-mkdir -p ./infrakit
-	-rm -rf ./infrakit/*
+	rm -rf build
+	mkdir -p build
 
 binaries: clean build
 	@echo "+ $@"
 	@for bin in $(BINARIES); do \
-	  go build -o ./infrakit/$$( echo $${bin} | awk -F '/' '{print $$NF}') \
+	  go build -o build/$$( echo $${bin} | awk -F '/' '{print $$NF}') \
 		 -ldflags "-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" $${bin} || exit 1; \
 	done
 

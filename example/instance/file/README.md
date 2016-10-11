@@ -7,17 +7,17 @@ to disk as `provision`.  It is useful for testing and debugging.
 ## Building
 
 When you do `make binaries` in the top level directory, the CLI binary will be built and can be
-found as `./infrakit/cli` from the project's top level directory.
+found as `./build/cli` from the project's top level directory.
 
 ## Usage
 
 ```
-$ ./infrakit/file -h
+$ build/file -h
 File instance plugin
 
 Usage:
-  ./infrakit/file [flags]
-  ./infrakit/file [command]
+  build/file [flags]
+  build/file [command]
 
 Available Commands:
   version     print build version information
@@ -27,14 +27,14 @@ Flags:
       --listen string   listen address (unix or tcp) for the control endpoint (default "unix:///run/infrakit/plugins/instance-file.sock")
       --log int         Logging level. 0 is least verbose. Max is 5 (default 4)
 
-Use "./infrakit/file [command] --help" for more information about a command.
+Use "build/file [command] --help" for more information about a command.
 ```
 
 The plugin can be started without any arguments and will default to using unix socket in
 `/run/infrakit/plugins` for communications with the CLI and other plugins:
 
 ```
-$ ./infrakit/file --dir=./test
+$ build/file --dir=./test
 INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-file.sock err= <nil>
@@ -44,7 +44,7 @@ This starts the plugin using `./test` as directory and `instance-file` as name.
 
 You can give the another plugin instance a different name via the `listen` flag:
 ```
-$ ./infrakit/file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
+$ build/file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
 INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/another-file.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock err= <nil>
@@ -53,7 +53,7 @@ INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock
 Using the CLI, it you can see
 
 ```
-$ ./infrakit/cli plugin ls
+$ build/cli plugin ls
 Plugins:
 NAME                	LISTEN
 group               	unix:///run/infrakit/plugins/group.sock

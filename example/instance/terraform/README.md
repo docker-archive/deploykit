@@ -107,17 +107,17 @@ and update its state.
 ## Building
 
 When you do `make binaries` in the top level directory, the CLI binary will be built and can be
-found as `./infrakit/cli` from the project's top level directory.
+found as `./build/cli` from the project's top level directory.
 
 ## Usage
 
 ```
-$ infrakit/terraform -h
+$ build/terraform -h
 Terraform instance plugin
 
 Usage:
-  infrakit/terraform [flags]
-  infrakit/terraform [command]
+  build/terraform [flags]
+  build/terraform [command]
 
 Available Commands:
   version     print build version information
@@ -127,7 +127,7 @@ Flags:
       --listen string   listen address (unix or tcp) for the control endpoint (default "unix:///run/infrakit/plugins/instance-terraform.sock")
       --log int         Logging level. 0 is least verbose. Max is 5 (default 4)
 
-Use "infrakit/terraform [command] --help" for more information about a command.
+Use "build/terraform [command] --help" for more information about a command.
 ```
 
 The plugin requires a `dir` directory that will be used to contain the `tfstate` and `tf.json`
@@ -138,7 +138,7 @@ As usual, you can give this plugin a different name by the URL (`unix:///plugins
 when starting the plugin.  However you name it, it is still an InstancePlugin:
 
 ```
-$ infrakit/terraform version
+$ build/terraform version
 {
     "name": "TerraformInstance",
     "revision": "5999abffa5c10d4c9b9953459829dadea93d7ba4",
@@ -164,7 +164,7 @@ See the [CLI Doc](/cmd/cli/README.md) for details on accessing the instance plug
 Start the plugin:
 
 ```
-$ infrakit/terraform --log 5 --dir=./example/instance/terraform/aws-two-tier/
+$ build/terraform --log 5 --dir=./example/instance/terraform/aws-two-tier/
 INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-terraform.sock
 DEBU[0000] terraform instance plugin. dir= ./example/instance/terraform/aws-two-tier/
@@ -174,7 +174,7 @@ INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-terrafor
 Check that you can see it:
 
 ```
-$ infrakit/cli plugin ls
+$ build/cli plugin ls
 Plugins:
 NAME                	LISTEN
 instance-terraform  	unix:///run/infrakit/plugins/instance-terraform.sock
@@ -204,7 +204,7 @@ $ cat example/instance/terraform/aws-two-tier/instance-plugin-properties.json
         }
     }
 }
-$ infrakit/cli instance --name instance-terraform validate example/instance/terraform/aws-two-tier/instance-plugin-properties.json
+$ build/cli instance --name instance-terraform validate example/instance/terraform/aws-two-tier/instance-plugin-properties.json
 validate:ok
 ```
 
@@ -235,14 +235,14 @@ $ cat example/instance/terraform/aws-two-tier/instance-plugin-spec.json
     },
     "Init" : "#!/bin/sh; sudo apt-get -y update; sudo apt-get -y install nginx; sudo service nginx start"
 }
-$ infrakit/cli instance --name instance-terraform provision example/instance/terraform/aws-two-tier/instance-plugin-spec.json
+$ build/cli instance --name instance-terraform provision example/instance/terraform/aws-two-tier/instance-plugin-spec.json
 instance-1475004829
 ```
 
 Now list them.
 
 ```
-$ infrakit/cli instance --name instance-terraform describe
+$ build/cli instance --name instance-terraform describe
 ID                            	LOGICAL                       	TAGS
 instance-1475004829           	  -                           	other=values,provisioner=infrakit-terraform-example,InstancePlugin=terraform,Name=instance-1475004829,Tier=web
 ```
@@ -255,9 +255,9 @@ In AWS Console you can filter by tag `provisioner` with value `infrakit-terrafor
 Now destroy the instance:
 
 ```
-$ infrakit/cli instance --name instance-terraform destroy instance-1475004829
+$ build/cli instance --name instance-terraform destroy instance-1475004829
 destroyed instance-1475004829
-$ infrakit/cli instance --name instance-terraform describe
+$ build/cli instance --name instance-terraform describe
 ID                            	LOGICAL                       	TAGS
 ```
 

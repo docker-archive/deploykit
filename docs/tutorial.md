@@ -15,7 +15,7 @@ $ chmod 777 /run/infrakit/plugins
 Start the group plugin
 
 ```shell
-$ infrakit/group --log 5
+$ build/group --log 5
 INFO[0000] Starting discovery
 DEBU[0000] Opening: /run/infrakit/plugins
 INFO[0000] Starting plugin
@@ -28,7 +28,7 @@ Start the file instance plugin
 
 ```shell
 $ mkdir -p tutorial
-$ infrakit/file --log 5 --dir ./tutorial/
+$ build/file --log 5 --dir ./tutorial/
 INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
 DEBU[0000] file instance plugin. dir= ./tutorial/
@@ -40,7 +40,7 @@ We can look at the files here to see what's being created and how they are confi
 Start the vanilla flavor plugin
 
 ```shell
-$ infrakit/vanilla --log 5
+$ build/vanilla --log 5
 INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-vanilla.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.sock err= <nil>
@@ -49,7 +49,7 @@ INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.so
 Show the plugins:
 
 ```shell
-$ infrakit/cli plugin ls
+$ build/cli plugin ls
 Plugins:
 NAME                    LISTEN
 flavor-vanilla          unix:///run/infrakit/plugins/flavor-vanilla.sock
@@ -164,7 +164,7 @@ some criteria.
 Checking for the instances via the CLI:
 
 ```shell
-$ infrakit/cli instance --name instance-file describe
+$ build/cli instance --name instance-file describe
 ID                              LOGICAL                         TAGS
 
 ```
@@ -172,7 +172,7 @@ ID                              LOGICAL                         TAGS
 Let's tell the group plugin to `watch` our group by providing the group plugin with the configuration:
 
 ```shell
-$ infrakit/cli group --name group watch <<EOF
+$ build/cli group --name group watch <<EOF
 {
     "ID": "cattle",
     "Properties": {
@@ -206,7 +206,7 @@ watching cattle
 **_NOTE:_** You can also specify a file name to load from instead of using stdin, like this:
 
 ```
-$ infrakit/cli group --name group watch group.json
+$ build/cli group --name group watch group.json
 ```
 
 The group plugin is responsible for ensuring that the infrastructure state matches with your specifications.  Since we
@@ -214,7 +214,7 @@ started out with nothing, it will create 5 instances and maintain that state by 
 
 
 ```shell
-$ infrakit/cli group --name group inspect cattle
+$ build/cli group --name group inspect cattle
 ID                              LOGICAL         TAGS
 instance-1475104926           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475104936           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
@@ -226,7 +226,7 @@ instance-1475104966           	  -             infrakit.config_sha=Y23cKqyRpkQ_M
 The Instance Plugin can also report instances, it will report all instances across all groups (not just `cattle`).
 
 ```shell
-$ infrakit/cli instance --name instance-file describe
+$ build/cli instance --name instance-file describe
 ID                              LOGICAL         TAGS
 instance-1475104926           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475104936           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
@@ -282,7 +282,7 @@ $ diff group.json group2.json
 Before we do an update, we can see what the proposed changes are:
 
 ```
-$ infrakit/cli group --name group describe group2.json 
+$ build/cli group --name group describe group2.json 
 cattle : Performs a rolling update on 5 instances, then adds 5 instances to increase the group size to 10
 ```
 
@@ -292,7 +292,7 @@ be created.
 Let's apply the new config:
 
 ```shell
-$ infrakit/cli group --name group update group2.json 
+$ build/cli group --name group update group2.json 
 
 # ..... wait a bit...
 update cattle completed
@@ -300,7 +300,7 @@ update cattle completed
 Now we can check:
 
 ```shell
-$ infrakit/cli group --name group inspect cattle
+$ build/cli group --name group inspect cattle
 ID                              LOGICAL         TAGS
 instance-1475105646           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475105656           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
@@ -345,7 +345,7 @@ original specification of 10 instances.
 Finally, let's clean up:
 
 ```
-$ infrakit/cli group --name group destroy cattle
+$ build/cli group --name group destroy cattle
 ```
 
 This concludes our quick tutorial.  In this tutorial we have

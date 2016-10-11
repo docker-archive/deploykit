@@ -10,17 +10,17 @@ the properties of the physical resource (Instance plugin) and semantics or natur
 ## Building
 
 When you do `make binaries` in the top level directory, the CLI binary will be built and can be
-found as `./infrakit/cli` from the project's top level directory.
+found as `./build/cli` from the project's top level directory.
 
 ## Usage
 
 ```
-$ ./infrakit/group -h
+$ build/group -h
 Group server
 
 Usage:
-  ./infrakit/group [flags]
-  ./infrakit/group [command]
+  build/group [flags]
+  build/group [command]
 
 Available Commands:
   version     print build version information
@@ -30,14 +30,14 @@ Flags:
       --log int                  Logging level. 0 is least verbose. Max is 5 (default 4)
       --poll-interval duration   Group polling interval (default 10s)
 
-Use "./infrakit/group [command] --help" for more information about a command.
+Use "build/group [command] --help" for more information about a command.
 ```
 
 The plugin can be started without any arguments and will default to using unix socket in
 `/run/infrakit/plugins` for communications with the CLI and other plugins:
 
 ```
-$ ./infrakit/group --log=5
+$ build/group --log=5
 INFO[0000] Starting discovery
 DEBU[0000] Opening: /run/infrakit/plugins
 DEBU[0000] Discovered plugin at unix:///run/infrakit/plugins/flavor-swarm.sock

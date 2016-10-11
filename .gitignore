@@ -7,7 +7,7 @@
 coverage.txt
 
 # Build binaries
-infrakit/*
+build/
 
 # Vendored sources.  These are synced during the build by govendor.
 vendor/*/
