@@ -9,7 +9,7 @@ exposed as verbs and configuration JSON can be read from local file or standard 
 
 ## Building
 
-When you do `make -k all` in the top level directory, the CLI binary will be built and can be
+When you do `make binaries` in the top level directory, the CLI binary will be built and can be
 found as `./infrakit/cli` from the project's top level directory.
 
 ## Usage
