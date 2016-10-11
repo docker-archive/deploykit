@@ -6,7 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	infrakit_aws "github.com/docker/infrakit.aws"
+	"github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/spi/group"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -95,7 +95,7 @@ func (a *CLI) Command() *cobra.Command {
 					abort("When creating from flags, --key, --cluster, and --region must be provided")
 				}
 
-				instanceConfig := infrakit_aws.CreateInstanceRequest{
+				instanceConfig := instance.CreateInstanceRequest{
 					RunInstancesInput: ec2.RunInstancesInput{
 						ImageId: aws.String("ami-2ef48339"),
 						KeyName: aws.String(keyName),

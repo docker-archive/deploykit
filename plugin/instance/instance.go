@@ -1,4 +1,4 @@
-package aws
+package instance
 
 import (
 	"encoding/base64"
@@ -8,10 +8,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/infrakit/spi/instance"
@@ -33,33 +29,6 @@ type properties struct {
 	Region   string
 	Retries  int
 	Instance json.RawMessage
-}
-
-// NewPluginFromProperties creates a new AWS plugin based on a JSON configuration.
-func NewPluginFromProperties(pluginProperties json.RawMessage) (instance.Plugin, string, error) {
-	props := properties{Retries: 5}
-	err := json.Unmarshal([]byte(pluginProperties), &props)
-	if err != nil {
-		return nil, "", err
-	}
-
-	providers := []credentials.Provider{
-		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
-		&credentials.EnvProvider{},
-		&credentials.SharedCredentialsProvider{},
-	}
-
-	client := session.New(aws.NewConfig().
-		WithRegion(props.Region).
-		WithCredentials(credentials.NewChainCredentials(providers)).
-		WithLogger(GetLogger()).
-		WithMaxRetries(props.Retries))
-
-	instancePlugin := NewInstancePlugin(ec2.New(client))
-
-	// TODO(wfarner): Provide a way for the plugin to validate an instance request to identify bad configurations
-	// more quickly.
-	return instancePlugin, string(props.Instance), nil
 }
 
 // NewInstancePlugin creates a new plugin that creates instances in AWS EC2.

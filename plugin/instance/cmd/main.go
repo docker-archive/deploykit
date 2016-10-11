@@ -6,7 +6,7 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit.aws"
+	"github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/plugin/util"
 	instance_plugin "github.com/docker/infrakit/spi/http/instance"
 	"github.com/spf13/cobra"
@@ -28,7 +28,7 @@ var (
 
 func main() {
 
-	builder := &aws.Builder{}
+	builder := &instance.Builder{}
 	logLevel := len(log.AllLevels) - 2
 	listen := "unix:///run/infrakit/plugins/instance-vagrant.sock"
 

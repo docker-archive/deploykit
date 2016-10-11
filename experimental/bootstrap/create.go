@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/iam"
-	infrakit_aws "github.com/docker/infrakit.aws"
+	infrakit_instance "github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/spi/group"
 	"github.com/docker/infrakit/spi/instance"
 	"text/template"
@@ -39,7 +39,7 @@ func createEBSVolumes(config client.ConfigProvider, swim fakeSWIMSchema) error {
 			Tags: []*ec2.Tag{
 				swim.cluster().resourceTag(),
 				{
-					Key:   aws.String(infrakit_aws.VolumeTag),
+					Key:   aws.String(infrakit_instance.VolumeTag),
 					Value: aws.String(managerIP),
 				},
 			},
@@ -451,7 +451,7 @@ func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
 
 func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) error {
 	log.Info("Starting cluster boot leader instance")
-	builder := infrakit_aws.Builder{Config: config}
+	builder := infrakit_instance.Builder{Config: config}
 	provisioner, err := builder.BuildInstancePlugin()
 	if err != nil {
 		return err

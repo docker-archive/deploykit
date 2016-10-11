@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/s3"
-	infrakit_aws "github.com/docker/infrakit.aws"
+	"github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/spi/group"
 	"strings"
 )
@@ -92,7 +92,7 @@ type instanceGroup struct {
 	Name   group.ID
 	Type   string
 	Size   int
-	Config infrakit_aws.CreateInstanceRequest
+	Config instance.CreateInstanceRequest
 }
 
 func (i instanceGroup) isManager() bool {

@@ -6,6 +6,7 @@ PREFIX?=$(shell pwd -L)
 
 # Used to populate version variable in main package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+REVISION=$(shell git rev-list -1 HEAD)
 
 # Allow turning off function inlining and variable registerization
 ifeq (${DISABLE_OPTIMIZATION},true)
@@ -48,6 +49,16 @@ lint:
 build: vendor-sync
 	@echo "+ $@"
 	@go build ${GO_LDFLAGS} $(PKGS)
+
+clean:
+	@echo "+ $@"
+	rm -rf build
+	mkdir -p build
+
+binaries: clean
+	@echo "+ $@"
+	@go build -o ./build/infrakit-instance-aws \
+	  -ldflags "-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" plugin/instance/cmd/main.go
 
 install: vendor-sync
 	@echo "+ $@"

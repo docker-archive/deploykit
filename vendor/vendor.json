@@ -208,7 +208,7 @@
 			"revisionTime": "2016-09-28T05:28:40Z"
 		},
 		{
-			"checksumSHA1": "eB1fQxb3O1M8reUi7+d8aNH0nKU=",
+			"checksumSHA1": "sWDxd7ySKkEq04yjCSdTtn4BQ+w=",
 			"path": "github.com/docker/infrakit/spi/http/instance",
 			"revision": "8670e7987441528655eb79976927f0c10d9d574b",
 			"revisionTime": "2016-09-28T05:28:40Z"
