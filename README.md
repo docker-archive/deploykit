@@ -148,7 +148,7 @@ $ make ci
 
 ### Binaries
 ```shell
-$ make -k infrakit
+$ make binaries
 ```
 This will create a directory, `infrakit` in the project directory.  The executables can be found here.
 Currently, several binaries are available. More detailed documentations can be found here

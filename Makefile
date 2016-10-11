@@ -13,7 +13,7 @@ endif
 
 .PHONY: clean all fmt vet lint build test vendor-sync containers
 .DEFAULT: all
-all: clean fmt vet lint build test infrakit
+all: clean fmt vet lint build test binaries
 
 ci: fmt vet lint vendor-sync vendor-check coverage
 
@@ -53,7 +53,7 @@ clean:
 	-mkdir -p ./infrakit
 	-rm -rf ./infrakit/*
 
-infrakit: clean build
+binaries: clean build
 	@echo "+ $@"
 	@for bin in $(BINARIES); do \
 	  go build -o ./infrakit/$$( echo $${bin} | awk -F '/' '{print $$NF}') \
