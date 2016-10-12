@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 	zk "github.com/docker/infrakit/plugin/flavor/zookeeper"
@@ -30,8 +32,8 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/"
-	sock := "flavor-zookeeper.sock"
+	discoveryDir := "/run/infrakit/plugins/"
+	name := "flavor-zooker"
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -49,10 +51,20 @@ func main() {
 				return nil
 			}
 
-			log.Infoln("Starting plugin")
-			log.Infoln("Listening on:", listen)
+			discoveryDir = viper.GetString("discovery")
+			name = viper.GetString("name")
+			listen := fmt.Sprintf("unix://%s/%s.sock", path.Clean(discoveryDir), name)
 
-			_, stopped, err := util.StartServer(listen, flavor_plugin.PluginServer(zk.NewPlugin()))
+			// parse the listen string
+			listenURL, err := url.Parse(listen)
+			if err != nil {
+				return err
+			}
+
+			log.Infoln("Starting plugin")
+			log.Infoln("Listening on:", listenURL.String())
+
+			_, stopped, err := util.StartServer(listenURL.String(), flavor_plugin.PluginServer(zk.NewPlugin()))
 
 			if err != nil {
 				log.Error(err)
@@ -83,11 +95,12 @@ func main() {
 		},
 	})
 
-	cmd.Flags().String("listen", listen, "listen address (unix or tcp) for the control endpoint")
-	viper.BindEnv("listen", "INFRAKIT_PLUGINS_LISTEN")
-	viper.BindPFlag("listen", cmd.Flags().Lookup("listen"))
-	cmd.Flags().String("sock", sock, "listen socket for the control endpoint")
-	viper.BindPFlag("sock", cmd.Flags().Lookup("sock"))
+	cmd.Flags().String("discovery", discoveryDir, "Dir discovery path for plugin discovery")
+	// Bind Pflags for cmd passed
+	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
+	viper.BindPFlag("discovery", cmd.Flags().Lookup("discovery"))
+	cmd.Flags().String("name", name, "listen socket name for the control endpoint")
+	viper.BindPFlag("name", cmd.Flags().Lookup("name"))
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()

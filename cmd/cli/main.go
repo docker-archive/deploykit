@@ -65,7 +65,7 @@ func main() {
 	})
 
 	f := func() *discovery.Dir {
-		d, err := discovery.NewDir(viper.GetString("dir"))
+		d, err := discovery.NewDir(viper.GetString("discovery"))
 		if err != nil {
 			log.Errorf("Failed to initialize plugin discovery: %s", err)
 			os.Exit(1)
@@ -74,9 +74,9 @@ func main() {
 	}
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
 
-	cmd.PersistentFlags().String("dir", discoveryDir, "Dir path for plugin discovery")
-	viper.BindEnv("dir", "INFRAKIT_PLUGINS_DIR")
-	viper.BindPFlag("dir", cmd.PersistentFlags().Lookup("dir"))
+	cmd.PersistentFlags().String("discovery", discoveryDir, "Dir discovery path for plugin discovery")
+	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
+	viper.BindPFlag("discovery", cmd.PersistentFlags().Lookup("discovery"))
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()
