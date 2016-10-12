@@ -1,6 +1,6 @@
 # InfraKit.AWS
 
-[![CircleCI](https://circleci.com/gh/docker/infrakit.aws.svg?style=svg)](https://circleci.com/gh/docker/infrakit.aws)
+[![CircleCI](https://circleci.com/gh/docker/infrakit.aws.svg?style=shield&circle-token=e74dcf8c25027948307a7618041e1d1997ded50a)](https://circleci.com/gh/docker/infrakit.aws)
 
 [InfraKit](https://github.com/docker/infrakit) plugins for creating and managing resources in Amazon AWS.
 
