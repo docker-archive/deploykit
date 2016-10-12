@@ -163,7 +163,7 @@ Currently, several binaries are available:
 
 
 ## Examples
-There are few examples of _InfraKit_ plugins:
+There are a few examples of _InfraKit_ plugins:
 
   + Terraform Instance Plugin
     - [README](./example/instance/terraform/README.md)
@@ -176,11 +176,11 @@ There are few examples of _InfraKit_ plugins:
 # Design
 
 ## Configuration
-_InfraKit_ uses JSON for configuration because it is composable and widely accepted format for many
-infrastructure SDKs and tools.  Because the system is highly components-driven, our JSON format follow
-simple patterns to support composition of components.
+_InfraKit_ uses JSON for configuration because it is composable and a widely accepted format for many
+infrastructure SDKs and tools.  Since the system is highly component-driven, our JSON format follows
+simple patterns to support the composition of components.
 
-A common pattern for a JSON value looks like this:
+A common pattern for a JSON object looks like this:
 
 ```json
 {
@@ -190,7 +190,7 @@ A common pattern for a JSON value looks like this:
 }
 ```
 
-There is only one `Properties` field in this struct and its value is a another raw JSON value. The opaque
+There is only one `Properties` field in this JSON and its value is a JSON object. The opaque
 JSON value for `Properties` is decoded via the Go `Spec` struct defined within the package of the plugin --
 for example -- [`vanilla.Spec`](/plugin/flavor/vanilla/flavor.go).
 
