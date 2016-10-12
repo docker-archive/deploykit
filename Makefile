@@ -23,7 +23,6 @@ AUTHORS: .mailmap .git/HEAD
 # Package list
 PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor)
 PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
-BINARIES := $(shell go list ./cmd/... ./example/... | grep -v /vendor)
 
 vet:
 	@echo "+ $@"
@@ -50,16 +49,27 @@ build: vendor-sync
 
 clean:
 	@echo "+ $@"
-	-mkdir -p ./infrakit
-	-rm -rf ./infrakit/*
+	rm -rf build
+	mkdir -p build
 
-binaries: clean build
+define build_binary
+	go build -o build/$(1) -ldflags "-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" $(2)
+endef
+
+binaries: clean
 	@echo "+ $@"
-	@for bin in $(BINARIES); do \
-	  go build -o ./infrakit/$$( echo $${bin} | awk -F '/' '{print $$NF}') \
-		 -ldflags "-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" $${bin} || exit 1; \
-	done
+ifneq (,$(findstring .m,$(VERSION)))
+	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
+endif
 
+	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
+	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
+	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/example/flavor/swarm)
+	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/example/flavor/vanilla)
+	$(call build_binary,infrakit-flavor-zookeeper,github.com/docker/infrakit/example/flavor/zookeeper)
+	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/example/instance/file)
+	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/example/instance/terraform)
+	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/example/instance/vagrant)
 
 install: vendor-sync
 	@echo "+ $@"

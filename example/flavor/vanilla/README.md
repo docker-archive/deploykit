@@ -110,18 +110,17 @@ Or with assigned ID's:
 
 ## Building
 
-When you do `make binaries` in the top level directory, the CLI binary will be built and can be
-found as `./infrakit/cli` from the project's top level directory.
+Begin by building plugin [binaries](../../../README.md#binaries).
 
 ## Usage
 
 ```
-$ infrakit/vanilla -h
+$ build/infrakit-flavor-vanilla -h
 Vanilla flavor plugin
 
 Usage:
-  infrakit/vanilla [flags]
-  infrakit/vanilla [command]
+  build/infrakit-flavor-vanilla [flags]
+  build/infrakit-flavor-vanilla [command]
 
 Available Commands:
   version     print build version information
@@ -130,7 +129,7 @@ Flags:
       --listen string   listen address (unix or tcp) for the control endpoint (default "unix:///run/infrakit/plugins/flavor-vanilla.sock")
       --log int         Logging level. 0 is least verbose. Max is 5 (default 4)
 
-Use "infrakit/vanilla [command] --help" for more information about a command.
+Use "build/infrakit-flavor-vanilla [command] --help" for more information about a command.
 ```
 
 ## Example
@@ -139,7 +138,7 @@ This plugin will be called whenever you use a Flavor plugin and reference the pl
 in your config JSON.  For instance, you may start up this plugin as `french-vanilla`:
 
 ```shell
-$ infrakit/vanilla --listen=unix:///run/infrakit/plugins/french-vanilla.sock
+$ build/infrakit-flavor-vanilla --listen=unix:///run/infrakit/plugins/french-vanilla.sock
 INFO[0000] Starting plugin                              
 INFO[0000] Listening on: unix:///run/infrakit/plugins/french-vanilla.sock 
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/french-vanilla.sock err= <nil> 
@@ -182,7 +181,7 @@ Then when you watch a group with the config above (`cattle`), the cattle will be
 Watch this group....
 
 ```
-$ infrakit/cli group --name group watch << EOF
+$ build/infrakit group --name group watch << EOF
 > {
 >     "ID": "cattle",
 >     "Properties": {

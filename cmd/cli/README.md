@@ -9,17 +9,16 @@ exposed as verbs and configuration JSON can be read from local file or standard 
 
 ## Building
 
-When you do `make binaries` in the top level directory, the CLI binary will be built and can be
-found as `./infrakit/cli` from the project's top level directory.
+Begin by building plugin [binaries](../../README.md#binaries).
 
 ## Usage
 
 ```
-$ ./infrakit/cli -h
+$ build/infrakit -h
 infrakit cli
 
 Usage:
-  ./infrakit/cli [command]
+  build/infrakit [command]
 
 Available Commands:
   flavor      Access flavor plugin
@@ -32,7 +31,7 @@ Flags:
       --dir string   Dir path for plugin discovery (default "/run/infrakit/plugins")
       --log int      Logging level. 0 is least verbose. Max is 5 (default 4)
 
-Use "./infrakit/cli [command] --help" for more information about a command.
+Use "build/infrakit [command] --help" for more information about a command.
 ```
 
 ### Default Directory for Plugin Discovery
@@ -48,7 +47,7 @@ chmod 777 /run/infrakit/plugins
 ### List Plugins
 
 ```
-$ ./infrakit/cli plugin ls
+$ build/infrakit plugin ls
 Plugins:
 NAME                	LISTEN
 flavor-swarm        	unix:///run/infrakit/plugins/flavor-swarm.sock
@@ -70,11 +69,11 @@ You can access the following plugins and their methods via command line:
 ### Working with Instance Plugin
 
 ```
-$ ./infrakit/cli instance -h
+$ build/infrakit instance -h
 Access instance plugin
 
 Usage:
-  ./infrakit/cli instance [command]
+  build/infrakit instance [command]
 
 Available Commands:
   describe    describe the instances
@@ -89,7 +88,7 @@ Global Flags:
       --dir string   Dir path for plugin discovery (default "/run/infrakit/plugins")
       --log int      Logging level. 0 is least verbose. Max is 5 (default 4)
 
-Use "./infrakit/cli instance [command] --help" for more information about a command.
+Use "build/infrakit instance [command] --help" for more information about a command.
 ```
 
 For example, using the plugin `instance-file` as an example:
@@ -97,7 +96,7 @@ For example, using the plugin `instance-file` as an example:
 `describe` calls the `DescribeInstances` endpoint of the plugin:
 
 ```
-./infrakit/cli instance --name instance-file describe
+$ build/infrakit instance --name instance-file describe
 ID                            	LOGICAL                       	TAGS
 instance-1474850397           	  -                           	group=test,instanceType=small
 instance-1474850412           	  -                           	group=test2,instanceType=small
@@ -107,7 +106,7 @@ instance-1474851747           	logic2                        	instanceType=small
 Validate - send the config JSON via stdin:
 
 ```
-$ ./infrakit/cli instance --name instance-file validate << EOF
+$ build/infrakit instance --name instance-file validate << EOF
 > {
 >     "Properties" : {
 >         "version" : "v0.0.1",
@@ -143,7 +142,7 @@ validate:ok
 Provision - send via stdin:
 
 ```
-$ ./infrakit/cli instance --name instance-file provision << EOF
+$ build/infrakit instance --name instance-file provision << EOF
 > {
 >     "Properties" : {
 >         "version" : "v0.0.1",
@@ -179,7 +178,7 @@ instance-1474873473
 List instances
 
 ```
-$ ./infrakit/cli instance --name instance-file describe
+$ build/infrakit instance --name instance-file describe
 ID                            	LOGICAL                       	TAGS
 instance-1474850397           	  -                           	group=test,instanceType=small
 instance-1474850412           	  -                           	group=test2,instanceType=small
@@ -189,18 +188,18 @@ instance-1474873473           	logic2                        	group=test2,instan
 Destroy
 
 ```
-$ ./infrakit/cli instance --name instance-file destroy instance-1474873473
+$ build/infrakit instance --name instance-file destroy instance-1474873473
 destroyed instance-1474873473
 ```
 
 ### Working with Group Plugin
 
 ```
-$ ./infrakit/cli group -h
+$ build/infrakit group -h
 Access group plugin
 
 Usage:
-  ./infrakit/cli group [command]
+  build/infrakit group [command]
 
 Available Commands:
   describe    describe update (describe - or describe filename)
@@ -218,17 +217,17 @@ Global Flags:
       --dir string   Dir path for plugin discovery (default "/run/infrakit/plugins")
       --log int      Logging level. 0 is least verbose. Max is 5 (default 4)
 
-Use "./infrakit/cli group [command] --help" for more information about a command.
+Use "build/infrakit group [command] --help" for more information about a command.
 ```
 
 ### Working with Flavor Plugin
 
 ```
-./infrakit/cli flavor -h
+$ build/infrakit flavor -h
 Access flavor plugin
 
 Usage:
-  ./infrakit/cli flavor [command]
+  build/infrakit flavor [command]
 
 Available Commands:
   healthy     checks for health
@@ -242,5 +241,5 @@ Global Flags:
       --dir string   Dir path for plugin discovery (default "/run/infrakit/plugins")
       --log int      Logging level. 0 is least verbose. Max is 5 (default 4)
 
-Use "./infrakit/cli flavor [command] --help" for more information about a command.
+Use "build/infrakit flavor [command] --help" for more information about a command.
 ```
