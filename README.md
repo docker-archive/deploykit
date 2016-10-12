@@ -6,12 +6,12 @@
 
 ## Instance plugin
 
-An InfraKit instance plugin is provided, creates Amazon EC2 instances.
+An InfraKit instance plugin is provided, which creates Amazon EC2 instances.
 
 ### Building and running
 
 To build the AWS Instance plugin, run `make binaries`.  The plugin binary will be located at
-`./bin/infrakit-instance-aws`.
+`./build/infrakit-instance-aws`.
 
 ### Plugin properties
 
