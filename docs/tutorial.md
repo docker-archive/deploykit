@@ -361,27 +361,3 @@ This concludes our quick tutorial.  In this tutorial we:
   + Applied the update across the group
   + Removed some instances and observed that the group self-healed
   + Destroyed the group
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:35 instance-1475105736
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:40 instance-1475106016 <-- new instance
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:40 instance-1475106026 <-- new instance
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:40 instance-1475106036 <-- new instance
-```
-
-We see that 3 new instance have been created to replace the three removed, to match our
-original specification of 10 instances.
-
-Finally, let's clean up:
-
-```
-$ build/infrakit group --name group destroy cattle
-```
-
-This concludes our quick tutorial.  In this tutorial we:
-  + Started the plugins and learned to access them
-  + Created a configuration for a group we wanted to watch
-  + Verified the instances created matched the specifications
-  + Updated the configurations of the group and scaled up the group
-  + Reviewed the proposed changes
-  + Applied the update across the group
-  + Removed some instances and observed that the group self-healed
-  + Destroyed the group
