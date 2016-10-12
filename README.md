@@ -150,16 +150,16 @@ $ make ci
 ```shell
 $ make binaries
 ```
-Executables will be placed in the `build` directory.
+Executables will be placed in the `./build` directory.
 Currently, several binaries are available:
-  + [`build/cli`](./cmd/cli/README.md), the command line interface
-  + [`build/group`](./cmd/group/README.md), the default [group plugin](./spi/group)
-  + [`build/file`](./example/instance/file), an instance plugin using files
-  + [`build/terraform`](./example/instance/terraform), an instance plugin integrating [Terraform](https://www.terraform.io)
-  + [`build/vagrant`](./example/instance/vagrant), an instance plugin using vagrant
-  + [`build/vanilla`](./example/flavor/vanilla), a flavor plugin for plain vanilla set up with user data and labels
-  + [`build/zookeeper`](./example/flavor/zookeeper), a flavor plugin for zookeeper ensemble members
-  + [`build/swarm`](./example/flavor/swarm), a flavor plugin for Docker Swarm managers and workers.
+  + [`build/infrakit`](./cmd/cli/README.md), the command line interface
+  + [`build/infrakit-group-default`](./cmd/group/README.md), the default [Group plugin](./spi/group)
+  + [`build/infrakit-instance-file`](./example/instance/file), an Instance plugin using dummy files to represent instances
+  + [`build/infrakit-instance-terraform`](./example/instance/terraform), an Instance plugin integrating [Terraform](https://www.terraform.io)
+  + [`build/infrakit-instance-vagrant`](./example/instance/vagrant), an Instance plugin using [Vagrant](https://www.vagrantup.com/)
+  + [`build/infrakit-flavor-vanilla`](./example/flavor/vanilla), a Flavor plugin for plain vanilla set up with user data and labels
+  + [`build/infrakit-flavor-zookeeper`](./example/flavor/zookeeper), a Flavor plugin for [Apache ZooKeeper](https://zookeeper.apache.org/) ensemble members
+  + [`build/infrakit-flavor-swarm`](./example/flavor/swarm), a Flavor plugin for Docker in [Swarm mode](https://docs.docker.com/engine/swarm/).
 
 
 ## Examples
@@ -290,26 +290,18 @@ _file_ instance plugins running but with different names and configurations (for
 what they _provision_ or the content they write to disk).  For example:
 
 ```
-$ build/file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
+$ build/infrakit-instance-file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
 INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/another-file.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock err= <nil>
 ```
 
-List the plugins using the CLI subcommand `plugin`:
-
-```shell
-$ build/cli plugin ls
-Plugins:
-NAME                    LISTEN
-instance-file           unix:///run/infrakit/plugins/instance-file.sock
-another-file            unix:///run/infrakit/plugins/another-file.sock
-```
+You can use the CLI to see which plugins are [discoverable](cmd/cli/README.md#list-plugins).
 
 For each binary, you can find out more about it by using the `version` verb in the command line. For example:
 
 ```shell
-$ build/group version
+$ build/infrakit-group-default version
 {
     "name": "GroupPlugin",
     "revision": "75d7f4dbc17dbc48aadb9a4abfd87d57fbd7e1f8",

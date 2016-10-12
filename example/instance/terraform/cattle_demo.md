@@ -54,23 +54,23 @@ From the top level directory of the project:
 
 ```shell
 # The instance plugin:
-$ build/terraform --log 5 --dir $(pwd)/example/instance/terraform/aws-two-tier/
+$ build/infrakit-instance-terraform --log 5 --dir $(pwd)/example/instance/terraform/aws-two-tier/
 ```
 
 ```shell
 # The group plugin
-$ build/group --log 5
+$ build/infrakit-group-default --log 5
 ```
 
 ```shell
 # The vanilla flavor
-$ build/vanilla --log 5
+$ build/infrakit-flavor-vanilla --log 5
 ```
 
 ## 3. List all the instances
 
 ```shell
-$ build/cli instance --name=instance-terraform describe
+$ build/infrakit instance --name=instance-terraform describe
 ID                                                LOGICAL                               TAGS
 # no instances
 ```
@@ -79,7 +79,7 @@ ID                                                LOGICAL                       
 Using the JSON we showed above, start watching this group:
 
 ```shell
-$ build/cli group watch example/instance/terraform/aws-two-tier/group.json
+$ build/infrakit group watch example/instance/terraform/aws-two-tier/group.json
 watching terraform_demo
 ```
 The group plugin starts to create new instances to match the specification.
@@ -88,7 +88,7 @@ these instances ![instances](images/1.png)
 
 ## 5. List members
 ```shell
-$ build/cli group inspect terraform_demo
+$ build/infrakit group inspect terraform_demo
 ID                              LOGICAL                         TAGS
 instance-1475601644               -                             Name=instance-1475601644,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
 instance-1475601645               -                             Name=instance-1475601645,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
@@ -103,21 +103,21 @@ Let's change the size to 8 and the instance type to `t2.nano`.
 Before we run we can check to see what will be done:
 
 ```shell
-$ build/cli group describe example/instance/terraform/aws-two-tier/group.json
+$ build/infrakit group describe example/instance/terraform/aws-two-tier/group.json
 terraform_demo : Performs a rolling update on 5 instances, then adds 3 instances to increase the group size to 8
 ```
 
 Looks good.  Let's commit:
 
 ```shell
-$ build/cli group update example/instance/terraform/aws-two-tier/group.json
+$ build/infrakit group update example/instance/terraform/aws-two-tier/group.json
 update terraform_demo completed
 ```
 
 ## 7. Check on the group:
 
 ```shell
-$ build/cli group inspect terraform_demo
+$ build/infrakit group inspect terraform_demo
 ID                              LOGICAL                         TAGS
 instance-1475602365               -                             Name=instance-1475602365,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
 instance-1475602374               -                             Name=instance-1475602374,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
@@ -139,6 +139,6 @@ You can also try to remove some instances and see that the group size will be re
 We are done with the demo, remove the resources...
 
 ```shell
-$ build/cli group destroy terraform_demo
+$ build/infrakit group destroy terraform_demo
 destroy terraform_demo initiated
 ```
