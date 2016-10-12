@@ -161,6 +161,7 @@ Currently, several binaries are available:
   + [`build/infrakit-flavor-zookeeper`](./example/flavor/zookeeper), a Flavor plugin for [Apache ZooKeeper](https://zookeeper.apache.org/) ensemble members
   + [`build/infrakit-flavor-swarm`](./example/flavor/swarm), a Flavor plugin for Docker in [Swarm mode](https://docs.docker.com/engine/swarm/).
 
+All provided binaries have a `help` subcommand to get usage and a `version` subcommand to identify the build revision.
 
 ## Examples
 There are a few examples of _InfraKit_ plugins:
@@ -272,17 +273,13 @@ specification.
 
 ## Plugin Discovery
 
-_InfraKit_ plugins collaborate with each other to accomplish a set of objectives.  Therefore, they
-need to be able to talk to one another.  While many different discovery methods are available, this
-toolkit implements a simple file-based discovery system the names of the unix socket files in a common
-directory represents the _name_ of the plugin.
+Multiple _InfraKit_ plugins are typically used together to support a declared configuration.  These plugins discover
+each other by looking for plugin files in a common plugin directory, and communicate via well-defined HTTP APIs.
 
-By default the common directory for unix sockets is located at `/run/infrakit/plugins`.
-Make sure this directory exists on your host:
-
-```
-mkdir -p /run/infrakit/plugins
-chmod 777 /run/infrakit/plugins
+The default plugin directory for unix sockets is located at `/run/infrakit/plugins`.  Make sure this directory exists:
+```shell
+$ mkdir -p /run/infrakit/plugins
+$ chmod 777 /run/infrakit/plugins
 ```
 
 Note that a plugin's name is separate from the _type_ of the plugin, so it's possible to have two
