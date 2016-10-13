@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,12 +12,6 @@ import (
 )
 
 var (
-	// PluginName is the name of the plugin in the Docker Hub / registry
-	PluginName = "TerraformInstance"
-
-	// PluginType is the type / interface it supports
-	PluginType = "infrakit.InstancePlugin/1.0"
-
 	// Version is the build release identifier.
 	Version = "Unspecified"
 
@@ -77,18 +70,9 @@ func main() {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "print build version information",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			buff, err := json.MarshalIndent(map[string]interface{}{
-				"name":     PluginName,
-				"type":     PluginType,
-				"version":  Version,
-				"revision": Revision,
-			}, "  ", "  ")
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(buff))
-			return nil
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Version: %s\n", Version)
+			fmt.Printf("Revision: %s\n", Revision)
 		},
 	})
 
