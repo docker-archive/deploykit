@@ -5,13 +5,8 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
   + The `file` instance plugin - to provision instances by writing files to disk
   + The `vanilla` flavor plugin - to provide context/ flavor to the configuration of the instances
 
-All InfraKit plugins will by default open the unix socket located at /run/infrakit/plugins. Make sure this directory
-exists on your host:
-
-```shell
-$ mkdir -p /run/infrakit/plugins/
-$ chmod 777 /run/infrakit/plugins
-```
+It may be helpful to familiarize yourself with [plugin discovery](README.md#plugin-discovery) if you have not already
+done so.
 
 Start the default Group plugin
 

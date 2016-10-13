@@ -3,31 +3,9 @@ InfraKit Flavor Plugin - Zookeeper
 
 This is a plugin for handling Zookeeper ensemble.
 
-## Building
+## Running
 
-Begin by building plugin [binaries](../../README.md#binaries).
-
-## Usage
-
-```
-$ build/infrakit-flavor-zookeeper -h
-Zookeeper flavor plugin
-
-Usage:
-  build/infrakit-flavor-zookeeper [flags]
-  build/infrakit-flavor-zookeeper [command]
-
-Available Commands:
-  version     print build version information
-
-Flags:
-      --listen string   listen address (unix or tcp) for the control endpoint (default "unix:///run/infrakit/plugins/flavor-zookeeper.sock")
-      --log int         Logging level. 0 is least verbose. Max is 5 (default 4)
-
-Use "build/infrakit-flavor-zookeeper [command] --help" for more information about a command.
-```
-
-## Test
+Begin by building plugin [binaries](../../../README.md#binaries).
 
 Start the [vagrant instance plugin](/example/instance/vagrant):
 

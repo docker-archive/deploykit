@@ -177,8 +177,7 @@ Then in your JSON config for the default group plugin, you would reference it by
 ```
 Then when you watch a group with the config above (`cattle`), the cattle will be `french-vanilla` flavored.
 
-Watch this group....
-
+Watch this group:
 ```
 $ build/infrakit group --name group watch << EOF
 > {
