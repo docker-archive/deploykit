@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -13,12 +12,6 @@ import (
 )
 
 var (
-	// PluginName is the name of the plugin in the Docker Hub / registry
-	PluginName = "VagrantInstance"
-
-	// PluginType is the type / interface it supports
-	PluginType = "infrakit.InstancePlugin/1.0"
-
 	// Version is the build release identifier.
 	Version = "Unspecified"
 
@@ -30,7 +23,7 @@ func main() {
 
 	builder := &instance.Builder{}
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/instance-vagrant.sock"
+	listen := "unix:///run/infrakit/plugins/instance-aws.sock"
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -73,18 +66,9 @@ func main() {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "print build version information",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			buff, err := json.MarshalIndent(map[string]interface{}{
-				"name":     PluginName,
-				"type":     PluginType,
-				"version":  Version,
-				"revision": Revision,
-			}, "  ", "  ")
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(buff))
-			return nil
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Version: %s\n", Version)
+			fmt.Printf("Revision: %s\n", Revision)
 		},
 	})
 
