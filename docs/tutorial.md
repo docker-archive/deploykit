@@ -5,13 +5,8 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
   + The `file` instance plugin - to provision instances by writing files to disk
   + The `vanilla` flavor plugin - to provide context/ flavor to the configuration of the instances
 
-All InfraKit plugins will by default open the unix socket located at /run/infrakit/plugins. Make sure this directory
-exists on your host:
-
-```shell
-$ mkdir -p /run/infrakit/plugins/
-$ chmod 777 /run/infrakit/plugins
-```
+It may be helpful to familiarize yourself with [plugin discovery](README.md#plugin-discovery) if you have not already
+done so.
 
 Start the default Group plugin
 
@@ -92,9 +87,8 @@ For the Vanilla Flavor Plugin, we have the spec:
 {
     "Size": 5,
     "UserData": [
-        "sudo apt-get update -y",
-        "sudo apt-get install -y nginx",
-        "sudo service nginx start"
+        "docker pull nginx:alpine",
+        "docker run -d -p 80:80 nginx-alpine"
     ],
     "Labels": {
         "tier": "web",
@@ -141,11 +135,9 @@ Putting everything together, we have the configuration to give to the default Gr
             "Properties": {
                 "Size": 5,
                 "UserData": [
-                    "sudo apt-get update -y",
-                    "sudo apt-get install -y nginx",
-                    "sudo service nginx start"
+                    "docker pull nginx:alpine",
+                    "docker run -d -p 80:80 nginx-alpine"
                 ],
-
                 "Labels": {
                     "tier": "web",
                     "project": "infrakit"
@@ -188,9 +180,8 @@ $ build/infrakit group --name group watch <<EOF
             "Properties": {
                 "Size": 5,
                 "UserData": [
-                    "sudo apt-get update -y",
-                    "sudo apt-get install -y nginx",
-                    "sudo service nginx start"
+                    "docker pull nginx:alpine",
+                    "docker run -d -p 80:80 nginx-alpine"
                 ],
                 "Labels": {
                     "tier": "web",
@@ -253,9 +244,8 @@ Now let's update the configuration by changing the size of the group and a prope
             "Properties": {
                 "Size": 10,
                 "UserData": [
-                    "sudo apt-get update -y",
-                    "sudo apt-get install -y nginx",
-                    "sudo service nginx start"
+                    "docker pull nginx:alpine",
+                    "docker run -d -p 80:80 nginx-alpine"
                 ],
                 "Labels": {
                     "tier": "web",
