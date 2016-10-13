@@ -87,9 +87,8 @@ For the Vanilla Flavor Plugin, we have the spec:
 {
     "Size": 5,
     "UserData": [
-        "sudo apt-get update -y",
-        "sudo apt-get install -y nginx",
-        "sudo service nginx start"
+        "docker pull nginx:alpine",
+        "docker run -d -p 80:80 nginx-alpine"
     ],
     "Labels": {
         "tier": "web",
@@ -136,11 +135,9 @@ Putting everything together, we have the configuration to give to the default Gr
             "Properties": {
                 "Size": 5,
                 "UserData": [
-                    "sudo apt-get update -y",
-                    "sudo apt-get install -y nginx",
-                    "sudo service nginx start"
+                    "docker pull nginx:alpine",
+                    "docker run -d -p 80:80 nginx-alpine"
                 ],
-
                 "Labels": {
                     "tier": "web",
                     "project": "infrakit"
@@ -183,9 +180,8 @@ $ build/infrakit group --name group watch <<EOF
             "Properties": {
                 "Size": 5,
                 "UserData": [
-                    "sudo apt-get update -y",
-                    "sudo apt-get install -y nginx",
-                    "sudo service nginx start"
+                    "docker pull nginx:alpine",
+                    "docker run -d -p 80:80 nginx-alpine"
                 ],
                 "Labels": {
                     "tier": "web",
@@ -248,9 +244,8 @@ Now let's update the configuration by changing the size of the group and a prope
             "Properties": {
                 "Size": 10,
                 "UserData": [
-                    "sudo apt-get update -y",
-                    "sudo apt-get install -y nginx",
-                    "sudo service nginx start"
+                    "docker pull nginx:alpine",
+                    "docker run -d -p 80:80 nginx-alpine"
                 ],
                 "Labels": {
                     "tier": "web",
