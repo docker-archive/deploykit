@@ -70,8 +70,6 @@ func main() {
 				return err
 			}
 
-			log.Infoln("Starting discovery")
-
 			pluginDir, err := discovery.NewDir(filepath.Dir(listenURL.Path))
 			if err != nil {
 				return err
@@ -109,8 +107,6 @@ func main() {
 			}
 
 			<-stopped // block until done
-
-			log.Infoln("Server stopped")
 			return nil
 		},
 	}
@@ -137,7 +133,7 @@ func main() {
 	// Bind Pflags for cmd passed
 	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
 	viper.BindPFlag("discovery", cmd.Flags().Lookup("discovery"))
-	cmd.Flags().String("name", name, "listen socket name for the control endpoint")
+	cmd.Flags().String("name", name, "Plugin name to advertise for the control endpoint")
 	viper.BindPFlag("name", cmd.Flags().Lookup("name"))
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.Flags().DurationVar(&pollInterval, "poll-interval", pollInterval, "Group polling interval")

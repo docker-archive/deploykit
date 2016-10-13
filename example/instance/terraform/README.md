@@ -5,8 +5,8 @@ This is a proof of concept Instance Plugin based on [Terraform](https://www.terr
 In this concept, InfraKit provides the active group management while Terraform performs the
 functions of resource provisioning.
 
-This poc is adapted from the [`aws-two-tier`](https://github.com/hashicorp/terraform/tree/master/examples/aws-two-tier) example from the Terraform project.
-There are some minor changes:
+This poc is adapted from the [`aws-two-tier`](https://github.com/hashicorp/terraform/tree/master/examples/aws-two-tier)
+example from the Terraform project. There are some minor changes:
 
   + Variables that required on-screen user interaction (for setting public keys) have been removed
   and replaced with the `key_name` parameter in the provisioning config.
@@ -104,32 +104,11 @@ and update its state.  When an instance is removed, Terraform will do the same b
 and update its state.
 
  
-## Building
+## Running
 
-Begin by building plugin [binaries](../../README.md#binaries).
+Begin by building plugin [binaries](../../../README.md#binaries).
 
-## Usage
-
-```
-$ build/infrakit-instance-terraform -h
-Terraform instance plugin
-
-Usage:
-  build/infrakit-instance-terraform [flags]
-  build/infrakit-instance-terraform [command]
-
-Available Commands:
-  version     print build version information
-
-Flags:
-      --dir string      Dir for storing the files (default "/var/folders/rq/g0cj3y7n511c10p2kbz5q33w0000gn/T/")
-      --listen string   listen address (unix or tcp) for the control endpoint (default "unix:///run/infrakit/plugins/instance-terraform.sock")
-      --log int         Logging level. 0 is least verbose. Max is 5 (default 4)
-
-Use "build/infrakit-instance-terraform [command] --help" for more information about a command.
-```
-
-The plugin requires a `dir` directory that will be used to contain the `tfstate` and `tf.json`
+The plugin requires a directory (`--dir`) that will be used to contain the `tfstate` and `tf.json`
 files.  It also checks to make sure it can call `terraform`.
 Install Terraform [here](https://www.terraform.io/downloads.html) if you haven't done so.
 
@@ -146,25 +125,12 @@ $ build/infrakit-instance-terraform version
   }
 ```
 
-### Default Directory for Plugin Discovery
-
-All InfraKit plugins will by default open the unix socket located at `/run/infrakit/plugins`.
-Make sure this directory exists on your host:
-
-```
-mkdir -p /run/infrakit/plugins
-chmod 777 /run/infrakit/plugins
-```
-
 See the [CLI Doc](/cmd/cli/README.md) for details on accessing the instance plugin via CLI.
-
-## Using
 
 Start the plugin:
 
 ```
 $ build/infrakit-instance-terraform --log 5 --dir=./example/instance/terraform/aws-two-tier/
-INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-terraform.sock
 DEBU[0000] terraform instance plugin. dir= ./example/instance/terraform/aws-two-tier/
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-terraform.sock err= <nil>

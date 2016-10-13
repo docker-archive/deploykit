@@ -31,19 +31,13 @@ func main() {
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "infrakit cli",
-		PersistentPreRunE: func(c *cobra.Command, args []string) error {
+		PersistentPreRun: func(c *cobra.Command, args []string) {
 			if logLevel > len(log.AllLevels)-1 {
 				logLevel = len(log.AllLevels) - 1
 			} else if logLevel < 0 {
 				logLevel = 0
 			}
 			log.SetLevel(log.AllLevels[logLevel])
-
-			if c.Use == "version" {
-				return nil
-			}
-
-			return nil
 		},
 	}
 

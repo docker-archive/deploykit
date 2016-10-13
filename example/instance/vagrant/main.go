@@ -39,7 +39,7 @@ func main() {
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Vagrant instance plugin",
-		RunE: func(c *cobra.Command, args []string) error {
+		Run: func(c *cobra.Command, args []string) {
 
 			if logLevel > len(log.AllLevels)-1 {
 				logLevel = len(log.AllLevels) - 1
@@ -48,6 +48,7 @@ func main() {
 			}
 			log.SetLevel(log.AllLevels[logLevel])
 
+<<<<<<< HEAD
 			if c.Use == "version" {
 				return nil
 			}
@@ -66,15 +67,15 @@ func main() {
 			log.Infoln("Listening on:", listenURL.String())
 
 			_, stopped, err := util.StartServer(listenURL.String(), instance_plugin.PluginServer(vagrant.NewVagrantPlugin(dir)))
+=======
+			_, stopped, err := util.StartServer(listen, instance_plugin.PluginServer(vagrant.NewVagrantPlugin(dir)))
+>>>>>>> 2fcf1a30dce8922f160a131bbc34849ab4ee51a8
 
 			if err != nil {
 				log.Error(err)
 			}
 
 			<-stopped // block until done
-
-			log.Infoln("Server stopped")
-			return nil
 		},
 	}
 

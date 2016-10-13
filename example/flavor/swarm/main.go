@@ -41,7 +41,7 @@ func main() {
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Docker Swarm flavor plugin",
-		RunE: func(c *cobra.Command, args []string) error {
+		Run: func(c *cobra.Command, args []string) {
 
 			if logLevel > len(log.AllLevels)-1 {
 				logLevel = len(log.AllLevels) - 1
@@ -50,22 +50,16 @@ func main() {
 			}
 			log.SetLevel(log.AllLevels[logLevel])
 
-			if c.Use == "version" {
-				return nil
-			}
-
 			dockerClient, err := NewDockerClient(host, &tlsOptions)
 			log.Infoln("Connect to docker", host, "err=", err)
 			if err != nil {
-				return err
+				log.Error(err)
+				os.Exit(1)
 			}
 
 			discoveryDir = viper.GetString("discovery")
 			name = viper.GetString("name")
 			listen := fmt.Sprintf("unix://%s/%s.sock", path.Clean(discoveryDir), name)
-
-			log.Infoln("Starting plugin")
-			log.Infoln("Listening on:", listen)
 
 			_, stopped, err := util.StartServer(listen, flavor_plugin.PluginServer(swarm.NewSwarmFlavor(dockerClient)))
 
@@ -74,9 +68,6 @@ func main() {
 			}
 
 			<-stopped // block until done
-
-			log.Infoln("Server stopped")
-			return nil
 		},
 	}
 
@@ -102,15 +93,15 @@ func main() {
 	// Bind Pflags for cmd passed
 	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
 	viper.BindPFlag("discovery", cmd.Flags().Lookup("discovery"))
-	cmd.Flags().String("name", name, "listen socket name for the control endpoint")
+	cmd.Flags().String("name", name, "Plugin name to advertise for the control endpoint")
 	viper.BindPFlag("name", cmd.Flags().Lookup("name"))
-	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
+	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
-	cmd.Flags().StringVar(&host, "host", host, "Docker host")
-	cmd.Flags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
-	cmd.Flags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
-	cmd.Flags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")
-	cmd.Flags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
+	cmd.PersistentFlags().StringVar(&host, "host", host, "Docker host")
+	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert file path")
+	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert file path")
+	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key file path")
+	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
 
 	err := cmd.Execute()
 	if err != nil {
