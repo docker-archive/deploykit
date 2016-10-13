@@ -167,7 +167,7 @@ func (s zkFlavor) Prepare(
 			return spec, errors.New("Manager nodes require an assigned logical ID")
 		}
 
-		spec.Init = generateInitScript(properties.UseDocker, allocation.LogicalIDs, *spec.LogicalID)
+		spec.Init += "\n" + generateInitScript(properties.UseDocker, allocation.LogicalIDs, *spec.LogicalID)
 
 	default:
 		return spec, errors.New("Unsupported role type")

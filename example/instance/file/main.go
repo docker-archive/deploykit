@@ -10,9 +10,9 @@ import (
 
 func main() {
 
-	logLevel := cli.DefaultLogLevel
-	name := "instance-file"
-	dir := os.TempDir()
+	var logLevel int
+	var name string
+	var dir string
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -26,10 +26,10 @@ func main() {
 
 	cmd.AddCommand(cli.VersionCommand())
 
-	cmd.Flags().String("name", name, "Plugin name to advertise for discovery")
-	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
+	cmd.Flags().StringVar(&name, "name", "instance-file", "Plugin name to advertise for discovery")
+	cmd.PersistentFlags().IntVar(&logLevel, "log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 
-	cmd.Flags().StringVar(&dir, "dir", dir, "Dir for storing the files")
+	cmd.Flags().StringVar(&dir, "dir", os.TempDir(), "Dir for storing the files")
 
 	err := cmd.Execute()
 	if err != nil {

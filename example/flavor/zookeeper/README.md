@@ -33,32 +33,34 @@ INFO[0000] Listening at: ~/.infrakit/plugins/flavor-zookeeper
 
 Be sure to verify that the plugin is [discoverable](../../../cmd/cli/README.md#list-plugins).
 
-Here's a JSON for the group we'd like to see [vagrant-zk-example.json](./vagrant-zk-example.json):
+Here's a JSON for the group we'd like to see [vagrant-zk.json](./vagrant-zk.json):
 
 ```json
 {
-    "ID": "zk",
-    "Properties": {
-        "Instance" : {
-            "Plugin": "instance-vagrant",
-            "Properties": {
-                "Box": "bento/ubuntu-16.04"
-            }
-        },
-        "Flavor" : {
-            "Plugin": "flavor-zookeeper",
-            "Properties": {
-                "type": "member",
-                "IPs": ["192.168.1.200", "192.168.1.201", "192.168.1.202"]
-            }
-        }
+  "ID": "zk",
+  "Properties": {
+    "Allocation": {
+      "LogicalIDs": ["192.168.1.200", "192.168.1.201", "192.168.1.202"]
+    },
+    "Instance" : {
+      "Plugin": "instance-vagrant",
+      "Properties": {
+        "Box": "bento/ubuntu-16.04"
+      }
+    },
+    "Flavor" : {
+      "Plugin": "flavor-zookeeper",
+      "Properties": {
+        "Type": "member"
+      }
     }
+  }
 }
 ```
 
 Now tell the group plugin to watch the zk group, create if necessary:
 
 ```shell
-$ build/infrakit group watch ./vagrant-zk-example.json
+$ build/infrakit group watch ./vagrant-zk.json
 watching zk
 ```

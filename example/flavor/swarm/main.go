@@ -12,8 +12,8 @@ import (
 
 func main() {
 
-	logLevel := cli.DefaultLogLevel
-	name := "flavor-swarm"
+	var logLevel int
+	var name string
 
 	tlsOptions := tlsconfig.Options{}
 	host := "unix:///var/run/docker.sock"
@@ -38,8 +38,8 @@ func main() {
 
 	cmd.AddCommand(cli.VersionCommand())
 
-	cmd.Flags().String("name", name, "Plugin name to advertise for discovery")
-	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
+	cmd.Flags().StringVar(&name, "name", "flavor-swarm", "Plugin name to advertise for discovery")
+	cmd.PersistentFlags().IntVar(&logLevel, "log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	cmd.PersistentFlags().StringVar(&host, "host", host, "Docker host")
 	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert file path")
