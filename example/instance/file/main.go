@@ -27,7 +27,7 @@ func main() {
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "File instance plugin",
-		RunE: func(c *cobra.Command, args []string) error {
+		Run: func(c *cobra.Command, args []string) {
 
 			if logLevel > len(log.AllLevels)-1 {
 				logLevel = len(log.AllLevels) - 1
@@ -35,13 +35,6 @@ func main() {
 				logLevel = 0
 			}
 			log.SetLevel(log.AllLevels[logLevel])
-
-			if c.Use == "version" {
-				return nil
-			}
-
-			log.Infoln("Starting plugin")
-			log.Infoln("Listening on:", listen)
 
 			_, stopped, err := util.StartServer(listen, instance_plugin.PluginServer(
 				NewFileInstancePlugin(dir)))
@@ -51,9 +44,6 @@ func main() {
 			}
 
 			<-stopped // block until done
-
-			log.Infoln("Server stopped")
-			return nil
 		},
 	}
 

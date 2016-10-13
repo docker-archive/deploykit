@@ -27,7 +27,7 @@ func main() {
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Vanilla flavor plugin",
-		RunE: func(c *cobra.Command, args []string) error {
+		Run: func(c *cobra.Command, args []string) {
 
 			if logLevel > len(log.AllLevels)-1 {
 				logLevel = len(log.AllLevels) - 1
@@ -36,13 +36,6 @@ func main() {
 			}
 			log.SetLevel(log.AllLevels[logLevel])
 
-			if c.Use == "version" {
-				return nil
-			}
-
-			log.Infoln("Starting plugin")
-			log.Infoln("Listening on:", listen)
-
 			_, stopped, err := util.StartServer(listen, flavor_plugin.PluginServer(vanilla.NewPlugin()))
 
 			if err != nil {
@@ -50,9 +43,6 @@ func main() {
 			}
 
 			<-stopped // block until done
-
-			log.Infoln("Server stopped")
-			return nil
 		},
 	}
 

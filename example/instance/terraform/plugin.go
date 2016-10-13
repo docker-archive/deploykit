@@ -175,15 +175,12 @@ func (p *plugin) terraformApply() error {
 	}
 
 	go func() {
-		log.Infoln("Starting applying loop")
-
 		for {
 			if err := p.lock.TryLock(); err == nil {
-				log.Infoln("Acquired lock.  Applying")
 				defer p.lock.Unlock()
 				p.doTerraformApply()
 			}
-			log.Infoln("Can't acquire lock.  Wait.")
+			log.Debugln("Can't acquire lock, waiting")
 			time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
 		}
 	}()
@@ -192,6 +189,7 @@ func (p *plugin) terraformApply() error {
 }
 
 func (p *plugin) doTerraformApply() error {
+	log.Infoln("Applying plan")
 	cmd := exec.Command("terraform", "apply")
 	cmd.Dir = p.Dir
 	stdout, err := cmd.StdoutPipe()
@@ -310,11 +308,10 @@ func (p *plugin) parseTfStateFile() (map[string]interface{}, error) {
 func (p *plugin) ensureUniqueFile() string {
 	for {
 		if err := p.lock.TryLock(); err == nil {
-			log.Infoln("Acquired lock.  Applying")
 			defer p.lock.Unlock()
 			return ensureUniqueFile(p.Dir)
 		}
-		log.Infoln("Can't acquire lock.  Wait.")
+		log.Infoln("Can't acquire lock, waiting")
 		time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
 	}
 }

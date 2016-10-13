@@ -57,8 +57,6 @@ func main() {
 				return err
 			}
 
-			log.Infoln("Starting discovery")
-
 			pluginDir, err := discovery.NewDir(filepath.Dir(listenURL.Path))
 			if err != nil {
 				return err
@@ -80,11 +78,6 @@ func main() {
 				return flavor_client.PluginClient(callable), nil
 			}
 
-			log.Infoln("Starting plugin")
-
-			log.Infoln("Starting")
-			log.Infoln("Listening on:", listen)
-
 			_, stopped, err := util.StartServer(listen, group_server.PluginServer(
 				group.NewGroupPlugin(
 					instancePluginLookup,
@@ -96,8 +89,6 @@ func main() {
 			}
 
 			<-stopped // block until done
-
-			log.Infoln("Server stopped")
 			return nil
 		},
 	}

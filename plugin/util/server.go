@@ -20,6 +20,8 @@ import (
 // Returns a channel to signal stop when closed, a channel to block on stopping, and an error if occurs.
 func StartServer(addr string, endpoint http.Handler, shutdown ...func() error) (chan<- struct{}, <-chan error, error) {
 
+	log.Infoln("Listening on:", addr)
+
 	listenURL, err := url.Parse(addr)
 	if err != nil {
 		return nil, nil, err
@@ -168,7 +170,7 @@ func saveCrumbFile(listenURL *url.URL) (string, error) {
 
 	fmt.Fprintf(crumbFile, "%s", listenURL.String())
 
-	log.Infoln("crumb file written to", crumbPath)
+	log.Debugln("crumb file written to", crumbPath)
 
 	return crumbPath, nil
 }
