@@ -17,10 +17,7 @@ Start the default Group plugin
 
 ```shell
 $ build/infrakit-group-default --log 5
-INFO[0000] Starting discovery
 DEBU[0000] Opening: /run/infrakit/plugins
-INFO[0000] Starting plugin
-INFO[0000] Starting
 INFO[0000] Listening on: unix:///run/infrakit/plugins/group.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <nil>
 ```
@@ -30,7 +27,6 @@ Start the file Instance plugin
 ```shell
 $ mkdir -p tutorial
 $ build/infrakit-instance-file --log 5 --dir ./tutorial/
-INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
 DEBU[0000] file instance plugin. dir= ./tutorial/
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-file.sock err= <nil>
@@ -42,7 +38,6 @@ Start the vanilla Flavor plugin
 
 ```shell
 $ build/infrakit-flavor-vanilla --log 5
-INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-vanilla.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.sock err= <nil>
 ```

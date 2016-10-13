@@ -64,7 +64,7 @@ func (q *quorum) Run() {
 func (q *quorum) converge() {
 	descriptions, err := q.scaled.List()
 	if err != nil {
-		log.Infof("Failed to check group: %s", err)
+		log.Errorf("Failed to check group: %s", err)
 		return
 	}
 

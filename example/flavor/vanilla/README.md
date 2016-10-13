@@ -139,7 +139,6 @@ in your config JSON.  For instance, you may start up this plugin as `french-vani
 
 ```shell
 $ build/infrakit-flavor-vanilla --listen=unix:///run/infrakit/plugins/french-vanilla.sock
-INFO[0000] Starting plugin                              
 INFO[0000] Listening on: unix:///run/infrakit/plugins/french-vanilla.sock 
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/french-vanilla.sock err= <nil> 
 ```

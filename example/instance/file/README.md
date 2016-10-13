@@ -34,7 +34,6 @@ The plugin can be started without any arguments and will default to using unix s
 
 ```
 $ build/infrakit-instance-file --dir=./test
-INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-file.sock err= <nil>
 ```
@@ -44,7 +43,6 @@ This starts the plugin using `./test` as directory and `instance-file` as name.
 You can give the another plugin instance a different name via the `listen` flag:
 ```
 $ build/infrakit-instance-file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
-INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/another-file.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock err= <nil>
 ```

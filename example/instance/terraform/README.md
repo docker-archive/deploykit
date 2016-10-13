@@ -164,7 +164,6 @@ Start the plugin:
 
 ```
 $ build/infrakit-instance-terraform --log 5 --dir=./example/instance/terraform/aws-two-tier/
-INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-terraform.sock
 DEBU[0000] terraform instance plugin. dir= ./example/instance/terraform/aws-two-tier/
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-terraform.sock err= <nil>
