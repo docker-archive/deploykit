@@ -5,38 +5,19 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
   + The `file` instance plugin - to provision instances by writing files to disk
   + The `vanilla` flavor plugin - to provide context/ flavor to the configuration of the instances
 
-<<<<<<< HEAD
-All InfraKit plugins will by default open the unix socket located at /run/infrakit/plugins. Make sure this directory
-exists on your host:
-
-```shell
-# Make sure directory exists for plugins to discover each other (default is: /run/infrakit/plugins/)
-$ mkdir -p /$TMPDIR/infrakit/plugins/
-```
-=======
-It may be helpful to familiarize yourself with [plugin discovery](README.md#plugin-discovery) if you have not already
+It may be helpful to familiarize yourself with [plugin discovery](../README.md#plugin-discovery) if you have not already
 done so.
->>>>>>> 2fcf1a30dce8922f160a131bbc34849ab4ee51a8
 
 Start the default Group plugin
 
-**_NOTE:_** You can set the listen url as an env variale via `export INFRAKIT_PLUGINS_DIR="/$TMPDIR/infrakit/plugins/"` instead of passing it as a flag. The default socket will be used, unless the `--name` flag is passed, when the env variable is set. 
+**_NOTE:_** You can set the listen url as an env variale via `export INFRAKIT_PLUGINS_DIR="$TMPDIR/infrakit/plugins/"` instead of passing it as a flag. The default socket will be used, unless the `--name` flag is passed, when the env variable is set. 
 
 ```shell
-$ export INFRAKIT_PLUGINS_DIR="/$TMPDIR/infrakit/plugins/"
+$ export INFRAKIT_PLUGINS_DIR="$TMPDIR/infrakit/plugins/"
 $ build/infrakit-group-default --log 5
-<<<<<<< HEAD
-INFO[0000] Starting discovery
-DEBU[0000] Opening: /$TMPDIR/infrakit/plugins
-INFO[0000] Starting plugin
-INFO[0000] Starting
-INFO[0000] Listening on: unix:///$TMPDIR/infrakit/plugins/group.sock
-INFO[0000] listener protocol= unix addr= /$TMPDIR/infrakit/plugins/group.sock err= <nil>
-=======
-DEBU[0000] Opening: /run/infrakit/plugins
-INFO[0000] Listening on: unix:///run/infrakit/plugins/group.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <nil>
->>>>>>> 2fcf1a30dce8922f160a131bbc34849ab4ee51a8
+DEBU[0000] Opening: /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins
+INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock
+INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock err= <nil>
 ```
 
 Start the file Instance plugin
@@ -44,14 +25,9 @@ Start the file Instance plugin
 ```shell
 $ mkdir -p tutorial
 $ build/infrakit-instance-file --log 5 --dir ./tutorial/
-<<<<<<< HEAD
-INFO[0000] Starting plugin
-INFO[0000] Listening on: unix:///$TMPDIR/infrakit/plugins/instance-file.sock
-=======
-INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
->>>>>>> 2fcf1a30dce8922f160a131bbc34849ab4ee51a8
+INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock
 DEBU[0000] file instance plugin. dir= ./tutorial/
-INFO[0000] listener protocol= unix addr= /$TMPDIR/infrakit/plugins/instance-file.sock err= <nil>
+INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock err= <nil>
 ```
 Note the directory `./tutorial` where the plugin will store the instances as they are provisioned.
 We can look at the files here to see what's being created and how they are configured.
@@ -60,14 +36,8 @@ Start the vanilla Flavor plugin
 
 ```shell
 $ build/infrakit-flavor-vanilla --log 5
-<<<<<<< HEAD
-INFO[0000] Starting plugin
-INFO[0000] Listening on: unix:///$TMPDIR/infrakit/plugins/flavor-vanilla.sock
-INFO[0000] listener protocol= unix addr= /$TMPDIR/infrakit/plugins/flavor-vanilla.sock err= <nil>
-=======
-INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-vanilla.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.sock err= <nil>
->>>>>>> 2fcf1a30dce8922f160a131bbc34849ab4ee51a8
+INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock
+INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock err= <nil>
 ```
 
 Show the plugins:
@@ -76,9 +46,9 @@ Show the plugins:
 $ build/infrakit plugin ls
 Plugins:
 NAME                    LISTEN
-flavor-vanilla          unix:///$TMPDIR/infrakit/plugins/flavor-vanilla.sock
-group                   unix:///$TMPDIR/infrakit/plugins/group.sock
-instance-file           unix:///$TMPDIR/infrakit/plugins/instance-file.sock
+flavor-vanilla          unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock
+group                   unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock
+instance-file           unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock
 ```
 
 Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
