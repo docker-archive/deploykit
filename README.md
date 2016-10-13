@@ -79,8 +79,8 @@ however, the members may require special handling and demand stronger notions of
 #### Reference implementations
 This repository contains several Plugins which should be considered reference implementations for demonstration purposes
 and development aides.  With the exception of those listed as
-[supported](#supported-implementations), all Plugins in this repository should be considered under active development
-and for use at your own risk.
+[supported](#supported-implementations), Plugins in this repository should be considered **not** to be under active
+development and for use at your own risk.
 
 Over time, we would prefer to phase out reference Plugins that appear to provide real value for implementations that
 are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit.aws/issues/new)
