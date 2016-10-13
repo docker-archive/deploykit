@@ -48,7 +48,9 @@ func (f vanillaFlavor) Prepare(flavor json.RawMessage, instance instance.Spec) (
 
 	// Merge UserData into Init
 	lines := []string{}
-	lines = append(lines, instance.Init)
+	if instance.Init != "" {
+		lines = append(lines, instance.Init)
+	}
 	lines = append(lines, s.UserData...)
 
 	instance.Init = strings.Join(lines, "\n")
