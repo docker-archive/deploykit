@@ -1,7 +1,7 @@
 InfraKit Flavor Plugin - Vanilla
 ================================
 
-A [reference](#../../../README.md#reference-implementations) implementation of a Flavor plugin that supports direct
+A [reference](../../../README.md#reference-implementations) implementation of a Flavor plugin that supports direct
 injection of Instance fields.
 
 It supports:
