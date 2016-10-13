@@ -200,7 +200,7 @@ func (s *scaler) Run() {
 func (s *scaler) converge() {
 	descriptions, err := s.scaled.List()
 	if err != nil {
-		log.Infof("Failed to check size of group: %s", err)
+		log.Errorf("Failed to check size of group: %s", err)
 		return
 	}
 

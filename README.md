@@ -288,7 +288,6 @@ what they _provision_ or the content they write to disk).  For example:
 
 ```
 $ build/infrakit-instance-file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
-INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/another-file.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock err= <nil>
 ```
