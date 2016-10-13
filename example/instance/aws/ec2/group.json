@@ -1,0 +1,30 @@
+{
+    "ID": "aws_ec2_demo",
+    "Properties": {
+        "Instance" : {
+            "Plugin": "aws-ec2",
+            "Properties": {
+                "DiscoverDefaults" : true,
+                "Tags" : {
+                    "env" : "dev",
+                    "instance-plugin" : "aws-ec2"
+                },
+                "RunInstancesInput" : {
+                    "InstanceType" : "t2.micro",
+                    "KeyName" : "some-key-name"
+                }
+            }
+        },
+	"Flavor" : {
+            "Plugin": "flavor-vanilla",
+            "Properties": {
+		"Size" : 5,
+		"UserData" : [
+                    "sudo apt-get update -y",
+                    "sudo apt-get install -y nginx",
+                    "sudo service nginx start"
+		]
+            }
+	}
+    }
+}
