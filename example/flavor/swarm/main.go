@@ -38,7 +38,7 @@ func main() {
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Docker Swarm flavor plugin",
-		RunE: func(c *cobra.Command, args []string) error {
+		Run: func(c *cobra.Command, args []string) {
 
 			if logLevel > len(log.AllLevels)-1 {
 				logLevel = len(log.AllLevels) - 1
@@ -47,18 +47,12 @@ func main() {
 			}
 			log.SetLevel(log.AllLevels[logLevel])
 
-			if c.Use == "version" {
-				return nil
-			}
-
 			dockerClient, err := NewDockerClient(host, &tlsOptions)
 			log.Infoln("Connect to docker", host, "err=", err)
 			if err != nil {
-				return err
+				log.Error(err)
+				os.Exit(1)
 			}
-
-			log.Infoln("Starting plugin")
-			log.Infoln("Listening on:", listen)
 
 			_, stopped, err := util.StartServer(listen, flavor_plugin.PluginServer(swarm.NewSwarmFlavor(dockerClient)))
 
@@ -67,9 +61,6 @@ func main() {
 			}
 
 			<-stopped // block until done
-
-			log.Infoln("Server stopped")
-			return nil
 		},
 	}
 
@@ -95,9 +86,9 @@ func main() {
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	cmd.PersistentFlags().StringVar(&host, "host", host, "Docker host")
-	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert")
-	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert")
-	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key")
+	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert file path")
+	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert file path")
+	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key file path")
 	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
 
 	err := cmd.Execute()

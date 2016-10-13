@@ -139,7 +139,6 @@ in your config JSON.  For instance, you may start up this plugin as `french-vani
 
 ```shell
 $ build/infrakit-flavor-vanilla --listen=unix:///run/infrakit/plugins/french-vanilla.sock
-INFO[0000] Starting plugin                              
 INFO[0000] Listening on: unix:///run/infrakit/plugins/french-vanilla.sock 
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/french-vanilla.sock err= <nil> 
 ```
@@ -178,8 +177,7 @@ Then in your JSON config for the default group plugin, you would reference it by
 ```
 Then when you watch a group with the config above (`cattle`), the cattle will be `french-vanilla` flavored.
 
-Watch this group....
-
+Watch this group:
 ```
 $ build/infrakit group --name group watch << EOF
 > {
