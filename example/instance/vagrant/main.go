@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"path"
 
@@ -48,28 +47,11 @@ func main() {
 			}
 			log.SetLevel(log.AllLevels[logLevel])
 
-<<<<<<< HEAD
-			if c.Use == "version" {
-				return nil
-			}
-
 			discoveryDir = viper.GetString("discovery")
 			name = viper.GetString("name")
 			listen := fmt.Sprintf("unix://%s/%s.sock", path.Clean(discoveryDir), name)
 
-			// parse the listen string
-			listenURL, err := url.Parse(listen)
-			if err != nil {
-				return err
-			}
-
-			log.Infoln("Starting plugin")
-			log.Infoln("Listening on:", listenURL.String())
-
-			_, stopped, err := util.StartServer(listenURL.String(), instance_plugin.PluginServer(vagrant.NewVagrantPlugin(dir)))
-=======
 			_, stopped, err := util.StartServer(listen, instance_plugin.PluginServer(vagrant.NewVagrantPlugin(dir)))
->>>>>>> 2fcf1a30dce8922f160a131bbc34849ab4ee51a8
 
 			if err != nil {
 				log.Error(err)
@@ -101,7 +83,7 @@ func main() {
 	// Bind Pflags for cmd passed
 	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
 	viper.BindPFlag("discovery", cmd.Flags().Lookup("discovery"))
-	cmd.Flags().String("name", name, "listen socket name for the control endpoint")
+	cmd.Flags().String("name", name, "Plugin name to advertise for the control endpoint")
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.Flags().StringVar(&dir, "dir", dir, "Vagrant directory")
 
