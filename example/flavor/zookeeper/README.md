@@ -75,7 +75,7 @@ Here's a JSON for the group we'd like to see [vagrant-zk-example.json](./vagrant
             "Properties": {
                 "Box": "bento/ubuntu-16.04"
             }
-        }
+        },
         "Flavor" : {
             "Plugin": "flavor-zookeeper",
             "Properties": {
