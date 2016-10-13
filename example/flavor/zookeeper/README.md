@@ -5,18 +5,17 @@ This is a plugin for handling Zookeeper ensemble.
 
 ## Building
 
-When you do `make binaries` in the top level directory, the CLI binary will be built and can be
-found as `./infrakit/cli` from the project's top level directory.
+Begin by building plugin [binaries](../../README.md#binaries).
 
 ## Usage
 
 ```
-$ ./infrakit/zookeeper -h
+$ build/infrakit-flavor-zookeeper -h
 Zookeeper flavor plugin
 
 Usage:
-  ./infrakit/zookeeper [flags]
-  ./infrakit/zookeeper [command]
+  build/infrakit-flavor-zookeeper [flags]
+  build/infrakit-flavor-zookeeper [command]
 
 Available Commands:
   version     print build version information
@@ -25,7 +24,7 @@ Flags:
       --listen string   listen address (unix or tcp) for the control endpoint (default "unix:///run/infrakit/plugins/flavor-zookeeper.sock")
       --log int         Logging level. 0 is least verbose. Max is 5 (default 4)
 
-Use "./infrakit/zookeeper [command] --help" for more information about a command.
+Use "build/infrakit-flavor-zookeeper [command] --help" for more information about a command.
 ```
 
 ## Test
@@ -33,7 +32,7 @@ Use "./infrakit/zookeeper [command] --help" for more information about a command
 Start the [vagrant instance plugin](/example/instance/vagrant):
 
 ```
-$ infrakit/vagrant
+$ build/infrakit-instance-vagrant
 INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-vagrant.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-vagrant.sock err= <nil>
@@ -42,7 +41,7 @@ INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-vagrant.
 Start the [Group plugin](/cmd/group):
 
 ```
-$ ./infrakit/group --log=5
+$ build/infrakit-group-default --log=5
 INFO[0000] Starting discovery
 DEBU[0000] Opening: /run/infrakit/plugins
 DEBU[0000] Discovered plugin at unix:///run/infrakit/plugins/flavor-swarm.sock
@@ -57,22 +56,13 @@ INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <
 Start Zookeeper flavor plugin:
 
 ```
-$ ./infrakit/zookeeper
+$ build/infrakit-flavor-zookeeper
 INFO[0000] Starting plugin
 INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-zookeeper.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-zookeeper.sock err= <nil>
 ```
 
-Check everything's running:
-
-```
-$ ./infrakit/cli plugin ls
-Plugins:
-NAME                	LISTEN
-flavor-zookeeper    	unix:///run/infrakit/plugins/flavor-zookeeper.sock
-group               	unix:///run/infrakit/plugins/group.sock
-instance-vagrant    	unix:///run/infrakit/plugins/instance-vagrant.sock
-```
+Be sure to verify that the plugin is [discoverable](../../../cmd/cli/README.md#list-plugins).
 
 Here's a JSON for the group we'd like to see [vagrant-zk-example.json](./vagrant-zk-example.json):
 
@@ -100,6 +90,6 @@ Here's a JSON for the group we'd like to see [vagrant-zk-example.json](./vagrant
 Now tell the group plugin to watch the zk group, create if necessary:
 
 ```
-infrakit/cli group --name group watch ./vagrant-zk-example.json
+$ build/infrakit group --name group watch ./vagrant-zk-example.json
 watching zk
 ```
