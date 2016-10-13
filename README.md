@@ -285,33 +285,18 @@ mkdir -p /run/infrakit/plugins
 chmod 777 /run/infrakit/plugins
 ```
 
-Note that a plugin's name is separate from the _type_ of the plugin, so it's possible to have two
-_file_ instance plugins running but with different names and configurations (for
-what they _provision_ or the content they write to disk).  For example:
+Note that multiple instances of a plugin may run, provided they have different names for discovery.  This may be useful,
+for example, if a plugin can be configured to behave differently. For example:
 
-```
-$ build/infrakit-instance-file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
-INFO[0000] Starting plugin
-INFO[0000] Listening on: unix:///run/infrakit/plugins/another-file.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock err= <nil>
-```
-
-You can use the CLI to see which plugins are [discoverable](cmd/cli/README.md#list-plugins).
+The CLI shows which plugins are [discoverable](cmd/cli/README.md#list-plugins).
 
 For each binary, you can find out more about it by using the `version` verb in the command line. For example:
 
 ```shell
 $ build/infrakit-group-default version
-{
-    "name": "GroupPlugin",
-    "revision": "75d7f4dbc17dbc48aadb9a4abfd87d57fbd7e1f8",
-    "type": "infra.GroupPlugin/1.0",
-    "version": "75d7f4d.m"
-  }
+Version: c7a04c2
+Revision: c7a04c2e6b46c2b1c6cb8e8c33fbe3d897e58eec
 ```
-
-So you can have different plugins of the same type (e.g. `infrakit.InstancePlugin/1.0`) subject to the naming restrictions
-of the files in the common plugin directory.
 
 ## Docs
 
