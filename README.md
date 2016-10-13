@@ -13,6 +13,106 @@ An InfraKit instance plugin is provided, which creates Amazon EC2 instances.
 To build the AWS Instance plugin, run `make binaries`.  The plugin binary will be located at
 `./build/infrakit-instance-aws`.
 
+At a minimum, the plugin requires the AWS region to use.  However, this can be inferred from instance metadata when the
+plugin is running within EC2.  In other cases, specify the `--region` argument:
+```console
+$ build/infrakit-instance-aws --region us-west-2
+INFO[0000] Starting plugin
+INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-vagrant.sock
+INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-vagrant.sock err= <nil>
+```
+
+### Example
+
+To continue with an example, we will use the [default](https://github.com/docker/infrakit/tree/master/cmd/group) Group
+plugin:
+```console
+$ build/infrakit-group-default
+INFO[0000] Starting discovery
+INFO[0000] Starting plugin
+INFO[0000] Starting
+INFO[0000] Listening on: unix:///run/infrakit/plugins/group.sock
+INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <nil>
+```
+
+and the [Vanilla](https://github.com/docker/infrakit/tree/master/example/flavor/vanilla) Flavor plugin:.
+```console
+$ build/infrakit-flavor-vanilla
+INFO[0000] Starting plugin
+INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-vanilla.sock
+INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.sock err= <nil>
+```
+
+We will use a basic configuration that creates a single instance:
+```console
+$ cat << EOF > aws-vanilla.json
+{
+  "ID": "aws-example",
+  "Properties": {
+    "Instance": {
+      "Plugin": "instance-aws",
+      "Properties": {
+        "RunInstancesInput": {
+          "ImageId": "ami-4926fd29",
+          "KeyName": "bill-laptop",
+          "Placement": {
+            "AvailabilityZone": "us-west-2a"
+          },
+          "SecurityGroupIds": ["sg-57411931"]
+        },
+        "Tags": {
+          "Name": "infrakit-example"
+        }
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Size": 1,
+        "UserData": [
+          "#!/bin/sh",
+          "echo 'Hello, World!' > /hello"
+        ]
+      }
+    }
+  }
+}
+EOF
+```
+
+Note that you will need to replace the `KeyName` with an
+[SSH key pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html) you have access to, and the
+`SecurityGroups` with a group available in your VPC.  For the purposes of this example, it will be helpful to select
+a [Security Group](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-network-security.html) that you can access
+via [SSH](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AccessingInstancesLinux.html).
+
+Finally, instruct the Group plugin to start watching the group:
+```console
+$ build/infrakit group watch aws-vanilla.json
+watching aws-example
+```
+
+In the console running the Group plugin, we will see input like the following:
+```
+INFO[1208] Watching group 'aws-example'
+INFO[1219] Adding 1 instances to group to reach desired 1
+INFO[1219] Created instance i-ba0412a2 with tags map[infrakit.config_sha:dUBtWGmkptbGg29ecBgv1VJYzys= infrakit.group:aws-example]
+```
+
+Additionally, the CLI will report the newly-created instance:
+```console
+$ build/infrakit group inspect aws-example
+ID                             	LOGICAL                        	TAGS
+i-ba0412a2                     	172.31.41.13                   	Name=infrakit-example,infrakit.config_sha=dUBtWGmkptbGg29ecBgv1VJYzys=,infrakit.group=aws-example
+```
+
+Retrieve the IP address of the host from the AWS console, and use SSH to verify that our shell code ran:
+
+```console
+$ ssh ubuntu@55.55.55.55 cat /hello
+Hello, World!
+```
+
 ### Plugin properties
 
 The plugin expects properties in the following format:
@@ -33,12 +133,15 @@ The `Tags` property is a string-string mapping of EC2 instance tags to include o
 #### AWS API Credentials
 
 The plugin can use API credentials from several sources.
-- config file: See [AWS docs](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-environment)
-- EC2 instance metadata See [AWS docs](http://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html)
+- config file:
+  see [AWS docs](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-config-files)
+- EC2 instance metadata:
+  see [AWS docs](http://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html)
 
 Additional credentials sources are supported, but are not generally recommended as they are less secure:
 - command line arguments: `--session-token`, or  `--access-key-id` and `--secret-access-key`
-- environment variables: See [AWS docs](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-environment)
+- environment variables:
+  see [AWS docs](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-environment)
 
 
 ## Reporting security issues
