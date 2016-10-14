@@ -84,11 +84,6 @@ func main() {
 				return flavor_client.PluginClient(callable), nil
 			}
 
-			log.Infoln("Starting plugin")
-
-			log.Infoln("Starting")
-			log.Infoln("Listening on:", listenURL.String())
-
 			_, stopped, err := util.StartServer(listenURL.String(), group_server.PluginServer(
 				group.NewGroupPlugin(
 					instancePluginLookup,
