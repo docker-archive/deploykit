@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/plugin/flavor/vanilla"
 	"github.com/docker/infrakit/plugin/util"
 	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -22,7 +24,8 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/flavor-vanilla.sock"
+	discoveryDir := "/run/infrakit/plugins/"
+	name := "flavor-vanilla"
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -35,6 +38,10 @@ func main() {
 				logLevel = 0
 			}
 			log.SetLevel(log.AllLevels[logLevel])
+
+			discoveryDir = viper.GetString("discovery")
+			name = viper.GetString("name")
+			listen := fmt.Sprintf("unix://%s/%s.sock", path.Clean(discoveryDir), name)
 
 			_, stopped, err := util.StartServer(listen, flavor_plugin.PluginServer(vanilla.NewPlugin()))
 
@@ -55,7 +62,13 @@ func main() {
 		},
 	})
 
-	cmd.Flags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	cmd.Flags().String("discovery", discoveryDir, "Dir discovery path for plugin discovery")
+	// Bind Pflags for cmd passed
+	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
+	viper.BindPFlag("discovery", cmd.Flags().Lookup("discovery"))
+	cmd.Flags().String("name", name, "Plugin name to advertise for the control endpoint")
+	// Bind Pflags for cmd passed
+	viper.BindPFlag("name", cmd.Flags().Lookup("name"))
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()

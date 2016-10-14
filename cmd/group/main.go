@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	instance_client "github.com/docker/infrakit/spi/http/instance"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -30,8 +32,8 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-
-	listen := "unix:///run/infrakit/plugins/group.sock"
+	discoveryDir := "/run/infrakit/plugins/"
+	name := "group"
 
 	pollInterval := 10 * time.Second
 
@@ -50,6 +52,10 @@ func main() {
 			if c.Use == "version" {
 				return nil
 			}
+
+			discoveryDir = viper.GetString("discovery")
+			name = viper.GetString("name")
+			listen := fmt.Sprintf("unix://%s/%s.sock", path.Clean(discoveryDir), name)
 
 			// parse the listen string
 			listenURL, err := url.Parse(listen)
@@ -78,7 +84,7 @@ func main() {
 				return flavor_client.PluginClient(callable), nil
 			}
 
-			_, stopped, err := util.StartServer(listen, group_server.PluginServer(
+			_, stopped, err := util.StartServer(listenURL.String(), group_server.PluginServer(
 				group.NewGroupPlugin(
 					instancePluginLookup,
 					flavorPluginLookup,
@@ -102,7 +108,12 @@ func main() {
 		},
 	})
 
-	cmd.Flags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	cmd.Flags().String("discovery", discoveryDir, "Dir discovery path for plugin discovery")
+	// Bind Pflags for cmd passed
+	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
+	viper.BindPFlag("discovery", cmd.Flags().Lookup("discovery"))
+	cmd.Flags().String("name", name, "Plugin name to advertise for the control endpoint")
+	viper.BindPFlag("name", cmd.Flags().Lookup("name"))
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.Flags().DurationVar(&pollInterval, "poll-interval", pollInterval, "Group polling interval")
 

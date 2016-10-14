@@ -5,16 +5,19 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
   + The `file` instance plugin - to provision instances by writing files to disk
   + The `vanilla` flavor plugin - to provide context/ flavor to the configuration of the instances
 
-It may be helpful to familiarize yourself with [plugin discovery](README.md#plugin-discovery) if you have not already
+It may be helpful to familiarize yourself with [plugin discovery](../README.md#plugin-discovery) if you have not already
 done so.
 
 Start the default Group plugin
 
+**_NOTE:_** You can set the listen url as an env variale via `export INFRAKIT_PLUGINS_DIR="$TMPDIR/infrakit/plugins/"` instead of passing it as a flag. The default socket will be used, unless the `--name` flag is passed, when the env variable is set. 
+
 ```shell
+$ export INFRAKIT_PLUGINS_DIR="$TMPDIR/infrakit/plugins/"
 $ build/infrakit-group-default --log 5
-DEBU[0000] Opening: /run/infrakit/plugins
-INFO[0000] Listening on: unix:///run/infrakit/plugins/group.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <nil>
+DEBU[0000] Opening: /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins
+INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock
+INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock err= <nil>
 ```
 
 Start the file Instance plugin
@@ -22,9 +25,9 @@ Start the file Instance plugin
 ```shell
 $ mkdir -p tutorial
 $ build/infrakit-instance-file --log 5 --dir ./tutorial/
-INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
+INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock
 DEBU[0000] file instance plugin. dir= ./tutorial/
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-file.sock err= <nil>
+INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock err= <nil>
 ```
 Note the directory `./tutorial` where the plugin will store the instances as they are provisioned.
 We can look at the files here to see what's being created and how they are configured.
@@ -33,8 +36,8 @@ Start the vanilla Flavor plugin
 
 ```shell
 $ build/infrakit-flavor-vanilla --log 5
-INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-vanilla.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.sock err= <nil>
+INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock
+INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock err= <nil>
 ```
 
 Show the plugins:
@@ -43,9 +46,9 @@ Show the plugins:
 $ build/infrakit plugin ls
 Plugins:
 NAME                    LISTEN
-flavor-vanilla          unix:///run/infrakit/plugins/flavor-vanilla.sock
-group                   unix:///run/infrakit/plugins/group.sock
-instance-file           unix:///run/infrakit/plugins/instance-file.sock
+flavor-vanilla          unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock
+group                   unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock
+instance-file           unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock
 ```
 
 Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
@@ -192,7 +195,7 @@ watching cattle
 
 **_NOTE:_** You can also specify a file name to load from instead of using stdin, like this:
 
-```
+```shell
 $ build/infrakit group --name group watch group.json
 ```
 
@@ -325,7 +328,7 @@ drwxr-xr-x  36 davidchung  staff  1224 Sep 28 16:39 ..
 -rw-r--r--   1 davidchung  staff   654 Sep 28 16:40 instance-1475106036 <-- new instance
 ```
 
-We see that 3 new instance has been created to replace the three removed, to match our
+We see that 3 new instance have been created to replace the three removed, to match our
 original specification of 10 instances.
 
 Finally, let's clean up:
@@ -334,12 +337,12 @@ Finally, let's clean up:
 $ build/infrakit group --name group destroy cattle
 ```
 
-This concludes our quick tutorial.  In this tutorial we have
+This concludes our quick tutorial.  In this tutorial we:
   + Started the plugins and learned to access them
-  + Created a configuration for a group we want to watch
-  + See the instances created to match the specifications
-  + Updated the configurations of the group and scale up the group
+  + Created a configuration for a group we wanted to watch
+  + Verified the instances created matched the specifications
+  + Updated the configurations of the group and scaled up the group
   + Reviewed the proposed changes
-  + Apply the update across the group
-  + Removed some instances and see that the group self-healed
+  + Applied the update across the group
+  + Removed some instances and observed that the group self-healed
   + Destroyed the group

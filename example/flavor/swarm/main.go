@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/go-connections/tlsconfig"
@@ -10,6 +11,7 @@ import (
 	"github.com/docker/infrakit/plugin/util"
 	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -23,7 +25,8 @@ var (
 func main() {
 
 	logLevel := len(log.AllLevels) - 2
-	listen := "unix:///run/infrakit/plugins/flavor-swarm.sock"
+	discoveryDir := "/run/infrakit/plugins/"
+	name := "flavor-swarm"
 
 	tlsOptions := tlsconfig.Options{}
 	host := "unix:///var/run/docker.sock"
@@ -47,6 +50,10 @@ func main() {
 				os.Exit(1)
 			}
 
+			discoveryDir = viper.GetString("discovery")
+			name = viper.GetString("name")
+			listen := fmt.Sprintf("unix://%s/%s.sock", path.Clean(discoveryDir), name)
+
 			_, stopped, err := util.StartServer(listen, flavor_plugin.PluginServer(swarm.NewSwarmFlavor(dockerClient)))
 
 			if err != nil {
@@ -66,7 +73,12 @@ func main() {
 		},
 	})
 
-	cmd.PersistentFlags().StringVar(&listen, "listen", listen, "listen address (unix or tcp) for the control endpoint")
+	cmd.Flags().String("discovery", discoveryDir, "Dir discovery path for plugin discovery")
+	// Bind Pflags for cmd passed
+	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
+	viper.BindPFlag("discovery", cmd.Flags().Lookup("discovery"))
+	cmd.Flags().String("name", name, "Plugin name to advertise for the control endpoint")
+	viper.BindPFlag("name", cmd.Flags().Lookup("name"))
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	cmd.PersistentFlags().StringVar(&host, "host", host, "Docker host")
