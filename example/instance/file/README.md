@@ -1,8 +1,9 @@
 InfraKit Instance Plugin - File
 ===============================
 
-This is a simple Instance Plugin that can accept any configuration and writes the configuration
-to disk as `provision`.  It is useful for testing and debugging.
+
+A [reference](../../../README.md#reference-implementations) implementation of an Instance Plugin that can accept any
+configuration and writes the configuration to disk as `provision`.  It is useful for testing and debugging.
 
 ## Building
 
