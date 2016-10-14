@@ -6,10 +6,9 @@ injection of Instance fields.
 
 It supports:
   + the [`AllocationMethod`](/spi/flavor/spi.go) to define the size or logical IDs of the Group
-  + Instance labels
-  + `UserData` which determine the instance's `Init` (init script).
+  + Instance `Tags` and `Init`
 
-While we can specify a list of logical ID's (for example, IP addresses), the UserData and Labels
+While we can specify a list of logical ID's (for example, IP addresses), `Init` and `Tags`
 are all statically defined in the config JSON.  This means all the members of the group are
 considered identical.
 
@@ -25,9 +24,9 @@ Here's a skeleton of this Plugin's schema:
 {
     "Size" : 0,
     "LogicalIDs": [],
-    "UserData" : [
+    "Init" : [
     ],
-    "Labels" : {
+    "Tags" : {
     }
 }
 ```
@@ -49,15 +48,13 @@ Here's an example Group configuration using the default [infrakit/group](/cmd/gr
         },
         "FlavorPlugin": "flavor-vanilla",
         "FlavorPluginProperties": {
-            "Size" : 5,
-
-            "UserData": [
+            "Size": 5,
+            "Init": [
                 "sudo apt-get update -y",
                 "sudo apt-get install -y nginx",
                 "sudo service nginx start"
             ],
-
-            "Labels": {
+            "Tags": {
                 "tier": "web",
                 "project": "infrakit"
             }
@@ -68,7 +65,6 @@ Here's an example Group configuration using the default [infrakit/group](/cmd/gr
 ```
 
 Or with assigned IDs:
-
 ```
 {
     "ID": "named-cattle",
@@ -79,23 +75,21 @@ Or with assigned IDs:
         },
         "FlavorPlugin": "flavor-vanilla",
         "FlavorPluginProperties": {
-            "LogicalIDs" : [
+            "LogicalIDs": [
                 "192.168.0.1",
                 "192.168.0.2",
                 "192.168.0.3",
                 "192.168.0.4",
                 "192.168.0.5"
             ],
-
-            "UserData" : [
+            "Init": [
                 "sudo apt-get update -y",
                 "sudo apt-get install -y nginx",
                 "sudo service nginx start"
             ],
-
-            "Labels" : {
-                "tier" : "web",
-                "project" : "infrakit"
+            "Tags": {
+                "tier": "web",
+                "project": "infrakit"
             }
         }
 
@@ -123,26 +117,24 @@ Then in your JSON config for the default group plugin, you would reference it by
 {
     "ID": "cattle",
     "Properties": {
-        "Instance" : {
+        "Instance": {
             "Plugin": "instance-file",
             "Properties": {
                 "Note": "Here is a property that only the instance plugin cares about"
             }
         },
         "Flavor": {
-            "Plugin" : "french-vanilla",
+            "Plugin": "french-vanilla",
             "Properties": {
-                "Size" : 5,
-
-                "UserData" : [
+                "Size": 5,
+                "Init": [
                     "sudo apt-get update -y",
                     "sudo apt-get install -y nginx",
                     "sudo service nginx start"
                 ],
-
-                "Labels" : {
-                    "tier" : "web",
-                    "project" : "infrakit"
+                "Tags": {
+                    "tier": "web",
+                    "project": "infrakit"
                 }
             }
         }
