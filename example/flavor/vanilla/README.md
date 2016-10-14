@@ -1,14 +1,14 @@
 InfraKit Flavor Plugin - Vanilla
 ================================
 
-This is a plain vanilla flavor plugin that doesn't do anything special. However, it
+A [reference](../../../README.md#reference-implementations) implementation of a Flavor Plugin that supports direct
+injection of Instance fields.
 
-  + Lets the user specify the [`AllocationMethod`](/spi/flavor/spi.go) which determines the size
-  of the group by either specifying a size or by a list of logical ids.
-  + Lets the user specify the labels to tag the instances with
-  + Lets the user specify the `UserData` which determine the instance's `Init` (init script).
+It supports:
+  + the [`AllocationMethod`](/spi/flavor/spi.go) to define the size or logical IDs of the Group
+  + Instance `Tags` and `Init`
 
-While we can specify a list of logical ID's (for example, IP addresses), the UserData and Labels
+While we can specify a list of logical ID's (for example, IP addresses), `Init` and `Tags`
 are all statically defined in the config JSON.  This means all the members of the group are
 considered identical.
 
@@ -19,29 +19,25 @@ the plugin.  This plugin simply applies the static configuration.
 
 ## Schema
 
-Wherever the config JSON blob is (usually the value of a `Properties` field), the schema for the
-configuration of this plugin looks like:
-
+Here's a skeleton of this Plugin's schema:
 ```
 {
-    "Size" : 5,
-
-    "UserData" : [
-        "sudo apt-get update -y",
-        "sudo apt-get install -y nginx",
-        "sudo service nginx start"
+    "Size" : 0,
+    "LogicalIDs": [],
+    "Init" : [
     ],
-
-    "Labels" : {
-        "tier" : "web",
-        "project" : "infrakit"
+    "Tags" : {
     }
 }
 ```
 
-So in a larger config for the group -- the default [infrakit/group](/cmd/group) plugin -- the config
-may look like:
+The supported fields are:
+* `Size`: the number of Instances in the Group, if this is a scaling Group
+* `LogicalIDs`: the fixed logical identifiers for Group members, if this is a quorum Group
+* `UserData`: an array of shell code lines to use for the Instance's Init script
+* `Labels`: a string-string mapping of keys and values to add as Instance Tags
 
+Here's an example Group configuration using the default [infrakit/group](/cmd/group) Plugin and the Vanilla Plugin:
 ```
 {
     "ID": "cattle",
@@ -50,19 +46,17 @@ may look like:
         "InstancePluginProperties": {
             "Box": "bento/ubuntu-16.04"
         },
-        "FlavorPlugin": "flavor-plain",
+        "FlavorPlugin": "flavor-vanilla",
         "FlavorPluginProperties": {
-            "Size" : 5,
-
-            "UserData" : [
+            "Size": 5,
+            "Init": [
                 "sudo apt-get update -y",
                 "sudo apt-get install -y nginx",
                 "sudo service nginx start"
             ],
-
-            "Labels" : {
-                "tier" : "web",
-                "project" : "infrakit"
+            "Tags": {
+                "tier": "web",
+                "project": "infrakit"
             }
         }
 
@@ -70,8 +64,7 @@ may look like:
 }
 ```
 
-Or with assigned ID's:
-
+Or with assigned IDs:
 ```
 {
     "ID": "named-cattle",
@@ -82,23 +75,21 @@ Or with assigned ID's:
         },
         "FlavorPlugin": "flavor-vanilla",
         "FlavorPluginProperties": {
-            "LogicalIDs" : [
+            "LogicalIDs": [
                 "192.168.0.1",
                 "192.168.0.2",
                 "192.168.0.3",
                 "192.168.0.4",
                 "192.168.0.5"
             ],
-
-            "UserData" : [
+            "Init": [
                 "sudo apt-get update -y",
                 "sudo apt-get install -y nginx",
                 "sudo service nginx start"
             ],
-
-            "Labels" : {
-                "tier" : "web",
-                "project" : "infrakit"
+            "Tags": {
+                "tier": "web",
+                "project": "infrakit"
             }
         }
 
@@ -107,32 +98,9 @@ Or with assigned ID's:
 ```
 
 
-
-## Building
+## Example
 
 Begin by building plugin [binaries](../../../README.md#binaries).
-
-## Usage
-
-```
-$ build/infrakit-flavor-vanilla -h
-Vanilla flavor plugin
-
-Usage:
-  build/infrakit-flavor-vanilla [flags]
-  build/infrakit-flavor-vanilla [command]
-
-Available Commands:
-  version     print build version information
-
-Flags:
-      --listen string   listen address (unix or tcp) for the control endpoint (default "unix:///run/infrakit/plugins/flavor-vanilla.sock")
-      --log int         Logging level. 0 is least verbose. Max is 5 (default 4)
-
-Use "build/infrakit-flavor-vanilla [command] --help" for more information about a command.
-```
-
-## Example
 
 This plugin will be called whenever you use a Flavor plugin and reference the plugin by name
 in your config JSON.  For instance, you may start up this plugin as `french-vanilla`:
@@ -149,66 +117,28 @@ Then in your JSON config for the default group plugin, you would reference it by
 {
     "ID": "cattle",
     "Properties": {
-        "Instance" : {
+        "Instance": {
             "Plugin": "instance-file",
             "Properties": {
                 "Note": "Here is a property that only the instance plugin cares about"
             }
         },
         "Flavor": {
-            "Plugin" : "french-vanilla",
+            "Plugin": "french-vanilla",
             "Properties": {
-                "Size" : 5,
-
-                "UserData" : [
+                "Size": 5,
+                "Init": [
                     "sudo apt-get update -y",
                     "sudo apt-get install -y nginx",
                     "sudo service nginx start"
                 ],
-
-                "Labels" : {
-                    "tier" : "web",
-                    "project" : "infrakit"
+                "Tags": {
+                    "tier": "web",
+                    "project": "infrakit"
                 }
             }
         }
     }
 }
 ```
-Then when you watch a group with the config above (`cattle`), the cattle will be `french-vanilla` flavored.
-
-Watch this group:
-```
-$ build/infrakit group --name group watch << EOF
-> {
->     "ID": "cattle",
->     "Properties": {
->         "Instance" : {
->             "Plugin": "instance-file",
->             "Properties": {
->                 "Note": "Here is a property that only the instance plugin cares about"
->             }
->         },
->         "Flavor": {
->             "Plugin" : "french-vanilla",
->             "Properties": {
->                 "Size" : 5,
-> 
->                 "UserData" : [
->                     "sudo apt-get update -y",
->                     "sudo apt-get install -y nginx",
->                     "sudo service nginx start"
->                 ],
-> 
->                 "Labels" : {
->                     "tier" : "web",
->                     "project" : "infrakit"
->                 }
->             }
->         }
->     }
-> }
-> EOF
-watching cattle
-
-```
+Then when you watch a group with the configuration above (`cattle`), the cattle will be `french-vanilla` flavored.

@@ -84,11 +84,11 @@ For the Vanilla Flavor Plugin, we have the spec:
 ```json
 {
     "Size": 5,
-    "UserData": [
+    "Init": [
         "docker pull nginx:alpine",
         "docker run -d -p 80:80 nginx-alpine"
     ],
-    "Labels": {
+    "Tags": {
         "tier": "web",
         "project": "infrakit"
     }
@@ -132,11 +132,11 @@ Putting everything together, we have the configuration to give to the default Gr
             "Plugin": "flavor-vanilla",
             "Properties": {
                 "Size": 5,
-                "UserData": [
+                "Init": [
                     "docker pull nginx:alpine",
                     "docker run -d -p 80:80 nginx-alpine"
                 ],
-                "Labels": {
+                "Tags": {
                     "tier": "web",
                     "project": "infrakit"
                 }
@@ -177,11 +177,11 @@ $ build/infrakit group --name group watch <<EOF
             "Plugin": "flavor-vanilla",
             "Properties": {
                 "Size": 5,
-                "UserData": [
+                "Init": [
                     "docker pull nginx:alpine",
                     "docker run -d -p 80:80 nginx-alpine"
                 ],
-                "Labels": {
+                "Tags": {
                     "tier": "web",
                     "project": "infrakit"
                 }
@@ -241,11 +241,11 @@ Now let's update the configuration by changing the size of the group and a prope
             "Plugin": "flavor-vanilla",
             "Properties": {
                 "Size": 10,
-                "UserData": [
+                "Init": [
                     "docker pull nginx:alpine",
                     "docker run -d -p 80:80 nginx-alpine"
                 ],
-                "Labels": {
+                "Tags": {
                     "tier": "web",
                     "project": "infrakit"
                 }

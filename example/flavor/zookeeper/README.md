@@ -1,6 +1,9 @@
 InfraKit Flavor Plugin - Zookeeper
 ==================================
 
+A [reference](../../../README.md#reference-implementations) implementation of a Flavor Plugin that creates an
+[Apache ZooKeeper](https://zookeeper.apache.org/) ensemble.
+
 This is a plugin for handling Zookeeper ensemble.
 
 ## Running

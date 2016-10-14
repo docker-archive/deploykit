@@ -1,9 +1,9 @@
 InfraKit Instance Plugin - Terraform
 =====================================
 
-This is a proof of concept Instance Plugin based on [Terraform](https://www.terraform.io).
-In this concept, InfraKit provides the active group management while Terraform performs the
-functions of resource provisioning.
+A [reference](../../../README.md#reference-implementations) implementation of an Instance Plugin that creates machines
+using [Terraform](https://www.terraform.io).  In this concept, InfraKit provides the active group management while
+Terraform performs the functions of resource provisioning.
 
 This poc is adapted from the [`aws-two-tier`](https://github.com/hashicorp/terraform/tree/master/examples/aws-two-tier)
 example from the Terraform project. There are some minor changes:

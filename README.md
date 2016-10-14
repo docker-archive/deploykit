@@ -14,27 +14,14 @@ Although _InfraKit_ emphasizes primitives for building self-healing infrastructu
 
 To get started, try the [tutorial](docs/tutorial.md).
 
-## Overview
+## Plugins
+_InfraKit_ leverages active processes, called _Plugins_, which can be composed to meet
+different needs.  Technically, a Plugin is an HTTP server with a well-defined API, listening on a unix socket.
 
-### Plugins
-_InfraKit_ at the core consists of a set of collaborating, active processes.  These components are called _plugins_.  
+[Utilities](spi/http) are provided as libraries to simplify Plugin development in Go.
 
-_InfraKit_ supports composing different plugins to meet different needs.  These plugins are active controllers that
-can look at current infrastructure state and take action when the state diverges from user specification.
-
-Initially, we implement these plugins as servers listening on unix sockets and communicate using HTTP.  By nature, the
-plugin interface definitions are language agnostic so it's possible to implement a plugin in a language other than Go.
-Plugins can be packaged and deployed differently, such as Docker containers.
-
-Plugins are the active components that provide the behavior for the primitives that _InfraKit_ supports. These primitives
-are described below.
-
-
-### Groups, Instances, and Flavors
-
-_InfraKit_ supports these primitives: groups, instances, and flavors.  They are active components running as _plugins_.
-
-#### Groups
+### Plugin types
+#### Group
 When managing infrastructure like computing clusters, Groups make good abstraction, and working with groups is easier
 than managing individual instances. For example, a group can be made up of a collection
 of machines as individual instances. The machines in a group can have identical configurations (replicas, or cattle).
@@ -67,24 +54,10 @@ While it's generally simplest to use the default Group plugin, custom implementa
 infrastructure management system.  This would allow you to use _InfraKit_ tooling to perform basic operations on widely
 different infrastructure using the same interface.
 
-| plugin| description                  |
-|:------|:-----------------------------|
-| [infrakit/group](./cmd/group) | supports Instance and Flavor plugins, rolling updates |
-
-
-#### Instances
+#### Instance
 Instances are members of a group. An [instance plugin](spi/instance/spi.go) manages some physical resource instances.
 It knows only about individual instances and nothing about Groups.  Instance is technically defined by the plugin, and
 need not be a physical machine at all.
-
-
-| plugin| description                  |
-|:------|:-----------------------------|
-|[infrakit/file](./example/instance/file)   | A simple plugin for development and testing.  Uses a local disk file as instance. |
-|[infrakit/terraform](./example/instance/terraform) | A plugin to provision using Terraform |
-|[infrakit/vagrant](./example/instance/vagrant) | A plugin that provisions Vagrant VMs |
-
-
 
 For compute, for example, instances can be VM instances of identical spec. Instances
 support the notions of attachment to auxiliary resources.  Instances are taggable and tags are assumed to be persistent
@@ -93,7 +66,7 @@ which allows the state of the cluster to be inferred and computed.
 In some cases, instances can be identical, while in other cases the members of a group require stronger identities and
 persistent, stable state. These properties are captured via the _flavors_ of the instances.
 
-#### Flavors
+#### Flavor
 Flavors help distinguish members of one group from another by describing how these members should be treated.
 A [flavor plugin](spi/flavor/spi.go) can be thought of as defining what runs on an Instance.
 It is responsible for dictating commands to run services, and check the health of those services.
@@ -102,11 +75,37 @@ Flavors allow a group of instances to have different characteristics.  In a grou
 all members are treated identically and individual members do not have strong identity.  In a group of pets,
 however, the members may require special handling and demand stronger notions of identity and state.
 
-| plugin| description                  |
-|:------|:-----------------------------|
-| [vanilla](plugin/flavor/vanilla) | A vanilla flavor that lets you configure by user data and labels |
-| [zookeeper](plugin/flavor/zookeeper) | For handling of zookeeper ensemble members |
-| [swarm](plugin/flavor/swarm) | configures instances with Docker in Swarm mode |
+
+#### Reference implementations
+This repository contains several Plugins which should be considered reference implementations for demonstration purposes
+and development aides.  With the exception of those listed as
+[supported](#supported-implementations), Plugins in this repository should be considered **not** to be under active
+development and for use at your own risk.
+
+Over time, we would prefer to phase out reference Plugins that appear to provide real value for implementations that
+are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit/issues/new)
+to start a discussion before contributing to these plugins with non-trivial code.
+
+| plugin                                            | type     | description                             |
+|:--------------------------------------------------|:---------|:----------------------------------------|
+| [swarm](plugin/flavor/swarm)                      | flavor   | runs Docker in Swarm mode               |
+| [vanilla](plugin/flavor/vanilla)                  | flavor   | manual specification of instance fields |
+| [zookeeper](plugin/flavor/zookeeper)              | flavor   | run an Apache ZooKeeper ensemble        |
+| [infrakit/file](./example/instance/file)          | instance | useful for development and testing      |
+| [infrakit/terraform](./example/instance/terraform)| instance | creates instances using Terraform       |
+| [infrakit/vagrant](./example/instance/vagrant)    | instance | creates Vagrant VMs                     |
+
+
+#### Supported implementations
+The following Plugins are supported for active development.  Note that these Plugins may not be part of the InfraKit
+project, so please double-check where the code lives before filing InfraKit issues.
+
+| plugin                                                        | type     | description                                           |
+|:--------------------------------------------------------------|:---------|:------------------------------------------------------|
+| [infrakit/group](./cmd/group)                                 | group    | supports Instance and Flavor plugins, rolling updates |
+| [docker/infrakit.aws](https://github.com/docker/infrakit.aws) | instance | creates Amazon EC2 instances                          |
+
+Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
 
 
 ## Building
@@ -130,16 +129,16 @@ mkdir -p ~/go/src/github.com/docker
 cd !$
 git clone git@github.com:docker/infrakit.git
 cd infrakit
-
 ```
 
-Also install a few tools
+We recommended go version 1.7.1 or greater for all platforms.
+
+Also install a few build tools
 
 ```shell
 go get -u github.com/kardianos/govendor  # the dependency manager
 go get -u github.com/golang/lint/golint  # if you're running tests
 ```
-Now you are ready to go.
 
 ### Running tests
 ```shell
@@ -151,15 +150,20 @@ $ make ci
 $ make binaries
 ```
 Executables will be placed in the `./build` directory.
-Currently, several binaries are available:
-  + [`build/infrakit`](./cmd/cli/README.md), the command line interface
-  + [`build/infrakit-group-default`](./cmd/group/README.md), the default [Group plugin](./spi/group)
-  + [`build/infrakit-instance-file`](./example/instance/file), an Instance plugin using dummy files to represent instances
-  + [`build/infrakit-instance-terraform`](./example/instance/terraform), an Instance plugin integrating [Terraform](https://www.terraform.io)
-  + [`build/infrakit-instance-vagrant`](./example/instance/vagrant), an Instance plugin using [Vagrant](https://www.vagrantup.com/)
-  + [`build/infrakit-flavor-vanilla`](./example/flavor/vanilla), a Flavor plugin for plain vanilla set up with user data and labels
-  + [`build/infrakit-flavor-zookeeper`](./example/flavor/zookeeper), a Flavor plugin for [Apache ZooKeeper](https://zookeeper.apache.org/) ensemble members
-  + [`build/infrakit-flavor-swarm`](./example/flavor/swarm), a Flavor plugin for Docker in [Swarm mode](https://docs.docker.com/engine/swarm/).
+This will produce binaries for tools and several reference Plugin implementations:
+  + [`infrakit`](./cmd/cli/README.md): a command line interface to interact with plugins
+  + [`infrakit-group-default`](./cmd/group/README.md): the default [Group plugin](./spi/group)
+  + [`infrakit-instance-file`](./example/instance/file): an Instance plugin using dummy files to represent instances
+  + [`infrakit-instance-terraform`](./example/instance/terraform):
+    an Instance plugin integrating [Terraform](https://www.terraform.io)
+  + [`infrakit-instance-vagrant`](./example/instance/vagrant):
+    an Instance plugin using [Vagrant](https://www.vagrantup.com/)
+  + [`infrakit-flavor-vanilla`](./example/flavor/vanilla):
+    a Flavor plugin for plain vanilla set up with user data and labels
+  + [`infrakit-flavor-zookeeper`](./example/flavor/zookeeper):
+    a Flavor plugin for [Apache ZooKeeper](https://zookeeper.apache.org/) ensemble members
+  + [`infrakit-flavor-swarm`](./example/flavor/swarm):
+    a Flavor plugin for Docker in [Swarm mode](https://docs.docker.com/engine/swarm/).
 
 All provided binaries have a `help` subcommand to get usage and a `version` subcommand to identify the build revision.
 
@@ -274,7 +278,7 @@ specification.
 ## Plugin Discovery
 
 Multiple _InfraKit_ plugins are typically used together to support a declared configuration.  These plugins discover
-each other by looking for plugin files in a common plugin directory, and communicate via well-defined HTTP APIs.
+each other by looking for plugin files in a common plugin directory, and communicate via HTTP.
 
 The default plugin directory for unix sockets is located at `/run/infrakit/plugins`.  Make sure this directory exists:
 ```shell
