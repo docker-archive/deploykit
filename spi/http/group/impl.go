@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/infrakit/plugin"
 	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/plugin/util/server"
 	"github.com/docker/infrakit/spi/group"
 )
 
@@ -15,7 +16,7 @@ type client struct {
 	c plugin.Callable
 }
 
-type server struct {
+type groupServer struct {
 	plugin group.Plugin
 }
 
@@ -27,15 +28,15 @@ func PluginClient(c plugin.Callable) group.Plugin {
 // PluginServer returns an instance of the Plugin
 func PluginServer(p group.Plugin) http.Handler {
 
-	server := &server{plugin: p}
-	return util.BuildHandler([]func() (plugin.Endpoint, plugin.Handler){
-		server.watchGroup,
-		server.unwatchGroup,
-		server.inspectGroup,
-		server.describeUpdate,
-		server.updateGroup,
-		server.stopUpdate,
-		server.destroyGroup,
+	g := &groupServer{plugin: p}
+	return server.BuildHandler([]func() (plugin.Endpoint, plugin.Handler){
+		g.watchGroup,
+		g.unwatchGroup,
+		g.inspectGroup,
+		g.describeUpdate,
+		g.updateGroup,
+		g.stopUpdate,
+		g.destroyGroup,
 	})
 }
 
@@ -44,7 +45,7 @@ func (c *client) WatchGroup(grp group.Spec) error {
 	return err
 }
 
-func (s *server) watchGroup() (plugin.Endpoint, plugin.Handler) {
+func (s *groupServer) watchGroup() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Watch"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -63,7 +64,7 @@ func (c *client) UnwatchGroup(id group.ID) error {
 	return err
 }
 
-func (s *server) unwatchGroup() (plugin.Endpoint, plugin.Handler) {
+func (s *groupServer) unwatchGroup() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Unwatch/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -78,7 +79,7 @@ func (c *client) InspectGroup(id group.ID) (group.Description, error) {
 	return description, err
 }
 
-func (s *server) inspectGroup() (plugin.Endpoint, plugin.Handler) {
+func (s *groupServer) inspectGroup() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Inspect/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -92,7 +93,7 @@ func (c *client) DescribeUpdate(updated group.Spec) (string, error) {
 	return envelope["message"], err
 }
 
-func (s *server) describeUpdate() (plugin.Endpoint, plugin.Handler) {
+func (s *groupServer) describeUpdate() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.DescribeUpdate"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -117,7 +118,7 @@ func (c *client) UpdateGroup(updated group.Spec) error {
 	return err
 }
 
-func (s *server) updateGroup() (plugin.Endpoint, plugin.Handler) {
+func (s *groupServer) updateGroup() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Update"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -136,7 +137,7 @@ func (c *client) StopUpdate(id group.ID) error {
 	return err
 }
 
-func (s *server) stopUpdate() (plugin.Endpoint, plugin.Handler) {
+func (s *groupServer) stopUpdate() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.StopUpdate/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -150,7 +151,7 @@ func (c *client) DestroyGroup(id group.ID) error {
 	return err
 }
 
-func (s *server) destroyGroup() (plugin.Endpoint, plugin.Handler) {
+func (s *groupServer) destroyGroup() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.Destroy/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {

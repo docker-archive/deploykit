@@ -53,7 +53,8 @@ clean:
 	mkdir -p build
 
 define build_binary
-	go build -o build/$(1) -ldflags "-X main.Version=$(VERSION) -X main.Revision=$(REVISION)" $(2)
+	go build -o build/$(1) \
+	  -ldflags "-X github.com/docker/infrakit/cli.Version=$(VERSION) -X github.com/docker/infrakit/cli.Revision=$(REVISION)" $(2)
 endef
 
 binaries: clean

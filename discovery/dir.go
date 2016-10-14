@@ -5,18 +5,17 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/plugin"
-	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/plugin/util/client"
 )
 
 type pluginInstance struct {
 	name     string
 	endpoint string
-	client   *util.Client
+	client   *client.Client
 }
 
 // String returns a string representation of the callable.
@@ -29,14 +28,13 @@ func (i *pluginInstance) Call(endpoint plugin.Endpoint, message, result interfac
 	return i.client.Call(endpoint, message, result)
 }
 
-// Dir is an object for finding out what plugins we have access to.
-type Dir struct {
+type dirPluginDiscovery struct {
 	dir  string
 	lock sync.Mutex
 }
 
-// PluginByName returns a plugin by name
-func (r *Dir) PluginByName(name string) (plugin.Callable, error) {
+// Find returns a plugin by name
+func (r *dirPluginDiscovery) Find(name string) (plugin.Callable, error) {
 
 	plugins, err := r.List()
 	if err != nil {
@@ -51,45 +49,30 @@ func (r *Dir) PluginByName(name string) (plugin.Callable, error) {
 	return p, nil
 }
 
-// NewDir creates a registry instance with the given file directory path.  The entries in the directory
-// are either unix socket files or a flat file indicating the tcp port.
-func NewDir(dir string) (*Dir, error) {
-	d := &Dir{dir: dir}
+// newDirPluginDiscovery creates a registry instance with the given file directory path.
+func newDirPluginDiscovery(dir string) (*dirPluginDiscovery, error) {
+	d := &dirPluginDiscovery{dir: dir}
 
 	// Perform a dummy read to catch obvious issues early (such as the directory not existing).
 	_, err := d.List()
 	return d, err
 }
 
-func (r *Dir) dirLookup(entry os.FileInfo) (*pluginInstance, error) {
-	var listenerURL string
+func (r *dirPluginDiscovery) dirLookup(entry os.FileInfo) (*pluginInstance, error) {
 	if entry.Mode()&os.ModeSocket != 0 {
-		listenerURL = "unix://" + filepath.Join(r.dir, entry.Name())
-	} else {
-		// content is the url, name is the plugin name
-		f := filepath.Join(r.dir, entry.Name())
-		buff, err := ioutil.ReadFile(f)
-		if err != nil {
-			return nil, err
-		}
-		listenerURL = string(buff)
+		socketPath := filepath.Join(r.dir, entry.Name())
+		return &pluginInstance{
+			endpoint: socketPath,
+			name:     entry.Name(),
+			client:   client.New(socketPath),
+		}, nil
 	}
 
-	client, err := util.NewClient(listenerURL)
-	if err != nil {
-		log.Warningln("Not valid:", listenerURL, "dir=", r.dir, "file=", entry.Name())
-		return nil, err
-	}
-
-	return &pluginInstance{
-		endpoint: listenerURL,
-		name:     strings.Split(entry.Name(), ".")[0], // no file extension like .sock
-		client:   client,
-	}, nil
+	return nil, fmt.Errorf("File is not a socket: %s", entry)
 }
 
 // List returns a list of plugins known, keyed by the name
-func (r *Dir) List() (map[string]plugin.Callable, error) {
+func (r *dirPluginDiscovery) List() (map[string]plugin.Callable, error) {
 
 	r.lock.Lock()
 	defer r.lock.Unlock()

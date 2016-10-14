@@ -17,10 +17,10 @@ Begin by building plugin [binaries](../../README.md#binaries).
 $ build/infrakit plugin ls
 Plugins:
 NAME                	LISTEN
-flavor-swarm        	unix:///run/infrakit/plugins/flavor-swarm.sock
-flavor-zookeeper    	unix:///run/infrakit/plugins/flavor-zookeeper.sock
-group               	unix:///run/infrakit/plugins/group.sock
-instance-file       	unix:///run/infrakit/plugins/instance-file.sock
+flavor-swarm        	~/.infrakit/plugins/flavor-swarm
+flavor-zookeeper    	~/.infrakit/plugins/flavor-zookeeper
+group               	~/.infrakit/plugins/group
+instance-file       	~/.infrakit/plugins/instance-file
 ```
 
 Once you know the plugins by name, you can make calls to them.  For example, the instance plugin

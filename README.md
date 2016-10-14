@@ -278,26 +278,15 @@ specification.
 ## Plugin Discovery
 
 Multiple _InfraKit_ plugins are typically used together to support a declared configuration.  These plugins discover
-each other by looking for plugin files in a common plugin directory, and communicate via HTTP.
+each other by looking for socket files in a common plugin directory, and communicate via HTTP.
 
-The default plugin directory for unix sockets is located at `/run/infrakit/plugins`.  Make sure this directory exists:
-```shell
-$ mkdir -p /run/infrakit/plugins
-$ chmod 777 /run/infrakit/plugins
-```
+The default plugin directory is `~/.infrakit/plugins`, and can be overridden with the environment variable
+`INFRAKIT_PLUGINS_DIR`.
 
 Note that multiple instances of a plugin may run, provided they have different names for discovery.  This may be useful,
 for example, if a plugin can be configured to behave differently. For example:
 
 The CLI shows which plugins are [discoverable](cmd/cli/README.md#list-plugins).
-
-For each binary, you can find out more about it by using the `version` verb in the command line. For example:
-
-```shell
-$ build/infrakit-group-default version
-Version: c7a04c2
-Revision: c7a04c2e6b46c2b1c6cb8e8c33fbe3d897e58eec
-```
 
 ## Docs
 

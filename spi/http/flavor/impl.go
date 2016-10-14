@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/infrakit/plugin"
 	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/plugin/util/server"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 )
@@ -16,7 +17,7 @@ type client struct {
 	c plugin.Callable
 }
 
-type server struct {
+type flavorServer struct {
 	plugin flavor.Plugin
 }
 
@@ -28,11 +29,11 @@ func PluginClient(c plugin.Callable) flavor.Plugin {
 // PluginServer returns an instance of the Plugin
 func PluginServer(p flavor.Plugin) http.Handler {
 
-	server := &server{plugin: p}
-	return util.BuildHandler([]func() (plugin.Endpoint, plugin.Handler){
-		server.validate,
-		server.prepare,
-		server.healthy,
+	f := &flavorServer{plugin: p}
+	return server.BuildHandler([]func() (plugin.Endpoint, plugin.Handler){
+		f.validate,
+		f.prepare,
+		f.healthy,
 	})
 }
 
@@ -42,7 +43,7 @@ func (c *client) Validate(flavorProperties json.RawMessage) (flavor.AllocationMe
 	return response, err
 }
 
-func (s *server) validate() (plugin.Endpoint, plugin.Handler) {
+func (s *flavorServer) validate() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Validate"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -67,7 +68,7 @@ func (c *client) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (
 	return instanceSpec, err
 }
 
-func (s *server) prepare() (plugin.Endpoint, plugin.Handler) {
+func (s *flavorServer) prepare() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.PreProvision"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -97,7 +98,7 @@ func (c *client) Healthy(inst instance.Description) (bool, error) {
 	return response.Healthy, err
 }
 
-func (s *server) healthy() (plugin.Endpoint, plugin.Handler) {
+func (s *flavorServer) healthy() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Healthy"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {

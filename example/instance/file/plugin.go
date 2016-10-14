@@ -9,6 +9,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/afero"
+	"math/rand"
 )
 
 // This example uses local files as a representation of an instance.  When we
@@ -20,6 +21,10 @@ import (
 
 // Spec is just whatever that can be unmarshalled into a generic JSON map
 type Spec map[string]interface{}
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+}
 
 // fileInstance represents a single file instance on disk.
 type fileInstance struct {
@@ -58,7 +63,7 @@ func (p *plugin) Validate(req json.RawMessage) error {
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// simply writes a file
 	// use timestamp as instance id
-	id := instance.ID(fmt.Sprintf("instance-%d", time.Now().Unix()))
+	id := instance.ID(fmt.Sprintf("instance-%d", rand.Int63()))
 	buff, err := json.MarshalIndent(fileInstance{
 		Description: instance.Description{
 			Tags:      spec.Tags,

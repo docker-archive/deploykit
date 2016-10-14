@@ -3,14 +3,15 @@ package group
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"math/rand"
 	"testing"
 
-	"github.com/docker/infrakit/plugin/util"
+	plugin_client "github.com/docker/infrakit/plugin/util/client"
+	"github.com/docker/infrakit/plugin/util/server"
 	"github.com/docker/infrakit/spi/group"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	"path"
 )
 
 type testPlugin struct {
@@ -45,12 +46,17 @@ func (t *testPlugin) DestroyGroup(id group.ID) error {
 	return t.DoDestroyGroup(id)
 }
 
-func listenAddr() string {
-	return fmt.Sprintf("tcp://:%d", rand.Int()%10000+1000)
+func tempSocket() string {
+	dir, err := ioutil.TempDir("", "infrakit-test-")
+	if err != nil {
+		panic(err)
+	}
+
+	return path.Join(dir, "group-impl-test")
 }
 
 func TestGroupPluginWatchGroup(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"foo":"bar"}`))
 	groupSpecActual := make(chan group.Spec, 1)
@@ -59,19 +65,16 @@ func TestGroupPluginWatchGroup(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoWatchGroup: func(req group.Spec) error {
 			groupSpecActual <- req
 			return nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
 	// Make call
-	err = groupPluginClient.WatchGroup(groupSpec)
+	err = PluginClient(plugin_client.New(socketPath)).WatchGroup(groupSpec)
 	require.NoError(t, err)
 
 	close(stop)
@@ -80,7 +83,7 @@ func TestGroupPluginWatchGroup(t *testing.T) {
 }
 
 func TestGroupPluginWatchGroupError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"foo":"bar"}`))
 	groupSpecActual := make(chan group.Spec, 1)
@@ -89,19 +92,15 @@ func TestGroupPluginWatchGroupError(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoWatchGroup: func(req group.Spec) error {
 			groupSpecActual <- req
 			return errors.New("error")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.WatchGroup(groupSpec)
+	err = PluginClient(plugin_client.New(socketPath)).WatchGroup(groupSpec)
 	require.Error(t, err)
 	require.Equal(t, "error", err.Error())
 
@@ -111,7 +110,7 @@ func TestGroupPluginWatchGroupError(t *testing.T) {
 }
 
 func TestGroupPluginDescribeUpdate(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"foo":"bar"}`))
 	groupSpecActual := make(chan group.Spec, 1)
@@ -120,19 +119,15 @@ func TestGroupPluginDescribeUpdate(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeUpdate: func(req group.Spec) (string, error) {
 			groupSpecActual <- req
 			return "hello", nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	desc, err := groupPluginClient.DescribeUpdate(groupSpec)
+	desc, err := PluginClient(plugin_client.New(socketPath)).DescribeUpdate(groupSpec)
 	require.NoError(t, err)
 	require.Equal(t, "hello", desc)
 
@@ -141,7 +136,7 @@ func TestGroupPluginDescribeUpdate(t *testing.T) {
 }
 
 func TestGroupPluginDescribeUpdateError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"foo":"bar"}`))
 	groupSpecActual := make(chan group.Spec, 1)
@@ -150,19 +145,15 @@ func TestGroupPluginDescribeUpdateError(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeUpdate: func(req group.Spec) (string, error) {
 			groupSpecActual <- req
 			return "", errors.New("error")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	_, err = groupPluginClient.DescribeUpdate(groupSpec)
+	_, err = PluginClient(plugin_client.New(socketPath)).DescribeUpdate(groupSpec)
 	require.Error(t, err)
 	require.Equal(t, "error", err.Error())
 
@@ -172,7 +163,7 @@ func TestGroupPluginDescribeUpdateError(t *testing.T) {
 }
 
 func TestGroupPluginUpdateGroup(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"foo":"bar"}`))
 	groupSpecActual := make(chan group.Spec, 1)
@@ -181,19 +172,15 @@ func TestGroupPluginUpdateGroup(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoUpdateGroup: func(req group.Spec) error {
 			groupSpecActual <- req
 			return nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.UpdateGroup(groupSpec)
+	err = PluginClient(plugin_client.New(socketPath)).UpdateGroup(groupSpec)
 	require.NoError(t, err)
 
 	close(stop)
@@ -202,7 +189,7 @@ func TestGroupPluginUpdateGroup(t *testing.T) {
 }
 
 func TestGroupPluginUpdateGroupError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"foo":"bar"}`))
 	groupSpecActual := make(chan group.Spec, 1)
@@ -211,19 +198,15 @@ func TestGroupPluginUpdateGroupError(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoUpdateGroup: func(req group.Spec) error {
 			groupSpecActual <- req
 			return errors.New("error")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.UpdateGroup(groupSpec)
+	err = PluginClient(plugin_client.New(socketPath)).UpdateGroup(groupSpec)
 	require.Error(t, err)
 	require.Equal(t, "error", err.Error())
 
@@ -233,23 +216,19 @@ func TestGroupPluginUpdateGroupError(t *testing.T) {
 }
 
 func TestGroupPluginUnwatchGroup(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoUnwatchGroup: func(req group.ID) error {
 			idActual <- req
 			return nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.UnwatchGroup(id)
+	err = PluginClient(plugin_client.New(socketPath)).UnwatchGroup(id)
 	require.NoError(t, err)
 
 	close(stop)
@@ -257,23 +236,19 @@ func TestGroupPluginUnwatchGroup(t *testing.T) {
 }
 
 func TestGroupPluginUnwatchGroupError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoUnwatchGroup: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.UnwatchGroup(id)
+	err = PluginClient(plugin_client.New(socketPath)).UnwatchGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -282,23 +257,19 @@ func TestGroupPluginUnwatchGroupError(t *testing.T) {
 }
 
 func TestGroupPluginStopUpdate(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoStopUpdate: func(req group.ID) error {
 			idActual <- req
 			return nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.StopUpdate(id)
+	err = PluginClient(plugin_client.New(socketPath)).StopUpdate(id)
 	require.NoError(t, err)
 
 	close(stop)
@@ -306,23 +277,19 @@ func TestGroupPluginStopUpdate(t *testing.T) {
 }
 
 func TestGroupPluginStopUpdateError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoStopUpdate: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.StopUpdate(id)
+	err = PluginClient(plugin_client.New(socketPath)).StopUpdate(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -331,23 +298,19 @@ func TestGroupPluginStopUpdateError(t *testing.T) {
 }
 
 func TestGroupPluginDestroyGroup(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDestroyGroup: func(req group.ID) error {
 			idActual <- req
 			return nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.DestroyGroup(id)
+	err = PluginClient(plugin_client.New(socketPath)).DestroyGroup(id)
 	require.NoError(t, err)
 
 	close(stop)
@@ -355,23 +318,19 @@ func TestGroupPluginDestroyGroup(t *testing.T) {
 }
 
 func TestGroupPluginDestroyGroupError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDestroyGroup: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	err = groupPluginClient.DestroyGroup(id)
+	err = PluginClient(plugin_client.New(socketPath)).DestroyGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -380,7 +339,7 @@ func TestGroupPluginDestroyGroupError(t *testing.T) {
 }
 
 func TestGroupPluginInspectGroup(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
@@ -391,19 +350,15 @@ func TestGroupPluginInspectGroup(t *testing.T) {
 		},
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoInspectGroup: func(req group.ID) (group.Description, error) {
 			idActual <- req
 			return desc, nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	res, err := groupPluginClient.InspectGroup(id)
+	res, err := PluginClient(plugin_client.New(socketPath)).InspectGroup(id)
 	require.NoError(t, err)
 	require.Equal(t, desc, res)
 
@@ -412,7 +367,7 @@ func TestGroupPluginInspectGroup(t *testing.T) {
 }
 
 func TestGroupPluginInspectGroupError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
@@ -422,19 +377,15 @@ func TestGroupPluginInspectGroupError(t *testing.T) {
 		},
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoInspectGroup: func(req group.ID) (group.Description, error) {
 			idActual <- req
 			return desc, errors.New("no")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	groupPluginClient := PluginClient(callable)
 
-	// Make call
-	_, err = groupPluginClient.InspectGroup(id)
+	_, err = PluginClient(plugin_client.New(socketPath)).InspectGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 

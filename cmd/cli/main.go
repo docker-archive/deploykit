@@ -1,81 +1,47 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/cli"
 	"github.com/docker/infrakit/discovery"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-// This is a generic client for infrakit
-
-var (
-	// Version is the build release identifier.
-	Version = "Unspecified"
-
-	// Revision is the build source control revision.
-	Revision = "Unspecified"
-)
+// A generic client for infrakit
 
 func main() {
 
-	logLevel := len(log.AllLevels) - 2
-	discoveryDir := "/run/infrakit/plugins"
+	logLevel := cli.DefaultLogLevel
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "infrakit cli",
 		PersistentPreRun: func(c *cobra.Command, args []string) {
-			if logLevel > len(log.AllLevels)-1 {
-				logLevel = len(log.AllLevels) - 1
-			} else if logLevel < 0 {
-				logLevel = 0
-			}
-			log.SetLevel(log.AllLevels[logLevel])
+			cli.SetLogLevel(logLevel)
 		},
 	}
 
-	cmd.AddCommand(&cobra.Command{
-		Use:   "version",
-		Short: "Print build version information",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			buff, err := json.MarshalIndent(map[string]interface{}{
-				"description": "infrakit cli",
-				"version":     Version,
-				"revision":    Revision,
-			}, "  ", "  ")
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(buff))
-			return nil
-		},
-	})
+	cmd.AddCommand(cli.VersionCommand())
 
-	f := func() *discovery.Dir {
-		d, err := discovery.NewDir(viper.GetString("discovery"))
+	f := func() discovery.Plugins {
+		d, err := discovery.NewPluginDiscovery()
 		if err != nil {
-			log.Errorf("Failed to initialize plugin discovery: %s", err)
+			log.Fatalf("Failed to initialize plugin discovery: %s", err)
 			os.Exit(1)
 		}
 		return d
 	}
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
 
-	cmd.PersistentFlags().String("discovery", discoveryDir, "Dir discovery path for plugin discovery")
-	viper.BindEnv("discovery", "INFRAKIT_PLUGINS_DIR")
-	viper.BindPFlag("discovery", cmd.PersistentFlags().Lookup("discovery"))
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()
 	if err != nil {
-		log.Error(err)
+		log.Fatal(err)
 		os.Exit(1)
 	}
 }

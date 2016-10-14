@@ -18,7 +18,7 @@ const (
 	DefaultGroupPluginName = "group"
 )
 
-func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
+func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	name := DefaultGroupPluginName
 	var groupPlugin group.Plugin
@@ -28,7 +28,7 @@ func groupPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 		Short: "Access group plugin",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 
-			callable, err := pluginDir().PluginByName(name)
+			callable, err := plugins().Find(name)
 			if err != nil {
 				return err
 			}

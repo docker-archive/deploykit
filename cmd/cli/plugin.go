@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func pluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
+func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "plugin",
@@ -17,7 +17,7 @@ func pluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 		Use:   "ls",
 		Short: "List available plugins",
 		RunE: func(c *cobra.Command, args []string) error {
-			entries, err := pluginDir().List()
+			entries, err := plugins().List()
 			if err != nil {
 				return err
 			}

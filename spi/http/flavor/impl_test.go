@@ -3,18 +3,24 @@ package flavor
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"math/rand"
 	"testing"
 
-	"github.com/docker/infrakit/plugin/util"
+	plugin_client "github.com/docker/infrakit/plugin/util/client"
+	"github.com/docker/infrakit/plugin/util/server"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	"path"
 )
 
-func listenAddr() string {
-	return fmt.Sprintf("tcp://:%d", rand.Int()%10000+1000)
+func tempSocket() string {
+	dir, err := ioutil.TempDir("", "infrakit-test-")
+	if err != nil {
+		panic(err)
+	}
+
+	return path.Join(dir, "flavor-impl-test")
 }
 
 type testPlugin struct {
@@ -34,7 +40,7 @@ func (t *testPlugin) Healthy(inst instance.Description) (bool, error) {
 }
 
 func TestFlavorPluginValidate(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -42,7 +48,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 	allocation := flavor.AllocationMethod{
 		Size: 10,
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoValidate: func(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
 			inputFlavorPropertiesActual <- flavorProperties
 			return allocation, nil
@@ -50,13 +56,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	flavorPluginClient := PluginClient(callable)
-
-	// Make call
-	alloc, err := flavorPluginClient.Validate(inputFlavorProperties)
+	alloc, err := PluginClient(plugin_client.New(socketPath)).Validate(inputFlavorProperties)
 	require.NoError(t, err)
 	require.Equal(t, allocation, alloc)
 
@@ -66,7 +66,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 }
 
 func TestFlavorPluginValidateError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -75,7 +75,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 		LogicalIDs: []instance.LogicalID{instance.LogicalID("overlord")},
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoValidate: func(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
 			inputFlavorPropertiesActual <- flavorProperties
 			return allocation, errors.New("something-went-wrong")
@@ -83,13 +83,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	flavorPluginClient := PluginClient(callable)
-
-	// Make call
-	_, err = flavorPluginClient.Validate(inputFlavorProperties)
+	_, err = PluginClient(plugin_client.New(socketPath)).Validate(inputFlavorProperties)
 	require.Error(t, err)
 	require.Equal(t, "something-went-wrong", err.Error())
 
@@ -98,7 +92,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 }
 
 func TestFlavorPluginPrepare(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -108,7 +102,7 @@ func TestFlavorPluginPrepare(t *testing.T) {
 		Tags:       map[string]string{"foo": "bar"},
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoPrepare: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
@@ -119,13 +113,7 @@ func TestFlavorPluginPrepare(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	flavorPluginClient := PluginClient(callable)
-
-	// Make call
-	spec, err := flavorPluginClient.Prepare(inputFlavorProperties, inputInstanceSpec)
+	spec, err := PluginClient(plugin_client.New(socketPath)).Prepare(inputFlavorProperties, inputInstanceSpec)
 	require.NoError(t, err)
 	require.Equal(t, inputInstanceSpec, spec)
 
@@ -136,7 +124,7 @@ func TestFlavorPluginPrepare(t *testing.T) {
 }
 
 func TestFlavorPluginPrepareError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -146,7 +134,7 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 		Tags:       map[string]string{"foo": "bar"},
 	}
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoPrepare: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
@@ -157,13 +145,7 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	flavorPluginClient := PluginClient(callable)
-
-	// Make call
-	_, err = flavorPluginClient.Prepare(inputFlavorProperties, inputInstanceSpec)
+	_, err = PluginClient(plugin_client.New(socketPath)).Prepare(inputFlavorProperties, inputInstanceSpec)
 	require.Error(t, err)
 	require.Equal(t, "bad-thing-happened", err.Error())
 
@@ -174,14 +156,14 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 }
 
 func TestFlavorPluginHealthy(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	inputInstanceActual := make(chan instance.Description, 1)
 	inputInstance := instance.Description{
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoHealthy: func(inst instance.Description) (bool, error) {
 			inputInstanceActual <- inst
 			return true, nil
@@ -189,13 +171,7 @@ func TestFlavorPluginHealthy(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	flavorPluginClient := PluginClient(callable)
-
-	// Make call
-	healthy, err := flavorPluginClient.Healthy(inputInstance)
+	healthy, err := PluginClient(plugin_client.New(socketPath)).Healthy(inputInstance)
 	require.NoError(t, err)
 	require.True(t, healthy)
 
@@ -204,14 +180,14 @@ func TestFlavorPluginHealthy(t *testing.T) {
 }
 
 func TestFlavorPluginHealthyError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	inputInstanceActual := make(chan instance.Description, 1)
 	inputInstance := instance.Description{
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoHealthy: func(inst instance.Description) (bool, error) {
 			inputInstanceActual <- inst
 			return true, errors.New("oh-noes")
@@ -219,13 +195,7 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	flavorPluginClient := PluginClient(callable)
-
-	// Make call
-	_, err = flavorPluginClient.Healthy(inputInstance)
+	_, err = PluginClient(plugin_client.New(socketPath)).Healthy(inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 

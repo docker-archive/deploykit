@@ -1,4 +1,4 @@
-package util
+package server
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/plugin"
+	"github.com/docker/infrakit/plugin/util"
 	"github.com/gorilla/mux"
 )
 
@@ -27,7 +28,7 @@ func BuildHandler(endpoints []func() (plugin.Endpoint, plugin.Handler)) http.Han
 
 		endpoint, serve := f()
 
-		ep, err := GetHTTPEndpoint(endpoint)
+		ep, err := util.GetHTTPEndpoint(endpoint)
 		if err != nil {
 			panic(err) // This is system initialization so we have to panic
 		}

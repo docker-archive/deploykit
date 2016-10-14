@@ -54,17 +54,17 @@ From the top level directory of the project:
 
 ```shell
 # The instance plugin:
-$ build/infrakit-instance-terraform --log 5 --dir $(pwd)/example/instance/terraform/aws-two-tier/
+$ build/infrakit-instance-terraform --dir $(pwd)/example/instance/terraform/aws-two-tier/
 ```
 
 ```shell
 # The group plugin
-$ build/infrakit-group-default --log 5
+$ build/infrakit-group-default
 ```
 
 ```shell
 # The vanilla flavor
-$ build/infrakit-flavor-vanilla --log 5
+$ build/infrakit-flavor-vanilla
 ```
 
 ## 3. List all the instances
