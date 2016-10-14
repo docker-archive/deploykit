@@ -83,8 +83,8 @@ and development aides.  With the exception of those listed as
 development and for use at your own risk.
 
 Over time, we would prefer to phase out reference Plugins that appear to provide real value for implementations that
-are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit.aws/issues/new)
-to start a discussion before writing non-trivial code to contribute to these plugins.
+are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit/issues/new)
+to start a discussion before contributing to these plugins with non-trivial code.
 
 | plugin                                            | type     | description                             |
 |:--------------------------------------------------|:---------|:----------------------------------------|
