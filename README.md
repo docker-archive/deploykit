@@ -130,16 +130,16 @@ mkdir -p ~/go/src/github.com/docker
 cd !$
 git clone git@github.com:docker/infrakit.git
 cd infrakit
-
 ```
 
-Also install a few tools
+We recommended go version 1.7.1 or greater for all platforms.
+
+Also install a few build tools
 
 ```shell
 go get -u github.com/kardianos/govendor  # the dependency manager
 go get -u github.com/golang/lint/golint  # if you're running tests
 ```
-Now you are ready to go.
 
 ### Running tests
 ```shell
