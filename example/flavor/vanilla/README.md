@@ -4,11 +4,11 @@ InfraKit Flavor Plugin - Vanilla
 This is a plain vanilla flavor plugin that doesn't do anything special. However, it
 
   + Lets the user specify the [`AllocationMethod`](/spi/flavor/spi.go) which determines the size
-  of the group by either specifying a size or by a list of logical ids.
-  + Lets the user specify the labels to tag the instances with
-  + Lets the user specify the `UserData` which determine the instance's `Init` (init script).
+  of the group by either specifying a size or by a list of logical ids
+  + Lets the user specify the tags to include on Instances
+  + Lets the user specify the Instance's `Init` string
 
-While we can specify a list of logical ID's (for example, IP addresses), the UserData and Labels
+While we can specify a list of logical ID's (for example, IP addresses), `Init` and `Tags`
 are all statically defined in the config JSON.  This means all the members of the group are
 considered identical.
 
@@ -24,17 +24,16 @@ configuration of this plugin looks like:
 
 ```
 {
-    "Size" : 5,
-
-    "UserData" : [
+    "Size": 5,
+    "Init": [
         "sudo apt-get update -y",
         "sudo apt-get install -y nginx",
         "sudo service nginx start"
     ],
 
-    "Labels" : {
-        "tier" : "web",
-        "project" : "infrakit"
+    "Tags": {
+        "tier": "web",
+        "project": "infrakit"
     }
 }
 ```
@@ -52,17 +51,15 @@ may look like:
         },
         "FlavorPlugin": "flavor-plain",
         "FlavorPluginProperties": {
-            "Size" : 5,
-
-            "UserData" : [
+            "Size": 5,
+            "Init": [
                 "sudo apt-get update -y",
                 "sudo apt-get install -y nginx",
                 "sudo service nginx start"
             ],
-
-            "Labels" : {
-                "tier" : "web",
-                "project" : "infrakit"
+            "Tags": {
+                "tier": "web",
+                "project": "infrakit"
             }
         }
 
@@ -70,8 +67,7 @@ may look like:
 }
 ```
 
-Or with assigned ID's:
-
+Or with assigned IDs:
 ```
 {
     "ID": "named-cattle",
@@ -82,23 +78,21 @@ Or with assigned ID's:
         },
         "FlavorPlugin": "flavor-vanilla",
         "FlavorPluginProperties": {
-            "LogicalIDs" : [
+            "LogicalIDs": [
                 "192.168.0.1",
                 "192.168.0.2",
                 "192.168.0.3",
                 "192.168.0.4",
                 "192.168.0.5"
             ],
-
-            "UserData" : [
+            "Init": [
                 "sudo apt-get update -y",
                 "sudo apt-get install -y nginx",
                 "sudo service nginx start"
             ],
-
-            "Labels" : {
-                "tier" : "web",
-                "project" : "infrakit"
+            "Tags": {
+                "tier": "web",
+                "project": "infrakit"
             }
         }
 
@@ -149,26 +143,24 @@ Then in your JSON config for the default group plugin, you would reference it by
 {
     "ID": "cattle",
     "Properties": {
-        "Instance" : {
+        "Instance": {
             "Plugin": "instance-file",
             "Properties": {
                 "Note": "Here is a property that only the instance plugin cares about"
             }
         },
         "Flavor": {
-            "Plugin" : "french-vanilla",
+            "Plugin": "french-vanilla",
             "Properties": {
-                "Size" : 5,
-
-                "UserData" : [
+                "Size": 5,
+                "Init": [
                     "sudo apt-get update -y",
                     "sudo apt-get install -y nginx",
                     "sudo service nginx start"
                 ],
-
-                "Labels" : {
-                    "tier" : "web",
-                    "project" : "infrakit"
+                "Tags": {
+                    "tier": "web",
+                    "project": "infrakit"
                 }
             }
         }
@@ -183,26 +175,24 @@ $ build/infrakit group --name group watch << EOF
 > {
 >     "ID": "cattle",
 >     "Properties": {
->         "Instance" : {
+>         "Instance": {
 >             "Plugin": "instance-file",
 >             "Properties": {
 >                 "Note": "Here is a property that only the instance plugin cares about"
 >             }
 >         },
 >         "Flavor": {
->             "Plugin" : "french-vanilla",
+>             "Plugin": "french-vanilla",
 >             "Properties": {
->                 "Size" : 5,
-> 
->                 "UserData" : [
+>                 "Size": 5,
+>                 "Init": [
 >                     "sudo apt-get update -y",
 >                     "sudo apt-get install -y nginx",
 >                     "sudo service nginx start"
 >                 ],
-> 
->                 "Labels" : {
->                     "tier" : "web",
->                     "project" : "infrakit"
+>                 "Tags": {
+>                     "tier": "web",
+>                     "project": "infrakit"
 >                 }
 >             }
 >         }
@@ -210,5 +200,4 @@ $ build/infrakit group --name group watch << EOF
 > }
 > EOF
 watching cattle
-
 ```

@@ -1,14 +1,12 @@
 {
-    "Size" : 5,
-
-    "UserData" : [
+    "Size": 5,
+    "Init": [
         "sudo apt-get update -y",
         "sudo apt-get install -y nginx",
         "sudo service nginx start"
     ],
-
-    "Labels" : {
-        "tier" : "web",
-        "project" : "infrakit"
+    "Tags": {
+        "tier": "web",
+        "project": "infrakit"
     }
 }

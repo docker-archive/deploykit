@@ -12,16 +12,16 @@ import (
 type Spec struct {
 	flavor.AllocationMethod
 
-	// UserData
-	UserData []string
+	// Init
+	Init []string
 
-	// Labels
-	Labels map[string]string
+	// Tags
+	Tags map[string]string
 }
 
 // NewPlugin creates a Flavor plugin that doesn't do very much. It assumes instances are
 // identical (cattles) but can assume specific identities (via the LogicalIDs).  The
-// instances here are treated identically because we have constant UserData that applies
+// instances here are treated identically because we have constant Init that applies
 // to all instances
 func NewPlugin() flavor.Plugin {
 	return vanillaFlavor(0)
@@ -46,17 +46,17 @@ func (f vanillaFlavor) Prepare(flavor json.RawMessage, instance instance.Spec) (
 		return instance, err
 	}
 
-	// Merge UserData into Init
+	// Append Init
 	lines := []string{}
 	if instance.Init != "" {
 		lines = append(lines, instance.Init)
 	}
-	lines = append(lines, s.UserData...)
+	lines = append(lines, s.Init...)
 
 	instance.Init = strings.Join(lines, "\n")
 
-	// Add user Labels as tags
-	for k, v := range s.Labels {
+	// Append tags
+	for k, v := range s.Tags {
 		if instance.Tags == nil {
 			instance.Tags = map[string]string{}
 		}

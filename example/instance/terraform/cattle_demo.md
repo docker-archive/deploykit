@@ -13,31 +13,31 @@ shows a simple group of cattle nodes provisioned using Terraform:
 {
     "ID": "terraform_demo",
     "Properties": {
-        "Instance" : {
+        "Instance": {
             "Plugin": "instance-terraform",
             "Properties": {
-                "type" : "aws_instance",
-                "value" : {
-                    "ami" : "${lookup(var.aws_amis, var.aws_region)}",
-                    "instance_type" : "t2.micro",
+                "type": "aws_instance",
+                "value": {
+                    "ami": "${lookup(var.aws_amis, var.aws_region)}",
+                    "instance_type": "t2.micro",
                     "key_name": "chungers-ssh",
-                    "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
+                    "vpc_security_group_ids": ["${aws_security_group.default.id}"],
                     "subnet_id": "${aws_subnet.default.id}",
-                    "tags" :  {
-                        "Tier" : "web",
-                        "provisioner" : "infrakit-terraform-demo"
+                    "tags":  {
+                        "Tier": "web",
+                        "provisioner": "infrakit-terraform-demo"
                     },
-                    "connection" : {
-                        "user" : "ubuntu"
+                    "connection": {
+                        "user": "ubuntu"
                     }
                 }
             }
         },
-        "Flavor" : {
+        "Flavor": {
             "Plugin": "flavor-vanilla",
             "Properties": {
-                "Size" : 5,
-                "UserData" : [
+                "Size": 5,
+                "Init": [
                     "sudo apt-get update -y",
                     "sudo apt-get install -y nginx",
                     "sudo service nginx start"

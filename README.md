@@ -104,7 +104,7 @@ however, the members may require special handling and demand stronger notions of
 
 | plugin| description                  |
 |:------|:-----------------------------|
-| [vanilla](plugin/flavor/vanilla) | A vanilla flavor that lets you configure by user data and labels |
+| [vanilla](plugin/flavor/vanilla) | A Flavor that directly populates Instance fields |
 | [zookeeper](plugin/flavor/zookeeper) | For handling of zookeeper ensemble members |
 | [swarm](plugin/flavor/swarm) | configures instances with Docker in Swarm mode |
 
