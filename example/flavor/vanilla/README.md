@@ -20,7 +20,7 @@ the plugin.  This plugin simply applies the static configuration.
 ## Schema
 
 Here's a skeleton of this Plugin's schema:
-```
+```json
 {
     "Size" : 0,
     "LogicalIDs": [],
@@ -38,7 +38,7 @@ The supported fields are:
 * `Labels`: a string-string mapping of keys and values to add as Instance Tags
 
 Here's an example Group configuration using the default [infrakit/group](/cmd/group) Plugin and the Vanilla Plugin:
-```
+```json
 {
     "ID": "cattle",
     "Properties": {
@@ -65,7 +65,7 @@ Here's an example Group configuration using the default [infrakit/group](/cmd/gr
 ```
 
 Or with assigned IDs:
-```
+```json
 {
     "ID": "named-cattle",
     "Properties": {

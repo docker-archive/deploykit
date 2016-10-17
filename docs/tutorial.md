@@ -66,50 +66,8 @@ So now we have the names of the plugins and their configurations.
 
 Putting everything together, we have the configuration to give to the default Group plugin:
 
-```json
-{
-    "ID": "cattle",
-    "Properties": {
-        "Instance": {
-            "Plugin": "instance-file",
-            "Properties": {
-                "Note": "Instance properties version 1.0"
-            }
-        },
-        "Flavor": {
-            "Plugin": "flavor-vanilla",
-            "Properties": {
-                "Size": 5,
-                "Init": [
-                    "docker pull nginx:alpine",
-                    "docker run -d -p 80:80 nginx-alpine"
-                ],
-                "Tags": {
-                    "tier": "web",
-                    "project": "infrakit"
-                }
-            }
-        }
-    }
-}
-```
-
-Note that we specify the number of instances via the `Size` parameter in the `flavor-vanilla` plugin.  It's possible
-that a specialized flavor plugin doesn't even accept a size for the group, but rather computes the optimal size based on
-some criteria.
-
-Checking for the instances via the CLI:
-
 ```shell
-$ build/infrakit instance --name instance-file describe
-ID                              LOGICAL                         TAGS
-
-```
-
-Let's tell the group plugin to `watch` our group by providing the group plugin with the configuration:
-
-```shell
-$ build/infrakit group watch <<EOF
+$ cat << EOF > cattle.json
 {
     "ID": "cattle",
     "Properties": {
@@ -136,13 +94,25 @@ $ build/infrakit group watch <<EOF
     }
 }
 EOF
-watching cattle
 ```
 
-**_NOTE:_** You can also specify a file name to load from instead of using stdin, like this:
+Note that we specify the number of instances via the `Size` parameter in the `flavor-vanilla` plugin.  It's possible
+that a specialized Flavor plugin doesn't even accept a size for the group, but rather computes the optimal size based on
+some criteria.
+
+Checking for the instances via the CLI:
 
 ```shell
-$ build/infrakit group watch group.json
+$ build/infrakit instance --name instance-file describe
+ID                              LOGICAL                         TAGS
+
+```
+
+Let's tell the group plugin to `watch` our group by providing the group plugin with the configuration:
+
+```shell
+$ build/infrakit group watch cattle.json
+watching cattle
 ```
 
 The group plugin is responsible for ensuring that the infrastructure state matches with your specifications.  Since we
@@ -171,38 +141,8 @@ instance-1475104966           	  -             infrakit.config_sha=Y23cKqyRpkQ_M
 
 Now let's update the configuration by changing the size of the group and a property of the instance:
 
-```json
-{
-    "ID": "cattle",
-    "Properties": {
-        "Instance": {
-            "Plugin": "instance-file",
-            "Properties": {
-                "Note": "Instance properties version 2.0"
-            }
-        },
-        "Flavor": {
-            "Plugin": "flavor-vanilla",
-            "Properties": {
-                "Size": 10,
-                "Init": [
-                    "docker pull nginx:alpine",
-                    "docker run -d -p 80:80 nginx-alpine"
-                ],
-                "Tags": {
-                    "tier": "web",
-                    "project": "infrakit"
-                }
-            }
-        }
-    }
-}
-```
-
-(You can also save the edits in a new file, `group2.json`).
-
 ```shell
-$ diff group.json group2.json 
+$ diff cattle.json cattle2.json 
 7c7
 <                 "Note": "Instance properties version 1.0"
 ---
@@ -212,10 +152,10 @@ $ diff group.json group2.json
 ---
 >                 "Size": 10,
 ```
-Before we do an update, we can see what the proposed changes are:
 
-```
-$ build/infrakit group describe group2.json 
+Before we do an update, we can see what the proposed changes are:
+```shell
+$ build/infrakit group describe cattle2.json 
 cattle : Performs a rolling update on 5 instances, then adds 5 instances to increase the group size to 10
 ```
 
@@ -225,7 +165,7 @@ be created.
 Let's apply the new config:
 
 ```shell
-$ build/infrakit group update group2.json 
+$ build/infrakit group update cattle2.json 
 
 # ..... wait a bit...
 update cattle completed
@@ -277,7 +217,7 @@ original specification of 10 instances.
 
 Finally, let's clean up:
 
-```
+```shell
 $ build/infrakit group destroy cattle
 ```
 
