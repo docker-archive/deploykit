@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/infrakit/plugin"
 	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/plugin/util/server"
 	"github.com/docker/infrakit/spi/instance"
 )
 
@@ -16,19 +17,19 @@ type client struct {
 	c plugin.Callable
 }
 
-type server struct {
+type instanceServer struct {
 	plugin instance.Plugin
 }
 
 // PluginServer returns an instance of the Plugin
 func PluginServer(p instance.Plugin) http.Handler {
 
-	server := &server{plugin: p}
-	return util.BuildHandler([]func() (plugin.Endpoint, plugin.Handler){
-		server.validate,
-		server.provision,
-		server.destroy,
-		server.describeInstances,
+	i := &instanceServer{plugin: p}
+	return server.BuildHandler([]func() (plugin.Endpoint, plugin.Handler){
+		i.validate,
+		i.provision,
+		i.destroy,
+		i.describeInstances,
 	})
 }
 
@@ -42,7 +43,7 @@ func (c *client) Validate(req json.RawMessage) error {
 	return err
 }
 
-func (s *server) validate() (plugin.Endpoint, plugin.Handler) {
+func (s *instanceServer) validate() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Instance.Validate"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -64,7 +65,7 @@ func (c *client) Provision(spec instance.Spec) (*instance.ID, error) {
 	return envelope.ID, err
 }
 
-func (s *server) provision() (plugin.Endpoint, plugin.Handler) {
+func (s *instanceServer) provision() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Instance.Provision"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -83,7 +84,7 @@ func (c *client) Destroy(instance instance.ID) error {
 	return err
 }
 
-func (s *server) destroy() (plugin.Endpoint, plugin.Handler) {
+func (s *instanceServer) destroy() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Instance.Destroy/{id}"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
@@ -99,7 +100,7 @@ func (c *client) DescribeInstances(tags map[string]string) ([]instance.Descripti
 
 }
 
-func (s *server) describeInstances() (plugin.Endpoint, plugin.Handler) {
+func (s *instanceServer) describeInstances() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Instance.DescribeInstances"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {

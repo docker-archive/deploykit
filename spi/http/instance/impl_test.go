@@ -3,18 +3,15 @@ package instance
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"math/rand"
 	"testing"
 
-	"github.com/docker/infrakit/plugin/util"
+	plugin_client "github.com/docker/infrakit/plugin/util/client"
+	"github.com/docker/infrakit/plugin/util/server"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	"path"
 )
-
-func listenAddr() string {
-	return fmt.Sprintf("tcp://:%d", rand.Int()%10000+1000)
-}
 
 type testPlugin struct {
 	// Validate performs local validation on a provision request.
@@ -43,15 +40,24 @@ func (t *testPlugin) DescribeInstances(tags map[string]string) ([]instance.Descr
 	return t.DoDescribeInstances(tags)
 }
 
+func tempSocket() string {
+	dir, err := ioutil.TempDir("", "infrakit-test-")
+	if err != nil {
+		panic(err)
+	}
+
+	return path.Join(dir, "instance-impl-test")
+}
+
 func TestInstancePluginValidate(t *testing.T) {
 
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 
 	rawActual := make(chan json.RawMessage, 1)
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoValidate: func(req json.RawMessage) error {
 
 			rawActual <- req
@@ -61,13 +67,7 @@ func TestInstancePluginValidate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	instancePluginClient := PluginClient(callable)
-
-	// Make call
-	err = instancePluginClient.Validate(raw)
+	err = PluginClient(plugin_client.New(socketPath)).Validate(raw)
 	require.NoError(t, err)
 
 	close(stop)
@@ -77,11 +77,11 @@ func TestInstancePluginValidate(t *testing.T) {
 
 func TestInstancePluginValidateError(t *testing.T) {
 
-	listen := listenAddr()
+	socketPath := tempSocket()
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 	rawActual := make(chan json.RawMessage, 1)
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoValidate: func(req json.RawMessage) error {
 
 			rawActual <- req
@@ -91,13 +91,7 @@ func TestInstancePluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	instancePluginClient := PluginClient(callable)
-
-	// Make call
-	err = instancePluginClient.Validate(raw)
+	err = PluginClient(plugin_client.New(socketPath)).Validate(raw)
 	require.Error(t, err)
 	require.Equal(t, "whoops", err.Error())
 
@@ -106,14 +100,14 @@ func TestInstancePluginValidateError(t *testing.T) {
 }
 
 func TestInstancePluginProvisionNil(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
 	spec := instance.Spec{
 		Properties: &raw,
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
 			specActual <- req
 			return nil, nil
@@ -121,14 +115,8 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	instancePluginClient := PluginClient(callable)
-
-	// Make call
 	var id *instance.ID
-	id, err = instancePluginClient.Provision(spec)
+	id, err = PluginClient(plugin_client.New(socketPath)).Provision(spec)
 	require.NoError(t, err)
 	require.Nil(t, id)
 
@@ -138,14 +126,14 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 }
 
 func TestInstancePluginProvision(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
 	spec := instance.Spec{
 		Properties: &raw,
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
 			specActual <- req
 			v := instance.ID("test")
@@ -154,14 +142,8 @@ func TestInstancePluginProvision(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	instancePluginClient := PluginClient(callable)
-
-	// Make call
 	var id *instance.ID
-	id, err = instancePluginClient.Provision(spec)
+	id, err = PluginClient(plugin_client.New(socketPath)).Provision(spec)
 	require.NoError(t, err)
 	require.Equal(t, "test", string(*id))
 
@@ -171,14 +153,14 @@ func TestInstancePluginProvision(t *testing.T) {
 }
 
 func TestInstancePluginProvisionError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
 	spec := instance.Spec{
 		Properties: &raw,
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
 			specActual <- req
 			return nil, errors.New("nope")
@@ -186,13 +168,7 @@ func TestInstancePluginProvisionError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-
-	instancePluginClient := PluginClient(callable)
-
-	// Make call
-	_, err = instancePluginClient.Provision(spec)
+	_, err = PluginClient(plugin_client.New(socketPath)).Provision(spec)
 	require.Error(t, err)
 	require.Equal(t, "nope", err.Error())
 
@@ -202,24 +178,20 @@ func TestInstancePluginProvisionError(t *testing.T) {
 }
 
 func TestInstancePluginDestroy(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDestroy: func(req instance.ID) error {
 			instActual <- req
 			return nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	instancePluginClient := PluginClient(callable)
 
-	// Make call
-	err = instancePluginClient.Destroy(inst)
+	err = PluginClient(plugin_client.New(socketPath)).Destroy(inst)
 	require.NoError(t, err)
 
 	close(stop)
@@ -228,24 +200,20 @@ func TestInstancePluginDestroy(t *testing.T) {
 }
 
 func TestInstancePluginDestroyError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
 
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDestroy: func(req instance.ID) error {
 			instActual <- req
 			return errors.New("can't do")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	instancePluginClient := PluginClient(callable)
 
-	// Make call
-	err = instancePluginClient.Destroy(inst)
+	err = PluginClient(plugin_client.New(socketPath)).Destroy(inst)
 	require.Error(t, err)
 	require.Equal(t, "can't do", err.Error())
 
@@ -254,26 +222,22 @@ func TestInstancePluginDestroyError(t *testing.T) {
 }
 
 func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	var tags map[string]string
 	tagsActual := make(chan map[string]string, 1)
 	list := []instance.Description{
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	instancePluginClient := PluginClient(callable)
 
-	// Make call
-	l, err := instancePluginClient.DescribeInstances(tags)
+	l, err := PluginClient(plugin_client.New(socketPath)).DescribeInstances(tags)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -282,7 +246,7 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 }
 
 func TestInstancePluginDescribeInstances(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	tags := map[string]string{
 		"foo": "bar",
@@ -291,19 +255,15 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 	list := []instance.Description{
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, nil
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	instancePluginClient := PluginClient(callable)
 
-	// Make call
-	l, err := instancePluginClient.DescribeInstances(tags)
+	l, err := PluginClient(plugin_client.New(socketPath)).DescribeInstances(tags)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -312,7 +272,7 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 }
 
 func TestInstancePluginDescribeInstancesError(t *testing.T) {
-	listen := listenAddr()
+	socketPath := tempSocket()
 
 	tags := map[string]string{
 		"foo": "bar",
@@ -321,19 +281,15 @@ func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	list := []instance.Description{
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
-	stop, _, err := util.StartServer(listen, PluginServer(&testPlugin{
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, errors.New("bad")
 		},
 	}))
 	require.NoError(t, err)
-	callable, err := util.NewClient(listen)
-	require.NoError(t, err)
-	instancePluginClient := PluginClient(callable)
 
-	// Make call
-	_, err = instancePluginClient.DescribeInstances(tags)
+	_, err = PluginClient(plugin_client.New(socketPath)).DescribeInstances(tags)
 	require.Error(t, err)
 	require.Equal(t, "bad", err.Error())
 

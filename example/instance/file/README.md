@@ -12,21 +12,19 @@ Begin by building plugin [binaries](../../../README.md#binaries).
 ## Usage
 
 The plugin can be started without any arguments and will default to using unix socket in
-`/run/infrakit/plugins` for communications with the CLI and other plugins:
+`~/.infrakit/plugins` for communications with the CLI and other plugins:
 
 ```
 $ build/infrakit-instance-file --dir=./test
-INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-file.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-file.sock err= <nil>
+INFO[0000] Listening at: ~/.infrakit/plugins/instance-file
 ```
 
 This starts the plugin using `./test` as directory and `instance-file` as name.
 
 You can give the another plugin instance a different name via the `listen` flag:
 ```
-$ build/infrakit-instance-file --listen=unix:///run/infrakit/plugins/another-file.sock --dir=./test
-INFO[0000] Listening on: unix:///run/infrakit/plugins/another-file.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/another-file.sock err= <nil>
+$ build/infrakit-instance-file --name=another-file --dir=./test
+INFO[0000] Listening at: ~/.infrakit/plugins/another-file
 ```
 
 Be sure to verify that the plugin is [discoverable](../../../cmd/cli/README.md#list-plugins).

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func flavorPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
+func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	name := ""
 	var flavorPlugin flavor.Plugin
@@ -22,7 +22,7 @@ func flavorPluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 		Short: "Access flavor plugin",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 
-			callable, err := pluginDir().PluginByName(name)
+			callable, err := plugins().Find(name)
 			if err != nil {
 				return err
 			}

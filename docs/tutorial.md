@@ -10,24 +10,17 @@ done so.
 
 Start the default Group plugin
 
-**_NOTE:_** You can set the listen url as an env variale via `export INFRAKIT_PLUGINS_DIR="$TMPDIR/infrakit/plugins/"` instead of passing it as a flag. The default socket will be used, unless the `--name` flag is passed, when the env variable is set. 
-
 ```shell
-$ export INFRAKIT_PLUGINS_DIR="$TMPDIR/infrakit/plugins/"
-$ build/infrakit-group-default --log 5
-DEBU[0000] Opening: /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins
-INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock
-INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock err= <nil>
+$ build/infrakit-group-default
+INFO[0000] Listening at: ~/.infrakit/plugins/group
 ```
 
 Start the file Instance plugin
 
 ```shell
 $ mkdir -p tutorial
-$ build/infrakit-instance-file --log 5 --dir ./tutorial/
-INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock
-DEBU[0000] file instance plugin. dir= ./tutorial/
-INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock err= <nil>
+$ build/infrakit-instance-file --dir ./tutorial/
+INFO[0000] Listening at: ~/.infrakit/plugins/instance-file
 ```
 Note the directory `./tutorial` where the plugin will store the instances as they are provisioned.
 We can look at the files here to see what's being created and how they are configured.
@@ -35,9 +28,8 @@ We can look at the files here to see what's being created and how they are confi
 Start the vanilla Flavor plugin
 
 ```shell
-$ build/infrakit-flavor-vanilla --log 5
-INFO[0000] Listening on: unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock
-INFO[0000] listener protocol= unix addr= /var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock err= <nil>
+$ build/infrakit-flavor-vanilla
+INFO[0000] Listening at: ~/.infrakit/plugins/flavor-vanilla
 ```
 
 Show the plugins:
@@ -46,9 +38,9 @@ Show the plugins:
 $ build/infrakit plugin ls
 Plugins:
 NAME                    LISTEN
-flavor-vanilla          unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/flavor-vanilla.sock
-group                   unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/group.sock
-instance-file           unix:///var/folders/kl/4fm2zyxs3_5dd869x992dvvw0000gn/T/infrakit/plugins/instance-file.sock
+flavor-vanilla          ~/.infrakit/plugins/flavor-vanilla
+group                   ~/.infrakit/plugins/group
+instance-file           ~/.infrakit/plugins/instance-file
 ```
 
 Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
@@ -57,60 +49,16 @@ Here we have a configuration JSON for the group.  In general, the JSON structure
 
 ```json
 {
-   "SomeKey": "ValueForTheKey",
+   "Plugin": "PluginName",
    "Properties": {
    }
 }
 ```
 
-The `Properties` field has a value of that is an opaque and correct JSON value.  This raw JSON value here
-will configure the plugin specified. 
-
-The plugins are free to define their own configuration schema.
-In our codebase, we follow a convention.  The values of the `Properties` field are decoded using
-a `Spec` Go struct.  The [`group.Spec`](/plugin/group/types/types.go) in the default Group plugin, and
-[`vanilla.Spec`](/plugin/flavor/vanilla/flavor.go) are examples of this pattern.
-
-For the File Instance Plugin, we have the spec:
-
-```json
-{
-    "Note": "Instance properties version 1.0"
-}
-```
-
-For the Vanilla Flavor Plugin, we have the spec:
-
-```json
-{
-    "Size": 5,
-    "Init": [
-        "docker pull nginx:alpine",
-        "docker run -d -p 80:80 nginx-alpine"
-    ],
-    "Tags": {
-        "tier": "web",
-        "project": "infrakit"
-    }
-}
-```
-
-The default Group plugin is a composition of the instance and flavor plugins and has the form:
-
-```json
-{
-    "Instance": {
-        "Plugin": "name of the instance plugin",
-        "Properties": {
-        }
-    },
-    "Flavor": {
-        "Plugin": "name of the flavor plugin",
-        "Properties": {
-        }
-    }
-}
-```
+This defines the name of the `Plugin` to use and the `Properties` to configure it with.  The plugins are free to define
+their own configuration schema.  Plugins in this repository follow a convention of using a `Spec` Go struct to define
+the `Properties` schema for each plugin.  The [`group.Spec`](/plugin/group/types/types.go) in the default Group plugin,
+and [`vanilla.Spec`](/plugin/flavor/vanilla/flavor.go) are examples of this pattern.
 
 From listing the plugins earlier, we have two plugins running. `instance-file` is the name of the File Instance Plugin,
 and `flavor-vanilla` is the name of the Vanilla Flavor Plugin.
@@ -146,8 +94,6 @@ Putting everything together, we have the configuration to give to the default Gr
 }
 ```
 
-You can save the JSON above in a file (say, `group.json`)
-
 Note that we specify the number of instances via the `Size` parameter in the `flavor-vanilla` plugin.  It's possible
 that a specialized flavor plugin doesn't even accept a size for the group, but rather computes the optimal size based on
 some criteria.
@@ -163,7 +109,7 @@ ID                              LOGICAL                         TAGS
 Let's tell the group plugin to `watch` our group by providing the group plugin with the configuration:
 
 ```shell
-$ build/infrakit group --name group watch <<EOF
+$ build/infrakit group watch <<EOF
 {
     "ID": "cattle",
     "Properties": {
@@ -196,15 +142,13 @@ watching cattle
 **_NOTE:_** You can also specify a file name to load from instead of using stdin, like this:
 
 ```shell
-$ build/infrakit group --name group watch group.json
+$ build/infrakit group watch group.json
 ```
 
 The group plugin is responsible for ensuring that the infrastructure state matches with your specifications.  Since we
 started out with nothing, it will create 5 instances and maintain that state by monitoring the instances:
-
-
 ```shell
-$ build/infrakit group --name group inspect cattle
+$ build/infrakit group inspect cattle
 ID                              LOGICAL         TAGS
 instance-1475104926           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475104936           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
@@ -271,7 +215,7 @@ $ diff group.json group2.json
 Before we do an update, we can see what the proposed changes are:
 
 ```
-$ build/infrakit group --name group describe group2.json 
+$ build/infrakit group describe group2.json 
 cattle : Performs a rolling update on 5 instances, then adds 5 instances to increase the group size to 10
 ```
 
@@ -281,7 +225,7 @@ be created.
 Let's apply the new config:
 
 ```shell
-$ build/infrakit group --name group update group2.json 
+$ build/infrakit group update group2.json 
 
 # ..... wait a bit...
 update cattle completed
@@ -289,7 +233,7 @@ update cattle completed
 Now we can check:
 
 ```shell
-$ build/infrakit group --name group inspect cattle
+$ build/infrakit group inspect cattle
 ID                              LOGICAL         TAGS
 instance-1475105646           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475105656           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
@@ -334,7 +278,7 @@ original specification of 10 instances.
 Finally, let's clean up:
 
 ```
-$ build/infrakit group --name group destroy cattle
+$ build/infrakit group destroy cattle
 ```
 
 This concludes our quick tutorial.  In this tutorial we:

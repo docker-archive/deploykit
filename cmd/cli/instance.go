@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func instancePluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
+func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	name := ""
 	var instancePlugin instance.Plugin
@@ -23,7 +23,7 @@ func instancePluginCommand(pluginDir func() *discovery.Dir) *cobra.Command {
 		Short: "Access instance plugin",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 
-			callable, err := pluginDir().PluginByName(name)
+			callable, err := plugins().Find(name)
 			if err != nil {
 				return err
 			}

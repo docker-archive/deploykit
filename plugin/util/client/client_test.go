@@ -1,11 +1,13 @@
-package util
+package client
 
 import (
 	"encoding/json"
+	"github.com/docker/infrakit/plugin/util"
+	"github.com/docker/infrakit/plugin/util/server"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -34,49 +36,6 @@ type testResponse struct {
 	Status bool
 }
 
-func TestTCPClient(t *testing.T) {
-
-	serverReq := testRequest{
-		Name:  "client",
-		Count: 100,
-	}
-
-	serverResp := testResponse{
-		Name:   "server",
-		Status: true,
-	}
-
-	router := mux.NewRouter()
-	router.HandleFunc("/test", func(resp http.ResponseWriter, req *http.Request) {
-
-		input := testRequest{}
-		read(t, req, &input)
-		require.Equal(t, serverReq, input)
-
-		testRespond(t, resp, serverResp)
-		return
-	}).Methods("POST")
-
-	dir := os.TempDir()
-	stop, errors, err := StartServer("tcp://:4321"+dir, router)
-
-	require.NoError(t, err)
-	require.NotNil(t, stop)
-	require.NotNil(t, errors)
-
-	client, err := NewClient("tcp://localhost:4321")
-	require.NoError(t, err)
-
-	response := testResponse{}
-	_, err = client.Call(&HTTPEndpoint{Method: "post", Path: "/test"}, serverReq, &response)
-
-	require.NoError(t, err)
-	require.Equal(t, serverResp, response)
-
-	// Now we stop the server
-	close(stop)
-}
-
 func TestUnixClient(t *testing.T) {
 
 	serverReq := testRequest{
@@ -100,19 +59,18 @@ func TestUnixClient(t *testing.T) {
 		return
 	}).Methods("POST")
 
-	dir := os.TempDir()
-	listen := "unix://" + filepath.Join(dir, "server.sock")
-	stop, errors, err := StartServer(listen, router)
+	dir, err := ioutil.TempDir("", "infrakit-client-test")
+	require.NoError(t, err)
+
+	socketPath := filepath.Join(dir, "server.sock")
+	stop, errors, err := server.StartPluginAtPath(socketPath, router)
 
 	require.NoError(t, err)
 	require.NotNil(t, stop)
 	require.NotNil(t, errors)
 
-	client, err := NewClient(listen)
-	require.NoError(t, err)
-
 	response := testResponse{}
-	_, err = client.Call(&HTTPEndpoint{Method: "post", Path: "/test"}, serverReq, &response)
+	_, err = New(socketPath).Call(&util.HTTPEndpoint{Method: "post", Path: "/test"}, serverReq, &response)
 
 	require.NoError(t, err)
 	require.Equal(t, serverResp, response)

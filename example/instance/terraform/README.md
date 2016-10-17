@@ -112,28 +112,13 @@ The plugin requires a directory (`--dir`) that will be used to contain the `tfst
 files.  It also checks to make sure it can call `terraform`.
 Install Terraform [here](https://www.terraform.io/downloads.html) if you haven't done so.
 
-As usual, you can give this plugin a different name by the URL (`unix:///plugins/dir/name.sock`)
-when starting the plugin.  However you name it, it is still an InstancePlugin:
-
-```
-$ build/infrakit-instance-terraform version
-{
-    "name": "TerraformInstance",
-    "revision": "5999abffa5c10d4c9b9953459829dadea93d7ba4",
-    "type": "infrakit.InstancePlugin/1.0",
-    "version": "5999abf"
-  }
-```
-
 See the [CLI Doc](/cmd/cli/README.md) for details on accessing the instance plugin via CLI.
 
 Start the plugin:
 
 ```
-$ build/infrakit-instance-terraform --log 5 --dir=./example/instance/terraform/aws-two-tier/
-INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-terraform.sock
-DEBU[0000] terraform instance plugin. dir= ./example/instance/terraform/aws-two-tier/
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-terraform.sock err= <nil>
+$ build/infrakit-instance-terraform --dir=./example/instance/terraform/aws-two-tier/
+INFO[0000] Listening at: ~/.infrakit/plugins/instance-terraform
 ```
 
 Be sure to verify that the plugin is [discoverable](../../../cmd/cli/README.md#list-plugins).
