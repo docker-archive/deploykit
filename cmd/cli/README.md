@@ -21,7 +21,7 @@ instance-file       	~/.infrakit/plugins/instance-file
 ```
 
 Once you know the plugins by name, you can make calls to them.  For example, the instance plugin
-`instance-file` is a pPlugin that "provisions" instances by writing the instructions to
+`instance-file` is a Plugin that "provisions" instances by writing the instructions to
 a file in a local directory.
 
 You can access the following plugins and their methods via command line:
