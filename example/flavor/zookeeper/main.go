@@ -12,7 +12,7 @@ import (
 func main() {
 
 	logLevel := cli.DefaultLogLevel
-	name := "flavor-zooker"
+	name := "flavor-zookeeper"
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
