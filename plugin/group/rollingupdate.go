@@ -101,7 +101,7 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 	for {
 		err := r.waitUntilQuiesced(
 			pollInterval,
-			minInt(expectedNewInstances, int(r.updatingTo.allocation.Size)))
+			minInt(expectedNewInstances, int(r.updatingTo.config.Allocation.Size)))
 		if err != nil {
 			return err
 		}

@@ -39,7 +39,7 @@ func NewScalingGroup(scaled Scaled, size uint, pollInterval time.Duration) Super
 
 func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings groupSettings) (updatePlan, error) {
 
-	sizeChange := int(newSettings.allocation.Size) - int(settings.allocation.Size)
+	sizeChange := int(newSettings.config.Allocation.Size) - int(settings.config.Allocation.Size)
 
 	instances, err := scaled.List()
 	if err != nil {
@@ -49,8 +49,8 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 	desired, undesired := desiredAndUndesiredInstances(instances, newSettings)
 
 	plan := scalerUpdatePlan{
-		originalSize: settings.allocation.Size,
-		newSize:      newSettings.allocation.Size,
+		originalSize: settings.config.Allocation.Size,
+		newSize:      newSettings.config.Allocation.Size,
 		scaler:       s,
 		rollingPlan:  noopUpdate{},
 	}
@@ -80,7 +80,7 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 		plan.desc = fmt.Sprintf("Performs a rolling update on %d instances", rollCount)
 
 	case sizeChange < 0:
-		rollCount := int(newSettings.allocation.Size) - len(desired)
+		rollCount := int(newSettings.config.Allocation.Size) - len(desired)
 		if rollCount < 0 {
 			rollCount = 0
 		}
@@ -89,13 +89,13 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 			plan.desc = fmt.Sprintf(
 				"Terminates %d instances to reduce the group size to %d",
 				int(sizeChange)*-1,
-				newSettings.allocation.Size)
+				newSettings.config.Allocation.Size)
 		} else {
 			plan.desc = fmt.Sprintf(
 				"Terminates %d instances to reduce the group size to %d, "+
 					" then performs a rolling update on %d instances",
 				int(sizeChange)*-1,
-				newSettings.allocation.Size,
+				newSettings.config.Allocation.Size,
 				rollCount)
 		}
 
@@ -106,14 +106,14 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 			plan.desc = fmt.Sprintf(
 				"Adds %d instances to increase the group size to %d",
 				sizeChange,
-				newSettings.allocation.Size)
+				newSettings.config.Allocation.Size)
 		} else {
 			plan.desc = fmt.Sprintf(
 				"Performs a rolling update on %d instances,"+
 					" then adds %d instances to increase the group size to %d",
 				rollCount,
 				sizeChange,
-				newSettings.allocation.Size)
+				newSettings.config.Allocation.Size)
 		}
 	}
 
