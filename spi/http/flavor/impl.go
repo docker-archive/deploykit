@@ -3,10 +3,10 @@ package flavor
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/docker/infrakit/plugin"
+	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/plugin/util"
 	"github.com/docker/infrakit/plugin/util/server"
 	"github.com/docker/infrakit/spi/flavor"
@@ -37,32 +37,47 @@ func PluginServer(p flavor.Plugin) http.Handler {
 	})
 }
 
-func (c *client) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
-	response := flavor.AllocationMethod{}
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Validate"}, &flavorProperties, &response)
-	return response, err
+type validateRequest struct {
+	Properties *json.RawMessage
+	Allocation types.AllocationMethod
+}
+
+func (c *client) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+	request := validateRequest{Properties: &flavorProperties, Allocation: allocation}
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Validate"}, request, nil)
+	return err
 }
 
 func (s *flavorServer) validate() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Validate"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
-			buff, err := ioutil.ReadAll(body)
-			if err != nil {
+			request := validateRequest{}
+			if err := json.NewDecoder(body).Decode(&request); err != nil {
 				return nil, err
 			}
 
-			return s.plugin.Validate(json.RawMessage(buff))
+			var properties json.RawMessage
+			if request.Properties != nil {
+				properties = *request.Properties
+			}
+
+			return nil, s.plugin.Validate(properties, request.Allocation)
 		}
 }
 
 type prepareRequest struct {
-	Properties   *json.RawMessage
-	InstanceSpec instance.Spec
+	Properties *json.RawMessage
+	Instance   instance.Spec
+	Allocation types.AllocationMethod
 }
 
-func (c *client) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
-	request := prepareRequest{Properties: &flavorProperties, InstanceSpec: spec}
+func (c *client) Prepare(
+	flavorProperties json.RawMessage,
+	spec instance.Spec,
+	allocation types.AllocationMethod) (instance.Spec, error) {
+
+	request := prepareRequest{Properties: &flavorProperties, Instance: spec, Allocation: allocation}
 	instanceSpec := instance.Spec{}
 	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.PreProvision"}, request, &instanceSpec)
 	return instanceSpec, err
@@ -73,8 +88,8 @@ func (s *flavorServer) prepare() (plugin.Endpoint, plugin.Handler) {
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			request := prepareRequest{}
-			err = json.NewDecoder(body).Decode(&request)
-			if err != nil {
+
+			if err := json.NewDecoder(body).Decode(&request); err != nil {
 				return nil, err
 			}
 
@@ -83,7 +98,7 @@ func (s *flavorServer) prepare() (plugin.Endpoint, plugin.Handler) {
 				arg1 = *request.Properties
 			}
 
-			return s.plugin.Prepare(arg1, request.InstanceSpec)
+			return s.plugin.Prepare(arg1, request.Instance, request.Allocation)
 		}
 }
 

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/plugin/group/util"
-	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"sync"
 )
@@ -112,25 +112,35 @@ type schema struct {
 	Tags   map[string]string
 }
 
-func (t testFlavor) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
+func (t testFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 
 	s := schema{}
 	err := json.Unmarshal(flavorProperties, &s)
 	if err != nil {
-		return flavor.AllocationMethod{}, err
+		return err
 	}
 
 	switch s.Type {
 	case typeMinion:
-		return flavor.AllocationMethod{Size: s.Size}, nil
+		if len(allocation.LogicalIDs) > 0 {
+			return errors.New("Minion Groups must be scaled with Size, not LogicalIDs")
+		}
+		return nil
 	case typeLeader:
-		return flavor.AllocationMethod{LogicalIDs: s.Shards}, nil
+		if allocation.Size > 0 {
+			return errors.New("Leader Groups must be scaled with LogicalIDs, not Size")
+		}
+		return nil
 	default:
-		return flavor.AllocationMethod{}, errors.New("Unrecognized node type")
+		return errors.New("Unrecognized node type")
 	}
 }
 
-func (t testFlavor) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+func (t testFlavor) Prepare(
+	flavorProperties json.RawMessage,
+	spec instance.Spec,
+	allocation types.AllocationMethod) (instance.Spec, error) {
+
 	s := schema{}
 	err := json.Unmarshal(flavorProperties, &s)
 	if err != nil {

@@ -5,14 +5,16 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/docker/infrakit/plugin/group/types"
 	plugin_client "github.com/docker/infrakit/plugin/util/client"
 	"github.com/docker/infrakit/plugin/util/server"
-	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"path"
 )
+
+var allocation = types.AllocationMethod{}
 
 func tempSocket() string {
 	dir, err := ioutil.TempDir("", "infrakit-test-")
@@ -24,16 +26,16 @@ func tempSocket() string {
 }
 
 type testPlugin struct {
-	DoValidate func(flavorProperties json.RawMessage) (flavor.AllocationMethod, error)
-	DoPrepare  func(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error)
+	DoValidate func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error
+	DoPrepare  func(flavorProperties json.RawMessage, spec instance.Spec, allocation types.AllocationMethod) (instance.Spec, error)
 	DoHealthy  func(inst instance.Description) (bool, error)
 }
 
-func (t *testPlugin) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
-	return t.DoValidate(flavorProperties)
+func (t *testPlugin) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+	return t.DoValidate(flavorProperties, allocation)
 }
-func (t *testPlugin) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
-	return t.DoPrepare(flavorProperties, spec)
+func (t *testPlugin) Prepare(flavorProperties json.RawMessage, spec instance.Spec, allocation types.AllocationMethod) (instance.Spec, error) {
+	return t.DoPrepare(flavorProperties, spec, allocation)
 }
 func (t *testPlugin) Healthy(inst instance.Description) (bool, error) {
 	return t.DoHealthy(inst)
@@ -45,20 +47,15 @@ func TestFlavorPluginValidate(t *testing.T) {
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
 
-	allocation := flavor.AllocationMethod{
-		Size: 10,
-	}
 	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoValidate: func(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
+		DoValidate: func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
-			return allocation, nil
+			return nil
 		},
 	}))
 	require.NoError(t, err)
 
-	alloc, err := PluginClient(plugin_client.New(socketPath)).Validate(inputFlavorProperties)
-	require.NoError(t, err)
-	require.Equal(t, allocation, alloc)
+	require.NoError(t, PluginClient(plugin_client.New(socketPath)).Validate(inputFlavorProperties, allocation))
 
 	close(stop)
 
@@ -70,20 +67,16 @@ func TestFlavorPluginValidateError(t *testing.T) {
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
-	allocation := flavor.AllocationMethod{
-		Size:       1,
-		LogicalIDs: []instance.LogicalID{instance.LogicalID("overlord")},
-	}
 
 	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoValidate: func(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
+		DoValidate: func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
-			return allocation, errors.New("something-went-wrong")
+			return errors.New("something-went-wrong")
 		},
 	}))
 	require.NoError(t, err)
 
-	_, err = PluginClient(plugin_client.New(socketPath)).Validate(inputFlavorProperties)
+	err = PluginClient(plugin_client.New(socketPath)).Validate(inputFlavorProperties, allocation)
 	require.Error(t, err)
 	require.Equal(t, "something-went-wrong", err.Error())
 
@@ -103,7 +96,10 @@ func TestFlavorPluginPrepare(t *testing.T) {
 	}
 
 	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoPrepare: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
+		DoPrepare: func(
+			flavorProperties json.RawMessage,
+			instanceSpec instance.Spec,
+			allocation types.AllocationMethod) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
 			inputInstanceSpecActual <- instanceSpec
@@ -113,7 +109,10 @@ func TestFlavorPluginPrepare(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	spec, err := PluginClient(plugin_client.New(socketPath)).Prepare(inputFlavorProperties, inputInstanceSpec)
+	spec, err := PluginClient(plugin_client.New(socketPath)).Prepare(
+		inputFlavorProperties,
+		inputInstanceSpec,
+		allocation)
 	require.NoError(t, err)
 	require.Equal(t, inputInstanceSpec, spec)
 
@@ -135,7 +134,10 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 	}
 
 	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoPrepare: func(flavorProperties json.RawMessage, instanceSpec instance.Spec) (instance.Spec, error) {
+		DoPrepare: func(
+			flavorProperties json.RawMessage,
+			instanceSpec instance.Spec,
+			allocation types.AllocationMethod) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
 			inputInstanceSpecActual <- instanceSpec
@@ -145,7 +147,10 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = PluginClient(plugin_client.New(socketPath)).Prepare(inputFlavorProperties, inputInstanceSpec)
+	_, err = PluginClient(plugin_client.New(socketPath)).Prepare(
+		inputFlavorProperties,
+		inputInstanceSpec,
+		allocation)
 	require.Error(t, err)
 	require.Equal(t, "bad-thing-happened", err.Error())
 

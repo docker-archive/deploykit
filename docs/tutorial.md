@@ -69,29 +69,31 @@ Putting everything together, we have the configuration to give to the default Gr
 ```shell
 $ cat << EOF > cattle.json
 {
-    "ID": "cattle",
-    "Properties": {
-        "Instance": {
-            "Plugin": "instance-file",
-            "Properties": {
-                "Note": "Instance properties version 1.0"
-            }
-        },
-        "Flavor": {
-            "Plugin": "flavor-vanilla",
-            "Properties": {
-                "Size": 5,
-                "Init": [
-                    "docker pull nginx:alpine",
-                    "docker run -d -p 80:80 nginx-alpine"
-                ],
-                "Tags": {
-                    "tier": "web",
-                    "project": "infrakit"
-                }
-            }
+  "ID": "cattle",
+  "Properties": {
+    "Allocation": {
+      "Size": 5
+    },
+    "Instance": {
+      "Plugin": "instance-file",
+      "Properties": {
+        "Note": "Instance properties version 1.0"
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": [
+          "docker pull nginx:alpine",
+          "docker run -d -p 80:80 nginx-alpine"
+        ],
+        "Tags": {
+          "tier": "web",
+          "project": "infrakit"
         }
+      }
     }
+  }
 }
 EOF
 ```
