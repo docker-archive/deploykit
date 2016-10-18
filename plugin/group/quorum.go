@@ -6,6 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/spi/instance"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -88,9 +89,16 @@ func (q *quorum) converge() {
 		}
 	}
 
+	grp := sync.WaitGroup{}
+
 	for _, unknownInstance := range unknownIPs {
 		log.Warnf("Destroying instances with unknown IP address: %+v", unknownInstance)
-		q.scaled.Destroy(unknownInstance.ID)
+
+		grp.Add(1)
+		go func() {
+			defer grp.Done()
+			q.scaled.Destroy(unknownInstance.ID)
+		}()
 	}
 
 	missingIDs := []instance.LogicalID{}
@@ -113,6 +121,14 @@ func (q *quorum) converge() {
 	for _, missingID := range missingIDs {
 		log.Infof("Logical ID %s is missing, provisioning new instance", missingID)
 		id := missingID
-		q.scaled.CreateOne(&id)
+
+		grp.Add(1)
+		go func() {
+			defer grp.Done()
+
+			q.scaled.CreateOne(&id)
+		}()
 	}
+
+	grp.Wait()
 }
