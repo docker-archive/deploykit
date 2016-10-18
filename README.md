@@ -200,27 +200,37 @@ JSON value for `Properties` is decoded via the Go `Spec` struct defined within t
 for example -- [`vanilla.Spec`](/plugin/flavor/vanilla/flavor.go).
 
 The JSON above is a _value_, but the type of the value belongs outside the structure.  For example, the
-default Group [Spec](/plugin/group/types/types.go) is composed of one instance and one flavor plugin:
+default Group [Spec](/plugin/group/types/types.go) is composed of an Instance plugin, a Flavor plugin, and an
+Allocation:
 
 ```json
 {
-    "ID": "name-of-the-group",
-    "Properties": {
-        "Instance": {
-           "Plugin": "name-of-the-instance-plugin",
-           "Properties": {
-           }
-        },
-        "Flavor": {
-           "Plugin": "name-of-the-flavor-plugin",
-           "Properties": {
-           }
-        }
+  "ID": "name-of-the-group",
+  "Properties": {
+    "Allocation": {
+    },
+    "Instance": {
+      "Plugin": "name-of-the-instance-plugin",
+      "Properties": {
+      }
+    },
+    "Flavor": {
+      "Plugin": "name-of-the-flavor-plugin",
+      "Properties": {
+      }
     }
+  }
 }
 ```
 The group's Spec has `Instance` and `Flavor` fields which are used to indicate the type, and the value of the
 fields follow the pattern of `<some_key>` and `Properties` as shown above.
+
+The `Allocation` determines how the Group is managed.  Allocation has two properties:
+  - `Size`: an integer for the number of instances to maintain in the Group
+  - `LogicalIDs`: a list of string identifiers, one will be associated wih each Instance
+
+Exactly one of these fields must be set, which defines whether the Group is treated as 'cattle' (`Size`) or 'pets'
+(`LogicalIDs`).  It is up to the Instance and Flavor plugins to determine how to use `LogicalID` values.
 
 As an example, if you wanted to manage a Group of NGINX servers, you could
 write a custom Group plugin for ultimate customizability.  The most concise configuration looks something like this:
@@ -244,6 +254,9 @@ Your resulting configuration might look something like this:
   "ID": "nginx",
   "Plugin": "group",
   "Properties": {
+    "Allocation": {
+      "Size": 10
+    },
     "Instance": {
       "Plugin": "aws",
       "Properties": {
@@ -254,7 +267,6 @@ Your resulting configuration might look something like this:
     "Flavor": {
       "Plugin": "nginx",
       "Properties": {
-        "size": 10,
         "port": 8080
       }
     }

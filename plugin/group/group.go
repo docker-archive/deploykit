@@ -58,18 +58,24 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 		return noSettings, err
 	}
 
+	if parsed.Allocation.Size == 0 &&
+		(parsed.Allocation.LogicalIDs == nil || len(parsed.Allocation.LogicalIDs) == 0) {
+
+		return noSettings, errors.New("Allocation must not be blank")
+	}
+
+	if parsed.Allocation.Size > 0 && parsed.Allocation.LogicalIDs != nil && len(parsed.Allocation.LogicalIDs) > 0 {
+
+		return noSettings, errors.New("Only one Allocation method may be used")
+	}
+
 	flavorPlugin, err := p.flavorPlugins(parsed.Flavor.Plugin)
 	if err != nil {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.Flavor.Plugin, err)
 	}
 
-	allocation, err := flavorPlugin.Validate(types.RawMessage(parsed.Flavor.Properties))
-	if err != nil {
+	if err := flavorPlugin.Validate(types.RawMessage(parsed.Flavor.Properties), parsed.Allocation); err != nil {
 		return noSettings, err
-	}
-
-	if allocation.Size == 0 && (allocation.LogicalIDs == nil || len(allocation.LogicalIDs) == 0) {
-		return noSettings, errors.New("Invalid allocation method")
 	}
 
 	instancePlugin, err := p.instancePlugins(parsed.Instance.Plugin)
@@ -82,7 +88,6 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 	}
 
 	return groupSettings{
-		allocation:     allocation,
 		instancePlugin: instancePlugin,
 		flavorPlugin:   flavorPlugin,
 		config:         parsed,
@@ -107,14 +112,15 @@ func (p *plugin) WatchGroup(config group.Spec) error {
 		flavorPlugin:     settings.flavorPlugin,
 		flavorProperties: types.RawMessage(settings.config.Flavor.Properties),
 		memberTags:       map[string]string{groupTag: string(config.ID)},
+		allocation:       settings.config.Allocation,
 	}
 	scaled.changeSettings(settings)
 
 	var supervisor Supervisor
-	if settings.allocation.Size != 0 {
-		supervisor = NewScalingGroup(scaled, settings.allocation.Size, p.pollInterval)
-	} else if len(settings.allocation.LogicalIDs) > 0 {
-		supervisor = NewQuorum(scaled, settings.allocation.LogicalIDs, p.pollInterval)
+	if settings.config.Allocation.Size != 0 {
+		supervisor = NewScalingGroup(scaled, settings.config.Allocation.Size, p.pollInterval)
+	} else if len(settings.config.Allocation.LogicalIDs) > 0 {
+		supervisor = NewQuorum(scaled, settings.config.Allocation.LogicalIDs, p.pollInterval)
 	} else {
 		panic("Invalid empty allocation method")
 	}

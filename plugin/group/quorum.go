@@ -29,14 +29,14 @@ func NewQuorum(scaled Scaled, logicalIDs []instance.LogicalID, pollInterval time
 
 func (q *quorum) PlanUpdate(scaled Scaled, settings groupSettings, newSettings groupSettings) (updatePlan, error) {
 
-	if !reflect.DeepEqual(settings.allocation.LogicalIDs, newSettings.allocation.LogicalIDs) {
+	if !reflect.DeepEqual(settings.config.Allocation.LogicalIDs, newSettings.config.Allocation.LogicalIDs) {
 		return nil, errors.New("Logical ID changes to a quorum is not currently supported")
 	}
 
 	return &rollingupdate{
 		desc: fmt.Sprintf(
 			"Performs a rolling update on %d instances",
-			len(settings.allocation.LogicalIDs)),
+			len(settings.config.Allocation.LogicalIDs)),
 		scaled:     scaled,
 		updatingTo: newSettings,
 		stop:       make(chan bool),

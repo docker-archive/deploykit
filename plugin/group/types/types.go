@@ -6,12 +6,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/infrakit/spi/group"
+	"github.com/docker/infrakit/spi/instance"
 )
 
 // Spec is the configuration schema for the plugin, provided in group.Spec.Properties
 type Spec struct {
-	Instance InstancePlugin
-	Flavor   FlavorPlugin
+	Instance   InstancePlugin
+	Flavor     FlavorPlugin
+	Allocation AllocationMethod
+}
+
+// AllocationMethod defines the type of allocation and supervision needed by a flavor's Group.
+type AllocationMethod struct {
+	Size       uint
+	LogicalIDs []instance.LogicalID
 }
 
 // InstancePlugin is the structure that describes an instance plugin.
@@ -43,19 +51,11 @@ func MustParse(s Spec, e error) Spec {
 	return s
 }
 
-// InstanceHash computes a stable hash of the document in InstancePluginProperties.
-func (c Spec) InstanceHash() string {
+func stableFormat(v interface{}) []byte {
 	// Marshal the JSON to ensure stable key ordering.  This allows structurally-identical JSON to yield the same
 	// hash even if the fields are reordered.
 
-	// TODO(wfarner): This does not consider changes made by plugins that are not represented by user
-	// configuration changes, such as if a plugin is updated.
-
-	// TODO(wfarner): This does not consider flavor plugin and properties.  At present, since details like group
-	// size and logical IDs are extracted from opaque properties, there's no way to distinguish between a group size
-	// change and a change requiring a rolling update.
-
-	unstable, err := json.Marshal(c.Instance)
+	unstable, err := json.Marshal(v)
 	if err != nil {
 		panic(err)
 	}
@@ -70,9 +70,18 @@ func (c Spec) InstanceHash() string {
 	if err != nil {
 		panic(err)
 	}
+	return stable
+}
+
+// InstanceHash computes a stable hash of the document in InstancePluginProperties.
+func (c Spec) InstanceHash() string {
+	// TODO(wfarner): This does not consider changes made by plugins that are not represented by user
+	// configuration changes, such as if a plugin is updated.  We may be able to address this by resolving plugin
+	// names to a versioned plugin identifier.
 
 	hasher := sha1.New()
-	hasher.Write(stable)
+	hasher.Write(stableFormat(c.Instance))
+	hasher.Write(stableFormat(c.Flavor))
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 

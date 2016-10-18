@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 )
 
 // Spec is the model of the Properties section of the top level group spec.
 type Spec struct {
-	flavor.AllocationMethod
-
 	// Init
 	Init []string
 
@@ -29,17 +28,19 @@ func NewPlugin() flavor.Plugin {
 
 type vanillaFlavor int
 
-func (f vanillaFlavor) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
-	s := Spec{}
-	err := json.Unmarshal(flavorProperties, &s)
-	return s.AllocationMethod, err
+func (f vanillaFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+	return json.Unmarshal(flavorProperties, &Spec{})
 }
 
 func (f vanillaFlavor) Healthy(inst instance.Description) (bool, error) {
 	return true, nil
 }
 
-func (f vanillaFlavor) Prepare(flavor json.RawMessage, instance instance.Spec) (instance.Spec, error) {
+func (f vanillaFlavor) Prepare(
+	flavor json.RawMessage,
+	instance instance.Spec,
+	allocation types.AllocationMethod) (instance.Spec, error) {
+
 	s := Spec{}
 	err := json.Unmarshal(flavor, &s)
 	if err != nil {

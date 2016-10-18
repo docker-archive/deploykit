@@ -7,7 +7,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	mock_client "github.com/docker/infrakit/mock/docker/docker/client"
-	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -20,16 +20,11 @@ func TestValidate(t *testing.T) {
 
 	swarmFlavor := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl))
 
-	allocation, err := swarmFlavor.Validate(json.RawMessage(`{"type": "worker", "Size": 5}`))
-	require.NoError(t, err)
-	require.Equal(t, flavor.AllocationMethod{Size: 5}, allocation)
-
-	allocation, err = swarmFlavor.Validate(json.RawMessage(`{"type": "manager", "IPs": ["127.0.0.1"]}`))
-	require.NoError(t, err)
-	require.Equal(t, flavor.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}, allocation)
-
-	allocation, err = swarmFlavor.Validate(json.RawMessage(`{"type": "other"}`))
-	require.Error(t, err)
+	require.NoError(t, swarmFlavor.Validate(json.RawMessage(`{"type": "worker"}`), types.AllocationMethod{Size: 5}))
+	require.NoError(t, swarmFlavor.Validate(
+		json.RawMessage(`{"type": "manager"}`),
+		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
+	require.Error(t, swarmFlavor.Validate(json.RawMessage(`{"type": "other"}`), types.AllocationMethod{Size: 5}))
 }
 
 func TestAssociation(t *testing.T) {
@@ -56,7 +51,8 @@ func TestAssociation(t *testing.T) {
 
 	details, err := helper.Prepare(
 		json.RawMessage(`{"type": "worker"}`),
-		instance.Spec{Tags: map[string]string{"a": "b"}})
+		instance.Spec{Tags: map[string]string{"a": "b"}},
+		types.AllocationMethod{Size: 5})
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
 	associationID := details.Tags[associationTag]
