@@ -39,6 +39,9 @@ func flavorPluginLookup(_ string) (flavor.Plugin, error) {
 
 func minionProperties(instances int, instanceData string, flavorInit string) *json.RawMessage {
 	r := json.RawMessage(fmt.Sprintf(`{
+	  "Allocation": {
+	    "Size": %d
+	  },
 	  "Instance" : {
               "Plugin": "test",
 	      "Properties": {
@@ -49,11 +52,10 @@ func minionProperties(instances int, instanceData string, flavorInit string) *js
               "Plugin" : "test",
 	      "Properties": {
 	          "Type": "minion",
-	          "Size": %d,
 	          "Init": "%s"
 	      }
           }
-	}`, instanceData, instances, flavorInit))
+	}`, instances, instanceData, flavorInit))
 	return &r
 }
 
@@ -64,6 +66,9 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMes
 	}
 
 	r := json.RawMessage(fmt.Sprintf(`{
+	  "Allocation": {
+	    "LogicalIDs": %s
+	  },
 	  "Instance" : {
               "Plugin": "test",
 	      "Properties": {
@@ -73,15 +78,14 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMes
 	  "Flavor" : {
               "Plugin": "test",
 	      "Properties": {
-	         "Type": "leader",
-	         "Shards": %s
+	         "Type": "leader"
 	      }
           }
-	}`, data, idsValue))
+	}`, idsValue, data))
 	return &r
 }
 
-func fakeInstancePluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLookup {
+func pluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLookup {
 	return func(key string) (instance.Plugin, error) {
 		if key == pluginName {
 			return plugin, nil
@@ -92,7 +96,7 @@ func fakeInstancePluginLookup(pluginName string, plugin instance.Plugin) Instanc
 
 func mockedPluginGroup(ctrl *gomock.Controller) (*mock_instance.MockPlugin, group.Plugin) {
 	plugin := mock_instance.NewMockPlugin(ctrl)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 	return plugin, grp
 }
 
@@ -156,7 +160,7 @@ func TestNoopUpdate(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -180,7 +184,7 @@ func TestRollingUpdate(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -206,7 +210,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -238,7 +242,7 @@ func TestScaleIncrease(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -267,11 +271,11 @@ func TestScaleDecrease(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
-	updated := group.Spec{ID: id, Properties: minionProperties(1, "data", "flavorInit")}
+	updated := group.Spec{ID: id, Properties: minionProperties(1, "data", "init")}
 
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
@@ -307,7 +311,7 @@ func TestDestroyGroup(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 	require.NoError(t, grp.DestroyGroup(minions.ID))
@@ -323,7 +327,7 @@ func TestSuperviseQuorum(t *testing.T) {
 		newFakeInstance(leaders, &leaderIDs[1]),
 		newFakeInstance(leaders, &leaderIDs[2]),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(leaders))
 
@@ -351,7 +355,7 @@ func TestUpdateCompletes(t *testing.T) {
 	// Tests that a completed update clears the 'update in progress state', allowing another update to commence.
 
 	plugin := newTestInstancePlugin()
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -370,7 +374,7 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -401,7 +405,7 @@ func TestFlavorChange(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(fakeInstancePluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.NoError(t, grp.WatchGroup(minions))
 
@@ -410,6 +414,5 @@ func TestFlavorChange(t *testing.T) {
 	desc, err := grp.DescribeUpdate(updated)
 	require.NoError(t, err)
 
-	// TODO(wfarner): Update this test when addressing the TODO in Spec.InstanceHash().
-	require.Equal(t, "Noop", desc)
+	require.Equal(t, "Performs a rolling update on 3 instances", desc)
 }

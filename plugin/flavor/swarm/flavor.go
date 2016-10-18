@@ -9,6 +9,7 @@ import (
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/plugin/group/util"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
@@ -32,8 +33,6 @@ type swarmProvisioner struct {
 
 type schema struct {
 	Type string
-	Size uint
-	IPs  []instance.LogicalID
 }
 
 func parseProperties(flavorProperties json.RawMessage) (schema, error) {
@@ -42,23 +41,24 @@ func parseProperties(flavorProperties json.RawMessage) (schema, error) {
 	return s, err
 }
 
-func (s swarmProvisioner) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
+func (s swarmProvisioner) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
-		return flavor.AllocationMethod{}, err
+		return err
 	}
 
 	switch properties.Type {
 	case roleWorker:
-		return flavor.AllocationMethod{Size: properties.Size}, nil
+		return nil
 	case roleManager:
-		if len(properties.IPs) != 1 && len(properties.IPs) != 3 && len(properties.IPs) != 5 {
-			return flavor.AllocationMethod{}, errors.New("Must have 1, 3, or 5 managers")
+		numIDs := len(allocation.LogicalIDs)
+		if numIDs != 1 && numIDs != 3 && numIDs != 5 {
+			return errors.New("Must have 1, 3, or 5 manager logical IDs")
 		}
 
-		return flavor.AllocationMethod{LogicalIDs: properties.IPs}, nil
+		return nil
 	default:
-		return flavor.AllocationMethod{}, errors.New("Unrecognized node Type")
+		return errors.New("Unrecognized node Type")
 	}
 }
 
@@ -136,7 +136,11 @@ func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
 	return len(nodes) == 1, nil
 }
 
-func (s swarmProvisioner) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
+func (s swarmProvisioner) Prepare(
+	flavorProperties json.RawMessage,
+	spec instance.Spec,
+	allocation types.AllocationMethod) (instance.Spec, error) {
+
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return spec, err

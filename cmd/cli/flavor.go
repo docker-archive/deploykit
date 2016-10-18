@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/discovery"
+	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/spi/flavor"
 	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/docker/infrakit/spi/instance"
@@ -35,6 +36,33 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
 
+	logicalIDs := []string{}
+	groupSize := uint(0)
+	addAllocationMethodFlags := func(cmd *cobra.Command) {
+		cmd.Flags().StringSliceVar(
+			&logicalIDs,
+			"logical-ids",
+			[]string{},
+			"Logical IDs to use as the Allocation method")
+		cmd.Flags().UintVar(
+			&groupSize,
+			"size",
+			0,
+			"Group Size to use as the Allocation method")
+	}
+
+	allocationMethodFromFlags := func() types.AllocationMethod {
+		ids := []instance.LogicalID{}
+		for _, id := range logicalIDs {
+			ids = append(ids, instance.LogicalID(id))
+		}
+
+		return types.AllocationMethod{
+			Size:       groupSize,
+			LogicalIDs: ids,
+		}
+	}
+
 	validate := &cobra.Command{
 		Use:   "validate <flavor configuration file>",
 		Short: "validate a flavor configuration",
@@ -52,31 +80,29 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			alloc, err := flavorPlugin.Validate(json.RawMessage(buff))
-			if err == nil {
-				if buff, err2 := json.MarshalIndent(alloc, "  ", "  "); err2 == nil {
-					fmt.Println("validate", string(buff))
-				} else {
-					err = err2
-				}
-			}
-			return err
+			return flavorPlugin.Validate(json.RawMessage(buff), allocationMethodFromFlags())
 		},
 	}
+	addAllocationMethodFlags(validate)
 
-	flavorPropertiesFile := ""
 	prepare := &cobra.Command{
-		Use:   "prepare  <instance Spec JSON file>",
+		Use:   "prepare <flavor configuration file> <instance Spec JSON file>",
 		Short: "prepare provisioning inputs for an instance",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", flavorPlugin)
 
-			if len(args) != 1 {
+			if len(args) != 2 {
 				cmd.Usage()
 				os.Exit(1)
 			}
 
-			buff, err := ioutil.ReadFile(args[0])
+			flavorProperties, err := ioutil.ReadFile(args[0])
+			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+
+			buff, err := ioutil.ReadFile(args[1])
 			if err != nil {
 				log.Error(err)
 				os.Exit(1)
@@ -87,13 +113,10 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			buff, err = ioutil.ReadFile(args[0])
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			spec, err = flavorPlugin.Prepare(json.RawMessage(buff), spec)
+			spec, err = flavorPlugin.Prepare(
+				json.RawMessage(flavorProperties),
+				spec,
+				allocationMethodFromFlags())
 			if err == nil {
 				buff, err = json.MarshalIndent(spec, "  ", "  ")
 				if err == nil {
@@ -103,11 +126,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	prepare.Flags().StringVar(
-		&flavorPropertiesFile,
-		"properties",
-		flavorPropertiesFile,
-		"Path to flavor properties")
+	addAllocationMethodFlags(prepare)
 
 	tags := []string{}
 	id := ""

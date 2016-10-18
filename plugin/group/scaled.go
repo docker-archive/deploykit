@@ -30,6 +30,7 @@ type scaledGroup struct {
 	flavorProperties json.RawMessage
 	provisionRequest json.RawMessage
 	provisionTags    map[string]string
+	allocation       types.AllocationMethod
 	lock             sync.Mutex
 }
 
@@ -70,7 +71,7 @@ func (s *scaledGroup) getSpec(logicalID *instance.LogicalID) (instance.Spec, err
 		spec.Tags = tags
 
 		var err error
-		spec, err = s.flavorPlugin.Prepare(s.flavorProperties, spec)
+		spec, err = s.flavorPlugin.Prepare(s.flavorProperties, spec, s.allocation)
 		if err != nil {
 			return spec, err
 		}
