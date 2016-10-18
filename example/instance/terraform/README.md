@@ -36,7 +36,7 @@ This directory contains a `main.tf` that builds a VPC with subnet on AWS.  EC2 i
 (or `aws_instance` resource) are then added to the config as separate files when the plugin provisions
 the resource.  For an EC2 instance this is a valid `.tf.json`:
 
-```
+```json
 {
     "resource": {
       "aws_instance": {
@@ -67,7 +67,7 @@ Terraform's configuration schema requires user assignment of names for individua
 InfraKit operates on groups of them.  So we changed the JSON format slightly to require only the
 resource type name (e.g. `aws_instance`).  This is the spec for the instance plugin:
 
-```
+```json
 {
     "Properties" : {
         "type" : "aws_instance",
@@ -116,7 +116,7 @@ See the [CLI Doc](/cmd/cli/README.md) for details on accessing the instance plug
 
 Start the plugin:
 
-```
+```shell
 $ build/infrakit-instance-terraform --dir=./example/instance/terraform/aws-two-tier/
 INFO[0000] Listening at: ~/.infrakit/plugins/instance-terraform
 ```
@@ -126,7 +126,7 @@ Be sure to verify that the plugin is [discoverable](../../../cmd/cli/README.md#l
 Now lets try to validate something.  Instead of reading from stdin we are loading from a file
 to avoid problems with bad bash substitution beacuse Terrafrom configs use `$` to indicate variables.
 
-```
+```shell
 $ cat example/instance/terraform/aws-two-tier/instance-plugin-properties.json
 {
     "type" : "aws_instance",
@@ -151,7 +151,7 @@ validate:ok
 
 Now we can provision:
 
-```
+```shell
 $ cat example/instance/terraform/aws-two-tier/instance-plugin-spec.json
 {
     "Properties" : {
@@ -182,7 +182,7 @@ instance-1475004829
 
 Now list them.
 
-```
+```shell
 $ build/infrakit instance --name instance-terraform describe
 ID                            	LOGICAL                       	TAGS
 instance-1475004829           	  -                           	other=values,provisioner=infrakit-terraform-example,InstancePlugin=terraform,Name=instance-1475004829,Tier=web
@@ -195,7 +195,7 @@ In AWS Console you can filter by tag `provisioner` with value `infrakit-terrafor
 
 Now destroy the instance:
 
-```
+```shell
 $ build/infrakit instance --name instance-terraform destroy instance-1475004829
 destroyed instance-1475004829
 $ build/infrakit instance --name instance-terraform describe

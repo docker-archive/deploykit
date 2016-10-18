@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
@@ -51,24 +50,4 @@ func assertNotNil(message string, f interface{}) {
 		log.Error(errors.New(message))
 		os.Exit(1)
 	}
-}
-
-func getInput(args []string) []byte {
-	input := os.Stdin
-	if len(args) > 0 {
-		i, err := os.Open(args[0])
-		if err != nil {
-			log.Error(err)
-			os.Exit(1)
-		}
-		input = i
-	}
-
-	buff, err := ioutil.ReadAll(input)
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
-
-	return buff
 }

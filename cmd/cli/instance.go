@@ -2,15 +2,16 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"sort"
-	"strings"
-
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/discovery"
 	instance_plugin "github.com/docker/infrakit/spi/http/instance"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/cobra"
+	"io/ioutil"
+	"os"
+	"sort"
+	"strings"
 )
 
 func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
@@ -35,12 +36,23 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
 
 	validate := &cobra.Command{
-		Use:   "validate",
-		Short: "validate input",
+		Use:   "validate <instance configuration file>",
+		Short: "validates an instance configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", instancePlugin)
 
-			err := instancePlugin.Validate(json.RawMessage(getInput(args)))
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			buff, err := ioutil.ReadFile(args[0])
+			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+
+			err = instancePlugin.Validate(json.RawMessage(buff))
 			if err == nil {
 				fmt.Println("validate:ok")
 			}
@@ -49,15 +61,24 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	provision := &cobra.Command{
-		Use:   "provision",
-		Short: "provision the resource instance",
+		Use:   "provision <instance configuration file>",
+		Short: "provisions an instance",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", instancePlugin)
 
-			buff := getInput(args)
-			spec := instance.Spec{}
-			err := json.Unmarshal(buff, &spec)
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			buff, err := ioutil.ReadFile(args[0])
 			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+
+			spec := instance.Spec{}
+			if err := json.Unmarshal(buff, &spec); err != nil {
 				return err
 			}
 
@@ -70,13 +91,14 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	destroy := &cobra.Command{
-		Use:   "destroy",
+		Use:   "destroy <instance ID>",
 		Short: "destroy the resource",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", instancePlugin)
 
-			if len(args) == 0 {
-				return errors.New("missing id")
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
 			}
 
 			instanceID := instance.ID(args[0])

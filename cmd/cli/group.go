@@ -2,15 +2,16 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"sort"
-	"strings"
-
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/discovery"
 	"github.com/docker/infrakit/spi/group"
 	group_plugin "github.com/docker/infrakit/spi/http/group"
 	"github.com/spf13/cobra"
+	"io/ioutil"
+	"os"
+	"sort"
+	"strings"
 )
 
 const (
@@ -45,10 +46,19 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			buff := getInput(args)
-			spec := group.Spec{}
-			err := json.Unmarshal(buff, &spec)
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			buff, err := ioutil.ReadFile(args[0])
 			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+
+			spec := group.Spec{}
+			if err := json.Unmarshal(buff, &spec); err != nil {
 				return err
 			}
 
@@ -61,13 +71,14 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	unwatch := &cobra.Command{
-		Use:   "unwatch [group ID]",
+		Use:   "unwatch <group ID>",
 		Short: "unwatch a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			if len(args) == 0 {
-				return errors.New("missing id")
+			if len(args) != 0 {
+				cmd.Usage()
+				os.Exit(1)
 			}
 
 			groupID := group.ID(args[0])
@@ -81,13 +92,14 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	inspect := &cobra.Command{
-		Use:   "inspect [group ID]",
+		Use:   "inspect <group ID>",
 		Short: "inspect a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			if len(args) == 0 {
-				return errors.New("missing id")
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
 			}
 
 			groupID := group.ID(args[0])
@@ -115,15 +127,24 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	describe := &cobra.Command{
-		Use:   "describe",
-		Short: "describe update (describe - or describe filename)",
+		Use:   "describe <group configuration file>",
+		Short: "describes the steps to perform an update",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			buff := getInput(args)
-			spec := group.Spec{}
-			err := json.Unmarshal(buff, &spec)
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			buff, err := ioutil.ReadFile(args[0])
 			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+
+			spec := group.Spec{}
+			if err := json.Unmarshal(buff, &spec); err != nil {
 				return err
 			}
 
@@ -141,10 +162,19 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			buff := getInput(args)
-			spec := group.Spec{}
-			err := json.Unmarshal(buff, &spec)
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			buff, err := ioutil.ReadFile(args[0])
 			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+
+			spec := group.Spec{}
+			if err := json.Unmarshal(buff, &spec); err != nil {
 				return err
 			}
 
@@ -158,13 +188,14 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	stop := &cobra.Command{
-		Use:   "stop [group ID]",
+		Use:   "stop <group ID>",
 		Short: "stop updating a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			if len(args) == 0 {
-				return errors.New("missing id")
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
 			}
 
 			groupID := group.ID(args[0])
@@ -178,13 +209,14 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	destroy := &cobra.Command{
-		Use:   "destroy [group ID]",
+		Use:   "destroy <group ID>",
 		Short: "destroy a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			if len(args) == 0 {
-				return errors.New("missing id")
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
 			}
 
 			groupID := group.ID(args[0])

@@ -3,13 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
-
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/discovery"
 	"github.com/docker/infrakit/spi/flavor"
 	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/cobra"
+	"io/ioutil"
+	"os"
+	"strings"
 )
 
 func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
@@ -34,12 +36,23 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
 
 	validate := &cobra.Command{
-		Use:   "validate",
-		Short: "validate input",
+		Use:   "validate <flavor configuration file>",
+		Short: "validate a flavor configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", flavorPlugin)
 
-			alloc, err := flavorPlugin.Validate(json.RawMessage(getInput(args)))
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			buff, err := ioutil.ReadFile(args[0])
+			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+
+			alloc, err := flavorPlugin.Validate(json.RawMessage(buff))
 			if err == nil {
 				if buff, err2 := json.MarshalIndent(alloc, "  ", "  "); err2 == nil {
 					fmt.Println("validate", string(buff))
@@ -53,22 +66,34 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	flavorPropertiesFile := ""
 	prepare := &cobra.Command{
-		Use:   "prepare",
-		Short: "prepare the provision data",
+		Use:   "prepare  <instance Spec JSON file>",
+		Short: "prepare provisioning inputs for an instance",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", flavorPlugin)
 
-			buff := getInput(args)
-			spec := instance.Spec{}
-			err := json.Unmarshal(buff, &spec)
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			buff, err := ioutil.ReadFile(args[0])
 			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+
+			spec := instance.Spec{}
+			if err := json.Unmarshal(buff, &spec); err != nil {
 				return err
 			}
 
-			// the flavor's config is in a flag.
-			buffFlavor := getInput([]string{flavorPropertiesFile})
+			buff, err = ioutil.ReadFile(args[0])
+			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
 
-			spec, err = flavorPlugin.Prepare(json.RawMessage(buffFlavor), spec)
+			spec, err = flavorPlugin.Prepare(json.RawMessage(buff), spec)
 			if err == nil {
 				buff, err = json.MarshalIndent(spec, "  ", "  ")
 				if err == nil {
@@ -78,14 +103,18 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	prepare.Flags().StringVar(&flavorPropertiesFile, "properties", flavorPropertiesFile, "Path to flavor properties")
+	prepare.Flags().StringVar(
+		&flavorPropertiesFile,
+		"properties",
+		flavorPropertiesFile,
+		"Path to flavor properties")
 
 	tags := []string{}
 	id := ""
 	logicalID := ""
 	healthy := &cobra.Command{
 		Use:   "healthy",
-		Short: "checks for health",
+		Short: "checks if an instance is considered healthy",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", flavorPlugin)
 

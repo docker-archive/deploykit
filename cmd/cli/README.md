@@ -1,11 +1,8 @@
 InfraKit CLI
 ============
 
-This is a CLI for working with various infrakit plugins.  In the simplest form, an InfraKit plugin
-is simply a daemon that communicates over unix domain sockets.  InfraKit plugins can find each
-other by the socket files in a common directory.  The CLI uses the common directory as a discovery
-mechanism and offers various subcommands for working with plugins. In general, plugin methods are
-exposed as verbs and configuration JSON can be read from local file or standard input.
+This is a developer CLI for working with various _InfraKit_ plugins.  The CLI offers several subcommands for working
+with plugins. In general, plugin methods are exposed as verbs and configuration JSON can be read from local file.
 
 ## Building
 
@@ -24,7 +21,7 @@ instance-file       	~/.infrakit/plugins/instance-file
 ```
 
 Once you know the plugins by name, you can make calls to them.  For example, the instance plugin
-`instance-file` is a simple plugin that "provisions" an instance by writing the instructions to
+`instance-file` is a Plugin that "provisions" instances by writing the instructions to
 a file in a local directory.
 
 You can access the following plugins and their methods via command line:
@@ -37,89 +34,35 @@ You can access the following plugins and their methods via command line:
 
 Using the plugin `instance-file` as an example:
 
-`describe` calls the `DescribeInstances` endpoint of the plugin:
+### Validate
 
 ```
-$ build/infrakit instance --name instance-file describe
-ID                            	LOGICAL                       	TAGS
-instance-1474850397           	  -                           	group=test,instanceType=small
-instance-1474850412           	  -                           	group=test2,instanceType=small
-instance-1474851747           	logic2                        	instanceType=small,group=test2
-```
+$ cat << EOF > instance.json
+{
+    "Properties": {
+        "version": "v0.0.1"
+    },
+    "Tags": {
+        "instanceType": "small",
+        "group": "test2"
+    },
+    "Init": "#!/bin/sh\napt-get install -y wget",
+    "LogicalID": "logic2"
+}
+EOF
 
-Validate - send the config JSON via stdin:
-
-```
-$ build/infrakit instance --name instance-file validate << EOF
-> {
->     "Properties" : {
->         "version" : "v0.0.1",
->         "groups" : {
->             "managers" : {
->                 "driver" : "infrakit/quorum"
->             },
->             "small" : {
->                 "driver" : "infrakit/scaler",
->                 "properties" : {
->                     "size" : 3
->                 }
->             },
->             "large" : {
->                 "driver" : "infrakit/scaler",
->                 "properties" : {
->                     "size" : 3
->                 }
->             }
->         }
->     },
->     "Tags" : {
->         "instanceType" : "small",
->         "group" : "test2"
->     },
->     "Init" : "#!/bin/sh\napt-get install -y wget",
->     "LogicalID" : "logic2"
-> }
-> EOF
+$ build/infrakit instance --name instance-file instance.json
 validate:ok
 ```
 
-Provision - send via stdin:
+### Provision
 
 ```
-$ build/infrakit instance --name instance-file provision << EOF
-> {
->     "Properties" : {
->         "version" : "v0.0.1",
->         "groups" : {
->             "managers" : {
->                 "driver" : "infrakit/quorum"
->             },
->             "small" : {
->                 "driver" : "infrakit/scaler",
->                 "properties" : {
->                     "size" : 3
->                 }
->             },
->             "large" : {
->                 "driver" : "infrakit/scaler",
->                 "properties" : {
->                     "size" : 3
->                 }
->             }
->         }
->     },
->     "Tags" : {
->         "instanceType" : "small",
->         "group" : "test2"
->     },
->     "Init" : "#!/bin/sh\napt-get install -y wget",
->     "LogicalID" : "logic2"
-> }
-> EOF
+$ build/infrakit instance --name instance-file provision instance.json
 instance-1474873473
 ```
 
-List instances
+### List instances
 
 ```
 $ build/infrakit instance --name instance-file describe
@@ -129,7 +72,8 @@ instance-1474850412           	  -                           	group=test2,instan
 instance-1474851747           	logic2                        	group=test2,instanceType=small
 instance-1474873473           	logic2                        	group=test2,instanceType=small
 ```
-Destroy
+
+### Destroy
 
 ```
 $ build/infrakit instance --name instance-file destroy instance-1474873473
