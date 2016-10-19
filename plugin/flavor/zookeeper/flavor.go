@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"strings"
@@ -23,30 +24,32 @@ func NewPlugin() flavor.Plugin {
 type zkFlavor struct {
 }
 
-type schema struct {
+type spec struct {
 	Type      string
-	Size      uint
-	IPs       []instance.LogicalID
 	UseDocker bool
 }
 
-func parseProperties(flavorProperties json.RawMessage) (schema, error) {
-	s := schema{UseDocker: false}
+func parseSpec(flavorProperties json.RawMessage) (spec, error) {
+	s := spec{UseDocker: false}
 	err := json.Unmarshal(flavorProperties, &s)
 	return s, err
 }
 
-func (s zkFlavor) Validate(flavorProperties json.RawMessage) (flavor.AllocationMethod, error) {
-	properties, err := parseProperties(flavorProperties)
+func (s zkFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+	properties, err := parseSpec(flavorProperties)
 	if err != nil {
-		return flavor.AllocationMethod{}, err
+		return err
 	}
 
 	switch properties.Type {
 	case roleMember:
-		return flavor.AllocationMethod{LogicalIDs: properties.IPs}, nil
+		if len(allocation.LogicalIDs) == 0 {
+			return errors.New("IP addresses are required as LogicalIDs for a ZooKeeper ensemble")
+		}
+
+		return nil
 	default:
-		return flavor.AllocationMethod{}, errors.New("Unrecognized node Type")
+		return errors.New("Unrecognized node Type")
 	}
 }
 
@@ -148,8 +151,12 @@ func (s zkFlavor) Healthy(inst instance.Description) (bool, error) {
 	return true, nil
 }
 
-func (s zkFlavor) Prepare(flavorProperties json.RawMessage, spec instance.Spec) (instance.Spec, error) {
-	properties, err := parseProperties(flavorProperties)
+func (s zkFlavor) Prepare(
+	flavorProperties json.RawMessage,
+	spec instance.Spec,
+	allocation types.AllocationMethod) (instance.Spec, error) {
+
+	properties, err := parseSpec(flavorProperties)
 	if err != nil {
 		return spec, err
 	}
@@ -160,7 +167,7 @@ func (s zkFlavor) Prepare(flavorProperties json.RawMessage, spec instance.Spec) 
 			return spec, errors.New("Manager nodes require an assigned logical ID")
 		}
 
-		spec.Init = generateInitScript(properties.UseDocker, properties.IPs, *spec.LogicalID)
+		spec.Init = generateInitScript(properties.UseDocker, allocation.LogicalIDs, *spec.LogicalID)
 
 	default:
 		return spec, errors.New("Unsupported role type")

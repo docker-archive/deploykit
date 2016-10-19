@@ -19,7 +19,7 @@ import (
 func main() {
 
 	logLevel := cli.DefaultLogLevel
-	name := "group"
+	var name string
 
 	pollInterval := 10 * time.Second
 
@@ -60,7 +60,7 @@ func main() {
 
 	cmd.AddCommand(cli.VersionCommand())
 
-	cmd.Flags().String("name", name, "Plugin name to advertise for discovery")
+	cmd.Flags().StringVar(&name, "name", "group", "Plugin name to advertise for discovery")
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.Flags().DurationVar(&pollInterval, "poll-interval", pollInterval, "Group polling interval")
 

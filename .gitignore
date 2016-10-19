@@ -8,6 +8,3 @@ coverage.txt
 
 # Build binaries
 build/
-
-# Vendored sources.  These are synced during the build by govendor.
-vendor/*/
