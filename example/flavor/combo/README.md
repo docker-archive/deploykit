@@ -4,7 +4,10 @@ InfraKit Flavor Plugin - Combo
 A [reference](../../../README.md#reference-implementations) implementation of a Flavor Plugin that supports composition
 of other Flavors.
 
-The Combo plugin allows you to use Flavors as mixins, combining their Instance properties.
+The Combo plugin allows you to use Flavors as mixins, combining their Instance properties:
+  * `Tags`: combined, with any colliding values determined by the last Plugin to set them
+  * `Init`: concatenated in the order of the configuration, separated by a newline
+  * `Attachments`: combined in the order of the configuration
 
 ## Schema
 

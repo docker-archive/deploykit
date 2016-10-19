@@ -6,7 +6,6 @@ import (
 	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
-	"github.com/go-openapi/spec"
 )
 
 // Spec is the model of the plugin Properties.
@@ -38,41 +37,68 @@ func cloneSpec(spec instance.Spec) instance.Spec {
 		tags[k] = v
 	}
 
-	var logicalID *string
+	var logicalID instance.LogicalID
 	if spec.LogicalID != nil {
-		*logicalID = *spec.LogicalID
+		logicalID = *spec.LogicalID
+	}
+
+	attachments := []instance.Attachment{}
+	for _, v := range spec.Attachments {
+		attachments = append(attachments, v)
 	}
 
 	return instance.Spec{
-		Properties: spec.Properties,
+		Properties:  spec.Properties,
 		Tags:        tags,
 		Init:        spec.Init,
-		LogicalID:   *LogicalID
-		Attachments []Attachment
+		LogicalID:   &logicalID,
+		Attachments: attachments,
 	}
+}
+
+func mergeSpecs(initial instance.Spec, specs []instance.Spec) (instance.Spec, error) {
+	result := cloneSpec(initial)
+
+	for _, spec := range specs {
+		for k, v := range spec.Tags {
+			result.Tags[k] = v
+		}
+
+		if spec.Init != "" {
+			if result.Init != "" {
+				result.Init += "\n"
+			}
+
+			result.Init += spec.Init
+		}
+
+		for _, v := range spec.Attachments {
+			result.Attachments = append(result.Attachments, v)
+		}
+	}
+
+	return result, nil
 }
 
 func (f flavorCombo) Prepare(
 	flavor json.RawMessage,
-	instance instance.Spec,
+	inst instance.Spec,
 	allocation types.AllocationMethod) (instance.Spec, error) {
 
 	combo := Spec{}
 	err := json.Unmarshal(flavor, &combo)
 	if err != nil {
-		return instance, err
+		return inst, err
 	}
 
+	specs := []instance.Spec{}
 	for _, pluginSpec := range combo.Flavors {
 		// Copy the instance spec to prevent Flavor plugins from interfering with each other.
-		inst := instance.Spec{
-			Properties: instance.Properties,
-
-		}
+		clone := cloneSpec(inst)
 
 		plugin, err := f.flavorPlugins(pluginSpec.Plugin)
 		if err != nil {
-			return instance, err
+			return inst, err
 		}
 
 		var props json.RawMessage
@@ -80,11 +106,12 @@ func (f flavorCombo) Prepare(
 			props = *pluginSpec.Properties
 		}
 
-		instance, err = plugin.Prepare(props, instance, allocation)
+		flavorOutput, err := plugin.Prepare(props, clone, allocation)
 		if err != nil {
-			return instance, err
+			return inst, err
 		}
+		specs = append(specs, flavorOutput)
 	}
 
-	return instance, nil
+	return mergeSpecs(inst, specs)
 }
