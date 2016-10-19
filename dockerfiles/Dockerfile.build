@@ -2,7 +2,7 @@ FROM golang:1.7.1-alpine
 
 # A container for building InfraKit
 
-RUN apk add --update git tree make
+RUN apk add --update git make
 
 ENV GOPATH=/go
 ENV PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
