@@ -12,7 +12,7 @@ import (
 func main() {
 
 	logLevel := cli.DefaultLogLevel
-	name := "flavor-vanilla"
+	var name string
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -26,7 +26,7 @@ func main() {
 	cmd.AddCommand(cli.VersionCommand())
 
 	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
-	cmd.Flags().String("name", name, "Plugin name to advertise for discovery")
+	cmd.Flags().StringVar(&name, "name", "flavor-vanilla", "Plugin name to advertise for discovery")
 
 	err := cmd.Execute()
 	if err != nil {
