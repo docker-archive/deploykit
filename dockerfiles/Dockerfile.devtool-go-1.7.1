@@ -9,7 +9,10 @@ RUN apk add --update git tree make
 env GOPATH=/go
 env PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-RUN go get github.com/kardianos/govendor
+# Dependency management
+RUN go get github.com/rancher/trash
+
+# Development tools
 RUN go get github.com/golang/lint/golint
 RUN go get github.com/golang/mock/gomock
 RUN go get github.com/golang/mock/mockgen

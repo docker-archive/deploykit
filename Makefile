@@ -29,25 +29,14 @@ PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
 
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
-VENDOR_HASH=$(shell git hash-object vendor/vendor.json)
-
-# First we create a container that is versioned (via the vendor.json hash) that has
-# all the downloaded vendor dependencies.  Then we use that container as the data
-# volume container across multiple builds, as long as the vendoring dependencies
-# don't chnage.  When vendor.json is updated, a new hash results in a new container
-# which is reused across builds again.  If you bulid this target, vendor/ directory
-# will not be changed.  Instead the vendored files will be in the container's fs namespace.
-build-in-container:
+build-in-container: clean
 	@echo "+ $@"
-	docker build -t infrakit-build:${VENDOR_HASH} -f ${CURDIR}/dockerfiles/Dockerfile.build .
-	-docker run --name infrakit-build-${VENDOR_HASH} \
-		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} \
-		infrakit-build:${VENDOR_HASH}
-	docker run --rm \
-		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} \
+	@docker build -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
+	@docker run --name infrakit-build \
+		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} -e GOPATH=/go \
 		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
-		--volumes-from infrakit-build-${VENDOR_HASH} \
-		infrakit-build:${VENDOR_HASH} make build-binaries
+		infrakit-build
+	@docker rm infrakit-build
 
 vet:
 	@echo "+ $@"
@@ -76,11 +65,7 @@ clean:
 	@echo "+ $@"
 	rm -rf build
 	mkdir -p build
-
-clean-vendor:
-	@echo "+ $@"
-	-rm -rf vendor
-	git checkout -- vendor/vendor.json
+	@-docker rm infrakit-build
 
 define build_binary
 	go build -o build/$(1) \
@@ -88,7 +73,6 @@ define build_binary
 endef
 
 binaries: clean build-binaries
-
 build-binaries:
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
