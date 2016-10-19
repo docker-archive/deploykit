@@ -6,6 +6,7 @@ import (
 	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
+	"github.com/go-openapi/spec"
 )
 
 // Spec is the model of the plugin Properties.
@@ -31,18 +32,44 @@ func (f flavorCombo) Healthy(inst instance.Description) (bool, error) {
 	return true, nil
 }
 
+func cloneSpec(spec instance.Spec) instance.Spec {
+	tags := map[string]string{}
+	for k, v := range spec.Tags {
+		tags[k] = v
+	}
+
+	var logicalID *string
+	if spec.LogicalID != nil {
+		*logicalID = *spec.LogicalID
+	}
+
+	return instance.Spec{
+		Properties: spec.Properties,
+		Tags:        tags,
+		Init:        spec.Init,
+		LogicalID:   *LogicalID
+		Attachments []Attachment
+	}
+}
+
 func (f flavorCombo) Prepare(
 	flavor json.RawMessage,
 	instance instance.Spec,
 	allocation types.AllocationMethod) (instance.Spec, error) {
 
-	s := Spec{}
-	err := json.Unmarshal(flavor, &s)
+	combo := Spec{}
+	err := json.Unmarshal(flavor, &combo)
 	if err != nil {
 		return instance, err
 	}
 
-	for _, pluginSpec := range s.Flavors {
+	for _, pluginSpec := range combo.Flavors {
+		// Copy the instance spec to prevent Flavor plugins from interfering with each other.
+		inst := instance.Spec{
+			Properties: instance.Properties,
+
+		}
+
 		plugin, err := f.flavorPlugins(pluginSpec.Plugin)
 		if err != nil {
 			return instance, err
