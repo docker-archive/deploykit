@@ -11,11 +11,11 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test vendor-sync containers
+.PHONY: clean all fmt vet lint build test vendor-update containers
 .DEFAULT: all
 all: clean fmt vet lint build test binaries
 
-ci: fmt vet lint vendor-sync vendor-check coverage
+ci: fmt vet lint coverage
 
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
@@ -43,7 +43,7 @@ lint:
 		$(error Please install golint: `go get -u github.com/golang/lint/golint`))
 	@test -z "$$(golint ./... 2>&1 | grep -v ^vendor/ | grep -v mock/ | tee /dev/stderr)"
 
-build: vendor-sync
+build:
 	@echo "+ $@"
 	@go build ${GO_LDFLAGS} $(PKGS)
 
@@ -72,7 +72,7 @@ endif
 	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/example/instance/terraform)
 	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/example/instance/vagrant)
 
-install: vendor-sync
+install:
 	@echo "+ $@"
 	@go install ${GO_LDFLAGS} $(PKGS)
 
@@ -80,36 +80,23 @@ generate:
 	@echo "+ $@"
 	@go generate -x $(PKGS_AND_MOCKS)
 
-test: vendor-sync
+test:
 	@echo "+ $@"
 	@go test -test.short -race -v $(PKGS)
 
-coverage: vendor-sync
+coverage:
 	@echo "+ $@"
 	@for pkg in $(PKGS); do \
 	  go test -test.short -race -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 
-test-full: vendor-sync
+test-full:
 	@echo "+ $@"
 	@go test -race $(PKGS)
 
-# govendor helpers
-check-govendor:
-	$(if $(shell which govendor || echo ''), , \
-		$(error Please install govendor: go get github.com/kardianos/govendor))
-
-vendor-sync: check-govendor
+vendor-update:
 	@echo "+ $@"
-	@govendor sync
-
-vendor-save: check-govendor
-	@echo "+ $@"
-	@govendor add +external
-
-vendor-check:
-	@echo "+ $@"
-	@test -z "$$(govendor status | tee /dev/stderr)"
+	@trash -u
 
 containers:
 	@echo "+ $@"
