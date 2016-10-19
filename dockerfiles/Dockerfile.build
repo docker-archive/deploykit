@@ -1,11 +1,28 @@
-FROM infrakit/devtool:go-1.7.1
+FROM golang:1.7.1-alpine
 
-ADD ./ /go/src/github.com/docker/infrakit
+# A simple container for compiling Go projects with govendor and misc tools
 
-WORKDIR /go/src/github.com/docker/infrakit
+MAINTAINER chungers <david.chung@docker.com>
+
+RUN apk add --update git tree make
 
 env GOPATH=/go
 env PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Dependency management
+RUN go get github.com/rancher/trash
+
+# Development tools
+RUN go get github.com/golang/lint/golint
+RUN go get github.com/golang/mock/gomock
+RUN go get github.com/golang/mock/mockgen
+
+env GOPATH=/go
+env PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# The project sources
+ADD ./ /go/src/github.com/docker/infrakit
+WORKDIR /go/src/github.com/docker/infrakit
 
 VOLUME [ "/go/src/github.com/docker/infrakit/build" ]
 
