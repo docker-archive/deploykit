@@ -113,11 +113,11 @@ func generateInitScript(joinIP, joinToken, associationID string) string {
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
-func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
+func (s swarmProvisioner) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 	associationID, exists := inst.Tags[associationTag]
 	if !exists {
 		log.Info("Reporting unhealthy for instance without an association tag", inst.ID)
-		return false, nil
+		return flavor.Unhealthy, nil
 	}
 
 	filter := filters.NewArgs()
@@ -125,15 +125,22 @@ func (s swarmProvisioner) Healthy(inst instance.Description) (bool, error) {
 
 	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filter: filter})
 	if err != nil {
-		return false, err
+		return flavor.UnknownHealth, err
 	}
 
-	if len(nodes) > 1 {
+	switch {
+	case len(nodes) == 0:
+		// The instance may not yet be joined, so we consider the health unknown.
+		return flavor.UnknownHealth, nil
+
+	case len(nodes) == 1:
+		return flavor.Healthy, nil
+
+	default:
 		log.Warnf("Expected at most one node with label %s, but found %s", associationID, nodes)
-	}
+		return flavor.Healthy, nil
 
-	// If a node was returned from the query, the association ID is present and the node is healthy.
-	return len(nodes) == 1, nil
+	}
 }
 
 func (s swarmProvisioner) Prepare(

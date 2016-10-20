@@ -32,8 +32,9 @@ func (f vanillaFlavor) Validate(flavorProperties json.RawMessage, allocation typ
 	return json.Unmarshal(flavorProperties, &Spec{})
 }
 
-func (f vanillaFlavor) Healthy(inst instance.Description) (bool, error) {
-	return true, nil
+func (f vanillaFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+	// TODO: We could add support for shell code in the Spec for a command to run for checking health.
+	return flavor.Healthy, nil
 }
 
 func (f vanillaFlavor) Prepare(

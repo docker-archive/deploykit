@@ -146,9 +146,9 @@ func generateInitScript(useDocker bool, servers []instance.LogicalID, id instanc
 }
 
 // Healthy determines whether an instance is healthy.
-func (s zkFlavor) Healthy(inst instance.Description) (bool, error) {
+func (s zkFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 	// TODO(wfarner): Implement.
-	return true, nil
+	return flavor.Healthy, nil
 }
 
 func (s zkFlavor) Prepare(

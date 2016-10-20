@@ -102,27 +102,32 @@ func (s *flavorServer) prepare() (plugin.Endpoint, plugin.Handler) {
 		}
 }
 
-type healthResponse struct {
-	Healthy  bool
-	Instance instance.Description
+type healthRequest struct {
+	Properties *json.RawMessage
+	Instance   instance.Description
 }
 
-func (c *client) Healthy(inst instance.Description) (bool, error) {
+type healthResponse struct {
+	Health flavor.Health
+}
+
+func (c *client) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+	request := healthRequest{Properties: &flavorProperties, Instance: inst}
 	response := healthResponse{}
-	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Healthy"}, inst, &response)
-	return response.Healthy, err
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Healthy"}, request, &response)
+	return response.Health, err
 }
 
 func (s *flavorServer) healthy() (plugin.Endpoint, plugin.Handler) {
 	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Healthy"},
 
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
-			inst := instance.Description{}
-			err = json.NewDecoder(body).Decode(&inst)
+			request := healthRequest{}
+			err = json.NewDecoder(body).Decode(&request)
 			if err != nil {
 				return nil, err
 			}
-			healthy, err := s.plugin.Healthy(inst)
-			return healthResponse{Healthy: healthy, Instance: inst}, err
+			health, err := s.plugin.Healthy(types.RawMessage(request.Properties), request.Instance)
+			return healthResponse{Health: health}, err
 		}
 }

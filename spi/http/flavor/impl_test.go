@@ -8,6 +8,7 @@ import (
 	"github.com/docker/infrakit/plugin/group/types"
 	plugin_client "github.com/docker/infrakit/plugin/util/client"
 	"github.com/docker/infrakit/plugin/util/server"
+	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -27,18 +28,25 @@ func tempSocket() string {
 
 type testPlugin struct {
 	DoValidate func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error
-	DoPrepare  func(flavorProperties json.RawMessage, spec instance.Spec, allocation types.AllocationMethod) (instance.Spec, error)
-	DoHealthy  func(inst instance.Description) (bool, error)
+	DoPrepare  func(
+		flavorProperties json.RawMessage,
+		spec instance.Spec,
+		allocation types.AllocationMethod) (instance.Spec, error)
+	DoHealthy func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error)
 }
 
 func (t *testPlugin) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 	return t.DoValidate(flavorProperties, allocation)
 }
-func (t *testPlugin) Prepare(flavorProperties json.RawMessage, spec instance.Spec, allocation types.AllocationMethod) (instance.Spec, error) {
+func (t *testPlugin) Prepare(
+	flavorProperties json.RawMessage,
+	spec instance.Spec,
+	allocation types.AllocationMethod) (instance.Spec, error) {
+
 	return t.DoPrepare(flavorProperties, spec, allocation)
 }
-func (t *testPlugin) Healthy(inst instance.Description) (bool, error) {
-	return t.DoHealthy(inst)
+func (t *testPlugin) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+	return t.DoHealthy(flavorProperties, inst)
 }
 
 func TestFlavorPluginValidate(t *testing.T) {
@@ -163,23 +171,27 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 func TestFlavorPluginHealthy(t *testing.T) {
 	socketPath := tempSocket()
 
+	inputPropertiesActual := make(chan json.RawMessage, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
+	inputProperties := json.RawMessage("{}")
 	inputInstance := instance.Description{
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
 	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoHealthy: func(inst instance.Description) (bool, error) {
+		DoHealthy: func(properties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+			inputPropertiesActual <- properties
 			inputInstanceActual <- inst
-			return true, nil
+			return flavor.Healthy, nil
 		},
 	}))
 	require.NoError(t, err)
 
-	healthy, err := PluginClient(plugin_client.New(socketPath)).Healthy(inputInstance)
+	health, err := PluginClient(plugin_client.New(socketPath)).Healthy(inputProperties, inputInstance)
 	require.NoError(t, err)
-	require.True(t, healthy)
+	require.Equal(t, flavor.Healthy, health)
 
+	require.Equal(t, inputProperties, <-inputPropertiesActual)
 	require.Equal(t, inputInstance, <-inputInstanceActual)
 	close(stop)
 }
@@ -187,23 +199,27 @@ func TestFlavorPluginHealthy(t *testing.T) {
 func TestFlavorPluginHealthyError(t *testing.T) {
 	socketPath := tempSocket()
 
+	inputPropertiesActual := make(chan json.RawMessage, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
+	inputProperties := json.RawMessage("{}")
 	inputInstance := instance.Description{
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
 	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoHealthy: func(inst instance.Description) (bool, error) {
+		DoHealthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+			inputPropertiesActual <- flavorProperties
 			inputInstanceActual <- inst
-			return true, errors.New("oh-noes")
+			return flavor.UnknownHealth, errors.New("oh-noes")
 		},
 	}))
 	require.NoError(t, err)
 
-	_, err = PluginClient(plugin_client.New(socketPath)).Healthy(inputInstance)
+	_, err = PluginClient(plugin_client.New(socketPath)).Healthy(inputProperties, inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 
+	require.Equal(t, inputProperties, <-inputPropertiesActual)
 	require.Equal(t, inputInstance, <-inputInstanceActual)
 	close(stop)
 }

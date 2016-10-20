@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 	"time"
 )
@@ -184,8 +185,22 @@ func TestRollingUpdate(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+			if strings.Contains(string(flavorProperties), "flavor2") {
+				return flavor.Healthy, nil
+			}
+
+			// The update should be unaffected by an 'old' instance that is unhealthy.
+			return flavor.Unhealthy, nil
+		},
+	}
+	flavorLookup := func(_ string) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond)
 	require.NoError(t, grp.WatchGroup(minions))
 
 	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "flavor2")}
@@ -415,4 +430,77 @@ func TestFlavorChange(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "Performs a rolling update on 3 instances", desc)
+}
+
+func TestStopUpdate(t *testing.T) {
+
+	plugin := newTestInstancePlugin(
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+	)
+
+	healthChecksStarted := make(chan bool)
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+			if strings.Contains(string(flavorProperties), "flavor2") {
+				healthChecksStarted <- true
+			}
+
+			// Unknown health will stall the update indefinitely.
+			return flavor.UnknownHealth, nil
+		},
+	}
+	flavorLookup := func(_ string) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond)
+
+	require.NoError(t, grp.WatchGroup(minions))
+
+	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "flavor2")}
+
+	go func() {
+		err := grp.UpdateGroup(updated)
+		require.Error(t, err)
+		require.Equal(t, "Update halted by user", err.Error())
+	}()
+
+	// Wait for the first health check to ensure the update has begun.
+	<- healthChecksStarted
+
+	require.NoError(t, grp.StopUpdate(id))
+	close(healthChecksStarted)
+}
+
+func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
+
+	plugin := newTestInstancePlugin(
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+	)
+
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+			if strings.Contains(string(flavorProperties), "bad update") {
+				return flavor.Unhealthy, nil
+			}
+			return flavor.Healthy, nil
+		},
+	}
+	flavorLookup := func(_ string) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond)
+
+	require.NoError(t, grp.WatchGroup(minions))
+
+	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "bad update")}
+
+	err := grp.UpdateGroup(updated)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unhealthy")
 }

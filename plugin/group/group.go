@@ -108,11 +108,8 @@ func (p *plugin) WatchGroup(config group.Spec) error {
 	// membership tags but different generation-specific tags.  In practice, we use this the additional tags to
 	// attach a config SHA to instances for config change detection.
 	scaled := &scaledGroup{
-		instancePlugin:   settings.instancePlugin,
-		flavorPlugin:     settings.flavorPlugin,
-		flavorProperties: types.RawMessage(settings.config.Flavor.Properties),
-		memberTags:       map[string]string{groupTag: string(config.ID)},
-		allocation:       settings.config.Allocation,
+		settings:   settings,
+		memberTags: map[string]string{groupTag: string(config.ID)},
 	}
 	scaled.changeSettings(settings)
 
@@ -264,6 +261,7 @@ func (p *plugin) StopUpdate(gid group.ID) error {
 		return fmt.Errorf("Group '%s' is not being updated", gid)
 	}
 
+	log.Infof("Stopping update for group %s", gid)
 	grp.setUpdate(nil)
 	update.Stop()
 

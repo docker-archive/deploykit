@@ -6,6 +6,20 @@ import (
 	"github.com/docker/infrakit/spi/instance"
 )
 
+// Health is an indication of whether the Flavor is functioning properly.
+type Health int
+
+const (
+	// UnknownHealth indicates that the Health cannot currently be confirmed.
+	UnknownHealth Health = iota
+
+	// Healthy indicates that the Flavor is confirmed to be functioning.
+	Healthy
+
+	// Unhealthy indicates that the Flavor is confirmed to not be functioning properly.
+	Unhealthy
+)
+
 // Plugin defines custom behavior for what runs on instances.
 type Plugin interface {
 
@@ -17,6 +31,6 @@ type Plugin interface {
 	// the flavor configuration.
 	Prepare(flavorProperties json.RawMessage, spec instance.Spec, allocation types.AllocationMethod) (instance.Spec, error)
 
-	// Healthy determines whether an instance is healthy.
-	Healthy(inst instance.Description) (bool, error)
+	// Healthy determines the Health of this Flavor on an instance.
+	Healthy(flavorProperties json.RawMessage, inst instance.Description) (Health, error)
 }

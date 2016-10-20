@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	mock_client "github.com/docker/infrakit/mock/docker/docker/client"
 	"github.com/docker/infrakit/plugin/group/types"
+	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -65,9 +66,9 @@ func TestAssociation(t *testing.T) {
 	require.Contains(t, details.Init, nodeInfo.ManagerStatus.Addr)
 
 	// An instance with no association information is considered unhealthy.
-	healthy, err := helper.Healthy(instance.Description{})
+	health, err := helper.Healthy(json.RawMessage("{}"), instance.Description{})
 	require.NoError(t, err)
-	require.False(t, healthy)
+	require.Equal(t, flavor.Unhealthy, health)
 
 	filter, err := filters.FromParam(fmt.Sprintf(`{"label": {"%s=%s": true}}`, associationTag, associationID))
 	require.NoError(t, err)
@@ -75,7 +76,9 @@ func TestAssociation(t *testing.T) {
 		[]swarm.Node{
 			{},
 		}, nil)
-	healthy, err = helper.Healthy(instance.Description{Tags: map[string]string{associationTag: associationID}})
+	health, err = helper.Healthy(
+		json.RawMessage("{}"),
+		instance.Description{Tags: map[string]string{associationTag: associationID}})
 	require.NoError(t, err)
-	require.True(t, healthy)
+	require.Equal(t, flavor.Healthy, health)
 }

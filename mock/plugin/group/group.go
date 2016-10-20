@@ -4,6 +4,7 @@
 package group
 
 import (
+	flavor "github.com/docker/infrakit/spi/flavor"
 	instance "github.com/docker/infrakit/spi/instance"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -43,6 +44,16 @@ func (_m *MockScaled) Destroy(_param0 instance.ID) {
 
 func (_mr *_MockScaledRecorder) Destroy(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
+}
+
+func (_m *MockScaled) Health(_param0 instance.Description) flavor.Health {
+	ret := _m.ctrl.Call(_m, "Health", _param0)
+	ret0, _ := ret[0].(flavor.Health)
+	return ret0
+}
+
+func (_mr *_MockScaledRecorder) Health(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Health", arg0)
 }
 
 func (_m *MockScaled) List() ([]instance.Description, error) {

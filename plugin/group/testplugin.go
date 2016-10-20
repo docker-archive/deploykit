@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/plugin/group/util"
+	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"sync"
 )
@@ -102,19 +103,18 @@ const (
 )
 
 type testFlavor struct {
+	healthy func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error)
 }
 
-type schema struct {
-	Type   string
-	Size   uint
-	Shards []instance.LogicalID
-	Init   string
-	Tags   map[string]string
+type flavorSchema struct {
+	Type string
+	Init string
+	Tags map[string]string
 }
 
 func (t testFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 
-	s := schema{}
+	s := flavorSchema{}
 	err := json.Unmarshal(flavorProperties, &s)
 	if err != nil {
 		return err
@@ -141,7 +141,7 @@ func (t testFlavor) Prepare(
 	spec instance.Spec,
 	allocation types.AllocationMethod) (instance.Spec, error) {
 
-	s := schema{}
+	s := flavorSchema{}
 	err := json.Unmarshal(flavorProperties, &s)
 	if err != nil {
 		return spec, err
@@ -154,6 +154,10 @@ func (t testFlavor) Prepare(
 	return spec, nil
 }
 
-func (t testFlavor) Healthy(inst instance.Description) (bool, error) {
-	return true, nil
+func (t testFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+	if t.healthy != nil {
+		return t.healthy(flavorProperties, inst)
+	}
+
+	return flavor.Healthy, nil
 }
