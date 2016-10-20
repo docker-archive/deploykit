@@ -24,6 +24,19 @@ AUTHORS: .mailmap .git/HEAD
 PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor)
 PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
 
+# Current working environment.  Set these explicitly if you want to cross-compile
+# in the build container (see the build-in-container target):
+
+GOOS?=$(shell go env GOOS)
+GOARCH?=$(shell go env GOARCH)
+build-in-container: clean
+	@echo "+ $@"
+	@docker build -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
+	@docker run --rm \
+		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} \
+		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
+		infrakit-build
+
 vet:
 	@echo "+ $@"
 	@go vet $(PKGS)
@@ -57,7 +70,8 @@ define build_binary
 	  -ldflags "-X github.com/docker/infrakit/cli.Version=$(VERSION) -X github.com/docker/infrakit/cli.Revision=$(REVISION)" $(2)
 endef
 
-binaries: clean
+binaries: clean build-binaries
+build-binaries:
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
@@ -98,7 +112,3 @@ test-full:
 vendor-update:
 	@echo "+ $@"
 	@trash -u
-
-containers:
-	@echo "+ $@"
-	cd swarm/swarmboot/container && make container
