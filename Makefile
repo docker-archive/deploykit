@@ -32,11 +32,10 @@ GOARCH?=$(shell go env GOARCH)
 build-in-container: clean
 	@echo "+ $@"
 	@docker build -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
-	@docker run --name infrakit-build \
-		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} -e GOPATH=/go \
+	@docker run --rm \
+		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} \
 		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
 		infrakit-build
-	@docker rm infrakit-build
 
 vet:
 	@echo "+ $@"
@@ -65,7 +64,6 @@ clean:
 	@echo "+ $@"
 	rm -rf build
 	mkdir -p build
-	@-docker rm infrakit-build
 
 define build_binary
 	go build -o build/$(1) \

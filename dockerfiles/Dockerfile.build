@@ -4,6 +4,7 @@ FROM golang:1.7.1-alpine
 
 RUN apk add --update git make
 
+ENV CGO_ENABLED=0
 ENV GOPATH=/go
 ENV PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
