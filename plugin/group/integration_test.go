@@ -3,12 +3,10 @@ package group
 import (
 	"encoding/json"
 	"fmt"
-	mock_instance "github.com/docker/infrakit/mock/spi/instance"
 	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/group"
 	"github.com/docker/infrakit/spi/instance"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -94,23 +92,16 @@ func pluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLooku
 	}
 }
 
-func mockedPluginGroup(ctrl *gomock.Controller) (*mock_instance.MockPlugin, group.Plugin) {
-	plugin := mock_instance.NewMockPlugin(ctrl)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
-	return plugin, grp
-}
-
 func TestInvalidGroupCalls(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	plugin, grp := mockedPluginGroup(ctrl)
+	plugin := newTestInstancePlugin()
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.Error(t, grp.DestroyGroup(id))
 	_, err := grp.InspectGroup(id)
 	require.Error(t, err)
 	require.Error(t, grp.UnwatchGroup(id))
 	require.Error(t, grp.StopUpdate(id))
-	expectValidate(plugin, minions).Return(nil).MinTimes(1)
+
 	_, err = grp.DescribeUpdate(minions)
 	require.Error(t, err)
 	require.Error(t, grp.UpdateGroup(minions))
@@ -123,10 +114,6 @@ func instanceProperties(config group.Spec) json.RawMessage {
 		panic(err)
 	}
 	return *spec.Instance.Properties
-}
-
-func expectValidate(plugin *mock_instance.MockPlugin, config group.Spec) *gomock.Call {
-	return plugin.EXPECT().Validate(instanceProperties(config))
 }
 
 func memberTags(id group.ID) map[string]string {
@@ -295,13 +282,14 @@ func TestScaleDecrease(t *testing.T) {
 }
 
 func TestUnwatchGroup(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	plugin, grp := mockedPluginGroup(ctrl)
+	plugin := newTestInstancePlugin(
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+		newFakeInstance(minions, nil),
+	)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	expectValidate(plugin, minions).Return(nil)
 	require.NoError(t, grp.WatchGroup(minions))
-
 	require.NoError(t, grp.UnwatchGroup(id))
 }
 
