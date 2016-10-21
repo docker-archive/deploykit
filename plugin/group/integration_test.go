@@ -468,7 +468,7 @@ func TestStopUpdate(t *testing.T) {
 	}()
 
 	// Wait for the first health check to ensure the update has begun.
-	<- healthChecksStarted
+	<-healthChecksStarted
 
 	require.NoError(t, grp.StopUpdate(id))
 	close(healthChecksStarted)
