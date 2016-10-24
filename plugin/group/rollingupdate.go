@@ -87,6 +87,9 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 			//
 			numHealthy := 0
 			for _, inst := range matching {
+				// TODO(wfarner): More careful thought is needed with respect to blocking and timeouts
+				// here.  This might mean formalizing timeout behavior for different types of RPCs in
+				// the group, and/or documenting the expectations for plugin implementations.
 				switch r.scaled.Health(inst) {
 				case flavor.Healthy:
 					numHealthy++
