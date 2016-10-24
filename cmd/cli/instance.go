@@ -112,6 +112,7 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	tags := []string{}
+	var quiet bool
 	describe := &cobra.Command{
 		Use:   "describe",
 		Short: "describe the instances",
@@ -131,7 +132,9 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			desc, err := instancePlugin.DescribeInstances(filter)
 			if err == nil {
 
-				fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+				if !quiet {
+					fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+				}
 				for _, d := range desc {
 					logical := "  -   "
 					if d.LogicalID != nil {
@@ -152,6 +155,7 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 	describe.Flags().StringSliceVar(&tags, "tags", tags, "Tags to filter")
+	describe.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
 
 	cmd.AddCommand(validate, provision, destroy, describe)
 

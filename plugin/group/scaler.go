@@ -186,6 +186,7 @@ func (s *scaler) Stop() {
 func (s *scaler) Run() {
 	ticker := time.NewTicker(s.pollInterval)
 
+	s.converge()
 	for {
 		select {
 		case <-ticker.C:
