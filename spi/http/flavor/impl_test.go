@@ -210,7 +210,7 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 		DoHealthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 			inputPropertiesActual <- flavorProperties
 			inputInstanceActual <- inst
-			return flavor.UnknownHealth, errors.New("oh-noes")
+			return flavor.Unknown, errors.New("oh-noes")
 		},
 	}))
 	require.NoError(t, err)

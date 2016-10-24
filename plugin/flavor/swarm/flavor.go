@@ -125,13 +125,13 @@ func (s swarmProvisioner) Healthy(flavorProperties json.RawMessage, inst instanc
 
 	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filter: filter})
 	if err != nil {
-		return flavor.UnknownHealth, err
+		return flavor.Unknown, err
 	}
 
 	switch {
 	case len(nodes) == 0:
 		// The instance may not yet be joined, so we consider the health unknown.
-		return flavor.UnknownHealth, nil
+		return flavor.Unknown, nil
 
 	case len(nodes) == 1:
 		return flavor.Healthy, nil

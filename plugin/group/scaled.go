@@ -88,7 +88,7 @@ func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
 		inst)
 	if err != nil {
 		log.Warnf("Failed to check health of instance %s: %s", inst.ID, err)
-		return flavor.UnknownHealth
+		return flavor.Unknown
 	}
 	return health
 

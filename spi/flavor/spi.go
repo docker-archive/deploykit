@@ -10,8 +10,8 @@ import (
 type Health int
 
 const (
-	// UnknownHealth indicates that the Health cannot currently be confirmed.
-	UnknownHealth Health = iota
+	// Unknown indicates that the Health cannot currently be confirmed.
+	Unknown Health = iota
 
 	// Healthy indicates that the Flavor is confirmed to be functioning.
 	Healthy

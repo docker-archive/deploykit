@@ -34,13 +34,13 @@ func (f flavorCombo) Healthy(flavorProperties json.RawMessage, inst instance.Des
 
 	s := Spec{}
 	if err := json.Unmarshal(flavorProperties, &s); err != nil {
-		return flavor.UnknownHealth, err
+		return flavor.Unknown, err
 	}
 
 	for _, pluginSpec := range s.Flavors {
 		plugin, err := f.flavorPlugins(pluginSpec.Plugin)
 		if err != nil {
-			return flavor.UnknownHealth, err
+			return flavor.Unknown, err
 		}
 
 		health, err := plugin.Healthy(types.RawMessage(pluginSpec.Properties), inst)

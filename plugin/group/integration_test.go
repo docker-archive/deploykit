@@ -448,7 +448,7 @@ func TestStopUpdate(t *testing.T) {
 			}
 
 			// Unknown health will stall the update indefinitely.
-			return flavor.UnknownHealth, nil
+			return flavor.Unknown, nil
 		},
 	}
 	flavorLookup := func(_ string) (flavor.Plugin, error) {
