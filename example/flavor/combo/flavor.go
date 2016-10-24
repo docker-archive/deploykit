@@ -27,8 +27,29 @@ func (f flavorCombo) Validate(flavorProperties json.RawMessage, allocation types
 	return json.Unmarshal(flavorProperties, &s)
 }
 
-func (f flavorCombo) Healthy(inst instance.Description) (bool, error) {
-	return true, nil
+func (f flavorCombo) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+	// The overall health of the flavor combination is taken as the 'lowest common demoninator' of the configured
+	// flavors.  Only flavor.Healthy is reported if all flavors report flavor.Healthy.  flavor.Unhealthy or
+	// flavor.UnknownHealth is returned as soon as any Flavor reports that value.
+
+	s := Spec{}
+	if err := json.Unmarshal(flavorProperties, &s); err != nil {
+		return flavor.Unknown, err
+	}
+
+	for _, pluginSpec := range s.Flavors {
+		plugin, err := f.flavorPlugins(pluginSpec.Plugin)
+		if err != nil {
+			return flavor.Unknown, err
+		}
+
+		health, err := plugin.Healthy(types.RawMessage(pluginSpec.Properties), inst)
+		if err != nil || health != flavor.Healthy {
+			return health, err
+		}
+	}
+
+	return flavor.Healthy, nil
 }
 
 func cloneSpec(spec instance.Spec) instance.Spec {

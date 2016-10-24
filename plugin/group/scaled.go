@@ -1,7 +1,6 @@
 package group
 
 import (
-	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/plugin/group/types"
@@ -16,6 +15,9 @@ type Scaled interface {
 	// of the instance.
 	CreateOne(id *instance.LogicalID)
 
+	// Health inspects the current health state of an instance.
+	Health(inst instance.Description) flavor.Health
+
 	// Destroy destroys a single instance.
 	Destroy(id instance.ID)
 
@@ -24,70 +26,46 @@ type Scaled interface {
 }
 
 type scaledGroup struct {
-	instancePlugin   instance.Plugin
-	memberTags       map[string]string
-	flavorPlugin     flavor.Plugin
-	flavorProperties json.RawMessage
-	provisionRequest json.RawMessage
-	provisionTags    map[string]string
-	allocation       types.AllocationMethod
-	lock             sync.Mutex
+	settings   groupSettings
+	memberTags map[string]string
+	lock       sync.Mutex
 }
 
 func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// TODO(wfarner): Consider supporting changing the plugin names as well.
-	s.flavorProperties = types.RawMessage(settings.config.Flavor.Properties)
-	s.provisionRequest = types.RawMessage(settings.config.Instance.Properties)
+	s.settings = settings
+}
+
+func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	tags := map[string]string{}
 	for k, v := range s.memberTags {
 		tags[k] = v
 	}
 
 	// Instances are tagged with a SHA of the entire instance configuration to support change detection.
-	tags[configTag] = settings.config.InstanceHash()
-
-	s.provisionTags = tags
-}
-
-func (s *scaledGroup) getSpec(logicalID *instance.LogicalID) (instance.Spec, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	tags[configTag] = s.settings.config.InstanceHash()
 
 	spec := instance.Spec{
-		Tags:       s.provisionTags,
+		Tags:       tags,
 		LogicalID:  logicalID,
-		Properties: &s.provisionRequest,
+		Properties: s.settings.config.Instance.Properties,
 	}
 
-	if s.flavorPlugin != nil {
-		// Copy tags to prevent concurrency issues if modified.
-		tags := map[string]string{}
-		for k, v := range spec.Tags {
-			tags[k] = v
-		}
-		spec.Tags = tags
-
-		var err error
-		spec, err = s.flavorPlugin.Prepare(s.flavorProperties, spec, s.allocation)
-		if err != nil {
-			return spec, err
-		}
-	}
-
-	return spec, nil
-}
-
-func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
-	spec, err := s.getSpec(logicalID)
+	spec, err := s.settings.flavorPlugin.Prepare(
+		types.RawMessage(s.settings.config.Flavor.Properties),
+		spec,
+		s.settings.config.Allocation)
 	if err != nil {
-		log.Errorf("Pre-provision failed: %s", err)
+		log.Errorf("Failed to Prepare instance: %s", err)
 		return
 	}
 
-	id, err := s.instancePlugin.Provision(spec)
+	id, err := s.settings.instancePlugin.Provision(spec)
 	if err != nil {
 		log.Errorf("Failed to provision: %s", err)
 		return
@@ -101,13 +79,34 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 	log.Infof("Created instance %s with tags %v%s", *id, spec.Tags, volumeDesc)
 }
 
+func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	health, err := s.settings.flavorPlugin.Healthy(
+		types.RawMessage(s.settings.config.Flavor.Properties),
+		inst)
+	if err != nil {
+		log.Warnf("Failed to check health of instance %s: %s", inst.ID, err)
+		return flavor.Unknown
+	}
+	return health
+
+}
+
 func (s *scaledGroup) Destroy(id instance.ID) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	log.Infof("Destroying instance %s", id)
-	if err := s.instancePlugin.Destroy(id); err != nil {
+	if err := s.settings.instancePlugin.Destroy(id); err != nil {
 		log.Errorf("Failed to destroy %s: %s", id, err)
 	}
 }
 
 func (s *scaledGroup) List() ([]instance.Description, error) {
-	return s.instancePlugin.DescribeInstances(s.memberTags)
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.settings.instancePlugin.DescribeInstances(s.memberTags)
 }

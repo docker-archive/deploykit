@@ -6,6 +6,7 @@ package instance
 import (
 	json "encoding/json"
 	types "github.com/docker/infrakit/plugin/group/types"
+	flavor "github.com/docker/infrakit/spi/flavor"
 	instance "github.com/docker/infrakit/spi/instance"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -31,15 +32,15 @@ func (_m *MockPlugin) EXPECT() *_MockPluginRecorder {
 	return _m.recorder
 }
 
-func (_m *MockPlugin) Healthy(_param0 instance.Description) (bool, error) {
-	ret := _m.ctrl.Call(_m, "Healthy", _param0)
-	ret0, _ := ret[0].(bool)
+func (_m *MockPlugin) Healthy(_param0 json.RawMessage, _param1 instance.Description) (flavor.Health, error) {
+	ret := _m.ctrl.Call(_m, "Healthy", _param0, _param1)
+	ret0, _ := ret[0].(flavor.Health)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-func (_mr *_MockPluginRecorder) Healthy(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Healthy", arg0)
+func (_mr *_MockPluginRecorder) Healthy(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Healthy", arg0, arg1)
 }
 
 func (_m *MockPlugin) Prepare(_param0 json.RawMessage, _param1 instance.Spec, _param2 types.AllocationMethod) (instance.Spec, error) {

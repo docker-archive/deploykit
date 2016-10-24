@@ -132,10 +132,21 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	id := ""
 	logicalID := ""
 	healthy := &cobra.Command{
-		Use:   "healthy",
+		Use:   "healthy <flavor configuration file>",
 		Short: "checks if an instance is considered healthy",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", flavorPlugin)
+
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			flavorProperties, err := ioutil.ReadFile(args[0])
+			if err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
 
 			filter := map[string]string{}
 			for _, t := range tags {
@@ -159,7 +170,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				desc.LogicalID = &logical
 			}
 
-			healthy, err := flavorPlugin.Healthy(desc)
+			healthy, err := flavorPlugin.Healthy(json.RawMessage(flavorProperties), desc)
 			if err == nil {
 				fmt.Printf("%v\n", healthy)
 			}
