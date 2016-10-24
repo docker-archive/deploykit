@@ -13,7 +13,8 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Manage plugins",
 	}
 
-	cmd.AddCommand(&cobra.Command{
+	var quiet bool
+	ls := cobra.Command{
 		Use:   "ls",
 		Short: "List available plugins",
 		RunE: func(c *cobra.Command, args []string) error {
@@ -22,15 +23,19 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			fmt.Println("Plugins:")
-			fmt.Printf("%-20s\t%-s\n", "NAME", "LISTEN")
+			if !quiet {
+				fmt.Printf("%-20s\t%-s\n", "NAME", "LISTEN")
+			}
 			for k, v := range entries {
 				fmt.Printf("%-20s\t%-s\n", k, v.String())
 			}
 
 			return nil
 		},
-	})
+	}
+	ls.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
+
+	cmd.AddCommand(&ls)
 
 	return cmd
 }

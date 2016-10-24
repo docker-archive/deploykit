@@ -50,6 +50,7 @@ func (q *quorum) Stop() {
 func (q *quorum) Run() {
 	ticker := time.NewTicker(q.pollInterval)
 
+	q.converge()
 	for {
 		select {
 		case <-ticker.C:

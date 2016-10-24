@@ -91,6 +91,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 
+	var quiet bool
 	inspect := &cobra.Command{
 		Use:   "inspect <group ID>",
 		Short: "inspect a group",
@@ -106,7 +107,9 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			desc, err := groupPlugin.InspectGroup(groupID)
 
 			if err == nil {
-				fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+				if !quiet {
+					fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+				}
 				for _, d := range desc.Instances {
 					logical := "  -   "
 					if d.LogicalID != nil {
@@ -125,6 +128,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
+	inspect.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
 
 	describe := &cobra.Command{
 		Use:   "describe <group configuration file>",
@@ -150,7 +154,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 			desc, err := groupPlugin.DescribeUpdate(spec)
 			if err == nil {
-				fmt.Println(spec.ID, ":", desc)
+				fmt.Println(desc)
 			}
 			return err
 		},
