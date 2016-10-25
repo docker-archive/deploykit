@@ -5,8 +5,8 @@ REPO?=github.com/docker/infrakit.aws
 PREFIX?=$(shell pwd -L)
 
 # Used to populate version variable in main package.
-VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
-REVISION=$(shell git rev-list -1 HEAD)
+VERSION?=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+REVISION?=$(shell git rev-list -1 HEAD)
 
 # Allow turning off function inlining and variable registerization
 ifeq (${DISABLE_OPTIMIZATION},true)
