@@ -10,7 +10,6 @@ set -o nounset
 set -o pipefail
 
 LDFLAGS=${LDFLAGS:-}
-REBUILD_VENDOR=${REBUILD_VENDOR:-true}
 
 if [[ $# -ne 2 ]]
 then
@@ -41,15 +40,6 @@ then
 fi
 
 BIN_NAME=$(basename "$OUT_PATH")
-
-if [[ "$REBUILD_VENDOR" = "true" ]]
-then
-  echo 'Populating vendor/ from scratch'
-  mv vendor/vendor.json .
-  rm -rf vendor/*
-  mv vendor.json vendor/
-  govendor sync
-fi
 
 echo 'Building'
 container_id=$(docker run --detach \

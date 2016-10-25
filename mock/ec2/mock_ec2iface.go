@@ -30,6 +30,28 @@ func (_m *MockEC2API) EXPECT() *_MockEC2APIRecorder {
 	return _m.recorder
 }
 
+func (_m *MockEC2API) AcceptReservedInstancesExchangeQuote(_param0 *ec2.AcceptReservedInstancesExchangeQuoteInput) (*ec2.AcceptReservedInstancesExchangeQuoteOutput, error) {
+	ret := _m.ctrl.Call(_m, "AcceptReservedInstancesExchangeQuote", _param0)
+	ret0, _ := ret[0].(*ec2.AcceptReservedInstancesExchangeQuoteOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) AcceptReservedInstancesExchangeQuote(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "AcceptReservedInstancesExchangeQuote", arg0)
+}
+
+func (_m *MockEC2API) AcceptReservedInstancesExchangeQuoteRequest(_param0 *ec2.AcceptReservedInstancesExchangeQuoteInput) (*request.Request, *ec2.AcceptReservedInstancesExchangeQuoteOutput) {
+	ret := _m.ctrl.Call(_m, "AcceptReservedInstancesExchangeQuoteRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.AcceptReservedInstancesExchangeQuoteOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) AcceptReservedInstancesExchangeQuoteRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "AcceptReservedInstancesExchangeQuoteRequest", arg0)
+}
+
 func (_m *MockEC2API) AcceptVpcPeeringConnection(_param0 *ec2.AcceptVpcPeeringConnectionInput) (*ec2.AcceptVpcPeeringConnectionOutput, error) {
 	ret := _m.ctrl.Call(_m, "AcceptVpcPeeringConnection", _param0)
 	ret0, _ := ret[0].(*ec2.AcceptVpcPeeringConnectionOutput)
@@ -1944,6 +1966,50 @@ func (_mr *_MockEC2APIRecorder) DescribeFlowLogsRequest(arg0 interface{}) *gomoc
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeFlowLogsRequest", arg0)
 }
 
+func (_m *MockEC2API) DescribeHostReservationOfferings(_param0 *ec2.DescribeHostReservationOfferingsInput) (*ec2.DescribeHostReservationOfferingsOutput, error) {
+	ret := _m.ctrl.Call(_m, "DescribeHostReservationOfferings", _param0)
+	ret0, _ := ret[0].(*ec2.DescribeHostReservationOfferingsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeHostReservationOfferings(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeHostReservationOfferings", arg0)
+}
+
+func (_m *MockEC2API) DescribeHostReservationOfferingsRequest(_param0 *ec2.DescribeHostReservationOfferingsInput) (*request.Request, *ec2.DescribeHostReservationOfferingsOutput) {
+	ret := _m.ctrl.Call(_m, "DescribeHostReservationOfferingsRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.DescribeHostReservationOfferingsOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeHostReservationOfferingsRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeHostReservationOfferingsRequest", arg0)
+}
+
+func (_m *MockEC2API) DescribeHostReservations(_param0 *ec2.DescribeHostReservationsInput) (*ec2.DescribeHostReservationsOutput, error) {
+	ret := _m.ctrl.Call(_m, "DescribeHostReservations", _param0)
+	ret0, _ := ret[0].(*ec2.DescribeHostReservationsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeHostReservations(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeHostReservations", arg0)
+}
+
+func (_m *MockEC2API) DescribeHostReservationsRequest(_param0 *ec2.DescribeHostReservationsInput) (*request.Request, *ec2.DescribeHostReservationsOutput) {
+	ret := _m.ctrl.Call(_m, "DescribeHostReservationsRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.DescribeHostReservationsOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) DescribeHostReservationsRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeHostReservationsRequest", arg0)
+}
+
 func (_m *MockEC2API) DescribeHosts(_param0 *ec2.DescribeHostsInput) (*ec2.DescribeHostsOutput, error) {
 	ret := _m.ctrl.Call(_m, "DescribeHosts", _param0)
 	ret0, _ := ret[0].(*ec2.DescribeHostsOutput)
@@ -3540,6 +3606,28 @@ func (_mr *_MockEC2APIRecorder) GetConsoleScreenshotRequest(arg0 interface{}) *g
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetConsoleScreenshotRequest", arg0)
 }
 
+func (_m *MockEC2API) GetHostReservationPurchasePreview(_param0 *ec2.GetHostReservationPurchasePreviewInput) (*ec2.GetHostReservationPurchasePreviewOutput, error) {
+	ret := _m.ctrl.Call(_m, "GetHostReservationPurchasePreview", _param0)
+	ret0, _ := ret[0].(*ec2.GetHostReservationPurchasePreviewOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) GetHostReservationPurchasePreview(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetHostReservationPurchasePreview", arg0)
+}
+
+func (_m *MockEC2API) GetHostReservationPurchasePreviewRequest(_param0 *ec2.GetHostReservationPurchasePreviewInput) (*request.Request, *ec2.GetHostReservationPurchasePreviewOutput) {
+	ret := _m.ctrl.Call(_m, "GetHostReservationPurchasePreviewRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.GetHostReservationPurchasePreviewOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) GetHostReservationPurchasePreviewRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetHostReservationPurchasePreviewRequest", arg0)
+}
+
 func (_m *MockEC2API) GetPasswordData(_param0 *ec2.GetPasswordDataInput) (*ec2.GetPasswordDataOutput, error) {
 	ret := _m.ctrl.Call(_m, "GetPasswordData", _param0)
 	ret0, _ := ret[0].(*ec2.GetPasswordDataOutput)
@@ -3560,6 +3648,28 @@ func (_m *MockEC2API) GetPasswordDataRequest(_param0 *ec2.GetPasswordDataInput) 
 
 func (_mr *_MockEC2APIRecorder) GetPasswordDataRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetPasswordDataRequest", arg0)
+}
+
+func (_m *MockEC2API) GetReservedInstancesExchangeQuote(_param0 *ec2.GetReservedInstancesExchangeQuoteInput) (*ec2.GetReservedInstancesExchangeQuoteOutput, error) {
+	ret := _m.ctrl.Call(_m, "GetReservedInstancesExchangeQuote", _param0)
+	ret0, _ := ret[0].(*ec2.GetReservedInstancesExchangeQuoteOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) GetReservedInstancesExchangeQuote(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetReservedInstancesExchangeQuote", arg0)
+}
+
+func (_m *MockEC2API) GetReservedInstancesExchangeQuoteRequest(_param0 *ec2.GetReservedInstancesExchangeQuoteInput) (*request.Request, *ec2.GetReservedInstancesExchangeQuoteOutput) {
+	ret := _m.ctrl.Call(_m, "GetReservedInstancesExchangeQuoteRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.GetReservedInstancesExchangeQuoteOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) GetReservedInstancesExchangeQuoteRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetReservedInstancesExchangeQuoteRequest", arg0)
 }
 
 func (_m *MockEC2API) ImportImage(_param0 *ec2.ImportImageInput) (*ec2.ImportImageOutput, error) {
@@ -4044,6 +4154,28 @@ func (_m *MockEC2API) MoveAddressToVpcRequest(_param0 *ec2.MoveAddressToVpcInput
 
 func (_mr *_MockEC2APIRecorder) MoveAddressToVpcRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "MoveAddressToVpcRequest", arg0)
+}
+
+func (_m *MockEC2API) PurchaseHostReservation(_param0 *ec2.PurchaseHostReservationInput) (*ec2.PurchaseHostReservationOutput, error) {
+	ret := _m.ctrl.Call(_m, "PurchaseHostReservation", _param0)
+	ret0, _ := ret[0].(*ec2.PurchaseHostReservationOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) PurchaseHostReservation(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PurchaseHostReservation", arg0)
+}
+
+func (_m *MockEC2API) PurchaseHostReservationRequest(_param0 *ec2.PurchaseHostReservationInput) (*request.Request, *ec2.PurchaseHostReservationOutput) {
+	ret := _m.ctrl.Call(_m, "PurchaseHostReservationRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ec2.PurchaseHostReservationOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockEC2APIRecorder) PurchaseHostReservationRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PurchaseHostReservationRequest", arg0)
 }
 
 func (_m *MockEC2API) PurchaseReservedInstancesOffering(_param0 *ec2.PurchaseReservedInstancesOfferingInput) (*ec2.PurchaseReservedInstancesOfferingOutput, error) {
@@ -4660,4 +4792,304 @@ func (_m *MockEC2API) UnmonitorInstancesRequest(_param0 *ec2.UnmonitorInstancesI
 
 func (_mr *_MockEC2APIRecorder) UnmonitorInstancesRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "UnmonitorInstancesRequest", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilBundleTaskComplete(_param0 *ec2.DescribeBundleTasksInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilBundleTaskComplete", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilBundleTaskComplete(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilBundleTaskComplete", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilConversionTaskCancelled(_param0 *ec2.DescribeConversionTasksInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilConversionTaskCancelled", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilConversionTaskCancelled(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilConversionTaskCancelled", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilConversionTaskCompleted(_param0 *ec2.DescribeConversionTasksInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilConversionTaskCompleted", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilConversionTaskCompleted(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilConversionTaskCompleted", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilConversionTaskDeleted(_param0 *ec2.DescribeConversionTasksInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilConversionTaskDeleted", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilConversionTaskDeleted(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilConversionTaskDeleted", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilCustomerGatewayAvailable(_param0 *ec2.DescribeCustomerGatewaysInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilCustomerGatewayAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilCustomerGatewayAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilCustomerGatewayAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilExportTaskCancelled(_param0 *ec2.DescribeExportTasksInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilExportTaskCancelled", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilExportTaskCancelled(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilExportTaskCancelled", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilExportTaskCompleted(_param0 *ec2.DescribeExportTasksInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilExportTaskCompleted", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilExportTaskCompleted(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilExportTaskCompleted", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilImageAvailable(_param0 *ec2.DescribeImagesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilImageAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilImageAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilImageAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilImageExists(_param0 *ec2.DescribeImagesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilImageExists", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilImageExists(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilImageExists", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilInstanceExists(_param0 *ec2.DescribeInstancesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilInstanceExists", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilInstanceExists(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilInstanceExists", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilInstanceRunning(_param0 *ec2.DescribeInstancesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilInstanceRunning", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilInstanceRunning(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilInstanceRunning", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilInstanceStatusOk(_param0 *ec2.DescribeInstanceStatusInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilInstanceStatusOk", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilInstanceStatusOk(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilInstanceStatusOk", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilInstanceStopped(_param0 *ec2.DescribeInstancesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilInstanceStopped", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilInstanceStopped(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilInstanceStopped", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilInstanceTerminated(_param0 *ec2.DescribeInstancesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilInstanceTerminated", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilInstanceTerminated(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilInstanceTerminated", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilKeyPairExists(_param0 *ec2.DescribeKeyPairsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilKeyPairExists", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilKeyPairExists(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilKeyPairExists", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilNatGatewayAvailable(_param0 *ec2.DescribeNatGatewaysInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilNatGatewayAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilNatGatewayAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilNatGatewayAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilNetworkInterfaceAvailable(_param0 *ec2.DescribeNetworkInterfacesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilNetworkInterfaceAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilNetworkInterfaceAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilNetworkInterfaceAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilPasswordDataAvailable(_param0 *ec2.GetPasswordDataInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilPasswordDataAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilPasswordDataAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilPasswordDataAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilSnapshotCompleted(_param0 *ec2.DescribeSnapshotsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilSnapshotCompleted", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilSnapshotCompleted(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilSnapshotCompleted", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilSpotInstanceRequestFulfilled(_param0 *ec2.DescribeSpotInstanceRequestsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilSpotInstanceRequestFulfilled", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilSpotInstanceRequestFulfilled(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilSpotInstanceRequestFulfilled", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilSubnetAvailable(_param0 *ec2.DescribeSubnetsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilSubnetAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilSubnetAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilSubnetAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilSystemStatusOk(_param0 *ec2.DescribeInstanceStatusInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilSystemStatusOk", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilSystemStatusOk(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilSystemStatusOk", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilVolumeAvailable(_param0 *ec2.DescribeVolumesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilVolumeAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilVolumeAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilVolumeAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilVolumeDeleted(_param0 *ec2.DescribeVolumesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilVolumeDeleted", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilVolumeDeleted(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilVolumeDeleted", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilVolumeInUse(_param0 *ec2.DescribeVolumesInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilVolumeInUse", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilVolumeInUse(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilVolumeInUse", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilVpcAvailable(_param0 *ec2.DescribeVpcsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilVpcAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilVpcAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilVpcAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilVpcExists(_param0 *ec2.DescribeVpcsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilVpcExists", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilVpcExists(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilVpcExists", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilVpcPeeringConnectionExists(_param0 *ec2.DescribeVpcPeeringConnectionsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilVpcPeeringConnectionExists", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilVpcPeeringConnectionExists(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilVpcPeeringConnectionExists", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilVpnConnectionAvailable(_param0 *ec2.DescribeVpnConnectionsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilVpnConnectionAvailable", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilVpnConnectionAvailable(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilVpnConnectionAvailable", arg0)
+}
+
+func (_m *MockEC2API) WaitUntilVpnConnectionDeleted(_param0 *ec2.DescribeVpnConnectionsInput) error {
+	ret := _m.ctrl.Call(_m, "WaitUntilVpnConnectionDeleted", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockEC2APIRecorder) WaitUntilVpnConnectionDeleted(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "WaitUntilVpnConnectionDeleted", arg0)
 }
