@@ -79,21 +79,7 @@ cat << EOF > /etc/docker/daemon.json
 }
 EOF
 
-start_install() {
-  if command -v docker >/dev/null
-  then
-    echo 'Detected existing Docker installation, will not attempt to install or update'
-  else
-    sleep 5
-    wget -qO- https://get.docker.com/ | sh
-  fi
-
-  docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
-}
-
-# See https://github.com/docker/docker/issues/23793#issuecomment-237735835 for
-# details on why we background/sleep.
-start_install &
+docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
 `
 )
 
