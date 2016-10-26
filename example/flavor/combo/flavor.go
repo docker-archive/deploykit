@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/docker/infrakit/plugin/group"
 	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
+	"strings"
 )
 
 // Spec is the model of the plugin Properties.
@@ -50,6 +52,35 @@ func (f flavorCombo) Healthy(flavorProperties json.RawMessage, inst instance.Des
 	}
 
 	return flavor.Healthy, nil
+}
+
+func (f flavorCombo) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	// Draining is attempted on all flavors regardless of errors encountered.  All errors encountered are combined
+	// and returned.
+
+	s := Spec{}
+	if err := json.Unmarshal(flavorProperties, &s); err != nil {
+		return err
+	}
+
+	errs := []string{}
+
+	for _, pluginSpec := range s.Flavors {
+		plugin, err := f.flavorPlugins(pluginSpec.Plugin)
+		if err != nil {
+			errs = append(errs, err.Error())
+		}
+
+		if err := plugin.Drain(types.RawMessage(pluginSpec.Properties), inst); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(errs, ", "))
 }
 
 func cloneSpec(spec instance.Spec) instance.Spec {

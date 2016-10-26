@@ -149,9 +149,8 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		// Sort instances first to ensure predictable destroy order.
 		sort.Sort(sortByID(undesiredInstances))
 
-		// TODO(wfarner): Provide a mechanism to gracefully drain instances.
 		// TODO(wfarner): Make the 'batch size' configurable.
-		r.scaled.Destroy(undesiredInstances[0].ID)
+		r.scaled.Destroy(undesiredInstances[0])
 
 		expectedNewInstances++
 	}
