@@ -31,8 +31,8 @@ a. exposing the Docker remote API for the InfraKit plugin to access join tokens
 b. running InfraKit on the manager nodes to access join tokens via the Docker socket
  
 We recommend approach (b) for anything but demonstration purposes unless the Docker daemon socket is
-appropriately [secured(https://docs.docker.com/engine/security/https/).  For simplicity, **this example does not secure
-Docker socket**
+[secured](https://docs.docker.com/engine/security/https/).  For simplicity, **this example does not secure
+Docker socket**.
 
 
 ### Running
@@ -57,7 +57,6 @@ $ build/infrakit-flavor-swarm --host tcp://192.168.2.200:4243
 
 Note that the Swarm Plugin is configured with a Docker host.  This is used to determine where the join tokens are
 fetched from.  In this case, we are pointing at the yet-to-be-created Swarm manager node.
-
 
 Next, create the [manager node](swarm-vagrant-manager.json) and initialize the cluster:
 
