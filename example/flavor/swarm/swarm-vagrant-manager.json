@@ -1,0 +1,24 @@
+{
+  "ID": "swarm-managers",
+  "Properties": {
+    "Allocation": {
+      "LogicalIDs": ["192.168.2.200"]
+    },
+    "Instance": {
+      "Plugin": "instance-vagrant",
+      "Properties": {
+        "Box": "williamyeh/ubuntu-trusty64-docker"
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": [
+          "docker swarm init --advertise-addr 192.168.2.200",
+          "echo 'DOCKER_OPTS=\"$DOCKER_OPTS -H tcp://0.0.0.0:4243\"' >> /etc/default/docker",
+          "service docker restart"
+        ]
+      }
+    }
+  }
+}

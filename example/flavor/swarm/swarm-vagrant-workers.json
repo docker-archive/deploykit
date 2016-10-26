@@ -1,0 +1,20 @@
+{
+  "ID": "swarm-workers",
+  "Properties": {
+    "Allocation": {
+      "Size": 1
+    },
+    "Instance": {
+      "Plugin": "instance-vagrant",
+      "Properties": {
+        "Box": "williamyeh/ubuntu-trusty64-docker"
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-swarm",
+      "Properties": {
+        "Type": "worker"
+      }
+    }
+  }
+}
