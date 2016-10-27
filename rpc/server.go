@@ -120,7 +120,7 @@ func runHTTP(socketPath string, server *http.Server) (chan<- struct{}, <-chan er
 
 	if _, err = os.Lstat(socketPath); err == nil {
 		// Update socket filename permission
-		if err := os.Chmod(server.Addr, 0777); err != nil {
+		if err := os.Chmod(server.Addr, 0700); err != nil {
 			return nil, nil, err
 		}
 	} else {
