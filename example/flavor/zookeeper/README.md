@@ -35,6 +35,7 @@ Be sure to verify that the plugin is [discoverable](../../../cmd/cli/README.md#l
 
 Here's a JSON for the group we'd like to see [vagrant-zk.json](./vagrant-zk.json):
 
+<!-- blockcheck vagrant-zk.json -->
 ```json
 {
   "ID": "zk",
