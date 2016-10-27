@@ -3,16 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/discovery"
-	"github.com/docker/infrakit/plugin/group/types"
-	"github.com/docker/infrakit/spi/flavor"
-	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
-	"github.com/docker/infrakit/spi/instance"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/discovery"
+	"github.com/docker/infrakit/plugin/group/types"
+	flavor_plugin "github.com/docker/infrakit/rpc/flavor"
+	"github.com/docker/infrakit/spi/flavor"
+	"github.com/docker/infrakit/spi/instance"
+	"github.com/spf13/cobra"
 )
 
 func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
@@ -25,11 +26,15 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access flavor plugin",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 
-			callable, err := plugins().Find(name)
+			endpoint, err := plugins().Find(name)
 			if err != nil {
 				return err
 			}
-			flavorPlugin = flavor_plugin.PluginClient(callable)
+
+			flavorPlugin, err = flavor_plugin.NewClient(endpoint.Protocol, endpoint.Address)
+			if err != nil {
+				return err
+			}
 
 			return nil
 		},

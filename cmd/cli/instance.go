@@ -3,15 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/discovery"
-	instance_plugin "github.com/docker/infrakit/spi/http/instance"
-	"github.com/docker/infrakit/spi/instance"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/discovery"
+	instance_plugin "github.com/docker/infrakit/rpc/instance"
+	"github.com/docker/infrakit/spi/instance"
+	"github.com/spf13/cobra"
 )
 
 func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
@@ -24,11 +25,15 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access instance plugin",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 
-			callable, err := plugins().Find(name)
+			endpoint, err := plugins().Find(name)
 			if err != nil {
 				return err
 			}
-			instancePlugin = instance_plugin.PluginClient(callable)
+
+			instancePlugin, err = instance_plugin.NewClient(endpoint.Protocol, endpoint.Address)
+			if err != nil {
+				return err
+			}
 
 			return nil
 		},
