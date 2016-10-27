@@ -17,17 +17,9 @@ import (
 const vagrantFile = `
 Vagrant.configure("2") do |config|
   config.vm.box = "{{.Properties.Box}}"
-  {{if .Properties.BoxVersion }}
-  config.vm.box_version = "{{.Properties.BoxVersion}}"
-  {{end}}
-  {{if .Properties.BoxURL }}
-  config.vm.box_url = "{{.Properties.BoxURL}}"
-  {{end}}
   config.vm.hostname = "infrakit.box"
   config.vm.network "private_network"{{.NetworkOptions}}
-
   config.vm.provision :shell, path: "boot.sh"
-
   config.vm.provider :virtualbox do |vb|
     vb.memory = {{.Properties.Memory}}
     vb.cpus = {{.Properties.CPUs}}
@@ -58,11 +50,9 @@ func inheritedEnvCommand(cmdAndArgs []string, extraEnv ...string) (string, error
 }
 
 type schema struct {
-	Box        string
-	BoxVersion string
-	BoxURL     string
-	Memory     int
-	CPUs       int
+	Box    string
+	Memory int
+	CPUs   int
 }
 
 // Provision creates a new instance.
@@ -83,6 +73,10 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	templ := template.Must(template.New("").Parse(vagrantFile))
+	if _, err := os.Stat(v.VagrantfilesDir + "vagrant.tmpl"); err == nil {
+		templ = template.Must(template.ParseFiles(v.VagrantfilesDir + "vagrant.tmpl"))
+	}
+
 	networkOptions := `, type: "dhcp"`
 	if spec.LogicalID != nil {
 		networkOptions = fmt.Sprintf(`, ip: "%s"`, *spec.LogicalID)
