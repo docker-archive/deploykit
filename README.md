@@ -133,10 +133,9 @@ cd infrakit
 
 We recommended go version 1.7.1 or greater for all platforms.
 
-Also install a few build tools
-
+Also install a few build tools:
 ```shell
-go get -u github.com/golang/lint/golint  # if you're running tests
+go get -u github.com/golang/lint/golint github.com/wfarner/blockcheck  # if you're running tests
 ```
 
 ### Running tests

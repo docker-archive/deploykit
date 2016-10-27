@@ -66,8 +66,8 @@ So now we have the names of the plugins and their configurations.
 
 Putting everything together, we have the configuration to give to the default Group plugin:
 
-```shell
-$ cat << EOF > cattle.json
+<!-- blockcheck cattle.json -->
+```json
 {
   "ID": "cattle",
   "Properties": {
@@ -95,7 +95,6 @@ $ cat << EOF > cattle.json
     }
   }
 }
-EOF
 ```
 
 Note that we specify the number of instances via the `Size` parameter in the `flavor-vanilla` plugin.  It's possible
@@ -141,7 +140,39 @@ instance-1475104956           	  -             infrakit.config_sha=Y23cKqyRpkQ_M
 instance-1475104966           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
-Now let's update the configuration by changing the size of the group and a property of the instance:
+Now let's update the configuration by changing the size of the group and a property of the instance.  Save this file as
+`cattle2.json`:
+
+<!-- blockcheck cattle2.json -->
+```json
+{
+  "ID": "cattle",
+  "Properties": {
+    "Allocation": {
+      "Size": 10
+    },
+    "Instance": {
+      "Plugin": "instance-file",
+      "Properties": {
+        "Note": "Instance properties version 2.0"
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": [
+          "docker pull nginx:alpine",
+          "docker run -d -p 80:80 nginx-alpine"
+        ],
+        "Tags": {
+          "tier": "web",
+          "project": "infrakit"
+        }
+      }
+    }
+  }
+}
+```
 
 ```shell
 $ diff cattle.json cattle2.json 

@@ -36,8 +36,8 @@ Using the plugin `instance-file` as an example:
 
 ### Validate
 
-```
-$ cat << EOF > instance.json
+Save the folliwing in a file named `instance.json`,
+```json
 {
     "Properties": {
         "version": "v0.0.1"
@@ -49,8 +49,10 @@ $ cat << EOF > instance.json
     "Init": "#!/bin/sh\napt-get install -y wget",
     "LogicalID": "logic2"
 }
-EOF
+```
 
+and send a request for an instance plugin to validate it:
+```shell
 $ build/infrakit instance --name instance-file instance.json
 validate:ok
 ```

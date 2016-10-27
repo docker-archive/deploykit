@@ -27,7 +27,7 @@ dependencies:
     - cp -R "$HOME/$CIRCLE_PROJECT_REPONAME" "$WORKDIR"
 
     # Install dependencies
-    - cd $WORKDIR && go get github.com/axw/gocov/gocov github.com/golang/lint/golint
+    - cd $WORKDIR && go get github.com/golang/lint/golint github.com/wfarner/blockcheck
 
 test:
   override:
