@@ -5,17 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/infrakit/spi/instance"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"text/template"
+
+	"github.com/docker/infrakit/spi/instance"
 )
 
 const vagrantFile = `
 Vagrant.configure("2") do |config|
   config.vm.box = "{{.Properties.Box}}"
+  {{if .Properties.BoxVersion }}
+  config.vm.box_version = "{{.Properties.BoxVersion}}"
+  {{end}}
+  {{if .Properties.BoxURL }}
+  config.vm.box_url = "{{.Properties.BoxURL}}"
+  {{end}}
   config.vm.hostname = "infrakit.box"
   config.vm.network "private_network"{{.NetworkOptions}}
 
@@ -51,9 +58,11 @@ func inheritedEnvCommand(cmdAndArgs []string, extraEnv ...string) (string, error
 }
 
 type schema struct {
-	Box    string
-	Memory int
-	CPUs   int
+	Box        string
+	BoxVersion string
+	BoxURL     string
+	Memory     int
+	CPUs       int
 }
 
 // Provision creates a new instance.
