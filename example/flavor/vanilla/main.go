@@ -1,12 +1,13 @@
 package main
 
 import (
+	"os"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cli"
 	"github.com/docker/infrakit/plugin/flavor/vanilla"
-	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
+	flavor_plugin "github.com/docker/infrakit/rpc/flavor"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func main() {

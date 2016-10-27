@@ -2,17 +2,17 @@ package discovery
 
 import (
 	"fmt"
-	"github.com/docker/infrakit/plugin"
 	"os"
 	"os/user"
 	"path"
+
+	"github.com/docker/infrakit/plugin"
 )
 
 // Plugins provides access to plugin discovery.
 type Plugins interface {
-	Find(name string) (plugin.Callable, error)
-
-	List() (map[string]plugin.Callable, error)
+	Find(name string) (*plugin.Endpoint, error)
+	List() (map[string]*plugin.Endpoint, error)
 }
 
 const (

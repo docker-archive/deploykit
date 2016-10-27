@@ -24,10 +24,10 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			if !quiet {
-				fmt.Printf("%-20s\t%-s\n", "NAME", "LISTEN")
+				fmt.Printf("%-20s\t%-8s\t%-s\n", "NAME", "PROTOCOL", "LISTEN")
 			}
 			for k, v := range entries {
-				fmt.Printf("%-20s\t%-s\n", k, v.String())
+				fmt.Printf("%-20s\t%-8s\t%-s\n", k, v.Protocol, v.Address)
 			}
 
 			return nil

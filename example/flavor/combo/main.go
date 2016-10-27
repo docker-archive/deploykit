@@ -1,14 +1,14 @@
 package main
 
 import (
+	"os"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cli"
 	"github.com/docker/infrakit/discovery"
+	flavor_rpc "github.com/docker/infrakit/rpc/flavor"
 	"github.com/docker/infrakit/spi/flavor"
-	flavor_client "github.com/docker/infrakit/spi/http/flavor"
-	flavor_plugin "github.com/docker/infrakit/spi/http/flavor"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func main() {
@@ -28,15 +28,15 @@ func main() {
 			}
 
 			flavorPluginLookup := func(n string) (flavor.Plugin, error) {
-				callable, err := plugins.Find(n)
+				endpoint, err := plugins.Find(n)
 				if err != nil {
 					return nil, err
 				}
-				return flavor_client.PluginClient(callable), nil
+				return flavor_rpc.NewClient(endpoint.Protocol, endpoint.Address)
 			}
 
 			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name, flavor_plugin.PluginServer(NewPlugin(flavorPluginLookup)))
+			cli.RunPlugin(name, flavor_rpc.PluginServer(NewPlugin(flavorPluginLookup)))
 		},
 	}
 

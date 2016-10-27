@@ -8,10 +8,10 @@ import (
 	"github.com/docker/infrakit/cli"
 	"github.com/docker/infrakit/discovery"
 	"github.com/docker/infrakit/plugin/group"
+	flavor_client "github.com/docker/infrakit/rpc/flavor"
+	group_server "github.com/docker/infrakit/rpc/group"
+	instance_client "github.com/docker/infrakit/rpc/instance"
 	"github.com/docker/infrakit/spi/flavor"
-	flavor_client "github.com/docker/infrakit/spi/http/flavor"
-	group_server "github.com/docker/infrakit/spi/http/group"
-	instance_client "github.com/docker/infrakit/spi/http/instance"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/spf13/cobra"
 )
@@ -36,19 +36,19 @@ func main() {
 			}
 
 			instancePluginLookup := func(n string) (instance.Plugin, error) {
-				callable, err := plugins.Find(n)
+				endpoint, err := plugins.Find(n)
 				if err != nil {
 					return nil, err
 				}
-				return instance_client.PluginClient(callable), nil
+				return instance_client.NewClient(endpoint.Protocol, endpoint.Address)
 			}
 
 			flavorPluginLookup := func(n string) (flavor.Plugin, error) {
-				callable, err := plugins.Find(n)
+				endpoint, err := plugins.Find(n)
 				if err != nil {
 					return nil, err
 				}
-				return flavor_client.PluginClient(callable), nil
+				return flavor_client.NewClient(endpoint.Protocol, endpoint.Address)
 			}
 
 			cli.RunPlugin(name, group_server.PluginServer(
