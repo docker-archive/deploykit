@@ -19,7 +19,7 @@ type Scaled interface {
 	Health(inst instance.Description) flavor.Health
 
 	// Destroy destroys a single instance.
-	Destroy(id instance.ID)
+	Destroy(inst instance.Description)
 
 	// List returns all instances in the group.
 	List() ([]instance.Description, error)
@@ -94,13 +94,18 @@ func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
 
 }
 
-func (s *scaledGroup) Destroy(id instance.ID) {
+func (s *scaledGroup) Destroy(inst instance.Description) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	log.Infof("Destroying instance %s", id)
-	if err := s.settings.instancePlugin.Destroy(id); err != nil {
-		log.Errorf("Failed to destroy %s: %s", id, err)
+	flavorProperties := types.RawMessage(s.settings.config.Flavor.Properties)
+	if err := s.settings.flavorPlugin.Drain(flavorProperties, inst); err != nil {
+		log.Errorf("Failed to drain %s: %s", inst.ID, err)
+	}
+
+	log.Infof("Destroying instance %s", inst.ID)
+	if err := s.settings.instancePlugin.Destroy(inst.ID); err != nil {
+		log.Errorf("Failed to destroy %s: %s", inst.ID, err)
 	}
 }
 

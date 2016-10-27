@@ -38,7 +38,7 @@ func (_mr *_MockScaledRecorder) CreateOne(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateOne", arg0)
 }
 
-func (_m *MockScaled) Destroy(_param0 instance.ID) {
+func (_m *MockScaled) Destroy(_param0 instance.Description) {
 	_m.ctrl.Call(_m, "Destroy", _param0)
 }
 

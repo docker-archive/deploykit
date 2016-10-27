@@ -229,7 +229,7 @@ func (s *scaler) converge() {
 		// injecting a sorter.
 		for _, toDestroy := range sorted[:remove] {
 			grp.Add(1)
-			destroy := toDestroy.ID
+			destroy := toDestroy
 			go func() {
 				defer grp.Done()
 				s.scaled.Destroy(destroy)

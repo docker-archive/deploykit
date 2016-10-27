@@ -47,8 +47,8 @@ func TestScaleDown(t *testing.T) {
 		scaled.EXPECT().List().Return([]instance.Description{c, d}, nil).AnyTimes(),
 	)
 
-	scaled.EXPECT().Destroy(a.ID)
-	scaled.EXPECT().Destroy(b.ID)
+	scaled.EXPECT().Destroy(a)
+	scaled.EXPECT().Destroy(b)
 
 	scaler.Run()
 }

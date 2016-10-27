@@ -33,4 +33,7 @@ type Plugin interface {
 
 	// Healthy determines the Health of this Flavor on an instance.
 	Healthy(flavorProperties json.RawMessage, inst instance.Description) (Health, error)
+
+	// Drain allows the flavor to perform a best-effort cleanup operation before the instance is destroyed.
+	Drain(flavorProperties json.RawMessage, inst instance.Description) error
 }
