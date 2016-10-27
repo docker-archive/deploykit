@@ -27,12 +27,13 @@ Vagrant.configure("2") do |config|
 end`
 
 // NewVagrantPlugin creates an instance plugin for vagrant.
-func NewVagrantPlugin(dir string) instance.Plugin {
-	return &vagrantPlugin{VagrantfilesDir: dir}
+func NewVagrantPlugin(dir string, template string) instance.Plugin {
+	return &vagrantPlugin{VagrantfilesDir: dir, VagrantTmpl: template}
 }
 
 type vagrantPlugin struct {
 	VagrantfilesDir string
+	VagrantTmpl     string
 }
 
 // Validate performs local validation on a provision request.
@@ -73,8 +74,8 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	templ := template.Must(template.New("").Parse(vagrantFile))
-	if _, err := os.Stat(v.VagrantfilesDir + "vagrant.tmpl"); err == nil {
-		templ = template.Must(template.ParseFiles(v.VagrantfilesDir + "vagrant.tmpl"))
+	if _, err := os.Stat(v.VagrantTmpl); err == nil {
+		templ = template.Must(template.ParseFiles(v.VagrantTmpl))
 	}
 
 	networkOptions := `, type: "dhcp"`

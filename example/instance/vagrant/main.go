@@ -1,12 +1,13 @@
 package main
 
 import (
+	"os"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cli"
 	"github.com/docker/infrakit/plugin/instance/vagrant"
 	instance_plugin "github.com/docker/infrakit/spi/http/instance"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func main() {
@@ -14,6 +15,7 @@ func main() {
 	var name string
 	var logLevel int
 	var dir string
+	var template string
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -21,7 +23,7 @@ func main() {
 		Run: func(c *cobra.Command, args []string) {
 
 			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name, instance_plugin.PluginServer(vagrant.NewVagrantPlugin(dir)))
+			cli.RunPlugin(name, instance_plugin.PluginServer(vagrant.NewVagrantPlugin(dir, template)))
 		},
 	}
 
@@ -35,6 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 	cmd.Flags().StringVar(&dir, "dir", defaultDir, "Vagrant directory")
+	cmd.Flags().StringVar(&template, "template", template, "Vagrant Template file")
 
 	if err := cmd.Execute(); err != nil {
 		log.Error(err)
