@@ -34,6 +34,7 @@ func PluginServer(p flavor.Plugin) http.Handler {
 		f.validate,
 		f.prepare,
 		f.healthy,
+		f.drain,
 	})
 }
 
@@ -129,5 +130,29 @@ func (s *flavorServer) healthy() (plugin.Endpoint, plugin.Handler) {
 			}
 			health, err := s.plugin.Healthy(types.RawMessage(request.Properties), request.Instance)
 			return healthResponse{Health: health}, err
+		}
+}
+
+type drainRequest struct {
+	Properties *json.RawMessage
+	Instance   instance.Description
+}
+
+func (c *client) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	request := drainRequest{Properties: &flavorProperties, Instance: inst}
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Drain"}, request, nil)
+	return err
+}
+
+func (s *flavorServer) drain() (plugin.Endpoint, plugin.Handler) {
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Flavor.Drain"},
+
+		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
+			request := drainRequest{}
+			err = json.NewDecoder(body).Decode(&request)
+			if err != nil {
+				return nil, err
+			}
+			return nil, s.plugin.Drain(types.RawMessage(request.Properties), request.Instance)
 		}
 }

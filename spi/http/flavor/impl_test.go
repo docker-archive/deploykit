@@ -33,11 +33,13 @@ type testPlugin struct {
 		spec instance.Spec,
 		allocation types.AllocationMethod) (instance.Spec, error)
 	DoHealthy func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error)
+	DoDrain   func(flavorProperties json.RawMessage, inst instance.Description) error
 }
 
 func (t *testPlugin) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 	return t.DoValidate(flavorProperties, allocation)
 }
+
 func (t *testPlugin) Prepare(
 	flavorProperties json.RawMessage,
 	spec instance.Spec,
@@ -45,8 +47,13 @@ func (t *testPlugin) Prepare(
 
 	return t.DoPrepare(flavorProperties, spec, allocation)
 }
+
 func (t *testPlugin) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 	return t.DoHealthy(flavorProperties, inst)
+}
+
+func (t *testPlugin) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	return t.DoDrain(flavorProperties, inst)
 }
 
 func TestFlavorPluginValidate(t *testing.T) {
@@ -216,6 +223,60 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = PluginClient(plugin_client.New(socketPath)).Healthy(inputProperties, inputInstance)
+	require.Error(t, err)
+	require.Equal(t, "oh-noes", err.Error())
+
+	require.Equal(t, inputProperties, <-inputPropertiesActual)
+	require.Equal(t, inputInstance, <-inputInstanceActual)
+	close(stop)
+}
+
+func TestFlavorPluginDrain(t *testing.T) {
+	socketPath := tempSocket()
+
+	inputPropertiesActual := make(chan json.RawMessage, 1)
+	inputInstanceActual := make(chan instance.Description, 1)
+	inputProperties := json.RawMessage("{}")
+	inputInstance := instance.Description{
+		ID:   instance.ID("foo"),
+		Tags: map[string]string{"foo": "bar"},
+	}
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+		DoDrain: func(properties json.RawMessage, inst instance.Description) error {
+			inputPropertiesActual <- properties
+			inputInstanceActual <- inst
+			return nil
+		},
+	}))
+	require.NoError(t, err)
+
+	require.NoError(t, PluginClient(plugin_client.New(socketPath)).Drain(inputProperties, inputInstance))
+
+	require.Equal(t, inputProperties, <-inputPropertiesActual)
+	require.Equal(t, inputInstance, <-inputInstanceActual)
+	close(stop)
+}
+
+func TestFlavorPluginDrainError(t *testing.T) {
+	socketPath := tempSocket()
+
+	inputPropertiesActual := make(chan json.RawMessage, 1)
+	inputInstanceActual := make(chan instance.Description, 1)
+	inputProperties := json.RawMessage("{}")
+	inputInstance := instance.Description{
+		ID:   instance.ID("foo"),
+		Tags: map[string]string{"foo": "bar"},
+	}
+	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+		DoDrain: func(flavorProperties json.RawMessage, inst instance.Description) error {
+			inputPropertiesActual <- flavorProperties
+			inputInstanceActual <- inst
+			return errors.New("oh-noes")
+		},
+	}))
+	require.NoError(t, err)
+
+	err = PluginClient(plugin_client.New(socketPath)).Drain(inputProperties, inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 

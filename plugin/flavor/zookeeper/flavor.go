@@ -35,7 +35,7 @@ func parseSpec(flavorProperties json.RawMessage) (spec, error) {
 	return s, err
 }
 
-func (s zkFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+func (z zkFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 	properties, err := parseSpec(flavorProperties)
 	if err != nil {
 		return err
@@ -146,12 +146,17 @@ func generateInitScript(useDocker bool, servers []instance.LogicalID, id instanc
 }
 
 // Healthy determines whether an instance is healthy.
-func (s zkFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (z zkFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 	// TODO(wfarner): Implement.
 	return flavor.Healthy, nil
 }
 
-func (s zkFlavor) Prepare(
+func (z zkFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	// There doesn't seem to be any need to drain ZK members, especially if they are expected to return.
+	return nil
+}
+
+func (z zkFlavor) Prepare(
 	flavorProperties json.RawMessage,
 	spec instance.Spec,
 	allocation types.AllocationMethod) (instance.Spec, error) {

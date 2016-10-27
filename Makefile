@@ -101,7 +101,7 @@ generate:
 
 test:
 	@echo "+ $@"
-	@go test -test.short -race -v $(PKGS)
+	@go test -test.short -timeout 30s -race -v $(PKGS)
 
 coverage:
 	@echo "+ $@"

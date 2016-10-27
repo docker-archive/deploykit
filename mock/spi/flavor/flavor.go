@@ -32,6 +32,16 @@ func (_m *MockPlugin) EXPECT() *_MockPluginRecorder {
 	return _m.recorder
 }
 
+func (_m *MockPlugin) Drain(_param0 json.RawMessage, _param1 instance.Description) error {
+	ret := _m.ctrl.Call(_m, "Drain", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockPluginRecorder) Drain(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Drain", arg0, arg1)
+}
+
 func (_m *MockPlugin) Healthy(_param0 json.RawMessage, _param1 instance.Description) (flavor.Health, error) {
 	ret := _m.ctrl.Call(_m, "Healthy", _param0, _param1)
 	ret0, _ := ret[0].(flavor.Health)
