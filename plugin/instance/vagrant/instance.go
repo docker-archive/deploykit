@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"text/template"
 
 	"github.com/docker/infrakit/spi/instance"
@@ -51,26 +52,27 @@ func inheritedEnvCommand(cmdAndArgs []string, extraEnv ...string) (string, error
 	return string(output), err
 }
 
-type schema struct {
-	Box    string
-	Memory int
-	CPUs   int
-}
-
 // Provision creates a new instance.
 func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
-	properties := schema{
-		Memory: 1024,
-		CPUs:   2,
-	}
+	properties := map[string]string{}
+
 	if spec.Properties != nil {
-		if err := json.Unmarshal(*spec.Properties, &properties); err != nil {
+		dec := json.NewDecoder(strings.NewReader(string(*spec.Properties)))
+		if err := dec.Decode(&properties); err != nil {
 			return nil, fmt.Errorf("Invalid instance properties: %s", err)
 		}
 	}
 
-	if properties.Box == "" {
+	if properties["CPUs"] == "" {
+		properties["CPUs"] = "2"
+	}
+
+	if properties["Memory"] == "" {
+		properties["Memory"] = "512"
+	}
+
+	if properties["Box"] == "" {
 		return nil, errors.New("Property 'Box' must be set")
 	}
 
