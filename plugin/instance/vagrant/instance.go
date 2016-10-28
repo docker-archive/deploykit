@@ -14,7 +14,8 @@ import (
 	"github.com/docker/infrakit/spi/instance"
 )
 
-const vagrantFile = `
+// VagrantFile is the minimum definition of the vagrant file
+const VagrantFile = `
 Vagrant.configure("2") do |config|
   config.vm.box = "{{.Properties.Box}}"
   config.vm.hostname = "infrakit.box"
@@ -27,13 +28,13 @@ Vagrant.configure("2") do |config|
 end`
 
 // NewVagrantPlugin creates an instance plugin for vagrant.
-func NewVagrantPlugin(dir string, template string) instance.Plugin {
+func NewVagrantPlugin(dir string, template *template.Template) instance.Plugin {
 	return &vagrantPlugin{VagrantfilesDir: dir, VagrantTmpl: template}
 }
 
 type vagrantPlugin struct {
 	VagrantfilesDir string
-	VagrantTmpl     string
+	VagrantTmpl     *template.Template
 }
 
 // Validate performs local validation on a provision request.
@@ -73,11 +74,6 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, errors.New("Property 'Box' must be set")
 	}
 
-	templ := template.Must(template.New("").Parse(vagrantFile))
-	if _, err := os.Stat(v.VagrantTmpl); err == nil {
-		templ = template.Must(template.ParseFiles(v.VagrantTmpl))
-	}
-
 	networkOptions := `, type: "dhcp"`
 	if spec.LogicalID != nil {
 		networkOptions = fmt.Sprintf(`, ip: "%s"`, *spec.LogicalID)
@@ -89,7 +85,7 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		"NetworkOptions": networkOptions,
 		"Properties":     properties,
 	}
-	if err := templ.Execute(&config, params); err != nil {
+	if err := v.VagrantTmpl.Execute(&config, params); err != nil {
 		return nil, err
 	}
 
