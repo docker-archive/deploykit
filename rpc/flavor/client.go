@@ -51,3 +51,15 @@ func (c *client) Healthy(flavorProperties json.RawMessage, inst instance.Descrip
 	err := c.rpc.Call("Flavor.Healthy", req, resp)
 	return resp.Health, err
 }
+
+// Drain allows the flavor to perform a best-effort cleanup operation before the instance is destroyed.
+func (c *client) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	req := &DrainRequest{Properties: flavorProperties, Instance: inst}
+	resp := &DrainResponse{}
+	err := c.rpc.Call("Flavor.Drain", req, resp)
+	if err != nil {
+		return err
+	}
+	resp.OK = true
+	return nil
+}

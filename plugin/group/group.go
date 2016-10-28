@@ -288,8 +288,25 @@ func (p *plugin) DestroyGroup(gid group.ID) error {
 	}
 
 	for _, desc := range descriptions {
-		context.scaled.Destroy(desc.ID)
+		context.scaled.Destroy(desc)
 	}
 
 	return nil
+}
+
+func (p *plugin) DescribeGroups() ([]group.Spec, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	var specs []group.Spec
+	err := p.groups.forEach(func(id group.ID, ctx *groupContext) error {
+		if ctx != nil {
+			spec, err := types.UnparseProperties(string(id), ctx.settings.config)
+			if err != nil {
+				return err
+			}
+			specs = append(specs, spec)
+		}
+		return nil
+	})
+	return specs, err
 }

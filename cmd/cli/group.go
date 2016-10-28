@@ -237,8 +237,29 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
+	describeGroups := &cobra.Command{
+		Use:   "describe-groups",
+		Short: "describe the groups",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			assertNotNil("no plugin", groupPlugin)
 
-	cmd.AddCommand(watch, unwatch, inspect, describe, update, stop, destroy)
+			groups, err := groupPlugin.DescribeGroups()
+			if err == nil {
+
+				if !quiet {
+					fmt.Printf("%-30s\n", "ID")
+				}
+				for _, g := range groups {
+					fmt.Printf("%-30s\n", g.ID)
+				}
+			}
+
+			return err
+		},
+	}
+	describeGroups.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
+
+	cmd.AddCommand(watch, unwatch, inspect, describe, update, stop, destroy, describeGroups)
 
 	return cmd
 }

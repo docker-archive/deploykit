@@ -43,6 +43,18 @@ func ParseProperties(config group.Spec) (Spec, error) {
 	return parsed, nil
 }
 
+// UnparseProperties composes group.spec from id and props
+func UnparseProperties(id string, props Spec) (group.Spec, error) {
+	unparsed := group.Spec{ID: group.ID(id)}
+	b, err := json.Marshal(props)
+	if err != nil {
+		return unparsed, fmt.Errorf("Invalid properties: %s", err)
+	}
+	rawMessage := json.RawMessage(b)
+	unparsed.Properties = &rawMessage
+	return unparsed, nil
+}
+
 // MustParse can be wrapped over ParseProperties to panic if parsing fails.
 func MustParse(s Spec, e error) Spec {
 	if e != nil {

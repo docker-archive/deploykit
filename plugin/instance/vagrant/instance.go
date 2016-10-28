@@ -5,22 +5,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/infrakit/spi/instance"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"text/template"
+
+	"github.com/docker/infrakit/spi/instance"
 )
 
-const vagrantFile = `
+// VagrantFile is the minimum definition of the vagrant file
+const VagrantFile = `
 Vagrant.configure("2") do |config|
   config.vm.box = "{{.Properties.Box}}"
   config.vm.hostname = "infrakit.box"
   config.vm.network "private_network"{{.NetworkOptions}}
-
   config.vm.provision :shell, path: "boot.sh"
-
   config.vm.provider :virtualbox do |vb|
     vb.memory = {{.Properties.Memory}}
     vb.cpus = {{.Properties.CPUs}}
@@ -28,12 +29,13 @@ Vagrant.configure("2") do |config|
 end`
 
 // NewVagrantPlugin creates an instance plugin for vagrant.
-func NewVagrantPlugin(dir string) instance.Plugin {
-	return &vagrantPlugin{VagrantfilesDir: dir}
+func NewVagrantPlugin(dir string, template *template.Template) instance.Plugin {
+	return &vagrantPlugin{VagrantfilesDir: dir, VagrantTmpl: template}
 }
 
 type vagrantPlugin struct {
 	VagrantfilesDir string
+	VagrantTmpl     *template.Template
 }
 
 // Validate performs local validation on a provision request.
@@ -50,30 +52,30 @@ func inheritedEnvCommand(cmdAndArgs []string, extraEnv ...string) (string, error
 	return string(output), err
 }
 
-type schema struct {
-	Box    string
-	Memory int
-	CPUs   int
-}
-
 // Provision creates a new instance.
 func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
-	properties := schema{
-		Memory: 1024,
-		CPUs:   2,
-	}
+	properties := map[string]string{}
+
 	if spec.Properties != nil {
-		if err := json.Unmarshal(*spec.Properties, &properties); err != nil {
+		dec := json.NewDecoder(strings.NewReader(string(*spec.Properties)))
+		if err := dec.Decode(&properties); err != nil {
 			return nil, fmt.Errorf("Invalid instance properties: %s", err)
 		}
 	}
 
-	if properties.Box == "" {
+	if properties["CPUs"] == "" {
+		properties["CPUs"] = "2"
+	}
+
+	if properties["Memory"] == "" {
+		properties["Memory"] = "512"
+	}
+
+	if properties["Box"] == "" {
 		return nil, errors.New("Property 'Box' must be set")
 	}
 
-	templ := template.Must(template.New("").Parse(vagrantFile))
 	networkOptions := `, type: "dhcp"`
 	if spec.LogicalID != nil {
 		networkOptions = fmt.Sprintf(`, ip: "%s"`, *spec.LogicalID)
@@ -85,7 +87,7 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		"NetworkOptions": networkOptions,
 		"Properties":     properties,
 	}
-	if err := templ.Execute(&config, params); err != nil {
+	if err := v.VagrantTmpl.Execute(&config, params); err != nil {
 		return nil, err
 	}
 

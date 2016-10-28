@@ -17,22 +17,24 @@ import (
 	"text/template"
 )
 
+type nodeType string
+
 const (
-	roleWorker  = "worker"
-	roleManager = "manager"
+	worker  nodeType = "worker"
+	manager nodeType = "manager"
 )
 
 // NewSwarmFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
 func NewSwarmFlavor(dockerClient client.APIClient) flavor.Plugin {
-	return &swarmProvisioner{client: dockerClient}
+	return &swarmFlavor{client: dockerClient}
 }
 
-type swarmProvisioner struct {
+type swarmFlavor struct {
 	client client.APIClient
 }
 
 type schema struct {
-	Type string
+	Type nodeType
 }
 
 func parseProperties(flavorProperties json.RawMessage) (schema, error) {
@@ -41,16 +43,16 @@ func parseProperties(flavorProperties json.RawMessage) (schema, error) {
 	return s, err
 }
 
-func (s swarmProvisioner) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return err
 	}
 
 	switch properties.Type {
-	case roleWorker:
+	case worker:
 		return nil
-	case roleManager:
+	case manager:
 		numIDs := len(allocation.LogicalIDs)
 		if numIDs != 1 && numIDs != 3 && numIDs != 5 {
 			return errors.New("Must have 1, 3, or 5 manager logical IDs")
@@ -99,7 +101,7 @@ func generateInitScript(joinIP, joinToken, associationID string) string {
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
-func (s swarmProvisioner) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (s swarmFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 	associationID, exists := inst.Tags[associationTag]
 	if !exists {
 		log.Info("Reporting unhealthy for instance without an association tag", inst.ID)
@@ -129,7 +131,31 @@ func (s swarmProvisioner) Healthy(flavorProperties json.RawMessage, inst instanc
 	}
 }
 
-func (s swarmProvisioner) Prepare(
+func (s swarmFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	if inst.LogicalID == nil {
+		log.Infof("Node %s has no logical ID, unable to drain", inst.ID)
+	}
+
+	properties, err := parseProperties(flavorProperties)
+	if err != nil {
+		return err
+	}
+
+	// Only explicitly remove worker nodes, not manager nodes.  Manager nodes are assumed to have an attached volume
+	// for state, and fixed IP addresses.  This allows them to rejoin as the same node.
+
+	if properties.Type == worker {
+		removeOptions := docker_types.NodeRemoveOptions{Force: true}
+		err := s.client.NodeRemove(context.Background(), string(*inst.LogicalID), removeOptions)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s swarmFlavor) Prepare(
 	flavorProperties json.RawMessage,
 	spec instance.Spec,
 	allocation types.AllocationMethod) (instance.Spec, error) {
@@ -163,13 +189,13 @@ func (s swarmProvisioner) Prepare(
 	spec.Tags[associationTag] = associationID
 
 	switch properties.Type {
-	case roleWorker:
+	case worker:
 		spec.Init = generateInitScript(
 			self.ManagerStatus.Addr,
 			swarmStatus.JoinTokens.Worker,
 			associationID)
 
-	case roleManager:
+	case manager:
 		if spec.LogicalID == nil {
 			return spec, errors.New("Manager nodes require an assigned private IP address")
 		}
@@ -182,7 +208,7 @@ func (s swarmProvisioner) Prepare(
 		spec.Attachments = []instance.Attachment{instance.Attachment(*spec.LogicalID)}
 
 	default:
-		return spec, errors.New("Unsupported role type")
+		return spec, errors.New("Unsupported node type")
 	}
 
 	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another

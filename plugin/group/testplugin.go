@@ -104,6 +104,7 @@ const (
 
 type testFlavor struct {
 	healthy func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error)
+	drain   func(flavorProperties json.RawMessage, inst instance.Description) error
 }
 
 type flavorSchema struct {
@@ -160,4 +161,12 @@ func (t testFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Desc
 	}
 
 	return flavor.Healthy, nil
+}
+
+func (t testFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	if t.drain != nil {
+		return t.drain(flavorProperties, inst)
+	}
+
+	return nil
 }

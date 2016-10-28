@@ -37,6 +37,11 @@ func (f vanillaFlavor) Healthy(flavorProperties json.RawMessage, inst instance.D
 	return flavor.Healthy, nil
 }
 
+func (f vanillaFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	// TODO: We could add support for shell code in the Spec for a drain command to run.
+	return nil
+}
+
 func (f vanillaFlavor) Prepare(
 	flavor json.RawMessage,
 	instance instance.Spec,
