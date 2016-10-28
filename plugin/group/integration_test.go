@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -164,6 +165,8 @@ func TestNoopUpdate(t *testing.T) {
 	for _, i := range instances {
 		require.Equal(t, newFakeInstance(minions, nil).Tags, i.Tags)
 	}
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestRollingUpdate(t *testing.T) {
@@ -204,6 +207,8 @@ func TestRollingUpdate(t *testing.T) {
 	for _, i := range instances {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestRollAndAdjustScale(t *testing.T) {
@@ -236,6 +241,8 @@ func TestRollAndAdjustScale(t *testing.T) {
 	for _, i := range instances {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestScaleIncrease(t *testing.T) {
@@ -265,6 +272,8 @@ func TestScaleIncrease(t *testing.T) {
 	for _, i := range instances {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestScaleDecrease(t *testing.T) {
@@ -294,6 +303,8 @@ func TestScaleDecrease(t *testing.T) {
 	for _, i := range instances {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestUnwatchGroup(t *testing.T) {
@@ -352,6 +363,8 @@ func TestSuperviseQuorum(t *testing.T) {
 	}
 
 	// TODO(wfarner): Validate logical IDs in created instances.
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestUpdateCompletes(t *testing.T) {
@@ -367,6 +380,8 @@ func TestUpdateCompletes(t *testing.T) {
 
 	updated = group.Spec{ID: id, Properties: minionProperties(5, "data", "init")}
 	require.NoError(t, grp.UpdateGroup(updated))
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestInstanceAndFlavorChange(t *testing.T) {
@@ -398,6 +413,8 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "data2", properties["OpaqueValue"])
 	}
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestFlavorChange(t *testing.T) {
@@ -418,6 +435,8 @@ func TestFlavorChange(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "Performs a rolling update on 3 instances", desc)
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestStopUpdate(t *testing.T) {
@@ -428,11 +447,17 @@ func TestStopUpdate(t *testing.T) {
 		newFakeInstance(minions, nil),
 	)
 
+	var once sync.Once
 	healthChecksStarted := make(chan bool)
+	defer close(healthChecksStarted)
 	flavorPlugin := testFlavor{
 		healthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 			if strings.Contains(string(flavorProperties), "flavor2") {
-				healthChecksStarted <- true
+				// sync.Once is used to prevent writing to healthChecksStarted more than one time,
+				// causing the test to deadlock.
+				once.Do(func() {
+					healthChecksStarted <- true
+				})
 			}
 
 			// Unknown health will stall the update indefinitely.
@@ -447,6 +472,9 @@ func TestStopUpdate(t *testing.T) {
 
 	require.NoError(t, grp.WatchGroup(minions))
 
+	// Since we expect only a single write to healthChecksStarted, it's important to use only one instance here.
+	// This prevents flaky behavior where another health check is performed before StopUpdate() is called, leading
+	// to a deadlock.
 	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "flavor2")}
 
 	go func() {
@@ -459,7 +487,7 @@ func TestStopUpdate(t *testing.T) {
 	<-healthChecksStarted
 
 	require.NoError(t, grp.StopUpdate(id))
-	close(healthChecksStarted)
+	require.NoError(t, grp.UnwatchGroup(id))
 }
 
 func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
@@ -491,4 +519,6 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 	err := grp.UpdateGroup(updated)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unhealthy")
+
+	require.NoError(t, grp.UnwatchGroup(id))
 }
