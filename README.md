@@ -49,6 +49,9 @@ $ cat << EOF > aws-vanilla.json
 {
   "ID": "aws-example",
   "Properties": {
+    "Allocation": {
+      "Size": 1
+    },
     "Instance": {
       "Plugin": "instance-aws",
       "Properties": {
@@ -68,10 +71,8 @@ $ cat << EOF > aws-vanilla.json
     "Flavor": {
       "Plugin": "flavor-vanilla",
       "Properties": {
-        "Size": 1,
-        "UserData": [
-          "#!/bin/sh",
-          "echo 'Hello, World!' > /hello"
+        "Init": [
+          "sh -c \"echo 'Hello, World!' > /hello\""
         ]
       }
     }
@@ -80,11 +81,15 @@ $ cat << EOF > aws-vanilla.json
 EOF
 ```
 
+For the structure of `RunInstancesInput`, please refer to [the document of AWS SDK for Go](https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#RunInstancesInput).
+
 Note that you will need to replace the `KeyName` with an
 [SSH key pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html) you have access to, and the
 `SecurityGroups` with a group available in your VPC.  For the purposes of this example, it will be helpful to select
 a [Security Group](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-network-security.html) that you can access
 via [SSH](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AccessingInstancesLinux.html).
+
+The instance type is set to `m1.small` by default. Note that you cannot use HVM images for `m1.small`.
 
 Finally, instruct the Group plugin to start watching the group:
 ```console
