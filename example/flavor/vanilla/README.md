@@ -24,8 +24,8 @@ Here's a skeleton of this Plugin's schema:
 ```
 
 The supported fields are:
-* `UserData`: an array of shell code lines to use for the Instance's Init script
-* `Labels`: a string-string mapping of keys and values to add as Instance Tags
+* `Init`: an array of shell code lines to use for the Instance's Init script
+* `Tags`: a string-string mapping of keys and values to add as Instance Tags
 
 Here's an example Group configuration using the default [infrakit/group](/cmd/group) Plugin and the Vanilla Plugin:
 ```json
