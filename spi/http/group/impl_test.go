@@ -22,6 +22,7 @@ type testPlugin struct {
 	DoUpdateGroup    func(updated group.Spec) error
 	DoStopUpdate     func(id group.ID) error
 	DoDestroyGroup   func(id group.ID) error
+	DoDescribeGroups func() ([]group.Spec, error)
 }
 
 func (t *testPlugin) WatchGroup(grp group.Spec) error {
@@ -44,6 +45,9 @@ func (t *testPlugin) StopUpdate(id group.ID) error {
 }
 func (t *testPlugin) DestroyGroup(id group.ID) error {
 	return t.DoDestroyGroup(id)
+}
+func (t *testPlugin) DescribeGroups() ([]group.Spec, error) {
+	return t.DoDescribeGroups()
 }
 
 func tempSocket() string {

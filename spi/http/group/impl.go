@@ -37,6 +37,7 @@ func PluginServer(p group.Plugin) http.Handler {
 		g.updateGroup,
 		g.stopUpdate,
 		g.destroyGroup,
+		g.describeGroups,
 	})
 }
 
@@ -157,5 +158,20 @@ func (s *groupServer) destroyGroup() (plugin.Endpoint, plugin.Handler) {
 		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
 			err = s.plugin.DestroyGroup(group.ID(vars["id"]))
 			return nil, err
+		}
+}
+
+func (c *client) DescribeGroups() ([]group.Spec, error) {
+	result := []group.Spec{}
+	_, err := c.c.Call(&util.HTTPEndpoint{Method: "POST", Path: "/Group.DescribeGroups"}, nil, &result)
+	return result, err
+
+}
+
+func (s *groupServer) describeGroups() (plugin.Endpoint, plugin.Handler) {
+	return &util.HTTPEndpoint{Method: "POST", Path: "/Group.DescribeGroups"},
+
+		func(vars map[string]string, body io.Reader) (result interface{}, err error) {
+			return s.plugin.DescribeGroups()
 		}
 }
