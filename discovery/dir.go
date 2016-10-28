@@ -9,24 +9,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/plugin"
-	"github.com/docker/infrakit/plugin/util/client"
 )
-
-type pluginInstance struct {
-	name     string
-	endpoint string
-	client   *client.Client
-}
-
-// String returns a string representation of the callable.
-func (i *pluginInstance) String() string {
-	return i.endpoint
-}
-
-// Call calls the plugin with some message
-func (i *pluginInstance) Call(endpoint plugin.Endpoint, message, result interface{}) ([]byte, error) {
-	return i.client.Call(endpoint, message, result)
-}
 
 type dirPluginDiscovery struct {
 	dir  string
@@ -34,7 +17,7 @@ type dirPluginDiscovery struct {
 }
 
 // Find returns a plugin by name
-func (r *dirPluginDiscovery) Find(name string) (plugin.Callable, error) {
+func (r *dirPluginDiscovery) Find(name string) (*plugin.Endpoint, error) {
 
 	plugins, err := r.List()
 	if err != nil {
@@ -58,13 +41,13 @@ func newDirPluginDiscovery(dir string) (*dirPluginDiscovery, error) {
 	return d, err
 }
 
-func (r *dirPluginDiscovery) dirLookup(entry os.FileInfo) (*pluginInstance, error) {
+func (r *dirPluginDiscovery) dirLookup(entry os.FileInfo) (*plugin.Endpoint, error) {
 	if entry.Mode()&os.ModeSocket != 0 {
 		socketPath := filepath.Join(r.dir, entry.Name())
-		return &pluginInstance{
-			endpoint: socketPath,
-			name:     entry.Name(),
-			client:   client.New(socketPath),
+		return &plugin.Endpoint{
+			Protocol: "unix",
+			Address:  socketPath,
+			Name:     entry.Name(),
 		}, nil
 	}
 
@@ -72,7 +55,7 @@ func (r *dirPluginDiscovery) dirLookup(entry os.FileInfo) (*pluginInstance, erro
 }
 
 // List returns a list of plugins known, keyed by the name
-func (r *dirPluginDiscovery) List() (map[string]plugin.Callable, error) {
+func (r *dirPluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -83,7 +66,7 @@ func (r *dirPluginDiscovery) List() (map[string]plugin.Callable, error) {
 		return nil, err
 	}
 
-	plugins := map[string]plugin.Callable{}
+	plugins := map[string]*plugin.Endpoint{}
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -94,8 +77,8 @@ func (r *dirPluginDiscovery) List() (map[string]plugin.Callable, error) {
 				continue
 			}
 
-			log.Debugln("Discovered plugin at", instance.endpoint)
-			plugins[instance.name] = plugin.Callable(instance)
+			log.Debugln("Discovered plugin at", instance.Address)
+			plugins[instance.Name] = instance
 		}
 	}
 
