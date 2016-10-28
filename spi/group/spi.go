@@ -20,6 +20,8 @@ type Plugin interface {
 	StopUpdate(id ID) error
 
 	DestroyGroup(id ID) error
+
+	DescribeGroups() ([]Spec, error)
 }
 
 // ID is the unique identifier for a Group.

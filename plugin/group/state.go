@@ -85,6 +85,17 @@ func (g *groups) put(id group.ID, context *groupContext) {
 	g.byID[id] = context
 }
 
+func (g *groups) forEach(fn func(group.ID, *groupContext) error) error {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	for id, ctx := range g.byID {
+		if err := fn(id, ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type sortByID []instance.Description
 
 func (n sortByID) Len() int {
