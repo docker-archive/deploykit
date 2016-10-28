@@ -108,15 +108,6 @@ func TestInvalidGroupCalls(t *testing.T) {
 	require.Error(t, grp.UpdateGroup(minions))
 }
 
-func instanceProperties(config group.Spec) json.RawMessage {
-	spec := types.Spec{}
-	err := json.Unmarshal(*config.Properties, &spec)
-	if err != nil {
-		panic(err)
-	}
-	return *spec.Instance.Properties
-}
-
 func memberTags(id group.ID) map[string]string {
 	return map[string]string{groupTag: string(id)}
 }
@@ -418,48 +409,6 @@ func TestFlavorChange(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "Performs a rolling update on 3 instances", desc)
-}
-
-func TestStopUpdate(t *testing.T) {
-
-	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-	)
-
-	healthChecksStarted := make(chan bool)
-	flavorPlugin := testFlavor{
-		healthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-			if strings.Contains(string(flavorProperties), "flavor2") {
-				healthChecksStarted <- true
-			}
-
-			// Unknown health will stall the update indefinitely.
-			return flavor.Unknown, nil
-		},
-	}
-	flavorLookup := func(_ string) (flavor.Plugin, error) {
-		return &flavorPlugin, nil
-	}
-
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond)
-
-	require.NoError(t, grp.WatchGroup(minions))
-
-	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "flavor2")}
-
-	go func() {
-		err := grp.UpdateGroup(updated)
-		require.Error(t, err)
-		require.Equal(t, "Update halted by user", err.Error())
-	}()
-
-	// Wait for the first health check to ensure the update has begun.
-	<-healthChecksStarted
-
-	require.NoError(t, grp.StopUpdate(id))
-	close(healthChecksStarted)
 }
 
 func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
