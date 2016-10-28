@@ -45,6 +45,7 @@ func (p *Flavor) Healthy(req *HealthyRequest, resp *HealthyResponse) error {
 	resp.Health = health
 	return nil
 }
+<<<<<<< HEAD
 
 // Drain drains the instance. It's the inverse of prepare before provision and happens before destroy.
 func (p *Flavor) Drain(req *DrainRequest, resp *DrainResponse) error {
@@ -55,3 +56,5 @@ func (p *Flavor) Drain(req *DrainRequest, resp *DrainResponse) error {
 	resp.OK = true
 	return nil
 }
+=======
+>>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0

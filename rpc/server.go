@@ -84,11 +84,19 @@ func runJSONRPCServer(socketPath string, server *rpc.Server) (chan<- struct{}, <
 	}()
 
 	go func() {
+<<<<<<< HEAD:rpc/server.go
 
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
 				break
+=======
+	serverLoop:
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				break serverLoop
+>>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0:rpc/server.go
 			}
 			go server.ServeCodec(jsonrpc.NewServerCodec(conn))
 		}

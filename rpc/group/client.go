@@ -89,6 +89,7 @@ func (c *client) DestroyGroup(id group.ID) error {
 	resp.OK = true
 	return nil
 }
+<<<<<<< HEAD
 
 func (c *client) DescribeGroups() ([]group.Spec, error) {
 	req := &DescribeGroupsRequest{}
@@ -96,3 +97,5 @@ func (c *client) DescribeGroups() ([]group.Spec, error) {
 	err := c.rpc.Call("Group.DescribeGroups", req, resp)
 	return resp.Groups, err
 }
+=======
+>>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0
