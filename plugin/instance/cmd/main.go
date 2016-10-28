@@ -33,7 +33,7 @@ func main() {
 	}
 
 	cmd.Flags().IntVar(&logLevel, "log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
-	cmd.Flags().StringVar(&name, "name", "flavor-combo", "Plugin name to advertise for discovery")
+	cmd.Flags().StringVar(&name, "name", "instance-aws", "Plugin name to advertise for discovery")
 
 	// TODO(chungers) - the exposed flags here won't be set in plugins, because plugin install doesn't allow
 	// user to pass in command line args like containers with entrypoint.
