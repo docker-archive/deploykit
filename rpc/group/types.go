@@ -74,7 +74,6 @@ type DestroyGroupResponse struct {
 	OK bool
 }
 
-<<<<<<< HEAD
 // DescribeGroupsRequest is the rpc wrapper for the input to destroy a group
 type DescribeGroupsRequest struct {
 	ID group.ID
@@ -85,8 +84,6 @@ type DescribeGroupsResponse struct {
 	Groups []group.Spec
 }
 
-=======
->>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0
 // RPCService is the interface for exposing the group plugin as a RPC service. It conforms to the call conventions
 // defined in net/rpc
 type RPCService interface {
@@ -97,8 +94,5 @@ type RPCService interface {
 	UpdateGroup(req *UpdateGroupRequest, resp *UpdateGroupResponse) error
 	StopUpdate(req *StopUpdateRequest, resp *StopUpdateResponse) error
 	DestroyGroup(req *DestroyGroupRequest, resp *DestroyGroupResponse) error
-<<<<<<< HEAD
 	DescribeGroups(req *DescribeGroupsRequest, resp *DescribeGroupsResponse) error
-=======
->>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0
 }

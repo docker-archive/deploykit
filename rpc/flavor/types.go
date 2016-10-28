@@ -42,7 +42,6 @@ type HealthyResponse struct {
 	Health flavor.Health
 }
 
-<<<<<<< HEAD
 // DrainRequest is the rpc wrapper of the params to Drain
 type DrainRequest struct {
 	Properties json.RawMessage
@@ -54,8 +53,6 @@ type DrainResponse struct {
 	OK bool
 }
 
-=======
->>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0
 // RPCService is the interface for exposing the plugin methods to rpc
 type RPCService interface {
 
@@ -67,11 +64,8 @@ type RPCService interface {
 
 	// Healthy is the rpc method for flavor Healthy
 	Healthy(req *HealthyRequest, resp *HealthyResponse) error
-<<<<<<< HEAD
 
 	// Drain is the rpc method for flavor Drain
 	// It's the inverse of prepare before provision and happens before destroy.
 	Drain(req *DrainRequest, resp *DrainResponse) error
-=======
->>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0
 }

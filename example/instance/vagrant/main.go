@@ -2,10 +2,7 @@ package main
 
 import (
 	"os"
-<<<<<<< HEAD
 	"text/template"
-=======
->>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cli"

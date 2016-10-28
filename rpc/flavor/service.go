@@ -30,7 +30,7 @@ func (p *Flavor) Validate(req *ValidateRequest, resp *ValidateResponse) error {
 func (p *Flavor) Prepare(req *PrepareRequest, resp *PrepareResponse) error {
 	spec, err := p.plugin.Prepare(req.Properties, req.Spec, req.Allocation)
 	if err != nil {
-		return nil
+		return err
 	}
 	resp.Spec = spec
 	return nil
@@ -40,21 +40,18 @@ func (p *Flavor) Prepare(req *PrepareRequest, resp *PrepareResponse) error {
 func (p *Flavor) Healthy(req *HealthyRequest, resp *HealthyResponse) error {
 	health, err := p.plugin.Healthy(req.Properties, req.Instance)
 	if err != nil {
-		return nil
+		return err
 	}
 	resp.Health = health
 	return nil
 }
-<<<<<<< HEAD
 
 // Drain drains the instance. It's the inverse of prepare before provision and happens before destroy.
 func (p *Flavor) Drain(req *DrainRequest, resp *DrainResponse) error {
 	err := p.plugin.Drain(req.Properties, req.Instance)
 	if err != nil {
-		return nil
+		return err
 	}
 	resp.OK = true
 	return nil
 }
-=======
->>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0

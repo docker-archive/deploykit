@@ -83,7 +83,6 @@ func (p *Group) DestroyGroup(req *DestroyGroupRequest, resp *DestroyGroupRespons
 	resp.OK = true
 	return nil
 }
-<<<<<<< HEAD
 
 // DescribeGroups is the rpc method to describe groups
 func (p *Group) DescribeGroups(req *DescribeGroupsRequest, resp *DescribeGroupsResponse) error {
@@ -94,5 +93,3 @@ func (p *Group) DescribeGroups(req *DescribeGroupsRequest, resp *DescribeGroupsR
 	resp.Groups = groups
 	return nil
 }
-=======
->>>>>>> ba0155815ea4622affab23ce6558ba53e45e62a0
