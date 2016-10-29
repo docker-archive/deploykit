@@ -1,8 +1,10 @@
-package server
+package rpc
 
 import (
 	"net"
 	"net/http"
+	"net/rpc"
+	"net/rpc/jsonrpc"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,16 +14,20 @@ import (
 
 // StartPluginAtPath starts an HTTP server listening on a unix socket at the specified path.
 // Returns a channel to signal stop when closed, a channel to block on stopping, and an error if occurs.
-func StartPluginAtPath(socketPath string, endpoint http.Handler) (chan<- struct{}, <-chan error, error) {
+func StartPluginAtPath(socketPath string, endpoint interface{}) (chan<- struct{}, <-chan error, error) {
 	log.Infoln("Listening at:", socketPath)
 
-	engineStop, engineStopped, err := runHTTP(socketPath, &http.Server{Handler: endpoint, Addr: socketPath})
+	server := rpc.NewServer()
+	err := server.Register(endpoint)
+	if err != nil {
+		return nil, nil, err
+	}
+	engineStop, engineStopped, err := runJSONRPCServer(socketPath, server)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	shutdownTasks := []func() error{}
-
 	shutdownTasks = append(shutdownTasks, func() error {
 		// close channels that others may block on for shutdown
 		close(engineStop)
@@ -58,6 +64,47 @@ func StartPluginAtPath(socketPath string, endpoint http.Handler) (chan<- struct{
 	}(shutdownTasks)
 
 	return fromUser, stopped, nil
+}
+
+// Run the JSON RPC server listening at the given path
+func runJSONRPCServer(socketPath string, server *rpc.Server) (chan<- struct{}, <-chan error, error) {
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	stop := make(chan struct{})
+	stopped := make(chan error)
+
+	userInitiated := new(bool)
+	go func() {
+		<-stop
+		*userInitiated = true
+		listener.Close()
+	}()
+
+	go func() {
+
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				break
+			}
+			go server.ServeCodec(jsonrpc.NewServerCodec(conn))
+		}
+
+		defer close(stopped)
+
+		switch {
+		case !*userInitiated && err != nil:
+			panic(err)
+		case *userInitiated:
+			stopped <- nil
+		default:
+			stopped <- err
+		}
+	}()
+	return stop, stopped, nil
 }
 
 // Runs the http server.  This server offers more control than the standard go's default http server.

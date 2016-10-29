@@ -1,14 +1,15 @@
 package discovery
 
 import (
-	"github.com/docker/infrakit/plugin/util/server"
-	"github.com/gorilla/mux"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	server "github.com/docker/infrakit/rpc"
+	rpc "github.com/docker/infrakit/rpc/instance"
+	"github.com/stretchr/testify/require"
 )
 
 func blockWhileFileExists(name string) {
@@ -30,14 +31,14 @@ func TestDirDiscovery(t *testing.T) {
 
 	name1 := "server1"
 	path1 := filepath.Join(dir, name1)
-	stop1, errors1, err1 := server.StartPluginAtPath(path1, mux.NewRouter())
+	stop1, errors1, err1 := server.StartPluginAtPath(path1, rpc.PluginServer(nil))
 	require.NoError(t, err1)
 	require.NotNil(t, stop1)
 	require.NotNil(t, errors1)
 
 	name2 := "server2"
 	path2 := filepath.Join(dir, name2)
-	stop2, errors2, err2 := server.StartPluginAtPath(path2, mux.NewRouter())
+	stop2, errors2, err2 := server.StartPluginAtPath(path2, rpc.PluginServer(nil))
 	require.NoError(t, err2)
 	require.NotNil(t, stop2)
 	require.NotNil(t, errors2)

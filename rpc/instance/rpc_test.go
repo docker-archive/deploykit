@@ -5,8 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	plugin_client "github.com/docker/infrakit/plugin/util/client"
-	"github.com/docker/infrakit/plugin/util/server"
+	"github.com/docker/infrakit/rpc"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -49,6 +48,12 @@ func tempSocket() string {
 	return path.Join(dir, "instance-impl-test")
 }
 
+func testClient(t *testing.T, socket string) instance.Plugin {
+	cl, err := NewClient("unix", socket)
+	require.NoError(t, err)
+	return cl
+}
+
 func TestInstancePluginValidate(t *testing.T) {
 
 	socketPath := tempSocket()
@@ -57,7 +62,7 @@ func TestInstancePluginValidate(t *testing.T) {
 
 	rawActual := make(chan json.RawMessage, 1)
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoValidate: func(req json.RawMessage) error {
 
 			rawActual <- req
@@ -67,7 +72,7 @@ func TestInstancePluginValidate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).Validate(raw)
+	err = testClient(t, socketPath).Validate(raw)
 	require.NoError(t, err)
 
 	close(stop)
@@ -81,7 +86,7 @@ func TestInstancePluginValidateError(t *testing.T) {
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 	rawActual := make(chan json.RawMessage, 1)
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoValidate: func(req json.RawMessage) error {
 
 			rawActual <- req
@@ -91,7 +96,7 @@ func TestInstancePluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).Validate(raw)
+	err = testClient(t, socketPath).Validate(raw)
 	require.Error(t, err)
 	require.Equal(t, "whoops", err.Error())
 
@@ -107,7 +112,7 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 	spec := instance.Spec{
 		Properties: &raw,
 	}
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
 			specActual <- req
 			return nil, nil
@@ -116,7 +121,7 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 	require.NoError(t, err)
 
 	var id *instance.ID
-	id, err = PluginClient(plugin_client.New(socketPath)).Provision(spec)
+	id, err = testClient(t, socketPath).Provision(spec)
 	require.NoError(t, err)
 	require.Nil(t, id)
 
@@ -133,7 +138,7 @@ func TestInstancePluginProvision(t *testing.T) {
 	spec := instance.Spec{
 		Properties: &raw,
 	}
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
 			specActual <- req
 			v := instance.ID("test")
@@ -143,7 +148,7 @@ func TestInstancePluginProvision(t *testing.T) {
 	require.NoError(t, err)
 
 	var id *instance.ID
-	id, err = PluginClient(plugin_client.New(socketPath)).Provision(spec)
+	id, err = testClient(t, socketPath).Provision(spec)
 	require.NoError(t, err)
 	require.Equal(t, "test", string(*id))
 
@@ -160,7 +165,7 @@ func TestInstancePluginProvisionError(t *testing.T) {
 	spec := instance.Spec{
 		Properties: &raw,
 	}
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
 			specActual <- req
 			return nil, errors.New("nope")
@@ -168,7 +173,7 @@ func TestInstancePluginProvisionError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = PluginClient(plugin_client.New(socketPath)).Provision(spec)
+	_, err = testClient(t, socketPath).Provision(spec)
 	require.Error(t, err)
 	require.Equal(t, "nope", err.Error())
 
@@ -183,7 +188,7 @@ func TestInstancePluginDestroy(t *testing.T) {
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDestroy: func(req instance.ID) error {
 			instActual <- req
 			return nil
@@ -191,7 +196,7 @@ func TestInstancePluginDestroy(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).Destroy(inst)
+	err = testClient(t, socketPath).Destroy(inst)
 	require.NoError(t, err)
 
 	close(stop)
@@ -205,7 +210,7 @@ func TestInstancePluginDestroyError(t *testing.T) {
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDestroy: func(req instance.ID) error {
 			instActual <- req
 			return errors.New("can't do")
@@ -213,7 +218,7 @@ func TestInstancePluginDestroyError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).Destroy(inst)
+	err = testClient(t, socketPath).Destroy(inst)
 	require.Error(t, err)
 	require.Equal(t, "can't do", err.Error())
 
@@ -229,7 +234,7 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 	list := []instance.Description{
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, nil
@@ -237,7 +242,7 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	l, err := PluginClient(plugin_client.New(socketPath)).DescribeInstances(tags)
+	l, err := testClient(t, socketPath).DescribeInstances(tags)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -255,7 +260,7 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 	list := []instance.Description{
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, nil
@@ -263,7 +268,7 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	l, err := PluginClient(plugin_client.New(socketPath)).DescribeInstances(tags)
+	l, err := testClient(t, socketPath).DescribeInstances(tags)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -281,7 +286,7 @@ func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	list := []instance.Description{
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, errors.New("bad")
@@ -289,7 +294,7 @@ func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = PluginClient(plugin_client.New(socketPath)).DescribeInstances(tags)
+	_, err = testClient(t, socketPath).DescribeInstances(tags)
 	require.Error(t, err)
 	require.Equal(t, "bad", err.Error())
 

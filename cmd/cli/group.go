@@ -3,15 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/discovery"
-	"github.com/docker/infrakit/spi/group"
-	group_plugin "github.com/docker/infrakit/spi/http/group"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/discovery"
+	group_plugin "github.com/docker/infrakit/rpc/group"
+	"github.com/docker/infrakit/spi/group"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -29,11 +30,15 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access group plugin",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 
-			callable, err := plugins().Find(name)
+			endpoint, err := plugins().Find(name)
 			if err != nil {
 				return err
 			}
-			groupPlugin = group_plugin.PluginClient(callable)
+
+			groupPlugin, err = group_plugin.NewClient(endpoint.Protocol, endpoint.Address)
+			if err != nil {
+				return err
+			}
 
 			return nil
 		},

@@ -5,8 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	plugin_client "github.com/docker/infrakit/plugin/util/client"
-	"github.com/docker/infrakit/plugin/util/server"
+	"github.com/docker/infrakit/rpc"
 	"github.com/docker/infrakit/spi/group"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
@@ -23,6 +22,12 @@ type testPlugin struct {
 	DoStopUpdate     func(id group.ID) error
 	DoDestroyGroup   func(id group.ID) error
 	DoDescribeGroups func() ([]group.Spec, error)
+}
+
+func testClient(t *testing.T, socket string) group.Plugin {
+	cl, err := NewClient("unix", socket)
+	require.NoError(t, err)
+	return cl
 }
 
 func (t *testPlugin) WatchGroup(grp group.Spec) error {
@@ -69,7 +74,7 @@ func TestGroupPluginWatchGroup(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoWatchGroup: func(req group.Spec) error {
 			groupSpecActual <- req
 			return nil
@@ -78,7 +83,7 @@ func TestGroupPluginWatchGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make call
-	err = PluginClient(plugin_client.New(socketPath)).WatchGroup(groupSpec)
+	err = testClient(t, socketPath).WatchGroup(groupSpec)
 	require.NoError(t, err)
 
 	close(stop)
@@ -96,7 +101,7 @@ func TestGroupPluginWatchGroupError(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoWatchGroup: func(req group.Spec) error {
 			groupSpecActual <- req
 			return errors.New("error")
@@ -104,7 +109,7 @@ func TestGroupPluginWatchGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).WatchGroup(groupSpec)
+	err = testClient(t, socketPath).WatchGroup(groupSpec)
 	require.Error(t, err)
 	require.Equal(t, "error", err.Error())
 
@@ -123,7 +128,7 @@ func TestGroupPluginDescribeUpdate(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeUpdate: func(req group.Spec) (string, error) {
 			groupSpecActual <- req
 			return "hello", nil
@@ -131,7 +136,7 @@ func TestGroupPluginDescribeUpdate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	desc, err := PluginClient(plugin_client.New(socketPath)).DescribeUpdate(groupSpec)
+	desc, err := testClient(t, socketPath).DescribeUpdate(groupSpec)
 	require.NoError(t, err)
 	require.Equal(t, "hello", desc)
 
@@ -149,7 +154,7 @@ func TestGroupPluginDescribeUpdateError(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDescribeUpdate: func(req group.Spec) (string, error) {
 			groupSpecActual <- req
 			return "", errors.New("error")
@@ -157,7 +162,7 @@ func TestGroupPluginDescribeUpdateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = PluginClient(plugin_client.New(socketPath)).DescribeUpdate(groupSpec)
+	_, err = testClient(t, socketPath).DescribeUpdate(groupSpec)
 	require.Error(t, err)
 	require.Equal(t, "error", err.Error())
 
@@ -176,7 +181,7 @@ func TestGroupPluginUpdateGroup(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoUpdateGroup: func(req group.Spec) error {
 			groupSpecActual <- req
 			return nil
@@ -184,7 +189,7 @@ func TestGroupPluginUpdateGroup(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).UpdateGroup(groupSpec)
+	err = testClient(t, socketPath).UpdateGroup(groupSpec)
 	require.NoError(t, err)
 
 	close(stop)
@@ -202,7 +207,7 @@ func TestGroupPluginUpdateGroupError(t *testing.T) {
 		Properties: &raw,
 	}
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoUpdateGroup: func(req group.Spec) error {
 			groupSpecActual <- req
 			return errors.New("error")
@@ -210,7 +215,7 @@ func TestGroupPluginUpdateGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).UpdateGroup(groupSpec)
+	err = testClient(t, socketPath).UpdateGroup(groupSpec)
 	require.Error(t, err)
 	require.Equal(t, "error", err.Error())
 
@@ -224,7 +229,7 @@ func TestGroupPluginUnwatchGroup(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoUnwatchGroup: func(req group.ID) error {
 			idActual <- req
 			return nil
@@ -232,7 +237,7 @@ func TestGroupPluginUnwatchGroup(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).UnwatchGroup(id)
+	err = testClient(t, socketPath).UnwatchGroup(id)
 	require.NoError(t, err)
 
 	close(stop)
@@ -244,7 +249,7 @@ func TestGroupPluginUnwatchGroupError(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoUnwatchGroup: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
@@ -252,7 +257,7 @@ func TestGroupPluginUnwatchGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).UnwatchGroup(id)
+	err = testClient(t, socketPath).UnwatchGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -265,7 +270,7 @@ func TestGroupPluginStopUpdate(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoStopUpdate: func(req group.ID) error {
 			idActual <- req
 			return nil
@@ -273,7 +278,7 @@ func TestGroupPluginStopUpdate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).StopUpdate(id)
+	err = testClient(t, socketPath).StopUpdate(id)
 	require.NoError(t, err)
 
 	close(stop)
@@ -285,7 +290,7 @@ func TestGroupPluginStopUpdateError(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoStopUpdate: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
@@ -293,7 +298,7 @@ func TestGroupPluginStopUpdateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).StopUpdate(id)
+	err = testClient(t, socketPath).StopUpdate(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -306,7 +311,7 @@ func TestGroupPluginDestroyGroup(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDestroyGroup: func(req group.ID) error {
 			idActual <- req
 			return nil
@@ -314,7 +319,7 @@ func TestGroupPluginDestroyGroup(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).DestroyGroup(id)
+	err = testClient(t, socketPath).DestroyGroup(id)
 	require.NoError(t, err)
 
 	close(stop)
@@ -326,7 +331,7 @@ func TestGroupPluginDestroyGroupError(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDestroyGroup: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
@@ -334,7 +339,7 @@ func TestGroupPluginDestroyGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = PluginClient(plugin_client.New(socketPath)).DestroyGroup(id)
+	err = testClient(t, socketPath).DestroyGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -354,7 +359,7 @@ func TestGroupPluginInspectGroup(t *testing.T) {
 		},
 	}
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoInspectGroup: func(req group.ID) (group.Description, error) {
 			idActual <- req
 			return desc, nil
@@ -362,7 +367,7 @@ func TestGroupPluginInspectGroup(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	res, err := PluginClient(plugin_client.New(socketPath)).InspectGroup(id)
+	res, err := testClient(t, socketPath).InspectGroup(id)
 	require.NoError(t, err)
 	require.Equal(t, desc, res)
 
@@ -381,7 +386,7 @@ func TestGroupPluginInspectGroupError(t *testing.T) {
 		},
 	}
 
-	stop, _, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoInspectGroup: func(req group.ID) (group.Description, error) {
 			idActual <- req
 			return desc, errors.New("no")
@@ -389,7 +394,7 @@ func TestGroupPluginInspectGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = PluginClient(plugin_client.New(socketPath)).InspectGroup(id)
+	_, err = testClient(t, socketPath).InspectGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
