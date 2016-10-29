@@ -60,8 +60,8 @@ It knows only about individual instances and nothing about Groups.  Instance is 
 need not be a physical machine at all.
 
 For compute, for example, instances can be VM instances of identical spec. Instances
-support the notions of attachment to auxiliary resources.  Instances are taggable and tags are assumed to be persistent
-which allows the state of the cluster to be inferred and computed.
+support the notions of attachment to auxiliary resources.  Instances may be tagged, and tags are assumed to be
+persistent which allows the state of the cluster to be inferred and computed.
 
 In some cases, instances can be identical, while in other cases the members of a group require stronger identities and
 persistent, stable state. These properties are captured via the _flavors_ of the instances.
@@ -86,14 +86,14 @@ Over time, we would prefer to phase out reference Plugins that appear to provide
 are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit/issues/new)
 to start a discussion before contributing to these plugins with non-trivial code.
 
-| plugin                                            | type     | description                             |
-|:--------------------------------------------------|:---------|:----------------------------------------|
-| [swarm](plugin/flavor/swarm)                      | flavor   | runs Docker in Swarm mode               |
-| [vanilla](plugin/flavor/vanilla)                  | flavor   | manual specification of instance fields |
-| [zookeeper](plugin/flavor/zookeeper)              | flavor   | run an Apache ZooKeeper ensemble        |
-| [infrakit/file](./example/instance/file)          | instance | useful for development and testing      |
-| [infrakit/terraform](./example/instance/terraform)| instance | creates instances using Terraform       |
-| [infrakit/vagrant](./example/instance/vagrant)    | instance | creates Vagrant VMs                     |
+| plugin                                             | type     | description                             |
+|:---------------------------------------------------|:---------|:----------------------------------------|
+| [swarm](example/flavor/swarm)                      | flavor   | runs Docker in Swarm mode               |
+| [vanilla](example/flavor/vanilla)                  | flavor   | manual specification of instance fields |
+| [zookeeper](example/flavor/zookeeper)              | flavor   | run an Apache ZooKeeper ensemble        |
+| [infrakit/file](example/instance/file)             | instance | useful for development and testing      |
+| [infrakit/terraform](example/instance/terraform)   | instance | creates instances using Terraform       |
+| [infrakit/vagrant](example/instance/vagrant)       | instance | creates Vagrant VMs                     |
 
 
 #### Supported implementations
@@ -102,7 +102,7 @@ project, so please double-check where the code lives before filing InfraKit issu
 
 | plugin                                                        | type     | description                                           |
 |:--------------------------------------------------------------|:---------|:------------------------------------------------------|
-| [infrakit/group](./cmd/group)                                 | group    | supports Instance and Flavor plugins, rolling updates |
+| [infrakit/group](cmd/group)                                   | group    | supports Instance and Flavor plugins, rolling updates |
 | [docker/infrakit.aws](https://github.com/docker/infrakit.aws) | instance | creates Amazon EC2 instances                          |
 
 Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
@@ -133,10 +133,9 @@ cd infrakit
 
 We recommended go version 1.7.1 or greater for all platforms.
 
-Also install a few build tools
-
+Also install a few build tools:
 ```shell
-go get -u github.com/golang/lint/golint  # if you're running tests
+go get -u github.com/golang/lint/golint github.com/wfarner/blockcheck  # if you're running tests
 ```
 
 ### Running tests
@@ -164,7 +163,7 @@ This will produce binaries for tools and several reference Plugin implementation
   + [`infrakit-flavor-swarm`](./example/flavor/swarm):
     a Flavor plugin for Docker in [Swarm mode](https://docs.docker.com/engine/swarm/).
 
-All provided binaries have a `help` subcommand to get usage and a `version` subcommand to identify the build revision.
+All provided binaries have a `help` sub-command to get usage and a `version` sub-command to identify the build revision.
 
 ## Examples
 There are a few examples of _InfraKit_ plugins:
@@ -232,7 +231,7 @@ Exactly one of these fields must be set, which defines whether the Group is trea
 (`LogicalIDs`).  It is up to the Instance and Flavor plugins to determine how to use `LogicalID` values.
 
 As an example, if you wanted to manage a Group of NGINX servers, you could
-write a custom Group plugin for ultimate customizability.  The most concise configuration looks something like this:
+write a custom Group plugin for ultimate customization.  The most concise configuration looks something like this:
 
 ```json
 {

@@ -11,11 +11,11 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test vendor-update containers
+.PHONY: clean all fmt vet lint build test vendor-update containers check-docs
 .DEFAULT: all
 all: clean fmt vet lint build test binaries
 
-ci: fmt vet lint coverage
+ci: fmt vet lint check-docs coverage
 
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
@@ -55,6 +55,10 @@ lint:
 	$(if $(shell which golint || echo ''), , \
 		$(error Please install golint: `go get -u github.com/golang/lint/golint`))
 	@test -z "$$(golint ./... 2>&1 | grep -v ^vendor/ | grep -v mock/ | tee /dev/stderr)"
+
+check-docs:
+	@echo "+ $@"
+	find . -name '*.md' | grep -v vendor/ | blockcheck
 
 build:
 	@echo "+ $@"
@@ -97,7 +101,7 @@ generate:
 
 test:
 	@echo "+ $@"
-	@go test -test.short -race -v $(PKGS)
+	@go test -test.short -timeout 30s -race -v $(PKGS)
 
 coverage:
 	@echo "+ $@"

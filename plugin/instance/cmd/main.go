@@ -6,7 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/cli"
-	instance_plugin "github.com/docker/infrakit/spi/http/instance"
+	instance_plugin "github.com/docker/infrakit/rpc/instance"
 	"github.com/spf13/cobra"
 )
 
