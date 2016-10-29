@@ -38,9 +38,17 @@ func (s *scaledGroup) changeSettings(settings groupSettings) {
 	s.settings = settings
 }
 
-func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
+// latestSettings gives a point-in-time view of the settings for this group.  This allows other functions to
+// safely use settings and make calls to plugins without holding the lock.
+func (s *scaledGroup) latestSettings() groupSettings {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	return s.settings
+}
+
+func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
+	settings := s.latestSettings()
 
 	tags := map[string]string{}
 	for k, v := range s.memberTags {
@@ -48,24 +56,24 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 	}
 
 	// Instances are tagged with a SHA of the entire instance configuration to support change detection.
-	tags[configTag] = s.settings.config.InstanceHash()
+	tags[configTag] = settings.config.InstanceHash()
 
 	spec := instance.Spec{
 		Tags:       tags,
 		LogicalID:  logicalID,
-		Properties: s.settings.config.Instance.Properties,
+		Properties: settings.config.Instance.Properties,
 	}
 
-	spec, err := s.settings.flavorPlugin.Prepare(
-		types.RawMessage(s.settings.config.Flavor.Properties),
+	spec, err := settings.flavorPlugin.Prepare(
+		types.RawMessage(settings.config.Flavor.Properties),
 		spec,
-		s.settings.config.Allocation)
+		settings.config.Allocation)
 	if err != nil {
 		log.Errorf("Failed to Prepare instance: %s", err)
 		return
 	}
 
-	id, err := s.settings.instancePlugin.Provision(spec)
+	id, err := settings.instancePlugin.Provision(spec)
 	if err != nil {
 		log.Errorf("Failed to provision: %s", err)
 		return
@@ -80,11 +88,10 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 }
 
 func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	settings := s.latestSettings()
 
-	health, err := s.settings.flavorPlugin.Healthy(
-		types.RawMessage(s.settings.config.Flavor.Properties),
+	health, err := settings.flavorPlugin.Healthy(
+		types.RawMessage(settings.config.Flavor.Properties),
 		inst)
 	if err != nil {
 		log.Warnf("Failed to check health of instance %s: %s", inst.ID, err)
@@ -95,23 +102,21 @@ func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
 }
 
 func (s *scaledGroup) Destroy(inst instance.Description) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	settings := s.latestSettings()
 
-	flavorProperties := types.RawMessage(s.settings.config.Flavor.Properties)
-	if err := s.settings.flavorPlugin.Drain(flavorProperties, inst); err != nil {
+	flavorProperties := types.RawMessage(settings.config.Flavor.Properties)
+	if err := settings.flavorPlugin.Drain(flavorProperties, inst); err != nil {
 		log.Errorf("Failed to drain %s: %s", inst.ID, err)
 	}
 
 	log.Infof("Destroying instance %s", inst.ID)
-	if err := s.settings.instancePlugin.Destroy(inst.ID); err != nil {
+	if err := settings.instancePlugin.Destroy(inst.ID); err != nil {
 		log.Errorf("Failed to destroy %s: %s", inst.ID, err)
 	}
 }
 
 func (s *scaledGroup) List() ([]instance.Description, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	settings := s.latestSettings()
 
-	return s.settings.instancePlugin.DescribeInstances(s.memberTags)
+	return settings.instancePlugin.DescribeInstances(s.memberTags)
 }
