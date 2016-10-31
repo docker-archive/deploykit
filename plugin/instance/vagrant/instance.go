@@ -72,10 +72,6 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		properties["Memory"] = 512
 	}
 
-	if properties["Box"] == "" {
-		return nil, errors.New("Property 'Box' must be set")
-	}
-
 	networkOptions := `, type: "dhcp"`
 	if spec.LogicalID != nil {
 		networkOptions = fmt.Sprintf(`, ip: "%s"`, *spec.LogicalID)
