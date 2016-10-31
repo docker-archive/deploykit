@@ -34,7 +34,8 @@ type swarmFlavor struct {
 }
 
 type schema struct {
-	Type nodeType
+	Type                 nodeType
+	DockerRestartCommand string
 }
 
 func parseProperties(flavorProperties json.RawMessage) (schema, error) {
@@ -47,6 +48,10 @@ func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return err
+	}
+
+	if properties.DockerRestartCommand == "" {
+		return errors.New("DockerRestartCommand must be specified")
 	}
 
 	switch properties.Type {
@@ -81,17 +86,20 @@ cat << EOF > /etc/docker/daemon.json
 }
 EOF
 
+{{.RESTART_DOCKER}}
+
 docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
 `
 )
 
-func generateInitScript(joinIP, joinToken, associationID string) string {
+func generateInitScript(joinIP, joinToken, associationID, restartCommand string) string {
 	buffer := bytes.Buffer{}
 	templ := template.Must(template.New("").Parse(bootScript))
 	err := templ.Execute(&buffer, map[string]string{
 		"MY_IP":          joinIP,
 		"JOIN_TOKEN":     joinToken,
 		"ASSOCIATION_ID": associationID,
+		"RESTART_DOCKER": restartCommand,
 	})
 	if err != nil {
 		panic(err)
@@ -193,7 +201,8 @@ func (s swarmFlavor) Prepare(
 		spec.Init = generateInitScript(
 			self.ManagerStatus.Addr,
 			swarmStatus.JoinTokens.Worker,
-			associationID)
+			associationID,
+			properties.DockerRestartCommand)
 
 	case manager:
 		if spec.LogicalID == nil {
@@ -203,7 +212,8 @@ func (s swarmFlavor) Prepare(
 		spec.Init = generateInitScript(
 			self.ManagerStatus.Addr,
 			swarmStatus.JoinTokens.Manager,
-			associationID)
+			associationID,
+			properties.DockerRestartCommand)
 
 		spec.Attachments = []instance.Attachment{instance.Attachment(*spec.LogicalID)}
 

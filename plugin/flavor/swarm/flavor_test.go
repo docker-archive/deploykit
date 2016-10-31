@@ -21,9 +21,11 @@ func TestValidate(t *testing.T) {
 
 	swarmFlavor := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl))
 
-	require.NoError(t, swarmFlavor.Validate(json.RawMessage(`{"type": "worker"}`), types.AllocationMethod{Size: 5}))
 	require.NoError(t, swarmFlavor.Validate(
-		json.RawMessage(`{"type": "manager"}`),
+		json.RawMessage(`{"Type": "worker", "DockerRestartCommand": "systemctl restart docker"}`),
+		types.AllocationMethod{Size: 5}))
+	require.NoError(t, swarmFlavor.Validate(
+		json.RawMessage(`{"Type": "manager", "DockerRestartCommand": "systemctl restart docker"}`),
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 	require.Error(t, swarmFlavor.Validate(json.RawMessage(`{"type": "other"}`), types.AllocationMethod{Size: 5}))
 }
