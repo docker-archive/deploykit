@@ -135,32 +135,52 @@ func (s swarmFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Des
 	default:
 		log.Warnf("Expected at most one node with label %s, but found %s", associationID, nodes)
 		return flavor.Healthy, nil
-
 	}
 }
 
 func (s swarmFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
-	if inst.LogicalID == nil {
-		log.Infof("Node %s has no logical ID, unable to drain", inst.ID)
-	}
-
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return err
 	}
 
-	// Only explicitly remove worker nodes, not manager nodes.  Manager nodes are assumed to have an attached volume
-	// for state, and fixed IP addresses.  This allows them to rejoin as the same node.
+	// Only explicitly remove worker nodes, not manager nodes.  Manager nodes are assumed to have an
+	// attached volume for state, and fixed IP addresses.  This allows them to rejoin as the same node.
+	if properties.Type != worker {
+		return nil
+	}
 
-	if properties.Type == worker {
-		removeOptions := docker_types.NodeRemoveOptions{Force: true}
-		err := s.client.NodeRemove(context.Background(), string(*inst.LogicalID), removeOptions)
+	associationID, exists := inst.Tags[associationTag]
+	if !exists {
+		return fmt.Errorf("Unable to drain %s without an association tag", inst.ID)
+	}
+
+	filter := filters.NewArgs()
+	filter.Add("label", fmt.Sprintf("%s=%s", associationTag, associationID))
+
+	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filter: filter})
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case len(nodes) == 0:
+		return fmt.Errorf("Unable to drain %s, not found in swarm", inst.ID)
+
+	case len(nodes) == 1:
+		err := s.client.NodeRemove(
+			context.Background(),
+			nodes[0].ID,
+			docker_types.NodeRemoveOptions{Force: true})
 		if err != nil {
 			return err
 		}
-	}
 
-	return nil
+		return nil
+
+	default:
+		return fmt.Errorf("Expected at most one node with label %s, but found %s", associationID, nodes)
+	}
 }
 
 func (s swarmFlavor) Prepare(
