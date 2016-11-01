@@ -10,12 +10,14 @@ cluster in [Swarm Mode](https://docs.docker.com/engine/swarm/).
 Here's a skeleton of this Plugin's schema:
 ```json
 {
-  "Type": ""
+  "Type": "",
+  "DockerRestartCommand": ""
 }
 ```
 
 The supported fields are:
 * `Type`: The Swarm mode node type, `manager` or `worker`
+* `DockerRestartCommand`: A shell command that will restart the Docker daemon, used when adding daemon labels
 
 
 ## Example

@@ -95,3 +95,67 @@ func TestMergeBehavior(t *testing.T) {
 	}
 	require.Equal(t, expected, result)
 }
+
+func TestMergeNoLogicalID(t *testing.T) {
+	// Tests regression of a bug where a zero value was returned for the LogicalID despite nil being passed.
+
+	inst = instance.Spec{
+		Properties:  jsonPtr("{}"),
+		Tags:        map[string]string{},
+		Init:        "",
+		Attachments: []instance.Attachment{"att1"},
+	}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	a := mock_flavor.NewMockPlugin(ctrl)
+	b := mock_flavor.NewMockPlugin(ctrl)
+
+	plugins := map[string]flavor.Plugin{"a": a, "b": b}
+
+	combo := NewPlugin(pluginLookup(plugins))
+
+	flavorProperties := json.RawMessage(`{
+	  "Flavors": [
+	    {
+	      "Plugin": "a",
+	      "Properties": {"a": "1"}
+	    },
+	    {
+	      "Plugin": "b",
+	      "Properties": {"b": "2"}
+	    }
+	  ]
+	}`)
+
+	allocation := types.AllocationMethod{Size: 1}
+
+	a.EXPECT().Prepare(json.RawMessage(`{"a": "1"}`), inst, allocation).Return(instance.Spec{
+		Properties:  inst.Properties,
+		Tags:        map[string]string{"a": "1", "c": "4"},
+		Init:        "init data a",
+		LogicalID:   inst.LogicalID,
+		Attachments: []instance.Attachment{"a"},
+	}, nil)
+
+	b.EXPECT().Prepare(json.RawMessage(`{"b": "2"}`), inst, allocation).Return(instance.Spec{
+		Properties:  inst.Properties,
+		Tags:        map[string]string{"b": "2", "c": "5"},
+		Init:        "init data b",
+		LogicalID:   inst.LogicalID,
+		Attachments: []instance.Attachment{"b"},
+	}, nil)
+
+	result, err := combo.Prepare(flavorProperties, inst, types.AllocationMethod{Size: 1})
+	require.NoError(t, err)
+
+	expected := instance.Spec{
+		Properties:  inst.Properties,
+		Tags:        map[string]string{"a": "1", "b": "2", "c": "5"},
+		Init:        "init data a\ninit data b",
+		LogicalID:   inst.LogicalID,
+		Attachments: []instance.Attachment{"att1", "a", "b"},
+	}
+	require.Equal(t, expected, result)
+}
