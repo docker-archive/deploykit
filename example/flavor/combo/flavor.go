@@ -89,9 +89,10 @@ func cloneSpec(spec instance.Spec) instance.Spec {
 		tags[k] = v
 	}
 
-	var logicalID instance.LogicalID
+	var logicalID *instance.LogicalID
 	if spec.LogicalID != nil {
-		logicalID = *spec.LogicalID
+		idCopy := *spec.LogicalID
+		logicalID = &idCopy
 	}
 
 	attachments := []instance.Attachment{}
@@ -103,7 +104,7 @@ func cloneSpec(spec instance.Spec) instance.Spec {
 		Properties:  spec.Properties,
 		Tags:        tags,
 		Init:        spec.Init,
-		LogicalID:   &logicalID,
+		LogicalID:   logicalID,
 		Attachments: attachments,
 	}
 }
