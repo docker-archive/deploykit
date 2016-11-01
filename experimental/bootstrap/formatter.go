@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func formatVolumes(config client.ConfigProvider, swim fakeSWIMSchema, volumeIDs []*string) error {
+func formatVolumes(config client.ConfigProvider, spec clusterSpec, volumeIDs []*string) error {
 	log.Info("Formatting Swarm data EBS volumes")
 
 	// TODO(wfarner): Could we instead format on the bootstrap volume, as part of other bootstrap operations
@@ -43,10 +43,10 @@ func formatVolumes(config client.ConfigProvider, swim fakeSWIMSchema, volumeIDs 
 	ec2Client := ec2.New(config)
 	instance, err := ec2Client.RunInstances(&ec2.RunInstancesInput{
 		InstanceType: aws.String("t2.micro"),
-		KeyName:      swim.managers().Config.RunInstancesInput.KeyName,
-		ImageId:      aws.String("ami-2ef48339"),
+		KeyName:      spec.managers().Config.RunInstancesInput.KeyName,
+		ImageId:      aws.String("ami-99c812f9"),
 		Placement: &ec2.Placement{
-			AvailabilityZone: aws.String(swim.availabilityZone()),
+			AvailabilityZone: aws.String(spec.availabilityZone()),
 		},
 		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(buffer.String()))),
 		MinCount: aws.Int64(1),
@@ -60,10 +60,10 @@ func formatVolumes(config client.ConfigProvider, swim fakeSWIMSchema, volumeIDs 
 	_, err = ec2Client.CreateTags(&ec2.CreateTagsInput{
 		Resources: []*string{formatterInstance},
 		Tags: []*ec2.Tag{
-			swim.cluster().resourceTag(),
+			spec.cluster().resourceTag(),
 			{
 				Key:   aws.String("Name"),
-				Value: aws.String(fmt.Sprintf("%s formatter", swim.cluster().name)),
+				Value: aws.String(fmt.Sprintf("%s formatter", spec.cluster().name)),
 			},
 		},
 	})

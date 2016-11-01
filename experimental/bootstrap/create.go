@@ -13,18 +13,19 @@ import (
 	infrakit_instance "github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/spi/group"
 	"github.com/docker/infrakit/spi/instance"
+	"strings"
 	"text/template"
 	"time"
 )
 
-func createEBSVolumes(config client.ConfigProvider, swim fakeSWIMSchema) error {
+func createEBSVolumes(config client.ConfigProvider, spec clusterSpec) error {
 	log.Info("Creating EBS volumes")
 	ec2Client := ec2.New(config)
 
 	volumeIDs := []*string{}
-	for _, managerIP := range swim.ManagerIPs {
+	for _, managerIP := range spec.ManagerIPs {
 		volume, err := ec2Client.CreateVolume(&ec2.CreateVolumeInput{
-			AvailabilityZone: aws.String(swim.availabilityZone()),
+			AvailabilityZone: aws.String(spec.availabilityZone()),
 			Size:             aws.Int64(4),
 		})
 		volumeIDs = append(volumeIDs, volume.VolumeId)
@@ -37,7 +38,7 @@ func createEBSVolumes(config client.ConfigProvider, swim fakeSWIMSchema) error {
 		_, err = ec2Client.CreateTags(&ec2.CreateTagsInput{
 			Resources: []*string{volume.VolumeId},
 			Tags: []*ec2.Tag{
-				swim.cluster().resourceTag(),
+				spec.cluster().resourceTag(),
 				{
 					Key:   aws.String(infrakit_instance.VolumeTag),
 					Value: aws.String(managerIP),
@@ -62,7 +63,7 @@ func applySubnetAndSecurityGroups(run *ec2.RunInstancesInput, subnetID *string, 
 	}
 }
 
-func createInternetGateway(ec2Client ec2iface.EC2API, vpcID string, swim fakeSWIMSchema) (*ec2.InternetGateway, error) {
+func createInternetGateway(ec2Client ec2iface.EC2API, vpcID string) (*ec2.InternetGateway, error) {
 	internetGateway, err := ec2Client.CreateInternetGateway(&ec2.CreateInternetGatewayInput{})
 	if err != nil {
 		return nil, err
@@ -79,12 +80,9 @@ func createInternetGateway(ec2Client ec2iface.EC2API, vpcID string, swim fakeSWI
 	return internetGateway.InternetGateway, nil
 }
 
-func createRouteTable(
-	ec2Client ec2iface.EC2API,
-	vpcID string,
-	swim fakeSWIMSchema) (*ec2.RouteTable, *ec2.InternetGateway, error) {
+func createRouteTable(ec2Client ec2iface.EC2API, vpcID string) (*ec2.RouteTable, *ec2.InternetGateway, error) {
 
-	internetGateway, err := createInternetGateway(ec2Client, vpcID, swim)
+	internetGateway, err := createInternetGateway(ec2Client, vpcID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -109,11 +107,11 @@ func createRouteTable(
 	return routeTable.RouteTable, internetGateway, nil
 }
 
-func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, error) {
+func createNetwork(config client.ConfigProvider, spec *clusterSpec) (string, error) {
 	log.Info("Creating network resources")
 
 	// Apply the private IP address wildcard to the manager.
-	swim.mutateManagers(func(managers *instanceGroup) {
+	spec.mutateManagers(func(managers *instanceGroupSpec) {
 		if managers.Config.RunInstancesInput.NetworkInterfaces == nil ||
 			len(managers.Config.RunInstancesInput.NetworkInterfaces) == 0 {
 
@@ -164,7 +162,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	workerSubnet, err := ec2Client.CreateSubnet(&ec2.CreateSubnetInput{
 		VpcId:            aws.String(vpcID),
 		CidrBlock:        aws.String("192.168.34.0/24"),
-		AvailabilityZone: aws.String(swim.availabilityZone()),
+		AvailabilityZone: aws.String(spec.availabilityZone()),
 	})
 	if err != nil {
 		return "", err
@@ -174,7 +172,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	managerSubnet, err := ec2Client.CreateSubnet(&ec2.CreateSubnetInput{
 		VpcId:            aws.String(vpcID),
 		CidrBlock:        aws.String("192.168.33.0/24"),
-		AvailabilityZone: aws.String(swim.availabilityZone()),
+		AvailabilityZone: aws.String(spec.availabilityZone()),
 	})
 	if err != nil {
 		return "", err
@@ -217,7 +215,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 		return "", err
 	}
 
-	routeTable, internetGateway, err := createRouteTable(ec2Client, vpcID, *swim)
+	routeTable, internetGateway, err := createRouteTable(ec2Client, vpcID)
 	if err != nil {
 		return "", err
 	}
@@ -249,13 +247,13 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 			routeTable.RouteTableId,
 			internetGateway.InternetGatewayId,
 		},
-		Tags: []*ec2.Tag{swim.cluster().resourceTag()},
+		Tags: []*ec2.Tag{spec.cluster().resourceTag()},
 	})
 	if err != nil {
 		return "", err
 	}
 
-	swim.mutateGroups(func(group *instanceGroup) {
+	spec.mutateGroups(func(group *instanceGroupSpec) {
 		if group.isManager() {
 			applySubnetAndSecurityGroups(
 				&group.Config.RunInstancesInput,
@@ -272,7 +270,7 @@ func createNetwork(config client.ConfigProvider, swim *fakeSWIMSchema) (string, 
 	return vpcID, nil
 }
 
-func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error {
+func createAccessRole(config client.ConfigProvider, spec *clusterSpec) error {
 	log.Info("Creating IAM resources")
 
 	iamClient := iam.New(config)
@@ -280,7 +278,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 	// TODO(wfarner): IAM roles are a global concept in AWS, meaning we will probably need to include region
 	// in these entities to avoid collisions.
 	role, err := iamClient.CreateRole(&iam.CreateRoleInput{
-		RoleName: aws.String(swim.cluster().roleName()),
+		RoleName: aws.String(spec.cluster().roleName()),
 		AssumeRolePolicyDocument: aws.String(`{
 			"Version" : "2012-10-17",
 			"Statement": [{
@@ -299,7 +297,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 	log.Infof("  role %s (id %s)", *role.Role.RoleName, *role.Role.RoleId)
 
 	policy, err := iamClient.CreatePolicy(&iam.CreatePolicyInput{
-		PolicyName: aws.String(swim.cluster().managerPolicyName()),
+		PolicyName: aws.String(spec.cluster().managerPolicyName()),
 
 		PolicyDocument: aws.String(`{
 			"Version" : "2012-10-17",
@@ -321,7 +319,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 	})
 
 	instanceProfile, err := iamClient.CreateInstanceProfile(&iam.CreateInstanceProfileInput{
-		InstanceProfileName: aws.String(swim.cluster().instanceProfileName()),
+		InstanceProfileName: aws.String(spec.cluster().instanceProfileName()),
 	})
 	if err != nil {
 		return err
@@ -354,7 +352,7 @@ func createAccessRole(config client.ConfigProvider, swim *fakeSWIMSchema) error 
 	// Looks like we may need to poll for the role association as well.
 	time.Sleep(10 * time.Second)
 
-	swim.mutateManagers(func(managers *instanceGroup) {
+	spec.mutateManagers(func(managers *instanceGroupSpec) {
 		managers.Config.RunInstancesInput.IamInstanceProfile = &ec2.IamInstanceProfileSpecification{
 			Arn: instanceProfile.InstanceProfile.Arn,
 		}
@@ -445,11 +443,41 @@ func ProvisionManager(
 func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
 	return map[string]string{
 		*resourceTag.Key: *resourceTag.Value,
-		"group":          string(gid),
+		"infrakit.group": string(gid),
 	}
 }
 
-func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) error {
+const prepareGroupWatches = `
+plugins=/infrakit/plugins
+configs=/infrakit/configs
+discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
+run_plugin="docker run -d --restart always $discovery"
+image=wfarner/infrakit-demo-plugins
+
+mkdir -p $configs
+mkdir -p $plugins
+
+{{ range $name, $config := . }}
+cat << 'EOF' > "$configs/{{ $name }}.json"
+{{ $config }}
+EOF
+{{ end }}
+
+docker pull $image
+$run_plugin --name flavor-combo $image infrakit-flavor-combo
+$run_plugin --name flavor-swarm -v /var/run/docker.sock:/var/run/docker.sock $image infrakit-flavor-swarm
+$run_plugin --name flavor-vanilla $image infrakit-flavor-vanilla
+$run_plugin --name group-default $image infrakit-group-default
+$run_plugin --name instance-aws $image infrakit-instance-aws
+
+echo "alias infrakit='docker run --rm $discovery $image infrakit'" >> /home/ubuntu/.bashrc
+
+{{ range $name, $config := . }}
+docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json
+{{ end }}
+`
+
+func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 	log.Info("Starting cluster boot leader instance")
 	builder := infrakit_instance.Builder{Config: config}
 	provisioner, err := builder.BuildInstancePlugin()
@@ -457,7 +485,28 @@ func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) erro
 		return err
 	}
 
-	managerGroup := swim.managers()
+	managerGroup := spec.managers()
+
+	// Produce InfraKit groups.
+	infrakitGroups, err := generateInfraKitGroups(spec)
+	if err != nil {
+		return err
+	}
+
+	buffer := bytes.Buffer{}
+	err = template.Must(template.New("").Parse(prepareGroupWatches)).Execute(&buffer, infrakitGroups)
+	if err != nil {
+		return err
+	}
+
+	// TODO(wfarner): Include shell code that creates infrakit group JSON files, and watches the groups.
+	managerGroup.Config.RunInstancesInput.UserData = aws.String(strings.Join([]string{
+		"#!/bin/bash",
+		initializeManager,
+		"curl -sSL https://get.docker.com/ | sh",
+		"docker swarm init",
+		string(buffer.Bytes()),
+	}, "\n"))
 
 	rawConfig, err := json.Marshal(managerGroup.Config)
 	if err != nil {
@@ -466,102 +515,118 @@ func startInitialManager(config client.ConfigProvider, swim fakeSWIMSchema) erro
 
 	return ProvisionManager(
 		provisioner,
-		InstanceTags(*swim.cluster().resourceTag(), managerGroup.Name),
+		InstanceTags(*spec.cluster().resourceTag(), managerGroup.Name),
 		json.RawMessage(rawConfig),
-		swim.ManagerIPs[0])
+		spec.ManagerIPs[0])
 }
 
 const (
-	mountEBSVolume = `
-# This technique may be brittle.  If it proves insufficient, we may want to consider putting the EBS device name
-# in the SWIM config, but this places the burden on the user.
-unmounted=$(blkid -o list | grep '/dev' | grep 'not mounted' | cut -d' ' -f1)
+	// TODO(wfarner): Ideally we would have a better indicator of a file system that has not yet been formatted
+	// than inspecting the block device.  For examlpe, a trashed file system may be grounds for operator
+	// intervention rather than the system deciding to clear its state.
+	initializeManager = `
+set -o errexit
+set -o nounset
+set -o xtrace
 
-if [ "$unmounted" = "" ]
-then
-  echo 'Did not find an unmounted block device'
-  exit 1
-fi
+# See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html why device naming is tricky, and likely
+# coupled to the AMI (host OS) used.
+EBS_DEVICE=/dev/xvdf
 
-count=$(echo "$unmounted" | wc -l)
-if [ $count != 1 ]
+# Determine whether the EBS volume needs to be formatted.
+if [ "$(file -sL $EBS_DEVICE)" = "$EBS_DEVICE: data" ]
 then
-  echo "Expected exactly 1 unmounted disk, found $count"
-  exit 1
+  echo 'Formatting EBS volume device'
+  mkfs -t ext4 $EBS_DEVICE
 fi
 
 mkdir -p /var/lib/docker
-echo "$unmounted /var/lib/docker ext4 defaults,nofail 0 2" > /etc/fstab
+echo "$EBS_DEVICE /var/lib/docker ext4 defaults,nofail 0 2" >> /etc/fstab
 mount -a
-`
-
-	machineBootCommand = `#!/usr/bin/env bash
-
-set -o errexit
-set -o nounset
-set -o pipefail
-set -o xtrace
-
-{{.CONFIGURE_HOST}}
-
-start_install() {
-  if command -v docker >/dev/null
-  then
-    echo 'Detected existing Docker installation'
-  else
-    sleep 5
-    curl -sSL https://get.docker.com/ | sh
-  fi
-}
-
-# See https://github.com/docker/docker/issues/23793#issuecomment-237735835 for
-# details on why we background/sleep.
-start_install &
 `
 )
 
-func generateUserData(t *template.Template, swim *fakeSWIMSchema, hostConfigureScript string) string {
-	buffer := bytes.Buffer{}
-	err := t.Execute(&buffer, map[string]string{
-		"SWIM_URL":       swim.cluster().url(),
-		"CONFIGURE_HOST": hostConfigureScript,
-		// Since the join token is not yet known, we re-apply a templated variable, to be filled in by
-		// managers when they are creating instances.
-		"JOIN_TOKEN_ARG": "{{.JOIN_TOKEN_ARG}}",
-	})
-	if err != nil {
-		panic(err)
-	}
+const (
+	managerGroup = `{
+  "ID": {{.ID}},
+  "Properties": {
+    "Allocation": {
+      "LogicalIDs": {{.ManagerIPs}}
+    },
+    "Instance": {
+      "Plugin": "instance-aws",
+      "Properties": {{.CreateInstanceRequest}}
+    },
+    "Flavor": {
+      "Plugin": "flavor-combo",
+      "Properties": {
+        "Flavors": [
+          {
+            "Plugin": "flavor-vanilla",
+            "Properties": {
+              "Init": [
+                "#!/bin/bash",
+                {{.BootScript}},
+                "curl -sSL https://get.docker.com/ | sh"
+              ]
+            }
+          },
+          {
+            "Plugin": "flavor-swarm",
+            "Properties": {
+              "Type": "manager",
+              "DockerRestartCommand": "systemctl restart docker"
+            }
+          }
+        ]
+      }
+    }
+  }
+}`
 
-	return string(buffer.Bytes())
-}
+	workerGroup = `{
+  "ID": {{.ID}},
+  "Properties": {
+    "Allocation": {
+      "Size": {{.WorkerCount}}
+    },
+    "Instance": {
+      "Plugin": "instance-aws",
+      "Properties": {{.CreateInstanceRequest}}
+    },
+    "Flavor": {
+      "Plugin": "flavor-combo",
+      "Properties": {
+        "Flavors": [
+          {
+            "Plugin": "flavor-vanilla",
+            "Properties": {
+              "Init": [
+                "#!/bin/bash",
+                "curl -sSL https://get.docker.com/ | sh"
+              ]
+            }
+          },
+          {
+            "Plugin": "flavor-swarm",
+            "Properties": {
+              "Type": "worker",
+              "DockerRestartCommand": "systemctl restart docker"
+            }
+          }
+        ]
+      }
+    }
+  }
+}`
+)
 
-func injectUserData(swim *fakeSWIMSchema) error {
-	t, err := template.New("userdata").Parse(machineBootCommand)
-	if err != nil {
-		return fmt.Errorf("Internal UserData template is invalid: %s", err)
-	}
-
-	swim.mutateGroups(func(group *instanceGroup) {
-		var configureHost string
-		if group.isManager() {
-			configureHost = generateUserData(t, swim, mountEBSVolume)
-		} else {
-			configureHost = generateUserData(t, swim, "")
-		}
-
-		group.Config.RunInstancesInput.UserData = aws.String(configureHost)
-	})
-
-	return nil
-}
-
-func bootstrap(swim fakeSWIMSchema) error {
-	sess := swim.cluster().getAWSClient()
+func bootstrap(spec clusterSpec) error {
+	sess := spec.cluster().getAWSClient()
 
 	keyNames := []*string{}
-	for _, group := range swim.Groups {
-		keyNames = append(keyNames, group.Config.RunInstancesInput.KeyName)
+	for _, g := range spec.Groups {
+		keyNames = append(keyNames, g.Config.RunInstancesInput.KeyName)
 	}
 
 	ec2Client := ec2.New(sess)
@@ -572,33 +637,23 @@ func bootstrap(swim fakeSWIMSchema) error {
 		return err
 	}
 
-	err = createAccessRole(sess, &swim)
+	err = createAccessRole(sess, &spec)
 	if err != nil {
 		return err
 	}
 
-	vpcID, err := createNetwork(sess, &swim)
+	vpcID, err := createNetwork(sess, &spec)
 	if err != nil {
 		return err
 	}
 
-	err = injectUserData(&swim)
-	if err != nil {
-		return err
-	}
-
-	err = createEBSVolumes(sess, swim)
-	if err != nil {
-		return err
-	}
-
-	err = swim.push()
+	err = createEBSVolumes(sess, spec)
 	if err != nil {
 		return err
 	}
 
 	// Create one manager instance.  The manager boot container will handle setting up other containers.
-	err = startInitialManager(sess, swim)
+	err = startInitialManager(sess, spec)
 	if err != nil {
 		return err
 	}
@@ -616,7 +671,7 @@ func bootstrap(swim fakeSWIMSchema) error {
 		return instances, nil
 	}
 
-	instances, err := getInstances(&ec2.DescribeInstancesInput{Filters: swim.cluster().resourceFilter(vpcID)})
+	instances, err := getInstances(&ec2.DescribeInstancesInput{Filters: spec.cluster().resourceFilter(vpcID)})
 	if err != nil {
 		return fmt.Errorf("Failed to fetch boot leader: %s", err)
 	}
@@ -659,4 +714,45 @@ func bootstrap(swim fakeSWIMSchema) error {
 	}
 
 	return nil
+}
+
+func generateInfraKitGroups(spec clusterSpec) (map[group.ID]string, error) {
+	groups := map[group.ID]string{}
+
+	for _, grp := range spec.Groups {
+		buffer := bytes.Buffer{}
+		templateText := ""
+		templateParams := map[string]interface{}{
+			"CreateInstanceRequest": grp.Config,
+			"ID": grp.Name,
+		}
+
+		if grp.isManager() {
+			templateText = managerGroup
+			templateParams["ManagerIPs"] = spec.ManagerIPs
+			templateParams["BootScript"] = initializeManager
+		} else {
+			templateText = workerGroup
+			templateParams["WorkerCount"] = grp.Size
+		}
+
+		// Convert all template parameters to JSON.
+		for k, v := range templateParams {
+			vJSON, err := json.MarshalIndent(v, "      ", "  ")
+			if err != nil {
+				return nil, err
+			}
+
+			templateParams[k] = string(vJSON)
+		}
+
+		err := template.Must(template.New("").Parse(templateText)).Execute(&buffer, templateParams)
+		if err != nil {
+			return nil, err
+		}
+
+		groups[grp.Name] = string(buffer.Bytes())
+	}
+
+	return groups, nil
 }

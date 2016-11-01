@@ -23,26 +23,26 @@ func NewCLI() *CLI {
 type CLI struct {
 }
 
-func readConfig(swimFile string) (fakeSWIMSchema, error) {
-	swim := fakeSWIMSchema{}
-	swimData, err := ioutil.ReadFile(swimFile)
+func readConfig(clusterSpecFile string) (clusterSpec, error) {
+	spec := clusterSpec{}
+	specData, err := ioutil.ReadFile(clusterSpecFile)
 	if err != nil {
-		return swim, fmt.Errorf("Failed to read config file: %s", err)
+		return spec, fmt.Errorf("Failed to read config file: %s", err)
 	}
 
-	err = json.Unmarshal(swimData, &swim)
+	err = json.Unmarshal(specData, &spec)
 	if err != nil {
-		return swim, err
+		return spec, err
 	}
 
-	err = swim.validate()
+	err = spec.validate()
 	if err != nil {
-		return swim, err
+		return spec, err
 	}
 
-	swim.applyDefaults()
+	spec.applyDefaults()
 
-	return swim, err
+	return spec, err
 }
 
 type clusterIDFlags struct {
@@ -65,10 +65,8 @@ func abort(format string, args ...interface{}) {
 	os.Exit(1)
 }
 
-// Command gets the subcommand for the CLI.
-func (a *CLI) Command() *cobra.Command {
-	cmd := cobra.Command{Use: "aws", Short: "manage Swarm clusters in AWS"}
-
+// AddCommands attaches subcommands for the CLI.
+func (a *CLI) AddCommands(root *cobra.Command) {
 	cluster := clusterIDFlags{}
 
 	var keyName string
@@ -76,17 +74,17 @@ func (a *CLI) Command() *cobra.Command {
 	workerSize := 3
 
 	createCmd := cobra.Command{
-		Use:   "create [<swim config>]",
+		Use:   "create [<cluster config>]",
 		Short: "create a swarm cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			swim := fakeSWIMSchema{}
+			spec := clusterSpec{}
 			if len(args) == 1 {
 				if keyName != "" || cluster.ID.name != "" || cluster.ID.region != "" {
-					abort("No other cluster-related flags may be set when a SWIM file is used")
+					abort("No other cluster-related flags may be set when a spec file is used")
 				}
 
 				var err error
-				swim, err = readConfig(args[0])
+				spec, err = readConfig(args[0])
 				if err != nil {
 					abort("Invalid config file: %s", err)
 				}
@@ -97,19 +95,19 @@ func (a *CLI) Command() *cobra.Command {
 
 				instanceConfig := instance.CreateInstanceRequest{
 					RunInstancesInput: ec2.RunInstancesInput{
-						ImageId: aws.String("ami-2ef48339"),
+						ImageId: aws.String("ami-a9d276c9"),
 						KeyName: aws.String(keyName),
 						Placement: &ec2.Placement{
 							// TODO(wfarner): Picking the AZ like this feels hackish.
 							AvailabilityZone: aws.String(cluster.ID.region + "a"),
 						},
 					},
+					Tags: map[string]string{"infrakit.cluster": cluster.ID.name},
 				}
 
-				swim = fakeSWIMSchema{
-					Driver:      "aws",
+				spec = clusterSpec{
 					ClusterName: cluster.ID.name,
-					Groups: []instanceGroup{
+					Groups: []instanceGroupSpec{
 						{
 							Name:   group.ID("Managers"),
 							Type:   managerType,
@@ -125,15 +123,15 @@ func (a *CLI) Command() *cobra.Command {
 					},
 				}
 
-				err := swim.validate()
+				err := spec.validate()
 				if err != nil {
 					abort(err.Error())
 				}
 
-				swim.applyDefaults()
+				spec.applyDefaults()
 			}
 
-			err := bootstrap(swim)
+			err := bootstrap(spec)
 			if err != nil {
 				abort(err.Error())
 			}
@@ -143,29 +141,29 @@ func (a *CLI) Command() *cobra.Command {
 	createCmd.Flags().StringVar(&keyName, "key", "", "The existing SSH key in AWS to use for provisioned instances")
 	createCmd.Flags().IntVar(&workerSize, "worker_size", workerSize, "Size of worker group")
 
-	cmd.AddCommand(&createCmd)
+	root.AddCommand(&createCmd)
 
-	var swimFile string
+	var clusterSpec string
 	destroyCmd := cobra.Command{
 		Use:   "destroy",
 		Short: "destroy a swarm cluster",
-		Long: `destroy all resources associated with a SWIM cluster
+		Long: `destroy all resources associated with a cluster
 
-The cluster may be identified manually or based on the contents of a SWIM file.`,
+The cluster may be identified manually or based on the contents of a cluster spec file.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			var id clusterID
-			if swimFile == "" {
+			if clusterSpec == "" {
 				if !cluster.valid() {
 					abort("Must specify --config or both of --region and --cluster")
 				}
 
 				id = cluster.ID
 			} else {
-				swim, err := readConfig(swimFile)
+				spec, err := readConfig(clusterSpec)
 				if err != nil {
 					abort("Invalid config file: %s", err)
 				}
-				id = swim.cluster()
+				id = spec.cluster()
 			}
 
 			err := destroy(id)
@@ -174,79 +172,10 @@ The cluster may be identified manually or based on the contents of a SWIM file.`
 			}
 		},
 	}
-	destroyCmd.Flags().StringVar(&swimFile, "config", "", "A SWIM file")
+	destroyCmd.Flags().StringVar(&clusterSpec, "config", "", "A cluster spec file")
 
 	destroyCmd.Flags().AddFlagSet(cluster.flags())
-	cmd.AddCommand(&destroyCmd)
-
-	// Commands that are to be executed ON THE SWARM
-	// So in these cases we allow specification of a local api server which can trigger updates.
-	// TODO(chungers) -- the api server will basically become the docker engine subsystem later.
-
-	apiEndpoint := ""
-
-	reconfigureCmd := &cobra.Command{
-		Use: "reconfigure <swim config>",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			swim, err := readConfig(args[0])
-			if err != nil {
-				abort("Invalid config file: %s", err)
-			}
-
-			// TODO(wfarner): Fetch the existing config and check that the requested change is possible.
-
-			err = swim.push()
-			if err != nil {
-				abort("Failed to push config: %s", err)
-			}
-			log.Infof("Configuration pushed")
-		},
-	}
-	reconfigureCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Infrakit subsystem api endpoint")
-	cmd.AddCommand(reconfigureCmd)
-
-	describeCmd := &cobra.Command{
-		Use: "describe <swim config>",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			swim, err := readConfig(args[0])
-			if err != nil {
-				abort("Invalid config file: %s", err)
-			}
-
-			groups := []string{}
-			for _, group := range swim.Groups {
-				groups = append(groups, string(group.Name))
-			}
-
-			log.Infof("Groups: %s", groups)
-		},
-	}
-	describeCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Infrakit subsystem api endpoint")
-	cmd.AddCommand(describeCmd)
-
-	statusCmd := &cobra.Command{
-		Use: "status",
-		Run: func(cmd *cobra.Command, args []string) {
-			// TODO(wfarner): Implement.
-
-			log.Infof("Managers: 3 instances")
-			log.Infof("Workers: 5 instances")
-		},
-	}
-	statusCmd.Flags().StringVar(&apiEndpoint, "api", apiEndpoint, "Infrakit subsystem api endpoint")
-	cmd.AddCommand(statusCmd)
-
-	return &cmd
+	root.AddCommand(&destroyCmd)
 }
 
 type logger struct {

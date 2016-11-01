@@ -7,7 +7,7 @@
       "Size": 1,
       "Config": {
         "run_instances_input": {
-          "ImageId": "ami-f701cb97",
+          "ImageId": "ami-99c812f9",
           "KeyName": "bill-laptop",
           "Placement": {
             "AvailabilityZone": "us-west-2a"

@@ -16,15 +16,6 @@ var (
 	Revision = "Unspecified"
 )
 
-func attachDriver(rootCmd *cobra.Command, cli *bootstrap.CLI, requiredName string) {
-	cmd := cli.Command()
-	if cmd.Name() != requiredName {
-		panic(fmt.Sprintf("Internal error - driver must use name '%s'", requiredName))
-	}
-
-	rootCmd.AddCommand(cmd)
-}
-
 func main() {
 	rootCmd := &cobra.Command{Use: "infrakitcli"}
 
@@ -36,7 +27,7 @@ func main() {
 		},
 	})
 
-	attachDriver(rootCmd, bootstrap.NewCLI(), "aws")
+	bootstrap.NewCLI().AddCommands(rootCmd)
 
 	err := rootCmd.Execute()
 	if err != nil {

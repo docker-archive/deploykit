@@ -1,11 +1,8 @@
 package bootstrap
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -13,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/spi/group"
 	"strings"
@@ -22,7 +18,6 @@ import (
 const (
 	workerType  = "worker"
 	managerType = "manager"
-	s3File      = "config.swim"
 )
 
 type clusterID struct {
@@ -44,14 +39,6 @@ func (c clusterID) getAWSClient() client.ConfigProvider {
 		WithLogger(&logger{}))
 }
 
-func (c clusterID) url() string {
-	return fmt.Sprintf(
-		"https://infrakit-cluster.s3-%s.amazonaws.com/%s/%s",
-		c.region,
-		c.name,
-		s3File)
-}
-
 func (c clusterID) resourceFilter(vpcID string) []*ec2.Filter {
 	return []*ec2.Filter{
 		{
@@ -64,7 +51,7 @@ func (c clusterID) resourceFilter(vpcID string) []*ec2.Filter {
 
 func (c clusterID) clusterFilter() *ec2.Filter {
 	return &ec2.Filter{
-		Name:   aws.String("tag:infrakit-cluster"),
+		Name:   aws.String("tag:infrakit.cluster"),
 		Values: []*string{aws.String(c.name)},
 	}
 }
@@ -83,92 +70,34 @@ func (c clusterID) instanceProfileName() string {
 
 func (c clusterID) resourceTag() *ec2.Tag {
 	return &ec2.Tag{
-		Key:   aws.String("infrakit-cluster"),
+		Key:   aws.String("infrakit.cluster"),
 		Value: aws.String(c.name),
 	}
 }
 
-type instanceGroup struct {
+type instanceGroupSpec struct {
 	Name   group.ID
 	Type   string
 	Size   int
 	Config instance.CreateInstanceRequest
 }
 
-func (i instanceGroup) isManager() bool {
+func (i instanceGroupSpec) isManager() bool {
 	return i.Type == managerType
 }
 
-type fakeSWIMSchema struct {
-	Driver      string
+type clusterSpec struct {
 	ClusterName string
 	ManagerIPs  []string
-	Groups      []instanceGroup
+	Groups      []instanceGroupSpec
 }
 
-func (s *fakeSWIMSchema) cluster() clusterID {
+func (s *clusterSpec) cluster() clusterID {
 	az := s.availabilityZone()
 	return clusterID{region: az[:len(az)-1], name: s.ClusterName}
 }
 
-func (s *fakeSWIMSchema) push() error {
-	swimData, err := json.Marshal(*s)
-	if err != nil {
-		return err
-	}
-
-	s3Client := s3.New(s.cluster().getAWSClient())
-
-	bucket := aws.String("infrakit-cluster")
-	head := &s3.HeadBucketInput{Bucket: bucket}
-
-	_, err = s3Client.HeadBucket(head)
-	if err != nil {
-		// The bucket does not appear to exist.  Try to create it.
-		bucketCreateResult, err := s3Client.CreateBucket(&s3.CreateBucketInput{
-			Bucket: bucket,
-		})
-		if err != nil {
-			return err
-		}
-
-		log.Infof("Created S3 bucket: %s", *bucketCreateResult.Location)
-
-		err = s3Client.WaitUntilBucketExists(head)
-		if err != nil {
-			return err
-		}
-	}
-
-	key := aws.String(fmt.Sprintf("%s/%s", s.ClusterName, s3File))
-
-	// Note - this will overwrite an existing object.
-	putRequest, _ := s3Client.PutObjectRequest(&s3.PutObjectInput{
-		Bucket: bucket,
-		Key:    key,
-		// TODO(wfarner): Explore tightening permissions, as these URLs are reasonably guessable and could
-		// potentially contain sensitive information in the future.
-		ACL:         aws.String("public-read"),
-		Body:        bytes.NewReader(swimData),
-		ContentType: aws.String("application/json"),
-	})
-
-	err = putRequest.Send()
-	if err != nil {
-		return err
-	}
-
-	if putRequest.HTTPRequest.URL.String() != s.cluster().url() {
-		log.Warnf(
-			"Expected config URL %s, but received %s",
-			s.cluster().url(),
-			putRequest.HTTPRequest.URL.String())
-	}
-
-	return nil
-}
-
-func (s *fakeSWIMSchema) managers() instanceGroup {
+func (s *clusterSpec) managers() instanceGroupSpec {
 	for _, group := range s.Groups {
 		if group.isManager() {
 			return group
@@ -177,15 +106,15 @@ func (s *fakeSWIMSchema) managers() instanceGroup {
 	panic("No manager group found")
 }
 
-func (s *fakeSWIMSchema) mutateManagers(op func(*instanceGroup)) {
-	s.mutateGroups(func(group *instanceGroup) {
+func (s *clusterSpec) mutateManagers(op func(*instanceGroupSpec)) {
+	s.mutateGroups(func(group *instanceGroupSpec) {
 		if group.isManager() {
 			op(group)
 		}
 	})
 }
 
-func (s *fakeSWIMSchema) mutateGroups(op func(*instanceGroup)) {
+func (s *clusterSpec) mutateGroups(op func(*instanceGroupSpec)) {
 	for i, group := range s.Groups {
 		op(&group)
 		s.Groups[i] = group
@@ -208,8 +137,8 @@ func applyInstanceDefaults(r *ec2.RunInstancesInput) {
 	}
 }
 
-func (s *fakeSWIMSchema) applyDefaults() {
-	s.mutateGroups(func(group *instanceGroup) {
+func (s *clusterSpec) applyDefaults() {
+	s.mutateGroups(func(group *instanceGroupSpec) {
 		if group.Type == managerType {
 			bootLeaderLastOctet := 4
 			s.ManagerIPs = []string{}
@@ -222,7 +151,7 @@ func (s *fakeSWIMSchema) applyDefaults() {
 	})
 }
 
-func (s *fakeSWIMSchema) validate() error {
+func (s *clusterSpec) validate() error {
 	errs := []string{}
 
 	addError := func(format string, a ...interface{}) {
@@ -274,7 +203,7 @@ func (s *fakeSWIMSchema) validate() error {
 		}
 	}
 
-	validateGroup := func(gid group.ID, group instanceGroup) {
+	validateGroup := func(gid group.ID, group instanceGroupSpec) {
 		errorPrefix := fmt.Sprintf("In group %s: ", gid)
 
 		if group.Config.RunInstancesInput.Placement == nil {
@@ -310,7 +239,7 @@ func (s *fakeSWIMSchema) validate() error {
 	return nil
 }
 
-func (s *fakeSWIMSchema) availabilityZone() string {
+func (s *clusterSpec) availabilityZone() string {
 	for _, group := range s.Groups {
 		return *group.Config.RunInstancesInput.Placement.AvailabilityZone
 	}
