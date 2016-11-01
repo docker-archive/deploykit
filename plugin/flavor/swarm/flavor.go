@@ -9,12 +9,10 @@ import (
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/docker/engine-api/types/swarm"
 	"github.com/docker/infrakit/plugin/group/types"
 	"github.com/docker/infrakit/plugin/group/util"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
-	"github.com/magiconair/properties"
 	"golang.org/x/net/context"
 	"text/template"
 )
@@ -146,6 +144,12 @@ func (s swarmFlavor) Drain(flavorProperties json.RawMessage, inst instance.Descr
 		return err
 	}
 
+	// Only explicitly remove worker nodes, not manager nodes.  Manager nodes are assumed to have an
+	// attached volume for state, and fixed IP addresses.  This allows them to rejoin as the same node.
+	if properties.Type != worker {
+		return nil
+	}
+
 	associationID, exists := inst.Tags[associationTag]
 	if !exists {
 		return fmt.Errorf("Unable to drain %s without an association tag", inst.ID)
@@ -156,7 +160,7 @@ func (s swarmFlavor) Drain(flavorProperties json.RawMessage, inst instance.Descr
 
 	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filter: filter})
 	if err != nil {
-		return flavor.Unknown, err
+		return err
 	}
 
 	switch {
@@ -164,16 +168,12 @@ func (s swarmFlavor) Drain(flavorProperties json.RawMessage, inst instance.Descr
 		return fmt.Errorf("Unable to drain %s, not found in swarm", inst.ID)
 
 	case len(nodes) == 1:
-		// Only explicitly remove worker nodes, not manager nodes.  Manager nodes are assumed to have an
-		// attached volume for state, and fixed IP addresses.  This allows them to rejoin as the same node.
-		if properties.Type == worker {
-			err := s.client.NodeRemove(
-				context.Background(),
-				nodes[0].ID,
-				docker_types.NodeRemoveOptions{Force: true})
-			if err != nil {
-				return err
-			}
+		err := s.client.NodeRemove(
+			context.Background(),
+			nodes[0].ID,
+			docker_types.NodeRemoveOptions{Force: true})
+		if err != nil {
+			return err
 		}
 
 		return nil
