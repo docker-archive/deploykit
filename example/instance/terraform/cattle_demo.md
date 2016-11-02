@@ -103,7 +103,7 @@ Let's change the size to 8 and the instance type to `t2.nano`.
 Before we run we can check to see what will be done:
 
 ```shell
-$ build/infrakit group describe example/instance/terraform/aws-two-tier/group.json
+$ build/infrakit group describe-update example/instance/terraform/aws-two-tier/group.json
 terraform_demo : Performs a rolling update on 5 instances, then adds 3 instances to increase the group size to 8
 ```
 

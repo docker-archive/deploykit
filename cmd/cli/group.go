@@ -136,7 +136,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	inspect.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
 
 	describe := &cobra.Command{
-		Use:   "describe <group configuration file>",
+		Use:   "describe-update <group configuration file>",
 		Short: "describes the steps to perform an update",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
@@ -197,7 +197,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	stop := &cobra.Command{
-		Use:   "stop <group ID>",
+		Use:   "stop-update <group ID>",
 		Short: "stop updating a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
@@ -238,8 +238,8 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 	describeGroups := &cobra.Command{
-		Use:   "describe-groups",
-		Short: "describe the groups",
+		Use:   "ls",
+		Short: "list groups",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
