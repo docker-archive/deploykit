@@ -65,7 +65,7 @@ expect_output_lines "5 instances should exist" "build/infrakit instance describe
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
-  "build/infrakit group describe docs/cattle2.json" \
+  "build/infrakit group describe-update docs/cattle2.json" \
   "Performs a rolling update on 5 instances, then adds 5 instances to increase the group size to 10"
 
 build/infrakit group update docs/cattle2.json

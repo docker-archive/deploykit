@@ -188,7 +188,7 @@ $ diff cattle.json cattle2.json
 
 Before we do an update, we can see what the proposed changes are:
 ```shell
-$ build/infrakit group describe cattle2.json 
+$ build/infrakit group describe-update cattle2.json 
 Performs a rolling update on 5 instances, then adds 5 instances to increase the group size to 10
 ```
 
