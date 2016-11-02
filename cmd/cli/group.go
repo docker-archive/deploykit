@@ -137,7 +137,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	describe := &cobra.Command{
 		Use:   "describe-update <group configuration file>",
-		Short: "describes the steps to perform an update",
+		Short: "describe the steps to perform an update",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
@@ -167,7 +167,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	update := &cobra.Command{
 		Use:   "update [group configuration]",
-		Short: "update group (update < file or update filename)",
+		Short: "update a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
