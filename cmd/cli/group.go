@@ -81,7 +81,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			if len(args) != 0 {
+			if len(args) != 1 {
 				cmd.Usage()
 				os.Exit(1)
 			}
@@ -245,12 +245,11 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 			groups, err := groupPlugin.DescribeGroups()
 			if err == nil {
-
 				if !quiet {
-					fmt.Printf("%-30s\n", "ID")
+					fmt.Printf("%s\n", "ID")
 				}
 				for _, g := range groups {
-					fmt.Printf("%-30s\n", g.ID)
+					fmt.Printf("%s\n", g.ID)
 				}
 			}
 
