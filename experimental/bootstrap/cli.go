@@ -95,7 +95,7 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 
 				instanceConfig := instance.CreateInstanceRequest{
 					RunInstancesInput: ec2.RunInstancesInput{
-						ImageId: aws.String("ami-a9d276c9"),
+						ImageId: aws.String("ami-d4fe5fb4"),
 						KeyName: aws.String(keyName),
 						Placement: &ec2.Placement{
 							// TODO(wfarner): Picking the AZ like this feels hackish.
