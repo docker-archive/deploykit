@@ -28,11 +28,14 @@ expect_exact_output() {
   expected_output=$3
 
   echo -n "$1: "
-  if [ "$($2)" = "$3" ]
+  actual_output="$($2)"
+  if [ "$actual_output" = "$3" ]
   then
     echo 'PASS'
   else
     echo 'FAIL'
+    echo "Expected output: $expected_output"
+    echo "Actual output: $actual_output"
     exit 1
   fi
 }
@@ -62,6 +65,11 @@ sleep 2
 
 expect_output_lines "5 instances should exist in group" "build/infrakit group inspect cattle -q" "5"
 expect_output_lines "5 instances should exist" "build/infrakit instance describe -q --name instance-file" "5"
+
+build/infrakit group unwatch cattle
+build/infrakit group watch docs/cattle.json
+
+expect_exact_output "Should be watching one group" "build/infrakit group ls -q" "cattle"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
