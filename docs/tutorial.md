@@ -140,6 +140,21 @@ instance-1475104956           	  -             infrakit.config_sha=Y23cKqyRpkQ_M
 instance-1475104966           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
+At any point you can safely `unwatch` a group.  This will instruct _InfraKit_ to cease active monitoring:
+```shell
+$ build/infrakit group unwatch cattle
+```
+
+You can `watch` the group to start monitoring it again:
+```shell
+$ build/infrakit group watch cattle.json
+```
+
+Check which groups are being watched:
+```shell
+$ build/infrakit group ls
+```
+
 Now let's update the configuration by changing the size of the group and a property of the instance.  Save this file as
 `cattle2.json`:
 
