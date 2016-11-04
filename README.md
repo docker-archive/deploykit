@@ -8,14 +8,21 @@ CI](https://circleci.com/gh/docker/infrakit.png?style=shield&circle-token=50d206
 _InfraKit_ is a toolkit for creating and managing declarative, self-healing infrastructure.
 It breaks infrastructure automation down into simple, pluggable components. These components work together to actively
 ensure the infrastructure state matches the user's specifications.
-Although _InfraKit_ emphasizes primitives for building self-healing infrastructure, it also can be used passively like conventional tools.
-
-![arch image](images/arch.png)
+Although _InfraKit_ emphasizes primitives for building self-healing infrastructure, it also can be used passively like
+conventional tools.
 
 To get started, try the [tutorial](docs/tutorial.md).
 
+### Who InfraKit is for
+
+_InfraKit_ is designed to support setup and management of base infrastructure.  For example, it can help you manage a
+system like a cluster or container orchestrator, ideally relieving you of building custom release and maintenance tools.
+As a result, it is a low-level tool intended to be used by infrastructure operators directly or indirectly
+(as a toolkit) through a higher-level tool.  Since _InfraKit_ is pluggable, it allows you to manage resources in diverse
+environments while using shared components and consistent interfaces.
+
 ## Plugins
-_InfraKit_ leverages active processes, called _Plugins_, which can be composed to meet
+_InfraKit_ leverages _Plugins_ to manage arbitrary systems in diverse environments, which can be composed to meet
 different needs.  Technically, a Plugin is an HTTP server with a well-defined API, listening on a unix socket.
 
 [Utilities](spi/http) are provided as libraries to simplify Plugin development in Go.
@@ -27,17 +34,17 @@ than managing individual instances. For example, a group can be made up of a col
 of machines as individual instances. The machines in a group can have identical configurations (replicas, or cattle).
 They can also have slightly different properties like identity and ordering (as members of a quorum or pets).
 
-_InfraKit_ provides primitives to manage Groups: a group has a given size and can shrink or grow based on some specification,
-whether it's human generated or machine computed.
-Group members can also be updated in a rolling fashion so that the configuration of the instance members reflect a new desired
-state.  Operators can focus on Groups while _InfraKit_ handles the necessary coordination of Instances.
+_InfraKit_ provides primitives to manage Groups: a group has a given size and can shrink or grow based on some
+specification, whether it's human generated or machine computed.
+Group members can also be updated in a rolling fashion so that the configuration of the instance members reflect a new
+desired state.  Operators can focus on Groups while _InfraKit_ handles the necessary coordination of Instances.
 
 Since _InfraKit_ emphasizes on declarative infrastructure, there are no operations to move machines or Groups from one
 state to another.  Instead, you _declare_ your desired state of the infrastructure.  _InfraKit_ is responsible
 for converging towards, and maintaining, that desired state.
 
-Therefore, a [group plugin](spi/group/spi.go) manages Groups of Instances and exposes the operations that are of interest to
-a user:
+Therefore, a [group plugin](spi/group/spi.go) manages Groups of Instances and exposes the operations that are of
+interest to a user:
 
   + watch/ unwatch a group (start / stop managing a group)
   + inspect a group
@@ -315,6 +322,21 @@ We also like to send gifts—if you're into Docker schwag, make sure to let
 us know. We currently do not offer a paid security bounty program, but are not
 ruling it out in the future.
 
+
+## Design goals
+
+_InfraKit_ is currently focused on supporting setup and management of base infrastructure, such as a cluster
+orchestrator.  The image below illustrates an architecture we are working towards supporting - a Docker cluster in Swarm
+mode.
+
+![arch image](images/arch.png)
+
+This configuration co-locates _InfraKit_ with Swarm manager nodes and offers high availability of _InfraKit_ itself and
+Swarm managers (using attached storage).  _InfraKit_ is shown managing two groups - managers and workers that will be
+continuously monitored, and may be modified with rolling updates.
+
+Countless configurations are possible with _InfraKit_, but we believe achieving support for this configuration will
+enable a large number of real-world use cases.
 
 ## Copyright and license
 
