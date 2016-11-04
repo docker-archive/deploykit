@@ -11,14 +11,16 @@ Here's a skeleton of this Plugin's schema:
 ```json
 {
   "Type": "",
+  "Attachments": {},
   "DockerRestartCommand": ""
 }
 ```
 
 The supported fields are:
 * `Type`: The Swarm mode node type, `manager` or `worker`
+* `Attachments`: A mapping from logical IDs to arrays of attachment IDs to associate.  The instance plugin being used
+  defines the meaning of attachments and how to attach them.
 * `DockerRestartCommand`: A shell command that will restart the Docker daemon, used when adding daemon labels
-
 
 ## Example
 
