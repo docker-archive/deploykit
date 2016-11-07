@@ -47,5 +47,6 @@ func TestSwarmDetector(t *testing.T) {
 			detector.Stop()
 		}
 	}
-	// tests that we will stop cleanly here
+
+	<-events // ensures clean stop
 }

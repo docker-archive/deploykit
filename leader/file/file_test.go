@@ -1,10 +1,8 @@
 package file
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,14 +12,16 @@ import (
 
 func TestFileDetector(t *testing.T) {
 
-	file := filepath.Join(os.TempDir(), fmt.Sprintf("%d", time.Now().UnixNano()))
-
-	err := ioutil.WriteFile(file, []byte("instance1"), 0644)
+	dir := os.TempDir()
+	file, err := ioutil.TempFile(dir, "infrakit-file-test")
 	require.NoError(t, err)
 
-	detector1, err := NewDetector(10*time.Millisecond, file, "instance1")
+	err = ioutil.WriteFile(file.Name(), []byte("instance1"), 0644)
 	require.NoError(t, err)
-	detector2, err := NewDetector(10*time.Millisecond, file, "instance2")
+
+	detector1, err := NewDetector(10*time.Millisecond, file.Name(), "instance1")
+	require.NoError(t, err)
+	detector2, err := NewDetector(10*time.Millisecond, file.Name(), "instance2")
 	require.NoError(t, err)
 
 	events1, err1 := detector1.Start()
@@ -62,7 +62,7 @@ loop:
 			// It's instance1 for a while and then we switch to instance2
 			count += -1
 			if count == 0 {
-				err = ioutil.WriteFile(file, []byte("instance2"), 0644)
+				err = ioutil.WriteFile(file.Name(), []byte("instance2"), 0644)
 				require.NoError(t, err)
 				count = 5
 				leader = append(leader, "instance1")

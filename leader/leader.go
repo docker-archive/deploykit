@@ -16,6 +16,9 @@ const (
 
 // CheckLeaderFunc is all that a special backend needs to implement.  It can be used with the
 // NewPoller function to return a polling implementation of the Detector interface.
+// This function returns true or false for leadership, or errors / exceptions that arise during the check.
+// The consumer of this information will apply common criteria based on this raw data so that the implementation
+// here won't have to do its own error handling or filtering and behavior can be enforced across all implementations.
 type CheckLeaderFunc func() (bool, error)
 
 // Leadership is a struct that captures the leadership state, possibly error if exception occurs

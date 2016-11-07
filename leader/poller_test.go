@@ -35,4 +35,6 @@ func TestPoller(t *testing.T) {
 
 	// Expect proper stopping
 	detector.Stop()
+
+	<-events // ensures properly closed channel.
 }
