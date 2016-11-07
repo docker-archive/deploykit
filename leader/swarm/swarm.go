@@ -12,12 +12,12 @@ import (
 // NewDetector return an implementation of leader detector
 func NewDetector(pollInterval time.Duration, client client.APIClient) leader.Detector {
 	return leader.NewPoller(pollInterval, func() (bool, error) {
-		return amISwarmLeader(client, context.Background())
+		return amISwarmLeader(context.Background(), client)
 	})
 }
 
 // amISwarmLeader determines if the current node is the swarm manager leader
-func amISwarmLeader(client client.APIClient, ctx context.Context) (bool, error) {
+func amISwarmLeader(ctx context.Context, client client.APIClient) (bool, error) {
 	info, err := client.Info(ctx)
 
 	if err != nil {
