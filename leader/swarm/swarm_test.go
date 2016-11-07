@@ -41,7 +41,7 @@ func TestSwarmDetector(t *testing.T) {
 
 	count := 10
 	for event := range events {
-		require.Equal(t, leader.StatusLeader, event.Status)
+		require.Equal(t, leader.Leader, event.Status)
 		count += -1
 		if count == 0 {
 			detector.Stop()

@@ -52,13 +52,13 @@ func (l *poller) poll() {
 			isLeader, err := l.pollFunc()
 			event := Leadership{}
 			if err != nil {
-				event.Status = StatusUnknown
+				event.Status = Unknown
 				event.Error = err
 			} else {
 				if isLeader {
-					event.Status = StatusLeader
+					event.Status = Leader
 				} else {
-					event.Status = StatusNotLeader
+					event.Status = NotLeader
 				}
 			}
 

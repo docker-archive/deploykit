@@ -4,20 +4,20 @@ package leader
 type Status int
 
 const (
-	// StatusNotLeader means the current node is not a leader
-	StatusNotLeader Status = iota
+	// NotLeader means the current node is not a leader
+	NotLeader Status = iota
 
-	// StatusLeader means the current node / instance is a leader
-	StatusLeader
+	// Leader means the current node / instance is a leader
+	Leader
 
-	// StatusUnknown indicates some exception happened while determining leadership.  Consumer will interpret accordingly.
-	StatusUnknown
+	// Unknown indicates some exception happened while determining leadership.  Consumer will interpret accordingly.
+	Unknown
 )
 
 // CheckLeaderFunc is all that a special backend needs to implement.  It can be used with the
 // NewPoller function to return a polling implementation of the Detector interface.
-// This function returns true or false for leadership when there are no errors.  Return error if there
-// are errors and the poller may assume lost leadership.
+// This function returns true or false for leadership when there are no errors.  Returned error is reported and
+// the status of the event will be set to `Unknown`.
 type CheckLeaderFunc func() (bool, error)
 
 // Leadership is a struct that captures the leadership state, possibly error if exception occurs

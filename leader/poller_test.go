@@ -31,7 +31,7 @@ func TestPoller(t *testing.T) {
 
 	// Expect 1 event from the channel
 	event := <-events
-	require.Equal(t, StatusLeader, event.Status)
+	require.Equal(t, Leader, event.Status)
 
 	// Expect proper stopping
 	detector.Stop()

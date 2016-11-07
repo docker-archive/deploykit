@@ -37,7 +37,7 @@ func TestFileDetector(t *testing.T) {
 
 	go func() {
 		for event := range events1 {
-			if event.Status == leader.StatusLeader {
+			if event.Status == leader.Leader {
 				instance1 <- true
 			}
 		}
@@ -45,7 +45,7 @@ func TestFileDetector(t *testing.T) {
 
 	go func() {
 		for event := range events2 {
-			if event.Status == leader.StatusLeader {
+			if event.Status == leader.Leader {
 				instance2 <- true
 			}
 		}
