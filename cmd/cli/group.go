@@ -43,9 +43,10 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
+
 	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
 
-	watch := &cobra.Command{
+	cmd.AddCommand(&cobra.Command{
 		Use:   "watch <group configuration>",
 		Short: "watch a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -73,9 +74,9 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	}
+	})
 
-	unwatch := &cobra.Command{
+	cmd.AddCommand(&cobra.Command{
 		Use:   "unwatch <group ID>",
 		Short: "unwatch a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -94,12 +95,12 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	}
+	})
 
 	var quiet bool
-	inspect := &cobra.Command{
-		Use:   "inspect <group ID>",
-		Short: "inspect a group",
+	describe := &cobra.Command{
+		Use:   "describe <group ID>",
+		Short: "describe the live instances that make up a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
@@ -109,7 +110,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			groupID := group.ID(args[0])
-			desc, err := groupPlugin.InspectGroup(groupID)
+			desc, err := groupPlugin.DescribeGroup(groupID)
 
 			if err == nil {
 				if !quiet {
@@ -133,9 +134,45 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	inspect.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
+	describe.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
+	cmd.AddCommand(describe)
 
-	describe := &cobra.Command{
+	cmd.AddCommand(&cobra.Command{
+		Use:   "inspect <group ID>",
+		Short: "return the raw configuration associated with a group",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			assertNotNil("no plugin", groupPlugin)
+
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			groupID := group.ID(args[0])
+			specs, err := groupPlugin.InspectGroups()
+
+			if err == nil {
+
+				for _, spec := range specs {
+					if spec.ID == groupID {
+						data, err := json.MarshalIndent(spec, "", "  ")
+						if err != nil {
+							return err
+						}
+
+						fmt.Println(string(data))
+
+						return nil
+					}
+				}
+
+				return fmt.Errorf("Group %s is not being watched", groupID)
+			}
+			return err
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
 		Use:   "describe-update <group configuration file>",
 		Short: "describe the steps to perform an update",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -163,9 +200,9 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	}
+	})
 
-	update := &cobra.Command{
+	cmd.AddCommand(&cobra.Command{
 		Use:   "update [group configuration]",
 		Short: "update a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -194,9 +231,9 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	}
+	})
 
-	stop := &cobra.Command{
+	cmd.AddCommand(&cobra.Command{
 		Use:   "stop-update <group ID>",
 		Short: "stop updating a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -215,9 +252,9 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	}
+	})
 
-	destroy := &cobra.Command{
+	cmd.AddCommand(&cobra.Command{
 		Use:   "destroy <group ID>",
 		Short: "destroy a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -236,14 +273,15 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	}
+	})
+
 	describeGroups := &cobra.Command{
 		Use:   "ls",
 		Short: "list groups",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
-			groups, err := groupPlugin.DescribeGroups()
+			groups, err := groupPlugin.InspectGroups()
 			if err == nil {
 				if !quiet {
 					fmt.Printf("%s\n", "ID")
@@ -257,8 +295,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 	describeGroups.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
-
-	cmd.AddCommand(watch, unwatch, inspect, describe, update, stop, destroy, describeGroups)
+	cmd.AddCommand(describeGroups)
 
 	return cmd
 }

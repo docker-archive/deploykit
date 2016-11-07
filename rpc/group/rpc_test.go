@@ -16,12 +16,12 @@ import (
 type testPlugin struct {
 	DoWatchGroup     func(grp group.Spec) error
 	DoUnwatchGroup   func(id group.ID) error
-	DoInspectGroup   func(id group.ID) (group.Description, error)
+	DoDescribeGroup  func(id group.ID) (group.Description, error)
 	DoDescribeUpdate func(updated group.Spec) (string, error)
 	DoUpdateGroup    func(updated group.Spec) error
 	DoStopUpdate     func(id group.ID) error
 	DoDestroyGroup   func(id group.ID) error
-	DoDescribeGroups func() ([]group.Spec, error)
+	DoInspectGroups  func() ([]group.Spec, error)
 }
 
 func testClient(t *testing.T, socket string) group.Plugin {
@@ -36,8 +36,8 @@ func (t *testPlugin) WatchGroup(grp group.Spec) error {
 func (t *testPlugin) UnwatchGroup(id group.ID) error {
 	return t.DoUnwatchGroup(id)
 }
-func (t *testPlugin) InspectGroup(id group.ID) (group.Description, error) {
-	return t.DoInspectGroup(id)
+func (t *testPlugin) DescribeGroup(id group.ID) (group.Description, error) {
+	return t.DoDescribeGroup(id)
 }
 func (t *testPlugin) DescribeUpdate(updated group.Spec) (string, error) {
 	return t.DoDescribeUpdate(updated)
@@ -51,8 +51,8 @@ func (t *testPlugin) StopUpdate(id group.ID) error {
 func (t *testPlugin) DestroyGroup(id group.ID) error {
 	return t.DoDestroyGroup(id)
 }
-func (t *testPlugin) DescribeGroups() ([]group.Spec, error) {
-	return t.DoDescribeGroups()
+func (t *testPlugin) InspectGroups() ([]group.Spec, error) {
+	return t.DoInspectGroups()
 }
 
 func tempSocket() string {
@@ -360,14 +360,14 @@ func TestGroupPluginInspectGroup(t *testing.T) {
 	}
 
 	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoInspectGroup: func(req group.ID) (group.Description, error) {
+		DoDescribeGroup: func(req group.ID) (group.Description, error) {
 			idActual <- req
 			return desc, nil
 		},
 	}))
 	require.NoError(t, err)
 
-	res, err := testClient(t, socketPath).InspectGroup(id)
+	res, err := testClient(t, socketPath).DescribeGroup(id)
 	require.NoError(t, err)
 	require.Equal(t, desc, res)
 
@@ -387,14 +387,14 @@ func TestGroupPluginInspectGroupError(t *testing.T) {
 	}
 
 	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoInspectGroup: func(req group.ID) (group.Description, error) {
+		DoDescribeGroup: func(req group.ID) (group.Description, error) {
 			idActual <- req
 			return desc, errors.New("no")
 		},
 	}))
 	require.NoError(t, err)
 
-	_, err = testClient(t, socketPath).InspectGroup(id)
+	_, err = testClient(t, socketPath).DescribeGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 

@@ -11,7 +11,7 @@ type Plugin interface {
 
 	UnwatchGroup(id ID) error
 
-	InspectGroup(id ID) (Description, error)
+	DescribeGroup(id ID) (Description, error)
 
 	DescribeUpdate(updated Spec) (string, error)
 
@@ -21,7 +21,7 @@ type Plugin interface {
 
 	DestroyGroup(id ID) error
 
-	DescribeGroups() ([]Spec, error)
+	InspectGroups() ([]Spec, error)
 }
 
 // ID is the unique identifier for a Group.

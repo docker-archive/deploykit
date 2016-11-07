@@ -88,7 +88,7 @@ these instances ![instances](images/1.png)
 
 ## 5. List members
 ```shell
-$ build/infrakit group inspect terraform_demo
+$ build/infrakit group describe terraform_demo
 ID                              LOGICAL                         TAGS
 instance-1475601644               -                             Name=instance-1475601644,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
 instance-1475601645               -                             Name=instance-1475601645,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
@@ -117,7 +117,7 @@ update terraform_demo completed
 ## 7. Check on the group:
 
 ```shell
-$ build/infrakit group inspect terraform_demo
+$ build/infrakit group describe terraform_demo
 ID                              LOGICAL                         TAGS
 instance-1475602365               -                             Name=instance-1475602365,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
 instance-1475602374               -                             Name=instance-1475602374,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo

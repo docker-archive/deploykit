@@ -24,13 +24,13 @@ type UnwatchGroupResponse struct {
 	OK bool
 }
 
-// InspectGroupRequest is the rpc wrapper for the input to inspect a group
-type InspectGroupRequest struct {
+// DescribeGroupRequest is the rpc wrapper for the input to inspect a group
+type DescribeGroupRequest struct {
 	ID group.ID
 }
 
-// InspectGroupResponse is the rpc wrapper for the results from inspecting a group
-type InspectGroupResponse struct {
+// DescribeGroupResponse is the rpc wrapper for the results from inspecting a group
+type DescribeGroupResponse struct {
 	Description group.Description
 }
 
@@ -74,13 +74,13 @@ type DestroyGroupResponse struct {
 	OK bool
 }
 
-// DescribeGroupsRequest is the rpc wrapper for the input to destroy a group
-type DescribeGroupsRequest struct {
+// InspectGroupsRequest is the rpc wrapper for the input to destroy a group
+type InspectGroupsRequest struct {
 	ID group.ID
 }
 
-// DescribeGroupsResponse is the rpc wrapper for the output from destroying a group
-type DescribeGroupsResponse struct {
+// InspectGroupsResponse is the rpc wrapper for the output from destroying a group
+type InspectGroupsResponse struct {
 	Groups []group.Spec
 }
 
@@ -89,10 +89,10 @@ type DescribeGroupsResponse struct {
 type RPCService interface {
 	WatchGroup(req *WatchGroupRequest, resp *WatchGroupResponse) error
 	UnwatchGroup(req *UnwatchGroupRequest, resp *UnwatchGroupResponse) error
-	InspectGroup(req *InspectGroupRequest, resp *InspectGroupResponse) error
+	DescribeGroup(req *DescribeGroupRequest, resp *DescribeGroupResponse) error
 	DescribeUpdate(req *DescribeUpdateRequest, resp *DescribeUpdateResponse) error
 	UpdateGroup(req *UpdateGroupRequest, resp *UpdateGroupResponse) error
 	StopUpdate(req *StopUpdateRequest, resp *StopUpdateResponse) error
 	DestroyGroup(req *DestroyGroupRequest, resp *DestroyGroupResponse) error
-	DescribeGroups(req *DescribeGroupsRequest, resp *DescribeGroupsResponse) error
+	InspectGroups(req *InspectGroupsRequest, resp *InspectGroupsResponse) error
 }

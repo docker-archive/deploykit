@@ -24,6 +24,13 @@ func main() {
 		},
 	}
 
+	// Don't print usage text for any error returned from a RunE function.  Only print it when explicitly requested.
+	cmd.SilenceUsage = true
+
+	// Don't automatically print errors returned from a RunE function.  They are returned from cmd.Execute() below
+	// and we print it ourselves.
+	cmd.SilenceErrors = true
+
 	cmd.AddCommand(cli.VersionCommand())
 
 	f := func() discovery.Plugins {

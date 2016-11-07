@@ -63,7 +63,7 @@ build/infrakit group watch docs/cattle.json
 echo 'Waiting for group to be provisioned'
 sleep 2
 
-expect_output_lines "5 instances should exist in group" "build/infrakit group inspect cattle -q" "5"
+expect_output_lines "5 instances should exist in group" "build/infrakit group describe cattle -q" "5"
 expect_output_lines "5 instances should exist" "build/infrakit instance describe -q --name instance-file" "5"
 
 build/infrakit group unwatch cattle
@@ -79,7 +79,7 @@ expect_exact_output \
 build/infrakit group update docs/cattle2.json
 sleep 20
 
-expect_output_lines "10 instances should exist in group" "build/infrakit group inspect cattle -q" "10"
+expect_output_lines "10 instances should exist in group" "build/infrakit group describe cattle -q" "10"
 
 # Terminate 3 instances.
 pushd tutorial
@@ -88,7 +88,7 @@ popd
 
 sleep 20
 
-expect_output_lines "10 instances should exist in group" "build/infrakit group inspect cattle -q" "10"
+expect_output_lines "10 instances should exist in group" "build/infrakit group describe cattle -q" "10"
 
 build/infrakit group destroy cattle
 expect_output_lines "0 instances should exist" "build/infrakit instance describe -q --name instance-file" "0"
