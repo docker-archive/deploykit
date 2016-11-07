@@ -35,3 +35,10 @@ type Detector interface {
 	// Stop stops
 	Stop()
 }
+
+// Always is a trivial implementation that asserts the current instance to always be the leader (or not)
+func Always(leader bool) CheckLeaderFunc {
+	return func() (bool, error) {
+		return leader, nil
+	}
+}
