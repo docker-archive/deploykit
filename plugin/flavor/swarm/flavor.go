@@ -35,6 +35,7 @@ type swarmFlavor struct {
 
 type schema struct {
 	Type                 nodeType
+	Attachments          map[instance.LogicalID][]instance.Attachment
 	DockerRestartCommand string
 }
 
@@ -42,6 +43,36 @@ func parseProperties(flavorProperties json.RawMessage) (schema, error) {
 	s := schema{}
 	err := json.Unmarshal(flavorProperties, &s)
 	return s, err
+}
+
+func validateIDsAndAttachments(logicalIDs []instance.LogicalID, attachments map[instance.LogicalID][]instance.Attachment) error {
+	// Each attachment association must be represented by a logical ID.
+	idsMap := map[instance.LogicalID]bool{}
+	for _, id := range logicalIDs {
+		if _, exists := idsMap[id]; exists {
+			return fmt.Errorf("LogicalID %s specified more than once", id)
+		}
+
+		idsMap[id] = true
+	}
+	for id := range attachments {
+		if _, exists := idsMap[id]; !exists {
+			return fmt.Errorf("LogicalID %s used for an attachment but is not in group LogicalIDs", id)
+		}
+	}
+
+	// Each attachment may only be used once.
+	allAttachments := map[instance.Attachment]bool{}
+	for _, att := range attachments {
+		for _, attachment := range att {
+			if _, exists := allAttachments[attachment]; exists {
+				return fmt.Errorf("Attachment %s specified more than once", attachment)
+			}
+			allAttachments[attachment] = true
+		}
+	}
+
+	return nil
 }
 
 func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
@@ -55,18 +86,30 @@ func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types
 	}
 
 	switch properties.Type {
-	case worker:
-		return nil
 	case manager:
 		numIDs := len(allocation.LogicalIDs)
 		if numIDs != 1 && numIDs != 3 && numIDs != 5 {
 			return errors.New("Must have 1, 3, or 5 manager logical IDs")
 		}
+	case worker:
 
-		return nil
 	default:
 		return errors.New("Unrecognized node Type")
 	}
+
+	if properties.Type == manager {
+		for _, id := range allocation.LogicalIDs {
+			if att, exists := properties.Attachments[id]; !exists || len(att) == 0 {
+				log.Warnf("LogicalID %s has no attachments, which is needed for durability")
+			}
+		}
+	}
+
+	if err := validateIDsAndAttachments(allocation.LogicalIDs, properties.Attachments); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 const (
@@ -226,7 +269,8 @@ func (s swarmFlavor) Prepare(
 
 	case manager:
 		if spec.LogicalID == nil {
-			return spec, errors.New("Manager nodes require an assigned private IP address")
+			return spec, errors.New("Manager nodes require a LogicalID, " +
+				"which will be used as an assigned private IP address")
 		}
 
 		spec.Init = generateInitScript(
@@ -235,10 +279,14 @@ func (s swarmFlavor) Prepare(
 			associationID,
 			properties.DockerRestartCommand)
 
-		spec.Attachments = []instance.Attachment{instance.Attachment(*spec.LogicalID)}
-
 	default:
 		return spec, errors.New("Unsupported node type")
+	}
+
+	if spec.LogicalID != nil {
+		if attachments, exists := properties.Attachments[*spec.LogicalID]; exists {
+			spec.Attachments = append(spec.Attachments, attachments...)
+		}
 	}
 
 	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
