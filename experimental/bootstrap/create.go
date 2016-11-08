@@ -449,7 +449,7 @@ image=wfarner/infrakit-demo-plugins
 mkdir -p $configs
 mkdir -p $plugins
 
-{{ range $name, $config := . }}
+{{ range $name, $config := .ConfigsByName }}
 cat << 'EOF' > "$configs/{{ $name }}.json"
 {{ $config }}
 EOF
@@ -460,11 +460,11 @@ $run_plugin --name flavor-combo $image infrakit-flavor-combo
 $run_plugin --name flavor-swarm -v /var/run/docker.sock:/var/run/docker.sock $image infrakit-flavor-swarm
 $run_plugin --name flavor-vanilla $image infrakit-flavor-vanilla
 $run_plugin --name group-default $image infrakit-group-default
-$run_plugin --name instance-aws $image infrakit-instance-aws
+$run_plugin --name instance-aws $image infrakit-instance-aws --namespace-tags infrakit.cluster={{.ClusterName}}
 
 echo "alias infrakit='docker run --rm $discovery -v $configs:$configs $image infrakit'" >> /home/ubuntu/.bashrc
 
-{{ range $name, $config := . }}
+{{ range $name, $config := .ConfigsByName }}
 docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json
 {{ end }}
 `
@@ -486,7 +486,9 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 	}
 
 	buffer := bytes.Buffer{}
-	err = template.Must(template.New("").Parse(prepareGroupWatches)).Execute(&buffer, infrakitGroups)
+	err = template.Must(template.New("").Parse(prepareGroupWatches)).Execute(
+		&buffer,
+		map[string]interface{}{"ClusterName": spec.ClusterName, "ConfigsByName": infrakitGroups})
 	if err != nil {
 		return err
 	}
