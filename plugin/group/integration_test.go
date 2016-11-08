@@ -99,7 +99,7 @@ func TestInvalidGroupCalls(t *testing.T) {
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
 	require.Error(t, grp.DestroyGroup(id))
-	_, err := grp.InspectGroup(id)
+	_, err := grp.DescribeGroup(id)
 	require.Error(t, err)
 	require.Error(t, grp.UnwatchGroup(id))
 	require.Error(t, grp.StopUpdate(id))

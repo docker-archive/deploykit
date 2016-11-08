@@ -43,10 +43,10 @@ func (c *client) UnwatchGroup(id group.ID) error {
 	return nil
 }
 
-func (c *client) InspectGroup(id group.ID) (group.Description, error) {
-	req := &InspectGroupRequest{ID: id}
-	resp := &InspectGroupResponse{}
-	err := c.rpc.Call("Group.InspectGroup", req, resp)
+func (c *client) DescribeGroup(id group.ID) (group.Description, error) {
+	req := &DescribeGroupRequest{ID: id}
+	resp := &DescribeGroupResponse{}
+	err := c.rpc.Call("Group.DescribeGroup", req, resp)
 	return resp.Description, err
 }
 
@@ -90,9 +90,9 @@ func (c *client) DestroyGroup(id group.ID) error {
 	return nil
 }
 
-func (c *client) DescribeGroups() ([]group.Spec, error) {
-	req := &DescribeGroupsRequest{}
-	resp := &DescribeGroupsResponse{}
-	err := c.rpc.Call("Group.DescribeGroups", req, resp)
+func (c *client) InspectGroups() ([]group.Spec, error) {
+	req := &InspectGroupsRequest{}
+	resp := &InspectGroupsResponse{}
+	err := c.rpc.Call("Group.InspectGroups", req, resp)
 	return resp.Groups, err
 }

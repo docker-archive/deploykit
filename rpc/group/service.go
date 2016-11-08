@@ -34,9 +34,9 @@ func (p *Group) UnwatchGroup(req *UnwatchGroupRequest, resp *UnwatchGroupRespons
 	return nil
 }
 
-// InspectGroup is the rpc method to inspect a group
-func (p *Group) InspectGroup(req *InspectGroupRequest, resp *InspectGroupResponse) error {
-	desc, err := p.plugin.InspectGroup(req.ID)
+// DescribeGroup is the rpc method to describe a group
+func (p *Group) DescribeGroup(req *DescribeGroupRequest, resp *DescribeGroupResponse) error {
+	desc, err := p.plugin.DescribeGroup(req.ID)
 	if err != nil {
 		return err
 	}
@@ -84,9 +84,9 @@ func (p *Group) DestroyGroup(req *DestroyGroupRequest, resp *DestroyGroupRespons
 	return nil
 }
 
-// DescribeGroups is the rpc method to describe groups
-func (p *Group) DescribeGroups(req *DescribeGroupsRequest, resp *DescribeGroupsResponse) error {
-	groups, err := p.plugin.DescribeGroups()
+// InspectGroups is the rpc method to inspect groups
+func (p *Group) InspectGroups(req *InspectGroupsRequest, resp *InspectGroupsResponse) error {
+	groups, err := p.plugin.InspectGroups()
 	if err != nil {
 		return err
 	}

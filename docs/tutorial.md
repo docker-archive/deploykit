@@ -8,6 +8,11 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
 It may be helpful to familiarize yourself with [plugin discovery](../README.md#plugin-discovery) if you have not already
 done so.
 
+First, build the plugins:
+```shell
+$ make binaries
+```
+
 Start the default Group plugin
 
 ```shell
@@ -19,7 +24,7 @@ Start the file Instance plugin
 
 ```shell
 $ mkdir -p tutorial
-$ build/infrakit-instance-file --dir ./tutorial/
+$ build/infrakit-instance-file --dir ./tutorial
 INFO[0000] Listening at: ~/.infrakit/plugins/instance-file
 ```
 Note the directory `./tutorial` where the plugin will store the instances as they are provisioned.
@@ -45,7 +50,7 @@ instance-file           ~/.infrakit/plugins/instance-file
 
 Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
 
-Here we have a configuration JSON for the group.  In general, the JSON structures follow a pattern:
+Now we must create the JSOn for a group.  You will find that the JSON structures follow a pattern:
 
 ```json
 {
@@ -96,6 +101,7 @@ Putting everything together, we have the configuration to give to the default Gr
   }
 }
 ```
+*Save this as `cattle.json`*
 
 Note that we specify the number of instances via the `Size` parameter in the `flavor-vanilla` plugin.  It's possible
 that a specialized Flavor plugin doesn't even accept a size for the group, but rather computes the optimal size based on
@@ -106,7 +112,6 @@ Checking for the instances via the CLI:
 ```shell
 $ build/infrakit instance --name instance-file describe
 ID                              LOGICAL                         TAGS
-
 ```
 
 Let's tell the group plugin to `watch` our group by providing the group plugin with the configuration:
@@ -119,7 +124,7 @@ watching cattle
 The group plugin is responsible for ensuring that the infrastructure state matches with your specifications.  Since we
 started out with nothing, it will create 5 instances and maintain that state by monitoring the instances:
 ```shell
-$ build/infrakit group inspect cattle
+$ build/infrakit group describe cattle
 ID                              LOGICAL         TAGS
 instance-1475104926           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475104936           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
@@ -188,6 +193,7 @@ Now let's update the configuration by changing the size of the group and a prope
   }
 }
 ```
+*Save this as `cattle2.json`*
 
 ```shell
 $ diff cattle.json cattle2.json 
@@ -221,7 +227,7 @@ update cattle completed
 Now we can check:
 
 ```shell
-$ build/infrakit group inspect cattle
+$ build/infrakit group describe cattle
 ID                              LOGICAL         TAGS
 instance-1475105646           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
 instance-1475105656           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web

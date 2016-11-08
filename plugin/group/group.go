@@ -150,7 +150,7 @@ func (p *plugin) UnwatchGroup(id group.ID) error {
 	return nil
 }
 
-func (p *plugin) InspectGroup(id group.ID) (group.Description, error) {
+func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -294,7 +294,7 @@ func (p *plugin) DestroyGroup(gid group.ID) error {
 	return nil
 }
 
-func (p *plugin) DescribeGroups() ([]group.Spec, error) {
+func (p *plugin) InspectGroups() ([]group.Spec, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	var specs []group.Spec
