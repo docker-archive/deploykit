@@ -439,14 +439,6 @@ func ProvisionManager(
 	return nil
 }
 
-// InstanceTags gets the tags used to associate an instance with a group.
-func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
-	return map[string]string{
-		*resourceTag.Key: *resourceTag.Value,
-		"infrakit.group": string(gid),
-	}
-}
-
 const prepareGroupWatches = `
 plugins=/infrakit/plugins
 configs=/infrakit/configs
@@ -514,7 +506,7 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 
 	return ProvisionManager(
 		provisioner,
-		InstanceTags(*spec.cluster().resourceTag(), managerGroup.Name),
+		map[string]string{"infrakit.group": string(managerGroup.Name)},
 		json.RawMessage(rawConfig),
 		spec.ManagerIPs[0])
 }

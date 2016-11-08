@@ -102,7 +102,6 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 							AvailabilityZone: aws.String(cluster.ID.region + "a"),
 						},
 					},
-					Tags: map[string]string{"infrakit.cluster": cluster.ID.name},
 				}
 
 				spec = clusterSpec{
