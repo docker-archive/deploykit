@@ -13,8 +13,9 @@ import (
 )
 
 // StartPluginAtPath starts an HTTP server listening on a unix socket at the specified path.
+// Caller can optionally provide functions to execute as part of shutdown sequence.
 // Returns a channel to signal stop when closed, a channel to block on stopping, and an error if occurs.
-func StartPluginAtPath(socketPath string, endpoint interface{}) (chan<- struct{}, <-chan error, error) {
+func StartPluginAtPath(socketPath string, endpoint interface{}, shutdown ...func() error) (chan<- struct{}, <-chan error, error) {
 	log.Infoln("Listening at:", socketPath)
 
 	server := rpc.NewServer()
@@ -28,6 +29,10 @@ func StartPluginAtPath(socketPath string, endpoint interface{}) (chan<- struct{}
 	}
 
 	shutdownTasks := []func() error{}
+	for _, f := range shutdown {
+		shutdownTasks = append(shutdownTasks, f)
+	}
+
 	shutdownTasks = append(shutdownTasks, func() error {
 		// close channels that others may block on for shutdown
 		close(engineStop)
