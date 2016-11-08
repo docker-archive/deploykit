@@ -41,7 +41,7 @@ func (b *Builder) Flags() *pflag.FlagSet {
 }
 
 // BuildInstancePlugin creates an instance Provisioner configured with the Flags.
-func (b *Builder) BuildInstancePlugin() (instance.Plugin, error) {
+func (b *Builder) BuildInstancePlugin(namespaceTags map[string]string) (instance.Plugin, error) {
 	if b.Config == nil {
 		providers := []credentials.Provider{
 			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
@@ -79,7 +79,7 @@ func (b *Builder) BuildInstancePlugin() (instance.Plugin, error) {
 			WithMaxRetries(b.options.retries))
 	}
 
-	return NewInstancePlugin(ec2.New(b.Config)), nil
+	return NewInstancePlugin(ec2.New(b.Config), namespaceTags), nil
 }
 
 type logger struct {
