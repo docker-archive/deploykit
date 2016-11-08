@@ -20,9 +20,9 @@ const (
 	VolumeTag = "docker-infrakit-volume"
 )
 
-// Provisioner is an instance provisioner for AWS.
-type Provisioner struct {
-	Client ec2iface.EC2API
+type awsInstancePlugin struct {
+	client        ec2iface.EC2API
+	namespaceTags map[string]string
 }
 
 type properties struct {
@@ -32,42 +32,25 @@ type properties struct {
 }
 
 // NewInstancePlugin creates a new plugin that creates instances in AWS EC2.
-func NewInstancePlugin(client ec2iface.EC2API) instance.Plugin {
-	return &Provisioner{Client: client}
+func NewInstancePlugin(client ec2iface.EC2API, namespaceTags map[string]string) instance.Plugin {
+	return &awsInstancePlugin{client: client, namespaceTags: namespaceTags}
 }
 
-func (p Provisioner) tagInstance(
+func (p awsInstancePlugin) tagInstance(
 	instance *ec2.Instance,
 	systemTags map[string]string,
 	userTags map[string]string) error {
 
 	ec2Tags := []*ec2.Tag{}
 
-	// Gather the tag keys in sorted order, to provide predictable tag order.  This is
-	// particularly useful for tests.
-	var keys []string
-	for k := range userTags {
-		keys = append(keys, k)
-	}
-	for k := range systemTags {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys, allTags := mergeTags(userTags, systemTags, p.namespaceTags)
 
 	for _, k := range keys {
 		key := k
-		value, exists := userTags[key]
-
-		// System tags overwrite user tags.
-		systemValue, exists := systemTags[key]
-		if exists {
-			value = systemValue
-		}
-
-		ec2Tags = append(ec2Tags, &ec2.Tag{Key: &key, Value: &value})
+		ec2Tags = append(ec2Tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(allTags[key])})
 	}
 
-	_, err := p.Client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{instance.InstanceId}, Tags: ec2Tags})
+	_, err := p.client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{instance.InstanceId}, Tags: ec2Tags})
 	return err
 }
 
@@ -78,13 +61,38 @@ type CreateInstanceRequest struct {
 }
 
 // Validate performs local checks to determine if the request is valid.
-func (p Provisioner) Validate(req json.RawMessage) error {
+func (p awsInstancePlugin) Validate(req json.RawMessage) error {
 	// TODO(wfarner): Implement
 	return nil
 }
 
+// mergeTags merges multiple maps of tags, implementing 'last write wins' for colliding keys.
+//
+// Returns a sorted slice of all keys, and the map of merged tags.  Sorted keys are particularly useful to assist in
+// preparing predictable output such as for tests.
+func mergeTags(tagMaps ...map[string]string) ([]string, map[string]string) {
+
+	keys := []string{}
+	tags := map[string]string{}
+
+	for _, tagMap := range tagMaps {
+		for k, v := range tagMap {
+			if _, exists := tags[k]; exists {
+				log.Warnf("Ovewriting tag value for key %s", k)
+			} else {
+				keys = append(keys, k)
+			}
+			tags[k] = v
+		}
+	}
+
+	sort.Strings(keys)
+
+	return keys, tags
+}
+
 // Provision creates a new instance.
-func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
+func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	if spec.Properties == nil {
 		return nil, errors.New("Properties must be set")
@@ -124,7 +132,7 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 			filterValues = append(filterValues, &s)
 		}
 
-		volumes, err := p.Client.DescribeVolumes(&ec2.DescribeVolumesInput{
+		volumes, err := p.client.DescribeVolumes(&ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{
 				// TODO(wfarner): Need a way to disambiguate between volumes associated with different
 				// clusters.  Currently, volume IDs are private IP addresses, which are not guaranteed
@@ -151,7 +159,7 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 	}
 
-	reservation, err := p.Client.RunInstances(&request.RunInstancesInput)
+	reservation, err := p.client.RunInstances(&request.RunInstancesInput)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +181,7 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 		for {
 			time.Sleep(10 * time.Second)
 
-			inst, err := p.Client.DescribeInstances(&ec2.DescribeInstancesInput{
+			inst, err := p.client.DescribeInstances(&ec2.DescribeInstancesInput{
 				InstanceIds: []*string{ec2Instance.InstanceId},
 			})
 			if err == nil {
@@ -189,7 +197,7 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 
 		for _, awsVolumeID := range awsVolumeIDs {
-			_, err := p.Client.AttachVolume(&ec2.AttachVolumeInput{
+			_, err := p.client.AttachVolume(&ec2.AttachVolumeInput{
 				InstanceId: ec2Instance.InstanceId,
 				VolumeId:   awsVolumeID,
 				Device:     aws.String("/dev/sdf"),
@@ -204,8 +212,8 @@ func (p Provisioner) Provision(spec instance.Spec) (*instance.ID, error) {
 }
 
 // Destroy terminates an existing instance.
-func (p Provisioner) Destroy(id instance.ID) error {
-	result, err := p.Client.TerminateInstances(&ec2.TerminateInstancesInput{
+func (p awsInstancePlugin) Destroy(id instance.ID) error {
+	result, err := p.client.TerminateInstances(&ec2.TerminateInstancesInput{
 		InstanceIds: []*string{aws.String(string(id))}})
 
 	if err != nil {
@@ -219,7 +227,7 @@ func (p Provisioner) Destroy(id instance.ID) error {
 	return nil
 }
 
-func describeGroupRequest(tags map[string]string, nextToken *string) *ec2.DescribeInstancesInput {
+func describeGroupRequest(namespaceTags, tags map[string]string, nextToken *string) *ec2.DescribeInstancesInput {
 
 	filters := []*ec2.Filter{
 		{
@@ -230,18 +238,22 @@ func describeGroupRequest(tags map[string]string, nextToken *string) *ec2.Descri
 			},
 		},
 	}
-	for key, value := range tags {
+
+	keys, allTags := mergeTags(tags, namespaceTags)
+
+	for _, key := range keys {
 		filters = append(filters, &ec2.Filter{
 			Name:   aws.String(fmt.Sprintf("tag:%s", key)),
-			Values: []*string{aws.String(value)},
+			Values: []*string{aws.String(allTags[key])},
 		})
 	}
 
 	return &ec2.DescribeInstancesInput{NextToken: nextToken, Filters: filters}
 }
 
-func (p Provisioner) describeInstances(tags map[string]string, nextToken *string) ([]instance.Description, error) {
-	result, err := p.Client.DescribeInstances(describeGroupRequest(tags, nextToken))
+func (p awsInstancePlugin) describeInstances(tags map[string]string, nextToken *string) ([]instance.Description, error) {
+
+	result, err := p.client.DescribeInstances(describeGroupRequest(p.namespaceTags, tags, nextToken))
 	if err != nil {
 		return nil, err
 	}
@@ -280,12 +292,12 @@ func (p Provisioner) describeInstances(tags map[string]string, nextToken *string
 }
 
 // DescribeInstances implements instance.Provisioner.DescribeInstances.
-func (p Provisioner) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p awsInstancePlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
 	return p.describeInstances(tags, nil)
 }
 
-func (p Provisioner) describeInstance(id instance.ID) (*ec2.Instance, error) {
-	result, err := p.Client.DescribeInstances(&ec2.DescribeInstancesInput{
+func (p awsInstancePlugin) describeInstance(id instance.ID) (*ec2.Instance, error) {
+	result, err := p.client.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(string(id))},
 	})
 	if err != nil {

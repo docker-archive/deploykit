@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	tags = map[string]string{"group": "workers"}
+	testNamespace = map[string]string{"cluster": "test", "type": "testing"}
+	tags          = map[string]string{"group": "workers"}
 )
 
 func TestInstanceLifecycle(t *testing.T) {
@@ -22,7 +23,7 @@ func TestInstanceLifecycle(t *testing.T) {
 	defer ctrl.Finish()
 
 	clientMock := mock_ec2.NewMockEC2API(ctrl)
-	provisioner := Provisioner{Client: clientMock}
+	pluginImpl := awsInstancePlugin{client: clientMock, namespaceTags: testNamespace}
 
 	// Create an instance.
 
@@ -34,14 +35,16 @@ func TestInstanceLifecycle(t *testing.T) {
 	tagRequest := ec2.CreateTagsInput{
 		Resources: []*string{&instanceID},
 		Tags: []*ec2.Tag{
+			{Key: aws.String("cluster"), Value: aws.String("test")},
 			{Key: aws.String("group"), Value: aws.String("workers")},
 			{Key: aws.String("test"), Value: aws.String("aws-create-test")},
+			{Key: aws.String("type"), Value: aws.String("testing")},
 		},
 	}
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
 	// TODO(wfarner): Test user-data and private IP plumbing.
-	id, err := provisioner.Provision(instance.Spec{Properties: &inputJSON, Tags: tags})
+	id, err := pluginImpl.Provision(instance.Spec{Properties: &inputJSON, Tags: tags})
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
@@ -53,7 +56,7 @@ func TestInstanceLifecycle(t *testing.T) {
 			TerminatingInstances: []*ec2.InstanceStateChange{{InstanceId: &instanceID}}},
 			nil)
 
-	require.NoError(t, provisioner.Destroy(instance.ID(instanceID)))
+	require.NoError(t, pluginImpl.Destroy(instance.ID(instanceID)))
 }
 
 func TestCreateInstanceError(t *testing.T) {
@@ -64,9 +67,9 @@ func TestCreateInstanceError(t *testing.T) {
 	runError := errors.New("request failed")
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
-	provisioner := NewInstancePlugin(clientMock)
+	pluginImpl := NewInstancePlugin(clientMock, map[string]string{"cluster": "test"})
 	properties := json.RawMessage("{}")
-	id, err := provisioner.Provision(instance.Spec{Properties: &properties, Tags: tags})
+	id, err := pluginImpl.Provision(instance.Spec{Properties: &properties, Tags: tags})
 
 	require.Error(t, err)
 	require.Nil(t, id)
@@ -83,8 +86,8 @@ func TestDestroyInstanceError(t *testing.T) {
 	clientMock.EXPECT().TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: []*string{&instanceID}}).
 		Return(nil, runError)
 
-	provisioner := NewInstancePlugin(clientMock)
-	require.Error(t, provisioner.Destroy(instance.ID(instanceID)))
+	pluginImpl := NewInstancePlugin(clientMock, testNamespace)
+	require.Error(t, pluginImpl.Destroy(instance.ID(instanceID)))
 }
 
 func describeInstancesResponse(
@@ -118,7 +121,7 @@ func TestDescribeInstancesRequest(t *testing.T) {
 	defer ctrl.Finish()
 
 	var nextToken *string
-	request := describeGroupRequest(tags, nextToken)
+	request := describeGroupRequest(testNamespace, tags, nextToken)
 
 	require.Equal(t, nextToken, request.NextToken)
 
@@ -133,14 +136,17 @@ func TestDescribeInstancesRequest(t *testing.T) {
 				}
 			}
 		}
-		require.Fail(t, fmt.Sprintf("Did not have filter %s/%s", name, value))
+		require.Fail(t, fmt.Sprintf("Did not have filter %s=%s", name, value))
 	}
 	for key, value := range tags {
 		requireFilter(fmt.Sprintf("tag:%s", key), value)
 	}
+	for key, value := range testNamespace {
+		requireFilter(fmt.Sprintf("tag:%s", key), value)
+	}
 
 	nextToken = aws.String("page-2")
-	request = describeGroupRequest(tags, nextToken)
+	request = describeGroupRequest(testNamespace, tags, nextToken)
 	require.Equal(t, nextToken, request.NextToken)
 }
 
@@ -153,17 +159,17 @@ func TestListGroup(t *testing.T) {
 
 	// Split instance IDs across multiple reservations and request pages.
 	gomock.InOrder(
-		clientMock.EXPECT().DescribeInstances(describeGroupRequest(tags, nil)).
+		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testNamespace, tags, nil)).
 			Return(describeInstancesResponse([][]string{
 				{"a", "b", "c"},
 				{"d", "e"},
 			}, tags, &page2Token), nil),
-		clientMock.EXPECT().DescribeInstances(describeGroupRequest(tags, &page2Token)).
+		clientMock.EXPECT().DescribeInstances(describeGroupRequest(testNamespace, tags, &page2Token)).
 			Return(describeInstancesResponse([][]string{{"f", "g"}}, tags, nil), nil),
 	)
 
-	provisioner := NewInstancePlugin(clientMock)
-	descriptions, err := provisioner.DescribeInstances(tags)
+	pluginImpl := NewInstancePlugin(clientMock, testNamespace)
+	descriptions, err := pluginImpl.DescribeInstances(tags)
 
 	require.NoError(t, err)
 	id := instance.LogicalID("127.0.0.1")

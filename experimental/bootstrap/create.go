@@ -480,7 +480,7 @@ docker run --rm $discovery -v $configs:$configs $image infrakit group watch $con
 func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 	log.Info("Starting cluster boot leader instance")
 	builder := infrakit_instance.Builder{Config: config}
-	provisioner, err := builder.BuildInstancePlugin()
+	provisioner, err := builder.BuildInstancePlugin(spec.cluster().clusterTagMap())
 	if err != nil {
 		return err
 	}

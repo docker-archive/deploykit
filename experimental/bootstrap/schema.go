@@ -18,6 +18,7 @@ import (
 const (
 	workerType  = "worker"
 	managerType = "manager"
+	clusterTag  = "infrakit.cluster"
 )
 
 type clusterID struct {
@@ -51,7 +52,7 @@ func (c clusterID) resourceFilter(vpcID string) []*ec2.Filter {
 
 func (c clusterID) clusterFilter() *ec2.Filter {
 	return &ec2.Filter{
-		Name:   aws.String("tag:infrakit.cluster"),
+		Name:   aws.String("tag:" + clusterTag),
 		Values: []*string{aws.String(c.name)},
 	}
 }
@@ -68,9 +69,13 @@ func (c clusterID) instanceProfileName() string {
 	return fmt.Sprintf("%s-ManagerProfile", c.name)
 }
 
+func (c clusterID) clusterTagMap() map[string]string {
+	return map[string]string{clusterTag: c.name}
+}
+
 func (c clusterID) resourceTag() *ec2.Tag {
 	return &ec2.Tag{
-		Key:   aws.String("infrakit.cluster"),
+		Key:   aws.String(clusterTag),
 		Value: aws.String(c.name),
 	}
 }
