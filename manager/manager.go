@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/discovery"
@@ -312,37 +311,7 @@ func (m *manager) doUnwatchGroups(config GlobalSpec) error {
 		})
 }
 
-func (m *manager) ensurePluginsRunning(config GlobalSpec) error {
-	tick := time.Tick(1 * time.Second)
-	timeout := time.After(10 * time.Second)
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for plugins to run")
-
-		case <-tick:
-			running, err := m.plugins.List()
-			if err != nil {
-				return err
-			}
-
-			needed := config.findPlugins()
-			// TODO(chungers) -- do set intersection
-			if len(running) >= len(needed) {
-				return nil
-			}
-		}
-	}
-}
-
 func (m *manager) execPlugins(config GlobalSpec, work func(group.Plugin, group.Spec) error) error {
-
-	// Do not execute unless all plugins are running.  The entire config should have everything
-	// ready as a whole.
-	if err := m.ensurePluginsRunning(config); err != nil {
-		return err
-	}
-
 	running, err := m.plugins.List()
 	if err != nil {
 		return err
@@ -369,7 +338,7 @@ func (m *manager) execPlugins(config GlobalSpec, work func(group.Plugin, group.S
 
 		// spec is store in the properties
 		if pluginSpec.Properties == nil {
-			return fmt.Errorf("no spec for group", id, "plugin=", name)
+			return fmt.Errorf("no spec for group %s plugin=%v", id, name)
 		}
 
 		spec := group.Spec{}
