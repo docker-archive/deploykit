@@ -90,7 +90,7 @@ Putting everything together, we have the configuration to give to the default Gr
       "Properties": {
         "Init": [
           "docker pull nginx:alpine",
-          "docker run -d -p 80:80 nginx:alpine"
+          "docker run -d -p 80:80 nginx-alpine"
         ],
         "Tags": {
           "tier": "web",
