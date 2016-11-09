@@ -50,7 +50,7 @@ instance-file           ~/.infrakit/plugins/instance-file
 
 Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
 
-Now we must create the JSOn for a group.  You will find that the JSON structures follow a pattern:
+Now we must create the JSON for a group.  You will find that the JSON structures follow a pattern:
 
 ```json
 {
