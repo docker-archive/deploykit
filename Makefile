@@ -18,7 +18,7 @@ all: clean fmt vet lint build test binaries
 ci: fmt vet lint check-docs coverage
 
 AUTHORS: .mailmap .git/HEAD
-	 git log --format='%aN <%aE>' | sort -fu > $@
+	git log --format='%aN <%aE>' | sort -fu > $@
 
 # Package list
 PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor)
@@ -71,7 +71,7 @@ clean:
 
 define build_binary
 	go build -o build/$(1) \
-	  -ldflags "-X github.com/docker/infrakit/cli.Version=$(VERSION) -X github.com/docker/infrakit/cli.Revision=$(REVISION)" $(2)
+		-ldflags "-X github.com/docker/infrakit/cli.Version=$(VERSION) -X github.com/docker/infrakit/cli.Revision=$(REVISION)" $(2)
 endef
 
 binaries: clean build-binaries
@@ -106,7 +106,7 @@ test:
 coverage:
 	@echo "+ $@"
 	@for pkg in $(PKGS); do \
-	  go test -test.short -race -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
+		go test -test.short -race -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 
 test-full:
