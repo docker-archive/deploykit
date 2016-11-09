@@ -8,6 +8,7 @@ import (
 	"github.com/docker/infrakit/cli"
 	"github.com/docker/infrakit/plugin/flavor/swarm"
 	flavor_plugin "github.com/docker/infrakit/rpc/flavor"
+	"github.com/docker/infrakit/util/docker/1.24"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +27,7 @@ func main() {
 
 			cli.SetLogLevel(logLevel)
 
-			dockerClient, err := NewDockerClient(host, &tlsOptions)
+			dockerClient, err := docker.NewDockerClient(host, &tlsOptions)
 			log.Infoln("Connect to docker", host, "err=", err)
 			if err != nil {
 				log.Error(err)

@@ -9,7 +9,7 @@ import (
 	"github.com/docker/infrakit/discovery"
 	swarm_leader "github.com/docker/infrakit/leader/swarm"
 	swarm_store "github.com/docker/infrakit/store/swarm"
-	"github.com/docker/infrakit/util/docker"
+	"github.com/docker/infrakit/util/docker/1.24"
 	"github.com/spf13/cobra"
 )
 
