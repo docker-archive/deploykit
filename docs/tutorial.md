@@ -50,7 +50,7 @@ instance-file           ~/.infrakit/plugins/instance-file
 
 Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
 
-Now we must create the JSOn for a group.  You will find that the JSON structures follow a pattern:
+Now we must create the JSON for a group.  You will find that the JSON structures follow a pattern:
 
 ```json
 {
@@ -90,7 +90,7 @@ Putting everything together, we have the configuration to give to the default Gr
       "Properties": {
         "Init": [
           "docker pull nginx:alpine",
-          "docker run -d -p 80:80 nginx-alpine"
+          "docker run -d -p 80:80 nginx:alpine"
         ],
         "Tags": {
           "tier": "web",
