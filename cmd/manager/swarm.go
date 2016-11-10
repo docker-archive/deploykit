@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -18,7 +17,7 @@ func swarmEnvironment(backend *backend) *cobra.Command {
 	tlsOptions := tlsconfig.Options{}
 	host := "unix:///var/run/docker.sock"
 
-	pollInterval := 5 * time.Second
+	var pollInterval time.Duration
 
 	cmd := &cobra.Command{
 		Use:   "swarm",
@@ -28,8 +27,7 @@ func swarmEnvironment(backend *backend) *cobra.Command {
 			dockerClient, err := docker.NewDockerClient(host, &tlsOptions)
 			log.Infoln("Connect to docker", host, "err=", err)
 			if err != nil {
-				log.Error(err)
-				os.Exit(1)
+				return err
 			}
 
 			leader := swarm_leader.NewDetector(pollInterval, dockerClient)
@@ -50,7 +48,7 @@ func swarmEnvironment(backend *backend) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().DurationVar(&pollInterval, "poll-interval", pollInterval, "Leader polling interval")
+	cmd.Flags().DurationVar(&pollInterval, "poll-interval", 5*time.Second, "Leader polling interval")
 	cmd.Flags().StringVar(&host, "host", host, "Docker host")
 	cmd.Flags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert file path")
 	cmd.Flags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert file path")

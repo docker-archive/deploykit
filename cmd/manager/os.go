@@ -21,11 +21,10 @@ const (
 )
 
 func getHome() string {
-	home := os.Getenv("HOME")
 	if usr, err := user.Current(); err == nil {
-		home = usr.HomeDir
+		return usr.HomeDir
 	}
-	return home
+	return os.Getenv("HOME")
 }
 
 func defaultLeaderFile() string {
@@ -44,9 +43,8 @@ func defaultStoreDir() string {
 
 func osEnvironment(backend *backend) *cobra.Command {
 
-	pollInterval := 5 * time.Second
-	filename := defaultLeaderFile()
-	storeDir := defaultStoreDir()
+	var pollInterval time.Duration
+	var filename, storeDir string
 
 	cmd := &cobra.Command{
 		Use:   "os",
@@ -74,8 +72,8 @@ func osEnvironment(backend *backend) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&filename, "leader-file", filename, "File used for leader election/detection")
-	cmd.Flags().StringVar(&storeDir, "store-dir", storeDir, "Dir to store the config")
-	cmd.Flags().DurationVar(&pollInterval, "poll-interval", pollInterval, "Leader polling interval")
+	cmd.Flags().StringVar(&filename, "leader-file", defaultLeaderFile(), "File used for leader election/detection")
+	cmd.Flags().StringVar(&storeDir, "store-dir", defaultStoreDir(), "Dir to store the config")
+	cmd.Flags().DurationVar(&pollInterval, "poll-interval", 5*time.Second, "Leader polling interval")
 	return cmd
 }

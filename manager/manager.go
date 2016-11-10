@@ -36,16 +36,14 @@ type manager struct {
 	stop     chan struct{}
 	running  chan struct{}
 
-	currentConfig GlobalSpec
-
 	backendName string
 	backendOps  chan<- backendOp
 }
 
 type backendOp struct {
-	n   string
-	f   func() error
-	err chan<- error
+	name      string
+	operation func() error
+	err       chan<- error
 }
 
 // NewManager returns the manager which depends on other services to coordinate and manage
@@ -68,26 +66,33 @@ func NewManager(plugins discovery.Plugins, leader leader.Detector, snapshot stor
 	return m, nil
 }
 
+// return true only if the current call caused an allocation of the running channel.
+func (m *manager) initRunning() bool {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.running != nil {
+		m.running = make(chan struct{})
+		return true
+	}
+	return false
+}
+
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.
 func (m *manager) Start() (<-chan struct{}, error) {
-	m.lock.Lock()
-	if m.running != nil {
-		m.lock.Unlock()
+
+	// initRunning guarantees that the m.running will be initialized the first time it's
+	// called.  If another call of Start is made after the first, don't do anything just return the references.
+	if !m.initRunning() {
 		return m.running, nil
 	}
 
 	leaderChan, err := m.leader.Start()
 	if err != nil {
-		m.lock.Unlock()
 		return nil, err
 	}
 
-	m.running = make(chan struct{})
 	m.stop = make(chan struct{})
-
-	// don't hold the lock forever.
-	m.lock.Unlock()
-
 	notify := make(chan bool)
 	stopWorkQueue := make(chan struct{})
 
@@ -104,7 +109,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 			case op := <-backendOps:
 				log.Debugln("Backend operation:", op)
 				if m.isLeader {
-					op.err <- op.f()
+					op.err <- op.operation()
 				} else {
 					op.err <- fmt.Errorf("not-a-leader")
 				}
@@ -192,6 +197,38 @@ func (m *manager) Stop() {
 	close(m.stop)
 }
 
+func (m *manager) getCurrentState() (GlobalSpec, error) {
+	// TODO(chungers) -- using the group plugin backend here isn't the general case.
+	// When plugin activation is implemented, it's possible to have multiple group plugins
+	// and the only way to reconstruct the GlobalSpec, which contains multiple groups of
+	// possibly different group plugin implementations, is to do an 'all-shard' query across
+	// all plugins of the type 'group' and then aggregate the results into the final GlobalSpec.
+	// For now this just uses the gross simplification of asking the group plugin that the manager
+	// proxies.
+
+	global := GlobalSpec{
+		Groups: map[group.ID]PluginSpec{},
+	}
+
+	specs, err := m.Plugin.InspectGroups()
+	if err != nil {
+		return global, err
+	}
+
+	for _, spec := range specs {
+		buff, err := json.MarshalIndent(spec, "  ", "  ")
+		if err != nil {
+			return global, err
+		}
+		raw := json.RawMessage(buff)
+		global.Groups[spec.ID] = PluginSpec{
+			Plugin:     m.backendName,
+			Properties: &raw,
+		}
+	}
+	return global, nil
+}
+
 func (m *manager) onAssumeLeadership() error {
 	log.Infoln("Assuming leadership")
 
@@ -209,24 +246,15 @@ func (m *manager) onAssumeLeadership() error {
 	if err != nil {
 		return err
 	}
-
-	m.lock.Lock()
-	m.currentConfig = config // make a copy
-	m.lock.Unlock()
-
 	return m.doWatchGroups(config)
 }
 
 func (m *manager) onLostLeadership() error {
 	log.Infoln("Lost leadership")
-
-	// Unwatch uses a cached version in memory.  This means that we are never able to
-	// unwatch without first watching.  If the manager crashes and comes back up again,
-	// there will be no possibility to unwatch existing groups.
-	m.lock.Lock()
-	config := m.currentConfig
-	m.lock.Unlock()
-
+	config, err := m.getCurrentState()
+	if err != nil {
+		return err
+	}
 	return m.doUnwatchGroups(config)
 }
 
@@ -245,11 +273,6 @@ func (m *manager) doCommit() error {
 	if err != nil {
 		return err
 	}
-
-	m.lock.Lock()
-	m.currentConfig = config // make a copy
-	m.lock.Unlock()
-
 	return m.doUpdateGroups(config)
 }
 
@@ -260,7 +283,7 @@ func (m *manager) doUpdateGroups(config GlobalSpec) error {
 			log.Infoln("UPDATE group", spec.ID, "with spec:", spec)
 			err := plugin.UpdateGroup(spec)
 
-			// TODO(chungers) -- yes this is clunky
+			// TODO(chungers) -- yes this is clunky comparing error text -- replace with typed error / code later.
 			if err != nil && strings.Contains(err.Error(), "not being watched") {
 
 				log.Infoln("UPDATE group", spec.ID, "changed to WATCH")
@@ -283,10 +306,11 @@ func (m *manager) doWatchGroups(config GlobalSpec) error {
 			log.Infoln("WATCH group", spec.ID, "with spec:", spec)
 			err := plugin.WatchGroup(spec)
 
-			// TODO(chungers) -- yes this is clunky
+			// TODO(chungers) -- yes this is clunky with string comparison of error text.
+			// Consider adding return code or error types for the Group SPI.
 			if err != nil && strings.Contains(err.Error(), "Already watching") {
 
-				log.Infoln("Already WATCHING", spec.ID, "no action")
+				log.Warningln("Already WATCHING", spec.ID, "no action")
 				return nil
 			}
 

@@ -86,7 +86,8 @@ perform the work of watching and updating:
 ## Running
 
 ```shell
-$ infrakit-manager -h
+$ make binaries
+$ build/infrakit-manager -h
 Manager
 
 Usage:
