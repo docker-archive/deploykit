@@ -71,7 +71,7 @@ func (m *manager) initRunning() bool {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if m.running != nil {
+	if m.running == nil {
 		m.running = make(chan struct{})
 		return true
 	}
@@ -86,6 +86,8 @@ func (m *manager) Start() (<-chan struct{}, error) {
 	if !m.initRunning() {
 		return m.running, nil
 	}
+
+	log.Infoln("Manager starting")
 
 	leaderChan, err := m.leader.Start()
 	if err != nil {
