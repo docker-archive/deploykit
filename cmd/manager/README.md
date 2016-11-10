@@ -128,3 +128,91 @@ On each Swarm manager node:
 $ infrakit-manager swarm --log 5
 ```
 will connect to Docker using defaulted Docker socket.
+
+
+## Example -- Running Locally
+
+You can use the `os` subcommand of the manager to run the manager in the local, os mode where a
+shared file is used to determine leadership.
+
+1. Start the plugins depending on which plugins you reference in your config.  Note that the
+usual Group plugin is renamed `group-stateless`.
+
+```shell
+$ make binaries
+$ build/infrakit-group-default --name group-stateless &
+$ build/infrakit-instance-file
+$ build/infrakit-flavor-vanilla
+```
+
+2. Use a local file for leadership.  For example - `/tmp/leader`
+
+```shell
+echo group > /tmp/leader
+```
+2. Start the manager with the name `group`
+
+```shell
+$ build/infrakit-manager os --log 5 --proxy-for-group group-stateless --leader-file /tmp/leader --name group
+DEBU[0000] Opening: /Users/myuser/.infrakit/plugins
+DEBU[0000] Discovered plugin at /Users/myuser/.infrakit/plugins/group-stateless
+DEBU[0000] Discovered plugin at /Users/myuser/.infrakit/plugins/infrakit-flavor-vanilla
+DEBU[0000] Discovered plugin at /Users/myuser/.infrakit/plugins/infrakit-instance-file
+INFO[0000] Starting up manager: &{group 0xc4202ce7e0 0xc4202e8810 0xc4202ce940 group-stateless}
+DEBU[0000] Opening: /Users/myuser/.infrakit/plugins
+DEBU[0000] Discovered plugin at /Users/myuser/.infrakit/plugins/group-stateless
+DEBU[0000] Discovered plugin at /Users/myuser/.infrakit/plugins/infrakit-flavor-vanilla
+DEBU[0000] Discovered plugin at /Users/myuser/.infrakit/plugins/infrakit-instance-file
+INFO[0000] Manager starting
+INFO[0000] Listening at: /Users/myuser/.infrakit/plugins/group
+DEBU[0005] ID (group) - checked /tmp/leader for leadership: group, err=<nil>, leader=true
+DEBU[0005] leader: true
+INFO[0005] Assuming leadership
+INFO[0005] Loaded snapshot. err= <nil>
+INFO[0005] Start watching groups
+DEBU[0005] Opening: /Users/myuser/.infrakit/plugins
+DEBU[0005] Discovered plugin at /Users/myuser/.infrakit/plugins/group
+DEBU[0005] Discovered plugin at /Users/myuser/.infrakit/plugins/group-stateless
+DEBU[0005] Discovered plugin at /Users/myuser/.infrakit/plugins/infrakit-flavor-vanilla
+DEBU[0005] Discovered plugin at /Users/myuser/.infrakit/plugins/infrakit-instance-file
+INFO[0005] Processing group managers with plugin group-stateless
+DEBU[0005] exec on group managers plugin= group-stateless
+INFO[0005] WATCH group managers with spec: {managers 0xc420122600}
+INFO[0005] Processing group workers with plugin group-stateless
+DEBU[0005] exec on group workers plugin= group-stateless
+INFO[0005] WATCH group workers with spec: {workers 0xc420122a60}
+DEBU[0010] ID (group) - checked /tmp/leader for leadership: group, err=<nil>, leader=true
+DEBU[0015] ID (group) - checked /tmp/leader for leadership: group, err=<nil>, leader=true
+DEBU[0020] ID (group) - checked /tmp/leader for leadership: group, err=<nil>, leader=true
+DEBU[0025] ID (group) - checked /tmp/leader for leadership: group, err=<nil>, leader=true
+DEBU[0030] ID (group) - checked /tmp/leader for leadership: group, err=<nil>, leader=true
+
+```
+
+You should see that the current instance is detecting that it's the leader, since `$(cat /tmp/leader) == 'group'`.
+You can change the leadership by changing the content of the file `/tmp/leader`:
+
+```shell
+$ echo group2 > /tmp/leader
+```
+
+You should see the instance detecting its non-leader status and will unwatch groups if any.
+
+```shell
+DEBU[0150] leader: false
+INFO[0150] Lost leadership
+INFO[0150] Unwatching groups
+DEBU[0150] Opening: /Users/myuser/.infrakit/plugins
+DEBU[0150] Discovered plugin at /Users/myuser/.infrakit/plugins/group
+DEBU[0150] Discovered plugin at /Users/myuser/.infrakit/plugins/group-stateless
+DEBU[0150] Discovered plugin at /Users/myuser/.infrakit/plugins/infrakit-flavor-vanilla
+DEBU[0150] Discovered plugin at /Users/myuser/.infrakit/plugins/infrakit-instance-file
+INFO[0150] Processing group managers with plugin group-stateless
+DEBU[0150] exec on group managers plugin= group-stateless
+INFO[0150] UNWATCH group managers with spec: {managers 0xc420123580}
+INFO[0150] Processing group workers with plugin group-stateless
+DEBU[0150] exec on group workers plugin= group-stateless
+INFO[0150] UNWATCH group workers with spec: {workers 0xc4200cb880}
+DEBU[0155] ID (group) - checked /tmp/leader for leadership: group2, err=<nil>, leader=false
+DEBU[0160] ID (group) - checked /tmp/leader for leadership: group2, err=<nil>, leader=false
+```

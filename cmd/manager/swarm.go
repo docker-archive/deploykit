@@ -44,7 +44,8 @@ func swarmEnvironment(backend *backend) *cobra.Command {
 			backend.plugins = plugins
 			backend.leader = leader
 			backend.snapshot = snapshot
-			return nil
+
+			return runMain(backend)
 		},
 	}
 

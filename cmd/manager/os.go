@@ -69,7 +69,8 @@ func osEnvironment(backend *backend) *cobra.Command {
 			backend.plugins = plugins
 			backend.leader = leader
 			backend.snapshot = snapshot
-			return nil
+
+			return runMain(backend)
 		},
 	}
 	cmd.Flags().StringVar(&filename, "leader-file", defaultLeaderFile(), "File used for leader election/detection")

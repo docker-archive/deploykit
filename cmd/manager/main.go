@@ -34,9 +34,6 @@ func main() {
 		PersistentPreRun: func(c *cobra.Command, args []string) {
 			cli.SetLogLevel(logLevel)
 		},
-		PersistentPostRunE: func(c *cobra.Command, args []string) error {
-			return runMain(backend)
-		},
 	}
 	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.PersistentFlags().StringVar(&backend.id, "name", "group", "Name of the manager")
@@ -69,16 +66,15 @@ func runMain(backend *backend) error {
 	_, stopped, err := rpc.StartPluginAtPath(
 		filepath.Join(discovery.Dir(), backend.id),
 		group_rpc.PluginServer(manager),
-		func() error {
-			log.Infoln("Stopping manager")
-			manager.Stop()
-			return nil
-		},
 	)
 	if err != nil {
 		return err
 	}
 
 	<-stopped // block until done
+
+	manager.Stop()
+	log.Infoln("Manager stopped")
+
 	return err
 }
