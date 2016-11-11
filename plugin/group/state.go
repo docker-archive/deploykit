@@ -14,6 +14,8 @@ import (
 type Supervisor interface {
 	util.RunStop
 
+	Size() uint
+
 	PlanUpdate(scaled Scaled, settings groupSettings, newSettings groupSettings) (updatePlan, error)
 }
 
@@ -38,11 +40,21 @@ func (c *groupContext) setUpdate(plan updatePlan) {
 	c.update = plan
 }
 
-func (c *groupContext) getUpdate() updatePlan {
+func (c *groupContext) updating() bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	return c.update
+	return c.update != nil
+}
+
+func (c *groupContext) stopUpdating() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.update != nil {
+		c.update.Stop()
+		c.update = nil
+	}
 }
 
 func (c *groupContext) changeSettings(settings groupSettings) {

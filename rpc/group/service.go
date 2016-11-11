@@ -14,19 +14,19 @@ type Group struct {
 	plugin group.Plugin
 }
 
-// WatchGroup is the rpc method to watch a group
-func (p *Group) WatchGroup(req *WatchGroupRequest, resp *WatchGroupResponse) error {
-	err := p.plugin.WatchGroup(req.Spec)
+// CommitGroup is the rpc method to commit a group
+func (p *Group) CommitGroup(req *CommitGroupRequest, resp *CommitGroupResponse) error {
+	details, err := p.plugin.CommitGroup(req.Spec, req.Pretend)
 	if err != nil {
 		return err
 	}
-	resp.OK = true
+	resp.Details = details
 	return nil
 }
 
-// UnwatchGroup is the rpc method to unwatch a group
-func (p *Group) UnwatchGroup(req *UnwatchGroupRequest, resp *UnwatchGroupResponse) error {
-	err := p.plugin.UnwatchGroup(req.ID)
+// ReleaseGroup is the rpc method to release a group
+func (p *Group) ReleaseGroup(req *ReleaseGroupRequest, resp *ReleaseGroupResponse) error {
+	err := p.plugin.ReleaseGroup(req.ID)
 	if err != nil {
 		return err
 	}
@@ -41,36 +41,6 @@ func (p *Group) DescribeGroup(req *DescribeGroupRequest, resp *DescribeGroupResp
 		return err
 	}
 	resp.Description = desc
-	return nil
-}
-
-// DescribeUpdate is the rpc method to describe an update without performing it
-func (p *Group) DescribeUpdate(req *DescribeUpdateRequest, resp *DescribeUpdateResponse) error {
-	plan, err := p.plugin.DescribeUpdate(req.Spec)
-	if err != nil {
-		return err
-	}
-	resp.Plan = plan
-	return nil
-}
-
-// UpdateGroup is the rpc method to actually updating a group
-func (p *Group) UpdateGroup(req *UpdateGroupRequest, resp *UpdateGroupResponse) error {
-	err := p.plugin.UpdateGroup(req.Spec)
-	if err != nil {
-		return err
-	}
-	resp.OK = true
-	return nil
-}
-
-// StopUpdate is the rpc method to stop a current update
-func (p *Group) StopUpdate(req *StopUpdateRequest, resp *StopUpdateResponse) error {
-	err := p.plugin.StopUpdate(req.ID)
-	if err != nil {
-		return err
-	}
-	resp.OK = true
 	return nil
 }
 

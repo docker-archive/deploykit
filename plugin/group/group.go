@@ -45,6 +45,168 @@ type plugin struct {
 	groups          groups
 }
 
+func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	settings, err := p.validate(config)
+	if err != nil {
+		return "", err
+	}
+
+	log.Infof("Committing group %s (pretend=%t)", config.ID, pretend)
+
+	context, exists := p.groups.get(config.ID)
+	if exists {
+		if !pretend {
+			// Halt the existing update to prevent interference.
+			context.stopUpdating()
+		}
+
+		// TODO(wfarner): Change the updater behaviors to handle creating a group from scratch.  This should
+		// not be much work, and will make this routine easier to follow.
+
+		// TODO(wfarner): Don't hold the lock - this is a blocking operation.
+		updatePlan, err := context.supervisor.PlanUpdate(context.scaled, context.settings, settings)
+		if err != nil {
+			return updatePlan.Explain(), err
+		}
+
+		if !pretend {
+			context.setUpdate(updatePlan)
+			context.changeSettings(settings)
+			go func() {
+				log.Infof("Executing update plan for '%s': %s", config.ID, updatePlan.Explain())
+				if err := updatePlan.Run(p.pollInterval); err != nil {
+					log.Errorf("Update to %s failed: %s", config.ID, err)
+				} else {
+					log.Infof("Group %s has converged", config.ID)
+				}
+				context.setUpdate(nil)
+			}()
+		}
+
+		return updatePlan.Explain(), nil
+	}
+
+	scaled := &scaledGroup{
+		settings:   settings,
+		memberTags: map[string]string{groupTag: string(config.ID)},
+	}
+
+	var supervisor Supervisor
+	if settings.config.Allocation.Size != 0 {
+		supervisor = NewScalingGroup(scaled, settings.config.Allocation.Size, p.pollInterval)
+	} else if len(settings.config.Allocation.LogicalIDs) > 0 {
+		supervisor = NewQuorum(scaled, settings.config.Allocation.LogicalIDs, p.pollInterval)
+	} else {
+		panic("Invalid empty allocation method")
+	}
+
+	p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
+
+	if !pretend {
+		go supervisor.Run()
+	}
+
+	return fmt.Sprintf("Managing %d instances", supervisor.Size()), nil
+}
+
+func (p *plugin) doRelease(id group.ID) (*groupContext, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	grp, exists := p.groups.get(id)
+	if !exists {
+		return nil, fmt.Errorf("Group '%s' is not being watched", id)
+	}
+
+	grp.stopUpdating()
+	grp.supervisor.Stop()
+	p.groups.del(id)
+
+	log.Infof("Ignored group '%s'", id)
+	return grp, nil
+}
+
+func (p *plugin) ReleaseGroup(id group.ID) error {
+	_, err := p.doRelease(id)
+	return err
+}
+
+func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	// TODO(wfarner): Include details about any in-flight updates.
+
+	context, exists := p.groups.get(id)
+	if !exists {
+		return group.Description{}, fmt.Errorf("Group '%s' is not being watched", id)
+	}
+
+	instances, err := context.scaled.List()
+	if err != nil {
+		return group.Description{}, err
+	}
+
+	return group.Description{Instances: instances, Converged: !context.updating()}, nil
+}
+
+func (p *plugin) DestroyGroup(gid group.ID) error {
+	context, err := p.doRelease(gid)
+
+	if context != nil {
+		descriptions, err := context.scaled.List()
+		if err != nil {
+			return err
+		}
+
+		for _, desc := range descriptions {
+			context.scaled.Destroy(desc)
+		}
+	}
+
+	return err
+}
+
+func (p *plugin) InspectGroups() ([]group.Spec, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	var specs []group.Spec
+	err := p.groups.forEach(func(id group.ID, ctx *groupContext) error {
+		if ctx != nil {
+			spec, err := types.UnparseProperties(string(id), ctx.settings.config)
+			if err != nil {
+				return err
+			}
+			specs = append(specs, spec)
+		}
+		return nil
+	})
+	return specs, err
+}
+
+type updatePlan interface {
+	Explain() string
+	Run(pollInterval time.Duration) error
+	Stop()
+}
+
+type noopUpdate struct {
+}
+
+func (n noopUpdate) Explain() string {
+	return "Noop"
+}
+
+func (n noopUpdate) Run(_ time.Duration) error {
+	return nil
+}
+
+func (n noopUpdate) Stop() {
+}
+
 func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 
 	noSettings := groupSettings{}
@@ -92,221 +254,4 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 		flavorPlugin:   flavorPlugin,
 		config:         parsed,
 	}, nil
-}
-
-func (p *plugin) WatchGroup(config group.Spec) error {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	settings, err := p.validate(config)
-	if err != nil {
-		return err
-	}
-
-	// Two sets of instance tags are used - one for defining membership within the group, and another used to tag
-	// newly-created instances.  This allows the scaler to collect and report members of a group which have
-	// membership tags but different generation-specific tags.  In practice, we use this the additional tags to
-	// attach a config SHA to instances for config change detection.
-	scaled := &scaledGroup{
-		settings:   settings,
-		memberTags: map[string]string{groupTag: string(config.ID)},
-	}
-	scaled.changeSettings(settings)
-
-	var supervisor Supervisor
-	if settings.config.Allocation.Size != 0 {
-		supervisor = NewScalingGroup(scaled, settings.config.Allocation.Size, p.pollInterval)
-	} else if len(settings.config.Allocation.LogicalIDs) > 0 {
-		supervisor = NewQuorum(scaled, settings.config.Allocation.LogicalIDs, p.pollInterval)
-	} else {
-		panic("Invalid empty allocation method")
-	}
-
-	if _, exists := p.groups.get(config.ID); exists {
-		return fmt.Errorf("Already watching group '%s'", config.ID)
-	}
-
-	p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
-
-	go supervisor.Run()
-	log.Infof("Watching group '%v'", config.ID)
-
-	return nil
-}
-
-func (p *plugin) UnwatchGroup(id group.ID) error {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	grp, exists := p.groups.get(id)
-	if !exists {
-		return fmt.Errorf("Group '%s' is not being watched", id)
-	}
-
-	grp.supervisor.Stop()
-
-	p.groups.del(id)
-	log.Infof("Stopped watching group '%s'", id)
-	return nil
-}
-
-func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	context, exists := p.groups.get(id)
-	if !exists {
-		return group.Description{}, fmt.Errorf("Group '%s' is not being watched", id)
-	}
-
-	instances, err := context.scaled.List()
-	if err != nil {
-		return group.Description{}, err
-	}
-
-	return group.Description{Instances: instances}, nil
-}
-
-type updatePlan interface {
-	Explain() string
-	Run(pollInterval time.Duration) error
-	Stop()
-}
-
-type noopUpdate struct {
-}
-
-func (n noopUpdate) Explain() string {
-	return "Noop"
-}
-
-func (n noopUpdate) Run(_ time.Duration) error {
-	return nil
-}
-
-func (n noopUpdate) Stop() {
-}
-
-func (p *plugin) planUpdate(id group.ID, updatedSettings groupSettings) (updatePlan, error) {
-
-	context, exists := p.groups.get(id)
-	if !exists {
-		return nil, fmt.Errorf("Group '%s' is not being watched", id)
-	}
-
-	return context.supervisor.PlanUpdate(context.scaled, context.settings, updatedSettings)
-}
-
-func (p *plugin) DescribeUpdate(updated group.Spec) (string, error) {
-	updatedSettings, err := p.validate(updated)
-	if err != nil {
-		return "", err
-	}
-
-	plan, err := p.planUpdate(updated.ID, updatedSettings)
-	if err != nil {
-		return "", err
-	}
-
-	return plan.Explain(), nil
-}
-
-func (p *plugin) initiateUpdate(id group.ID, updatedSettings groupSettings) (*groupContext, updatePlan, error) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	plan, err := p.planUpdate(id, updatedSettings)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	grp, _ := p.groups.get(id)
-	if grp.getUpdate() != nil {
-		return nil, nil, errors.New("Update already in progress for this group")
-	}
-
-	grp.setUpdate(plan)
-	grp.changeSettings(updatedSettings)
-	log.Infof("Executing update plan for '%s': %s", id, plan.Explain())
-	return grp, plan, nil
-}
-
-func (p *plugin) UpdateGroup(updated group.Spec) error {
-	updatedSettings, err := p.validate(updated)
-	if err != nil {
-		return err
-	}
-
-	grp, plan, err := p.initiateUpdate(updated.ID, updatedSettings)
-	if err != nil {
-		return err
-	}
-
-	err = plan.Run(p.pollInterval)
-	grp.setUpdate(nil)
-	log.Infof("Finished updating group %s", updated.ID)
-	return err
-}
-
-func (p *plugin) StopUpdate(gid group.ID) error {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	grp, exists := p.groups.get(gid)
-	if !exists {
-		return fmt.Errorf("Group '%s' is not being watched", gid)
-	}
-	update := grp.getUpdate()
-	if update == nil {
-		return fmt.Errorf("Group '%s' is not being updated", gid)
-	}
-
-	log.Infof("Stopping update for group %s", gid)
-	grp.setUpdate(nil)
-	update.Stop()
-
-	return nil
-}
-
-func (p *plugin) DestroyGroup(gid group.ID) error {
-	p.lock.Lock()
-
-	context, exists := p.groups.get(gid)
-	if !exists {
-		p.lock.Unlock()
-		return fmt.Errorf("Group '%s' is not being watched", gid)
-	}
-
-	// The lock is released before performing blocking operations.
-	p.groups.del(gid)
-	p.lock.Unlock()
-
-	context.supervisor.Stop()
-	descriptions, err := context.scaled.List()
-	if err != nil {
-		return err
-	}
-
-	for _, desc := range descriptions {
-		context.scaled.Destroy(desc)
-	}
-
-	return nil
-}
-
-func (p *plugin) InspectGroups() ([]group.Spec, error) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	var specs []group.Spec
-	err := p.groups.forEach(func(id group.ID, ctx *groupContext) error {
-		if ctx != nil {
-			spec, err := types.UnparseProperties(string(id), ctx.settings.config)
-			if err != nil {
-				return err
-			}
-			specs = append(specs, spec)
-		}
-		return nil
-	})
-	return specs, err
 }

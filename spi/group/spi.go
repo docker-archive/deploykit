@@ -7,17 +7,11 @@ import (
 
 // Plugin defines the functions for a Group plugin.
 type Plugin interface {
-	WatchGroup(grp Spec) error
+	CommitGroup(grp Spec, pretend bool) (string, error)
 
-	UnwatchGroup(id ID) error
+	ReleaseGroup(id ID) error
 
 	DescribeGroup(id ID) (Description, error)
-
-	DescribeUpdate(updated Spec) (string, error)
-
-	UpdateGroup(updated Spec) error
-
-	StopUpdate(id ID) error
 
 	DestroyGroup(id ID) error
 
@@ -43,4 +37,5 @@ type Spec struct {
 // Description is a placeholder for the reported state of a Group.
 type Description struct {
 	Instances []instance.Description
+	Converged bool
 }

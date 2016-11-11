@@ -101,21 +101,7 @@ func TestInvalidGroupCalls(t *testing.T) {
 	require.Error(t, grp.DestroyGroup(id))
 	_, err := grp.DescribeGroup(id)
 	require.Error(t, err)
-	require.Error(t, grp.UnwatchGroup(id))
-	require.Error(t, grp.StopUpdate(id))
-
-	_, err = grp.DescribeUpdate(minions)
-	require.Error(t, err)
-	require.Error(t, grp.UpdateGroup(minions))
-}
-
-func instanceProperties(config group.Spec) json.RawMessage {
-	spec := types.Spec{}
-	err := json.Unmarshal(*config.Properties, &spec)
-	if err != nil {
-		panic(err)
-	}
-	return *spec.Instance.Properties
+	require.Error(t, grp.ReleaseGroup(id))
 }
 
 func memberTags(id group.ID) map[string]string {
@@ -151,13 +137,15 @@ func TestNoopUpdate(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
-	desc, err := grp.DescribeUpdate(minions)
+	desc, err := grp.CommitGroup(minions, true)
 	require.NoError(t, err)
 	require.Equal(t, "Noop", desc)
 
-	require.NoError(t, grp.UpdateGroup(minions))
+	_, err = grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	instances, err := plugin.DescribeInstances(memberTags(minions.ID))
 	require.NoError(t, err)
@@ -166,7 +154,18 @@ func TestNoopUpdate(t *testing.T) {
 		require.Equal(t, newFakeInstance(minions, nil).Tags, i.Tags)
 	}
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
+}
+
+func awaitGroupConvergence(t *testing.T, grp group.Plugin) {
+	for {
+		desc, err := grp.DescribeGroup(id)
+		require.NoError(t, err)
+		if desc.Converged {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 func TestRollingUpdate(t *testing.T) {
@@ -191,15 +190,20 @@ func TestRollingUpdate(t *testing.T) {
 	}
 
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond)
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "flavor2")}
 
-	desc, err := grp.DescribeUpdate(updated)
+	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
-	require.Equal(t, "Performs a rolling update on 3 instances", desc)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	require.NoError(t, grp.UpdateGroup(updated))
+	desc, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	awaitGroupConvergence(t, grp)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
 	require.NoError(t, err)
@@ -208,7 +212,7 @@ func TestRollingUpdate(t *testing.T) {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
 func TestRollAndAdjustScale(t *testing.T) {
@@ -219,18 +223,22 @@ func TestRollAndAdjustScale(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: minionProperties(8, "data2", "flavor2")}
 
-	desc, err := grp.DescribeUpdate(updated)
+	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		"Performs a rolling update on 3 instances, then adds 5 instances to increase the group size to 8",
+		"Performing a rolling update on 3 instances, then adding 5 instances to increase the group size to 8",
 		desc)
 
-	require.NoError(t, grp.UpdateGroup(updated))
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+
+	awaitGroupConvergence(t, grp)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
 	require.NoError(t, err)
@@ -242,7 +250,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
 func TestScaleIncrease(t *testing.T) {
@@ -253,15 +261,17 @@ func TestScaleIncrease(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: minionProperties(8, "data", "init")}
 
-	desc, err := grp.DescribeUpdate(updated)
+	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
-	require.Equal(t, "Adds 5 instances to increase the group size to 8", desc)
+	require.Equal(t, "Adding 5 instances to increase the group size to 8", desc)
 
-	require.NoError(t, grp.UpdateGroup(updated))
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
 	require.NoError(t, err)
@@ -273,7 +283,7 @@ func TestScaleIncrease(t *testing.T) {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
 func TestScaleDecrease(t *testing.T) {
@@ -284,15 +294,17 @@ func TestScaleDecrease(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: minionProperties(1, "data", "init")}
 
-	desc, err := grp.DescribeUpdate(updated)
+	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
-	require.Equal(t, "Terminates 2 instances to reduce the group size to 1", desc)
+	require.Equal(t, "Terminating 2 instances to reduce the group size to 1", desc)
 
-	require.NoError(t, grp.UpdateGroup(updated))
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
 	require.NoError(t, err)
@@ -304,10 +316,10 @@ func TestScaleDecrease(t *testing.T) {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
-func TestUnwatchGroup(t *testing.T) {
+func TestReleaseGroup(t *testing.T) {
 	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
@@ -315,8 +327,10 @@ func TestUnwatchGroup(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
-	require.NoError(t, grp.UnwatchGroup(id))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
+
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
 func TestDestroyGroup(t *testing.T) {
@@ -327,7 +341,9 @@ func TestDestroyGroup(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
+
 	require.NoError(t, grp.DestroyGroup(minions.ID))
 
 	instances, err := plugin.DescribeInstances(memberTags(minions.ID))
@@ -343,17 +359,21 @@ func TestSuperviseQuorum(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(leaders))
+	_, err := grp.CommitGroup(leaders, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: leaderProperties(leaderIDs, "data2")}
 
 	time.Sleep(1 * time.Second)
 
-	desc, err := grp.DescribeUpdate(updated)
+	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
-	require.Equal(t, "Performs a rolling update on 3 instances", desc)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	require.NoError(t, grp.UpdateGroup(updated))
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+
+	awaitGroupConvergence(t, grp)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
 	require.NoError(t, err)
@@ -364,7 +384,7 @@ func TestSuperviseQuorum(t *testing.T) {
 
 	// TODO(wfarner): Validate logical IDs in created instances.
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
 func TestUpdateCompletes(t *testing.T) {
@@ -373,15 +393,18 @@ func TestUpdateCompletes(t *testing.T) {
 	plugin := newTestInstancePlugin()
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: minionProperties(8, "data", "init")}
-	require.NoError(t, grp.UpdateGroup(updated))
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
 
 	updated = group.Spec{ID: id, Properties: minionProperties(5, "data", "init")}
-	require.NoError(t, grp.UpdateGroup(updated))
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
 func TestInstanceAndFlavorChange(t *testing.T) {
@@ -394,16 +417,20 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "updated init")}
 
-	desc, err := grp.DescribeUpdate(updated)
+	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
 
-	require.Equal(t, "Performs a rolling update on 3 instances", desc)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	require.NoError(t, grp.UpdateGroup(updated))
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+
+	awaitGroupConvergence(t, grp)
 
 	for _, inst := range plugin.instancesCopy() {
 		require.Equal(t, "updated init", inst.Init)
@@ -414,7 +441,7 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 		require.Equal(t, "data2", properties["OpaqueValue"])
 	}
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
 func TestFlavorChange(t *testing.T) {
@@ -427,19 +454,22 @@ func TestFlavorChange(t *testing.T) {
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "updated init")}
 
-	desc, err := grp.DescribeUpdate(updated)
+	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
 
-	require.Equal(t, "Performs a rolling update on 3 instances", desc)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
-func TestStopUpdate(t *testing.T) {
+func TestReleaseGroupWhileConverging(t *testing.T) {
+
+	// Ensures that the group can be ignored while a commit is converging.
 
 	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
@@ -470,24 +500,23 @@ func TestStopUpdate(t *testing.T) {
 
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
+
+	awaitGroupConvergence(t, grp)
 
 	// Since we expect only a single write to healthChecksStarted, it's important to use only one instance here.
 	// This prevents flaky behavior where another health check is performed before StopUpdate() is called, leading
 	// to a deadlock.
 	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "flavor2")}
 
-	go func() {
-		err := grp.UpdateGroup(updated)
-		require.Error(t, err)
-		require.Equal(t, "Update halted by user", err.Error())
-	}()
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
 
 	// Wait for the first health check to ensure the update has begun.
 	<-healthChecksStarted
 
-	require.NoError(t, grp.StopUpdate(id))
-	require.NoError(t, grp.UnwatchGroup(id))
+	require.NoError(t, grp.ReleaseGroup(id))
 }
 
 func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
@@ -512,13 +541,24 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond)
 
-	require.NoError(t, grp.WatchGroup(minions))
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
 
 	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "bad update")}
 
-	err := grp.UpdateGroup(updated)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unhealthy")
+	_, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
 
-	require.NoError(t, grp.UnwatchGroup(id))
+	awaitGroupConvergence(t, grp)
+
+	// Only one instance should exist in the new configuration.
+	badUpdateInstanaces := 0
+	for _, inst := range plugin.instancesCopy() {
+		if inst.Init == "bad update" {
+			badUpdateInstanaces++
+		}
+	}
+
+	require.Equal(t, 1, badUpdateInstanaces)
+	require.NoError(t, grp.ReleaseGroup(id))
 }

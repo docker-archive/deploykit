@@ -65,7 +65,7 @@ fetched from.  In this case, we are pointing at the yet-to-be-created Swarm mana
 Next, create the [manager node](swarm-vagrant-manager.json) and initialize the cluster:
 
 ```shell
-$ build/infrakit group watch example/flavor/swarm/swarm-vagrant-manager.json
+$ build/infrakit group commit example/flavor/swarm/swarm-vagrant-manager.json
 ```
 
 Once the first node has been successfully created, confirm that the Swarm was initialized:
@@ -77,7 +77,7 @@ exid5ftbv15pgqkfzastnpw9n *  infrakit  Ready   Active        Leader
  
 Now the [worker group](swarm-vagrant-workers.json) may be created:
 ```shell
-$ build/infrakit group watch example/flavor/swarm/swarm-vagrant-workers.json
+$ build/infrakit group commit example/flavor/swarm/swarm-vagrant-workers.json
 ```
 
 Once completed, the cluster contains two nodes:

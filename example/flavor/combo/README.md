@@ -57,10 +57,10 @@ $ build/infrakit-flavor-combo
 INFO[0000] Listening at: ~/.infrakit/plugins/flavor-combo
 ```
 
-Using the [example](example.json) configuration, start watching a group:
+Using the [example](example.json) configuration, commit a group:
 ```shell
-$ build/infrakit group watch example/flavor/combo/example.json
-watching combo
+$ build/infrakit group commit example/flavor/combo/example.json
+Committed combo
 ```
 
 You will notice that the configuration is somewhat nonsensical, as the result could have been achieved without

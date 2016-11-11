@@ -46,10 +46,8 @@ for converging towards, and maintaining, that desired state.
 Therefore, a [group plugin](spi/group/spi.go) manages Groups of Instances and exposes the operations that are of
 interest to a user:
 
-  + watch/ unwatch a group (start / stop managing a group)
+  + commit a group configuration, to start managing a group
   + inspect a group
-  + trigger an update the configuration of a group - like changing its size or underlying properties of instances. 
-  + stop an update
   + destroy a group
 
 ##### Default Group plugin

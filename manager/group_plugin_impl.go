@@ -41,6 +41,7 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	stored := GlobalSpec{}
 
 	err := m.snapshot.Load(&stored)
+	// TODO: More robust (type-based) error handling.
 	if err != nil && err.Error() != "not-found" {
 		return err
 	}
@@ -64,34 +65,21 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	return m.snapshot.Save(stored)
 }
 
-func (m *manager) WatchGroup(grp group.Spec) error {
+func (m *manager) CommitGroup(grp group.Spec, pretend bool) (string, error) {
 	err := make(chan error)
 	m.backendOps <- backendOp{
 		name: "watch",
 		operation: func() error {
 			log.Debugln("Proxy WatchGroup:", grp)
-			if err := m.updateConfig(grp); err != nil {
-				return err
+			if !pretend {
+				if err := m.updateConfig(grp); err != nil {
+					return err
+				}
 			}
-			return m.Plugin.WatchGroup(grp)
+			_, err := m.Plugin.CommitGroup(grp, pretend)
+			return err
 		},
 		err: err,
 	}
-	return <-err
-}
-
-func (m *manager) UpdateGroup(updated group.Spec) error {
-	err := make(chan error)
-	m.backendOps <- backendOp{
-		name: "update",
-		operation: func() error {
-			log.Debugln("Proxy UpdateGroup:", updated)
-			if err := m.updateConfig(updated); err != nil {
-				return err
-			}
-			return m.Plugin.UpdateGroup(updated)
-		},
-		err: err,
-	}
-	return <-err
+	return "TODO(chungers): Allow the commit details string to be plumbed through", <-err
 }

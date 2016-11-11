@@ -46,39 +46,45 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
 
-	cmd.AddCommand(&cobra.Command{
-		Use:   "watch <group configuration>",
-		Short: "watch a group",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", groupPlugin)
+	commit := cobra.Command{
+		Use:   "commit <group configuration>",
+		Short: "commit a group configuration",
+	}
+	pretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
+	commit.RunE = func(cmd *cobra.Command, args []string) error {
+		assertNotNil("no plugin", groupPlugin)
 
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
 
-			buff, err := ioutil.ReadFile(args[0])
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
+		buff, err := ioutil.ReadFile(args[0])
+		if err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
 
-			spec := group.Spec{}
-			if err := json.Unmarshal(buff, &spec); err != nil {
-				return err
-			}
-
-			err = groupPlugin.WatchGroup(spec)
-			if err == nil {
-				fmt.Println("watching", spec.ID)
-			}
+		spec := group.Spec{}
+		if err := json.Unmarshal(buff, &spec); err != nil {
 			return err
-		},
-	})
+		}
+
+		details, err := groupPlugin.CommitGroup(spec, *pretend)
+		if err == nil {
+			if *pretend {
+				fmt.Printf("Committing %s would involve: %s\n", spec.ID, details)
+			} else {
+				fmt.Printf("Committed %s: %s\n", spec.ID, details)
+			}
+		}
+		return err
+	}
+	cmd.AddCommand(&commit)
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "unwatch <group ID>",
-		Short: "unwatch a group",
+		Use:   "release <group ID>",
+		Short: "release a group from active monitoring, nondestructive",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
@@ -88,10 +94,9 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			groupID := group.ID(args[0])
-			err := groupPlugin.UnwatchGroup(groupID)
-
+			err := groupPlugin.ReleaseGroup(groupID)
 			if err == nil {
-				fmt.Println("unwatched", groupID)
+				fmt.Println("Released", groupID)
 			}
 			return err
 		},
@@ -167,88 +172,6 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				}
 
 				return fmt.Errorf("Group %s is not being watched", groupID)
-			}
-			return err
-		},
-	})
-
-	cmd.AddCommand(&cobra.Command{
-		Use:   "describe-update <group configuration file>",
-		Short: "describe the steps to perform an update",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", groupPlugin)
-
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			buff, err := ioutil.ReadFile(args[0])
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			spec := group.Spec{}
-			if err := json.Unmarshal(buff, &spec); err != nil {
-				return err
-			}
-
-			desc, err := groupPlugin.DescribeUpdate(spec)
-			if err == nil {
-				fmt.Println(desc)
-			}
-			return err
-		},
-	})
-
-	cmd.AddCommand(&cobra.Command{
-		Use:   "update [group configuration]",
-		Short: "update a group",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", groupPlugin)
-
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			buff, err := ioutil.ReadFile(args[0])
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			spec := group.Spec{}
-			if err := json.Unmarshal(buff, &spec); err != nil {
-				return err
-			}
-
-			// TODO - make this not block, but how to get status?
-			err = groupPlugin.UpdateGroup(spec)
-			if err == nil {
-				fmt.Println("update", spec.ID, "completed")
-			}
-			return err
-		},
-	})
-
-	cmd.AddCommand(&cobra.Command{
-		Use:   "stop-update <group ID>",
-		Short: "stop updating a group",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", groupPlugin)
-
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			groupID := group.ID(args[0])
-			err := groupPlugin.StopUpdate(groupID)
-
-			if err == nil {
-				fmt.Println("update", groupID, "stopped")
 			}
 			return err
 		},
