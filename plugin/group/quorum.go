@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+// TODO(wfarner): Converge this implementation with scaler.go, they share a lot of behavior.
+
 type quorum struct {
 	scaled       Scaled
 	LogicalIDs   []instance.LogicalID
@@ -35,7 +37,7 @@ func (q *quorum) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 
 	return &rollingupdate{
 		desc: fmt.Sprintf(
-			"Performs a rolling update on %d instances",
+			"Performing a rolling update on %d instances",
 			len(settings.config.Allocation.LogicalIDs)),
 		scaled:     scaled,
 		updatingTo: newSettings,
@@ -61,6 +63,10 @@ func (q *quorum) Run() {
 			return
 		}
 	}
+}
+
+func (q *quorum) Size() uint {
+	return uint(len(q.LogicalIDs))
 }
 
 func (q *quorum) converge() {

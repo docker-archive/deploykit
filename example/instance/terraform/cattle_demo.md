@@ -74,13 +74,13 @@ $ build/infrakit instance --name=instance-terraform describe
 ID                                                LOGICAL                               TAGS
 # no instances
 ```
-## 4.  Start watching!
+## 4. Commit the group
 
-Using the JSON we showed above, start watching this group:
+Using the JSON we showed above, commit the group:
 
 ```shell
-$ build/infrakit group watch example/instance/terraform/aws-two-tier/group.json
-watching terraform_demo
+$ build/infrakit group commit example/instance/terraform/aws-two-tier/group.json
+Committed terraform_demo
 ```
 The group plugin starts to create new instances to match the specification.
 In the AWS console using `infrakit-terraform-demo` as tag filter, we find 
@@ -100,22 +100,23 @@ instance-1475601636               -                             Name=instance-14
 ## 6. Update the config
 Let's change the size to 8 and the instance type to `t2.nano`.  
 
-Before we run we can check to see what will be done:
+Before committing, let's use the `--pretend` flag to double-check what will happen:
 
 ```shell
-$ build/infrakit group describe-update example/instance/terraform/aws-two-tier/group.json
-terraform_demo : Performs a rolling update on 5 instances, then adds 3 instances to increase the group size to 8
+$ build/infrakit group commit example/instance/terraform/aws-two-tier/group.json --pretend
+Committing terraform_demo will involve: Performing a rolling update on 5 instances, then adding 3 instances to increase the group size to 8
 ```
 
 Looks good.  Let's commit:
 
 ```shell
-$ build/infrakit group update example/instance/terraform/aws-two-tier/group.json
-update terraform_demo completed
+$ build/infrakit group commit example/instance/terraform/aws-two-tier/group.json
+Committed terraform_demo
 ```
 
 ## 7. Check on the group:
 
+The commit will proceed in the background, and after a short period the group will converge to the new configuration:
 ```shell
 $ build/infrakit group describe terraform_demo
 ID                              LOGICAL                         TAGS
