@@ -36,7 +36,7 @@ func swarmEnvironment(backend *backend) *cobra.Command {
 				return err
 			}
 
-			plugins, err := discovery.NewPluginDiscovery()
+			plugins, err := discovery.NewPluginDiscovery(discovery.Dir())
 			if err != nil {
 				return err
 			}

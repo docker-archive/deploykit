@@ -30,7 +30,7 @@ func main() {
 
 			cli.SetLogLevel(logLevel)
 
-			plugins, err := discovery.NewPluginDiscovery()
+			plugins, err := discovery.NewPluginDiscovery(discovery.Dir())
 			if err != nil {
 				return err
 			}

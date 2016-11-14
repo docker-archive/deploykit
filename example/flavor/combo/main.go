@@ -21,7 +21,7 @@ func main() {
 		Short: "A Flavor plugin that supports composition of other Flavors",
 		Run: func(c *cobra.Command, args []string) {
 
-			plugins, err := discovery.NewPluginDiscovery()
+			plugins, err := discovery.NewPluginDiscovery(discovery.Dir())
 			if err != nil {
 				log.Error(err)
 				os.Exit(1)
