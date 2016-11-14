@@ -82,6 +82,7 @@ ifneq (,$(findstring .m,$(VERSION)))
 endif
 
 	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
+	$(call build_binary,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
 	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/example/flavor/combo)
 	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/example/flavor/swarm)
