@@ -31,10 +31,10 @@ func (c *client) CommitGroup(grp group.Spec, pretend bool) (string, error) {
 	return resp.Details, nil
 }
 
-func (c *client) ReleaseGroup(id group.ID) error {
-	req := &ReleaseGroupRequest{ID: id}
-	resp := &ReleaseGroupResponse{}
-	err := c.rpc.Call("Group.ReleaseGroup", req, resp)
+func (c *client) FreeGroup(id group.ID) error {
+	req := &FreeGroupRequest{ID: id}
+	resp := &FreeGroupResponse{}
+	err := c.rpc.Call("Group.FreeGroup", req, resp)
 	if err != nil {
 		return err
 	}

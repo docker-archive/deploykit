@@ -301,7 +301,7 @@ func (m *manager) doReleaseGroups(config GlobalSpec) error {
 		func(plugin group.Plugin, spec group.Spec) error {
 
 			log.Infoln("Releasing group", spec.ID)
-			err := plugin.ReleaseGroup(spec.ID)
+			err := plugin.FreeGroup(spec.ID)
 			if err != nil {
 				log.Warningln("Error releasing group:", spec.ID, "Err=", err)
 			}

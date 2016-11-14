@@ -24,9 +24,9 @@ func (p *Group) CommitGroup(req *CommitGroupRequest, resp *CommitGroupResponse) 
 	return nil
 }
 
-// ReleaseGroup is the rpc method to release a group
-func (p *Group) ReleaseGroup(req *ReleaseGroupRequest, resp *ReleaseGroupResponse) error {
-	err := p.plugin.ReleaseGroup(req.ID)
+// FreeGroup is the rpc method to free a group
+func (p *Group) FreeGroup(req *FreeGroupRequest, resp *FreeGroupResponse) error {
+	err := p.plugin.FreeGroup(req.ID)
 	if err != nil {
 		return err
 	}

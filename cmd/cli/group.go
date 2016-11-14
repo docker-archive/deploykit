@@ -83,8 +83,8 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	cmd.AddCommand(&commit)
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "release <group ID>",
-		Short: "release a group from active monitoring, nondestructive",
+		Use:   "free <group ID>",
+		Short: "free a group from active monitoring, nondestructive",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			assertNotNil("no plugin", groupPlugin)
 
@@ -94,9 +94,9 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			groupID := group.ID(args[0])
-			err := groupPlugin.ReleaseGroup(groupID)
+			err := groupPlugin.FreeGroup(groupID)
 			if err == nil {
-				fmt.Println("Released", groupID)
+				fmt.Println("Freed", groupID)
 			}
 			return err
 		},

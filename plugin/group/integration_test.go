@@ -101,7 +101,7 @@ func TestInvalidGroupCalls(t *testing.T) {
 	require.Error(t, grp.DestroyGroup(id))
 	_, err := grp.DescribeGroup(id)
 	require.Error(t, err)
-	require.Error(t, grp.ReleaseGroup(id))
+	require.Error(t, grp.FreeGroup(id))
 }
 
 func memberTags(id group.ID) map[string]string {
@@ -154,7 +154,7 @@ func TestNoopUpdate(t *testing.T) {
 		require.Equal(t, newFakeInstance(minions, nil).Tags, i.Tags)
 	}
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func awaitGroupConvergence(t *testing.T, grp group.Plugin) {
@@ -212,7 +212,7 @@ func TestRollingUpdate(t *testing.T) {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestRollAndAdjustScale(t *testing.T) {
@@ -250,7 +250,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestScaleIncrease(t *testing.T) {
@@ -283,7 +283,7 @@ func TestScaleIncrease(t *testing.T) {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestScaleDecrease(t *testing.T) {
@@ -316,7 +316,7 @@ func TestScaleDecrease(t *testing.T) {
 		require.Equal(t, provisionTags(updated), i.Tags)
 	}
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestReleaseGroup(t *testing.T) {
@@ -330,7 +330,7 @@ func TestReleaseGroup(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestDestroyGroup(t *testing.T) {
@@ -384,7 +384,7 @@ func TestSuperviseQuorum(t *testing.T) {
 
 	// TODO(wfarner): Validate logical IDs in created instances.
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestUpdateCompletes(t *testing.T) {
@@ -404,7 +404,7 @@ func TestUpdateCompletes(t *testing.T) {
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestInstanceAndFlavorChange(t *testing.T) {
@@ -441,7 +441,7 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 		require.Equal(t, "data2", properties["OpaqueValue"])
 	}
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestFlavorChange(t *testing.T) {
@@ -464,7 +464,7 @@ func TestFlavorChange(t *testing.T) {
 
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestReleaseGroupWhileConverging(t *testing.T) {
@@ -516,7 +516,7 @@ func TestReleaseGroupWhileConverging(t *testing.T) {
 	// Wait for the first health check to ensure the update has begun.
 	<-healthChecksStarted
 
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }
 
 func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
@@ -560,5 +560,5 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 	}
 
 	require.Equal(t, 1, badUpdateInstanaces)
-	require.NoError(t, grp.ReleaseGroup(id))
+	require.NoError(t, grp.FreeGroup(id))
 }

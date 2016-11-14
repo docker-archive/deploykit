@@ -148,8 +148,8 @@ instance-9014687032220994836   	  -                            	infrakit.config_
 At any point you can safely `release` a group.  This is a non-destructive action, which instructs _InfraKit_ to cease
 active monitoring.  No instances are affected, but _InfraKit_ will no longer manage them.
 ```shell
-$ build/infrakit group release cattle
-Released cattle
+$ build/infrakit group free cattle
+Freed cattle
 ```
 
 You can `commit` the group to start monitoring it again:

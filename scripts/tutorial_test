@@ -69,7 +69,7 @@ sleep 2
 expect_output_lines "5 instances should exist in group" "build/infrakit group describe cattle -q" "5"
 expect_output_lines "5 instances should exist" "build/infrakit instance describe -q --name instance-file" "5"
 
-build/infrakit group release cattle
+build/infrakit group free cattle
 build/infrakit group commit docs/cattle.json
 
 expect_exact_output "Should be watching one group" "build/infrakit group ls -q" "cattle"

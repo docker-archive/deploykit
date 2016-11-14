@@ -15,13 +15,13 @@ type CommitGroupResponse struct {
 	Details string
 }
 
-// ReleaseGroupRequest is the rpc wrapper for input to release a group
-type ReleaseGroupRequest struct {
+// FreeGroupRequest is the rpc wrapper for input to release a group
+type FreeGroupRequest struct {
 	ID group.ID
 }
 
-// ReleaseGroupResponse is the rpc wrapper for the results to release a group
-type ReleaseGroupResponse struct {
+// FreeGroupResponse is the rpc wrapper for the results to release a group
+type FreeGroupResponse struct {
 	OK bool
 }
 
@@ -59,7 +59,7 @@ type InspectGroupsResponse struct {
 // defined in net/rpc
 type RPCService interface {
 	CommitGroup(req *CommitGroupRequest, resp *CommitGroupResponse) error
-	ReleaseGroup(req *ReleaseGroupRequest, resp *ReleaseGroupResponse) error
+	FreeGroup(req *FreeGroupRequest, resp *FreeGroupResponse) error
 	DescribeGroup(req *DescribeGroupRequest, resp *DescribeGroupResponse) error
 	DestroyGroup(req *DestroyGroupRequest, resp *DestroyGroupResponse) error
 	InspectGroups(req *InspectGroupsRequest, resp *InspectGroupsResponse) error

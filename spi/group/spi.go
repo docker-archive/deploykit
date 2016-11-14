@@ -9,7 +9,7 @@ import (
 type Plugin interface {
 	CommitGroup(grp Spec, pretend bool) (string, error)
 
-	ReleaseGroup(id ID) error
+	FreeGroup(id ID) error
 
 	DescribeGroup(id ID) (Description, error)
 

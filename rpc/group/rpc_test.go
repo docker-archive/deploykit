@@ -15,7 +15,7 @@ import (
 
 type testPlugin struct {
 	DoCommitGroup   func(grp group.Spec, pretend bool) (string, error)
-	DoReleaseGroup  func(id group.ID) error
+	DoFreeGroup     func(id group.ID) error
 	DoDescribeGroup func(id group.ID) (group.Description, error)
 	DoDestroyGroup  func(id group.ID) error
 	DoInspectGroups func() ([]group.Spec, error)
@@ -30,8 +30,8 @@ func testClient(t *testing.T, socket string) group.Plugin {
 func (t *testPlugin) CommitGroup(grp group.Spec, pretend bool) (string, error) {
 	return t.DoCommitGroup(grp, pretend)
 }
-func (t *testPlugin) ReleaseGroup(id group.ID) error {
-	return t.DoReleaseGroup(id)
+func (t *testPlugin) FreeGroup(id group.ID) error {
+	return t.DoFreeGroup(id)
 }
 func (t *testPlugin) DescribeGroup(id group.ID) (group.Description, error) {
 	return t.DoDescribeGroup(id)
@@ -107,40 +107,40 @@ func TestGroupPluginCommitGroupError(t *testing.T) {
 	require.Equal(t, groupSpec, <-groupSpecActual)
 }
 
-func TestGroupPluginReleaseGroup(t *testing.T) {
+func TestGroupPluginFreeGroup(t *testing.T) {
 	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
 	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoReleaseGroup: func(req group.ID) error {
+		DoFreeGroup: func(req group.ID) error {
 			idActual <- req
 			return nil
 		},
 	}))
 	require.NoError(t, err)
 
-	err = testClient(t, socketPath).ReleaseGroup(id)
+	err = testClient(t, socketPath).FreeGroup(id)
 	require.NoError(t, err)
 
 	close(stop)
 	require.Equal(t, id, <-idActual)
 }
 
-func TestGroupPluginReleaseGroupError(t *testing.T) {
+func TestGroupPluginFreeGroupError(t *testing.T) {
 	socketPath := tempSocket()
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
 	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoReleaseGroup: func(req group.ID) error {
+		DoFreeGroup: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
 		},
 	}))
 	require.NoError(t, err)
 
-	err = testClient(t, socketPath).ReleaseGroup(id)
+	err = testClient(t, socketPath).FreeGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 

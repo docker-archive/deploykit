@@ -112,7 +112,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 	return fmt.Sprintf("Managing %d instances", supervisor.Size()), nil
 }
 
-func (p *plugin) doRelease(id group.ID) (*groupContext, error) {
+func (p *plugin) doFree(id group.ID) (*groupContext, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -129,8 +129,8 @@ func (p *plugin) doRelease(id group.ID) (*groupContext, error) {
 	return grp, nil
 }
 
-func (p *plugin) ReleaseGroup(id group.ID) error {
-	_, err := p.doRelease(id)
+func (p *plugin) FreeGroup(id group.ID) error {
+	_, err := p.doFree(id)
 	return err
 }
 
@@ -154,7 +154,7 @@ func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
 }
 
 func (p *plugin) DestroyGroup(gid group.ID) error {
-	context, err := p.doRelease(gid)
+	context, err := p.doFree(gid)
 
 	if context != nil {
 		descriptions, err := context.scaled.List()
