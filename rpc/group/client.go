@@ -21,21 +21,20 @@ type client struct {
 	rpc *rpc.Client
 }
 
-func (c *client) WatchGroup(grp group.Spec) error {
-	req := &WatchGroupRequest{Spec: grp}
-	resp := &WatchGroupResponse{}
-	err := c.rpc.Call("Group.WatchGroup", req, resp)
+func (c *client) CommitGroup(grp group.Spec, pretend bool) (string, error) {
+	req := &CommitGroupRequest{Spec: grp, Pretend: pretend}
+	resp := &CommitGroupResponse{}
+	err := c.rpc.Call("Group.CommitGroup", req, resp)
 	if err != nil {
-		return err
+		return resp.Details, err
 	}
-	resp.OK = true
-	return nil
+	return resp.Details, nil
 }
 
-func (c *client) UnwatchGroup(id group.ID) error {
-	req := &UnwatchGroupRequest{ID: id}
-	resp := &UnwatchGroupResponse{}
-	err := c.rpc.Call("Group.UnwatchGroup", req, resp)
+func (c *client) FreeGroup(id group.ID) error {
+	req := &FreeGroupRequest{ID: id}
+	resp := &FreeGroupResponse{}
+	err := c.rpc.Call("Group.FreeGroup", req, resp)
 	if err != nil {
 		return err
 	}
@@ -48,35 +47,6 @@ func (c *client) DescribeGroup(id group.ID) (group.Description, error) {
 	resp := &DescribeGroupResponse{}
 	err := c.rpc.Call("Group.DescribeGroup", req, resp)
 	return resp.Description, err
-}
-
-func (c *client) DescribeUpdate(updated group.Spec) (string, error) {
-	req := &DescribeUpdateRequest{Spec: updated}
-	resp := &DescribeUpdateResponse{}
-	err := c.rpc.Call("Group.DescribeUpdate", req, resp)
-	return resp.Plan, err
-}
-
-func (c *client) UpdateGroup(updated group.Spec) error {
-	req := &UpdateGroupRequest{Spec: updated}
-	resp := &UpdateGroupResponse{}
-	err := c.rpc.Call("Group.UpdateGroup", req, resp)
-	if err != nil {
-		return err
-	}
-	resp.OK = true
-	return nil
-}
-
-func (c *client) StopUpdate(id group.ID) error {
-	req := &StopUpdateRequest{ID: id}
-	resp := &StopUpdateResponse{}
-	err := c.rpc.Call("Group.StopUpdate", req, resp)
-	if err != nil {
-		return err
-	}
-	resp.OK = true
-	return nil
 }
 
 func (c *client) DestroyGroup(id group.ID) error {

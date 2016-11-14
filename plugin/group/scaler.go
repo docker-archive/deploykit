@@ -3,20 +3,11 @@ package group
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/plugin/group/util"
 	"github.com/docker/infrakit/spi/instance"
 	"sort"
 	"sync"
 	"time"
 )
-
-// Scaler is the spi of the scaler controller which mimics the behavior
-// of an autoscaling group / scale set on AWS or Azure.
-type Scaler interface {
-	util.RunStop
-	Size() uint
-	SetSize(size uint)
-}
 
 type scaler struct {
 	scaled       Scaled
@@ -73,11 +64,11 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 			// created. We proceed with the update here, which will likely only change the target
 			// configuration in the scaler.
 
-			plan.desc = "Adjusts the instance configuration, no restarts necessary"
+			plan.desc = "Adjusting the instance configuration, no restarts necessary"
 			return &plan, nil
 		}
 
-		plan.desc = fmt.Sprintf("Performs a rolling update on %d instances", rollCount)
+		plan.desc = fmt.Sprintf("Performing a rolling update on %d instances", rollCount)
 
 	case sizeChange < 0:
 		rollCount := int(newSettings.config.Allocation.Size) - len(desired)
@@ -87,13 +78,13 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 
 		if rollCount == 0 {
 			plan.desc = fmt.Sprintf(
-				"Terminates %d instances to reduce the group size to %d",
+				"Terminating %d instances to reduce the group size to %d",
 				int(sizeChange)*-1,
 				newSettings.config.Allocation.Size)
 		} else {
 			plan.desc = fmt.Sprintf(
-				"Terminates %d instances to reduce the group size to %d, "+
-					" then performs a rolling update on %d instances",
+				"Terminating %d instances to reduce the group size to %d, "+
+					" then performing a rolling update on %d instances",
 				int(sizeChange)*-1,
 				newSettings.config.Allocation.Size,
 				rollCount)
@@ -104,13 +95,13 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 
 		if rollCount == 0 {
 			plan.desc = fmt.Sprintf(
-				"Adds %d instances to increase the group size to %d",
+				"Adding %d instances to increase the group size to %d",
 				sizeChange,
 				newSettings.config.Allocation.Size)
 		} else {
 			plan.desc = fmt.Sprintf(
-				"Performs a rolling update on %d instances,"+
-					" then adds %d instances to increase the group size to %d",
+				"Performing a rolling update on %d instances,"+
+					" then adding %d instances to increase the group size to %d",
 				rollCount,
 				sizeChange,
 				newSettings.config.Allocation.Size)
@@ -196,6 +187,10 @@ func (s *scaler) Run() {
 			return
 		}
 	}
+}
+
+func (s *scaler) Size() uint {
+	return s.size
 }
 
 func (s *scaler) converge() {

@@ -114,50 +114,55 @@ $ build/infrakit instance --name instance-file describe
 ID                              LOGICAL                         TAGS
 ```
 
-Let's tell the group plugin to `watch` our group by providing the group plugin with the configuration:
+Let's tell the group plugin to `commit` our group by providing the group plugin with the configuration:
 
 ```shell
-$ build/infrakit group watch cattle.json
-watching cattle
+$ build/infrakit group commit cattle.json
+Committed cattle: Managing 5 instances
 ```
 
 The group plugin is responsible for ensuring that the infrastructure state matches with your specifications.  Since we
 started out with nothing, it will create 5 instances and maintain that state by monitoring the instances:
 ```shell
 $ build/infrakit group describe cattle
-ID                              LOGICAL         TAGS
-instance-1475104926           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475104936           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475104946           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475104956           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475104966           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+ID                             	LOGICAL                        	TAGS
+instance-5993795900014843850   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+instance-6529053068646043018   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+instance-7203714904652099824   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+instance-8430289623921829870   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+instance-9014687032220994836   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
 The Instance Plugin can also report instances, it will report all instances across all groups (not just `cattle`).
 
 ```shell
 $ build/infrakit instance --name instance-file describe
-ID                              LOGICAL         TAGS
-instance-1475104926           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475104936           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475104946           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475104956           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475104966           	  -             infrakit.config_sha=Y23cKqyRpkQ_M60vIq7CufFmQWk=,infrakit.group=cattle,project=infrakit,tier=web
+ID                             	LOGICAL                        	TAGS
+instance-5993795900014843850   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+instance-6529053068646043018   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+instance-7203714904652099824   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+instance-8430289623921829870   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+instance-9014687032220994836   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
-At any point you can safely `unwatch` a group.  This will instruct _InfraKit_ to cease active monitoring:
+At any point you can safely `free` a group.  This is a non-destructive action, which instructs _InfraKit_ to cease
+active monitoring.  No instances are affected, but _InfraKit_ will no longer manage them.
 ```shell
-$ build/infrakit group unwatch cattle
+$ build/infrakit group free cattle
+Freed cattle
 ```
 
-You can `watch` the group to start monitoring it again:
+You can `commit` the group to start monitoring it again:
 ```shell
-$ build/infrakit group watch cattle.json
+$ build/infrakit group commit cattle.json
+Committed cattle: Managing 5 instances
 ```
 
-Check which groups are being watched:
+Check which groups are being managed:
 ```shell
 $ build/infrakit group ls
+ID
+cattle
 ```
 
 Now let's update the configuration by changing the size of the group and a property of the instance.  Save this file as
@@ -209,8 +214,8 @@ $ diff cattle.json cattle2.json
 
 Before we do an update, we can see what the proposed changes are:
 ```shell
-$ build/infrakit group describe-update cattle2.json 
-Performs a rolling update on 5 instances, then adds 5 instances to increase the group size to 10
+$ build/infrakit group commit cattle2.json --pretend 
+Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10
 ```
 
 So here 5 instances will be updated via rolling update, while 5 new instances at the new configuration will
@@ -219,51 +224,48 @@ be created.
 Let's apply the new config:
 
 ```shell
-$ build/infrakit group update cattle2.json 
-
-# ..... wait a bit...
-update cattle completed
+$ build/infrakit group commit cattle2.json 
+Committed cattle: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10
 ```
-Now we can check:
 
+If we poll the group, we can see state will converging until all instances have been updated:
 ```shell
 $ build/infrakit group describe cattle
-ID                              LOGICAL         TAGS
-instance-1475105646           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105656           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105666           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105676           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105686           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105696           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105706           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105716           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105726           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1475105736           	  -             infrakit.config_sha=BXedrwY0GdZlHhgHmPAzxTN4oHM=,infrakit.group=cattle,project=infrakit,tier=web
+ID                             	LOGICAL                        	TAGS
+instance-1422140834255860063   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1478871890164117825   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1507972539885141336   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1665488406863611296   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-2340140454359833670   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-2796731287627125229   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-285480170677988698    	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-4084455402433225349   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-5591036640758692177   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-6810420924276316298   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
-Note the instances now have a new SHA `BXedrwY0GdZlHhgHmPAzxTN4oHM=` (vs `Y23cKqyRpkQ_M60vIq7CufFmQWk=` previously)
+Note the instances now have a new SHA `eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=` (vs `006438mMXW8gXeYtUxgf9Zbg94Y_M60vIq7CufFmQWk=` previously)
 
 To see that the Group plugin can enforce the size of the group, let's simulate an instance disappearing.
 
 ```shell
-$ rm tutorial/instance-1475105646 tutorial/instance-1475105686 tutorial/instance-1475105726
+$ rm tutorial/instance-1422140834255860063 tutorial/instance-1478871890164117825 tutorial/instance-1507972539885141336
+```
 
-# ... now check
-
-$ ls -al tutorial
-total 104
-drwxr-xr-x  15 davidchung  staff   510 Sep 28 16:40 .
-drwxr-xr-x  36 davidchung  staff  1224 Sep 28 16:39 ..
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105656
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105666
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105676
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:34 instance-1475105696
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:35 instance-1475105706
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:35 instance-1475105716
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:35 instance-1475105736
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:40 instance-1475106016 <-- new instance
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:40 instance-1475106026 <-- new instance
--rw-r--r--   1 davidchung  staff   654 Sep 28 16:40 instance-1475106036 <-- new instance
+After a few moments, the missing instances will be replaced (we've highlighted new instances with `-->`):
+```shell
+$ build/infrakit group describe cattle
+ID                             	LOGICAL                        	TAGS
+--> instance-1265288729718091217   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-1665488406863611296   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+--> instance-1952247477026188949   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-2340140454359833670   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-2796731287627125229   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-285480170677988698    	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-4084455402433225349   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+--> instance-4161733946225446641   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-5591036640758692177   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+instance-6810420924276316298   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
 We see that 3 new instance have been created to replace the three removed, to match our
@@ -277,7 +279,7 @@ $ build/infrakit group destroy cattle
 
 This concludes our quick tutorial.  In this tutorial we:
   + Started the plugins and learned to access them
-  + Created a configuration for a group we wanted to watch
+  + Created a configuration for a group we wanted to manage
   + Verified the instances created matched the specifications
   + Updated the configurations of the group and scaled up the group
   + Reviewed the proposed changes

@@ -3,9 +3,9 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/discovery"
 	"github.com/docker/infrakit/leader"
@@ -48,7 +48,10 @@ type backendOp struct {
 
 // NewManager returns the manager which depends on other services to coordinate and manage
 // the plugins in order to ensure the infrastructure state matches the user's spec.
-func NewManager(plugins discovery.Plugins, leader leader.Detector, snapshot store.Snapshot,
+func NewManager(
+	plugins discovery.Plugins,
+	leader leader.Detector,
+	snapshot store.Snapshot,
 	backendName string) (Backend, error) {
 
 	m := &manager{
@@ -113,7 +116,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 				if m.isLeader {
 					op.err <- op.operation()
 				} else {
-					op.err <- fmt.Errorf("not-a-leader")
+					op.err <- errors.New("not-a-leader")
 				}
 
 			case <-stopWorkQueue:
@@ -248,7 +251,7 @@ func (m *manager) onAssumeLeadership() error {
 	if err != nil {
 		return err
 	}
-	return m.doWatchGroups(config)
+	return m.doCommitGroups(config)
 }
 
 func (m *manager) onLostLeadership() error {
@@ -257,7 +260,7 @@ func (m *manager) onLostLeadership() error {
 	if err != nil {
 		return err
 	}
-	return m.doUnwatchGroups(config)
+	return m.doFreeGroups(config)
 }
 
 func (m *manager) doCommit() error {
@@ -271,67 +274,36 @@ func (m *manager) doCommit() error {
 		return err
 	}
 
-	log.Infoln("Committing.  Loaded snapshot. err=", err)
+	log.Infoln("Committing. Loaded snapshot. err=", err)
 	if err != nil {
 		return err
 	}
-	return m.doUpdateGroups(config)
+	return m.doCommitGroups(config)
 }
 
-func (m *manager) doUpdateGroups(config GlobalSpec) error {
+func (m *manager) doCommitGroups(config GlobalSpec) error {
 	return m.execPlugins(config,
 		func(plugin group.Plugin, spec group.Spec) error {
 
-			log.Infoln("UPDATE group", spec.ID, "with spec:", spec)
-			err := plugin.UpdateGroup(spec)
+			log.Infoln("Committing group", spec.ID, "with spec:", spec)
 
-			// TODO(chungers) -- yes this is clunky comparing error text -- replace with typed error / code later.
-			if err != nil && strings.Contains(err.Error(), "not being watched") {
-
-				log.Infoln("UPDATE group", spec.ID, "changed to WATCH")
-				err = plugin.WatchGroup(spec)
-
-			}
-
+			_, err := plugin.CommitGroup(spec, false)
 			if err != nil {
-				log.Warningln("Error updating/watch group:", spec.ID, "Err=", err)
+				log.Warningln("Error committing group:", spec.ID, "Err=", err)
 			}
 			return err
 		})
 }
 
-func (m *manager) doWatchGroups(config GlobalSpec) error {
-	log.Infoln("Start watching groups")
+func (m *manager) doFreeGroups(config GlobalSpec) error {
+	log.Infoln("Freeing groups")
 	return m.execPlugins(config,
 		func(plugin group.Plugin, spec group.Spec) error {
 
-			log.Infoln("WATCH group", spec.ID, "with spec:", spec)
-			err := plugin.WatchGroup(spec)
-
-			// TODO(chungers) -- yes this is clunky with string comparison of error text.
-			// Consider adding return code or error types for the Group SPI.
-			if err != nil && strings.Contains(err.Error(), "Already watching") {
-
-				log.Warningln("Already WATCHING", spec.ID, "no action")
-				return nil
-			}
-
+			log.Infoln("Freeing group", spec.ID)
+			err := plugin.FreeGroup(spec.ID)
 			if err != nil {
-				log.Warningln("Error watching group:", spec.ID, "Err=", err)
-			}
-			return nil
-		})
-}
-
-func (m *manager) doUnwatchGroups(config GlobalSpec) error {
-	log.Infoln("Unwatching groups")
-	return m.execPlugins(config,
-		func(plugin group.Plugin, spec group.Spec) error {
-
-			log.Infoln("UNWATCH group", spec.ID, "with spec:", spec)
-			err := plugin.UnwatchGroup(spec.ID)
-			if err != nil {
-				log.Warningln("Error unwatching group:", spec.ID, "Err=", err)
+				log.Warningln("Error freeing group:", spec.ID, "Err=", err)
 			}
 			return nil
 		})

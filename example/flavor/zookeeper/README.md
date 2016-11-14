@@ -59,9 +59,9 @@ Here's a JSON for the group we'd like to see [vagrant-zk.json](./vagrant-zk.json
 }
 ```
 
-Now tell the group plugin to watch the zk group, create if necessary:
+Now commit the group configuration:
 
 ```shell
-$ build/infrakit group watch ./vagrant-zk.json
+$ build/infrakit group commit vagrant-zk.json
 watching zk
 ```

@@ -17,7 +17,7 @@ trap cleanup EXIT
 
 mkdir -p tutorial
 build/infrakit-instance-file --dir ./tutorial/ &
-build/infrakit-group-default &
+build/infrakit-group-default --poll-interval 500ms &
 build/infrakit-flavor-vanilla &
 
 sleep 1
@@ -27,8 +27,8 @@ expect_exact_output() {
   cmd=$2
   expected_output=$3
 
-  echo -n "$1: "
   actual_output="$($2)"
+  echo -n "--> $message: "
   if [ "$actual_output" = "$3" ]
   then
     echo 'PASS'
@@ -45,12 +45,15 @@ expect_output_lines() {
   cmd=$2
   expected_lines=$3
 
-  echo -n "$1: "
-  if [ "$($2 | wc -l)" -eq "$3" ]
+  actual_line_count=$($2 | wc -l)
+  echo -n "--> $message: "
+  if [ "$actual_line_count" -eq "$3" ]
   then
     echo 'PASS'
   else
     echo 'FAIL'
+    echo "Expected line count: $expected_lines"
+    echo "Actual line count: $actual_line_count"
     exit 1
   fi
 }
@@ -58,7 +61,7 @@ expect_output_lines() {
 expect_output_lines "3 plugins should be discoverable" "build/infrakit plugin ls -q" "3"
 expect_output_lines "0 instances should exist" "build/infrakit instance describe -q --name instance-file" "0"
 
-build/infrakit group watch docs/cattle.json
+build/infrakit group commit docs/cattle.json
 
 echo 'Waiting for group to be provisioned'
 sleep 2
@@ -66,18 +69,19 @@ sleep 2
 expect_output_lines "5 instances should exist in group" "build/infrakit group describe cattle -q" "5"
 expect_output_lines "5 instances should exist" "build/infrakit instance describe -q --name instance-file" "5"
 
-build/infrakit group unwatch cattle
-build/infrakit group watch docs/cattle.json
+build/infrakit group free cattle
+build/infrakit group commit docs/cattle.json
 
 expect_exact_output "Should be watching one group" "build/infrakit group ls -q" "cattle"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
-  "build/infrakit group describe-update docs/cattle2.json" \
-  "Performs a rolling update on 5 instances, then adds 5 instances to increase the group size to 10"
+  "build/infrakit group commit docs/cattle2.json --pretend" \
+  "Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10"
 
-build/infrakit group update docs/cattle2.json
-sleep 20
+build/infrakit group commit docs/cattle2.json
+
+sleep 5
 
 expect_output_lines "10 instances should exist in group" "build/infrakit group describe cattle -q" "10"
 
@@ -86,7 +90,7 @@ pushd tutorial
   rm $(ls | head -3)
 popd
 
-sleep 20
+sleep 5
 
 expect_output_lines "10 instances should exist in group" "build/infrakit group describe cattle -q" "10"
 
