@@ -15,12 +15,12 @@ type CommitGroupResponse struct {
 	Details string
 }
 
-// FreeGroupRequest is the rpc wrapper for input to release a group
+// FreeGroupRequest is the rpc wrapper for input to free a group
 type FreeGroupRequest struct {
 	ID group.ID
 }
 
-// FreeGroupResponse is the rpc wrapper for the results to release a group
+// FreeGroupResponse is the rpc wrapper for the results to free a group
 type FreeGroupResponse struct {
 	OK bool
 }

@@ -319,7 +319,7 @@ func TestScaleDecrease(t *testing.T) {
 	require.NoError(t, grp.FreeGroup(id))
 }
 
-func TestReleaseGroup(t *testing.T) {
+func TestFreeGroup(t *testing.T) {
 	plugin := newTestInstancePlugin(
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
@@ -467,7 +467,7 @@ func TestFlavorChange(t *testing.T) {
 	require.NoError(t, grp.FreeGroup(id))
 }
 
-func TestReleaseGroupWhileConverging(t *testing.T) {
+func TestFreeGroupWhileConverging(t *testing.T) {
 
 	// Ensures that the group can be ignored while a commit is converging.
 

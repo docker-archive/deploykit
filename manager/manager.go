@@ -260,7 +260,7 @@ func (m *manager) onLostLeadership() error {
 	if err != nil {
 		return err
 	}
-	return m.doReleaseGroups(config)
+	return m.doFreeGroups(config)
 }
 
 func (m *manager) doCommit() error {
@@ -295,15 +295,15 @@ func (m *manager) doCommitGroups(config GlobalSpec) error {
 		})
 }
 
-func (m *manager) doReleaseGroups(config GlobalSpec) error {
-	log.Infoln("Releasing groups")
+func (m *manager) doFreeGroups(config GlobalSpec) error {
+	log.Infoln("Freeing groups")
 	return m.execPlugins(config,
 		func(plugin group.Plugin, spec group.Spec) error {
 
-			log.Infoln("Releasing group", spec.ID)
+			log.Infoln("Freeing group", spec.ID)
 			err := plugin.FreeGroup(spec.ID)
 			if err != nil {
-				log.Warningln("Error releasing group:", spec.ID, "Err=", err)
+				log.Warningln("Error freeing group:", spec.ID, "Err=", err)
 			}
 			return nil
 		})

@@ -145,7 +145,7 @@ instance-8430289623921829870   	  -                            	infrakit.config_
 instance-9014687032220994836   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
-At any point you can safely `release` a group.  This is a non-destructive action, which instructs _InfraKit_ to cease
+At any point you can safely `free` a group.  This is a non-destructive action, which instructs _InfraKit_ to cease
 active monitoring.  No instances are affected, but _InfraKit_ will no longer manage them.
 ```shell
 $ build/infrakit group free cattle
