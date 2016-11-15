@@ -2,11 +2,12 @@ package loadbalancer
 
 import (
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/engine-api/types/swarm"
 	"net/url"
 	"strconv"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types/swarm"
 )
 
 type listener struct {
@@ -131,7 +132,7 @@ func listenersFromExposedPorts(service swarm.Service) []*listener {
 	requestedPublishPorts := map[uint32]uint32{} // key - target port Y (app/container port), value = publish port X
 	if service.Spec.EndpointSpec != nil {
 		for _, p := range service.Spec.EndpointSpec.Ports {
-			if p.PublishedPort > 0 {
+			if p.PublishedPort > 0 && strings.EqualFold(string(p.PublishMode), "ingress") {
 				// Only if the user has specify the desired publish port
 				requestedPublishPorts[p.TargetPort] = p.PublishedPort
 			}

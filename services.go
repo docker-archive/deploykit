@@ -3,7 +3,7 @@ package loadbalancer
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/engine-api/types/swarm"
+	"github.com/docker/docker/api/types/swarm"
 	"time"
 )
 

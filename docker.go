@@ -3,17 +3,18 @@ package loadbalancer
 import (
 	"crypto/tls"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/engine-api/client"
-	"github.com/docker/go-connections/sockets"
-	"github.com/docker/go-connections/tlsconfig"
 	"net/http"
 	"os"
 	"runtime"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/sockets"
+	"github.com/docker/go-connections/tlsconfig"
 )
 
 const (
-	clientVersion = "1.24"
+	clientVersion = "1.25"
 )
 
 // NewDockerClient creates a new API client.

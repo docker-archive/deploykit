@@ -1,8 +1,8 @@
 package loadbalancer
 
 import (
-	mock_client "github.com/docker/editions/mock/docker/engine-api/client"
-	"github.com/docker/engine-api/types/swarm"
+	"github.com/docker/docker/api/types/swarm"
+	mock_client "github.com/docker/editions/mock/docker/docker/client"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
