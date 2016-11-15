@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"net"
+	"os"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -12,8 +13,20 @@ import (
 
 // CheckpointCreateOptions holds parameters to create a checkpoint from a container
 type CheckpointCreateOptions struct {
-	CheckpointID string
-	Exit         bool
+	CheckpointID  string
+	CheckpointDir string
+	Exit          bool
+}
+
+// CheckpointListOptions holds parameters to list checkpoints for a container
+type CheckpointListOptions struct {
+	CheckpointDir string
+}
+
+// CheckpointDeleteOptions holds parameters to delete a checkpoint from a container
+type CheckpointDeleteOptions struct {
+	CheckpointID  string
+	CheckpointDir string
 }
 
 // ContainerAttachOptions holds parameters to attach to a container.
@@ -23,6 +36,7 @@ type ContainerAttachOptions struct {
 	Stdout     bool
 	Stderr     bool
 	DetachKeys string
+	Logs       bool
 }
 
 // ContainerCommitOptions holds parameters to commit changes into a container.
@@ -41,18 +55,19 @@ type ContainerExecInspect struct {
 	ContainerID string
 	Running     bool
 	ExitCode    int
+	Pid         int
 }
 
 // ContainerListOptions holds parameters to list containers with.
 type ContainerListOptions struct {
-	Quiet  bool
-	Size   bool
-	All    bool
-	Latest bool
-	Since  string
-	Before string
-	Limit  int
-	Filter filters.Args
+	Quiet   bool
+	Size    bool
+	All     bool
+	Latest  bool
+	Since   string
+	Before  string
+	Limit   int
+	Filters filters.Args
 }
 
 // ContainerLogsOptions holds parameters to filter logs with.
@@ -75,7 +90,8 @@ type ContainerRemoveOptions struct {
 
 // ContainerStartOptions holds parameters to start containers.
 type ContainerStartOptions struct {
-	CheckpointID string
+	CheckpointID  string
+	CheckpointDir string
 }
 
 // CopyToContainerOptions holds information
@@ -140,6 +156,7 @@ type ImageBuildOptions struct {
 	Memory         int64
 	MemorySwap     int64
 	CgroupParent   string
+	NetworkMode    string
 	ShmSize        int64
 	Dockerfile     string
 	Ulimits        []*units.Ulimit
@@ -185,9 +202,8 @@ type ImageImportOptions struct {
 
 // ImageListOptions holds parameters to filter the list of images with.
 type ImageListOptions struct {
-	MatchName string
-	All       bool
-	Filters   filters.Args
+	All     bool
+	Filters filters.Args
 }
 
 // ImageLoadResponse returns information to the client about a load process.
@@ -251,7 +267,7 @@ func (v VersionResponse) ServerOK() bool {
 
 // NodeListOptions holds parameters to list nodes with.
 type NodeListOptions struct {
-	Filter filters.Args
+	Filters filters.Args
 }
 
 // NodeRemoveOptions holds parameters to remove nodes with.
@@ -301,15 +317,46 @@ type ServiceUpdateOptions struct {
 
 // ServiceListOptions holds parameters to list  services with.
 type ServiceListOptions struct {
-	Filter filters.Args
+	Filters filters.Args
 }
 
 // TaskListOptions holds parameters to list  tasks with.
 type TaskListOptions struct {
-	Filter filters.Args
+	Filters filters.Args
 }
 
 // PluginRemoveOptions holds parameters to remove plugins.
 type PluginRemoveOptions struct {
 	Force bool
+}
+
+// PluginInstallOptions holds parameters to install a plugin.
+type PluginInstallOptions struct {
+	Disabled              bool
+	AcceptAllPermissions  bool
+	RegistryAuth          string // RegistryAuth is the base64 encoded credentials for the registry
+	PrivilegeFunc         RequestPrivilegeFunc
+	AcceptPermissionsFunc func(PluginPrivileges) (bool, error)
+	Args                  []string
+}
+
+// SecretRequestOption is a type for requesting secrets
+type SecretRequestOption struct {
+	Source string
+	Target string
+	UID    string
+	GID    string
+	Mode   os.FileMode
+}
+
+// SwarmUnlockKeyResponse contains the response for Remote API:
+// GET /swarm/unlockkey
+type SwarmUnlockKeyResponse struct {
+	// UnlockKey is the unlock key in ASCII-armored format.
+	UnlockKey string
+}
+
+// PluginCreateOptions hold all options to plugin create.
+type PluginCreateOptions struct {
+	RepoName string
 }
