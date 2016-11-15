@@ -26,17 +26,20 @@ func Dir() string {
 		return pluginDir
 	}
 
-	usr, err := user.Current()
-	if err != nil {
-		panic(err)
+	home := os.Getenv("HOME")
+	if usr, err := user.Current(); err == nil {
+		home = usr.HomeDir
 	}
-	return path.Join(usr.HomeDir, ".infrakit/plugins")
+	return path.Join(home, ".infrakit/plugins")
 }
 
 // NewPluginDiscovery creates a plugin discovery based on the environment configuration.
 func NewPluginDiscovery() (Plugins, error) {
-	pluginDir := Dir()
+	return NewPluginDiscoveryWithDirectory(Dir())
+}
 
+// NewPluginDiscoveryWithDirectory creates a plugin discovery based on the directory given.
+func NewPluginDiscoveryWithDirectory(pluginDir string) (Plugins, error) {
 	stat, err := os.Stat(pluginDir)
 	if err == nil {
 		if !stat.IsDir() {
