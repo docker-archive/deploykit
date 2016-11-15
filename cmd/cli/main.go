@@ -34,7 +34,7 @@ func main() {
 	cmd.AddCommand(cli.VersionCommand())
 
 	f := func() discovery.Plugins {
-		d, err := discovery.NewPluginDiscovery(discovery.Dir())
+		d, err := discovery.NewPluginDiscovery()
 		if err != nil {
 			log.Fatalf("Failed to initialize plugin discovery: %s", err)
 			os.Exit(1)

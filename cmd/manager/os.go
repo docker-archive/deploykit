@@ -51,7 +51,7 @@ func osEnvironment(backend *backend) *cobra.Command {
 		Short: "os",
 		RunE: func(c *cobra.Command, args []string) error {
 
-			plugins, err := discovery.NewPluginDiscovery(discovery.Dir())
+			plugins, err := discovery.NewPluginDiscovery()
 			if err != nil {
 				return err
 			}
