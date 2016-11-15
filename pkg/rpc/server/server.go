@@ -39,7 +39,7 @@ type loggingHandler struct {
 func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestData, err := httputil.DumpRequest(req, true)
 	if err == nil {
-		log.Debug(string(requestData))
+		log.Debugf("Received request %s", string(requestData))
 	} else {
 		log.Error(err)
 	}
@@ -50,7 +50,7 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	responseData, err := httputil.DumpResponse(recorder.Result(), true)
 	if err == nil {
-		log.Debug(string(responseData))
+		log.Debugf("Sending response %s", string(responseData))
 	} else {
 		log.Error(err)
 	}
