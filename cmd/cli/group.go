@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/discovery"
-	group_plugin "github.com/docker/infrakit/rpc/group"
-	"github.com/docker/infrakit/spi/group"
+	"github.com/docker/infrakit/pkg/discovery"
+	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 )
 

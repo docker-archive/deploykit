@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/cli"
-	"github.com/docker/infrakit/discovery"
-	"github.com/docker/infrakit/leader"
-	"github.com/docker/infrakit/manager"
-	group_rpc "github.com/docker/infrakit/rpc/group"
-	"github.com/docker/infrakit/store"
+	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/leader"
+	"github.com/docker/infrakit/pkg/manager"
+	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
+	"github.com/docker/infrakit/pkg/store"
 	"github.com/spf13/cobra"
 )
 

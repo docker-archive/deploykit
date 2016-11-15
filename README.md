@@ -25,7 +25,7 @@ environments while using shared components and consistent interfaces.
 _InfraKit_ leverages _Plugins_ to manage arbitrary systems in diverse environments, which can be composed to meet
 different needs.  Technically, a Plugin is an HTTP server with a well-defined API, listening on a unix socket.
 
-[Utilities](spi/http) are provided as libraries to simplify Plugin development in Go.
+[Utilities](pkg/rpc) are provided as libraries to simplify Plugin development in Go.
 
 ### Plugin types
 #### Group
@@ -43,7 +43,7 @@ Since _InfraKit_ emphasizes on declarative infrastructure, there are no operatio
 state to another.  Instead, you _declare_ your desired state of the infrastructure.  _InfraKit_ is responsible
 for converging towards, and maintaining, that desired state.
 
-Therefore, a [group plugin](spi/group/spi.go) manages Groups of Instances and exposes the operations that are of
+Therefore, a [group plugin](pkg/spi/group/spi.go) manages Groups of Instances and exposes the operations that are of
 interest to a user:
 
   + commit a group configuration, to start managing a group
@@ -60,7 +60,7 @@ infrastructure management system.  This would allow you to use _InfraKit_ toolin
 different infrastructure using the same interface.
 
 #### Instance
-Instances are members of a group. An [instance plugin](spi/instance/spi.go) manages some physical resource instances.
+Instances are members of a group. An [instance plugin](pkg/spi/instance/spi.go) manages some physical resource instances.
 It knows only about individual instances and nothing about Groups.  Instance is technically defined by the plugin, and
 need not be a physical machine at all.
 
@@ -73,7 +73,7 @@ persistent, stable state. These properties are captured via the _flavors_ of the
 
 #### Flavor
 Flavors help distinguish members of one group from another by describing how these members should be treated.
-A [flavor plugin](spi/flavor/spi.go) can be thought of as defining what runs on an Instance.
+A [flavor plugin](pkg/spi/flavor/spi.go) can be thought of as defining what runs on an Instance.
 It is responsible for dictating commands to run services, and check the health of those services.
 
 Flavors allow a group of instances to have different characteristics.  In a group of cattle,
@@ -93,12 +93,12 @@ to start a discussion before contributing to these plugins with non-trivial code
 
 | plugin                                             | type     | description                             |
 |:---------------------------------------------------|:---------|:----------------------------------------|
-| [swarm](example/flavor/swarm)                      | flavor   | runs Docker in Swarm mode               |
-| [vanilla](example/flavor/vanilla)                  | flavor   | manual specification of instance fields |
-| [zookeeper](example/flavor/zookeeper)              | flavor   | run an Apache ZooKeeper ensemble        |
-| [infrakit/file](example/instance/file)             | instance | useful for development and testing      |
-| [infrakit/terraform](example/instance/terraform)   | instance | creates instances using Terraform       |
-| [infrakit/vagrant](example/instance/vagrant)       | instance | creates Vagrant VMs                     |
+| [swarm](pkg/example/flavor/swarm)                      | flavor   | runs Docker in Swarm mode               |
+| [vanilla](pkg/example/flavor/vanilla)                  | flavor   | manual specification of instance fields |
+| [zookeeper](pkg/example/flavor/zookeeper)              | flavor   | run an Apache ZooKeeper ensemble        |
+| [infrakit/file](pkg/example/instance/file)             | instance | useful for development and testing      |
+| [infrakit/terraform](pkg/example/instance/terraform)   | instance | creates instances using Terraform       |
+| [infrakit/vagrant](pkg/example/instance/vagrant)       | instance | creates Vagrant VMs                     |
 
 
 #### Supported implementations
@@ -154,31 +154,21 @@ $ make binaries
 ```
 Executables will be placed in the `./build` directory.
 This will produce binaries for tools and several reference Plugin implementations:
-  + [`infrakit`](./cmd/cli/README.md): a command line interface to interact with plugins
-  + [`infrakit-group-default`](./cmd/group/README.md): the default [Group plugin](./spi/group)
-  + [`infrakit-instance-file`](./example/instance/file): an Instance plugin using dummy files to represent instances
-  + [`infrakit-instance-terraform`](./example/instance/terraform):
+  + [`infrakit`](cmd/cli/README.md): a command line interface to interact with plugins
+  + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./spi/group)
+  + [`infrakit-instance-file`](pkg/example/instance/file): an Instance plugin using dummy files to represent instances
+  + [`infrakit-instance-terraform`](pkg/example/instance/terraform):
     an Instance plugin integrating [Terraform](https://www.terraform.io)
-  + [`infrakit-instance-vagrant`](./example/instance/vagrant):
+  + [`infrakit-instance-vagrant`](pkg/example/instance/vagrant):
     an Instance plugin using [Vagrant](https://www.vagrantup.com/)
-  + [`infrakit-flavor-vanilla`](./example/flavor/vanilla):
+  + [`infrakit-flavor-vanilla`](pkg/example/flavor/vanilla):
     a Flavor plugin for plain vanilla set up with user data and labels
-  + [`infrakit-flavor-zookeeper`](./example/flavor/zookeeper):
+  + [`infrakit-flavor-zookeeper`](pkg/example/flavor/zookeeper):
     a Flavor plugin for [Apache ZooKeeper](https://zookeeper.apache.org/) ensemble members
-  + [`infrakit-flavor-swarm`](./example/flavor/swarm):
+  + [`infrakit-flavor-swarm`](pkg/example/flavor/swarm):
     a Flavor plugin for Docker in [Swarm mode](https://docs.docker.com/engine/swarm/).
 
 All provided binaries have a `help` sub-command to get usage and a `version` sub-command to identify the build revision.
-
-## Examples
-There are a few examples of _InfraKit_ plugins:
-
-  + Terraform Instance Plugin
-    - [README](./example/instance/terraform/README.md)
-    - [Code] (./example/instance/terraform/plugin.go) and [configs](./example/instance/terraform/aws-two-tier)
-  + Zookeeper / Vagrant
-    - [README](./example/flavor/zookeeper/README.md)
-    - [Code] (./plugin/flavor/zookeeper)
 
 
 # Design
@@ -200,10 +190,10 @@ A common pattern for a JSON object looks like this:
 
 There is only one `Properties` field in this JSON and its value is a JSON object. The opaque
 JSON value for `Properties` is decoded via the Go `Spec` struct defined within the package of the plugin --
-for example -- [`vanilla.Spec`](/plugin/flavor/vanilla/flavor.go).
+for example -- [`vanilla.Spec`](pkg/plugin/flavor/vanilla/flavor.go).
 
 The JSON above is a _value_, but the type of the value belongs outside the structure.  For example, the
-default Group [Spec](/plugin/group/types/types.go) is composed of an Instance plugin, a Flavor plugin, and an
+default Group [Spec](pkg/plugin/group/types/types.go) is composed of an Instance plugin, a Flavor plugin, and an
 Allocation:
 
 ```json
@@ -305,7 +295,7 @@ The CLI shows which plugins are [discoverable](cmd/cli/README.md#list-plugins).
 
 ## Docs
 
-Design docs can be found [here](./docs).
+Additional documentation can be found [here](docs).
 
 ## Reporting security issues
 
@@ -327,7 +317,7 @@ _InfraKit_ is currently focused on supporting setup and management of base infra
 orchestrator.  The image below illustrates an architecture we are working towards supporting - a Docker cluster in Swarm
 mode.
 
-![arch image](images/arch.png)
+![arch image](docs/images/arch.png)
 
 This configuration co-locates _InfraKit_ with Swarm manager nodes and offers high availability of _InfraKit_ itself and
 Swarm managers (using attached storage).  _InfraKit_ is shown managing two groups - managers and workers that will be

@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/discovery"
-	instance_plugin "github.com/docker/infrakit/rpc/instance"
-	"github.com/docker/infrakit/spi/instance"
+	"github.com/docker/infrakit/pkg/discovery"
+	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
 

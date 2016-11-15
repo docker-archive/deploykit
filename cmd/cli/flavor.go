@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/discovery"
-	"github.com/docker/infrakit/plugin/group/types"
-	flavor_plugin "github.com/docker/infrakit/rpc/flavor"
-	"github.com/docker/infrakit/spi/flavor"
-	"github.com/docker/infrakit/spi/instance"
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin/group/types"
+	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
+	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
 
