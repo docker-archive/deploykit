@@ -15,7 +15,7 @@ Currently the manager exposes the same Group plugin interface as the `infrakit-g
 This means `infrakit group ...` command will work as usual.  The manager expects a group plugin
 to be running prior to starting up and it functions as proxy for that group plugin:
 
-  + When user does a `infrakit group watch` or `infrakit group update`, the manager will
+  + When user does a `infrakit group commit`, the manager will
   persist the input configuration in the data store it was configured at startup time.
   + If the data store is configured with a backend that is shared or replicated across multiple
   instances of InfraKit ensemble (all the collaborating plugins), high availability can be
@@ -44,14 +44,14 @@ The manager can use either `os` or `swarm` for leadership detection:
 When an instance assumes leadership:
 
   + State is retrieved from shared storage (see below) and for each group in the config, a group
-  `watch` is invoked so that the new leader can begin watching the groups
+  `commit` is invoked so that the new leader can begin watching the groups
   + Since this is the frontend for the stateless group, it records any input the user provides when the
   user performs and update.  The new config is then written in the shared store and `update` is forwarded
   to the actual group plugin to do the real work.
 
 When an instance loses leadership:
 
-  + The manager uses previous configuration and 'deactivates' the local group plugin by calling `unwatch`
+  + The manager uses previous configuration and 'deactivates' the local group plugin by calling `free`
   on the downstream group plugin
   + It rejects user's attempt to `update` since it's not the leader.
 
