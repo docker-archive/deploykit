@@ -19,8 +19,10 @@ func TestSwarmDetector(t *testing.T) {
 
 	ctx := context.Background()
 	nodeInfo := types.Info{
-		Swarm: swarm.Info{
-			NodeID: "node",
+		InfoBase: &types.InfoBase{
+			Swarm: swarm.Info{
+				NodeID: "node",
+			},
 		},
 	}
 	node := swarm.Node{

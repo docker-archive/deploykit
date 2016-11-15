@@ -2,10 +2,11 @@ package group
 
 import (
 	"github.com/docker/infrakit/spi/group"
+	"net/http"
 )
 
 // PluginServer returns a RPCService that conforms to the net/rpc rpc call convention.
-func PluginServer(p group.Plugin) RPCService {
+func PluginServer(p group.Plugin) *Group {
 	return &Group{plugin: p}
 }
 
@@ -15,7 +16,7 @@ type Group struct {
 }
 
 // CommitGroup is the rpc method to commit a group
-func (p *Group) CommitGroup(req *CommitGroupRequest, resp *CommitGroupResponse) error {
+func (p *Group) CommitGroup(_ *http.Request, req *CommitGroupRequest, resp *CommitGroupResponse) error {
 	details, err := p.plugin.CommitGroup(req.Spec, req.Pretend)
 	if err != nil {
 		return err
@@ -25,7 +26,7 @@ func (p *Group) CommitGroup(req *CommitGroupRequest, resp *CommitGroupResponse) 
 }
 
 // FreeGroup is the rpc method to free a group
-func (p *Group) FreeGroup(req *FreeGroupRequest, resp *FreeGroupResponse) error {
+func (p *Group) FreeGroup(_ *http.Request, req *FreeGroupRequest, resp *FreeGroupResponse) error {
 	err := p.plugin.FreeGroup(req.ID)
 	if err != nil {
 		return err
@@ -35,7 +36,7 @@ func (p *Group) FreeGroup(req *FreeGroupRequest, resp *FreeGroupResponse) error 
 }
 
 // DescribeGroup is the rpc method to describe a group
-func (p *Group) DescribeGroup(req *DescribeGroupRequest, resp *DescribeGroupResponse) error {
+func (p *Group) DescribeGroup(_ *http.Request, req *DescribeGroupRequest, resp *DescribeGroupResponse) error {
 	desc, err := p.plugin.DescribeGroup(req.ID)
 	if err != nil {
 		return err
@@ -45,7 +46,7 @@ func (p *Group) DescribeGroup(req *DescribeGroupRequest, resp *DescribeGroupResp
 }
 
 // DestroyGroup is the rpc method to destroy a group
-func (p *Group) DestroyGroup(req *DestroyGroupRequest, resp *DestroyGroupResponse) error {
+func (p *Group) DestroyGroup(_ *http.Request, req *DestroyGroupRequest, resp *DestroyGroupResponse) error {
 	err := p.plugin.DestroyGroup(req.ID)
 	if err != nil {
 		return err
@@ -55,7 +56,7 @@ func (p *Group) DestroyGroup(req *DestroyGroupRequest, resp *DestroyGroupRespons
 }
 
 // InspectGroups is the rpc method to inspect groups
-func (p *Group) InspectGroups(req *InspectGroupsRequest, resp *InspectGroupsResponse) error {
+func (p *Group) InspectGroups(_ *http.Request, req *InspectGroupsRequest, resp *InspectGroupsResponse) error {
 	groups, err := p.plugin.InspectGroups()
 	if err != nil {
 		return err

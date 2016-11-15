@@ -35,10 +35,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			groupPlugin, err = group_plugin.NewClient(endpoint.Protocol, endpoint.Address)
-			if err != nil {
-				return err
-			}
+			groupPlugin = group_plugin.NewClient(endpoint.Address)
 
 			return nil
 		},

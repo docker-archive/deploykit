@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/plugin/group/types"
-	"github.com/docker/infrakit/rpc"
+	rpc_server "github.com/docker/infrakit/rpc/server"
 	"github.com/docker/infrakit/spi/flavor"
 	"github.com/docker/infrakit/spi/instance"
 	"github.com/stretchr/testify/require"
@@ -23,12 +23,6 @@ func tempSocket() string {
 	}
 
 	return path.Join(dir, "flavor-impl-test")
-}
-
-func testClient(t *testing.T, socket string) flavor.Plugin {
-	cl, err := NewClient("unix", socket)
-	require.NoError(t, err)
-	return cl
 }
 
 type testPlugin struct {
@@ -67,7 +61,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
 
-	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoValidate: func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
 			return nil
@@ -75,9 +69,9 @@ func TestFlavorPluginValidate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	require.NoError(t, testClient(t, socketPath).Validate(inputFlavorProperties, allocation))
+	require.NoError(t, NewClient(socketPath).Validate(inputFlavorProperties, allocation))
 
-	close(stop)
+	server.Stop()
 
 	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
 }
@@ -88,7 +82,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
 
-	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoValidate: func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
 			return errors.New("something-went-wrong")
@@ -96,11 +90,11 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = testClient(t, socketPath).Validate(inputFlavorProperties, allocation)
+	err = NewClient(socketPath).Validate(inputFlavorProperties, allocation)
 	require.Error(t, err)
 	require.Equal(t, "something-went-wrong", err.Error())
 
-	close(stop)
+	server.Stop()
 	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
 }
 
@@ -115,7 +109,7 @@ func TestFlavorPluginPrepare(t *testing.T) {
 		Tags:       map[string]string{"foo": "bar"},
 	}
 
-	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoPrepare: func(
 			flavorProperties json.RawMessage,
 			instanceSpec instance.Spec,
@@ -129,14 +123,14 @@ func TestFlavorPluginPrepare(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	spec, err := testClient(t, socketPath).Prepare(
+	spec, err := NewClient(socketPath).Prepare(
 		inputFlavorProperties,
 		inputInstanceSpec,
 		allocation)
 	require.NoError(t, err)
 	require.Equal(t, inputInstanceSpec, spec)
 
-	close(stop)
+	server.Stop()
 
 	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
 	require.Equal(t, inputInstanceSpec, <-inputInstanceSpecActual)
@@ -153,7 +147,7 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 		Tags:       map[string]string{"foo": "bar"},
 	}
 
-	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoPrepare: func(
 			flavorProperties json.RawMessage,
 			instanceSpec instance.Spec,
@@ -167,14 +161,14 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = testClient(t, socketPath).Prepare(
+	_, err = NewClient(socketPath).Prepare(
 		inputFlavorProperties,
 		inputInstanceSpec,
 		allocation)
 	require.Error(t, err)
 	require.Equal(t, "bad-thing-happened", err.Error())
 
-	close(stop)
+	server.Stop()
 
 	require.Equal(t, inputFlavorProperties, <-inputFlavorPropertiesActual)
 	require.Equal(t, inputInstanceSpec, <-inputInstanceSpecActual)
@@ -190,7 +184,7 @@ func TestFlavorPluginHealthy(t *testing.T) {
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoHealthy: func(properties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 			inputPropertiesActual <- properties
 			inputInstanceActual <- inst
@@ -199,13 +193,13 @@ func TestFlavorPluginHealthy(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	health, err := testClient(t, socketPath).Healthy(inputProperties, inputInstance)
+	health, err := NewClient(socketPath).Healthy(inputProperties, inputInstance)
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
 
 	require.Equal(t, inputProperties, <-inputPropertiesActual)
 	require.Equal(t, inputInstance, <-inputInstanceActual)
-	close(stop)
+	server.Stop()
 }
 
 func TestFlavorPluginHealthyError(t *testing.T) {
@@ -218,7 +212,7 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoHealthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
 			inputPropertiesActual <- flavorProperties
 			inputInstanceActual <- inst
@@ -227,13 +221,13 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = testClient(t, socketPath).Healthy(inputProperties, inputInstance)
+	_, err = NewClient(socketPath).Healthy(inputProperties, inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 
 	require.Equal(t, inputProperties, <-inputPropertiesActual)
 	require.Equal(t, inputInstance, <-inputInstanceActual)
-	close(stop)
+	server.Stop()
 }
 
 func TestFlavorPluginDrain(t *testing.T) {
@@ -246,7 +240,7 @@ func TestFlavorPluginDrain(t *testing.T) {
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDrain: func(properties json.RawMessage, inst instance.Description) error {
 			inputPropertiesActual <- properties
 			inputInstanceActual <- inst
@@ -255,11 +249,11 @@ func TestFlavorPluginDrain(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	require.NoError(t, testClient(t, socketPath).Drain(inputProperties, inputInstance))
+	require.NoError(t, NewClient(socketPath).Drain(inputProperties, inputInstance))
 
 	require.Equal(t, inputProperties, <-inputPropertiesActual)
 	require.Equal(t, inputInstance, <-inputInstanceActual)
-	close(stop)
+	server.Stop()
 }
 
 func TestFlavorPluginDrainError(t *testing.T) {
@@ -272,7 +266,7 @@ func TestFlavorPluginDrainError(t *testing.T) {
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	stop, _, err := rpc.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoDrain: func(flavorProperties json.RawMessage, inst instance.Description) error {
 			inputPropertiesActual <- flavorProperties
 			inputInstanceActual <- inst
@@ -281,11 +275,11 @@ func TestFlavorPluginDrainError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = testClient(t, socketPath).Drain(inputProperties, inputInstance)
+	err = NewClient(socketPath).Drain(inputProperties, inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 
 	require.Equal(t, inputProperties, <-inputPropertiesActual)
 	require.Equal(t, inputInstance, <-inputInstanceActual)
-	close(stop)
+	server.Stop()
 }

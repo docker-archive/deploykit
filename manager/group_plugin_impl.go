@@ -18,13 +18,8 @@ func (m *manager) proxyForGroupPlugin(name string) (group.Plugin, error) {
 		return nil, err
 	}
 
-	client, err := rpc.NewClient(endpoint.Protocol, endpoint.Address)
-	if err != nil {
-		return nil, err
-	}
-
 	m.backendName = name
-	return client, nil
+	return rpc.NewClient(endpoint.Address), nil
 }
 
 // This implements the Group Plugin interface to support single group-only operations

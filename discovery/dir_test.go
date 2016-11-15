@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	server "github.com/docker/infrakit/rpc"
 	rpc "github.com/docker/infrakit/rpc/instance"
+	"github.com/docker/infrakit/rpc/server"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,17 +31,15 @@ func TestDirDiscovery(t *testing.T) {
 
 	name1 := "server1"
 	path1 := filepath.Join(dir, name1)
-	stop1, errors1, err1 := server.StartPluginAtPath(path1, rpc.PluginServer(nil))
-	require.NoError(t, err1)
-	require.NotNil(t, stop1)
-	require.NotNil(t, errors1)
+	server1, err := server.StartPluginAtPath(path1, rpc.PluginServer(nil))
+	require.NoError(t, err)
+	require.NotNil(t, server1)
 
 	name2 := "server2"
 	path2 := filepath.Join(dir, name2)
-	stop2, errors2, err2 := server.StartPluginAtPath(path2, rpc.PluginServer(nil))
-	require.NoError(t, err2)
-	require.NotNil(t, stop2)
-	require.NotNil(t, errors2)
+	server2, err := server.StartPluginAtPath(path2, rpc.PluginServer(nil))
+	require.NoError(t, err)
+	require.NotNil(t, server2)
 
 	discover, err := newDirPluginDiscovery(dir)
 	require.NoError(t, err)
@@ -55,7 +53,7 @@ func TestDirDiscovery(t *testing.T) {
 	require.NotNil(t, p)
 
 	// Now we stop the servers
-	close(stop1)
+	server1.Stop()
 	blockWhileFileExists(path1)
 
 	p, err = discover.Find(name1)
@@ -65,7 +63,7 @@ func TestDirDiscovery(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
-	close(stop2)
+	server2.Stop()
 
 	blockWhileFileExists(path2)
 

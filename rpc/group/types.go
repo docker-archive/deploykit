@@ -54,13 +54,3 @@ type InspectGroupsRequest struct {
 type InspectGroupsResponse struct {
 	Groups []group.Spec
 }
-
-// RPCService is the interface for exposing the group plugin as a RPC service. It conforms to the call conventions
-// defined in net/rpc
-type RPCService interface {
-	CommitGroup(req *CommitGroupRequest, resp *CommitGroupResponse) error
-	FreeGroup(req *FreeGroupRequest, resp *FreeGroupResponse) error
-	DescribeGroup(req *DescribeGroupRequest, resp *DescribeGroupResponse) error
-	DestroyGroup(req *DestroyGroupRequest, resp *DestroyGroupResponse) error
-	InspectGroups(req *InspectGroupsRequest, resp *InspectGroupsResponse) error
-}
