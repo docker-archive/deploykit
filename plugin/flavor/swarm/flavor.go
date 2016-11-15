@@ -50,14 +50,14 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID, attachments map[
 	idsMap := map[instance.LogicalID]bool{}
 	for _, id := range logicalIDs {
 		if _, exists := idsMap[id]; exists {
-			return fmt.Errorf("LogicalID %s specified more than once", id)
+			return fmt.Errorf("LogicalID %v specified more than once", id)
 		}
 
 		idsMap[id] = true
 	}
 	for id := range attachments {
 		if _, exists := idsMap[id]; !exists {
-			return fmt.Errorf("LogicalID %s used for an attachment but is not in group LogicalIDs", id)
+			return fmt.Errorf("LogicalID %v used for an attachment but is not in group LogicalIDs", id)
 		}
 	}
 
@@ -66,7 +66,7 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID, attachments map[
 	for _, att := range attachments {
 		for _, attachment := range att {
 			if _, exists := allAttachments[attachment]; exists {
-				return fmt.Errorf("Attachment %s specified more than once", attachment)
+				return fmt.Errorf("Attachment %v specified more than once", attachment)
 			}
 			allAttachments[attachment] = true
 		}
