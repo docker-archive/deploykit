@@ -18,51 +18,45 @@ import (
 
 func main() {
 
-	logLevel := cli.DefaultLogLevel
-	var name string
-
-	pollInterval := 10 * time.Second
-
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Group server",
-		RunE: func(c *cobra.Command, args []string) error {
+	}
+	name := cmd.Flags().String("name", "group", "Plugin name to advertise for discovery")
+	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+	pollInterval := cmd.Flags().Duration("poll-interval", 10*time.Second, "Group polling interval")
+	cmd.RunE = func(c *cobra.Command, args []string) error {
 
-			cli.SetLogLevel(logLevel)
+		cli.SetLogLevel(*logLevel)
 
-			plugins, err := discovery.NewPluginDiscovery()
+		plugins, err := discovery.NewPluginDiscovery()
+		if err != nil {
+			return err
+		}
+
+		instancePluginLookup := func(n string) (instance.Plugin, error) {
+			endpoint, err := plugins.Find(n)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			return instance_client.NewClient(endpoint.Address), nil
+		}
 
-			instancePluginLookup := func(n string) (instance.Plugin, error) {
-				endpoint, err := plugins.Find(n)
-				if err != nil {
-					return nil, err
-				}
-				return instance_client.NewClient(endpoint.Address), nil
+		flavorPluginLookup := func(n string) (flavor.Plugin, error) {
+			endpoint, err := plugins.Find(n)
+			if err != nil {
+				return nil, err
 			}
+			return flavor_client.NewClient(endpoint.Address), nil
+		}
 
-			flavorPluginLookup := func(n string) (flavor.Plugin, error) {
-				endpoint, err := plugins.Find(n)
-				if err != nil {
-					return nil, err
-				}
-				return flavor_client.NewClient(endpoint.Address), nil
-			}
+		cli.RunPlugin(*name, group_server.PluginServer(
+			group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup, *pollInterval)))
 
-			cli.RunPlugin(name, group_server.PluginServer(
-				group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup, pollInterval)))
-
-			return nil
-		},
+		return nil
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
-
-	cmd.Flags().StringVar(&name, "name", "group", "Plugin name to advertise for discovery")
-	cmd.Flags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
-	cmd.Flags().DurationVar(&pollInterval, "poll-interval", pollInterval, "Group polling interval")
 
 	err := cmd.Execute()
 	if err != nil {

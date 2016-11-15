@@ -17,25 +17,24 @@ import (
 
 func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
-	name := ""
 	var instancePlugin instance.Plugin
 
 	cmd := &cobra.Command{
 		Use:   "instance",
 		Short: "Access instance plugin",
-		PersistentPreRunE: func(c *cobra.Command, args []string) error {
-
-			endpoint, err := plugins().Find(name)
-			if err != nil {
-				return err
-			}
-
-			instancePlugin = instance_plugin.NewClient(endpoint.Address)
-
-			return nil
-		},
 	}
-	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
+	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
+	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
+
+		endpoint, err := plugins().Find(*name)
+		if err != nil {
+			return err
+		}
+
+		instancePlugin = instance_plugin.NewClient(endpoint.Address)
+
+		return nil
+	}
 
 	validate := &cobra.Command{
 		Use:   "validate <instance configuration file>",
@@ -113,52 +112,49 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 
-	tags := []string{}
-	var quiet bool
 	describe := &cobra.Command{
 		Use:   "describe",
 		Short: "describe the instances",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", instancePlugin)
-
-			filter := map[string]string{}
-			for _, t := range tags {
-				p := strings.Split(t, "=")
-				if len(p) == 2 {
-					filter[p[0]] = p[1]
-				} else {
-					filter[p[0]] = ""
-				}
-			}
-
-			desc, err := instancePlugin.DescribeInstances(filter)
-			if err == nil {
-
-				if !quiet {
-					fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
-				}
-				for _, d := range desc {
-					logical := "  -   "
-					if d.LogicalID != nil {
-						logical = string(*d.LogicalID)
-					}
-
-					printTags := []string{}
-					for k, v := range d.Tags {
-						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
-					}
-					sort.Strings(printTags)
-
-					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
-				}
-			}
-
-			return err
-		},
 	}
-	describe.Flags().StringSliceVar(&tags, "tags", tags, "Tags to filter")
-	describe.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
+	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
+	quiet := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
+	describe.RunE = func(cmd *cobra.Command, args []string) error {
+		assertNotNil("no plugin", instancePlugin)
 
+		filter := map[string]string{}
+		for _, t := range *tags {
+			p := strings.Split(t, "=")
+			if len(p) == 2 {
+				filter[p[0]] = p[1]
+			} else {
+				filter[p[0]] = ""
+			}
+		}
+
+		desc, err := instancePlugin.DescribeInstances(filter)
+		if err == nil {
+
+			if !*quiet {
+				fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+			}
+			for _, d := range desc {
+				logical := "  -   "
+				if d.LogicalID != nil {
+					logical = string(*d.LogicalID)
+				}
+
+				printTags := []string{}
+				for k, v := range d.Tags {
+					printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
+				}
+				sort.Strings(printTags)
+
+				fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
+			}
+		}
+
+		return err
+	}
 	cmd.AddCommand(validate, provision, destroy, describe)
 
 	return cmd
