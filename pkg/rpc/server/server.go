@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json"
+	"net/http/httptest"
+	"net/http/httputil"
 )
 
 // Stoppable support proactive stopping, and blocking until stopped.
@@ -31,6 +32,33 @@ func (s *stoppableServer) AwaitStopped() {
 	<-s.server.StopChan()
 }
 
+type loggingHandler struct {
+	handler http.Handler
+}
+
+func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	requestData, err := httputil.DumpRequest(req, true)
+	if err == nil {
+		log.Debug(string(requestData))
+	} else {
+		log.Error(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	h.handler.ServeHTTP(recorder, req)
+
+	responseData, err := httputil.DumpResponse(recorder.Result(), true)
+	if err == nil {
+		log.Debug(string(responseData))
+	} else {
+		log.Error(err)
+	}
+
+	w.WriteHeader(recorder.Code)
+	recorder.Body.WriteTo(w)
+}
+
 // StartPluginAtPath starts an HTTP server listening on a unix socket at the specified path.
 // Returns a Stoppable that can be used to stop or block on the server.
 func StartPluginAtPath(socketPath string, receiver interface{}) (Stoppable, error) {
@@ -44,7 +72,7 @@ func StartPluginAtPath(socketPath string, receiver interface{}) (Stoppable, erro
 	httpLog := log.New()
 	httpLog.Level = log.GetLevel()
 
-	handler := handlers.LoggingHandler(httpLog.WriterLevel(log.DebugLevel), server)
+	handler := loggingHandler{handler: server}
 	gracefulServer := graceful.Server{
 		Timeout: 10 * time.Second,
 		Server:  &http.Server{Addr: fmt.Sprintf("unix://%s", socketPath), Handler: handler},
