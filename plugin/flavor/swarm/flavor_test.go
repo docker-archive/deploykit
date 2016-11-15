@@ -73,10 +73,10 @@ func TestWorker(t *testing.T) {
 	}
 	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarmInfo, nil)
 
-	client.EXPECT().Info(gomock.Any()).Return(docker_types.Info{Swarm: swarm.Info{NodeID: "my-node-id"}}, nil)
+	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil)
 
 	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
-	client.EXPECT().NodeInspectWithRaw(gomock.Any(), "my-node-id").Return(nodeInfo, nil, nil)
+	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil)
 
 	details, err := flavorImpl.Prepare(
 		json.RawMessage(`{"Type": "worker"}`),
@@ -103,7 +103,7 @@ func TestWorker(t *testing.T) {
 
 	filter, err := filters.FromParam(fmt.Sprintf(`{"label": {"%s=%s": true}}`, associationTag, associationID))
 	require.NoError(t, err)
-	client.EXPECT().NodeList(gomock.Any(), docker_types.NodeListOptions{Filter: filter}).Return(
+	client.EXPECT().NodeList(gomock.Any(), docker_types.NodeListOptions{Filters: filter}).Return(
 		[]swarm.Node{
 			{},
 		}, nil)
@@ -113,6 +113,10 @@ func TestWorker(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
 }
+
+const nodeID = "my-node-id"
+
+var infoResponse = docker_types.Info{InfoBase: &docker_types.InfoBase{Swarm: swarm.Info{NodeID: nodeID}}}
 
 func TestManager(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -131,10 +135,10 @@ func TestManager(t *testing.T) {
 	}
 	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarmInfo, nil)
 
-	client.EXPECT().Info(gomock.Any()).Return(docker_types.Info{Swarm: swarm.Info{NodeID: "my-node-id"}}, nil)
+	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil)
 
 	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
-	client.EXPECT().NodeInspectWithRaw(gomock.Any(), "my-node-id").Return(nodeInfo, nil, nil)
+	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil)
 
 	id := instance.LogicalID("127.0.0.1")
 	details, err := flavorImpl.Prepare(
@@ -162,7 +166,7 @@ func TestManager(t *testing.T) {
 
 	filter, err := filters.FromParam(fmt.Sprintf(`{"label": {"%s=%s": true}}`, associationTag, associationID))
 	require.NoError(t, err)
-	client.EXPECT().NodeList(gomock.Any(), docker_types.NodeListOptions{Filter: filter}).Return(
+	client.EXPECT().NodeList(gomock.Any(), docker_types.NodeListOptions{Filters: filter}).Return(
 		[]swarm.Node{
 			{},
 		}, nil)

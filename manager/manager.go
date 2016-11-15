@@ -326,7 +326,7 @@ func (m *manager) execPlugins(config GlobalSpec, work func(group.Plugin, group.S
 			return err
 		}
 
-		gp, err := rpc.NewClient(ep.Protocol, ep.Address)
+		gp := rpc.NewClient(ep.Address)
 		if err != nil {
 			log.Warningln("Cannot contact group", id, " at plugin", name, "endpoint=", ep.Address)
 			return err

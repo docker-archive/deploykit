@@ -1,4 +1,4 @@
-package rpc
+package server
 
 import (
 	"encoding/json"
@@ -41,11 +41,10 @@ func TestUnixSocketServer(t *testing.T) {
 	service := plugin_rpc.PluginServer(mock)
 
 	socket := filepath.Join(os.TempDir(), fmt.Sprintf("%d.sock", time.Now().Unix()))
-	stop, errors, err := StartPluginAtPath(socket, service)
+	server, err := StartPluginAtPath(socket, service)
 	require.NoError(t, err)
 
-	c, err := plugin_rpc.NewClient("unix", socket)
-	require.NoError(t, err)
+	c := plugin_rpc.NewClient(socket)
 
 	err = c.Validate(properties)
 	require.Error(t, err)
@@ -55,9 +54,5 @@ func TestUnixSocketServer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, instanceID, *id)
 
-	// Now we stop the server
-	close(stop)
-
-	// We shouldn't block here.
-	<-errors
+	server.Stop()
 }

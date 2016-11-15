@@ -162,7 +162,7 @@ func (s swarmFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Des
 	filter := filters.NewArgs()
 	filter.Add("label", fmt.Sprintf("%s=%s", associationTag, associationID))
 
-	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filter: filter})
+	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
 	if err != nil {
 		return flavor.Unknown, err
 	}
@@ -201,7 +201,7 @@ func (s swarmFlavor) Drain(flavorProperties json.RawMessage, inst instance.Descr
 	filter := filters.NewArgs()
 	filter.Add("label", fmt.Sprintf("%s=%s", associationTag, associationID))
 
-	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filter: filter})
+	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
 	if err != nil {
 		return err
 	}

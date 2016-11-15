@@ -1,11 +1,13 @@
 package instance
 
 import (
+	"errors"
 	"github.com/docker/infrakit/spi/instance"
+	"net/http"
 )
 
 // PluginServer returns a RPCService that conforms to the net/rpc rpc call convention.
-func PluginServer(p instance.Plugin) RPCService {
+func PluginServer(p instance.Plugin) *Instance {
 	return &Instance{plugin: p}
 }
 
@@ -16,8 +18,12 @@ type Instance struct {
 }
 
 // Validate performs local validation on a provision request.
-func (p *Instance) Validate(req *ValidateRequest, resp *ValidateResponse) error {
-	err := p.plugin.Validate(req.Properties)
+func (p *Instance) Validate(_ *http.Request, req *ValidateRequest, resp *ValidateResponse) error {
+	if req.Properties == nil {
+		return errors.New("Request Properties must be set")
+	}
+
+	err := p.plugin.Validate(*req.Properties)
 	if err != nil {
 		return err
 	}
@@ -26,7 +32,7 @@ func (p *Instance) Validate(req *ValidateRequest, resp *ValidateResponse) error 
 }
 
 // Provision creates a new instance based on the spec.
-func (p *Instance) Provision(req *ProvisionRequest, resp *ProvisionResponse) error {
+func (p *Instance) Provision(_ *http.Request, req *ProvisionRequest, resp *ProvisionResponse) error {
 	id, err := p.plugin.Provision(req.Spec)
 	if err != nil {
 		return err
@@ -36,7 +42,7 @@ func (p *Instance) Provision(req *ProvisionRequest, resp *ProvisionResponse) err
 }
 
 // Destroy terminates an existing instance.
-func (p *Instance) Destroy(req *DestroyRequest, resp *DestroyResponse) error {
+func (p *Instance) Destroy(_ *http.Request, req *DestroyRequest, resp *DestroyResponse) error {
 	err := p.plugin.Destroy(req.Instance)
 	if err != nil {
 		return err
@@ -46,7 +52,7 @@ func (p *Instance) Destroy(req *DestroyRequest, resp *DestroyResponse) error {
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
-func (p *Instance) DescribeInstances(req *DescribeInstancesRequest, resp *DescribeInstancesResponse) error {
+func (p *Instance) DescribeInstances(_ *http.Request, req *DescribeInstancesRequest, resp *DescribeInstancesResponse) error {
 	desc, err := p.plugin.DescribeInstances(req.Tags)
 	if err != nil {
 		return err

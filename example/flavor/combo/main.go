@@ -32,7 +32,7 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
-				return flavor_rpc.NewClient(endpoint.Protocol, endpoint.Address)
+				return flavor_rpc.NewClient(endpoint.Address), nil
 			}
 
 			cli.SetLogLevel(logLevel)
