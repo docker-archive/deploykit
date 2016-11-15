@@ -5,8 +5,8 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/cli"
-	"github.com/docker/infrakit/discovery"
+	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/spf13/cobra"
 )
 
