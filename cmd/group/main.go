@@ -5,14 +5,14 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/cli"
-	"github.com/docker/infrakit/discovery"
-	"github.com/docker/infrakit/plugin/group"
-	flavor_client "github.com/docker/infrakit/rpc/flavor"
-	group_server "github.com/docker/infrakit/rpc/group"
-	instance_client "github.com/docker/infrakit/rpc/instance"
-	"github.com/docker/infrakit/spi/flavor"
-	"github.com/docker/infrakit/spi/instance"
+	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin/group"
+	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
+	group_server "github.com/docker/infrakit/pkg/rpc/group"
+	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
-				return instance_client.NewClient(endpoint.Protocol, endpoint.Address)
+				return instance_client.NewClient(endpoint.Address), nil
 			}
 
 			flavorPluginLookup := func(n string) (flavor.Plugin, error) {
@@ -48,7 +48,7 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
-				return flavor_client.NewClient(endpoint.Protocol, endpoint.Address)
+				return flavor_client.NewClient(endpoint.Address), nil
 			}
 
 			cli.RunPlugin(name, group_server.PluginServer(

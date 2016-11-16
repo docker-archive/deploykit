@@ -10,8 +10,8 @@ import (
 )
 
 // ImageList returns a list of images in the docker host.
-func (cli *Client) ImageList(ctx context.Context, options types.ImageListOptions) ([]types.Image, error) {
-	var images []types.Image
+func (cli *Client) ImageList(ctx context.Context, options types.ImageListOptions) ([]types.ImageSummary, error) {
+	var images []types.ImageSummary
 	query := url.Values{}
 
 	if options.Filters.Len() > 0 {
@@ -20,10 +20,6 @@ func (cli *Client) ImageList(ctx context.Context, options types.ImageListOptions
 			return images, err
 		}
 		query.Set("filters", filterJSON)
-	}
-	if options.MatchName != "" {
-		// FIXME rename this parameter, to not be confused with the filters flag
-		query.Set("filter", options.MatchName)
 	}
 	if options.All {
 		query.Set("all", "1")

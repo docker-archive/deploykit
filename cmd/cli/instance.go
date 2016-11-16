@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/discovery"
-	instance_plugin "github.com/docker/infrakit/rpc/instance"
-	"github.com/docker/infrakit/spi/instance"
+	"github.com/docker/infrakit/pkg/discovery"
+	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
 
@@ -30,10 +30,7 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			instancePlugin, err = instance_plugin.NewClient(endpoint.Protocol, endpoint.Address)
-			if err != nil {
-				return err
-			}
+			instancePlugin = instance_plugin.NewClient(endpoint.Address)
 
 			return nil
 		},

@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/infrakit/discovery"
-	file_leader "github.com/docker/infrakit/leader/file"
-	file_store "github.com/docker/infrakit/store/file"
+	"github.com/docker/infrakit/pkg/discovery"
+	file_leader "github.com/docker/infrakit/pkg/leader/file"
+	file_store "github.com/docker/infrakit/pkg/store/file"
 	"github.com/spf13/cobra"
 )
 

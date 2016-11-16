@@ -62,8 +62,8 @@ Now we must create the JSON for a group.  You will find that the JSON structures
 
 This defines the name of the `Plugin` to use and the `Properties` to configure it with.  The plugins are free to define
 their own configuration schema.  Plugins in this repository follow a convention of using a `Spec` Go struct to define
-the `Properties` schema for each plugin.  The [`group.Spec`](/plugin/group/types/types.go) in the default Group plugin,
-and [`vanilla.Spec`](/plugin/flavor/vanilla/flavor.go) are examples of this pattern.
+the `Properties` schema for each plugin.  The [`group.Spec`](../pkg/plugin/group/types/types.go) in the default Group plugin,
+and [`vanilla.Spec`](../pkg/plugin/flavor/vanilla/flavor.go) are examples of this pattern.
 
 From listing the plugins earlier, we have two plugins running. `instance-file` is the name of the File Instance Plugin,
 and `flavor-vanilla` is the name of the Vanilla Flavor Plugin.

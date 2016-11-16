@@ -5,10 +5,10 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/go-connections/tlsconfig"
-	"github.com/docker/infrakit/discovery"
-	swarm_leader "github.com/docker/infrakit/leader/swarm"
-	swarm_store "github.com/docker/infrakit/store/swarm"
-	"github.com/docker/infrakit/util/docker/1.24"
+	"github.com/docker/infrakit/pkg/discovery"
+	swarm_leader "github.com/docker/infrakit/pkg/leader/swarm"
+	swarm_store "github.com/docker/infrakit/pkg/store/swarm"
+	"github.com/docker/infrakit/pkg/util/docker/1.24"
 	"github.com/spf13/cobra"
 )
 

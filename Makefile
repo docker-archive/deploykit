@@ -84,13 +84,13 @@ endif
 	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
 	$(call build_binary,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
-	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/example/flavor/combo)
-	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/example/flavor/swarm)
-	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/example/flavor/vanilla)
-	$(call build_binary,infrakit-flavor-zookeeper,github.com/docker/infrakit/example/flavor/zookeeper)
-	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/example/instance/file)
-	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/example/instance/terraform)
-	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/example/instance/vagrant)
+	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/pkg/example/flavor/combo)
+	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/pkg/example/flavor/swarm)
+	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/pkg/example/flavor/vanilla)
+	$(call build_binary,infrakit-flavor-zookeeper,github.com/docker/infrakit/pkg/example/flavor/zookeeper)
+	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/pkg/example/instance/file)
+	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/pkg/example/instance/terraform)
+	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/pkg/example/instance/vagrant)
 
 install:
 	@echo "+ $@"

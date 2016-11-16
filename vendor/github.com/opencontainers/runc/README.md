@@ -17,6 +17,11 @@ You can find official releases of `runc` on the [release](https://github.com/ope
 `runc` currently supports the Linux platform with various architecture support. 
 It must be built with Go version 1.6 or higher in order for some features to function properly.
 
+In order to enable seccomp support you will need to install `libseccomp` on your platform.
+> e.g. `libseccomp-devel` for CentOS, or `libseccomp-dev` for Ubuntu
+
+Otherwise, if you do not want to build `runc` with seccomp support you can add `BUILDTAGS=""` when running make.
+
 ```bash
 # create a 'github.com/opencontainers' in your GOPATH/src
 cd github.com/opencontainers
@@ -28,9 +33,6 @@ sudo make install
 ```
 
 `runc` will be installed to `/usr/local/sbin/runc` on your system.
-
-In order to enable seccomp support you will need to install libseccomp on your platform.
-If you do not want to build `runc` with seccomp support you can add `BUILDTAGS=""` when running make.
 
 #### Build Tags
 
@@ -46,6 +48,7 @@ make BUILDTAGS='seccomp apparmor'
 | seccomp   | Syscall filtering                  | libseccomp  |
 | selinux   | selinux process and mount labeling | <none>      |
 | apparmor  | apparmor profile support           | libapparmor |
+| ambient   | ambient capability support         | kernel 4.3  |
 
 
 ### Running the test suite
@@ -107,7 +110,7 @@ runc run mycontainerid
 If you used the unmodified `runc spec` template this should give you a `sh` session inside the container.
 
 The second way to start a container is using the specs lifecycle operations.
-This gives you move power of how the container is created and managed while it is running.
+This gives you more power over how the container is created and managed while it is running.
 This will also launch the container in the background so you will have to edit the `config.json` to remove the `terminal` setting for the simple examples here.
 Your process field in the `config.json` should look like this below with `"terminal": false` and `"args": ["sleep", "5"]`.
 

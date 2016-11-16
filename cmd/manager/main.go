@@ -5,13 +5,12 @@ import (
 	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/cli"
-	"github.com/docker/infrakit/discovery"
-	"github.com/docker/infrakit/leader"
-	"github.com/docker/infrakit/manager"
-	"github.com/docker/infrakit/rpc"
-	group_rpc "github.com/docker/infrakit/rpc/group"
-	"github.com/docker/infrakit/store"
+	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/leader"
+	"github.com/docker/infrakit/pkg/manager"
+	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
+	"github.com/docker/infrakit/pkg/store"
 	"github.com/spf13/cobra"
 )
 
@@ -52,28 +51,20 @@ func runMain(backend *backend) error {
 
 	log.Infoln("Starting up manager:", backend)
 
-	manager, err := manager.NewManager(backend.plugins,
+	mgr, err := manager.NewManager(backend.plugins,
 		backend.leader, backend.snapshot, backend.pluginName)
 	if err != nil {
 		return err
 	}
 
-	_, err = manager.Start()
+	_, err = mgr.Start()
 	if err != nil {
 		return err
 	}
 
-	_, stopped, err := rpc.StartPluginAtPath(
-		filepath.Join(discovery.Dir(), backend.id),
-		group_rpc.PluginServer(manager),
-	)
-	if err != nil {
-		return err
-	}
+	cli.RunPlugin(backend.id, group_rpc.PluginServer(mgr))
 
-	<-stopped // block until done
-
-	manager.Stop()
+	mgr.Stop()
 	log.Infoln("Manager stopped")
 
 	return err
