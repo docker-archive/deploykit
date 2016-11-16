@@ -11,11 +11,11 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test vendor-update containers check-docs
+.PHONY: clean all fmt vet lint build test vendor-update containers check-docs tutorial-test
 .DEFAULT: all
 all: clean fmt vet lint build test binaries
 
-ci: fmt vet lint check-docs coverage
+ci: fmt vet lint check-docs coverage tutorial-test
 
 AUTHORS: .mailmap .git/HEAD
 	git log --format='%aN <%aE>' | sort -fu > $@
@@ -109,6 +109,10 @@ coverage:
 	@for pkg in $(PKGS); do \
 		go test -test.short -race -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
+
+tutorial-test:
+	@echo "+ $@"
+	./scripts/tutorial-test
 
 test-full:
 	@echo "+ $@"
