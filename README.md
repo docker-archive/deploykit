@@ -22,99 +22,13 @@ As a result, it is a low-level tool intended to be used by infrastructure operat
 environments while using shared components and consistent interfaces.
 
 ## Plugins
-_InfraKit_ leverages _Plugins_ to manage arbitrary systems in diverse environments, which can be composed to meet
-different needs.  Technically, a Plugin is an HTTP server with a well-defined API, listening on a unix socket.
+_InfraKit_ makes extensive use of _Plugins_ to manage arbitrary systems in diverse environments, which can be composed
+to meet different needs.
 
-[Utilities](pkg/rpc) are provided as libraries to simplify Plugin development in Go.
-
-### Plugin types
-#### Group
-When managing infrastructure like computing clusters, Groups make good abstraction, and working with groups is easier
-than managing individual instances. For example, a group can be made up of a collection
-of machines as individual instances. The machines in a group can have identical configurations (replicas, or cattle).
-They can also have slightly different properties like identity and ordering (as members of a quorum or pets).
-
-_InfraKit_ provides primitives to manage Groups: a group has a given size and can shrink or grow based on some
-specification, whether it's human generated or machine computed.
-Group members can also be updated in a rolling fashion so that the configuration of the instance members reflect a new
-desired state.  Operators can focus on Groups while _InfraKit_ handles the necessary coordination of Instances.
-
-Since _InfraKit_ emphasizes on declarative infrastructure, there are no operations to move machines or Groups from one
-state to another.  Instead, you _declare_ your desired state of the infrastructure.  _InfraKit_ is responsible
-for converging towards, and maintaining, that desired state.
-
-Therefore, a [group plugin](pkg/spi/group/spi.go) manages Groups of Instances and exposes the operations that are of
-interest to a user:
-
-  + commit a group configuration, to start managing a group
-  + inspect a group
-  + destroy a group
-
-##### Default Group plugin
-_InfraKit_ provides a default Group plugin implementation, intended to suit common use cases.  The default Group plugin
-manages Instances of a specific Flavor.  Instance and Flavor plugins can be composed to manage different types of
-services on different infrastructure providers.
-
-While it's generally simplest to use the default Group plugin, custom implementations may be valuable to adapt another
-infrastructure management system.  This would allow you to use _InfraKit_ tooling to perform basic operations on widely
-different infrastructure using the same interface.
-
-#### Instance
-Instances are members of a group. An [instance plugin](pkg/spi/instance/spi.go) manages some physical resource instances.
-It knows only about individual instances and nothing about Groups.  Instance is technically defined by the plugin, and
-need not be a physical machine at all.
-
-For compute, for example, instances can be VM instances of identical spec. Instances
-support the notions of attachment to auxiliary resources.  Instances may be tagged, and tags are assumed to be
-persistent which allows the state of the cluster to be inferred and computed.
-
-In some cases, instances can be identical, while in other cases the members of a group require stronger identities and
-persistent, stable state. These properties are captured via the _flavors_ of the instances.
-
-#### Flavor
-Flavors help distinguish members of one group from another by describing how these members should be treated.
-A [flavor plugin](pkg/spi/flavor/spi.go) can be thought of as defining what runs on an Instance.
-It is responsible for dictating commands to run services, and check the health of those services.
-
-Flavors allow a group of instances to have different characteristics.  In a group of cattle,
-all members are treated identically and individual members do not have strong identity.  In a group of pets,
-however, the members may require special handling and demand stronger notions of identity and state.
-
-
-#### Reference implementations
-This repository contains several Plugins which should be considered reference implementations for demonstration purposes
-and development aides.  With the exception of those listed as
-[supported](#supported-implementations), Plugins in this repository should be considered **not** to be under active
-development and for use at your own risk.
-
-Over time, we would prefer to phase out reference Plugins that appear to provide real value for implementations that
-are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit/issues/new)
-to start a discussion before contributing to these plugins with non-trivial code.
-
-| plugin                                             | type     | description                             |
-|:---------------------------------------------------|:---------|:----------------------------------------|
-| [swarm](pkg/example/flavor/swarm)                      | flavor   | runs Docker in Swarm mode               |
-| [vanilla](pkg/example/flavor/vanilla)                  | flavor   | manual specification of instance fields |
-| [zookeeper](pkg/example/flavor/zookeeper)              | flavor   | run an Apache ZooKeeper ensemble        |
-| [infrakit/file](pkg/example/instance/file)             | instance | useful for development and testing      |
-| [infrakit/terraform](pkg/example/instance/terraform)   | instance | creates instances using Terraform       |
-| [infrakit/vagrant](pkg/example/instance/vagrant)       | instance | creates Vagrant VMs                     |
-
-
-#### Supported implementations
-The following Plugins are supported for active development.  Note that these Plugins may not be part of the InfraKit
-project, so please double-check where the code lives before filing InfraKit issues.
-
-| plugin                                                        | type     | description                                           |
-|:--------------------------------------------------------------|:---------|:------------------------------------------------------|
-| [infrakit/group](cmd/group)                                   | group    | supports Instance and Flavor plugins, rolling updates |
-| [docker/infrakit.aws](https://github.com/docker/infrakit.aws) | instance | creates Amazon EC2 instances                          |
-
-Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
+See the [plugins](docs/plugins.md) documentation for more details.
 
 
 ## Building
-
 ### Your Environment
 
 Make sure you check out the project following a convention for building Go projects. For example,
@@ -279,19 +193,6 @@ existing instances have disappeared such that the state doesn't match your speci
 Updating the group tells the Group plugin that your configuration may have changed.  It will
 then determine the changes necessary to ensure the state of the infrastructure matches the new
 specification.
-
-## Plugin Discovery
-
-Multiple _InfraKit_ plugins are typically used together to support a declared configuration.  These plugins discover
-each other by looking for socket files in a common plugin directory, and communicate via HTTP.
-
-The default plugin directory is `~/.infrakit/plugins`, and can be overridden with the environment variable
-`INFRAKIT_PLUGINS_DIR`.
-
-Note that multiple instances of a plugin may run, provided they have different names for discovery.  This may be useful,
-for example, if a plugin can be configured to behave differently. For example:
-
-The CLI shows which plugins are [discoverable](cmd/cli/README.md#list-plugins).
 
 ## Docs
 
