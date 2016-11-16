@@ -1,7 +1,7 @@
 package loadbalancer
 
 import (
-	"github.com/docker/docker/types/swarm"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -327,6 +327,7 @@ func TestListenersFromExposedPorts(t *testing.T) {
 				Protocol:      swarm.PortConfigProtocol("tcp"),
 				TargetPort:    uint32(8080),
 				PublishedPort: uint32(8080),
+				PublishMode:   swarm.PortConfigPublishModeIngress,
 			},
 			{
 				Protocol:   swarm.PortConfigProtocol("tcp"),
@@ -339,6 +340,7 @@ func TestListenersFromExposedPorts(t *testing.T) {
 			Protocol:      swarm.PortConfigProtocol("tcp"),
 			TargetPort:    uint32(8080),
 			PublishedPort: uint32(8080),
+			PublishMode:   swarm.PortConfigPublishModeIngress,
 		},
 		{
 			Protocol:      swarm.PortConfigProtocol("tcp"),

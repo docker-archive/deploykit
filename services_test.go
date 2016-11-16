@@ -185,11 +185,13 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 				Protocol:      swarm.PortConfigProtocol("tcp"),
 				TargetPort:    uint32(8080),
 				PublishedPort: uint32(8080),
+				PublishMode:   swarm.PortConfigPublishModeIngress,
 			},
 			{
 				Protocol:      swarm.PortConfigProtocol("tcp"),
 				TargetPort:    uint32(4343),
 				PublishedPort: uint32(4343),
+				PublishMode:   swarm.PortConfigPublishModeIngress,
 			},
 		},
 	}
@@ -198,11 +200,13 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 			Protocol:      swarm.PortConfigProtocol("tcp"),
 			TargetPort:    uint32(8080),
 			PublishedPort: uint32(8080),
+			PublishMode:   swarm.PortConfigPublishModeIngress,
 		},
 		{
 			Protocol:      swarm.PortConfigProtocol("tcp"),
 			TargetPort:    uint32(4343),
 			PublishedPort: uint32(4343),
+			PublishMode:   swarm.PortConfigPublishModeIngress,
 		},
 	}
 
@@ -255,11 +259,13 @@ func TestExternalLoadBalancerListenersFromServiceWithNoLabels(t *testing.T) {
 				Protocol:      swarm.PortConfigProtocol("tcp"),
 				TargetPort:    uint32(8080),
 				PublishedPort: uint32(8080),
+				PublishMode:   swarm.PortConfigPublishModeIngress,
 			},
 			{
 				Protocol:      swarm.PortConfigProtocol("tcp"),
 				TargetPort:    uint32(4343),
 				PublishedPort: uint32(4343),
+				PublishMode:   swarm.PortConfigPublishModeIngress,
 			},
 		},
 	}
@@ -268,11 +274,13 @@ func TestExternalLoadBalancerListenersFromServiceWithNoLabels(t *testing.T) {
 			Protocol:      swarm.PortConfigProtocol("tcp"),
 			TargetPort:    uint32(8080),
 			PublishedPort: uint32(8080),
+			PublishMode:   swarm.PortConfigPublishModeIngress,
 		},
 		{
 			Protocol:      swarm.PortConfigProtocol("tcp"),
 			TargetPort:    uint32(4343),
 			PublishedPort: uint32(4343),
+			PublishMode:   swarm.PortConfigPublishModeIngress,
 		},
 	}
 
