@@ -196,7 +196,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "ls",
 		Short: "list groups",
 	}
-	quietls := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
+	quietls := describeGroups.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
 	describeGroups.RunE = func(cmd *cobra.Command, args []string) error {
 		assertNotNil("no plugin", groupPlugin)
 
