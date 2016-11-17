@@ -3,27 +3,57 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
-	leader_file "github.com/docker/infrakit/pkg/leader/file"
+	"github.com/docker/infrakit/pkg/leader"
 	group_mock "github.com/docker/infrakit/pkg/mock/spi/group"
 	store_mock "github.com/docker/infrakit/pkg/mock/store"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/group"
-	_ "github.com/docker/infrakit/pkg/store"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
 
+type testLeaderDetector struct {
+	t     *testing.T
+	me    string
+	input <-chan string
+	stop  chan struct{}
+	ch    chan leader.Leadership
+}
+
+func (l *testLeaderDetector) Start() (<-chan leader.Leadership, error) {
+	l.stop = make(chan struct{})
+	l.ch = make(chan leader.Leadership)
+	go func() {
+		for {
+			select {
+			case <-l.stop:
+				return
+			case found := <-l.input:
+				if found == l.me {
+					l.ch <- leader.Leadership{Status: leader.Leader}
+				} else {
+					l.ch <- leader.Leadership{Status: leader.NotLeader}
+				}
+			}
+		}
+	}()
+	return l.ch, nil
+}
+
+func (l *testLeaderDetector) Stop() {
+	close(l.stop)
+}
+
 func testEnsemble(t *testing.T,
 	dir, id string,
-	leaderFile *os.File,
+	leader chan string,
 	ctrl *gomock.Controller,
 	configStore func(*store_mock.MockSnapshot),
 	configureGroup func(*group_mock.MockPlugin)) (Backend, server.Stoppable) {
@@ -31,8 +61,7 @@ func testEnsemble(t *testing.T,
 	disc, err := discovery.NewPluginDiscoveryWithDirectory(dir)
 	require.NoError(t, err)
 
-	detector, err := leader_file.NewDetector(10*time.Millisecond, leaderFile.Name(), id)
-	require.NoError(t, err)
+	detector := &testLeaderDetector{t: t, me: id, input: leader}
 
 	snap := store_mock.NewMockSnapshot(ctrl)
 	configStore(snap)
@@ -51,9 +80,10 @@ func testEnsemble(t *testing.T,
 	return m, st
 }
 
-func testSetLeader(t *testing.T, f *os.File, l string) {
-	err := ioutil.WriteFile(f.Name(), []byte(l), 0644)
-	require.NoError(t, err)
+func testSetLeader(t *testing.T, c []chan string, l string) {
+	for _, cc := range c {
+		cc <- l
+	}
 }
 
 func testDiscoveryDir(t *testing.T) string {
@@ -95,19 +125,16 @@ func TestNoCallsToGroupWhenNoLeader(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	leaderFile, err := ioutil.TempFile(os.TempDir(), "infrakit-leader")
-	require.NoError(t, err)
+	leaderChans := []chan string{make(chan string), make(chan string)}
 
-	testSetLeader(t, leaderFile, "nobody")
-
-	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderFile, ctrl,
+	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
 			// no calls
 		},
 		func(g *group_mock.MockPlugin) {
 			// no calls
 		})
-	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderFile, ctrl,
+	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderChans[1], ctrl,
 		func(s *store_mock.MockSnapshot) {
 			// no calls
 		},
@@ -117,8 +144,6 @@ func TestNoCallsToGroupWhenNoLeader(t *testing.T) {
 
 	manager1.Start()
 	manager2.Start()
-
-	time.Sleep(1 * time.Second)
 
 	manager1.Stop()
 	manager2.Stop()
@@ -131,11 +156,6 @@ func TestStartOneLeader(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	leaderFile, err := ioutil.TempFile(os.TempDir(), "infrakit-leader")
-	require.NoError(t, err)
-
-	testSetLeader(t, leaderFile, "m1")
-
 	gs := testBuildGroupSpec("managers", `
 {
    "field1": "value1"
@@ -143,7 +163,10 @@ func TestStartOneLeader(t *testing.T) {
 `)
 	global := testBuildGlobalSpec(t, gs)
 
-	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderFile, ctrl,
+	leaderChans := []chan string{make(chan string), make(chan string)}
+	checkpoint := make(chan struct{})
+
+	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
 			empty := &GlobalSpec{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
@@ -157,12 +180,15 @@ func TestStartOneLeader(t *testing.T) {
 		func(g *group_mock.MockPlugin) {
 			g.EXPECT().CommitGroup(gomock.Any(), false).Do(
 				func(spec group.Spec, pretend bool) (string, error) {
+
+					defer close(checkpoint)
+
 					require.Equal(t, gs.ID, spec.ID)
 					require.Equal(t, testToStruct(gs.Properties), testToStruct(spec.Properties))
 					return "ok", nil
 				}).Return("ok", nil)
 		})
-	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderFile, ctrl,
+	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderChans[1], ctrl,
 		func(s *store_mock.MockSnapshot) {
 			// no calls expected
 		},
@@ -173,7 +199,9 @@ func TestStartOneLeader(t *testing.T) {
 	manager1.Start()
 	manager2.Start()
 
-	time.Sleep(1 * time.Second)
+	testSetLeader(t, leaderChans, "m1")
+
+	<-checkpoint
 
 	manager1.Stop()
 	manager2.Stop()
@@ -187,11 +215,6 @@ func TestChangeLeadership(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	leaderFile, err := ioutil.TempFile(os.TempDir(), "infrakit-leader")
-	require.NoError(t, err)
-
-	testSetLeader(t, leaderFile, "nobody")
-
 	gs := testBuildGroupSpec("managers", `
 {
    "field1": "value1"
@@ -199,7 +222,12 @@ func TestChangeLeadership(t *testing.T) {
 `)
 	global := testBuildGlobalSpec(t, gs)
 
-	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderFile, ctrl,
+	leaderChans := []chan string{make(chan string), make(chan string)}
+	checkpoint1 := make(chan struct{})
+	checkpoint2 := make(chan struct{})
+	checkpoint3 := make(chan struct{})
+
+	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
 			empty := &GlobalSpec{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
@@ -208,24 +236,37 @@ func TestChangeLeadership(t *testing.T) {
 					require.True(t, is)
 					*p = global
 					return nil
-				}).Return(nil)
+				},
+			).Return(nil)
 		},
 		func(g *group_mock.MockPlugin) {
 			g.EXPECT().CommitGroup(gomock.Any(), false).Do(
 				func(spec group.Spec, pretend bool) (string, error) {
+
+					defer close(checkpoint1)
+
+					t.Log("m1 leading")
 					require.Equal(t, gs.ID, spec.ID)
 					require.Equal(t, testToStruct(gs.Properties), testToStruct(spec.Properties))
 					return "ok", nil
-				}).Return("ok", nil)
+				},
+			).Return("ok", nil)
 
 			// We will get a call to inspect what's being watched
 			g.EXPECT().InspectGroups().Return([]group.Spec{gs}, nil)
 
 			// Now we lost leadership... need to unwatch
-			g.EXPECT().FreeGroup(gomock.Eq(group.ID("managers"))).Return(nil)
+			g.EXPECT().FreeGroup(gomock.Eq(group.ID("managers"))).Do(
+				func(id group.ID) error {
 
+					defer close(checkpoint3)
+
+					t.Log("m1 releasing")
+					return nil
+				},
+			).Return(nil)
 		})
-	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderFile, ctrl,
+	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderChans[1], ctrl,
 		func(s *store_mock.MockSnapshot) {
 			empty := &GlobalSpec{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
@@ -234,32 +275,38 @@ func TestChangeLeadership(t *testing.T) {
 					require.True(t, is)
 					*p = global
 					return nil
-				}).Return(nil)
+				},
+			).Return(nil)
 		},
 		func(g *group_mock.MockPlugin) {
 			g.EXPECT().CommitGroup(gomock.Any(), false).Do(
 				func(spec group.Spec, pretend bool) (string, error) {
+
+					defer close(checkpoint2)
+
+					t.Log("m2 leading")
 					require.Equal(t, gs.ID, spec.ID)
 					require.Equal(t, testToStruct(gs.Properties), testToStruct(spec.Properties))
 					return "ok", nil
-				}).Return("ok", nil)
+				},
+			).Return("ok", nil)
 		})
 
 	manager1.Start()
 	manager2.Start()
 
-	testSetLeader(t, leaderFile, "m1")
+	testSetLeader(t, leaderChans, "m1")
 
-	time.Sleep(1 * time.Second)
+	<-checkpoint1
 
-	testSetLeader(t, leaderFile, "m2")
+	testSetLeader(t, leaderChans, "m2")
 
-	time.Sleep(1 * time.Second)
+	<-checkpoint2
+	<-checkpoint3
 
 	manager1.Stop()
 	manager2.Stop()
 
 	stoppable1.Stop()
 	stoppable2.Stop()
-
 }
