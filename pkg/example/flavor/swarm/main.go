@@ -14,40 +14,37 @@ import (
 
 func main() {
 
-	var logLevel int
-	var name string
-
-	tlsOptions := tlsconfig.Options{}
-	host := "unix:///var/run/docker.sock"
-
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Docker Swarm flavor plugin",
-		Run: func(c *cobra.Command, args []string) {
+	}
+	name := cmd.Flags().String("name", "flavor-swarm", "Plugin name to advertise for discovery")
+	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+	host := cmd.Flags().String("host", "unix:///var/run/docker.sock", "Docker host")
+	caFile := cmd.Flags().String("tlscacert", "", "TLS CA cert file path")
+	certFile := cmd.Flags().String("tlscert", "", "TLS cert file path")
+	tlsKey := cmd.Flags().String("tlskey", "", "TLS key file path")
+	insecureSkipVerify := cmd.Flags().Bool("tlsverify", true, "True to skip TLS")
+	cmd.RunE = func(c *cobra.Command, args []string) error {
 
-			cli.SetLogLevel(logLevel)
+		cli.SetLogLevel(*logLevel)
 
-			dockerClient, err := docker.NewDockerClient(host, &tlsOptions)
-			log.Infoln("Connect to docker", host, "err=", err)
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
+		dockerClient, err := docker.NewDockerClient(*host, &tlsconfig.Options{
+			CAFile:             *caFile,
+			CertFile:           *certFile,
+			KeyFile:            *tlsKey,
+			InsecureSkipVerify: *insecureSkipVerify,
+		})
+		log.Infoln("Connect to docker", host, "err=", err)
+		if err != nil {
+			return err
+		}
 
-			cli.RunPlugin(name, flavor_plugin.PluginServer(swarm.NewSwarmFlavor(dockerClient)))
-		},
+		cli.RunPlugin(*name, flavor_plugin.PluginServer(swarm.NewSwarmFlavor(dockerClient)))
+		return nil
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
-
-	cmd.Flags().StringVar(&name, "name", "flavor-swarm", "Plugin name to advertise for discovery")
-	cmd.PersistentFlags().IntVar(&logLevel, "log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
-
-	cmd.PersistentFlags().StringVar(&host, "host", host, "Docker host")
-	cmd.PersistentFlags().StringVar(&tlsOptions.CAFile, "tlscacert", "", "TLS CA cert file path")
-	cmd.PersistentFlags().StringVar(&tlsOptions.CertFile, "tlscert", "", "TLS cert file path")
-	cmd.PersistentFlags().StringVar(&tlsOptions.KeyFile, "tlskey", "", "TLS key file path")
-	cmd.PersistentFlags().BoolVar(&tlsOptions.InsecureSkipVerify, "tlsverify", true, "True to skip TLS")
 
 	err := cmd.Execute()
 	if err != nil {

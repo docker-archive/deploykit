@@ -18,25 +18,25 @@ import (
 
 func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
-	name := ""
 	var flavorPlugin flavor.Plugin
 
 	cmd := &cobra.Command{
 		Use:   "flavor",
 		Short: "Access flavor plugin",
-		PersistentPreRunE: func(c *cobra.Command, args []string) error {
-
-			endpoint, err := plugins().Find(name)
-			if err != nil {
-				return err
-			}
-
-			flavorPlugin = flavor_plugin.NewClient(endpoint.Address)
-
-			return nil
-		},
 	}
-	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
+	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
+
+	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
+
+		endpoint, err := plugins().Find(*name)
+		if err != nil {
+			return err
+		}
+
+		flavorPlugin = flavor_plugin.NewClient(endpoint.Address)
+
+		return nil
+	}
 
 	logicalIDs := []string{}
 	groupSize := uint(0)
@@ -86,6 +86,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 	addAllocationMethodFlags(validate)
+	cmd.AddCommand(validate)
 
 	prepare := &cobra.Command{
 		Use:   "prepare <flavor configuration file> <instance Spec JSON file>",
@@ -129,61 +130,58 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 	addAllocationMethodFlags(prepare)
+	cmd.AddCommand(prepare)
 
-	tags := []string{}
-	id := ""
-	logicalID := ""
 	healthy := &cobra.Command{
 		Use:   "healthy <flavor configuration file>",
 		Short: "checks if an instance is considered healthy",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", flavorPlugin)
-
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			flavorProperties, err := ioutil.ReadFile(args[0])
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-
-			filter := map[string]string{}
-			for _, t := range tags {
-				p := strings.Split(t, "=")
-				if len(p) == 2 {
-					filter[p[0]] = p[1]
-				} else {
-					filter[p[0]] = ""
-				}
-			}
-
-			desc := instance.Description{}
-			if len(filter) > 0 {
-				desc.Tags = filter
-			}
-			if id != "" {
-				desc.ID = instance.ID(id)
-			}
-			if logicalID != "" {
-				logical := instance.LogicalID(logicalID)
-				desc.LogicalID = &logical
-			}
-
-			healthy, err := flavorPlugin.Healthy(json.RawMessage(flavorProperties), desc)
-			if err == nil {
-				fmt.Printf("%v\n", healthy)
-			}
-			return err
-		},
 	}
-	healthy.Flags().StringSliceVar(&tags, "tags", tags, "Tags to filter")
-	healthy.Flags().StringVar(&id, "id", id, "ID of resource")
-	healthy.Flags().StringVar(&logicalID, "logical-id", logicalID, "Logical ID of resource")
+	tags := healthy.Flags().StringSlice("tags", []string{}, "Tags to filter")
+	id := healthy.Flags().String("id", "", "ID of resource")
+	logicalID := healthy.Flags().String("logical-id", "", "Logical ID of resource")
+	healthy.RunE = func(cmd *cobra.Command, args []string) error {
+		assertNotNil("no plugin", flavorPlugin)
 
-	cmd.AddCommand(validate, prepare, healthy)
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		flavorProperties, err := ioutil.ReadFile(args[0])
+		if err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
+
+		filter := map[string]string{}
+		for _, t := range *tags {
+			p := strings.Split(t, "=")
+			if len(p) == 2 {
+				filter[p[0]] = p[1]
+			} else {
+				filter[p[0]] = ""
+			}
+		}
+
+		desc := instance.Description{}
+		if len(filter) > 0 {
+			desc.Tags = filter
+		}
+		if *id != "" {
+			desc.ID = instance.ID(*id)
+		}
+		if *logicalID != "" {
+			logical := instance.LogicalID(*logicalID)
+			desc.LogicalID = &logical
+		}
+
+		healthy, err := flavorPlugin.Healthy(json.RawMessage(flavorProperties), desc)
+		if err == nil {
+			fmt.Printf("%v\n", healthy)
+		}
+		return err
+	}
+	cmd.AddCommand(healthy)
 
 	return cmd
 }

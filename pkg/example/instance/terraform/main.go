@@ -20,26 +20,21 @@ func mustHaveTerraform() {
 
 func main() {
 
-	mustHaveTerraform()
-
-	var name string
-	var logLevel int
-	var dir string
-
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Terraform instance plugin",
-		Run: func(c *cobra.Command, args []string) {
-			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name, instance_plugin.PluginServer(NewTerraformInstancePlugin(dir)))
-		},
+	}
+	name := cmd.Flags().String("name", "instance-terraform", "Plugin name to advertise for discovery")
+	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+	dir := cmd.Flags().String("dir", os.TempDir(), "Dir for storing plan files")
+	cmd.Run = func(c *cobra.Command, args []string) {
+		mustHaveTerraform()
+
+		cli.SetLogLevel(*logLevel)
+		cli.RunPlugin(*name, instance_plugin.PluginServer(NewTerraformInstancePlugin(*dir)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
-
-	cmd.Flags().StringVar(&name, "name", "instance-terraform", "Plugin name to advertise for discovery")
-	cmd.PersistentFlags().IntVar(&logLevel, "log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
-	cmd.Flags().StringVar(&dir, "dir", os.TempDir(), "Dir for storing plan files")
 
 	err := cmd.Execute()
 	if err != nil {

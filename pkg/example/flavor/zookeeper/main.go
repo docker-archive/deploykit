@@ -12,23 +12,18 @@ import (
 
 func main() {
 
-	var logLevel int
-	var name string
-
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Zookeeper flavor plugin",
-		Run: func(c *cobra.Command, args []string) {
-
-			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name, flavor_plugin.PluginServer(zk.NewPlugin()))
-		},
+	}
+	name := cmd.Flags().String("name", "flavor-zookeeper", "Plugin name to advertise for discovery")
+	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+	cmd.Run = func(c *cobra.Command, args []string) {
+		cli.SetLogLevel(*logLevel)
+		cli.RunPlugin(*name, flavor_plugin.PluginServer(zk.NewPlugin()))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
-
-	cmd.Flags().StringVar(&name, "name", "flavor-zookeeper", "Plugin name to advertise for discovery")
-	cmd.PersistentFlags().IntVar(&logLevel, "log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()
 	if err != nil {
