@@ -14,14 +14,13 @@ import (
 
 func main() {
 
-	logLevel := cli.DefaultLogLevel
-
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "infrakit cli",
-		PersistentPreRun: func(c *cobra.Command, args []string) {
-			cli.SetLogLevel(logLevel)
-		},
+	}
+	logLevel := cmd.PersistentFlags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+	cmd.PersistentPreRun = func(c *cobra.Command, args []string) {
+		cli.SetLogLevel(*logLevel)
 	}
 
 	// Don't print usage text for any error returned from a RunE function.  Only print it when explicitly requested.
@@ -42,8 +41,6 @@ func main() {
 		return d
 	}
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
-
-	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	err := cmd.Execute()
 	if err != nil {

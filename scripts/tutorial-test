@@ -4,8 +4,7 @@ set -o errexit
 set -o nounset
 
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$HERE"
-cd ..
+cd "$HERE/.."
 
 make binaries
 
@@ -14,6 +13,8 @@ cleanup() {
   rm -rf tutorial
 }
 trap cleanup EXIT
+
+mkdir -p ~/.infrakit/plugins
 
 mkdir -p tutorial
 build/infrakit-instance-file --dir ./tutorial/ &
