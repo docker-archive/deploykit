@@ -41,40 +41,38 @@ func defaultStoreDir() string {
 	return filepath.Join(getHome(), ".infrakit/configs")
 }
 
-func osEnvironment(backend *backend) *cobra.Command {
-
-	var pollInterval time.Duration
-	var filename, storeDir string
+func osEnvironment(getConfig func() config) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "os",
 		Short: "os",
-		RunE: func(c *cobra.Command, args []string) error {
-
-			plugins, err := discovery.NewPluginDiscovery()
-			if err != nil {
-				return err
-			}
-
-			leader, err := file_leader.NewDetector(pollInterval, filename, backend.id)
-			if err != nil {
-				return err
-			}
-
-			snapshot, err := file_store.NewSnapshot(storeDir, "global.config")
-			if err != nil {
-				return err
-			}
-
-			backend.plugins = plugins
-			backend.leader = leader
-			backend.snapshot = snapshot
-
-			return runMain(backend)
-		},
 	}
-	cmd.Flags().StringVar(&filename, "leader-file", defaultLeaderFile(), "File used for leader election/detection")
-	cmd.Flags().StringVar(&storeDir, "store-dir", defaultStoreDir(), "Dir to store the config")
-	cmd.Flags().DurationVar(&pollInterval, "poll-interval", 5*time.Second, "Leader polling interval")
+	leaderFile := cmd.Flags().String("leader-file", defaultLeaderFile(), "File used for leader election/detection")
+	storeDir := cmd.Flags().String("store-dir", defaultStoreDir(), "Dir to store the config")
+	pollInterval := cmd.Flags().Duration("poll-interval", 5*time.Second, "Leader polling interval")
+	cmd.RunE = func(c *cobra.Command, args []string) error {
+
+		plugins, err := discovery.NewPluginDiscovery()
+		if err != nil {
+			return err
+		}
+
+		cfg := getConfig()
+		leader, err := file_leader.NewDetector(*pollInterval, *leaderFile, cfg.id)
+		if err != nil {
+			return err
+		}
+
+		snapshot, err := file_store.NewSnapshot(*storeDir, "global.config")
+		if err != nil {
+			return err
+		}
+
+		cfg.plugins = plugins
+		cfg.leader = leader
+		cfg.snapshot = snapshot
+
+		return runMain(cfg)
+	}
 	return cmd
 }

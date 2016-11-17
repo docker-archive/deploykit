@@ -22,26 +22,24 @@ const (
 
 func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
-	name := DefaultGroupPluginName
 	var groupPlugin group.Plugin
 
 	cmd := &cobra.Command{
 		Use:   "group",
 		Short: "Access group plugin",
-		PersistentPreRunE: func(c *cobra.Command, args []string) error {
-
-			endpoint, err := plugins().Find(name)
-			if err != nil {
-				return err
-			}
-
-			groupPlugin = group_plugin.NewClient(endpoint.Address)
-
-			return nil
-		},
 	}
+	name := cmd.PersistentFlags().String("name", DefaultGroupPluginName, "Name of plugin")
+	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 
-	cmd.PersistentFlags().StringVar(&name, "name", name, "Name of plugin")
+		endpoint, err := plugins().Find(*name)
+		if err != nil {
+			return err
+		}
+
+		groupPlugin = group_plugin.NewClient(endpoint.Address)
+
+		return nil
+	}
 
 	commit := cobra.Command{
 		Use:   "commit <group configuration>",
@@ -99,44 +97,43 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	})
 
-	var quiet bool
 	describe := &cobra.Command{
 		Use:   "describe <group ID>",
 		Short: "describe the live instances that make up a group",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", groupPlugin)
-
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			groupID := group.ID(args[0])
-			desc, err := groupPlugin.DescribeGroup(groupID)
-
-			if err == nil {
-				if !quiet {
-					fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
-				}
-				for _, d := range desc.Instances {
-					logical := "  -   "
-					if d.LogicalID != nil {
-						logical = string(*d.LogicalID)
-					}
-
-					printTags := []string{}
-					for k, v := range d.Tags {
-						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
-					}
-					sort.Strings(printTags)
-
-					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
-				}
-			}
-			return err
-		},
 	}
-	describe.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
+	quietDescribe := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
+	describe.RunE = func(cmd *cobra.Command, args []string) error {
+		assertNotNil("no plugin", groupPlugin)
+
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		groupID := group.ID(args[0])
+		desc, err := groupPlugin.DescribeGroup(groupID)
+
+		if err == nil {
+			if !*quietDescribe {
+				fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+			}
+			for _, d := range desc.Instances {
+				logical := "  -   "
+				if d.LogicalID != nil {
+					logical = string(*d.LogicalID)
+				}
+
+				printTags := []string{}
+				for k, v := range d.Tags {
+					printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
+				}
+				sort.Strings(printTags)
+
+				fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
+			}
+		}
+		return err
+	}
 	cmd.AddCommand(describe)
 
 	cmd.AddCommand(&cobra.Command{
@@ -198,23 +195,23 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	describeGroups := &cobra.Command{
 		Use:   "ls",
 		Short: "list groups",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", groupPlugin)
-
-			groups, err := groupPlugin.InspectGroups()
-			if err == nil {
-				if !quiet {
-					fmt.Printf("%s\n", "ID")
-				}
-				for _, g := range groups {
-					fmt.Printf("%s\n", g.ID)
-				}
-			}
-
-			return err
-		},
 	}
-	describeGroups.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print rows without column headers")
+	quietls := describeGroups.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
+	describeGroups.RunE = func(cmd *cobra.Command, args []string) error {
+		assertNotNil("no plugin", groupPlugin)
+
+		groups, err := groupPlugin.InspectGroups()
+		if err == nil {
+			if !*quietls {
+				fmt.Printf("%s\n", "ID")
+			}
+			for _, g := range groups {
+				fmt.Printf("%s\n", g.ID)
+			}
+		}
+
+		return err
+	}
 	cmd.AddCommand(describeGroups)
 
 	return cmd

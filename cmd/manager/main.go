@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type backend struct {
+type config struct {
 	id         string
 	plugins    discovery.Plugins
 	leader     leader.Detector
@@ -24,21 +24,29 @@ type backend struct {
 
 func main() {
 
-	logLevel := cli.DefaultLogLevel
-	backend := &backend{}
-
 	cmd := &cobra.Command{
 		Use:   filepath.Base(os.Args[0]),
 		Short: "Manager",
-		PersistentPreRun: func(c *cobra.Command, args []string) {
-			cli.SetLogLevel(logLevel)
-		},
 	}
-	cmd.PersistentFlags().IntVar(&logLevel, "log", logLevel, "Logging level. 0 is least verbose. Max is 5")
-	cmd.PersistentFlags().StringVar(&backend.id, "name", "group", "Name of the manager")
-	cmd.PersistentFlags().StringVar(&backend.pluginName, "proxy-for-group", "group-stateless", "Name of the group plugin to proxy for.")
 
-	cmd.AddCommand(cli.VersionCommand(), osEnvironment(backend), swarmEnvironment(backend))
+	logLevel := cmd.PersistentFlags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+	pluginName := cmd.PersistentFlags().String("name", "group", "Name of the manager")
+	backendPlugin := cmd.PersistentFlags().String(
+		"proxy-for-group",
+		"group-stateless",
+		"Name of the group plugin to proxy for.")
+	cmd.PersistentPreRun = func(c *cobra.Command, args []string) {
+		cli.SetLogLevel(*logLevel)
+	}
+
+	buildConfig := func() config {
+		return config{
+			id:         *pluginName,
+			pluginName: *backendPlugin,
+		}
+	}
+
+	cmd.AddCommand(cli.VersionCommand(), osEnvironment(buildConfig), swarmEnvironment(buildConfig))
 
 	err := cmd.Execute()
 	if err != nil {
@@ -47,12 +55,11 @@ func main() {
 	}
 }
 
-func runMain(backend *backend) error {
+func runMain(cfg config) error {
 
-	log.Infoln("Starting up manager:", backend)
+	log.Infoln("Starting up manager:", cfg)
 
-	mgr, err := manager.NewManager(backend.plugins,
-		backend.leader, backend.snapshot, backend.pluginName)
+	mgr, err := manager.NewManager(cfg.plugins, cfg.leader, cfg.snapshot, cfg.pluginName)
 	if err != nil {
 		return err
 	}
@@ -62,7 +69,7 @@ func runMain(backend *backend) error {
 		return err
 	}
 
-	cli.RunPlugin(backend.id, group_rpc.PluginServer(mgr))
+	cli.RunPlugin(cfg.id, group_rpc.PluginServer(mgr))
 
 	mgr.Stop()
 	log.Infoln("Manager stopped")
