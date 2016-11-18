@@ -59,6 +59,7 @@ lint:
 check-docs:
 	@echo "+ $@"
 	find . -name '*.md' | grep -v vendor/ | blockcheck
+	./scripts/doc-source-check
 
 build:
 	@echo "+ $@"

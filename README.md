@@ -25,7 +25,7 @@ environments while using shared components and consistent interfaces.
 _InfraKit_ makes extensive use of _Plugins_ to manage arbitrary systems in diverse environments, which can be composed
 to meet different needs.
 
-See the [plugins](docs/plugins.md) documentation for more details.
+See the [plugins](docs/plugins) documentation for more details.
 
 
 ## Building
