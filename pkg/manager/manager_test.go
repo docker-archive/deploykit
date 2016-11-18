@@ -245,7 +245,6 @@ func TestChangeLeadership(t *testing.T) {
 
 					defer close(checkpoint1)
 
-					t.Log("m1 leading")
 					require.Equal(t, gs.ID, spec.ID)
 					require.Equal(t, testToStruct(gs.Properties), testToStruct(spec.Properties))
 					return "ok", nil
@@ -261,7 +260,6 @@ func TestChangeLeadership(t *testing.T) {
 
 					defer close(checkpoint3)
 
-					t.Log("m1 releasing")
 					return nil
 				},
 			).Return(nil)
@@ -284,7 +282,6 @@ func TestChangeLeadership(t *testing.T) {
 
 					defer close(checkpoint2)
 
-					t.Log("m2 leading")
 					require.Equal(t, gs.ID, spec.ID)
 					require.Equal(t, testToStruct(gs.Properties), testToStruct(spec.Properties))
 					return "ok", nil
