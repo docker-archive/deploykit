@@ -51,9 +51,18 @@ do
   then
     echo "PASS"
   else
-    echo "FAIL"
-    echo "Expected: $checksum"
-    echo "Actual: $hash"
+    echo "FAIL
+Expected: $checksum
+Actual: $hash
+
+The document at $f contains a SOURCE-CHECKSUM tag indicating
+that it describes $file_pattern.  The checksum has changed, which indicates
+that $file_pattern has changed, but the checksum at $f has not.
+
+Please double-check that the documentation is up-to-date and certify the
+documentation by updating the SOURCE-CHECKSUM SHA with the above 'Actual'
+value.
+"
     exit 1
   fi
 done
