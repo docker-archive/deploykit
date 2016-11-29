@@ -3,7 +3,7 @@ package client
 import (
 	"bytes"
 	log "github.com/Sirupsen/logrus"
-	"github.com/gorilla/rpc/v2/json"
+	"github.com/gorilla/rpc/v2/json2"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -25,7 +25,7 @@ func New(socketPath string) Client {
 
 // Call sends an RPC with a method and argument.  The result must be a pointer to the response object.
 func (c Client) Call(method string, arg interface{}, result interface{}) error {
-	message, err := json.EncodeClientRequest(method, arg)
+	message, err := json2.EncodeClientRequest(method, arg)
 	if err != nil {
 		return err
 	}
@@ -57,5 +57,5 @@ func (c Client) Call(method string, arg interface{}, result interface{}) error {
 		log.Error(err)
 	}
 
-	return json.DecodeClientResponse(resp.Body, result)
+	return json2.DecodeClientResponse(resp.Body, result)
 }
