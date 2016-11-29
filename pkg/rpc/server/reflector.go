@@ -19,7 +19,7 @@ const (
 var (
 	// Precompute the reflect.Type of error and http.Request -- from gorilla/rpc
 	typeOfError       = reflect.TypeOf((*error)(nil)).Elem()
-	typeOfHttpRequest = reflect.TypeOf((*http.Request)(nil)).Elem()
+	typeOfHTTPRequest = reflect.TypeOf((*http.Request)(nil)).Elem()
 )
 
 type reflector struct {
@@ -158,7 +158,7 @@ func (r *reflector) pluginMethods() []reflect.Method {
 		}
 		// First argument must be a pointer and must be http.Request.
 		reqType := mtype.In(1)
-		if reqType.Kind() != reflect.Ptr || reqType.Elem() != typeOfHttpRequest {
+		if reqType.Kind() != reflect.Ptr || reqType.Elem() != typeOfHTTPRequest {
 			continue
 		}
 		// Second argument must be a pointer and must be exported.
