@@ -2,14 +2,14 @@ package server
 
 import (
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"gopkg.in/tylerb/graceful.v1"
 	"net"
 	"net/http"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json"
+	"gopkg.in/tylerb/graceful.v1"
 	"net/http/httptest"
 	"net/http/httputil"
 )
@@ -66,6 +66,14 @@ func StartPluginAtPath(socketPath string, receiver interface{}) (Stoppable, erro
 	server.RegisterCodec(json.NewCodec(), "application/json")
 
 	if err := server.RegisterService(receiver, ""); err != nil {
+		return nil, err
+	}
+
+	metadata, err := NewMetadata(receiver)
+	if err != nil {
+		return nil, err
+	}
+	if err := server.RegisterService(metadata, "Plugin"); err != nil {
 		return nil, err
 	}
 

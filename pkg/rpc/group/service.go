@@ -1,8 +1,11 @@
 package group
 
 import (
-	"github.com/docker/infrakit/pkg/spi/group"
+	"encoding/json"
 	"net/http"
+
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi/group"
 )
 
 // PluginServer returns a RPCService that conforms to the net/rpc rpc call convention.
@@ -13,6 +16,22 @@ func PluginServer(p group.Plugin) *Group {
 // Group the exported type needed to conform to json-rpc call convention
 type Group struct {
 	plugin group.Plugin
+}
+
+// Info returns a metadata object about the plugin, if the plugin implements it.  See plugin.Vendor
+func (p *Group) Info() plugin.Info {
+	if m, is := p.plugin.(plugin.Vendor); is {
+		return m.Info()
+	}
+	return plugin.NoInfo
+}
+
+// ExampleProperties returns an example properties used by the plugin
+func (p *Group) ExampleProperties() *json.RawMessage {
+	if i, is := p.plugin.(plugin.InputExample); is {
+		return i.ExampleProperties()
+	}
+	return nil
 }
 
 // CommitGroup is the rpc method to commit a group

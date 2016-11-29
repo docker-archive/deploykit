@@ -1,8 +1,11 @@
 package flavor
 
 import (
-	"github.com/docker/infrakit/pkg/spi/flavor"
+	"encoding/json"
 	"net/http"
+
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi/flavor"
 )
 
 // PluginServer returns a RPCService that conforms to the net/rpc rpc call convention.
@@ -13,6 +16,22 @@ func PluginServer(p flavor.Plugin) *Flavor {
 // Flavor the exported type needed to conform to json-rpc call convention
 type Flavor struct {
 	plugin flavor.Plugin
+}
+
+// Info returns a metadata object about the plugin, if the plugin implements it.  See plugin.Vendor
+func (p *Flavor) Info() plugin.Info {
+	if m, is := p.plugin.(plugin.Vendor); is {
+		return m.Info()
+	}
+	return plugin.NoInfo
+}
+
+// ExampleProperties returns an example properties used by the plugin
+func (p *Flavor) ExampleProperties() *json.RawMessage {
+	if i, is := p.plugin.(plugin.InputExample); is {
+		return i.ExampleProperties()
+	}
+	return nil
 }
 
 // Validate checks whether the helper can support a configuration.

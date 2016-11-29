@@ -1,9 +1,12 @@
 package instance
 
 import (
+	"encoding/json"
 	"errors"
-	"github.com/docker/infrakit/pkg/spi/instance"
 	"net/http"
+
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 // PluginServer returns a RPCService that conforms to the net/rpc rpc call convention.
@@ -15,6 +18,22 @@ func PluginServer(p instance.Plugin) *Instance {
 // registered by the rpc server package.
 type Instance struct {
 	plugin instance.Plugin
+}
+
+// Info returns a metadata object about the plugin, if the plugin implements it.  See plugin.Informer
+func (p *Instance) Info() plugin.Info {
+	if m, is := p.plugin.(plugin.Vendor); is {
+		return m.Info()
+	}
+	return plugin.NoInfo
+}
+
+// ExampleProperties returns an example properties used by the plugin
+func (p *Instance) ExampleProperties() *json.RawMessage {
+	if i, is := p.plugin.(plugin.InputExample); is {
+		return i.ExampleProperties()
+	}
+	return nil
 }
 
 // Validate performs local validation on a provision request.
