@@ -5,8 +5,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.aws/plugin/instance"
-	"github.com/docker/infrakit/cli"
-	instance_plugin "github.com/docker/infrakit/rpc/instance"
+	"github.com/docker/infrakit/pkg/cli"
+	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/spf13/cobra"
 	"strings"
 )

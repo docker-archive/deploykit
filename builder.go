@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/docker/infrakit/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/pflag"
 	"log"
 	"os"
