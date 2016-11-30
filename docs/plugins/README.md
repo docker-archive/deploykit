@@ -102,3 +102,32 @@ project, so please double-check where the code lives before filing InfraKit issu
 | [docker/infrakit.aws](https://github.com/docker/infrakit.aws) | instance | creates Amazon EC2 instances                          |
 
 Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
+
+### APIs
+_InfraKit_ plugins are exposed via HTTP, using [JSON-RPC 2.0](http://www.jsonrpc.org/specification).
+
+API requests can be made manually with `curl`.  For example, the following command will list all groups:
+```console
+$ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
+  -H 'Content-Type: application/json'
+  -d '{"jsonrpc":"2.0","method":"Group.InspectGroups","params":{},"id":5577006791947779410}'
+{"jsonrpc":"2.0","result":{"Groups":null},"id":1}
+```
+
+API errors are surfaced with the `error` response field:
+```console
+$ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
+  -H 'Content-Type: application/json'
+  -d '{"jsonrpc":"2.0","method":"Group.CommitGroup","params":{},"id":1}'
+{"jsonrpc":"2.0","error":{"code":-32000,"message":"Group ID must not be blank","data":null},"id":1}
+```
+
+Per the JSON-RPC format, each API call has a `method` and `params`.  The following pages define the available methods
+for each plugin type:
+- [Flavor](flavor.md)
+- [Group](group.md)
+- [Instance](instance.md)
+
+See also: documentation on common API [types](types.md).
+
+Additionally, all plugins will log each API HTTP request and response when run with the `--log 5` command line argument.
