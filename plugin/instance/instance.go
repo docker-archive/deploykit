@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	"github.com/docker/infrakit/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"sort"
 	"time"
 )

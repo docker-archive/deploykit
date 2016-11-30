@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/infrakit.aws/plugin/instance"
-	"github.com/docker/infrakit/spi/group"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"io/ioutil"

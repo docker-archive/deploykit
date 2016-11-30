@@ -35,7 +35,7 @@ INFO[0000] Listening on: unix:///run/infrakit/plugins/group.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <nil>
 ```
 
-and the [Vanilla](https://github.com/docker/infrakit/tree/master/example/flavor/vanilla) Flavor plugin:.
+and the [Vanilla](https://github.com/docker/infrakit/tree/master/pkg/example/flavor/vanilla) Flavor plugin:.
 ```console
 $ build/infrakit-flavor-vanilla
 INFO[0000] Starting plugin
