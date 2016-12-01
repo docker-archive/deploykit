@@ -424,7 +424,6 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
-
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
 	_, err = grp.CommitGroup(updated, false)
@@ -461,7 +460,6 @@ func TestFlavorChange(t *testing.T) {
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
-
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -561,4 +559,31 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 
 	require.Equal(t, 1, badUpdateInstanaces)
 	require.NoError(t, grp.FreeGroup(id))
+}
+
+func TestNoSideEffectsFromPretendCommit(t *testing.T) {
+	// Tests that internal state is not modified by a GroupCommit with Pretend=true.
+
+	plugin := newTestInstancePlugin()
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond)
+
+	desc, err := grp.CommitGroup(minions, true)
+	require.NoError(t, err)
+	require.Equal(t, "Managing 3 instances", desc)
+
+	desc, err = grp.CommitGroup(minions, true)
+	require.NoError(t, err)
+	require.Equal(t, "Managing 3 instances", desc)
+
+	err = grp.FreeGroup(id)
+	require.Error(t, err)
+	require.Equal(t, "Group 'testGroup' is not being watched", err.Error())
+
+	err = grp.DestroyGroup(id)
+	require.Error(t, err)
+	require.Equal(t, "Group 'testGroup' is not being watched", err.Error())
+
+	desc, err = grp.CommitGroup(minions, true)
+	require.NoError(t, err)
+	require.Equal(t, "Managing 3 instances", desc)
 }
