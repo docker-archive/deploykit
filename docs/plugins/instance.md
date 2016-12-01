@@ -1,6 +1,6 @@
 # Instance plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/instance/* 0c778e96cbeb32043532709412e15e6cc86778d7153c65b1d7422b9f0b5901c89362666bfdd75de7 -->
+<!-- SOURCE-CHECKSUM pkg/spi/instance/* 0c778e96cbeb32043532709412e15e6cc86778d7338393f886f528c3824986fc97cb27410aefd8e2 -->
 
 ## API
 
@@ -39,7 +39,7 @@ Provisions a new instance.
     "Tags": {"tag_key": "tag_value"},
     "Init": "",
     "LogicalID": "logical_id",
-    "Attachments": ["attachment_id"]
+    "Attachments": [{"ID": "attachment_id", "Type": "block-device"}]
   }
 }
 ```
