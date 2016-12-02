@@ -20,8 +20,9 @@ import (
 type nodeType string
 
 const (
-	worker  nodeType = "worker"
-	manager nodeType = "manager"
+	worker        nodeType = "worker"
+	manager       nodeType = "manager"
+	ebsAttachment string   = "ebs"
 )
 
 // NewSwarmFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
@@ -61,14 +62,33 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID, attachments map[
 		}
 	}
 
-	// Each attachment may only be used once.
-	allAttachments := map[instance.Attachment]bool{}
-	for _, att := range attachments {
-		for _, attachment := range att {
-			if _, exists := allAttachments[attachment]; exists {
-				return fmt.Errorf("Attachment %v specified more than once", attachment)
+	// Only EBS attachments are supported.
+	for _, atts := range attachments {
+		for _, attachment := range atts {
+			if attachment.Type == "" {
+				return fmt.Errorf(
+					"Attachment Type %s must be specified for '%s'",
+					ebsAttachment,
+					attachment.ID)
 			}
-			allAttachments[attachment] = true
+
+			if attachment.Type != ebsAttachment {
+				return fmt.Errorf(
+					"Invalid attachment Type '%s', only %s is supported",
+					attachment.Type,
+					ebsAttachment)
+			}
+		}
+	}
+
+	// Each attachment may only be used once.
+	allAttachmentIDs := map[string]bool{}
+	for _, atts := range attachments {
+		for _, attachment := range atts {
+			if _, exists := allAttachmentIDs[attachment.ID]; exists {
+				return fmt.Errorf("Attachment %v specified more than once", attachment.ID)
+			}
+			allAttachmentIDs[attachment.ID] = true
 		}
 	}
 
@@ -100,7 +120,7 @@ func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types
 	if properties.Type == manager {
 		for _, id := range allocation.LogicalIDs {
 			if att, exists := properties.Attachments[id]; !exists || len(att) == 0 {
-				log.Warnf("LogicalID %s has no attachments, which is needed for durability")
+				log.Warnf("LogicalID %s has no attachments, which is needed for durability", id)
 			}
 		}
 	}

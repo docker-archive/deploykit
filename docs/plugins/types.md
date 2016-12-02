@@ -33,8 +33,11 @@ Fields:
 - `Properties`: A JSON object representing the Group.  The schema is defined by the Group plugin in use.
 
 ### Instance Attachment
-An identifier for an external entity associated with an Instance.  The meaning of Attachments and handling of Attachment
-IDs is defined by the Instance plugin.
+An external entity associated with an Instance.  The meaning of an Attachment is defined by the Instance plugin.
+
+Fields:
+- `ID`: A unique identifier for the Attachment
+- `Type`: An identifier for the kind of attachment.
 
 
 ### Instance Description
