@@ -2,8 +2,15 @@ package group
 
 import (
 	"encoding/json"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
+
+// APISpec is the current name and version of the Group API.
+var APISpec = spi.APISpec{
+	Name:    "Group",
+	Version: "0.1.0",
+}
 
 // Plugin defines the functions for a Group plugin.
 type Plugin interface {

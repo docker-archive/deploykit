@@ -1,11 +1,12 @@
 package flavor
 
 import (
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"net/http"
 )
 
-// PluginServer returns a RPCService that conforms to the net/rpc rpc call convention.
+// PluginServer returns a Flavor that conforms to the net/rpc rpc call convention.
 func PluginServer(p flavor.Plugin) *Flavor {
 	return &Flavor{plugin: p}
 }
@@ -13,6 +14,11 @@ func PluginServer(p flavor.Plugin) *Flavor {
 // Flavor the exported type needed to conform to json-rpc call convention
 type Flavor struct {
 	plugin flavor.Plugin
+}
+
+// APISpec returns the API implemented by this RPC service.
+func (p *Flavor) APISpec() spi.APISpec {
+	return flavor.APISpec
 }
 
 // Validate checks whether the helper can support a configuration.

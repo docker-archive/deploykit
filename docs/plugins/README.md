@@ -113,7 +113,7 @@ _InfraKit_ plugins are exposed via HTTP, using [JSON-RPC 2.0](http://www.jsonrpc
 API requests can be made manually with `curl`.  For example, the following command will list all groups:
 ```console
 $ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
-  -H 'Content-Type: application/json'
+  -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"Group.InspectGroups","params":{},"id":1}'
 {"jsonrpc":"2.0","result":{"Groups":null},"id":1}
 ```
@@ -121,7 +121,7 @@ $ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
 API errors are surfaced with the `error` response field:
 ```console
 $ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
-  -H 'Content-Type: application/json'
+  -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"Group.CommitGroup","params":{},"id":1}'
 {"jsonrpc":"2.0","error":{"code":-32000,"message":"Group ID must not be blank","data":null},"id":1}
 ```
@@ -135,3 +135,14 @@ for each plugin type:
 See also: documentation on common API [types](types.md).
 
 Additionally, all plugins will log each API HTTP request and response when run with the `--log 5` command line argument.
+
+##### API identification
+Plugins are required to identify the name and version of plugin APIs they implement.  This is done with a request
+like the following:
+
+```console
+$ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"Plugin.APIs","params":{},"id":1}'
+{"jsonrpc":"2.0","result":{"APIs":[{"Name":"Group","Version":"0.1.0"}]},"id":1}
+```

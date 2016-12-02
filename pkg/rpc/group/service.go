@@ -1,6 +1,7 @@
 package group
 
 import (
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"net/http"
 )
@@ -13,6 +14,11 @@ func PluginServer(p group.Plugin) *Group {
 // Group the exported type needed to conform to json-rpc call convention
 type Group struct {
 	plugin group.Plugin
+}
+
+// APISpec returns the API implemented by this RPC service.
+func (p *Group) APISpec() spi.APISpec {
+	return group.APISpec
 }
 
 // CommitGroup is the rpc method to commit a group

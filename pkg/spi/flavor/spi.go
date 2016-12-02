@@ -3,8 +3,15 @@ package flavor
 import (
 	"encoding/json"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
+
+// APISpec is the current name and version of the Flavor API.
+var APISpec = spi.APISpec{
+	Name:    "Flavor",
+	Version: "0.1.0",
+}
 
 // Health is an indication of whether the Flavor is functioning properly.
 type Health int

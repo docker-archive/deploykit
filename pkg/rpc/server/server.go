@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/docker/infrakit/pkg/rpc/plugin"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 	"net/http/httptest"
@@ -59,13 +61,23 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	recorder.Body.WriteTo(w)
 }
 
+// A VersionedAPI identifies which APIs it supports.
+type VersionedAPI interface {
+	// APISpec returns the API being provided.
+	APISpec() spi.APISpec
+}
+
 // StartPluginAtPath starts an HTTP server listening on a unix socket at the specified path.
 // Returns a Stoppable that can be used to stop or block on the server.
-func StartPluginAtPath(socketPath string, receiver interface{}) (Stoppable, error) {
+func StartPluginAtPath(socketPath string, receiver VersionedAPI) (Stoppable, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json2.NewCodec(), "application/json")
 
 	if err := server.RegisterService(receiver, ""); err != nil {
+		return nil, err
+	}
+
+	if err := server.RegisterService(plugin.Plugin{Spec: receiver.APISpec()}, ""); err != nil {
 		return nil, err
 	}
 
