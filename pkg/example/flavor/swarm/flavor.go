@@ -1,4 +1,4 @@
-package swarm
+package main
 
 import (
 	"bytes"

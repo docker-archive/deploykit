@@ -6,7 +6,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/plugin/instance/vagrant"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/spf13/cobra"
 )
@@ -30,7 +29,7 @@ func main() {
 
 		var templ *template.Template
 		if *templFile == "" {
-			templ = template.Must(template.New("").Parse(vagrant.VagrantFile))
+			templ = template.Must(template.New("").Parse(VagrantFile))
 		} else {
 			var err error
 			templ, err = template.ParseFiles()
@@ -40,7 +39,7 @@ func main() {
 		}
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(vagrant.NewVagrantPlugin(*dir, templ)))
+		cli.RunPlugin(*name, instance_plugin.PluginServer(NewVagrantPlugin(*dir, templ)))
 		return nil
 	}
 
@@ -51,3 +50,16 @@ func main() {
 		os.Exit(1)
 	}
 }
+
+// VagrantFile is the minimum definition of the vagrant file
+const VagrantFile = `
+Vagrant.configure("2") do |config|
+  config.vm.box = "{{.Properties.Box}}"
+  config.vm.hostname = "infrakit.box"
+  config.vm.network "private_network"{{.NetworkOptions}}
+  config.vm.provision :shell, path: "boot.sh"
+  config.vm.provider :virtualbox do |vb|
+    vb.memory = {{.Properties.Memory}}
+    vb.cpus = {{.Properties.CPUs}}
+  end
+end`
