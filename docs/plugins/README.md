@@ -3,8 +3,6 @@
 Much of the behavior in _InfraKit_ is defined by Plugins.  Technically, a Plugin is an HTTP server with a well-defined
 API, listening on a unix socket.
 
-[Utilities](pkg/rpc) are available as libraries to simplify Plugin development in Go.
-
 ## Plugin Discovery
 
 Multiple _InfraKit_ plugins are typically used together to support a declared configuration.  These plugins discover
@@ -82,14 +80,14 @@ Over time, we would prefer to phase out reference Plugins that appear to provide
 are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit/issues/new)
 to start a discussion before contributing to these plugins with non-trivial code.
 
-| plugin                                             | type     | description                             |
-|:---------------------------------------------------|:---------|:----------------------------------------|
-| [swarm](pkg/example/flavor/swarm)                      | flavor   | runs Docker in Swarm mode               |
-| [vanilla](pkg/example/flavor/vanilla)                  | flavor   | manual specification of instance fields |
-| [zookeeper](pkg/example/flavor/zookeeper)              | flavor   | run an Apache ZooKeeper ensemble        |
-| [infrakit/file](pkg/example/instance/file)             | instance | useful for development and testing      |
-| [infrakit/terraform](pkg/example/instance/terraform)   | instance | creates instances using Terraform       |
-| [infrakit/vagrant](pkg/example/instance/vagrant)       | instance | creates Vagrant VMs                     |
+| plugin                                               | type     | description                             |
+|:-----------------------------------------------------|:---------|:----------------------------------------|
+| [swarm](pkg/example/flavor/swarm)                    | flavor   | runs Docker in Swarm mode               |
+| [vanilla](pkg/example/flavor/vanilla)                | flavor   | manual specification of instance fields |
+| [zookeeper](pkg/example/flavor/zookeeper)            | flavor   | run an Apache ZooKeeper ensemble        |
+| [infrakit/file](pkg/example/instance/file)           | instance | useful for development and testing      |
+| [infrakit/terraform](pkg/example/instance/terraform) | instance | creates instances using Terraform       |
+| [infrakit/vagrant](pkg/example/instance/vagrant)     | instance | creates Vagrant VMs                     |
 
 
 ### Supported implementations
@@ -103,14 +101,20 @@ project, so please double-check where the code lives before filing InfraKit issu
 
 Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
 
-### APIs
+### Creating a plugin
+A plugin must be an HTTP server that implements one of the plugin [APIs](#apis), lisetning on a Unix socket.  While
+a plugin can be written in any programming language, [utilities](pkg/rpc) are available as libraries to simplify Plugin
+development in Go.  Our [reference implementations](#reference-implementations) should provide a good starting point
+for building a new plugin using these utilities.
+
+#### APIs
 _InfraKit_ plugins are exposed via HTTP, using [JSON-RPC 2.0](http://www.jsonrpc.org/specification).
 
 API requests can be made manually with `curl`.  For example, the following command will list all groups:
 ```console
 $ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
   -H 'Content-Type: application/json'
-  -d '{"jsonrpc":"2.0","method":"Group.InspectGroups","params":{},"id":5577006791947779410}'
+  -d '{"jsonrpc":"2.0","method":"Group.InspectGroups","params":{},"id":1}'
 {"jsonrpc":"2.0","result":{"Groups":null},"id":1}
 ```
 
