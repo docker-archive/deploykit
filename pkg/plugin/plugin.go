@@ -8,12 +8,11 @@ import (
 // for GET-type methods requiring no input
 type EmptyRequest struct{}
 
-// TypeVersion is the plugin type + version string used by infrakit.  The type and version
-// are defined by infrakit and not by the vendor.  The vendor's name and version fields can
-// be set in the Info (see Vendor interface).
-// For example, Instance/v1.0.0  The string is not case sensitive and
-// version should use semantic versioning.
-type TypeVersion string
+// Interface of the plugin
+type Interface struct {
+	Name    string
+	Version string
+}
 
 // Meta is metadata for the plugin
 type Meta struct {
@@ -22,32 +21,54 @@ type Meta struct {
 	Vendor Info
 
 	// Implements is a list of plugin interface and versions this plugin supports
-	Implements []TypeVersion
+	Implements []Interface
 
 	// Interfaces (optional) is a slice of interface descriptions by the type and version
-	Interfaces []Interface `json:",omitempty"`
+	Interfaces []InterfaceDescription `json:",omitempty"`
 }
 
-// Interface is a holder for RPC interface version and method descriptions
-type Interface struct {
-	Name    TypeVersion
+// InterfaceDescription is a holder for RPC interface version and method descriptions
+type InterfaceDescription struct {
+	Interface
 	Methods []MethodDescription
 }
 
 // MethodDescription contains information about the RPC method such as the request and response
-// example structs.  Note that the field names match the JSON-RPC payload spec with fields like
-// 'method', 'params'.  The RPC payload can be constructed by taking this structure and add an 'id'
-// field for the RPC request id.
+// example structs.  The request value can be used as an example input, possibly with example
+// plugin-custom properties if the underlying plugin implements the InputExample interface.
+// The response value gives an example of the example response.
 type MethodDescription struct {
+	// Request is the RPC request example
+	Request Request
+
+	// Response is the RPC response example
+	Response Response
+}
+
+// Request models the RPC request payload
+type Request struct {
+
+	// Version is the version of the JSON RPC protocol
+	Version string `json:"jsonrpc"`
 
 	// Method is the rpc method to use in the payload field 'method'
 	Method string `json:"method"`
 
 	// Params contains example inputs.  This can be a zero value struct or one with defaults
-	Params []interface{} `json:"params"`
+	Params interface{} `json:"params"`
 
-	// Result contains an example response/ output.  This can be zero value or with defaults
+	// ID is the request is
+	ID string `json:"id"`
+}
+
+// Response is the RPC response struct
+type Response struct {
+
+	// Result is the result of the call
 	Result interface{} `json:"result"`
+
+	// ID is id matching the request ID
+	ID string `json:"id"`
 }
 
 var (

@@ -6,14 +6,12 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/docker/infrakit/pkg/plugin"
-)
-
-const (
-	nullTypeVersion = plugin.TypeVersion("")
+	"github.com/docker/infrakit/pkg/rpc"
 )
 
 var (
@@ -40,51 +38,6 @@ func (r *reflector) exampleProperties() *json.RawMessage {
 	return nil
 }
 
-// Given the input value, look for all the fields named 'fn' that are typed
-// *json.RawMessage and set the field with the example value from the plugin (vendor
-// implementation).  This will recurse through all the nested structures.  Fields with
-// nil pointers of complex types will be set to a zero value.  The input val parameter
-// should be a pointer so that actual struct fields are mutated as needed.
-func setFieldValue(fn string, val reflect.Value, example *json.RawMessage, recurse bool) {
-
-	v := reflect.Indirect(val)
-	if v.Type().Kind() != reflect.Struct {
-		return
-	}
-
-	p := v.FieldByName(fn)
-	if p.IsValid() && p.Type() == reflect.TypeOf(&json.RawMessage{}) {
-		if p.IsNil() && p.CanSet() {
-			p.Set(reflect.ValueOf(example))
-		}
-	}
-
-	if !recurse {
-		return
-	}
-
-	for i := 0; i < v.NumField(); i++ {
-		f := v.Field(i)
-		switch f.Type().Kind() {
-		case reflect.Struct:
-			if f.CanAddr() {
-				setFieldValue(fn, f.Addr(), example, true)
-			}
-		case reflect.Ptr:
-			if f.Type().Elem().Kind() == reflect.Struct {
-				var c reflect.Value
-				if f.IsNil() {
-					c = reflect.New(f.Type().Elem())
-				} else {
-					c = f
-				}
-				f.Set(c)
-				setFieldValue(fn, c, example, true)
-			}
-		}
-	}
-}
-
 // Type returns the target's type, taking into account of pointer receiver
 func (r *reflector) targetType() reflect.Type {
 	return reflect.Indirect(reflect.ValueOf(r.target)).Type()
@@ -98,10 +51,12 @@ func (r *reflector) validate() error {
 	return nil
 }
 
-// TypeVersion returns the plugin type and version.  The plugin rpc object is verified and
-// the current version in semver is concatenated with '/' as separator.
-func (r *reflector) TypeVersion() (plugin.TypeVersion, error) {
-	return plugin.TypeVersion(fmt.Sprintf("%s/%s", r.getPluginTypeName(), plugin.CurrentVersion)), nil
+// Interface returns the plugin type and version.
+func (r *reflector) Interface() plugin.Interface {
+	return plugin.Interface{
+		Name:    r.getPluginTypeName(),
+		Version: plugin.CurrentVersion,
+	}
 }
 
 // isExported returns true of a string is an exported (upper case) name. -- from gorilla/rpc
@@ -124,16 +79,29 @@ func (r *reflector) getPluginTypeName() string {
 	return r.targetType().Name()
 }
 
+func (r *reflector) setExampleProperties(param interface{}) {
+	if example, is := r.target.(rpc.InputExample); is {
+		example.SetExampleProperties(param)
+	}
+}
+
 func (r *reflector) toDescription(m reflect.Method) plugin.MethodDescription {
 	method := fmt.Sprintf("%s.%s", r.getPluginTypeName(), m.Name)
 	input := reflect.New(m.Type.In(2).Elem())
+	ts := fmt.Sprintf("%v", time.Now().Unix())
 	d := plugin.MethodDescription{
-		Method: method,
-		// JSON-RPC 1.0 wrapper calls for an array for params
-		Params: []interface{}{
-			input.Interface(),
+
+		Request: plugin.Request{
+			Version: "2.0",
+			Method:  method,
+			Params:  input.Interface(),
+			ID:      ts,
 		},
-		Result: reflect.Zero(m.Type.In(3).Elem()).Interface(),
+
+		Response: plugin.Response{
+			Result: reflect.Zero(m.Type.In(3).Elem()).Interface(),
+			ID:     ts,
+		},
 	}
 	return d
 }

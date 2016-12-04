@@ -1,7 +1,6 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -28,12 +27,23 @@ func (p *Instance) Info() plugin.Info {
 	return plugin.NoInfo
 }
 
-// ExampleProperties returns an example properties used by the plugin
-func (p *Instance) ExampleProperties() *json.RawMessage {
-	if i, is := p.plugin.(plugin.InputExample); is {
-		return i.ExampleProperties()
+// SetExampleProperties sets the rpc request with any example properties/ custom type
+func (p *Instance) SetExampleProperties(request interface{}) {
+	i, is := p.plugin.(plugin.InputExample)
+	if !is {
+		return
 	}
-	return nil
+	example := i.ExampleProperties()
+	if example == nil {
+		return
+	}
+
+	switch request := request.(type) {
+	case *ValidateRequest:
+		request.Properties = example
+	case *ProvisionRequest:
+		request.Spec.Properties = example
+	}
 }
 
 // Validate performs local validation on a provision request.

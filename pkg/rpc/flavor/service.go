@@ -26,8 +26,29 @@ func (p *Flavor) Info() plugin.Info {
 	return plugin.NoInfo
 }
 
-// ExampleProperties returns an example properties used by the plugin
-func (p *Flavor) ExampleProperties() *json.RawMessage {
+// SetExampleProperties sets the rpc request with any example properties/ custom type
+func (p *Flavor) SetExampleProperties(request interface{}) {
+	i, is := p.plugin.(plugin.InputExample)
+	if !is {
+		return
+	}
+	example := i.ExampleProperties()
+	if example == nil {
+		return
+	}
+
+	switch request := request.(type) {
+	case *PrepareRequest:
+		request.Properties = example
+	case *HealthyRequest:
+		request.Properties = example
+	case *DrainRequest:
+		request.Properties = example
+	}
+}
+
+// exampleProperties returns an example properties used by the plugin
+func (p *Flavor) exampleProperties() *json.RawMessage {
 	if i, is := p.plugin.(plugin.InputExample); is {
 		return i.ExampleProperties()
 	}

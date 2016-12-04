@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	plugin_pkg "github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/afero"
 	"math/rand"
@@ -44,6 +45,28 @@ func NewFileInstancePlugin(dir string) instance.Plugin {
 		Dir: dir,
 		fs:  afero.NewOsFs(),
 	}
+}
+
+// Info returns a vendor specific name and version
+func (p *plugin) Info() plugin_pkg.Info {
+	return plugin_pkg.Info{
+		Name:    "infrakit-instance-file",
+		Version: plugin_pkg.CurrentVersion,
+	}
+}
+
+// ExampleProperties returns the properties / config of this plugin
+func (p *plugin) ExampleProperties() *json.RawMessage {
+	buff, err := json.MarshalIndent(Spec{
+		"exampleString": "a_string",
+		"exampleBool":   true,
+		"exampleInt":    1,
+	}, "  ", "  ")
+	if err != nil {
+		panic(err)
+	}
+	raw := json.RawMessage(buff)
+	return &raw
 }
 
 // Validate performs local validation on a provision request.

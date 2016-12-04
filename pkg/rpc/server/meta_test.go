@@ -80,15 +80,21 @@ func TestMetaForInstance(t *testing.T) {
 
 	err = md.Meta(nil, nil, meta)
 	require.NoError(t, err)
-	require.Equal(t, []plugin.TypeVersion{
-		plugin.TypeVersion("Instance/" + plugin.CurrentVersion),
+	require.Equal(t, []plugin.Interface{
+		{
+			Name:    "Instance",
+			Version: plugin.CurrentVersion,
+		},
 	}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)
 	require.Equal(t, vendorVersion, meta.Vendor.Version)
 	require.Equal(t, 1, len(meta.Interfaces))
 	require.Equal(t, 4, len(meta.Interfaces[0].Methods))
-	require.Equal(t, plugin.TypeVersion("Instance/"+plugin.CurrentVersion), meta.Interfaces[0].Name)
+	require.Equal(t, plugin.Interface{
+		Name:    "Instance",
+		Version: plugin.CurrentVersion,
+	}, meta.Interfaces[0].Interface)
 
 	buff, err := json.MarshalIndent(meta, "  ", "  ")
 	require.NoError(t, err)
@@ -129,15 +135,18 @@ func TestMetaForFlavor(t *testing.T) {
 
 	err = md.Meta(nil, nil, meta)
 	require.NoError(t, err)
-	require.Equal(t, []plugin.TypeVersion{
-		plugin.TypeVersion("Flavor/" + plugin.CurrentVersion),
-	}, meta.Implements)
+	require.Equal(t, []plugin.Interface{
+		{
+			Name:    "Flavor",
+			Version: plugin.CurrentVersion,
+		}}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)
 	require.Equal(t, vendorVersion, meta.Vendor.Version)
 	require.Equal(t, 1, len(meta.Interfaces))
 	require.Equal(t, 4, len(meta.Interfaces[0].Methods))
-	require.Equal(t, plugin.TypeVersion("Flavor/"+plugin.CurrentVersion), meta.Interfaces[0].Name)
+	require.Equal(t, plugin.Interface{Name: "Flavor", Version: plugin.CurrentVersion},
+		meta.Interfaces[0].Interface)
 
 	buff, err := json.MarshalIndent(meta, "  ", "  ")
 	require.NoError(t, err)
@@ -172,15 +181,16 @@ func TestMetaForGroup(t *testing.T) {
 
 	err = md.Meta(nil, nil, meta)
 	require.NoError(t, err)
-	require.Equal(t, []plugin.TypeVersion{
-		plugin.TypeVersion("Group/" + plugin.CurrentVersion),
+	require.Equal(t, []plugin.Interface{
+		{Name: "Group", Version: plugin.CurrentVersion},
 	}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)
 	require.Equal(t, vendorVersion, meta.Vendor.Version)
 	require.Equal(t, 1, len(meta.Interfaces))
 	require.Equal(t, 5, len(meta.Interfaces[0].Methods))
-	require.Equal(t, plugin.TypeVersion("Group/"+plugin.CurrentVersion), meta.Interfaces[0].Name)
+	require.Equal(t, plugin.Interface{Name: "Group", Version: plugin.CurrentVersion},
+		meta.Interfaces[0].Interface)
 
 	buff, err := json.MarshalIndent(meta, "  ", "  ")
 	require.NoError(t, err)
