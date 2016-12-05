@@ -30,7 +30,7 @@ func TestHandshakeSuccess(t *testing.T) {
 	require.NoError(t, client.DoSomething())
 }
 
-func TestHandshakeFail(t *testing.T) {
+func TestHandshakeFailVersion(t *testing.T) {
 	dir, err := ioutil.TempDir("", "infrakit_handshake_test")
 	require.NoError(t, err)
 
@@ -45,6 +45,23 @@ func TestHandshakeFail(t *testing.T) {
 	err = client.DoSomething()
 	require.Error(t, err)
 	require.Equal(t, "Plugin supports TestPlugin API version 0.1.0, client requires 0.2.0", err.Error())
+}
+
+func TestHandshakeFailWrongAPI(t *testing.T) {
+	dir, err := ioutil.TempDir("", "infrakit_handshake_test")
+	require.NoError(t, err)
+
+	name := "instance"
+	socket := filepath.Join(dir, name)
+
+	instanceServer, err := server.StartPluginAtPath(socket, &TestPlugin{spec: apiSpec})
+	require.NoError(t, err)
+	defer instanceServer.Stop()
+
+	client := rpcClient{client: New(socket, spi.APISpec{Name: "OtherPlugin", Version: "0.1.0"})}
+	err = client.DoSomething()
+	require.Error(t, err)
+	require.Equal(t, "Plugin does not support API {OtherPlugin 0.1.0}", err.Error())
 }
 
 type rpcClient struct {
