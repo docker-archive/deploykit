@@ -11,9 +11,13 @@ type handshakingClient struct {
 	client Client
 	api    spi.APISpec
 
+	// handshakeResult handles the tri-state outcome of handshake state:
+	//  - handshake has not yet completed (nil)
+	//  - handshake completed successfully (non-nil result, nil error)
+	//  - handshake failed (non-nil result, non-nil error)
 	handshakeResult *handshakeResult
 
-	// lock guards handshakeComplete
+	// lock guards handshakeResult
 	lock *sync.Mutex
 }
 
