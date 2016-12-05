@@ -189,7 +189,7 @@ func (p *plugin) terraformApply() error {
 }
 
 func (p *plugin) doTerraformApply() error {
-	log.Infoln("Applying plan")
+	log.Infoln(time.Now().Format(time.RFC850) + " Applying plan")
 	cmd := exec.Command("terraform", "apply")
 	cmd.Dir = p.Dir
 	stdout, err := cmd.StdoutPipe()
@@ -352,6 +352,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 			spec.Tags["Name"] = string(id)
 		}
 	}
+
 	switch properties.Type {
 	case "aws_instance", "azurerm_virtual_machine", "digitalocean_droplet", "google_compute_instance":
 		if t, exists := properties.Value["tags"]; !exists {
@@ -362,6 +363,17 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 				mm[tt] = vv
 			}
 		}
+	case "softlayer_virtual_guest":
+		log.Debugln("softlayer_virtual_guest detected, adding hostname to properties: hostname=", name)
+		properties.Value["hostname"] = name
+		var tags []interface{}
+
+		//softlayer uses a list of tags, instead of a map of tags
+		for i, v := range spec.Tags {
+			log.Debugln("softlayer_virtual_guest detected, append system tag v=", v)
+			tags = append(tags, i+":"+v)
+		}
+		properties.Value["tags"] = tags
 	}
 
 	// Use tag to store the logical id
@@ -375,6 +387,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	switch properties.Type {
 	case "aws_instance", "digitalocean_droplet":
 		addUserData(properties.Value, "user_data", spec.Init)
+	case "softlayer_virtual_guest":
+		addUserData(properties.Value, "user_metadata", spec.Init)
 	case "azurerm_virtual_machine":
 		// os_profile.custom_data
 		if m, has := properties.Value["os_profile"]; !has {
@@ -414,7 +428,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 // Destroy terminates an existing instance.
 func (p *plugin) Destroy(instance instance.ID) error {
 	fp := filepath.Join(p.Dir, string(instance)+".tf.json")
-	log.Debugln("destroy", fp)
+	log.Debugln("destroy instance", fp)
 	err := p.fs.Remove(fp)
 	if err != nil {
 		return err
@@ -445,6 +459,7 @@ scan:
 				ID:        instance.ID(id),
 				LogicalID: terraformLogicalID(v),
 			}
+
 			if len(tags) == 0 {
 				result = append(result, inst)
 			} else {
@@ -457,12 +472,16 @@ scan:
 			}
 		}
 	}
+	log.Debugln("describe-instances result=", result)
+
 	return result, nil
 }
 
 func terraformTags(v interface{}, key string) map[string]string {
+	log.Debugln("terraformTags", v)
 	m, ok := v.(map[string]interface{})
 	if !ok {
+		log.Debugln("terraformTags: return nil")
 		return nil
 	}
 	tags := map[string]string{}
@@ -471,7 +490,28 @@ func terraformTags(v interface{}, key string) map[string]string {
 			tags[k] = fmt.Sprintf("%v", v)
 		}
 		return tags
+	} else if mm, ok := m[key].([]interface{}); ok {
+		// add each tag in the list to the tags map
+		for _, v := range mm {
+			value := fmt.Sprintf("%v", v)
+			if strings.Contains(value, ":") {
+				log.Debugln("terraformTags system tags detected v=", v)
+				vv := strings.Split(value, ":")
+				if len(vv) == 2 {
+					tags[vv[0]] = vv[1]
+				} else {
+					log.Errorln("terraformTags: ignore invalid tag detected", value)
+				}
+			} else {
+				log.Warnln("terraformTags user tags ignored v=", value)
+			}
+		}
+		log.Debugln("terraformTags return tags", tags)
+		return tags
+	} else {
+		log.Errorln("terraformTags: invalid terraformTags tags value", m[key])
 	}
+
 	for k, v := range m {
 		if k != "tags.%" && strings.Index(k, "tags.") == 0 {
 			n := k[len("tags."):]
