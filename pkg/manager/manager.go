@@ -150,6 +150,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 			case <-m.stop:
 
 				log.Infoln("Stopping..")
+				m.stop = nil
 				close(stopWorkQueue)
 				close(notify)
 				return
@@ -198,8 +199,8 @@ func (m *manager) Stop() {
 	if m.stop == nil {
 		return
 	}
-	m.leader.Stop()
 	close(m.stop)
+	m.leader.Stop()
 }
 
 func (m *manager) getCurrentState() (GlobalSpec, error) {
