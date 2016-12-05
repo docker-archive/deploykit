@@ -2,6 +2,7 @@ package instance
 
 import (
 	"errors"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"net/http"
 )
@@ -15,6 +16,11 @@ func PluginServer(p instance.Plugin) *Instance {
 // registered by the rpc server package.
 type Instance struct {
 	plugin instance.Plugin
+}
+
+// ImplementedInterface returns the interface implemented by this RPC service.
+func (p *Instance) ImplementedInterface() spi.InterfaceSpec {
+	return instance.InterfaceSpec
 }
 
 // Validate performs local validation on a provision request.

@@ -8,7 +8,7 @@ import (
 
 // NewClient returns a plugin interface implementation connected to a plugin
 func NewClient(socketPath string) instance.Plugin {
-	return &client{client: rpc_client.New(socketPath)}
+	return &client{client: rpc_client.New(socketPath, instance.InterfaceSpec)}
 }
 
 type client struct {
