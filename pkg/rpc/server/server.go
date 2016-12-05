@@ -8,7 +8,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/rpc/v2"
-	"github.com/gorilla/rpc/v2/json"
+	"github.com/gorilla/rpc/v2/json2"
 	"gopkg.in/tylerb/graceful.v1"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -63,7 +63,7 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // Returns a Stoppable that can be used to stop or block on the server.
 func StartPluginAtPath(socketPath string, receiver interface{}) (Stoppable, error) {
 	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
+	server.RegisterCodec(json2.NewCodec(), "application/json")
 
 	if err := server.RegisterService(receiver, ""); err != nil {
 		return nil, err

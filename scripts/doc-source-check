@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+# Validate that documentation is kept up to date with the sources being documented.
+#
+# This is a low-tech approach to ensure that documentation is validated when relevant sources
+# are changed.  A markdown file can 'call out' the sources being referenced using an HTML comment.
+# For example:
+#
+#   <!-- SOURCE-CHECKSUM pkg/spi/instance/* ABCDEF -->
+#
+# This instructs the script to compute a checksum of the files under pkg/spi/instance and check
+# that it matches ABCDEF.
+#
+# The goal is to remind developers to update documentation when code changes.  Hashing the source
+# files undoubtedly raises false positives, but mitigates stale documentation.
+
+set -o errexit
+set -o nounset
+
+HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$HERE/.."
+
+# Check all markdown files we own.
+for f in $(find . -name '*.md' -not -path './vendor/*')
+do
+  # Look for the sentinel string.
+  doc_source_link=$(grep '<!-- SOURCE-CHECKSUM' "$f" || true)
+  if [ "$doc_source_link" == "" ]
+  then
+    continue
+  fi
+
+  echo -n "Validating source checksum in $f: "
+
+  # Split the command arguments.
+  IFS=' ' read -r -a link_cmd <<< "$doc_source_link"
+  if [ "${link_cmd[1]}" != "SOURCE-CHECKSUM" -o "${#link_cmd[@]}" -lt 5 ]
+  then
+    echo "FAIL"
+    echo "Invalid SOURCE-CHECKSUM command"
+    echo "<!-- SOURCE-CHECKSUM file-pattern checksum -->"
+    exit 1
+  fi
+
+  file_pattern="${link_cmd[2]}"
+  checksum="${link_cmd[3]}"
+
+  # Use git to hash the source files specified, concatenating them to form a single hash string.
+  hash=$(git hash-object $file_pattern | tr -d '\n')
+  if [ "$hash" == "$checksum" ]
+  then
+    echo "PASS"
+  else
+    echo "FAIL
+Expected: $checksum
+Actual: $hash
+
+The document at $f contains a SOURCE-CHECKSUM tag indicating
+that it describes $file_pattern.  The checksum has changed, which indicates
+that $file_pattern has changed, but the checksum at $f has not.
+
+Please double-check that the documentation is up-to-date and certify the
+documentation by updating the SOURCE-CHECKSUM SHA with the above 'Actual'
+value.
+"
+    exit 1
+  fi
+done

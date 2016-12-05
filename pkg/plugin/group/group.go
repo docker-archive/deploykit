@@ -103,9 +103,8 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		panic("Invalid empty allocation method")
 	}
 
-	p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
-
 	if !pretend {
+		p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
 		go supervisor.Run()
 	}
 
