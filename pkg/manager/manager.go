@@ -126,7 +126,11 @@ func (m *manager) Start() (<-chan struct{}, error) {
 				log.Infoln("Manager stopped.")
 				return
 
-			case leader := <-notify:
+			case leader, open := <-notify:
+
+				if !open {
+					return
+				}
 
 				// This channel has data only when there's been a leadership change.
 
@@ -154,7 +158,12 @@ func (m *manager) Start() (<-chan struct{}, error) {
 				close(notify)
 				return
 
-			case evt := <-leaderChan:
+			case evt, open := <-leaderChan:
+
+				if !open {
+					return
+				}
+
 				// This here handles possible duplicated events about leadership and fires only when there
 				// is a change.
 
