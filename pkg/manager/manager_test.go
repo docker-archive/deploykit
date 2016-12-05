@@ -145,11 +145,11 @@ func TestNoCallsToGroupWhenNoLeader(t *testing.T) {
 	manager1.Start()
 	manager2.Start()
 
-	manager1.Stop()
-	manager2.Stop()
-
 	stoppable1.Stop()
 	stoppable2.Stop()
+
+	manager1.Stop()
+	manager2.Stop()
 }
 
 func TestStartOneLeader(t *testing.T) {

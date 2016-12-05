@@ -20,8 +20,6 @@ type informer struct {
 func (i informer) GetMeta() (plugin.Meta, error) {
 	req := plugin.EmptyRequest{}
 	resp := plugin.Meta{}
-
-	fmt.Println(">>>>>", req, resp)
 	err := i.client.Call("Plugin.Meta", req, &resp)
 
 	fmt.Println(">>>>>===", err)
