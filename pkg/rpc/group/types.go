@@ -45,12 +45,11 @@ type DestroyGroupResponse struct {
 	OK bool
 }
 
-// InspectGroupsRequest is the rpc wrapper for the input to destroy a group
+// InspectGroupsRequest is the rpc wrapper for the input to inspect groups
 type InspectGroupsRequest struct {
-	ID group.ID
 }
 
-// InspectGroupsResponse is the rpc wrapper for the output from destroying a group
+// InspectGroupsResponse is the rpc wrapper for the output from inspecting groups
 type InspectGroupsResponse struct {
 	Groups []group.Spec
 }

@@ -1,4 +1,4 @@
-package swarm
+package main
 
 import (
 	"encoding/json"
@@ -33,7 +33,7 @@ func TestValidate(t *testing.T) {
 		json.RawMessage(`{
 			"Type": "manager",
 			"DockerRestartCommand": "systemctl restart docker",
-			"Attachments": {"127.0.0.1": ["a", "b"]}}`),
+			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`),
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
 	require.Error(t, swarmFlavor.Validate(json.RawMessage(`{"type": "other"}`), types.AllocationMethod{Size: 5}))
@@ -50,10 +50,20 @@ func TestValidate(t *testing.T) {
 		json.RawMessage(`{
 			"Type": "manager",
 			"DockerRestartCommand": "systemctl restart docker",
-			"Attachments": {"127.0.0.1": ["a"], "127.0.0.2": ["a"]}}`),
+			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}], "127.0.0.2": [{"ID": "a", "Type": "ebs"}]}}`),
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
 	require.Error(t, err)
 	require.Equal(t, "Attachment a specified more than once", err.Error())
+
+	// Unsupported Attachment Type.
+	err = swarmFlavor.Validate(
+		json.RawMessage(`{
+			"Type": "manager",
+			"DockerRestartCommand": "systemctl restart docker",
+			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "keyboard"}]}}`),
+		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
+	require.Error(t, err)
+	require.Equal(t, "Invalid attachment Type 'keyboard', only ebs is supported", err.Error())
 }
 
 func TestWorker(t *testing.T) {
@@ -142,7 +152,7 @@ func TestManager(t *testing.T) {
 
 	id := instance.LogicalID("127.0.0.1")
 	details, err := flavorImpl.Prepare(
-		json.RawMessage(`{"Type": "manager", "Attachments": {"127.0.0.1": ["a"]}}`),
+		json.RawMessage(`{"Type": "manager", "Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
 	require.NoError(t, err)
@@ -157,7 +167,7 @@ func TestManager(t *testing.T) {
 	require.NotContains(t, details.Init, swarmInfo.JoinTokens.Worker)
 	require.Contains(t, details.Init, nodeInfo.ManagerStatus.Addr)
 
-	require.Equal(t, []instance.Attachment{"a"}, details.Attachments)
+	require.Equal(t, []instance.Attachment{{ID: "a", Type: "gpu"}}, details.Attachments)
 
 	// An instance with no association information is considered unhealthy.
 	health, err := flavorImpl.Healthy(json.RawMessage("{}"), instance.Description{})

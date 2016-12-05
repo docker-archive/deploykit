@@ -5,7 +5,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/plugin/flavor/vanilla"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/spf13/cobra"
 )
@@ -20,7 +19,7 @@ func main() {
 	name := cmd.Flags().String("name", "flavor-vanilla", "Plugin name to advertise for discovery")
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, flavor_plugin.PluginServer(vanilla.NewPlugin()))
+		cli.RunPlugin(*name, flavor_plugin.PluginServer(NewPlugin()))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())

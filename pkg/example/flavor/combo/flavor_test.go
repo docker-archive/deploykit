@@ -28,7 +28,7 @@ var inst = instance.Spec{
 	Tags:        map[string]string{},
 	Init:        "",
 	LogicalID:   logicalID("id"),
-	Attachments: []instance.Attachment{"att1"},
+	Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}},
 }
 
 func pluginLookup(plugins map[string]flavor.Plugin) group.FlavorPluginLookup {
@@ -72,7 +72,7 @@ func TestMergeBehavior(t *testing.T) {
 		Tags:        map[string]string{"a": "1", "c": "4"},
 		Init:        "init data a",
 		LogicalID:   inst.LogicalID,
-		Attachments: []instance.Attachment{"a"},
+		Attachments: []instance.Attachment{{ID: "a", Type: "nic"}},
 	}, nil)
 
 	b.EXPECT().Prepare(json.RawMessage(`{"b": "2"}`), inst, allocation).Return(instance.Spec{
@@ -80,7 +80,7 @@ func TestMergeBehavior(t *testing.T) {
 		Tags:        map[string]string{"b": "2", "c": "5"},
 		Init:        "init data b",
 		LogicalID:   inst.LogicalID,
-		Attachments: []instance.Attachment{"b"},
+		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
 	result, err := combo.Prepare(flavorProperties, inst, types.AllocationMethod{Size: 1})
@@ -91,7 +91,7 @@ func TestMergeBehavior(t *testing.T) {
 		Tags:        map[string]string{"a": "1", "b": "2", "c": "5"},
 		Init:        "init data a\ninit data b",
 		LogicalID:   inst.LogicalID,
-		Attachments: []instance.Attachment{"att1", "a", "b"},
+		Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}, {ID: "a", Type: "nic"}, {ID: "b", Type: "gpu"}},
 	}
 	require.Equal(t, expected, result)
 }
@@ -103,7 +103,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Properties:  jsonPtr("{}"),
 		Tags:        map[string]string{},
 		Init:        "",
-		Attachments: []instance.Attachment{"att1"},
+		Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}},
 	}
 
 	ctrl := gomock.NewController(t)
@@ -136,7 +136,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Tags:        map[string]string{"a": "1", "c": "4"},
 		Init:        "init data a",
 		LogicalID:   inst.LogicalID,
-		Attachments: []instance.Attachment{"a"},
+		Attachments: []instance.Attachment{{ID: "a", Type: "nic"}},
 	}, nil)
 
 	b.EXPECT().Prepare(json.RawMessage(`{"b": "2"}`), inst, allocation).Return(instance.Spec{
@@ -144,7 +144,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Tags:        map[string]string{"b": "2", "c": "5"},
 		Init:        "init data b",
 		LogicalID:   inst.LogicalID,
-		Attachments: []instance.Attachment{"b"},
+		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
 	result, err := combo.Prepare(flavorProperties, inst, types.AllocationMethod{Size: 1})
@@ -155,7 +155,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Tags:        map[string]string{"a": "1", "b": "2", "c": "5"},
 		Init:        "init data a\ninit data b",
 		LogicalID:   inst.LogicalID,
-		Attachments: []instance.Attachment{"att1", "a", "b"},
+		Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}, {ID: "a", Type: "nic"}, {ID: "b", Type: "gpu"}},
 	}
 	require.Equal(t, expected, result)
 }

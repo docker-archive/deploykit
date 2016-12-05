@@ -6,7 +6,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/plugin/flavor/swarm"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/docker/infrakit/pkg/util/docker/1.24"
 	"github.com/spf13/cobra"
@@ -40,7 +39,7 @@ func main() {
 			return err
 		}
 
-		cli.RunPlugin(*name, flavor_plugin.PluginServer(swarm.NewSwarmFlavor(dockerClient)))
+		cli.RunPlugin(*name, flavor_plugin.PluginServer(NewSwarmFlavor(dockerClient)))
 		return nil
 	}
 
