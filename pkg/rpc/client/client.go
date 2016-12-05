@@ -2,11 +2,12 @@ package client
 
 import (
 	"bytes"
-	log "github.com/Sirupsen/logrus"
-	"github.com/gorilla/rpc/v2/json"
 	"net"
 	"net/http"
 	"net/http/httputil"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/gorilla/rpc/v2/json2"
 )
 
 // Client is an HTTP client for sending JSON-RPC requests.
@@ -14,7 +15,7 @@ type Client struct {
 	http http.Client
 }
 
-// New creates a new Client that communicates with a unix socke.
+// New creates a new Client that communicates over a unix socket.
 func New(socketPath string) Client {
 	dialUnix := func(proto, addr string) (conn net.Conn, err error) {
 		return net.Dial("unix", socketPath)
@@ -25,12 +26,12 @@ func New(socketPath string) Client {
 
 // Call sends an RPC with a method and argument.  The result must be a pointer to the response object.
 func (c Client) Call(method string, arg interface{}, result interface{}) error {
-	message, err := json.EncodeClientRequest(method, arg)
+	message, err := json2.EncodeClientRequest(method, arg)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", "http:///", bytes.NewReader(message))
+	req, err := http.NewRequest("POST", "http://a/", bytes.NewReader(message))
 	if err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func (c Client) Call(method string, arg interface{}, result interface{}) error {
 		log.Error(err)
 	}
 
-	resp, err := c.http.Post("http://d/rpc", "application/json", bytes.NewReader(message))
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -57,5 +58,5 @@ func (c Client) Call(method string, arg interface{}, result interface{}) error {
 		log.Error(err)
 	}
 
-	return json.DecodeClientResponse(resp.Body, result)
+	return json2.DecodeClientResponse(resp.Body, result)
 }

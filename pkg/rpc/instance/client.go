@@ -2,16 +2,20 @@ package instance
 
 import (
 	"encoding/json"
+
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 // NewClient returns a plugin interface implementation connected to a plugin
 func NewClient(socketPath string) instance.Plugin {
-	return &client{client: rpc_client.New(socketPath)}
+	return &client{Informer: rpc.NewPluginInformer(socketPath), client: rpc_client.New(socketPath)}
 }
 
 type client struct {
+	plugin.Informer
 	client rpc_client.Client
 }
 

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -35,6 +36,8 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 		return nil
 	}
+
+	meta := cli.MetaCommand(func() interface{} { return instancePlugin })
 
 	validate := &cobra.Command{
 		Use:   "validate <instance configuration file>",
@@ -155,7 +158,7 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 		return err
 	}
-	cmd.AddCommand(validate, provision, destroy, describe)
+	cmd.AddCommand(validate, provision, destroy, describe, meta)
 
 	return cmd
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
@@ -64,6 +65,9 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			LogicalIDs: ids,
 		}
 	}
+
+	meta := cli.MetaCommand(func() interface{} { return flavorPlugin })
+	cmd.AddCommand(meta)
 
 	validate := &cobra.Command{
 		Use:   "validate <flavor configuration file>",

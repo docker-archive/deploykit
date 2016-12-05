@@ -4,6 +4,13 @@ import (
 	"encoding/json"
 )
 
+// Informer is the interface that gives information about the plugin such as version and interface methods
+type Informer interface {
+
+	// GetMeta returns metadata about the plugin
+	GetMeta() (Meta, error)
+}
+
 // EmptyRequest is a fake type created to meet the rpc export requirements
 // for GET-type methods requiring no input
 type EmptyRequest struct{}

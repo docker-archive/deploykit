@@ -1,16 +1,19 @@
 package group
 
 import (
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/group"
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
 func NewClient(socketPath string) group.Plugin {
-	return &client{client: rpc_client.New(socketPath)}
+	return &client{Informer: rpc.NewPluginInformer(socketPath), client: rpc_client.New(socketPath)}
 }
 
 type client struct {
+	plugin.Informer
 	client rpc_client.Client
 }
 
