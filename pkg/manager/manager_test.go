@@ -203,12 +203,11 @@ func TestStartOneLeader(t *testing.T) {
 
 	<-checkpoint
 
-	manager1.Stop()
-	manager2.Stop()
-
 	stoppable1.Stop()
 	stoppable2.Stop()
 
+	manager1.Stop()
+	manager2.Stop()
 }
 
 func TestChangeLeadership(t *testing.T) {
@@ -301,9 +300,9 @@ func TestChangeLeadership(t *testing.T) {
 	<-checkpoint2
 	<-checkpoint3
 
-	manager1.Stop()
-	manager2.Stop()
-
 	stoppable1.Stop()
 	stoppable2.Stop()
+
+	manager1.Stop()
+	manager2.Stop()
 }
