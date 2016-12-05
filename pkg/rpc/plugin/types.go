@@ -2,11 +2,11 @@ package plugin
 
 import "github.com/docker/infrakit/pkg/spi"
 
-// APIsRequest is the rpc wrapper for the APIs method args.
-type APIsRequest struct {
+// ImplementsRequest is the rpc wrapper for the Implements method args.
+type ImplementsRequest struct {
 }
 
-// APIsResponse is the rpc wrapper for the APIs return value.
-type APIsResponse struct {
-	APIs []spi.APISpec
+// ImplementsResponse is the rpc wrapper for the Implements return value.
+type ImplementsResponse struct {
+	APIs []spi.InterfaceSpec
 }

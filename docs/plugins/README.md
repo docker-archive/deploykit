@@ -143,6 +143,6 @@ like the following:
 ```console
 $ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"Plugin.APIs","params":{},"id":1}'
-{"jsonrpc":"2.0","result":{"APIs":[{"Name":"Group","Version":"0.1.0"}]},"id":1}
+  -d '{"jsonrpc":"2.0","method":"Plugin.Implements","params":{},"id":1}'
+{"jsonrpc":"2.0","result":{"Interfaces":[{"Name":"Group","Version":"0.1.0"}]},"id":1}
 ```

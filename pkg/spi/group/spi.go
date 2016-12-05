@@ -6,8 +6,8 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
-// APISpec is the current name and version of the Group API.
-var APISpec = spi.APISpec{
+// InterfaceSpec is the current name and version of the Group API.
+var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Group",
 	Version: "0.1.0",
 }

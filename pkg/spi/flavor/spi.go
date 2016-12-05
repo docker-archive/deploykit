@@ -7,8 +7,8 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
-// APISpec is the current name and version of the Flavor API.
-var APISpec = spi.APISpec{
+// InterfaceSpec is the current name and version of the Flavor API.
+var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Flavor",
 	Version: "0.1.0",
 }

@@ -16,9 +16,9 @@ type Group struct {
 	plugin group.Plugin
 }
 
-// APISpec returns the API implemented by this RPC service.
-func (p *Group) APISpec() spi.APISpec {
-	return group.APISpec
+// ImplementedInterface returns the interface implemented by this RPC service.
+func (p *Group) ImplementedInterface() spi.InterfaceSpec {
+	return group.InterfaceSpec
 }
 
 // CommitGroup is the rpc method to commit a group

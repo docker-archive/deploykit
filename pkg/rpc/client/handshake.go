@@ -9,7 +9,7 @@ import (
 
 type handshakingClient struct {
 	client Client
-	api    spi.APISpec
+	iface  spi.InterfaceSpec
 
 	// handshakeResult handles the tri-state outcome of handshake state:
 	//  - handshake has not yet completed (nil)
@@ -30,26 +30,26 @@ func (c *handshakingClient) handshake() error {
 	defer c.lock.Unlock()
 
 	if c.handshakeResult == nil {
-		req := plugin.APIsRequest{}
-		resp := plugin.APIsResponse{}
+		req := plugin.ImplementsRequest{}
+		resp := plugin.ImplementsResponse{}
 
-		if err := c.client.Call("Plugin.APIs", req, &resp); err != nil {
+		if err := c.client.Call("Plugin.Implements", req, &resp); err != nil {
 			return err
 		}
 
-		err := fmt.Errorf("Plugin does not support API %v", c.api)
+		err := fmt.Errorf("Plugin does not support interface %v", c.iface)
 		if resp.APIs != nil {
-			for _, api := range resp.APIs {
-				if api.Name == c.api.Name {
-					if api.Version == c.api.Version {
+			for _, iface := range resp.APIs {
+				if iface.Name == c.iface.Name {
+					if iface.Version == c.iface.Version {
 						err = nil
 						break
 					} else {
 						err = fmt.Errorf(
-							"Plugin supports %s API version %s, client requires %s",
-							api.Name,
-							api.Version,
-							c.api.Version)
+							"Plugin supports %s interface version %s, client requires %s",
+							iface.Name,
+							iface.Version,
+							c.iface.Version)
 					}
 				}
 			}

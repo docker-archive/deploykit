@@ -5,8 +5,8 @@ import (
 	"github.com/docker/infrakit/pkg/spi"
 )
 
-// APISpec is the current name and version of the Instance API.
-var APISpec = spi.APISpec{
+// InterfaceSpec is the current name and version of the Instance API.
+var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Instance",
 	Version: "0.1.0",
 }

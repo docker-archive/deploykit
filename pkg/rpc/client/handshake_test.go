@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-var apiSpec = spi.APISpec{
+var apiSpec = spi.InterfaceSpec{
 	Name:    "TestPlugin",
 	Version: "0.1.0",
 }
@@ -39,20 +39,20 @@ func TestHandshakeFailVersion(t *testing.T) {
 	testServer, socket := startPluginServer(t)
 	defer testServer.Stop()
 
-	client := rpcClient{client: New(socket, spi.APISpec{Name: "TestPlugin", Version: "0.2.0"})}
+	client := rpcClient{client: New(socket, spi.InterfaceSpec{Name: "TestPlugin", Version: "0.2.0"})}
 	err := client.DoSomething()
 	require.Error(t, err)
-	require.Equal(t, "Plugin supports TestPlugin API version 0.1.0, client requires 0.2.0", err.Error())
+	require.Equal(t, "Plugin supports TestPlugin interface version 0.1.0, client requires 0.2.0", err.Error())
 }
 
 func TestHandshakeFailWrongAPI(t *testing.T) {
 	testServer, socket := startPluginServer(t)
 	defer testServer.Stop()
 
-	client := rpcClient{client: New(socket, spi.APISpec{Name: "OtherPlugin", Version: "0.1.0"})}
+	client := rpcClient{client: New(socket, spi.InterfaceSpec{Name: "OtherPlugin", Version: "0.1.0"})}
 	err := client.DoSomething()
 	require.Error(t, err)
-	require.Equal(t, "Plugin does not support API {OtherPlugin 0.1.0}", err.Error())
+	require.Equal(t, "Plugin does not support interface {OtherPlugin 0.1.0}", err.Error())
 }
 
 type rpcClient struct {
@@ -67,11 +67,11 @@ func (c rpcClient) DoSomething() error {
 
 // TestPlugin is an RPC service for this unit test.
 type TestPlugin struct {
-	spec spi.APISpec
+	spec spi.InterfaceSpec
 }
 
-// APISpec returns the API implemented by this RPC service.
-func (p *TestPlugin) APISpec() spi.APISpec {
+// ImplementedInterface returns the interface implemented by this RPC service.
+func (p *TestPlugin) ImplementedInterface() spi.InterfaceSpec {
 	return p.spec
 }
 

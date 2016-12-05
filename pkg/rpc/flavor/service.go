@@ -16,9 +16,9 @@ type Flavor struct {
 	plugin flavor.Plugin
 }
 
-// APISpec returns the API implemented by this RPC service.
-func (p *Flavor) APISpec() spi.APISpec {
-	return flavor.APISpec
+// ImplementedInterface returns the interface implemented by this RPC service.
+func (p *Flavor) ImplementedInterface() spi.InterfaceSpec {
+	return flavor.InterfaceSpec
 }
 
 // Validate checks whether the helper can support a configuration.

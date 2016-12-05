@@ -18,9 +18,9 @@ type Instance struct {
 	plugin instance.Plugin
 }
 
-// APISpec returns the API implemented by this RPC service.
-func (p *Instance) APISpec() spi.APISpec {
-	return instance.APISpec
+// ImplementedInterface returns the interface implemented by this RPC service.
+func (p *Instance) ImplementedInterface() spi.InterfaceSpec {
+	return instance.InterfaceSpec
 }
 
 // Validate performs local validation on a provision request.

@@ -7,11 +7,11 @@ import (
 
 // Plugin is the service for API metadata.
 type Plugin struct {
-	Spec spi.APISpec
+	Spec spi.InterfaceSpec
 }
 
-// APIs responds to a request for the supported plugin APIs.
-func (p Plugin) APIs(_ *http.Request, req *APIsRequest, resp *APIsResponse) error {
-	resp.APIs = []spi.APISpec{p.Spec}
+// Implements responds to a request for the supported plugin interfaces.
+func (p Plugin) Implements(_ *http.Request, req *ImplementsRequest, resp *ImplementsResponse) error {
+	resp.APIs = []spi.InterfaceSpec{p.Spec}
 	return nil
 }
