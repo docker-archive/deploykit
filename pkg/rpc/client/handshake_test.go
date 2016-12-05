@@ -15,51 +15,42 @@ var apiSpec = spi.APISpec{
 	Version: "0.1.0",
 }
 
-func TestHandshakeSuccess(t *testing.T) {
+func startPluginServer(t *testing.T) (server.Stoppable, string) {
 	dir, err := ioutil.TempDir("", "infrakit_handshake_test")
 	require.NoError(t, err)
 
 	name := "instance"
 	socket := filepath.Join(dir, name)
 
-	instanceServer, err := server.StartPluginAtPath(socket, &TestPlugin{spec: apiSpec})
+	testServer, err := server.StartPluginAtPath(socket, &TestPlugin{spec: apiSpec})
 	require.NoError(t, err)
-	defer instanceServer.Stop()
+	return testServer, socket
+}
+
+func TestHandshakeSuccess(t *testing.T) {
+	testServer, socket := startPluginServer(t)
+	defer testServer.Stop()
 
 	client := rpcClient{client: New(socket, apiSpec)}
 	require.NoError(t, client.DoSomething())
 }
 
 func TestHandshakeFailVersion(t *testing.T) {
-	dir, err := ioutil.TempDir("", "infrakit_handshake_test")
-	require.NoError(t, err)
-
-	name := "instance"
-	socket := filepath.Join(dir, name)
-
-	instanceServer, err := server.StartPluginAtPath(socket, &TestPlugin{spec: apiSpec})
-	require.NoError(t, err)
-	defer instanceServer.Stop()
+	testServer, socket := startPluginServer(t)
+	defer testServer.Stop()
 
 	client := rpcClient{client: New(socket, spi.APISpec{Name: "TestPlugin", Version: "0.2.0"})}
-	err = client.DoSomething()
+	err := client.DoSomething()
 	require.Error(t, err)
 	require.Equal(t, "Plugin supports TestPlugin API version 0.1.0, client requires 0.2.0", err.Error())
 }
 
 func TestHandshakeFailWrongAPI(t *testing.T) {
-	dir, err := ioutil.TempDir("", "infrakit_handshake_test")
-	require.NoError(t, err)
-
-	name := "instance"
-	socket := filepath.Join(dir, name)
-
-	instanceServer, err := server.StartPluginAtPath(socket, &TestPlugin{spec: apiSpec})
-	require.NoError(t, err)
-	defer instanceServer.Stop()
+	testServer, socket := startPluginServer(t)
+	defer testServer.Stop()
 
 	client := rpcClient{client: New(socket, spi.APISpec{Name: "OtherPlugin", Version: "0.1.0"})}
-	err = client.DoSomething()
+	err := client.DoSomething()
 	require.Error(t, err)
 	require.Equal(t, "Plugin does not support API {OtherPlugin 0.1.0}", err.Error())
 }
