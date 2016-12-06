@@ -1,6 +1,15 @@
 package instance
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"github.com/docker/infrakit/pkg/spi"
+)
+
+// InterfaceSpec is the current name and version of the Instance API.
+var InterfaceSpec = spi.InterfaceSpec{
+	Name:    "Instance",
+	Version: "0.1.0",
+}
 
 // Plugin is a vendor-agnostic API used to create and manage resources with an infrastructure provider.
 type Plugin interface {
