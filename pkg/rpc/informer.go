@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	// MetaURL is the well-known HTTP GET endpoint that retrieves description of the plugin's interfaces.
 	MetaURL = "/metaz"
 )
 
@@ -27,7 +28,7 @@ type informer struct {
 // GetMeta implements the Informer interface and returns the metadata about the plugin
 func (i informer) GetMeta() (plugin.Meta, error) {
 	meta := plugin.Meta{}
-	resp, err := i.client.Get(MetaURL)
+	resp, err := i.client.Get("http://d" + MetaURL)
 	if err != nil {
 		return meta, err
 	}
