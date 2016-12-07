@@ -13,7 +13,7 @@ import (
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
 func NewClient(socketPath string) flavor.Plugin {
-	return &client{Informer: rpc.NewPluginInformer(socketPath), client: rpc_client.New(socketPath)}
+	return &client{Informer: rpc.NewPluginInformer(socketPath), client: rpc_client.New(socketPath, flavor.InterfaceSpec)}
 }
 
 type client struct {

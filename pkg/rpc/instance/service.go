@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
@@ -44,6 +45,11 @@ func (p *Instance) SetExampleProperties(request interface{}) {
 	case *ProvisionRequest:
 		request.Spec.Properties = example
 	}
+}
+
+// ImplementedInterface returns the interface implemented by this RPC service.
+func (p *Instance) ImplementedInterface() spi.InterfaceSpec {
+	return instance.InterfaceSpec
 }
 
 // Validate performs local validation on a provision request.

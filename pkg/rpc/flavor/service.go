@@ -5,10 +5,11 @@ import (
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 )
 
-// PluginServer returns a RPCService that conforms to the net/rpc rpc call convention.
+// PluginServer returns a Flavor that conforms to the net/rpc rpc call convention.
 func PluginServer(p flavor.Plugin) *Flavor {
 	return &Flavor{plugin: p}
 }
@@ -53,6 +54,11 @@ func (p *Flavor) exampleProperties() *json.RawMessage {
 		return i.ExampleProperties()
 	}
 	return nil
+}
+
+// ImplementedInterface returns the interface implemented by this RPC service.
+func (p *Flavor) ImplementedInterface() spi.InterfaceSpec {
+	return flavor.InterfaceSpec
 }
 
 // Validate checks whether the helper can support a configuration.

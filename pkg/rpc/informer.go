@@ -1,31 +1,37 @@
 package rpc
 
 import (
-	"fmt"
+	"encoding/json"
+	"net"
+	"net/http"
 
 	"github.com/docker/infrakit/pkg/plugin"
-	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
+)
+
+const (
+	MetaURL = "/metaz"
 )
 
 // NewPluginInformer returns a plugin informer that can give metadata about a plugin
 func NewPluginInformer(socketPath string) plugin.Informer {
-	return &informer{client: rpc_client.New(socketPath)}
+	dialUnix := func(proto, addr string) (conn net.Conn, err error) {
+		return net.Dial("unix", socketPath)
+	}
+	return &informer{client: &http.Client{Transport: &http.Transport{Dial: dialUnix}}}
 }
 
 type informer struct {
-	client rpc_client.Client
+	client *http.Client
 }
 
 // GetMeta implements the Informer interface and returns the metadata about the plugin
 func (i informer) GetMeta() (plugin.Meta, error) {
-	req := plugin.EmptyRequest{}
-	resp := plugin.Meta{}
-	err := i.client.Call("Plugin.Meta", req, &resp)
-
-	fmt.Println(">>>>>===", err)
-
+	meta := plugin.Meta{}
+	resp, err := i.client.Get(MetaURL)
 	if err != nil {
-		return resp, err
+		return meta, err
 	}
-	return resp, nil
+	defer resp.Body.Close()
+	err = json.NewDecoder(resp.Body).Decode(&meta)
+	return meta, err
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
+	"github.com/docker/infrakit/pkg/spi"
 )
 
 var (
@@ -52,11 +53,8 @@ func (r *reflector) validate() error {
 }
 
 // Interface returns the plugin type and version.
-func (r *reflector) Interface() plugin.Interface {
-	return plugin.Interface{
-		Name:    r.getPluginTypeName(),
-		Version: plugin.CurrentVersion,
-	}
+func (r *reflector) Interface() spi.InterfaceSpec {
+	return spi.GetInterface(r.getPluginTypeName())
 }
 
 // isExported returns true of a string is an exported (upper case) name. -- from gorilla/rpc

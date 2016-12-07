@@ -13,6 +13,7 @@ import (
 	instance_plugin_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -76,25 +77,14 @@ func TestMetaForInstance(t *testing.T) {
 	md, err := NewMetadata(service)
 	require.NoError(t, err)
 
-	meta := &plugin.Meta{}
-
-	err = md.Meta(nil, nil, meta)
-	require.NoError(t, err)
-	require.Equal(t, []plugin.Interface{
-		{
-			Name:    "Instance",
-			Version: plugin.CurrentVersion,
-		},
-	}, meta.Implements)
+	meta := md.getMeta()
+	require.Equal(t, []spi.InterfaceSpec{instance.InterfaceSpec}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)
 	require.Equal(t, vendorVersion, meta.Vendor.Version)
 	require.Equal(t, 1, len(meta.Interfaces))
 	require.Equal(t, 4, len(meta.Interfaces[0].Methods))
-	require.Equal(t, plugin.Interface{
-		Name:    "Instance",
-		Version: plugin.CurrentVersion,
-	}, meta.Interfaces[0].Interface)
+	require.Equal(t, instance.InterfaceSpec, meta.Interfaces[0].InterfaceSpec)
 
 	buff, err := json.MarshalIndent(meta, "  ", "  ")
 	require.NoError(t, err)
@@ -131,22 +121,14 @@ func TestMetaForFlavor(t *testing.T) {
 	md, err := NewMetadata(service)
 	require.NoError(t, err)
 
-	meta := &plugin.Meta{}
-
-	err = md.Meta(nil, nil, meta)
-	require.NoError(t, err)
-	require.Equal(t, []plugin.Interface{
-		{
-			Name:    "Flavor",
-			Version: plugin.CurrentVersion,
-		}}, meta.Implements)
+	meta := md.getMeta()
+	require.Equal(t, []spi.InterfaceSpec{flavor.InterfaceSpec}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)
 	require.Equal(t, vendorVersion, meta.Vendor.Version)
 	require.Equal(t, 1, len(meta.Interfaces))
 	require.Equal(t, 4, len(meta.Interfaces[0].Methods))
-	require.Equal(t, plugin.Interface{Name: "Flavor", Version: plugin.CurrentVersion},
-		meta.Interfaces[0].Interface)
+	require.Equal(t, flavor.InterfaceSpec, meta.Interfaces[0].InterfaceSpec)
 
 	buff, err := json.MarshalIndent(meta, "  ", "  ")
 	require.NoError(t, err)
@@ -177,20 +159,14 @@ func TestMetaForGroup(t *testing.T) {
 	md, err := NewMetadata(service)
 	require.NoError(t, err)
 
-	meta := &plugin.Meta{}
-
-	err = md.Meta(nil, nil, meta)
-	require.NoError(t, err)
-	require.Equal(t, []plugin.Interface{
-		{Name: "Group", Version: plugin.CurrentVersion},
-	}, meta.Implements)
+	meta := md.getMeta()
+	require.Equal(t, []spi.InterfaceSpec{group.InterfaceSpec}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)
 	require.Equal(t, vendorVersion, meta.Vendor.Version)
 	require.Equal(t, 1, len(meta.Interfaces))
 	require.Equal(t, 5, len(meta.Interfaces[0].Methods))
-	require.Equal(t, plugin.Interface{Name: "Group", Version: plugin.CurrentVersion},
-		meta.Interfaces[0].Interface)
+	require.Equal(t, group.InterfaceSpec, meta.Interfaces[0].InterfaceSpec)
 
 	buff, err := json.MarshalIndent(meta, "  ", "  ")
 	require.NoError(t, err)

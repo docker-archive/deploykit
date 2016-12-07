@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
 )
 
@@ -32,6 +33,12 @@ func (p *Group) ExampleProperties() *json.RawMessage {
 		return i.ExampleProperties()
 	}
 	return nil
+}
+
+// ImplementedInterface returns the interface implemented by this RPC service.
+func (p *Group) ImplementedInterface() spi.InterfaceSpec {
+	return group.InterfaceSpec
+
 }
 
 // CommitGroup is the rpc method to commit a group

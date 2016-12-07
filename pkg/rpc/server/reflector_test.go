@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	plugin_mock "github.com/docker/infrakit/pkg/mock/spi/instance"
-	"github.com/docker/infrakit/pkg/plugin"
 	plugin_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ func TestReflect(t *testing.T) {
 	require.Equal(t, reflect.TypeOf(plugin_rpc.Instance{}), tt)
 
 	tver2 := r.Interface()
-	require.Equal(t, plugin.Interface{Name: "Instance", Version: plugin.CurrentVersion}, tver2)
+	require.Equal(t, instance.InterfaceSpec, tver2)
 
 	methods := r.pluginMethods()
 	require.Equal(t, 4, len(methods))

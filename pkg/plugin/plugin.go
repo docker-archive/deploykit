@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"encoding/json"
+
+	"github.com/docker/infrakit/pkg/spi"
 )
 
 // Informer is the interface that gives information about the plugin such as version and interface methods
@@ -11,16 +13,6 @@ type Informer interface {
 	GetMeta() (Meta, error)
 }
 
-// EmptyRequest is a fake type created to meet the rpc export requirements
-// for GET-type methods requiring no input
-type EmptyRequest struct{}
-
-// Interface of the plugin
-type Interface struct {
-	Name    string
-	Version string
-}
-
 // Meta is metadata for the plugin
 type Meta struct {
 
@@ -28,7 +20,7 @@ type Meta struct {
 	Vendor Info
 
 	// Implements is a list of plugin interface and versions this plugin supports
-	Implements []Interface
+	Implements []spi.InterfaceSpec
 
 	// Interfaces (optional) is a slice of interface descriptions by the type and version
 	Interfaces []InterfaceDescription `json:",omitempty"`
@@ -36,7 +28,7 @@ type Meta struct {
 
 // InterfaceDescription is a holder for RPC interface version and method descriptions
 type InterfaceDescription struct {
-	Interface
+	spi.InterfaceSpec
 	Methods []MethodDescription
 }
 

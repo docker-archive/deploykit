@@ -151,6 +151,8 @@ func TestNoCallsToGroupWhenNoLeader(t *testing.T) {
 	manager1.Start()
 	manager2.Start()
 
+	testSetLeader(t, leaderChans, "nobody")
+
 	manager1.Stop()
 	manager2.Stop()
 

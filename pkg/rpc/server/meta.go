@@ -1,9 +1,11 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi"
 )
 
 // Metadata is the service object for the RPC metadata service
@@ -33,10 +35,22 @@ func (m *Metadata) Register(receiver interface{}) error {
 	return nil
 }
 
-// Meta exposes a simple RPC method that returns information about the plugin's interfaces and
-// versions.
-func (m *Metadata) Meta(_ *http.Request, req *plugin.EmptyRequest, resp *plugin.Meta) error {
-	myImplements := []plugin.Interface{}
+// ServeHTTP implements the http.Handler interface and responds by returning information about the plugin.
+func (m *Metadata) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	meta := m.getMeta()
+	buff, err := json.Marshal(meta)
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		resp.Write([]byte(err.Error()))
+		return
+	}
+	resp.Write(buff)
+	return
+}
+
+func (m *Metadata) getMeta() *plugin.Meta {
+	meta := &plugin.Meta{}
+	myImplements := []spi.InterfaceSpec{}
 	myInterfaces := []plugin.InterfaceDescription{}
 
 	for _, r := range m.reflectors {
@@ -56,17 +70,16 @@ func (m *Metadata) Meta(_ *http.Request, req *plugin.EmptyRequest, resp *plugin.
 
 		myInterfaces = append(myInterfaces,
 			plugin.InterfaceDescription{
-				Interface: iface,
-				Methods:   descriptions,
+				InterfaceSpec: iface,
+				Methods:       descriptions,
 			})
 	}
 
 	if m.vendor != nil {
-		resp.Vendor = m.vendor.Info()
+		meta.Vendor = m.vendor.Info()
 	}
 
-	resp.Implements = myImplements
-	resp.Interfaces = myInterfaces
-
-	return nil
+	meta.Implements = myImplements
+	meta.Interfaces = myInterfaces
+	return meta
 }
