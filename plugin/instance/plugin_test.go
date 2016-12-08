@@ -23,8 +23,8 @@ func NewMockGCloud(t *testing.T) (*mock_gcloud.MockGCloud, *gomock.Controller) {
 func TestProvision(t *testing.T) {
 	properties := json.RawMessage(`{
 		"NamePrefix":"worker",
-		"MachineType":"g1-small",
-		"Network":"default",
+		"MachineType":"n1-standard-1",
+		"Network":"NETWORK",
 		"Tags":["TAG1", "TAG2"],
 		"DiskSizeMb":100,
 		"Scopes":["SCOPE1", "SCOPE2"],
@@ -40,8 +40,8 @@ func TestProvision(t *testing.T) {
 	defer ctrl.Finish()
 	api.EXPECT().CreateInstance("worker-8717895732742165505", &gcloud.InstanceSettings{
 		Description: "vm",
-		MachineType: "g1-small",
-		Network:     "default",
+		MachineType: "n1-standard-1",
+		Network:     "NETWORK",
 		Tags:        []string{"TAG1", "TAG2"},
 		DiskSizeMb:  100,
 		Scopes:      []string{"SCOPE1", "SCOPE2"},
@@ -65,7 +65,7 @@ func TestProvision(t *testing.T) {
 }
 
 func TestProvisionFails(t *testing.T) {
-	properties := json.RawMessage(`{"MachineType":"g1-small", "Network":"default"}`)
+	properties := json.RawMessage(`{}`)
 	tags := map[string]string{
 		"key1": "value1",
 	}
@@ -90,7 +90,7 @@ func TestProvisionFails(t *testing.T) {
 }
 
 func TestProvisionFailsToAddToTargetPool(t *testing.T) {
-	properties := json.RawMessage(`{"MachineType":"g1-small", "Network":"default", "TargetPool":"POOL"}`)
+	properties := json.RawMessage(`{"TargetPool":"POOL"}`)
 	tags := map[string]string{}
 
 	rand.Seed(0)
@@ -222,13 +222,6 @@ func TestValidate(t *testing.T) {
 	err := plugin.Validate(json.RawMessage(`{"MachineType":"g1-small", "Network":"default"}`))
 
 	require.NoError(t, err)
-}
-
-func TestValidateMissingFields(t *testing.T) {
-	plugin := &plugin{}
-	err := plugin.Validate(json.RawMessage(`{}`))
-
-	require.EqualError(t, err, "Missing: MachineType, Network")
 }
 
 func TestValidateFails(t *testing.T) {

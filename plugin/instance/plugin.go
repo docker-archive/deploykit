@@ -4,12 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.gcp/plugin/instance/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
+)
+
+const (
+	defaultNamePrefix  = "instance"
+	defaultMachineType = "g1-small"
+	defaultNetwork     = "default"
+	defaultDiskSizeMb  = 10
 )
 
 func init() {
@@ -55,10 +61,16 @@ func parseProperties(properties json.RawMessage) (*instanceProperties, error) {
 	}
 
 	if p.NamePrefix == "" {
-		p.NamePrefix = "instance"
+		p.NamePrefix = defaultNamePrefix
+	}
+	if p.MachineType == "" {
+		p.MachineType = defaultMachineType
+	}
+	if p.Network == "" {
+		p.Network = defaultNetwork
 	}
 	if p.DiskSizeMb == 0 {
-		p.DiskSizeMb = 10
+		p.DiskSizeMb = defaultDiskSizeMb
 	}
 
 	return &p, nil
@@ -67,25 +79,9 @@ func parseProperties(properties json.RawMessage) (*instanceProperties, error) {
 func (p *plugin) Validate(req json.RawMessage) error {
 	log.Debugln("validate", string(req))
 
-	instanceProperties, err := parseProperties(req)
-	if err != nil {
-		return err
-	}
+	_, err := parseProperties(req)
 
-	missingProperties := []string{}
-	if instanceProperties.MachineType == "" {
-		missingProperties = append(missingProperties, "MachineType")
-	}
-	if instanceProperties.Network == "" {
-		missingProperties = append(missingProperties, "Network")
-	}
-
-	switch len(missingProperties) {
-	case 0:
-		return nil
-	default:
-		return fmt.Errorf("Missing: %s", strings.Join(missingProperties, ", "))
-	}
+	return err
 }
 
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
