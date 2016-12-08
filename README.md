@@ -1,5 +1,18 @@
 # InfraKit.GCP
 
+[![CircleCI](https://circleci.com/gh/docker/infrakit.gcp.svg?style=shield&circle-token=28d281a3090845d1c42c36298ff878a7c9bb6ffa)](https://circleci.com/gh/docker/infrakit.gcp)
+
+[InfraKit](https://github.com/docker/infrakit) plugins for creating and managing resources in Google Cloud Platform.
+
+## Instance plugin
+
+An InfraKit instance plugin is provided, which creates Google Compute Engine instances.
+
+### Building and running
+
+To build the GCP Instance plugin, run `make binaries`.  The plugin binary will be located at
+`./build/infrakit-instance-gcp`.
+
 
 ## Reporting security issues
 
