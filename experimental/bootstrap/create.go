@@ -426,10 +426,15 @@ func ProvisionManager(
 	logicalID := instance.LogicalID(ip)
 
 	id, err := provisioner.Provision(instance.Spec{
-		Properties:  &provisionRequest,
-		Tags:        tags,
-		LogicalID:   &logicalID,
-		Attachments: []instance.Attachment{instance.Attachment(ip)},
+		Properties: &provisionRequest,
+		Tags:       tags,
+		LogicalID:  &logicalID,
+		Attachments: []instance.Attachment{
+			{
+				Type: infrakit_instance.AttachmentEBSVolume,
+				ID:   ip, // we use ip as a unique name for the volume
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("Failed to provision: %s", err)

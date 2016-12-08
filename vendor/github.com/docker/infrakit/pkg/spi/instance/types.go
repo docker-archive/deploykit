@@ -18,13 +18,29 @@ type Description struct {
 type LogicalID string
 
 // Attachment is an identifier for a resource to attach to an instance.
-type Attachment string
+type Attachment struct {
+	// ID is the unique identifier for the attachment.
+	ID string
+
+	// Type is the kind of attachment.  This allows multiple attachments of different types, with the supported
+	// types defined by the plugin.
+	Type string
+}
 
 // Spec is a specification of an instance to be provisioned
 type Spec struct {
-	Properties  *json.RawMessage
-	Tags        map[string]string
-	Init        string
-	LogicalID   *LogicalID
+	// Properties is the opaque instance plugin configuration.
+	Properties *json.RawMessage
+
+	// Tags are metadata that describes an instance.
+	Tags map[string]string
+
+	// Init is the boot script to execute when the instance is created.
+	Init string
+
+	// LogicalID is the logical identifier assigned to this instance, which may be absent.
+	LogicalID *LogicalID
+
+	// Attachments are instructions for external entities that should be attached to the instance.
 	Attachments []Attachment
 }

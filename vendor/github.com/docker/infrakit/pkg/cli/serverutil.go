@@ -10,7 +10,7 @@ import (
 
 // RunPlugin runs a plugin server, advertising with the provided name for discovery.
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
-func RunPlugin(name string, plugin interface{}) {
+func RunPlugin(name string, plugin server.VersionedInterface) {
 	stoppable, err := server.StartPluginAtPath(path.Join(discovery.Dir(), name), plugin)
 	if err != nil {
 		log.Error(err)

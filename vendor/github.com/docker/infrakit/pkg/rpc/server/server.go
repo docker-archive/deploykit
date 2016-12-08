@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/docker/infrakit/pkg/rpc/plugin"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/gorilla/rpc/v2"
-	"github.com/gorilla/rpc/v2/json"
+	"github.com/gorilla/rpc/v2/json2"
 	"net/http/httptest"
 	"net/http/httputil"
 )
@@ -59,13 +61,23 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	recorder.Body.WriteTo(w)
 }
 
+// A VersionedInterface identifies which Interfaces a plugin supports.
+type VersionedInterface interface {
+	// ImplementedInterface returns the interface being provided.
+	ImplementedInterface() spi.InterfaceSpec
+}
+
 // StartPluginAtPath starts an HTTP server listening on a unix socket at the specified path.
 // Returns a Stoppable that can be used to stop or block on the server.
-func StartPluginAtPath(socketPath string, receiver interface{}) (Stoppable, error) {
+func StartPluginAtPath(socketPath string, receiver VersionedInterface) (Stoppable, error) {
 	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
+	server.RegisterCodec(json2.NewCodec(), "application/json")
 
 	if err := server.RegisterService(receiver, ""); err != nil {
+		return nil, err
+	}
+
+	if err := server.RegisterService(plugin.Plugin{Spec: receiver.ImplementedInterface()}, ""); err != nil {
 		return nil, err
 	}
 

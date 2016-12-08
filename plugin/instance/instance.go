@@ -18,6 +18,9 @@ import (
 const (
 	// VolumeTag is the AWS tag name used to associate unique identifiers (instance.VolumeID) with volumes.
 	VolumeTag = "docker-infrakit-volume"
+
+	// AttachmentEBSVolume is the type name used in instance.Attachment
+	AttachmentEBSVolume = "ebs"
 )
 
 type awsInstancePlugin struct {
@@ -91,6 +94,52 @@ func mergeTags(tagMaps ...map[string]string) ([]string, map[string]string) {
 	return keys, tags
 }
 
+func (p awsInstancePlugin) findEBSVolumeAttachments(spec instance.Spec) ([]*string, error) {
+	found := []*string{}
+
+	// for querying volumes
+	filterValues := []*string{}
+
+	for _, attachment := range spec.Attachments {
+		if attachment.Type == AttachmentEBSVolume {
+			s := attachment.ID
+			filterValues = append(filterValues, &s)
+		}
+	}
+
+	if len(filterValues) == 0 {
+		return found, nil // nothing
+	}
+
+	volumes, err := p.client.DescribeVolumes(&ec2.DescribeVolumesInput{
+		Filters: []*ec2.Filter{
+			// TODO(wfarner): Need a way to disambiguate between volumes associated with different
+			// clusters.  Currently, volume IDs are private IP addresses, which are not guaranteed
+			// unique in separate VPCs.
+			{
+				Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
+				Values: filterValues,
+			},
+		},
+	})
+	if err != nil {
+		return nil, errors.New("Failed while looking up volume")
+	}
+
+	// TODO(chungers) -- not dealing with if only a subset is found.
+	if len(volumes.Volumes) != len(spec.Attachments) {
+		return nil, fmt.Errorf(
+			"Not all required volumes found to attach.  Wanted %s, found %s",
+			spec.Attachments,
+			volumes.Volumes)
+	}
+
+	for _, volume := range volumes.Volumes {
+		found = append(found, volume.VolumeId)
+	}
+	return found, nil
+}
+
 // Provision creates a new instance.
 func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
@@ -124,41 +173,6 @@ func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 			base64.StdEncoding.EncodeToString([]byte(*request.RunInstancesInput.UserData)))
 	}
 
-	awsVolumeIDs := []*string{}
-	if spec.Attachments != nil && len(spec.Attachments) > 0 {
-		filterValues := []*string{}
-		for _, attachment := range spec.Attachments {
-			s := string(attachment)
-			filterValues = append(filterValues, &s)
-		}
-
-		volumes, err := p.client.DescribeVolumes(&ec2.DescribeVolumesInput{
-			Filters: []*ec2.Filter{
-				// TODO(wfarner): Need a way to disambiguate between volumes associated with different
-				// clusters.  Currently, volume IDs are private IP addresses, which are not guaranteed
-				// unique in separate VPCs.
-				{
-					Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
-					Values: filterValues,
-				},
-			},
-		})
-		if err != nil {
-			return nil, errors.New("Failed while looking up volume")
-		}
-
-		if len(volumes.Volumes) == len(spec.Attachments) {
-			for _, volume := range volumes.Volumes {
-				awsVolumeIDs = append(awsVolumeIDs, volume.VolumeId)
-			}
-		} else {
-			return nil, fmt.Errorf(
-				"Not all required volumes found to attach.  Wanted %s, found %s",
-				spec.Attachments,
-				volumes.Volumes)
-		}
-	}
-
 	reservation, err := p.client.RunInstances(&request.RunInstancesInput)
 	if err != nil {
 		return nil, err
@@ -172,6 +186,12 @@ func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	id := (*instance.ID)(ec2Instance.InstanceId)
 
 	err = p.tagInstance(ec2Instance, spec.Tags, request.Tags)
+	if err != nil {
+		return id, err
+	}
+
+	// work with attachments
+	awsVolumeIDs, err := p.findEBSVolumeAttachments(spec)
 	if err != nil {
 		return id, err
 	}

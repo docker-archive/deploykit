@@ -11,7 +11,7 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test vendor-update containers check-docs tutorial-test
+.PHONY: clean all fmt vet lint build test vendor-update containers check-docs tutorial-test get-tools
 .DEFAULT: all
 all: clean fmt vet lint build test binaries
 
@@ -37,6 +37,12 @@ build-in-container: clean
 		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
 		infrakit-build
 
+get-tools:
+	@echo "+ $@"
+	@go get -u \
+		github.com/golang/lint/golint \
+		github.com/wfarner/blockcheck
+
 vet:
 	@echo "+ $@"
 	@go vet $(PKGS)
@@ -53,7 +59,7 @@ fmt-save:
 lint:
 	@echo "+ $@"
 	$(if $(shell which golint || echo ''), , \
-		$(error Please install golint: `go get -u github.com/golang/lint/golint`))
+		$(error Please install golint: `make get-tools`))
 	@test -z "$$(golint ./... 2>&1 | grep -v ^vendor/ | grep -v mock/ | tee /dev/stderr)"
 
 check-docs:

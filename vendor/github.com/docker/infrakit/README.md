@@ -54,7 +54,7 @@ We recommended go version 1.7.1 or greater for all platforms.
 
 Also install a few build tools:
 ```shell
-go get -u github.com/golang/lint/golint github.com/wfarner/blockcheck  # if you're running tests
+make get-tools
 ```
 
 ### Running tests
