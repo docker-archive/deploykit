@@ -30,6 +30,21 @@ func (_m *MockGCloud) EXPECT() *_MockGCloudRecorder {
 	return _m.recorder
 }
 
+func (_m *MockGCloud) AddInstanceToTargetPool(_param0 string, _param1 ...string) error {
+	_s := []interface{}{_param0}
+	for _, _x := range _param1 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "AddInstanceToTargetPool", _s...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockGCloudRecorder) AddInstanceToTargetPool(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0}, arg1...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "AddInstanceToTargetPool", _s...)
+}
+
 func (_m *MockGCloud) CreateInstance(_param0 string, _param1 *gcloud.InstanceSettings) error {
 	ret := _m.ctrl.Call(_m, "CreateInstance", _param0, _param1)
 	ret0, _ := ret[0].(error)

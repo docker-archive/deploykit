@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewMockGCloud(t *testing.T) *mock_gcloud.MockGCloud {
+func NewMockGCloud(t *testing.T) (*mock_gcloud.MockGCloud, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
-	return mock_gcloud.NewMockGCloud(ctrl)
+	return mock_gcloud.NewMockGCloud(ctrl), ctrl
 }
 
 func TestProvision(t *testing.T) {
@@ -28,6 +28,7 @@ func TestProvision(t *testing.T) {
 		"Tags":["TAG1", "TAG2"],
 		"DiskSizeMb":100,
 		"Scopes":["SCOPE1", "SCOPE2"],
+		"TargetPool":"POOL",
 		"Description":"vm"}`)
 	tags := map[string]string{
 		"key1": "value1",
@@ -35,7 +36,8 @@ func TestProvision(t *testing.T) {
 	}
 
 	rand.Seed(0)
-	api := NewMockGCloud(t)
+	api, ctrl := NewMockGCloud(t)
+	defer ctrl.Finish()
 	api.EXPECT().CreateInstance("worker-8717895732742165505", &gcloud.InstanceSettings{
 		Description: "vm",
 		MachineType: "g1-small",
@@ -49,6 +51,7 @@ func TestProvision(t *testing.T) {
 			"startup-script": "echo 'Startup'",
 		}),
 	}).Return(nil)
+	api.EXPECT().AddInstanceToTargetPool("POOL", "worker-8717895732742165505").Return(nil)
 
 	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}
 	id, err := plugin.Provision(instance.Spec{
@@ -68,13 +71,37 @@ func TestProvisionFails(t *testing.T) {
 	}
 
 	rand.Seed(0)
-	api := NewMockGCloud(t)
+	api, _ := NewMockGCloud(t)
 	api.EXPECT().CreateInstance("instance-8717895732742165505", &gcloud.InstanceSettings{
 		MachineType: "g1-small",
 		Network:     "default",
 		DiskSizeMb:  10,
 		MetaData:    gcloud.TagsToMetaData(tags),
 	}).Return(errors.New("BUG"))
+
+	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}
+	id, err := plugin.Provision(instance.Spec{
+		Tags:       tags,
+		Properties: &properties,
+	})
+
+	require.EqualError(t, err, "BUG")
+	require.Nil(t, id)
+}
+
+func TestProvisionFailsToAddToTargetPool(t *testing.T) {
+	properties := json.RawMessage(`{"MachineType":"g1-small", "Network":"default", "TargetPool":"POOL"}`)
+	tags := map[string]string{}
+
+	rand.Seed(0)
+	api, _ := NewMockGCloud(t)
+	api.EXPECT().CreateInstance("instance-8717895732742165505", &gcloud.InstanceSettings{
+		MachineType: "g1-small",
+		Network:     "default",
+		DiskSizeMb:  10,
+		MetaData:    gcloud.TagsToMetaData(tags),
+	}).Return(nil)
+	api.EXPECT().AddInstanceToTargetPool("POOL", "instance-8717895732742165505").Return(errors.New("BUG"))
 
 	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}
 	id, err := plugin.Provision(instance.Spec{
@@ -99,7 +126,7 @@ func TestProvisionWithInvalidProperties(t *testing.T) {
 }
 
 func TestDestroy(t *testing.T) {
-	api := NewMockGCloud(t)
+	api, _ := NewMockGCloud(t)
 	api.EXPECT().DeleteInstance("instance-id").Return(nil)
 
 	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}
@@ -109,7 +136,7 @@ func TestDestroy(t *testing.T) {
 }
 
 func TestDestroyFails(t *testing.T) {
-	api := NewMockGCloud(t)
+	api, _ := NewMockGCloud(t)
 	api.EXPECT().DeleteInstance("instance-wrong-id").Return(errors.New("BUG"))
 
 	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}
@@ -119,7 +146,7 @@ func TestDestroyFails(t *testing.T) {
 }
 
 func TestDescribeEmptyInstances(t *testing.T) {
-	api := NewMockGCloud(t)
+	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return([]*compute.Instance{}, nil)
 
 	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}
@@ -142,7 +169,7 @@ func TestDescribeInstances(t *testing.T) {
 		"key2": "value2",
 	}
 
-	api := NewMockGCloud(t)
+	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return([]*compute.Instance{
 		{
 			Name: "instance-valid",
@@ -180,7 +207,7 @@ func TestDescribeInstances(t *testing.T) {
 }
 
 func TestDescribeInstancesFails(t *testing.T) {
-	api := NewMockGCloud(t)
+	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return(nil, errors.New("BUG"))
 
 	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}

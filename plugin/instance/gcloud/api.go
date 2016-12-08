@@ -21,7 +21,10 @@ type GCloud interface {
 	// CreateInstance creates an instance.
 	CreateInstance(name string, settings *InstanceSettings) error
 
-	// DeleteInstance deletes an instance
+	// AddInstanceToTargetPool adds a list of instances to a target pool.
+	AddInstanceToTargetPool(targetPool string, instances ...string) error
+
+	// DeleteInstance deletes an instance.
 	DeleteInstance(name string) error
 }
 
@@ -116,8 +119,25 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 	return g.doCall(g.service.Instances.Insert(g.project, g.zone, instance))
 }
 
+func (g *computeServiceWrapper) AddInstanceToTargetPool(targetPool string, instances ...string) error {
+	references := []*compute.InstanceReference{}
+	for _, instance := range instances {
+		references = append(references, &compute.InstanceReference{
+			Instance: fmt.Sprintf("projects/%s/zones/%s/instances/%s", g.project, g.zone, instance),
+		})
+	}
+
+	return g.doCall(g.service.TargetPools.AddInstance(g.project, g.region(), targetPool, &compute.TargetPoolsAddInstanceRequest{
+		Instances: references,
+	}))
+}
+
 func (g *computeServiceWrapper) DeleteInstance(name string) error {
 	return g.doCall(g.service.Instances.Delete(g.project, g.zone, name))
+}
+
+func (g *computeServiceWrapper) region() string {
+	return g.zone[:len(g.zone)-2]
 }
 
 // Call is an async Google Api call

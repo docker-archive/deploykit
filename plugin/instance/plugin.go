@@ -24,6 +24,7 @@ type instanceProperties struct {
 	DiskSizeMb  int64
 	Tags        []string
 	Scopes      []string
+	TargetPool  string
 }
 
 type gceInstance struct {
@@ -109,7 +110,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	err = api.CreateInstance(name, &gcloud.InstanceSettings{
+	if err = api.CreateInstance(name, &gcloud.InstanceSettings{
 		Description: properties.Description,
 		MachineType: properties.MachineType,
 		Network:     properties.Network,
@@ -117,11 +118,14 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		DiskSizeMb:  properties.DiskSizeMb,
 		Scopes:      properties.Scopes,
 		MetaData:    gcloud.TagsToMetaData(tags),
-	})
-
-	log.Debugln("provision", id, "err=", err)
-	if err != nil {
+	}); err != nil {
 		return nil, err
+	}
+
+	if properties.TargetPool != "" {
+		if err = api.AddInstanceToTargetPool(properties.TargetPool, name); err != nil {
+			return nil, err
+		}
 	}
 
 	return &id, nil
