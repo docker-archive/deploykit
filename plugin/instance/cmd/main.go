@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"os"
 
 	"github.com/docker/infrakit.gcp/plugin/instance"
@@ -22,13 +21,6 @@ func main() {
 	zone := cmd.Flags().String("zone", "europe-west1-d", "Google Cloud zone")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
-		if *project == "" {
-			return errors.New("Missing project")
-		}
-		if *zone == "" {
-			return errors.New("Missing zone")
-		}
-
 		cli.SetLogLevel(*logLevel)
 		cli.RunPlugin(*name, instance_plugin.PluginServer(instance.NewGCEInstancePlugin(*project, *zone)))
 		return nil

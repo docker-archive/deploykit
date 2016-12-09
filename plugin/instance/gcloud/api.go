@@ -1,10 +1,14 @@
 package gcloud
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -57,11 +61,62 @@ func New(project, zone string) (GCloud, error) {
 		return nil, err
 	}
 
+	// Try to find the project from the metaData server
+	if project == "" {
+		project, err = metadata("instance/project")
+		if err != nil {
+			return nil, err
+		}
+	}
+	if project == "" {
+		return nil, errors.New("Missing project")
+	}
+	log.Debugln("Project:", project)
+
+	// Try to find the zone from the metaData server
+	if zone == "" {
+		zoneURI, err := metadata("instance/zone")
+		if err != nil {
+			return nil, err
+		}
+
+		zone = last(zoneURI)
+	}
+	if zone == "" {
+		return nil, errors.New("Missing zone")
+	}
+	log.Debugln("Zone:", zone)
+
 	return &computeServiceWrapper{
 		service: service,
 		project: project,
 		zone:    zone,
 	}, nil
+}
+
+func metadata(path string) (string, error) {
+	req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/"+path, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Metadata-Flavor", "Google")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", errors.New(resp.Status)
+	}
+
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
 }
 
 func (g *computeServiceWrapper) ListInstances() ([]*compute.Instance, error) {
