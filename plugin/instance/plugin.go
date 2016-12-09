@@ -90,7 +90,12 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	name := fmt.Sprintf("%s-%d", properties.NamePrefix, rand.Int63())
+	var name string
+	if spec.LogicalID != nil {
+		name = string(*spec.LogicalID)
+	} else {
+		name = fmt.Sprintf("%s-%d", properties.NamePrefix, rand.Int63())
+	}
 	id := instance.ID(name)
 
 	tags := make(map[string]string)
@@ -166,9 +171,11 @@ scan:
 			}
 		}
 
+		logicalID := instance.LogicalID(inst.Name)
 		result = append(result, instance.Description{
-			ID:   instance.ID(inst.Name),
-			Tags: instTags,
+			LogicalID: &logicalID,
+			ID:        instance.ID(inst.Name),
+			Tags:      instTags,
 		})
 	}
 

@@ -64,6 +64,33 @@ func TestProvision(t *testing.T) {
 	require.Equal(t, *id, instance.ID("worker-8717895732742165505"))
 }
 
+func TestProvisionLogicalID(t *testing.T) {
+	properties := json.RawMessage(`{}`)
+	tags := map[string]string{}
+
+	rand.Seed(0)
+	api, ctrl := NewMockGCloud(t)
+	defer ctrl.Finish()
+	api.EXPECT().CreateInstance("LOGICAL-ID", &gcloud.InstanceSettings{
+		MachineType: "g1-small",
+		Network:     "default",
+		DiskSizeMb:  10,
+		MetaData:    gcloud.TagsToMetaData(map[string]string{}),
+	}).Return(nil)
+
+	logicalID := instance.LogicalID("LOGICAL-ID")
+
+	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}
+	id, err := plugin.Provision(instance.Spec{
+		LogicalID:  &logicalID,
+		Tags:       tags,
+		Properties: &properties,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, *id, instance.ID("LOGICAL-ID"))
+}
+
 func TestProvisionFails(t *testing.T) {
 	properties := json.RawMessage(`{}`)
 	tags := map[string]string{
