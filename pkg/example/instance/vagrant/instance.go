@@ -34,7 +34,9 @@ func inheritedEnvCommand(cmdAndArgs []string, extraEnv ...string) (string, error
 	cmd.Env = append(os.Environ(), extraEnv...)
 	output, err := cmd.CombinedOutput()
 	fmt.Printf("DEBUGGING cmd output: %s\n", string(output))
-	fmt.Printf("Err: %s\n", err)
+	if err != nil {
+		fmt.Printf("Err: %s\n", err)
+	}
 	return string(output), err
 }
 
