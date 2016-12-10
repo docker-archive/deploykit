@@ -27,6 +27,8 @@ func TestProvision(t *testing.T) {
 		"Network":"NETWORK",
 		"Tags":["TAG1", "TAG2"],
 		"DiskSizeMb":100,
+		"DiskImage":"docker-image",
+		"DiskType":"ssd",
 		"Scopes":["SCOPE1", "SCOPE2"],
 		"TargetPool":"POOL",
 		"Description":"vm"}`)
@@ -44,6 +46,8 @@ func TestProvision(t *testing.T) {
 		Network:     "NETWORK",
 		Tags:        []string{"TAG1", "TAG2"},
 		DiskSizeMb:  100,
+		DiskImage:   "docker-image",
+		DiskType:    "ssd",
 		Scopes:      []string{"SCOPE1", "SCOPE2"},
 		MetaData: gcloud.TagsToMetaData(map[string]string{
 			"key1":           "value1",
@@ -75,6 +79,8 @@ func TestProvisionLogicalID(t *testing.T) {
 		MachineType: "g1-small",
 		Network:     "default",
 		DiskSizeMb:  10,
+		DiskImage:   "docker",
+		DiskType:    "pd-standard",
 		MetaData:    gcloud.TagsToMetaData(map[string]string{}),
 	}).Return(nil)
 
@@ -103,6 +109,8 @@ func TestProvisionFails(t *testing.T) {
 		MachineType: "g1-small",
 		Network:     "default",
 		DiskSizeMb:  10,
+		DiskImage:   "docker",
+		DiskType:    "pd-standard",
 		MetaData:    gcloud.TagsToMetaData(tags),
 	}).Return(errors.New("BUG"))
 
@@ -126,6 +134,8 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 		MachineType: "g1-small",
 		Network:     "default",
 		DiskSizeMb:  10,
+		DiskImage:   "docker",
+		DiskType:    "pd-standard",
 		MetaData:    gcloud.TagsToMetaData(tags),
 	}).Return(nil)
 	api.EXPECT().AddInstanceToTargetPool("POOL", "instance-8717895732742165505").Return(errors.New("BUG"))

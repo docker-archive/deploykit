@@ -40,6 +40,8 @@ type InstanceSettings struct {
 	Tags        []string
 	Scopes      []string
 	DiskSizeMb  int64
+	DiskImage   string
+	DiskType    string
 	MetaData    []*compute.MetadataItems
 }
 
@@ -128,11 +130,26 @@ func (g *computeServiceWrapper) ListInstances() ([]*compute.Instance, error) {
 	return list.Items, nil
 }
 
+func addAPIUrlPrefix(value string, prefix string) string {
+	if strings.HasPrefix(value, apiURL+prefix) {
+		return value
+	}
+	if strings.HasPrefix(value, prefix) {
+		return apiURL + value
+	}
+	return apiURL + prefix + value
+}
+
 func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSettings) error {
+	machineType := addAPIUrlPrefix(settings.MachineType, g.project+"/zones/"+g.zone+"/machineTypes/")
+	network := addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
+	sourceImage := addAPIUrlPrefix(settings.DiskImage, g.project+"/global/images/")
+	diskType := addAPIUrlPrefix(settings.DiskType, g.project+"/zones/"+g.zone+"/diskTypes/")
+
 	instance := &compute.Instance{
 		Name:        name,
 		Description: settings.Description,
-		MachineType: apiURL + g.project + "/zones/" + g.zone + "/machineTypes/" + settings.MachineType,
+		MachineType: machineType,
 		Tags: &compute.Tags{
 			Items: settings.Tags,
 		},
@@ -144,15 +161,15 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 				Mode:       "READ_WRITE",
 				InitializeParams: &compute.AttachedDiskInitializeParams{
 					DiskName:    name + "-disk",
-					SourceImage: apiURL + g.project + "/global/images/docker",
+					SourceImage: sourceImage,
 					DiskSizeGb:  settings.DiskSizeMb,
-					DiskType:    apiURL + g.project + "/zones/" + g.zone + "/diskTypes/" + "pd-standard",
+					DiskType:    diskType,
 				},
 			},
 		},
 		NetworkInterfaces: []*compute.NetworkInterface{
 			{
-				Network: apiURL + g.project + "/global/networks/" + settings.Network,
+				Network: network,
 				AccessConfigs: []*compute.AccessConfig{
 					{
 						Type: "ONE_TO_ONE_NAT",

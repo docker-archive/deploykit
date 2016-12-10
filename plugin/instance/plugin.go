@@ -16,6 +16,8 @@ const (
 	defaultMachineType = "g1-small"
 	defaultNetwork     = "default"
 	defaultDiskSizeMb  = 10
+	defaultDiskImage   = "docker"
+	defaultDiskType    = "pd-standard"
 )
 
 func init() {
@@ -28,6 +30,8 @@ type instanceProperties struct {
 	MachineType string
 	Network     string
 	DiskSizeMb  int64
+	DiskImage   string
+	DiskType    string
 	Tags        []string
 	Scopes      []string
 	TargetPool  string
@@ -71,6 +75,12 @@ func parseProperties(properties json.RawMessage) (*instanceProperties, error) {
 	}
 	if p.DiskSizeMb == 0 {
 		p.DiskSizeMb = defaultDiskSizeMb
+	}
+	if p.DiskImage == "" {
+		p.DiskImage = defaultDiskImage
+	}
+	if p.DiskType == "" {
+		p.DiskType = defaultDiskType
 	}
 
 	return &p, nil
@@ -117,6 +127,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		Network:     properties.Network,
 		Tags:        properties.Tags,
 		DiskSizeMb:  properties.DiskSizeMb,
+		DiskImage:   properties.DiskImage,
+		DiskType:    properties.DiskType,
 		Scopes:      properties.Scopes,
 		MetaData:    gcloud.TagsToMetaData(tags),
 	}); err != nil {
