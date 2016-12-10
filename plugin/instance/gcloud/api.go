@@ -63,7 +63,7 @@ func New(project, zone string) (GCloud, error) {
 
 	// Try to find the project from the metaData server
 	if project == "" {
-		project, err = metadata("instance/project")
+		project, err = metadata("project/project-id")
 		if err != nil {
 			return nil, err
 		}
