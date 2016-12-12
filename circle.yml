@@ -3,7 +3,7 @@ machine:
     OS: "linux"
     ARCH: "amd64"
 
-    GOVERSION: "1.6"
+    GOVERSION: "1.7"
     GOPATH: "$HOME/.go_workspace"
 
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
