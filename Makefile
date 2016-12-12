@@ -39,7 +39,7 @@ build-in-container: clean
 # For packaging as Docker container images.  Set the environment variables DOCKER_PUSH, DOCKER_TAG_LATEST
 # if also push to remote repo.  You must have access to the remote repo.
 DOCKER_IMAGE?=infrakit/bundle
-DOCKER_TAG?=v0.1.0
+DOCKER_TAG?=dev
 build-docker:
 	@echo "+ $@"
 	GOOS=linux GOARCH=amd64 make build-in-container
@@ -50,7 +50,7 @@ build-docker:
 ifeq (${DOCKER_PUSH},true)
 	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
 ifeq (${DOCKER_TAG_LATEST},true)
-	@docker push ${DOCKER_REPO}:latest
+	@docker push ${DOCKER_IMAGE}:latest
 endif
 endif
 
