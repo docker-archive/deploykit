@@ -10,21 +10,23 @@ import (
 )
 
 type scaler struct {
-	scaled       Scaled
-	size         uint
-	pollInterval time.Duration
-	lock         sync.Mutex
-	stop         chan bool
+	scaled         Scaled
+	size           uint
+	pollInterval   time.Duration
+	maxParallelNum uint
+	lock           sync.Mutex
+	stop           chan bool
 }
 
 // NewScalingGroup creates a supervisor that monitors a group of instances on a provisioner, attempting to maintain a
 // desired size.
-func NewScalingGroup(scaled Scaled, size uint, pollInterval time.Duration) Supervisor {
+func NewScalingGroup(scaled Scaled, size uint, pollInterval time.Duration, maxParallelNum uint) Supervisor {
 	return &scaler{
-		scaled:       scaled,
-		size:         size,
-		pollInterval: pollInterval,
-		stop:         make(chan bool),
+		scaled:         scaled,
+		size:           size,
+		pollInterval:   pollInterval,
+		maxParallelNum: maxParallelNum,
+		stop:           make(chan bool),
 	}
 }
 
@@ -170,6 +172,21 @@ func (s *scaler) getSize() uint {
 	return s.size
 }
 
+func (s *scaler) SetMaxParallelNum(psize uint) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	log.Infof("Set max parallel instance creation  to %d", psize)
+	s.maxParallelNum = psize
+}
+
+func (s *scaler) getMaxParallelNum() uint {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.maxParallelNum
+}
+
 func (s *scaler) Stop() {
 	close(s.stop)
 }
@@ -242,6 +259,10 @@ func (s *scaler) converge() {
 
 				s.scaled.CreateOne(nil)
 			}()
+			if s.maxParallelNum > 0 && (i+1)%int(s.maxParallelNum) == 0 {
+				log.Infof("Reach limit parallel creation number %d, waing...", s.maxParallelNum)
+				grp.Wait()
+			}
 		}
 	}
 

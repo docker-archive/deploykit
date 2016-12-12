@@ -25,6 +25,7 @@ func main() {
 	name := cmd.Flags().String("name", "group", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	pollInterval := cmd.Flags().Duration("poll-interval", 10*time.Second, "Group polling interval")
+	maxParallelNum := cmd.Flags().Uint("max-parallel", 0, "Max number of parallel instance creation. (Default: 0 = no limit)")
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
 		cli.SetLogLevel(*logLevel)
@@ -51,7 +52,7 @@ func main() {
 		}
 
 		cli.RunPlugin(*name, group_server.PluginServer(
-			group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup, *pollInterval)))
+			group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup, *pollInterval, *maxParallelNum)))
 
 		return nil
 	}

@@ -13,7 +13,7 @@ func TestScaleUp(t *testing.T) {
 	defer ctrl.Finish()
 
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 3, 1*time.Millisecond)
+	scaler := NewScalingGroup(scaled, 3, 1*time.Millisecond, 0)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
@@ -35,7 +35,7 @@ func TestScaleDown(t *testing.T) {
 	defer ctrl.Finish()
 
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond)
+	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 0)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{c, b}, nil),
