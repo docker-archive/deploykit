@@ -100,11 +100,12 @@ func (q *quorum) converge() {
 
 	for _, unknownInstance := range unknownIPs {
 		log.Warnf("Destroying instances with unknown IP address: %+v", unknownInstance)
+		uInstance := unknownInstance
 
 		grp.Add(1)
 		go func() {
 			defer grp.Done()
-			q.scaled.Destroy(unknownInstance)
+			q.scaled.Destroy(uInstance)
 		}()
 	}
 
