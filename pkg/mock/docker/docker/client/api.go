@@ -378,7 +378,7 @@ func (_mr *_MockAPIClientRecorder) ContainerWait(arg0, arg1 interface{}) *gomock
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ContainerWait", arg0, arg1)
 }
 
-func (_m *MockAPIClient) ContainersPrune(_param0 context.Context, _param1 types.ContainersPruneConfig) (types.ContainersPruneReport, error) {
+func (_m *MockAPIClient) ContainersPrune(_param0 context.Context, _param1 filters.Args) (types.ContainersPruneReport, error) {
 	ret := _m.ctrl.Call(_m, "ContainersPrune", _param0, _param1)
 	ret0, _ := ret[0].(types.ContainersPruneReport)
 	ret1, _ := ret[1].(error)
@@ -576,7 +576,7 @@ func (_mr *_MockAPIClientRecorder) ImageTag(arg0, arg1, arg2 interface{}) *gomoc
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ImageTag", arg0, arg1, arg2)
 }
 
-func (_m *MockAPIClient) ImagesPrune(_param0 context.Context, _param1 types.ImagesPruneConfig) (types.ImagesPruneReport, error) {
+func (_m *MockAPIClient) ImagesPrune(_param0 context.Context, _param1 filters.Args) (types.ImagesPruneReport, error) {
 	ret := _m.ctrl.Call(_m, "ImagesPrune", _param0, _param1)
 	ret0, _ := ret[0].(types.ImagesPruneReport)
 	ret1, _ := ret[1].(error)
@@ -673,7 +673,7 @@ func (_mr *_MockAPIClientRecorder) NetworkRemove(arg0, arg1 interface{}) *gomock
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "NetworkRemove", arg0, arg1)
 }
 
-func (_m *MockAPIClient) NetworksPrune(_param0 context.Context, _param1 types.NetworksPruneConfig) (types.NetworksPruneReport, error) {
+func (_m *MockAPIClient) NetworksPrune(_param0 context.Context, _param1 filters.Args) (types.NetworksPruneReport, error) {
 	ret := _m.ctrl.Call(_m, "NetworksPrune", _param0, _param1)
 	ret0, _ := ret[0].(types.NetworksPruneReport)
 	ret1, _ := ret[1].(error)
@@ -758,14 +758,14 @@ func (_mr *_MockAPIClientRecorder) PluginDisable(arg0, arg1 interface{}) *gomock
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "PluginDisable", arg0, arg1)
 }
 
-func (_m *MockAPIClient) PluginEnable(_param0 context.Context, _param1 string) error {
-	ret := _m.ctrl.Call(_m, "PluginEnable", _param0, _param1)
+func (_m *MockAPIClient) PluginEnable(_param0 context.Context, _param1 string, _param2 types.PluginEnableOptions) error {
+	ret := _m.ctrl.Call(_m, "PluginEnable", _param0, _param1, _param2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockAPIClientRecorder) PluginEnable(arg0, arg1 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "PluginEnable", arg0, arg1)
+func (_mr *_MockAPIClientRecorder) PluginEnable(arg0, arg1, arg2 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PluginEnable", arg0, arg1, arg2)
 }
 
 func (_m *MockAPIClient) PluginInspectWithRaw(_param0 context.Context, _param1 string) (*types.Plugin, []byte, error) {
@@ -952,10 +952,11 @@ func (_mr *_MockAPIClientRecorder) ServiceRemove(arg0, arg1 interface{}) *gomock
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ServiceRemove", arg0, arg1)
 }
 
-func (_m *MockAPIClient) ServiceUpdate(_param0 context.Context, _param1 string, _param2 swarm.Version, _param3 swarm.ServiceSpec, _param4 types.ServiceUpdateOptions) error {
+func (_m *MockAPIClient) ServiceUpdate(_param0 context.Context, _param1 string, _param2 swarm.Version, _param3 swarm.ServiceSpec, _param4 types.ServiceUpdateOptions) (types.ServiceUpdateResponse, error) {
 	ret := _m.ctrl.Call(_m, "ServiceUpdate", _param0, _param1, _param2, _param3, _param4)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(types.ServiceUpdateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 func (_mr *_MockAPIClientRecorder) ServiceUpdate(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
@@ -1121,7 +1122,7 @@ func (_mr *_MockAPIClientRecorder) VolumeRemove(arg0, arg1, arg2 interface{}) *g
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "VolumeRemove", arg0, arg1, arg2)
 }
 
-func (_m *MockAPIClient) VolumesPrune(_param0 context.Context, _param1 types.VolumesPruneConfig) (types.VolumesPruneReport, error) {
+func (_m *MockAPIClient) VolumesPrune(_param0 context.Context, _param1 filters.Args) (types.VolumesPruneReport, error) {
 	ret := _m.ctrl.Call(_m, "VolumesPrune", _param0, _param1)
 	ret0, _ := ret[0].(types.VolumesPruneReport)
 	ret1, _ := ret[1].(error)
