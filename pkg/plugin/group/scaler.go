@@ -10,21 +10,23 @@ import (
 )
 
 type scaler struct {
-	scaled       Scaled
-	size         uint
-	pollInterval time.Duration
-	lock         sync.Mutex
-	stop         chan bool
+	scaled         Scaled
+	size           uint
+	pollInterval   time.Duration
+	maxParallelNum uint
+	lock           sync.Mutex
+	stop           chan bool
 }
 
 // NewScalingGroup creates a supervisor that monitors a group of instances on a provisioner, attempting to maintain a
 // desired size.
-func NewScalingGroup(scaled Scaled, size uint, pollInterval time.Duration) Supervisor {
+func NewScalingGroup(scaled Scaled, size uint, pollInterval time.Duration, maxParallelNum uint) Supervisor {
 	return &scaler{
-		scaled:       scaled,
-		size:         size,
-		pollInterval: pollInterval,
-		stop:         make(chan bool),
+		scaled:         scaled,
+		size:           size,
+		pollInterval:   pollInterval,
+		maxParallelNum: maxParallelNum,
+		stop:           make(chan bool),
 	}
 }
 
@@ -170,6 +172,21 @@ func (s *scaler) getSize() uint {
 	return s.size
 }
 
+func (s *scaler) SetMaxParallelNum(psize uint) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	log.Infof("Set max parallel instance creation  to %d", psize)
+	s.maxParallelNum = psize
+}
+
+func (s *scaler) getMaxParallelNum() uint {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.maxParallelNum
+}
+
 func (s *scaler) Stop() {
 	close(s.stop)
 }
@@ -191,6 +208,14 @@ func (s *scaler) Run() {
 
 func (s *scaler) Size() uint {
 	return s.size
+}
+
+func (s *scaler) waitIfReachParallelLimit(current int, batch *sync.WaitGroup) {
+	if s.maxParallelNum > 0 && (current+1)%int(s.maxParallelNum) == 0 {
+		log.Infof("Reach limit parallel instance operation number %d, waiting...", s.maxParallelNum)
+		batch.Wait()
+	}
+	return
 }
 
 func (s *scaler) converge() {
@@ -222,13 +247,14 @@ func (s *scaler) converge() {
 
 		// TODO(wfarner): Consider favoring removal of instances that do not match the desired configuration by
 		// injecting a sorter.
-		for _, toDestroy := range sorted[:remove] {
+		for i, toDestroy := range sorted[:remove] {
 			grp.Add(1)
 			destroy := toDestroy
 			go func() {
 				defer grp.Done()
 				s.scaled.Destroy(destroy)
 			}()
+			s.waitIfReachParallelLimit(i, &grp)
 		}
 
 	case actualSize < desiredSize:
@@ -242,6 +268,7 @@ func (s *scaler) converge() {
 
 				s.scaled.CreateOne(nil)
 			}()
+			s.waitIfReachParallelLimit(i, &grp)
 		}
 	}
 
