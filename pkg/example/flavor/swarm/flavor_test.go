@@ -126,7 +126,7 @@ func TestWorker(t *testing.T) {
 
 const nodeID = "my-node-id"
 
-var infoResponse = docker_types.Info{InfoBase: &docker_types.InfoBase{Swarm: swarm.Info{NodeID: nodeID}}}
+var infoResponse = docker_types.Info{Swarm: swarm.Info{NodeID: nodeID}}
 
 func TestManager(t *testing.T) {
 	ctrl := gomock.NewController(t)
