@@ -210,6 +210,14 @@ func (s *scaler) Size() uint {
 	return s.size
 }
 
+func (s *scaler) waitIfReachParallelLimit(current int, batch *sync.WaitGroup) {
+	if s.maxParallelNum > 0 && (current+1)%int(s.maxParallelNum) == 0 {
+		log.Infof("Reach limit parallel instance operation number %d, waiting...", s.maxParallelNum)
+		batch.Wait()
+	}
+	return
+}
+
 func (s *scaler) converge() {
 	descriptions, err := s.scaled.List()
 	if err != nil {
@@ -239,13 +247,14 @@ func (s *scaler) converge() {
 
 		// TODO(wfarner): Consider favoring removal of instances that do not match the desired configuration by
 		// injecting a sorter.
-		for _, toDestroy := range sorted[:remove] {
+		for i, toDestroy := range sorted[:remove] {
 			grp.Add(1)
 			destroy := toDestroy
 			go func() {
 				defer grp.Done()
 				s.scaled.Destroy(destroy)
 			}()
+			s.waitIfReachParallelLimit(i, &grp)
 		}
 
 	case actualSize < desiredSize:
@@ -259,10 +268,7 @@ func (s *scaler) converge() {
 
 				s.scaled.CreateOne(nil)
 			}()
-			if s.maxParallelNum > 0 && (i+1)%int(s.maxParallelNum) == 0 {
-				log.Infof("Reach limit parallel creation number %d, waing...", s.maxParallelNum)
-				grp.Wait()
-			}
+			s.waitIfReachParallelLimit(i, &grp)
 		}
 	}
 
