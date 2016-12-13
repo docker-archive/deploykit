@@ -26,7 +26,6 @@ PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
 
 # Current working environment.  Set these explicitly if you want to cross-compile
 # in the build container (see the build-in-container target):
-
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
 build-in-container: clean
@@ -36,6 +35,24 @@ build-in-container: clean
 		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} \
 		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
 		infrakit-build
+
+# For packaging as Docker container images.  Set the environment variables DOCKER_PUSH, DOCKER_TAG_LATEST
+# if also push to remote repo.  You must have access to the remote repo.
+DOCKER_IMAGE?=infrakit/bundle
+DOCKER_TAG?=dev
+build-docker:
+	@echo "+ $@"
+	GOOS=linux GOARCH=amd64 make build-in-container
+	@docker build --no-cache --pull \
+	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
+	-t ${DOCKER_IMAGE}:latest \
+	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+ifeq (${DOCKER_PUSH},true)
+	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+ifeq (${DOCKER_TAG_LATEST},true)
+	@docker push ${DOCKER_IMAGE}:latest
+endif
+endif
 
 get-tools:
 	@echo "+ $@"
