@@ -12,8 +12,8 @@ import (
 	registry "github.com/docker/docker/api/types/registry"
 	swarm "github.com/docker/docker/api/types/swarm"
 	volume "github.com/docker/docker/api/types/volume"
-	context "golang.org/x/net/context"
 	gomock "github.com/golang/mock/gomock"
+	context "golang.org/x/net/context"
 	io "io"
 	time "time"
 )
