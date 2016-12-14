@@ -12,8 +12,9 @@ import (
 	"runtime"
 )
 
-const (
+var (
 	// ClientVersion is the Docker client API version to use when connecting to Docker
+	// See Makefile targets that may set this at build time.
 	ClientVersion = "1.24"
 )
 

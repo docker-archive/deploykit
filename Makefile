@@ -33,9 +33,9 @@ GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
 build-in-container: clean
 	@echo "+ $@"
-	@docker build -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
+	@docker build --no-cache --pull -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
 	@docker run --rm \
-		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} \
+		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} -e DOCKER_CLIENT_VERSION=${DOCKER_CLIENT_VERSION} \
 		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
 		infrakit-build
 
