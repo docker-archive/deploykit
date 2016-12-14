@@ -952,10 +952,11 @@ func (_mr *_MockAPIClientRecorder) ServiceRemove(arg0, arg1 interface{}) *gomock
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ServiceRemove", arg0, arg1)
 }
 
-func (_m *MockAPIClient) ServiceUpdate(_param0 context.Context, _param1 string, _param2 swarm.Version, _param3 swarm.ServiceSpec, _param4 types.ServiceUpdateOptions) error {
+func (_m *MockAPIClient) ServiceUpdate(_param0 context.Context, _param1 string, _param2 swarm.Version, _param3 swarm.ServiceSpec, _param4 types.ServiceUpdateOptions) (types.ServiceUpdateResponse, error) {
 	ret := _m.ctrl.Call(_m, "ServiceUpdate", _param0, _param1, _param2, _param3, _param4)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(types.ServiceUpdateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 func (_mr *_MockAPIClientRecorder) ServiceUpdate(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
