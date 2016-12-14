@@ -58,7 +58,8 @@ get-tools:
 	@echo "+ $@"
 	@go get -u \
 		github.com/golang/lint/golint \
-		github.com/wfarner/blockcheck
+		github.com/wfarner/blockcheck \
+		github.com/rancher/trash
 
 vet:
 	@echo "+ $@"
