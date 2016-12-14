@@ -13,6 +13,47 @@ An InfraKit instance plugin is provided, which creates Google Compute Engine ins
 To build the GCP Instance plugin, run `make binaries`.  The plugin binary will be located at
 `./build/infrakit-instance-gcp`.
 
+### Example configuration
+
+```
+$ cat gcp-example.json
+{
+  "ID": "gcp-example",
+  "Properties": {
+    "Allocation": {
+      "Size": 1
+    },
+    "Instance": {
+      "Plugin": "instance-gcp",
+      "Properties": {
+        "NamePrefix": "test",
+        "Description": "Test of GCP infrakit",
+        "Network": "default",
+        "Tags": ["TAG1", "TAG2"],
+        "MachineType": "n1-standard-1",
+        "DiskSizeMb": 60,
+        "DiskImage": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
+        "DiskType": "pd-standard",
+        "Scopes": [
+          "https://www.googleapis.com/auth/cloudruntimeconfig",
+          "https://www.googleapis.com/auth/logging.write"
+        ]
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": [
+          "sh -c \"echo 'Hello, World!' > /hello\""
+        ]
+      }
+    }
+  }
+}
+```
+
+`infrakit group commit gcp-example.json`
+
 
 ## Reporting security issues
 
