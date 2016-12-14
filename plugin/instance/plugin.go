@@ -31,6 +31,7 @@ type instanceProperties struct {
 	Tags        []string
 	Scopes      []string
 	TargetPool  string
+	Connect     bool
 }
 
 type gceInstance struct {
@@ -104,6 +105,9 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	if spec.Init != "" {
 		tags["startup-script"] = spec.Init
+	}
+	if properties.Connect {
+		tags["serial-port-enable"] = "true"
 	}
 
 	api, err := p.API()
