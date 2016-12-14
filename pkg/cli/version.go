@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+
+	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +21,9 @@ func VersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "print build version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Version: %s\n", Version)
-			fmt.Printf("Revision: %s\n", Revision)
+			fmt.Printf("Version:             %s\n", Version)
+			fmt.Printf("Revision:            %s\n", Revision)
+			fmt.Printf("DockerClientVersion: %s\n", docker.ClientVersion)
 		},
 	}
 }

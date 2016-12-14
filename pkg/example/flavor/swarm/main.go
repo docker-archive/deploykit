@@ -7,7 +7,7 @@ import (
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/docker/infrakit/pkg/cli"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
-	"github.com/docker/infrakit/pkg/util/docker/1.24"
+	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
 )
 

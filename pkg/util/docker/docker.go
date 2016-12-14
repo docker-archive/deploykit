@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	clientVersion = "1.24"
+	// ClientVersion is the Docker client API version to use when connecting to Docker
+	ClientVersion = "1.24"
 )
 
 // NewDockerClient creates a new API client.
@@ -26,7 +27,7 @@ func NewDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, err
 	customHeaders := map[string]string{
 		"User-Agent": clientUserAgent(),
 	}
-	verStr := clientVersion
+	verStr := ClientVersion
 	if tmpStr := os.Getenv("DOCKER_API_VERSION"); tmpStr != "" {
 		verStr = tmpStr
 	}
@@ -63,5 +64,5 @@ func newHTTPClient(host string, tlsOptions *tlsconfig.Options) (*http.Client, er
 }
 
 func clientUserAgent() string {
-	return fmt.Sprintf("Docker-Client/%s (%s)", clientVersion, runtime.GOOS)
+	return fmt.Sprintf("Docker-Client/%s (%s)", ClientVersion, runtime.GOOS)
 }
