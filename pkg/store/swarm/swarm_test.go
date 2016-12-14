@@ -26,7 +26,7 @@ var input = map[string]interface{}{
 const nodeID = "my-node-id"
 const encodedInput = "eJx0jkEKwlAMRPc9xTBrT/B3bhTPIC7STxXx+yNpVVB6dymSGhE3gTeTmeTZAADXptcLE94I8CxVDp31QQO4LEWzDEetTNjOOkDhImL7jZkz7T4GV0VuakxgKxYS3NR+kJq7ydqrenr0Fd7VTj/fxbrHv7rpktc1PsdXAAAA//8CYjjK"
 
-var infoResponse = docker_types.Info{InfoBase: &docker_types.InfoBase{Swarm: swarm.Info{NodeID: nodeID}}}
+var infoResponse = docker_types.Info{Swarm: swarm.Info{NodeID: nodeID}}
 
 func TestSaveLoadSnapshot(t *testing.T) {
 	ctrl := gomock.NewController(t)

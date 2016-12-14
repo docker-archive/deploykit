@@ -7,6 +7,22 @@ be found.
 
 ## 1.13.0 (2016-12-08)
 
+**IMPORTANT**: In Docker 1.13, the managed plugin api changed, as compared to the experimental
+version introduced in Docker 1.12. You must **uninstall** plugins which you installed with Docker 1.12
+_before_ upgrading to Docker 1.13. You can uninstall plugins using the `docker plugin rm` command.
+
+If you have already upgraded to Docker 1.13 without uninstalling
+previously-installed plugins, you may see this message when the Docker daemon
+starts:
+
+    Error starting daemon: json: cannot unmarshal string into Go value of type types.PluginEnv
+
+To manually remove all plugins and resolve this problem, take the following steps:
+
+1. Remove plugins.json from: `/var/lib/docker/plugins/`.
+2. Restart Docker. Verify that the Docker daemon starts with no errors.
+3. Reinstall your plugins.
+
 ### Builder
 + Add capability to specify images used as a cache source on build. These images do not need to have local parent chain and can be pulled from other registries [#26839](https://github.com/docker/docker/pull/26839)
 + (experimental) Add option to squash image layers to the FROM image after successful builds [#22641](https://github.com/docker/docker/pull/22641)
@@ -90,14 +106,13 @@ be found.
 + Add `--format` on `docker stats` [#24987](https://github.com/docker/docker/pull/24987)
 + Make `docker node ps` default to `self` in swarm node [#25214](https://github.com/docker/docker/pull/25214)
 + Add `--group` in `docker service create` [#25317](https://github.com/docker/docker/pull/25317)
-+ Add `--no-trunc` to service/node/stack ps output [#25337(https://github.com/docker/docker/pull/25337)
++ Add `--no-trunc` to service/node/stack ps output [#25337](https://github.com/docker/docker/pull/25337)
 + Add Logs to `ContainerAttachOptions` so go clients can request to retrieve container logs as part of the attach process [#26718](https://github.com/docker/docker/pull/26718)
 + Allow client to talk to an older server [#27745](https://github.com/docker/docker/pull/27745)
 * Inform user client-side that a container removal is in progress [#26074](https://github.com/docker/docker/pull/26074)
 + Add `Isolation` to the /info endpoint [#26255](https://github.com/docker/docker/pull/26255)
 + Add `userns` to the /info endpoint [#27840](https://github.com/docker/docker/pull/27840)
 - Do not allow more than one mode be requested at once in the services endpoint [#26643](https://github.com/docker/docker/pull/26643)
-+ Add `--mount` flag to `docker create` and `docker run` [#26825](https://github.com/docker/docker/pull/26825)[#28150](https://github.com/docker/docker/pull/28150)
 + Add capability to /containers/create API to specify mounts in a more granular and safer way [#22373](https://github.com/docker/docker/pull/22373)
 + Add `--format` flag to `network ls` and `volume ls` [#23475](https://github.com/docker/docker/pull/23475)
 * Allow the top-level `docker inspect` command to inspect any kind of resource [#23614](https://github.com/docker/docker/pull/23614)
@@ -171,11 +186,11 @@ be found.
 - Pin images by digest for `docker service create` and `update` [#28173](https://github.com/docker/docker/pull/28173)
 - Add short (`-f`) flag for `docker node rm --force` and `docker swarm leave --force` [#28196](https://github.com/docker/docker/pull/28196)
 + Don't repull image if pinned by digest [#28265](https://github.com/docker/docker/pull/28265)
-+ swarm-mode support for indows [#27838](https://github.com/docker/docker/pull/27838)
++ swarm-mode support for Windows [#27838](https://github.com/docker/docker/pull/27838)
 
 ### Volume
 
-+ Add support for labels on volumes [#25628](https://github.com/docker/docker/pull/21567)
++ Add support for labels on volumes [#21270](https://github.com/docker/docker/pull/21270)
 + Add support for filtering volumes by label [#25628](https://github.com/docker/docker/pull/25628)
 * Add a `--force` flag in `docker volume rm` to forcefully purge the data of the volume that has already been deleted [#23436](https://github.com/docker/docker/pull/23436)
 * Enhance `docker volume inspect` to show all options used when creating the volume [#26671](https://github.com/docker/docker/pull/26671)
@@ -584,7 +599,7 @@ installing docker, please make sure to update them accordingly.
 
 
 ### DEPRECATION
-* Environment variables `DOCKER_CONTENT_TRUST_OFFLINE_PASSPHRASE` and `DOCKER_CONTENT_TRUST_TAGGING_PASSPHRASE` have been renamed  
+* Environment variables `DOCKER_CONTENT_TRUST_OFFLINE_PASSPHRASE` and `DOCKER_CONTENT_TRUST_TAGGING_PASSPHRASE` have been renamed
   to `DOCKER_CONTENT_TRUST_ROOT_PASSPHRASE` and `DOCKER_CONTENT_TRUST_REPOSITORY_PASSPHRASE` respectively [#22574](https://github.com/docker/docker/pull/22574)
 * Remove deprecated `syslog-tag`, `gelf-tag`, `fluentd-tag` log option in favor of the more generic `tag` one [#22620](https://github.com/docker/docker/pull/22620)
 * Remove deprecated feature of passing HostConfig at API container start [#22570](https://github.com/docker/docker/pull/22570)
@@ -755,7 +770,7 @@ installing docker, please make sure to update them accordingly.
 - Fix a panic that could occur when cleanup after a container started with invalid parameters ([#21716](https://github.com/docker/docker/pull/21716))
 - Fix a race with event timers stopping early ([#21692](https://github.com/docker/docker/pull/21692))
 - Fix race conditions in the layer store, potentially corrupting the map and crashing the process ([#21677](https://github.com/docker/docker/pull/21677))
-- Un-deprecate auto-creation of host directories for mounts. This feature was marked deprecated in ([#21666](https://github.com/docker/docker/pull/21666))  
+- Un-deprecate auto-creation of host directories for mounts. This feature was marked deprecated in ([#21666](https://github.com/docker/docker/pull/21666))
   Docker 1.9, but was decided to be too much of a backward-incompatible change, so it was decided to keep the feature.
 + It is now possible for containers to share the NET and IPC namespaces when `userns` is enabled ([#21383](https://github.com/docker/docker/pull/21383))
 + `docker inspect <image-id>` will now expose the rootfs layers ([#21370](https://github.com/docker/docker/pull/21370))
@@ -1120,7 +1135,7 @@ that allows to add build-time environment variables (#15182)
 
 - devicemapper: Implement deferred deletion capability (#16381)
 
-## Networking
+### Networking
 
 + `docker network` exits experimental and is part of standard release (#16645)
 + New network top-level concept, with associated subcommands and API (#16645)
