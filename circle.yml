@@ -2,11 +2,12 @@ machine:
   environment:
     OS: "linux"
     ARCH: "amd64"
-
     GOVERSION: "1.7"
     GOPATH: "$HOME/.go_workspace"
-
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+
+  services:
+    - docker
 
 dependencies:
   pre:
@@ -36,3 +37,13 @@ test:
   post:
     # Report to codecov
     - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)
+
+deployment:
+  docker:
+    branch: master
+    commands:
+      - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
+      - DOCKER_PUSH=true DOCKER_TAG_LATEST=true \
+      DOCKER_IMAGE=infrakit/bundle \
+      DOCKER_TAG=master-$CIRCLE_BUILD_NUM \
+      make build-in-container build-docker
