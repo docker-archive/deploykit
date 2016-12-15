@@ -31,9 +31,10 @@ PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
 # in the build container (see the build-in-container target):
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
+DOCKER_BUILD_FLAGS?=--no-cache --pull
 build-in-container: clean
 	@echo "+ $@"
-	@docker build --no-cache --pull -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
+	@docker build ${DOCKER_BUILD_FLAGS} -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
 	@docker run --rm \
 		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} -e DOCKER_CLIENT_VERSION=${DOCKER_CLIENT_VERSION} \
 		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
@@ -46,7 +47,7 @@ DOCKER_TAG?=dev
 build-docker:
 	@echo "+ $@"
 	GOOS=linux GOARCH=amd64 make build-in-container
-	@docker build --no-cache --pull \
+	@docker build ${DOCKER_BUILD_FLAGS} \
 	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
 	-t ${DOCKER_IMAGE}:latest \
 	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
