@@ -16,7 +16,7 @@ endif
 
 .PHONY: clean all fmt vet lint build test containers get-tools
 .DEFAULT: all
-all: fmt vet lint build test
+all: clean fmt vet lint build test
 
 ci: fmt vet lint coverage
 
@@ -108,7 +108,7 @@ build-in-container:
 	@docker build ${DOCKER_BUILD_FLAGS} -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
 	@docker run --rm \
 		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} -e DOCKER_CLIENT_VERSION=${DOCKER_CLIENT_VERSION} \
-		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
+		-v ${CURDIR}/build:/go/src/${REPO}/build \
 		infrakit-build
 
 # For packaging as Docker container images.  Set the environment variables DOCKER_PUSH, DOCKER_TAG_LATEST
