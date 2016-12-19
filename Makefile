@@ -57,7 +57,7 @@ clean:
 
 define build_binary
 	go build -o build/$(1) \
-		-ldflags "-X github.com/docker/infrakit/pkg/cli.Version=$(VERSION) -X github.com/docker/infrakit/pkg/cli.Revision=$(REVISION)" $(2)
+		-ldflags "-X github.com/docker/infrakit.aws/plugin.Version=$(VERSION) -X github.com/docker/infrakit.aws/plugin.Revision=$(REVISION)" $(2)
 endef
 binaries: clean build-binaries
 build-binaries:
