@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/docker/infrakit.gcp/plugin"
 	"github.com/docker/infrakit.gcp/plugin/instance"
 	"github.com/docker/infrakit/pkg/cli"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
@@ -26,7 +27,7 @@ func main() {
 		return nil
 	}
 
-	cmd.AddCommand(cli.VersionCommand())
+	cmd.AddCommand(plugin.VersionCommand())
 
 	err := cmd.Execute()
 	if err != nil {
