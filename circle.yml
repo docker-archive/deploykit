@@ -44,4 +44,4 @@ deployment:
     branch: master
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
-      - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_IMAGE="infrakit/bundle" DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-in-container build-docker
+      - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker

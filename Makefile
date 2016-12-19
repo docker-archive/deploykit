@@ -42,7 +42,7 @@ build-in-container:
 
 # For packaging as Docker container images.  Set the environment variables DOCKER_PUSH, DOCKER_TAG_LATEST
 # if also push to remote repo.  You must have access to the remote repo.
-DOCKER_IMAGE?=infrakit/bundle
+DOCKER_IMAGE?=infrakit/devbundle
 DOCKER_TAG?=dev
 build-docker:
 	@echo "+ $@"
