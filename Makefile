@@ -66,7 +66,7 @@ ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
 endif
 
-	$(call build_binary,infrakit-instance-aws,github.com/docker/infrakit.gcp/plugin/instance/cmd)
+	$(call build_binary,infrakit-instance-gcp,github.com/docker/infrakit.gcp/plugin/instance/cmd)
 
 
 install:
