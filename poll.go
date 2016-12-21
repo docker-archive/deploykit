@@ -62,6 +62,7 @@ type PollerBuilder struct {
 	err      error
 	matchers []*matcher
 	interval time.Duration
+	hardSync bool
 	lock     sync.Mutex
 }
 
@@ -73,6 +74,7 @@ type RunWithContext interface {
 }
 
 type poller struct {
+	hardSync bool
 	client   client.APIClient
 	interval time.Duration
 	matchers []*matcher
@@ -82,6 +84,13 @@ type poller struct {
 // NewServicePoller creates a poller.
 func NewServicePoller(client client.APIClient, interval time.Duration) *PollerBuilder {
 	return &PollerBuilder{client: client, interval: interval}
+}
+
+// SetHardSyncWithLB forces the poller to do a hard sync for every service.  This is not very
+// efficient when there are lots of services.
+func (b *PollerBuilder) SetHardSyncWithLB(t bool) *PollerBuilder {
+	b.hardSync = t
+	return b
 }
 
 // AddService adds a service to poll.
@@ -109,6 +118,7 @@ func (b *PollerBuilder) Build() (RunWithContext, error) {
 		client:   b.client,
 		matchers: b.matchers,
 		interval: b.interval,
+		hardSync: b.hardSync,
 	}, nil
 }
 
@@ -164,7 +174,14 @@ func (p *poller) Run(ctx context.Context) error {
 			// for those ELBs that the user has already configured in other contexts.
 			// The policy needs to be per-ELB, specified in the config file, so that we avoid
 			// wiping out listeners that we don't think are represented by the services in this swarm.
-			if different(lastKnown, found) || iteration == 0 {
+
+			// Adding an option to do a hard sync for some cases where the lb backend eventually fails to
+			// update. Basically we can't trust that the backend will eventually update successfully (for whatever
+			// reason), and we'd have to treat each service as though it's found anew each time.
+			// This has happened with Azure where initial update was 200 and followed by a 429.
+			// This is not very efficient when there are lots of swarm services and we are basically calling the
+			// backend api each run.
+			if p.hardSync || different(lastKnown, found) || iteration == 0 {
 				log.Infoln(len(found), "matches found. Processing.")
 				matcher.run(found)
 			}
