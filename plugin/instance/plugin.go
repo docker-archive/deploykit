@@ -126,15 +126,17 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	if err = api.CreateInstance(name, &gcloud.InstanceSettings{
-		Description: properties.Description,
-		MachineType: properties.MachineType,
-		Network:     properties.Network,
-		Tags:        properties.Tags,
-		DiskSizeMb:  properties.DiskSizeMb,
-		DiskImage:   properties.DiskImage,
-		DiskType:    properties.DiskType,
-		Scopes:      properties.Scopes,
-		MetaData:    gcloud.TagsToMetaData(tags),
+		Description:       properties.Description,
+		MachineType:       properties.MachineType,
+		Network:           properties.Network,
+		Tags:              properties.Tags,
+		DiskSizeMb:        properties.DiskSizeMb,
+		DiskImage:         properties.DiskImage,
+		DiskType:          properties.DiskType,
+		Scopes:            properties.Scopes,
+		AutoDeleteDisk:    spec.LogicalID == nil,
+		ReuseExistingDisk: spec.LogicalID != nil,
+		MetaData:          gcloud.TagsToMetaData(tags),
 	}); err != nil {
 		return nil, err
 	}
@@ -187,9 +189,15 @@ scan:
 			}
 		}
 
-		logicalID := instance.LogicalID(inst.Name)
+		// When pets are deleted, we keep the disk
+		var logicalID *instance.LogicalID
+		if !inst.Disks[0].AutoDelete {
+			id := instance.LogicalID(inst.Name)
+			logicalID = &id
+		}
+
 		result = append(result, instance.Description{
-			LogicalID: &logicalID,
+			LogicalID: logicalID,
 			ID:        instance.ID(inst.Name),
 			Tags:      instTags,
 		})

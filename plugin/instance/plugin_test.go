@@ -41,14 +41,16 @@ func TestProvision(t *testing.T) {
 	api, ctrl := NewMockGCloud(t)
 	defer ctrl.Finish()
 	api.EXPECT().CreateInstance("worker-8717895732742165505", &gcloud.InstanceSettings{
-		Description: "vm",
-		MachineType: "n1-standard-1",
-		Network:     "NETWORK",
-		Tags:        []string{"TAG1", "TAG2"},
-		DiskSizeMb:  100,
-		DiskImage:   "docker-image",
-		DiskType:    "ssd",
-		Scopes:      []string{"SCOPE1", "SCOPE2"},
+		Description:       "vm",
+		MachineType:       "n1-standard-1",
+		Network:           "NETWORK",
+		Tags:              []string{"TAG1", "TAG2"},
+		DiskSizeMb:        100,
+		DiskImage:         "docker-image",
+		DiskType:          "ssd",
+		Scopes:            []string{"SCOPE1", "SCOPE2"},
+		AutoDeleteDisk:    true,
+		ReuseExistingDisk: false,
 		MetaData: gcloud.TagsToMetaData(map[string]string{
 			"key1":           "value1",
 			"key2":           "value2",
@@ -76,12 +78,14 @@ func TestProvisionLogicalID(t *testing.T) {
 	api, ctrl := NewMockGCloud(t)
 	defer ctrl.Finish()
 	api.EXPECT().CreateInstance("LOGICAL-ID", &gcloud.InstanceSettings{
-		MachineType: "g1-small",
-		Network:     "default",
-		DiskSizeMb:  10,
-		DiskImage:   "docker",
-		DiskType:    "pd-standard",
-		MetaData:    gcloud.TagsToMetaData(map[string]string{}),
+		MachineType:       "g1-small",
+		Network:           "default",
+		DiskSizeMb:        10,
+		DiskImage:         "docker",
+		DiskType:          "pd-standard",
+		AutoDeleteDisk:    false,
+		ReuseExistingDisk: true,
+		MetaData:          gcloud.TagsToMetaData(map[string]string{}),
 	}).Return(nil)
 
 	logicalID := instance.LogicalID("LOGICAL-ID")
@@ -106,12 +110,14 @@ func TestProvisionFails(t *testing.T) {
 	rand.Seed(0)
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().CreateInstance("instance-8717895732742165505", &gcloud.InstanceSettings{
-		MachineType: "g1-small",
-		Network:     "default",
-		DiskSizeMb:  10,
-		DiskImage:   "docker",
-		DiskType:    "pd-standard",
-		MetaData:    gcloud.TagsToMetaData(tags),
+		MachineType:       "g1-small",
+		Network:           "default",
+		DiskSizeMb:        10,
+		DiskImage:         "docker",
+		DiskType:          "pd-standard",
+		AutoDeleteDisk:    true,
+		ReuseExistingDisk: false,
+		MetaData:          gcloud.TagsToMetaData(tags),
 	}).Return(errors.New("BUG"))
 
 	plugin := &plugin{func() (gcloud.GCloud, error) { return api, nil }}
@@ -131,12 +137,14 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 	rand.Seed(0)
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().CreateInstance("instance-8717895732742165505", &gcloud.InstanceSettings{
-		MachineType: "g1-small",
-		Network:     "default",
-		DiskSizeMb:  10,
-		DiskImage:   "docker",
-		DiskType:    "pd-standard",
-		MetaData:    gcloud.TagsToMetaData(tags),
+		MachineType:       "g1-small",
+		Network:           "default",
+		DiskSizeMb:        10,
+		DiskImage:         "docker",
+		DiskType:          "pd-standard",
+		AutoDeleteDisk:    true,
+		ReuseExistingDisk: false,
+		MetaData:          gcloud.TagsToMetaData(tags),
 	}).Return(nil)
 	api.EXPECT().AddInstanceToTargetPool("POOL", "instance-8717895732742165505").Return(errors.New("BUG"))
 
@@ -209,11 +217,30 @@ func TestDescribeInstances(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return([]*compute.Instance{
 		{
-			Name: "instance-valid",
+			Name: "instance-pet-valid",
 			Metadata: &compute.Metadata{
 				Items: []*compute.MetadataItems{
 					NewMetadataItems("key1", "value1"),
 					NewMetadataItems("key2", "value2"),
+				},
+			},
+			Disks: []*compute.AttachedDisk{
+				{
+					AutoDelete: false,
+				},
+			},
+		},
+		{
+			Name: "instance-cattle-valid",
+			Metadata: &compute.Metadata{
+				Items: []*compute.MetadataItems{
+					NewMetadataItems("key1", "value1"),
+					NewMetadataItems("key2", "value2"),
+				},
+			},
+			Disks: []*compute.AttachedDisk{
+				{
+					AutoDelete: true,
 				},
 			},
 		},
@@ -240,7 +267,11 @@ func TestDescribeInstances(t *testing.T) {
 	instances, err := plugin.DescribeInstances(tags)
 
 	require.NoError(t, err)
-	require.Equal(t, len(instances), 1)
+	require.Equal(t, len(instances), 2)
+	require.Equal(t, "instance-pet-valid", string(instances[0].ID))
+	require.Equal(t, "instance-pet-valid", string(*instances[0].LogicalID))
+	require.Equal(t, "instance-cattle-valid", string(instances[1].ID))
+	require.Nil(t, instances[1].LogicalID)
 }
 
 func TestDescribeInstancesFails(t *testing.T) {

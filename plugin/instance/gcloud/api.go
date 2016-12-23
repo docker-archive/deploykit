@@ -34,15 +34,17 @@ type GCloud interface {
 
 // InstanceSettings lists the characteristics of an VM instance.
 type InstanceSettings struct {
-	Description string
-	MachineType string
-	Network     string
-	Tags        []string
-	Scopes      []string
-	DiskSizeMb  int64
-	DiskImage   string
-	DiskType    string
-	MetaData    []*compute.MetadataItems
+	Description       string
+	MachineType       string
+	Network           string
+	Tags              []string
+	Scopes            []string
+	DiskSizeMb        int64
+	DiskImage         string
+	DiskType          string
+	AutoDeleteDisk    bool
+	ReuseExistingDisk bool
+	MetaData          []*compute.MetadataItems
 }
 
 type computeServiceWrapper struct {
@@ -156,15 +158,9 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		Disks: []*compute.AttachedDisk{
 			{
 				Boot:       true,
-				AutoDelete: true,
+				AutoDelete: settings.AutoDeleteDisk,
 				Type:       "PERSISTENT",
 				Mode:       "READ_WRITE",
-				InitializeParams: &compute.AttachedDiskInitializeParams{
-					DiskName:    name + "-disk",
-					SourceImage: sourceImage,
-					DiskSizeGb:  settings.DiskSizeMb,
-					DiskType:    diskType,
-				},
 			},
 		},
 		NetworkInterfaces: []*compute.NetworkInterface{
@@ -186,6 +182,31 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 				Scopes: settings.Scopes,
 			},
 		},
+	}
+
+	diskName := name + "-disk"
+	var existingDisk *compute.Disk
+	if settings.ReuseExistingDisk {
+		log.Debugln("Trying to reuse disk", diskName)
+
+		disk, err := g.service.Disks.Get(g.project, g.zone, diskName).Do()
+		if err != nil || disk == nil {
+			log.Debugln("Couldn't find existing disk", diskName)
+		} else {
+			log.Debugln("Found existing disk", diskName)
+			existingDisk = disk
+		}
+	}
+
+	if existingDisk != nil {
+		instance.Disks[0].Source = "projects/" + g.project + "/zones/" + g.zone + "/disks/" + diskName
+	} else {
+		instance.Disks[0].InitializeParams = &compute.AttachedDiskInitializeParams{
+			DiskName:    diskName,
+			SourceImage: sourceImage,
+			DiskSizeGb:  settings.DiskSizeMb,
+			DiskType:    diskType,
+		}
 	}
 
 	return g.doCall(g.service.Instances.Insert(g.project, g.zone, instance))
