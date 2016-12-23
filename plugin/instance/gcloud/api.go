@@ -143,7 +143,7 @@ func addAPIUrlPrefix(value string, prefix string) string {
 func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSettings) error {
 	machineType := addAPIUrlPrefix(settings.MachineType, g.project+"/zones/"+g.zone+"/machineTypes/")
 	network := addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
-	sourceImage := addAPIUrlPrefix(settings.DiskImage, g.project+"/global/images/")
+	sourceImage := addAPIUrlPrefix(settings.DiskImage, "")
 	diskType := addAPIUrlPrefix(settings.DiskType, g.project+"/zones/"+g.zone+"/diskTypes/")
 
 	instance := &compute.Instance{
