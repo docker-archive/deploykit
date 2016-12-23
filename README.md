@@ -29,7 +29,7 @@ $ cat gcp-example.json
         "NamePrefix": "test",
         "Description": "Test of GCP infrakit",
         "Network": "default",
-        "Tags": ["TAG1", "TAG2"],
+        "Tags": ["tag1", "tag2"],
         "MachineType": "n1-standard-1",
         "DiskSizeMb": 60,
         "DiskImage": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
