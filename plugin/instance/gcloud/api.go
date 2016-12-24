@@ -184,25 +184,24 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		},
 	}
 
-	diskName := name + "-disk"
 	var existingDisk *compute.Disk
 	if settings.ReuseExistingDisk {
-		log.Debugln("Trying to reuse disk", diskName)
+		log.Debugln("Trying to reuse disk", name)
 
-		disk, err := g.service.Disks.Get(g.project, g.zone, diskName).Do()
+		disk, err := g.service.Disks.Get(g.project, g.zone, name).Do()
 		if err != nil || disk == nil {
-			log.Debugln("Couldn't find existing disk", diskName)
+			log.Debugln("Couldn't find existing disk", name)
 		} else {
-			log.Debugln("Found existing disk", diskName)
+			log.Debugln("Found existing disk", name)
 			existingDisk = disk
 		}
 	}
 
 	if existingDisk != nil {
-		instance.Disks[0].Source = "projects/" + g.project + "/zones/" + g.zone + "/disks/" + diskName
+		instance.Disks[0].Source = "projects/" + g.project + "/zones/" + g.zone + "/disks/" + name
 	} else {
 		instance.Disks[0].InitializeParams = &compute.AttachedDiskInitializeParams{
-			DiskName:    diskName,
+			DiskName:    name,
 			SourceImage: sourceImage,
 			DiskSizeGb:  settings.DiskSizeMb,
 			DiskType:    diskType,
