@@ -2,7 +2,6 @@ package flavor
 
 import (
 	"encoding/json"
-
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/flavor"

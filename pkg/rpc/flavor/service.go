@@ -18,7 +18,7 @@ type Flavor struct {
 	plugin flavor.Plugin
 }
 
-// Info returns a metadata object about the plugin, if the plugin implements it.  See spi.Vendor
+// VendorInfo returns a metadata object about the plugin, if the plugin implements it.  See spi.Vendor
 func (p *Flavor) VendorInfo() *spi.VendorInfo {
 	if m, is := p.plugin.(spi.Vendor); is {
 		return m.VendorInfo()

@@ -2,7 +2,6 @@ package instance
 
 import (
 	"encoding/json"
-
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )

@@ -48,7 +48,7 @@ func NewFileInstancePlugin(dir string) instance.Plugin {
 }
 
 // Info returns a vendor specific name and version
-func (p *plugin) Info() *spi.VendorInfo {
+func (p *plugin) VendorInfo() *spi.VendorInfo {
 	return &spi.VendorInfo{
 		InterfaceSpec: spi.InterfaceSpec{
 			Name:    "infrakit-instance-file",

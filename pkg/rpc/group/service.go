@@ -18,7 +18,7 @@ type Group struct {
 	plugin group.Plugin
 }
 
-// Info returns a metadata object about the plugin, if the plugin implements it.  See plugin.Vendor
+// VendorInfo returns a metadata object about the plugin, if the plugin implements it.  See plugin.Vendor
 func (p *Group) VendorInfo() *spi.VendorInfo {
 	if m, is := p.plugin.(spi.Vendor); is {
 		return m.VendorInfo()

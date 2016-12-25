@@ -17,6 +17,7 @@ func NewPluginInfoClient(socketPath string) *InfoClient {
 	return &InfoClient{client: &http.Client{Transport: &http.Transport{Dial: dialUnix}}}
 }
 
+// InfoClient is the client for retrieving plugin info
 type InfoClient struct {
 	client *http.Client
 }

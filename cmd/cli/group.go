@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -41,9 +40,6 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 		return nil
 	}
-
-	meta := cli.MetaCommand(func() interface{} { return groupPlugin })
-	cmd.AddCommand(meta)
 
 	commit := cobra.Command{
 		Use:   "commit <group configuration>",
