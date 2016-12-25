@@ -7,7 +7,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	plugin_pkg "github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/afero"
 	"math/rand"
@@ -48,10 +48,13 @@ func NewFileInstancePlugin(dir string) instance.Plugin {
 }
 
 // Info returns a vendor specific name and version
-func (p *plugin) Info() plugin_pkg.Info {
-	return plugin_pkg.Info{
-		Name:    "infrakit-instance-file",
-		Version: plugin_pkg.CurrentVersion,
+func (p *plugin) Info() *spi.VendorInfo {
+	return &spi.VendorInfo{
+		InterfaceSpec: spi.InterfaceSpec{
+			Name:    "infrakit-instance-file",
+			Version: "0.1.0",
+		},
+		URL: "https://github.com/docker/infrakit",
 	}
 }
 

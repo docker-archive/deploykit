@@ -1,8 +1,6 @@
 package plugin
 
 import (
-	"encoding/json"
-
 	"github.com/docker/infrakit/pkg/spi"
 )
 
@@ -10,14 +8,14 @@ import (
 type Informer interface {
 
 	// GetMeta returns metadata about the plugin
-	GetMeta() (Meta, error)
+	GetInfo() (Info, error)
 }
 
-// Meta is metadata for the plugin
-type Meta struct {
+// Info is metadata for the plugin
+type Info struct {
 
 	// Vendor captures vendor-specific information about this plugin
-	Vendor Info
+	Vendor *spi.VendorInfo
 
 	// Implements is a list of plugin interface and versions this plugin supports
 	Implements []spi.InterfaceSpec
@@ -68,40 +66,6 @@ type Response struct {
 
 	// ID is id matching the request ID
 	ID string `json:"id"`
-}
-
-var (
-	// NoInfo indicates nothing is known about the plugin
-	NoInfo = Info{}
-)
-
-// Info is the struct stores the information about the plugin, such as version and parameter types
-type Info struct {
-
-	// Name of the plugin.  This is a vendor specific name
-	Name string
-
-	// Version of the plugin.  This is a vendor specific version separate from the infrakit
-	// api version
-	Version string
-}
-
-// Vendor is the interface that has vendor-specific information methods
-type Vendor interface {
-
-	// Info returns an info struct about the plugin
-	Info() Info
-}
-
-// InputExample interface is an optional interface implemented by the plugin that will provide
-// example input struct to document the vendor-specific api of the plugin. An example of this
-// is to provide a sample JSON for all the Properties field in the plugin API.
-type InputExample interface {
-
-	// ExampleProperties returns an example JSON raw message that the vendor plugin understands.
-	// This is an example of what the user will configure and what will be used as the opaque
-	// blob in all the plugin methods where raw JSON messages are referenced.
-	ExampleProperties() *json.RawMessage
 }
 
 // Endpoint is the address of the plugin service

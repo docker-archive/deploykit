@@ -83,8 +83,8 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface) (Stoppabl
 		return nil, err
 	}
 
-	// metadata handler
-	metadata, err := NewMetadata(receiver)
+	// info handler
+	info, err := NewPluginInfo(receiver)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface) (Stoppabl
 	httpLog.Level = log.GetLevel()
 
 	router := mux.NewRouter()
-	router.Handle(rpc_server.MetaURL, metadata)
+	router.Handle(rpc_server.InfoURL, info)
 	router.Handle("/", server)
 
 	handler := loggingHandler{handler: router}

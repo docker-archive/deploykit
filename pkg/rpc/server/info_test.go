@@ -23,8 +23,8 @@ import (
 
 type infoWrapper plugin.Info
 
-func (f infoWrapper) Info() plugin.Info {
-	return plugin.Info(f)
+func (f infoWrapper) VendorInfo() *spi.VendorInfo {
+	return plugin.Info(f).Vendor
 }
 
 type inputExampleWrapper struct {
@@ -59,13 +59,17 @@ func TestMetaForInstance(t *testing.T) {
 	}
 	mock := struct {
 		instance.Plugin
-		plugin.Vendor
-		plugin.InputExample
+		spi.Vendor
+		spi.InputExample
 	}{
 		Plugin: instance_plugin_mock.NewMockPlugin(ctrl),
 		Vendor: infoWrapper(plugin.Info{
-			Name:    vendorName,
-			Version: vendorVersion,
+			Vendor: &spi.VendorInfo{
+				InterfaceSpec: spi.InterfaceSpec{
+					Name:    vendorName,
+					Version: vendorVersion,
+				},
+			},
 		}),
 		InputExample: inputExampleWrapper{value: example},
 	}
@@ -74,10 +78,10 @@ func TestMetaForInstance(t *testing.T) {
 
 	service := instance_plugin_rpc.PluginServer(mock)
 
-	md, err := NewMetadata(service)
+	md, err := NewPluginInfo(service)
 	require.NoError(t, err)
 
-	meta := md.getMeta()
+	meta := md.getInfo()
 	require.Equal(t, []spi.InterfaceSpec{instance.InterfaceSpec}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)
@@ -106,22 +110,26 @@ func TestMetaForFlavor(t *testing.T) {
 
 	mock := struct {
 		flavor.Plugin
-		plugin.Vendor
-		plugin.InputExample
+		spi.Vendor
+		spi.InputExample
 	}{
 		Plugin: flavor_plugin_mock.NewMockPlugin(ctrl),
 		Vendor: infoWrapper(plugin.Info{
-			Name:    vendorName,
-			Version: vendorVersion,
+			Vendor: &spi.VendorInfo{
+				InterfaceSpec: spi.InterfaceSpec{
+					Name:    vendorName,
+					Version: vendorVersion,
+				},
+			},
 		}),
 		InputExample: inputExampleWrapper{value: example},
 	}
 	service := flavor_plugin_rpc.PluginServer(mock)
 
-	md, err := NewMetadata(service)
+	md, err := NewPluginInfo(service)
 	require.NoError(t, err)
 
-	meta := md.getMeta()
+	meta := md.getInfo()
 	require.Equal(t, []spi.InterfaceSpec{flavor.InterfaceSpec}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)
@@ -144,22 +152,26 @@ func TestMetaForGroup(t *testing.T) {
 
 	mock := struct {
 		group.Plugin
-		plugin.Vendor
-		plugin.InputExample
+		spi.Vendor
+		spi.InputExample
 	}{
 		Plugin: group_plugin_mock.NewMockPlugin(ctrl),
 		Vendor: infoWrapper(plugin.Info{
-			Name:    vendorName,
-			Version: vendorVersion,
+			Vendor: &spi.VendorInfo{
+				InterfaceSpec: spi.InterfaceSpec{
+					Name:    vendorName,
+					Version: vendorVersion,
+				},
+			},
 		}),
 		InputExample: inputExampleWrapper{value: group_plugin_types.Spec{}},
 	}
 	service := group_plugin_rpc.PluginServer(mock)
 
-	md, err := NewMetadata(service)
+	md, err := NewPluginInfo(service)
 	require.NoError(t, err)
 
-	meta := md.getMeta()
+	meta := md.getInfo()
 	require.Equal(t, []spi.InterfaceSpec{group.InterfaceSpec}, meta.Implements)
 
 	require.Equal(t, vendorName, meta.Vendor.Name)

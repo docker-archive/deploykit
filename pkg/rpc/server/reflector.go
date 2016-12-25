@@ -25,15 +25,15 @@ type reflector struct {
 	target interface{}
 }
 
-func (r *reflector) Info() plugin.Info {
-	if i, is := r.target.(plugin.Vendor); is {
-		return i.Info()
+func (r *reflector) VendorInfo() *spi.VendorInfo {
+	if i, is := r.target.(spi.Vendor); is {
+		return i.VendorInfo()
 	}
-	return plugin.NoInfo
+	return nil
 }
 
 func (r *reflector) exampleProperties() *json.RawMessage {
-	if example, is := r.target.(plugin.InputExample); is {
+	if example, is := r.target.(spi.InputExample); is {
 		return example.ExampleProperties()
 	}
 	return nil

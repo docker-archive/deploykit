@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
@@ -20,17 +19,17 @@ type Instance struct {
 	plugin instance.Plugin
 }
 
-// Info returns a metadata object about the plugin, if the plugin implements it.  See plugin.Informer
-func (p *Instance) Info() plugin.Info {
-	if m, is := p.plugin.(plugin.Vendor); is {
-		return m.Info()
+// VendorInfo returns a metadata object about the plugin, if the plugin implements it.
+func (p *Instance) VendorInfo() *spi.VendorInfo {
+	if m, is := p.plugin.(spi.Vendor); is {
+		return m.VendorInfo()
 	}
-	return plugin.NoInfo
+	return nil
 }
 
 // SetExampleProperties sets the rpc request with any example properties/ custom type
 func (p *Instance) SetExampleProperties(request interface{}) {
-	i, is := p.plugin.(plugin.InputExample)
+	i, is := p.plugin.(spi.InputExample)
 	if !is {
 		return
 	}

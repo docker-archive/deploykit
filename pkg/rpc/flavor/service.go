@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 )
@@ -19,17 +18,17 @@ type Flavor struct {
 	plugin flavor.Plugin
 }
 
-// Info returns a metadata object about the plugin, if the plugin implements it.  See plugin.Vendor
-func (p *Flavor) Info() plugin.Info {
-	if m, is := p.plugin.(plugin.Vendor); is {
-		return m.Info()
+// Info returns a metadata object about the plugin, if the plugin implements it.  See spi.Vendor
+func (p *Flavor) VendorInfo() *spi.VendorInfo {
+	if m, is := p.plugin.(spi.Vendor); is {
+		return m.VendorInfo()
 	}
-	return plugin.NoInfo
+	return nil
 }
 
 // SetExampleProperties sets the rpc request with any example properties/ custom type
 func (p *Flavor) SetExampleProperties(request interface{}) {
-	i, is := p.plugin.(plugin.InputExample)
+	i, is := p.plugin.(spi.InputExample)
 	if !is {
 		return
 	}
@@ -50,7 +49,7 @@ func (p *Flavor) SetExampleProperties(request interface{}) {
 
 // exampleProperties returns an example properties used by the plugin
 func (p *Flavor) exampleProperties() *json.RawMessage {
-	if i, is := p.plugin.(plugin.InputExample); is {
+	if i, is := p.plugin.(spi.InputExample); is {
 		return i.ExampleProperties()
 	}
 	return nil

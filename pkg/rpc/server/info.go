@@ -8,25 +8,25 @@ import (
 	"github.com/docker/infrakit/pkg/spi"
 )
 
-// Metadata is the service object for the RPC metadata service
-type Metadata struct {
-	vendor     plugin.Vendor
+// PluginInfo is the service object for the RPC metadata service
+type PluginInfo struct {
+	vendor     spi.Vendor
 	reflectors []*reflector
 }
 
-// NewMetadata returns an instance of the metadata service
-func NewMetadata(receiver interface{}) (*Metadata, error) {
-	m := &Metadata{
+// NewPluginInfo returns an instance of the metadata service
+func NewPluginInfo(receiver interface{}) (*PluginInfo, error) {
+	m := &PluginInfo{
 		reflectors: []*reflector{},
 	}
-	if v, is := receiver.(plugin.Vendor); is {
+	if v, is := receiver.(spi.Vendor); is {
 		m.vendor = v
 	}
 	return m, m.Register(receiver)
 }
 
 // Register registers an rpc-capable object for introspection and metadata service
-func (m *Metadata) Register(receiver interface{}) error {
+func (m *PluginInfo) Register(receiver interface{}) error {
 	r := &reflector{target: receiver}
 	if err := r.validate(); err != nil {
 		return err
@@ -36,8 +36,8 @@ func (m *Metadata) Register(receiver interface{}) error {
 }
 
 // ServeHTTP implements the http.Handler interface and responds by returning information about the plugin.
-func (m *Metadata) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	meta := m.getMeta()
+func (m *PluginInfo) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	meta := m.getInfo()
 	buff, err := json.Marshal(meta)
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
@@ -48,8 +48,8 @@ func (m *Metadata) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	return
 }
 
-func (m *Metadata) getMeta() *plugin.Meta {
-	meta := &plugin.Meta{}
+func (m *PluginInfo) getInfo() *plugin.Info {
+	meta := &plugin.Info{}
 	myImplements := []spi.InterfaceSpec{}
 	myInterfaces := []plugin.InterfaceDescription{}
 
@@ -76,7 +76,7 @@ func (m *Metadata) getMeta() *plugin.Meta {
 	}
 
 	if m.vendor != nil {
-		meta.Vendor = m.vendor.Info()
+		meta.Vendor = m.vendor.VendorInfo()
 	}
 
 	meta.Implements = myImplements

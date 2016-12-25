@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
 )
@@ -20,16 +19,16 @@ type Group struct {
 }
 
 // Info returns a metadata object about the plugin, if the plugin implements it.  See plugin.Vendor
-func (p *Group) Info() plugin.Info {
-	if m, is := p.plugin.(plugin.Vendor); is {
-		return m.Info()
+func (p *Group) VendorInfo() *spi.VendorInfo {
+	if m, is := p.plugin.(spi.Vendor); is {
+		return m.VendorInfo()
 	}
-	return plugin.NoInfo
+	return nil
 }
 
 // ExampleProperties returns an example properties used by the plugin
 func (p *Group) ExampleProperties() *json.RawMessage {
-	if i, is := p.plugin.(plugin.InputExample); is {
+	if i, is := p.plugin.(spi.InputExample); is {
 		return i.ExampleProperties()
 	}
 	return nil

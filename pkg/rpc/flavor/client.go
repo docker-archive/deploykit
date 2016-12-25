@@ -3,9 +3,7 @@ package flavor
 import (
 	"encoding/json"
 
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
-	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -13,11 +11,10 @@ import (
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
 func NewClient(socketPath string) flavor.Plugin {
-	return &client{Informer: rpc.NewPluginInformer(socketPath), client: rpc_client.New(socketPath, flavor.InterfaceSpec)}
+	return &client{client: rpc_client.New(socketPath, flavor.InterfaceSpec)}
 }
 
 type client struct {
-	plugin.Informer
 	client rpc_client.Client
 }
 
