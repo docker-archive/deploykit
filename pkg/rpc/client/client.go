@@ -2,14 +2,13 @@ package client
 
 import (
 	"bytes"
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/spi"
+	"github.com/gorilla/rpc/v2/json2"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"sync"
-
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/spi"
-	"github.com/gorilla/rpc/v2/json2"
 )
 
 type client struct {
