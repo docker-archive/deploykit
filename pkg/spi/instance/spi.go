@@ -11,10 +11,6 @@ var InterfaceSpec = spi.InterfaceSpec{
 	Version: "0.1.0",
 }
 
-func init() {
-	spi.RegisterInterface(InterfaceSpec)
-}
-
 // Plugin is a vendor-agnostic API used to create and manage resources with an infrastructure provider.
 type Plugin interface {
 	// Validate performs local validation on a provision request.

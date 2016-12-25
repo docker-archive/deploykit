@@ -54,7 +54,10 @@ func (r *reflector) validate() error {
 
 // Interface returns the plugin type and version.
 func (r *reflector) Interface() spi.InterfaceSpec {
-	return spi.GetInterface(r.getPluginTypeName())
+	if v, is := r.target.(VersionedInterface); is {
+		return v.ImplementedInterface()
+	}
+	return spi.InterfaceSpec{}
 }
 
 // isExported returns true of a string is an exported (upper case) name. -- from gorilla/rpc

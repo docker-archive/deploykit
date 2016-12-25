@@ -2,7 +2,6 @@ package flavor
 
 import (
 	"encoding/json"
-
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -12,10 +11,6 @@ import (
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Flavor",
 	Version: "0.1.0",
-}
-
-func init() {
-	spi.RegisterInterface(InterfaceSpec)
 }
 
 // Health is an indication of whether the Flavor is functioning properly.
