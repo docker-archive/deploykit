@@ -1,9 +1,11 @@
 package flavor
 
 import (
+	"encoding/json"
+	"net/http"
+
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
-	"net/http"
 )
 
 // PluginServer returns a Flavor that conforms to the net/rpc rpc call convention.
@@ -14,6 +16,43 @@ func PluginServer(p flavor.Plugin) *Flavor {
 // Flavor the exported type needed to conform to json-rpc call convention
 type Flavor struct {
 	plugin flavor.Plugin
+}
+
+// VendorInfo returns a metadata object about the plugin, if the plugin implements it.  See spi.Vendor
+func (p *Flavor) VendorInfo() *spi.VendorInfo {
+	if m, is := p.plugin.(spi.Vendor); is {
+		return m.VendorInfo()
+	}
+	return nil
+}
+
+// SetExampleProperties sets the rpc request with any example properties/ custom type
+func (p *Flavor) SetExampleProperties(request interface{}) {
+	i, is := p.plugin.(spi.InputExample)
+	if !is {
+		return
+	}
+	example := i.ExampleProperties()
+	if example == nil {
+		return
+	}
+
+	switch request := request.(type) {
+	case *PrepareRequest:
+		request.Properties = example
+	case *HealthyRequest:
+		request.Properties = example
+	case *DrainRequest:
+		request.Properties = example
+	}
+}
+
+// exampleProperties returns an example properties used by the plugin
+func (p *Flavor) exampleProperties() *json.RawMessage {
+	if i, is := p.plugin.(spi.InputExample); is {
+		return i.ExampleProperties()
+	}
+	return nil
 }
 
 // ImplementedInterface returns the interface implemented by this RPC service.
