@@ -17,8 +17,8 @@ import (
 
 const apiURL = "https://www.googleapis.com/compute/v1/projects/"
 
-// GCloud is the list of operations that can execute on Google Cloud Platform.
-type GCloud interface {
+// Api is the list of operations that can execute on Google Cloud Platform.
+type Api interface {
 	// ListInstances lists the instances for a given zone.
 	ListInstances() ([]*compute.Instance, error)
 
@@ -53,8 +53,8 @@ type computeServiceWrapper struct {
 	zone    string
 }
 
-// New creates a new Gcloud instance.
-func New(project, zone string) (GCloud, error) {
+// New creates a new Api instance.
+func New(project, zone string) (Api, error) {
 	client, err := google.DefaultClient(context.Background(), compute.ComputeScope)
 	if err != nil {
 		return nil, err
