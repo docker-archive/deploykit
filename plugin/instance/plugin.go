@@ -24,7 +24,7 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-type instanceProperties struct {
+type properties struct {
 	NamePrefix  string
 	Description string
 	MachineType string
@@ -54,10 +54,10 @@ func NewGCEInstancePlugin(project, zone string) instance.Plugin {
 	}
 }
 
-func parseProperties(properties json.RawMessage) (*instanceProperties, error) {
-	p := instanceProperties{}
+func parseProperties(rawJson json.RawMessage) (*properties, error) {
+	p := properties{}
 
-	if err := json.Unmarshal(properties, &p); err != nil {
+	if err := json.Unmarshal(rawJson, &p); err != nil {
 		return nil, err
 	}
 
