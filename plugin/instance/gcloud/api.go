@@ -9,10 +9,10 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+	"context"
 )
 
 const apiURL = "https://www.googleapis.com/compute/v1/projects/"
@@ -55,7 +55,7 @@ type computeServiceWrapper struct {
 
 // New creates a new Gcloud instance.
 func New(project, zone string) (GCloud, error) {
-	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+	client, err := google.DefaultClient(context.Background(), compute.ComputeScope)
 	if err != nil {
 		return nil, err
 	}
