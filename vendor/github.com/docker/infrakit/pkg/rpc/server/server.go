@@ -2,16 +2,18 @@ package server
 
 import (
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"gopkg.in/tylerb/graceful.v1"
 	"net"
 	"net/http"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
+	rpc_server "github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/plugin"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
+	"gopkg.in/tylerb/graceful.v1"
 	"net/http/httptest"
 	"net/http/httputil"
 )
@@ -81,10 +83,20 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface) (Stoppabl
 		return nil, err
 	}
 
+	// info handler
+	info, err := NewPluginInfo(receiver)
+	if err != nil {
+		return nil, err
+	}
+
 	httpLog := log.New()
 	httpLog.Level = log.GetLevel()
 
-	handler := loggingHandler{handler: server}
+	router := mux.NewRouter()
+	router.Handle(rpc_server.InfoURL, info)
+	router.Handle("/", server)
+
+	handler := loggingHandler{handler: router}
 	gracefulServer := graceful.Server{
 		Timeout: 10 * time.Second,
 		Server:  &http.Server{Addr: fmt.Sprintf("unix://%s", socketPath), Handler: handler},

@@ -5,6 +5,9 @@ PREFIX?=$(shell pwd -L)
 VERSION?=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION?=$(shell git rev-list -1 HEAD)
 
+# Docker client API version.  Change this to be consistent with the version of the vendored sources you use.
+DOCKER_CLIENT_VERSION?=1.24
+
 # Allow turning off function inlining and variable registerization
 ifeq (${DISABLE_OPTIMIZATION},true)
 	GO_GCFLAGS=-gcflags "-N -l"
@@ -26,22 +29,41 @@ PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
 
 # Current working environment.  Set these explicitly if you want to cross-compile
 # in the build container (see the build-in-container target):
-
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
-build-in-container: clean
+DOCKER_BUILD_FLAGS?=--no-cache --pull
+build-in-container:
 	@echo "+ $@"
-	@docker build -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
+	@docker build ${DOCKER_BUILD_FLAGS} -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
 	@docker run --rm \
-		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} \
+		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} -e DOCKER_CLIENT_VERSION=${DOCKER_CLIENT_VERSION} \
 		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
 		infrakit-build
+
+# For packaging as Docker container images.  Set the environment variables DOCKER_PUSH, DOCKER_TAG_LATEST
+# if also push to remote repo.  You must have access to the remote repo.
+DOCKER_IMAGE?=infrakit/devbundle
+DOCKER_TAG?=dev
+build-docker:
+	@echo "+ $@"
+	GOOS=linux GOARCH=amd64 make build-in-container
+	@docker build ${DOCKER_BUILD_FLAGS} \
+	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
+	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+ifeq (${DOCKER_PUSH},true)
+	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+ifeq (${DOCKER_TAG_LATEST},true)
+	@docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+	@docker push ${DOCKER_IMAGE}:latest
+endif
+endif
 
 get-tools:
 	@echo "+ $@"
 	@go get -u \
 		github.com/golang/lint/golint \
-		github.com/wfarner/blockcheck
+		github.com/wfarner/blockcheck \
+		github.com/rancher/trash
 
 vet:
 	@echo "+ $@"
@@ -78,7 +100,7 @@ clean:
 
 define build_binary
 	go build -o build/$(1) \
-		-ldflags "-X github.com/docker/infrakit/cli.Version=$(VERSION) -X github.com/docker/infrakit/cli.Revision=$(REVISION)" $(2)
+		-ldflags "-X github.com/docker/infrakit/pkg/cli.Version=$(VERSION) -X github.com/docker/infrakit/pkg/cli.Revision=$(REVISION) -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=$(DOCKER_CLIENT_VERSION)" $(2)
 endef
 
 binaries: clean build-binaries

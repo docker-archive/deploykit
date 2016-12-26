@@ -69,7 +69,7 @@ $ make binaries
 Executables will be placed in the `./build` directory.
 This will produce binaries for tools and several reference Plugin implementations:
   + [`infrakit`](cmd/cli/README.md): a command line interface to interact with plugins
-  + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./spi/group)
+  + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./pkg/spi/group)
   + [`infrakit-instance-file`](pkg/example/instance/file): an Instance plugin using dummy files to represent instances
   + [`infrakit-instance-terraform`](pkg/example/instance/terraform):
     an Instance plugin integrating [Terraform](https://www.terraform.io)

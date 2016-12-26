@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"sort"
-	"time"
 )
 
 const (
@@ -61,6 +63,43 @@ func (p awsInstancePlugin) tagInstance(
 type CreateInstanceRequest struct {
 	Tags              map[string]string
 	RunInstancesInput ec2.RunInstancesInput
+}
+
+// VendorInfo returns a vendor specific name and version
+func (p awsInstancePlugin) VendorInfo() *spi.VendorInfo {
+	return &spi.VendorInfo{
+		InterfaceSpec: spi.InterfaceSpec{
+			Name:    "infrakit-instance-aws",
+			Version: "0.1.0",
+		},
+		URL: "https://github.com/docker/infrakit.aws",
+	}
+}
+
+// ExampleProperties returns the properties / config of this plugin
+func (p awsInstancePlugin) ExampleProperties() *json.RawMessage {
+	example := CreateInstanceRequest{
+		Tags: map[string]string{
+			"tag1": "value1",
+			"tag2": "value2",
+		},
+		RunInstancesInput: ec2.RunInstancesInput{
+			BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+				{
+					// The device name exposed to the instance (for example, /dev/sdh or xvdh).
+					DeviceName: aws.String("/dev/sdh"),
+				},
+			},
+			SecurityGroupIds: []*string{},
+			SecurityGroups:   []*string{},
+		},
+	}
+	buff, err := json.MarshalIndent(example, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	raw := json.RawMessage(buff)
+	return &raw
 }
 
 // Validate performs local checks to determine if the request is valid.
