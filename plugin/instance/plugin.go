@@ -38,10 +38,6 @@ type instanceProperties struct {
 	Connect     bool
 }
 
-type gceInstance struct {
-	instance.Description
-}
-
 type plugin struct {
 	API func() (gcloud.GCloud, error)
 }
