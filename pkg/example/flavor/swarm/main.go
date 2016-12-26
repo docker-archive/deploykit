@@ -11,6 +11,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	cli.RegisterInfo("swarm-flavor",
+		map[string]interface{}{
+			"DockerClientAPIVersion": docker.ClientVersion,
+		})
+}
+
 func main() {
 
 	cmd := &cobra.Command{

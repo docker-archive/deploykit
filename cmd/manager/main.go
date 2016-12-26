@@ -11,8 +11,16 @@ import (
 	"github.com/docker/infrakit/pkg/manager"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/store"
+	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	cli.RegisterInfo("manager - swarm option",
+		map[string]interface{}{
+			"DockerClientAPIVersion": docker.ClientVersion,
+		})
+}
 
 type config struct {
 	id         string
