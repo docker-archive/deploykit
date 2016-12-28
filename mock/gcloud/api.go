@@ -9,28 +9,28 @@ import (
 	v1 "google.golang.org/api/compute/v1"
 )
 
-// Mock of GCloud interface
-type MockGCloud struct {
+// Mock of API interface
+type MockAPI struct {
 	ctrl     *gomock.Controller
 	recorder *_MockGCloudRecorder
 }
 
 // Recorder for MockGCloud (not exported)
 type _MockGCloudRecorder struct {
-	mock *MockGCloud
+	mock *MockAPI
 }
 
-func NewMockGCloud(ctrl *gomock.Controller) *MockGCloud {
-	mock := &MockGCloud{ctrl: ctrl}
+func NewMockGCloud(ctrl *gomock.Controller) *MockAPI {
+	mock := &MockAPI{ctrl: ctrl}
 	mock.recorder = &_MockGCloudRecorder{mock}
 	return mock
 }
 
-func (_m *MockGCloud) EXPECT() *_MockGCloudRecorder {
+func (_m *MockAPI) EXPECT() *_MockGCloudRecorder {
 	return _m.recorder
 }
 
-func (_m *MockGCloud) AddInstanceToTargetPool(_param0 string, _param1 ...string) error {
+func (_m *MockAPI) AddInstanceToTargetPool(_param0 string, _param1 ...string) error {
 	_s := []interface{}{_param0}
 	for _, _x := range _param1 {
 		_s = append(_s, _x)
@@ -45,7 +45,7 @@ func (_mr *_MockGCloudRecorder) AddInstanceToTargetPool(arg0 interface{}, arg1 .
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "AddInstanceToTargetPool", _s...)
 }
 
-func (_m *MockGCloud) CreateInstance(_param0 string, _param1 *gcloud.InstanceSettings) error {
+func (_m *MockAPI) CreateInstance(_param0 string, _param1 *gcloud.InstanceSettings) error {
 	ret := _m.ctrl.Call(_m, "CreateInstance", _param0, _param1)
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -55,7 +55,7 @@ func (_mr *_MockGCloudRecorder) CreateInstance(arg0, arg1 interface{}) *gomock.C
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateInstance", arg0, arg1)
 }
 
-func (_m *MockGCloud) DeleteInstance(_param0 string) error {
+func (_m *MockAPI) DeleteInstance(_param0 string) error {
 	ret := _m.ctrl.Call(_m, "DeleteInstance", _param0)
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -65,7 +65,7 @@ func (_mr *_MockGCloudRecorder) DeleteInstance(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteInstance", arg0)
 }
 
-func (_m *MockGCloud) ListInstances() ([]*v1.Instance, error) {
+func (_m *MockAPI) ListInstances() ([]*v1.Instance, error) {
 	ret := _m.ctrl.Call(_m, "ListInstances")
 	ret0, _ := ret[0].([]*v1.Instance)
 	ret1, _ := ret[1].(error)

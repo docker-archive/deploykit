@@ -14,8 +14,8 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-// Api is the list of operations that can execute on Google Cloud Platform.
-type Api interface {
+// API is the list of operations that can execute on Google Cloud Platform.
+type API interface {
 	// ListInstances lists the instances for a given zone.
 	ListInstances() ([]*compute.Instance, error)
 
@@ -50,8 +50,8 @@ type computeServiceWrapper struct {
 	zone    string
 }
 
-// New creates a new Api instance.
-func New(project, zone string) (Api, error) {
+// New creates a new API instance.
+func New(project, zone string) (API, error) {
 	client, err := google.DefaultClient(context.Background(), compute.ComputeScope)
 	if err != nil {
 		return nil, err

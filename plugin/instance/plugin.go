@@ -39,7 +39,7 @@ type properties struct {
 }
 
 type plugin struct {
-	API func() (gcloud.Api, error)
+	API func() (gcloud.API, error)
 }
 
 // NewGCEInstancePlugin creates a new GCE instance plugin for a given project
@@ -48,16 +48,16 @@ func NewGCEInstancePlugin(project, zone string) instance.Plugin {
 	log.Debugln("gce instance plugin. project=", project)
 
 	return &plugin{
-		API: func() (gcloud.Api, error) {
+		API: func() (gcloud.API, error) {
 			return gcloud.New(project, zone)
 		},
 	}
 }
 
-func parseProperties(rawJson json.RawMessage) (*properties, error) {
+func parseProperties(rawJSON json.RawMessage) (*properties, error) {
 	p := properties{}
 
-	if err := json.Unmarshal(rawJson, &p); err != nil {
+	if err := json.Unmarshal(rawJSON, &p); err != nil {
 		return nil, err
 	}
 
