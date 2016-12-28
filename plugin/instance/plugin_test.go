@@ -6,16 +6,15 @@ import (
 	"math/rand"
 	"testing"
 
-	compute "google.golang.org/api/compute/v1"
-
 	mock_gcloud "github.com/docker/infrakit.gcp/mock/gcloud"
 	"github.com/docker/infrakit.gcp/plugin/instance/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	compute "google.golang.org/api/compute/v1"
 )
 
-func NewMockGCloud(t *testing.T) (*mock_gcloud.MockGCloud, *gomock.Controller) {
+func NewMockGCloud(t *testing.T) (*mock_gcloud.MockAPI, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
 	return mock_gcloud.NewMockGCloud(ctrl), ctrl
 }
@@ -59,7 +58,7 @@ func TestProvision(t *testing.T) {
 	}).Return(nil)
 	api.EXPECT().AddInstanceToTargetPool("POOL", "worker-8717895732742165505").Return(nil)
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: &properties,
@@ -90,7 +89,7 @@ func TestProvisionLogicalID(t *testing.T) {
 
 	logicalID := instance.LogicalID("LOGICAL-ID")
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	id, err := plugin.Provision(instance.Spec{
 		LogicalID:  &logicalID,
 		Tags:       tags,
@@ -120,7 +119,7 @@ func TestProvisionFails(t *testing.T) {
 		MetaData:          gcloud.TagsToMetaData(tags),
 	}).Return(errors.New("BUG"))
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: &properties,
@@ -148,7 +147,7 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 	}).Return(nil)
 	api.EXPECT().AddInstanceToTargetPool("POOL", "instance-8717895732742165505").Return(errors.New("BUG"))
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: &properties,
@@ -174,7 +173,7 @@ func TestDestroy(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().DeleteInstance("instance-id").Return(nil)
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	err := plugin.Destroy("instance-id")
 
 	require.NoError(t, err)
@@ -184,7 +183,7 @@ func TestDestroyFails(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().DeleteInstance("instance-wrong-id").Return(errors.New("BUG"))
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	err := plugin.Destroy("instance-wrong-id")
 
 	require.EqualError(t, err, "BUG")
@@ -194,7 +193,7 @@ func TestDescribeEmptyInstances(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return([]*compute.Instance{}, nil)
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	instances, err := plugin.DescribeInstances(nil)
 
 	require.NoError(t, err)
@@ -263,7 +262,7 @@ func TestDescribeInstances(t *testing.T) {
 		},
 	}, nil)
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	instances, err := plugin.DescribeInstances(tags)
 
 	require.NoError(t, err)
@@ -278,7 +277,7 @@ func TestDescribeInstancesFails(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return(nil, errors.New("BUG"))
 
-	plugin := &plugin{func() (gcloud.Api, error) { return api, nil }}
+	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
 	instances, err := plugin.DescribeInstances(nil)
 
 	require.EqualError(t, err, "BUG")

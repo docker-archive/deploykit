@@ -1,24 +1,21 @@
 package gcloud
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	log "github.com/Sirupsen/logrus"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"context"
 )
 
-const apiURL = "https://www.googleapis.com/compute/v1/projects/"
-
-// Api is the list of operations that can execute on Google Cloud Platform.
-type Api interface {
+// API is the list of operations that can execute on Google Cloud Platform.
+type API interface {
 	// ListInstances lists the instances for a given zone.
 	ListInstances() ([]*compute.Instance, error)
 
@@ -53,8 +50,8 @@ type computeServiceWrapper struct {
 	zone    string
 }
 
-// New creates a new Api instance.
-func New(project, zone string) (Api, error) {
+// New creates a new API instance.
+func New(project, zone string) (API, error) {
 	client, err := google.DefaultClient(context.Background(), compute.ComputeScope)
 	if err != nil {
 		return nil, err
@@ -67,7 +64,7 @@ func New(project, zone string) (Api, error) {
 
 	// Try to find the project from the metaData server
 	if project == "" {
-		project, err = metadata("project/project-id")
+		project, err = metadata.ProjectID()
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +76,7 @@ func New(project, zone string) (Api, error) {
 
 	// Try to find the zone from the metaData server
 	if zone == "" {
-		zoneURI, err := metadata("instance/zone")
+		zoneURI, err := metadata.InstanceAttributeValue("zone")
 		if err != nil {
 			return nil, err
 		}
@@ -98,31 +95,6 @@ func New(project, zone string) (Api, error) {
 	}, nil
 }
 
-func metadata(path string) (string, error) {
-	req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/"+path, nil)
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Set("Metadata-Flavor", "Google")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", errors.New(resp.Status)
-	}
-
-	content, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(content), nil
-}
-
 func (g *computeServiceWrapper) ListInstances() ([]*compute.Instance, error) {
 	list, err := g.service.Instances.List(g.project, g.zone).Do()
 	if err != nil {
@@ -132,21 +104,21 @@ func (g *computeServiceWrapper) ListInstances() ([]*compute.Instance, error) {
 	return list.Items, nil
 }
 
-func addAPIUrlPrefix(value string, prefix string) string {
-	if strings.HasPrefix(value, apiURL+prefix) {
+func (g *computeServiceWrapper) addAPIUrlPrefix(value string, prefix string) string {
+	if strings.HasPrefix(value, g.service.BasePath+prefix) {
 		return value
 	}
 	if strings.HasPrefix(value, prefix) {
-		return apiURL + value
+		return g.service.BasePath + value
 	}
-	return apiURL + prefix + value
+	return g.service.BasePath + prefix + value
 }
 
 func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSettings) error {
-	machineType := addAPIUrlPrefix(settings.MachineType, g.project+"/zones/"+g.zone+"/machineTypes/")
-	network := addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
-	sourceImage := addAPIUrlPrefix(settings.DiskImage, "")
-	diskType := addAPIUrlPrefix(settings.DiskType, g.project+"/zones/"+g.zone+"/diskTypes/")
+	machineType := g.addAPIUrlPrefix(settings.MachineType, g.project+"/zones/"+g.zone+"/machineTypes/")
+	network := g.addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
+	sourceImage := g.addAPIUrlPrefix(settings.DiskImage, "")
+	diskType := g.addAPIUrlPrefix(settings.DiskType, g.project+"/zones/"+g.zone+"/diskTypes/")
 
 	instance := &compute.Instance{
 		Name:        name,
