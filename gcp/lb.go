@@ -1,6 +1,7 @@
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/docker/editions/pkg/loadbalancer"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
-	"context"
 )
 
 // NewLoadBalancerDriver creates a load balancer driver
@@ -84,22 +84,13 @@ func (d *lbDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, error
 		return nil, err
 	}
 
-	for _, allowed := range firewall.Allowed {
-		for _, allowedPort := range allowed.Ports {
-			port, errConv := strconv.ParseUint(allowedPort, 10, 32)
-			if errConv != nil {
-				return nil, errConv
-			}
+	found, err := OpenPort(firewall, route.Port, route.Protocol)
+	if err != nil {
+		return nil, err
+	}
 
-			if uint32(port) == route.Port {
-				return NewResult("Already published"), nil
-			}
-		}
-
-		// Add port
-		if loadbalancer.ProtocolFromString(allowed.IPProtocol) == route.Protocol {
-			allowed.Ports = append(allowed.Ports, fmt.Sprintf("%d", route.Port))
-		}
+	if found {
+		return NewResult("Already published"), nil
 	}
 
 	err = d.updateFirewall(firewall)
@@ -119,26 +110,9 @@ func (d *lbDriver) Unpublish(extPort uint32) (loadbalancer.Result, error) {
 		return nil, err
 	}
 
-	found := false
-
-	for _, allowed := range firewall.Allowed {
-		allowedPorts := []string{}
-
-		for _, allowedPort := range allowed.Ports {
-			port, errConv := strconv.ParseUint(allowedPort, 10, 32)
-			if errConv != nil {
-				return nil, errConv
-			}
-
-			if uint32(port) == extPort {
-				// Ignore port
-				found = true
-			} else {
-				allowedPorts = append(allowedPorts, allowedPort)
-			}
-		}
-
-		allowed.Ports = allowedPorts
+	found, err := ClosePort(firewall, extPort)
+	if err != nil {
+		return nil, err
 	}
 
 	if !found {
@@ -151,6 +125,68 @@ func (d *lbDriver) Unpublish(extPort uint32) (loadbalancer.Result, error) {
 	}
 
 	return NewResult("Unpublished"), nil
+}
+
+// OpenPort opens a port on the given firewall.
+func OpenPort(firewall *compute.Firewall, portToAdd uint32, protocol loadbalancer.Protocol) (bool, error) {
+	added := false
+
+	for _, allowed := range firewall.Allowed {
+		for _, allowedPort := range allowed.Ports {
+			port, errConv := strconv.ParseUint(allowedPort, 10, 32)
+			if errConv != nil {
+				return false, fmt.Errorf("Invalid port: %s", allowedPort)
+			}
+
+			if uint32(port) == portToAdd {
+				return true, nil
+			}
+		}
+
+		// Add port
+		if loadbalancer.ProtocolFromString(allowed.IPProtocol) == protocol {
+			added = true
+			allowed.Ports = append(allowed.Ports, fmt.Sprintf("%d", portToAdd))
+		}
+	}
+
+	if !added {
+		firewall.Allowed = append(firewall.Allowed, &compute.FirewallAllowed {
+			IPProtocol: string(protocol),
+			Ports: []string{fmt.Sprintf("%d", portToAdd)},
+
+		})
+	}
+
+	return false, nil
+}
+
+// ClosePort closes a port on the given firewall.
+func ClosePort(firewall *compute.Firewall, portToRemove uint32) (bool, error) {
+	found := false
+
+	for _, allowed := range firewall.Allowed {
+		allowedPorts := []string{}
+
+		for _, allowedPort := range allowed.Ports {
+			port, errConv := strconv.ParseUint(allowedPort, 10, 32)
+			if errConv != nil {
+				return false, fmt.Errorf("Invalid port: %s", allowedPort)
+			}
+
+			if uint32(port) == portToRemove {
+				// Ignore port
+				found = true
+			} else {
+				allowedPorts = append(allowedPorts, allowedPort)
+			}
+		}
+
+		allowed.Ports = allowedPorts
+	}
+
+	return found, nil
+
 }
 
 // ConfigureHealthCheck configures the health checks for instance removal and reconfiguration
