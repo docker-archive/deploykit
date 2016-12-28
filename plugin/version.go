@@ -20,8 +20,8 @@ func VersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "print build version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Version: %s\n", Version)
-			fmt.Printf("Revision: %s\n", Revision)
+			fmt.Println("Version:", Version)
+			fmt.Println("Revision:", Revision)
 		},
 	}
 }

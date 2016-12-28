@@ -24,7 +24,7 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-type instanceProperties struct {
+type properties struct {
 	NamePrefix  string
 	Description string
 	MachineType string
@@ -38,12 +38,8 @@ type instanceProperties struct {
 	Connect     bool
 }
 
-type gceInstance struct {
-	instance.Description
-}
-
 type plugin struct {
-	API func() (gcloud.GCloud, error)
+	API func() (gcloud.Api, error)
 }
 
 // NewGCEInstancePlugin creates a new GCE instance plugin for a given project
@@ -52,16 +48,16 @@ func NewGCEInstancePlugin(project, zone string) instance.Plugin {
 	log.Debugln("gce instance plugin. project=", project)
 
 	return &plugin{
-		API: func() (gcloud.GCloud, error) {
+		API: func() (gcloud.Api, error) {
 			return gcloud.New(project, zone)
 		},
 	}
 }
 
-func parseProperties(properties json.RawMessage) (*instanceProperties, error) {
-	p := instanceProperties{}
+func parseProperties(rawJson json.RawMessage) (*properties, error) {
+	p := properties{}
 
-	if err := json.Unmarshal(properties, &p); err != nil {
+	if err := json.Unmarshal(rawJson, &p); err != nil {
 		return nil, err
 	}
 
