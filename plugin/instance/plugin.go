@@ -45,13 +45,18 @@ type plugin struct {
 // NewGCEInstancePlugin creates a new GCE instance plugin for a given project
 // and zone.
 func NewGCEInstancePlugin(project, zone string) instance.Plugin {
-	log.Debugln("gce instance plugin. project=", project)
-
-	return &plugin{
+	gcePlugin := &plugin{
 		API: func() (gcloud.API, error) {
 			return gcloud.New(project, zone)
 		},
 	}
+
+	_, err := gcePlugin.API()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return gcePlugin
 }
 
 func parseProperties(rawJSON json.RawMessage) (*properties, error) {

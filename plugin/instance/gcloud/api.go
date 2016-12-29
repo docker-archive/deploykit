@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -52,7 +53,28 @@ type computeServiceWrapper struct {
 
 // New creates a new API instance.
 func New(project, zone string) (API, error) {
-	client, err := google.DefaultClient(context.Background(), compute.ComputeScope)
+	if project == "" {
+		log.Debugln("Project not passed on the command line")
+
+		project = findProject()
+		if project == "" {
+			return nil, errors.New("Missing project")
+		}
+	}
+
+	if zone == "" {
+		log.Debugln("Zone not passed on the command line")
+
+		zone = findZone()
+		if zone == "" {
+			return nil, errors.New("Missing zone")
+		}
+	}
+
+	log.Debugln("Project:", project)
+	log.Debugln("Zone:", zone)
+
+	client, err := google.DefaultClient(context.TODO(), compute.ComputeScope)
 	if err != nil {
 		return nil, err
 	}
@@ -62,37 +84,51 @@ func New(project, zone string) (API, error) {
 		return nil, err
 	}
 
-	// Try to find the project from the metaData server
-	if project == "" {
-		project, err = metadata.ProjectID()
-		if err != nil {
-			return nil, err
-		}
-	}
-	if project == "" {
-		return nil, errors.New("Missing project")
-	}
-	log.Debugln("Project:", project)
-
-	// Try to find the zone from the metaData server
-	if zone == "" {
-		zoneURI, err := metadata.InstanceAttributeValue("zone")
-		if err != nil {
-			return nil, err
-		}
-
-		zone = last(zoneURI)
-	}
-	if zone == "" {
-		return nil, errors.New("Missing zone")
-	}
-	log.Debugln("Zone:", zone)
-
 	return &computeServiceWrapper{
 		service: service,
 		project: project,
 		zone:    zone,
 	}, nil
+}
+
+func findProject() string {
+	if metadata.OnGCE() {
+		log.Debugln("- Query the metadata server...")
+
+		projectID, err := metadata.ProjectID()
+		if err == nil {
+			return projectID
+		}
+	}
+
+	log.Debugln(" - Look for CLOUDSDK_CORE_PROJECT env variable...")
+
+	value, found := os.LookupEnv("CLOUDSDK_CORE_PROJECT")
+	if found && value != "" {
+		return value
+	}
+
+	return ""
+}
+
+func findZone() string {
+	if metadata.OnGCE() {
+		log.Debugln("- Query the metadata server...")
+
+		zoneURI, err := metadata.InstanceAttributeValue("zone")
+		if err == nil {
+			return last(zoneURI)
+		}
+	}
+
+	log.Debugln(" - Look for CLOUDSDK_COMPUTE_ZONE env variable...")
+
+	value, found := os.LookupEnv("CLOUDSDK_COMPUTE_ZONE")
+	if found && value != "" {
+		return value
+	}
+
+	return ""
 }
 
 func (g *computeServiceWrapper) ListInstances() ([]*compute.Instance, error) {
