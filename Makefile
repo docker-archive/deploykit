@@ -127,3 +127,7 @@ ifeq (${DOCKER_TAG_LATEST},true)
 	@docker push ${DOCKER_IMAGE}:latest
 endif
 endif
+
+integration-tests:
+	@echo "+ $@"
+	@cd ${CURDIR}/integration; ./run.sh
