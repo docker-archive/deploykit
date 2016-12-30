@@ -43,7 +43,7 @@ run_infrakit() {
   run_plugin='docker run -d -v infrakit:/root/.infrakit/'
 
   $run_plugin --name=flavor ${INFRAKIT_IMAGE} infrakit-flavor-vanilla --log=5
-  $run_plugin --name=group ${INFRAKIT_IMAGE} infrakit-group-default --name=group --log=5
+  $run_plugin --name=group ${INFRAKIT_IMAGE} infrakit-group-default --log=5
 }
 
 build_infrakit_gcp() {

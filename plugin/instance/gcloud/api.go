@@ -15,6 +15,14 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
+const (
+	// EnvProject is the environment variable that defines the default GCP project
+	EnvProject = "CLOUDSDK_CORE_PROJECT"
+
+	// EnvZone is the environment variable that defines the default GCP zone
+	EnvZone = "CLOUDSDK_COMPUTE_ZONE"
+)
+
 // API is the list of operations that can execute on Google Cloud Platform.
 type API interface {
 	// ListInstances lists the instances for a given zone.
@@ -101,9 +109,9 @@ func findProject() string {
 		}
 	}
 
-	log.Debugln(" - Look for CLOUDSDK_CORE_PROJECT env variable...")
+	log.Debugln(" - Look for", EnvProject, "env variable...")
 
-	value, found := os.LookupEnv("CLOUDSDK_CORE_PROJECT")
+	value, found := os.LookupEnv(EnvProject)
 	if found && value != "" {
 		return value
 	}
@@ -121,9 +129,9 @@ func findZone() string {
 		}
 	}
 
-	log.Debugln(" - Look for CLOUDSDK_COMPUTE_ZONE env variable...")
+	log.Debugln(" - Look for", EnvZone, "env variable...")
 
-	value, found := os.LookupEnv("CLOUDSDK_COMPUTE_ZONE")
+	value, found := os.LookupEnv(EnvZone)
 	if found && value != "" {
 		return value
 	}
