@@ -8,14 +8,44 @@
 
 An InfraKit instance plugin is provided, which creates Google Compute Engine instances.
 
-### Building and running
+### Building
 
 To build the GCP Instance plugin, run `make binaries`.  The plugin binary will be located at
 `./build/infrakit-instance-gcp`.
 
+### Running
+
+```bash
+${PATH_TO_INFRAKIT}/infrakit-flavor-vanilla
+${PATH_TO_INFRAKIT}/iinfrakit-group-default
+./build/infrakit-instance-gcp --project=[GCP_PROJECT] --zone=[GCP_ZONE]
+
+${PATH_TO_INFRAKIT}/infrakit group commit gcp-example.json
+```
+
+#### Project and zone selection
+
+Google Cloud project and zone can be passed on the command line with `--project`
+and `--zone`. In case a value is not provided, the plugin will fallback to:
+ + Querying the [Metadata server][metadata] when running on GCE
+ + `CLOUDSDK_CORE_PROJECT` and `CLOUDSDK_CORE_ZONE` environment variables
+
+[metadata]: https://cloud.google.com/compute/docs/storing-retrieving-metadata
+
+#### Pets versus Cattle
+
+Groups defined with an `Allocation/Size` will create 'cattle' instances that
+are fully disposable. When an instance is deleted, a completely new one will be
+recreated. this new instance will have a different name and a different disk.
+
+Groups defined with an `Allocation/LogicalIDs` will create 'pet' instances.
+When an instance is deleted, a new one will be created, with the same name. It
+will also try to reuse the disk named after the instance if it was not deleted
+too.
+
 ### Example configuration
 
-```
+```json
 $ cat gcp-example.json
 {
   "ID": "gcp-example",
@@ -51,9 +81,6 @@ $ cat gcp-example.json
   }
 }
 ```
-
-`infrakit group commit gcp-example.json`
-
 
 ## Reporting security issues
 
