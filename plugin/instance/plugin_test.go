@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	mock_gcloud "github.com/docker/infrakit.gcp/mock/gcloud"
-	"github.com/docker/infrakit.gcp/plugin/instance/gcloud"
+	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit.gcp/plugin/instance/gcloud"
+	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
