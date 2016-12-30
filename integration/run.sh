@@ -82,18 +82,17 @@ check_instances_created() {
 
   for i in $(seq 1 120); do
     COUNT=$(${GCLOUD} compute instances list --filter="status:RUNNING AND tags.items:${TAG}" --uri | wc -w | tr -d '[:space:]')
+    echo "- ${COUNT} instances where created"
 
     if [ ${COUNT} -gt 2 ]; then
-      echo "- ERROR: ${COUNT} instances where created"
+      echo "- ERROR: that's too many!"
       exit 1
     fi
 
     if [ ${COUNT} -eq 2 ]; then
-      echo "- 2 instances where created"
       return
     fi
 
-    echo "- ${COUNT} instances where created for now"
     docker logs --tail 1 group
     sleep 1
   done
@@ -108,7 +107,7 @@ destroy_group() {
 check_instances_gone() {
   echo Check that the instances are gone
 
-  COUNT=$(${GCLOUD} compute instances list --filter="status:RUNNING AND tags.items:${TAG}" --uri | wc -w | tr -d '[:space:]')
+  COUNT=$(${GCLOUD} compute instances list --filter="tags.items:${TAG}" --uri | wc -w | tr -d '[:space:]')
 
   if [ ${COUNT} -eq 0 ]; then
     echo "- All instances are gone"
@@ -120,9 +119,9 @@ check_instances_gone() {
 }
 
 [ -n "${GCLOUD_SERVICE_KEY}" ] || exit 0
-[ "${CI}" ] || cleanup
+[ -n "${CI}" ] || cleanup
 auth_gcloud
-[ "${CI}" ] || remove_previous_instances
+[ -n "${CI}" ] || remove_previous_instances
 run_infrakit
 build_infrakit_gcp
 run_infrakit_gcp
