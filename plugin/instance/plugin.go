@@ -3,40 +3,13 @@ package instance
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.gcp/plugin/gcloud"
+	"github.com/docker/infrakit.gcp/plugin/instance/types"
+	"github.com/docker/infrakit.gcp/plugin/instance/util"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
-
-const (
-	defaultNamePrefix  = "instance"
-	defaultMachineType = "g1-small"
-	defaultNetwork     = "default"
-	defaultDiskSizeMb  = 10
-	defaultDiskImage   = "docker"
-	defaultDiskType    = "pd-standard"
-)
-
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
-}
-
-type properties struct {
-	NamePrefix  string
-	Description string
-	MachineType string
-	Network     string
-	DiskSizeMb  int64
-	DiskImage   string
-	DiskType    string
-	Tags        []string
-	Scopes      []string
-	TargetPool  string
-	Connect     bool
-}
 
 type plugin struct {
 	API func() (gcloud.API, error)
@@ -45,59 +18,33 @@ type plugin struct {
 // NewGCEInstancePlugin creates a new GCE instance plugin for a given project
 // and zone.
 func NewGCEInstancePlugin(project, zone string) instance.Plugin {
-	gcePlugin := &plugin{
-		API: func() (gcloud.API, error) {
-			return gcloud.New(project, zone)
-		},
-	}
-
-	_, err := gcePlugin.API()
+	_, err := gcloud.New(project, zone)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return gcePlugin
-}
-
-func parseProperties(rawJSON json.RawMessage) (*properties, error) {
-	p := properties{}
-
-	if err := json.Unmarshal(rawJSON, &p); err != nil {
-		return nil, err
+	return &plugin{
+		API: func() (gcloud.API, error) {
+			return gcloud.New(project, zone)
+		},
 	}
-
-	if p.NamePrefix == "" {
-		p.NamePrefix = defaultNamePrefix
-	}
-	if p.MachineType == "" {
-		p.MachineType = defaultMachineType
-	}
-	if p.Network == "" {
-		p.Network = defaultNetwork
-	}
-	if p.DiskSizeMb == 0 {
-		p.DiskSizeMb = defaultDiskSizeMb
-	}
-	if p.DiskImage == "" {
-		p.DiskImage = defaultDiskImage
-	}
-	if p.DiskType == "" {
-		p.DiskType = defaultDiskType
-	}
-
-	return &p, nil
 }
 
 func (p *plugin) Validate(req json.RawMessage) error {
 	log.Debugln("validate", string(req))
 
-	_, err := parseProperties(req)
+	_, err := types.ParseProperties(req)
 
 	return err
 }
 
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
-	properties, err := parseProperties(*spec.Properties)
+	properties, err := types.ParseProperties(*spec.Properties)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata, err := types.ParseMetadata(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -106,20 +53,9 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if spec.LogicalID != nil {
 		name = string(*spec.LogicalID)
 	} else {
-		name = fmt.Sprintf("%s-%d", properties.NamePrefix, rand.Int63())
+		name = fmt.Sprintf("%s-%s", properties.NamePrefix, util.RandomSuffix(6))
 	}
 	id := instance.ID(name)
-
-	tags := make(map[string]string)
-	for k, v := range spec.Tags {
-		tags[k] = v
-	}
-	if spec.Init != "" {
-		tags["startup-script"] = spec.Init
-	}
-	if properties.Connect {
-		tags["serial-port-enable"] = "true"
-	}
 
 	api, err := p.API()
 	if err != nil {
@@ -135,9 +71,10 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		DiskImage:         properties.DiskImage,
 		DiskType:          properties.DiskType,
 		Scopes:            properties.Scopes,
+		Preemptible:       properties.Preemptible,
 		AutoDeleteDisk:    spec.LogicalID == nil,
 		ReuseExistingDisk: spec.LogicalID != nil,
-		MetaData:          gcloud.TagsToMetaData(tags),
+		MetaData:          gcloud.TagsToMetaData(metadata),
 	}); err != nil {
 		return nil, err
 	}
@@ -158,6 +95,7 @@ func (p *plugin) Destroy(id instance.ID) error {
 	}
 
 	err = api.DeleteInstance(string(id))
+
 	log.Debugln("destroy", id, "err=", err)
 
 	return err
@@ -180,28 +118,24 @@ func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Descripti
 
 	result := []instance.Description{}
 
-scan:
 	for _, inst := range instances {
 		instTags := gcloud.MetaDataToTags(inst.Metadata.Items)
+		if gcloud.HasDifferentTag(tags, instTags) {
+			continue
+		}
 
-		for k, v := range tags {
-			if instTags[k] != v {
-				continue scan // we implement AND
-			}
+		description := instance.Description{
+			ID:   instance.ID(inst.Name),
+			Tags: instTags,
 		}
 
 		// When pets are deleted, we keep the disk
-		var logicalID *instance.LogicalID
-		if !inst.Disks[0].AutoDelete {
+		if len(inst.Disks) > 0 && !inst.Disks[0].AutoDelete {
 			id := instance.LogicalID(inst.Name)
-			logicalID = &id
+			description.LogicalID = &id
 		}
 
-		result = append(result, instance.Description{
-			LogicalID: logicalID,
-			ID:        instance.ID(inst.Name),
-			Tags:      instTags,
-		})
+		result = append(result, description)
 	}
 
 	log.Debugln("matching count:", len(result))

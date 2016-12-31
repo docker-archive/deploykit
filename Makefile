@@ -14,7 +14,7 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test containers
+.PHONY: clean all fmt vet lint build test containers integration-tests
 .DEFAULT: all
 all: fmt vet lint build test
 

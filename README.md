@@ -6,11 +6,11 @@
 
 ## Instance plugin
 
-An InfraKit instance plugin is provided, which creates Google Compute Engine instances.
+An InfraKit instance plugin which creates Google Compute Engine instances.
 
 ### Building
 
-To build the GCP Instance plugin, run `make binaries`.  The plugin binary will be located at
+To build the instance plugin, run `make binaries`.  The plugin binary will be located at
 `./build/infrakit-instance-gcp`.
 
 ### Running
@@ -46,7 +46,6 @@ too.
 ### Example configuration
 
 ```json
-$ cat gcp-example.json
 {
   "ID": "gcp-example",
   "Properties": {

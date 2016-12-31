@@ -98,6 +98,50 @@ check_instances_created() {
   done
 }
 
+check_instance_properties() {
+  echo Check that the instances are well configured
+
+  URIS=$(${GCLOUD} compute instances list --filter="status:RUNNING AND tags.items:${TAG}" --uri)
+  for URI in ${URIS}; do
+    echo - Check ${URI}
+
+    JSON=$(${GCLOUD} compute instances describe ${URI} --format=json)
+
+    echo "  - Check description"
+    echo "${JSON}" | jq -r '.description' | assert_equals "Test of GCP infrakit"
+
+    echo "  - Check zone"
+    echo "${JSON}" | jq -r '.zone' | assert_contains "/projects/${CLOUDSDK_CORE_PROJECT}/zones/${CLOUDSDK_COMPUTE_ZONE}"
+
+    echo "  - Check network"
+    echo "${JSON}" | jq -r '.networkInterfaces[0].network' | assert_contains "/projects/${CLOUDSDK_CORE_PROJECT}/global/networks/default"
+
+    echo "  - Check machine type"
+    echo "${JSON}" | jq -r '.machineType' | assert_contains "/projects/${CLOUDSDK_CORE_PROJECT}/zones/${CLOUDSDK_COMPUTE_ZONE}/machineTypes/f1-micro"
+
+    echo "  - Check name"
+    echo "${JSON}" | jq -r '.name' | assert_contains "test-"
+
+    echo "  - Check tags"
+    echo "${JSON}" | jq -r '.tags.items[]' | assert_equals "${TAG}"
+
+    echo "  - Check disk type"
+    echo "${JSON}" | jq -r '.disks[0].type' | assert_equals "PERSISTENT"
+
+    echo "  - Check startup script"
+    ${GCLOUD} compute instances get-serial-port-output ${URI} 2>/dev/null | assert_contains "Hello, World"
+  done
+}
+
+delete_instances() {
+  echo Delete instances
+
+  OLD=$(${GCLOUD} compute instances list --filter="tags.items:${TAG}" --uri)
+  if [ -n "${OLD}" ]; then
+    ${GCLOUD} compute instances delete -q ${OLD}
+  fi
+}
+
 destroy_group() {
   echo Destroy Instance Group
 
@@ -108,7 +152,6 @@ check_instances_gone() {
   echo Check that the instances are gone
 
   COUNT=$(${GCLOUD} compute instances list --filter="tags.items:${TAG}" --uri | wc -w | tr -d '[:space:]')
-
   if [ ${COUNT} -eq 0 ]; then
     echo "- All instances are gone"
     return
@@ -117,6 +160,17 @@ check_instances_gone() {
   echo "ERROR: ${COUNT} instances are still around"
   exit 1
 }
+
+assert_contains() {
+  STDIN=$(cat)
+  echo "${STDIN}" | grep -q "${1}" || (echo "Expected [${STDIN}] to contain [${1}]" && return 1)
+}
+
+assert_equals() {
+  STDIN=$(cat)
+  [ "${STDIN}" == "${1}" ] || (echo "Expected [${1}], got [${STDIN}]" && return 1)
+}
+
 
 [ -n "${GCLOUD_SERVICE_KEY}" ] || exit 0
 [ -n "${CI}" ] || cleanup
@@ -127,6 +181,10 @@ build_infrakit_gcp
 run_infrakit_gcp
 create_group
 check_instances_created
+check_instance_properties
+delete_instances
+check_instances_created
+check_instance_properties
 destroy_group
 check_instances_gone
 

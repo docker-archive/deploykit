@@ -21,10 +21,9 @@ func main() {
 	project := cmd.Flags().String("project", "", "Google Cloud project")
 	zone := cmd.Flags().String("zone", "", "Google Cloud zone")
 
-	cmd.RunE = func(c *cobra.Command, args []string) error {
+	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
 		cli.RunPlugin(*name, instance_plugin.PluginServer(instance.NewGCEInstancePlugin(*project, *zone)))
-		return nil
 	}
 
 	cmd.AddCommand(plugin.VersionCommand())

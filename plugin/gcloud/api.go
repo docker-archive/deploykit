@@ -25,7 +25,7 @@ const (
 
 // API is the list of operations that can execute on Google Cloud Platform.
 type API interface {
-	// ListInstances lists the instances for a given zone.
+	// ListInstances lists the instances.
 	ListInstances() ([]*compute.Instance, error)
 
 	// CreateInstance creates an instance.
@@ -50,6 +50,7 @@ type InstanceSettings struct {
 	DiskType          string
 	AutoDeleteDisk    bool
 	ReuseExistingDisk bool
+	Preemptible       bool
 	MetaData          []*compute.MetadataItems
 }
 
@@ -140,12 +141,26 @@ func findZone() string {
 }
 
 func (g *computeServiceWrapper) ListInstances() ([]*compute.Instance, error) {
-	list, err := g.service.Instances.List(g.project, g.zone).Do()
-	if err != nil {
-		return nil, err
+	items := []*compute.Instance{}
+
+	pageToken := ""
+	for {
+		list, err := g.service.Instances.List(g.project, g.zone).PageToken(pageToken).Do()
+		if err != nil {
+			return nil, err
+		}
+
+		for i := range list.Items {
+			items = append(items, list.Items[i])
+		}
+
+		pageToken = list.NextPageToken
+		if pageToken == "" {
+			break
+		}
 	}
 
-	return list.Items, nil
+	return items, nil
 }
 
 func (g *computeServiceWrapper) addAPIUrlPrefix(value string, prefix string) string {
@@ -197,6 +212,11 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 				Email:  "default",
 				Scopes: settings.Scopes,
 			},
+		},
+		Scheduling: &compute.Scheduling{
+			AutomaticRestart:  true,
+			OnHostMaintenance: "MIGRATE",
+			Preemptible:       settings.Preemptible,
 		},
 	}
 
