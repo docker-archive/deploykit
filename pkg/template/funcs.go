@@ -8,6 +8,7 @@ import (
 	"github.com/jmespath/go-jmespath"
 )
 
+// DefaultFuncs returns a list of default functions for binding in the template
 func (t *Template) DefaultFuncs() map[string]interface{} {
 	return map[string]interface{}{
 		"var": func(name, doc string, v ...interface{}) interface{} {
