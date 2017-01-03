@@ -28,6 +28,9 @@ type API interface {
 	// ListInstances lists the instances.
 	ListInstances() ([]*compute.Instance, error)
 
+	// GetInstance find an instance by name.
+	GetInstance(name string) (*compute.Instance, error)
+
 	// CreateInstance creates an instance.
 	CreateInstance(name string, settings *InstanceSettings) error
 
@@ -36,9 +39,30 @@ type API interface {
 
 	// DeleteInstance deletes an instance.
 	DeleteInstance(name string) error
+
+	// DeleteInstanceGroupManager deletes an instance group manager.
+	DeleteInstanceGroupManager(name string) error
+
+	// DeleteInstanceTemplate deletes an instance template.
+	DeleteInstanceTemplate(name string) error
+
+	// ListInstanceGroupInstances lists the instances of an instance group found by its name.
+	ListInstanceGroupInstances(name string) ([]*compute.InstanceWithNamedPorts, error)
+
+	// CreateInstanceTemplate creates an instance template
+	CreateInstanceTemplate(name string, settings *InstanceSettings) error
+
+	// CreateInstanceGroupManager creates an instance group manager.
+	CreateInstanceGroupManager(name string, settings *InstanceManagerSettings) error
+
+	// SetInstanceTemplate sets the instance template used by a group manager.
+	SetInstanceTemplate(name string, templateName string) error
+
+	// ResizeInstanceGroupManager changes the target size of an instance group manager.
+	ResizeInstanceGroupManager(name string, targetSize int64) error
 }
 
-// InstanceSettings lists the characteristics of an VM instance.
+// InstanceSettings lists the characteristics of a VM instance.
 type InstanceSettings struct {
 	Description       string
 	MachineType       string
@@ -52,6 +76,15 @@ type InstanceSettings struct {
 	ReuseExistingDisk bool
 	Preemptible       bool
 	MetaData          []*compute.MetadataItems
+}
+
+// InstanceManagerSettings the characteristics of a VM instance template manager.
+type InstanceManagerSettings struct {
+	Description      string
+	TemplateName     string
+	TargetSize       int64
+	TargetPool       string
+	BaseInstanceName string
 }
 
 type computeServiceWrapper struct {
@@ -163,6 +196,10 @@ func (g *computeServiceWrapper) ListInstances() ([]*compute.Instance, error) {
 	return items, nil
 }
 
+func (g *computeServiceWrapper) GetInstance(name string) (*compute.Instance, error) {
+	return g.service.Instances.Get(g.project, g.zone, name).Do()
+}
+
 func (g *computeServiceWrapper) addAPIUrlPrefix(value string, prefix string) string {
 	if strings.HasPrefix(value, g.service.BasePath+prefix) {
 		return value
@@ -262,6 +299,120 @@ func (g *computeServiceWrapper) AddInstanceToTargetPool(targetPool string, insta
 
 func (g *computeServiceWrapper) DeleteInstance(name string) error {
 	return g.doCall(g.service.Instances.Delete(g.project, g.zone, name))
+}
+
+func (g *computeServiceWrapper) DeleteInstanceGroupManager(name string) error {
+	return g.doCall(g.service.InstanceGroupManagers.Delete(g.project, g.zone, name))
+}
+
+func (g *computeServiceWrapper) DeleteInstanceTemplate(name string) error {
+	return g.doCall(g.service.InstanceTemplates.Delete(g.project, name))
+}
+
+func (g *computeServiceWrapper) ListInstanceGroupInstances(name string) ([]*compute.InstanceWithNamedPorts, error) {
+	items := []*compute.InstanceWithNamedPorts{}
+
+	pageToken := ""
+	for {
+		instances, err := g.service.InstanceGroups.ListInstances(g.project, g.zone, name, &compute.InstanceGroupsListInstancesRequest{
+			InstanceState: "ALL",
+		}).PageToken(pageToken).Do()
+		if err != nil {
+			return nil, err
+		}
+
+		for i := range instances.Items {
+			items = append(items, instances.Items[i])
+		}
+
+		pageToken = instances.NextPageToken
+		if pageToken == "" {
+			break
+		}
+	}
+
+	return items, nil
+}
+
+func (g *computeServiceWrapper) CreateInstanceTemplate(name string, settings *InstanceSettings) error {
+	network := g.addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
+	sourceImage := g.addAPIUrlPrefix(settings.DiskImage, "")
+
+	return g.doCall(g.service.InstanceTemplates.Insert(g.project, &compute.InstanceTemplate{
+		Name:        name,
+		Description: settings.Description,
+		Properties: &compute.InstanceProperties{
+			Description: settings.Description,
+			MachineType: settings.MachineType,
+			Tags: &compute.Tags{
+				Items: settings.Tags,
+			},
+			Disks: []*compute.AttachedDisk{
+				{
+					Boot:       true,
+					AutoDelete: settings.AutoDeleteDisk,
+					Type:       "PERSISTENT",
+					Mode:       "READ_WRITE",
+					InitializeParams: &compute.AttachedDiskInitializeParams{
+						SourceImage: sourceImage,
+						DiskSizeGb:  settings.DiskSizeMb,
+						DiskType:    settings.DiskType,
+					},
+				},
+			},
+			NetworkInterfaces: []*compute.NetworkInterface{
+				{
+					Network: network,
+					AccessConfigs: []*compute.AccessConfig{
+						{
+							Type: "ONE_TO_ONE_NAT",
+						},
+					},
+				},
+			},
+			Metadata: &compute.Metadata{
+				Items: settings.MetaData,
+			},
+			ServiceAccounts: []*compute.ServiceAccount{
+				{
+					Email:  "default",
+					Scopes: settings.Scopes,
+				},
+			},
+			Scheduling: &compute.Scheduling{
+				AutomaticRestart:  true,
+				OnHostMaintenance: "MIGRATE",
+				Preemptible:       settings.Preemptible,
+			},
+		},
+	}))
+}
+
+func (g *computeServiceWrapper) CreateInstanceGroupManager(name string, settings *InstanceManagerSettings) error {
+	targetPools := []string{}
+	if settings.TargetPool != "" {
+		targetPools = append(targetPools, settings.TargetPool)
+	}
+
+	return g.doCall(g.service.InstanceGroupManagers.Insert(g.project, g.zone, &compute.InstanceGroupManager{
+		Name:             name,
+		Description:      settings.Description,
+		Zone:             g.zone,
+		InstanceTemplate: "projects/" + g.project + "/global/instanceTemplates/" + settings.TemplateName,
+		BaseInstanceName: settings.BaseInstanceName,
+		TargetPools:      targetPools,
+		TargetSize:       settings.TargetSize,
+	}))
+}
+
+func (g *computeServiceWrapper) SetInstanceTemplate(name string, templateName string) error {
+	return g.doCall(g.service.InstanceGroupManagers.SetInstanceTemplate(g.project, g.zone, name, &compute.InstanceGroupManagersSetInstanceTemplateRequest{
+		InstanceTemplate: templateName,
+	}))
+}
+
+func (g *computeServiceWrapper) ResizeInstanceGroupManager(name string, targetSize int64) error {
+	return g.doCall(g.service.InstanceGroupManagers.Resize(g.project, g.zone, name, targetSize))
 }
 
 func (g *computeServiceWrapper) region() string {

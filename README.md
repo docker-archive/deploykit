@@ -17,10 +17,10 @@ To build the instance plugin, run `make binaries`.  The plugin binary will be lo
 
 ```bash
 ${PATH_TO_INFRAKIT}/infrakit-flavor-vanilla
-${PATH_TO_INFRAKIT}/iinfrakit-group-default
+${PATH_TO_INFRAKIT}/infrakit-group-default
 ./build/infrakit-instance-gcp --project=[GCP_PROJECT] --zone=[GCP_ZONE]
 
-${PATH_TO_INFRAKIT}/infrakit group commit gcp-example.json
+${PATH_TO_INFRAKIT}/infrakit group commit gcp-example-1.json
 ```
 
 #### Project and zone selection
@@ -47,7 +47,7 @@ too.
 
 ```json
 {
-  "ID": "gcp-example",
+  "ID": "gcp-example-1",
   "Properties": {
     "Allocation": {
       "Size": 1
@@ -56,6 +56,72 @@ too.
       "Plugin": "instance-gcp",
       "Properties": {
         "NamePrefix": "test",
+        "Description": "Test of GCP infrakit",
+        "Network": "default",
+        "Tags": ["tag1", "tag2"],
+        "MachineType": "n1-standard-1",
+        "DiskSizeMb": 60,
+        "DiskImage": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
+        "DiskType": "pd-standard",
+        "Scopes": [
+          "https://www.googleapis.com/auth/cloudruntimeconfig",
+          "https://www.googleapis.com/auth/logging.write"
+        ]
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": [
+          "sh -c \"echo 'Hello, World!' > /hello\""
+        ]
+      }
+    }
+  }
+}
+```
+
+## Group plugin
+
+An InfraKit group plugin which wraps Google Compute Engine's managed instance
+groups.
+
+### Building
+
+To build the group plugin, run `make binaries`.  The plugin binary will be located at
+`./build/infrakit-group-gcp`.
+
+### Running
+
+```bash
+${PATH_TO_INFRAKIT}/infrakit-flavor-vanilla
+./build/infrakit-instance-gcp --project=[GCP_PROJECT] --zone=[GCP_ZONE] --name=group
+
+${PATH_TO_INFRAKIT}/infrakit group commit gcp-example-2.json
+```
+
+#### Project and zone selection
+
+Works the same as the instance plugin.
+
+#### Pets versus Cattle
+
+This plugin supports only pets via `Allocation/Size`. It doesn't support
+`Allocation/LogicalIDs`.
+This plugin doesn't need an instance plugin since instances are managed directly
+by GCP.
+
+### Example configuration
+
+```json
+{
+  "ID": "gcp-example-2",
+  "Properties": {
+    "Allocation": {
+      "Size": 2
+    },
+    "Instance": {
+      "Properties": {
         "Description": "Test of GCP infrakit",
         "Network": "default",
         "Tags": ["tag1", "tag2"],

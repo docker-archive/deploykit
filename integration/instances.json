@@ -1,5 +1,5 @@
 {
-  "ID": "nodes",
+  "ID": "instances",
   "Properties": {
     "Allocation": {
       "Size": 2

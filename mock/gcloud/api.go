@@ -12,21 +12,21 @@ import (
 // Mock of API interface
 type MockAPI struct {
 	ctrl     *gomock.Controller
-	recorder *_MockGCloudRecorder
+	recorder *_MockAPIRecorder
 }
 
-// Recorder for MockGCloud (not exported)
-type _MockGCloudRecorder struct {
+// Recorder for MockAPI (not exported)
+type _MockAPIRecorder struct {
 	mock *MockAPI
 }
 
-func NewMockGCloud(ctrl *gomock.Controller) *MockAPI {
+func NewMockAPI(ctrl *gomock.Controller) *MockAPI {
 	mock := &MockAPI{ctrl: ctrl}
-	mock.recorder = &_MockGCloudRecorder{mock}
+	mock.recorder = &_MockAPIRecorder{mock}
 	return mock
 }
 
-func (_m *MockAPI) EXPECT() *_MockGCloudRecorder {
+func (_m *MockAPI) EXPECT() *_MockAPIRecorder {
 	return _m.recorder
 }
 
@@ -40,7 +40,7 @@ func (_m *MockAPI) AddInstanceToTargetPool(_param0 string, _param1 ...string) er
 	return ret0
 }
 
-func (_mr *_MockGCloudRecorder) AddInstanceToTargetPool(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+func (_mr *_MockAPIRecorder) AddInstanceToTargetPool(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
 	_s := append([]interface{}{arg0}, arg1...)
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "AddInstanceToTargetPool", _s...)
 }
@@ -51,8 +51,28 @@ func (_m *MockAPI) CreateInstance(_param0 string, _param1 *gcloud.InstanceSettin
 	return ret0
 }
 
-func (_mr *_MockGCloudRecorder) CreateInstance(arg0, arg1 interface{}) *gomock.Call {
+func (_mr *_MockAPIRecorder) CreateInstance(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateInstance", arg0, arg1)
+}
+
+func (_m *MockAPI) CreateInstanceGroupManager(_param0 string, _param1 *gcloud.InstanceManagerSettings) error {
+	ret := _m.ctrl.Call(_m, "CreateInstanceGroupManager", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) CreateInstanceGroupManager(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateInstanceGroupManager", arg0, arg1)
+}
+
+func (_m *MockAPI) CreateInstanceTemplate(_param0 string, _param1 *gcloud.InstanceSettings) error {
+	ret := _m.ctrl.Call(_m, "CreateInstanceTemplate", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) CreateInstanceTemplate(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateInstanceTemplate", arg0, arg1)
 }
 
 func (_m *MockAPI) DeleteInstance(_param0 string) error {
@@ -61,8 +81,50 @@ func (_m *MockAPI) DeleteInstance(_param0 string) error {
 	return ret0
 }
 
-func (_mr *_MockGCloudRecorder) DeleteInstance(arg0 interface{}) *gomock.Call {
+func (_mr *_MockAPIRecorder) DeleteInstance(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteInstance", arg0)
+}
+
+func (_m *MockAPI) DeleteInstanceGroupManager(_param0 string) error {
+	ret := _m.ctrl.Call(_m, "DeleteInstanceGroupManager", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) DeleteInstanceGroupManager(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteInstanceGroupManager", arg0)
+}
+
+func (_m *MockAPI) DeleteInstanceTemplate(_param0 string) error {
+	ret := _m.ctrl.Call(_m, "DeleteInstanceTemplate", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) DeleteInstanceTemplate(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteInstanceTemplate", arg0)
+}
+
+func (_m *MockAPI) GetInstance(_param0 string) (*v1.Instance, error) {
+	ret := _m.ctrl.Call(_m, "GetInstance", _param0)
+	ret0, _ := ret[0].(*v1.Instance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockAPIRecorder) GetInstance(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetInstance", arg0)
+}
+
+func (_m *MockAPI) ListInstanceGroupInstances(_param0 string) ([]*v1.InstanceWithNamedPorts, error) {
+	ret := _m.ctrl.Call(_m, "ListInstanceGroupInstances", _param0)
+	ret0, _ := ret[0].([]*v1.InstanceWithNamedPorts)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockAPIRecorder) ListInstanceGroupInstances(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListInstanceGroupInstances", arg0)
 }
 
 func (_m *MockAPI) ListInstances() ([]*v1.Instance, error) {
@@ -72,6 +134,26 @@ func (_m *MockAPI) ListInstances() ([]*v1.Instance, error) {
 	return ret0, ret1
 }
 
-func (_mr *_MockGCloudRecorder) ListInstances() *gomock.Call {
+func (_mr *_MockAPIRecorder) ListInstances() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListInstances")
+}
+
+func (_m *MockAPI) ResizeInstanceGroupManager(_param0 string, _param1 int64) error {
+	ret := _m.ctrl.Call(_m, "ResizeInstanceGroupManager", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) ResizeInstanceGroupManager(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ResizeInstanceGroupManager", arg0, arg1)
+}
+
+func (_m *MockAPI) SetInstanceTemplate(_param0 string, _param1 string) error {
+	ret := _m.ctrl.Call(_m, "SetInstanceTemplate", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) SetInstanceTemplate(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceTemplate", arg0, arg1)
 }

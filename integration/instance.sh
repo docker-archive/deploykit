@@ -5,7 +5,7 @@ set -e
 BASEDIR=$(dirname "$0")
 INFRAKIT_IMAGE=infrakit/devbundle:master-1041
 GCLOUD="docker run -e CLOUDSDK_CORE_PROJECT --rm -v gcloud-config:/.config google/cloud-sdk gcloud"
-TAG="ci-infrakit-${CIRCLE_BUILD_NUM:-local}"
+TAG="ci-infrakit-gcp-instance-${CIRCLE_BUILD_NUM:-local}"
 
 export CLOUDSDK_CORE_PROJECT="docker4x"
 export CLOUDSDK_COMPUTE_ZONE="us-central1-f"
@@ -13,7 +13,7 @@ export CLOUDSDK_COMPUTE_ZONE="us-central1-f"
 cleanup() {
   echo Clean up
 
-  docker rm -f flavor group instance-gcp 2>/dev/null || true
+  docker rm -f flavor group 2>/dev/null || true
   docker volume rm infrakit 2>/dev/null || true
   docker volume rm gcloud-config 2>/dev/null || true
 }
@@ -29,7 +29,7 @@ auth_gcloud() {
 remove_previous_instances() {
   echo Remove previous instances
 
-  OLD=$(${GCLOUD} compute instances list --filter="tags.items${TAG}" --uri)
+  OLD=$(${GCLOUD} compute instances list --filter="tags.items:${TAG}" --uri)
   if [ -n "${OLD}" ]; then
     ${GCLOUD} compute instances delete -q --delete-disks=boot ${OLD}
   fi
@@ -54,7 +54,7 @@ build_infrakit_gcp() {
   popd
 }
 
-run_infrakit_gcp() {
+run_infrakit_gcp_instance() {
   echo Run Infrakit GCP Instance Plugin
 
   docker run -d --name=instance-gcp \
@@ -71,10 +71,10 @@ create_group() {
   echo Create Instance Group
 
   docker_run="docker run --rm -v infrakit:/root/.infrakit/"
-  docker cp ${BASEDIR}/nodes.json group:/root/.infrakit/
-  $docker_run busybox sed -i.bak s/{{TAG}}/${TAG}/g /root/.infrakit/nodes.json
-  $docker_run busybox cat /root/.infrakit/nodes.json
-  $docker_run ${INFRAKIT_IMAGE} infrakit group commit /root/.infrakit/nodes.json
+  docker cp ${BASEDIR}/instances.json group:/root/.infrakit/
+  $docker_run busybox sed -i.bak s/{{TAG}}/${TAG}/g /root/.infrakit/instances.json
+  $docker_run busybox cat /root/.infrakit/instances.json
+  $docker_run ${INFRAKIT_IMAGE} infrakit group commit /root/.infrakit/instances.json
 }
 
 check_instances_created() {
@@ -82,7 +82,7 @@ check_instances_created() {
 
   for i in $(seq 1 120); do
     COUNT=$(${GCLOUD} compute instances list --filter="status:RUNNING AND tags.items:${TAG}" --uri | wc -w | tr -d '[:space:]')
-    echo "- ${COUNT} instances where created"
+    echo "- ${COUNT} instances were created"
 
     if [ ${COUNT} -gt 2 ]; then
       echo "- ERROR: that's too many!"
@@ -145,7 +145,7 @@ delete_instances() {
 destroy_group() {
   echo Destroy Instance Group
 
-  docker run --rm -v infrakit:/root/.infrakit/ ${INFRAKIT_IMAGE} infrakit group destroy nodes
+  docker run --rm -v infrakit:/root/.infrakit/ ${INFRAKIT_IMAGE} infrakit group destroy instances
 }
 
 check_instances_gone() {
@@ -173,12 +173,12 @@ assert_equals() {
 
 
 [ -n "${GCLOUD_SERVICE_KEY}" ] || exit 0
-[ -n "${CI}" ] || cleanup
+cleanup
 auth_gcloud
-[ -n "${CI}" ] || remove_previous_instances
+remove_previous_instances
 run_infrakit
 build_infrakit_gcp
-run_infrakit_gcp
+run_infrakit_gcp_instance
 create_group
 check_instances_created
 check_instance_properties
