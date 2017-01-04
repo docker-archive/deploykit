@@ -185,5 +185,6 @@ check_instances_created
 check_instance_properties
 destroy_group
 check_instances_gone
+cleanup
 
 exit 0
