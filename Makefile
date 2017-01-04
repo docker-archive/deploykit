@@ -14,7 +14,7 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test containers
+.PHONY: clean all fmt vet lint build test containers integration-tests
 .DEFAULT: all
 all: fmt vet lint build test
 
@@ -67,7 +67,7 @@ ifneq (,$(findstring .m,$(VERSION)))
 endif
 
 	$(call build_binary,infrakit-instance-gcp,github.com/docker/infrakit.gcp/plugin/instance/cmd)
-
+	$(call build_binary,infrakit-group-gcp,github.com/docker/infrakit.gcp/plugin/group/cmd)
 
 install:
 	@echo "+ $@"
@@ -130,4 +130,4 @@ endif
 
 integration-tests:
 	@echo "+ $@"
-	@cd ${CURDIR}/integration; ./run.sh
+	@cd ${CURDIR}/integration; ./instance.sh

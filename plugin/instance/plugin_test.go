@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	mock_gcloud "github.com/docker/infrakit.gcp/mock/gcloud"
-	"github.com/docker/infrakit.gcp/plugin/instance/gcloud"
+	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -16,7 +16,11 @@ import (
 
 func NewMockGCloud(t *testing.T) (*mock_gcloud.MockAPI, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
-	return mock_gcloud.NewMockGCloud(ctrl), ctrl
+	return mock_gcloud.NewMockAPI(ctrl), ctrl
+}
+
+func NewPlugin(api gcloud.API) instance.Plugin {
+	return &plugin{func() (gcloud.API, error) { return api, nil }}
 }
 
 func TestProvision(t *testing.T) {
@@ -30,6 +34,7 @@ func TestProvision(t *testing.T) {
 		"DiskType":"ssd",
 		"Scopes":["SCOPE1", "SCOPE2"],
 		"TargetPool":"POOL",
+		"Preemptible":true,
 		"Description":"vm"}`)
 	tags := map[string]string{
 		"key1": "value1",
@@ -39,7 +44,7 @@ func TestProvision(t *testing.T) {
 	rand.Seed(0)
 	api, ctrl := NewMockGCloud(t)
 	defer ctrl.Finish()
-	api.EXPECT().CreateInstance("worker-8717895732742165505", &gcloud.InstanceSettings{
+	api.EXPECT().CreateInstance("worker-ssnk9q", &gcloud.InstanceSettings{
 		Description:       "vm",
 		MachineType:       "n1-standard-1",
 		Network:           "NETWORK",
@@ -50,15 +55,16 @@ func TestProvision(t *testing.T) {
 		Scopes:            []string{"SCOPE1", "SCOPE2"},
 		AutoDeleteDisk:    true,
 		ReuseExistingDisk: false,
+		Preemptible:       true,
 		MetaData: gcloud.TagsToMetaData(map[string]string{
 			"key1":           "value1",
 			"key2":           "value2",
 			"startup-script": "echo 'Startup'",
 		}),
 	}).Return(nil)
-	api.EXPECT().AddInstanceToTargetPool("POOL", "worker-8717895732742165505").Return(nil)
+	api.EXPECT().AddInstanceToTargetPool("POOL", "worker-ssnk9q").Return(nil)
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: &properties,
@@ -66,7 +72,7 @@ func TestProvision(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, *id, instance.ID("worker-8717895732742165505"))
+	require.Equal(t, *id, instance.ID("worker-ssnk9q"))
 }
 
 func TestProvisionLogicalID(t *testing.T) {
@@ -84,12 +90,13 @@ func TestProvisionLogicalID(t *testing.T) {
 		DiskType:          "pd-standard",
 		AutoDeleteDisk:    false,
 		ReuseExistingDisk: true,
+		Preemptible:       false,
 		MetaData:          gcloud.TagsToMetaData(map[string]string{}),
 	}).Return(nil)
 
 	logicalID := instance.LogicalID("LOGICAL-ID")
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	id, err := plugin.Provision(instance.Spec{
 		LogicalID:  &logicalID,
 		Tags:       tags,
@@ -108,7 +115,7 @@ func TestProvisionFails(t *testing.T) {
 
 	rand.Seed(0)
 	api, _ := NewMockGCloud(t)
-	api.EXPECT().CreateInstance("instance-8717895732742165505", &gcloud.InstanceSettings{
+	api.EXPECT().CreateInstance("instance-ssnk9q", &gcloud.InstanceSettings{
 		MachineType:       "g1-small",
 		Network:           "default",
 		DiskSizeMb:        10,
@@ -119,7 +126,7 @@ func TestProvisionFails(t *testing.T) {
 		MetaData:          gcloud.TagsToMetaData(tags),
 	}).Return(errors.New("BUG"))
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: &properties,
@@ -135,7 +142,7 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 
 	rand.Seed(0)
 	api, _ := NewMockGCloud(t)
-	api.EXPECT().CreateInstance("instance-8717895732742165505", &gcloud.InstanceSettings{
+	api.EXPECT().CreateInstance("instance-ssnk9q", &gcloud.InstanceSettings{
 		MachineType:       "g1-small",
 		Network:           "default",
 		DiskSizeMb:        10,
@@ -145,9 +152,9 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 		ReuseExistingDisk: false,
 		MetaData:          gcloud.TagsToMetaData(tags),
 	}).Return(nil)
-	api.EXPECT().AddInstanceToTargetPool("POOL", "instance-8717895732742165505").Return(errors.New("BUG"))
+	api.EXPECT().AddInstanceToTargetPool("POOL", "instance-ssnk9q").Return(errors.New("BUG"))
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: &properties,
@@ -173,7 +180,7 @@ func TestDestroy(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().DeleteInstance("instance-id").Return(nil)
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	err := plugin.Destroy("instance-id")
 
 	require.NoError(t, err)
@@ -183,7 +190,7 @@ func TestDestroyFails(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().DeleteInstance("instance-wrong-id").Return(errors.New("BUG"))
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	err := plugin.Destroy("instance-wrong-id")
 
 	require.EqualError(t, err, "BUG")
@@ -193,7 +200,7 @@ func TestDescribeEmptyInstances(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return([]*compute.Instance{}, nil)
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	instances, err := plugin.DescribeInstances(nil)
 
 	require.NoError(t, err)
@@ -262,7 +269,7 @@ func TestDescribeInstances(t *testing.T) {
 		},
 	}, nil)
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	instances, err := plugin.DescribeInstances(tags)
 
 	require.NoError(t, err)
@@ -277,7 +284,7 @@ func TestDescribeInstancesFails(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return(nil, errors.New("BUG"))
 
-	plugin := &plugin{func() (gcloud.API, error) { return api, nil }}
+	plugin := NewPlugin(api)
 	instances, err := plugin.DescribeInstances(nil)
 
 	require.EqualError(t, err, "BUG")

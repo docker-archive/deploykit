@@ -1,5 +1,5 @@
 {
-  "ID": "nodes",
+  "ID": "instances",
   "Properties": {
     "Allocation": {
       "Size": 2
@@ -21,7 +21,7 @@
       "Plugin": "flavor-vanilla",
       "Properties": {
         "Init": [
-          "sh -c \"echo 'Hello, World!' > /hello\""
+          "echo Hello, World"
         ]
       }
     }

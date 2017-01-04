@@ -36,6 +36,17 @@ func MetaDataToTags(metaData []*compute.MetadataItems) map[string]string {
 	return tags
 }
 
+// HasDifferentTag compares two sets of tags.
+func HasDifferentTag(expected, actual map[string]string) bool {
+	for k, v := range expected {
+		if actual[k] != v {
+			return true
+		}
+	}
+
+	return false
+}
+
 func escapeKey(key string) string {
 	return strings.Replace(key, ".", "--", -1)
 }
