@@ -157,9 +157,9 @@ func findZone() string {
 	if metadata.OnGCE() {
 		log.Debugln("- Query the metadata server...")
 
-		zoneURI, err := metadata.InstanceAttributeValue("zone")
+		zone, err := metadata.Zone()
 		if err == nil {
-			return last(zoneURI)
+			return zone
 		}
 	}
 
