@@ -21,6 +21,8 @@ func templateCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Render an infrakit template",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			var engine *template.Template
+
 			opt := template.Options{
 				SocketDir: discovery.Dir(),
 			}
@@ -32,36 +34,26 @@ func templateCommand(plugins func() discovery.Plugins) *cobra.Command {
 					contextURL = template.GetDefaultContextURL()
 				}
 
-				engine, err := template.NewTemplateFromReader(os.Stdin, contextURL, opt)
+				eng, err := template.NewTemplateFromReader(os.Stdin, contextURL, opt)
 				if err != nil {
 					return err
 				}
-
-				view, err := engine.Render(nil)
-				if err != nil {
-					return err
-				}
-
-				fmt.Print(view)
-				return nil
-
+				engine = eng
 			} else {
-
 				log.Infof("Using %v for reading template\n", templateURL)
-				engine, err := template.NewTemplate(templateURL, opt)
+				eng, err := template.NewTemplate(templateURL, opt)
 				if err != nil {
 					return err
 				}
-
-				view, err := engine.Render(nil)
-				if err != nil {
-					return err
-				}
-
-				fmt.Print(view)
-				return nil
+				engine = eng
 			}
 
+			view, err := engine.Render(nil)
+			if err != nil {
+				return err
+			}
+
+			fmt.Print(view)
 			return nil
 		},
 	}
