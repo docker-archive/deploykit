@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
@@ -57,9 +56,7 @@ func main() {
 
 		var templ *template.Template
 		if *initScriptTemplURL == "" {
-			contextURL := template.GetDefaultContextURL()
-			input := bytes.NewBufferString(DefaultInitScriptTemplate)
-			t, err := template.NewTemplateFromReader(input, contextURL, opts)
+			t, err := template.NewTemplate("str://"+DefaultInitScriptTemplate, opts)
 			if err != nil {
 				return err
 			}

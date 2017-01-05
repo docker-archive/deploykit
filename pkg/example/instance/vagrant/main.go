@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,9 +36,7 @@ func main() {
 
 		var templ *template.Template
 		if *templFile == "" {
-			contextURL := template.GetDefaultContextURL()
-			input := bytes.NewBufferString(VagrantFile)
-			t, err := template.NewTemplateFromReader(input, contextURL, opts)
+			t, err := template.NewTemplate("str://"+VagrantFile, opts)
 			if err != nil {
 				return err
 			}

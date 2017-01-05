@@ -4,8 +4,8 @@ import (
 	"os"
 )
 
-// GetDefaultContextURL returns the default context URL if none is known.
-func GetDefaultContextURL() string {
+// defaultContextURL returns the default context URL if none is known.
+func defaultContextURL() string {
 	pwd := "/"
 	if wd, err := os.Getwd(); err == nil {
 		pwd = wd

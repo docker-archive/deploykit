@@ -3,7 +3,6 @@ package template
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"strings"
 	"sync"
 	"text/template"
@@ -32,30 +31,21 @@ type Template struct {
 	lock   sync.Mutex
 }
 
-// NewTemplate fetches the content at the url and returns a template
+// NewTemplate fetches the content at the url and returns a template.  If the string begins
+// with str:// as scheme, then the rest of the string is interpreted as the body of the template.
 func NewTemplate(s string, opt Options) (*Template, error) {
 	var buff []byte
 	contextURL := s
 	// Special case of specifying the entire template as a string; otherwise treat as url
 	if strings.Index(s, "str://") == 0 {
 		buff = []byte(strings.Replace(s, "str://", "", 1))
-		contextURL = GetDefaultContextURL()
+		contextURL = defaultContextURL()
 	} else {
 		b, err := fetch(s, opt)
 		if err != nil {
 			return nil, err
 		}
 		buff = b
-	}
-	return NewTemplateFromBytes(buff, contextURL, opt)
-}
-
-// NewTemplateFromReader creates the template from the given reader and options.
-// A context URL is used to locate all templates specified in relative paths with the include function
-func NewTemplateFromReader(reader io.Reader, contextURL string, opt Options) (*Template, error) {
-	buff, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
 	}
 	return NewTemplateFromBytes(buff, contextURL, opt)
 }
