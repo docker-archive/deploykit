@@ -39,7 +39,7 @@ func NewTemplate(s string, opt Options) (*Template, error) {
 	// Special case of specifying the entire template as a string; otherwise treat as url
 	if strings.Index(s, "str://") == 0 {
 		buff = []byte(strings.Replace(s, "str://", "", 1))
-		contextURL = "str://"
+		contextURL = GetDefaultContextURL()
 	} else {
 		b, err := fetch(s, opt)
 		if err != nil {
@@ -47,7 +47,7 @@ func NewTemplate(s string, opt Options) (*Template, error) {
 		}
 		buff = b
 	}
-	return buildTemplate(buff, contextURL, opt)
+	return NewTemplateFromBytes(buff, contextURL, opt)
 }
 
 // NewTemplateFromReader creates the template from the given reader and options.
@@ -57,12 +57,12 @@ func NewTemplateFromReader(reader io.Reader, contextURL string, opt Options) (*T
 	if err != nil {
 		return nil, err
 	}
-	return buildTemplate(buff, contextURL, opt)
+	return NewTemplateFromBytes(buff, contextURL, opt)
 }
 
-// build the template from buffer with a contextURL which is used to deduce absolute
+// NewTemplateFromBytes builds the template from buffer with a contextURL which is used to deduce absolute
 // path of any 'included' templates e.g. {{ include "./another.tpl" . }}
-func buildTemplate(buff []byte, contextURL string, opt Options) (*Template, error) {
+func NewTemplateFromBytes(buff []byte, contextURL string, opt Options) (*Template, error) {
 	if contextURL == "" {
 		log.Warningln("Context is not known.  Included templates may not work properly.")
 	}
