@@ -27,8 +27,7 @@ type settings struct {
 }
 
 type plugin struct {
-	API func() (gcloud.API, error)
-
+	API           gcloud.API
 	flavorPlugins group_plugin.FlavorPluginLookup
 	groups        map[group.ID]settings
 	lock          sync.Mutex
@@ -37,15 +36,13 @@ type plugin struct {
 // NewGCEGroupPlugin creates a new GCE group plugin for a given project
 // and zone.
 func NewGCEGroupPlugin(project, zone string, flavorPlugins group_plugin.FlavorPluginLookup) group.Plugin {
-	_, err := gcloud.New(project, zone)
+	api, err := gcloud.New(project, zone)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return &plugin{
-		API: func() (gcloud.API, error) {
-			return gcloud.New(project, zone)
-		},
+		API:           api,
 		flavorPlugins: flavorPlugins,
 		groups:        map[group.ID]settings{},
 	}
@@ -151,11 +148,6 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 	}
 
 	if !pretend {
-		api, err := p.API()
-		if err != nil {
-			return "", err
-		}
-
 		templateName := fmt.Sprintf("%s-%d", name, settings.currentTemplate)
 		settings.createdTemplates = append(settings.createdTemplates, templateName)
 
@@ -165,7 +157,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 				return "", err
 			}
 
-			if err = api.CreateInstanceTemplate(templateName, &gcloud.InstanceSettings{
+			if err = p.API.CreateInstanceTemplate(templateName, &gcloud.InstanceSettings{
 				Description:       settings.instanceProperties.Description,
 				MachineType:       settings.instanceProperties.MachineType,
 				Network:           settings.instanceProperties.Network,
@@ -184,7 +176,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		}
 
 		if createManager {
-			if err = api.CreateInstanceGroupManager(name, &gcloud.InstanceManagerSettings{
+			if err = p.API.CreateInstanceGroupManager(name, &gcloud.InstanceManagerSettings{
 				TemplateName:     fmt.Sprintf("%s-%d", name, settings.currentTemplate),
 				TargetSize:       targetSize,
 				Description:      settings.instanceProperties.Description,
@@ -198,13 +190,13 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		if updateManager {
 			// TODO: should be trigger a recreation of the VMS
 			// TODO: What about the instances already being updated
-			if err = api.SetInstanceTemplate(name, templateName); err != nil {
+			if err = p.API.SetInstanceTemplate(name, templateName); err != nil {
 				return "", err
 			}
 		}
 
 		if resize {
-			err := api.ResizeInstanceGroupManager(name, targetSize)
+			err := p.API.ResizeInstanceGroupManager(name, targetSize)
 			if err != nil {
 				return "", err
 			}
@@ -236,11 +228,6 @@ func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	api, err := p.API()
-	if err != nil {
-		return noDescription, err
-	}
-
 	currentSettings, present := p.groups[id]
 	if !present {
 		return noDescription, fmt.Errorf("This group is not being watched: '%s", id)
@@ -248,7 +235,7 @@ func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
 
 	name := string(id)
 
-	instanceGroupInstances, err := api.ListInstanceGroupInstances(name)
+	instanceGroupInstances, err := p.API.ListInstanceGroupInstances(name)
 	if err != nil {
 		return noDescription, err
 	}
@@ -258,7 +245,7 @@ func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
 	for _, grpInst := range instanceGroupInstances {
 		name := last(grpInst.Instance)
 
-		inst, err := api.GetInstance(name)
+		inst, err := p.API.GetInstance(name)
 		if err != nil {
 			return noDescription, err
 		}
@@ -284,19 +271,14 @@ func (p *plugin) DestroyGroup(id group.ID) error {
 		return fmt.Errorf("This group is not being watched: '%s", id)
 	}
 
-	api, err := p.API()
-	if err != nil {
-		return err
-	}
-
 	name := string(id)
 
-	if err = api.DeleteInstanceGroupManager(name); err != nil {
+	if err := p.API.DeleteInstanceGroupManager(name); err != nil {
 		return err
 	}
 
 	for _, createdTemplate := range currentSettings.createdTemplates {
-		if err = api.DeleteInstanceTemplate(createdTemplate); err != nil {
+		if err := p.API.DeleteInstanceTemplate(createdTemplate); err != nil {
 			return err
 		}
 	}
@@ -320,5 +302,5 @@ func (p *plugin) InspectGroups() ([]group.Spec, error) {
 
 func last(url string) string {
 	parts := strings.Split(url, "/")
-	return parts[len(parts)-1]
+	return parts[len(parts) - 1]
 }

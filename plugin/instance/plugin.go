@@ -12,21 +12,19 @@ import (
 )
 
 type plugin struct {
-	API func() (gcloud.API, error)
+	API gcloud.API
 }
 
 // NewGCEInstancePlugin creates a new GCE instance plugin for a given project
 // and zone.
 func NewGCEInstancePlugin(project, zone string) instance.Plugin {
-	_, err := gcloud.New(project, zone)
+	api, err := gcloud.New(project, zone)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return &plugin{
-		API: func() (gcloud.API, error) {
-			return gcloud.New(project, zone)
-		},
+		API: api,
 	}
 }
 
@@ -57,12 +55,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	id := instance.ID(name)
 
-	api, err := p.API()
-	if err != nil {
-		return nil, err
-	}
-
-	if err = api.CreateInstance(name, &gcloud.InstanceSettings{
+	if err = p.API.CreateInstance(name, &gcloud.InstanceSettings{
 		Description:       properties.Description,
 		MachineType:       properties.MachineType,
 		Network:           properties.Network,
@@ -80,7 +73,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	if properties.TargetPool != "" {
-		if err = api.AddInstanceToTargetPool(properties.TargetPool, name); err != nil {
+		if err = p.API.AddInstanceToTargetPool(properties.TargetPool, name); err != nil {
 			return nil, err
 		}
 	}
@@ -89,12 +82,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 }
 
 func (p *plugin) Destroy(id instance.ID) error {
-	api, err := p.API()
-	if err != nil {
-		return err
-	}
-
-	err = api.DeleteInstance(string(id))
+	err := p.API.DeleteInstance(string(id))
 
 	log.Debugln("destroy", id, "err=", err)
 
@@ -104,12 +92,7 @@ func (p *plugin) Destroy(id instance.ID) error {
 func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 
-	api, err := p.API()
-	if err != nil {
-		return nil, err
-	}
-
-	instances, err := api.ListInstances()
+	instances, err := p.API.ListInstances()
 	if err != nil {
 		return nil, err
 	}

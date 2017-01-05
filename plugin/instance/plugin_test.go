@@ -20,7 +20,7 @@ func NewMockGCloud(t *testing.T) (*mock_gcloud.MockAPI, *gomock.Controller) {
 }
 
 func NewPlugin(api gcloud.API) instance.Plugin {
-	return &plugin{func() (gcloud.API, error) { return api, nil }}
+	return &plugin{api}
 }
 
 func TestProvision(t *testing.T) {

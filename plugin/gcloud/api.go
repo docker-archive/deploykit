@@ -88,9 +88,9 @@ type InstanceManagerSettings struct {
 }
 
 type computeServiceWrapper struct {
-	service *compute.Service
-	project string
-	zone    string
+	project  string
+	zone     string
+	service  *compute.Service
 }
 
 // New creates a new API instance.
@@ -116,20 +116,25 @@ func New(project, zone string) (API, error) {
 	log.Debugln("Project:", project)
 	log.Debugln("Zone:", zone)
 
-	client, err := google.DefaultClient(context.TODO(), compute.ComputeScope)
-	if err != nil {
-		return nil, err
+	serviceProvider := func() (*compute.Service, error) {
+		client, err := google.DefaultClient(context.TODO(), compute.ComputeScope)
+		if err != nil {
+			return nil, err
+		}
+
+		return compute.New(client)
 	}
 
-	service, err := compute.New(client)
+	// Check that everything works
+	service, err := serviceProvider()
 	if err != nil {
 		return nil, err
 	}
 
 	return &computeServiceWrapper{
-		service: service,
-		project: project,
-		zone:    zone,
+		project:         project,
+		zone:            zone,
+		service:         service,
 	}, nil
 }
 
@@ -292,9 +297,11 @@ func (g *computeServiceWrapper) AddInstanceToTargetPool(targetPool string, insta
 		})
 	}
 
-	return g.doCall(g.service.TargetPools.AddInstance(g.project, g.region(), targetPool, &compute.TargetPoolsAddInstanceRequest{
+	request := &compute.TargetPoolsAddInstanceRequest{
 		Instances: references,
-	}))
+	}
+
+	return g.doCall(g.service.TargetPools.AddInstance(g.project, g.region(), targetPool, request))
 }
 
 func (g *computeServiceWrapper) DeleteInstance(name string) error {
@@ -338,7 +345,7 @@ func (g *computeServiceWrapper) CreateInstanceTemplate(name string, settings *In
 	network := g.addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
 	sourceImage := g.addAPIUrlPrefix(settings.DiskImage, "")
 
-	return g.doCall(g.service.InstanceTemplates.Insert(g.project, &compute.InstanceTemplate{
+	template := &compute.InstanceTemplate{
 		Name:        name,
 		Description: settings.Description,
 		Properties: &compute.InstanceProperties{
@@ -385,7 +392,9 @@ func (g *computeServiceWrapper) CreateInstanceTemplate(name string, settings *In
 				Preemptible:       settings.Preemptible,
 			},
 		},
-	}))
+	}
+
+	return g.doCall(g.service.InstanceTemplates.Insert(g.project, template))
 }
 
 func (g *computeServiceWrapper) CreateInstanceGroupManager(name string, settings *InstanceManagerSettings) error {
@@ -394,7 +403,7 @@ func (g *computeServiceWrapper) CreateInstanceGroupManager(name string, settings
 		targetPools = append(targetPools, settings.TargetPool)
 	}
 
-	return g.doCall(g.service.InstanceGroupManagers.Insert(g.project, g.zone, &compute.InstanceGroupManager{
+	groupManager := &compute.InstanceGroupManager{
 		Name:             name,
 		Description:      settings.Description,
 		Zone:             g.zone,
@@ -402,13 +411,17 @@ func (g *computeServiceWrapper) CreateInstanceGroupManager(name string, settings
 		BaseInstanceName: settings.BaseInstanceName,
 		TargetPools:      targetPools,
 		TargetSize:       settings.TargetSize,
-	}))
+	}
+
+	return g.doCall(g.service.InstanceGroupManagers.Insert(g.project, g.zone, groupManager))
 }
 
 func (g *computeServiceWrapper) SetInstanceTemplate(name string, templateName string) error {
-	return g.doCall(g.service.InstanceGroupManagers.SetInstanceTemplate(g.project, g.zone, name, &compute.InstanceGroupManagersSetInstanceTemplateRequest{
+	request := &compute.InstanceGroupManagersSetInstanceTemplateRequest{
 		InstanceTemplate: templateName,
-	}))
+	}
+
+	return g.doCall(g.service.InstanceGroupManagers.SetInstanceTemplate(g.project, g.zone, name, request))
 }
 
 func (g *computeServiceWrapper) ResizeInstanceGroupManager(name string, targetSize int64) error {
@@ -416,7 +429,7 @@ func (g *computeServiceWrapper) ResizeInstanceGroupManager(name string, targetSi
 }
 
 func (g *computeServiceWrapper) region() string {
-	return g.zone[:len(g.zone)-2]
+	return g.zone[:len(g.zone) - 2]
 }
 
 // Call is an async Google Api call
@@ -461,5 +474,5 @@ func (g *computeServiceWrapper) getOperationCall(op *compute.Operation) Call {
 
 func last(url string) string {
 	parts := strings.Split(url, "/")
-	return parts[len(parts)-1]
+	return parts[len(parts) - 1]
 }
