@@ -29,13 +29,7 @@ func templateCommand(plugins func() discovery.Plugins) *cobra.Command {
 				log.Infoln("Using stdin for reading template")
 
 				if contextURL == "" {
-					pwd, err := os.Getwd()
-					if err != nil {
-						pwd = os.Getenv("PWD")
-					}
-					if pwd != "" {
-						contextURL = "file://localhost" + pwd + "/"
-					}
+					contextURL = template.GetDefaultContextURL()
 				}
 
 				engine, err := template.NewTemplateFromReader(os.Stdin, contextURL, opt)

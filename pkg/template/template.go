@@ -92,6 +92,14 @@ func (t *Template) AddFunc(name string, f interface{}) *Template {
 	return t
 }
 
+// Validate parses the template and checks for validity.
+func (t *Template) Validate() (*Template, error) {
+	t.lock.Lock()
+	t.parsed = nil
+	t.lock.Unlock()
+	return t, t.build()
+}
+
 func (t *Template) build() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -117,6 +125,14 @@ func (t *Template) build() error {
 
 	t.parsed = parsed
 	return nil
+}
+
+// Execute is a drop-in replace of the execute method of template
+func (t *Template) Execute(output io.Writer, context interface{}) error {
+	if err := t.build(); err != nil {
+		return err
+	}
+	return t.parsed.Execute(output, context)
 }
 
 // Render renders the template given the context
