@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -13,8 +14,8 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/group/util"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"golang.org/x/net/context"
-	"text/template"
 )
 
 type nodeType string
@@ -26,12 +27,13 @@ const (
 )
 
 // NewSwarmFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewSwarmFlavor(dockerClient client.APIClient) flavor.Plugin {
-	return &swarmFlavor{client: dockerClient}
+func NewSwarmFlavor(dockerClient client.APIClient, templ *template.Template) flavor.Plugin {
+	return &swarmFlavor{client: dockerClient, initScript: templ}
 }
 
 type swarmFlavor struct {
-	client client.APIClient
+	client     client.APIClient
+	initScript *template.Template
 }
 
 type schema struct {
@@ -135,29 +137,10 @@ func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types
 const (
 	// associationTag is a machine tag added to associate machines with Swarm nodes.
 	associationTag = "swarm-association-id"
-
-	// bootScript is used to generate node boot scripts.
-	bootScript = `#!/bin/sh
-set -o errexit
-set -o nounset
-set -o xtrace
-
-mkdir -p /etc/docker
-cat << EOF > /etc/docker/daemon.json
-{
-  "labels": ["swarm-association-id={{.ASSOCIATION_ID}}"]
-}
-EOF
-
-{{.RESTART_DOCKER}}
-
-docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
-`
 )
 
-func generateInitScript(joinIP, joinToken, associationID, restartCommand string) string {
-	buffer := bytes.Buffer{}
-	templ := template.Must(template.New("").Parse(bootScript))
+func generateInitScript(templ *template.Template, joinIP, joinToken, associationID, restartCommand string) (string, error) {
+	var buffer bytes.Buffer
 	err := templ.Execute(&buffer, map[string]string{
 		"MY_IP":          joinIP,
 		"JOIN_TOKEN":     joinToken,
@@ -165,9 +148,9 @@ func generateInitScript(joinIP, joinToken, associationID, restartCommand string)
 		"RESTART_DOCKER": restartCommand,
 	})
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return buffer.String()
+	return buffer.String(), nil
 }
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
@@ -246,7 +229,7 @@ func (s swarmFlavor) Drain(flavorProperties json.RawMessage, inst instance.Descr
 	}
 }
 
-func (s swarmFlavor) Prepare(
+func (s *swarmFlavor) Prepare(
 	flavorProperties json.RawMessage,
 	spec instance.Spec,
 	allocation types.AllocationMethod) (instance.Spec, error) {
@@ -281,11 +264,17 @@ func (s swarmFlavor) Prepare(
 
 	switch properties.Type {
 	case worker:
-		spec.Init = generateInitScript(
-			self.ManagerStatus.Addr,
-			swarmStatus.JoinTokens.Worker,
-			associationID,
-			properties.DockerRestartCommand)
+		initScript, err :=
+			generateInitScript(
+				s.initScript,
+				self.ManagerStatus.Addr,
+				swarmStatus.JoinTokens.Worker,
+				associationID,
+				properties.DockerRestartCommand)
+		if err != nil {
+			return spec, err
+		}
+		spec.Init = initScript
 
 	case manager:
 		if spec.LogicalID == nil {
@@ -293,12 +282,16 @@ func (s swarmFlavor) Prepare(
 				"which will be used as an assigned private IP address")
 		}
 
-		spec.Init = generateInitScript(
+		initScript, err := generateInitScript(
+			s.initScript,
 			self.ManagerStatus.Addr,
 			swarmStatus.JoinTokens.Manager,
 			associationID,
 			properties.DockerRestartCommand)
-
+		if err != nil {
+			return spec, err
+		}
+		spec.Init = initScript
 	default:
 		return spec, errors.New("Unsupported node type")
 	}
