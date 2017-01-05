@@ -50,6 +50,8 @@ build-docker:
 	@docker build ${DOCKER_BUILD_FLAGS} \
 	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
 	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+	@echo "Running tests -- scripts/container-test to verify the binaries"
+	@scripts/container-test
 ifeq (${DOCKER_PUSH},true)
 	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
 ifeq (${DOCKER_TAG_LATEST},true)
