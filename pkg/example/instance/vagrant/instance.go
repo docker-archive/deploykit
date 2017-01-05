@@ -9,9 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"text/template"
 
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 )
 
 // NewVagrantPlugin creates an instance plugin for vagrant.
