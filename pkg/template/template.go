@@ -2,11 +2,14 @@ package template
 
 import (
 	"bytes"
+	"io"
+	"io/ioutil"
 	"strings"
 	"sync"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
+	log "github.com/Sirupsen/logrus"
 )
 
 // Options contains parameters for customizing the behavior of the engine
@@ -32,9 +35,11 @@ type Template struct {
 // NewTemplate fetches the content at the url and returns a template
 func NewTemplate(s string, opt Options) (*Template, error) {
 	var buff []byte
+	contextURL := s
 	// Special case of specifying the entire template as a string; otherwise treat as url
 	if strings.Index(s, "str://") == 0 {
 		buff = []byte(strings.Replace(s, "str://", "", 1))
+		contextURL = "str://"
 	} else {
 		b, err := fetch(s, opt)
 		if err != nil {
@@ -42,10 +47,29 @@ func NewTemplate(s string, opt Options) (*Template, error) {
 		}
 		buff = b
 	}
+	return buildTemplate(buff, contextURL, opt)
+}
+
+// NewTemplateFromReader creates the template from the given reader and options.
+// A context URL is used to locate all templates specified in relative paths with the include function
+func NewTemplateFromReader(reader io.Reader, contextURL string, opt Options) (*Template, error) {
+	buff, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return buildTemplate(buff, contextURL, opt)
+}
+
+// build the template from buffer with a contextURL which is used to deduce absolute
+// path of any 'included' templates e.g. {{ include "./another.tpl" . }}
+func buildTemplate(buff []byte, contextURL string, opt Options) (*Template, error) {
+	if contextURL == "" {
+		log.Warningln("Context is not known.  Included templates may not work properly.")
+	}
 
 	return &Template{
 		options: opt,
-		url:     s,
+		url:     contextURL,
 		body:    buff,
 		funcs:   map[string]interface{}{},
 		binds:   map[string]interface{}{},

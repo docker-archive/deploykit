@@ -18,7 +18,7 @@ func (t *Template) DefaultFuncs() map[string]interface{} {
 			return v // default
 		},
 
-		"export": func(name string, v interface{}) interface{} {
+		"global": func(name string, v interface{}) interface{} {
 			t.binds[name] = v
 			return ""
 		},

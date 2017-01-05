@@ -30,8 +30,8 @@ func TestRunTemplateWithJMESPath(t *testing.T) {
 	require.Equal(t, expected, view)
 }
 
-func TestVarAndExport(t *testing.T) {
-	str := `{{ q "locations[?state == 'WA'].name | sort(@) | {WashingtonCities: join(', ', @)}" . | export "washington-cities"}}
+func TestVarAndGlobal(t *testing.T) {
+	str := `{{ q "locations[?state == 'WA'].name | sort(@) | {WashingtonCities: join(', ', @)}" . | global "washington-cities"}}
 
 {{/* The query above is exported and referenced somewhere else */}}
 {
