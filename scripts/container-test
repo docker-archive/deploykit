@@ -13,6 +13,7 @@ DOCKER_TAG="${DOCKER_TAG:-dev}"
 
 cleanup() {
   docker ps | grep devbundle | awk '{print $1}' | xargs docker stop
+  docker ps | grep devbundle | awk '{print $1}' | xargs docker rm
   rm -rf $TEST_DIR
 }
 trap cleanup EXIT
@@ -27,7 +28,7 @@ volumes="-v $TEST_DIR:/root -v $PWD/docs:/root/docs"
 envs="-e INFRAKIT_PLUGINS_DIR=/root"
 
 server() {
- docker run -d --rm --name $1 $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
+ docker run -d --name $1 $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
 }
 
 run() {
