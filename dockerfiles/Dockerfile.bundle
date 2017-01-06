@@ -1,5 +1,5 @@
 FROM alpine:3.5
 
-RUN apk add --update ca-certificates && rm -Rf /tmp/* /var/lib/cache/apk/*
+RUN apk add --update ca-certificates
 
 ADD build/* /usr/local/bin/
