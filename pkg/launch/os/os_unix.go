@@ -59,6 +59,8 @@ func startAsync(name, sh string, wait chan error) {
 		stdin.Write([]byte(sh))
 		stdin.Close()
 
+		// TODO(chungers) - make a symbolic link to the latest log file
+
 		wait <- cmd.Wait()
 		return
 	}()
