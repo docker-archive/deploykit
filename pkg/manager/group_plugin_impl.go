@@ -12,14 +12,17 @@ import (
 func (m *manager) proxyForGroupPlugin(name string) (group.Plugin, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
-	endpoint, err := m.plugins.Find(name)
-	if err != nil {
-		return nil, err
-	}
-
 	m.backendName = name
-	return rpc.NewClient(endpoint.Address), nil
+
+	// A late-binding proxy so that we don't have a problem with having to
+	// start up the manager as the last of all the plugins.
+	return NewProxy(func() (group.Plugin, error) {
+		endpoint, err := m.plugins.Find(name)
+		if err != nil {
+			return nil, err
+		}
+		return rpc.NewClient(endpoint.Address), nil
+	}), nil
 }
 
 // This implements the Group Plugin interface to support single group-only operations
