@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"testing"
+
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
@@ -10,16 +12,24 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
+
+func templ() *template.Template {
+	t, err := template.NewTemplate("str://"+DefaultInitScriptTemplate, template.Options{})
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
 
 func TestValidate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	swarmFlavor := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl))
+	swarmFlavor := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl), templ())
 
 	require.NoError(t, swarmFlavor.Validate(
 		json.RawMessage(`{"Type": "worker", "DockerRestartCommand": "systemctl restart docker"}`),
@@ -72,7 +82,7 @@ func TestWorker(t *testing.T) {
 
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	flavorImpl := NewSwarmFlavor(client)
+	flavorImpl := NewSwarmFlavor(client, templ())
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -134,7 +144,7 @@ func TestManager(t *testing.T) {
 
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	flavorImpl := NewSwarmFlavor(client)
+	flavorImpl := NewSwarmFlavor(client, templ())
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},

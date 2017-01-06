@@ -2,11 +2,14 @@ package main
 
 import (
 	"os"
-	"text/template"
+	"path/filepath"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/discovery"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
 
@@ -24,18 +27,38 @@ func main() {
 		os.Exit(1)
 	}
 	dir := cmd.Flags().String("dir", defaultDir, "Vagrant directory")
-	templFile := cmd.Flags().String("template", "", "Vagrant Template file")
+	templFile := cmd.Flags().String("template", "", "Vagrant Template file, in URL form")
 	cmd.RunE = func(c *cobra.Command, args []string) error {
+
+		opts := template.Options{
+			SocketDir: discovery.Dir(),
+		}
 
 		var templ *template.Template
 		if *templFile == "" {
-			templ = template.Must(template.New("").Parse(VagrantFile))
-		} else {
-			var err error
-			templ, err = template.ParseFiles()
+			t, err := template.NewTemplate("str://"+VagrantFile, opts)
 			if err != nil {
 				return err
 			}
+			templ = t
+		} else {
+
+			// For compatiblity with old code, append a file:// if the
+			// value is just a path
+			if strings.Index(*templFile, "://") == -1 {
+
+				p, err := filepath.Abs(*templFile)
+				if err != nil {
+					return err
+				}
+				*templFile = "file://localhost" + p
+			}
+
+			t, err := template.NewTemplate(*templFile, opts)
+			if err != nil {
+				return err
+			}
+			templ = t
 		}
 
 		cli.SetLogLevel(*logLevel)

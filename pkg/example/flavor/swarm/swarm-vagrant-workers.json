@@ -2,7 +2,7 @@
   "ID": "swarm-workers",
   "Properties": {
     "Allocation": {
-      "Size": 1
+      "Size": 2
     },
     "Instance": {
       "Plugin": "instance-vagrant",

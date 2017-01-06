@@ -6,7 +6,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/discovery"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
 )
@@ -31,6 +33,8 @@ func main() {
 	certFile := cmd.Flags().String("tlscert", "", "TLS cert file path")
 	tlsKey := cmd.Flags().String("tlskey", "", "TLS key file path")
 	insecureSkipVerify := cmd.Flags().Bool("tlsverify", true, "True to skip TLS")
+	initScriptTemplURL := cmd.Flags().String("init-template", "", "Init script template file, in URL form")
+
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
 		cli.SetLogLevel(*logLevel)
@@ -46,7 +50,27 @@ func main() {
 			return err
 		}
 
-		cli.RunPlugin(*name, flavor_plugin.PluginServer(NewSwarmFlavor(dockerClient)))
+		opts := template.Options{
+			SocketDir: discovery.Dir(),
+		}
+
+		var templ *template.Template
+		if *initScriptTemplURL == "" {
+			t, err := template.NewTemplate("str://"+DefaultInitScriptTemplate, opts)
+			if err != nil {
+				return err
+			}
+			templ = t
+		} else {
+
+			t, err := template.NewTemplate(*initScriptTemplURL, opts)
+			if err != nil {
+				return err
+			}
+			templ = t
+		}
+
+		cli.RunPlugin(*name, flavor_plugin.PluginServer(NewSwarmFlavor(dockerClient, templ)))
 		return nil
 	}
 
@@ -58,3 +82,25 @@ func main() {
 		os.Exit(1)
 	}
 }
+
+const (
+	// DefaultInitScriptTemplate is the default template for the init script which
+	// the flavor injects into the user data of the instance to configure Docker Swarm.
+	DefaultInitScriptTemplate = `
+#!/bin/sh
+set -o errexit
+set -o nounset
+set -o xtrace
+
+mkdir -p /etc/docker
+cat << EOF > /etc/docker/daemon.json
+{
+  "labels": ["swarm-association-id={{.ASSOCIATION_ID}}"]
+}
+EOF
+
+{{.RESTART_DOCKER}}
+
+docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
+`
+)
