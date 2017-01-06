@@ -27,12 +27,14 @@ type FlavorPluginLookup func(string) (flavor.Plugin, error)
 func NewGroupPlugin(
 	instancePlugins InstancePluginLookup,
 	flavorPlugins FlavorPluginLookup,
-	pollInterval time.Duration) group.Plugin {
+	pollInterval time.Duration,
+	maxParallelNum uint) group.Plugin {
 
 	return &plugin{
 		instancePlugins: instancePlugins,
 		flavorPlugins:   flavorPlugins,
 		pollInterval:    pollInterval,
+		maxParallelNum:  maxParallelNum,
 		groups:          groups{byID: map[group.ID]*groupContext{}},
 	}
 }
@@ -41,6 +43,7 @@ type plugin struct {
 	instancePlugins InstancePluginLookup
 	flavorPlugins   FlavorPluginLookup
 	pollInterval    time.Duration
+	maxParallelNum  uint
 	lock            sync.Mutex
 	groups          groups
 }
@@ -96,16 +99,15 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 
 	var supervisor Supervisor
 	if settings.config.Allocation.Size != 0 {
-		supervisor = NewScalingGroup(scaled, settings.config.Allocation.Size, p.pollInterval)
+		supervisor = NewScalingGroup(scaled, settings.config.Allocation.Size, p.pollInterval, p.maxParallelNum)
 	} else if len(settings.config.Allocation.LogicalIDs) > 0 {
 		supervisor = NewQuorum(scaled, settings.config.Allocation.LogicalIDs, p.pollInterval)
 	} else {
 		panic("Invalid empty allocation method")
 	}
 
-	p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
-
 	if !pretend {
+		p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
 		go supervisor.Run()
 	}
 

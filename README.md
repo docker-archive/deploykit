@@ -25,7 +25,7 @@ environments while using shared components and consistent interfaces.
 _InfraKit_ makes extensive use of _Plugins_ to manage arbitrary systems in diverse environments, which can be composed
 to meet different needs.
 
-See the [plugins](docs/plugins.md) documentation for more details.
+See the [plugins](docs/plugins) documentation for more details.
 
 
 ## Building
@@ -54,7 +54,7 @@ We recommended go version 1.7.1 or greater for all platforms.
 
 Also install a few build tools:
 ```shell
-go get -u github.com/golang/lint/golint github.com/wfarner/blockcheck  # if you're running tests
+make get-tools
 ```
 
 ### Running tests
@@ -69,7 +69,7 @@ $ make binaries
 Executables will be placed in the `./build` directory.
 This will produce binaries for tools and several reference Plugin implementations:
   + [`infrakit`](cmd/cli/README.md): a command line interface to interact with plugins
-  + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./spi/group)
+  + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./pkg/spi/group)
   + [`infrakit-instance-file`](pkg/example/instance/file): an Instance plugin using dummy files to represent instances
   + [`infrakit-instance-terraform`](pkg/example/instance/terraform):
     an Instance plugin integrating [Terraform](https://www.terraform.io)

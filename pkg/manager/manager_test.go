@@ -121,6 +121,12 @@ func testToStruct(m *json.RawMessage) interface{} {
 	return &o
 }
 
+func testCloseAll(c []chan string) {
+	for _, cc := range c {
+		close(cc)
+	}
+}
+
 func TestNoCallsToGroupWhenNoLeader(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -145,11 +151,15 @@ func TestNoCallsToGroupWhenNoLeader(t *testing.T) {
 	manager1.Start()
 	manager2.Start()
 
+	testSetLeader(t, leaderChans, "nobody")
+
 	manager1.Stop()
 	manager2.Stop()
 
 	stoppable1.Stop()
 	stoppable2.Stop()
+
+	testCloseAll(leaderChans)
 }
 
 func TestStartOneLeader(t *testing.T) {
@@ -209,6 +219,7 @@ func TestStartOneLeader(t *testing.T) {
 	stoppable1.Stop()
 	stoppable2.Stop()
 
+	testCloseAll(leaderChans)
 }
 
 func TestChangeLeadership(t *testing.T) {
@@ -306,4 +317,6 @@ func TestChangeLeadership(t *testing.T) {
 
 	stoppable1.Stop()
 	stoppable2.Stop()
+
+	testCloseAll(leaderChans)
 }

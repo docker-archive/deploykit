@@ -3,34 +3,35 @@ package client
 import (
 	"bytes"
 	log "github.com/Sirupsen/logrus"
-	"github.com/gorilla/rpc/v2/json"
+	"github.com/docker/infrakit/pkg/spi"
+	"github.com/gorilla/rpc/v2/json2"
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"sync"
 )
 
-// Client is an HTTP client for sending JSON-RPC requests.
-type Client struct {
+type client struct {
 	http http.Client
 }
 
-// New creates a new Client that communicates with a unix socke.
-func New(socketPath string) Client {
+// New creates a new Client that communicates with a unix socket and validates the remote API.
+func New(socketPath string, api spi.InterfaceSpec) Client {
 	dialUnix := func(proto, addr string) (conn net.Conn, err error) {
 		return net.Dial("unix", socketPath)
 	}
 
-	return Client{http: http.Client{Transport: &http.Transport{Dial: dialUnix}}}
+	unvalidatedClient := &client{http: http.Client{Transport: &http.Transport{Dial: dialUnix}}}
+	return &handshakingClient{client: unvalidatedClient, iface: api, lock: &sync.Mutex{}}
 }
 
-// Call sends an RPC with a method and argument.  The result must be a pointer to the response object.
-func (c Client) Call(method string, arg interface{}, result interface{}) error {
-	message, err := json.EncodeClientRequest(method, arg)
+func (c client) Call(method string, arg interface{}, result interface{}) error {
+	message, err := json2.EncodeClientRequest(method, arg)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", "http:///", bytes.NewReader(message))
+	req, err := http.NewRequest("POST", "http://a/", bytes.NewReader(message))
 	if err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func (c Client) Call(method string, arg interface{}, result interface{}) error {
 		log.Error(err)
 	}
 
-	resp, err := c.http.Post("http://d/rpc", "application/json", bytes.NewReader(message))
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -57,5 +58,5 @@ func (c Client) Call(method string, arg interface{}, result interface{}) error {
 		log.Error(err)
 	}
 
-	return json.DecodeClientResponse(resp.Body, result)
+	return json2.DecodeClientResponse(resp.Body, result)
 }

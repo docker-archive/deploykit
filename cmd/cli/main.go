@@ -29,9 +29,6 @@ func main() {
 	// Don't automatically print errors returned from a RunE function.  They are returned from cmd.Execute() below
 	// and we print it ourselves.
 	cmd.SilenceErrors = true
-
-	cmd.AddCommand(cli.VersionCommand())
-
 	f := func() discovery.Plugins {
 		d, err := discovery.NewPluginDiscovery()
 		if err != nil {
@@ -40,6 +37,10 @@ func main() {
 		}
 		return d
 	}
+
+	cmd.AddCommand(cli.VersionCommand(), cli.InfoCommand(f))
+
+	cmd.AddCommand(templateCommand(f))
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
 
 	err := cmd.Execute()

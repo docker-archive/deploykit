@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+
+HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$HERE/.."
+
+
+TEST_DIR=$(pwd)/container-test
+DOCKER_IMAGE="${DOCKER_IMAGE:-infrakit/devbundle}"
+DOCKER_TAG="${DOCKER_TAG:-dev}"
+DOCKER_RM="${DOCKER_RM:-true}"
+
+cleanup() {
+  if [ "$DOCKER_RM" = "true" ]; then
+    echo "cleaning up docker images"
+    docker ps | grep devbundle | awk '{print $1}' | xargs docker stop
+    docker ps | grep devbundle | awk '{print $1}' | xargs docker rm
+    rm -rf $TEST_DIR
+  fi
+}
+trap cleanup EXIT
+
+mkdir -p $TEST_DIR/plugins
+mkdir -p $TEST_DIR/tutorial
+
+volumes="-v $TEST_DIR:/root -v $PWD/docs:/root/docs"
+
+# set the environment variable to use a shorter path so we don't have
+# problems with Docker for Mac.  See https://github.com/docker/docker/issues/23545
+envs="-e INFRAKIT_PLUGINS_DIR=/root"
+
+server() {
+ docker run -d --name $1 $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
+}
+
+run() {
+ docker run --rm $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
+}
+
+server infrakit-instance-file --dir /root/tutorial/
+server infrakit-group-default --poll-interval 500ms
+server infrakit-flavor-vanilla
+
+sleep 1
+
+expect_exact_output() {
+  message=$1
+  cmd=$2
+  expected_output=$3
+
+  actual_output="$($2)"
+  echo -n "--> $message: "
+  if [ "$actual_output" = "$3" ]
+  then
+    echo 'PASS'
+  else
+    echo 'FAIL'
+    echo "Expected output: $expected_output"
+    echo "Actual output: $actual_output"
+    exit 1
+  fi
+}
+
+expect_output_lines() {
+  message=$1
+  cmd=$2
+  expected_lines=$3
+
+  actual_line_count=$($2 | wc -l)
+  echo -n "--> $message: "
+  if [ "$actual_line_count" -eq "$3" ]
+  then
+    echo 'PASS'
+  else
+    echo 'FAIL'
+    echo "Expected line count: $expected_lines"
+    echo "Actual line count: $actual_line_count"
+    exit 1
+  fi
+}
+
+expect_output_lines "3 plugins should be discoverable" "run infrakit plugin ls -q" "3"
+
+expect_output_lines "0 instances should exist" "run infrakit instance describe -q --name instance-file" "0"
+
+run infrakit group commit /root/docs/cattle.json
+
+echo 'Waiting for group to be provisioned'
+sleep 2
+
+expect_output_lines "5 instances should exist in group" "run infrakit group describe cattle -q" "5"
+expect_output_lines "5 instances should exist" "run infrakit instance describe -q --name instance-file" "5"
+
+run infrakit group free cattle
+run infrakit group commit /root/docs/cattle.json
+
+expect_exact_output "Should be watching one group" "run infrakit group ls -q" "cattle"
+
+expect_exact_output \
+  "Update should roll 5 and scale group to 10" \
+  "run infrakit group commit /root/docs/cattle2.json --pretend" \
+  "Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10"
+
+run infrakit group commit /root/docs/cattle2.json
+
+sleep 5
+
+expect_output_lines "10 instances should exist in group" "run infrakit group describe cattle -q" "10"
+
+# Terminate 3 instances.
+pushd $TEST_DIR/tutorial
+  rm -f $(ls | head -3)
+popd
+
+sleep 5
+
+expect_output_lines "10 instances should exist in group" "run infrakit group describe cattle -q" "10"
+
+run infrakit group destroy cattle
+expect_output_lines "0 instances should exist" "run infrakit instance describe -q --name instance-file" "0"
+
+echo 'ALL TESTS PASSED'

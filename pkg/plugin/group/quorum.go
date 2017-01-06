@@ -98,7 +98,8 @@ func (q *quorum) converge() {
 
 	grp := sync.WaitGroup{}
 
-	for _, unknownInstance := range unknownIPs {
+	for _, ip := range unknownIPs {
+		unknownInstance := ip
 		log.Warnf("Destroying instances with unknown IP address: %+v", unknownInstance)
 
 		grp.Add(1)
