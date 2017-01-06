@@ -107,7 +107,7 @@ expect_output_lines "10 instances should exist in group" "run infrakit group des
 
 # Terminate 3 instances.
 pushd $TEST_DIR/tutorial
-  rm $(ls | head -3)
+  rm -f $(ls | head -3)
 popd
 
 sleep 5
