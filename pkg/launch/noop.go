@@ -12,7 +12,7 @@ func NewNoOpLauncher() Launcher {
 }
 
 // Launch starts the plugin given the name
-func (n noOp) Launch(name string, args ...string) (<-chan error, error) {
+func (n noOp) Launch(name, cmd string, args ...string) (<-chan error, error) {
 	log.Infoln("NO-OP Launcher: not automatically starting plugin", name, "args=", args)
 
 	starting := make(chan error)

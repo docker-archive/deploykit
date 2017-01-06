@@ -6,9 +6,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"sync"
-	"syscall"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -55,11 +52,13 @@ type Launcher struct {
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes (which uses shell to run the real task in
 // background).
-func (l *Launcher) Launch(cmd string, args ...string) (<-chan error, error) {
+func (l *Launcher) Launch(name, cmd string, args ...string) (<-chan error, error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	if s, has := l.plugins[plugin(cmd)]; has {
+	key := plugin(name)
+
+	if s, has := l.plugins[key]; has {
 		return s.wait, nil
 	}
 
@@ -70,46 +69,14 @@ func (l *Launcher) Launch(cmd string, args ...string) (<-chan error, error) {
 
 	wait := make(chan error)
 	s := state{
-		log:  l.buildLogfile(cmd, args...),
+		log:  l.buildLogfile(name),
 		wait: wait,
 	}
 
-	l.plugins[plugin(cmd)] = s
-
+	l.plugins[key] = s
 	sh := l.buildCmd(s.log, cmd, args...)
 
-	go func() {
-
-		log.Infoln("OS launcher: Plugin", cmd, "starting", sh)
-		cmd := getShell()
-
-		// Set new pgid so the process doesn't exit when the starter exits.
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setpgid: true,
-			Pgid:    0,
-		}
-
-		defer close(wait)
-
-		// pipe the command string to the shell
-		stdin, err := cmd.StdinPipe()
-		if err != nil {
-			wait <- err
-			return
-		}
-
-		err = cmd.Start()
-		if err != nil {
-			log.Warningln("OS launcher: Plugin", cmd, "failed to start:", err, "cmd=", sh)
-			wait <- err
-			return
-		}
-		stdin.Write([]byte(sh))
-		stdin.Close()
-
-		wait <- cmd.Wait()
-		return
-	}()
+	startAsync(name, sh, wait)
 
 	return wait, nil
 }
