@@ -17,8 +17,8 @@ cleanup() {
     echo "cleaning up docker images"
     docker ps | grep devbundle | awk '{print $1}' | xargs docker stop
     docker ps | grep devbundle | awk '{print $1}' | xargs docker rm
+    rm -rf $TEST_DIR
   fi
-  rm -rf $TEST_DIR
 }
 trap cleanup EXIT
 
