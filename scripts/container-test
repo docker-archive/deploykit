@@ -15,35 +15,57 @@ DOCKER_RM="${DOCKER_RM:-true}"
 cleanup() {
   if [ "$DOCKER_RM" = "true" ]; then
     echo "cleaning up docker images"
-    docker ps | grep devbundle | awk '{print $1}' | xargs docker stop
-    docker ps | grep devbundle | awk '{print $1}' | xargs docker rm
+    docker ps -a | grep devbundle | awk '{print $1}' | xargs docker stop
+    docker ps -a | grep devbundle | awk '{print $1}' | xargs docker rm
     rm -rf $TEST_DIR
   fi
 }
 trap cleanup EXIT
 
+# set up the directories
+
 mkdir -p $TEST_DIR/plugins
+
+configstore=$TEST_DIR/configs
+mkdir -p $configstore
+
 mkdir -p $TEST_DIR/tutorial
 
 volumes="-v $TEST_DIR:/root -v $PWD/docs:/root/docs"
 
 # set the environment variable to use a shorter path so we don't have
 # problems with Docker for Mac.  See https://github.com/docker/docker/issues/23545
-envs="-e INFRAKIT_PLUGINS_DIR=/root"
+envs="-e INFRAKIT_PLUGINS_DIR=/root/plugins"
+
+log="--log 5"
 
 server() {
- docker run -d --name $1 $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
+    name=$1
+    shift;
+    docker run -d --name $name $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
 }
 
 run() {
  docker run --rm $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
 }
 
-server infrakit-instance-file --dir /root/tutorial/
-server infrakit-group-default --poll-interval 500ms
-server infrakit-flavor-vanilla
+# set the leader -- for os / file based leader detection for manager
+leaderfile=$TEST_DIR/leader
+echo group > $leaderfile
 
-sleep 1
+# start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
+# but here for simplicity just start up with multiple managers and one set of plugins
+server manager infrakit-manager $log --name group --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
+server manager1 infrakit-manager $log --name group1 --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
+server manager2 infrakit-manager $log --name group2 --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
+
+sleep 5 # wait for leadership detection to run
+
+server instance-file infrakit-instance-file --dir /root/tutorial/ $log
+server group-default infrakit-group-default --poll-interval 500ms --name group-stateless $log
+server flavor-vanilla infrakit-flavor-vanilla $log
+
+sleep 2
 
 expect_exact_output() {
   message=$1
@@ -81,10 +103,11 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "3 plugins should be discoverable" "run infrakit plugin ls -q" "3"
+expect_output_lines "6 plugins should be discoverable" "run infrakit plugin ls -q" "6"
 
 expect_output_lines "0 instances should exist" "run infrakit instance describe -q --name instance-file" "0"
 
+echo "Commiting"
 run infrakit group commit /root/docs/cattle.json
 
 echo 'Waiting for group to be provisioned'
@@ -93,7 +116,10 @@ sleep 2
 expect_output_lines "5 instances should exist in group" "run infrakit group describe cattle -q" "5"
 expect_output_lines "5 instances should exist" "run infrakit instance describe -q --name instance-file" "5"
 
+echo "Free the cattle"
 run infrakit group free cattle
+
+echo "Commit again"
 run infrakit group commit /root/docs/cattle.json
 
 expect_exact_output "Should be watching one group" "run infrakit group ls -q" "cattle"

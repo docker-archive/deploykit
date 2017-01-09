@@ -6,22 +6,37 @@ set -o nounset
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$HERE/.."
 
-make binaries
-
 cleanup() {
   kill $(jobs -p)
   rm -rf tutorial
 }
 trap cleanup EXIT
 
+mkdir -p tutorial
+
+# infrakit directories
 mkdir -p ~/.infrakit/plugins
 
-mkdir -p tutorial
+configstore=~/.infrakit/configs
+mkdir -p $configstore
+
+# set the leader -- for os / file based leader detection for manager
+leaderfile=~/.infrakit/leader
+echo group > $leaderfile
+
+# start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
+# but here for simplicity just start up with multiple managers and one set of plugins
+build/infrakit-manager --name group --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+build/infrakit-manager --name group1 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+build/infrakit-manager --name group2 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+
+sleep 5  # manager needs to detect leadership
+
+build/infrakit-group-default --poll-interval 500ms --name group-stateless &
 build/infrakit-instance-file --dir ./tutorial/ &
-build/infrakit-group-default --poll-interval 500ms &
 build/infrakit-flavor-vanilla &
 
-sleep 1
+sleep 2
 
 expect_exact_output() {
   message=$1
@@ -59,9 +74,10 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "3 plugins should be discoverable" "build/infrakit plugin ls -q" "3"
+expect_output_lines "6 plugins should be discoverable" "build/infrakit plugin ls -q" "6"
 expect_output_lines "0 instances should exist" "build/infrakit instance describe -q --name instance-file" "0"
 
+echo "Commiting"
 build/infrakit group commit docs/cattle.json
 
 echo 'Waiting for group to be provisioned'

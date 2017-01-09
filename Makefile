@@ -141,7 +141,7 @@ coverage:
 		go test -test.short -race -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 
-tutorial-test:
+tutorial-test: binaries
 	@echo "+ $@"
 	./scripts/tutorial-test
 
