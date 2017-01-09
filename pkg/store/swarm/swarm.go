@@ -42,11 +42,16 @@ func (s *snapshot) Save(obj interface{}) error {
 // Load loads a snapshot and marshals into the given reference
 func (s *snapshot) Load(output interface{}) error {
 	label, err := readSwarm(s.client)
-	if err != nil {
+	if err == nil {
+		return decode(label, output)
+	}
+	if err != errNotFound {
 		return err
 	}
-	return decode(label, output)
+	return nil
 }
+
+var errNotFound = fmt.Errorf("not-found")
 
 func readSwarm(client client.APIClient) (string, error) {
 	info, err := client.SwarmInspect(context.Background())
@@ -60,7 +65,7 @@ func readSwarm(client client.APIClient) (string, error) {
 			return l, nil
 		}
 	}
-	return "", fmt.Errorf("not-found")
+	return "", errNotFound
 }
 
 func writeSwarm(client client.APIClient, value string) error {
