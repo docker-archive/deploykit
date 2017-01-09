@@ -26,10 +26,6 @@ trap cleanup EXIT
 
 mkdir -p $TEST_DIR/plugins
 
-# set the leader -- for os / file based leader detection for manager
-leaderfile=$TEST_DIR/leader
-echo group > $leaderfile
-
 configstore=$TEST_DIR/configs
 mkdir -p $configstore
 
@@ -44,20 +40,30 @@ envs="-e INFRAKIT_PLUGINS_DIR=/root/plugins"
 log="--log 5"
 
 server() {
- docker run -d --name $1 $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
+    name=$1
+    shift;
+    docker run -d --name $name $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
 }
 
 run() {
  docker run --rm $envs $volumes $DOCKER_IMAGE:$DOCKER_TAG $@
 }
 
-server infrakit-manager $log --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
+# set the leader -- for os / file based leader detection for manager
+leaderfile=$TEST_DIR/leader
+echo group > $leaderfile
+
+# start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
+# but here for simplicity just start up with multiple managers and one set of plugins
+server manager infrakit-manager $log --name group --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
+server manager1 infrakit-manager $log --name group1 --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
+server manager2 infrakit-manager $log --name group2 --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
 
 sleep 5 # wait for leadership detection to run
 
-server infrakit-instance-file --dir /root/tutorial/ $log
-server infrakit-group-default --poll-interval 500ms --name group-stateless $log
-server infrakit-flavor-vanilla $log
+server instance-file infrakit-instance-file --dir /root/tutorial/ $log
+server group-default infrakit-group-default --poll-interval 500ms --name group-stateless $log
+server flavor-vanilla infrakit-flavor-vanilla $log
 
 sleep 2
 
@@ -97,7 +103,7 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "4 plugins should be discoverable" "run infrakit plugin ls -q" "4"
+expect_output_lines "6 plugins should be discoverable" "run infrakit plugin ls -q" "6"
 
 expect_output_lines "0 instances should exist" "run infrakit instance describe -q --name instance-file" "0"
 

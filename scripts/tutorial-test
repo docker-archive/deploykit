@@ -6,8 +6,6 @@ set -o nounset
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$HERE/.."
 
-#make binaries
-
 cleanup() {
   kill $(jobs -p)
   rm -rf tutorial
@@ -19,14 +17,18 @@ mkdir -p tutorial
 # infrakit directories
 mkdir -p ~/.infrakit/plugins
 
+configstore=~/.infrakit/configs
+mkdir -p $configstore
+
 # set the leader -- for os / file based leader detection for manager
 leaderfile=~/.infrakit/leader
 echo group > $leaderfile
 
-configstore=~/.infrakit/configs
-mkdir -p $configstore
-
-build/infrakit-manager --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+# start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
+# but here for simplicity just start up with multiple managers and one set of plugins
+build/infrakit-manager --name group --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+build/infrakit-manager --name group1 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+build/infrakit-manager --name group2 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
 
 sleep 5  # manager needs to detect leadership
 
@@ -72,7 +74,7 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "4 plugins should be discoverable" "build/infrakit plugin ls -q" "4"
+expect_output_lines "6 plugins should be discoverable" "build/infrakit plugin ls -q" "6"
 expect_output_lines "0 instances should exist" "build/infrakit instance describe -q --name instance-file" "0"
 
 echo "Commiting"
