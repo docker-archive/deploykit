@@ -6,7 +6,7 @@ set -o nounset
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$HERE/.."
 
-make binaries
+#make binaries
 
 cleanup() {
   kill $(jobs -p)
@@ -14,14 +14,27 @@ cleanup() {
 }
 trap cleanup EXIT
 
+mkdir -p tutorial
+
+# infrakit directories
 mkdir -p ~/.infrakit/plugins
 
-mkdir -p tutorial
+# set the leader -- for os / file based leader detection for manager
+leaderfile=~/.infrakit/leader
+echo group > $leaderfile
+
+configstore=~/.infrakit/configs
+mkdir -p $configstore
+
+build/infrakit-manager --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+
+sleep 5  # manager needs to detect leadership
+
+build/infrakit-group-default --poll-interval 500ms --name group-stateless &
 build/infrakit-instance-file --dir ./tutorial/ &
-build/infrakit-group-default --poll-interval 500ms &
 build/infrakit-flavor-vanilla &
 
-sleep 1
+sleep 2
 
 expect_exact_output() {
   message=$1
@@ -59,9 +72,10 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "3 plugins should be discoverable" "build/infrakit plugin ls -q" "3"
+expect_output_lines "4 plugins should be discoverable" "build/infrakit plugin ls -q" "4"
 expect_output_lines "0 instances should exist" "build/infrakit instance describe -q --name instance-file" "0"
 
+echo "Commiting"
 build/infrakit group commit docs/cattle.json
 
 echo 'Waiting for group to be provisioned'
