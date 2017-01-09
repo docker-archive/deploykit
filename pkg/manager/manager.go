@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/leader"
@@ -43,7 +42,6 @@ type manager struct {
 type backendOp struct {
 	name      string
 	operation func() error
-	err       chan<- error
 }
 
 // NewManager returns the manager which depends on other services to coordinate and manage
@@ -114,9 +112,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 			case op := <-backendOps:
 				log.Debugln("Backend operation:", op)
 				if m.isLeader {
-					op.err <- op.operation()
-				} else {
-					op.err <- errors.New("not-a-leader")
+					op.operation()
 				}
 
 			case <-stopWorkQueue:
