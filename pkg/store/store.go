@@ -7,6 +7,7 @@ type Snapshot interface {
 	// Save marshals (encodes) and saves a snapshot of the given object.
 	Save(obj interface{}) error
 
-	// Load loads a snapshot and marshals (decodes) into the given reference
+	// Load loads a snapshot and marshals (decodes) into the given reference.
+	// If no data is available to unmarshal into the given struct, the fuction returns nil.
 	Load(output interface{}) error
 }
