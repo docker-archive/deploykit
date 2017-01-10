@@ -30,6 +30,7 @@ func (c *Config) String() string {
 	return string([]byte(*c))
 }
 
+// MarshalJSON implements the json Marshaler interface
 func (c *Config) MarshalJSON() ([]byte, error) {
 	if c == nil {
 		return nil, nil
@@ -37,6 +38,7 @@ func (c *Config) MarshalJSON() ([]byte, error) {
 	return []byte(*c), nil
 }
 
+// UnmarshalJSON implements the json Unmarshaler interface
 func (c *Config) UnmarshalJSON(data []byte) error {
 	*c = Config(json.RawMessage(data))
 	return nil
