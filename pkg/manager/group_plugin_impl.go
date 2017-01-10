@@ -12,19 +12,18 @@ import (
 func (m *manager) proxyForGroupPlugin(name string) (group.Plugin, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
-	endpoint, err := m.plugins.Find(name)
-	if err != nil {
-		return nil, err
-	}
-
 	m.backendName = name
-	return rpc.NewClient(endpoint.Address), nil
-}
 
-// This implements the Group Plugin interface to support single group-only operations
-// This is contrast with the declarative semantics of commit.  It offers an imperative
-// operation by operation interface to the user.
+	// A late-binding proxy so that we don't have a problem with having to
+	// start up the manager as the last of all the plugins.
+	return NewProxy(func() (group.Plugin, error) {
+		endpoint, err := m.plugins.Find(name)
+		if err != nil {
+			return nil, err
+		}
+		return rpc.NewClient(endpoint.Address), nil
+	}), nil
+}
 
 func (m *manager) updateConfig(spec group.Spec) error {
 	log.Debugln("Updating config", spec)
@@ -36,6 +35,8 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	stored := GlobalSpec{}
 
 	err := m.snapshot.Load(&stored)
+
+	log.Warningln("Error updating config:", spec, "with error=", err)
 	// TODO: More robust (type-based) error handling.
 	if err != nil && err.Error() != "not-found" {
 		return err
@@ -60,21 +61,35 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	return m.snapshot.Save(stored)
 }
 
-func (m *manager) CommitGroup(grp group.Spec, pretend bool) (string, error) {
-	err := make(chan error)
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err error) {
+
+	resultChan := make(chan []interface{})
+
 	m.backendOps <- backendOp{
-		name: "watch",
+		name: "commit",
 		operation: func() error {
-			log.Debugln("Proxy WatchGroup:", grp)
+			log.Infoln("Proxy CommitGroup:", grp)
 			if !pretend {
 				if err := m.updateConfig(grp); err != nil {
+					log.Warningln("Error updating", err)
 					return err
 				}
 			}
-			_, err := m.Plugin.CommitGroup(grp, pretend)
+			resp, cerr := m.Plugin.CommitGroup(grp, pretend)
+			log.Infoln("Responses from CommitGroup:", resp, cerr)
+			resultChan <- []interface{}{resp, cerr}
 			return err
 		},
-		err: err,
 	}
-	return "TODO(chungers): Allow the commit details string to be plumbed through", <-err
+
+	r := <-resultChan
+
+	if v, has := r[0].(string); has {
+		resp = v
+	}
+	if v, has := r[1].(error); has && v != nil {
+		err = v
+	}
+	return
 }

@@ -43,8 +43,12 @@ func (s *snapshot) Save(obj interface{}) error {
 // Load loads a snapshot and marshals into the given reference
 func (s *snapshot) Load(output interface{}) error {
 	buff, err := ioutil.ReadFile(filepath.Join(s.dir, s.name))
-	if err != nil {
+	if err == nil {
+		return json.Unmarshal(buff, output)
+	}
+	if os.IsExist(err) {
+		// if file exists and we have problem reading
 		return err
 	}
-	return json.Unmarshal(buff, output)
+	return nil
 }
