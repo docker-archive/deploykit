@@ -1,0 +1,37 @@
+[
+    {
+	"Plugin" : "group-default",
+	"Exec" : "os",
+	"Launch" : {
+	    "Cmd" : "infrakit-group-default",
+	    "Args": [
+		"--poll-interval 500ms",
+		"--name group-stateless",
+		"--log 5"
+	    ]
+	}
+    }
+    ,
+    {
+	"Plugin" : "instance-file",
+	"Exec" : "os",
+	"Launch" : {
+	    "Cmd" : "infrakit-instance-file",
+	    "Args": [
+		"--dir ./tutorial/",
+		"--log 5"
+	    ]
+	}
+    }
+    ,
+    {
+	"Plugin" : "flavor-vanilla",
+	"Exec" : "os",
+	"Launch" : {
+	    "Cmd" : "infrakit-flavor-vanilla",
+	    "Args": [
+		"--log 5"
+	    ]
+	}
+    }
+]
