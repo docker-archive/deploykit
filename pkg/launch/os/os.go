@@ -6,7 +6,19 @@ import (
 	"os/user"
 	"path/filepath"
 	"sync"
+
+	"github.com/docker/infrakit/pkg/launch"
 )
+
+// LaunchConfig is the rule for how to start up a os process.
+type LaunchConfig struct {
+
+	// Cmd is the command. This should be in the PATH.
+	Cmd string
+
+	// Args are the argument list for the command
+	Args []string
+}
 
 const (
 	// LogDirEnvVar is the environment variable that may be used to customize the plugin logs location
@@ -47,12 +59,23 @@ type Launcher struct {
 	lock    sync.Mutex
 }
 
+// Name returns the name of the launcher
+func (l *Launcher) Name() string {
+	return "os"
+}
+
 // Launch implements Launcher.Launch.  Returns a signal channel to block on optionally.
 // The channel is closed as soon as an error (or nil for success completion) is written.
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes (which uses shell to run the real task in
 // background).
-func (l *Launcher) Launch(name, cmd string, args ...string) (<-chan error, error) {
+func (l *Launcher) Launch(name string, config *launch.Config) (<-chan error, error) {
+
+	launchConfig := &LaunchConfig{}
+	if err := config.Unmarshal(launchConfig); err != nil {
+		return nil, err
+	}
+
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -62,7 +85,7 @@ func (l *Launcher) Launch(name, cmd string, args ...string) (<-chan error, error
 		return s.wait, nil
 	}
 
-	_, err := exec.LookPath(cmd)
+	_, err := exec.LookPath(launchConfig.Cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +97,7 @@ func (l *Launcher) Launch(name, cmd string, args ...string) (<-chan error, error
 	}
 
 	l.plugins[key] = s
-	sh := l.buildCmd(s.log, cmd, args...)
+	sh := l.buildCmd(s.log, launchConfig.Cmd, launchConfig.Args...)
 
 	startAsync(name, sh, wait)
 

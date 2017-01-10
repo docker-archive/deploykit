@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/infrakit/pkg/launch"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,11 +15,22 @@ func TestLaunchOSCommand(t *testing.T) {
 	launcher, err := NewLauncher(os.TempDir())
 	require.NoError(t, err)
 
-	starting, err := launcher.Launch("badPlugin", "no-such-command")
+	raw := &launch.Config{}
+	err = raw.Marshal(&LaunchConfig{
+		Cmd: "no-such-command",
+	})
+	require.NoError(t, err)
+
+	starting, err := launcher.Launch("badPlugin", raw)
 	require.Error(t, err)
 	require.Nil(t, starting)
 
-	starting, err = launcher.Launch("sleepPlugin", "sleep", "100")
+	err = raw.Marshal(&LaunchConfig{
+		Cmd:  "sleep",
+		Args: []string{"100"},
+	})
+	require.NoError(t, err)
+	starting, err = launcher.Launch("sleepPlugin", raw)
 	require.NoError(t, err)
 
 	<-starting
@@ -31,7 +43,14 @@ func TestLaunchHasLog(t *testing.T) {
 	launcher, err := NewLauncher(dir)
 	require.NoError(t, err)
 
-	starting, err := launcher.Launch("sleepPlugin", "sleep", "1 && echo 'hello'")
+	raw := &launch.Config{}
+	err = raw.Marshal(&LaunchConfig{
+		Cmd:  "sleep",
+		Args: []string{"1 && echo 'hello'"},
+	})
+	require.NoError(t, err)
+
+	starting, err := launcher.Launch("sleepPlugin", raw)
 	require.NoError(t, err)
 
 	err = <-starting
