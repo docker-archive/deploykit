@@ -29,3 +29,15 @@ func (c *Config) Marshal(typed interface{}) error {
 func (c *Config) String() string {
 	return string([]byte(*c))
 }
+
+func (c *Config) MarshalJSON() ([]byte, error) {
+	if c == nil {
+		return nil, nil
+	}
+	return []byte(*c), nil
+}
+
+func (c *Config) UnmarshalJSON(data []byte) error {
+	*c = Config(json.RawMessage(data))
+	return nil
+}
