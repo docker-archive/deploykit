@@ -15,17 +15,17 @@ type Rule struct {
 	// Plugin is the name of the plugin
 	Plugin string
 
-	// Launcher is the name of the launcher to use to start the plugin
-	Launcher string
+	// Exec is the name of the exec to use to start the plugin
+	Exec string
 
-	// Properties is the rule data required by the launcher to do its work
-	Properties *Config
+	// Launch is encoded form of the rule on how to start/exec the process
+	Launch *Config
 }
 
 // Monitor runs continuously receiving requests to start a plugin.
 // Monitor uses a launcher to actually start the process of the plugin.
 type Monitor struct {
-	launcher  Launcher
+	exec      Exec
 	rules     map[string]Rule
 	startChan <-chan StartPlugin
 	inputChan chan<- StartPlugin
@@ -35,17 +35,17 @@ type Monitor struct {
 
 // NewMonitor returns a monitor that continuously watches for input
 // requests and launches the process for the plugin, if not already running.
-func NewMonitor(l Launcher, rules []Rule) *Monitor {
+func NewMonitor(l Exec, rules []Rule) *Monitor {
 	m := map[string]Rule{}
 	// index by name of plugin
 	for _, r := range rules {
-		if r.Launcher == l.Name() {
+		if r.Exec == l.Name() {
 			m[r.Plugin] = r
 		}
 	}
 	return &Monitor{
-		launcher: l,
-		rules:    m,
+		exec:  l,
+		rules: m,
 	}
 }
 
@@ -95,16 +95,16 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 			r, has := m.rules[req.Plugin]
 			if !has {
 				log.Warningln("no plugin:", req)
-				req.reportError(r.Properties, errNoConfig)
+				req.reportError(r.Launch, errNoConfig)
 				continue loop
 			}
 
 			configCopy := &Config{}
-			if r.Properties != nil {
-				*configCopy = *r.Properties
+			if r.Launch != nil {
+				*configCopy = *r.Launch
 			}
 
-			block, err := m.launcher.Launch(r.Plugin, configCopy)
+			block, err := m.exec.Exec(r.Plugin, configCopy)
 			if err != nil {
 				req.reportError(configCopy, err)
 				continue loop

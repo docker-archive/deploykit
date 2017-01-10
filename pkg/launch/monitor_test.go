@@ -21,7 +21,7 @@ func (l *testLauncher) Name() string {
 	return l.name
 }
 
-func (l *testLauncher) Launch(name string, config *Config) (<-chan error, error) {
+func (l *testLauncher) Exec(name string, config *Config) (<-chan error, error) {
 	rule := testConfig{}
 	err := config.Unmarshal(&rule)
 	if err != nil {
@@ -72,9 +72,9 @@ func TestMonitorLoopValidRule(t *testing.T) {
 
 	var receivedArgs *Config
 	rule := Rule{
-		Plugin:     "hello",
-		Launcher:   "test",
-		Properties: raw,
+		Plugin: "hello",
+		Exec:   "test",
+		Launch: raw,
 	}
 	monitor := NewMonitor(&testLauncher{
 		name: "test",

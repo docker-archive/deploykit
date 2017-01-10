@@ -43,19 +43,19 @@ func DefaultLogDir() string {
 func NewLauncher(logDir string) (*Launcher, error) {
 	return &Launcher{
 		logDir:  logDir,
-		plugins: map[plugin]state{},
+		plugins: map[string]state{},
 	}, nil
 }
 
-type plugin string
 type state struct {
 	log  string
 	wait <-chan error
 }
 
+// Launcher is a service that implements the launch.Exec interface for starting up os processes.
 type Launcher struct {
 	logDir  string
-	plugins map[plugin]state
+	plugins map[string]state
 	lock    sync.Mutex
 }
 
@@ -64,12 +64,12 @@ func (l *Launcher) Name() string {
 	return "os"
 }
 
-// Launch implements Launcher.Launch.  Returns a signal channel to block on optionally.
+// Exec starts the os process. Returns a signal channel to block on optionally.
 // The channel is closed as soon as an error (or nil for success completion) is written.
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes (which uses shell to run the real task in
 // background).
-func (l *Launcher) Launch(name string, config *launch.Config) (<-chan error, error) {
+func (l *Launcher) Exec(name string, config *launch.Config) (<-chan error, error) {
 
 	launchConfig := &LaunchConfig{}
 	if err := config.Unmarshal(launchConfig); err != nil {
@@ -79,9 +79,7 @@ func (l *Launcher) Launch(name string, config *launch.Config) (<-chan error, err
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	key := plugin(name)
-
-	if s, has := l.plugins[key]; has {
+	if s, has := l.plugins[name]; has {
 		return s.wait, nil
 	}
 
@@ -96,7 +94,7 @@ func (l *Launcher) Launch(name string, config *launch.Config) (<-chan error, err
 		wait: wait,
 	}
 
-	l.plugins[key] = s
+	l.plugins[name] = s
 	sh := l.buildCmd(s.log, launchConfig.Cmd, launchConfig.Args...)
 
 	startAsync(name, sh, wait)

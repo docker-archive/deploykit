@@ -21,7 +21,7 @@ func TestLaunchOSCommand(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	starting, err := launcher.Launch("badPlugin", raw)
+	starting, err := launcher.Exec("badPlugin", raw)
 	require.Error(t, err)
 	require.Nil(t, starting)
 
@@ -30,7 +30,7 @@ func TestLaunchOSCommand(t *testing.T) {
 		Args: []string{"100"},
 	})
 	require.NoError(t, err)
-	starting, err = launcher.Launch("sleepPlugin", raw)
+	starting, err = launcher.Exec("sleepPlugin", raw)
 	require.NoError(t, err)
 
 	<-starting
@@ -50,7 +50,7 @@ func TestLaunchHasLog(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	starting, err := launcher.Launch("sleepPlugin", raw)
+	starting, err := launcher.Exec("sleepPlugin", raw)
 	require.NoError(t, err)
 
 	err = <-starting
@@ -58,7 +58,7 @@ func TestLaunchHasLog(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	buff, err := ioutil.ReadFile(launcher.plugins[plugin("sleepPlugin")].log)
+	buff, err := ioutil.ReadFile(launcher.plugins["sleepPlugin"].log)
 	require.NoError(t, err)
 	require.Equal(t, "hello\n", string(buff))
 
