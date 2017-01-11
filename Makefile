@@ -122,6 +122,7 @@ endif
 	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/pkg/example/instance/file)
 	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/pkg/example/instance/terraform)
 	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/pkg/example/instance/vagrant)
+	$(call build_binary,infrakit-bootstrap,github.com/docker/infrakit/cmd/bootstrap)
 	$(call build_binary,infrakit-resource-file, github.com/docker/infrakit/pkg/example/resource/file)
 
 install:

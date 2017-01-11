@@ -1,0 +1,20 @@
+{
+  "ID": "bootstrap",
+  "Properties": {
+    "Resources": {
+      "resource_a": {
+        "Plugin": "resource-file",
+        "Type": "a",
+        "Properties": {
+          "Note": "Depends on {{.Resources.resource_b.ID}}"
+        }
+      },
+      "resource_b": {
+        "Plugin": "resource-file",
+        "Type": "b",
+        "Properties": {
+        }
+      }
+    }
+  }
+}
