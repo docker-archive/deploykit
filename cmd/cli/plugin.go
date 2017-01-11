@@ -46,6 +46,7 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
 	osExec := start.Flags().Bool("os", false, "True to use os plugin binaries")
+	doWait := start.Flags().BoolP("wait", "w", false, "True to wait in the foreground; Ctrl-C to exit")
 
 	start.RunE = func(c *cobra.Command, args []string) error {
 
@@ -72,7 +73,7 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		monitors := []*launch.Monitor{}
 
 		if *osExec {
-			exec, err := os.NewLauncher(os.DefaultLogDir())
+			exec, err := os.NewLauncher()
 			if err != nil {
 				return err
 			}
@@ -89,6 +90,10 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		var wait sync.WaitGroup
+
+		if *doWait {
+			wait.Add(1)
+		}
 
 		// now start all the plugins
 		for _, plugin := range args {

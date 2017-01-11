@@ -12,13 +12,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p tutorial
-
 # infrakit directories
-mkdir -p ~/.infrakit/plugins
+plugins=~/.infrakit/plugins
+mkdir -p $plugins
+rm -rf $plugins/*
 
 configstore=~/.infrakit/configs
 mkdir -p $configstore
+rm -rf $configstore/*
 
 # set the leader -- for os / file based leader detection for manager
 leaderfile=~/.infrakit/leader
@@ -33,13 +34,25 @@ build/infrakit-manager --name group2 --proxy-for-group group-stateless os --lead
 sleep 5  # manager needs to detect leadership
 
 # location of logfiles when plugins are started by the plugin cli
-logs=~/.infrakit/logs
-mkdir -p $logs
+# the config json below expects LOG_DIR as an environment variable
+LOG_DIR=~/.infrakit/logs
+mkdir -p $LOG_DIR
+
+# see the config josn 'tutorial-start-plugins.json' for reference of environment variable TUTORIAL_DIR
+TUTORIAL_DIR=~/.infrakit/tutorial
+mkdir -p $TUTORIAL_DIR
+rm -rf $TUTORIAL_DIR/*
+
+export LOG_DIR=$LOG_DIR
+export TUTORIAL_DIR=$TUTORIAL_DIR
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
-build/infrakit plugin start --config-url file:///$PWD/scripts/tutorial-start-plugins.json --os group-default instance-file flavor-vanilla
+build/infrakit plugin start --wait --config-url file:///$PWD/scripts/tutorial-start-plugins.json --os group-default instance-file flavor-vanilla &
 
-sleep 2
+lastpid=$!
+echo "plugin start pid=$lastpid"
+
+sleep 5
 
 expect_exact_output() {
   message=$1
@@ -106,7 +119,7 @@ sleep 5
 expect_output_lines "10 instances should exist in group" "build/infrakit group describe cattle -q" "10"
 
 # Terminate 3 instances.
-pushd tutorial
+pushd $TUTORIAL_DIR
   rm $(ls | head -3)
 popd
 

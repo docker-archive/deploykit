@@ -1,10 +1,6 @@
 package os
 
 import (
-	"os"
-	"os/exec"
-	"os/user"
-	"path/filepath"
 	"sync"
 
 	"github.com/docker/infrakit/pkg/launch"
@@ -13,48 +9,28 @@ import (
 // LaunchConfig is the rule for how to start up a os process.
 type LaunchConfig struct {
 
-	// Cmd is the command. This should be in the PATH.
+	// Cmd is the entire command line, including options.
 	Cmd string
 
-	// Args are the argument list for the command
-	Args []string
-}
-
-const (
-	// LogDirEnvVar is the environment variable that may be used to customize the plugin logs location
-	LogDirEnvVar = "INFRAKIT_LOG_DIR"
-)
-
-// DefaultLogDir is the directory for storing the log files from the plugins
-func DefaultLogDir() string {
-	if logDir := os.Getenv(LogDirEnvVar); logDir != "" {
-		return logDir
-	}
-
-	home := os.Getenv("HOME")
-	if usr, err := user.Current(); err == nil {
-		home = usr.HomeDir
-	}
-	return filepath.Join(home, ".infrakit/logs")
+	// SamePgID if true will make the process in the same process group as the launcher so that when the launcher
+	// exists the process exits too.
+	SamePgID bool
 }
 
 // NewLauncher returns a Launcher that can install and start plugins.  The OS version is simple - it translates
 // plugin names as command names and uses os.Exec
-func NewLauncher(logDir string) (*Launcher, error) {
+func NewLauncher() (*Launcher, error) {
 	return &Launcher{
-		logDir:  logDir,
 		plugins: map[string]state{},
 	}, nil
 }
 
 type state struct {
-	log  string
 	wait <-chan error
 }
 
 // Launcher is a service that implements the launch.Exec interface for starting up os processes.
 type Launcher struct {
-	logDir  string
 	plugins map[string]state
 	lock    sync.Mutex
 }
@@ -83,21 +59,9 @@ func (l *Launcher) Exec(name string, config *launch.Config) (<-chan error, error
 		return s.wait, nil
 	}
 
-	_, err := exec.LookPath(launchConfig.Cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	wait := make(chan error)
-	s := state{
-		log:  l.buildLogfile(name),
-		wait: wait,
-	}
-
+	s := state{}
 	l.plugins[name] = s
-	sh := l.buildCmd(s.log, launchConfig.Cmd, launchConfig.Args...)
+	s.wait = start(name, launchConfig.Cmd, !launchConfig.SamePgID)
 
-	startAsync(name, sh, wait)
-
-	return wait, nil
+	return s.wait, nil
 }

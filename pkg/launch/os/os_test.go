@@ -1,8 +1,10 @@
 package os
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,54 +14,45 @@ import (
 
 func TestLaunchOSCommand(t *testing.T) {
 
-	launcher, err := NewLauncher(os.TempDir())
+	launcher, err := NewLauncher()
 	require.NoError(t, err)
 
 	raw := &launch.Config{}
-	err = raw.Marshal(&LaunchConfig{
-		Cmd: "no-such-command",
-	})
-	require.NoError(t, err)
-
-	starting, err := launcher.Exec("badPlugin", raw)
-	require.Error(t, err)
-	require.Nil(t, starting)
 
 	err = raw.Marshal(&LaunchConfig{
-		Cmd:  "sleep",
-		Args: []string{"100"},
+		Cmd: "sleep 100",
 	})
 	require.NoError(t, err)
-	starting, err = launcher.Exec("sleepPlugin", raw)
+	starting, err := launcher.Exec("sleepPlugin", raw)
 	require.NoError(t, err)
 
 	<-starting
 	t.Log("started")
 }
 
-func TestLaunchHasLog(t *testing.T) {
+func TestLaunchWithLog(t *testing.T) {
 
-	dir := os.TempDir()
-	launcher, err := NewLauncher(dir)
+	logfile := filepath.Join(os.TempDir(), fmt.Sprintf("os-test-%v", time.Now().Unix()))
+
+	launcher, err := NewLauncher()
 	require.NoError(t, err)
 
 	raw := &launch.Config{}
+
 	err = raw.Marshal(&LaunchConfig{
-		Cmd:  "sleep",
-		Args: []string{"1 && echo 'hello'"},
+		Cmd:      fmt.Sprintf("echo hello > %s 2>&1", logfile),
+		SamePgID: true,
 	})
 	require.NoError(t, err)
-
-	starting, err := launcher.Exec("sleepPlugin", raw)
+	starting, err := launcher.Exec("echoPlugin", raw)
 	require.NoError(t, err)
 
-	err = <-starting
+	<-starting
+	t.Log("started")
+
+	time.Sleep(500 * time.Millisecond)
+
+	v, err := ioutil.ReadFile(logfile)
 	require.NoError(t, err)
-
-	time.Sleep(2 * time.Second)
-
-	buff, err := ioutil.ReadFile(launcher.plugins["sleepPlugin"].log)
-	require.NoError(t, err)
-	require.Equal(t, "hello\n", string(buff))
-
+	require.Equal(t, "hello\n", string(v))
 }
