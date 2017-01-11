@@ -35,12 +35,10 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	stored := GlobalSpec{}
 
 	err := m.snapshot.Load(&stored)
-
-	log.Warningln("Error updating config:", spec, "with error=", err)
-	// TODO: More robust (type-based) error handling.
-	if err != nil && err.Error() != "not-found" {
+	if err != nil {
 		return err
 	}
+
 	// if not-found ok to continue...
 
 	if stored.Groups == nil {

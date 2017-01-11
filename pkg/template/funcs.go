@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jmespath/go-jmespath"
 )
@@ -11,6 +12,10 @@ import (
 // DefaultFuncs returns a list of default functions for binding in the template
 func (t *Template) DefaultFuncs() map[string]interface{} {
 	return map[string]interface{}{
+		"unixtime": func() interface{} {
+			return time.Now().Unix()
+		},
+
 		"var": func(name, doc string, v ...interface{}) interface{} {
 			if found, has := t.binds[name]; has {
 				return found

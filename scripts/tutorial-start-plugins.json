@@ -1,0 +1,28 @@
+[
+    {
+	"Plugin" : "group-default",
+	"Exec" : "os",
+	"Launch" : {
+	    "Cmd" : "infrakit-group-default --poll-interval 500ms --name group-stateless --log 5 > {{env "LOG_DIR"}}/group-default-{{unixtime}}.log 2>&1 &",
+	    "SamePgID" : true
+	}
+    }
+    ,
+    {
+	"Plugin" : "instance-file",
+	"Exec" : "os",
+	"Launch" : {
+	    "Cmd" : "infrakit-instance-file --dir {{env "TUTORIAL_DIR"}} --log 5 > {{env "LOG_DIR"}}/instance-file-{{unixtime}}.log 2>&1",
+	    "SamePgID" : true
+	}
+    }
+    ,
+    {
+	"Plugin" : "flavor-vanilla",
+	"Exec" : "os",
+	"Launch" : {
+	    "Cmd" : "infrakit-flavor-vanilla --log 5 > {{env "LOG_DIR"}}/flavor-vanilla-{{unixtime}}.log 2>&1",
+	    "SamePgID" : true
+	}
+    }
+]
