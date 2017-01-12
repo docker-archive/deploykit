@@ -9,17 +9,22 @@ import (
 
 var errNoConfig = errors.New("no-counfig")
 
+// ExecRule encapsulates what's required to exec a plugin
+type ExecRule struct {
+	// Exec is the name of the exec to use to start the plugin
+	Exec string
+	// Properties is the properties for the executor
+	Properties *Config
+}
+
 // Rule provides the instructions on starting the plugin
 type Rule struct {
 
 	// Plugin is the name of the plugin
 	Plugin string
 
-	// Exec is the name of the exec to use to start the plugin
-	Exec string
-
-	// Launch is encoded form of the rule on how to start/exec the process
-	Launch *Config
+	// Launch is the rule for starting / launching the plugin.
+	Launch ExecRule
 }
 
 // Monitor runs continuously receiving requests to start a plugin.
@@ -39,7 +44,7 @@ func NewMonitor(l Exec, rules []Rule) *Monitor {
 	m := map[string]Rule{}
 	// index by name of plugin
 	for _, r := range rules {
-		if r.Exec == l.Name() {
+		if r.Launch.Exec == l.Name() {
 			m[r.Plugin] = r
 		}
 	}
@@ -95,13 +100,13 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 			r, has := m.rules[req.Plugin]
 			if !has {
 				log.Warningln("no plugin:", req)
-				req.reportError(r.Launch, errNoConfig)
+				req.reportError(r.Launch.Properties, errNoConfig)
 				continue loop
 			}
 
 			configCopy := &Config{}
-			if r.Launch != nil {
-				*configCopy = *r.Launch
+			if r.Launch.Properties != nil {
+				*configCopy = *r.Launch.Properties
 			}
 
 			block, err := m.exec.Exec(r.Plugin, configCopy)
