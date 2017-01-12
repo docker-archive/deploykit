@@ -10,10 +10,10 @@ cd "$HERE/.."
 TEST_DIR=$(pwd)/container-test
 DOCKER_IMAGE="${DOCKER_IMAGE:-infrakit/devbundle}"
 DOCKER_TAG="${DOCKER_TAG:-dev}"
-DOCKER_RM="${DOCKER_RM:-true}"
+E2E_CLEANUP=${E2E_CLEANUP:-true}
 
 cleanup() {
-  if [ "$DOCKER_RM" = "true" ]; then
+  if [ "$E2E_CLEANUP" = "true" ]; then
     echo "cleaning up docker images"
     docker ps -a | grep devbundle | awk '{print $1}' | xargs docker stop
     docker ps -a | grep devbundle | awk '{print $1}' | xargs docker rm
@@ -23,14 +23,19 @@ cleanup() {
 trap cleanup EXIT
 
 # set up the directories
-
-mkdir -p $TEST_DIR/plugins
+plugins=$TEST_DIR/plugins
+mkdir -p $plugins
+rm -rf $plugins/*
 
 configstore=$TEST_DIR/configs
 mkdir -p $configstore
+rm -rf $configstore/*
 
 mkdir -p $TEST_DIR/tutorial
+rm -rf $TEST_DIR/tutorial/*
 
+
+# bind mounts
 volumes="-v $TEST_DIR:/root -v $PWD/docs:/root/docs"
 
 # set the environment variable to use a shorter path so we don't have

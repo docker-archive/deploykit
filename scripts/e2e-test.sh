@@ -8,21 +8,20 @@ cd "$HERE/.."
 
 export PATH=$PWD/build:$PATH
 
-SKIP_CLEANUP=${SKIP_CLEANUP:-false}
+E2E_CLEANUP=${E2E_CLEANUP:-true}
 
 starterpid="" # pid of the cli plugin starter
 cleanup() {
+  if [ "$E2E_CLEANUP" = "true" ]; then
     pgid=$(ps -o pgid= -p $starterpid)
     echo "Stopping plugin starter utility - $starterpid , pgid=$pgid"
     kill -TERM -$pgid
     echo "Stopping other jobs"
     kill $(jobs -p)
     rm -rf tutorial
+  fi
 }
-
-if [ "$SKIP_CLEANUP" != "true" ]; then
-    trap cleanup EXIT
-fi
+trap cleanup EXIT
 
 # infrakit directories
 plugins=~/.infrakit/plugins
@@ -50,7 +49,7 @@ sleep 5  # manager needs to detect leadership
 LOG_DIR=~/.infrakit/logs
 mkdir -p $LOG_DIR
 
-# see the config josn 'tutorial-start-plugins.json' for reference of environment variable TUTORIAL_DIR
+# see the config josn 'e2e-test-plugins.json' for reference of environment variable TUTORIAL_DIR
 TUTORIAL_DIR=~/.infrakit/tutorial
 mkdir -p $TUTORIAL_DIR
 rm -rf $TUTORIAL_DIR/*
@@ -59,7 +58,7 @@ export LOG_DIR=$LOG_DIR
 export TUTORIAL_DIR=$TUTORIAL_DIR
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
-infrakit plugin start --wait --config-url file:///$PWD/scripts/tutorial-start-plugins.json --os group-default instance-file flavor-vanilla &
+infrakit plugin start --wait --config-url file:///$PWD/scripts/e2e-test-plugins.json --os group-default instance-file flavor-vanilla &
 
 starterpid=$!
 echo "plugin start pid=$starterpid"
