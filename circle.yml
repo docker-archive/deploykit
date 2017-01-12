@@ -10,6 +10,7 @@ machine:
     GOPATH: "$HOME/.go_workspace"
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     DOCKER_RM: "false"
+    SKIP_CLEANUP: "true"
 
 dependencies:
   pre:
