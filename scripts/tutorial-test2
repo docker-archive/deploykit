@@ -6,6 +6,8 @@ set -o nounset
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$HERE/.."
 
+export PATH=$PWD/build:$PATH
+
 starterpid="" # pid of the cli plugin starter
 cleanup() {
     pgid=$(ps -o pgid= -p $starterpid)
@@ -32,9 +34,9 @@ echo group > $leaderfile
 
 # start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
 # but here for simplicity just start up with multiple managers and one set of plugins
-build/infrakit-manager --name group --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
-build/infrakit-manager --name group1 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
-build/infrakit-manager --name group2 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+infrakit-manager --name group --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+infrakit-manager --name group1 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+infrakit-manager --name group2 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
 
 sleep 5  # manager needs to detect leadership
 
@@ -52,7 +54,7 @@ export LOG_DIR=$LOG_DIR
 export TUTORIAL_DIR=$TUTORIAL_DIR
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
-build/infrakit plugin start --wait --config-url file:///$PWD/scripts/tutorial-start-plugins.json --os group-default instance-file flavor-vanilla &
+infrakit plugin start --wait --config-url file:///$PWD/scripts/tutorial-start-plugins.json --os group-default instance-file flavor-vanilla &
 
 starterpid=$!
 echo "plugin start pid=$starterpid"
@@ -95,33 +97,33 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "6 plugins should be discoverable" "build/infrakit plugin ls -q" "6"
-expect_output_lines "0 instances should exist" "build/infrakit instance describe -q --name instance-file" "0"
+expect_output_lines "6 plugins should be discoverable" "infrakit plugin ls -q" "6"
+expect_output_lines "0 instances should exist" "infrakit instance describe -q --name instance-file" "0"
 
 echo "Commiting"
-build/infrakit group commit docs/cattle.json
+infrakit group commit docs/cattle.json
 
 echo 'Waiting for group to be provisioned'
 sleep 2
 
-expect_output_lines "5 instances should exist in group" "build/infrakit group describe cattle -q" "5"
-expect_output_lines "5 instances should exist" "build/infrakit instance describe -q --name instance-file" "5"
+expect_output_lines "5 instances should exist in group" "infrakit group describe cattle -q" "5"
+expect_output_lines "5 instances should exist" "infrakit instance describe -q --name instance-file" "5"
 
-build/infrakit group free cattle
-build/infrakit group commit docs/cattle.json
+infrakit group free cattle
+infrakit group commit docs/cattle.json
 
-expect_exact_output "Should be watching one group" "build/infrakit group ls -q" "cattle"
+expect_exact_output "Should be watching one group" "infrakit group ls -q" "cattle"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
-  "build/infrakit group commit docs/cattle2.json --pretend" \
+  "infrakit group commit docs/cattle2.json --pretend" \
   "Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10"
 
-build/infrakit group commit docs/cattle2.json
+infrakit group commit docs/cattle2.json
 
 sleep 5
 
-expect_output_lines "10 instances should exist in group" "build/infrakit group describe cattle -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit group describe cattle -q" "10"
 
 # Terminate 3 instances.
 pushd $TUTORIAL_DIR
@@ -130,9 +132,9 @@ popd
 
 sleep 5
 
-expect_output_lines "10 instances should exist in group" "build/infrakit group describe cattle -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit group describe cattle -q" "10"
 
-build/infrakit group destroy cattle
-expect_output_lines "0 instances should exist" "build/infrakit instance describe -q --name instance-file" "0"
+infrakit group destroy cattle
+expect_output_lines "0 instances should exist" "infrakit instance describe -q --name instance-file" "0"
 
 echo 'ALL TESTS PASSED'
