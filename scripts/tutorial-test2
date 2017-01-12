@@ -12,7 +12,7 @@ starterpid="" # pid of the cli plugin starter
 cleanup() {
     pgid=$(ps -o pgid= -p $starterpid)
     echo "Stopping plugin starter utility - $starterpid , pgid=$pgid"
-    kill -TERM -$pgid
+    $(kill -TERM -$pgid)
     echo "Stopping other jobs"
     kill $(jobs -p)
     rm -rf tutorial
