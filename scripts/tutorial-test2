@@ -12,12 +12,15 @@ starterpid="" # pid of the cli plugin starter
 cleanup() {
     pgid=$(ps -o pgid= -p $starterpid)
     echo "Stopping plugin starter utility - $starterpid , pgid=$pgid"
-    $(kill -TERM -$pgid)
+    kill -TERM -$pgid
     echo "Stopping other jobs"
     kill $(jobs -p)
     rm -rf tutorial
 }
-trap cleanup EXIT
+
+if [ "DOCKER_RM" = "true" ]; then
+    trap cleanup EXIT
+fi
 
 # infrakit directories
 plugins=~/.infrakit/plugins
