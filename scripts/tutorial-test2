@@ -6,9 +6,14 @@ set -o nounset
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$HERE/.."
 
+starterpid="" # pid of the cli plugin starter
 cleanup() {
-  kill $(jobs -p)
-  rm -rf tutorial
+    pgid=$(ps -o pgid= -p $starterpid)
+    echo "Stopping plugin starter utility - $starterpid , pgid=$pgid"
+    kill -TERM -$pgid
+    echo "Stopping other jobs"
+    kill $(jobs -p)
+    rm -rf tutorial
 }
 trap cleanup EXIT
 
@@ -49,8 +54,8 @@ export TUTORIAL_DIR=$TUTORIAL_DIR
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
 build/infrakit plugin start --wait --config-url file:///$PWD/scripts/tutorial-start-plugins.json --os group-default instance-file flavor-vanilla &
 
-lastpid=$!
-echo "plugin start pid=$lastpid"
+starterpid=$!
+echo "plugin start pid=$starterpid"
 
 sleep 5
 
