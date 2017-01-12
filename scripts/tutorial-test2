@@ -8,6 +8,8 @@ cd "$HERE/.."
 
 export PATH=$PWD/build:$PATH
 
+SKIP_CLEANUP=${SKIP_CLEANUP:-false}
+
 starterpid="" # pid of the cli plugin starter
 cleanup() {
     pgid=$(ps -o pgid= -p $starterpid)
@@ -18,7 +20,7 @@ cleanup() {
     rm -rf tutorial
 }
 
-if [ "DOCKER_RM" = "true" ]; then
+if [ "$SKIP_CLEANUP" != "true" ]; then
     trap cleanup EXIT
 fi
 
