@@ -145,7 +145,7 @@ coverage:
 
 tutorial-test: binaries
 	@echo "+ $@"
-	./scripts/tutorial-test
+	./scripts/tutorial-test2
 
 test-full:
 	@echo "+ $@"

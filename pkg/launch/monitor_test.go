@@ -73,8 +73,10 @@ func TestMonitorLoopValidRule(t *testing.T) {
 	var receivedArgs *Config
 	rule := Rule{
 		Plugin: "hello",
-		Exec:   "test",
-		Launch: raw,
+		Launch: ExecRule{
+			Exec:       "test",
+			Properties: raw,
+		},
 	}
 	monitor := NewMonitor(&testLauncher{
 		name: "test",
