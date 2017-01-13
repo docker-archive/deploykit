@@ -41,10 +41,11 @@ func TestUnixSocketServer(t *testing.T) {
 	service := plugin_rpc.PluginServer(mock)
 
 	socket := filepath.Join(os.TempDir(), fmt.Sprintf("%d.sock", time.Now().Unix()))
+	name := filepath.Base(socket)
 	server, err := StartPluginAtPath(socket, service)
 	require.NoError(t, err)
 
-	c := plugin_rpc.NewClient(socket)
+	c := plugin_rpc.NewClient(name, socket)
 
 	err = c.Validate(properties)
 	require.Error(t, err)
