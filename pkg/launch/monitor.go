@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/plugin"
 )
 
 var errNoConfig = errors.New("no-counfig")
@@ -21,7 +22,7 @@ type ExecRule struct {
 type Rule struct {
 
 	// Plugin is the name of the plugin
-	Plugin string
+	Plugin plugin.Name
 
 	// Launch is the rule for starting / launching the plugin.
 	Launch ExecRule
@@ -31,7 +32,7 @@ type Rule struct {
 // Monitor uses a launcher to actually start the process of the plugin.
 type Monitor struct {
 	exec      Exec
-	rules     map[string]Rule
+	rules     map[plugin.Name]Rule
 	startChan <-chan StartPlugin
 	inputChan chan<- StartPlugin
 	stop      chan interface{}
@@ -41,7 +42,7 @@ type Monitor struct {
 // NewMonitor returns a monitor that continuously watches for input
 // requests and launches the process for the plugin, if not already running.
 func NewMonitor(l Exec, rules []Rule) *Monitor {
-	m := map[string]Rule{}
+	m := map[plugin.Name]Rule{}
 	// index by name of plugin
 	for _, r := range rules {
 		if r.Launch.Exec == l.Name() {
@@ -56,7 +57,7 @@ func NewMonitor(l Exec, rules []Rule) *Monitor {
 
 // StartPlugin is the command to start a plugin
 type StartPlugin struct {
-	Plugin  string
+	Plugin  plugin.Name
 	Started func(*Config)
 	Error   func(*Config, error)
 }
@@ -97,7 +98,13 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 				return
 			}
 
+			// match first by full name of the form lookup/type -- 'specialization'
 			r, has := m.rules[req.Plugin]
+			if !has {
+				// match now by lookup only -- 'base class'
+				alternate, _ := req.Plugin.GetLookupAndType()
+				r, has = m.rules[plugin.Name(alternate)]
+			}
 			if !has {
 				log.Warningln("no plugin:", req)
 				req.reportError(r.Launch.Properties, errNoConfig)
@@ -109,7 +116,7 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 				*configCopy = *r.Launch.Properties
 			}
 
-			block, err := m.exec.Exec(r.Plugin, configCopy)
+			block, err := m.exec.Exec(r.Plugin.String(), configCopy)
 			if err != nil {
 				req.reportError(configCopy, err)
 				continue loop

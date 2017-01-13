@@ -108,3 +108,53 @@ func TestMonitorLoopValidRule(t *testing.T) {
 
 	monitor.Stop()
 }
+
+func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
+	raw := &Config{}
+	config := &testConfig{
+		Cmd:  "hello",
+		Args: []string{"world", "hello"},
+	}
+
+	rawErr := raw.Marshal(config)
+	require.NoError(t, rawErr)
+	require.True(t, len([]byte(*raw)) > 0)
+
+	var receivedArgs *Config
+	rule := Rule{
+		Plugin: "hello",
+		Launch: ExecRule{
+			Exec:       "test",
+			Properties: raw,
+		},
+	}
+	monitor := NewMonitor(&testLauncher{
+		name: "test",
+		t:    t,
+		callback: func(c *Config) {
+			receivedArgs = c
+		},
+	}, []Rule{rule})
+
+	input, err := monitor.Start()
+	require.NoError(t, err)
+	require.NotNil(t, input)
+
+	started := make(chan interface{})
+	input <- StartPlugin{
+		Plugin: "hello",
+		Started: func(config *Config) {
+			close(started)
+		},
+	}
+
+	<-started
+
+	expected := &Config{}
+	err = expected.Marshal(config)
+	require.NoError(t, err)
+
+	require.Equal(t, *expected, *receivedArgs)
+
+	monitor.Stop()
+}
