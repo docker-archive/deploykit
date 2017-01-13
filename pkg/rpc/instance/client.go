@@ -9,18 +9,18 @@ import (
 )
 
 // NewClient returns a plugin interface implementation connected to a plugin
-func NewClient(name, socketPath string) instance.Plugin {
+func NewClient(name plugin.Name, socketPath string) instance.Plugin {
 	return &client{name: name, client: rpc_client.New(socketPath, instance.InterfaceSpec)}
 }
 
 type client struct {
-	name   string
+	name   plugin.Name
 	client rpc_client.Client
 }
 
 // Validate performs local validation on a provision request.
 func (c client) Validate(properties json.RawMessage) error {
-	_, instanceType := plugin.GetLookupAndType(c.name)
+	_, instanceType := c.name.GetLookupAndType()
 	req := ValidateRequest{Properties: &properties, Type: instanceType}
 	resp := ValidateResponse{}
 
@@ -29,7 +29,7 @@ func (c client) Validate(properties json.RawMessage) error {
 
 // Provision creates a new instance based on the spec.
 func (c client) Provision(spec instance.Spec) (*instance.ID, error) {
-	_, instanceType := plugin.GetLookupAndType(c.name)
+	_, instanceType := c.name.GetLookupAndType()
 	req := ProvisionRequest{Spec: spec, Type: instanceType}
 	resp := ProvisionResponse{}
 
@@ -42,7 +42,7 @@ func (c client) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // Destroy terminates an existing instance.
 func (c client) Destroy(instance instance.ID) error {
-	_, instanceType := plugin.GetLookupAndType(c.name)
+	_, instanceType := c.name.GetLookupAndType()
 	req := DestroyRequest{Instance: instance, Type: instanceType}
 	resp := DestroyResponse{}
 
@@ -51,7 +51,7 @@ func (c client) Destroy(instance instance.ID) error {
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (c client) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
-	_, instanceType := plugin.GetLookupAndType(c.name)
+	_, instanceType := c.name.GetLookupAndType()
 	req := DescribeInstancesRequest{Tags: tags, Type: instanceType}
 	resp := DescribeInstancesResponse{}
 

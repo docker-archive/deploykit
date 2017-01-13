@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/stretchr/testify/require"
@@ -51,7 +52,7 @@ func tempSocket() string {
 
 func TestInstancePluginValidate(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 
@@ -78,7 +79,7 @@ func TestInstancePluginValidate(t *testing.T) {
 func TestInstancePluginValidateError(t *testing.T) {
 
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 	rawActual := make(chan json.RawMessage, 1)
@@ -103,7 +104,7 @@ func TestInstancePluginValidateError(t *testing.T) {
 
 func TestInstancePluginProvisionNil(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -130,7 +131,7 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 
 func TestInstancePluginProvision(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -158,7 +159,7 @@ func TestInstancePluginProvision(t *testing.T) {
 
 func TestInstancePluginProvisionError(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -184,7 +185,7 @@ func TestInstancePluginProvisionError(t *testing.T) {
 
 func TestInstancePluginDestroy(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
@@ -207,7 +208,7 @@ func TestInstancePluginDestroy(t *testing.T) {
 
 func TestInstancePluginDestroyError(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
@@ -230,7 +231,7 @@ func TestInstancePluginDestroyError(t *testing.T) {
 
 func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	var tags map[string]string
 	tagsActual := make(chan map[string]string, 1)
@@ -254,7 +255,7 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 
 func TestInstancePluginDescribeInstances(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	tags := map[string]string{
 		"foo": "bar",
@@ -281,7 +282,7 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 
 func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	socketPath := tempSocket()
-	name := filepath.Base(socketPath)
+	name := plugin.Name(filepath.Base(socketPath))
 
 	tags := map[string]string{
 		"foo": "bar",

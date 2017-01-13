@@ -7,6 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_server "github.com/docker/infrakit/pkg/rpc/group"
@@ -40,7 +41,7 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
-			return instance_client.NewClient(n, endpoint.Address), nil
+			return instance_client.NewClient(plugin.Name(n), endpoint.Address), nil
 		}
 
 		flavorPluginLookup := func(n string) (flavor.Plugin, error) {

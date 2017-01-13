@@ -10,6 +10,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
@@ -31,7 +32,7 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		instancePlugin = instance_plugin.NewClient(*name, endpoint.Address)
+		instancePlugin = instance_plugin.NewClient(plugin.Name(*name), endpoint.Address)
 
 		return nil
 	}

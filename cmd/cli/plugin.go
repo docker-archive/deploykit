@@ -7,6 +7,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/os"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
@@ -96,16 +97,16 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		// now start all the plugins
-		for _, plugin := range args {
-			fmt.Println("Starting up", plugin)
+		for _, pluginToStart := range args {
+			fmt.Println("Starting up", pluginToStart)
 
 			wait.Add(1)
 
 			for _, ch := range input {
 
-				name := plugin
+				name := pluginToStart
 				ch <- launch.StartPlugin{
-					Plugin: name,
+					Plugin: plugin.Name(name),
 					Started: func(config *launch.Config) {
 						fmt.Println(name, "started.")
 						wait.Done()

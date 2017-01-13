@@ -18,7 +18,7 @@ type dirPluginDiscovery struct {
 
 // Find returns a plugin by name
 func (r *dirPluginDiscovery) Find(name string) (*plugin.Endpoint, error) {
-	lookup, _ := plugin.GetLookupAndType(name)
+	lookup, _ := plugin.Name(name).GetLookupAndType()
 	plugins, err := r.List()
 	if err != nil {
 		return nil, err

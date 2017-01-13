@@ -7,15 +7,19 @@ import (
 )
 
 func TestGetLookupAndType(t *testing.T) {
-	lookup, instanceType := GetLookupAndType("instance-file")
+
+	ref := Name("instance-file")
+	lookup, instanceType := ref.GetLookupAndType()
 	require.Equal(t, "instance-file", lookup)
 	require.Equal(t, "", instanceType)
 
-	lookup, instanceType = GetLookupAndType("instance-file/json")
+	ref = Name("instance-file/json")
+	lookup, instanceType = ref.GetLookupAndType()
 	require.Equal(t, "instance-file", lookup)
 	require.Equal(t, "json", instanceType)
 
-	lookup, instanceType = GetLookupAndType("instance-file/text/html")
+	ref = Name("instance-file/text/html")
+	lookup, instanceType = ref.GetLookupAndType()
 	require.Equal(t, "instance-file", lookup)
 	require.Equal(t, "text/html", instanceType)
 }
