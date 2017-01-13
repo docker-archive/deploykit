@@ -102,7 +102,7 @@ project, so please double-check where the code lives before filing InfraKit issu
 Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
 
 ### Creating a plugin
-A plugin must be an HTTP server that implements one of the plugin [APIs](#apis), lisetning on a Unix socket.  While
+A plugin must be an HTTP server that implements one of the plugin [APIs](#apis), listening on a Unix socket.  While
 a plugin can be written in any programming language, [utilities](pkg/rpc) are available as libraries to simplify Plugin
 development in Go.  Our [reference implementations](#reference-implementations) should provide a good starting point
 for building a new plugin using these utilities.
@@ -112,7 +112,7 @@ _InfraKit_ plugins are exposed via HTTP, using [JSON-RPC 2.0](http://www.jsonrpc
 
 API requests can be made manually with `curl`.  For example, the following command will list all groups:
 ```console
-$ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
+$ curl -X POST --unix-socket ~/.infrakit/plugins/group http://rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"Group.InspectGroups","params":{},"id":1}'
 {"jsonrpc":"2.0","result":{"Groups":null},"id":1}
@@ -120,7 +120,7 @@ $ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
 
 API errors are surfaced with the `error` response field:
 ```console
-$ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
+$ curl -X POST --unix-socket ~/.infrakit/plugins/group http://rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"Group.CommitGroup","params":{},"id":1}'
 {"jsonrpc":"2.0","error":{"code":-32000,"message":"Group ID must not be blank","data":null},"id":1}
@@ -141,7 +141,7 @@ Plugins are required to identify the name and version of plugin APIs they implem
 like the following:
 
 ```console
-$ curl -X POST --unix-socket ~/.infrakit/plugins/group http:/rpc \
+$ curl -X POST --unix-socket ~/.infrakit/plugins/group http://rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"Plugin.Implements","params":{},"id":1}'
 {"jsonrpc":"2.0","result":{"Interfaces":[{"Name":"Group","Version":"0.1.0"}]},"id":1}
