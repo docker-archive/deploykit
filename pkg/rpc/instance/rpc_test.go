@@ -3,8 +3,10 @@ package instance
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/stretchr/testify/require"
@@ -49,8 +51,8 @@ func tempSocket() string {
 }
 
 func TestInstancePluginValidate(t *testing.T) {
-
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 
@@ -66,7 +68,7 @@ func TestInstancePluginValidate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).Validate(raw)
+	err = NewClient(name, socketPath).Validate(raw)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -77,6 +79,8 @@ func TestInstancePluginValidate(t *testing.T) {
 func TestInstancePluginValidateError(t *testing.T) {
 
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
+
 	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
 	rawActual := make(chan json.RawMessage, 1)
 
@@ -90,7 +94,7 @@ func TestInstancePluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).Validate(raw)
+	err = NewClient(name, socketPath).Validate(raw)
 	require.Error(t, err)
 	require.Equal(t, "whoops", err.Error())
 
@@ -100,6 +104,7 @@ func TestInstancePluginValidateError(t *testing.T) {
 
 func TestInstancePluginProvisionNil(t *testing.T) {
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -115,7 +120,7 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 	require.NoError(t, err)
 
 	var id *instance.ID
-	id, err = NewClient(socketPath).Provision(spec)
+	id, err = NewClient(name, socketPath).Provision(spec)
 	require.NoError(t, err)
 	require.Nil(t, id)
 
@@ -126,6 +131,7 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 
 func TestInstancePluginProvision(t *testing.T) {
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -142,7 +148,7 @@ func TestInstancePluginProvision(t *testing.T) {
 	require.NoError(t, err)
 
 	var id *instance.ID
-	id, err = NewClient(socketPath).Provision(spec)
+	id, err = NewClient(name, socketPath).Provision(spec)
 	require.NoError(t, err)
 	require.Equal(t, "test", string(*id))
 
@@ -153,6 +159,7 @@ func TestInstancePluginProvision(t *testing.T) {
 
 func TestInstancePluginProvisionError(t *testing.T) {
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	raw := json.RawMessage([]byte(`{"test":"foo"}`))
 	specActual := make(chan instance.Spec, 1)
@@ -167,7 +174,7 @@ func TestInstancePluginProvisionError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(socketPath).Provision(spec)
+	_, err = NewClient(name, socketPath).Provision(spec)
 	require.Error(t, err)
 	require.Equal(t, "nope", err.Error())
 
@@ -178,6 +185,7 @@ func TestInstancePluginProvisionError(t *testing.T) {
 
 func TestInstancePluginDestroy(t *testing.T) {
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
@@ -190,7 +198,7 @@ func TestInstancePluginDestroy(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).Destroy(inst)
+	err = NewClient(name, socketPath).Destroy(inst)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -200,6 +208,7 @@ func TestInstancePluginDestroy(t *testing.T) {
 
 func TestInstancePluginDestroyError(t *testing.T) {
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	inst := instance.ID("hello")
 	instActual := make(chan instance.ID, 1)
@@ -212,7 +221,7 @@ func TestInstancePluginDestroyError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).Destroy(inst)
+	err = NewClient(name, socketPath).Destroy(inst)
 	require.Error(t, err)
 	require.Equal(t, "can't do", err.Error())
 
@@ -222,6 +231,7 @@ func TestInstancePluginDestroyError(t *testing.T) {
 
 func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	var tags map[string]string
 	tagsActual := make(chan map[string]string, 1)
@@ -235,7 +245,7 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 		},
 	}))
 
-	l, err := NewClient(socketPath).DescribeInstances(tags)
+	l, err := NewClient(name, socketPath).DescribeInstances(tags)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -245,6 +255,7 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 
 func TestInstancePluginDescribeInstances(t *testing.T) {
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	tags := map[string]string{
 		"foo": "bar",
@@ -261,7 +272,7 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	l, err := NewClient(socketPath).DescribeInstances(tags)
+	l, err := NewClient(name, socketPath).DescribeInstances(tags)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -271,6 +282,7 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 
 func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
 
 	tags := map[string]string{
 		"foo": "bar",
@@ -287,7 +299,7 @@ func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(socketPath).DescribeInstances(tags)
+	_, err = NewClient(name, socketPath).DescribeInstances(tags)
 	require.Error(t, err)
 	require.Equal(t, "bad", err.Error())
 

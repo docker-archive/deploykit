@@ -10,6 +10,7 @@ import (
 	"time"
 
 	plugin_mock "github.com/docker/infrakit/pkg/mock/spi/instance"
+	"github.com/docker/infrakit/pkg/plugin"
 	plugin_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
@@ -41,10 +42,11 @@ func TestUnixSocketServer(t *testing.T) {
 	service := plugin_rpc.PluginServer(mock)
 
 	socket := filepath.Join(os.TempDir(), fmt.Sprintf("%d.sock", time.Now().Unix()))
+	name := plugin.Name(filepath.Base(socket))
 	server, err := StartPluginAtPath(socket, service)
 	require.NoError(t, err)
 
-	c := plugin_rpc.NewClient(socket)
+	c := plugin_rpc.NewClient(name, socket)
 
 	err = c.Validate(properties)
 	require.Error(t, err)

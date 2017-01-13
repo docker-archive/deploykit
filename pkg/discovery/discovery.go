@@ -11,6 +11,7 @@ import (
 
 // Plugins provides access to plugin discovery.
 type Plugins interface {
+	// Find looks up the plugin by name.  The name can be of the form $lookup[/$subtype].  See GetLookupAndType().
 	Find(name string) (*plugin.Endpoint, error)
 	List() (map[string]*plugin.Endpoint, error)
 }
