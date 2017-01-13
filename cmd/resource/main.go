@@ -6,9 +6,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
-	plugin_resource "github.com/docker/infrakit/pkg/plugin/resource"
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/plugin/resource"
 	group_server "github.com/docker/infrakit/pkg/rpc/group"
-	spi_resource "github.com/docker/infrakit/pkg/spi/resource"
+	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
 
@@ -29,15 +31,15 @@ func main() {
 			return err
 		}
 
-		resourcePluginLookup := func(n string) (spi_resource.Plugin, error) {
+		instancePluginLookup := func(n string) (instance.Plugin, error) {
 			endpoint, err := plugins.Find(n)
 			if err != nil {
 				return nil, err
 			}
-			return resource_client.NewClient(endpoint.Address), nil
+			return instance_client.NewClient(plugin.Name(n), endpoint.Address), nil
 		}
 
-		cli.RunPlugin(*name, group_server.PluginServer(plugin_resource.NewResourcePlugin(resourcePluginLookup)))
+		cli.RunPlugin(*name, group_server.PluginServer(resource.NewResourcePlugin(instancePluginLookup)))
 
 		return nil
 	}

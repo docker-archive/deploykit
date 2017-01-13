@@ -10,9 +10,10 @@ import (
 	"text/template"
 
 	log "github.com/Sirupsen/logrus"
+	plugin_group "github.com/docker/infrakit/pkg/plugin/group"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
-	spi_resource "github.com/docker/infrakit/pkg/spi/resource"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/twmb/algoimpl/go/graph"
 )
 
@@ -21,35 +22,25 @@ const (
 	resourceNameTag  = "infrakit.resource-name"
 )
 
-// ResourcePluginLookup looks up a resource plugin by name.
-type ResourcePluginLookup func(string) (spi_resource.Plugin, error)
-
 // NewResourcePlugin creates a new resource plugin.
-func NewResourcePlugin(resourcePlugins ResourcePluginLookup) group.Plugin {
+func NewResourcePlugin(instancePlugins plugin_group.InstancePluginLookup) group.Plugin {
 	return &plugin{
-		resourcePlugins: resourcePlugins,
+		instancePlugins: instancePlugins,
 	}
-}
-
-// ResourceConfig is the structure that describes a resource plugin.
-type ResourceConfig struct {
-	Plugin     string
-	Type       string
-	Properties *json.RawMessage // this will be the Spec of the plugin
 }
 
 // Spec is the configuration schema for this plugin, provided in group.Spec.Properties.
 type Spec struct {
-	Resources map[string]ResourceConfig
+	Resources map[string]types.InstancePlugin
 }
 
 type resource struct {
-	plugin spi_resource.Plugin
-	config ResourceConfig
+	plugin instance.Plugin
+	config types.InstancePlugin
 }
 
 type plugin struct {
-	resourcePlugins ResourcePluginLookup
+	instancePlugins plugin_group.InstancePluginLookup
 }
 
 func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
@@ -60,11 +51,11 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 
 	resources := map[string]*resource{}
 	for name, resourceConfig := range spec.Resources {
-		resourcePlugin, err := p.resourcePlugins(resourceConfig.Plugin)
+		resourcePlugin, err := p.instancePlugins(resourceConfig.Plugin)
 		if err != nil {
 			return "", fmt.Errorf("Failed to find resource plugin %s: %s", resourceConfig.Plugin, err)
 		}
-		if err := resourcePlugin.Validate(resourceConfig.Type, types.RawMessage(resourceConfig.Properties)); err != nil {
+		if err := resourcePlugin.Validate(types.RawMessage(resourceConfig.Properties)); err != nil {
 			return "", err
 		}
 		resources[name] = &resource{plugin: resourcePlugin, config: resourceConfig}
@@ -75,10 +66,10 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		return "", err
 	}
 
-	resourceIDs := map[string]struct{ spi_resource.ID }{}
+	resourceIDs := map[string]struct{ instance.ID }{}
 	for name, resource := range resources {
-		tags := map[string]string{resourceGroupTag: string(config.ID), resourceTag: name}
-		descriptions, err := resource.plugin.DescribeResources(resource.config.Type, tags)
+		tags := map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name}
+		descriptions, err := resource.plugin.DescribeInstances(tags)
 		if err != nil {
 			return "", fmt.Errorf("Describe failed for %s: %s", name, err)
 		}
@@ -88,9 +79,9 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 			break
 		case 1:
 			log.Infof("Found %s with ID %s", name, descriptions[0].ID)
-			resourceIDs[name] = struct{ spi_resource.ID }{descriptions[0].ID}
+			resourceIDs[name] = struct{ instance.ID }{descriptions[0].ID}
 		default:
-			var ids []spi_resource.ID
+			var ids []instance.ID
 			for _, d := range descriptions {
 				ids = append(ids, d.ID)
 			}
@@ -110,16 +101,15 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 			return "", fmt.Errorf("Failed to get properties for %s: %s", name, err)
 		}
 
-		id, err := resource.plugin.Provision(spi_resource.Spec{
-			Type:       resource.config.Type,
+		id, err := resource.plugin.Provision(instance.Spec{
 			Properties: &properties,
-			Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceTag: name},
+			Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name},
 		})
 		if err != nil {
 			return "", fmt.Errorf("Failed to provision %s: %s", name, err)
 		}
 		log.Infof("Provisioned %s with ID %s", name, *id)
-		resourceIDs[name] = struct{ spi_resource.ID }{*id}
+		resourceIDs[name] = struct{ instance.ID }{*id}
 	}
 
 	return fmt.Sprintf("Found %d resources and created %d ", numFound, len(resourceIDs)-numFound), nil

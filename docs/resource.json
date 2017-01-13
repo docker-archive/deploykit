@@ -3,14 +3,14 @@
   "Properties": {
     "Resources": {
       "resource_a": {
-        "Plugin": "resource-file",
+        "Plugin": "instance-file",
         "Type": "a",
         "Properties": {
           "Note": "Depends on {{.Resources.resource_b.ID}}"
         }
       },
       "resource_b": {
-        "Plugin": "resource-file",
+        "Plugin": "instance-file",
         "Type": "b",
         "Properties": {
         }
