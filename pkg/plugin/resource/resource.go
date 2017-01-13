@@ -1,4 +1,4 @@
-package bootstrap
+package resource
 
 import (
 	"bytes"
@@ -17,15 +17,15 @@ import (
 )
 
 const (
-	bootstrapTag = "infrakit.bootstrap"
-	resourceTag  = "infrakit.resource"
+	resourceGroupTag = "infrakit.resource-group"
+	resourceNameTag  = "infrakit.resource-name"
 )
 
 // ResourcePluginLookup looks up a resource plugin by name.
 type ResourcePluginLookup func(string) (spi_resource.Plugin, error)
 
-// NewBootstrapPlugin creates a new bootstrap plugin.
-func NewBootstrapPlugin(resourcePlugins ResourcePluginLookup) group.Plugin {
+// NewResourcePlugin creates a new resource plugin.
+func NewResourcePlugin(resourcePlugins ResourcePluginLookup) group.Plugin {
 	return &plugin{
 		resourcePlugins: resourcePlugins,
 	}
@@ -77,7 +77,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 
 	resourceIDs := map[string]struct{ spi_resource.ID }{}
 	for name, resource := range resources {
-		tags := map[string]string{bootstrapTag: string(config.ID), resourceTag: name}
+		tags := map[string]string{resourceGroupTag: string(config.ID), resourceTag: name}
 		descriptions, err := resource.plugin.DescribeResources(resource.config.Type, tags)
 		if err != nil {
 			return "", fmt.Errorf("Describe failed for %s: %s", name, err)
@@ -113,7 +113,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		id, err := resource.plugin.Provision(spi_resource.Spec{
 			Type:       resource.config.Type,
 			Properties: &properties,
-			Tags:       map[string]string{bootstrapTag: string(config.ID), resourceTag: name},
+			Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceTag: name},
 		})
 		if err != nil {
 			return "", fmt.Errorf("Failed to provision %s: %s", name, err)
