@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -22,4 +23,26 @@ func (r Name) GetLookupAndType() (string, string) {
 // String returns the string representation
 func (r Name) String() string {
 	return string(r)
+}
+
+// MarshalJSON implements the JSON marshaler interface
+func (r *Name) MarshalJSON() ([]byte, error) {
+	if r == nil {
+		return nil, nil
+	}
+	return []byte(r.String()), nil
+}
+
+// UnmarshalJSON implements the JSON unmarshaler interface
+func (r *Name) UnmarshalJSON(data []byte) error {
+	str := string(data)
+	start := strings.Index(str, "\"")
+	last := strings.LastIndex(str, "\"")
+	if start == 0 && last == len(str)-1 {
+		str = str[start+1 : last]
+	} else {
+		return fmt.Errorf("bad-format-for-name:%v", string(data))
+	}
+	*r = Name(str)
+	return nil
 }

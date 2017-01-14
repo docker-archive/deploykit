@@ -27,7 +27,7 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 
-		endpoint, err := plugins().Find(*name)
+		endpoint, err := plugins().Find(plugin.Name(*name))
 		if err != nil {
 			return err
 		}

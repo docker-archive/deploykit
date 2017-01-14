@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
@@ -24,13 +26,13 @@ type AllocationMethod struct {
 
 // InstancePlugin is the structure that describes an instance plugin.
 type InstancePlugin struct {
-	Plugin     string
+	Plugin     plugin.Name
 	Properties *json.RawMessage // this will be the Spec of the plugin
 }
 
 // FlavorPlugin describes the flavor configuration
 type FlavorPlugin struct {
-	Plugin     string
+	Plugin     plugin.Name
 	Properties *json.RawMessage // this will be the Spec of the plugin
 }
 

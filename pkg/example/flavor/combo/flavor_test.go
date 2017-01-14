@@ -3,14 +3,16 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"testing"
+
 	mock_flavor "github.com/docker/infrakit/pkg/mock/spi/flavor"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func jsonPtr(v string) *json.RawMessage {
@@ -32,8 +34,8 @@ var inst = instance.Spec{
 }
 
 func pluginLookup(plugins map[string]flavor.Plugin) group.FlavorPluginLookup {
-	return func(key string) (flavor.Plugin, error) {
-		plugin, has := plugins[key]
+	return func(key plugin.Name) (flavor.Plugin, error) {
+		plugin, has := plugins[key.String()]
 		if has {
 			return plugin, nil
 		}
