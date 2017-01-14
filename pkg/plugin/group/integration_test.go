@@ -39,8 +39,8 @@ func flavorPluginLookup(_ plugin_base.Name) (flavor.Plugin, error) {
 	return &testFlavor{}, nil
 }
 
-func minionProperties(instances int, instanceData string, flavorInit string) *json.RawMessage {
-	r := json.RawMessage(fmt.Sprintf(`{
+func minionProperties(instances int, instanceData string, flavorInit string) *plugin_base.Any {
+	return plugin_base.AnyString(fmt.Sprintf(`{
 	  "Allocation": {
 	    "Size": %d
 	  },
@@ -58,16 +58,15 @@ func minionProperties(instances int, instanceData string, flavorInit string) *js
 	      }
           }
 	}`, instances, instanceData, flavorInit))
-	return &r
 }
 
-func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMessage {
+func leaderProperties(logicalIDs []instance.LogicalID, data string) *plugin_base.Any {
 	idsValue, err := json.Marshal(logicalIDs)
 	if err != nil {
 		panic(err)
 	}
 
-	r := json.RawMessage(fmt.Sprintf(`{
+	return plugin_base.AnyString(fmt.Sprintf(`{
 	  "Allocation": {
 	    "LogicalIDs": %s
 	  },
@@ -84,7 +83,6 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMes
 	      }
           }
 	}`, idsValue, data))
-	return &r
 }
 
 func pluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLookup {
@@ -437,7 +435,7 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 		require.Equal(t, "updated init", inst.Init)
 
 		properties := map[string]string{}
-		err = json.Unmarshal(types.RawMessage(inst.Properties), &properties)
+		err = plugin_base.AnyBytes([]byte(*inst.Properties)).Decode(&properties)
 		require.NoError(t, err)
 		require.Equal(t, "data2", properties["OpaqueValue"])
 	}

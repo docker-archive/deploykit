@@ -27,20 +27,22 @@ type AllocationMethod struct {
 // InstancePlugin is the structure that describes an instance plugin.
 type InstancePlugin struct {
 	Plugin     plugin.Name
-	Properties *json.RawMessage // this will be the Spec of the plugin
+	Properties *plugin.Any // this will be the Spec of the plugin
 }
 
 // FlavorPlugin describes the flavor configuration
 type FlavorPlugin struct {
 	Plugin     plugin.Name
-	Properties *json.RawMessage // this will be the Spec of the plugin
+	Properties *plugin.Any // this will be the Spec of the plugin
 }
 
 // ParseProperties parses the group plugin properties JSON document in a group configuration.
 func ParseProperties(config group.Spec) (Spec, error) {
 	parsed := Spec{}
-	if err := json.Unmarshal([]byte(RawMessage(config.Properties)), &parsed); err != nil {
-		return parsed, fmt.Errorf("Invalid properties: %s", err)
+	if config.Properties != nil {
+		if err := config.Properties.Decode(&parsed); err != nil {
+			return parsed, fmt.Errorf("Invalid properties: %s", err)
+		}
 	}
 	return parsed, nil
 }
@@ -48,12 +50,11 @@ func ParseProperties(config group.Spec) (Spec, error) {
 // UnparseProperties composes group.spec from id and props
 func UnparseProperties(id string, props Spec) (group.Spec, error) {
 	unparsed := group.Spec{ID: group.ID(id)}
-	b, err := json.Marshal(props)
+	any, err := plugin.AnyValue(props)
 	if err != nil {
-		return unparsed, fmt.Errorf("Invalid properties: %s", err)
+		return unparsed, err
 	}
-	rawMessage := json.RawMessage(b)
-	unparsed.Properties = &rawMessage
+	unparsed.Properties = any
 	return unparsed, nil
 }
 
@@ -103,9 +104,18 @@ func (c Spec) InstanceHash() string {
 // an empty raw message.  This is useful for structs where fields are json.RawMessage pointers for bi-directional
 // marshal and unmarshal (value receivers will encode base64 instead of raw json when marshaled), so bi-directional
 // structs should use pointer fields.
-func RawMessage(r *json.RawMessage) (raw json.RawMessage) {
+func RawMessage(r *plugin.Any) (raw json.RawMessage) {
 	if r != nil {
-		raw = *r
+		raw = json.RawMessage(r.Bytes())
 	}
 	return
+}
+
+// RawMessagePtr makes a copy of the Any and make it available as a pointer to a JSON raw message
+func RawMessagePtr(r *plugin.Any) *json.RawMessage {
+	if r == nil {
+		return nil
+	}
+	raw := json.RawMessage(r.Bytes())
+	return &raw
 }

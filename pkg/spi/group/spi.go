@@ -1,7 +1,7 @@
 package group
 
 import (
-	"encoding/json"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
@@ -35,10 +35,10 @@ type Spec struct {
 	ID ID
 
 	// Properties is the configuration for the group.
-	// The schema for the raw JSON can be found as the *.Spec of the plugin used.
+	// The schema for the raw Any can be found as the *.Spec of the plugin used.
 	// For instance, if the default group plugin is used, the value here will be
-	// a JSON representation of github.com/docker/infrakit/plugin/group/types.Spec
-	Properties *json.RawMessage
+	// an Any / encoded representation of github.com/docker/infrakit/plugin/group/types.Spec
+	Properties *plugin.Any
 }
 
 // Description is a placeholder for the reported state of a Group.

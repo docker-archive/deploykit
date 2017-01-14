@@ -12,6 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	group_mock "github.com/docker/infrakit/pkg/mock/spi/group"
 	store_mock "github.com/docker/infrakit/pkg/mock/store"
+	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -94,10 +95,9 @@ func testDiscoveryDir(t *testing.T) string {
 }
 
 func testBuildGroupSpec(groupID, properties string) group.Spec {
-	raw := json.RawMessage([]byte(properties))
 	return group.Spec{
 		ID:         group.ID(groupID),
-		Properties: &raw,
+		Properties: plugin.AnyString(properties),
 	}
 }
 
@@ -115,9 +115,9 @@ func testBuildGlobalSpec(t *testing.T, gs group.Spec) GlobalSpec {
 	}
 }
 
-func testToStruct(m *json.RawMessage) interface{} {
+func testToStruct(m *plugin.Any) interface{} {
 	o := map[string]interface{}{}
-	json.Unmarshal([]byte(*m), &o)
+	m.Decode(&o)
 	return &o
 }
 
