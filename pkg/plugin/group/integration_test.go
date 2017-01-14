@@ -3,15 +3,17 @@ package group
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"sync"
-	"testing"
-	"time"
 )
 
 const (
@@ -33,7 +35,7 @@ var (
 	leaderIDs = []instance.LogicalID{"192.168.0.4", "192.168.0.5", "192.168.0.6"}
 )
 
-func flavorPluginLookup(_ string) (flavor.Plugin, error) {
+func flavorPluginLookup(_ plugin_base.Name) (flavor.Plugin, error) {
 	return &testFlavor{}, nil
 }
 
@@ -86,8 +88,8 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMes
 }
 
 func pluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLookup {
-	return func(key string) (instance.Plugin, error) {
-		if key == pluginName {
+	return func(key plugin_base.Name) (instance.Plugin, error) {
+		if key.String() == pluginName {
 			return plugin, nil
 		}
 		return nil, nil
@@ -185,7 +187,7 @@ func TestRollingUpdate(t *testing.T) {
 			return flavor.Unhealthy, nil
 		},
 	}
-	flavorLookup := func(_ string) (flavor.Plugin, error) {
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
 		return &flavorPlugin, nil
 	}
 
@@ -492,7 +494,7 @@ func TestFreeGroupWhileConverging(t *testing.T) {
 			return flavor.Unknown, nil
 		},
 	}
-	flavorLookup := func(_ string) (flavor.Plugin, error) {
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
 		return &flavorPlugin, nil
 	}
 
@@ -533,7 +535,7 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 			return flavor.Healthy, nil
 		},
 	}
-	flavorLookup := func(_ string) (flavor.Plugin, error) {
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
 		return &flavorPlugin, nil
 	}
 

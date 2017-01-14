@@ -6,6 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/spf13/cobra"
@@ -27,7 +28,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		flavorPluginLookup := func(n string) (flavor.Plugin, error) {
+		flavorPluginLookup := func(n plugin.Name) (flavor.Plugin, error) {
 			endpoint, err := plugins.Find(n)
 			if err != nil {
 				return nil, err

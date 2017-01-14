@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/stretchr/testify/require"
@@ -44,11 +45,11 @@ func TestDirDiscovery(t *testing.T) {
 	discover, err := newDirPluginDiscovery(dir)
 	require.NoError(t, err)
 
-	p, err := discover.Find(name1)
+	p, err := discover.Find(plugin.Name(name1))
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
-	p, err = discover.Find(name2)
+	p, err = discover.Find(plugin.Name(name2))
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
@@ -56,10 +57,10 @@ func TestDirDiscovery(t *testing.T) {
 	server1.Stop()
 	blockWhileFileExists(path1)
 
-	p, err = discover.Find(name1)
+	p, err = discover.Find(plugin.Name(name1))
 	require.Error(t, err)
 
-	p, err = discover.Find(name2)
+	p, err = discover.Find(plugin.Name(name2))
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
@@ -67,10 +68,10 @@ func TestDirDiscovery(t *testing.T) {
 
 	blockWhileFileExists(path2)
 
-	p, err = discover.Find(name1)
+	p, err = discover.Find(plugin.Name(name1))
 	require.Error(t, err)
 
-	p, err = discover.Find(name2)
+	p, err = discover.Find(plugin.Name(name2))
 	require.Error(t, err)
 
 	list, err := discover.List()
