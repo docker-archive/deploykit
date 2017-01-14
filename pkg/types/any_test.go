@@ -1,4 +1,4 @@
-package plugin
+package types
 
 import (
 	"encoding/json"
@@ -6,6 +6,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+type testSpec2 struct {
+	Properties *Any `json:"properties,omitempty"`
+}
+
+type testSpec struct {
+	Properties *Any      `json:"properties,omitempty"`
+	Nested     testSpec2 `json:"nested"`
+}
 
 type testCantMarshal struct {
 	Private func() error
@@ -23,10 +32,8 @@ func TestMarshalUnmarshalAny(t *testing.T) {
 	require.NoError(t, err)
 
 	spec := testSpec{
-		Plugin:     Name("instance-file/type1"),
 		Properties: config1,
 		Nested: testSpec2{
-			Plugin:     Name("instance-file/type2"),
 			Properties: config2,
 		},
 	}
@@ -56,10 +63,8 @@ func TestMarshalUnmarshalAny(t *testing.T) {
 			}
 		}()
 		spec = testSpec{
-			Plugin:     Name("instance-file/type1"),
 			Properties: AnyValueMust(testCantMarshal{Private: func() error { return nil }}),
 			Nested: testSpec2{
-				Plugin:     Name("instance-file/type2"),
 				Properties: AnyValueMust(nil),
 			},
 		}

@@ -26,14 +26,12 @@ func TestGetLookupAndType(t *testing.T) {
 }
 
 type testSpec2 struct {
-	Plugin     Name `json:"plugin"`
-	Properties *Any `json:"properties,omitempty"`
+	Plugin Name `json:"plugin"`
 }
 
 type testSpec struct {
-	Plugin     Name      `json:"plugin"`
-	Properties *Any      `json:"properties,omitempty"`
-	Nested     testSpec2 `json:"nested"`
+	Plugin Name      `json:"plugin"`
+	Nested testSpec2 `json:"nested"`
 }
 
 func TestMarshalUnmarshal(t *testing.T) {

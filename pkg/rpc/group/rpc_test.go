@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/docker/infrakit/pkg/plugin"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"path"
@@ -52,7 +52,7 @@ func TestGroupPluginCommitGroup(t *testing.T) {
 	groupSpecActual := make(chan group.Spec, 1)
 	groupSpec := group.Spec{
 		ID:         group.ID("group"),
-		Properties: plugin.AnyString(`{"foo":"bar"}`),
+		Properties: types.AnyString(`{"foo":"bar"}`),
 	}
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
@@ -78,7 +78,7 @@ func TestGroupPluginCommitGroupError(t *testing.T) {
 	groupSpecActual := make(chan group.Spec, 1)
 	groupSpec := group.Spec{
 		ID:         group.ID("group"),
-		Properties: plugin.AnyString(`{"foo":"bar"}`),
+		Properties: types.AnyString(`{"foo":"bar"}`),
 	}
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{

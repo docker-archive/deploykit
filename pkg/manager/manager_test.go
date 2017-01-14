@@ -12,10 +12,10 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	group_mock "github.com/docker/infrakit/pkg/mock/spi/group"
 	store_mock "github.com/docker/infrakit/pkg/mock/store"
-	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -97,7 +97,7 @@ func testDiscoveryDir(t *testing.T) string {
 func testBuildGroupSpec(groupID, properties string) group.Spec {
 	return group.Spec{
 		ID:         group.ID(groupID),
-		Properties: plugin.AnyString(properties),
+		Properties: types.AnyString(properties),
 	}
 }
 
@@ -115,7 +115,7 @@ func testBuildGlobalSpec(t *testing.T, gs group.Spec) GlobalSpec {
 	}
 }
 
-func testToStruct(m *plugin.Any) interface{} {
+func testToStruct(m *types.Any) interface{} {
 	o := map[string]interface{}{}
 	m.Decode(&o)
 	return &o

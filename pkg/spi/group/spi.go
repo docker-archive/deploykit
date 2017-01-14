@@ -1,9 +1,9 @@
 package group
 
 import (
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // InterfaceSpec is the current name and version of the Group API.
@@ -38,7 +38,7 @@ type Spec struct {
 	// The schema for the raw Any can be found as the *.Spec of the plugin used.
 	// For instance, if the default group plugin is used, the value here will be
 	// an Any / encoded representation of github.com/docker/infrakit/plugin/group/types.Spec
-	Properties *plugin.Any
+	Properties *types.Any
 }
 
 // Description is a placeholder for the reported state of a Group.
