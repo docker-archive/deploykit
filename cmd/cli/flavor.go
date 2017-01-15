@@ -34,7 +34,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		flavorPlugin = flavor_plugin.NewClient(endpoint.Address)
+		flavorPlugin = flavor_plugin.NewClient(plugin.Name(*name), endpoint.Address)
 
 		return nil
 	}
