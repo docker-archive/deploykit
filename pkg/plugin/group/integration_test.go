@@ -9,10 +9,11 @@ import (
 	"time"
 
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,8 +40,8 @@ func flavorPluginLookup(_ plugin_base.Name) (flavor.Plugin, error) {
 	return &testFlavor{}, nil
 }
 
-func minionProperties(instances int, instanceData string, flavorInit string) *json.RawMessage {
-	r := json.RawMessage(fmt.Sprintf(`{
+func minionProperties(instances int, instanceData string, flavorInit string) *types.Any {
+	return types.AnyString(fmt.Sprintf(`{
 	  "Allocation": {
 	    "Size": %d
 	  },
@@ -58,16 +59,15 @@ func minionProperties(instances int, instanceData string, flavorInit string) *js
 	      }
           }
 	}`, instances, instanceData, flavorInit))
-	return &r
 }
 
-func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMessage {
+func leaderProperties(logicalIDs []instance.LogicalID, data string) *types.Any {
 	idsValue, err := json.Marshal(logicalIDs)
 	if err != nil {
 		panic(err)
 	}
 
-	r := json.RawMessage(fmt.Sprintf(`{
+	return types.AnyString(fmt.Sprintf(`{
 	  "Allocation": {
 	    "LogicalIDs": %s
 	  },
@@ -84,7 +84,6 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *json.RawMes
 	      }
           }
 	}`, idsValue, data))
-	return &r
 }
 
 func pluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLookup {
@@ -112,7 +111,7 @@ func memberTags(id group.ID) map[string]string {
 
 func provisionTags(config group.Spec) map[string]string {
 	tags := memberTags(config.ID)
-	tags[configTag] = types.MustParse(types.ParseProperties(config)).InstanceHash()
+	tags[configTag] = group_types.MustParse(group_types.ParseProperties(config)).InstanceHash()
 
 	return tags
 }
@@ -437,7 +436,7 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 		require.Equal(t, "updated init", inst.Init)
 
 		properties := map[string]string{}
-		err = json.Unmarshal(types.RawMessage(inst.Properties), &properties)
+		err = types.AnyBytes([]byte(*inst.Properties)).Decode(&properties)
 		require.NoError(t, err)
 		require.Equal(t, "data2", properties["OpaqueValue"])
 	}

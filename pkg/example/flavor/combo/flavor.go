@@ -154,12 +154,7 @@ func (f flavorCombo) Prepare(
 			return inst, err
 		}
 
-		var props json.RawMessage
-		if pluginSpec.Properties != nil {
-			props = *pluginSpec.Properties
-		}
-
-		flavorOutput, err := plugin.Prepare(props, clone, allocation)
+		flavorOutput, err := plugin.Prepare(types.RawMessage(pluginSpec.Properties), clone, allocation)
 		if err != nil {
 			return inst, err
 		}

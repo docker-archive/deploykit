@@ -1,5 +1,9 @@
 package launch
 
+import (
+	"github.com/docker/infrakit/pkg/types"
+)
+
 // Exec is a service that is able to start plugins based on different
 // mechanisms from running local binary to pulling and running docker containers or engine plugins
 type Exec interface {
@@ -14,5 +18,5 @@ type Exec interface {
 	// status of the plugin.
 	// The client can receive and block on the returned channel
 	// and add optional timeout in its own select statement.
-	Exec(name string, config *Config) (<-chan error, error)
+	Exec(name string, config *types.Any) (<-chan error, error)
 }
