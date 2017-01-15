@@ -6,16 +6,17 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/types"
 )
 
-var errNoConfig = errors.New("no-counfig")
+var errNoConfig = errors.New("no-config")
 
 // ExecRule encapsulates what's required to exec a plugin
 type ExecRule struct {
 	// Exec is the name of the exec to use to start the plugin
 	Exec string
 	// Properties is the properties for the executor
-	Properties *Config
+	Properties *types.Any
 }
 
 // Rule provides the instructions on starting the plugin
@@ -58,17 +59,17 @@ func NewMonitor(l Exec, rules []Rule) *Monitor {
 // StartPlugin is the command to start a plugin
 type StartPlugin struct {
 	Plugin  plugin.Name
-	Started func(*Config)
-	Error   func(*Config, error)
+	Started func(*types.Any)
+	Error   func(*types.Any, error)
 }
 
-func (s StartPlugin) reportError(config *Config, e error) {
+func (s StartPlugin) reportError(config *types.Any, e error) {
 	if s.Error != nil {
 		go s.Error(config, e)
 	}
 }
 
-func (s StartPlugin) reportSuccess(config *Config) {
+func (s StartPlugin) reportSuccess(config *types.Any) {
 	if s.Started != nil {
 		go s.Started(config)
 	}
@@ -111,7 +112,7 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 				continue loop
 			}
 
-			configCopy := &Config{}
+			configCopy := types.AnyBytes(nil)
 			if r.Launch.Properties != nil {
 				*configCopy = *r.Launch.Properties
 			}

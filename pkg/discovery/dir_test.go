@@ -68,10 +68,10 @@ func TestDirDiscovery(t *testing.T) {
 
 	blockWhileFileExists(path2)
 
-	p, err = discover.Find(plugin.Name(name1))
+	_, err = discover.Find(plugin.Name(name1))
 	require.Error(t, err)
 
-	p, err = discover.Find(plugin.Name(name2))
+	_, err = discover.Find(plugin.Name(name2))
 	require.Error(t, err)
 
 	list, err := discover.List()

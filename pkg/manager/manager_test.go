@@ -15,6 +15,7 @@ import (
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -94,10 +95,9 @@ func testDiscoveryDir(t *testing.T) string {
 }
 
 func testBuildGroupSpec(groupID, properties string) group.Spec {
-	raw := json.RawMessage([]byte(properties))
 	return group.Spec{
 		ID:         group.ID(groupID),
-		Properties: &raw,
+		Properties: types.AnyString(properties),
 	}
 }
 
@@ -115,9 +115,9 @@ func testBuildGlobalSpec(t *testing.T, gs group.Spec) GlobalSpec {
 	}
 }
 
-func testToStruct(m *json.RawMessage) interface{} {
+func testToStruct(m *types.Any) interface{} {
 	o := map[string]interface{}{}
-	json.Unmarshal([]byte(*m), &o)
+	m.Decode(&o)
 	return &o
 }
 

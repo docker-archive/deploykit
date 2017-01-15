@@ -3,7 +3,7 @@ package os
 import (
 	"sync"
 
-	"github.com/docker/infrakit/pkg/launch"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // LaunchConfig is the rule for how to start up a os process.
@@ -45,10 +45,10 @@ func (l *Launcher) Name() string {
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes (which uses shell to run the real task in
 // background).
-func (l *Launcher) Exec(name string, config *launch.Config) (<-chan error, error) {
+func (l *Launcher) Exec(name string, config *types.Any) (<-chan error, error) {
 
 	launchConfig := &LaunchConfig{}
-	if err := config.Unmarshal(launchConfig); err != nil {
+	if err := config.Decode(launchConfig); err != nil {
 		return nil, err
 	}
 
