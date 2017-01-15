@@ -11,9 +11,8 @@
       }
     },
     "Flavor": {
-      "Plugin": "flavor-swarm",
+      "Plugin": "flavor-swarm/worker",
       "Properties": {
-        "Type": "worker",
         "DockerRestartCommand": "service docker restart"
       }
     }
