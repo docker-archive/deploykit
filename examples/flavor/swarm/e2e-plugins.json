@@ -1,0 +1,56 @@
+[
+    {
+        "Plugin" : "group-default",
+        "Launch" : {
+            "Exec" : "os",
+            "Properties": {
+                "Cmd" : "infrakit-group-default --poll-interval 500ms --name group-stateless --log 5 > {{env "LOG_DIR"}}/group-default-{{unixtime}}.log 2>&1 &",
+                "SamePgID" : true
+            }
+        }
+    }
+    ,
+    {
+        "Plugin" : "instance-file",
+        "Launch" : {
+            "Exec" : "os",
+            "Properties" : {
+                "Cmd" : "infrakit-instance-file --dir {{env "TUTORIAL_DIR"}} --log 5 > {{env "LOG_DIR"}}/instance-file-{{unixtime}}.log 2>&1",
+                "SamePgID" : true
+            }
+        }
+    }
+    ,
+    {
+        "Plugin" : "instance-vagrant",
+        "Launch" : {
+            "Exec" : "os",
+            "Properties" : {
+                "Cmd" : "infrakit-instance-vagrant --log 5 > {{env "LOG_DIR"}}/instance-vagrant-{{unixtime}}.log 2>&1",
+                "SamePgID" : true
+            }
+        }
+    }
+    ,
+    {
+        "Plugin" : "flavor-vanilla",
+        "Launch" : {
+            "Exec" : "os",
+            "Properties" : {
+                "Cmd" : "infrakit-flavor-vanilla --log 5 > {{env "LOG_DIR"}}/flavor-vanilla-{{unixtime}}.log 2>&1",
+                "SamePgID" : true
+            }
+        }
+    }
+    ,
+    {
+        "Plugin" : "flavor-swarm",
+        "Launch" : {
+            "Exec" : "os",
+            "Properties" : {
+                "Cmd" : "infrakit-flavor-swarm --host {{env "SWARM_MANAGER"}} --log 5 > {{env "LOG_DIR"}}/flavor-swarm-{{unixtime}}.log 2>&1",
+                "SamePgID" : true
+            }
+        }
+    }
+]

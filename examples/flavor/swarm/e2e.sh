@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$HERE/.."
+cd "$HERE/../../.."
 
 export PATH=$PWD/build:$PATH
 
@@ -59,7 +59,7 @@ export E2E_SWARM_DIR=$E2E_SWARM_DIR
 export SWARM_MANAGER="tcp://192.168.2.200:4243"
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
-infrakit plugin start --wait --config-url file:///$PWD/scripts/e2e-test-plugins.json --os group-default instance-vagrant flavor-swarm flavor-vanilla &
+infrakit plugin start --wait --config-url file:///$PWD/examples/flavor/swarm/e2e-plugins.json --os group-default instance-vagrant flavor-swarm flavor-vanilla &
 
 starterpid=$!
 echo "plugin start pid=$starterpid"
@@ -106,7 +106,7 @@ expect_output_lines "7 plugins should be discoverable" "infrakit plugin ls -q" "
 expect_output_lines "0 instances should exist" "infrakit instance describe -q --name instance-vagrant" "0"
 
 echo "Commiting manager"
-infrakit group commit pkg/example/flavor/swarm/swarm-vagrant-manager.json
+infrakit group commit examples/flavor/swarm/swarm-vagrant-manager.json
 
 echo 'Waiting for group to be provisioned'
 sleep 60
@@ -116,7 +116,7 @@ expect_output_lines "1 instances should exist in group" "infrakit group describe
 expect_output_lines "1 instances should exist" "infrakit instance describe -q --name instance-vagrant" "1"
 
 echo "Commiting workers"
-infrakit group commit pkg/example/flavor/swarm/swarm-vagrant-workers.json
+infrakit group commit examples/flavor/swarm/swarm-vagrant-workers.json
 
 echo 'Waiting for group to be provisioned'
 sleep 120
@@ -124,6 +124,11 @@ sleep 120
 expect_output_lines "Should be watching two groups" "infrakit group ls -q" "2"
 expect_output_lines "2 instances should exist in group" "infrakit group describe swarm-workers -q" "2"
 expect_output_lines "3 instances should exist" "infrakit instance describe -q --name instance-vagrant" "3"
+
+echo "Checking Docker Swarm"
+
+docker -H $SWARM_MANAGER node ls
+
 
 echo "Destroying workers"
 infrakit group destroy swarm-workers
