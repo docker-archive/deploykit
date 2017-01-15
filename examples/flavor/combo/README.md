@@ -59,7 +59,7 @@ INFO[0000] Listening at: ~/.infrakit/plugins/flavor-combo
 
 Using the [example](example.json) configuration, commit a group:
 ```shell
-$ build/infrakit group commit example/flavor/combo/example.json
+$ build/infrakit group commit examples/flavor/combo/example.json
 Committed combo
 ```
 
@@ -91,4 +91,3 @@ $ cat tutorial/instance-4039631736808433938
     }
   }
 ```
-
