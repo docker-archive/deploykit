@@ -3,8 +3,10 @@ package flavor
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -57,6 +59,7 @@ func (t *testPlugin) Drain(flavorProperties json.RawMessage, inst instance.Descr
 
 func TestFlavorPluginValidate(t *testing.T) {
 	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -69,7 +72,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	require.NoError(t, NewClient(socketPath).Validate(inputFlavorProperties, allocation))
+	require.NoError(t, NewClient(plugin.Name(name), socketPath).Validate(inputFlavorProperties, allocation))
 
 	server.Stop()
 
@@ -78,6 +81,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 
 func TestFlavorPluginValidateError(t *testing.T) {
 	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -90,7 +94,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).Validate(inputFlavorProperties, allocation)
+	err = NewClient(plugin.Name(name), socketPath).Validate(inputFlavorProperties, allocation)
 	require.Error(t, err)
 	require.Equal(t, "something-went-wrong", err.Error())
 
@@ -100,6 +104,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 
 func TestFlavorPluginPrepare(t *testing.T) {
 	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -123,7 +128,7 @@ func TestFlavorPluginPrepare(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	spec, err := NewClient(socketPath).Prepare(
+	spec, err := NewClient(plugin.Name(name), socketPath).Prepare(
 		inputFlavorProperties,
 		inputInstanceSpec,
 		allocation)
@@ -138,6 +143,7 @@ func TestFlavorPluginPrepare(t *testing.T) {
 
 func TestFlavorPluginPrepareError(t *testing.T) {
 	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
 
 	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
 	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
@@ -161,7 +167,7 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(socketPath).Prepare(
+	_, err = NewClient(plugin.Name(name), socketPath).Prepare(
 		inputFlavorProperties,
 		inputInstanceSpec,
 		allocation)
@@ -176,6 +182,7 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 
 func TestFlavorPluginHealthy(t *testing.T) {
 	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
 
 	inputPropertiesActual := make(chan json.RawMessage, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
@@ -193,7 +200,7 @@ func TestFlavorPluginHealthy(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	health, err := NewClient(socketPath).Healthy(inputProperties, inputInstance)
+	health, err := NewClient(plugin.Name(name), socketPath).Healthy(inputProperties, inputInstance)
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
 
@@ -204,6 +211,7 @@ func TestFlavorPluginHealthy(t *testing.T) {
 
 func TestFlavorPluginHealthyError(t *testing.T) {
 	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
 
 	inputPropertiesActual := make(chan json.RawMessage, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
@@ -221,7 +229,7 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(socketPath).Healthy(inputProperties, inputInstance)
+	_, err = NewClient(plugin.Name(name), socketPath).Healthy(inputProperties, inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 
@@ -232,6 +240,7 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 
 func TestFlavorPluginDrain(t *testing.T) {
 	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
 
 	inputPropertiesActual := make(chan json.RawMessage, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
@@ -249,7 +258,7 @@ func TestFlavorPluginDrain(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	require.NoError(t, NewClient(socketPath).Drain(inputProperties, inputInstance))
+	require.NoError(t, NewClient(plugin.Name(name), socketPath).Drain(inputProperties, inputInstance))
 
 	require.Equal(t, inputProperties, <-inputPropertiesActual)
 	require.Equal(t, inputInstance, <-inputInstanceActual)
@@ -258,6 +267,7 @@ func TestFlavorPluginDrain(t *testing.T) {
 
 func TestFlavorPluginDrainError(t *testing.T) {
 	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
 
 	inputPropertiesActual := make(chan json.RawMessage, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
@@ -275,7 +285,7 @@ func TestFlavorPluginDrainError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).Drain(inputProperties, inputInstance)
+	err = NewClient(plugin.Name(name), socketPath).Drain(inputProperties, inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 

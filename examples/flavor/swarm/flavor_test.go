@@ -29,36 +29,33 @@ func TestValidate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	swarmFlavor := NewSwarmFlavor(mock_client.NewMockAPIClient(ctrl), templ())
+	managerFlavor := NewManagerFlavor(mock_client.NewMockAPIClient(ctrl), templ())
+	workerFlavor := NewWorkerFlavor(mock_client.NewMockAPIClient(ctrl), templ())
 
-	require.NoError(t, swarmFlavor.Validate(
-		json.RawMessage(`{"Type": "worker", "DockerRestartCommand": "systemctl restart docker"}`),
+	require.NoError(t, workerFlavor.Validate(
+		json.RawMessage(`{"DockerRestartCommand": "systemctl restart docker"}`),
 		types.AllocationMethod{Size: 5}))
-	require.NoError(t, swarmFlavor.Validate(
-		json.RawMessage(`{"Type": "manager", "DockerRestartCommand": "systemctl restart docker"}`),
+	require.NoError(t, managerFlavor.Validate(
+		json.RawMessage(`{"DockerRestartCommand": "systemctl restart docker"}`),
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
 	// Logical ID with multiple attachments is allowed.
-	require.NoError(t, swarmFlavor.Validate(
+	require.NoError(t, managerFlavor.Validate(
 		json.RawMessage(`{
-			"Type": "manager",
 			"DockerRestartCommand": "systemctl restart docker",
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`),
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
-	require.Error(t, swarmFlavor.Validate(json.RawMessage(`{"type": "other"}`), types.AllocationMethod{Size: 5}))
-
 	// Logical ID used more than once.
-	err := swarmFlavor.Validate(
-		json.RawMessage(`{"Type": "manager", "DockerRestartCommand": "systemctl restart docker"}`),
+	err := managerFlavor.Validate(
+		json.RawMessage(`{"DockerRestartCommand": "systemctl restart docker"}`),
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.1", "127.0.0.2"}})
 	require.Error(t, err)
 	require.Equal(t, "LogicalID 127.0.0.1 specified more than once", err.Error())
 
 	// Attachment cannot be associated with multiple Logical IDs.
-	err = swarmFlavor.Validate(
+	err = managerFlavor.Validate(
 		json.RawMessage(`{
-			"Type": "manager",
 			"DockerRestartCommand": "systemctl restart docker",
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}], "127.0.0.2": [{"ID": "a", "Type": "ebs"}]}}`),
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
@@ -66,9 +63,8 @@ func TestValidate(t *testing.T) {
 	require.Equal(t, "Attachment a specified more than once", err.Error())
 
 	// Unsupported Attachment Type.
-	err = swarmFlavor.Validate(
+	err = managerFlavor.Validate(
 		json.RawMessage(`{
-			"Type": "manager",
 			"DockerRestartCommand": "systemctl restart docker",
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "keyboard"}]}}`),
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
@@ -82,7 +78,7 @@ func TestWorker(t *testing.T) {
 
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	flavorImpl := NewSwarmFlavor(client, templ())
+	flavorImpl := NewWorkerFlavor(client, templ())
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -99,7 +95,7 @@ func TestWorker(t *testing.T) {
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil)
 
 	details, err := flavorImpl.Prepare(
-		json.RawMessage(`{"Type": "worker"}`),
+		json.RawMessage(`{}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}},
 		types.AllocationMethod{Size: 5})
 	require.NoError(t, err)
@@ -144,7 +140,7 @@ func TestManager(t *testing.T) {
 
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	flavorImpl := NewSwarmFlavor(client, templ())
+	flavorImpl := NewManagerFlavor(client, templ())
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -162,7 +158,7 @@ func TestManager(t *testing.T) {
 
 	id := instance.LogicalID("127.0.0.1")
 	details, err := flavorImpl.Prepare(
-		json.RawMessage(`{"Type": "manager", "Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
+		json.RawMessage(`{"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
 		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
 	require.NoError(t, err)

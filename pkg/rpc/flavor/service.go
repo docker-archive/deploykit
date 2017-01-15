@@ -2,6 +2,7 @@ package flavor
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/spi"
@@ -13,13 +14,25 @@ func PluginServer(p flavor.Plugin) *Flavor {
 	return &Flavor{plugin: p}
 }
 
+// PluginServerWithTypes which supports multiple types of flavor plugins. The de-multiplexing
+// is done by the server's RPC method implementations.
+func PluginServerWithTypes(typed map[string]flavor.Plugin) *Flavor {
+	return &Flavor{typedPlugins: typed}
+}
+
 // Flavor the exported type needed to conform to json-rpc call convention
 type Flavor struct {
-	plugin flavor.Plugin
+	plugin       flavor.Plugin
+	typedPlugins map[string]flavor.Plugin // by type, as qualified in the name of the plugin
 }
 
 // VendorInfo returns a metadata object about the plugin, if the plugin implements it.  See spi.Vendor
 func (p *Flavor) VendorInfo() *spi.VendorInfo {
+	// TODO(chungers) - support typed plugins
+	if p.plugin == nil {
+		return nil
+	}
+
 	if m, is := p.plugin.(spi.Vendor); is {
 		return m.VendorInfo()
 	}
@@ -28,6 +41,11 @@ func (p *Flavor) VendorInfo() *spi.VendorInfo {
 
 // SetExampleProperties sets the rpc request with any example properties/ custom type
 func (p *Flavor) SetExampleProperties(request interface{}) {
+	// TODO(chungers) - support typed plugins
+	if p.plugin == nil {
+		return
+	}
+
 	i, is := p.plugin.(spi.InputExample)
 	if !is {
 		return
@@ -60,9 +78,29 @@ func (p *Flavor) ImplementedInterface() spi.InterfaceSpec {
 	return flavor.InterfaceSpec
 }
 
+func (p *Flavor) getPlugin(flavorType string) flavor.Plugin {
+	if flavorType == "" {
+		return p.plugin
+	}
+	if p, has := p.typedPlugins[flavorType]; has {
+		return p
+	}
+	return nil
+}
+
 // Validate checks whether the helper can support a configuration.
 func (p *Flavor) Validate(_ *http.Request, req *ValidateRequest, resp *ValidateResponse) error {
-	err := p.plugin.Validate(*req.Properties, req.Allocation)
+	var raw json.RawMessage
+	if req.Properties != nil {
+		raw = *req.Properties
+	}
+
+	resp.Type = req.Type
+	c := p.getPlugin(req.Type)
+	if c == nil {
+		return fmt.Errorf("no-plugin:%s", req.Type)
+	}
+	err := c.Validate(raw, req.Allocation)
 	if err != nil {
 		return err
 	}
@@ -74,7 +112,17 @@ func (p *Flavor) Validate(_ *http.Request, req *ValidateRequest, resp *ValidateR
 // helper could be used to place additional tags on the machine, or generate a specialized Init command based on
 // the flavor configuration.
 func (p *Flavor) Prepare(_ *http.Request, req *PrepareRequest, resp *PrepareResponse) error {
-	spec, err := p.plugin.Prepare(*req.Properties, req.Spec, req.Allocation)
+	var raw json.RawMessage
+	if req.Properties != nil {
+		raw = *req.Properties
+	}
+
+	resp.Type = req.Type
+	c := p.getPlugin(req.Type)
+	if c == nil {
+		return fmt.Errorf("no-plugin:%s", req.Type)
+	}
+	spec, err := c.Prepare(raw, req.Spec, req.Allocation)
 	if err != nil {
 		return err
 	}
@@ -84,7 +132,12 @@ func (p *Flavor) Prepare(_ *http.Request, req *PrepareRequest, resp *PrepareResp
 
 // Healthy determines whether an instance is healthy.
 func (p *Flavor) Healthy(_ *http.Request, req *HealthyRequest, resp *HealthyResponse) error {
-	health, err := p.plugin.Healthy(*req.Properties, req.Instance)
+	resp.Type = req.Type
+	c := p.getPlugin(req.Type)
+	if c == nil {
+		return fmt.Errorf("no-plugin:%s", req.Type)
+	}
+	health, err := c.Healthy(*req.Properties, req.Instance)
 	if err != nil {
 		return err
 	}
@@ -94,7 +147,12 @@ func (p *Flavor) Healthy(_ *http.Request, req *HealthyRequest, resp *HealthyResp
 
 // Drain drains the instance. It's the inverse of prepare before provision and happens before destroy.
 func (p *Flavor) Drain(_ *http.Request, req *DrainRequest, resp *DrainResponse) error {
-	err := p.plugin.Drain(*req.Properties, req.Instance)
+	resp.Type = req.Type
+	c := p.getPlugin(req.Type)
+	if c == nil {
+		return fmt.Errorf("no-plugin:%s", req.Type)
+	}
+	err := c.Drain(*req.Properties, req.Instance)
 	if err != nil {
 		return err
 	}
