@@ -10,17 +10,20 @@ import (
 
 // ValidateRequest is the rpc wrapper for request parameters to Validate
 type ValidateRequest struct {
+	Type       string
 	Properties *json.RawMessage
 	Allocation types.AllocationMethod
 }
 
 // ValidateResponse is the rpc wrapper for the results of Validate
 type ValidateResponse struct {
-	OK bool
+	Type string
+	OK   bool
 }
 
 // PrepareRequest is the rpc wrapper of the params to Prepare
 type PrepareRequest struct {
+	Type       string
 	Properties *json.RawMessage
 	Spec       instance.Spec
 	Allocation types.AllocationMethod
@@ -28,27 +31,32 @@ type PrepareRequest struct {
 
 // PrepareResponse is the rpc wrapper of the result of Prepare
 type PrepareResponse struct {
+	Type string
 	Spec instance.Spec
 }
 
 // HealthyRequest is the rpc wrapper of the params to Healthy
 type HealthyRequest struct {
+	Type       string
 	Properties *json.RawMessage
 	Instance   instance.Description
 }
 
 // HealthyResponse is the rpc wrapper of the result of Healthy
 type HealthyResponse struct {
+	Type   string
 	Health flavor.Health
 }
 
 // DrainRequest is the rpc wrapper of the params to Drain
 type DrainRequest struct {
+	Type       string
 	Properties *json.RawMessage
 	Instance   instance.Description
 }
 
 // DrainResponse is the rpc wrapper of the result of Drain
 type DrainResponse struct {
-	OK bool
+	Type string
+	OK   bool
 }
