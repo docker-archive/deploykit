@@ -10,7 +10,7 @@ This is a plugin for handling Zookeeper ensemble.
 
 Begin by building plugin [binaries](/README.md#binaries).
 
-Start the [vagrant instance plugin](/example/instance/vagrant):
+Start the [vagrant instance plugin](/examples/instance/vagrant):
 
 ```shell
 $ build/infrakit-instance-vagrant

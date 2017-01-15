@@ -117,7 +117,7 @@ See the [CLI Doc](/cmd/cli/README.md) for details on accessing the instance plug
 Start the plugin:
 
 ```shell
-$ build/infrakit-instance-terraform --dir=./example/instance/terraform/aws-two-tier/
+$ build/infrakit-instance-terraform --dir=./examples/instance/terraform/aws-two-tier/
 INFO[0000] Listening at: ~/.infrakit/plugins/instance-terraform
 ```
 
@@ -127,7 +127,7 @@ Now lets try to validate something.  Instead of reading from stdin we are loadin
 to avoid problems with bad bash substitution beacuse Terrafrom configs use `$` to indicate variables.
 
 ```shell
-$ cat example/instance/terraform/aws-two-tier/instance-plugin-properties.json
+$ cat examples/instance/terraform/aws-two-tier/instance-plugin-properties.json
 {
     "type" : "aws_instance",
     "value" : {
@@ -145,14 +145,14 @@ $ cat example/instance/terraform/aws-two-tier/instance-plugin-properties.json
         }
     }
 }
-$ build/infrakit instance --name instance-terraform validate example/instance/terraform/aws-two-tier/instance-plugin-properties.json
+$ build/infrakit instance --name instance-terraform validate examples/instance/terraform/aws-two-tier/instance-plugin-properties.json
 validate:ok
 ```
 
 Now we can provision:
 
 ```shell
-$ cat example/instance/terraform/aws-two-tier/instance-plugin-spec.json
+$ cat examples/instance/terraform/aws-two-tier/instance-plugin-spec.json
 {
     "Properties" : {
         "type" : "aws_instance",
@@ -176,7 +176,7 @@ $ cat example/instance/terraform/aws-two-tier/instance-plugin-spec.json
     },
     "Init" : "#!/bin/sh; sudo apt-get -y update; sudo apt-get -y install nginx; sudo service nginx start"
 }
-$ build/infrakit instance --name instance-terraform provision example/instance/terraform/aws-two-tier/instance-plugin-spec.json
+$ build/infrakit instance --name instance-terraform provision examples/instance/terraform/aws-two-tier/instance-plugin-spec.json
 instance-1475004829
 ```
 
