@@ -45,7 +45,7 @@ type plugin struct {
 
 func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 	spec := Spec{}
-	if err := json.Unmarshal([]byte(types.RawMessage(config.Properties)), &spec); err != nil {
+	if err := config.Properties.Decode(spec); err != nil {
 		return "", fmt.Errorf("Invalid properties %q: %s", config.Properties, err)
 	}
 
@@ -55,7 +55,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("Failed to find resource plugin %s: %s", resourceConfig.Plugin, err)
 		}
-		if err := resourcePlugin.Validate(types.RawMessage(resourceConfig.Properties)); err != nil {
+		if err := resourcePlugin.Validate(json.RawMessage(*resourceConfig.Properties)); err != nil {
 			return "", err
 		}
 		resources[name] = &resource{plugin: resourcePlugin, config: resourceConfig}
@@ -96,7 +96,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		}
 
 		resource := resources[name]
-		properties, err := executeAsTemplate(*resource.config.Properties, struct{ Resources interface{} }{resourceIDs})
+		properties, err := executeAsTemplate(json.RawMessage(*resource.config.Properties), struct{ Resources interface{} }{resourceIDs})
 		if err != nil {
 			return "", fmt.Errorf("Failed to get properties for %s: %s", name, err)
 		}
@@ -131,11 +131,11 @@ func executeAsTemplate(text json.RawMessage, data interface{}) (json.RawMessage,
 
 var resourceReferenceRegexp = regexp.MustCompile(`{{\s*\.Resources\.(\w+)`)
 
-func getResourceReferences(properties *json.RawMessage) []string {
+func getResourceReferences(properties json.RawMessage) []string {
 
 	var references []string
 	// TODO: Use text/template.Template.Execute instead.
-	for _, submatches := range resourceReferenceRegexp.FindAllSubmatch(*properties, -1) {
+	for _, submatches := range resourceReferenceRegexp.FindAllSubmatch(properties, -1) {
 		references = append(references, string(submatches[1]))
 	}
 	return references
@@ -152,7 +152,7 @@ func getProvisioningOrder(resources map[string]*resource) ([]string, error) {
 
 	for name, resource := range resources {
 		to := nodes[name]
-		references := getResourceReferences(resource.config.Properties)
+		references := getResourceReferences(json.RawMessage(*resource.config.Properties))
 		for _, reference := range references {
 			from, ok := nodes[reference]
 			if !ok {

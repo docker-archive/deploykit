@@ -1,7 +1,7 @@
 package instance
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -81,8 +81,9 @@ func (p *Instance) getPlugin(instanceType string) instance.Plugin {
 
 // Validate performs local validation on a provision request.
 func (p *Instance) Validate(_ *http.Request, req *ValidateRequest, resp *ValidateResponse) error {
-	if req.Properties == nil {
-		return errors.New("Request Properties must be set")
+	var raw json.RawMessage
+	if req.Properties != nil {
+		raw = *req.Properties
 	}
 
 	c := p.getPlugin(req.Type)
@@ -90,7 +91,7 @@ func (p *Instance) Validate(_ *http.Request, req *ValidateRequest, resp *Validat
 		return fmt.Errorf("no-plugin:%s", req.Type)
 	}
 	resp.Type = req.Type
-	err := c.Validate(*req.Properties)
+	err := c.Validate(raw)
 	if err != nil {
 		return err
 	}

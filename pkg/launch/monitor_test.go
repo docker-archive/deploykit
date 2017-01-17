@@ -3,6 +3,7 @@ package launch
 import (
 	"testing"
 
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,16 +15,16 @@ type testConfig struct {
 type testLauncher struct {
 	name     string
 	t        *testing.T
-	callback func(*Config)
+	callback func(*types.Any)
 }
 
 func (l *testLauncher) Name() string {
 	return l.name
 }
 
-func (l *testLauncher) Exec(name string, config *Config) (<-chan error, error) {
+func (l *testLauncher) Exec(name string, config *types.Any) (<-chan error, error) {
 	rule := testConfig{}
-	err := config.Unmarshal(&rule)
+	err := config.Decode(&rule)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func TestMonitorLoopNoRules(t *testing.T) {
 
 	input <- StartPlugin{
 		Plugin: "test",
-		Error: func(config *Config, e error) {
+		Error: func(config *types.Any, e error) {
 			errChan <- e
 		},
 	}
@@ -60,28 +61,23 @@ func TestMonitorLoopNoRules(t *testing.T) {
 
 func TestMonitorLoopValidRule(t *testing.T) {
 
-	raw := &Config{}
 	config := &testConfig{
 		Cmd:  "hello",
 		Args: []string{"world", "hello"},
 	}
 
-	rawErr := raw.Marshal(config)
-	require.NoError(t, rawErr)
-	require.True(t, len([]byte(*raw)) > 0)
-
-	var receivedArgs *Config
+	var receivedArgs *types.Any
 	rule := Rule{
 		Plugin: "hello",
 		Launch: ExecRule{
 			Exec:       "test",
-			Properties: raw,
+			Properties: types.AnyValueMust(config),
 		},
 	}
 	monitor := NewMonitor(&testLauncher{
 		name: "test",
 		t:    t,
-		callback: func(c *Config) {
+		callback: func(c *types.Any) {
 			receivedArgs = c
 		},
 	}, []Rule{rule})
@@ -93,45 +89,38 @@ func TestMonitorLoopValidRule(t *testing.T) {
 	started := make(chan interface{})
 	input <- StartPlugin{
 		Plugin: "hello",
-		Started: func(config *Config) {
+		Started: func(config *types.Any) {
 			close(started)
 		},
 	}
 
 	<-started
 
-	expected := &Config{}
-	err = expected.Marshal(config)
-	require.NoError(t, err)
-
+	expected := types.AnyValueMust(config)
 	require.Equal(t, *expected, *receivedArgs)
 
 	monitor.Stop()
 }
 
 func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
-	raw := &Config{}
+
 	config := &testConfig{
 		Cmd:  "hello",
 		Args: []string{"world", "hello"},
 	}
 
-	rawErr := raw.Marshal(config)
-	require.NoError(t, rawErr)
-	require.True(t, len([]byte(*raw)) > 0)
-
-	var receivedArgs *Config
+	var receivedArgs *types.Any
 	rule := Rule{
 		Plugin: "hello",
 		Launch: ExecRule{
 			Exec:       "test",
-			Properties: raw,
+			Properties: types.AnyValueMust(config),
 		},
 	}
 	monitor := NewMonitor(&testLauncher{
 		name: "test",
 		t:    t,
-		callback: func(c *Config) {
+		callback: func(c *types.Any) {
 			receivedArgs = c
 		},
 	}, []Rule{rule})
@@ -143,17 +132,14 @@ func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
 	started := make(chan interface{})
 	input <- StartPlugin{
 		Plugin: "hello",
-		Started: func(config *Config) {
+		Started: func(config *types.Any) {
 			close(started)
 		},
 	}
 
 	<-started
 
-	expected := &Config{}
-	err = expected.Marshal(config)
-	require.NoError(t, err)
-
+	expected := types.AnyValueMust(config)
 	require.Equal(t, *expected, *receivedArgs)
 
 	monitor.Stop()

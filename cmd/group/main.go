@@ -36,20 +36,20 @@ func main() {
 			return err
 		}
 
-		instancePluginLookup := func(n string) (instance.Plugin, error) {
+		instancePluginLookup := func(n plugin.Name) (instance.Plugin, error) {
 			endpoint, err := plugins.Find(n)
 			if err != nil {
 				return nil, err
 			}
-			return instance_client.NewClient(plugin.Name(n), endpoint.Address), nil
+			return instance_client.NewClient(n, endpoint.Address), nil
 		}
 
-		flavorPluginLookup := func(n string) (flavor.Plugin, error) {
+		flavorPluginLookup := func(n plugin.Name) (flavor.Plugin, error) {
 			endpoint, err := plugins.Find(n)
 			if err != nil {
 				return nil, err
 			}
-			return flavor_client.NewClient(endpoint.Address), nil
+			return flavor_client.NewClient(n, endpoint.Address), nil
 		}
 
 		cli.RunPlugin(*name, group_server.PluginServer(

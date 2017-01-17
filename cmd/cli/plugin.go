@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/launch/os"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -63,10 +64,10 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		configs := launch.Config([]byte(view))
+		configs := types.AnyString(view)
 
 		parsedRules := []launch.Rule{}
-		err = configs.Unmarshal(&parsedRules)
+		err = configs.Decode(&parsedRules)
 		if err != nil {
 			return err
 		}
@@ -107,11 +108,11 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				name := pluginToStart
 				ch <- launch.StartPlugin{
 					Plugin: plugin.Name(name),
-					Started: func(config *launch.Config) {
+					Started: func(config *types.Any) {
 						fmt.Println(name, "started.")
 						wait.Done()
 					},
-					Error: func(config *launch.Config, err error) {
+					Error: func(config *types.Any, err error) {
 						fmt.Println("Error starting", name, "err=", err)
 						wait.Done()
 					},

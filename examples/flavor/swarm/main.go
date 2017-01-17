@@ -8,6 +8,7 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
+	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
@@ -70,7 +71,11 @@ func main() {
 			templ = t
 		}
 
-		cli.RunPlugin(*name, flavor_plugin.PluginServer(NewSwarmFlavor(dockerClient, templ)))
+		cli.RunPlugin(*name, flavor_plugin.PluginServerWithTypes(
+			map[string]flavor.Plugin{
+				"manager": NewManagerFlavor(dockerClient, templ),
+				"worker":  NewWorkerFlavor(dockerClient, templ),
+			}))
 		return nil
 	}
 

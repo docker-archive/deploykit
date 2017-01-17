@@ -3,13 +3,15 @@ package group
 import (
 	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
+	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"sync"
-	"time"
 )
 
 const (
@@ -18,10 +20,10 @@ const (
 )
 
 // InstancePluginLookup helps with looking up an instance plugin by name
-type InstancePluginLookup func(string) (instance.Plugin, error)
+type InstancePluginLookup func(plugin_base.Name) (instance.Plugin, error)
 
 // FlavorPluginLookup helps with looking up a flavor plugin by name
-type FlavorPluginLookup func(string) (flavor.Plugin, error)
+type FlavorPluginLookup func(plugin_base.Name) (flavor.Plugin, error)
 
 // NewGroupPlugin creates a new group plugin.
 func NewGroupPlugin(

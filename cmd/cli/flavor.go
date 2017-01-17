@@ -9,6 +9,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -28,12 +29,12 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 
-		endpoint, err := plugins().Find(*name)
+		endpoint, err := plugins().Find(plugin.Name(*name))
 		if err != nil {
 			return err
 		}
 
-		flavorPlugin = flavor_plugin.NewClient(endpoint.Address)
+		flavorPlugin = flavor_plugin.NewClient(plugin.Name(*name), endpoint.Address)
 
 		return nil
 	}

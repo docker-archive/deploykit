@@ -10,6 +10,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
@@ -31,7 +32,7 @@ func groupPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	name := cmd.PersistentFlags().String("name", DefaultGroupPluginName, "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 
-		endpoint, err := plugins().Find(*name)
+		endpoint, err := plugins().Find(plugin.Name(*name))
 		if err != nil {
 			return err
 		}
