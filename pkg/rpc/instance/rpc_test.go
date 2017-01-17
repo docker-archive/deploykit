@@ -3,6 +3,8 @@ package instance
 import (
 	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -10,8 +12,6 @@ import (
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
-	"path"
 )
 
 type testPlugin struct {

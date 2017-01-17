@@ -9,7 +9,7 @@ import (
 func TestRunTemplateWithJMESPath(t *testing.T) {
 
 	// Example from http://jmespath.org/
-	str := `{{ q "locations[?state == 'WA'].name | sort(@) | {WashingtonCities: join(', ', @)}" . | jsonEncode}}`
+	str := `{{ q "locations[?state == 'WA'].name | sort(@) | {WashingtonCities: join(', ', @)}" . | to_json}}`
 
 	tpl, err := NewTemplate("str://"+str, Options{})
 	require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestVarAndGlobal(t *testing.T) {
 {
   "test" : "hello",
   "val"  : true,
-  "result" : {{var "washington-cities" "A json with washington cities" | jsonEncode}}
+  "result" : {{var "washington-cities" "A json with washington cities" | to_json}}
 }
 `
 

@@ -9,51 +9,75 @@ import (
 	"github.com/jmespath/go-jmespath"
 )
 
+// QueryObject applies a JMESPath query specified by the expression, against the target object.
+func QueryObject(exp string, target interface{}) (interface{}, error) {
+	query, err := jmespath.Compile(exp)
+	if err != nil {
+		return nil, err
+	}
+	return query.Search(target)
+}
+
+// SplitLines splits the input into a string slice.
+func SplitLines(o interface{}) ([]string, error) {
+	ret := []string{}
+	switch o := o.(type) {
+	case string:
+		return strings.Split(o, "\n"), nil
+	case []byte:
+		return strings.Split(string(o), "\n"), nil
+	}
+	return ret, fmt.Errorf("not-supported-value-type")
+}
+
+// FromJSON decode the input JSON encoded as string or byte slice into a map.
+func FromJSON(o interface{}) (interface{}, error) {
+	ret := map[string]interface{}{}
+	switch o := o.(type) {
+	case string:
+		err := json.Unmarshal([]byte(o), &ret)
+		return ret, err
+	case []byte:
+		err := json.Unmarshal(o, &ret)
+		return ret, err
+	}
+	return ret, fmt.Errorf("not-supported-value-type")
+}
+
+// ToJSON encodes the input struct into a JSON string.
+func ToJSON(o interface{}) (string, error) {
+	buff, err := json.MarshalIndent(o, "", "  ")
+	return string(buff), err
+}
+
+// FromMap decodes map into raw struct
+func FromMap(m map[string]interface{}, raw interface{}) error {
+	// The safest way, but the slowest, is to just marshal and unmarshal back
+	buff, err := ToJSON(m)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(buff), raw)
+}
+
+// ToMap encodes the input as a map
+func ToMap(raw interface{}) (map[string]interface{}, error) {
+	buff, err := ToJSON(raw)
+	if err != nil {
+		return nil, err
+	}
+	out, err := FromJSON(buff)
+	return out.(map[string]interface{}), err
+}
+
+// UnixTime returns a timestamp in unix time
+func UnixTime() interface{} {
+	return time.Now().Unix()
+}
+
 // DefaultFuncs returns a list of default functions for binding in the template
 func (t *Template) DefaultFuncs() map[string]interface{} {
 	return map[string]interface{}{
-		"unixtime": func() interface{} {
-			return time.Now().Unix()
-		},
-
-		"var": func(name, doc string, v ...interface{}) interface{} {
-			if found, has := t.binds[name]; has {
-				return found
-			}
-			return v // default
-		},
-
-		"global": func(name string, v interface{}) interface{} {
-			t.binds[name] = v
-			return ""
-		},
-
-		"q": func(q string, o interface{}) (interface{}, error) {
-			query, err := jmespath.Compile(q)
-			if err != nil {
-				return nil, err
-			}
-			return query.Search(o)
-		},
-
-		"jsonEncode": func(o interface{}) (string, error) {
-			buff, err := json.MarshalIndent(o, "", "  ")
-			return string(buff), err
-		},
-
-		"jsonDecode": func(o interface{}) (interface{}, error) {
-			ret := map[string]interface{}{}
-			switch o := o.(type) {
-			case string:
-				err := json.Unmarshal([]byte(o), &ret)
-				return ret, err
-			case []byte:
-				err := json.Unmarshal(o, &ret)
-				return ret, err
-			}
-			return ret, fmt.Errorf("not-supported-value-type")
-		},
-
 		"include": func(p string, opt ...interface{}) (string, error) {
 			var o interface{}
 			if len(opt) > 0 {
@@ -78,15 +102,22 @@ func (t *Template) DefaultFuncs() map[string]interface{} {
 			return included.Render(o)
 		},
 
-		"lines": func(o interface{}) ([]string, error) {
-			ret := []string{}
-			switch o := o.(type) {
-			case string:
-				return strings.Split(o, "\n"), nil
-			case []byte:
-				return strings.Split(string(o), "\n"), nil
+		"var": func(name, doc string, v ...interface{}) interface{} {
+			if found, has := t.binds[name]; has {
+				return found
 			}
-			return ret, fmt.Errorf("not-supported-value-type")
+			return v // default
 		},
+
+		"global": func(name string, v interface{}) interface{} {
+			t.binds[name] = v
+			return ""
+		},
+
+		"q":         QueryObject,
+		"unixtime":  UnixTime,
+		"lines":     SplitLines,
+		"to_json":   ToJSON,
+		"from_json": FromJSON,
 	}
 }
