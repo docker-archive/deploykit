@@ -13,6 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestErrNotUnixSocket(t *testing.T) {
+	err := errNotUnixSocket("no socket!")
+	require.Error(t, err)
+	require.True(t, IsErrNotUnixSocket(err))
+}
+
 func blockWhileFileExists(name string) {
 	for {
 		_, err := os.Stat(name)
