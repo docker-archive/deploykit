@@ -2,7 +2,18 @@ package plugin
 
 import (
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/types"
 )
+
+// Spec models a canonical pattern of fields that exist in a struct/ map / union that indicates the block is a plugin.
+type Spec struct {
+
+	// Plugin is the name of the plugin
+	Plugin Name
+
+	// Properties is the configuration of the plugin
+	Properties *types.Any
+}
 
 // Informer is the interface that gives information about the plugin such as version and interface methods
 type Informer interface {

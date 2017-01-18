@@ -1,12 +1,11 @@
 package manager
 
 import (
-	"encoding/json"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // proxyForGroupPlugin registers a group plugin that this manager will proxy for.
@@ -33,7 +32,7 @@ func (m *manager) updateConfig(spec group.Spec) error {
 
 	// Always read and then update with the current value.  Assumes the user's input
 	// is always authoritative.
-	stored := GlobalSpec{}
+	stored := globalSpec{}
 
 	err := m.snapshot.Load(&stored)
 	if err != nil {
@@ -43,17 +42,16 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	// if not-found ok to continue...
 
 	if stored.Groups == nil {
-		stored.Groups = map[group.ID]PluginSpec{}
+		stored.Groups = map[group.ID]plugin.Spec{}
 	}
 
-	buff, err := json.MarshalIndent(spec, "  ", "  ")
+	any, err := types.AnyValue(spec)
 	if err != nil {
 		return err
 	}
-	raw := json.RawMessage(buff)
-	stored.Groups[spec.ID] = PluginSpec{
-		Plugin:     m.backendName,
-		Properties: &raw,
+	stored.Groups[spec.ID] = plugin.Spec{
+		Plugin:     plugin.Name(m.backendName),
+		Properties: any,
 	}
 	log.Debugln("Saving updated config", stored)
 

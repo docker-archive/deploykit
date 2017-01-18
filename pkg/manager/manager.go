@@ -8,9 +8,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/leader"
+	"github.com/docker/infrakit/pkg/plugin"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/store"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // Backend is the admin / server interface
@@ -208,17 +210,17 @@ func (m *manager) Stop() {
 	m.leader.Stop()
 }
 
-func (m *manager) getCurrentState() (GlobalSpec, error) {
+func (m *manager) getCurrentState() (globalSpec, error) {
 	// TODO(chungers) -- using the group plugin backend here isn't the general case.
 	// When plugin activation is implemented, it's possible to have multiple group plugins
-	// and the only way to reconstruct the GlobalSpec, which contains multiple groups of
+	// and the only way to reconstruct the globalSpec, which contains multiple groups of
 	// possibly different group plugin implementations, is to do an 'all-shard' query across
-	// all plugins of the type 'group' and then aggregate the results into the final GlobalSpec.
+	// all plugins of the type 'group' and then aggregate the results into the final globalSpec.
 	// For now this just uses the gross simplification of asking the group plugin that the manager
 	// proxies.
 
-	global := GlobalSpec{
-		Groups: map[group.ID]PluginSpec{},
+	global := globalSpec{
+		Groups: map[group.ID]plugin.Spec{},
 	}
 
 	specs, err := m.Plugin.InspectGroups()
@@ -227,14 +229,14 @@ func (m *manager) getCurrentState() (GlobalSpec, error) {
 	}
 
 	for _, spec := range specs {
-		buff, err := json.MarshalIndent(spec, "  ", "  ")
+
+		any, err := types.AnyValue(spec)
 		if err != nil {
 			return global, err
 		}
-		raw := json.RawMessage(buff)
-		global.Groups[spec.ID] = PluginSpec{
-			Plugin:     m.backendName,
-			Properties: &raw,
+		global.Groups[spec.ID] = plugin.Spec{
+			Plugin:     plugin.Name(m.backendName),
+			Properties: any,
 		}
 	}
 	return global, nil
@@ -244,7 +246,7 @@ func (m *manager) onAssumeLeadership() error {
 	log.Infoln("Assuming leadership")
 
 	// load the config
-	config := GlobalSpec{}
+	config := globalSpec{}
 
 	// load the latest version -- assumption here is that it's been persisted already.
 	err := m.snapshot.Load(&config)
@@ -272,7 +274,7 @@ func (m *manager) onLostLeadership() error {
 func (m *manager) doCommit() error {
 
 	// load the config
-	config := GlobalSpec{}
+	config := globalSpec{}
 
 	// load the latest version -- assumption here is that it's been persisted already.
 	err := m.snapshot.Load(&config)
@@ -287,7 +289,7 @@ func (m *manager) doCommit() error {
 	return m.doCommitGroups(config)
 }
 
-func (m *manager) doCommitGroups(config GlobalSpec) error {
+func (m *manager) doCommitGroups(config globalSpec) error {
 	return m.execPlugins(config,
 		func(plugin group.Plugin, spec group.Spec) error {
 
@@ -301,7 +303,7 @@ func (m *manager) doCommitGroups(config GlobalSpec) error {
 		})
 }
 
-func (m *manager) doFreeGroups(config GlobalSpec) error {
+func (m *manager) doFreeGroups(config globalSpec) error {
 	log.Infoln("Freeing groups")
 	return m.execPlugins(config,
 		func(plugin group.Plugin, spec group.Spec) error {
@@ -315,7 +317,7 @@ func (m *manager) doFreeGroups(config GlobalSpec) error {
 		})
 }
 
-func (m *manager) execPlugins(config GlobalSpec, work func(group.Plugin, group.Spec) error) error {
+func (m *manager) execPlugins(config globalSpec, work func(group.Plugin, group.Spec) error) error {
 	running, err := m.plugins.List()
 	if err != nil {
 		return err
@@ -324,7 +326,7 @@ func (m *manager) execPlugins(config GlobalSpec, work func(group.Plugin, group.S
 	for id, pluginSpec := range config.Groups {
 
 		log.Infoln("Processing group", id, "with plugin", pluginSpec.Plugin)
-		name := pluginSpec.Plugin
+		name := pluginSpec.Plugin.String()
 
 		ep, has := running[name]
 		if !has {
