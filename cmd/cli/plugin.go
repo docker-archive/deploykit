@@ -181,11 +181,8 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 			log.Infoln("Stopping", n, "at PID=", pid)
 			if err := process.Signal(syscall.SIGTERM); err == nil {
-				_, err := process.Wait()
+				process.Wait()
 				log.Infoln("Process for", n, "exited")
-				if err != nil {
-					log.Warningln("error=", err)
-				}
 			}
 
 		}
