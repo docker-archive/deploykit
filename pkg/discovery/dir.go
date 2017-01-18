@@ -85,8 +85,10 @@ func (r *dirPluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 
 			instance, err := r.dirLookup(entry)
 
-			if err != nil && !IsErrNotUnixSocket(err) {
-				log.Warningln("Loading plugin err=", err)
+			if err != nil {
+				if !IsErrNotUnixSocket(err) {
+					log.Warningln("Loading plugin err=", err)
+				}
 				continue
 			}
 
