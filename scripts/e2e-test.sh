@@ -142,3 +142,6 @@ infrakit group destroy cattle
 expect_output_lines "0 instances should exist" "infrakit instance describe -q --name instance-file" "0"
 
 echo 'ALL TESTS PASSED'
+
+echo "Stopping plugins"
+infrakit plugin stop group-default instance-file flavor-vanilla

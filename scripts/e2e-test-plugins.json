@@ -5,7 +5,7 @@
             "Exec" : "os",
             "Properties": {
                 "Cmd" : "infrakit-group-default --poll-interval 500ms --name group-stateless --log 5 > {{env "LOG_DIR"}}/group-default-{{unixtime}}.log 2>&1 &",
-                "SamePgID" : false
+                "SamePgID" : true
             }
         }
     }
