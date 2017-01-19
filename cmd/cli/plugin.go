@@ -2,8 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	sys_os "os"
+	"strconv"
 	"sync"
+	"syscall"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/os"
@@ -128,7 +133,64 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
-	cmd.AddCommand(ls, start)
+	stop := &cobra.Command{
+		Use:   "stop",
+		Short: "Stop named plugins. Args are a list of plugin names.  This assumes plugins are local processes and not containers managed by another daemon, like Docker or runc.",
+	}
+
+	stop.RunE = func(c *cobra.Command, args []string) error {
+
+		allPlugins, err := plugins().List()
+		if err != nil {
+			return err
+		}
+
+		for _, n := range args {
+
+			p, has := allPlugins[n]
+			if !has {
+				log.Warningf("Plugin %s not running", n)
+				continue
+			}
+
+			if p.Protocol != "unix" {
+				log.Warningf("Plugin is not a local process", n)
+				continue
+			}
+
+			// TODO(chungers) -- here we
+			pidFile := p.Address + ".pid"
+
+			buff, err := ioutil.ReadFile(pidFile)
+			if err != nil {
+				log.Warningf("Cannot read PID file for %s: %s", n, pidFile)
+				continue
+			}
+
+			pid, err := strconv.Atoi(string(buff))
+			if err != nil {
+				log.Warningf("Cannot determine PID for %s from file: %s", n, pidFile)
+				continue
+			}
+
+			process, err := sys_os.FindProcess(pid)
+			if err != nil {
+				log.Warningf("Error finding process of plugin %s", n)
+				continue
+			}
+
+			log.Infoln("Stopping", n, "at PID=", pid)
+			if err := process.Signal(syscall.SIGTERM); err == nil {
+				process.Wait()
+				log.Infoln("Process for", n, "exited")
+			}
+
+		}
+
+		return nil
+	}
+
+	cmd.AddCommand(ls, start, stop)
 
 	return cmd
 }
