@@ -26,11 +26,8 @@ func (r Name) String() string {
 }
 
 // MarshalJSON implements the JSON marshaler interface
-func (r *Name) MarshalJSON() ([]byte, error) {
-	if r == nil {
-		return nil, nil
-	}
-	return []byte(r.String()), nil
+func (r Name) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, r.String())), nil
 }
 
 // UnmarshalJSON implements the JSON unmarshaler interface

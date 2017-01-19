@@ -22,6 +22,21 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "manager",
 		Short: "Access the manager",
 	}
+	name := cmd.PersistentFlags().String("name", DefaultGroupPluginName, "Name of plugin")
+	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
+
+		endpoint, err := plugins().Find(plugin.Name(*name))
+		if err != nil {
+			return err
+		}
+
+		p, err := group_plugin.NewClient(endpoint.Address)
+		if err != nil {
+			return err
+		}
+		groupPlugin = p
+		return nil
+	}
 
 	commit := cobra.Command{
 		Use:   "commit <template_URL>",
@@ -50,7 +65,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		fmt.Print(view)
+		log.Debugln(view)
 
 		// Treat this as an Any and then convert
 		any := types.AnyString(view)
@@ -80,7 +95,10 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 			// TODO(chungers) -- we need to enforce and confirm the type of this.
 			// Right now we assume the RPC endpoint is indeed a group.
-			target := group_plugin.NewClient(endpoint.Address)
+			target, err := group_plugin.NewClient(endpoint.Address)
+			if err != nil {
+				return err
+			}
 
 			plan, err := target.CommitGroup(spec, *pretend)
 			if err != nil {
@@ -92,7 +110,49 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 		return nil
 	}
-	cmd.AddCommand(&commit)
+
+	inspect := cobra.Command{
+		Use:   "inspect",
+		Short: "inspect returns the plugin configurations known by the manager",
+	}
+	inspect.RunE = func(cmd *cobra.Command, args []string) error {
+		assertNotNil("no plugin", groupPlugin)
+
+		if len(args) != 0 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		specs, err := groupPlugin.InspectGroups()
+		if err != nil {
+			return err
+		}
+
+		// the format is pluing.Spec
+		out := []plugin.Spec{}
+		for _, spec := range specs {
+
+			any, err := types.AnyValue(spec)
+			if err != nil {
+				return err
+			}
+
+			out = append(out, plugin.Spec{
+				Plugin:     plugin.Name(*name),
+				Properties: any,
+			})
+		}
+
+		view, err := types.AnyValue(out)
+		if err != nil {
+			return err
+		}
+		fmt.Println(view.String())
+
+		return nil
+	}
+
+	cmd.AddCommand(&commit, &inspect)
 
 	return cmd
 }
