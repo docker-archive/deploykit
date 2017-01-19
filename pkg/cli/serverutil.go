@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 
@@ -21,11 +23,25 @@ func RunPlugin(name string, plugin server.VersionedInterface) {
 	dir := discovery.Dir()
 	EnsureDirExists(dir)
 
-	stoppable, err := server.StartPluginAtPath(path.Join(dir, name), plugin)
+	socketPath := path.Join(dir, name)
+	pidPath := path.Join(dir, name+".pid")
+
+	stoppable, err := server.StartPluginAtPath(socketPath, plugin)
 	if err != nil {
 		log.Error(err)
 	}
+
+	// write PID file
+	err = ioutil.WriteFile(pidPath, []byte(fmt.Sprintf("%v", os.Getpid())), 0644)
+	if err != nil {
+		log.Error(err)
+	}
+	log.Infoln("PID file at", pidPath)
 	if stoppable != nil {
 		stoppable.AwaitStopped()
 	}
+
+	// clean up
+	os.Remove(pidPath)
+	log.Infoln("Removed PID file at", pidPath)
 }
