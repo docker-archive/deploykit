@@ -68,7 +68,7 @@ func TestInstancePluginValidate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(name, socketPath).Validate(raw)
+	err = must(NewClient(name, socketPath)).Validate(raw)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -94,7 +94,7 @@ func TestInstancePluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(name, socketPath).Validate(raw)
+	err = must(NewClient(name, socketPath)).Validate(raw)
 	require.Error(t, err)
 	require.Equal(t, "whoops", err.Error())
 
@@ -120,7 +120,7 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 	require.NoError(t, err)
 
 	var id *instance.ID
-	id, err = NewClient(name, socketPath).Provision(spec)
+	id, err = must(NewClient(name, socketPath)).Provision(spec)
 	require.NoError(t, err)
 	require.Nil(t, id)
 
@@ -148,7 +148,7 @@ func TestInstancePluginProvision(t *testing.T) {
 	require.NoError(t, err)
 
 	var id *instance.ID
-	id, err = NewClient(name, socketPath).Provision(spec)
+	id, err = must(NewClient(name, socketPath)).Provision(spec)
 	require.NoError(t, err)
 	require.Equal(t, "test", string(*id))
 
@@ -174,7 +174,7 @@ func TestInstancePluginProvisionError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(name, socketPath).Provision(spec)
+	_, err = must(NewClient(name, socketPath)).Provision(spec)
 	require.Error(t, err)
 	require.Equal(t, "nope", err.Error())
 
@@ -198,7 +198,7 @@ func TestInstancePluginDestroy(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(name, socketPath).Destroy(inst)
+	err = must(NewClient(name, socketPath)).Destroy(inst)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -221,7 +221,7 @@ func TestInstancePluginDestroyError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(name, socketPath).Destroy(inst)
+	err = must(NewClient(name, socketPath)).Destroy(inst)
 	require.Error(t, err)
 	require.Equal(t, "can't do", err.Error())
 
@@ -245,7 +245,7 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 		},
 	}))
 
-	l, err := NewClient(name, socketPath).DescribeInstances(tags)
+	l, err := must(NewClient(name, socketPath)).DescribeInstances(tags)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -272,7 +272,7 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	l, err := NewClient(name, socketPath).DescribeInstances(tags)
+	l, err := must(NewClient(name, socketPath)).DescribeInstances(tags)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -299,7 +299,7 @@ func TestInstancePluginDescribeInstancesError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(name, socketPath).DescribeInstances(tags)
+	_, err = must(NewClient(name, socketPath)).DescribeInstances(tags)
 	require.Error(t, err)
 	require.Equal(t, "bad", err.Error())
 

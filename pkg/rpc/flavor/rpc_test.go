@@ -72,7 +72,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	require.NoError(t, NewClient(plugin.Name(name), socketPath).Validate(inputFlavorProperties, allocation))
+	require.NoError(t, must(NewClient(plugin.Name(name), socketPath)).Validate(inputFlavorProperties, allocation))
 
 	server.Stop()
 
@@ -94,7 +94,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(plugin.Name(name), socketPath).Validate(inputFlavorProperties, allocation)
+	err = must(NewClient(plugin.Name(name), socketPath)).Validate(inputFlavorProperties, allocation)
 	require.Error(t, err)
 	require.Equal(t, "something-went-wrong", err.Error())
 
@@ -128,7 +128,7 @@ func TestFlavorPluginPrepare(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	spec, err := NewClient(plugin.Name(name), socketPath).Prepare(
+	spec, err := must(NewClient(plugin.Name(name), socketPath)).Prepare(
 		inputFlavorProperties,
 		inputInstanceSpec,
 		allocation)
@@ -167,7 +167,7 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(plugin.Name(name), socketPath).Prepare(
+	_, err = must(NewClient(plugin.Name(name), socketPath)).Prepare(
 		inputFlavorProperties,
 		inputInstanceSpec,
 		allocation)
@@ -200,7 +200,7 @@ func TestFlavorPluginHealthy(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	health, err := NewClient(plugin.Name(name), socketPath).Healthy(inputProperties, inputInstance)
+	health, err := must(NewClient(plugin.Name(name), socketPath)).Healthy(inputProperties, inputInstance)
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
 
@@ -229,7 +229,7 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(plugin.Name(name), socketPath).Healthy(inputProperties, inputInstance)
+	_, err = must(NewClient(plugin.Name(name), socketPath)).Healthy(inputProperties, inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 
@@ -258,7 +258,7 @@ func TestFlavorPluginDrain(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	require.NoError(t, NewClient(plugin.Name(name), socketPath).Drain(inputProperties, inputInstance))
+	require.NoError(t, must(NewClient(plugin.Name(name), socketPath)).Drain(inputProperties, inputInstance))
 
 	require.Equal(t, inputProperties, <-inputPropertiesActual)
 	require.Equal(t, inputInstance, <-inputInstanceActual)
@@ -285,7 +285,7 @@ func TestFlavorPluginDrainError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(plugin.Name(name), socketPath).Drain(inputProperties, inputInstance)
+	err = must(NewClient(plugin.Name(name), socketPath)).Drain(inputProperties, inputInstance)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 

@@ -14,6 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func must(p flavor.Plugin, err error) flavor.Plugin {
+	if err != nil {
+		panic(err)
+	}
+	return p
+}
+
 func TestFlavorMultiPluginValidate(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
@@ -41,9 +48,9 @@ func TestFlavorMultiPluginValidate(t *testing.T) {
 		}))
 	require.NoError(t, err)
 
-	require.NoError(t, NewClient(plugin.Name(name+"/type1"), socketPath).Validate(inputFlavorProperties1, allocation))
+	require.NoError(t, must(NewClient(plugin.Name(name+"/type1"), socketPath)).Validate(inputFlavorProperties1, allocation))
 
-	err = NewClient(plugin.Name(name+"/type2"), socketPath).Validate(inputFlavorProperties2, allocation)
+	err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Validate(inputFlavorProperties2, allocation)
 	require.Error(t, err)
 	require.Equal(t, "something-went-wrong", err.Error())
 
@@ -103,14 +110,14 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 	))
 	require.NoError(t, err)
 
-	spec, err := NewClient(plugin.Name(name+"/type1"), socketPath).Prepare(
+	spec, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).Prepare(
 		inputFlavorProperties1,
 		inputInstanceSpec1,
 		allocation)
 	require.NoError(t, err)
 	require.Equal(t, inputInstanceSpec1, spec)
 
-	_, err = NewClient(plugin.Name(name+"/type2"), socketPath).Prepare(
+	_, err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Prepare(
 		inputFlavorProperties2,
 		inputInstanceSpec2,
 		allocation)
@@ -165,11 +172,11 @@ func TestFlavorMultiPluginHealthy(t *testing.T) {
 		}))
 	require.NoError(t, err)
 
-	health, err := NewClient(plugin.Name(name+"/type1"), socketPath).Healthy(inputProperties1, inputInstance1)
+	health, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).Healthy(inputProperties1, inputInstance1)
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
 
-	_, err = NewClient(plugin.Name(name+"/type2"), socketPath).Healthy(inputProperties2, inputInstance2)
+	_, err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Healthy(inputProperties2, inputInstance2)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 
@@ -222,12 +229,12 @@ func TestFlavorMultiPluginDrain(t *testing.T) {
 	))
 	require.NoError(t, err)
 
-	require.NoError(t, NewClient(plugin.Name(name+"/type1"), socketPath).Drain(inputProperties1, inputInstance1))
+	require.NoError(t, must(NewClient(plugin.Name(name+"/type1"), socketPath)).Drain(inputProperties1, inputInstance1))
 
 	require.Equal(t, inputProperties1, <-inputPropertiesActual1)
 	require.Equal(t, inputInstance1, <-inputInstanceActual1)
 
-	err = NewClient(plugin.Name(name+"/type2"), socketPath).Drain(inputProperties2, inputInstance2)
+	err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Drain(inputProperties2, inputInstance2)
 	require.Error(t, err)
 	require.Equal(t, "oh-noes", err.Error())
 

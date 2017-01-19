@@ -37,6 +37,13 @@ func (t *testPlugin) InspectGroups() ([]group.Spec, error) {
 	return t.DoInspectGroups()
 }
 
+func must(p group.Plugin, err error) group.Plugin {
+	if err != nil {
+		panic(err)
+	}
+	return p
+}
+
 func tempSocket() string {
 	dir, err := ioutil.TempDir("", "infrakit-test-")
 	if err != nil {
@@ -63,7 +70,7 @@ func TestGroupPluginCommitGroup(t *testing.T) {
 	}))
 
 	// Make call
-	details, err := NewClient(socketPath).CommitGroup(groupSpec, false)
+	details, err := must(NewClient(socketPath)).CommitGroup(groupSpec, false)
 	require.NoError(t, err)
 	require.Equal(t, "commit details", details)
 
@@ -89,7 +96,7 @@ func TestGroupPluginCommitGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(socketPath).CommitGroup(groupSpec, false)
+	_, err = must(NewClient(socketPath)).CommitGroup(groupSpec, false)
 	require.Error(t, err)
 	require.Equal(t, "error", err.Error())
 
@@ -111,7 +118,7 @@ func TestGroupPluginFreeGroup(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).FreeGroup(id)
+	err = must(NewClient(socketPath)).FreeGroup(id)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -131,7 +138,7 @@ func TestGroupPluginFreeGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).FreeGroup(id)
+	err = must(NewClient(socketPath)).FreeGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -152,7 +159,7 @@ func TestGroupPluginDestroyGroup(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).DestroyGroup(id)
+	err = must(NewClient(socketPath)).DestroyGroup(id)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -172,7 +179,7 @@ func TestGroupPluginDestroyGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(socketPath).DestroyGroup(id)
+	err = must(NewClient(socketPath)).DestroyGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -199,7 +206,7 @@ func TestGroupPluginInspectGroup(t *testing.T) {
 		},
 	}))
 
-	res, err := NewClient(socketPath).DescribeGroup(id)
+	res, err := must(NewClient(socketPath)).DescribeGroup(id)
 	require.NoError(t, err)
 	require.Equal(t, desc, res)
 
@@ -226,7 +233,7 @@ func TestGroupPluginInspectGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = NewClient(socketPath).DescribeGroup(id)
+	_, err = must(NewClient(socketPath)).DescribeGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 

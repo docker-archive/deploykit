@@ -25,6 +25,19 @@ type handshakeResult struct {
 	err error
 }
 
+type errVersionMismatch string
+
+// Error implements error interface
+func (e errVersionMismatch) Error() string {
+	return string(e)
+}
+
+// IsErrVersionMismatch return true if the error is from mismatched api versions.
+func IsErrVersionMismatch(e error) bool {
+	_, is := e.(errVersionMismatch)
+	return is
+}
+
 func (c *handshakingClient) handshake() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -45,11 +58,11 @@ func (c *handshakingClient) handshake() error {
 						err = nil
 						break
 					} else {
-						err = fmt.Errorf(
+						err = errVersionMismatch(fmt.Sprintf(
 							"Plugin supports %s interface version %s, client requires %s",
 							iface.Name,
 							iface.Version,
-							c.iface.Version)
+							c.iface.Version))
 					}
 				}
 			}

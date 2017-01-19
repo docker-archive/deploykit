@@ -46,7 +46,8 @@ func TestUnixSocketServer(t *testing.T) {
 	server, err := StartPluginAtPath(socket, service)
 	require.NoError(t, err)
 
-	c := plugin_rpc.NewClient(name, socket)
+	c, err := plugin_rpc.NewClient(name, socket)
+	require.NoError(t, err)
 
 	err = c.Validate(properties)
 	require.Error(t, err)
