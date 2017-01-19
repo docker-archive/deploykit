@@ -16,7 +16,7 @@ func (m *manager) proxyForGroupPlugin(name string) (group.Plugin, error) {
 
 	// A late-binding proxy so that we don't have a problem with having to
 	// start up the manager as the last of all the plugins.
-	return NewProxy(func() (group.Plugin, error) {
+	return newProxy(func() (group.Plugin, error) {
 		endpoint, err := m.plugins.Find(plugin.Name(name))
 		if err != nil {
 			return nil, err
