@@ -11,8 +11,12 @@ import (
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
-func NewClient(name plugin.Name, socketPath string) flavor.Plugin {
-	return &client{name: name, client: rpc_client.New(socketPath, flavor.InterfaceSpec)}
+func NewClient(name plugin.Name, socketPath string) (flavor.Plugin, error) {
+	rpcClient, err := rpc_client.New(socketPath, flavor.InterfaceSpec)
+	if err != nil {
+		return nil, err
+	}
+	return &client{name: name, client: rpcClient}, nil
 }
 
 type client struct {

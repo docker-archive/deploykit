@@ -1,13 +1,15 @@
 package client
 
 import (
-	"github.com/docker/infrakit/pkg/rpc/server"
-	"github.com/docker/infrakit/pkg/spi"
-	"github.com/stretchr/testify/require"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"testing"
+
+	"github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/spi"
+	"github.com/stretchr/testify/require"
 )
 
 var apiSpec = spi.InterfaceSpec{
@@ -27,11 +29,23 @@ func startPluginServer(t *testing.T) (server.Stoppable, string) {
 	return testServer, socket
 }
 
+func TestErrVersionMismatch(t *testing.T) {
+	var e error
+
+	e = errVersionMismatch("test")
+	require.True(t, IsErrVersionMismatch(e))
+
+	e = fmt.Errorf("untyped")
+	require.False(t, IsErrVersionMismatch(e))
+}
+
 func TestHandshakeSuccess(t *testing.T) {
 	testServer, socket := startPluginServer(t)
 	defer testServer.Stop()
 
-	client := rpcClient{client: New(socket, apiSpec)}
+	r, err := New(socket, apiSpec)
+	require.NoError(t, err)
+	client := rpcClient{client: r}
 	require.NoError(t, client.DoSomething())
 }
 
@@ -39,8 +53,11 @@ func TestHandshakeFailVersion(t *testing.T) {
 	testServer, socket := startPluginServer(t)
 	defer testServer.Stop()
 
-	client := rpcClient{client: New(socket, spi.InterfaceSpec{Name: "TestPlugin", Version: "0.2.0"})}
-	err := client.DoSomething()
+	r, err := New(socket, spi.InterfaceSpec{Name: "TestPlugin", Version: "0.2.0"})
+	require.Error(t, err)
+
+	client := rpcClient{client: r}
+	err = client.DoSomething()
 	require.Error(t, err)
 	require.Equal(t, "Plugin supports TestPlugin interface version 0.1.0, client requires 0.2.0", err.Error())
 }
@@ -49,8 +66,11 @@ func TestHandshakeFailWrongAPI(t *testing.T) {
 	testServer, socket := startPluginServer(t)
 	defer testServer.Stop()
 
-	client := rpcClient{client: New(socket, spi.InterfaceSpec{Name: "OtherPlugin", Version: "0.1.0"})}
-	err := client.DoSomething()
+	r, err := New(socket, spi.InterfaceSpec{Name: "OtherPlugin", Version: "0.1.0"})
+	require.Error(t, err)
+
+	client := rpcClient{client: r}
+	err = client.DoSomething()
 	require.Error(t, err)
 	require.Equal(t, "Plugin does not support interface {OtherPlugin 0.1.0}", err.Error())
 }
