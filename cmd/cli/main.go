@@ -41,6 +41,7 @@ func main() {
 	cmd.AddCommand(cli.VersionCommand(), cli.InfoCommand(f))
 
 	cmd.AddCommand(templateCommand(f))
+	cmd.AddCommand(managerCommand(f))
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
 
 	err := cmd.Execute()
