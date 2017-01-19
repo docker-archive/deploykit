@@ -22,7 +22,7 @@ func (m *manager) proxyForGroupPlugin(name string) (group.Plugin, error) {
 		if err != nil {
 			return nil, err
 		}
-		return rpc.NewClient(endpoint.Address), nil
+		return rpc.NewClient(endpoint.Address)
 	}), nil
 }
 
