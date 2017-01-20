@@ -25,7 +25,7 @@ var InterfaceSpec = spi.InterfaceSpec{
 // Manager is the interface for interacting locally or remotely with the manager
 type Manager interface {
 	// IsLeader returns true only if for certain this is a leader. False if not or unknown.
-	IsLeader() bool
+	IsLeader() (bool, error)
 }
 
 // Backend is the admin / server interface
@@ -97,8 +97,8 @@ func (m *manager) initRunning() bool {
 }
 
 // IsLeader returns leader status.  False if not or unknown.
-func (m *manager) IsLeader() bool {
-	return m.isLeader
+func (m *manager) IsLeader() (bool, error) {
+	return m.isLeader, nil
 }
 
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.

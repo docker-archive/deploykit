@@ -41,7 +41,11 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 				m := manager_rpc.Adapt(rpcClient)
 
-				isLeader := m.IsLeader()
+				isLeader, err := m.IsLeader()
+				if err != nil {
+					return err
+				}
+
 				log.Infoln("Found manager", name, "is leader = ", isLeader)
 				if isLeader {
 

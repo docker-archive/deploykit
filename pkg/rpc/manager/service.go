@@ -33,6 +33,9 @@ type IsLeaderResponse struct {
 
 // Validate checks whether the helper can support a configuration.
 func (p *Manager) IsLeader(_ *http.Request, req *IsLeaderRequest, resp *IsLeaderResponse) error {
-	resp.Leader = p.manager.IsLeader()
-	return nil
+	is, err := p.manager.IsLeader()
+	if err == nil {
+		resp.Leader = is
+	}
+	return err
 }

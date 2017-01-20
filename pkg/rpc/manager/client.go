@@ -24,9 +24,9 @@ type client struct {
 }
 
 // IsLeader returns true if the maanger is a leader
-func (c client) IsLeader() bool {
+func (c client) IsLeader() (bool, error) {
 	req := IsLeaderRequest{}
 	resp := IsLeaderResponse{}
-	c.client.Call("Manager.IsLeader", req, &resp)
-	return resp.Leader
+	err := c.client.Call("Manager.IsLeader", req, &resp)
+	return resp.Leader, err
 }
