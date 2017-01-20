@@ -10,14 +10,29 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 )
 
+// InterfaceSpec is the current name and version of the Instance API.
+var InterfaceSpec = spi.InterfaceSpec{
+	Name:    "Manager",
+	Version: "0.1.0",
+}
+
+// Manager is the interface for interacting locally or remotely with the manager
+type Manager interface {
+	// IsLeader returns true only if for certain this is a leader. False if not or unknown.
+	IsLeader() bool
+}
+
 // Backend is the admin / server interface
 type Backend interface {
 	group.Plugin
+
+	Manager
 
 	Start() (<-chan struct{}, error)
 	Stop()
@@ -79,6 +94,11 @@ func (m *manager) initRunning() bool {
 		return true
 	}
 	return false
+}
+
+// IsLeader returns leader status.  False if not or unknown.
+func (m *manager) IsLeader() bool {
+	return m.isLeader
 }
 
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.

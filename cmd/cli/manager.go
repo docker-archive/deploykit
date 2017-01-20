@@ -6,8 +6,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc/client"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
+	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -17,24 +20,40 @@ import (
 func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	var groupPlugin group.Plugin
+	var groupPluginName string
 
 	cmd := &cobra.Command{
 		Use:   "manager",
 		Short: "Access the manager",
 	}
-	name := cmd.PersistentFlags().String("name", DefaultGroupPluginName, "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 
-		endpoint, err := plugins().Find(plugin.Name(*name))
+		// Scan for a manager
+		pm, err := plugins().List()
 		if err != nil {
 			return err
 		}
 
-		p, err := group_plugin.NewClient(endpoint.Address)
-		if err != nil {
-			return err
+		for name, endpoint := range pm {
+
+			rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
+			if err == nil {
+
+				m := manager_rpc.Adapt(rpcClient)
+
+				isLeader := m.IsLeader()
+				log.Infoln("Found manager", name, "is leader = ", isLeader)
+				if isLeader {
+
+					groupPlugin = group_plugin.Adapt(rpcClient)
+					groupPluginName = name
+
+					log.Infoln("Found manager as", name, "at", endpoint.Address)
+
+					break
+				}
+			}
 		}
-		groupPlugin = p
 		return nil
 	}
 
@@ -138,7 +157,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			out = append(out, plugin.Spec{
-				Plugin:     plugin.Name(*name),
+				Plugin:     plugin.Name(groupPluginName),
 				Properties: any,
 			})
 		}
