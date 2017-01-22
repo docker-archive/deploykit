@@ -1,18 +1,16 @@
 package manager
 
 import (
-	"encoding/json"
-
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 )
 
-// GlobalSpec is a simple model of a collection of Group plugin configs
-type GlobalSpec struct {
-	Groups map[group.ID]PluginSpec
-}
+// globalSpec is a simple model of a collection of Group plugin configs
+type globalSpec struct {
 
-// PluginSpec is a standard representation of a Plugin that specifies it by name and custom properties
-type PluginSpec struct {
-	Plugin     string
-	Properties *json.RawMessage
+	// Groups is a map keyed by the group.ID which is a nested field inside the spec's Properties.
+	// This is not a representation to be used externally because external, user-facing representation
+	// should be a list of plugin.Spec and not map to enforce the invariant that all YAML/JSON keys fields are
+	// fields in objects.  See https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#lists-of-named-subobjects-preferred-over-maps
+	Groups map[group.ID]plugin.Spec
 }

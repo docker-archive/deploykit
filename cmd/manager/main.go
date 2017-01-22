@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	"github.com/docker/infrakit/pkg/manager"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
+	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
@@ -77,7 +78,7 @@ func runMain(cfg config) error {
 		return err
 	}
 
-	cli.RunPlugin(cfg.id, group_rpc.PluginServer(mgr))
+	cli.RunPlugin(cfg.id, group_rpc.PluginServer(mgr), manager_rpc.PluginServer(mgr))
 
 	mgr.Stop()
 	log.Infoln("Manager stopped")

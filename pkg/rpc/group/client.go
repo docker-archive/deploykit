@@ -12,7 +12,13 @@ func NewClient(socketPath string) (group.Plugin, error) {
 		return nil, err
 	}
 
-	return &client{client: rpcClient}, nil
+	return Adapt(rpcClient), nil
+}
+
+// Adapt returns a group Plugin implementation based on given rpc client.  Assumption here is that
+// the rpcClient has been verified to support the group plugin RPC interface.
+func Adapt(rpcClient rpc_client.Client) group.Plugin {
+	return &client{client: rpcClient}
 }
 
 type client struct {

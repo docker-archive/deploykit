@@ -2,7 +2,8 @@ package client
 
 import (
 	"fmt"
-	"github.com/docker/infrakit/pkg/rpc/plugin"
+
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"sync"
 )
@@ -43,10 +44,10 @@ func (c *handshakingClient) handshake() error {
 	defer c.lock.Unlock()
 
 	if c.handshakeResult == nil {
-		req := plugin.ImplementsRequest{}
-		resp := plugin.ImplementsResponse{}
+		req := rpc.ImplementsRequest{}
+		resp := rpc.ImplementsResponse{}
 
-		if err := c.client.Call("Plugin.Implements", req, &resp); err != nil {
+		if err := c.client.Call("Handshake.Implements", req, &resp); err != nil {
 			return err
 		}
 

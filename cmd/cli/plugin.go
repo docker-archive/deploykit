@@ -138,6 +138,7 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Stop named plugins. Args are a list of plugin names.  This assumes plugins are local processes and not containers managed by another daemon, like Docker or runc.",
 	}
 
+	all := stop.Flags().Bool("all", false, "True to stop all running plugins")
 	stop.RunE = func(c *cobra.Command, args []string) error {
 
 		allPlugins, err := plugins().List()
@@ -145,11 +146,20 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		for _, n := range args {
+		targets := args
+
+		if *all {
+			names := []string{}
+			for n := range allPlugins {
+				names = append(names, n)
+			}
+			targets = names
+		}
+
+		for _, n := range targets {
 
 			p, has := allPlugins[n]
 			if !has {
-				log.Warningf("Plugin %s not running", n)
 				continue
 			}
 

@@ -6,9 +6,9 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 )
 
-// NewProxy returns a plugin interface.  The proxy is late-binding in that
+// newProxy returns a plugin interface.  The proxy is late-binding in that
 // it does not resolve plugin until a method is called.
-func NewProxy(finder func() (group.Plugin, error)) group.Plugin {
+func newProxy(finder func() (group.Plugin, error)) group.Plugin {
 	return &proxy{finder: finder}
 }
 
