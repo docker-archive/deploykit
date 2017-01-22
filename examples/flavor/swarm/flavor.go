@@ -1,19 +1,17 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
 
@@ -21,20 +19,9 @@ const (
 	ebsAttachment string = "ebs"
 )
 
-type swarmFlavor struct {
-	client     client.APIClient
-	initScript *template.Template
-}
-
-type schema struct {
-	Attachments          map[instance.LogicalID][]instance.Attachment
-	DockerRestartCommand string
-}
-
-func parseProperties(flavorProperties json.RawMessage) (schema, error) {
-	s := schema{}
-	err := json.Unmarshal(flavorProperties, &s)
-	return s, err
+// Spec is the value passed in the `Properties` field of configs
+type Spec struct {
+	Attachments map[instance.LogicalID][]instance.Attachment
 }
 
 func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
@@ -88,54 +75,79 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
 	return nil
 }
 
-const (
-	// associationTag is a machine tag added to associate machines with Swarm nodes.
-	associationTag = "swarm-association-id"
-)
-
-func generateInitScript(templ *template.Template,
-	joinIP, joinToken, associationID, restartCommand string) (string, error) {
-
-	var buffer bytes.Buffer
-	err := templ.Execute(&buffer, map[string]string{
-		"MY_IP":          joinIP,
-		"JOIN_TOKEN":     joinToken,
-		"ASSOCIATION_ID": associationID,
-		"RESTART_DOCKER": restartCommand,
-	})
+func swarmState(docker client.APIClient) (status swarm.Swarm, node swarm.Node, err error) {
+	ctx := context.Background()
+	info, err := docker.Info(ctx)
 	if err != nil {
-		return "", err
+		return
 	}
-	return buffer.String(), nil
+	node, _, err = docker.NodeInspectWithRaw(ctx, info.Swarm.NodeID)
+	if err != nil {
+		return
+	}
+	status, err = docker.SwarmInspect(ctx)
+	return
 }
 
-func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
-	properties, err := parseProperties(flavorProperties)
-	if err != nil {
-		return err
+func exportTemplateFunctions(swarmStatus swarm.Swarm, nodeInfo swarm.Node, link types.Link) []template.Function {
+
+	// Get a single consistent view of the data across multiple calls by exporting functions that
+	// query the input state
+
+	return []template.Function{
+		{
+			Name:        "INFRAKIT_LABELS",
+			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
+			Func: func() []string {
+				return link.KVPairs()
+			},
+		},
+		{
+			Name:        "SWARM_MANAGER_IP",
+			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
+			Func: func() (string, error) {
+				if nodeInfo.ManagerStatus == nil {
+					return "", fmt.Errorf("no manager status")
+				}
+				return nodeInfo.ManagerStatus.Addr, nil
+			},
+		},
+		{
+			Name:        "SWARM_INITIALIZED",
+			Description: "Returns true if the swarm has been initialized.",
+			Func: func() bool {
+				return nodeInfo.ManagerStatus != nil
+			},
+		},
+		{
+			Name:        "SWARM_JOIN_TOKENS",
+			Description: "Returns the swarm JoinTokens object, with either .Manager or .Worker fields",
+			Func: func() interface{} {
+				return swarmStatus.JoinTokens
+			},
+		},
+		{
+			Name:        "SWARM_CLUSTER_ID",
+			Description: "Returns the swarm cluster UUID",
+			Func: func() interface{} {
+				return swarmStatus.ID
+			},
+		},
 	}
-	if properties.DockerRestartCommand == "" {
-		return errors.New("DockerRestartCommand must be specified")
-	}
-	if err := validateIDsAndAttachments(allocation.LogicalIDs, properties.Attachments); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
-func healthy(client client.APIClient,
-	flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func healthy(client client.APIClient, inst instance.Description) (flavor.Health, error) {
 
-	associationID, exists := inst.Tags[associationTag]
-	if !exists {
+	link := types.NewLinkFromMap(inst.Tags)
+	if !link.Valid() {
 		log.Info("Reporting unhealthy for instance without an association tag", inst.ID)
 		return flavor.Unhealthy, nil
 	}
 
 	filter := filters.NewArgs()
-	filter.Add("label", fmt.Sprintf("%s=%s", associationTag, associationID))
+	filter.Add("label", fmt.Sprintf("%s=%s", link.Label(), link.Value()))
 
 	nodes, err := client.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
 	if err != nil {
@@ -151,7 +163,7 @@ func healthy(client client.APIClient,
 		return flavor.Healthy, nil
 
 	default:
-		log.Warnf("Expected at most one node with label %s, but found %s", associationID, nodes)
+		log.Warnf("Expected at most one node with label %s, but found %s", link.Value(), nodes)
 		return flavor.Healthy, nil
 	}
 }

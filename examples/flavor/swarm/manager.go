@@ -3,16 +3,14 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/client"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
-	"github.com/docker/infrakit/pkg/plugin/group/util"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
-	"golang.org/x/net/context"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
@@ -25,14 +23,11 @@ type managerFlavor struct {
 	initScript *template.Template
 }
 
-func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
-	properties, err := parseProperties(flavorProperties)
+func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation group_types.AllocationMethod) error {
+	spec := Spec{}
+	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
 	if err != nil {
 		return err
-	}
-
-	if properties.DockerRestartCommand == "" {
-		return errors.New("DockerRestartCommand must be specified")
 	}
 
 	numIDs := len(allocation.LogicalIDs)
@@ -41,81 +36,70 @@ func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation ty
 	}
 
 	for _, id := range allocation.LogicalIDs {
-		if att, exists := properties.Attachments[id]; !exists || len(att) == 0 {
+		if att, exists := spec.Attachments[id]; !exists || len(att) == 0 {
 			log.Warnf("LogicalID %s has no attachments, which is needed for durability", id)
 		}
 	}
 
-	if err := validateIDsAndAttachments(allocation.LogicalIDs, properties.Attachments); err != nil {
+	if err := validateIDsAndAttachments(allocation.LogicalIDs, spec.Attachments); err != nil {
 		return err
 	}
 	return nil
 }
 
+// ExportTemplateFunctions returns the functions that are to exported in templates
+func (s *managerFlavor) ExportTemplateFunctions() []template.Function {
+	swarmStatus, self, err := swarmState(s.client)
+	if err != nil {
+		return nil
+	}
+	return exportTemplateFunctions(swarmStatus, self, *types.NewLink())
+}
+
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
 func (s *managerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-	return healthy(s.client, flavorProperties, inst)
+	return healthy(s.client, inst)
 }
 
+// Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
 func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
-	spec instance.Spec, allocation types.AllocationMethod) (instance.Spec, error) {
+	instanceSpec instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error) {
 
-	properties, err := parseProperties(flavorProperties)
+	spec := Spec{}
+	any := types.AnyBytes([]byte(flavorProperties))
+	err := any.Decode(&spec)
 	if err != nil {
-		return spec, err
+		return instanceSpec, err
 	}
 
-	swarmStatus, err := s.client.SwarmInspect(context.Background())
+	swarmStatus, node, err := swarmState(s.client)
 	if err != nil {
-		return spec, fmt.Errorf("Failed to fetch Swarm join tokens: %s", err)
+		return instanceSpec, err
 	}
 
-	nodeInfo, err := s.client.Info(context.Background())
+	link := types.NewLink().WithContext("swarm/" + swarmStatus.ID + "/manager")
+
+	s.initScript.AddFuncs(exportTemplateFunctions(swarmStatus, node, *link))
+	initScript, err := s.initScript.Render(nil)
 	if err != nil {
-		return spec, fmt.Errorf("Failed to fetch node self info: %s", err)
+		return instanceSpec, err
 	}
 
-	self, _, err := s.client.NodeInspectWithRaw(context.Background(), nodeInfo.Swarm.NodeID)
-	if err != nil {
-		return spec, fmt.Errorf("Failed to fetch Swarm node status: %s", err)
-	}
+	instanceSpec.Init = initScript
 
-	if self.ManagerStatus == nil {
-		return spec, errors.New(
-			"Swarm node status did not include manager status.  Need to run 'docker swarm init`?")
-	}
-
-	associationID := util.RandomAlphaNumericString(8)
-	spec.Tags[associationTag] = associationID
-
-	if spec.LogicalID == nil {
-		return spec, errors.New("Manager nodes require a LogicalID, " +
-			"which will be used as an assigned private IP address")
-	}
-
-	initScript, err := generateInitScript(
-		s.initScript,
-		self.ManagerStatus.Addr,
-		swarmStatus.JoinTokens.Manager,
-		associationID,
-		properties.DockerRestartCommand)
-	if err != nil {
-		return spec, err
-	}
-	spec.Init = initScript
-
-	if spec.LogicalID != nil {
-		if attachments, exists := properties.Attachments[*spec.LogicalID]; exists {
-			spec.Attachments = append(spec.Attachments, attachments...)
+	if instanceSpec.LogicalID != nil {
+		if attachments, exists := spec.Attachments[*instanceSpec.LogicalID]; exists {
+			instanceSpec.Attachments = append(instanceSpec.Attachments, attachments...)
 		}
 	}
 
 	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
 	// swarm.  This will require plumbing back to Scaled (membership tags).
-	spec.Tags["swarm-id"] = swarmStatus.ID
+	instanceSpec.Tags["swarm-id"] = swarmStatus.ID
+	link.WriteMap(instanceSpec.Tags)
 
-	return spec, nil
+	return instanceSpec, nil
 }
 
 // Drain only explicitly remove worker nodes, not manager nodes.  Manager nodes are assumed to have an

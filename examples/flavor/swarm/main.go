@@ -34,7 +34,8 @@ func main() {
 	certFile := cmd.Flags().String("tlscert", "", "TLS cert file path")
 	tlsKey := cmd.Flags().String("tlskey", "", "TLS key file path")
 	insecureSkipVerify := cmd.Flags().Bool("tlsverify", true, "True to skip TLS")
-	initScriptTemplURL := cmd.Flags().String("init-template", "", "Init script template file, in URL form")
+	managerInitScriptTemplURL := cmd.Flags().String("manager-init-template", "", "URL, init script template for managers")
+	workerInitScriptTemplURL := cmd.Flags().String("worker-init-template", "", "URL, init script template for workers")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
@@ -55,26 +56,19 @@ func main() {
 			SocketDir: discovery.Dir(),
 		}
 
-		var templ *template.Template
-		if *initScriptTemplURL == "" {
-			t, err := template.NewTemplate("str://"+DefaultInitScriptTemplate, opts)
-			if err != nil {
-				return err
-			}
-			templ = t
-		} else {
-
-			t, err := template.NewTemplate(*initScriptTemplURL, opts)
-			if err != nil {
-				return err
-			}
-			templ = t
+		mt, err := getTemplate(*managerInitScriptTemplURL, DefaultManagerInitScriptTemplate, opts)
+		if err != nil {
+			return err
+		}
+		wt, err := getTemplate(*workerInitScriptTemplURL, DefaultWorkerInitScriptTemplate, opts)
+		if err != nil {
+			return err
 		}
 
 		cli.RunPlugin(*name, flavor_plugin.PluginServerWithTypes(
 			map[string]flavor.Plugin{
-				"manager": NewManagerFlavor(dockerClient, templ),
-				"worker":  NewWorkerFlavor(dockerClient, templ),
+				"manager": NewManagerFlavor(dockerClient, mt),
+				"worker":  NewWorkerFlavor(dockerClient, wt),
 			}))
 		return nil
 	}
@@ -88,24 +82,11 @@ func main() {
 	}
 }
 
-const (
-	// DefaultInitScriptTemplate is the default template for the init script which
-	// the flavor injects into the user data of the instance to configure Docker Swarm.
-	DefaultInitScriptTemplate = `
-#!/bin/sh
-set -o errexit
-set -o nounset
-set -o xtrace
-
-mkdir -p /etc/docker
-cat << EOF > /etc/docker/daemon.json
-{
-  "labels": ["swarm-association-id={{.ASSOCIATION_ID}}"]
+func getTemplate(url string, defaultTemplate string, opts template.Options) (t *template.Template, err error) {
+	if url == "" {
+		t, err = template.NewTemplate("str://"+defaultTemplate, opts)
+		return
+	}
+	t, err = template.NewTemplate(url, opts)
+	return
 }
-EOF
-
-{{.RESTART_DOCKER}}
-
-docker swarm join {{.MY_IP}} --token {{.JOIN_TOKEN}}
-`
-)
