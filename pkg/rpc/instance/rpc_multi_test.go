@@ -12,6 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func must(i instance.Plugin, err error) instance.Plugin {
+	if err != nil {
+		panic(err)
+	}
+	return i
+}
+
 func TestInstanceTypedPluginValidate(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
@@ -43,13 +50,13 @@ func TestInstanceTypedPluginValidate(t *testing.T) {
 		}))
 	require.NoError(t, err)
 
-	err = NewClient(plugin.Name(name+"/type1"), socketPath).Validate(raw1)
+	err = must(NewClient(plugin.Name(name+"/type1"), socketPath)).Validate(raw1)
 	require.NoError(t, err)
 
-	err = NewClient(plugin.Name(name+"/type2"), socketPath).Validate(raw2)
+	err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Validate(raw2)
 	require.NoError(t, err)
 
-	err = NewClient(plugin.Name(name+"/typeUnknown"), socketPath).Validate(raw2)
+	err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Validate(raw2)
 	require.Error(t, err)
 	require.Equal(t, "no-plugin:typeUnknown", err.Error())
 
@@ -89,11 +96,11 @@ func TestInstanceTypedPluginValidateError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = NewClient(plugin.Name(name+"/type1"), socketPath).Validate(raw1)
+	err = must(NewClient(plugin.Name(name+"/type1"), socketPath)).Validate(raw1)
 	require.Error(t, err)
 	require.Equal(t, "whoops", err.Error())
 
-	err = NewClient(plugin.Name(name+"/type2"), socketPath).Validate(raw2)
+	err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Validate(raw2)
 	require.Error(t, err)
 	require.Equal(t, "whoops2", err.Error())
 
@@ -147,15 +154,15 @@ func TestInstanceTypedPluginProvision(t *testing.T) {
 	require.NoError(t, err)
 
 	var id *instance.ID
-	id, err = NewClient(plugin.Name(name+"/type1"), socketPath).Provision(spec1)
+	id, err = must(NewClient(plugin.Name(name+"/type1"), socketPath)).Provision(spec1)
 	require.NoError(t, err)
 	require.Nil(t, id)
 
-	id, err = NewClient(plugin.Name(name+"/type2"), socketPath).Provision(spec2)
+	id, err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Provision(spec2)
 	require.NoError(t, err)
 	require.Equal(t, "test", string(*id))
 
-	_, err = NewClient(plugin.Name(name+"/error"), socketPath).Provision(spec3)
+	_, err = must(NewClient(plugin.Name(name+"/error"), socketPath)).Provision(spec3)
 	require.Error(t, err)
 	require.Equal(t, "nope", err.Error())
 
@@ -192,10 +199,10 @@ func TestInstanceTypedPluginDestroy(t *testing.T) {
 		}))
 	require.NoError(t, err)
 
-	err = NewClient(plugin.Name(name+"/type1"), socketPath).Destroy(inst1)
+	err = must(NewClient(plugin.Name(name+"/type1"), socketPath)).Destroy(inst1)
 	require.NoError(t, err)
 
-	err = NewClient(plugin.Name(name+"/type2"), socketPath).Destroy(inst2)
+	err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Destroy(inst2)
 	require.Error(t, err)
 	require.Equal(t, "can't do", err.Error())
 
@@ -250,15 +257,15 @@ func TestInstanceTypedPluginDescribeInstances(t *testing.T) {
 			},
 		}))
 
-	l, err := NewClient(plugin.Name(name+"/type1"), socketPath).DescribeInstances(tags1)
+	l, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).DescribeInstances(tags1)
 	require.NoError(t, err)
 	require.Equal(t, list1, l)
 
-	l, err = NewClient(plugin.Name(name+"/type2"), socketPath).DescribeInstances(tags2)
+	l, err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).DescribeInstances(tags2)
 	require.NoError(t, err)
 	require.Equal(t, list2, l)
 
-	_, err = NewClient(plugin.Name(name+"/type3"), socketPath).DescribeInstances(tags3)
+	_, err = must(NewClient(plugin.Name(name+"/type3"), socketPath)).DescribeInstances(tags3)
 	require.Error(t, err)
 	require.Equal(t, "bad", err.Error())
 

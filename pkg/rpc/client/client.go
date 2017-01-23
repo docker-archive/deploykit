@@ -16,13 +16,22 @@ type client struct {
 }
 
 // New creates a new Client that communicates with a unix socket and validates the remote API.
-func New(socketPath string, api spi.InterfaceSpec) Client {
+func New(socketPath string, api spi.InterfaceSpec) (Client, error) {
 	dialUnix := func(proto, addr string) (conn net.Conn, err error) {
 		return net.Dial("unix", socketPath)
 	}
 
 	unvalidatedClient := &client{http: http.Client{Transport: &http.Transport{Dial: dialUnix}}}
-	return &handshakingClient{client: unvalidatedClient, iface: api, lock: &sync.Mutex{}}
+	cl := &handshakingClient{client: unvalidatedClient, iface: api, lock: &sync.Mutex{}}
+
+	// check handshake
+	if err := cl.handshake(); err != nil {
+		// Note - we still return the client with the possibility of doing a handshake later on
+		// if we provide an api for the plugin to recheck later.  This way, individual components
+		// can stay running and recalibrate themselves after the user has corrected the problems.
+		return cl, err
+	}
+	return cl, nil
 }
 
 func (c client) Call(method string, arg interface{}, result interface{}) error {

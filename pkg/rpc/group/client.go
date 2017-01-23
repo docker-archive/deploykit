@@ -6,8 +6,19 @@ import (
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
-func NewClient(socketPath string) group.Plugin {
-	return &client{client: rpc_client.New(socketPath, group.InterfaceSpec)}
+func NewClient(socketPath string) (group.Plugin, error) {
+	rpcClient, err := rpc_client.New(socketPath, group.InterfaceSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return Adapt(rpcClient), nil
+}
+
+// Adapt returns a group Plugin implementation based on given rpc client.  Assumption here is that
+// the rpcClient has been verified to support the group plugin RPC interface.
+func Adapt(rpcClient rpc_client.Client) group.Plugin {
+	return &client{client: rpcClient}
 }
 
 type client struct {

@@ -32,8 +32,11 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		instancePlugin = instance_plugin.NewClient(plugin.Name(*name), endpoint.Address)
-
+		p, err := instance_plugin.NewClient(plugin.Name(*name), endpoint.Address)
+		if err != nil {
+			return err
+		}
+		instancePlugin = p
 		return nil
 	}
 

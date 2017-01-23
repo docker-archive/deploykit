@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,4 +62,25 @@ func TestMarshalUnmarshal(t *testing.T) {
 	buff, err := json.Marshal(spec)
 	require.NoError(t, err)
 	require.Equal(t, `{"plugin":"instance-file/text","nested":{"plugin":"instance-file/nested"}}`, string(buff))
+
+	// marshal using Any
+
+	complex := map[string]interface{}{
+		"Plugin": Name("top"),
+		"Properties": types.AnyValueMust(testSpec{
+			Plugin: Name("test-plugin1"),
+			Nested: testSpec2{
+				Plugin: Name("nested1"),
+			},
+		}),
+	}
+
+	any := types.AnyValueMust(complex)
+
+	parsed := map[string]interface{}{}
+	err = json.Unmarshal(any.Bytes(), &parsed)
+	require.NoError(t, err)
+
+	require.Equal(t, "top", parsed["Plugin"])
+	require.Equal(t, "nested1", parsed["Properties"].(map[string]interface{})["nested"].(map[string]interface{})["plugin"])
 }

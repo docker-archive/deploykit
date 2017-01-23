@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	group_mock "github.com/docker/infrakit/pkg/mock/spi/group"
 	store_mock "github.com/docker/infrakit/pkg/mock/store"
+	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -101,15 +101,14 @@ func testBuildGroupSpec(groupID, properties string) group.Spec {
 	}
 }
 
-func testBuildGlobalSpec(t *testing.T, gs group.Spec) GlobalSpec {
-	buff, err := json.Marshal(gs)
+func testBuildGlobalSpec(t *testing.T, gs group.Spec) globalSpec {
+	any, err := types.AnyValue(gs)
 	require.NoError(t, err)
-	raw := json.RawMessage(buff)
-	return GlobalSpec{
-		Groups: map[group.ID]PluginSpec{
+	return globalSpec{
+		Groups: map[group.ID]plugin.Spec{
 			gs.ID: {
-				Plugin:     "group-stateless",
-				Properties: &raw,
+				Plugin:     plugin.Name("group-stateless"),
+				Properties: any,
 			},
 		},
 	}
@@ -178,10 +177,10 @@ func TestStartOneLeader(t *testing.T) {
 
 	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &GlobalSpec{}
+			empty := &globalSpec{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*GlobalSpec)
+					p, is := o.(*globalSpec)
 					require.True(t, is)
 					*p = global
 					return nil
@@ -240,10 +239,10 @@ func TestChangeLeadership(t *testing.T) {
 
 	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &GlobalSpec{}
+			empty := &globalSpec{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*GlobalSpec)
+					p, is := o.(*globalSpec)
 					require.True(t, is)
 					*p = global
 					return nil
@@ -277,10 +276,10 @@ func TestChangeLeadership(t *testing.T) {
 		})
 	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderChans[1], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &GlobalSpec{}
+			empty := &globalSpec{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*GlobalSpec)
+					p, is := o.(*globalSpec)
 					require.True(t, is)
 					*p = global
 					return nil

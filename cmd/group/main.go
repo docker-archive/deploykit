@@ -41,7 +41,7 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
-			return instance_client.NewClient(n, endpoint.Address), nil
+			return instance_client.NewClient(n, endpoint.Address)
 		}
 
 		flavorPluginLookup := func(n plugin.Name) (flavor.Plugin, error) {
@@ -49,7 +49,7 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
-			return flavor_client.NewClient(n, endpoint.Address), nil
+			return flavor_client.NewClient(n, endpoint.Address)
 		}
 
 		cli.RunPlugin(*name, group_server.PluginServer(
