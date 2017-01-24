@@ -23,43 +23,39 @@ cleanup() {
 }
 trap cleanup EXIT
 
+INFRAKIT_HOME=${INFRAKIT_HOME:-~/.infrakit}
+
 # infrakit directories
-plugins=~/.infrakit/plugins
+plugins=$INFRAKIT_HOME/plugins
 mkdir -p $plugins
 rm -rf $plugins/*
 
-configstore=~/.infrakit/configs
+configstore=$INFRAKIT_HOME/configs
 mkdir -p $configstore
 rm -rf $configstore/*
 
 # set the leader -- for os / file based leader detection for manager
-leaderfile=~/.infrakit/leader
+leaderfile=$INFRAKIT_HOME/leader
 echo group > $leaderfile
-
-# start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
-# but here for simplicity just start up with multiple managers and one set of plugins
-infrakit-manager --name group --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
-infrakit-manager --name group1 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
-infrakit-manager --name group2 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
-
-sleep 5  # manager needs to detect leadership
 
 # location of logfiles when plugins are started by the plugin cli
 # the config json below expects LOG_DIR as an environment variable
-LOG_DIR=~/.infrakit/logs
+LOG_DIR=$INFRAKIT_HOME/logs
 mkdir -p $LOG_DIR
 
 # see the config josn 'e2e-test-plugins.json' for reference of environment variable E2E_SWARM_DIR
-E2E_SWARM_DIR=~/.infrakit/e2e_swarm
+E2E_SWARM_DIR=$INFRAKIT_HOME/e2e_swarm
 mkdir -p $E2E_SWARM_DIR
 rm -rf $E2E_SWARM_DIR/*
 
+export INFRAKIT_HOME=$INFRAKIT_HOME
 export LOG_DIR=$LOG_DIR
 export E2E_SWARM_DIR=$E2E_SWARM_DIR
 export SWARM_MANAGER="tcp://192.168.2.200:4243"
 
+
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
-infrakit plugin start --wait --config-url file:///$PWD/examples/flavor/swarm/e2e-plugins.json --os group-default instance-vagrant flavor-swarm flavor-vanilla &
+infrakit plugin start --wait --config-url file:///$PWD/examples/flavor/swarm/e2e-plugins.json --os manager group-stateless instance-file instance-vagrant flavor-swarm flavor-vanilla &
 
 starterpid=$!
 echo "plugin start pid=$starterpid"

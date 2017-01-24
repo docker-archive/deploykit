@@ -21,6 +21,10 @@ func init() {
 		})
 }
 
+var defaultTemplateOptions = template.Options{
+	SocketDir: discovery.Dir(),
+}
+
 func main() {
 
 	cmd := &cobra.Command{
@@ -52,15 +56,11 @@ func main() {
 			return err
 		}
 
-		opts := template.Options{
-			SocketDir: discovery.Dir(),
-		}
-
-		mt, err := getTemplate(*managerInitScriptTemplURL, DefaultManagerInitScriptTemplate, opts)
+		mt, err := getTemplate(*managerInitScriptTemplURL, DefaultManagerInitScriptTemplate, defaultTemplateOptions)
 		if err != nil {
 			return err
 		}
-		wt, err := getTemplate(*workerInitScriptTemplURL, DefaultWorkerInitScriptTemplate, opts)
+		wt, err := getTemplate(*workerInitScriptTemplURL, DefaultWorkerInitScriptTemplate, defaultTemplateOptions)
 		if err != nil {
 			return err
 		}

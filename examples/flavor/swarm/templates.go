@@ -24,7 +24,7 @@ sleep 10
 {{ if SWARM_INITIALIZED }}
 docker swarm join {{ SWARM_MANAGER_IP }} --token {{  SWARM_JOIN_TOKENS.Manager }}
 {{ else }}
-docker swarm init
+docker swarm init --advertise-addr {{ SWARM_MANAGER_IP }}
 {{ end }}
 `
 

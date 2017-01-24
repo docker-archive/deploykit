@@ -30,6 +30,13 @@ func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation gr
 		return err
 	}
 
+	if spec.InitScriptTemplateURL != "" {
+		_, err := template.NewTemplate(spec.InitScriptTemplateURL, defaultTemplateOptions)
+		if err != nil {
+			return err
+		}
+	}
+
 	numIDs := len(allocation.LogicalIDs)
 	if numIDs != 1 && numIDs != 3 && numIDs != 5 {
 		return errors.New("Must have 1, 3, or 5 manager logical IDs")
@@ -73,6 +80,19 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 		return instanceSpec, err
 	}
 
+	initTemplate := s.initScript
+
+	if spec.InitScriptTemplateURL != "" {
+
+		t, err := template.NewTemplate(spec.InitScriptTemplateURL, defaultTemplateOptions)
+		if err != nil {
+			return instanceSpec, err
+		}
+
+		initTemplate = t
+		log.Infoln("Using", spec.InitScriptTemplateURL, "for init script template")
+	}
+
 	swarmStatus, node, err := swarmState(s.client)
 	if err != nil {
 		return instanceSpec, err
@@ -80,11 +100,13 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 
 	link := types.NewLink().WithContext("swarm/" + swarmStatus.ID + "/manager")
 
-	s.initScript.AddFuncs(exportTemplateFunctions(swarmStatus, node, *link))
-	initScript, err := s.initScript.Render(nil)
+	initTemplate.AddFuncs(exportTemplateFunctions(swarmStatus, node, *link))
+	initScript, err := initTemplate.Render(nil)
 	if err != nil {
 		return instanceSpec, err
 	}
+
+	log.Infoln("Init script:", initScript)
 
 	instanceSpec.Init = initScript
 

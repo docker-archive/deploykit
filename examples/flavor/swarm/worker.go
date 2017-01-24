@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -32,6 +33,13 @@ func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation gro
 		return err
 	}
 
+	if spec.InitScriptTemplateURL != "" {
+		_, err := template.NewTemplate(spec.InitScriptTemplateURL, defaultTemplateOptions)
+		if err != nil {
+			return err
+		}
+	}
+
 	if err := validateIDsAndAttachments(allocation.LogicalIDs, spec.Attachments); err != nil {
 		return err
 	}
@@ -55,6 +63,19 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 		return instanceSpec, err
 	}
 
+	initTemplate := s.initScript
+
+	if spec.InitScriptTemplateURL != "" {
+
+		t, err := template.NewTemplate(spec.InitScriptTemplateURL, defaultTemplateOptions)
+		if err != nil {
+			return instanceSpec, err
+		}
+
+		initTemplate = t
+		log.Infoln("Using", spec.InitScriptTemplateURL, "for init script template")
+	}
+
 	swarmStatus, node, err := swarmState(s.client)
 	if err != nil {
 		return instanceSpec, err
@@ -62,8 +83,8 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 
 	link := types.NewLink().WithContext("swarm/" + swarmStatus.ID + "/worker")
 
-	s.initScript.AddFuncs(exportTemplateFunctions(swarmStatus, node, *link))
-	initScript, err := s.initScript.Render(nil)
+	initTemplate.AddFuncs(exportTemplateFunctions(swarmStatus, node, *link))
+	initScript, err := initTemplate.Render(nil)
 	if err != nil {
 		return instanceSpec, err
 	}

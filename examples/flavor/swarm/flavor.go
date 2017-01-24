@@ -21,7 +21,12 @@ const (
 
 // Spec is the value passed in the `Properties` field of configs
 type Spec struct {
+
+	// Attachments indicate the devices that are to be attached to the instance
 	Attachments map[instance.LogicalID][]instance.Attachment
+
+	// InitScriptTemplateURL overrides the template specified when the plugin started up.
+	InitScriptTemplateURL string
 }
 
 func validateIDsAndAttachments(logicalIDs []instance.LogicalID,

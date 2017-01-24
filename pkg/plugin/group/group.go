@@ -73,6 +73,8 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 
 		// TODO(wfarner): Don't hold the lock - this is a blocking operation.
 		updatePlan, err := context.supervisor.PlanUpdate(context.scaled, context.settings, settings)
+
+		log.Infoln(">>>>", updatePlan, err)
 		if err != nil {
 			return updatePlan.Explain(), err
 		}
