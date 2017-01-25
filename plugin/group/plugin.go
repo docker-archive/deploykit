@@ -1,6 +1,7 @@
 package group
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -80,9 +81,11 @@ func (p *plugin) validate(groupSpec group.Spec) (settings, error) {
 		return noSettings, err
 	}
 
+	rawInstanceProperties := json.RawMessage(spec.Instance.Properties.Bytes())
+
 	instanceSpec := instance.Spec{
 		Tags:       map[string]string{},
-		Properties: spec.Instance.Properties,
+		Properties: &rawInstanceProperties,
 	}
 
 	instanceSpec, err = flavorPlugin.Prepare(types.RawMessage(spec.Flavor.Properties), instanceSpec, spec.Allocation)
@@ -90,7 +93,7 @@ func (p *plugin) validate(groupSpec group.Spec) (settings, error) {
 		return noSettings, err
 	}
 
-	instanceProperties, err := instance_types.ParseProperties(types.RawMessage(instanceSpec.Properties))
+	instanceProperties, err := instance_types.ParseProperties(instance_types.RawMessage(instanceSpec.Properties))
 	if err != nil {
 		return noSettings, err
 	}

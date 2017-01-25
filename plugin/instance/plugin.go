@@ -33,13 +33,13 @@ func NewGCEInstancePlugin(project, zone string) instance.Plugin {
 func (p *plugin) Validate(req json.RawMessage) error {
 	log.Debugln("validate", string(req))
 
-	_, err := types.ParseProperties(req)
+	parsed := types.Properties{}
 
-	return err
+	return json.Unmarshal([]byte(req), &parsed)
 }
 
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
-	properties, err := types.ParseProperties(*spec.Properties)
+	properties, err := types.ParseProperties(types.RawMessage(spec.Properties))
 	if err != nil {
 		return nil, err
 	}

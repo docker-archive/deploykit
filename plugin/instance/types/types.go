@@ -61,7 +61,7 @@ func ParseMetadata(spec instance.Spec) (map[string]string, error) {
 		metadata["startup-script"] = spec.Init
 	}
 
-	properties, err := ParseProperties(*spec.Properties)
+	properties, err := ParseProperties(RawMessage(spec.Properties))
 	if err != nil {
 		return nil, err
 	}
@@ -70,4 +70,13 @@ func ParseMetadata(spec instance.Spec) (map[string]string, error) {
 	}
 
 	return metadata, nil
+}
+
+// RawMessage converts a pointer to a raw message to a copy of the value. If the pointer is nil, it returns
+// an empty raw message.
+func RawMessage(r *json.RawMessage) (raw json.RawMessage) {
+	if r != nil {
+		raw = *r
+	}
+	return
 }

@@ -1,12 +1,15 @@
 machine:
+  pre:
+    - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
+  services:
+    - docker
   environment:
     OS: "linux"
     ARCH: "amd64"
-
-    GOVERSION: "1.6"
+    GOVERSION: "1.7"
     GOPATH: "$HOME/.go_workspace"
-
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+    E2E_CLEANUP: "false"
 
 dependencies:
   pre:
@@ -36,3 +39,10 @@ test:
   post:
     # Report to codecov
     - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)
+
+deployment:
+  docker:
+    branch: master
+    commands:
+      - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
+      - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
