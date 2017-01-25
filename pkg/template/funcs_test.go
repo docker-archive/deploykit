@@ -280,3 +280,18 @@ func TestMapEncodeDecode(t *testing.T) {
 
 	require.Equal(t, expect, actual)
 }
+
+func TestIndex(t *testing.T) {
+	require.Equal(t, -1, Index("a", []string{"x", "y", "z"}))
+	require.Equal(t, 1, Index("y", []string{"x", "y", "z"}))
+	require.Equal(t, -1, Index(25, []string{"x", "y", "z"}))
+	require.Equal(t, -1, Index(25, 26))
+	require.Equal(t, 1, Index("y", []string{"x", "y", "z"}))
+	require.Equal(t, 1, Index("y", []interface{}{"x", "y", "z"}))
+	require.Equal(t, 1, Index(1, []interface{}{0, 1, 2}))
+	require.Equal(t, 1, Index("1", []interface{}{0, 1, 2}))
+	require.Equal(t, 1, Index(1, []interface{}{0, "1", 2}))
+	require.Equal(t, -1, Index("1", []interface{}{0, 1, 2}, true))  // strict case type must match
+	require.Equal(t, 1, Index("1", []interface{}{0, "1", 2}, true)) // strict case type must match
+	require.Equal(t, -1, Index(1, []interface{}{0, "1", 2}, true))  // strict case type must match
+}

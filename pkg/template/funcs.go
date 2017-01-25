@@ -3,6 +3,7 @@ package template
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -75,6 +76,34 @@ func UnixTime() interface{} {
 	return time.Now().Unix()
 }
 
+// Index returns the index of search in array.  -1 if not found or array is not iterable.  An optional true will
+// turn on strict type check while by default string representations are used to compare values.
+func Index(search interface{}, array interface{}, strictOptional ...bool) int {
+	strict := false
+	searchStr := fmt.Sprintf("%v", search)
+	if len(strictOptional) > 0 {
+		strict = strictOptional[0]
+	}
+	switch reflect.TypeOf(array).Kind() {
+	case reflect.Slice:
+		s := reflect.ValueOf(array)
+		for i := 0; i < s.Len(); i++ {
+			if strict {
+				if reflect.DeepEqual(search, s.Index(i).Interface()) {
+					return i
+				}
+			} else {
+				// by string value which is useful for text based compares
+				check := fmt.Sprintf("%v", s.Index(i).Interface())
+				if searchStr == check {
+					return i
+				}
+			}
+		}
+	}
+	return -1
+}
+
 // DefaultFuncs returns a list of default functions for binding in the template
 func (t *Template) DefaultFuncs() map[string]interface{} {
 	return map[string]interface{}{
@@ -119,5 +148,6 @@ func (t *Template) DefaultFuncs() map[string]interface{} {
 		"lines":     SplitLines,
 		"to_json":   ToJSON,
 		"from_json": FromJSON,
+		"index":     Index,
 	}
 }
