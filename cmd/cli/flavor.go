@@ -10,10 +10,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -57,13 +58,13 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			"Group Size to use as the Allocation method")
 	}
 
-	allocationMethodFromFlags := func() types.AllocationMethod {
+	allocationMethodFromFlags := func() group_types.AllocationMethod {
 		ids := []instance.LogicalID{}
 		for _, id := range logicalIDs {
 			ids = append(ids, instance.LogicalID(id))
 		}
 
-		return types.AllocationMethod{
+		return group_types.AllocationMethod{
 			Size:       groupSize,
 			LogicalIDs: ids,
 		}
@@ -86,7 +87,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			return flavorPlugin.Validate(json.RawMessage(buff), allocationMethodFromFlags())
+			return flavorPlugin.Validate(types.AnyBytes(buff), allocationMethodFromFlags())
 		},
 	}
 	addAllocationMethodFlags(validate)
@@ -121,7 +122,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			spec, err = flavorPlugin.Prepare(
-				json.RawMessage(flavorProperties),
+				types.AnyBytes(flavorProperties),
 				spec,
 				allocationMethodFromFlags())
 			if err == nil {
@@ -179,7 +180,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			desc.LogicalID = &logical
 		}
 
-		healthy, err := flavorPlugin.Healthy(json.RawMessage(flavorProperties), desc)
+		healthy, err := flavorPlugin.Healthy(types.AnyBytes(flavorProperties), desc)
 		if err == nil {
 			fmt.Printf("%v\n", healthy)
 		}

@@ -26,5 +26,5 @@ type Plugin interface {
 	Destroy(instance ID) error
 
 	// DescribeInstances returns descriptions of all instances matching all of the provided tags.
-	DescribeInstances(tags map[string]string) ([]Description, error)
+	DescribeInstances(labels map[string]string) ([]Description, error)
 }

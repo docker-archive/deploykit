@@ -17,6 +17,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -31,12 +32,12 @@ type inputExampleWrapper struct {
 	value interface{}
 }
 
-func (i inputExampleWrapper) ExampleProperties() *json.RawMessage {
+func (i inputExampleWrapper) ExampleProperties() *types.Any {
 	buff, err := json.MarshalIndent(i.value, "  ", "  ")
 	if err != nil {
 		panic(err)
 	}
-	raw := json.RawMessage(buff)
+	raw := types.Any(buff)
 	return &raw
 }
 
@@ -87,7 +88,7 @@ func TestMetaForInstance(t *testing.T) {
 	require.Equal(t, vendorName, meta.Vendor.Name)
 	require.Equal(t, vendorVersion, meta.Vendor.Version)
 	require.Equal(t, 1, len(meta.Interfaces))
-	require.Equal(t, 4, len(meta.Interfaces[0].Methods))
+	require.Equal(t, 5, len(meta.Interfaces[0].Methods))
 	require.Equal(t, instance.InterfaceSpec, meta.Interfaces[0].InterfaceSpec)
 
 	buff, err := json.MarshalIndent(meta, "  ", "  ")
