@@ -63,7 +63,8 @@ func (s *managerFlavor) ExportTemplateFunctions() []template.Function {
 		swarmStatus = nil
 		self = nil
 	}
-	return exportTemplateFunctions(instance.Spec{}, group_types.AllocationMethod{}, swarmStatus, self, *types.NewLink())
+	return exportTemplateFunctions(Spec{},
+		instance.Spec{}, group_types.AllocationMethod{}, swarmStatus, self, *types.NewLink())
 }
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
@@ -110,7 +111,7 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 	}
 
 	link := types.NewLink().WithContext("swarm/" + swarmID + "/manager")
-	initTemplate.AddFuncs(exportTemplateFunctions(instanceSpec, allocation, swarmStatus, node, *link))
+	initTemplate.AddFuncs(exportTemplateFunctions(spec, instanceSpec, allocation, swarmStatus, node, *link))
 	initScript, err := initTemplate.Render(nil)
 	if err != nil {
 		return instanceSpec, err

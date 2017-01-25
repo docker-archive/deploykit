@@ -108,13 +108,20 @@ func swarmState(docker client.APIClient) (status *swarm.Swarm, node *swarm.Node,
 }
 
 // swarmStatus and nodeInfo can be nil if Swarm is not ready.
-func exportTemplateFunctions(spec instance.Spec, alloc group_types.AllocationMethod,
+func exportTemplateFunctions(flavorSpec Spec, spec instance.Spec, alloc group_types.AllocationMethod,
 	swarmStatus *swarm.Swarm, nodeInfo *swarm.Node, link types.Link) []template.Function {
 
 	// Get a single consistent view of the data across multiple calls by exporting functions that
 	// query the input state
 
 	return []template.Function{
+		{
+			Name:        "SPEC",
+			Description: "The flavor spec as found in Properties field of the config JSON",
+			Func: func() interface{} {
+				return flavorSpec
+			},
+		},
 		{
 			Name:        "INSTANCE_LOGICAL_ID",
 			Description: "The logical id for the instance being prepared; can be empty if no logical ids are set (cattle).",
