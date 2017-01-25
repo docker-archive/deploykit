@@ -24,10 +24,12 @@ const (
 
 // Spec is the configuration schema for this plugin, provided in resource.Spec.Properties.
 type Spec struct {
-	Resources map[string]*struct {
+	Resources map[string]struct {
 		Plugin     plugin_base.Name
-		plugin     instance.Plugin
 		Properties *types.Any
+
+		plugin   instance.Plugin
+		template *template.Template
 	}
 }
 
@@ -59,7 +61,15 @@ func (p *plugin) validate(config resource.Spec) (*Spec, []string, error) {
 		if err := instancePlugin.Validate(json.RawMessage(*resourceSpec.Properties)); err != nil {
 			return nil, nil, fmt.Errorf("Failed to validate spec for %s: %s", name, err)
 		}
+
+		template, err := template.New("").Option("missingkey=error").Parse(resourceSpec.Properties.String())
+		if err != nil {
+			return nil, nil, fmt.Errorf("Template parse error for %s: %s", name, err)
+		}
+
 		resourceSpec.plugin = instancePlugin
+		resourceSpec.template = template
+		spec.Resources[name] = resourceSpec
 	}
 
 	provisioningOrder, err := getProvisioningOrder(spec)
@@ -119,16 +129,18 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 		}
 
 		resourceSpec := spec.Resources[name]
-		properties, err := executeAsTemplate(json.RawMessage(*resourceSpec.Properties), struct{ Resources interface{} }{idStructs})
-		if err != nil {
-			return "", fmt.Errorf("Failed to get properties for %s: %s", name, err)
+
+		var b bytes.Buffer
+		if err := resourceSpec.template.Execute(&b, struct{ Resources interface{} }{idStructs}); err != nil {
+			return "", fmt.Errorf("Template execution error for %s: %s", name, err)
 		}
+		properties := types.AnyBytes(b.Bytes())
 
 		if pretend {
 			idStructs[name] = struct{ instance.ID }{instance.ID("unknown")}
 		} else {
 			id, err := resourceSpec.plugin.Provision(instance.Spec{
-				Properties: &properties,
+				Properties: (*json.RawMessage)(properties),
 				Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name},
 			})
 			if err != nil {
@@ -198,20 +210,6 @@ func (p *plugin) Destroy(config resource.Spec, pretend bool) (string, error) {
 
 func (p *plugin) DescribeResources() ([]instance.Description, error) {
 	return nil, errors.New("unimplemented")
-}
-
-func executeAsTemplate(text json.RawMessage, data interface{}) (json.RawMessage, error) {
-	tmpl, err := template.New("").Option("missingkey=error").Parse(string(text))
-	if err != nil {
-		return nil, err
-	}
-
-	var b bytes.Buffer
-	if err = tmpl.Execute(&b, data); err != nil {
-		return nil, err
-	}
-
-	return b.Bytes(), nil
 }
 
 var resourceReferenceRegexp = regexp.MustCompile(`{{\s*\.Resources\.(\w+)`)
