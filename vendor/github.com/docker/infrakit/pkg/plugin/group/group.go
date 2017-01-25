@@ -3,13 +3,15 @@ package group
 import (
 	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
+	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"sync"
-	"time"
 )
 
 const (
@@ -18,21 +20,23 @@ const (
 )
 
 // InstancePluginLookup helps with looking up an instance plugin by name
-type InstancePluginLookup func(string) (instance.Plugin, error)
+type InstancePluginLookup func(plugin_base.Name) (instance.Plugin, error)
 
 // FlavorPluginLookup helps with looking up a flavor plugin by name
-type FlavorPluginLookup func(string) (flavor.Plugin, error)
+type FlavorPluginLookup func(plugin_base.Name) (flavor.Plugin, error)
 
 // NewGroupPlugin creates a new group plugin.
 func NewGroupPlugin(
 	instancePlugins InstancePluginLookup,
 	flavorPlugins FlavorPluginLookup,
-	pollInterval time.Duration) group.Plugin {
+	pollInterval time.Duration,
+	maxParallelNum uint) group.Plugin {
 
 	return &plugin{
 		instancePlugins: instancePlugins,
 		flavorPlugins:   flavorPlugins,
 		pollInterval:    pollInterval,
+		maxParallelNum:  maxParallelNum,
 		groups:          groups{byID: map[group.ID]*groupContext{}},
 	}
 }
@@ -41,6 +45,7 @@ type plugin struct {
 	instancePlugins InstancePluginLookup
 	flavorPlugins   FlavorPluginLookup
 	pollInterval    time.Duration
+	maxParallelNum  uint
 	lock            sync.Mutex
 	groups          groups
 }
@@ -96,7 +101,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 
 	var supervisor Supervisor
 	if settings.config.Allocation.Size != 0 {
-		supervisor = NewScalingGroup(scaled, settings.config.Allocation.Size, p.pollInterval)
+		supervisor = NewScalingGroup(scaled, settings.config.Allocation.Size, p.pollInterval, p.maxParallelNum)
 	} else if len(settings.config.Allocation.LogicalIDs) > 0 {
 		supervisor = NewQuorum(scaled, settings.config.Allocation.LogicalIDs, p.pollInterval)
 	} else {

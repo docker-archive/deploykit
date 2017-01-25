@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
-	"github.com/docker/infrakit.gcp/plugin"
 	"github.com/docker/infrakit.gcp/plugin/group"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -32,12 +32,12 @@ func main() {
 			return err
 		}
 
-		flavorPluginLookup := func(n string) (flavor.Plugin, error) {
+		flavorPluginLookup := func(n plugin.Name) (flavor.Plugin, error) {
 			endpoint, err := plugins.Find(n)
 			if err != nil {
 				return nil, err
 			}
-			return flavor_client.NewClient(endpoint.Address), nil
+			return flavor_client.NewClient(n, endpoint.Address), nil
 		}
 
 		cli.RunPlugin(*name, group_plugin.PluginServer(group.NewGCEGroupPlugin(*project, *zone, flavorPluginLookup)))
@@ -45,7 +45,7 @@ func main() {
 		return nil
 	}
 
-	cmd.AddCommand(plugin.VersionCommand())
+	cmd.AddCommand(cli.VersionCommand())
 
 	err := cmd.Execute()
 	if err != nil {

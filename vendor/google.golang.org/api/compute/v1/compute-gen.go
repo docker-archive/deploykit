@@ -653,6 +653,7 @@ func (s *AccessConfig) MarshalJSON() ([]byte, error) {
 // Address: A reserved address resource.
 type Address struct {
 	// Address: The static external IP address represented by this resource.
+	// Only IPv4 is supported.
 	Address string `json:"address,omitempty"`
 
 	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
@@ -1598,6 +1599,20 @@ func (s *AutoscalingPolicyCpuUtilization) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+func (s *AutoscalingPolicyCpuUtilization) UnmarshalJSON(data []byte) error {
+	type noMethod AutoscalingPolicyCpuUtilization
+	var s1 struct {
+		UtilizationTarget gensupport.JSONFloat64 `json:"utilizationTarget"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.UtilizationTarget = float64(s1.UtilizationTarget)
+	return nil
+}
+
 // AutoscalingPolicyCustomMetricUtilization: Custom utilization metric
 // policy.
 type AutoscalingPolicyCustomMetricUtilization struct {
@@ -1658,6 +1673,20 @@ func (s *AutoscalingPolicyCustomMetricUtilization) MarshalJSON() ([]byte, error)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+func (s *AutoscalingPolicyCustomMetricUtilization) UnmarshalJSON(data []byte) error {
+	type noMethod AutoscalingPolicyCustomMetricUtilization
+	var s1 struct {
+		UtilizationTarget gensupport.JSONFloat64 `json:"utilizationTarget"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.UtilizationTarget = float64(s1.UtilizationTarget)
+	return nil
+}
+
 // AutoscalingPolicyLoadBalancingUtilization: Configuration parameters
 // of autoscaling based on load balancing.
 type AutoscalingPolicyLoadBalancingUtilization struct {
@@ -1689,6 +1718,20 @@ func (s *AutoscalingPolicyLoadBalancingUtilization) MarshalJSON() ([]byte, error
 	type noMethod AutoscalingPolicyLoadBalancingUtilization
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *AutoscalingPolicyLoadBalancingUtilization) UnmarshalJSON(data []byte) error {
+	type noMethod AutoscalingPolicyLoadBalancingUtilization
+	var s1 struct {
+		UtilizationTarget gensupport.JSONFloat64 `json:"utilizationTarget"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.UtilizationTarget = float64(s1.UtilizationTarget)
+	return nil
 }
 
 // Backend: Message containing information of one individual backend.
@@ -1796,6 +1839,24 @@ func (s *Backend) MarshalJSON() ([]byte, error) {
 	type noMethod Backend
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *Backend) UnmarshalJSON(data []byte) error {
+	type noMethod Backend
+	var s1 struct {
+		CapacityScaler     gensupport.JSONFloat64 `json:"capacityScaler"`
+		MaxRatePerInstance gensupport.JSONFloat64 `json:"maxRatePerInstance"`
+		MaxUtilization     gensupport.JSONFloat64 `json:"maxUtilization"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.CapacityScaler = float64(s1.CapacityScaler)
+	s.MaxRatePerInstance = float64(s1.MaxRatePerInstance)
+	s.MaxUtilization = float64(s1.MaxUtilization)
+	return nil
 }
 
 // BackendService: A BackendService resource. This resource defines a
@@ -2211,9 +2272,13 @@ func (s *BackendServicesScopedListWarningData) MarshalJSON() ([]byte, error) {
 }
 
 type CacheInvalidationRule struct {
+	// Host: If set, this invalidation rule will only apply to requests with
+	// a Host header matching host.
+	Host string `json:"host,omitempty"`
+
 	Path string `json:"path,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "Path") to
+	// ForceSendFields is a list of field names (e.g. "Host") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -2221,7 +2286,7 @@ type CacheInvalidationRule struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Path") to include in API
+	// NullFields is a list of field names (e.g. "Host") to include in API
 	// requests with the JSON null value. By default, fields with empty
 	// values are omitted from API requests. However, any field with an
 	// empty value appearing in NullFields will be sent to the server as
@@ -3223,7 +3288,7 @@ type Firewall struct {
 	// will apply to traffic that has source IP address within sourceRanges
 	// OR the source IP that belongs to a tag listed in the sourceTags
 	// property. The connection does not need to match both properties for
-	// the firewall to apply.
+	// the firewall to apply. Only IPv4 is supported.
 	SourceRanges []string `json:"sourceRanges,omitempty"`
 
 	// SourceTags: If source tags are specified, the firewall will apply
@@ -3377,7 +3442,7 @@ type ForwardingRule struct {
 	// the forwarding rule. A reserved address cannot be used. If the field
 	// is empty, the IP address will be automatically allocated from the
 	// internal IP range of the subnetwork or network configured for this
-	// forwarding rule.
+	// forwarding rule. Only IPv4 is supported.
 	IPAddress string `json:"IPAddress,omitempty"`
 
 	// IPProtocol: The IP protocol to which this rule applies. Valid options
@@ -3938,10 +4003,10 @@ type HealthCheck struct {
 	// greater value than checkIntervalSec.
 	TimeoutSec int64 `json:"timeoutSec,omitempty"`
 
-	// Type: Specifies the type of the healthCheck, either TCP, UDP, SSL,
-	// HTTP, HTTPS or HTTP2. If not specified, the default is TCP. Exactly
-	// one of the protocol-specific health check field must be specified,
-	// which must match type field.
+	// Type: Specifies the type of the healthCheck, either TCP, SSL, HTTP or
+	// HTTPS. If not specified, the default is TCP. Exactly one of the
+	// protocol-specific health check field must be specified, which must
+	// match type field.
 	//
 	// Possible values:
 	//   "HTTP"
@@ -6461,6 +6526,37 @@ func (s *InstancesSetMachineTypeRequest) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+type InstancesSetServiceAccountRequest struct {
+	// Email: Email address of the service account.
+	Email string `json:"email,omitempty"`
+
+	// Scopes: The list of scopes to be made available for this service
+	// account.
+	Scopes []string `json:"scopes,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Email") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Email") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *InstancesSetServiceAccountRequest) MarshalJSON() ([]byte, error) {
+	type noMethod InstancesSetServiceAccountRequest
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type InstancesStartWithEncryptionKeyRequest struct {
 	// Disks: Array of disks associated with this instance that are
 	// protected with a customer-supplied encryption key.
@@ -7261,6 +7357,10 @@ type NetworkInterface struct {
 	// there are no accessConfigs specified, then this instance will have no
 	// external internet access.
 	AccessConfigs []*AccessConfig `json:"accessConfigs,omitempty"`
+
+	// Kind: [Output Only] Type of the resource. Always
+	// compute#networkInterface for network interfaces.
+	Kind string `json:"kind,omitempty"`
 
 	// Name: [Output Only] The name of the network interface, generated by
 	// the server. For network devices, these are eth0, eth1, etc.
@@ -8085,6 +8185,7 @@ type Quota struct {
 	//   "TARGET_POOLS"
 	//   "TARGET_SSL_PROXIES"
 	//   "TARGET_VPN_GATEWAYS"
+	//   "TOTAL_CPUS"
 	//   "URL_MAPS"
 	//   "VPN_TUNNELS"
 	Metric string `json:"metric,omitempty"`
@@ -8113,6 +8214,22 @@ func (s *Quota) MarshalJSON() ([]byte, error) {
 	type noMethod Quota
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *Quota) UnmarshalJSON(data []byte) error {
+	type noMethod Quota
+	var s1 struct {
+		Limit gensupport.JSONFloat64 `json:"limit"`
+		Usage gensupport.JSONFloat64 `json:"usage"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.Limit = float64(s1.Limit)
+	s.Usage = float64(s1.Usage)
+	return nil
 }
 
 // Region: Region resource.
@@ -8737,7 +8854,7 @@ type Route struct {
 	Description string `json:"description,omitempty"`
 
 	// DestRange: The destination range of outgoing packets that this route
-	// applies to.
+	// applies to. Only IPv4 is supported.
 	DestRange string `json:"destRange,omitempty"`
 
 	// Id: [Output Only] The unique identifier for the resource. This
@@ -8775,7 +8892,7 @@ type Route struct {
 	NextHopInstance string `json:"nextHopInstance,omitempty"`
 
 	// NextHopIp: The network IP address of an instance that should handle
-	// matching packets.
+	// matching packets. Only IPv4 is supported.
 	NextHopIp string `json:"nextHopIp,omitempty"`
 
 	// NextHopNetwork: The URL of the local network if it should handle
@@ -9141,6 +9258,7 @@ type RouterBgpPeer struct {
 	InterfaceName string `json:"interfaceName,omitempty"`
 
 	// IpAddress: IP address of the interface inside Google Cloud Platform.
+	// Only IPv4 is supported.
 	IpAddress string `json:"ipAddress,omitempty"`
 
 	// Name: Name of this BGP peer. The name must be 1-63 characters long
@@ -9152,6 +9270,7 @@ type RouterBgpPeer struct {
 	PeerAsn int64 `json:"peerAsn,omitempty"`
 
 	// PeerIpAddress: IP address of the BGP interface outside Google cloud.
+	// Only IPv4 is supported.
 	PeerIpAddress string `json:"peerIpAddress,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g.
@@ -9943,8 +10062,8 @@ type SslCertificate struct {
 	// last character, which cannot be a dash.
 	Name string `json:"name,omitempty"`
 
-	// PrivateKey: A write-only private key in PEM format. Only insert RPCs
-	// will include this field.
+	// PrivateKey: A write-only private key in PEM format. Only insert
+	// requests will include this field.
 	PrivateKey string `json:"privateKey,omitempty"`
 
 	// SelfLink: [Output only] Server-defined URL for the resource.
@@ -10048,7 +10167,7 @@ type Subnetwork struct {
 	// IpCidrRange: The range of internal addresses that are owned by this
 	// subnetwork. Provide this property when you create the subnetwork. For
 	// example, 10.0.0.0/8 or 192.168.0.0/16. Ranges must be unique and
-	// non-overlapping within a network.
+	// non-overlapping within a network. Only IPv4 is supported.
 	IpCidrRange string `json:"ipCidrRange,omitempty"`
 
 	// Kind: [Output Only] Type of the resource. Always compute#subnetwork
@@ -11152,6 +11271,20 @@ func (s *TargetPool) MarshalJSON() ([]byte, error) {
 	type noMethod TargetPool
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *TargetPool) UnmarshalJSON(data []byte) error {
+	type noMethod TargetPool
+	var s1 struct {
+		FailoverRatio gensupport.JSONFloat64 `json:"failoverRatio"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.FailoverRatio = float64(s1.FailoverRatio)
+	return nil
 }
 
 type TargetPoolAggregatedList struct {
@@ -12487,7 +12620,7 @@ type VpnTunnel struct {
 	// LocalTrafficSelector: Local traffic selector to use when establishing
 	// the VPN tunnel with peer VPN gateway. The value should be a CIDR
 	// formatted string, for example: 192.168.0.0/16. The ranges should be
-	// disjoint.
+	// disjoint. Only IPv4 is supported.
 	LocalTrafficSelector []string `json:"localTrafficSelector,omitempty"`
 
 	// Name: Name of the resource. Provided by the client when the resource
@@ -12499,7 +12632,7 @@ type VpnTunnel struct {
 	// last character, which cannot be a dash.
 	Name string `json:"name,omitempty"`
 
-	// PeerIp: IP address of the peer VPN gateway.
+	// PeerIp: IP address of the peer VPN gateway. Only IPv4 is supported.
 	PeerIp string `json:"peerIp,omitempty"`
 
 	// Region: [Output Only] URL of the region where the VPN tunnel resides.
@@ -12508,7 +12641,7 @@ type VpnTunnel struct {
 	// RemoteTrafficSelector: Remote traffic selectors to use when
 	// establishing the VPN tunnel with peer VPN gateway. The value should
 	// be a CIDR formatted string, for example: 192.168.0.0/16. The ranges
-	// should be disjoint.
+	// should be disjoint. Only IPv4 is supported.
 	RemoteTrafficSelector []string `json:"remoteTrafficSelector,omitempty"`
 
 	// Router: URL of router resource to be used for dynamic routing.
@@ -28191,6 +28324,30 @@ func (r *InstanceGroupManagersService) ListManagedInstances(project string, zone
 	return c
 }
 
+// Filter sets the optional parameter "filter":
+func (c *InstanceGroupManagersListManagedInstancesCall) Filter(filter string) *InstanceGroupManagersListManagedInstancesCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
+// MaxResults sets the optional parameter "maxResults":
+func (c *InstanceGroupManagersListManagedInstancesCall) MaxResults(maxResults int64) *InstanceGroupManagersListManagedInstancesCall {
+	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
+	return c
+}
+
+// OrderBy sets the optional parameter "order_by":
+func (c *InstanceGroupManagersListManagedInstancesCall) OrderBy(orderBy string) *InstanceGroupManagersListManagedInstancesCall {
+	c.urlParams_.Set("order_by", orderBy)
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken":
+func (c *InstanceGroupManagersListManagedInstancesCall) PageToken(pageToken string) *InstanceGroupManagersListManagedInstancesCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -28285,10 +28442,30 @@ func (c *InstanceGroupManagersListManagedInstancesCall) Do(opts ...googleapi.Cal
 	//     "instanceGroupManager"
 	//   ],
 	//   "parameters": {
+	//     "filter": {
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "instanceGroupManager": {
 	//       "description": "The name of the managed instance group.",
 	//       "location": "path",
 	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "maxResults": {
+	//       "default": "500",
+	//       "format": "uint32",
+	//       "location": "query",
+	//       "maximum": "500",
+	//       "minimum": "0",
+	//       "type": "integer"
+	//     },
+	//     "order_by": {
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "pageToken": {
+	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "project": {
@@ -30330,6 +30507,27 @@ func (c *InstanceGroupsListInstancesCall) Do(opts ...googleapi.CallOption) (*Ins
 	//   ]
 	// }
 
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstanceGroupsListInstancesCall) Pages(ctx context.Context, f func(*InstanceGroupsListInstances) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
 }
 
 // method id "compute.instanceGroups.removeInstances":
@@ -33927,6 +34125,163 @@ func (c *InstancesSetSchedulingCall) Do(opts ...googleapi.CallOption) (*Operatio
 	//   "path": "{project}/zones/{zone}/instances/{instance}/setScheduling",
 	//   "request": {
 	//     "$ref": "Scheduling"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
+// method id "compute.instances.setServiceAccount":
+
+type InstancesSetServiceAccountCall struct {
+	s                                 *Service
+	project                           string
+	zone                              string
+	instance                          string
+	instancessetserviceaccountrequest *InstancesSetServiceAccountRequest
+	urlParams_                        gensupport.URLParams
+	ctx_                              context.Context
+	header_                           http.Header
+}
+
+// SetServiceAccount: Sets the service account on the instance.
+func (r *InstancesService) SetServiceAccount(project string, zone string, instance string, instancessetserviceaccountrequest *InstancesSetServiceAccountRequest) *InstancesSetServiceAccountCall {
+	c := &InstancesSetServiceAccountCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.zone = zone
+	c.instance = instance
+	c.instancessetserviceaccountrequest = instancessetserviceaccountrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *InstancesSetServiceAccountCall) Fields(s ...googleapi.Field) *InstancesSetServiceAccountCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *InstancesSetServiceAccountCall) Context(ctx context.Context) *InstancesSetServiceAccountCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *InstancesSetServiceAccountCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *InstancesSetServiceAccountCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.instancessetserviceaccountrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/zones/{zone}/instances/{instance}/setServiceAccount")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":  c.project,
+		"zone":     c.zone,
+		"instance": c.instance,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.instances.setServiceAccount" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *InstancesSetServiceAccountCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Sets the service account on the instance.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.instances.setServiceAccount",
+	//   "parameterOrder": [
+	//     "project",
+	//     "zone",
+	//     "instance"
+	//   ],
+	//   "parameters": {
+	//     "instance": {
+	//       "description": "Name of the instance resource to start.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "zone": {
+	//       "description": "The name of the zone for this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/zones/{zone}/instances/{instance}/setServiceAccount",
+	//   "request": {
+	//     "$ref": "InstancesSetServiceAccountRequest"
 	//   },
 	//   "response": {
 	//     "$ref": "Operation"
@@ -40213,6 +40568,30 @@ func (r *RegionInstanceGroupManagersService) ListManagedInstances(project string
 	return c
 }
 
+// Filter sets the optional parameter "filter":
+func (c *RegionInstanceGroupManagersListManagedInstancesCall) Filter(filter string) *RegionInstanceGroupManagersListManagedInstancesCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
+// MaxResults sets the optional parameter "maxResults":
+func (c *RegionInstanceGroupManagersListManagedInstancesCall) MaxResults(maxResults int64) *RegionInstanceGroupManagersListManagedInstancesCall {
+	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
+	return c
+}
+
+// OrderBy sets the optional parameter "order_by":
+func (c *RegionInstanceGroupManagersListManagedInstancesCall) OrderBy(orderBy string) *RegionInstanceGroupManagersListManagedInstancesCall {
+	c.urlParams_.Set("order_by", orderBy)
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken":
+func (c *RegionInstanceGroupManagersListManagedInstancesCall) PageToken(pageToken string) *RegionInstanceGroupManagersListManagedInstancesCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -40307,10 +40686,30 @@ func (c *RegionInstanceGroupManagersListManagedInstancesCall) Do(opts ...googlea
 	//     "instanceGroupManager"
 	//   ],
 	//   "parameters": {
+	//     "filter": {
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "instanceGroupManager": {
 	//       "description": "The name of the managed instance group.",
 	//       "location": "path",
 	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "maxResults": {
+	//       "default": "500",
+	//       "format": "uint32",
+	//       "location": "query",
+	//       "maximum": "500",
+	//       "minimum": "0",
+	//       "type": "integer"
+	//     },
+	//     "order_by": {
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "pageToken": {
+	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "project": {
@@ -41649,6 +42048,27 @@ func (c *RegionInstanceGroupsListInstancesCall) Do(opts ...googleapi.CallOption)
 	//   ]
 	// }
 
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *RegionInstanceGroupsListInstancesCall) Pages(ctx context.Context, f func(*RegionInstanceGroupsListInstances) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
 }
 
 // method id "compute.regionInstanceGroups.setNamedPorts":

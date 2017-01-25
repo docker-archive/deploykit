@@ -61,7 +61,7 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 	spec := instance.Spec{
 		Tags:       tags,
 		LogicalID:  logicalID,
-		Properties: settings.config.Instance.Properties,
+		Properties: types.RawMessagePtr(settings.config.Instance.Properties),
 	}
 
 	spec, err := settings.flavorPlugin.Prepare(
