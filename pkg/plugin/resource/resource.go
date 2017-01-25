@@ -10,10 +10,10 @@ import (
 	"text/template"
 
 	log "github.com/Sirupsen/logrus"
-	plugin_group "github.com/docker/infrakit/pkg/plugin/group"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
-	"github.com/docker/infrakit/pkg/spi/group"
+	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/resource"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/twmb/algoimpl/go/graph"
 )
 
@@ -22,56 +22,61 @@ const (
 	resourceNameTag  = "infrakit.resource-name"
 )
 
-// NewResourcePlugin creates a new resource plugin.
-func NewResourcePlugin(instancePlugins plugin_group.InstancePluginLookup) group.Plugin {
-	return &plugin{
-		instancePlugins: instancePlugins,
+// Spec is the configuration schema for this plugin, provided in resource.Spec.Properties.
+type Spec struct {
+	Resources map[string]*struct {
+		Plugin     plugin_base.Name
+		plugin     instance.Plugin
+		Properties *types.Any
 	}
 }
 
-// Spec is the configuration schema for this plugin, provided in group.Spec.Properties.
-type Spec struct {
-	Resources map[string]types.InstancePlugin
-}
+// InstancePluginLookup looks up a plugin by name.
+type InstancePluginLookup func(plugin_base.Name) (instance.Plugin, error)
 
-type resource struct {
-	plugin instance.Plugin
-	config types.InstancePlugin
+// NewResourcePlugin creates a new resource plugin.
+func NewResourcePlugin(instancePluginLookup InstancePluginLookup) resource.Plugin {
+	return &plugin{
+		instancePluginLookup: instancePluginLookup,
+	}
 }
 
 type plugin struct {
-	instancePlugins plugin_group.InstancePluginLookup
+	instancePluginLookup InstancePluginLookup
 }
 
-func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
+func (p *plugin) validate(config resource.Spec) (*Spec, []string, error) {
 	spec := Spec{}
-	if err := config.Properties.Decode(spec); err != nil {
-		return "", fmt.Errorf("Invalid properties %q: %s", config.Properties, err)
+	if err := config.Properties.Decode(&spec); err != nil {
+		return nil, nil, fmt.Errorf("Invalid properties %q: %s", config.Properties, err)
 	}
 
-	resources := map[string]*resource{}
-	for name, resourceConfig := range spec.Resources {
-		resourcePlugin, err := p.instancePlugins(resourceConfig.Plugin)
+	for name, resourceSpec := range spec.Resources {
+		instancePlugin, err := p.instancePluginLookup(resourceSpec.Plugin)
 		if err != nil {
-			return "", fmt.Errorf("Failed to find resource plugin %s: %s", resourceConfig.Plugin, err)
+			return nil, nil, fmt.Errorf("Failed to find plugin %s for %s: %s", resourceSpec.Plugin, name, err)
 		}
-		if err := resourcePlugin.Validate(json.RawMessage(*resourceConfig.Properties)); err != nil {
-			return "", err
+		if err := instancePlugin.Validate(json.RawMessage(*resourceSpec.Properties)); err != nil {
+			return nil, nil, fmt.Errorf("Failed to validate spec for %s: %s", name, err)
 		}
-		resources[name] = &resource{plugin: resourcePlugin, config: resourceConfig}
+		resourceSpec.plugin = instancePlugin
 	}
 
-	orderedResourceNames, err := getProvisioningOrder(resources)
+	provisioningOrder, err := getProvisioningOrder(spec)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
-	resourceIDs := map[string]struct{ instance.ID }{}
-	for name, resource := range resources {
-		tags := map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name}
-		descriptions, err := resource.plugin.DescribeInstances(tags)
+	return &spec, provisioningOrder, nil
+}
+
+func (p *plugin) describe(spec Spec, configID resource.ID) (map[string]instance.ID, error) {
+	ids := map[string]instance.ID{}
+	for name, resourceSpec := range spec.Resources {
+		tags := map[string]string{resourceGroupTag: string(configID), resourceNameTag: name}
+		descriptions, err := resourceSpec.plugin.DescribeInstances(tags)
 		if err != nil {
-			return "", fmt.Errorf("Describe failed for %s: %s", name, err)
+			return nil, fmt.Errorf("Describe failed for %s: %s", name, err)
 		}
 
 		switch len(descriptions) {
@@ -79,40 +84,120 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 			break
 		case 1:
 			log.Infof("Found %s with ID %s", name, descriptions[0].ID)
-			resourceIDs[name] = struct{ instance.ID }{descriptions[0].ID}
+			ids[name] = descriptions[0].ID
 		default:
-			var ids []instance.ID
+			var idList []instance.ID
 			for _, d := range descriptions {
-				ids = append(ids, d.ID)
+				idList = append(idList, d.ID)
 			}
-			return "", fmt.Errorf("Found multiple resources named %s: %v", name, ids)
+			return nil, fmt.Errorf("Found multiple resources named %s: %v", name, idList)
 		}
 	}
-	numFound := len(resourceIDs)
 
-	for _, name := range orderedResourceNames {
-		if _, ok := resourceIDs[name]; ok {
+	return ids, nil
+}
+
+func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
+	spec, provisioningOrder, err := p.validate(config)
+	if err != nil {
+		return "", err
+	}
+
+	ids, err := p.describe(*spec, config.ID)
+	if err != nil {
+		return "", err
+	}
+
+	idStructs := map[string]struct{ instance.ID }{}
+	for name, id := range ids {
+		idStructs[name] = struct{ instance.ID }{id}
+	}
+
+	for _, name := range provisioningOrder {
+		if _, ok := idStructs[name]; ok {
 			continue
 		}
 
-		resource := resources[name]
-		properties, err := executeAsTemplate(json.RawMessage(*resource.config.Properties), struct{ Resources interface{} }{resourceIDs})
+		resourceSpec := spec.Resources[name]
+		properties, err := executeAsTemplate(json.RawMessage(*resourceSpec.Properties), struct{ Resources interface{} }{idStructs})
 		if err != nil {
 			return "", fmt.Errorf("Failed to get properties for %s: %s", name, err)
 		}
 
-		id, err := resource.plugin.Provision(instance.Spec{
-			Properties: &properties,
-			Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name},
-		})
-		if err != nil {
-			return "", fmt.Errorf("Failed to provision %s: %s", name, err)
+		if pretend {
+			idStructs[name] = struct{ instance.ID }{instance.ID("unknown")}
+		} else {
+			id, err := resourceSpec.plugin.Provision(instance.Spec{
+				Properties: &properties,
+				Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name},
+			})
+			if err != nil {
+				return "", fmt.Errorf("Failed to provision %s: %s", name, err)
+			}
+
+			log.Infof("Provisioned %s (ID %s)", name, *id)
+			idStructs[name] = struct{ instance.ID }{*id}
 		}
-		log.Infof("Provisioned %s with ID %s", name, *id)
-		resourceIDs[name] = struct{ instance.ID }{*id}
 	}
 
-	return fmt.Sprintf("Found %d resources and created %d ", numFound, len(resourceIDs)-numFound), nil
+	var desc string
+	for _, name := range provisioningOrder {
+		var idStr, verb string
+		if id, ok := ids[name]; ok {
+			verb = "Found"
+			idStr = string(id)
+		} else {
+			verb = "Created"
+			idStr = "N/A"
+			if idStruct, ok := idStructs[name]; ok {
+				idStr = string(idStruct.ID)
+			}
+		}
+		desc += fmt.Sprintf("\n%s %s (%s)", verb, name, idStr)
+	}
+
+	return desc, nil
+}
+
+func (p *plugin) Destroy(config resource.Spec, pretend bool) (string, error) {
+	spec, provisioningOrder, err := p.validate(config)
+	if err != nil {
+		return "", err
+	}
+
+	ids, err := p.describe(*spec, config.ID)
+	if err != nil {
+		return "", err
+	}
+
+	// Traverse provisioningOrder in reverse.
+	for i := len(provisioningOrder) - 1; i >= 0; i-- {
+		name := provisioningOrder[i]
+
+		id, ok := ids[name]
+		if !ok {
+			continue
+		}
+
+		if !pretend {
+			if err = spec.Resources[name].plugin.Destroy(id); err != nil {
+				return "", fmt.Errorf("Failed to destroy %s (ID %s): %s", name, id, err)
+			}
+
+			log.Infof("Detroyed %s (ID %s)", name, id)
+		}
+	}
+
+	var desc string
+	for name, id := range ids {
+		desc += fmt.Sprintf("\nDestroyed %s (ID %s)", name, id)
+	}
+
+	return desc, nil
+}
+
+func (p *plugin) DescribeResources() ([]instance.Description, error) {
+	return nil, errors.New("unimplemented")
 }
 
 func executeAsTemplate(text json.RawMessage, data interface{}) (json.RawMessage, error) {
@@ -132,7 +217,6 @@ func executeAsTemplate(text json.RawMessage, data interface{}) (json.RawMessage,
 var resourceReferenceRegexp = regexp.MustCompile(`{{\s*\.Resources\.(\w+)`)
 
 func getResourceReferences(properties json.RawMessage) []string {
-
 	var references []string
 	// TODO: Use text/template.Template.Execute instead.
 	for _, submatches := range resourceReferenceRegexp.FindAllSubmatch(properties, -1) {
@@ -141,18 +225,18 @@ func getResourceReferences(properties json.RawMessage) []string {
 	return references
 }
 
-func getProvisioningOrder(resources map[string]*resource) ([]string, error) {
+func getProvisioningOrder(spec Spec) ([]string, error) {
 	g := graph.New(graph.Directed)
 
 	nodes := map[string]graph.Node{}
-	for name := range resources {
+	for name := range spec.Resources {
 		nodes[name] = g.MakeNode()
 		*nodes[name].Value = name
 	}
 
-	for name, resource := range resources {
+	for name, resourceSpec := range spec.Resources {
 		to := nodes[name]
-		references := getResourceReferences(json.RawMessage(*resource.config.Properties))
+		references := getResourceReferences(json.RawMessage(*resourceSpec.Properties))
 		for _, reference := range references {
 			from, ok := nodes[reference]
 			if !ok {
@@ -181,20 +265,4 @@ func getProvisioningOrder(resources map[string]*resource) ([]string, error) {
 	}
 
 	return sorted, nil
-}
-
-func (p *plugin) FreeGroup(id group.ID) error {
-	return errors.New("unimplemented")
-}
-
-func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
-	return group.Description{}, errors.New("unimplemented")
-}
-
-func (p *plugin) DestroyGroup(gid group.ID) error {
-	return errors.New("unimplemented")
-}
-
-func (p *plugin) InspectGroups() ([]group.Spec, error) {
-	return nil, errors.New("unimplemented")
 }
