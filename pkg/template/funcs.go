@@ -78,9 +78,8 @@ func UnixTime() interface{} {
 
 // Index returns the index of search in array.  -1 if not found or array is not iterable.  An optional true will
 // turn on strict type check while by default string representations are used to compare values.
-func Index(search interface{}, array interface{}, strictOptional ...bool) int {
+func Index(srch interface{}, array interface{}, strictOptional ...bool) int {
 	strict := false
-	searchStr := fmt.Sprintf("%v", search)
 	if len(strictOptional) > 0 {
 		strict = strictOptional[0]
 	}
@@ -88,13 +87,15 @@ func Index(search interface{}, array interface{}, strictOptional ...bool) int {
 	case reflect.Slice:
 		s := reflect.ValueOf(array)
 		for i := 0; i < s.Len(); i++ {
-			if strict {
-				if reflect.DeepEqual(search, s.Index(i).Interface()) {
-					return i
-				}
-			} else {
+			if reflect.DeepEqual(srch, s.Index(i).Interface()) {
+				return i
+			}
+			if !strict {
 				// by string value which is useful for text based compares
-				check := fmt.Sprintf("%v", s.Index(i).Interface())
+				search := reflect.Indirect(reflect.ValueOf(srch)).Interface()
+				value := reflect.Indirect(s.Index(i)).Interface()
+				searchStr := fmt.Sprintf("%v", search)
+				check := fmt.Sprintf("%v", value)
 				if searchStr == check {
 					return i
 				}

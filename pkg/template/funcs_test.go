@@ -294,4 +294,16 @@ func TestIndex(t *testing.T) {
 	require.Equal(t, -1, Index("1", []interface{}{0, 1, 2}, true))  // strict case type must match
 	require.Equal(t, 1, Index("1", []interface{}{0, "1", 2}, true)) // strict case type must match
 	require.Equal(t, -1, Index(1, []interface{}{0, "1", 2}, true))  // strict case type must match
+
+	v := "1"
+	require.Equal(t, 1, Index(&v, []interface{}{0, "1", 2}))
+	require.Equal(t, 1, Index(&v, []interface{}{0, &v, 2}, true))
+	require.Equal(t, 1, Index(&v, []interface{}{0, &v, 2}))
+
+	a := "0"
+	c := "2"
+	require.Equal(t, 1, Index("1", []*string{&a, &v, &c}))
+
+	// This doesn't work because the type information is gone and we have just an address
+	require.Equal(t, -1, Index("1", []interface{}{0, &v, 2}))
 }
