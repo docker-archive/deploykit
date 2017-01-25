@@ -106,9 +106,9 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 		details, err := resourcePlugin.Destroy(spec, *destroyPretend)
 		if err == nil {
 			if *destroyPretend {
-				fmt.Printf("Destroyting %s would involve: %s\n", spec.ID, details)
+				fmt.Printf("Destroying %s would involve: %s\n", spec.ID, details)
 			} else {
-				fmt.Printf("Destroyted %s: %s\n", spec.ID, details)
+				fmt.Printf("Destroyed %s: %s\n", spec.ID, details)
 			}
 		}
 		return err
