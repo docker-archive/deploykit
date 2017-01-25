@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
@@ -80,26 +81,57 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
 	return nil
 }
 
-func swarmState(docker client.APIClient) (status swarm.Swarm, node swarm.Node, err error) {
+func swarmState(docker client.APIClient) (status *swarm.Swarm, node *swarm.Node, err error) {
 	ctx := context.Background()
 	info, err := docker.Info(ctx)
 	if err != nil {
+		log.Warningln("Err docker info:", err)
+		status = nil
+		node = nil
 		return
 	}
-	node, _, err = docker.NodeInspectWithRaw(ctx, info.Swarm.NodeID)
+	n, _, err := docker.NodeInspectWithRaw(ctx, info.Swarm.NodeID)
 	if err != nil {
+		log.Warningln("Err node inspect:", err)
 		return
 	}
-	status, err = docker.SwarmInspect(ctx)
+
+	node = &n
+
+	s, err := docker.SwarmInspect(ctx)
+	if err != nil {
+		log.Warningln("Err swarm inspect:", err)
+		return
+	}
+	status = &s
 	return
 }
 
-func exportTemplateFunctions(swarmStatus swarm.Swarm, nodeInfo swarm.Node, link types.Link) []template.Function {
+// swarmStatus and nodeInfo can be nil if Swarm is not ready.
+func exportTemplateFunctions(spec instance.Spec, alloc group_types.AllocationMethod,
+	swarmStatus *swarm.Swarm, nodeInfo *swarm.Node, link types.Link) []template.Function {
 
 	// Get a single consistent view of the data across multiple calls by exporting functions that
 	// query the input state
 
 	return []template.Function{
+		{
+			Name:        "INSTANCE_LOGICAL_ID",
+			Description: "The logical id for the instance being prepared; can be empty if no logical ids are set (cattle).",
+			Func: func() string {
+				if spec.LogicalID != nil {
+					return string(*spec.LogicalID)
+				}
+				return ""
+			},
+		},
+		{
+			Name:        "ALLOCATIONS",
+			Description: "The allocations contain fields such as the size of the group or the list of logical ids.",
+			Func: func() interface{} {
+				return alloc
+			},
+		},
 		{
 			Name:        "INFRAKIT_LABELS",
 			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
@@ -111,6 +143,9 @@ func exportTemplateFunctions(swarmStatus swarm.Swarm, nodeInfo swarm.Node, link 
 			Name:        "SWARM_MANAGER_IP",
 			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
 			Func: func() (string, error) {
+				if nodeInfo == nil {
+					return "", fmt.Errorf("no node info")
+				}
 				if nodeInfo.ManagerStatus == nil {
 					return "", fmt.Errorf("no manager status")
 				}
@@ -120,22 +155,31 @@ func exportTemplateFunctions(swarmStatus swarm.Swarm, nodeInfo swarm.Node, link 
 		{
 			Name:        "SWARM_INITIALIZED",
 			Description: "Returns true if the swarm has been initialized.",
-			Func: func() bool {
-				return nodeInfo.ManagerStatus != nil
+			Func: func() (bool, error) {
+				if nodeInfo == nil {
+					return false, fmt.Errorf("no node info")
+				}
+				return nodeInfo.ManagerStatus != nil, nil
 			},
 		},
 		{
 			Name:        "SWARM_JOIN_TOKENS",
 			Description: "Returns the swarm JoinTokens object, with either .Manager or .Worker fields",
-			Func: func() interface{} {
-				return swarmStatus.JoinTokens
+			Func: func() (interface{}, error) {
+				if swarmStatus == nil {
+					return nil, fmt.Errorf("no swarm status")
+				}
+				return swarmStatus.JoinTokens, nil
 			},
 		},
 		{
 			Name:        "SWARM_CLUSTER_ID",
 			Description: "Returns the swarm cluster UUID",
-			Func: func() interface{} {
-				return swarmStatus.ID
+			Func: func() (interface{}, error) {
+				if swarmStatus == nil {
+					return nil, fmt.Errorf("no swarm status")
+				}
+				return swarmStatus.ID, nil
 			},
 		},
 	}

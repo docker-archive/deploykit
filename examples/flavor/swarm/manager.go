@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -58,9 +59,11 @@ func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation gr
 func (s *managerFlavor) ExportTemplateFunctions() []template.Function {
 	swarmStatus, self, err := swarmState(s.client)
 	if err != nil {
-		return nil
+		log.Warningln("Err", err)
+		swarmStatus = nil
+		self = nil
 	}
-	return exportTemplateFunctions(swarmStatus, self, *types.NewLink())
+	return exportTemplateFunctions(instance.Spec{}, group_types.AllocationMethod{}, swarmStatus, self, *types.NewLink())
 }
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
@@ -93,14 +96,21 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 		log.Infoln("Using", spec.InitScriptTemplateURL, "for init script template")
 	}
 
-	swarmStatus, node, err := swarmState(s.client)
+	var swarmStatus *swarm.Swarm
+	var node *swarm.Node
+
+	swarmStatus, node, err = swarmState(s.client)
 	if err != nil {
-		return instanceSpec, err
+		log.Warningln("Manager prepare:", err)
 	}
 
-	link := types.NewLink().WithContext("swarm/" + swarmStatus.ID + "/manager")
+	swarmID := "?"
+	if swarmStatus != nil {
+		swarmID = swarmStatus.ID
+	}
 
-	initTemplate.AddFuncs(exportTemplateFunctions(swarmStatus, node, *link))
+	link := types.NewLink().WithContext("swarm/" + swarmID + "/manager")
+	initTemplate.AddFuncs(exportTemplateFunctions(instanceSpec, allocation, swarmStatus, node, *link))
 	initScript, err := initTemplate.Render(nil)
 	if err != nil {
 		return instanceSpec, err
@@ -118,7 +128,7 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 
 	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
 	// swarm.  This will require plumbing back to Scaled (membership tags).
-	instanceSpec.Tags["swarm-id"] = swarmStatus.ID
+	instanceSpec.Tags["swarm-id"] = swarmID
 	link.WriteMap(instanceSpec.Tags)
 
 	return instanceSpec, nil

@@ -7,6 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -76,14 +77,22 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 		log.Infoln("Using", spec.InitScriptTemplateURL, "for init script template")
 	}
 
-	swarmStatus, node, err := swarmState(s.client)
+	var swarmStatus *swarm.Swarm
+	var node *swarm.Node
+
+	swarmStatus, node, err = swarmState(s.client)
 	if err != nil {
-		return instanceSpec, err
+		log.Warningln("Worker prepare:", err)
 	}
 
-	link := types.NewLink().WithContext("swarm/" + swarmStatus.ID + "/worker")
+	swarmID := "?"
+	if swarmStatus != nil {
+		swarmID = swarmStatus.ID
+	}
 
-	initTemplate.AddFuncs(exportTemplateFunctions(swarmStatus, node, *link))
+	link := types.NewLink().WithContext("swarm/" + swarmID + "/worker")
+
+	initTemplate.AddFuncs(exportTemplateFunctions(instanceSpec, allocation, swarmStatus, node, *link))
 	initScript, err := initTemplate.Render(nil)
 	if err != nil {
 		return instanceSpec, err
@@ -99,7 +108,7 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 
 	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
 	// swarm.  This will require plumbing back to Scaled (membership tags).
-	instanceSpec.Tags["swarm-id"] = swarmStatus.ID
+	instanceSpec.Tags["swarm-id"] = swarmID
 	link.WriteMap(instanceSpec.Tags)
 
 	return instanceSpec, nil
