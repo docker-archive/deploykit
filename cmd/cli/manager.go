@@ -27,6 +27,14 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access the manager",
 	}
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
+		if err := upTree(c, func(x *cobra.Command, argv []string) error {
+			if x.PersistentPreRunE != nil {
+				return x.PersistentPreRunE(x, argv)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 
 		// Scan for a manager
 		pm, err := plugins().List()

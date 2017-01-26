@@ -29,6 +29,14 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
 
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
+		if err := upTree(c, func(x *cobra.Command, argv []string) error {
+			if x.PersistentPreRunE != nil {
+				return x.PersistentPreRunE(x, argv)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 
 		endpoint, err := plugins().Find(plugin.Name(*name))
 		if err != nil {
