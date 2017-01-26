@@ -3,7 +3,7 @@
 set -e
 
 BASEDIR=$(dirname "$0")
-INFRAKIT_IMAGE=infrakit/devbundle:master-1041
+INFRAKIT_IMAGE=infrakit/devbundle:master-1131
 GCLOUD="docker run -e CLOUDSDK_CORE_PROJECT --rm -v gcloud-config:/.config google/cloud-sdk gcloud"
 TAG="ci-infrakit-gcp-group-${CIRCLE_BUILD_NUM:-local}"
 
@@ -173,7 +173,7 @@ assert_equals() {
 }
 
 
-[ -n "${GCLOUD_SERVICE_KEY}" ] || exit 0
+[ -n "${GCLOUD_SERVICE_KEY}" ] || exit 1
 cleanup
 auth_gcloud
 remove_previous_instances
