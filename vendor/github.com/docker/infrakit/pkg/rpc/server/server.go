@@ -8,7 +8,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	rpc_server "github.com/docker/infrakit/pkg/rpc"
-	"github.com/docker/infrakit/pkg/rpc/plugin"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/rpc/v2"
@@ -71,15 +70,29 @@ type VersionedInterface interface {
 
 // StartPluginAtPath starts an HTTP server listening on a unix socket at the specified path.
 // Returns a Stoppable that can be used to stop or block on the server.
-func StartPluginAtPath(socketPath string, receiver VersionedInterface) (Stoppable, error) {
+func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json2.NewCodec(), "application/json")
+
+	interfaces := []spi.InterfaceSpec{}
 
 	if err := server.RegisterService(receiver, ""); err != nil {
 		return nil, err
 	}
 
-	if err := server.RegisterService(plugin.Plugin{Spec: receiver.ImplementedInterface()}, ""); err != nil {
+	interfaces = append(interfaces, receiver.ImplementedInterface())
+
+	// Additional interfaces to publish
+	for _, obj := range more {
+		// the object can export 0 or more methods.  In any case we show the implemented interface
+		interfaces = append(interfaces, obj.ImplementedInterface())
+		if err := server.RegisterService(obj, ""); err != nil {
+			log.Warningln(err)
+		}
+	}
+
+	// TODO - deprecate this in favor of the more information-rich /info/api.json endpoint
+	if err := server.RegisterService(rpc_server.Handshake(interfaces), ""); err != nil {
 		return nil, err
 	}
 

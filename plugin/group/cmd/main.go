@@ -37,7 +37,7 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
-			return flavor_client.NewClient(n, endpoint.Address), nil
+			return flavor_client.NewClient(n, endpoint.Address)
 		}
 
 		cli.RunPlugin(*name, group_plugin.PluginServer(group.NewGCEGroupPlugin(*project, *zone, flavorPluginLookup)))

@@ -48,7 +48,7 @@ func (c *Any) Decode(typed interface{}) error {
 
 // marshal populates this raw message with a decoded form of the input struct.
 func (c *Any) marshal(typed interface{}) error {
-	buff, err := json.MarshalIndent(typed, "", "  ")
+	buff, err := json.MarshalIndent(typed, "", "")
 	if err != nil {
 		return err
 	}
