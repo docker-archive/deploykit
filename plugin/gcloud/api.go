@@ -88,9 +88,9 @@ type InstanceManagerSettings struct {
 }
 
 type computeServiceWrapper struct {
-	project  string
-	zone     string
-	service  *compute.Service
+	project string
+	zone    string
+	service *compute.Service
 }
 
 // New creates a new API instance.
@@ -132,9 +132,9 @@ func New(project, zone string) (API, error) {
 	}
 
 	return &computeServiceWrapper{
-		project:         project,
-		zone:            zone,
-		service:         service,
+		project: project,
+		zone:    zone,
+		service: service,
 	}, nil
 }
 
@@ -429,7 +429,7 @@ func (g *computeServiceWrapper) ResizeInstanceGroupManager(name string, targetSi
 }
 
 func (g *computeServiceWrapper) region() string {
-	return g.zone[:len(g.zone) - 2]
+	return g.zone[:len(g.zone)-2]
 }
 
 // Call is an async Google Api call
@@ -474,5 +474,5 @@ func (g *computeServiceWrapper) getOperationCall(op *compute.Operation) Call {
 
 func last(url string) string {
 	parts := strings.Split(url, "/")
-	return parts[len(parts) - 1]
+	return parts[len(parts)-1]
 }

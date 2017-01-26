@@ -302,5 +302,5 @@ func (p *plugin) InspectGroups() ([]group.Spec, error) {
 
 func last(url string) string {
 	parts := strings.Split(url, "/")
-	return parts[len(parts) - 1]
+	return parts[len(parts)-1]
 }
