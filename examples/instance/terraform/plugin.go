@@ -428,7 +428,59 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // Label labels the instance
 func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
-	return fmt.Errorf("not implemented")
+	buff, err := afero.ReadFile(p.fs, filepath.Join(p.Dir, string(instance)+".tf.json"))
+	if err != nil {
+		return err
+	}
+
+	tfFile := map[string]interface{}{}
+	err = json.Unmarshal(buff, &tfFile)
+	if err != nil {
+		return err
+	}
+
+	resources, has := tfFile["resource"].(map[string]interface{})
+	if !has {
+		return fmt.Errorf("bad tfile:%v", instance)
+	}
+
+	var first map[string]interface{} // there should be only one element keyed by the type (e.g. aws_instance)
+	for _, r := range resources {
+		if f, ok := r.(map[string]interface{}); ok {
+			first = f
+			break
+		}
+	}
+
+	if len(first) == 0 {
+		return fmt.Errorf("no typed properties:%v", instance)
+	}
+
+	props, has := first[string(instance)].(map[string]interface{})
+	if !has {
+		return fmt.Errorf("not found:%v", instance)
+	}
+
+	// update props.tags
+	if _, has := props["tags"]; !has {
+		props["tags"] = map[string]interface{}{}
+	}
+
+	if tags, ok := props["tags"].(map[string]interface{}); ok {
+		for k, v := range labels {
+			tags[k] = v
+		}
+	}
+
+	buff, err = json.MarshalIndent(tfFile, "  ", "  ")
+	if err != nil {
+		return err
+	}
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, string(instance)+".tf.json"), buff, 0644)
+	if err != nil {
+		return err
+	}
+	return p.terraformApply()
 }
 
 // Destroy terminates an existing instance.
