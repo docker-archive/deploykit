@@ -3,6 +3,7 @@ package instance
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.gcp/plugin/gcloud"
@@ -112,9 +113,10 @@ func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Descripti
 			Tags: instTags,
 		}
 
-		// When pets are deleted, we keep the disk
+		// When pets are deleted, we keep the disk. So a machine with a disk that's not auto-deleted is
+		// assumed to be a pet and its logicalID is the name of the disk.
 		if len(inst.Disks) > 0 && !inst.Disks[0].AutoDelete {
-			id := instance.LogicalID(inst.Name)
+			id := instance.LogicalID(last(inst.Disks[0].Source))
 			description.LogicalID = &id
 		}
 
@@ -124,4 +126,9 @@ func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Descripti
 	log.Debugln("matching count:", len(result))
 
 	return result, nil
+}
+
+func last(url string) string {
+	parts := strings.Split(url, "/")
+	return parts[len(parts)-1]
 }
