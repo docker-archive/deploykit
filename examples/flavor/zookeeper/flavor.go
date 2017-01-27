@@ -2,14 +2,15 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
-	"github.com/docker/infrakit/pkg/spi/flavor"
-	"github.com/docker/infrakit/pkg/spi/instance"
 	"strings"
 	"text/template"
+
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
@@ -29,13 +30,13 @@ type spec struct {
 	UseDocker bool
 }
 
-func parseSpec(flavorProperties json.RawMessage) (spec, error) {
+func parseSpec(flavorProperties *types.Any) (spec, error) {
 	s := spec{UseDocker: false}
-	err := json.Unmarshal(flavorProperties, &s)
+	err := flavorProperties.Decode(&s)
 	return s, err
 }
 
-func (z zkFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+func (z zkFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 	properties, err := parseSpec(flavorProperties)
 	if err != nil {
 		return err
@@ -146,20 +147,19 @@ func generateInitScript(useDocker bool, servers []instance.LogicalID, id instanc
 }
 
 // Healthy determines whether an instance is healthy.
-func (z zkFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (z zkFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 	// TODO(wfarner): Implement.
 	return flavor.Healthy, nil
 }
 
-func (z zkFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+func (z zkFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
 	// There doesn't seem to be any need to drain ZK members, especially if they are expected to return.
 	return nil
 }
 
-func (z zkFlavor) Prepare(
-	flavorProperties json.RawMessage,
+func (z zkFlavor) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	properties, err := parseSpec(flavorProperties)
 	if err != nil {

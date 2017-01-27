@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -10,10 +9,11 @@ import (
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
 
@@ -31,9 +31,9 @@ type schema struct {
 	DockerRestartCommand string
 }
 
-func parseProperties(flavorProperties json.RawMessage) (schema, error) {
+func parseProperties(flavorProperties *types.Any) (schema, error) {
 	s := schema{}
-	err := json.Unmarshal(flavorProperties, &s)
+	err := flavorProperties.Decode(&s)
 	return s, err
 }
 
@@ -109,7 +109,7 @@ func generateInitScript(templ *template.Template,
 	return buffer.String(), nil
 }
 
-func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+func (s swarmFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return err
@@ -126,7 +126,7 @@ func (s swarmFlavor) Validate(flavorProperties json.RawMessage, allocation types
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
 func healthy(client client.APIClient,
-	flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+	flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 
 	associationID, exists := inst.Tags[associationTag]
 	if !exists {

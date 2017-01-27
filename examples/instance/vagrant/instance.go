@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewVagrantPlugin creates an instance plugin for vagrant.
@@ -25,7 +25,7 @@ type vagrantPlugin struct {
 }
 
 // Validate performs local validation on a provision request.
-func (v vagrantPlugin) Validate(req json.RawMessage) error {
+func (v vagrantPlugin) Validate(req *types.Any) error {
 	return nil
 }
 
@@ -46,7 +46,7 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	var properties map[string]interface{}
 
 	if spec.Properties != nil {
-		if err := json.Unmarshal(*spec.Properties, &properties); err != nil {
+		if err := spec.Properties.Decode(&properties); err != nil {
 			return nil, fmt.Errorf("Invalid instance properties: %s", err)
 		}
 	}
@@ -97,12 +97,12 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	tagData, err := json.Marshal(spec.Tags)
+	tagData, err := types.AnyValue(spec.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := ioutil.WriteFile(path.Join(machineDir, "tags"), tagData, 0666); err != nil {
+	if err := ioutil.WriteFile(path.Join(machineDir, "tags"), tagData.Bytes(), 0666); err != nil {
 		return nil, err
 	}
 
@@ -113,6 +113,32 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	return &id, nil
+}
+
+// Label labels the instance
+func (v vagrantPlugin) Label(instance instance.ID, labels map[string]string) error {
+	machineDir := path.Join(v.VagrantfilesDir, string(instance))
+	tagFile := path.Join(machineDir, "tags")
+	buff, err := ioutil.ReadFile(tagFile)
+	if err != nil {
+		return err
+	}
+
+	tags := map[string]string{}
+	err = types.AnyBytes(buff).Decode(&tags)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range labels {
+		tags[k] = v
+	}
+
+	encoded, err := types.AnyValue(tags)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(tagFile, encoded.Bytes(), 0666)
 }
 
 // Destroy terminates an existing instance.
@@ -165,7 +191,7 @@ func (v vagrantPlugin) DescribeInstances(tags map[string]string) ([]instance.Des
 		}
 
 		machineTags := map[string]string{}
-		if err := json.Unmarshal(tagData, &machineTags); err != nil {
+		if err := types.AnyBytes(tagData).Decode(&machineTags); err != nil {
 			return nil, err
 		}
 

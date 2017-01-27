@@ -17,6 +17,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/nightlyone/lockfile"
 	"github.com/spf13/afero"
 )
@@ -139,21 +140,21 @@ type SpecPropertiesFormat struct {
 }
 
 // Validate performs local validation on a provision request.
-func (p *plugin) Validate(req json.RawMessage) error {
-	log.Debugln("validate", string(req))
+func (p *plugin) Validate(req *types.Any) error {
+	log.Debugln("validate", req.String())
 
 	parsed := SpecPropertiesFormat{}
-	err := json.Unmarshal([]byte(req), &parsed)
+	err := req.Decode(&parsed)
 	if err != nil {
 		return err
 	}
 
 	if parsed.Type == "" {
-		return fmt.Errorf("no-resource-type:%s", string(req))
+		return fmt.Errorf("no-resource-type:%s", req.String())
 	}
 
 	if len(parsed.Value) == 0 {
-		return fmt.Errorf("no-value:%s", string(req))
+		return fmt.Errorf("no-value:%s", req.String())
 	}
 	return nil
 }
@@ -335,7 +336,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	properties := SpecPropertiesFormat{}
-	err := json.Unmarshal(*spec.Properties, &properties)
+	err := spec.Properties.Decode(&properties)
 	if err != nil {
 		return nil, err
 	}
@@ -423,6 +424,11 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	return &id, p.terraformApply()
+}
+
+// Label labels the instance
+func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
+	return fmt.Errorf("not implemented!!")
 }
 
 // Destroy terminates an existing instance.

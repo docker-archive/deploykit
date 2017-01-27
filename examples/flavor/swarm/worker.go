@@ -1,18 +1,18 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/group/util"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
 
@@ -26,7 +26,7 @@ type workerFlavor struct {
 	initScript *template.Template
 }
 
-func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+func (s *workerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return err
@@ -45,12 +45,12 @@ func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation typ
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
-func (s *workerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (s *workerFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 	return healthy(s.client, flavorProperties, inst)
 }
 
-func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, spec instance.Spec,
-	allocation types.AllocationMethod) (instance.Spec, error) {
+func (s *workerFlavor) Prepare(flavorProperties *types.Any, spec instance.Spec,
+	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, spec instance.S
 	return spec, nil
 }
 
-func (s *workerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+func (s *workerFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
 
 	associationID, exists := inst.Tags[associationTag]
 	if !exists {

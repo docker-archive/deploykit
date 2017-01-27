@@ -1,17 +1,17 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/client"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/group/util"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
 
@@ -25,7 +25,7 @@ type managerFlavor struct {
 	initScript *template.Template
 }
 
-func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+func (s *managerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
 		return err
@@ -54,12 +54,12 @@ func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation ty
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
-func (s *managerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (s *managerFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 	return healthy(s.client, flavorProperties, inst)
 }
 
-func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
-	spec instance.Spec, allocation types.AllocationMethod) (instance.Spec, error) {
+func (s *managerFlavor) Prepare(flavorProperties *types.Any,
+	spec instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	properties, err := parseProperties(flavorProperties)
 	if err != nil {
@@ -120,6 +120,6 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 
 // Drain only explicitly remove worker nodes, not manager nodes.  Manager nodes are assumed to have an
 // attached volume for state, and fixed IP addresses.  This allows them to rejoin as the same node.
-func (s *managerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+func (s *managerFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
 	return nil
 }
