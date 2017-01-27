@@ -428,7 +428,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // Label labels the instance
 func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
-	return fmt.Errorf("not implemented!!")
+	return fmt.Errorf("not implemented")
 }
 
 // Destroy terminates an existing instance.
