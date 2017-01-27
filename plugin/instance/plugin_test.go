@@ -232,6 +232,7 @@ func TestDescribeInstances(t *testing.T) {
 			},
 			Disks: []*compute.AttachedDisk{
 				{
+					Source:     "/projects/p/zones/z/disks/instance-pet-valid-disk",
 					AutoDelete: false,
 				},
 			},
@@ -275,7 +276,7 @@ func TestDescribeInstances(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(instances), 2)
 	require.Equal(t, "instance-pet-valid", string(instances[0].ID))
-	require.Equal(t, "instance-pet-valid", string(*instances[0].LogicalID))
+	require.Equal(t, "instance-pet-valid-disk", string(*instances[0].LogicalID))
 	require.Equal(t, "instance-cattle-valid", string(instances[1].ID))
 	require.Nil(t, instances[1].LogicalID)
 }
