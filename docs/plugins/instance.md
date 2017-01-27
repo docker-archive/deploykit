@@ -1,6 +1,6 @@
 # Instance plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/instance/* 8fc5d1832d0d96d01d8d76ea1137230790fe51fe338393f886f528c3824986fc97cb27410aefd8e2 -->
+<!-- SOURCE-CHECKSUM pkg/spi/instance/* befb47292c2f062637d65e9777d88c322856baf650feb6b527cd3a4242f86d3482b656246051d2ca -->
 
 ## API
 
@@ -69,6 +69,35 @@ Permanently destroys an instance.
 
 Parameters:
 - `Instance`: An [instance ID](types.md#instance-id).
+
+#### Response
+```json
+{
+  "OK": true
+}
+```
+
+Fields:
+- `OK`: Whether the operation succeeded.
+
+### Method `Instance.Label`
+Labels an instance.  The plugin should add or update the labels given.
+
+#### Request
+```json
+{
+  "Instance": "instance_id",
+  "Labels" : {
+     "label1" : "value1",
+     "label2" : "value2",
+     "label3" : "value3"
+  }
+}
+```
+
+Parameters:
+- `Instance`: An [instance ID](types.md#instance-id).
+- `Labels`: A [map](types.md#instance-tags) of labels or instance tags.
 
 #### Response
 ```json
