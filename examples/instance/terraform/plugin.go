@@ -35,6 +35,7 @@ type plugin struct {
 	lock      lockfile.Lockfile
 	applying  bool
 	applyLock sync.Mutex
+	pretend   bool // true to actually do terraform apply
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
@@ -168,6 +169,10 @@ func addUserData(m map[string]interface{}, key string, init string) {
 }
 
 func (p *plugin) terraformApply() error {
+	if p.pretend {
+		return nil
+	}
+
 	p.applyLock.Lock()
 	defer p.applyLock.Unlock()
 
@@ -179,7 +184,7 @@ func (p *plugin) terraformApply() error {
 		for {
 			if err := p.lock.TryLock(); err == nil {
 				defer p.lock.Unlock()
-				p.doTerraformApply()
+				doTerraformApply(p.Dir)
 			}
 			log.Debugln("Can't acquire lock, waiting")
 			time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
@@ -189,10 +194,10 @@ func (p *plugin) terraformApply() error {
 	return nil
 }
 
-func (p *plugin) doTerraformApply() error {
+func doTerraformApply(dir string) error {
 	log.Infoln(time.Now().Format(time.RFC850) + " Applying plan")
 	cmd := exec.Command("terraform", "apply")
-	cmd.Dir = p.Dir
+	cmd.Dir = dir
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -444,10 +449,12 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 		return fmt.Errorf("bad tfile:%v", instance)
 	}
 
+	var resourceType string
 	var first map[string]interface{} // there should be only one element keyed by the type (e.g. aws_instance)
-	for _, r := range resources {
+	for k, r := range resources {
 		if f, ok := r.(map[string]interface{}); ok {
 			first = f
+			resourceType = k
 			break
 		}
 	}
@@ -461,15 +468,50 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 		return fmt.Errorf("not found:%v", instance)
 	}
 
-	// update props.tags
-	if _, has := props["tags"]; !has {
-		props["tags"] = map[string]interface{}{}
-	}
-
-	if tags, ok := props["tags"].(map[string]interface{}); ok {
-		for k, v := range labels {
-			tags[k] = v
+	switch resourceType {
+	case "aws_instance", "azurerm_virtual_machine", "digitalocean_droplet", "google_compute_instance":
+		if _, has := props["tags"]; !has {
+			props["tags"] = map[string]interface{}{}
 		}
+
+		if tags, ok := props["tags"].(map[string]interface{}); ok {
+			for k, v := range labels {
+				tags[k] = v
+			}
+		}
+
+	case "softlayer_virtual_guest":
+		if _, has := props["tags"]; !has {
+			props["tags"] = []interface{}{}
+		}
+		tags, ok := props["tags"].([]interface{})
+		if !ok {
+			return fmt.Errorf("bad format:%v", instance)
+		}
+
+		m := map[string]string{}
+		for _, l := range tags {
+
+			line := fmt.Sprintf("%v", l)
+			if i := strings.Index(line, ":"); i > 0 {
+				key := line[0:i]
+				value := ""
+				if i+1 < len(line) {
+					value = line[i+1:]
+				}
+				m[key] = value
+			}
+		}
+		for k, v := range labels {
+			m[k] = v
+		}
+
+		// now set the final format
+		lines := []string{}
+		for k, v := range m {
+			lines = append(lines, fmt.Sprintf("%v:%v", k, v))
+		}
+		props["tags"] = lines
 	}
 
 	buff, err = json.MarshalIndent(tfFile, "  ", "  ")
