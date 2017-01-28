@@ -53,7 +53,7 @@ func (p *plugin) VendorInfo() *spi.VendorInfo {
 	return &spi.VendorInfo{
 		InterfaceSpec: spi.InterfaceSpec{
 			Name:    "infrakit-instance-file",
-			Version: "0.1.0",
+			Version: "0.3.0",
 		},
 		URL: "https://github.com/docker/infrakit",
 	}

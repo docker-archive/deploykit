@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUsage1(t *testing.T) {
+func TestUsage(t *testing.T) {
 	run(t, "softlayer_virtual_guest", `
 {
         "type": "softlayer_virtual_guest",
