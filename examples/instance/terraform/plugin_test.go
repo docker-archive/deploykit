@@ -115,6 +115,7 @@ func run(t *testing.T, resourceType, properties string) {
 	switch resourceType {
 	case "softlayer_virtual_guest":
 		require.Equal(t, conv([]interface{}{
+			"terraform_demo_swarm_mgr_sl",
 			"label1:value1",
 			"label2:value2",
 			"Name:" + string(*id),
@@ -148,6 +149,7 @@ func run(t *testing.T, resourceType, properties string) {
 	switch resourceType {
 	case "softlayer_virtual_guest":
 		require.Equal(t, conv([]interface{}{
+			"terraform_demo_swarm_mgr_sl",
 			"label1:changed1",
 			"label2:value2",
 			"label3:value3",

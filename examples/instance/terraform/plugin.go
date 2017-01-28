@@ -372,14 +372,15 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	case "softlayer_virtual_guest":
 		log.Debugln("softlayer_virtual_guest detected, adding hostname to properties: hostname=", name)
 		properties.Value["hostname"] = name
-		var tags []interface{}
 
-		//softlayer uses a list of tags, instead of a map of tags
-		for i, v := range spec.Tags {
-			log.Debugln("softlayer_virtual_guest detected, append system tag v=", v)
-			tags = append(tags, i+":"+v)
+		if _, has := properties.Value["tags"]; !has {
+			properties.Value["tags"] = []interface{}{}
 		}
-		properties.Value["tags"] = tags
+		tags, ok := properties.Value["tags"].([]interface{})
+		if ok {
+			//softlayer uses a list of tags, instead of a map of tags
+			properties.Value["tags"] = mergeLabelsIntoTagSlice(tags, spec.Tags)
+		}
 	}
 
 	// Use tag to store the logical id
@@ -488,30 +489,7 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 		if !ok {
 			return fmt.Errorf("bad format:%v", instance)
 		}
-
-		m := map[string]string{}
-		for _, l := range tags {
-
-			line := fmt.Sprintf("%v", l)
-			if i := strings.Index(line, ":"); i > 0 {
-				key := line[0:i]
-				value := ""
-				if i+1 < len(line) {
-					value = line[i+1:]
-				}
-				m[key] = value
-			}
-		}
-		for k, v := range labels {
-			m[k] = v
-		}
-
-		// now set the final format
-		lines := []string{}
-		for k, v := range m {
-			lines = append(lines, fmt.Sprintf("%v:%v", k, v))
-		}
-		props["tags"] = lines
+		props["tags"] = mergeLabelsIntoTagSlice(tags, labels)
 	}
 
 	buff, err = json.MarshalIndent(tfFile, "  ", "  ")
