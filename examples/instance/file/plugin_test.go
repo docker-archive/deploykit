@@ -86,4 +86,21 @@ func run(t *testing.T, properties string) {
 		"label2": "value2",
 		"label3": "value3",
 	}, parsed.Description.Tags)
+
+	list, err := fileinst.DescribeInstances(map[string]string{"label1": "changed1"})
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{
+		{
+			ID:   *id,
+			Tags: parsed.Description.Tags,
+		},
+	}, list)
+
+	err = fileinst.Destroy(*id)
+	require.NoError(t, err)
+
+	list, err = fileinst.DescribeInstances(map[string]string{"label1": "changed1"})
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, list)
+
 }

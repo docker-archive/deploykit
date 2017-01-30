@@ -189,6 +189,66 @@ func TestInstancePluginProvisionError(t *testing.T) {
 	require.Equal(t, spec, <-specActual)
 }
 
+func TestInstancePluginLabel(t *testing.T) {
+	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
+
+	inst := instance.ID("hello")
+	labels := map[string]string{
+		"label1": "value1",
+		"label2": "value2",
+	}
+	instActual := make(chan instance.ID, 1)
+	labelActual := make(chan map[string]string, 1)
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+		DoLabel: func(req instance.ID, labels map[string]string) error {
+			instActual <- req
+			labelActual <- labels
+			return nil
+		},
+	}))
+	require.NoError(t, err)
+
+	err = must(NewClient(name, socketPath)).Label(inst, labels)
+	require.NoError(t, err)
+
+	server.Stop()
+
+	require.Equal(t, inst, <-instActual)
+	require.Equal(t, labels, <-labelActual)
+}
+
+func TestInstancePluginLabelError(t *testing.T) {
+	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
+
+	inst := instance.ID("hello")
+	labels := map[string]string{
+		"label1": "value1",
+		"label2": "value2",
+	}
+
+	instActual := make(chan instance.ID, 1)
+	labelActual := make(chan map[string]string, 1)
+
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+		DoLabel: func(req instance.ID, labels map[string]string) error {
+			instActual <- req
+			labelActual <- labels
+			return errors.New("can't do")
+		},
+	}))
+	require.NoError(t, err)
+
+	err = must(NewClient(name, socketPath)).Label(inst, labels)
+	require.Error(t, err)
+	require.Equal(t, "can't do", err.Error())
+
+	server.Stop()
+	require.Equal(t, inst, <-instActual)
+	require.Equal(t, labels, <-labelActual)
+}
+
 func TestInstancePluginDestroy(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))

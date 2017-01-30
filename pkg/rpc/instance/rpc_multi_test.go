@@ -173,6 +173,54 @@ func TestInstanceTypedPluginProvision(t *testing.T) {
 	require.Equal(t, spec3, <-specActual3)
 }
 
+func TestInstanceTypedPluginLabel(t *testing.T) {
+	socketPath := tempSocket()
+	name := filepath.Base(socketPath)
+
+	inst1 := instance.ID("hello1")
+	labels1 := map[string]string{"l1": "v1"}
+	instActual1 := make(chan instance.ID, 1)
+	labelActual1 := make(chan map[string]string, 1)
+
+	inst2 := instance.ID("hello2")
+	labels2 := map[string]string{"l1": "v2"}
+	instActual2 := make(chan instance.ID, 2)
+	labelActual2 := make(chan map[string]string, 1)
+
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
+		map[string]instance.Plugin{
+			"type1": &testPlugin{
+				DoLabel: func(req instance.ID, labels map[string]string) error {
+					instActual1 <- req
+					labelActual1 <- labels
+					return nil
+				},
+			},
+			"type2": &testPlugin{
+				DoLabel: func(req instance.ID, labels map[string]string) error {
+					instActual2 <- req
+					labelActual2 <- labels
+					return errors.New("can't do")
+				},
+			},
+		}))
+	require.NoError(t, err)
+
+	err = must(NewClient(plugin.Name(name+"/type1"), socketPath)).Label(inst1, labels1)
+	require.NoError(t, err)
+
+	err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Label(inst2, labels2)
+	require.Error(t, err)
+	require.Equal(t, "can't do", err.Error())
+
+	server.Stop()
+
+	require.Equal(t, inst1, <-instActual1)
+	require.Equal(t, inst2, <-instActual2)
+	require.Equal(t, labels1, <-labelActual1)
+	require.Equal(t, labels2, <-labelActual2)
+}
+
 func TestInstanceTypedPluginDestroy(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)

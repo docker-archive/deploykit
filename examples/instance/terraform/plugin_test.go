@@ -164,6 +164,45 @@ func run(t *testing.T, resourceType, properties string) {
 			"Name":           string(*id),
 		}, props["tags"])
 	}
+
+	list, err := terraform.DescribeInstances(map[string]string{"label1": "changed1"})
+	require.NoError(t, err)
+
+	switch resourceType {
+	case "softlayer_virtual_guest":
+		require.Equal(t, []instance.Description{
+			{
+				ID: *id,
+				Tags: map[string]string{
+					"terraform_demo_swarm_mgr_sl": "",
+					"label1":                      "changed1",
+					"label2":                      "value2",
+					"label3":                      "value3",
+					"Name":                        string(*id),
+				},
+			},
+		}, list)
+	case "aws_instance":
+		require.Equal(t, []instance.Description{
+			{
+				ID: *id,
+				Tags: map[string]string{
+					"InstancePlugin": "terraform",
+					"label1":         "changed1",
+					"label2":         "value2",
+					"label3":         "value3",
+					"Name":           string(*id),
+				},
+			},
+		}, list)
+	}
+
+	err = terraform.Destroy(*id)
+	require.NoError(t, err)
+
+	list, err = terraform.DescribeInstances(map[string]string{"label1": "changed1"})
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, list)
 }
 
 func conv(a []interface{}) []string {

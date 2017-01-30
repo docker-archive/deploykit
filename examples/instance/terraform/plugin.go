@@ -581,7 +581,7 @@ func terraformTags(v interface{}, key string) map[string]string {
 					log.Errorln("terraformTags: ignore invalid tag detected", value)
 				}
 			} else {
-				log.Warnln("terraformTags user tags ignored v=", value)
+				tags[value] = "" // for list but no ':"
 			}
 		}
 		log.Debugln("terraformTags return tags", tags)

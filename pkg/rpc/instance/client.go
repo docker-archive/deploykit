@@ -46,14 +46,10 @@ func (c client) Provision(spec instance.Spec) (*instance.ID, error) {
 // Label labels the instance
 func (c client) Label(instance instance.ID, labels map[string]string) error {
 	_, instanceType := c.name.GetLookupAndType()
-	req := LabelRequest{Type: instanceType, Instance: instance}
+	req := LabelRequest{Type: instanceType, Instance: instance, Labels: labels}
 	resp := LabelResponse{}
 
-	if err := c.client.Call("Instance.Label", req, &resp); err != nil {
-		return err
-	}
-
-	return nil
+	return c.client.Call("Instance.Label", req, &resp)
 }
 
 // Destroy terminates an existing instance.
