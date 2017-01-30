@@ -132,6 +132,10 @@ func (t *Template) DefaultFuncs() map[string]interface{} {
 			return included.Render(o)
 		},
 
+		"loop": func(c int) []struct{} {
+			return make([]struct{}, c)
+		},
+
 		"var": func(name, doc string, v ...interface{}) interface{} {
 			if found, has := t.binds[name]; has {
 				return found

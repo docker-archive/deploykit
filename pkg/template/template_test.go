@@ -72,24 +72,69 @@ func TestVarAndGlobal(t *testing.T) {
 }
 
 type context struct {
-	Count int
-	Bool  bool
+	Count  int
+	Bool   bool
+	String string
+
+	invokes int
+}
+
+func (s *context) SetBool(b bool) {
+	s.invokes++
+	s.Bool = b
 }
 
 func (s *context) Funcs() []Function {
 	return []Function{
 		{
-			Name:        "increment",
+			Name:        "inc",
 			Description: "increments the context counter when called",
-			Func: func(s Context) {
-				s.(*context).Count++
+			Func: func(c Context) interface{} {
+				c.(*context).invokes++
+				c.(*context).Count++
+				return ""
 			},
 		},
 		{
-			Name:        "decrement",
+			Name:        "dec",
 			Description: "decrements the context counter when called",
-			Func: func(s Context) {
+			Func: func(s Context) interface{} {
+				s.(*context).invokes++
 				s.(*context).Count--
+				return ""
+			},
+		},
+		{
+			Name:        "str",
+			Description: "prints the string",
+			Func: func(c Context) string {
+				c.(*context).invokes++
+				return s.String
+			},
+		},
+		{
+			Name:        "count",
+			Description: "prints the count",
+			Func: func(c Context) int {
+				c.(*context).invokes++
+				return s.Count
+			},
+		},
+		{
+			Name:        "setString",
+			Description: "sets the string",
+			Func: func(c Context, n string) interface{} {
+				c.(*context).invokes++
+				s.String = n
+				return ""
+			},
+		},
+		{
+			Name:        "setBool",
+			Description: "sets the bool",
+			Func: func(c Context, b bool) bool {
+				c.(*context).SetBool(b)
+				return c.(*context).Bool
 			},
 		},
 	}
@@ -175,7 +220,7 @@ func TestContextFuncs(t *testing.T) {
 	require.NoError(t, err)
 
 	for range []int{1, 1, 1, 1} {
-		tf.(func())()
+		tf.(func() interface{})()
 	}
 
 	require.Equal(t, 4, s.Count)

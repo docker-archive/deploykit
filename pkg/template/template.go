@@ -140,7 +140,7 @@ func (t *Template) build(context Context) error {
 
 	if context != nil {
 		for _, f := range context.Funcs() {
-			if tf, err := makeTemplateFunc(context, f); err == nil {
+			if tf, err := makeTemplateFunc(context, f.Func); err == nil {
 				fm[f.Name] = tf
 			} else {
 				return err
