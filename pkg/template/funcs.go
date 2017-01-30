@@ -3,6 +3,7 @@ package template
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -75,6 +76,35 @@ func UnixTime() interface{} {
 	return time.Now().Unix()
 }
 
+// Index returns the index of search in array.  -1 if not found or array is not iterable.  An optional true will
+// turn on strict type check while by default string representations are used to compare values.
+func Index(srch interface{}, array interface{}, strictOptional ...bool) int {
+	strict := false
+	if len(strictOptional) > 0 {
+		strict = strictOptional[0]
+	}
+	switch reflect.TypeOf(array).Kind() {
+	case reflect.Slice:
+		s := reflect.ValueOf(array)
+		for i := 0; i < s.Len(); i++ {
+			if reflect.DeepEqual(srch, s.Index(i).Interface()) {
+				return i
+			}
+			if !strict {
+				// by string value which is useful for text based compares
+				search := reflect.Indirect(reflect.ValueOf(srch)).Interface()
+				value := reflect.Indirect(s.Index(i)).Interface()
+				searchStr := fmt.Sprintf("%v", search)
+				check := fmt.Sprintf("%v", value)
+				if searchStr == check {
+					return i
+				}
+			}
+		}
+	}
+	return -1
+}
+
 // DefaultFuncs returns a list of default functions for binding in the template
 func (t *Template) DefaultFuncs() map[string]interface{} {
 	return map[string]interface{}{
@@ -102,6 +132,10 @@ func (t *Template) DefaultFuncs() map[string]interface{} {
 			return included.Render(o)
 		},
 
+		"loop": func(c int) []struct{} {
+			return make([]struct{}, c)
+		},
+
 		"var": func(name, doc string, v ...interface{}) interface{} {
 			if found, has := t.binds[name]; has {
 				return found
@@ -119,5 +153,6 @@ func (t *Template) DefaultFuncs() map[string]interface{} {
 		"lines":     SplitLines,
 		"to_json":   ToJSON,
 		"from_json": FromJSON,
+		"index":     Index,
 	}
 }
