@@ -27,7 +27,7 @@ type Properties struct {
 	DiskType    string
 	Tags        []string
 	Scopes      []string
-	TargetPool  string
+	TargetPools []string
 	Connect     bool
 	Preemptible bool
 }
