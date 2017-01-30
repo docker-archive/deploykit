@@ -83,7 +83,7 @@ type InstanceManagerSettings struct {
 	Description      string
 	TemplateName     string
 	TargetSize       int64
-	TargetPool       string
+	TargetPools      []string
 	BaseInstanceName string
 }
 
@@ -398,18 +398,13 @@ func (g *computeServiceWrapper) CreateInstanceTemplate(name string, settings *In
 }
 
 func (g *computeServiceWrapper) CreateInstanceGroupManager(name string, settings *InstanceManagerSettings) error {
-	targetPools := []string{}
-	if settings.TargetPool != "" {
-		targetPools = append(targetPools, settings.TargetPool)
-	}
-
 	groupManager := &compute.InstanceGroupManager{
 		Name:             name,
 		Description:      settings.Description,
 		Zone:             g.zone,
 		InstanceTemplate: "projects/" + g.project + "/global/instanceTemplates/" + settings.TemplateName,
 		BaseInstanceName: settings.BaseInstanceName,
-		TargetPools:      targetPools,
+		TargetPools:      settings.TargetPools,
 		TargetSize:       settings.TargetSize,
 	}
 

@@ -180,7 +180,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 				TemplateName:     fmt.Sprintf("%s-%d", name, settings.currentTemplate),
 				TargetSize:       targetSize,
 				Description:      settings.instanceProperties.Description,
-				TargetPool:       settings.instanceProperties.TargetPool,
+				TargetPools:      settings.instanceProperties.TargetPools,
 				BaseInstanceName: settings.instanceProperties.NamePrefix,
 			}); err != nil {
 				return "", err

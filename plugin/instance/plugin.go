@@ -73,8 +73,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	if properties.TargetPool != "" {
-		if err = p.API.AddInstanceToTargetPool(properties.TargetPool, name); err != nil {
+	for _, targetPool := range properties.TargetPools {
+		if err = p.API.AddInstanceToTargetPool(targetPool, name); err != nil {
 			return nil, err
 		}
 	}

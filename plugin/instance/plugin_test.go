@@ -33,7 +33,7 @@ func TestProvision(t *testing.T) {
 		"DiskImage":"docker-image",
 		"DiskType":"ssd",
 		"Scopes":["SCOPE1", "SCOPE2"],
-		"TargetPool":"POOL",
+		"TargetPools":["POOL1", "POOL2"],
 		"Preemptible":true,
 		"Description":"vm"}`)
 	tags := map[string]string{
@@ -62,7 +62,8 @@ func TestProvision(t *testing.T) {
 			"startup-script": "echo 'Startup'",
 		}),
 	}).Return(nil)
-	api.EXPECT().AddInstanceToTargetPool("POOL", "worker-ssnk9q").Return(nil)
+	api.EXPECT().AddInstanceToTargetPool("POOL1", "worker-ssnk9q").Return(nil)
+	api.EXPECT().AddInstanceToTargetPool("POOL2", "worker-ssnk9q").Return(nil)
 
 	plugin := NewPlugin(api)
 	id, err := plugin.Provision(instance.Spec{
@@ -137,7 +138,7 @@ func TestProvisionFails(t *testing.T) {
 }
 
 func TestProvisionFailsToAddToTargetPool(t *testing.T) {
-	properties := json.RawMessage(`{"TargetPool":"POOL"}`)
+	properties := json.RawMessage(`{"TargetPools":["POOL"]}`)
 	tags := map[string]string{}
 
 	rand.Seed(0)
