@@ -3,14 +3,7 @@ package template
 import (
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
-)
-
-var (
-	indexRoot     = "\\[(([+|-]*[0-9]+)|((.*)=(.*)))\\]$"
-	arrayIndexExp = regexp.MustCompile("(.*)" + indexRoot)
-	indexExp      = regexp.MustCompile("^" + indexRoot)
 )
 
 // returns a url string of the base and a relative path.
