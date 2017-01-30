@@ -269,6 +269,11 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		disk, err := g.service.Disks.Get(g.project, g.zone, name).Do()
 		if err != nil || disk == nil {
 			log.Debugln("Couldn't find existing disk", name)
+		} else if disk.SourceImage != sourceImage {
+			log.Debugln("Found existing disk that uses a wrong image. Let's delete", name)
+			if err := g.doCall(g.service.Disks.Delete(g.project, g.zone, disk.Name)); err != nil {
+				return err
+			}
 		} else {
 			log.Debugln("Found existing disk", name)
 			existingDisk = disk
