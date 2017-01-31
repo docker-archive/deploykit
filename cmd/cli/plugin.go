@@ -52,7 +52,7 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
-	osExec := start.Flags().Bool("os", false, "True to use os plugin binaries")
+	executor := start.Flags().String("exec", "os", "Executor to use for starting up plugins: [os | docker-run]")
 	doWait := start.Flags().BoolP("wait", "w", false, "True to wait in the foreground; Ctrl-C to exit")
 
 	start.RunE = func(c *cobra.Command, args []string) error {
@@ -79,8 +79,16 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 		monitors := []*launch.Monitor{}
 
-		if *osExec {
-			exec, err := os.NewLauncher()
+		switch *executor {
+		case "os":
+			exec, err := os.NewLauncher("os")
+			if err != nil {
+				return err
+			}
+			monitors = append(monitors, launch.NewMonitor(exec, parsedRules))
+		case "docker-run":
+			// docker-run is also implemented by the same os executor. We just search for a different key (docker-run)
+			exec, err := os.NewLauncher("docker-run")
 			if err != nil {
 				return err
 			}

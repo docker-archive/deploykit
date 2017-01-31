@@ -24,16 +24,19 @@ cleanup() {
 trap cleanup EXIT
 
 # infrakit directories
-plugins=~/.infrakit/plugins
+
+export INFRAKIT_HOME=~/.infrakit
+
+plugins=$INFRAKIT_HOME/plugins
 mkdir -p $plugins
 rm -rf $plugins/*
 
-configstore=~/.infrakit/configs
+configstore=$INFRAKIT_HOME/configs
 mkdir -p $configstore
 rm -rf $configstore/*
 
 # set the leader -- for os / file based leader detection for manager
-leaderfile=~/.infrakit/leader
+leaderfile=$INFRAKIT_HOME/leader
 echo group > $leaderfile
 
 # start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
@@ -46,19 +49,18 @@ sleep 5  # manager needs to detect leadership
 
 # location of logfiles when plugins are started by the plugin cli
 # the config json below expects LOG_DIR as an environment variable
-LOG_DIR=~/.infrakit/logs
+LOG_DIR=$INFRAKIT_HOME/logs
 mkdir -p $LOG_DIR
 
-# see the config josn 'e2e-test-plugins.json' for reference of environment variable TUTORIAL_DIR
-TUTORIAL_DIR=~/.infrakit/tutorial
-mkdir -p $TUTORIAL_DIR
-rm -rf $TUTORIAL_DIR/*
+# see the config josn 'e2e-test-plugins.json' for reference of environment variable
+INSTANCE_FILE_DIR=$INFRAKIT_HOME/instance-file
+mkdir -p $INSTANCE_FILE_DIR
+rm -rf $INSTANCE_FILE_DIR/*
 
 export LOG_DIR=$LOG_DIR
-export TUTORIAL_DIR=$TUTORIAL_DIR
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
-infrakit plugin start --wait --config-url file:///$PWD/scripts/e2e-test-plugins.json --os group-default instance-file flavor-vanilla &
+infrakit plugin start --wait --config-url file:///$PWD/scripts/e2e-test-plugins.json --exec os group-stateless instance-file flavor-vanilla &
 
 starterpid=$!
 echo "plugin start pid=$starterpid"
@@ -130,7 +132,7 @@ sleep 5
 expect_output_lines "10 instances should exist in group" "infrakit group describe cattle -q" "10"
 
 # Terminate 3 instances.
-pushd $TUTORIAL_DIR
+pushd $INSTANCE_FILE_DIR
   rm $(ls | head -3)
 popd
 

@@ -19,8 +19,9 @@ type LaunchConfig struct {
 
 // NewLauncher returns a Launcher that can install and start plugins.  The OS version is simple - it translates
 // plugin names as command names and uses os.Exec
-func NewLauncher() (*Launcher, error) {
+func NewLauncher(n string) (*Launcher, error) {
 	return &Launcher{
+		name:    n,
 		plugins: map[string]state{},
 	}, nil
 }
@@ -31,13 +32,14 @@ type state struct {
 
 // Launcher is a service that implements the launch.Exec interface for starting up os processes.
 type Launcher struct {
+	name    string
 	plugins map[string]state
 	lock    sync.Mutex
 }
 
 // Name returns the name of the launcher
 func (l *Launcher) Name() string {
-	return "os"
+	return l.name
 }
 
 // Exec starts the os process. Returns a signal channel to block on optionally.

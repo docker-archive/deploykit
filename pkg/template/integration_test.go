@@ -120,3 +120,41 @@ systemctl start docker
 `,
 	}
 )
+
+func TestTemplateContext(t *testing.T) {
+
+	s := `
+{{ inc }}
+
+{{ setString "hello" }}
+
+{{ setBool true }}
+
+{{ range loop 10 }}
+  {{ inc }}
+{{ end }}
+
+The count is {{count}}
+The message is {{str}}
+
+{{ dec }}
+{{ range loop 5 }}
+  {{ dec }}
+{{ end }}
+
+The count is {{count}}
+The message is {{str}}
+`
+
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+
+	context := &context{}
+
+	_, err = tt.Render(context)
+	require.NoError(t, err)
+
+	require.Equal(t, 5, context.Count)
+	require.True(t, context.Bool)
+	require.Equal(t, 23, context.invokes) // note this is private state not accessible in template
+}
