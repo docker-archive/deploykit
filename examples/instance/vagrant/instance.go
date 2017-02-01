@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 )
@@ -29,15 +32,60 @@ func (v vagrantPlugin) Validate(req json.RawMessage) error {
 	return nil
 }
 
+func stream(r io.ReadCloser, dest chan<- string) {
+	go func() {
+		defer r.Close()
+		reader := bufio.NewReader(r)
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			dest <- line
+		}
+	}()
+}
+
 func inheritedEnvCommand(cmdAndArgs []string, extraEnv ...string) (string, error) {
 	cmd := exec.Command(cmdAndArgs[0], cmdAndArgs[1:]...)
 	cmd.Env = append(os.Environ(), extraEnv...)
-	output, err := cmd.CombinedOutput()
-	fmt.Printf("DEBUGGING cmd output: %s\n", string(output))
+
+	stdoutChan := make(chan string)
+	stderrChan := make(chan string)
+
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		fmt.Printf("Err: %s\n", err)
+		return "", err
 	}
-	return string(output), err
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return "", err
+	}
+
+	stream(stdout, stdoutChan)
+	stream(stderr, stderrChan)
+
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case stderrl := <-stderrChan:
+				log.Warningln("Vagrant STDERR:", stderrl)
+			case stdoutl := <-stdoutChan:
+				log.Infoln("Vagrant STDOUT:", stdoutl)
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	err = cmd.Run()
+
+	log.Infoln("Command completed, err=", err)
+	close(done)
+
+	return "", err
 }
 
 // Provision creates a new instance.

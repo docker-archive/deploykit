@@ -2,7 +2,7 @@
   "ID": "swarm-managers",
   "Properties": {
     "Allocation": {
-        "LogicalIDs": ["192.168.2.200"]
+        "LogicalIDs": ["192.168.2.200", "192.168.2.201", "192.168.2.202"]
     },
     "Instance": {
       "Plugin": "instance-vagrant",

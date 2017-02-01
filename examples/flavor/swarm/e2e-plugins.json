@@ -2,8 +2,7 @@
     {
         "Plugin" : "manager",
         "Launch" : {
-            "Exec" : "os",
-            "Properties": {
+            "os": {
                 "Cmd" : "infrakit-manager --name group  --proxy-for-group group-stateless os --leader-file {{env "INFRAKIT_HOME"}}/leader --store-dir {{env "INFRAKIT_HOME"}}/configs > {{env "LOG_DIR"}}/manager.log 2>&1",
                 "SamePgID" : true
             }
@@ -13,9 +12,8 @@
     {
         "Plugin" : "group-stateless",
         "Launch" : {
-            "Exec" : "os",
-            "Properties": {
-                "Cmd" : "infrakit-group-default --poll-interval 500ms --name group-stateless --log 5 > {{env "LOG_DIR"}}/group-stateless.log 2>&1",
+            "os": {
+                "Cmd" : "infrakit-group-default --poll-interval 2s --name group-stateless --log 5 > {{env "LOG_DIR"}}/group-stateless.log 2>&1",
                 "SamePgID" : true
             }
         }
@@ -24,9 +22,8 @@
     {
         "Plugin" : "instance-file",
         "Launch" : {
-            "Exec" : "os",
-            "Properties" : {
-                "Cmd" : "infrakit-instance-file --dir {{env "E2E_SWARM_DIR"}} --log 5 > {{env "LOG_DIR"}}/instance-file.log 2>&1",
+            "os" : {
+                "Cmd" : "infrakit-instance-file --dir {{env "TUTORIAL_DIR"}} --log 5 > {{env "LOG_DIR"}}/instance-file.log 2>&1",
                 "SamePgID" : true
             }
         }
@@ -35,8 +32,7 @@
     {
         "Plugin" : "instance-vagrant",
         "Launch" : {
-            "Exec" : "os",
-            "Properties" : {
+            "os" : {
                 "Cmd" : "infrakit-instance-vagrant --log 5 > {{env "LOG_DIR"}}/instance-vagrant.log 2>&1",
                 "SamePgID" : true
             }
@@ -46,8 +42,7 @@
     {
         "Plugin" : "flavor-vanilla",
         "Launch" : {
-            "Exec" : "os",
-            "Properties" : {
+            "os" : {
                 "Cmd" : "infrakit-flavor-vanilla --log 5 > {{env "LOG_DIR"}}/flavor-vanilla.log 2>&1",
                 "SamePgID" : true
             }
@@ -57,8 +52,7 @@
     {
         "Plugin" : "flavor-swarm",
         "Launch" : {
-            "Exec" : "os",
-            "Properties" : {
+            "os" : {
                 "Cmd" : "infrakit-flavor-swarm --host {{env "SWARM_MANAGER"}} --log 5 > {{env "LOG_DIR"}}/flavor-swarm.log 2>&1",
                 "SamePgID" : true
             }

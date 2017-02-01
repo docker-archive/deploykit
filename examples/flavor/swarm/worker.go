@@ -91,9 +91,15 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 	}
 
 	link := types.NewLink().WithContext("swarm/" + swarmID + "/worker")
-
-	initTemplate.AddFuncs(exportTemplateFunctions(spec, instanceSpec, allocation, swarmStatus, node, *link))
-	initScript, err := initTemplate.Render(nil)
+	context := &templateContext{
+		flavorSpec:   spec,
+		instanceSpec: instanceSpec,
+		allocation:   allocation,
+		swarmStatus:  swarmStatus,
+		nodeInfo:     node,
+		link:         *link,
+	}
+	initScript, err := initTemplate.Render(context)
 	if err != nil {
 		return instanceSpec, err
 	}

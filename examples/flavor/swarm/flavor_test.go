@@ -177,6 +177,15 @@ func TestManager(t *testing.T) {
 	associationID := link.Value()
 	associationTag := link.Label()
 	require.Contains(t, details.Init, associationID)
+
+	// another instance -- note that this id is not the first in the allocation list of logical ids.
+	id = instance.LogicalID("172.200.100.2")
+	details, err = flavorImpl.Prepare(
+		json.RawMessage(`{"Attachments": {"172.200.100.2": [{"ID": "a", "Type": "gpu"}]}}`),
+		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"172.200.100.1", "172.200.100.2"}})
+	require.NoError(t, err)
+
 	require.Contains(t, details.Init, swarmInfo.JoinTokens.Manager)
 	require.NotContains(t, details.Init, swarmInfo.JoinTokens.Worker)
 	require.Contains(t, details.Init, nodeInfo.ManagerStatus.Addr)

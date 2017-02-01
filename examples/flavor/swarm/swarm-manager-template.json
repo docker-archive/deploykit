@@ -24,7 +24,12 @@ docker swarm init --advertise-addr {{ INSTANCE_LOGICAL_ID }}:4243
 
 {{ else }}
 
-{{/* The rest of the nodes will join as followers in the manager group. */}}
-docker swarm join {{ SWARM_MANAGER_IP }} --token {{  SWARM_JOIN_TOKENS.Manager }}
+  {{/* retries when trying to get the join tokens */}}
+  {{ SWARM_CONNECT_RETRIES 10 "30s" }}
+
+  {{/* The rest of the nodes will join as followers in the manager group. */}}
+  docker swarm join {{ SWARM_MANAGER_IP }} --token {{  SWARM_JOIN_TOKENS.Manager }}
+
+
 
 {{ end }}

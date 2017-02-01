@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
@@ -63,8 +64,7 @@ func (s *managerFlavor) ExportTemplateFunctions() []template.Function {
 		swarmStatus = nil
 		self = nil
 	}
-	return exportTemplateFunctions(Spec{},
-		instance.Spec{}, group_types.AllocationMethod{}, swarmStatus, self, *types.NewLink())
+	return (&templateContext{swarmStatus: swarmStatus, nodeInfo: self}).Funcs()
 }
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
@@ -97,24 +97,46 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 		log.Infoln("Using", spec.InitScriptTemplateURL, "for init script template")
 	}
 
+	var swarmID, initScript string
 	var swarmStatus *swarm.Swarm
 	var node *swarm.Node
+	var link *types.Link
 
-	swarmStatus, node, err = swarmState(s.client)
-	if err != nil {
-		log.Warningln("Manager prepare:", err)
-	}
+	for i := 0; ; i++ {
 
-	swarmID := "?"
-	if swarmStatus != nil {
-		swarmID = swarmStatus.ID
-	}
+		swarmStatus, node, err = swarmState(s.client)
+		if err != nil {
+			log.Warningln("Manager prepare:", err)
+		}
 
-	link := types.NewLink().WithContext("swarm/" + swarmID + "/manager")
-	initTemplate.AddFuncs(exportTemplateFunctions(spec, instanceSpec, allocation, swarmStatus, node, *link))
-	initScript, err := initTemplate.Render(nil)
-	if err != nil {
-		return instanceSpec, err
+		swarmID = "?"
+		if swarmStatus != nil {
+			swarmID = swarmStatus.ID
+		}
+
+		link = types.NewLink().WithContext("swarm/" + swarmID + "/manager")
+		context := &templateContext{
+			flavorSpec:   spec,
+			instanceSpec: instanceSpec,
+			allocation:   allocation,
+			swarmStatus:  swarmStatus,
+			nodeInfo:     node,
+			link:         *link,
+		}
+		initScript, err = initTemplate.Render(context)
+
+		if err == nil {
+			break
+		} else {
+			if context.retries == 0 || i == context.retries {
+				log.Warningln("Retries exceeded and error:", err)
+				return instanceSpec, err
+			} else {
+				log.Infoln("Going to wait for swarm to be ready. i=", i)
+				time.Sleep(context.poll)
+			}
+		}
+
 	}
 
 	log.Infoln("Init script:", initScript)

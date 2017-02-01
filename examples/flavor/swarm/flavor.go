@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
@@ -107,27 +108,46 @@ func swarmState(docker client.APIClient) (status *swarm.Swarm, node *swarm.Node,
 	return
 }
 
-// swarmStatus and nodeInfo can be nil if Swarm is not ready.
-func exportTemplateFunctions(flavorSpec Spec, spec instance.Spec, alloc group_types.AllocationMethod,
-	swarmStatus *swarm.Swarm, nodeInfo *swarm.Node, link types.Link) []template.Function {
+type templateContext struct {
+	flavorSpec   Spec
+	instanceSpec instance.Spec
+	allocation   group_types.AllocationMethod
+	swarmStatus  *swarm.Swarm
+	nodeInfo     *swarm.Node
+	link         types.Link
+	retries      int
+	poll         time.Duration
+}
 
-	// Get a single consistent view of the data across multiple calls by exporting functions that
-	// query the input state
-
+// Funcs implements the template.Context interface
+func (c *templateContext) Funcs() []template.Function {
 	return []template.Function{
+		{
+			Name:        "SWARM_CONNECT_RETRIES",
+			Description: "Connect to the swarm manager",
+			Func: func(retries int, wait string) interface{} {
+				c.retries = retries
+				poll, err := time.ParseDuration(wait)
+				if err != nil {
+					poll = 1 * time.Minute
+				}
+				c.poll = poll
+				return ""
+			},
+		},
 		{
 			Name:        "SPEC",
 			Description: "The flavor spec as found in Properties field of the config JSON",
 			Func: func() interface{} {
-				return flavorSpec
+				return c.flavorSpec
 			},
 		},
 		{
 			Name:        "INSTANCE_LOGICAL_ID",
 			Description: "The logical id for the instance being prepared; can be empty if no logical ids are set (cattle).",
 			Func: func() string {
-				if spec.LogicalID != nil {
-					return string(*spec.LogicalID)
+				if c.instanceSpec.LogicalID != nil {
+					return string(*c.instanceSpec.LogicalID)
 				}
 				return ""
 			},
@@ -136,57 +156,57 @@ func exportTemplateFunctions(flavorSpec Spec, spec instance.Spec, alloc group_ty
 			Name:        "ALLOCATIONS",
 			Description: "The allocations contain fields such as the size of the group or the list of logical ids.",
 			Func: func() interface{} {
-				return alloc
+				return c.allocation
 			},
 		},
 		{
 			Name:        "INFRAKIT_LABELS",
 			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
 			Func: func() []string {
-				return link.KVPairs()
+				return c.link.KVPairs()
 			},
 		},
 		{
 			Name:        "SWARM_MANAGER_IP",
 			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
 			Func: func() (string, error) {
-				if nodeInfo == nil {
+				if c.nodeInfo == nil {
 					return "", fmt.Errorf("no node info")
 				}
-				if nodeInfo.ManagerStatus == nil {
+				if c.nodeInfo.ManagerStatus == nil {
 					return "", fmt.Errorf("no manager status")
 				}
-				return nodeInfo.ManagerStatus.Addr, nil
+				return c.nodeInfo.ManagerStatus.Addr, nil
 			},
 		},
 		{
 			Name:        "SWARM_INITIALIZED",
 			Description: "Returns true if the swarm has been initialized.",
 			Func: func() (bool, error) {
-				if nodeInfo == nil {
+				if c.nodeInfo == nil {
 					return false, fmt.Errorf("no node info")
 				}
-				return nodeInfo.ManagerStatus != nil, nil
+				return c.nodeInfo.ManagerStatus != nil, nil
 			},
 		},
 		{
 			Name:        "SWARM_JOIN_TOKENS",
 			Description: "Returns the swarm JoinTokens object, with either .Manager or .Worker fields",
 			Func: func() (interface{}, error) {
-				if swarmStatus == nil {
+				if c.swarmStatus == nil {
 					return nil, fmt.Errorf("no swarm status")
 				}
-				return swarmStatus.JoinTokens, nil
+				return c.swarmStatus.JoinTokens, nil
 			},
 		},
 		{
 			Name:        "SWARM_CLUSTER_ID",
 			Description: "Returns the swarm cluster UUID",
 			Func: func() (interface{}, error) {
-				if swarmStatus == nil {
+				if c.swarmStatus == nil {
 					return nil, fmt.Errorf("no swarm status")
 				}
-				return swarmStatus.ID, nil
+				return c.swarmStatus.ID, nil
 			},
 		},
 	}
