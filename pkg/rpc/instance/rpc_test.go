@@ -1,7 +1,6 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"path"
@@ -11,15 +10,19 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
 type testPlugin struct {
 	// Validate performs local validation on a provision request.
-	DoValidate func(req json.RawMessage) error
+	DoValidate func(req *types.Any) error
 
 	// Provision creates a new instance based on the spec.
 	DoProvision func(spec instance.Spec) (*instance.ID, error)
+
+	// Label labels the instance
+	DoLabel func(instance instance.ID, labels map[string]string) error
 
 	// Destroy terminates an existing instance.
 	DoDestroy func(instance instance.ID) error
@@ -28,11 +31,14 @@ type testPlugin struct {
 	DoDescribeInstances func(tags map[string]string) ([]instance.Description, error)
 }
 
-func (t *testPlugin) Validate(req json.RawMessage) error {
+func (t *testPlugin) Validate(req *types.Any) error {
 	return t.DoValidate(req)
 }
 func (t *testPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	return t.DoProvision(spec)
+}
+func (t *testPlugin) Label(instance instance.ID, labels map[string]string) error {
+	return t.DoLabel(instance, labels)
 }
 func (t *testPlugin) Destroy(instance instance.ID) error {
 	return t.DoDestroy(instance)
@@ -54,12 +60,12 @@ func TestInstancePluginValidate(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
+	raw := types.AnyString(`{"name":"instance","type":"xlarge"}`)
 
-	rawActual := make(chan json.RawMessage, 1)
+	rawActual := make(chan *types.Any, 1)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoValidate: func(req json.RawMessage) error {
+		DoValidate: func(req *types.Any) error {
 
 			rawActual <- req
 
@@ -81,11 +87,11 @@ func TestInstancePluginValidateError(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	raw := json.RawMessage([]byte(`{"name":"instance","type":"xlarge"}`))
-	rawActual := make(chan json.RawMessage, 1)
+	raw := types.AnyString(`{"name":"instance","type":"xlarge"}`)
+	rawActual := make(chan *types.Any, 1)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoValidate: func(req json.RawMessage) error {
+		DoValidate: func(req *types.Any) error {
 
 			rawActual <- req
 
@@ -106,10 +112,10 @@ func TestInstancePluginProvisionNil(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	raw := json.RawMessage([]byte(`{"test":"foo"}`))
+	raw := types.AnyString(`{"test":"foo"}`)
 	specActual := make(chan instance.Spec, 1)
 	spec := instance.Spec{
-		Properties: &raw,
+		Properties: raw,
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
@@ -133,10 +139,10 @@ func TestInstancePluginProvision(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	raw := json.RawMessage([]byte(`{"test":"foo"}`))
+	raw := types.AnyString(`{"test":"foo"}`)
 	specActual := make(chan instance.Spec, 1)
 	spec := instance.Spec{
-		Properties: &raw,
+		Properties: raw,
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
@@ -161,10 +167,10 @@ func TestInstancePluginProvisionError(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	raw := json.RawMessage([]byte(`{"test":"foo"}`))
+	raw := types.AnyString(`{"test":"foo"}`)
 	specActual := make(chan instance.Spec, 1)
 	spec := instance.Spec{
-		Properties: &raw,
+		Properties: raw,
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
 		DoProvision: func(req instance.Spec) (*instance.ID, error) {
@@ -181,6 +187,66 @@ func TestInstancePluginProvisionError(t *testing.T) {
 	server.Stop()
 
 	require.Equal(t, spec, <-specActual)
+}
+
+func TestInstancePluginLabel(t *testing.T) {
+	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
+
+	inst := instance.ID("hello")
+	labels := map[string]string{
+		"label1": "value1",
+		"label2": "value2",
+	}
+	instActual := make(chan instance.ID, 1)
+	labelActual := make(chan map[string]string, 1)
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+		DoLabel: func(req instance.ID, labels map[string]string) error {
+			instActual <- req
+			labelActual <- labels
+			return nil
+		},
+	}))
+	require.NoError(t, err)
+
+	err = must(NewClient(name, socketPath)).Label(inst, labels)
+	require.NoError(t, err)
+
+	server.Stop()
+
+	require.Equal(t, inst, <-instActual)
+	require.Equal(t, labels, <-labelActual)
+}
+
+func TestInstancePluginLabelError(t *testing.T) {
+	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
+
+	inst := instance.ID("hello")
+	labels := map[string]string{
+		"label1": "value1",
+		"label2": "value2",
+	}
+
+	instActual := make(chan instance.ID, 1)
+	labelActual := make(chan map[string]string, 1)
+
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+		DoLabel: func(req instance.ID, labels map[string]string) error {
+			instActual <- req
+			labelActual <- labels
+			return errors.New("can't do")
+		},
+	}))
+	require.NoError(t, err)
+
+	err = must(NewClient(name, socketPath)).Label(inst, labels)
+	require.Error(t, err)
+	require.Equal(t, "can't do", err.Error())
+
+	server.Stop()
+	require.Equal(t, inst, <-instActual)
+	require.Equal(t, labels, <-labelActual)
 }
 
 func TestInstancePluginDestroy(t *testing.T) {

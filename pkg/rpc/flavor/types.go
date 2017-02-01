@@ -1,18 +1,17 @@
 package flavor
 
 import (
-	"encoding/json"
-
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // ValidateRequest is the rpc wrapper for request parameters to Validate
 type ValidateRequest struct {
 	Type       string
-	Properties *json.RawMessage
-	Allocation types.AllocationMethod
+	Properties *types.Any
+	Allocation group_types.AllocationMethod
 }
 
 // ValidateResponse is the rpc wrapper for the results of Validate
@@ -24,9 +23,9 @@ type ValidateResponse struct {
 // PrepareRequest is the rpc wrapper of the params to Prepare
 type PrepareRequest struct {
 	Type       string
-	Properties *json.RawMessage
+	Properties *types.Any
 	Spec       instance.Spec
-	Allocation types.AllocationMethod
+	Allocation group_types.AllocationMethod
 }
 
 // PrepareResponse is the rpc wrapper of the result of Prepare
@@ -38,7 +37,7 @@ type PrepareResponse struct {
 // HealthyRequest is the rpc wrapper of the params to Healthy
 type HealthyRequest struct {
 	Type       string
-	Properties *json.RawMessage
+	Properties *types.Any
 	Instance   instance.Description
 }
 
@@ -51,7 +50,7 @@ type HealthyResponse struct {
 // DrainRequest is the rpc wrapper of the params to Drain
 type DrainRequest struct {
 	Type       string
-	Properties *json.RawMessage
+	Properties *types.Any
 	Instance   instance.Description
 }
 

@@ -1,16 +1,16 @@
 package flavor
 
 import (
-	"encoding/json"
 	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,22 +25,22 @@ func TestFlavorMultiPluginValidate(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputFlavorPropertiesActual1 := make(chan json.RawMessage, 1)
-	inputFlavorProperties1 := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputFlavorPropertiesActual1 := make(chan *types.Any, 1)
+	inputFlavorProperties1 := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 
-	inputFlavorPropertiesActual2 := make(chan json.RawMessage, 1)
-	inputFlavorProperties2 := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"follower"}`))
+	inputFlavorPropertiesActual2 := make(chan *types.Any, 1)
+	inputFlavorProperties2 := types.AnyString(`{"flavor":"zookeeper","role":"follower"}`)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
 			"type1": &testPlugin{
-				DoValidate: func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+				DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 					inputFlavorPropertiesActual1 <- flavorProperties
 					return nil
 				},
 			},
 			"type2": &testPlugin{
-				DoValidate: func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+				DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 					inputFlavorPropertiesActual2 <- flavorProperties
 					return errors.New("something-went-wrong")
 				},
@@ -64,19 +64,19 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputFlavorPropertiesActual1 := make(chan json.RawMessage, 1)
-	inputFlavorProperties1 := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputFlavorPropertiesActual1 := make(chan *types.Any, 1)
+	inputFlavorProperties1 := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 	inputInstanceSpecActual1 := make(chan instance.Spec, 1)
 	inputInstanceSpec1 := instance.Spec{
-		Properties: &inputFlavorProperties1,
+		Properties: inputFlavorProperties1,
 		Tags:       map[string]string{"foo": "bar1"},
 	}
 
-	inputFlavorPropertiesActual2 := make(chan json.RawMessage, 1)
-	inputFlavorProperties2 := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"follower"}`))
+	inputFlavorPropertiesActual2 := make(chan *types.Any, 1)
+	inputFlavorProperties2 := types.AnyString(`{"flavor":"zookeeper","role":"follower"}`)
 	inputInstanceSpecActual2 := make(chan instance.Spec, 1)
 	inputInstanceSpec2 := instance.Spec{
-		Properties: &inputFlavorProperties2,
+		Properties: inputFlavorProperties2,
 		Tags:       map[string]string{"foo": "bar2"},
 	}
 
@@ -84,9 +84,9 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 		map[string]flavor.Plugin{
 			"type1": &testPlugin{
 				DoPrepare: func(
-					flavorProperties json.RawMessage,
+					flavorProperties *types.Any,
 					instanceSpec instance.Spec,
-					allocation types.AllocationMethod) (instance.Spec, error) {
+					allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 					inputFlavorPropertiesActual1 <- flavorProperties
 					inputInstanceSpecActual1 <- instanceSpec
@@ -96,9 +96,9 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 			},
 			"type2": &testPlugin{
 				DoPrepare: func(
-					flavorProperties json.RawMessage,
+					flavorProperties *types.Any,
 					instanceSpec instance.Spec,
-					allocation types.AllocationMethod) (instance.Spec, error) {
+					allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 					inputFlavorPropertiesActual2 <- flavorProperties
 					inputInstanceSpecActual2 <- instanceSpec
@@ -137,17 +137,17 @@ func TestFlavorMultiPluginHealthy(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputPropertiesActual1 := make(chan json.RawMessage, 1)
+	inputPropertiesActual1 := make(chan *types.Any, 1)
 	inputInstanceActual1 := make(chan instance.Description, 1)
-	inputProperties1 := json.RawMessage("{}")
+	inputProperties1 := types.AnyString("{}")
 	inputInstance1 := instance.Description{
 		ID:   instance.ID("foo1"),
 		Tags: map[string]string{"foo": "bar1"},
 	}
 
-	inputPropertiesActual2 := make(chan json.RawMessage, 1)
+	inputPropertiesActual2 := make(chan *types.Any, 1)
 	inputInstanceActual2 := make(chan instance.Description, 1)
-	inputProperties2 := json.RawMessage("{}")
+	inputProperties2 := types.AnyString("{}")
 	inputInstance2 := instance.Description{
 		ID:   instance.ID("foo2"),
 		Tags: map[string]string{"foo": "bar2"},
@@ -156,14 +156,14 @@ func TestFlavorMultiPluginHealthy(t *testing.T) {
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
 			"type1": &testPlugin{
-				DoHealthy: func(properties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+				DoHealthy: func(properties *types.Any, inst instance.Description) (flavor.Health, error) {
 					inputPropertiesActual1 <- properties
 					inputInstanceActual1 <- inst
 					return flavor.Healthy, nil
 				},
 			},
 			"type2": &testPlugin{
-				DoHealthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+				DoHealthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 					inputPropertiesActual2 <- flavorProperties
 					inputInstanceActual2 <- inst
 					return flavor.Unknown, errors.New("oh-noes")
@@ -193,17 +193,17 @@ func TestFlavorMultiPluginDrain(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputPropertiesActual1 := make(chan json.RawMessage, 1)
+	inputPropertiesActual1 := make(chan *types.Any, 1)
 	inputInstanceActual1 := make(chan instance.Description, 1)
-	inputProperties1 := json.RawMessage("{}")
+	inputProperties1 := types.AnyString("{}")
 	inputInstance1 := instance.Description{
 		ID:   instance.ID("foo1"),
 		Tags: map[string]string{"foo": "bar1"},
 	}
 
-	inputPropertiesActual2 := make(chan json.RawMessage, 1)
+	inputPropertiesActual2 := make(chan *types.Any, 1)
 	inputInstanceActual2 := make(chan instance.Description, 1)
-	inputProperties2 := json.RawMessage("{}")
+	inputProperties2 := types.AnyString("{}")
 	inputInstance2 := instance.Description{
 		ID:   instance.ID("foo2"),
 		Tags: map[string]string{"foo": "bar2"},
@@ -212,14 +212,14 @@ func TestFlavorMultiPluginDrain(t *testing.T) {
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
 			"type1": &testPlugin{
-				DoDrain: func(properties json.RawMessage, inst instance.Description) error {
+				DoDrain: func(properties *types.Any, inst instance.Description) error {
 					inputPropertiesActual1 <- properties
 					inputInstanceActual1 <- inst
 					return nil
 				},
 			},
 			"type2": &testPlugin{
-				DoDrain: func(flavorProperties json.RawMessage, inst instance.Description) error {
+				DoDrain: func(flavorProperties *types.Any, inst instance.Description) error {
 					inputPropertiesActual2 <- flavorProperties
 					inputInstanceActual2 <- inst
 					return errors.New("oh-noes")

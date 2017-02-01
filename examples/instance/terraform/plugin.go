@@ -17,6 +17,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/nightlyone/lockfile"
 	"github.com/spf13/afero"
 )
@@ -34,6 +35,7 @@ type plugin struct {
 	lock      lockfile.Lockfile
 	applying  bool
 	applyLock sync.Mutex
+	pretend   bool // true to actually do terraform apply
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
@@ -139,21 +141,21 @@ type SpecPropertiesFormat struct {
 }
 
 // Validate performs local validation on a provision request.
-func (p *plugin) Validate(req json.RawMessage) error {
-	log.Debugln("validate", string(req))
+func (p *plugin) Validate(req *types.Any) error {
+	log.Debugln("validate", req.String())
 
 	parsed := SpecPropertiesFormat{}
-	err := json.Unmarshal([]byte(req), &parsed)
+	err := req.Decode(&parsed)
 	if err != nil {
 		return err
 	}
 
 	if parsed.Type == "" {
-		return fmt.Errorf("no-resource-type:%s", string(req))
+		return fmt.Errorf("no-resource-type:%s", req.String())
 	}
 
 	if len(parsed.Value) == 0 {
-		return fmt.Errorf("no-value:%s", string(req))
+		return fmt.Errorf("no-value:%s", req.String())
 	}
 	return nil
 }
@@ -167,6 +169,10 @@ func addUserData(m map[string]interface{}, key string, init string) {
 }
 
 func (p *plugin) terraformApply() error {
+	if p.pretend {
+		return nil
+	}
+
 	p.applyLock.Lock()
 	defer p.applyLock.Unlock()
 
@@ -178,7 +184,7 @@ func (p *plugin) terraformApply() error {
 		for {
 			if err := p.lock.TryLock(); err == nil {
 				defer p.lock.Unlock()
-				p.doTerraformApply()
+				doTerraformApply(p.Dir)
 			}
 			log.Debugln("Can't acquire lock, waiting")
 			time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
@@ -188,10 +194,10 @@ func (p *plugin) terraformApply() error {
 	return nil
 }
 
-func (p *plugin) doTerraformApply() error {
+func doTerraformApply(dir string) error {
 	log.Infoln(time.Now().Format(time.RFC850) + " Applying plan")
 	cmd := exec.Command("terraform", "apply")
-	cmd.Dir = p.Dir
+	cmd.Dir = dir
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -335,7 +341,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	properties := SpecPropertiesFormat{}
-	err := json.Unmarshal(*spec.Properties, &properties)
+	err := spec.Properties.Decode(&properties)
 	if err != nil {
 		return nil, err
 	}
@@ -366,14 +372,15 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	case "softlayer_virtual_guest":
 		log.Debugln("softlayer_virtual_guest detected, adding hostname to properties: hostname=", name)
 		properties.Value["hostname"] = name
-		var tags []interface{}
 
-		//softlayer uses a list of tags, instead of a map of tags
-		for i, v := range spec.Tags {
-			log.Debugln("softlayer_virtual_guest detected, append system tag v=", v)
-			tags = append(tags, i+":"+v)
+		if _, has := properties.Value["tags"]; !has {
+			properties.Value["tags"] = []interface{}{}
 		}
-		properties.Value["tags"] = tags
+		tags, ok := properties.Value["tags"].([]interface{})
+		if ok {
+			//softlayer uses a list of tags, instead of a map of tags
+			properties.Value["tags"] = mergeLabelsIntoTagSlice(tags, spec.Tags)
+		}
 	}
 
 	// Use tag to store the logical id
@@ -423,6 +430,77 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	return &id, p.terraformApply()
+}
+
+// Label labels the instance
+func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
+	buff, err := afero.ReadFile(p.fs, filepath.Join(p.Dir, string(instance)+".tf.json"))
+	if err != nil {
+		return err
+	}
+
+	tfFile := map[string]interface{}{}
+	err = json.Unmarshal(buff, &tfFile)
+	if err != nil {
+		return err
+	}
+
+	resources, has := tfFile["resource"].(map[string]interface{})
+	if !has {
+		return fmt.Errorf("bad tfile:%v", instance)
+	}
+
+	var resourceType string
+	var first map[string]interface{} // there should be only one element keyed by the type (e.g. aws_instance)
+	for k, r := range resources {
+		if f, ok := r.(map[string]interface{}); ok {
+			first = f
+			resourceType = k
+			break
+		}
+	}
+
+	if len(first) == 0 {
+		return fmt.Errorf("no typed properties:%v", instance)
+	}
+
+	props, has := first[string(instance)].(map[string]interface{})
+	if !has {
+		return fmt.Errorf("not found:%v", instance)
+	}
+
+	switch resourceType {
+	case "aws_instance", "azurerm_virtual_machine", "digitalocean_droplet", "google_compute_instance":
+		if _, has := props["tags"]; !has {
+			props["tags"] = map[string]interface{}{}
+		}
+
+		if tags, ok := props["tags"].(map[string]interface{}); ok {
+			for k, v := range labels {
+				tags[k] = v
+			}
+		}
+
+	case "softlayer_virtual_guest":
+		if _, has := props["tags"]; !has {
+			props["tags"] = []interface{}{}
+		}
+		tags, ok := props["tags"].([]interface{})
+		if !ok {
+			return fmt.Errorf("bad format:%v", instance)
+		}
+		props["tags"] = mergeLabelsIntoTagSlice(tags, labels)
+	}
+
+	buff, err = json.MarshalIndent(tfFile, "  ", "  ")
+	if err != nil {
+		return err
+	}
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, string(instance)+".tf.json"), buff, 0644)
+	if err != nil {
+		return err
+	}
+	return p.terraformApply()
 }
 
 // Destroy terminates an existing instance.
@@ -503,7 +581,7 @@ func terraformTags(v interface{}, key string) map[string]string {
 					log.Errorln("terraformTags: ignore invalid tag detected", value)
 				}
 			} else {
-				log.Warnln("terraformTags user tags ignored v=", value)
+				tags[value] = "" // for list but no ':"
 			}
 		}
 		log.Debugln("terraformTags return tags", tags)

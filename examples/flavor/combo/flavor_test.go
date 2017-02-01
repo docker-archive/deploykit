@@ -1,24 +1,19 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"testing"
 
 	mock_flavor "github.com/docker/infrakit/pkg/mock/spi/flavor"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
-
-func jsonPtr(v string) *json.RawMessage {
-	j := json.RawMessage(v)
-	return &j
-}
 
 func logicalID(v string) *instance.LogicalID {
 	id := instance.LogicalID(v)
@@ -26,7 +21,7 @@ func logicalID(v string) *instance.LogicalID {
 }
 
 var inst = instance.Spec{
-	Properties:  jsonPtr("{}"),
+	Properties:  types.AnyString("{}"),
 	Tags:        map[string]string{},
 	Init:        "",
 	LogicalID:   logicalID("id"),
@@ -54,7 +49,7 @@ func TestMergeBehavior(t *testing.T) {
 
 	combo := NewPlugin(pluginLookup(plugins))
 
-	flavorProperties := json.RawMessage(`{
+	flavorProperties := types.AnyString(`{
 	  "Flavors": [
 	    {
 	      "Plugin": "a",
@@ -67,9 +62,9 @@ func TestMergeBehavior(t *testing.T) {
 	  ]
 	}`)
 
-	allocation := types.AllocationMethod{Size: 1}
+	allocation := group_types.AllocationMethod{Size: 1}
 
-	a.EXPECT().Prepare(json.RawMessage(`{"a": "1"}`), inst, allocation).Return(instance.Spec{
+	a.EXPECT().Prepare(types.AnyString(`{"a": "1"}`), inst, allocation).Return(instance.Spec{
 		Properties:  inst.Properties,
 		Tags:        map[string]string{"a": "1", "c": "4"},
 		Init:        "init data a",
@@ -77,7 +72,7 @@ func TestMergeBehavior(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "a", Type: "nic"}},
 	}, nil)
 
-	b.EXPECT().Prepare(json.RawMessage(`{"b": "2"}`), inst, allocation).Return(instance.Spec{
+	b.EXPECT().Prepare(types.AnyString(`{"b": "2"}`), inst, allocation).Return(instance.Spec{
 		Properties:  inst.Properties,
 		Tags:        map[string]string{"b": "2", "c": "5"},
 		Init:        "init data b",
@@ -85,7 +80,7 @@ func TestMergeBehavior(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
-	result, err := combo.Prepare(flavorProperties, inst, types.AllocationMethod{Size: 1})
+	result, err := combo.Prepare(flavorProperties, inst, group_types.AllocationMethod{Size: 1})
 	require.NoError(t, err)
 
 	expected := instance.Spec{
@@ -102,7 +97,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 	// Tests regression of a bug where a zero value was returned for the LogicalID despite nil being passed.
 
 	inst = instance.Spec{
-		Properties:  jsonPtr("{}"),
+		Properties:  types.AnyString("{}"),
 		Tags:        map[string]string{},
 		Init:        "",
 		Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}},
@@ -118,7 +113,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 
 	combo := NewPlugin(pluginLookup(plugins))
 
-	flavorProperties := json.RawMessage(`{
+	flavorProperties := types.AnyString(`{
 	  "Flavors": [
 	    {
 	      "Plugin": "a",
@@ -131,9 +126,9 @@ func TestMergeNoLogicalID(t *testing.T) {
 	  ]
 	}`)
 
-	allocation := types.AllocationMethod{Size: 1}
+	allocation := group_types.AllocationMethod{Size: 1}
 
-	a.EXPECT().Prepare(json.RawMessage(`{"a": "1"}`), inst, allocation).Return(instance.Spec{
+	a.EXPECT().Prepare(types.AnyString(`{"a": "1"}`), inst, allocation).Return(instance.Spec{
 		Properties:  inst.Properties,
 		Tags:        map[string]string{"a": "1", "c": "4"},
 		Init:        "init data a",
@@ -141,7 +136,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "a", Type: "nic"}},
 	}, nil)
 
-	b.EXPECT().Prepare(json.RawMessage(`{"b": "2"}`), inst, allocation).Return(instance.Spec{
+	b.EXPECT().Prepare(types.AnyString(`{"b": "2"}`), inst, allocation).Return(instance.Spec{
 		Properties:  inst.Properties,
 		Tags:        map[string]string{"b": "2", "c": "5"},
 		Init:        "init data b",
@@ -149,7 +144,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
-	result, err := combo.Prepare(flavorProperties, inst, types.AllocationMethod{Size: 1})
+	result, err := combo.Prepare(flavorProperties, inst, group_types.AllocationMethod{Size: 1})
 	require.NoError(t, err)
 
 	expected := instance.Spec{

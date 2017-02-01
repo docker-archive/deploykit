@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -9,10 +8,11 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -33,41 +33,41 @@ func TestValidate(t *testing.T) {
 	workerFlavor := NewWorkerFlavor(mock_client.NewMockAPIClient(ctrl), templ())
 
 	require.NoError(t, workerFlavor.Validate(
-		json.RawMessage(`{"DockerRestartCommand": "systemctl restart docker"}`),
-		types.AllocationMethod{Size: 5}))
+		types.AnyString(`{"DockerRestartCommand": "systemctl restart docker"}`),
+		group_types.AllocationMethod{Size: 5}))
 	require.NoError(t, managerFlavor.Validate(
-		json.RawMessage(`{"DockerRestartCommand": "systemctl restart docker"}`),
-		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
+		types.AnyString(`{"DockerRestartCommand": "systemctl restart docker"}`),
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
 	// Logical ID with multiple attachments is allowed.
 	require.NoError(t, managerFlavor.Validate(
-		json.RawMessage(`{
+		types.AnyString(`{
 			"DockerRestartCommand": "systemctl restart docker",
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`),
-		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
 	// Logical ID used more than once.
 	err := managerFlavor.Validate(
-		json.RawMessage(`{"DockerRestartCommand": "systemctl restart docker"}`),
-		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.1", "127.0.0.2"}})
+		types.AnyString(`{"DockerRestartCommand": "systemctl restart docker"}`),
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.1", "127.0.0.2"}})
 	require.Error(t, err)
 	require.Equal(t, "LogicalID 127.0.0.1 specified more than once", err.Error())
 
 	// Attachment cannot be associated with multiple Logical IDs.
 	err = managerFlavor.Validate(
-		json.RawMessage(`{
+		types.AnyString(`{
 			"DockerRestartCommand": "systemctl restart docker",
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}], "127.0.0.2": [{"ID": "a", "Type": "ebs"}]}}`),
-		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
 	require.Error(t, err)
 	require.Equal(t, "Attachment a specified more than once", err.Error())
 
 	// Unsupported Attachment Type.
 	err = managerFlavor.Validate(
-		json.RawMessage(`{
+		types.AnyString(`{
 			"DockerRestartCommand": "systemctl restart docker",
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "keyboard"}]}}`),
-		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
 	require.Error(t, err)
 	require.Equal(t, "Invalid attachment Type 'keyboard', only ebs is supported", err.Error())
 }
@@ -95,9 +95,9 @@ func TestWorker(t *testing.T) {
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil)
 
 	details, err := flavorImpl.Prepare(
-		json.RawMessage(`{}`),
+		types.AnyString(`{}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}},
-		types.AllocationMethod{Size: 5})
+		group_types.AllocationMethod{Size: 5})
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
 	associationID := details.Tags[associationTag]
@@ -113,7 +113,7 @@ func TestWorker(t *testing.T) {
 	require.Empty(t, details.Attachments)
 
 	// An instance with no association information is considered unhealthy.
-	health, err := flavorImpl.Healthy(json.RawMessage("{}"), instance.Description{})
+	health, err := flavorImpl.Healthy(types.AnyString("{}"), instance.Description{})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Unhealthy, health)
 
@@ -124,7 +124,7 @@ func TestWorker(t *testing.T) {
 			{},
 		}, nil)
 	health, err = flavorImpl.Healthy(
-		json.RawMessage("{}"),
+		types.AnyString("{}"),
 		instance.Description{Tags: map[string]string{associationTag: associationID}})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
@@ -158,9 +158,9 @@ func TestManager(t *testing.T) {
 
 	id := instance.LogicalID("127.0.0.1")
 	details, err := flavorImpl.Prepare(
-		json.RawMessage(`{"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
+		types.AnyString(`{"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
 	associationID := details.Tags[associationTag]
@@ -176,7 +176,7 @@ func TestManager(t *testing.T) {
 	require.Equal(t, []instance.Attachment{{ID: "a", Type: "gpu"}}, details.Attachments)
 
 	// An instance with no association information is considered unhealthy.
-	health, err := flavorImpl.Healthy(json.RawMessage("{}"), instance.Description{})
+	health, err := flavorImpl.Healthy(types.AnyString("{}"), instance.Description{})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Unhealthy, health)
 
@@ -187,7 +187,7 @@ func TestManager(t *testing.T) {
 			{},
 		}, nil)
 	health, err = flavorImpl.Healthy(
-		json.RawMessage("{}"),
+		types.AnyString("{}"),
 		instance.Description{Tags: map[string]string{associationTag: associationID}})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)

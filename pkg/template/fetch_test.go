@@ -1,7 +1,6 @@
 package template
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"path"
 	"path/filepath"
@@ -10,15 +9,19 @@ import (
 	rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
 type testPlugin struct {
 	// Validate performs local validation on a provision request.
-	DoValidate func(req json.RawMessage) error
+	DoValidate func(req *types.Any) error
 
 	// Provision creates a new instance based on the spec.
 	DoProvision func(spec instance.Spec) (*instance.ID, error)
+
+	// Label labels the resource
+	DoLabel func(instance instance.ID, labels map[string]string) error
 
 	// Destroy terminates an existing instance.
 	DoDestroy func(instance instance.ID) error
@@ -27,11 +30,14 @@ type testPlugin struct {
 	DoDescribeInstances func(tags map[string]string) ([]instance.Description, error)
 }
 
-func (t *testPlugin) Validate(req json.RawMessage) error {
+func (t *testPlugin) Validate(req *types.Any) error {
 	return t.DoValidate(req)
 }
 func (t *testPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	return t.DoProvision(spec)
+}
+func (t *testPlugin) Label(instance instance.ID, labels map[string]string) error {
+	return t.DoLabel(instance, labels)
 }
 func (t *testPlugin) Destroy(instance instance.ID) error {
 	return t.DoDestroy(instance)
