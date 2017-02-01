@@ -224,6 +224,7 @@ watch -d vagrant global-status  # using watch to monitor the vagrant vms
 
 Now check the swarm:
 
+```shell
 ~/projects/src/github.com/docker/infrakit$ docker -H tcp://192.168.2.200:4243 node ls
 ID                           HOSTNAME   STATUS  AVAILABILITY  MANAGER STATUS
 1ag3s3m1avdahg19933io5xjr *  infrakit   Ready   Active        Leader
@@ -234,7 +235,7 @@ c4z4a4h3p2jz5vwg36zy2rww9    localhost  Ready   Active
 ezkfjfjqmphi90daup2ur1yas    localhost  Ready   Active        Reachable
 ```
 
-Use Infrakit `group describe`:
+Or use Infrakit `group describe` to see the instances:
 ```shell
 ~/projects/src/github.com/docker/infrakit$ infrakit group describe swarm-managers
 ID                            	LOGICAL                       	TAGS
@@ -260,7 +261,7 @@ destroy swarm-managers initiated
 
 And stop all the plugins:
 
-```shell
+```
 ~/projects/src/github.com/docker/infrakit$ infrakit plugin stop --all
 INFO[0000] Stopping flavor-swarm at PID= 69525          
 INFO[0000] Process for flavor-swarm exited              
