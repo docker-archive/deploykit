@@ -1,0 +1,37 @@
+[
+    {
+        "Plugin" : "manager",
+        "Launch" : {
+            "os": {
+                "Cmd" : "infrakit-manager --name group  --proxy-for-group group-stateless os --leader-file {{env "INFRAKIT_HOME"}}/leader --store-dir {{env "INFRAKIT_HOME"}}/configs > {{env "INFRAKIT_HOME"}}/logs/manager.log 2>&1"
+            }
+        }
+    }
+    ,
+    {
+        "Plugin" : "group-stateless",
+        "Launch" : {
+            "os": {
+                "Cmd" : "infrakit-group-default --poll-interval 10s --name group-stateless --log 5 > {{env "INFRAKIT_HOME"}}/logs/group-stateless.log 2>&1"
+            }
+        }
+    }
+    ,
+    {
+        "Plugin" : "instance-vagrant",
+        "Launch" : {
+            "os" : {
+                "Cmd" : "infrakit-instance-vagrant --log 5 > {{env "INFRAKIT_HOME"}}/logs/instance-vagrant.log 2>&1"
+            }
+        }
+    }
+    ,
+    {
+        "Plugin" : "flavor-swarm",
+        "Launch" : {
+            "os" : {
+                "Cmd" : "infrakit-flavor-swarm --host {{env "SWARM_MANAGER"}} --log 5 > {{env "INFRAKIT_HOME"}}/logs/flavor-swarm.log 2>&1"
+            }
+        }
+    }
+]

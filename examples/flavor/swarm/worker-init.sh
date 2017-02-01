@@ -3,6 +3,7 @@ set -o errexit
 set -o nounset
 set -o xtrace
 
+{{/* Install Docker */}}
 {{ include "install-docker.sh" }}
 
 mkdir -p /etc/docker
@@ -17,4 +18,4 @@ kill -s HUP $(cat /var/run/docker.pid)
 
 sleep 5
 
-docker swarm join {{ SWARM_MANAGER_IP }} --token {{  SWARM_JOIN_TOKENS.Worker }}
+docker swarm join --token {{  SWARM_JOIN_TOKENS.Worker }} {{ SPEC.SwarmJoinIP }}:2377
