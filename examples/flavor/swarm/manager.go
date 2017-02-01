@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -16,13 +17,13 @@ import (
 )
 
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewManagerFlavor(dockerClient client.APIClient, templ *template.Template) flavor.Plugin {
-	return &managerFlavor{client: dockerClient, initScript: templ}
+func NewManagerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template) flavor.Plugin {
+	return &managerFlavor{initScript: templ, getDockerClient: connect}
 }
 
 type managerFlavor struct {
-	client     client.APIClient
-	initScript *template.Template
+	getDockerClient func(Spec) (client.APIClient, error)
+	initScript      *template.Template
 }
 
 func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation group_types.AllocationMethod) error {
@@ -30,6 +31,10 @@ func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation gr
 	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
 	if err != nil {
 		return err
+	}
+
+	if spec.Docker.Host == "" && spec.Docker.TLS == nil {
+		return fmt.Errorf("no docker connect info")
 	}
 
 	if spec.InitScriptTemplateURL != "" {
@@ -56,21 +61,19 @@ func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation gr
 	return nil
 }
 
-// ExportTemplateFunctions returns the functions that are to exported in templates
-func (s *managerFlavor) ExportTemplateFunctions() []template.Function {
-	swarmStatus, self, err := swarmState(s.client)
-	if err != nil {
-		log.Warningln("Err", err)
-		swarmStatus = nil
-		self = nil
-	}
-	return (&templateContext{swarmStatus: swarmStatus, nodeInfo: self}).Funcs()
-}
-
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
 func (s *managerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-	return healthy(s.client, inst)
+	spec := Spec{}
+	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	if err != nil {
+		return flavor.Unknown, err
+	}
+	dockerClient, err := s.getDockerClient(spec)
+	if err != nil {
+		return flavor.Unknown, err
+	}
+	return healthy(dockerClient, inst)
 }
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
@@ -105,7 +108,13 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 	for i := 0; ; i++ {
 		log.Infoln("MANAGER >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", i, "querying docker swarm")
 
-		swarmStatus, node, err = swarmState(s.client)
+		dockerClient, err := s.getDockerClient(spec)
+		if err != nil {
+			log.Warningln("Cannot connect to Docker:", err)
+			continue
+		}
+
+		swarmStatus, node, err = swarmState(dockerClient)
 		if err != nil {
 			log.Warningln("Manager prepare:", err)
 		}

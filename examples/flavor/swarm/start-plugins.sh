@@ -27,7 +27,6 @@ leaderfile=$INFRAKIT_HOME/leader
 echo group > $leaderfile
 
 export INFRAKIT_HOME=$INFRAKIT_HOME
-export SWARM_MANAGER="tcp://192.168.2.200:4243"  # Note this is the IP of the leader node we provision in swarm-managers
 
 infrakit plugin start --config-url file:///$PWD/examples/flavor/swarm/plugins.json --exec os \
 	 manager \

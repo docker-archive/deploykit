@@ -30,7 +30,7 @@
         "Plugin" : "flavor-swarm",
         "Launch" : {
             "os" : {
-                "Cmd" : "infrakit-flavor-swarm --host {{env "SWARM_MANAGER"}} --log 5 > {{env "INFRAKIT_HOME"}}/logs/flavor-swarm.log 2>&1"
+                "Cmd" : "infrakit-flavor-swarm --log 5 > {{env "INFRAKIT_HOME"}}/logs/flavor-swarm.log 2>&1"
             }
         }
     }

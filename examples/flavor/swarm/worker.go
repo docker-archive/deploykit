@@ -19,13 +19,13 @@ import (
 )
 
 // NewWorkerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewWorkerFlavor(dockerClient client.APIClient, templ *template.Template) flavor.Plugin {
-	return &workerFlavor{client: dockerClient, initScript: templ}
+func NewWorkerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template) flavor.Plugin {
+	return &workerFlavor{initScript: templ, getDockerClient: connect}
 }
 
 type workerFlavor struct {
-	client     client.APIClient
-	initScript *template.Template
+	getDockerClient func(Spec) (client.APIClient, error)
+	initScript      *template.Template
 }
 
 func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation group_types.AllocationMethod) error {
@@ -33,6 +33,10 @@ func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation gro
 	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
 	if err != nil {
 		return err
+	}
+
+	if spec.Docker.Host == "" && spec.Docker.TLS == nil {
+		return fmt.Errorf("no docker connect info")
 	}
 
 	if spec.InitScriptTemplateURL != "" {
@@ -52,7 +56,17 @@ func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation gro
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
 func (s *workerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-	return healthy(s.client, inst)
+	spec := Spec{}
+	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	if err != nil {
+		return flavor.Unknown, err
+	}
+	dockerClient, err := s.getDockerClient(spec)
+	if err != nil {
+		return flavor.Unknown, err
+	}
+
+	return healthy(dockerClient, inst)
 }
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
@@ -86,7 +100,13 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 	for i := 0; ; i++ {
 		log.Infoln("WORKER >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", i, "querying docker swarm")
 
-		swarmStatus, node, err = swarmState(s.client)
+		dockerClient, err := s.getDockerClient(spec)
+		if err != nil {
+			log.Warningln("Cannot connect to Docker:", err)
+			continue
+		}
+
+		swarmStatus, node, err = swarmState(dockerClient)
 		if err != nil {
 			log.Warningln("Worker prepare:", err)
 		}
@@ -141,6 +161,16 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 }
 
 func (s *workerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+	spec := Spec{}
+	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	if err != nil {
+		return err
+	}
+
+	dockerClient, err := s.getDockerClient(spec)
+	if err != nil {
+		return err
+	}
 
 	link := types.NewLinkFromMap(inst.Tags)
 	if !link.Valid() {
@@ -150,7 +180,7 @@ func (s *workerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Des
 	filter := filters.NewArgs()
 	filter.Add("label", fmt.Sprintf("%s=%s", link.Label(), link.Value()))
 
-	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
+	nodes, err := dockerClient.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
 	if err != nil {
 		return err
 	}
@@ -160,7 +190,7 @@ func (s *workerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Des
 		return fmt.Errorf("Unable to drain %s, not found in swarm", inst.ID)
 
 	case len(nodes) == 1:
-		err := s.client.NodeRemove(
+		err := dockerClient.NodeRemove(
 			context.Background(),
 			nodes[0].ID,
 			docker_types.NodeRemoveOptions{Force: true})

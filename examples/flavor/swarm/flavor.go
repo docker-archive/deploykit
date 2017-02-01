@@ -9,11 +9,13 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/tlsconfig"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/docker"
 	"golang.org/x/net/context"
 )
 
@@ -32,6 +34,27 @@ type Spec struct {
 
 	// SwarmJoinIP is the IP for managers and workers to join
 	SwarmJoinIP string
+
+	// Docker holds the connection params to the Docker engine for join tokens, etc.
+	Docker ConnectInfo
+}
+
+// ConnectInfo holds the connection parameters for connecting to a Docker engine to get join tokens, etc.
+type ConnectInfo struct {
+	Host string
+	TLS  *tlsconfig.Options
+}
+
+func DockerClient(spec Spec) (client.APIClient, error) {
+	if spec.Docker.Host == "" && spec.Docker.TLS == nil {
+		return nil, fmt.Errorf("no docker connect info")
+	}
+	tls := spec.Docker.TLS
+	if tls == nil {
+		tls = &tlsconfig.Options{}
+	}
+
+	return docker.NewDockerClient(spec.Docker.Host, tls)
 }
 
 func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
