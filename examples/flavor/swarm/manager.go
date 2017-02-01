@@ -34,7 +34,7 @@ func (s *managerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 	}
 
 	if len(allocation.LogicalIDs)%2 == 0 {
-		return errors.New("Must have 1, 3, or 5 manager logical IDs or odd number.")
+		return errors.New("must have odd number for quorum")
 	}
 
 	for _, id := range allocation.LogicalIDs {
