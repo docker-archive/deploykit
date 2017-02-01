@@ -4,8 +4,8 @@
 package instance
 
 import (
-	json "encoding/json"
 	instance "github.com/docker/infrakit/pkg/spi/instance"
+	types "github.com/docker/infrakit/pkg/types"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -51,6 +51,16 @@ func (_mr *_MockPluginRecorder) Destroy(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
 }
 
+func (_m *MockPlugin) Label(_param0 instance.ID, _param1 map[string]string) error {
+	ret := _m.ctrl.Call(_m, "Label", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockPluginRecorder) Label(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Label", arg0, arg1)
+}
+
 func (_m *MockPlugin) Provision(_param0 instance.Spec) (*instance.ID, error) {
 	ret := _m.ctrl.Call(_m, "Provision", _param0)
 	ret0, _ := ret[0].(*instance.ID)
@@ -62,7 +72,7 @@ func (_mr *_MockPluginRecorder) Provision(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Provision", arg0)
 }
 
-func (_m *MockPlugin) Validate(_param0 json.RawMessage) error {
+func (_m *MockPlugin) Validate(_param0 *types.Any) error {
 	ret := _m.ctrl.Call(_m, "Validate", _param0)
 	ret0, _ := ret[0].(error)
 	return ret0

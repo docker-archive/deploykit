@@ -1,11 +1,11 @@
 package group
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // PluginServer returns a RPCService that conforms to the net/rpc rpc call convention.
@@ -27,7 +27,7 @@ func (p *Group) VendorInfo() *spi.VendorInfo {
 }
 
 // ExampleProperties returns an example properties used by the plugin
-func (p *Group) ExampleProperties() *json.RawMessage {
+func (p *Group) ExampleProperties() *types.Any {
 	if i, is := p.plugin.(spi.InputExample); is {
 		return i.ExampleProperties()
 	}

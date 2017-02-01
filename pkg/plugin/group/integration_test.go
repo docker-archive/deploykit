@@ -177,8 +177,8 @@ func TestRollingUpdate(t *testing.T) {
 	)
 
 	flavorPlugin := testFlavor{
-		healthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-			if strings.Contains(string(flavorProperties), "flavor2") {
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			if strings.Contains(flavorProperties.String(), "flavor2") {
 				return flavor.Healthy, nil
 			}
 
@@ -480,8 +480,8 @@ func TestFreeGroupWhileConverging(t *testing.T) {
 	healthChecksStarted := make(chan bool)
 	defer close(healthChecksStarted)
 	flavorPlugin := testFlavor{
-		healthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-			if strings.Contains(string(flavorProperties), "flavor2") {
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			if strings.Contains(flavorProperties.String(), "flavor2") {
 				// sync.Once is used to prevent writing to healthChecksStarted more than one time,
 				// causing the test to deadlock.
 				once.Do(func() {
@@ -527,8 +527,8 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 	)
 
 	flavorPlugin := testFlavor{
-		healthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-			if strings.Contains(string(flavorProperties), "bad update") {
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			if strings.Contains(flavorProperties.String(), "bad update") {
 				return flavor.Unhealthy, nil
 			}
 			return flavor.Healthy, nil

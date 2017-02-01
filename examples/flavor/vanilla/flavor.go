@@ -1,12 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // Spec is the model of the Properties section of the top level group spec.
@@ -28,27 +28,26 @@ func NewPlugin() flavor.Plugin {
 
 type vanillaFlavor int
 
-func (f vanillaFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
-	return json.Unmarshal(flavorProperties, &Spec{})
+func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+	return flavorProperties.Decode(&Spec{})
 }
 
-func (f vanillaFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (f vanillaFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 	// TODO: We could add support for shell code in the Spec for a command to run for checking health.
 	return flavor.Healthy, nil
 }
 
-func (f vanillaFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+func (f vanillaFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
 	// TODO: We could add support for shell code in the Spec for a drain command to run.
 	return nil
 }
 
-func (f vanillaFlavor) Prepare(
-	flavor json.RawMessage,
+func (f vanillaFlavor) Prepare(flavor *types.Any,
 	instance instance.Spec,
-	allocation types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	s := Spec{}
-	err := json.Unmarshal(flavor, &s)
+	err := flavor.Decode(&s)
 	if err != nil {
 		return instance, err
 	}

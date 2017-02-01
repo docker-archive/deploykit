@@ -71,3 +71,5 @@ Instance grouping and metadata.
 ### Logical ID
 A possibly-reused logical identifier for an Instance.
 
+### Labels
+A map or dictionary of key-value pairs that label / tag the instance.  Same as [Instance Tags](#instance-tags)

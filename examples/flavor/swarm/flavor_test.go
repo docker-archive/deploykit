@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -39,29 +38,29 @@ func TestValidate(t *testing.T) {
 	}, templ(DefaultWorkerInitScriptTemplate))
 
 	require.NoError(t, workerFlavor.Validate(
-		json.RawMessage(`{"Docker" : {"Host":"unix:///var/run/docker.sock"}}`),
+		types.AnyString(`{"Docker" : {"Host":"unix:///var/run/docker.sock"}}`),
 		group_types.AllocationMethod{Size: 5}))
 	require.NoError(t, managerFlavor.Validate(
-		json.RawMessage(`{"Docker" : {"Host":"unix:///var/run/docker.sock"}}`),
+		types.AnyString(`{"Docker" : {"Host":"unix:///var/run/docker.sock"}}`),
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
 	// Logical ID with multiple attachments is allowed.
 	require.NoError(t, managerFlavor.Validate(
-		json.RawMessage(`{
+		types.AnyString(`{
                         "Docker" : {"Host":"unix:///var/run/docker.sock"},
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`),
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
 	// Logical ID used more than once.
 	err := managerFlavor.Validate(
-		json.RawMessage(`{"Docker":{"Host":"unix:///var/run/docker.sock"}}`),
+		types.AnyString(`{"Docker":{"Host":"unix:///var/run/docker.sock"}}`),
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.1", "127.0.0.2"}})
 	require.Error(t, err)
 	require.Equal(t, "LogicalID 127.0.0.1 specified more than once", err.Error())
 
 	// Attachment cannot be associated with multiple Logical IDs.
 	err = managerFlavor.Validate(
-		json.RawMessage(`{
+		types.AnyString(`{
                         "Docker" : {"Host":"unix:///var/run/docker.sock"},
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}], "127.0.0.2": [{"ID": "a", "Type": "ebs"}]}}`),
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
@@ -70,7 +69,7 @@ func TestValidate(t *testing.T) {
 
 	// Unsupported Attachment Type.
 	err = managerFlavor.Validate(
-		json.RawMessage(`{
+		types.AnyString(`{
                         "Docker" : {"Host":"unix:///var/run/docker.sock"},
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "keyboard"}]}}`),
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
@@ -102,7 +101,7 @@ func TestWorker(t *testing.T) {
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
 
 	details, err := flavorImpl.Prepare(
-		json.RawMessage(`{}`),
+		types.AnyString(`{}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}},
 		group_types.AllocationMethod{Size: 5})
 	require.NoError(t, err)
@@ -123,7 +122,7 @@ func TestWorker(t *testing.T) {
 	require.Empty(t, details.Attachments)
 
 	// An instance with no association information is considered unhealthy.
-	health, err := flavorImpl.Healthy(json.RawMessage("{}"), instance.Description{})
+	health, err := flavorImpl.Healthy(types.AnyString("{}"), instance.Description{})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Unhealthy, health)
 
@@ -134,7 +133,7 @@ func TestWorker(t *testing.T) {
 			{},
 		}, nil)
 	health, err = flavorImpl.Healthy(
-		json.RawMessage("{}"),
+		types.AnyString("{}"),
 		instance.Description{Tags: map[string]string{associationTag: associationID}})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
@@ -169,7 +168,7 @@ func TestManager(t *testing.T) {
 
 	id := instance.LogicalID("127.0.0.1")
 	details, err := flavorImpl.Prepare(
-		json.RawMessage(`{"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
+		types.AnyString(`{"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
 	require.NoError(t, err)
@@ -189,7 +188,7 @@ func TestManager(t *testing.T) {
 	// another instance -- note that this id is not the first in the allocation list of logical ids.
 	id = instance.LogicalID("172.200.100.2")
 	details, err = flavorImpl.Prepare(
-		json.RawMessage(`{"Attachments": {"172.200.100.2": [{"ID": "a", "Type": "gpu"}]}}`),
+		types.AnyString(`{"Attachments": {"172.200.100.2": [{"ID": "a", "Type": "gpu"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"172.200.100.1", "172.200.100.2"}})
 	require.NoError(t, err)
@@ -200,7 +199,7 @@ func TestManager(t *testing.T) {
 	require.Equal(t, []instance.Attachment{{ID: "a", Type: "gpu"}}, details.Attachments)
 
 	// An instance with no association information is considered unhealthy.
-	health, err := flavorImpl.Healthy(json.RawMessage("{}"), instance.Description{})
+	health, err := flavorImpl.Healthy(types.AnyString("{}"), instance.Description{})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Unhealthy, health)
 
@@ -211,7 +210,7 @@ func TestManager(t *testing.T) {
 			{},
 		}, nil)
 	health, err = flavorImpl.Healthy(
-		json.RawMessage("{}"),
+		types.AnyString("{}"),
 		instance.Description{Tags: map[string]string{associationTag: associationID}})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)

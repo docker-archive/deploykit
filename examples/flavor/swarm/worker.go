@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -28,9 +27,14 @@ type workerFlavor struct {
 	initScript      *template.Template
 }
 
-func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation group_types.AllocationMethod) error {
+func (s *workerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+	if flavorProperties == nil {
+		return fmt.Errorf("missing config")
+	}
+
 	spec := Spec{}
-	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	err := flavorProperties.Decode(&spec)
+
 	if err != nil {
 		return err
 	}
@@ -55,9 +59,12 @@ func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation gro
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
-func (s *workerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (s *workerFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+	if flavorProperties == nil {
+		return flavor.Unknown, fmt.Errorf("missing config")
+	}
 	spec := Spec{}
-	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return flavor.Unknown, err
 	}
@@ -70,11 +77,11 @@ func (s *workerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.D
 }
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
-func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec instance.Spec,
+func (s *workerFlavor) Prepare(flavorProperties *types.Any, instanceSpec instance.Spec,
 	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	spec := Spec{}
-	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return instanceSpec, err
 	}
@@ -160,9 +167,13 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 	return instanceSpec, nil
 }
 
-func (s *workerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+func (s *workerFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
+	if flavorProperties == nil {
+		return fmt.Errorf("missing config")
+	}
+
 	spec := Spec{}
-	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return err
 	}

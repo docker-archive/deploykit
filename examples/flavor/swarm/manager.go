@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -26,9 +25,13 @@ type managerFlavor struct {
 	initScript      *template.Template
 }
 
-func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation group_types.AllocationMethod) error {
+func (s *managerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+	if flavorProperties == nil {
+		return fmt.Errorf("missing config")
+	}
+
 	spec := Spec{}
-	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return err
 	}
@@ -63,9 +66,12 @@ func (s *managerFlavor) Validate(flavorProperties json.RawMessage, allocation gr
 
 // Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
 // Swarm.
-func (s *managerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (s *managerFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+	if flavorProperties == nil {
+		return flavor.Unknown, fmt.Errorf("missing config")
+	}
 	spec := Spec{}
-	err := types.AnyBytes([]byte(flavorProperties)).Decode(&spec)
+	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return flavor.Unknown, err
 	}
@@ -77,12 +83,14 @@ func (s *managerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.
 }
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
-func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
+func (s *managerFlavor) Prepare(flavorProperties *types.Any,
 	instanceSpec instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error) {
+	if flavorProperties == nil {
+		return instanceSpec, fmt.Errorf("missing config")
+	}
 
 	spec := Spec{}
-	any := types.AnyBytes([]byte(flavorProperties))
-	err := any.Decode(&spec)
+	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return instanceSpec, err
 	}
@@ -170,6 +178,6 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 
 // Drain only explicitly remove worker nodes, not manager nodes.  Manager nodes are assumed to have an
 // attached volume for state, and fixed IP addresses.  This allows them to rejoin as the same node.
-func (s *managerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+func (s *managerFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
 	return nil
 }
