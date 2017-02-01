@@ -45,6 +45,7 @@ type ConnectInfo struct {
 	TLS  *tlsconfig.Options
 }
 
+// DockerClient checks the validity of input spec and connects to Docker engine
 func DockerClient(spec Spec) (client.APIClient, error) {
 	if spec.Docker.Host == "" && spec.Docker.TLS == nil {
 		return nil, fmt.Errorf("no docker connect info")
