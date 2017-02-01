@@ -103,6 +103,7 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 	var link *types.Link
 
 	for i := 0; ; i++ {
+		log.Infoln("MANAGER >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", i, "querying docker swarm")
 
 		swarmStatus, node, err = swarmState(s.client)
 		if err != nil {
@@ -125,6 +126,8 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 		}
 		initScript, err = initTemplate.Render(context)
 
+		log.Infoln("MANAGER >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> context.retries =", context.retries, "err=", err, "i=", i)
+
 		if err == nil {
 			break
 		} else {
@@ -136,10 +139,9 @@ func (s *managerFlavor) Prepare(flavorProperties json.RawMessage,
 				time.Sleep(context.poll)
 			}
 		}
-
 	}
 
-	log.Infoln("Init script:", initScript)
+	log.Infoln("MANAGER Init script:", initScript)
 
 	instanceSpec.Init = initScript
 

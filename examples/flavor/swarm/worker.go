@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
@@ -77,32 +78,51 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 		log.Infoln("Using", spec.InitScriptTemplateURL, "for init script template")
 	}
 
+	var swarmID, initScript string
 	var swarmStatus *swarm.Swarm
 	var node *swarm.Node
+	var link *types.Link
 
-	swarmStatus, node, err = swarmState(s.client)
-	if err != nil {
-		log.Warningln("Worker prepare:", err)
+	for i := 0; ; i++ {
+		log.Infoln("WORKER >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", i, "querying docker swarm")
+
+		swarmStatus, node, err = swarmState(s.client)
+		if err != nil {
+			log.Warningln("Worker prepare:", err)
+		}
+
+		swarmID := "?"
+		if swarmStatus != nil {
+			swarmID = swarmStatus.ID
+		}
+
+		link = types.NewLink().WithContext("swarm/" + swarmID + "/worker")
+		context := &templateContext{
+			flavorSpec:   spec,
+			instanceSpec: instanceSpec,
+			allocation:   allocation,
+			swarmStatus:  swarmStatus,
+			nodeInfo:     node,
+			link:         *link,
+		}
+		initScript, err = initTemplate.Render(context)
+
+		log.Infoln("WORKER >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> context.retries =", context.retries, "err=", err, "i=", i)
+
+		if err == nil {
+			break
+		} else {
+			if context.retries == 0 || i == context.retries {
+				log.Warningln("Retries exceeded and error:", err)
+				return instanceSpec, err
+			} else {
+				log.Infoln("Going to wait for swarm to be ready. i=", i)
+				time.Sleep(context.poll)
+			}
+		}
 	}
 
-	swarmID := "?"
-	if swarmStatus != nil {
-		swarmID = swarmStatus.ID
-	}
-
-	link := types.NewLink().WithContext("swarm/" + swarmID + "/worker")
-	context := &templateContext{
-		flavorSpec:   spec,
-		instanceSpec: instanceSpec,
-		allocation:   allocation,
-		swarmStatus:  swarmStatus,
-		nodeInfo:     node,
-		link:         *link,
-	}
-	initScript, err := initTemplate.Render(context)
-	if err != nil {
-		return instanceSpec, err
-	}
+	log.Infoln("WORKER Init script:", initScript)
 
 	instanceSpec.Init = initScript
 

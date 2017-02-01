@@ -29,6 +29,9 @@ type Spec struct {
 
 	// InitScriptTemplateURL overrides the template specified when the plugin started up.
 	InitScriptTemplateURL string
+
+	// SwarmJoinIP is the IP for managers and workers to join
+	SwarmJoinIP string
 }
 
 func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
@@ -171,10 +174,10 @@ func (c *templateContext) Funcs() []template.Function {
 			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
 			Func: func() (string, error) {
 				if c.nodeInfo == nil {
-					return "", fmt.Errorf("no node info")
+					return "", fmt.Errorf("cannot prepare: no node info")
 				}
 				if c.nodeInfo.ManagerStatus == nil {
-					return "", fmt.Errorf("no manager status")
+					return "", fmt.Errorf("cannot prepare: no manager status")
 				}
 				return c.nodeInfo.ManagerStatus.Addr, nil
 			},
@@ -182,11 +185,11 @@ func (c *templateContext) Funcs() []template.Function {
 		{
 			Name:        "SWARM_INITIALIZED",
 			Description: "Returns true if the swarm has been initialized.",
-			Func: func() (bool, error) {
+			Func: func() bool {
 				if c.nodeInfo == nil {
-					return false, fmt.Errorf("no node info")
+					return false
 				}
-				return c.nodeInfo.ManagerStatus != nil, nil
+				return c.nodeInfo.ManagerStatus != nil
 			},
 		},
 		{
@@ -194,7 +197,7 @@ func (c *templateContext) Funcs() []template.Function {
 			Description: "Returns the swarm JoinTokens object, with either .Manager or .Worker fields",
 			Func: func() (interface{}, error) {
 				if c.swarmStatus == nil {
-					return nil, fmt.Errorf("no swarm status")
+					return nil, fmt.Errorf("cannot prepare: no swarm status")
 				}
 				return c.swarmStatus.JoinTokens, nil
 			},
@@ -204,7 +207,7 @@ func (c *templateContext) Funcs() []template.Function {
 			Description: "Returns the swarm cluster UUID",
 			Func: func() (interface{}, error) {
 				if c.swarmStatus == nil {
-					return nil, fmt.Errorf("no swarm status")
+					return nil, fmt.Errorf("cannot prepare: no swarm status")
 				}
 				return c.swarmStatus.ID, nil
 			},
