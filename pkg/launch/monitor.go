@@ -11,13 +11,8 @@ import (
 
 var errNoConfig = errors.New("no-config")
 
-// ExecRule encapsulates what's required to exec a plugin
-type ExecRule struct {
-	// Exec is the name of the exec to use to start the plugin
-	Exec string
-	// Properties is the properties for the executor
-	Properties *types.Any
-}
+// ExecName is the name of the executor to use (e.g. 'os', 'docker-run', etc.). It's found in the config.
+type ExecName string
 
 // Rule provides the instructions on starting the plugin
 type Rule struct {
@@ -25,15 +20,16 @@ type Rule struct {
 	// Plugin is the name of the plugin
 	Plugin plugin.Name
 
-	// Launch is the rule for starting / launching the plugin.
-	Launch ExecRule
+	// Launch is the rule for starting / launching the plugin. It's a dictionary with the key being
+	// the name of the executor and the value being the properties used by that executor.
+	Launch map[ExecName]*types.Any
 }
 
 // Monitor runs continuously receiving requests to start a plugin.
 // Monitor uses a launcher to actually start the process of the plugin.
 type Monitor struct {
 	exec      Exec
-	rules     map[plugin.Name]Rule
+	rules     map[plugin.Name]*types.Any
 	startChan <-chan StartPlugin
 	inputChan chan<- StartPlugin
 	stop      chan interface{}
@@ -42,12 +38,13 @@ type Monitor struct {
 
 // NewMonitor returns a monitor that continuously watches for input
 // requests and launches the process for the plugin, if not already running.
+// The configuration to use in the config is matched to the Name() of the executor (the field Exec).
 func NewMonitor(l Exec, rules []Rule) *Monitor {
-	m := map[plugin.Name]Rule{}
+	m := map[plugin.Name]*types.Any{}
 	// index by name of plugin
 	for _, r := range rules {
-		if r.Launch.Exec == l.Name() {
-			m[r.Plugin] = r
+		if cfg, has := r.Launch[ExecName(l.Name())]; has {
+			m[r.Plugin] = cfg
 		}
 	}
 	return &Monitor{
@@ -100,30 +97,30 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 			}
 
 			// match first by full name of the form lookup/type -- 'specialization'
-			r, has := m.rules[req.Plugin]
+			properties, has := m.rules[req.Plugin]
 			if !has {
 				// match now by lookup only -- 'base class'
 				alternate, _ := req.Plugin.GetLookupAndType()
-				r, has = m.rules[plugin.Name(alternate)]
+				properties, has = m.rules[plugin.Name(alternate)]
 			}
 			if !has {
 				log.Warningln("no plugin:", req)
-				req.reportError(r.Launch.Properties, errNoConfig)
+				req.reportError(nil, errNoConfig)
 				continue loop
 			}
 
 			configCopy := types.AnyBytes(nil)
-			if r.Launch.Properties != nil {
-				*configCopy = *r.Launch.Properties
+			if properties != nil {
+				*configCopy = *properties
 			}
 
-			block, err := m.exec.Exec(r.Plugin.String(), configCopy)
+			block, err := m.exec.Exec(req.Plugin.String(), configCopy)
 			if err != nil {
 				req.reportError(configCopy, err)
 				continue loop
 			}
 
-			log.Infoln("Waiting for", r.Plugin, "to start:", configCopy.String())
+			log.Infoln("Waiting for", req.Plugin, "to start:", configCopy.String())
 			err = <-block
 			if err != nil {
 				req.reportError(configCopy, err)

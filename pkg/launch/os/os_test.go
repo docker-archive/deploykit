@@ -14,7 +14,7 @@ import (
 
 func TestLaunchOSCommand(t *testing.T) {
 
-	launcher, err := NewLauncher()
+	launcher, err := NewLauncher("os")
 	require.NoError(t, err)
 
 	starting, err := launcher.Exec("sleepPlugin", types.AnyValueMust(&LaunchConfig{
@@ -30,7 +30,7 @@ func TestLaunchWithLog(t *testing.T) {
 
 	logfile := filepath.Join(os.TempDir(), fmt.Sprintf("os-test-%v", time.Now().Unix()))
 
-	launcher, err := NewLauncher()
+	launcher, err := NewLauncher("os")
 	require.NoError(t, err)
 
 	starting, err := launcher.Exec("echoPlugin", types.AnyValueMust(&LaunchConfig{

@@ -69,9 +69,8 @@ func TestMonitorLoopValidRule(t *testing.T) {
 	var receivedArgs *types.Any
 	rule := Rule{
 		Plugin: "hello",
-		Launch: ExecRule{
-			Exec:       "test",
-			Properties: types.AnyValueMust(config),
+		Launch: map[ExecName]*types.Any{
+			"test": types.AnyValueMust(config),
 		},
 	}
 	monitor := NewMonitor(&testLauncher{
@@ -112,9 +111,8 @@ func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
 	var receivedArgs *types.Any
 	rule := Rule{
 		Plugin: "hello",
-		Launch: ExecRule{
-			Exec:       "test",
-			Properties: types.AnyValueMust(config),
+		Launch: map[ExecName]*types.Any{
+			"test": types.AnyValueMust(config),
 		},
 	}
 	monitor := NewMonitor(&testLauncher{
