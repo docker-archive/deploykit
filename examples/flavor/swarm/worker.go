@@ -115,10 +115,10 @@ func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, instanceSpec in
 			if context.retries == 0 || i == context.retries {
 				log.Warningln("Retries exceeded and error:", err)
 				return instanceSpec, err
-			} else {
-				log.Infoln("Going to wait for swarm to be ready. i=", i)
-				time.Sleep(context.poll)
 			}
+
+			log.Infoln("Going to wait for swarm to be ready. i=", i)
+			time.Sleep(context.poll)
 		}
 	}
 
