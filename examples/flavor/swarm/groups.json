@@ -1,0 +1,61 @@
+{{/* This config uses full install of Docker so it's slower. */}}
+[
+    {
+        "Plugin": "group",
+        "Properties": {
+            "ID": "swarm-workers",
+            "Properties": {
+                "Allocation": {
+                    "Size": 3
+                },
+                "Flavor": {
+                    "Plugin": "flavor-swarm/worker",
+                    "Properties": {
+                        "InitScriptTemplateURL": "file://{{env "PWD"}}/examples/flavor/swarm/worker-init.sh",
+                        "SwarmJoinIP": "192.168.2.200",
+                        "Docker" : {
+                            "Host" : "tcp://192.168.2.200:4243"
+                        }
+                    }
+                },
+                "Instance": {
+                    "Plugin": "instance-vagrant",
+                    "Properties": {
+                        "Box": "ubuntu/trusty64"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "Plugin": "group",
+        "Properties": {
+            "ID": "swarm-managers",
+            "Properties": {
+                "Allocation": {
+                    "LogicalIDs": [
+                        "192.168.2.200",
+                        "192.168.2.201",
+                        "192.168.2.202"
+                    ]
+                },
+                "Flavor": {
+                    "Plugin": "flavor-swarm/manager",
+                    "Properties": {
+                        "InitScriptTemplateURL": "file://{{env "PWD"}}/examples/flavor/swarm/manager-init.sh",
+                        "SwarmJoinIP": "192.168.2.200",
+                        "Docker" : {
+                            "Host" : "tcp://192.168.2.200:4243"
+                        }
+                    }
+                },
+                "Instance": {
+                    "Plugin": "instance-vagrant",
+                    "Properties": {
+                        "Box": "ubuntu/trusty64"
+                    }
+                }
+            }
+        }
+    }
+]

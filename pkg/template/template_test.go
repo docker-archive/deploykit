@@ -137,6 +137,14 @@ func (s *context) Funcs() []Function {
 				return c.(*context).Bool
 			},
 		},
+		{
+			Name:        "invokes",
+			Description: "prints the invokes count",
+			Func: func() int {
+				s.invokes++
+				return s.invokes
+			},
+		},
 	}
 }
 

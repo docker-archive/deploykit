@@ -197,7 +197,7 @@ func makeTemplateFunc(ctx Context, f interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("not a function:%v", f)
 	}
 
-	if ff.Type().In(0).AssignableTo(contextType) {
+	if ff.Type().NumIn() > 0 && ff.Type().In(0).AssignableTo(contextType) {
 
 		in := make([]reflect.Type, ff.Type().NumIn()-1) // exclude the context param
 		out := make([]reflect.Type, ff.Type().NumOut())
