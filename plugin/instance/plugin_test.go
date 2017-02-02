@@ -1,7 +1,6 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"math/rand"
 	"testing"
@@ -9,6 +8,7 @@ import (
 	mock_gcloud "github.com/docker/infrakit.gcp/mock/gcloud"
 	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	compute "google.golang.org/api/compute/v1"
@@ -24,7 +24,7 @@ func NewPlugin(api gcloud.API) instance.Plugin {
 }
 
 func TestProvision(t *testing.T) {
-	properties := json.RawMessage(`{
+	properties := types.AnyString(`{
 		"NamePrefix":"worker",
 		"MachineType":"n1-standard-1",
 		"Network":"NETWORK",
@@ -68,7 +68,7 @@ func TestProvision(t *testing.T) {
 	plugin := NewPlugin(api)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
-		Properties: &properties,
+		Properties: properties,
 		Init:       "echo 'Startup'",
 	})
 
@@ -77,7 +77,7 @@ func TestProvision(t *testing.T) {
 }
 
 func TestProvisionLogicalID(t *testing.T) {
-	properties := json.RawMessage(`{}`)
+	properties := types.AnyString(`{}`)
 	tags := map[string]string{}
 
 	rand.Seed(0)
@@ -101,7 +101,7 @@ func TestProvisionLogicalID(t *testing.T) {
 	id, err := plugin.Provision(instance.Spec{
 		LogicalID:  &logicalID,
 		Tags:       tags,
-		Properties: &properties,
+		Properties: properties,
 	})
 
 	require.NoError(t, err)
@@ -109,7 +109,7 @@ func TestProvisionLogicalID(t *testing.T) {
 }
 
 func TestProvisionFails(t *testing.T) {
-	properties := json.RawMessage(`{}`)
+	properties := types.AnyString(`{}`)
 	tags := map[string]string{
 		"key1": "value1",
 	}
@@ -130,7 +130,7 @@ func TestProvisionFails(t *testing.T) {
 	plugin := NewPlugin(api)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
-		Properties: &properties,
+		Properties: properties,
 	})
 
 	require.EqualError(t, err, "BUG")
@@ -138,7 +138,7 @@ func TestProvisionFails(t *testing.T) {
 }
 
 func TestProvisionFailsToAddToTargetPool(t *testing.T) {
-	properties := json.RawMessage(`{"TargetPools":["POOL"]}`)
+	properties := types.AnyString(`{"TargetPools":["POOL"]}`)
 	tags := map[string]string{}
 
 	rand.Seed(0)
@@ -158,7 +158,7 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 	plugin := NewPlugin(api)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
-		Properties: &properties,
+		Properties: properties,
 	})
 
 	require.EqualError(t, err, "BUG")
@@ -166,11 +166,11 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 }
 
 func TestProvisionWithInvalidProperties(t *testing.T) {
-	properties := json.RawMessage(``)
+	properties := types.AnyString("-")
 
 	plugin := &plugin{}
 	id, err := plugin.Provision(instance.Spec{
-		Properties: &properties,
+		Properties: properties,
 	})
 
 	require.NotNil(t, err)
@@ -295,14 +295,14 @@ func TestDescribeInstancesFails(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	plugin := &plugin{}
-	err := plugin.Validate(json.RawMessage(`{"MachineType":"g1-small", "Network":"default"}`))
+	err := plugin.Validate(types.AnyString(`{"MachineType":"g1-small", "Network":"default"}`))
 
 	require.NoError(t, err)
 }
 
 func TestValidateFails(t *testing.T) {
 	plugin := &plugin{}
-	err := plugin.Validate(json.RawMessage{})
+	err := plugin.Validate(types.AnyString("-"))
 
 	require.Error(t, err)
 }

@@ -3,7 +3,7 @@
 set -e
 
 BASEDIR=$(dirname "$0")
-INFRAKIT_IMAGE=infrakit/devbundle:master-1131
+INFRAKIT_IMAGE=infrakit/devbundle:0.3.0
 GCLOUD="docker run -e CLOUDSDK_CORE_PROJECT --rm -v gcloud-config:/.config google/cloud-sdk gcloud"
 TAG="ci-infrakit-gcp-instance-${CIRCLE_BUILD_NUM:-local}"
 
