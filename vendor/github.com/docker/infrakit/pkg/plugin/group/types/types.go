@@ -100,23 +100,3 @@ func (c Spec) InstanceHash() string {
 	hasher.Write(stableFormat(c.Flavor))
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
-
-// RawMessage converts a pointer to a raw message to a copy of the value. If the pointer is nil, it returns
-// an empty raw message.  This is useful for structs where fields are json.RawMessage pointers for bi-directional
-// marshal and unmarshal (value receivers will encode base64 instead of raw json when marshaled), so bi-directional
-// structs should use pointer fields.
-func RawMessage(r *types.Any) (raw json.RawMessage) {
-	if r != nil {
-		raw = json.RawMessage(r.Bytes())
-	}
-	return
-}
-
-// RawMessagePtr makes a copy of the Any and make it available as a pointer to a JSON raw message
-func RawMessagePtr(r *types.Any) *json.RawMessage {
-	if r == nil {
-		return nil
-	}
-	raw := json.RawMessage(r.Bytes())
-	return &raw
-}

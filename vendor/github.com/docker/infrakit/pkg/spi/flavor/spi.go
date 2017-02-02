@@ -1,10 +1,10 @@
 package flavor
 
 import (
-	"encoding/json"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // InterfaceSpec is the current name and version of the Flavor API.
@@ -31,16 +31,16 @@ const (
 type Plugin interface {
 
 	// Validate checks whether the helper can support a configuration.
-	Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error
+	Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error
 
 	// Prepare allows the Flavor to modify the provisioning instructions for an instance.  For example, a
 	// helper could be used to place additional tags on the machine, or generate a specialized Init command based on
 	// the flavor configuration.
-	Prepare(flavorProperties json.RawMessage, spec instance.Spec, allocation types.AllocationMethod) (instance.Spec, error)
+	Prepare(flavorProperties *types.Any, spec instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error)
 
 	// Healthy determines the Health of this Flavor on an instance.
-	Healthy(flavorProperties json.RawMessage, inst instance.Description) (Health, error)
+	Healthy(flavorProperties *types.Any, inst instance.Description) (Health, error)
 
 	// Drain allows the flavor to perform a best-effort cleanup operation before the instance is destroyed.
-	Drain(flavorProperties json.RawMessage, inst instance.Description) error
+	Drain(flavorProperties *types.Any, inst instance.Description) error
 }

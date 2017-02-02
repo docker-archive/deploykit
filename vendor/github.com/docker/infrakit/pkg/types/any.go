@@ -19,6 +19,14 @@ func AnyBytes(data []byte) *Any {
 	return any
 }
 
+// AnyCopy makes a copy of the data in the given ptr.
+func AnyCopy(any *Any) *Any {
+	if any == nil {
+		return &Any{}
+	}
+	return AnyBytes(any.Bytes())
+}
+
 // AnyValue returns an Any from a value by marshaling / encoding the input
 func AnyValue(v interface{}) (*Any, error) {
 	if v == nil {
