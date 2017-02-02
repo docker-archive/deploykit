@@ -9,6 +9,7 @@ machine:
     GOVERSION: "1.7"
     GOPATH: "$HOME/.go_workspace"
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+    E2E_CLEANUP: "false"
 
 dependencies:
   pre:

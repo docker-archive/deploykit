@@ -13,6 +13,7 @@ import (
 	infrakit_instance "github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"strings"
 	"text/template"
 	"time"
@@ -420,13 +421,13 @@ func configureWorkerSecurityGroup(ec2Client ec2iface.EC2API, groupID string, man
 func ProvisionManager(
 	provisioner instance.Plugin,
 	tags map[string]string,
-	provisionRequest json.RawMessage,
+	provisionRequest *types.Any,
 	ip string) error {
 
 	logicalID := instance.LogicalID(ip)
 
 	id, err := provisioner.Provision(instance.Spec{
-		Properties: &provisionRequest,
+		Properties: provisionRequest,
 		Tags:       tags,
 		LogicalID:  &logicalID,
 		Attachments: []instance.Attachment{
@@ -506,7 +507,7 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 		string(buffer.Bytes()),
 	}, "\n"))
 
-	rawConfig, err := json.Marshal(managerGroup.Config)
+	rawConfig, err := types.AnyValue(managerGroup.Config)
 	if err != nil {
 		return err
 	}
@@ -514,7 +515,7 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 	return ProvisionManager(
 		provisioner,
 		map[string]string{"infrakit.group": string(managerGroup.Name)},
-		json.RawMessage(rawConfig),
+		rawConfig,
 		spec.ManagerIPs[0])
 }
 

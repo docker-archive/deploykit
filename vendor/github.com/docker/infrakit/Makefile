@@ -14,11 +14,11 @@ ifeq (${DISABLE_OPTIMIZATION},true)
 	VERSION:="$(VERSION)-noopt"
 endif
 
-.PHONY: clean all fmt vet lint build test vendor-update containers check-docs tutorial-test get-tools
+.PHONY: clean all fmt vet lint build test vendor-update containers check-docs e2e-test get-tools
 .DEFAULT: all
 all: clean fmt vet lint build test binaries
 
-ci: fmt vet lint check-docs coverage tutorial-test
+ci: fmt vet lint check-docs coverage e2e-test
 
 AUTHORS: .mailmap .git/HEAD
 	git log --format='%aN <%aE>' | sort -fu > $@
@@ -50,6 +50,8 @@ build-docker:
 	@docker build ${DOCKER_BUILD_FLAGS} \
 	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
 	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+	@echo "Running tests -- scripts/e2e-test-docker-containers.sh to verify the binaries"
+	@scripts/e2e-test-docker-containers.sh
 ifeq (${DOCKER_PUSH},true)
 	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
 ifeq (${DOCKER_TAG_LATEST},true)
@@ -113,13 +115,13 @@ endif
 	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
 	$(call build_binary,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
-	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/pkg/example/flavor/combo)
-	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/pkg/example/flavor/swarm)
-	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/pkg/example/flavor/vanilla)
-	$(call build_binary,infrakit-flavor-zookeeper,github.com/docker/infrakit/pkg/example/flavor/zookeeper)
-	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/pkg/example/instance/file)
-	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/pkg/example/instance/terraform)
-	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/pkg/example/instance/vagrant)
+	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
+	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
+	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
+	$(call build_binary,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
+	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
+	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
+	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
 
 install:
 	@echo "+ $@"
@@ -139,9 +141,9 @@ coverage:
 		go test -test.short -race -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 
-tutorial-test:
+e2e-test: binaries
 	@echo "+ $@"
-	./scripts/tutorial-test
+	./scripts/e2e-test.sh
 
 test-full:
 	@echo "+ $@"

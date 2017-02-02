@@ -1,16 +1,17 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	mock_ec2 "github.com/docker/infrakit.aws/mock/ec2"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var (
@@ -44,7 +45,7 @@ func TestInstanceLifecycle(t *testing.T) {
 	clientMock.EXPECT().CreateTags(&tagRequest).Return(&ec2.CreateTagsOutput{}, nil)
 
 	// TODO(wfarner): Test user-data and private IP plumbing.
-	id, err := pluginImpl.Provision(instance.Spec{Properties: &inputJSON, Tags: tags})
+	id, err := pluginImpl.Provision(instance.Spec{Properties: inputJSON, Tags: tags})
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
@@ -68,8 +69,8 @@ func TestCreateInstanceError(t *testing.T) {
 	clientMock.EXPECT().RunInstances(gomock.Any()).Return(&ec2.Reservation{}, runError)
 
 	pluginImpl := NewInstancePlugin(clientMock, map[string]string{"cluster": "test"})
-	properties := json.RawMessage("{}")
-	id, err := pluginImpl.Provision(instance.Spec{Properties: &properties, Tags: tags})
+	properties := types.AnyString("{}")
+	id, err := pluginImpl.Provision(instance.Spec{Properties: properties, Tags: tags})
 
 	require.Error(t, err)
 	require.Nil(t, id)
@@ -184,7 +185,7 @@ func TestListGroup(t *testing.T) {
 	}, descriptions)
 }
 
-var inputJSON = json.RawMessage(`{
+var inputJSON = types.AnyString(`{
     "tags": {"test": "aws-create-test"},
     "run_instances_input": {
         "BlockDeviceMappings": [

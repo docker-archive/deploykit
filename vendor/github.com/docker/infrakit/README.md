@@ -1,8 +1,8 @@
 InfraKit
 ========
 
-[![Circle 
-CI](https://circleci.com/gh/docker/infrakit.png?style=shield&circle-token=50d2063f283f98b7d94746416c979af3102275b5)](https://circleci.com/gh/docker/infrakit)
+[![Circle CI](https://circleci.com/gh/docker/infrakit.png?style=shield&circle-token=50d2063f283f98b7d94746416c979af3102275b5)](https://circleci.com/gh/docker/infrakit)
+[![Go Report Card](https://goreportcard.com/badge/github.com/docker/infrakit)](https://goreportcard.com/report/github.com/docker/infrakit)
 [![codecov.io](https://codecov.io/github/docker/infrakit/coverage.svg?branch=master&token=z08ZKeIJfA)](https://codecov.io/github/docker/infrakit?branch=master)
 
 _InfraKit_ is a toolkit for creating and managing declarative, self-healing infrastructure.
@@ -70,16 +70,16 @@ Executables will be placed in the `./build` directory.
 This will produce binaries for tools and several reference Plugin implementations:
   + [`infrakit`](cmd/cli/README.md): a command line interface to interact with plugins
   + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./pkg/spi/group)
-  + [`infrakit-instance-file`](pkg/example/instance/file): an Instance plugin using dummy files to represent instances
-  + [`infrakit-instance-terraform`](pkg/example/instance/terraform):
+  + [`infrakit-instance-file`](examples/instance/file): an Instance plugin using dummy files to represent instances
+  + [`infrakit-instance-terraform`](examples/instance/terraform):
     an Instance plugin integrating [Terraform](https://www.terraform.io)
-  + [`infrakit-instance-vagrant`](pkg/example/instance/vagrant):
+  + [`infrakit-instance-vagrant`](examples/instance/vagrant):
     an Instance plugin using [Vagrant](https://www.vagrantup.com/)
-  + [`infrakit-flavor-vanilla`](pkg/example/flavor/vanilla):
+  + [`infrakit-flavor-vanilla`](examples/flavor/vanilla):
     a Flavor plugin for plain vanilla set up with user data and labels
-  + [`infrakit-flavor-zookeeper`](pkg/example/flavor/zookeeper):
+  + [`infrakit-flavor-zookeeper`](examples/flavor/zookeeper):
     a Flavor plugin for [Apache ZooKeeper](https://zookeeper.apache.org/) ensemble members
-  + [`infrakit-flavor-swarm`](pkg/example/flavor/swarm):
+  + [`infrakit-flavor-swarm`](examples/flavor/swarm):
     a Flavor plugin for Docker in [Swarm mode](https://docs.docker.com/engine/swarm/).
 
 All provided binaries have a `help` sub-command to get usage and a `version` sub-command to identify the build revision.

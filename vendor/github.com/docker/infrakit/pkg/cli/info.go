@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +18,7 @@ func InfoCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		endpoint, err := plugins().Find(*name)
+		endpoint, err := plugins().Find(plugin.Name(*name))
 		if err != nil {
 			return err
 		}

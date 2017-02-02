@@ -2,7 +2,8 @@ package client
 
 import (
 	"fmt"
-	"github.com/docker/infrakit/pkg/rpc/plugin"
+
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"sync"
 )
@@ -25,15 +26,28 @@ type handshakeResult struct {
 	err error
 }
 
+type errVersionMismatch string
+
+// Error implements error interface
+func (e errVersionMismatch) Error() string {
+	return string(e)
+}
+
+// IsErrVersionMismatch return true if the error is from mismatched api versions.
+func IsErrVersionMismatch(e error) bool {
+	_, is := e.(errVersionMismatch)
+	return is
+}
+
 func (c *handshakingClient) handshake() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	if c.handshakeResult == nil {
-		req := plugin.ImplementsRequest{}
-		resp := plugin.ImplementsResponse{}
+		req := rpc.ImplementsRequest{}
+		resp := rpc.ImplementsResponse{}
 
-		if err := c.client.Call("Plugin.Implements", req, &resp); err != nil {
+		if err := c.client.Call("Handshake.Implements", req, &resp); err != nil {
 			return err
 		}
 
@@ -45,11 +59,11 @@ func (c *handshakingClient) handshake() error {
 						err = nil
 						break
 					} else {
-						err = fmt.Errorf(
+						err = errVersionMismatch(fmt.Sprintf(
 							"Plugin supports %s interface version %s, client requires %s",
 							iface.Name,
 							iface.Version,
-							c.iface.Version)
+							c.iface.Version))
 					}
 				}
 			}

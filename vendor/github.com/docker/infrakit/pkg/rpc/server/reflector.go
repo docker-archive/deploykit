@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -13,6 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 var (
@@ -32,7 +32,7 @@ func (r *reflector) VendorInfo() *spi.VendorInfo {
 	return nil
 }
 
-func (r *reflector) exampleProperties() *json.RawMessage {
+func (r *reflector) exampleProperties() *types.Any {
 	if example, is := r.target.(spi.InputExample); is {
 		return example.ExampleProperties()
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
@@ -33,7 +34,7 @@ type awsInstancePlugin struct {
 type properties struct {
 	Region   string
 	Retries  int
-	Instance json.RawMessage
+	Instance *types.Any
 }
 
 // NewInstancePlugin creates a new plugin that creates instances in AWS EC2.
@@ -70,14 +71,14 @@ func (p awsInstancePlugin) VendorInfo() *spi.VendorInfo {
 	return &spi.VendorInfo{
 		InterfaceSpec: spi.InterfaceSpec{
 			Name:    "infrakit-instance-aws",
-			Version: "0.1.0",
+			Version: "0.3.0",
 		},
 		URL: "https://github.com/docker/infrakit.aws",
 	}
 }
 
 // ExampleProperties returns the properties / config of this plugin
-func (p awsInstancePlugin) ExampleProperties() *json.RawMessage {
+func (p awsInstancePlugin) ExampleProperties() *types.Any {
 	example := CreateInstanceRequest{
 		Tags: map[string]string{
 			"tag1": "value1",
@@ -94,18 +95,50 @@ func (p awsInstancePlugin) ExampleProperties() *json.RawMessage {
 			SecurityGroups:   []*string{},
 		},
 	}
-	buff, err := json.MarshalIndent(example, "", "  ")
+
+	any, err := types.AnyValue(example)
 	if err != nil {
 		panic(err)
 	}
-	raw := json.RawMessage(buff)
-	return &raw
+	return any
 }
 
 // Validate performs local checks to determine if the request is valid.
-func (p awsInstancePlugin) Validate(req json.RawMessage) error {
+func (p awsInstancePlugin) Validate(req *types.Any) error {
 	// TODO(wfarner): Implement
 	return nil
+}
+
+// Label implements labeling the instances.
+func (p awsInstancePlugin) Label(id instance.ID, labels map[string]string) error {
+
+	output, err := p.client.DescribeTags(&ec2.DescribeTagsInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("resource-id"),
+				Values: []*string{aws.String(string(id))},
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	allTags := map[string]string{}
+	for _, t := range output.Tags {
+		allTags[aws.StringValue(t.Key)] = aws.StringValue(t.Value)
+	}
+
+	keys, merged := mergeTags(allTags, labels)
+
+	tags := []*ec2.Tag{}
+	for _, k := range keys {
+		key := k
+		tags = append(tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(merged[key])})
+	}
+
+	_, err = p.client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{aws.String(string(id))}, Tags: tags})
+	return err
 }
 
 // mergeTags merges multiple maps of tags, implementing 'last write wins' for colliding keys.

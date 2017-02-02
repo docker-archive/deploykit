@@ -1,7 +1,7 @@
 package instance
 
 import (
-	"encoding/json"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // ID is the identifier for an instance.
@@ -30,7 +30,7 @@ type Attachment struct {
 // Spec is a specification of an instance to be provisioned
 type Spec struct {
 	// Properties is the opaque instance plugin configuration.
-	Properties *json.RawMessage
+	Properties *types.Any
 
 	// Tags are metadata that describes an instance.
 	Tags map[string]string
