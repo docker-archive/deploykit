@@ -1,11 +1,10 @@
 package instance
 
 import (
-	"encoding/json"
-
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewClient returns a plugin interface implementation connected to a plugin
@@ -23,9 +22,9 @@ type client struct {
 }
 
 // Validate performs local validation on a provision request.
-func (c client) Validate(properties json.RawMessage) error {
+func (c client) Validate(properties *types.Any) error {
 	_, instanceType := c.name.GetLookupAndType()
-	req := ValidateRequest{Properties: &properties, Type: instanceType}
+	req := ValidateRequest{Properties: properties, Type: instanceType}
 	resp := ValidateResponse{}
 
 	return c.client.Call("Instance.Validate", req, &resp)
@@ -42,6 +41,15 @@ func (c client) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	return resp.ID, nil
+}
+
+// Label labels the instance
+func (c client) Label(instance instance.ID, labels map[string]string) error {
+	_, instanceType := c.name.GetLookupAndType()
+	req := LabelRequest{Type: instanceType, Instance: instance, Labels: labels}
+	resp := LabelResponse{}
+
+	return c.client.Call("Instance.Label", req, &resp)
 }
 
 // Destroy terminates an existing instance.

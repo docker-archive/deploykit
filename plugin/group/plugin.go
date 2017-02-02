@@ -1,7 +1,6 @@
 package group
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -13,6 +12,7 @@ import (
 	instance_types "github.com/docker/infrakit.gcp/plugin/instance/types"
 	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
@@ -48,6 +48,16 @@ func NewGCEGroupPlugin(project, zone string, flavorPlugins group_plugin.FlavorPl
 	}
 }
 
+func (p *plugin) VendorInfo() *spi.VendorInfo {
+	return &spi.VendorInfo{
+		InterfaceSpec: spi.InterfaceSpec{
+			Name:    "infrakit-group-gcp",
+			Version: "0.3.0",
+		},
+		URL: "https://github.com/docker/infrakit.gcp",
+	}
+}
+
 func (p *plugin) validate(groupSpec group.Spec) (settings, error) {
 	noSettings := settings{}
 
@@ -73,24 +83,22 @@ func (p *plugin) validate(groupSpec group.Spec) (settings, error) {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", spec.Flavor.Plugin, err)
 	}
 
-	err = flavorPlugin.Validate(types.RawMessage(spec.Flavor.Properties), spec.Allocation)
+	err = flavorPlugin.Validate(spec.Flavor.Properties, spec.Allocation)
 	if err != nil {
 		return noSettings, err
 	}
-
-	rawInstanceProperties := json.RawMessage(spec.Instance.Properties.Bytes())
 
 	instanceSpec := instance.Spec{
 		Tags:       map[string]string{},
-		Properties: &rawInstanceProperties,
+		Properties: spec.Instance.Properties,
 	}
 
-	instanceSpec, err = flavorPlugin.Prepare(types.RawMessage(spec.Flavor.Properties), instanceSpec, spec.Allocation)
+	instanceSpec, err = flavorPlugin.Prepare(spec.Flavor.Properties, instanceSpec, spec.Allocation)
 	if err != nil {
 		return noSettings, err
 	}
 
-	instanceProperties, err := instance_types.ParseProperties(instance_types.RawMessage(instanceSpec.Properties))
+	instanceProperties, err := instance_types.ParseProperties(instanceSpec.Properties)
 	if err != nil {
 		return noSettings, err
 	}

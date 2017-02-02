@@ -1,14 +1,15 @@
 package group
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	"sync"
+
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/group/util"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"sync"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // newTestInstancePlugin creates a new instance plugin for use in testing and development.
@@ -39,7 +40,7 @@ func (d *testplugin) instancesCopy() map[instance.ID]instance.Spec {
 	return instances
 }
 
-func (d *testplugin) Validate(req json.RawMessage) error {
+func (d *testplugin) Validate(req *types.Any) error {
 	return nil
 }
 
@@ -57,6 +58,10 @@ func (d *testplugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	id := d.addInstance(spec)
 	return &id, nil
+}
+
+func (d *testplugin) Label(id instance.ID, labels map[string]string) error {
+	return nil
 }
 
 func (d *testplugin) Destroy(id instance.ID) error {
@@ -103,8 +108,8 @@ const (
 )
 
 type testFlavor struct {
-	healthy func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error)
-	drain   func(flavorProperties json.RawMessage, inst instance.Description) error
+	healthy func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error)
+	drain   func(flavorProperties *types.Any, inst instance.Description) error
 }
 
 type flavorSchema struct {
@@ -113,10 +118,10 @@ type flavorSchema struct {
 	Tags map[string]string
 }
 
-func (t testFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+func (t testFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 
 	s := flavorSchema{}
-	err := json.Unmarshal(flavorProperties, &s)
+	err := flavorProperties.Decode(&s)
 	if err != nil {
 		return err
 	}
@@ -137,13 +142,12 @@ func (t testFlavor) Validate(flavorProperties json.RawMessage, allocation types.
 	}
 }
 
-func (t testFlavor) Prepare(
-	flavorProperties json.RawMessage,
+func (t testFlavor) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	s := flavorSchema{}
-	err := json.Unmarshal(flavorProperties, &s)
+	err := flavorProperties.Decode(&s)
 	if err != nil {
 		return spec, err
 	}
@@ -155,7 +159,7 @@ func (t testFlavor) Prepare(
 	return spec, nil
 }
 
-func (t testFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (t testFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 	if t.healthy != nil {
 		return t.healthy(flavorProperties, inst)
 	}
@@ -163,7 +167,7 @@ func (t testFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Desc
 	return flavor.Healthy, nil
 }
 
-func (t testFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+func (t testFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
 	if t.drain != nil {
 		return t.drain(flavorProperties, inst)
 	}

@@ -30,6 +30,16 @@ func (_m *MockAPI) EXPECT() *_MockAPIRecorder {
 	return _m.recorder
 }
 
+func (_m *MockAPI) AddInstanceMetadata(_param0 string, _param1 []*v1.MetadataItems) error {
+	ret := _m.ctrl.Call(_m, "AddInstanceMetadata", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) AddInstanceMetadata(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "AddInstanceMetadata", arg0, arg1)
+}
+
 func (_m *MockAPI) AddInstanceToTargetPool(_param0 string, _param1 ...string) error {
 	_s := []interface{}{_param0}
 	for _, _x := range _param1 {

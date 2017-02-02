@@ -8,7 +8,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -74,7 +74,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		// TODO(wfarner): Don't hold the lock - this is a blocking operation.
 		updatePlan, err := context.supervisor.PlanUpdate(context.scaled, context.settings, settings)
 		if err != nil {
-			return updatePlan.Explain(), err
+			return "unable to fulfill request", err
 		}
 
 		if !pretend {
@@ -180,7 +180,7 @@ func (p *plugin) InspectGroups() ([]group.Spec, error) {
 	var specs []group.Spec
 	err := p.groups.forEach(func(id group.ID, ctx *groupContext) error {
 		if ctx != nil {
-			spec, err := types.UnparseProperties(string(id), ctx.settings.config)
+			spec, err := group_types.UnparseProperties(string(id), ctx.settings.config)
 			if err != nil {
 				return err
 			}
@@ -219,7 +219,7 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 		return noSettings, errors.New("Group ID must not be blank")
 	}
 
-	parsed, err := types.ParseProperties(config)
+	parsed, err := group_types.ParseProperties(config)
 	if err != nil {
 		return noSettings, err
 	}
@@ -240,7 +240,7 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.Flavor.Plugin, err)
 	}
 
-	if err := flavorPlugin.Validate(types.RawMessage(parsed.Flavor.Properties), parsed.Allocation); err != nil {
+	if err := flavorPlugin.Validate(parsed.Flavor.Properties, parsed.Allocation); err != nil {
 		return noSettings, err
 	}
 
@@ -249,7 +249,7 @@ func (p *plugin) validate(config group.Spec) (groupSettings, error) {
 		return noSettings, fmt.Errorf("Failed to find Instance plugin '%s':%v", parsed.Instance.Plugin, err)
 	}
 
-	if err := instancePlugin.Validate(types.RawMessage(parsed.Instance.Properties)); err != nil {
+	if err := instancePlugin.Validate(parsed.Instance.Properties); err != nil {
 		return noSettings, err
 	}
 

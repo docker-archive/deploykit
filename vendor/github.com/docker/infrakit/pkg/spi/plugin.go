@@ -1,7 +1,7 @@
 package spi
 
 import (
-	"encoding/json"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // InterfaceSpec is metadata about an API.
@@ -35,5 +35,5 @@ type InputExample interface {
 	// ExampleProperties returns an example JSON raw message that the vendor plugin understands.
 	// This is an example of what the user will configure and what will be used as the opaque
 	// blob in all the plugin methods where raw JSON messages are referenced.
-	ExampleProperties() *json.RawMessage
+	ExampleProperties() *types.Any
 }

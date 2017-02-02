@@ -2,10 +2,11 @@ package group
 
 import (
 	"fmt"
+
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"sync"
 )
 
@@ -61,11 +62,10 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 	spec := instance.Spec{
 		Tags:       tags,
 		LogicalID:  logicalID,
-		Properties: types.RawMessagePtr(settings.config.Instance.Properties),
+		Properties: types.AnyCopy(settings.config.Instance.Properties),
 	}
 
-	spec, err := settings.flavorPlugin.Prepare(
-		types.RawMessage(settings.config.Flavor.Properties),
+	spec, err := settings.flavorPlugin.Prepare(types.AnyCopy(settings.config.Flavor.Properties),
 		spec,
 		settings.config.Allocation)
 	if err != nil {
@@ -90,9 +90,7 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
 	settings := s.latestSettings()
 
-	health, err := settings.flavorPlugin.Healthy(
-		types.RawMessage(settings.config.Flavor.Properties),
-		inst)
+	health, err := settings.flavorPlugin.Healthy(types.AnyCopy(settings.config.Flavor.Properties), inst)
 	if err != nil {
 		log.Warnf("Failed to check health of instance %s: %s", inst.ID, err)
 		return flavor.Unknown
@@ -104,7 +102,7 @@ func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
 func (s *scaledGroup) Destroy(inst instance.Description) {
 	settings := s.latestSettings()
 
-	flavorProperties := types.RawMessage(settings.config.Flavor.Properties)
+	flavorProperties := types.AnyCopy(settings.config.Flavor.Properties)
 	if err := settings.flavorPlugin.Drain(flavorProperties, inst); err != nil {
 		log.Errorf("Failed to drain %s: %s", inst.ID, err)
 	}

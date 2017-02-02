@@ -1,10 +1,10 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
@@ -33,7 +33,7 @@ type Properties struct {
 }
 
 // ParseProperties parses instance Properties from a json description.
-func ParseProperties(req json.RawMessage) (Properties, error) {
+func ParseProperties(req *types.Any) (Properties, error) {
 	parsed := Properties{
 		NamePrefix:  defaultNamePrefix,
 		MachineType: defaultMachineType,
@@ -43,7 +43,7 @@ func ParseProperties(req json.RawMessage) (Properties, error) {
 		DiskType:    defaultDiskType,
 	}
 
-	if err := json.Unmarshal([]byte(req), &parsed); err != nil {
+	if err := req.Decode(&parsed); err != nil {
 		return parsed, fmt.Errorf("Invalid properties: %s", err)
 	}
 
@@ -61,7 +61,7 @@ func ParseMetadata(spec instance.Spec) (map[string]string, error) {
 		metadata["startup-script"] = spec.Init
 	}
 
-	properties, err := ParseProperties(RawMessage(spec.Properties))
+	properties, err := ParseProperties(spec.Properties)
 	if err != nil {
 		return nil, err
 	}
@@ -70,13 +70,4 @@ func ParseMetadata(spec instance.Spec) (map[string]string, error) {
 	}
 
 	return metadata, nil
-}
-
-// RawMessage converts a pointer to a raw message to a copy of the value. If the pointer is nil, it returns
-// an empty raw message.
-func RawMessage(r *json.RawMessage) (raw json.RawMessage) {
-	if r != nil {
-		raw = *r
-	}
-	return
 }

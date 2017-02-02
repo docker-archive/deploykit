@@ -37,6 +37,9 @@ type API interface {
 	// AddInstanceToTargetPool adds a list of instances to a target pool.
 	AddInstanceToTargetPool(targetPool string, instances ...string) error
 
+	// AddInstanceMetadata replaces/adds metadata items to an instance
+	AddInstanceMetadata(instanceName string, items []*compute.MetadataItems) error
+
 	// DeleteInstance deletes an instance.
 	DeleteInstance(name string) error
 
@@ -307,6 +310,31 @@ func (g *computeServiceWrapper) AddInstanceToTargetPool(targetPool string, insta
 	}
 
 	return g.doCall(g.service.TargetPools.AddInstance(g.project, g.region(), targetPool, request))
+}
+
+func (g *computeServiceWrapper) AddInstanceMetadata(instanceName string, items []*compute.MetadataItems) error {
+	instance, err := g.GetInstance(instanceName)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range items {
+		found := false
+		for _, existingItem := range instance.Metadata.Items {
+			if existingItem.Key == item.Key {
+				existingItem.Value = item.Value
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			instance.Metadata.Items = append(instance.Metadata.Items, item)
+		}
+
+	}
+
+	return g.doCall(g.service.Instances.SetMetadata(g.project, g.zone, instanceName, instance.Metadata))
 }
 
 func (g *computeServiceWrapper) DeleteInstance(name string) error {
