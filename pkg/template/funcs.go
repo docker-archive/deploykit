@@ -76,9 +76,9 @@ func UnixTime() interface{} {
 	return time.Now().Unix()
 }
 
-// Index returns the index of search in array.  -1 if not found or array is not iterable.  An optional true will
+// IndexOf returns the index of search in array.  -1 if not found or array is not iterable.  An optional true will
 // turn on strict type check while by default string representations are used to compare values.
-func Index(srch interface{}, array interface{}, strictOptional ...bool) int {
+func IndexOf(srch interface{}, array interface{}, strictOptional ...bool) int {
 	strict := false
 	if len(strictOptional) > 0 {
 		strict = strictOptional[0]
@@ -153,6 +153,6 @@ func (t *Template) DefaultFuncs() map[string]interface{} {
 		"lines":     SplitLines,
 		"to_json":   ToJSON,
 		"from_json": FromJSON,
-		"index":     Index,
+		"index_of":  IndexOf,
 	}
 }
