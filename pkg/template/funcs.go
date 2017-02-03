@@ -33,7 +33,7 @@ func SplitLines(o interface{}) ([]string, error) {
 
 // FromJSON decode the input JSON encoded as string or byte slice into a map.
 func FromJSON(o interface{}) (interface{}, error) {
-	ret := map[string]interface{}{}
+	var ret interface{}
 	switch o := o.(type) {
 	case string:
 		err := json.Unmarshal([]byte(o), &ret)
@@ -136,11 +136,37 @@ func (t *Template) DefaultFuncs() map[string]interface{} {
 			return make([]struct{}, c)
 		},
 
-		"var": func(name, doc string, v ...interface{}) interface{} {
+		"def": func(name string, args ...interface{}) (string, error) {
+			if _, has := t.defaults[name]; has {
+				// not sure if this is good, but should complain loudly
+				return "", fmt.Errorf("already defined: %v", name)
+			}
+			var doc string
+			var value interface{}
+			switch len(args) {
+			case 1:
+				// just value, no docs
+				value = args[0]
+			case 2:
+				// docs and value
+				doc = fmt.Sprintf("%v", args[0])
+				value = args[1]
+			}
+			t.defaults[name] = defaultValue{
+				Name:  name,
+				Value: value,
+				Doc:   doc,
+			}
+			return "", nil
+		},
+
+		"ref": func(name string) interface{} {
 			if found, has := t.binds[name]; has {
 				return found
+			} else if v, has := t.defaults[name]; has {
+				return v.Value
 			}
-			return v // default
+			return nil
 		},
 
 		"global": func(name string, v interface{}) interface{} {
