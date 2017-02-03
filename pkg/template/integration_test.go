@@ -158,3 +158,31 @@ The message is {{str}}
 	require.True(t, context.Bool)
 	require.Equal(t, 23, context.invokes) // note this is private state not accessible in template
 }
+
+func TestIndexIndexOf(t *testing.T) {
+
+	{
+		tt, err := NewTemplate("str://{{ index . 1 }}", Options{})
+		require.NoError(t, err)
+
+		view, err := tt.Render([]string{"a", "b", "c", "d"})
+		require.NoError(t, err)
+		require.Equal(t, "b", view)
+	}
+	{
+		tt, err := NewTemplate(`str://{{ index_of "c" . }}`, Options{})
+		require.NoError(t, err)
+
+		view, err := tt.Render([]string{"a", "b", "c", "d"})
+		require.NoError(t, err)
+		require.Equal(t, "2", view)
+	}
+	{
+		tt, err := NewTemplate(`str://{{ index . 0 | cat "index-" | nospace }}`, Options{})
+		require.NoError(t, err)
+
+		view, err := tt.Render([]string{"a", "b", "c", "d"})
+		require.NoError(t, err)
+		require.Equal(t, "index-a", view)
+	}
+}
