@@ -45,16 +45,23 @@ type Options struct {
 	SocketDir string
 }
 
+type defaultValue struct {
+	Name  string
+	Value interface{}
+	Doc   string
+}
+
 // Template is the templating engine
 type Template struct {
 	options Options
 
-	url    string
-	body   []byte
-	parsed *template.Template
-	funcs  map[string]interface{}
-	binds  map[string]interface{}
-	lock   sync.Mutex
+	url      string
+	body     []byte
+	parsed   *template.Template
+	funcs    map[string]interface{}
+	binds    map[string]interface{}
+	defaults map[string]defaultValue
+	lock     sync.Mutex
 }
 
 // NewTemplate fetches the content at the url and returns a template.  If the string begins
@@ -84,11 +91,12 @@ func NewTemplateFromBytes(buff []byte, contextURL string, opt Options) (*Templat
 	}
 
 	return &Template{
-		options: opt,
-		url:     contextURL,
-		body:    buff,
-		funcs:   map[string]interface{}{},
-		binds:   map[string]interface{}{},
+		options:  opt,
+		url:      contextURL,
+		body:     buff,
+		funcs:    map[string]interface{}{},
+		binds:    map[string]interface{}{},
+		defaults: map[string]defaultValue{},
 	}, nil
 }
 
