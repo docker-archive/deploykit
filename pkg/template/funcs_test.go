@@ -57,6 +57,14 @@ func TestQueryObjectEncodeDecode(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, decoded, decoded2)
+
+	decoded, err = FromJSON("[]")
+	require.NoError(t, err)
+	require.Equal(t, []interface{}{}, decoded)
+
+	decoded, err = FromJSON(`{"foo":"bar"}`)
+	require.NoError(t, err)
+	require.Equal(t, map[string]interface{}{"foo": "bar"}, decoded)
 }
 
 func TestQueryObject(t *testing.T) {
