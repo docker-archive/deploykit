@@ -7,35 +7,12 @@ import (
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	testing_group "github.com/docker/infrakit/pkg/testing/group"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"path"
 )
-
-type testPlugin struct {
-	DoCommitGroup   func(grp group.Spec, pretend bool) (string, error)
-	DoFreeGroup     func(id group.ID) error
-	DoDescribeGroup func(id group.ID) (group.Description, error)
-	DoDestroyGroup  func(id group.ID) error
-	DoInspectGroups func() ([]group.Spec, error)
-}
-
-func (t *testPlugin) CommitGroup(grp group.Spec, pretend bool) (string, error) {
-	return t.DoCommitGroup(grp, pretend)
-}
-func (t *testPlugin) FreeGroup(id group.ID) error {
-	return t.DoFreeGroup(id)
-}
-func (t *testPlugin) DescribeGroup(id group.ID) (group.Description, error) {
-	return t.DoDescribeGroup(id)
-}
-func (t *testPlugin) DestroyGroup(id group.ID) error {
-	return t.DoDestroyGroup(id)
-}
-func (t *testPlugin) InspectGroups() ([]group.Spec, error) {
-	return t.DoInspectGroups()
-}
 
 func must(p group.Plugin, err error) group.Plugin {
 	if err != nil {
@@ -62,7 +39,7 @@ func TestGroupPluginCommitGroup(t *testing.T) {
 		Properties: types.AnyString(`{"foo":"bar"}`),
 	}
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_group.Plugin{
 		DoCommitGroup: func(req group.Spec, pretend bool) (string, error) {
 			groupSpecActual <- req
 			return "commit details", nil
@@ -88,7 +65,7 @@ func TestGroupPluginCommitGroupError(t *testing.T) {
 		Properties: types.AnyString(`{"foo":"bar"}`),
 	}
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_group.Plugin{
 		DoCommitGroup: func(req group.Spec, pretend bool) (string, error) {
 			groupSpecActual <- req
 			return "", errors.New("error")
@@ -110,7 +87,7 @@ func TestGroupPluginFreeGroup(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_group.Plugin{
 		DoFreeGroup: func(req group.ID) error {
 			idActual <- req
 			return nil
@@ -130,7 +107,7 @@ func TestGroupPluginFreeGroupError(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_group.Plugin{
 		DoFreeGroup: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
@@ -151,7 +128,7 @@ func TestGroupPluginDestroyGroup(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_group.Plugin{
 		DoDestroyGroup: func(req group.ID) error {
 			idActual <- req
 			return nil
@@ -171,7 +148,7 @@ func TestGroupPluginDestroyGroupError(t *testing.T) {
 
 	id := group.ID("group")
 	idActual := make(chan group.ID, 1)
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_group.Plugin{
 		DoDestroyGroup: func(req group.ID) error {
 			idActual <- req
 			return errors.New("no")
@@ -199,7 +176,7 @@ func TestGroupPluginInspectGroup(t *testing.T) {
 		},
 	}
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_group.Plugin{
 		DoDescribeGroup: func(req group.ID) (group.Description, error) {
 			idActual <- req
 			return desc, nil
@@ -225,7 +202,7 @@ func TestGroupPluginInspectGroupError(t *testing.T) {
 		},
 	}
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_group.Plugin{
 		DoDescribeGroup: func(req group.ID) (group.Description, error) {
 			idActual <- req
 			return desc, errors.New("no")

@@ -10,6 +10,7 @@ import (
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	testing_flavor "github.com/docker/infrakit/pkg/testing/flavor"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -27,33 +28,6 @@ func tempSocket() string {
 	return path.Join(dir, "flavor-impl-test")
 }
 
-type testPlugin struct {
-	DoValidate func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error
-	DoPrepare  func(flavorProperties *types.Any, spec instance.Spec,
-		allocation group_types.AllocationMethod) (instance.Spec, error)
-	DoHealthy func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error)
-	DoDrain   func(flavorProperties *types.Any, inst instance.Description) error
-}
-
-func (t *testPlugin) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
-	return t.DoValidate(flavorProperties, allocation)
-}
-
-func (t *testPlugin) Prepare(flavorProperties *types.Any,
-	spec instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
-
-	return t.DoPrepare(flavorProperties, spec, allocation)
-}
-
-func (t *testPlugin) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
-	return t.DoHealthy(flavorProperties, inst)
-}
-
-func (t *testPlugin) Drain(flavorProperties *types.Any, inst instance.Description) error {
-	return t.DoDrain(flavorProperties, inst)
-}
-
 func TestFlavorPluginValidate(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
@@ -61,7 +35,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 	inputFlavorPropertiesActual := make(chan *types.Any, 1)
 	inputFlavorProperties := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
 			return nil
@@ -83,7 +57,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	inputFlavorPropertiesActual := make(chan *types.Any, 1)
 	inputFlavorProperties := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
 			return errors.New("something-went-wrong")
@@ -111,7 +85,7 @@ func TestFlavorPluginPrepare(t *testing.T) {
 		Tags:       map[string]string{"foo": "bar"},
 	}
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoPrepare: func(
 			flavorProperties *types.Any,
 			instanceSpec instance.Spec,
@@ -150,7 +124,7 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 		Tags:       map[string]string{"foo": "bar"},
 	}
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoPrepare: func(
 			flavorProperties *types.Any,
 			instanceSpec instance.Spec,
@@ -188,7 +162,7 @@ func TestFlavorPluginHealthy(t *testing.T) {
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoHealthy: func(properties *types.Any, inst instance.Description) (flavor.Health, error) {
 			inputPropertiesActual <- properties
 			inputInstanceActual <- inst
@@ -217,7 +191,7 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoHealthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 			inputPropertiesActual <- flavorProperties
 			inputInstanceActual <- inst
@@ -246,7 +220,7 @@ func TestFlavorPluginDrain(t *testing.T) {
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoDrain: func(properties *types.Any, inst instance.Description) error {
 			inputPropertiesActual <- properties
 			inputInstanceActual <- inst
@@ -273,7 +247,7 @@ func TestFlavorPluginDrainError(t *testing.T) {
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoDrain: func(flavorProperties *types.Any, inst instance.Description) error {
 			inputPropertiesActual <- flavorProperties
 			inputInstanceActual <- inst

@@ -64,6 +64,12 @@ type baseFlavor struct {
 	initScript      *template.Template
 }
 
+// Funcs implements the template.FunctionExporter interface that allows the RPC server to expose help on the
+// functions it exports
+func (s *baseFlavor) Funcs() []template.Function {
+	return (&templateContext{}).Funcs()
+}
+
 // Validate checks the configuration of flavor plugin.
 func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 	if flavorProperties == nil {

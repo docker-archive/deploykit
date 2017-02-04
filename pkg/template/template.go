@@ -26,6 +26,12 @@ type Function struct {
 	Func interface{}
 }
 
+// FunctionExporter is implemented by any plugins wishing to show help on the function it exports.
+type FunctionExporter interface {
+	// Funcs returns a list of special template functions of the form func(template.Context, arg1, arg2) interface{}
+	Funcs() []Function
+}
+
 // Context is a marker interface for a user-defined struct that is passed into the template engine (as context)
 // and accessible in the exported template functions.  Template functions can have the signature
 // func(template.Context, arg1, arg2 ...) (string, error) and when functions like this are registered, the template
@@ -74,7 +80,7 @@ func NewTemplate(s string, opt Options) (*Template, error) {
 		buff = []byte(strings.Replace(s, "str://", "", 1))
 		contextURL = defaultContextURL()
 	} else {
-		b, err := fetch(s, opt)
+		b, err := Fetch(s, opt)
 		if err != nil {
 			return nil, err
 		}

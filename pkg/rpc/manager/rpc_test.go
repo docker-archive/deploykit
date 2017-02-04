@@ -8,17 +8,9 @@ import (
 
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/rpc/server"
+	testing_manager "github.com/docker/infrakit/pkg/testing/manager"
 	"github.com/stretchr/testify/require"
 )
-
-type testPlugin struct {
-	// IsLeader returns true if manager is leader
-	DoIsLeader func() (bool, error)
-}
-
-func (t *testPlugin) IsLeader() (bool, error) {
-	return t.DoIsLeader()
-}
 
 func tempSocket() string {
 	dir, err := ioutil.TempDir("", "infrakit-test-")
@@ -42,7 +34,7 @@ func TestManagerIsLeader(t *testing.T) {
 	rawActual := make(chan bool, 1)
 	expect := true
 
-	server, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := server.StartPluginAtPath(socketPath, PluginServer(&testing_manager.Plugin{
 		DoIsLeader: func() (bool, error) {
 
 			rawActual <- expect
@@ -67,7 +59,7 @@ func TestManagerIsLeaderError(t *testing.T) {
 	called := make(chan struct{})
 	expect := errors.New("backend-error")
 
-	server, err := server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := server.StartPluginAtPath(socketPath, PluginServer(&testing_manager.Plugin{
 		DoIsLeader: func() (bool, error) {
 
 			close(called)
