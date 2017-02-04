@@ -306,19 +306,6 @@ type templateContext struct {
 func (c *templateContext) Funcs() []template.Function {
 	return []template.Function{
 		{
-			Name:        "SWARM_CONNECT_RETRIES",
-			Description: "Connect to the swarm manager",
-			Func: func(retries int, wait string) interface{} {
-				c.retries = retries
-				poll, err := time.ParseDuration(wait)
-				if err != nil {
-					poll = 1 * time.Minute
-				}
-				c.poll = poll
-				return ""
-			},
-		},
-		{
 			Name:        "SPEC",
 			Description: "The flavor spec as found in Properties field of the config JSON",
 			Func: func() interface{} {
@@ -344,14 +331,14 @@ func (c *templateContext) Funcs() []template.Function {
 		},
 		{
 			Name:        "INFRAKIT_LABELS",
-			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
+			Description: "The Docker engine labels to be applied for linking the Docker engine to this instance.",
 			Func: func() []string {
 				return c.link.KVPairs()
 			},
 		},
 		{
 			Name:        "SWARM_MANAGER_IP",
-			Description: "The label name to use for linking an InfraKit managed resource somewhere else.",
+			Description: "IP of the Swarm manager / leader",
 			Func: func() (string, error) {
 				if c.nodeInfo == nil {
 					return "", fmt.Errorf("cannot prepare: no node info")
