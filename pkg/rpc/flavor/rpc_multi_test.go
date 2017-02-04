@@ -10,6 +10,7 @@ import (
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	testing_flavor "github.com/docker/infrakit/pkg/testing/flavor"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -33,13 +34,13 @@ func TestFlavorMultiPluginValidate(t *testing.T) {
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_flavor.Plugin{
 				DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 					inputFlavorPropertiesActual1 <- flavorProperties
 					return nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_flavor.Plugin{
 				DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 					inputFlavorPropertiesActual2 <- flavorProperties
 					return errors.New("something-went-wrong")
@@ -82,7 +83,7 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_flavor.Plugin{
 				DoPrepare: func(
 					flavorProperties *types.Any,
 					instanceSpec instance.Spec,
@@ -94,7 +95,7 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 					return instanceSpec, nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_flavor.Plugin{
 				DoPrepare: func(
 					flavorProperties *types.Any,
 					instanceSpec instance.Spec,
@@ -155,14 +156,14 @@ func TestFlavorMultiPluginHealthy(t *testing.T) {
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_flavor.Plugin{
 				DoHealthy: func(properties *types.Any, inst instance.Description) (flavor.Health, error) {
 					inputPropertiesActual1 <- properties
 					inputInstanceActual1 <- inst
 					return flavor.Healthy, nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_flavor.Plugin{
 				DoHealthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 					inputPropertiesActual2 <- flavorProperties
 					inputInstanceActual2 <- inst
@@ -211,14 +212,14 @@ func TestFlavorMultiPluginDrain(t *testing.T) {
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_flavor.Plugin{
 				DoDrain: func(properties *types.Any, inst instance.Description) error {
 					inputPropertiesActual1 <- properties
 					inputInstanceActual1 <- inst
 					return nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_flavor.Plugin{
 				DoDrain: func(flavorProperties *types.Any, inst instance.Description) error {
 					inputPropertiesActual2 <- flavorProperties
 					inputInstanceActual2 <- inst

@@ -8,6 +8,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	testing_instance "github.com/docker/infrakit/pkg/testing/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +32,7 @@ func TestInstanceTypedPluginValidate(t *testing.T) {
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]instance.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_instance.Plugin{
 				DoValidate: func(req *types.Any) error {
 
 					rawActual1 <- req
@@ -39,7 +40,7 @@ func TestInstanceTypedPluginValidate(t *testing.T) {
 					return nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_instance.Plugin{
 				DoValidate: func(req *types.Any) error {
 
 					rawActual2 <- req
@@ -77,7 +78,7 @@ func TestInstanceTypedPluginValidateError(t *testing.T) {
 	rawActual2 := make(chan *types.Any, 1)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(map[string]instance.Plugin{
-		"type1": &testPlugin{
+		"type1": &testing_instance.Plugin{
 			DoValidate: func(req *types.Any) error {
 
 				rawActual1 <- req
@@ -85,7 +86,7 @@ func TestInstanceTypedPluginValidateError(t *testing.T) {
 				return errors.New("whoops")
 			},
 		},
-		"type2": &testPlugin{
+		"type2": &testing_instance.Plugin{
 			DoValidate: func(req *types.Any) error {
 
 				rawActual2 <- req
@@ -131,20 +132,20 @@ func TestInstanceTypedPluginProvision(t *testing.T) {
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]instance.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_instance.Plugin{
 				DoProvision: func(req instance.Spec) (*instance.ID, error) {
 					specActual1 <- req
 					return nil, nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_instance.Plugin{
 				DoProvision: func(req instance.Spec) (*instance.ID, error) {
 					specActual2 <- req
 					v := instance.ID("test")
 					return &v, nil
 				},
 			},
-			"error": &testPlugin{
+			"error": &testing_instance.Plugin{
 				DoProvision: func(req instance.Spec) (*instance.ID, error) {
 					specActual3 <- req
 					return nil, errors.New("nope")
@@ -189,14 +190,14 @@ func TestInstanceTypedPluginLabel(t *testing.T) {
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]instance.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_instance.Plugin{
 				DoLabel: func(req instance.ID, labels map[string]string) error {
 					instActual1 <- req
 					labelActual1 <- labels
 					return nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_instance.Plugin{
 				DoLabel: func(req instance.ID, labels map[string]string) error {
 					instActual2 <- req
 					labelActual2 <- labels
@@ -232,13 +233,13 @@ func TestInstanceTypedPluginDestroy(t *testing.T) {
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]instance.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_instance.Plugin{
 				DoDestroy: func(req instance.ID) error {
 					instActual1 <- req
 					return nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_instance.Plugin{
 				DoDestroy: func(req instance.ID) error {
 					instActual2 <- req
 					return errors.New("can't do")
@@ -285,19 +286,19 @@ func TestInstanceTypedPluginDescribeInstances(t *testing.T) {
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]instance.Plugin{
-			"type1": &testPlugin{
+			"type1": &testing_instance.Plugin{
 				DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 					tagsActual1 <- req
 					return list1, nil
 				},
 			},
-			"type2": &testPlugin{
+			"type2": &testing_instance.Plugin{
 				DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 					tagsActual2 <- req
 					return list2, nil
 				},
 			},
-			"type3": &testPlugin{
+			"type3": &testing_instance.Plugin{
 				DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
 					tagsActual3 <- req
 					return list3, errors.New("bad")

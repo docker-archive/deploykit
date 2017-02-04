@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -37,6 +38,43 @@ func (p *Flavor) VendorInfo() *spi.VendorInfo {
 		return m.VendorInfo()
 	}
 	return nil
+}
+
+// Funcs implements the template.FunctionExporter method to expose help for plugin's template functions
+func (p *Flavor) Funcs() []template.Function {
+	f, is := p.plugin.(template.FunctionExporter)
+	if !is {
+		return []template.Function{}
+	}
+	return f.Funcs()
+}
+
+// Types implements server.TypedFunctionExporter
+func (p *Flavor) Types() []string {
+	if p.typedPlugins == nil {
+		return nil
+	}
+	list := []string{}
+	for k := range p.typedPlugins {
+		list = append(list, k)
+	}
+	return list
+}
+
+// FuncsByType implements server.TypedFunctionExporter
+func (p *Flavor) FuncsByType(t string) []template.Function {
+	if p.typedPlugins == nil {
+		return nil
+	}
+	fp, has := p.typedPlugins[t]
+	if !has {
+		return nil
+	}
+	exp, is := fp.(template.FunctionExporter)
+	if !is {
+		return nil
+	}
+	return exp.Funcs()
 }
 
 // SetExampleProperties sets the rpc request with any example properties/ custom type

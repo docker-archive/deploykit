@@ -14,6 +14,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPrintFunc(t *testing.T) {
+
+	s := printFunc("null", nil)
+	require.Equal(t, "no-function", s)
+
+	s = printFunc("string", "string")
+	require.Equal(t, "not-a-function", s)
+
+	s = printFunc("concat", func(a, b string) (string, error) { return "", nil })
+	require.Equal(t, "func(string, string) (string, error)", s)
+
+	s = printUsage("concat", func(a, b, c string) (string, error) { return "", nil })
+	require.Equal(t, `{{ concat "string" "string" "string" }}`, s)
+
+	s = printUsage("somefun", func(a, b, c string, d int) (string, error) { return "", nil })
+	require.Equal(t, `{{ somefun "string" "string" "string" int }}`, s)
+
+	s = printUsage("somefun", func(a, b, c string, d int, e ...bool) (string, error) { return "", nil })
+	require.Equal(t, `{{ somefun "string" "string" "string" int [ bool ... ] }}`, s)
+
+	s = printUsage("myfunc", func(a, b interface{}) (interface{}, error) { return "", nil })
+	require.Equal(t, `{{ myfunc any any }}`, s)
+
+	s = printUsage("myfunc", func(a []string, b map[string]interface{}) (interface{}, error) { return "", nil })
+	require.Equal(t, `{{ myfunc []string map[string]interface{} }}`, s)
+}
+
 func TestReflect(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
