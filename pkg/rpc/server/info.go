@@ -62,30 +62,12 @@ func (m *PluginInfo) ShowAPI(resp http.ResponseWriter, req *http.Request) {
 	return
 }
 
-type functionInfo struct {
-	template.Function
-	Func  string
-	Usage string
-}
-
-func fromFunctions(functions []template.Function) []*functionInfo {
-	list := []*functionInfo{}
-	for _, fn := range functions {
-		list = append(list, &functionInfo{
-			Function: fn,
-			Func:     printFunc(fn.Name, fn.Func),
-			Usage:    printUsage(fn.Name, fn.Func),
-		})
-	}
-	return list
-}
-
 // ShowTemplateFunctions responds by returning information about template functions the plugin expopses.
 func (m *PluginInfo) ShowTemplateFunctions(resp http.ResponseWriter, req *http.Request) {
-	result := map[string][]*functionInfo{}
+	result := map[string][]template.Function{}
 	exporter, is := m.receiver.(template.FunctionExporter)
 	if is {
-		base := fromFunctions(exporter.Funcs())
+		base := template.UpdateDocumentation(exporter.Funcs())
 		if len(base) > 0 {
 			result["base"] = base
 		}
@@ -94,7 +76,7 @@ func (m *PluginInfo) ShowTemplateFunctions(resp http.ResponseWriter, req *http.R
 	texporter, is := m.receiver.(TypedFunctionExporter)
 	if is {
 		for _, t := range texporter.Types() {
-			typed := fromFunctions(texporter.FuncsByType(t))
+			typed := template.UpdateDocumentation(texporter.FuncsByType(t))
 			if len(typed) > 0 {
 				result[t] = typed
 			}
@@ -102,13 +84,13 @@ func (m *PluginInfo) ShowTemplateFunctions(resp http.ResponseWriter, req *http.R
 	}
 
 	if t, err := template.NewTemplate("str://", template.Options{}); err == nil {
-		builtin := fromFunctions(t.DefaultFuncs())
+		builtin := template.UpdateDocumentation(t.DefaultFuncs())
 		if len(builtin) > 0 {
 			result["builtin"] = builtin
 		}
 	}
 
-	buff, err := json.Marshal(result)
+	buff, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
 		resp.Write([]byte(err.Error()))

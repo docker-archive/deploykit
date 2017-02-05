@@ -24,6 +24,12 @@ type Function struct {
 
 	// Func is the reference to the actual function
 	Func interface{} `json:"-"`
+
+	// Function is the signature of the function
+	Function string
+
+	// Usage shows how to use it
+	Usage string `json:",omitempty"`
 }
 
 // FunctionExporter is implemented by any plugins wishing to show help on the function it exports.
@@ -145,6 +151,7 @@ func (t *Template) Validate() (*Template, error) {
 	return t, t.build(nil)
 }
 
+// Funcs returns a list of registered functions used by the template when it rendered the view.
 func (t *Template) Funcs() []Function {
 	return t.registered
 }
@@ -208,6 +215,7 @@ func (t *Template) Execute(output io.Writer, context interface{}) error {
 	return t.parsed.Execute(output, context)
 }
 
+// returns as Context if input implements the interface; otherwise nil
 func toContext(in interface{}) Context {
 	var context Context
 	if in != nil {

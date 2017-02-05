@@ -47,7 +47,6 @@ func TestFetchAPIInfoFromPlugin(t *testing.T) {
 	url = "unix://" + host + "/info/functions.json"
 	buff, err = template.Fetch(url, template.Options{SocketDir: dir})
 	require.NoError(t, err)
-	t.Log(string(buff))
 
 	server.Stop()
 }
@@ -87,7 +86,7 @@ func TestFetchFunctionsFromPlugin(t *testing.T) {
 	dir := filepath.Dir(socketPath)
 	host := filepath.Base(socketPath)
 
-	url := "unix://" + host + "/info/api.json"
+	url := "unix://" + host + "/info/functions.json"
 
 	server, err := StartPluginAtPath(socketPath, rpc_flavor.PluginServer(&exporter{&testing_flavor.Plugin{}}))
 	require.NoError(t, err)
@@ -98,22 +97,10 @@ func TestFetchFunctionsFromPlugin(t *testing.T) {
 	decoded, err := template.FromJSON(buff)
 	require.NoError(t, err)
 
-	result, err := template.QueryObject("Implements[].Name | [0]", decoded)
-	require.NoError(t, err)
-	require.Equal(t, "Flavor", result)
-
-	url = "unix://" + host + "/info/functions.json"
-	buff, err = template.Fetch(url, template.Options{SocketDir: dir})
-	require.NoError(t, err)
-	t.Log(string(buff))
-
-	decoded, err = template.FromJSON(buff)
-	require.NoError(t, err)
-
 	list := decoded.(map[string]interface{})["base"].([]interface{})
 	require.Equal(t, 3, len(list))
 
-	result, err = template.QueryObject("[].Usage | [2]", list)
+	result, err := template.QueryObject("[].Usage | [2]", list)
 	require.NoError(t, err)
 	require.Equal(t, "{{ join_token }}", result)
 

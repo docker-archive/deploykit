@@ -51,6 +51,12 @@ func ToJSON(o interface{}) (string, error) {
 	return string(buff), err
 }
 
+// ToJSONFormat encodes the input struct into a JSON string with format prefix, and indent.
+func ToJSONFormat(prefix, indent string, o interface{}) (string, error) {
+	buff, err := json.MarshalIndent(o, prefix, indent)
+	return string(buff), err
+}
+
 // FromMap decodes map into raw struct
 func FromMap(m map[string]interface{}, raw interface{}) error {
 	// The safest way, but the slowest, is to just marshal and unmarshal back
@@ -217,6 +223,13 @@ func (t *Template) DefaultFuncs() []Function {
 				"Example: {{ include \"https://httpbin.org/get\" | from_json | to_json }}",
 			},
 			Func: ToJSON,
+		},
+		{
+			Name: "to_json_format",
+			Description: []string{
+				"Encodes the input as a JSON string with first arg as prefix, second arg the indentation, then the object",
+			},
+			Func: ToJSONFormat,
 		},
 		{
 			Name: "from_json",
