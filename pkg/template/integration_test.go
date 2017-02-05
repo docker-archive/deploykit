@@ -159,30 +159,13 @@ The message is {{str}}
 	require.Equal(t, 23, context.invokes) // note this is private state not accessible in template
 }
 
-func TestIndexIndexOf(t *testing.T) {
+func TestAddDef(t *testing.T) {
 
-	{
-		tt, err := NewTemplate("str://{{ index . 1 }}", Options{})
-		require.NoError(t, err)
+	s := `{{ ref "message" }}: x + y = {{ add (ref "x") (ref "y") }}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
 
-		view, err := tt.Render([]string{"a", "b", "c", "d"})
-		require.NoError(t, err)
-		require.Equal(t, "b", view)
-	}
-	{
-		tt, err := NewTemplate(`str://{{ index_of "c" . }}`, Options{})
-		require.NoError(t, err)
-
-		view, err := tt.Render([]string{"a", "b", "c", "d"})
-		require.NoError(t, err)
-		require.Equal(t, "2", view)
-	}
-	{
-		tt, err := NewTemplate(`str://{{ index . 0 | cat "index-" | nospace }}`, Options{})
-		require.NoError(t, err)
-
-		view, err := tt.Render([]string{"a", "b", "c", "d"})
-		require.NoError(t, err)
-		require.Equal(t, "index-a", view)
-	}
+	view, err := tt.AddDef("x", 25, "Default value for x").AddDef("y", 100).AddDef("message", "hello").Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "hello: x + y = 125", view)
 }

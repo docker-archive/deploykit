@@ -20,10 +20,16 @@ type Function struct {
 	Name string
 
 	// Description provides help for the function
-	Description string
+	Description []string `json:",omitempty"`
 
 	// Func is the reference to the actual function
-	Func interface{}
+	Func interface{} `json:"-"`
+
+	// Function is the signature of the function
+	Function string
+
+	// Usage shows how to use it
+	Usage string `json:",omitempty"`
 }
 
 // FunctionExporter is implemented by any plugins wishing to show help on the function it exports.
@@ -67,7 +73,9 @@ type Template struct {
 	funcs    map[string]interface{}
 	binds    map[string]interface{}
 	defaults map[string]defaultValue
-	lock     sync.Mutex
+
+	registered []Function
+	lock       sync.Mutex
 }
 
 // NewTemplate fetches the content at the url and returns a template.  If the string begins
@@ -122,12 +130,30 @@ func (t *Template) AddFunc(name string, f interface{}) *Template {
 	return t
 }
 
+// AddDef is equivalent to a {{ def "key" value "description" }} in defining a variable with a default value.
+// The value is accessible via a {{ ref "key" }} in the template.
+func (t *Template) AddDef(name string, val interface{}, doc ...string) *Template {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.defaults[name] = defaultValue{
+		Name:  name,
+		Value: val,
+		Doc:   strings.Join(doc, " "),
+	}
+	return t
+}
+
 // Validate parses the template and checks for validity.
 func (t *Template) Validate() (*Template, error) {
 	t.lock.Lock()
 	t.parsed = nil
 	t.lock.Unlock()
 	return t, t.build(nil)
+}
+
+// Funcs returns a list of registered functions used by the template when it rendered the view.
+func (t *Template) Funcs() []Function {
+	return t.registered
 }
 
 func (t *Template) build(context Context) error {
@@ -138,7 +164,8 @@ func (t *Template) build(context Context) error {
 		return nil
 	}
 
-	fm := t.DefaultFuncs()
+	registered := []Function{}
+	fm := map[string]interface{}{}
 
 	for k, v := range sprig.TxtFuncMap() {
 		fm[k] = v
@@ -156,11 +183,20 @@ func (t *Template) build(context Context) error {
 		for _, f := range context.Funcs() {
 			if tf, err := makeTemplateFunc(context, f.Func); err == nil {
 				fm[f.Name] = tf
+				registered = append(registered, f)
 			} else {
 				return err
 			}
 		}
 	}
+
+	// the default functions cannot be overriden
+	for _, f := range t.DefaultFuncs() {
+		fm[f.Name] = f.Func
+		registered = append(registered, f)
+	}
+
+	t.registered = registered
 
 	parsed, err := template.New(t.url).Funcs(fm).Parse(string(t.body))
 	if err != nil {
@@ -179,6 +215,7 @@ func (t *Template) Execute(output io.Writer, context interface{}) error {
 	return t.parsed.Execute(output, context)
 }
 
+// returns as Context if input implements the interface; otherwise nil
 func toContext(in interface{}) Context {
 	var context Context
 	if in != nil {

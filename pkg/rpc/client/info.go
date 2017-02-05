@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
+	"github.com/docker/infrakit/pkg/template"
 )
 
 // NewPluginInfoClient returns a plugin informer that can give metadata about a plugin
@@ -26,6 +27,18 @@ type InfoClient struct {
 func (i *InfoClient) GetInfo() (plugin.Info, error) {
 	meta := plugin.Info{}
 	resp, err := i.client.Get("http://d" + rpc.APIURL)
+	if err != nil {
+		return meta, err
+	}
+	defer resp.Body.Close()
+	err = json.NewDecoder(resp.Body).Decode(&meta)
+	return meta, err
+}
+
+// GetFunctions returns metadata about the plugin's template functions, if the plugin supports templating.
+func (i *InfoClient) GetFunctions() (map[string][]template.Function, error) {
+	meta := map[string][]template.Function{}
+	resp, err := i.client.Get("http://d" + rpc.FunctionsURL)
 	if err != nil {
 		return meta, err
 	}

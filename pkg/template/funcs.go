@@ -51,6 +51,12 @@ func ToJSON(o interface{}) (string, error) {
 	return string(buff), err
 }
 
+// ToJSONFormat encodes the input struct into a JSON string with format prefix, and indent.
+func ToJSONFormat(prefix, indent string, o interface{}) (string, error) {
+	buff, err := json.MarshalIndent(o, prefix, indent)
+	return string(buff), err
+}
+
 // FromMap decodes map into raw struct
 func FromMap(m map[string]interface{}, raw interface{}) error {
 	// The safest way, but the slowest, is to just marshal and unmarshal back
@@ -106,79 +112,155 @@ func IndexOf(srch interface{}, array interface{}, strictOptional ...bool) int {
 }
 
 // DefaultFuncs returns a list of default functions for binding in the template
-func (t *Template) DefaultFuncs() map[string]interface{} {
-	return map[string]interface{}{
-		"include": func(p string, opt ...interface{}) (string, error) {
-			var o interface{}
-			if len(opt) > 0 {
-				o = opt[0]
-			}
-			loc, err := getURL(t.url, p)
-			if err != nil {
-				return "", err
-			}
-			included, err := NewTemplate(loc, t.options)
-			if err != nil {
-				return "", err
-			}
-			// copy the binds in the parent scope into the child
-			for k, v := range t.binds {
-				included.binds[k] = v
-			}
-			// inherit the functions defined for this template
-			for k, v := range t.funcs {
-				included.AddFunc(k, v)
-			}
-			return included.Render(o)
+func (t *Template) DefaultFuncs() []Function {
+	return []Function{
+		{
+			Name: "include",
+			Description: []string{
+				"Render content found at URL as template and include here.",
+				"The optional second parameter is the context to use when rendering the template.",
+			},
+			Func: func(p string, opt ...interface{}) (string, error) {
+				var o interface{}
+				if len(opt) > 0 {
+					o = opt[0]
+				}
+				loc, err := getURL(t.url, p)
+				if err != nil {
+					return "", err
+				}
+				included, err := NewTemplate(loc, t.options)
+				if err != nil {
+					return "", err
+				}
+				// copy the binds in the parent scope into the child
+				for k, v := range t.binds {
+					included.binds[k] = v
+				}
+				// inherit the functions defined for this template
+				for k, v := range t.funcs {
+					included.AddFunc(k, v)
+				}
+				return included.Render(o)
+			},
 		},
-
-		"loop": func(c int) []struct{} {
-			return make([]struct{}, c)
+		{
+			Name: "loop",
+			Description: []string{
+				"Loop generates a slice of length specified by the input. For use like {{ range loop 5 }}...{{ end }}",
+			},
+			Func: func(c int) []struct{} {
+				return make([]struct{}, c)
+			},
 		},
-
-		"def": func(name string, args ...interface{}) (string, error) {
-			if _, has := t.defaults[name]; has {
-				// not sure if this is good, but should complain loudly
-				return "", fmt.Errorf("already defined: %v", name)
-			}
-			var doc string
-			var value interface{}
-			switch len(args) {
-			case 1:
-				// just value, no docs
-				value = args[0]
-			case 2:
-				// docs and value
-				doc = fmt.Sprintf("%v", args[0])
-				value = args[1]
-			}
-			t.defaults[name] = defaultValue{
-				Name:  name,
-				Value: value,
-				Doc:   doc,
-			}
-			return "", nil
+		{
+			Name: "def",
+			Description: []string{
+				"Defines a variable with the first argument as name and last argument value as the default.",
+				"It's also ok to pass a third optional parameter, in the middle, as the documentation string.",
+			},
+			Func: func(name string, args ...interface{}) (string, error) {
+				if _, has := t.defaults[name]; has {
+					// not sure if this is good, but should complain loudly
+					return "", fmt.Errorf("already defined: %v", name)
+				}
+				var doc string
+				var value interface{}
+				switch len(args) {
+				case 1:
+					// just value, no docs
+					value = args[0]
+				case 2:
+					// docs and value
+					doc = fmt.Sprintf("%v", args[0])
+					value = args[1]
+				}
+				t.AddDef(name, value, doc)
+				return "", nil
+			},
 		},
-
-		"ref": func(name string) interface{} {
-			if found, has := t.binds[name]; has {
-				return found
-			} else if v, has := t.defaults[name]; has {
-				return v.Value
-			}
-			return nil
+		{
+			Name: "global",
+			Description: []string{
+				"Sets a global variable named after the first argument, with the value as the second argument.",
+				"This is similar to def (which sets the default value).",
+				"Global variables are propagated to all templates that are rendered via the 'include' function.",
+			},
+			Func: func(name string, v interface{}) interface{} {
+				t.binds[name] = v
+				return ""
+			},
 		},
-
-		"global": func(name string, v interface{}) interface{} {
-			t.binds[name] = v
-			return ""
+		{
+			Name: "ref",
+			Description: []string{
+				"References / gets the variable named after the first argument.",
+				"The values must be set first by either def or global.",
+			},
+			Func: func(name string) interface{} {
+				if found, has := t.binds[name]; has {
+					return found
+				} else if v, has := t.defaults[name]; has {
+					return v.Value
+				}
+				return nil
+			},
 		},
-
-		"q":         QueryObject,
-		"unixtime":  UnixTime,
-		"lines":     SplitLines,
-		"to_json":   ToJSON,
-		"from_json": FromJSON,
-		"index_of":  IndexOf,
+		{
+			Name: "q",
+			Description: []string{
+				"Runs a JMESPath (http://jmespath.org/) query (first arg) on the object (second arg).",
+				"The return value is an object which needs to be rendered properly for the format of the document.",
+				"Example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of http request.",
+			},
+			Func: QueryObject,
+		},
+		{
+			Name: "to_json",
+			Description: []string{
+				"Encodes the input as a JSON string",
+				"This is useful for taking an object (interface{}) and render it inline as proper JSON.",
+				"Example: {{ include \"https://httpbin.org/get\" | from_json | to_json }}",
+			},
+			Func: ToJSON,
+		},
+		{
+			Name: "to_json_format",
+			Description: []string{
+				"Encodes the input as a JSON string with first arg as prefix, second arg the indentation, then the object",
+			},
+			Func: ToJSONFormat,
+		},
+		{
+			Name: "from_json",
+			Description: []string{
+				"Decodes the input (first arg) into a structure (a map[string]interface{} or []interface{}).",
+				"This is useful for parsing arbitrary resources in JSON format as object.  The object is the queryable via 'q'",
+				"For example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of request.",
+			},
+			Func: FromJSON,
+		},
+		{
+			Name: "unixtime",
+			Description: []string{
+				"Returns the unix timestamp as the number of seconds elapsed since January 1, 1970 UTC.",
+			},
+			Func: UnixTime,
+		},
+		{
+			Name: "lines",
+			Description: []string{
+				"Splits the input string (first arg) into a slice by '\n'",
+			},
+			Func: SplitLines,
+		},
+		{
+			Name: "index_of",
+			Description: []string{
+				"Returns the index of first argument in the second argument which is a slice.",
+				"Example: {{ index_of \"foo\" (from_json \"[\"bar\",\"foo\",\"baz\"]\") }} returns 1 (int).",
+			},
+			Func: IndexOf,
+		},
 	}
 }

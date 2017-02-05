@@ -101,7 +101,7 @@ func (s *context) Funcs() []Function {
 	return []Function{
 		{
 			Name:        "inc",
-			Description: "increments the context counter when called",
+			Description: []string{"increments the context counter when called"},
 			Func: func(c Context) interface{} {
 				c.(*context).invokes++
 				c.(*context).Count++
@@ -110,7 +110,7 @@ func (s *context) Funcs() []Function {
 		},
 		{
 			Name:        "dec",
-			Description: "decrements the context counter when called",
+			Description: []string{"decrements the context counter when called"},
 			Func: func(s Context) interface{} {
 				s.(*context).invokes++
 				s.(*context).Count--
@@ -119,7 +119,7 @@ func (s *context) Funcs() []Function {
 		},
 		{
 			Name:        "str",
-			Description: "prints the string",
+			Description: []string{"prints the string"},
 			Func: func(c Context) string {
 				c.(*context).invokes++
 				return s.String
@@ -127,7 +127,7 @@ func (s *context) Funcs() []Function {
 		},
 		{
 			Name:        "count",
-			Description: "prints the count",
+			Description: []string{"prints the count"},
 			Func: func(c Context) int {
 				c.(*context).invokes++
 				return s.Count
@@ -135,7 +135,7 @@ func (s *context) Funcs() []Function {
 		},
 		{
 			Name:        "setString",
-			Description: "sets the string",
+			Description: []string{"sets the string"},
 			Func: func(c Context, n string) interface{} {
 				c.(*context).invokes++
 				s.String = n
@@ -144,7 +144,7 @@ func (s *context) Funcs() []Function {
 		},
 		{
 			Name:        "setBool",
-			Description: "sets the bool",
+			Description: []string{"sets the bool"},
 			Func: func(c Context, b bool) bool {
 				c.(*context).SetBool(b)
 				return c.(*context).Bool
@@ -152,7 +152,7 @@ func (s *context) Funcs() []Function {
 		},
 		{
 			Name:        "invokes",
-			Description: "prints the invokes count",
+			Description: []string{"prints the invokes count"},
 			Func: func() int {
 				s.invokes++
 				return s.invokes

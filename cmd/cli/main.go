@@ -39,8 +39,8 @@ func main() {
 		return d
 	}
 
-	cmd.AddCommand(cli.VersionCommand(), cli.InfoCommand(f))
-
+	cmd.AddCommand(cli.VersionCommand())
+	cmd.AddCommand(infoCommand(f))
 	cmd.AddCommand(templateCommand(f))
 	cmd.AddCommand(managerCommand(f))
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))

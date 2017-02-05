@@ -315,3 +315,31 @@ func TestIndexOf(t *testing.T) {
 	// This doesn't work because the type information is gone and we have just an address
 	require.Equal(t, -1, IndexOf("1", []interface{}{0, &v, 2}))
 }
+
+func TestIndexIndexOf(t *testing.T) {
+
+	{
+		tt, err := NewTemplate("str://{{ index . 1 }}", Options{})
+		require.NoError(t, err)
+
+		view, err := tt.Render([]string{"a", "b", "c", "d"})
+		require.NoError(t, err)
+		require.Equal(t, "b", view)
+	}
+	{
+		tt, err := NewTemplate(`str://{{ index_of "c" . }}`, Options{})
+		require.NoError(t, err)
+
+		view, err := tt.Render([]string{"a", "b", "c", "d"})
+		require.NoError(t, err)
+		require.Equal(t, "2", view)
+	}
+	{
+		tt, err := NewTemplate(`str://{{ index . 0 | cat "index-" | nospace }}`, Options{})
+		require.NoError(t, err)
+
+		view, err := tt.Render([]string{"a", "b", "c", "d"})
+		require.NoError(t, err)
+		require.Equal(t, "index-a", view)
+	}
+}
