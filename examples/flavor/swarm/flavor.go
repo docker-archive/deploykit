@@ -306,15 +306,20 @@ type templateContext struct {
 func (c *templateContext) Funcs() []template.Function {
 	return []template.Function{
 		{
-			Name:        "SPEC",
-			Description: "The flavor spec as found in Properties field of the config JSON",
+			Name: "SPEC",
+			Description: []string{
+				"The flavor spec as found in Properties field of the config JSON",
+			},
 			Func: func() interface{} {
 				return c.flavorSpec
 			},
 		},
 		{
-			Name:        "INSTANCE_LOGICAL_ID",
-			Description: "The logical id for the instance being prepared; can be empty if no logical ids are set (cattle).",
+			Name: "INSTANCE_LOGICAL_ID",
+			Description: []string{
+				"The logical id for the instance being prepared.",
+				"For cattle (instances with no logical id in allocations), this is empty.",
+			},
 			Func: func() string {
 				if c.instanceSpec.LogicalID != nil {
 					return string(*c.instanceSpec.LogicalID)
@@ -324,21 +329,21 @@ func (c *templateContext) Funcs() []template.Function {
 		},
 		{
 			Name:        "ALLOCATIONS",
-			Description: "The allocations contain fields such as the size of the group or the list of logical ids.",
+			Description: []string{"The allocations contain fields such as the size of the group or the list of logical ids."},
 			Func: func() interface{} {
 				return c.allocation
 			},
 		},
 		{
 			Name:        "INFRAKIT_LABELS",
-			Description: "The Docker engine labels to be applied for linking the Docker engine to this instance.",
+			Description: []string{"The Docker engine labels to be applied for linking the Docker engine to this instance."},
 			Func: func() []string {
 				return c.link.KVPairs()
 			},
 		},
 		{
 			Name:        "SWARM_MANAGER_IP",
-			Description: "IP of the Swarm manager / leader",
+			Description: []string{"IP of the Swarm manager / leader"},
 			Func: func() (string, error) {
 				if c.nodeInfo == nil {
 					return "", fmt.Errorf("cannot prepare: no node info")
@@ -351,7 +356,7 @@ func (c *templateContext) Funcs() []template.Function {
 		},
 		{
 			Name:        "SWARM_INITIALIZED",
-			Description: "Returns true if the swarm has been initialized.",
+			Description: []string{"Returns true if the swarm has been initialized."},
 			Func: func() bool {
 				if c.nodeInfo == nil {
 					return false
@@ -361,7 +366,7 @@ func (c *templateContext) Funcs() []template.Function {
 		},
 		{
 			Name:        "SWARM_JOIN_TOKENS",
-			Description: "Returns the swarm JoinTokens object, with either .Manager or .Worker fields",
+			Description: []string{"Returns the swarm JoinTokens object, with either .Manager or .Worker fields"},
 			Func: func() (interface{}, error) {
 				if c.swarmStatus == nil {
 					return nil, fmt.Errorf("cannot prepare: no swarm status")
@@ -371,7 +376,7 @@ func (c *templateContext) Funcs() []template.Function {
 		},
 		{
 			Name:        "SWARM_CLUSTER_ID",
-			Description: "Returns the swarm cluster UUID",
+			Description: []string{"Returns the swarm cluster UUID"},
 			Func: func() (interface{}, error) {
 				if c.swarmStatus == nil {
 					return nil, fmt.Errorf("cannot prepare: no swarm status")

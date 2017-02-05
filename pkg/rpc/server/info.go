@@ -63,26 +63,29 @@ func (m *PluginInfo) ShowAPI(resp http.ResponseWriter, req *http.Request) {
 }
 
 type functionInfo struct {
-	Name        string
-	Description string
-	Function    string
-	Usage       string
+	template.Function
+	Func  string
+	Usage string
+}
+
+func fromFunctions(functions []template.Function) []*functionInfo {
+	list := []*functionInfo{}
+	for _, fn := range functions {
+		list = append(list, &functionInfo{
+			Function: fn,
+			Func:     printFunc(fn.Name, fn.Func),
+			Usage:    printUsage(fn.Name, fn.Func),
+		})
+	}
+	return list
 }
 
 // ShowTemplateFunctions responds by returning information about template functions the plugin expopses.
 func (m *PluginInfo) ShowTemplateFunctions(resp http.ResponseWriter, req *http.Request) {
-	result := map[string][]functionInfo{}
-	base := []functionInfo{}
+	result := map[string][]*functionInfo{}
 	exporter, is := m.receiver.(template.FunctionExporter)
 	if is {
-		for _, f := range exporter.Funcs() {
-			base = append(base, functionInfo{
-				Name:        f.Name,
-				Description: f.Description,
-				Function:    printFunc(f.Name, f.Func),
-				Usage:       printUsage(f.Name, f.Func),
-			})
-		}
+		base := fromFunctions(exporter.Funcs())
 		if len(base) > 0 {
 			result["base"] = base
 		}
@@ -91,18 +94,17 @@ func (m *PluginInfo) ShowTemplateFunctions(resp http.ResponseWriter, req *http.R
 	texporter, is := m.receiver.(TypedFunctionExporter)
 	if is {
 		for _, t := range texporter.Types() {
-			typed := []functionInfo{}
-
-			for _, f := range texporter.FuncsByType(t) {
-				typed = append(typed, functionInfo{
-					Name:        f.Name,
-					Description: f.Description,
-					Function:    printFunc(f.Name, f.Func),
-					Usage:       printUsage(f.Name, f.Func),
-				})
+			typed := fromFunctions(texporter.FuncsByType(t))
+			if len(typed) > 0 {
+				result[t] = typed
 			}
+		}
+	}
 
-			result[t] = typed
+	if t, err := template.NewTemplate("str://", template.Options{}); err == nil {
+		builtin := fromFunctions(t.DefaultFuncs())
+		if len(builtin) > 0 {
+			result["builtin"] = builtin
 		}
 	}
 

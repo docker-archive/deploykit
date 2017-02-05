@@ -60,21 +60,21 @@ func (p *exporter) Funcs() []template.Function {
 	return []template.Function{
 		{
 			Name:        "greater",
-			Description: "Returns true if a is greater than b",
+			Description: []string{"Returns true if a is greater than b"},
 			Func: func(a, b int) bool {
 				return a > b
 			},
 		},
 		{
 			Name:        "equal",
-			Description: "Returns true if a is same as b",
+			Description: []string{"Returns true if a is same as b"},
 			Func: func(a, b string) bool {
 				return a == b
 			},
 		},
 		{
 			Name:        "join_token",
-			Description: "Returns the join token",
+			Description: []string{"Returns the join token"},
 			Func: func() string {
 				return "token"
 			},
