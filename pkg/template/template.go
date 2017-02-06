@@ -76,6 +76,8 @@ type Template struct {
 
 	registered []Function
 	lock       sync.Mutex
+
+	parent *Template
 }
 
 // NewTemplate fetches the content at the url and returns a template.  If the string begins
@@ -141,6 +143,12 @@ func (t *Template) AddDef(name string, val interface{}, doc ...string) *Template
 		Doc:   strings.Join(doc, " "),
 	}
 	return t
+}
+
+func (t *Template) updateGlobal(name string, value interface{}) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.binds[name] = value
 }
 
 // Validate parses the template and checks for validity.

@@ -169,3 +169,13 @@ func TestAddDef(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "hello: x + y = 125", view)
 }
+
+func TestSourceAndGlobal(t *testing.T) {
+	r := `{{ global \"foo\" 100 }}`
+	s := `{{ source "str://` + r + `" }}foo={{ref "foo"}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "foo=100", view)
+}
