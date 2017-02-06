@@ -115,6 +115,40 @@ func IndexOf(srch interface{}, array interface{}, strictOptional ...bool) int {
 func (t *Template) DefaultFuncs() []Function {
 	return []Function{
 		{
+			Name: "source",
+			Description: []string{
+				"Source / evaluate the template at the input location (as URL).",
+				"This will make all of the global variables declared there visible in this template's context.",
+			},
+			Func: func(p string) (string, error) {
+				loc := p
+				if strings.Index(loc, "str://") == -1 {
+					buff, err := getURL(t.url, p)
+					if err != nil {
+						return "", err
+					}
+					loc = buff
+				}
+				sourced, err := NewTemplate(loc, t.options)
+				if err != nil {
+					return "", err
+				}
+				// copy the binds in the parent scope into the child
+				for k, v := range t.binds {
+					sourced.binds[k] = v
+				}
+				// inherit the functions defined for this template
+				for k, v := range t.funcs {
+					sourced.AddFunc(k, v)
+				}
+				// set this as the parent of the sourced template so its global can mutate the globals in this
+				sourced.parent = t
+
+				// TODO(chungers) -- let the sourced template define new functions that can be called in the parent.
+				return sourced.Render(nil)
+			},
+		},
+		{
 			Name: "include",
 			Description: []string{
 				"Render content found at URL as template and include here.",
@@ -187,7 +221,9 @@ func (t *Template) DefaultFuncs() []Function {
 				"Global variables are propagated to all templates that are rendered via the 'include' function.",
 			},
 			Func: func(name string, v interface{}) interface{} {
-				t.binds[name] = v
+				for here := t; here != nil; here = here.parent {
+					here.updateGlobal(name, v)
+				}
 				return ""
 			},
 		},
