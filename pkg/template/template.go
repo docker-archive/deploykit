@@ -73,12 +73,19 @@ type Template struct {
 	funcs    map[string]interface{}
 	binds    map[string]interface{}
 	defaults map[string]defaultValue
+	context  interface{}
 
 	registered []Function
 	lock       sync.Mutex
 
 	parent *Template
 }
+
+// Void is used in the template functions return value type to indicate a void.
+// Golang template does not allow functions with no return types to be bound.
+type Void string
+
+const voidValue Void = ""
 
 // NewTemplate fetches the content at the url and returns a template.  If the string begins
 // with str:// as scheme, then the rest of the string is interpreted as the body of the template.
@@ -143,6 +150,47 @@ func (t *Template) AddDef(name string, val interface{}, doc ...string) *Template
 		Doc:   strings.Join(doc, " "),
 	}
 	return t
+}
+
+// Ref returns the value keyed by name in the context of this template. See 'ref' template function.
+func (t *Template) Ref(name string) interface{} {
+	if found, has := t.binds[name]; has {
+		return found
+	} else if v, has := t.defaults[name]; has {
+		return v.Value
+	}
+	return nil
+}
+
+// Dot returns the '.' in this template.
+func (t *Template) Dot() interface{} {
+	return t.context
+}
+
+func (t *Template) forkFrom(parent *Template) (dotCopy interface{}, err error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	// copy the binds in the parent scope into the child
+	for k, v := range parent.binds {
+		t.binds[k] = v
+	}
+	// inherit the functions defined for this template
+	for k, v := range parent.funcs {
+		t.AddFunc(k, v)
+	}
+	if parent.context != nil {
+		return DeepCopyObject(parent.context)
+	}
+	return nil, nil
+}
+
+// Global sets the a key, value in the context of this template.  It is visible to all the 'included'
+// and 'sourced' templates by the calling template.
+func (t *Template) Global(name string, value interface{}) {
+	for here := t; here != nil; here = here.parent {
+		here.updateGlobal(name, value)
+	}
 }
 
 func (t *Template) updateGlobal(name string, value interface{}) {
@@ -220,6 +268,7 @@ func (t *Template) Execute(output io.Writer, context interface{}) error {
 	if err := t.build(toContext(context)); err != nil {
 		return err
 	}
+	t.context = context
 	return t.parsed.Execute(output, context)
 }
 
@@ -240,7 +289,7 @@ func (t *Template) Render(context interface{}) (string, error) {
 		return "", err
 	}
 	var buff bytes.Buffer
-	err := t.parsed.Execute(&buff, context)
+	err := t.Execute(&buff, context)
 	return buff.String(), err
 }
 

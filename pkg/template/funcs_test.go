@@ -25,6 +25,23 @@ type testCloud struct {
 	ResourceList []interface{}
 }
 
+func TestDeepCopyObject(t *testing.T) {
+	resource := "disk"
+	input := testCloud{
+		Parameters: []testParameter{{ParameterKey: "foo", ParameterValue: "bar"}},
+		Resources:  []testResource{{ResourceType: "test", ResourceTypePtr: &resource}},
+	}
+
+	copy, err := DeepCopyObject(input)
+	require.NoError(t, err)
+	require.Equal(t, input, copy)
+	inputStr, err := ToJSON(input)
+	require.NoError(t, err)
+	copyStr, err := ToJSON(copy)
+	require.NoError(t, err)
+	require.Equal(t, inputStr, copyStr)
+}
+
 func TestQueryObjectEncodeDecode(t *testing.T) {
 
 	param1 := testParameter{

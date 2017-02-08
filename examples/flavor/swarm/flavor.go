@@ -160,7 +160,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			log.Warningln("Worker prepare:", err)
 		}
 
-		swarmID := "?"
+		swarmID = "?"
 		if swarmStatus != nil {
 			swarmID = swarmStatus.ID
 		}
