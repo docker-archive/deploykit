@@ -179,3 +179,42 @@ func TestSourceAndGlobal(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "foo=100", view)
 }
+
+func TestIncludeAndGlobal(t *testing.T) {
+	r := `{{ global \"foo\" 100 }}` // the child template tries to mutate the global
+	s := `{{ include "str://` + r + `" }}foo={{ref "foo"}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	tt.Global("foo", 200) // set the global of the calling / parent template
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "foo=200", view) // parent's not affected by child template
+}
+
+func TestSourceAndGlobalWithContext(t *testing.T) {
+	ctx := map[string]interface{}{
+		"a": 1,
+		"b": 2,
+	}
+	r := `{{ global \"foo\" 100 }}{{$void := set . \"a\" 100}}` // sourced mutates the context
+	s := `{{ source "str://` + r + `" }}a={{.a}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "a=100", view) // the sourced template mutated the calling template's context.
+}
+
+func TestIncludeAndGlobalWithContext(t *testing.T) {
+	ctx := map[string]interface{}{
+		"a": 1,
+		"b": 2,
+	}
+	r := `{{ global \"foo\" 100 }}{{$void := set . \"a\" 100}}` // included tries to mutate the context
+	s := `{{ include "str://` + r + `" }}a={{.a}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "a=1", view) // the included template cannot mutate the calling template's context.
+}

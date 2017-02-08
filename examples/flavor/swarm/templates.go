@@ -20,7 +20,7 @@ EOF
 kill -s HUP $(cat /var/run/docker.pid)
 sleep 5
 
-{{ if eq INSTANCE_LOGICAL_ID SPEC.SwarmJoinIP }}
+{{ if and ( eq INSTANCE_LOGICAL_ID SPEC.SwarmJoinIP ) (not SWARM_INITIALIZED) }}
 
   {{/* The first node of the special allocations will initialize the swarm. */}}
   docker swarm init --advertise-addr {{ INSTANCE_LOGICAL_ID }}
@@ -34,7 +34,7 @@ sleep 5
 {{ else }}
 
   {{/* The rest of the nodes will join as followers in the manager group. */}}
-  docker swarm join --token {{ SWARM_JOIN_TOKENS.Manager }} {{ SPEC.SwarmJoinIP }}:2377
+  docker swarm join --token {{ SWARM_JOIN_TOKENS.Manager }} {{ SWARM_MANAGER_ADDR }}
 
 {{ end }}
 `
@@ -59,7 +59,7 @@ kill -s HUP $(cat /var/run/docker.pid)
 
 sleep 5
 
-docker swarm join --token {{  SWARM_JOIN_TOKENS.Worker }} {{ SPEC.SwarmJoinIP }}:2377
+docker swarm join --token {{  SWARM_JOIN_TOKENS.Worker }} {{ SWARM_MANAGER_ADDR }}
 
 `
 )

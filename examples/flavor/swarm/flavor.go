@@ -160,7 +160,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			log.Warningln("Worker prepare:", err)
 		}
 
-		swarmID := "?"
+		swarmID = "?"
 		if swarmStatus != nil {
 			swarmID = swarmStatus.ID
 		}
@@ -342,7 +342,7 @@ func (c *templateContext) Funcs() []template.Function {
 			},
 		},
 		{
-			Name:        "SWARM_MANAGER_IP",
+			Name:        "SWARM_MANAGER_ADDR",
 			Description: []string{"IP of the Swarm manager / leader"},
 			Func: func() (string, error) {
 				if c.nodeInfo == nil {

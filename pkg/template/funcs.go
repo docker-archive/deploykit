@@ -1,6 +1,7 @@
 package template
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -9,6 +10,24 @@ import (
 
 	"github.com/jmespath/go-jmespath"
 )
+
+// DeepCopyObject makes a deep copy of the argument, using encoding/gob encode/decode.
+func DeepCopyObject(from interface{}) (interface{}, error) {
+	var mod bytes.Buffer
+	enc := json.NewEncoder(&mod)
+	dec := json.NewDecoder(&mod)
+	err := enc.Encode(from)
+	if err != nil {
+		return nil, err
+	}
+
+	copy := reflect.New(reflect.TypeOf(from))
+	err = dec.Decode(copy.Interface())
+	if err != nil {
+		return nil, err
+	}
+	return reflect.Indirect(copy).Interface(), nil
+}
 
 // QueryObject applies a JMESPath query specified by the expression, against the target object.
 func QueryObject(exp string, target interface{}) (interface{}, error) {
@@ -119,8 +138,14 @@ func (t *Template) DefaultFuncs() []Function {
 			Description: []string{
 				"Source / evaluate the template at the input location (as URL).",
 				"This will make all of the global variables declared there visible in this template's context.",
+				"Similar to 'source' in bash, sourcing another template means applying it in the same context ",
+				"as the calling template.  The context (e.g. variables) of the calling template as a result can be mutated.",
 			},
-			Func: func(p string) (string, error) {
+			Func: func(p string, opt ...interface{}) (string, error) {
+				var o interface{}
+				if len(opt) > 0 {
+					o = opt[0]
+				}
 				loc := p
 				if strings.Index(loc, "str://") == -1 {
 					buff, err := getURL(t.url, p)
@@ -133,19 +158,16 @@ func (t *Template) DefaultFuncs() []Function {
 				if err != nil {
 					return "", err
 				}
-				// copy the binds in the parent scope into the child
-				for k, v := range t.binds {
-					sourced.binds[k] = v
-				}
-				// inherit the functions defined for this template
-				for k, v := range t.funcs {
-					sourced.AddFunc(k, v)
-				}
 				// set this as the parent of the sourced template so its global can mutate the globals in this
 				sourced.parent = t
+				sourced.forkFrom(t)
+				sourced.context = t.context
 
+				if o == nil {
+					o = sourced.context
+				}
 				// TODO(chungers) -- let the sourced template define new functions that can be called in the parent.
-				return sourced.Render(nil)
+				return sourced.Render(o)
 			},
 		},
 		{
@@ -153,28 +175,37 @@ func (t *Template) DefaultFuncs() []Function {
 			Description: []string{
 				"Render content found at URL as template and include here.",
 				"The optional second parameter is the context to use when rendering the template.",
+				"Conceptually similar to exec in bash, where the template included is applied using a fork ",
+				"of current context in the calling template.  Any mutations to the context via 'global' will not ",
+				"be visible in the calling template's context.",
 			},
 			Func: func(p string, opt ...interface{}) (string, error) {
 				var o interface{}
 				if len(opt) > 0 {
 					o = opt[0]
 				}
-				loc, err := getURL(t.url, p)
-				if err != nil {
-					return "", err
+				loc := p
+				if strings.Index(loc, "str://") == -1 {
+					buff, err := getURL(t.url, p)
+					if err != nil {
+						return "", err
+					}
+					loc = buff
 				}
 				included, err := NewTemplate(loc, t.options)
 				if err != nil {
 					return "", err
 				}
-				// copy the binds in the parent scope into the child
-				for k, v := range t.binds {
-					included.binds[k] = v
+				dotCopy, err := included.forkFrom(t)
+				if err != nil {
+					return "", err
 				}
-				// inherit the functions defined for this template
-				for k, v := range t.funcs {
-					included.AddFunc(k, v)
+				included.context = dotCopy
+
+				if o == nil {
+					o = included.context
 				}
+
 				return included.Render(o)
 			},
 		},
@@ -193,10 +224,10 @@ func (t *Template) DefaultFuncs() []Function {
 				"Defines a variable with the first argument as name and last argument value as the default.",
 				"It's also ok to pass a third optional parameter, in the middle, as the documentation string.",
 			},
-			Func: func(name string, args ...interface{}) (string, error) {
+			Func: func(name string, args ...interface{}) (Void, error) {
 				if _, has := t.defaults[name]; has {
 					// not sure if this is good, but should complain loudly
-					return "", fmt.Errorf("already defined: %v", name)
+					return voidValue, fmt.Errorf("already defined: %v", name)
 				}
 				var doc string
 				var value interface{}
@@ -210,7 +241,7 @@ func (t *Template) DefaultFuncs() []Function {
 					value = args[1]
 				}
 				t.AddDef(name, value, doc)
-				return "", nil
+				return voidValue, nil
 			},
 		},
 		{
@@ -220,11 +251,9 @@ func (t *Template) DefaultFuncs() []Function {
 				"This is similar to def (which sets the default value).",
 				"Global variables are propagated to all templates that are rendered via the 'include' function.",
 			},
-			Func: func(name string, v interface{}) interface{} {
-				for here := t; here != nil; here = here.parent {
-					here.updateGlobal(name, v)
-				}
-				return ""
+			Func: func(n string, v interface{}) Void {
+				t.Global(n, v)
+				return voidValue
 			},
 		},
 		{
@@ -233,14 +262,7 @@ func (t *Template) DefaultFuncs() []Function {
 				"References / gets the variable named after the first argument.",
 				"The values must be set first by either def or global.",
 			},
-			Func: func(name string) interface{} {
-				if found, has := t.binds[name]; has {
-					return found
-				} else if v, has := t.defaults[name]; has {
-					return v.Value
-				}
-				return nil
-			},
+			Func: t.Ref,
 		},
 		{
 			Name: "q",
