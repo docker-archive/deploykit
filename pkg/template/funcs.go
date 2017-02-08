@@ -2,7 +2,6 @@ package template
 
 import (
 	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -15,8 +14,8 @@ import (
 // DeepCopyObject makes a deep copy of the argument, using encoding/gob encode/decode.
 func DeepCopyObject(from interface{}) (interface{}, error) {
 	var mod bytes.Buffer
-	enc := gob.NewEncoder(&mod)
-	dec := gob.NewDecoder(&mod)
+	enc := json.NewEncoder(&mod)
+	dec := json.NewDecoder(&mod)
 	err := enc.Encode(from)
 	if err != nil {
 		return nil, err
