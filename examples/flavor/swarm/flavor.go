@@ -342,7 +342,7 @@ func (c *templateContext) Funcs() []template.Function {
 			},
 		},
 		{
-			Name:        "SWARM_MANAGER_IP",
+			Name:        "SWARM_MANAGER_ADDR",
 			Description: []string{"IP of the Swarm manager / leader"},
 			Func: func() (string, error) {
 				if c.nodeInfo == nil {
