@@ -71,7 +71,7 @@ type Template struct {
 	body     []byte
 	parsed   *template.Template
 	funcs    map[string]interface{}
-	binds    map[string]interface{}
+	globals  map[string]interface{}
 	defaults map[string]defaultValue
 	context  interface{}
 
@@ -118,7 +118,7 @@ func NewTemplateFromBytes(buff []byte, contextURL string, opt Options) (*Templat
 		url:      contextURL,
 		body:     buff,
 		funcs:    map[string]interface{}{},
-		binds:    map[string]interface{}{},
+		globals:  map[string]interface{}{},
 		defaults: map[string]defaultValue{},
 	}, nil
 }
@@ -154,7 +154,7 @@ func (t *Template) AddDef(name string, val interface{}, doc ...string) *Template
 
 // Ref returns the value keyed by name in the context of this template. See 'ref' template function.
 func (t *Template) Ref(name string) interface{} {
-	if found, has := t.binds[name]; has {
+	if found, has := t.globals[name]; has {
 		return found
 	} else if v, has := t.defaults[name]; has {
 		return v.Value
@@ -171,9 +171,9 @@ func (t *Template) forkFrom(parent *Template) (dotCopy interface{}, err error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	// copy the binds in the parent scope into the child
-	for k, v := range parent.binds {
-		t.binds[k] = v
+	// copy the globals in the parent scope into the child
+	for k, v := range parent.globals {
+		t.globals[k] = v
 	}
 	// inherit the functions defined for this template
 	for k, v := range parent.funcs {
@@ -196,7 +196,7 @@ func (t *Template) Global(name string, value interface{}) {
 func (t *Template) updateGlobal(name string, value interface{}) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	t.binds[name] = value
+	t.globals[name] = value
 }
 
 // Validate parses the template and checks for validity.
