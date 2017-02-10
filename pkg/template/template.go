@@ -139,19 +139,6 @@ func (t *Template) AddFunc(name string, f interface{}) *Template {
 	return t
 }
 
-// AddDef is equivalent to a {{ def "key" value "description" }} in defining a variable with a default value.
-// The value is accessible via a {{ ref "key" }} in the template.
-func (t *Template) AddDef(name string, val interface{}, doc ...string) *Template {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.defaults[name] = defaultValue{
-		Name:  name,
-		Value: val,
-		Doc:   strings.Join(doc, " "),
-	}
-	return t
-}
-
 // Ref returns the value keyed by name in the context of this template. See 'ref' template function.
 func (t *Template) Ref(name string) interface{} {
 	if found, has := t.globals[name]; has {
@@ -175,6 +162,10 @@ func (t *Template) forkFrom(parent *Template) (dotCopy interface{}, err error) {
 	for k, v := range parent.globals {
 		t.globals[k] = v
 	}
+	// copy the defaults in the parent scope into the child
+	for k, v := range parent.defaults {
+		t.defaults[k] = v
+	}
 	// inherit the functions defined for this template
 	for k, v := range parent.funcs {
 		t.AddFunc(k, v)
@@ -187,16 +178,37 @@ func (t *Template) forkFrom(parent *Template) (dotCopy interface{}, err error) {
 
 // Global sets the a key, value in the context of this template.  It is visible to all the 'included'
 // and 'sourced' templates by the calling template.
-func (t *Template) Global(name string, value interface{}) {
+func (t *Template) Global(name string, value interface{}) *Template {
 	for here := t; here != nil; here = here.parent {
 		here.updateGlobal(name, value)
 	}
+	return t
 }
 
 func (t *Template) updateGlobal(name string, value interface{}) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.globals[name] = value
+}
+
+// Def is equivalent to a {{ def "key" value "description" }} in defining a variable with a default value.
+// The value is accessible via a {{ ref "key" }} in the template.
+func (t *Template) Def(name string, value interface{}, doc string) *Template {
+	for here := t; here != nil; here = here.parent {
+		here.updateDef(name, value, doc)
+	}
+	return t
+}
+
+func (t *Template) updateDef(name string, val interface{}, doc ...string) *Template {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.defaults[name] = defaultValue{
+		Name:  name,
+		Value: val,
+		Doc:   strings.Join(doc, " "),
+	}
+	return t
 }
 
 // Validate parses the template and checks for validity.
