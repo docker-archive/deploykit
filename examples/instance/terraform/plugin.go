@@ -389,6 +389,20 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 			m["LogicalID"] = string(*spec.LogicalID)
 		}
 	}
+	switch properties.Type {
+	case "aws_instance":
+		if p, exists := properties.Value["private_ip"]; exists {
+			if p == "INSTANCE_LOGICAL_ID" {
+				if spec.LogicalID != nil {
+					// set private IP to logical ID
+					properties.Value["private_ip"] = string(*spec.LogicalID)
+				} else {
+					// reset private IP (the tag is not relevant in this context)
+					delete(properties.Value, "private_ip")
+				}
+			}
+		}
+	}
 
 	// merge the inits
 	switch properties.Type {
