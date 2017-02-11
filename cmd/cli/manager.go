@@ -163,7 +163,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		// the format is pluing.Spec
+		// the format is plugin.Spec
 		out := []plugin.Spec{}
 		for _, spec := range specs {
 
