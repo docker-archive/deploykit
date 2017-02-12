@@ -385,7 +385,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	// Use tag to store the logical id
 	if spec.LogicalID != nil {
-		if m, ok := properties.Value["tags"].(map[string]string); ok {
+		if m, ok := properties.Value["tags"].(map[string]interface{}); ok {
 			m["LogicalID"] = string(*spec.LogicalID)
 		}
 	}
@@ -603,7 +603,11 @@ func terraformLogicalID(v interface{}) *instance.LogicalID {
 	if !ok {
 		return nil
 	}
-	v, exists := m["tags.LogicalID"]
+	tags, ok := m["tags"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	v, exists := tags["LogicalID"]
 	if exists {
 		id := instance.LogicalID(fmt.Sprintf("%v", v))
 		return &id
