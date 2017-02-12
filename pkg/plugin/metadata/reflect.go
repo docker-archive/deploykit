@@ -75,10 +75,9 @@ func put(p []string, value interface{}, store interface{}) bool {
 
 			if len(p) > 1 {
 				return put(p[1:], value, m.Interface())
-			} else {
-				s.SetMapIndex(reflect.ValueOf(p[0]), reflect.ValueOf(value))
-				return true
 			}
+			s.SetMapIndex(reflect.ValueOf(p[0]), reflect.ValueOf(value))
+			return true
 		}
 
 	case reflect.Struct:
