@@ -67,7 +67,7 @@ func infoCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		view, err := renderer.AddDef("plugin", *name).Render(info)
+		view, err := renderer.Def("plugin", *name, "Plugin name").Render(info)
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func infoCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		view, err := renderer.AddDef("plugin", *name).Render(info)
+		view, err := renderer.Def("plugin", *name, "Plugin name").Render(info)
 		if err != nil {
 			return err
 		}

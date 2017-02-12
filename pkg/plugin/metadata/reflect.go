@@ -15,11 +15,6 @@ var (
 	indexExp      = regexp.MustCompile("^" + indexRoot)
 )
 
-// Path returns the path compoments of a / separated path
-func Path(path string) []string {
-	return strings.Split(path, "/")
-}
-
 // Put sets the attribute of an object at path to the given value
 func Put(path []string, value interface{}, object interface{}) bool {
 	return put(path, value, object)
