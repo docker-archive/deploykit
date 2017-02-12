@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -42,14 +41,6 @@ func (r *reflector) exampleProperties() *types.Any {
 // Type returns the target's type, taking into account of pointer receiver
 func (r *reflector) targetType() reflect.Type {
 	return reflect.Indirect(reflect.ValueOf(r.target)).Type()
-}
-
-func (r *reflector) validate() error {
-	t := r.targetType()
-	if !strings.Contains(t.PkgPath(), "github.com/docker/infrakit/pkg/rpc") {
-		return fmt.Errorf("object not a standard plugin type: %v", t)
-	}
-	return nil
 }
 
 // Interface returns the plugin type and version.

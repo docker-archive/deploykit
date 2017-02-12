@@ -42,9 +42,6 @@ func NewPluginInfo(receiver interface{}) (*PluginInfo, error) {
 // Register registers an rpc-capable object for introspection and metadata service
 func (m *PluginInfo) Register(receiver interface{}) error {
 	r := &reflector{target: receiver}
-	if err := r.validate(); err != nil {
-		return err
-	}
 	m.reflectors = append(m.reflectors, r)
 	return nil
 }
