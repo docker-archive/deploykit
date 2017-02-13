@@ -14,7 +14,7 @@ The default plugin directory is `~/.infrakit/plugins`, and can be overridden wit
 Note that multiple instances of a plugin may run, provided they have different names for discovery.  This may be useful,
 for example, if a plugin can be configured to behave differently. For example:
 
-The CLI shows which plugins are [discoverable](cmd/cli/README.md#list-plugins).
+The CLI shows which plugins are [discoverable](../../cmd/cli/README.md#list-plugins).
 
 ## Plugin types
 ### Group
@@ -32,7 +32,7 @@ Since _InfraKit_ emphasizes on declarative infrastructure, there are no operatio
 state to another.  Instead, you _declare_ your desired state of the infrastructure.  _InfraKit_ is responsible
 for converging towards, and maintaining, that desired state.
 
-Therefore, a [group plugin](pkg/spi/group/spi.go) manages Groups of Instances and exposes the operations that are of
+Therefore, a [group plugin](../../pkg/spi/group/spi.go) manages Groups of Instances and exposes the operations that are of
 interest to a user:
 
   + commit a group configuration, to start managing a group
@@ -49,7 +49,7 @@ infrastructure management system.  This would allow you to use _InfraKit_ toolin
 different infrastructure using the same interface.
 
 ### Instance
-Instances are members of a group. An [instance plugin](pkg/spi/instance/spi.go) manages some physical resource instances.
+Instances are members of a group. An [instance plugin](../../pkg/spi/instance/spi.go) manages some physical resource instances.
 It knows only about individual instances and nothing about Groups.  Instance is technically defined by the plugin, and
 need not be a physical machine at all.
 
@@ -62,7 +62,7 @@ persistent, stable state. These properties are captured via the _flavors_ of the
 
 ### Flavor
 Flavors help distinguish members of one group from another by describing how these members should be treated.
-A [flavor plugin](pkg/spi/flavor/spi.go) can be thought of as defining what runs on an Instance.
+A [flavor plugin](../../pkg/spi/flavor/spi.go) can be thought of as defining what runs on an Instance.
 It is responsible for dictating commands to run services, and check the health of those services.
 
 Flavors allow a group of instances to have different characteristics.  In a group of cattle,
@@ -80,30 +80,30 @@ Over time, we would prefer to phase out reference Plugins that appear to provide
 are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit/issues/new)
 to start a discussion before contributing to these plugins with non-trivial code.
 
-| plugin                                               | type     | description                             |
-|:-----------------------------------------------------|:---------|:----------------------------------------|
-| [swarm](pkg/example/flavor/swarm)                    | flavor   | runs Docker in Swarm mode               |
-| [vanilla](pkg/example/flavor/vanilla)                | flavor   | manual specification of instance fields |
-| [zookeeper](pkg/example/flavor/zookeeper)            | flavor   | run an Apache ZooKeeper ensemble        |
-| [infrakit/file](pkg/example/instance/file)           | instance | useful for development and testing      |
-| [infrakit/terraform](pkg/example/instance/terraform) | instance | creates instances using Terraform       |
-| [infrakit/vagrant](pkg/example/instance/vagrant)     | instance | creates Vagrant VMs                     |
+| plugin                                                  | type     | description                             |
+|:--------------------------------------------------------|:---------|:----------------------------------------|
+| [swarm](../../examples/flavor/swarm)                    | flavor   | runs Docker in Swarm mode               |
+| [vanilla](../../examples/flavor/vanilla)                | flavor   | manual specification of instance fields |
+| [zookeeper](../../examples/flavor/zookeeper)            | flavor   | run an Apache ZooKeeper ensemble        |
+| [infrakit/file](../../examples/instance/file)           | instance | useful for development and testing      |
+| [infrakit/terraform](../../examples/instance/terraform) | instance | creates instances using Terraform       |
+| [infrakit/vagrant](../../examples/instance/vagrant)     | instance | creates Vagrant VMs                     |
 
 
 ### Supported implementations
 The following Plugins are supported for active development.  Note that these Plugins may not be part of the InfraKit
 project, so please double-check where the code lives before filing InfraKit issues.
 
-| plugin                                                        | type     | description                                           |
-|:--------------------------------------------------------------|:---------|:------------------------------------------------------|
-| [infrakit/group](cmd/group)                                   | group    | supports Instance and Flavor plugins, rolling updates |
-| [docker/infrakit.aws](https://github.com/docker/infrakit.aws) | instance | creates Amazon EC2 instances                          |
+| plugin                                                              | type     | description                                           |
+|:--------------------------------------------------------------------|:---------|:------------------------------------------------------|
+| [infrakit/group](../../cmd/group)                                   | group    | supports Instance and Flavor plugins, rolling updates |
+| [docker/infrakit.aws](https://github.com/docker/infrakit.aws)       | instance | creates Amazon EC2 instances                          |
 
 Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
 
 ### Creating a plugin
 A plugin must be an HTTP server that implements one of the plugin [APIs](#apis), listening on a Unix socket.  While
-a plugin can be written in any programming language, [utilities](pkg/rpc) are available as libraries to simplify Plugin
+a plugin can be written in any programming language, [utilities](../../pkg/rpc) are available as libraries to simplify Plugin
 development in Go.  Our [reference implementations](#reference-implementations) should provide a good starting point
 for building a new plugin using these utilities.
 
