@@ -48,6 +48,7 @@ func TestUsage(t *testing.T) {
             "key_name": "PUBKEY",
             "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
             "subnet_id": "${aws_subnet.default.id}",
+            "private_ip": "INSTANCE_LOGICAL_ID",
             "tags" :  {
                 "Name" : "web4",
                 "InstancePlugin" : "terraform"
