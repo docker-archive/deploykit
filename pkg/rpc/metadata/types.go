@@ -1,13 +1,13 @@
 package metadata
 
 import (
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // ListRequest is the rpc wrapper for request parameters to List
 type ListRequest struct {
-	Properties *types.Any
-	Path       []string
+	Path metadata.Path
 }
 
 // ListResponse is the rpc wrapper for the results of List
@@ -17,7 +17,7 @@ type ListResponse struct {
 
 // GetRequest is the rpc wrapper of the params to Get
 type GetRequest struct {
-	Path []string
+	Path metadata.Path
 }
 
 // GetResponse is the rpc wrapper of the result of Get

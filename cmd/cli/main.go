@@ -43,7 +43,10 @@ func main() {
 	cmd.AddCommand(infoCommand(f))
 	cmd.AddCommand(templateCommand(f))
 	cmd.AddCommand(managerCommand(f))
-	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
+	cmd.AddCommand(metadataCommand(f))
+	cmd.AddCommand(pluginCommand(f))
+
+	cmd.AddCommand(instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
 
 	err := cmd.Execute()
 	if err != nil {

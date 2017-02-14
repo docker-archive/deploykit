@@ -8,7 +8,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
@@ -62,7 +64,14 @@ func main() {
 		}
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(NewVagrantPlugin(*dir, templ)))
+		cli.RunPlugin(*name,
+			instance_plugin.PluginServer(NewVagrantPlugin(*dir, templ)),
+			metadata_plugin.PluginServer(metadata.NewPluginFromData(
+				map[string]interface{}{
+					"version": "vagrant 1.8.5",
+				},
+			)),
+		)
 		return nil
 	}
 

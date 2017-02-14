@@ -1,7 +1,6 @@
 package metadata
 
 import (
-	"fmt"
 	"net/http"
 	"sort"
 
@@ -25,6 +24,18 @@ func PluginServerWithTypes(typed map[string]metadata.Plugin) *Metadata {
 type Metadata struct {
 	plugin       metadata.Plugin
 	typedPlugins map[string]metadata.Plugin // by type, as qualified in the name of the plugin
+}
+
+// WithBase sets the base plugin to the given plugin object
+func (p *Metadata) WithBase(m metadata.Plugin) *Metadata {
+	p.plugin = m
+	return p
+}
+
+// WithTypes sets the typed plugins to the given map of plugins (by type name)
+func (p *Metadata) WithTypes(typed map[string]metadata.Plugin) *Metadata {
+	p.typedPlugins = typed
+	return p
 }
 
 // VendorInfo returns a metadata object about the plugin, if the plugin implements it.  See spi.Vendor
@@ -117,10 +128,22 @@ func (p *Metadata) List(_ *http.Request, req *ListRequest, resp *ListResponse) e
 		return nil
 	}
 
-	c := p.getPlugin(req.Path[0])
-	if c == nil {
-		return fmt.Errorf("no-plugin:%s", req.Path[0])
+	c, has := p.typedPlugins[req.Path[0]]
+	if !has {
+
+		if p.plugin == nil {
+			return nil
+		}
+
+		nodes, err := p.plugin.List(req.Path)
+		if err != nil {
+			return err
+		}
+		sort.Strings(nodes)
+		resp.Nodes = nodes
+		return nil
 	}
+
 	nodes, err := c.List(req.Path[1:])
 	if err != nil {
 		return err
@@ -137,11 +160,21 @@ func (p *Metadata) Get(_ *http.Request, req *GetRequest, resp *GetResponse) erro
 		return nil
 	}
 
-	// The first part of the path is used for routing to the sub typed plugin.
-	c := p.getPlugin(req.Path[0])
-	if c == nil {
-		return fmt.Errorf("no-plugin:%s", req.Path[0])
+	c, has := p.typedPlugins[req.Path[0]]
+	if !has {
+
+		if p.plugin == nil {
+			return nil
+		}
+
+		value, err := p.plugin.Get(req.Path)
+		if err != nil {
+			return err
+		}
+		resp.Value = value
+		return nil
 	}
+
 	value, err := c.Get(req.Path[1:])
 	if err != nil {
 		return err

@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/docker/infrakit/pkg/types"
 )
 
 var (
@@ -16,13 +18,18 @@ var (
 )
 
 // Put sets the attribute of an object at path to the given value
-func Put(path []string, value interface{}, object interface{}) bool {
+func Put(path []string, value interface{}, object map[string]interface{}) bool {
 	return put(path, value, object)
 }
 
 // Get returns the attribute of the object at path
 func Get(path []string, object interface{}) interface{} {
 	return get(path, object)
+}
+
+// GetValue returns the attribute of the object at path, as serialized blob
+func GetValue(path []string, object interface{}) (*types.Any, error) {
+	return types.AnyValue(Get(path, object))
 }
 
 // List lists the members at the path
@@ -33,7 +40,6 @@ func List(path []string, object interface{}) []string {
 	if v == nil {
 		return list
 	}
-
 	val := reflect.Indirect(reflect.ValueOf(v))
 	switch val.Kind() {
 	case reflect.Slice:
@@ -56,14 +62,27 @@ func List(path []string, object interface{}) []string {
 	return list
 }
 
-func put(p []string, value interface{}, store interface{}) bool {
+func put(p []string, value interface{}, store map[string]interface{}) bool {
 	if len(p) == 0 {
 		return false
+	}
+
+	key := p[0]
+	if key == "" {
+		return put(p[1:], value, store)
+	}
+	// check if key is an array index of the form <1>[<2>]
+	matches := arrayIndexExp.FindStringSubmatch(key)
+	if len(matches) > 2 && matches[1] != "" {
+		key = matches[1]
+		p = append([]string{key, fmt.Sprintf("[%s]", matches[2])}, p[1:]...)
+		return put(p, value, store)
 	}
 
 	s := reflect.Indirect(reflect.ValueOf(store))
 	switch s.Kind() {
 	case reflect.Slice:
+		return false // not supported
 
 	case reflect.Map:
 		if reflect.TypeOf(p[0]).AssignableTo(s.Type().Key()) {
@@ -72,24 +91,11 @@ func put(p []string, value interface{}, store interface{}) bool {
 				m = reflect.ValueOf(map[string]interface{}{})
 				s.SetMapIndex(reflect.ValueOf(p[0]), m)
 			}
-
 			if len(p) > 1 {
-				return put(p[1:], value, m.Interface())
+				return put(p[1:], value, m.Interface().(map[string]interface{}))
 			}
 			s.SetMapIndex(reflect.ValueOf(p[0]), reflect.ValueOf(value))
 			return true
-		}
-
-	case reflect.Struct:
-		if len(p) > 1 {
-			if f := s.FieldByName(p[0]); f.IsValid() {
-				return put(p[1:], value, f.Interface())
-			}
-		} else {
-			if f := s.FieldByName(p[0]); f.IsValid() && f.CanSet() && reflect.TypeOf(value).AssignableTo(f.Type()) {
-				f.Set(reflect.ValueOf(value))
-				return true
-			}
 		}
 	}
 	return false
@@ -134,7 +140,7 @@ func get(path []string, object interface{}) interface{} {
 
 			} else if matches[3] != "" {
 				// equality search index for 'field=check'
-				lhs := matches[4] // supports another select expression for extractly deeply from the struct
+				lhs := matches[4] // supports another select expression for extracting deeply from the struct
 				rhs := matches[5]
 				// loop through the array looking for field that matches the check value
 				for j := 0; j < v.Len(); j++ {
@@ -152,7 +158,11 @@ func get(path []string, object interface{}) interface{} {
 			return get(path[1:], value.Interface())
 		}
 	case reflect.Struct:
-		return get(path[1:], v.FieldByName(key).Interface())
+		fv := v.FieldByName(key)
+		if !fv.IsValid() {
+			return nil
+		}
+		return get(path[1:], fv.Interface())
 	}
 	return nil
 }

@@ -52,7 +52,9 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		nodes := []string{}
-		for _, p := range paths {
+		for _, path := range paths {
+
+			p := path
 
 			err := forPlugin(plugins, func(name string, mp metadata.Plugin) error {
 
@@ -68,7 +70,7 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 				// Children is unqualified name so we need to prepend with the name of the plugin.
 				for _, c := range children {
-					nodes = append(nodes, metadata_plugin.PathString(name, c))
+					nodes = append(nodes, metadata_plugin.String(metadata_plugin.PathFromStrings(name, c)))
 				}
 				return nil
 			})
@@ -80,6 +82,8 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		sort.Strings(nodes)
+
+		fmt.Println("There are", len(nodes), "entries:")
 		for _, l := range nodes {
 			fmt.Println(l)
 		}
