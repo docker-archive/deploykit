@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
@@ -68,7 +69,9 @@ func main() {
 			instance_plugin.PluginServer(NewVagrantPlugin(*dir, templ)),
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(
 				map[string]interface{}{
-					"version": "vagrant 1.8.5",
+					"version":    cli.Version,
+					"revision":   cli.Revision,
+					"implements": instance_spi.InterfaceSpec,
 				},
 			)),
 		)

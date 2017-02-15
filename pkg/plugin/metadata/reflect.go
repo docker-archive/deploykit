@@ -108,7 +108,11 @@ func get(path []string, object interface{}) interface{} {
 	}
 
 	key := path[0]
-	if key == "" {
+
+	switch key {
+	case ".":
+		return object
+	case "":
 		return get(path[1:], object)
 	}
 

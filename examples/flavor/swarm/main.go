@@ -52,13 +52,16 @@ func main() {
 		}
 
 		cli.RunPlugin(*name,
-			metadata_plugin.PluginServerWithTypes(
+			metadata_plugin.PluginServer(metadata.NewPluginFromData(map[string]interface{}{
+				"version":  cli.Version,
+				"revision": cli.Revision,
+			})).WithTypes(
 				map[string]metadata_spi.Plugin{
 					"manager": metadata.NewPluginFromData(map[string]interface{}{
-						"version": "1.0",
+						"implements": flavor_spi.InterfaceSpec,
 					}),
 					"worker": metadata.NewPluginFromData(map[string]interface{}{
-						"version": "2.0",
+						"implements": flavor_spi.InterfaceSpec,
 					}),
 				}),
 			flavor_plugin.PluginServerWithTypes(

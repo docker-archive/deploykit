@@ -57,6 +57,7 @@ func TestMap(t *testing.T) {
 
 	require.Equal(t, 100, get(Path("region/us-west-2/metrics/instances/count"), m))
 
+	require.Equal(t, []string{"region"}, List(Path("."), m))
 	require.Equal(t, []string{}, List(Path("region/us-west-1/bogus"), m))
 	require.Equal(t, []string{}, List(Path("region/us-west-1/vpc/vpc1/network/network1/id"), m))
 	require.Equal(t, []string{"id"}, List(Path("region/us-west-1/vpc/vpc1/network/network1"), m))

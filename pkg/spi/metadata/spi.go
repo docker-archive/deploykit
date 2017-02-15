@@ -11,9 +11,6 @@ var InterfaceSpec = spi.InterfaceSpec{
 	Version: "0.1.0",
 }
 
-// Path is used to identify a particle of metadata.  The path can be strings separated by / as in a URL.
-type Path []string
-
 // Plugin is the interface for metadata-related operations.
 type Plugin interface {
 

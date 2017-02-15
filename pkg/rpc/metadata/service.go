@@ -105,16 +105,12 @@ func (p *Metadata) getPlugin(metadataType string) metadata.Plugin {
 
 // List returns a list of child nodes given a path.
 func (p *Metadata) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
-	if len(req.Path) == 0 {
-		return nil
-	}
-
-	// The first element of the path is the sub typed module.
 	nodes := []string{}
 
-	if req.Path[0] == "" {
+	// the . case - list the typed plugins and the default's first level.
+	if len(req.Path) == 0 || req.Path[0] == "" || req.Path[0] == "." {
 		if p.plugin != nil {
-			n, err := p.plugin.List(req.Path[1:])
+			n, err := p.plugin.List(req.Path)
 			if err != nil {
 				return err
 			}

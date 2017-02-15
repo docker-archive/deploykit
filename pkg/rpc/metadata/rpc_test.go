@@ -223,7 +223,9 @@ func TestMetadataMultiPlugin3(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"aws", "azure", "metrics"},
-		first(must(NewClient(socketPath)).List(plugin_metadata.Path(""))))
+		first(must(NewClient(socketPath)).List(metadata.Path([]string{}))))
+	require.Equal(t, []string{"aws", "azure", "metrics"},
+		first(must(NewClient(socketPath)).List(plugin_metadata.Path("/"))))
 	require.Equal(t, []string{"region"},
 		first(must(NewClient(socketPath)).List(plugin_metadata.Path("aws"))))
 	require.Equal(t, []string{"dc"},
@@ -232,6 +234,8 @@ func TestMetadataMultiPlugin3(t *testing.T) {
 		first(must(NewClient(socketPath)).List(plugin_metadata.Path("gce/"))))
 	require.Equal(t, []string{"network10", "network11"},
 		first(must(NewClient(socketPath)).List(plugin_metadata.Path("aws/region/us-west-1/vpc/vpc2/network"))))
+	require.Equal(t, []string{"aws", "azure", "metrics"},
+		first(must(NewClient(socketPath)).List(plugin_metadata.Path("."))))
 
 	require.Equal(t, "100",
 		firstAny(must(NewClient(socketPath)).Get(plugin_metadata.Path("metrics/instances/count"))).String())
