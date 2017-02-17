@@ -134,7 +134,7 @@ fields follow the pattern of `<some_key>` and `Properties` as shown above.
 
 The `Allocation` determines how the Group is managed.  Allocation has two properties:
   - `Size`: an integer for the number of instances to maintain in the Group
-  - `LogicalIDs`: a list of string identifiers, one will be associated wih each Instance
+  - `LogicalIDs`: a list of string identifiers, one will be associated with each Instance
 
 Exactly one of these fields must be set, which defines whether the Group is treated as 'cattle' (`Size`) or 'pets'
 (`LogicalIDs`).  It is up to the Instance and Flavor plugins to determine how to use `LogicalID` values.
