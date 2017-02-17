@@ -56,6 +56,16 @@ func (_mr *_MockScaledRecorder) Health(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Health", arg0)
 }
 
+func (_m *MockScaled) Label() error {
+	ret := _m.ctrl.Call(_m, "Label")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockScaledRecorder) Label() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Label")
+}
+
 func (_m *MockScaled) List() ([]instance.Description, error) {
 	ret := _m.ctrl.Call(_m, "List")
 	ret0, _ := ret[0].([]instance.Description)
