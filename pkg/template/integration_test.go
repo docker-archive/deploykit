@@ -160,7 +160,6 @@ The message is {{str}}
 }
 
 func TestMissingGlobal(t *testing.T) {
-
 	s := `{{ if not (ref "/not/exist")}}none{{else}}here{{end}}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
@@ -180,7 +179,6 @@ func TestSourceAndDef(t *testing.T) {
 }
 
 func TestAddDef(t *testing.T) {
-
 	s := `{{ ref "message" }}: x + y = {{ add (ref "x") (ref "y") }}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
@@ -237,4 +235,24 @@ func TestIncludeAndGlobalWithContext(t *testing.T) {
 	view, err := tt.Render(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "a=1", view) // the included template cannot mutate the calling template's context.
+}
+
+func TestWithFunctions(t *testing.T) {
+	ctx := map[string]interface{}{
+		"a": 1,
+		"b": 2,
+	}
+	s := `hello={{hello .a }}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.WithFunctions(func() []Function {
+		return []Function{
+			{
+				Name: "hello",
+				Func: func(n interface{}) interface{} { return n },
+			},
+		}
+	}).Render(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "hello=1", view)
 }

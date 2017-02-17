@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/jmespath/go-jmespath"
 )
 
@@ -59,6 +60,9 @@ func FromJSON(o interface{}) (interface{}, error) {
 		return ret, err
 	case []byte:
 		err := json.Unmarshal(o, &ret)
+		return ret, err
+	case *types.Any:
+		err := json.Unmarshal(o.Bytes(), &ret)
 		return ret, err
 	}
 	return ret, fmt.Errorf("not-supported-value-type")

@@ -8,6 +8,8 @@ var (
 // Path is used to identify a particle of metadata.  The path can be strings separated by / as in a URL.
 type Path []string
 
+// Clean scrubs the path to remove any empty string or . or .. and collapse the path into a concise form.
+// It's similar to path/filepath.Clean in the standard lib.
 func (p Path) Clean() Path {
 	this := []string(p)
 	copy := []string{}
@@ -76,7 +78,7 @@ func (p Path) Join(child string) Path {
 	return p.Sub(Path([]string{child}))
 }
 
-// Join joins the child to the parent
+// Sub joins the child to the parent
 func (p Path) Sub(child Path) Path {
 	pp := p.Clean()
 	return Path(append(pp, []string(child)...))

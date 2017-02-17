@@ -67,13 +67,14 @@ type defaultValue struct {
 type Template struct {
 	options Options
 
-	url      string
-	body     []byte
-	parsed   *template.Template
-	funcs    map[string]interface{}
-	globals  map[string]interface{}
-	defaults map[string]defaultValue
-	context  interface{}
+	url       string
+	body      []byte
+	parsed    *template.Template
+	functions []func() []Function
+	funcs     map[string]interface{}
+	globals   map[string]interface{}
+	defaults  map[string]defaultValue
+	context   interface{}
 
 	registered []Function
 	lock       sync.Mutex
@@ -114,12 +115,13 @@ func NewTemplateFromBytes(buff []byte, contextURL string, opt Options) (*Templat
 	}
 
 	return &Template{
-		options:  opt,
-		url:      contextURL,
-		body:     buff,
-		funcs:    map[string]interface{}{},
-		globals:  map[string]interface{}{},
-		defaults: map[string]defaultValue{},
+		options:   opt,
+		url:       contextURL,
+		body:      buff,
+		funcs:     map[string]interface{}{},
+		globals:   map[string]interface{}{},
+		defaults:  map[string]defaultValue{},
+		functions: []func() []Function{},
 	}, nil
 }
 
@@ -128,6 +130,14 @@ func (t *Template) SetOptions(opt Options) *Template {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.options = opt
+	return t
+}
+
+// WithFunctions allows client code to extend the template by adding its own functions.
+func (t *Template) WithFunctions(functions func() []Function) *Template {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.functions = append(t.functions, functions)
 	return t
 }
 
@@ -247,6 +257,30 @@ func (t *Template) build(context Context) error {
 		}
 	}
 
+	// the default functions cannot be overriden
+	for _, f := range t.DefaultFuncs() {
+		tf, err := makeTemplateFunc(context, f.Func)
+		if err != nil {
+			return err
+		}
+		fm[f.Name] = tf
+		registered = append(registered, f)
+	}
+
+	// If there are any function sources that was set via WithFunctions()
+	for _, exp := range t.functions {
+		for _, f := range exp() {
+			tf, err := makeTemplateFunc(context, f.Func)
+			if err != nil {
+				return err
+			}
+			fm[f.Name] = tf
+			registered = append(registered, f)
+		}
+	}
+
+	// If the context implements the FunctionExporter interface, it can add more functions
+	// and potentially override existing.
 	if context != nil {
 		for _, f := range context.Funcs() {
 			if tf, err := makeTemplateFunc(context, f.Func); err == nil {
@@ -256,12 +290,6 @@ func (t *Template) build(context Context) error {
 				return err
 			}
 		}
-	}
-
-	// the default functions cannot be overriden
-	for _, f := range t.DefaultFuncs() {
-		fm[f.Name] = f.Func
-		registered = append(registered, f)
 	}
 
 	t.registered = registered
