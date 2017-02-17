@@ -58,7 +58,7 @@ func (p *plugin) validate(config resource.Spec) (*Spec, []string, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("Failed to find plugin %s for %s: %s", resourceSpec.Plugin, name, err)
 		}
-		if err := instancePlugin.Validate(json.RawMessage(*resourceSpec.Properties)); err != nil {
+		if err := instancePlugin.Validate(resourceSpec.Properties); err != nil {
 			return nil, nil, fmt.Errorf("Failed to validate spec for %s: %s", name, err)
 		}
 
@@ -140,7 +140,7 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 			idStructs[name] = struct{ instance.ID }{instance.ID("unknown")}
 		} else {
 			id, err := resourceSpec.plugin.Provision(instance.Spec{
-				Properties: (*json.RawMessage)(properties),
+				Properties: properties,
 				Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name},
 			})
 			if err != nil {
