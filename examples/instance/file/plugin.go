@@ -9,6 +9,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/afero"
 	"math/rand"
 )
@@ -52,32 +53,31 @@ func (p *plugin) VendorInfo() *spi.VendorInfo {
 	return &spi.VendorInfo{
 		InterfaceSpec: spi.InterfaceSpec{
 			Name:    "infrakit-instance-file",
-			Version: "0.1.0",
+			Version: "0.3.0",
 		},
 		URL: "https://github.com/docker/infrakit",
 	}
 }
 
 // ExampleProperties returns the properties / config of this plugin
-func (p *plugin) ExampleProperties() *json.RawMessage {
-	buff, err := json.MarshalIndent(Spec{
+func (p *plugin) ExampleProperties() *types.Any {
+	any, err := types.AnyValue(Spec{
 		"exampleString": "a_string",
 		"exampleBool":   true,
 		"exampleInt":    1,
-	}, "  ", "  ")
+	})
 	if err != nil {
-		panic(err)
+		return nil
 	}
-	raw := json.RawMessage(buff)
-	return &raw
+	return any
 }
 
 // Validate performs local validation on a provision request.
-func (p *plugin) Validate(req json.RawMessage) error {
-	log.Debugln("validate", string(req))
+func (p *plugin) Validate(req *types.Any) error {
+	log.Debugln("validate", req.String())
 
 	spec := Spec{}
-	if err := json.Unmarshal(req, &spec); err != nil {
+	if err := req.Decode(&spec); err != nil {
 		return err
 	}
 
@@ -97,12 +97,40 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 			LogicalID: spec.LogicalID,
 		},
 		Spec: spec,
-	}, "  ", "  ")
+	}, "", "")
 	log.Debugln("provision", id, "data=", string(buff), "err=", err)
 	if err != nil {
 		return nil, err
 	}
 	return &id, afero.WriteFile(p.fs, filepath.Join(p.Dir, string(id)), buff, 0644)
+}
+
+// Label labels the instance
+func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
+	fp := filepath.Join(p.Dir, string(instance))
+	buff, err := afero.ReadFile(p.fs, fp)
+	if err != nil {
+		return err
+	}
+	instanceData := fileInstance{}
+	err = json.Unmarshal(buff, &instanceData)
+	if err != nil {
+		return err
+	}
+
+	if instanceData.Description.Tags == nil {
+		instanceData.Description.Tags = map[string]string{}
+	}
+	for k, v := range labels {
+		instanceData.Description.Tags[k] = v
+	}
+
+	buff, err = json.MarshalIndent(instanceData, "", "")
+	log.Debugln("label:", instance, "data=", string(buff), "err=", err)
+	if err != nil {
+		return err
+	}
+	return afero.WriteFile(p.fs, fp, buff, 0644)
 }
 
 // Destroy terminates an existing instance.

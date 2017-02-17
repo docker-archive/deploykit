@@ -1,12 +1,13 @@
 package flavor
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // PluginServer returns a Flavor that conforms to the net/rpc rpc call convention.
@@ -39,6 +40,43 @@ func (p *Flavor) VendorInfo() *spi.VendorInfo {
 	return nil
 }
 
+// Funcs implements the template.FunctionExporter method to expose help for plugin's template functions
+func (p *Flavor) Funcs() []template.Function {
+	f, is := p.plugin.(template.FunctionExporter)
+	if !is {
+		return []template.Function{}
+	}
+	return f.Funcs()
+}
+
+// Types implements server.TypedFunctionExporter
+func (p *Flavor) Types() []string {
+	if p.typedPlugins == nil {
+		return nil
+	}
+	list := []string{}
+	for k := range p.typedPlugins {
+		list = append(list, k)
+	}
+	return list
+}
+
+// FuncsByType implements server.TypedFunctionExporter
+func (p *Flavor) FuncsByType(t string) []template.Function {
+	if p.typedPlugins == nil {
+		return nil
+	}
+	fp, has := p.typedPlugins[t]
+	if !has {
+		return nil
+	}
+	exp, is := fp.(template.FunctionExporter)
+	if !is {
+		return nil
+	}
+	return exp.Funcs()
+}
+
 // SetExampleProperties sets the rpc request with any example properties/ custom type
 func (p *Flavor) SetExampleProperties(request interface{}) {
 	// TODO(chungers) - support typed plugins
@@ -66,7 +104,7 @@ func (p *Flavor) SetExampleProperties(request interface{}) {
 }
 
 // exampleProperties returns an example properties used by the plugin
-func (p *Flavor) exampleProperties() *json.RawMessage {
+func (p *Flavor) exampleProperties() *types.Any {
 	if i, is := p.plugin.(spi.InputExample); is {
 		return i.ExampleProperties()
 	}
@@ -90,17 +128,12 @@ func (p *Flavor) getPlugin(flavorType string) flavor.Plugin {
 
 // Validate checks whether the helper can support a configuration.
 func (p *Flavor) Validate(_ *http.Request, req *ValidateRequest, resp *ValidateResponse) error {
-	var raw json.RawMessage
-	if req.Properties != nil {
-		raw = *req.Properties
-	}
-
 	resp.Type = req.Type
 	c := p.getPlugin(req.Type)
 	if c == nil {
 		return fmt.Errorf("no-plugin:%s", req.Type)
 	}
-	err := c.Validate(raw, req.Allocation)
+	err := c.Validate(req.Properties, req.Allocation)
 	if err != nil {
 		return err
 	}
@@ -112,17 +145,12 @@ func (p *Flavor) Validate(_ *http.Request, req *ValidateRequest, resp *ValidateR
 // helper could be used to place additional tags on the machine, or generate a specialized Init command based on
 // the flavor configuration.
 func (p *Flavor) Prepare(_ *http.Request, req *PrepareRequest, resp *PrepareResponse) error {
-	var raw json.RawMessage
-	if req.Properties != nil {
-		raw = *req.Properties
-	}
-
 	resp.Type = req.Type
 	c := p.getPlugin(req.Type)
 	if c == nil {
 		return fmt.Errorf("no-plugin:%s", req.Type)
 	}
-	spec, err := c.Prepare(raw, req.Spec, req.Allocation)
+	spec, err := c.Prepare(req.Properties, req.Spec, req.Allocation)
 	if err != nil {
 		return err
 	}
@@ -137,7 +165,7 @@ func (p *Flavor) Healthy(_ *http.Request, req *HealthyRequest, resp *HealthyResp
 	if c == nil {
 		return fmt.Errorf("no-plugin:%s", req.Type)
 	}
-	health, err := c.Healthy(*req.Properties, req.Instance)
+	health, err := c.Healthy(req.Properties, req.Instance)
 	if err != nil {
 		return err
 	}
@@ -152,7 +180,7 @@ func (p *Flavor) Drain(_ *http.Request, req *DrainRequest, resp *DrainResponse) 
 	if c == nil {
 		return fmt.Errorf("no-plugin:%s", req.Type)
 	}
-	err := c.Drain(*req.Properties, req.Instance)
+	err := c.Drain(req.Properties, req.Instance)
 	if err != nil {
 		return err
 	}

@@ -1,11 +1,9 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
-	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -13,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 var (
@@ -32,7 +31,7 @@ func (r *reflector) VendorInfo() *spi.VendorInfo {
 	return nil
 }
 
-func (r *reflector) exampleProperties() *json.RawMessage {
+func (r *reflector) exampleProperties() *types.Any {
 	if example, is := r.target.(spi.InputExample); is {
 		return example.ExampleProperties()
 	}
@@ -42,14 +41,6 @@ func (r *reflector) exampleProperties() *json.RawMessage {
 // Type returns the target's type, taking into account of pointer receiver
 func (r *reflector) targetType() reflect.Type {
 	return reflect.Indirect(reflect.ValueOf(r.target)).Type()
-}
-
-func (r *reflector) validate() error {
-	t := r.targetType()
-	if !strings.Contains(t.PkgPath(), "github.com/docker/infrakit/pkg/rpc") {
-		return fmt.Errorf("object not a standard plugin type: %v", t)
-	}
-	return nil
 }
 
 // Interface returns the plugin type and version.

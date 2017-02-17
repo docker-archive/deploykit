@@ -10,7 +10,8 @@ import (
 	"path/filepath"
 )
 
-func fetch(s string, opt Options) ([]byte, error) {
+// Fetch fetchs content from the given URL string.  Supported schemes are http:// https:// file:// unix://
+func Fetch(s string, opt Options) ([]byte, error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		return nil, err

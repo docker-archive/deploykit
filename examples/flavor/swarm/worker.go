@@ -1,121 +1,63 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
+	//"time"
 
+	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	//"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
-	"github.com/docker/infrakit/pkg/plugin/group/util"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
 
 // NewWorkerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewWorkerFlavor(dockerClient client.APIClient, templ *template.Template) flavor.Plugin {
-	return &workerFlavor{client: dockerClient, initScript: templ}
+func NewWorkerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template) flavor.Plugin {
+	return &workerFlavor{&baseFlavor{initScript: templ, getDockerClient: connect}}
 }
 
 type workerFlavor struct {
-	client     client.APIClient
-	initScript *template.Template
+	*baseFlavor
 }
 
-func (s *workerFlavor) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
-	properties, err := parseProperties(flavorProperties)
+// Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
+func (s *workerFlavor) Prepare(flavorProperties *types.Any, instanceSpec instance.Spec,
+	allocation group_types.AllocationMethod) (instance.Spec, error) {
+	return s.baseFlavor.prepare("worker", flavorProperties, instanceSpec, allocation)
+}
+
+// Drain in the case of worker will force a node removal in the swarm.
+func (s *workerFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
+	if flavorProperties == nil {
+		return fmt.Errorf("missing config")
+	}
+
+	spec := Spec{}
+	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return err
 	}
 
-	if properties.DockerRestartCommand == "" {
-		return errors.New("DockerRestartCommand must be specified")
-	}
-
-	if err := validateIDsAndAttachments(allocation.LogicalIDs, properties.Attachments); err != nil {
+	dockerClient, err := s.baseFlavor.getDockerClient(spec)
+	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-// Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
-// Swarm.
-func (s *workerFlavor) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-	return healthy(s.client, flavorProperties, inst)
-}
-
-func (s *workerFlavor) Prepare(flavorProperties json.RawMessage, spec instance.Spec,
-	allocation types.AllocationMethod) (instance.Spec, error) {
-
-	properties, err := parseProperties(flavorProperties)
-	if err != nil {
-		return spec, err
-	}
-
-	swarmStatus, err := s.client.SwarmInspect(context.Background())
-	if err != nil {
-		return spec, fmt.Errorf("Failed to fetch Swarm join tokens: %s", err)
-	}
-
-	nodeInfo, err := s.client.Info(context.Background())
-	if err != nil {
-		return spec, fmt.Errorf("Failed to fetch node self info: %s", err)
-	}
-
-	self, _, err := s.client.NodeInspectWithRaw(context.Background(), nodeInfo.Swarm.NodeID)
-	if err != nil {
-		return spec, fmt.Errorf("Failed to fetch Swarm node status: %s", err)
-	}
-
-	if self.ManagerStatus == nil {
-		return spec, errors.New(
-			"Swarm node status did not include manager status.  Need to run 'docker swarm init`?")
-	}
-
-	associationID := util.RandomAlphaNumericString(8)
-	spec.Tags[associationTag] = associationID
-
-	initScript, err :=
-		generateInitScript(
-			s.initScript,
-			self.ManagerStatus.Addr,
-			swarmStatus.JoinTokens.Worker,
-			associationID,
-			properties.DockerRestartCommand)
-	if err != nil {
-		return spec, err
-	}
-	spec.Init = initScript
-
-	if spec.LogicalID != nil {
-		if attachments, exists := properties.Attachments[*spec.LogicalID]; exists {
-			spec.Attachments = append(spec.Attachments, attachments...)
-		}
-	}
-
-	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
-	// swarm.  This will require plumbing back to Scaled (membership tags).
-	spec.Tags["swarm-id"] = swarmStatus.ID
-
-	return spec, nil
-}
-
-func (s *workerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
-
-	associationID, exists := inst.Tags[associationTag]
-	if !exists {
+	link := types.NewLinkFromMap(inst.Tags)
+	if !link.Valid() {
 		return fmt.Errorf("Unable to drain %s without an association tag", inst.ID)
 	}
 
 	filter := filters.NewArgs()
-	filter.Add("label", fmt.Sprintf("%s=%s", associationTag, associationID))
+	filter.Add("label", fmt.Sprintf("%s=%s", link.Label(), link.Value()))
 
-	nodes, err := s.client.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
+	nodes, err := dockerClient.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
 	if err != nil {
 		return err
 	}
@@ -125,7 +67,8 @@ func (s *workerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Des
 		return fmt.Errorf("Unable to drain %s, not found in swarm", inst.ID)
 
 	case len(nodes) == 1:
-		err := s.client.NodeRemove(
+		log.Debugln("Docker NodeRemove", nodes[0].ID)
+		err := dockerClient.NodeRemove(
 			context.Background(),
 			nodes[0].ID,
 			docker_types.NodeRemoveOptions{Force: true})
@@ -136,6 +79,6 @@ func (s *workerFlavor) Drain(flavorProperties json.RawMessage, inst instance.Des
 		return nil
 
 	default:
-		return fmt.Errorf("Expected at most one node with label %s, but found %s", associationID, nodes)
+		return fmt.Errorf("Expected at most one node with label %s, but found %s", link.Value(), nodes)
 	}
 }

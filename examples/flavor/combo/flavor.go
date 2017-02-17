@@ -1,18 +1,19 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
+	"strings"
+
 	"github.com/docker/infrakit/pkg/plugin/group"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"strings"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // Spec is the model of the plugin Properties.
 type Spec struct {
-	Flavors []types.FlavorPlugin
+	Flavors []group_types.FlavorPlugin
 }
 
 // NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.  Each flavor
@@ -24,18 +25,18 @@ type flavorCombo struct {
 	flavorPlugins group.FlavorPluginLookup
 }
 
-func (f flavorCombo) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+func (f flavorCombo) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 	s := Spec{}
-	return json.Unmarshal(flavorProperties, &s)
+	return flavorProperties.Decode(&s)
 }
 
-func (f flavorCombo) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+func (f flavorCombo) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 	// The overall health of the flavor combination is taken as the 'lowest common demoninator' of the configured
 	// flavors.  Only flavor.Healthy is reported if all flavors report flavor.Healthy.  flavor.Unhealthy or
 	// flavor.UnknownHealth is returned as soon as any Flavor reports that value.
 
 	s := Spec{}
-	if err := json.Unmarshal(flavorProperties, &s); err != nil {
+	if err := flavorProperties.Decode(s); err != nil {
 		return flavor.Unknown, err
 	}
 
@@ -45,7 +46,7 @@ func (f flavorCombo) Healthy(flavorProperties json.RawMessage, inst instance.Des
 			return flavor.Unknown, err
 		}
 
-		health, err := plugin.Healthy(types.RawMessage(pluginSpec.Properties), inst)
+		health, err := plugin.Healthy(pluginSpec.Properties, inst)
 		if err != nil || health != flavor.Healthy {
 			return health, err
 		}
@@ -54,12 +55,12 @@ func (f flavorCombo) Healthy(flavorProperties json.RawMessage, inst instance.Des
 	return flavor.Healthy, nil
 }
 
-func (f flavorCombo) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
+func (f flavorCombo) Drain(flavorProperties *types.Any, inst instance.Description) error {
 	// Draining is attempted on all flavors regardless of errors encountered.  All errors encountered are combined
 	// and returned.
 
 	s := Spec{}
-	if err := json.Unmarshal(flavorProperties, &s); err != nil {
+	if err := flavorProperties.Decode(&s); err != nil {
 		return err
 	}
 
@@ -71,7 +72,7 @@ func (f flavorCombo) Drain(flavorProperties json.RawMessage, inst instance.Descr
 			errs = append(errs, err.Error())
 		}
 
-		if err := plugin.Drain(types.RawMessage(pluginSpec.Properties), inst); err != nil {
+		if err := plugin.Drain(pluginSpec.Properties, inst); err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
@@ -133,13 +134,12 @@ func mergeSpecs(initial instance.Spec, specs []instance.Spec) (instance.Spec, er
 	return result, nil
 }
 
-func (f flavorCombo) Prepare(
-	flavor json.RawMessage,
+func (f flavorCombo) Prepare(flavor *types.Any,
 	inst instance.Spec,
-	allocation types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	combo := Spec{}
-	err := json.Unmarshal(flavor, &combo)
+	err := flavor.Decode(&combo)
 	if err != nil {
 		return inst, err
 	}
@@ -154,7 +154,7 @@ func (f flavorCombo) Prepare(
 			return inst, err
 		}
 
-		flavorOutput, err := plugin.Prepare(types.RawMessage(pluginSpec.Properties), clone, allocation)
+		flavorOutput, err := plugin.Prepare(pluginSpec.Properties, clone, allocation)
 		if err != nil {
 			return inst, err
 		}

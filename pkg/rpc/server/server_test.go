@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	plugin_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func TestUnixSocketServer(t *testing.T) {
 		Init: "init",
 	}
 
-	properties := json.RawMessage([]byte(`{"foo":"bar"}`))
+	properties := types.AnyString(`{"foo":"bar"}`)
 	validateErr := errors.New("validate-error")
 
 	gomock.InOrder(

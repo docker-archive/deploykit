@@ -9,6 +9,7 @@ import (
 	plugin_mock "github.com/docker/infrakit/pkg/mock/spi/instance"
 	plugin_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,7 @@ func TestReflect(t *testing.T) {
 	require.Equal(t, instance.InterfaceSpec, tver2)
 
 	methods := r.pluginMethods()
-	require.Equal(t, 4, len(methods))
+	require.Equal(t, 5, len(methods))
 
 	// get method names
 	names := []string{}
@@ -39,6 +40,7 @@ func TestReflect(t *testing.T) {
 	expect := []string{
 		"Validate",
 		"Provision",
+		"Label",
 		"Destroy",
 		"DescribeInstances",
 	}
@@ -62,9 +64,8 @@ func TestReflect(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func toRaw(t *testing.T, v interface{}) *json.RawMessage {
-	buff, err := json.MarshalIndent(v, "  ", "  ")
+func toRaw(t *testing.T, v interface{}) *types.Any {
+	any, err := types.AnyValue(v)
 	require.NoError(t, err)
-	raw := json.RawMessage(buff)
-	return &raw
+	return any
 }

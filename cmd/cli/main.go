@@ -19,8 +19,9 @@ func main() {
 		Short: "infrakit cli",
 	}
 	logLevel := cmd.PersistentFlags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
-	cmd.PersistentPreRun = func(c *cobra.Command, args []string) {
+	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		cli.SetLogLevel(*logLevel)
+		return nil
 	}
 
 	// Don't print usage text for any error returned from a RunE function.  Only print it when explicitly requested.
@@ -38,8 +39,8 @@ func main() {
 		return d
 	}
 
-	cmd.AddCommand(cli.VersionCommand(), cli.InfoCommand(f))
-
+	cmd.AddCommand(cli.VersionCommand())
+	cmd.AddCommand(infoCommand(f))
 	cmd.AddCommand(templateCommand(f))
 	cmd.AddCommand(managerCommand(f))
 	cmd.AddCommand(pluginCommand(f), instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
@@ -57,4 +58,15 @@ func assertNotNil(message string, f interface{}) {
 		log.Error(errors.New(message))
 		os.Exit(1)
 	}
+}
+
+// upTree traverses up the command tree and starts executing the do function in the order from top
+// of the command tree to the bottom.  Cobra commands executes only one level of PersistentPreRunE
+// in reverse order.  This breaks our model of setting log levels at the very top and have the log level
+// set throughout the entire hierarchy of command execution.
+func upTree(c *cobra.Command, do func(*cobra.Command, []string) error) error {
+	if p := c.Parent(); p != nil {
+		return upTree(p, do)
+	}
+	return do(c, c.Flags().Args())
 }

@@ -27,6 +27,14 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access the manager",
 	}
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
+		if err := upTree(c, func(x *cobra.Command, argv []string) error {
+			if x.PersistentPreRunE != nil {
+				return x.PersistentPreRunE(x, argv)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 
 		// Scan for a manager
 		pm, err := plugins().List()
@@ -102,6 +110,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 		// Check the list of plugins
 		for _, gp := range groups {
+
 			endpoint, err := plugins().Find(gp.Plugin)
 			if err != nil {
 				return err
@@ -119,6 +128,9 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 			// TODO(chungers) -- we need to enforce and confirm the type of this.
 			// Right now we assume the RPC endpoint is indeed a group.
 			target, err := group_plugin.NewClient(endpoint.Address)
+
+			log.Debugln("For group", gp.Plugin, "address=", endpoint.Address, "err=", err, "spec=", spec)
+
 			if err != nil {
 				return err
 			}
@@ -151,7 +163,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		// the format is pluing.Spec
+		// the format is plugin.Spec
 		out := []plugin.Spec{}
 		for _, spec := range specs {
 

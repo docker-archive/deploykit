@@ -1,15 +1,14 @@
 package instance
 
 import (
-	"encoding/json"
-
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // ValidateRequest is the rpc wrapper for the Validate method args
 type ValidateRequest struct {
 	Type       string
-	Properties *json.RawMessage
+	Properties *types.Any
 }
 
 // ValidateResponse is the rpc wrapper for the Validate response values
@@ -28,6 +27,19 @@ type ProvisionRequest struct {
 type ProvisionResponse struct {
 	Type string
 	ID   *instance.ID
+}
+
+// LabelRequest is the rpc wrapper for Label request
+type LabelRequest struct {
+	Type     string
+	Instance instance.ID
+	Labels   map[string]string
+}
+
+// LabelResponse is the rpc wrapper for Label response
+type LabelResponse struct {
+	Type string
+	OK   bool
 }
 
 // DestroyRequest is the rpc wrapper for Destroy request

@@ -1,22 +1,23 @@
 package flavor
 
 import (
-	"encoding/json"
 	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	testing_flavor "github.com/docker/infrakit/pkg/testing/flavor"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"path"
 )
 
-var allocation = types.AllocationMethod{}
+var allocation = group_types.AllocationMethod{}
 
 func tempSocket() string {
 	dir, err := ioutil.TempDir("", "infrakit-test-")
@@ -27,45 +28,15 @@ func tempSocket() string {
 	return path.Join(dir, "flavor-impl-test")
 }
 
-type testPlugin struct {
-	DoValidate func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error
-	DoPrepare  func(
-		flavorProperties json.RawMessage,
-		spec instance.Spec,
-		allocation types.AllocationMethod) (instance.Spec, error)
-	DoHealthy func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error)
-	DoDrain   func(flavorProperties json.RawMessage, inst instance.Description) error
-}
-
-func (t *testPlugin) Validate(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
-	return t.DoValidate(flavorProperties, allocation)
-}
-
-func (t *testPlugin) Prepare(
-	flavorProperties json.RawMessage,
-	spec instance.Spec,
-	allocation types.AllocationMethod) (instance.Spec, error) {
-
-	return t.DoPrepare(flavorProperties, spec, allocation)
-}
-
-func (t *testPlugin) Healthy(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
-	return t.DoHealthy(flavorProperties, inst)
-}
-
-func (t *testPlugin) Drain(flavorProperties json.RawMessage, inst instance.Description) error {
-	return t.DoDrain(flavorProperties, inst)
-}
-
 func TestFlavorPluginValidate(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
-	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputFlavorPropertiesActual := make(chan *types.Any, 1)
+	inputFlavorProperties := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoValidate: func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
+		DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
 			return nil
 		},
@@ -83,11 +54,11 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
-	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputFlavorPropertiesActual := make(chan *types.Any, 1)
+	inputFlavorProperties := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoValidate: func(flavorProperties json.RawMessage, allocation types.AllocationMethod) error {
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
+		DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
 			return errors.New("something-went-wrong")
 		},
@@ -106,19 +77,19 @@ func TestFlavorPluginPrepare(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
-	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputFlavorPropertiesActual := make(chan *types.Any, 1)
+	inputFlavorProperties := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 	inputInstanceSpecActual := make(chan instance.Spec, 1)
 	inputInstanceSpec := instance.Spec{
-		Properties: &inputFlavorProperties,
+		Properties: inputFlavorProperties,
 		Tags:       map[string]string{"foo": "bar"},
 	}
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoPrepare: func(
-			flavorProperties json.RawMessage,
+			flavorProperties *types.Any,
 			instanceSpec instance.Spec,
-			allocation types.AllocationMethod) (instance.Spec, error) {
+			allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
 			inputInstanceSpecActual <- instanceSpec
@@ -145,19 +116,19 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputFlavorPropertiesActual := make(chan json.RawMessage, 1)
-	inputFlavorProperties := json.RawMessage([]byte(`{"flavor":"zookeeper","role":"leader"}`))
+	inputFlavorPropertiesActual := make(chan *types.Any, 1)
+	inputFlavorProperties := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 	inputInstanceSpecActual := make(chan instance.Spec, 1)
 	inputInstanceSpec := instance.Spec{
-		Properties: &inputFlavorProperties,
+		Properties: inputFlavorProperties,
 		Tags:       map[string]string{"foo": "bar"},
 	}
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoPrepare: func(
-			flavorProperties json.RawMessage,
+			flavorProperties *types.Any,
 			instanceSpec instance.Spec,
-			allocation types.AllocationMethod) (instance.Spec, error) {
+			allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
 			inputInstanceSpecActual <- instanceSpec
@@ -184,15 +155,15 @@ func TestFlavorPluginHealthy(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputPropertiesActual := make(chan json.RawMessage, 1)
+	inputPropertiesActual := make(chan *types.Any, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
-	inputProperties := json.RawMessage("{}")
+	inputProperties := types.AnyString("{}")
 	inputInstance := instance.Description{
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoHealthy: func(properties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
+		DoHealthy: func(properties *types.Any, inst instance.Description) (flavor.Health, error) {
 			inputPropertiesActual <- properties
 			inputInstanceActual <- inst
 			return flavor.Healthy, nil
@@ -213,15 +184,15 @@ func TestFlavorPluginHealthyError(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputPropertiesActual := make(chan json.RawMessage, 1)
+	inputPropertiesActual := make(chan *types.Any, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
-	inputProperties := json.RawMessage("{}")
+	inputProperties := types.AnyString("{}")
 	inputInstance := instance.Description{
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoHealthy: func(flavorProperties json.RawMessage, inst instance.Description) (flavor.Health, error) {
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
+		DoHealthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 			inputPropertiesActual <- flavorProperties
 			inputInstanceActual <- inst
 			return flavor.Unknown, errors.New("oh-noes")
@@ -242,15 +213,15 @@ func TestFlavorPluginDrain(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputPropertiesActual := make(chan json.RawMessage, 1)
+	inputPropertiesActual := make(chan *types.Any, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
-	inputProperties := json.RawMessage("{}")
+	inputProperties := types.AnyString("{}")
 	inputInstance := instance.Description{
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoDrain: func(properties json.RawMessage, inst instance.Description) error {
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
+		DoDrain: func(properties *types.Any, inst instance.Description) error {
 			inputPropertiesActual <- properties
 			inputInstanceActual <- inst
 			return nil
@@ -269,15 +240,15 @@ func TestFlavorPluginDrainError(t *testing.T) {
 	socketPath := tempSocket()
 	name := filepath.Base(socketPath)
 
-	inputPropertiesActual := make(chan json.RawMessage, 1)
+	inputPropertiesActual := make(chan *types.Any, 1)
 	inputInstanceActual := make(chan instance.Description, 1)
-	inputProperties := json.RawMessage("{}")
+	inputProperties := types.AnyString("{}")
 	inputInstance := instance.Description{
 		ID:   instance.ID("foo"),
 		Tags: map[string]string{"foo": "bar"},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testPlugin{
-		DoDrain: func(flavorProperties json.RawMessage, inst instance.Description) error {
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
+		DoDrain: func(flavorProperties *types.Any, inst instance.Description) error {
 			inputPropertiesActual <- flavorProperties
 			inputInstanceActual <- inst
 			return errors.New("oh-noes")

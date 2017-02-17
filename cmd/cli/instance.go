@@ -13,6 +13,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +27,14 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
+		if err := upTree(c, func(x *cobra.Command, argv []string) error {
+			if x.PersistentPreRunE != nil {
+				return x.PersistentPreRunE(x, argv)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 
 		endpoint, err := plugins().Find(plugin.Name(*name))
 		if err != nil {
@@ -57,7 +66,7 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			err = instancePlugin.Validate(json.RawMessage(buff))
+			err = instancePlugin.Validate(types.AnyBytes(buff))
 			if err == nil {
 				fmt.Println("validate:ok")
 			}

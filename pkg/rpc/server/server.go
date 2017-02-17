@@ -106,7 +106,8 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 	httpLog.Level = log.GetLevel()
 
 	router := mux.NewRouter()
-	router.Handle(rpc_server.InfoURL, info)
+	router.HandleFunc(rpc_server.APIURL, info.ShowAPI)
+	router.HandleFunc(rpc_server.FunctionsURL, info.ShowTemplateFunctions)
 	router.Handle("/", server)
 
 	handler := loggingHandler{handler: router}
