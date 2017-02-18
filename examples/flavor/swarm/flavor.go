@@ -81,8 +81,10 @@ func (s *baseFlavor) List(path metadata.Path) ([]string, error) {
 		return nil, err
 	}
 	data := map[string]interface{}{
-		"status": status,
-		"node":   node,
+		"local": map[string]interface{}{
+			"status": status,
+			"node":   node,
+		},
 	}
 	return metadata_plugin.List(path, data), nil
 }
@@ -102,8 +104,10 @@ func (s *baseFlavor) Get(path metadata.Path) (*types.Any, error) {
 		return nil, err
 	}
 	data := map[string]interface{}{
-		"status": status,
-		"node":   node,
+		"local": map[string]interface{}{
+			"status": status,
+			"node":   node,
+		},
 	}
 	return metadata_plugin.GetValue(path, data)
 }

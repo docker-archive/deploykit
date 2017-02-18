@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/spi/metadata"
+	_ "github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -69,7 +69,9 @@ func List(path []string, object interface{}) []string {
 	case reflect.Struct:
 		vt := val.Type()
 		for i := 0; i < vt.NumField(); i++ {
-			list = append(list, vt.Field(i).Name)
+			if vt.Field(i).PkgPath == "" {
+				list = append(list, vt.Field(i).Name)
+			}
 		}
 	}
 
@@ -117,17 +119,17 @@ func put(p []string, value interface{}, store map[string]interface{}) bool {
 }
 
 func get(path []string, object interface{}) interface{} {
-	if impl, is := object.(metadata.Plugin); is {
-		value, err := impl.Get(metadata.Path(path))
-		if err != nil {
-			return err
-		}
-		temp := map[string]interface{}{}
-		if err := value.Decode(&temp); err == nil {
-			return temp
-		}
-		return nil
-	}
+	// if impl, is := object.(metadata.Plugin); is {
+	// 	value, err := impl.Get(metadata.Path(path))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	temp := map[string]interface{}{}
+	// 	if err := value.Decode(&temp); err == nil {
+	// 		return temp
+	// 	}
+	// 	return nil
+	// }
 
 	if len(path) == 0 {
 		return object
@@ -190,6 +192,9 @@ func get(path []string, object interface{}) interface{} {
 	case reflect.Struct:
 		fv := v.FieldByName(key)
 		if !fv.IsValid() {
+			return nil
+		}
+		if !fv.CanInterface() {
 			return nil
 		}
 		return get(path[1:], fv.Interface())
