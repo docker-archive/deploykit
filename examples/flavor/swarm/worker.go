@@ -19,6 +19,7 @@ func NewWorkerFlavor(connect func(Spec) (client.APIClient, error), templ *templa
 	return &WorkerFlavor{&baseFlavor{initScript: templ, getDockerClient: connect}}
 }
 
+// WorkerFlavor implements the flavor and metadata plugins
 type WorkerFlavor struct {
 	*baseFlavor
 }

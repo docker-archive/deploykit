@@ -16,10 +16,12 @@ func NewManagerFlavor(connect func(Spec) (client.APIClient, error), templ *templ
 	return &ManagerFlavor{&baseFlavor{initScript: templ, getDockerClient: connect}}
 }
 
+// ManagerFlavor is the flavor for swarm managers
 type ManagerFlavor struct {
 	*baseFlavor
 }
 
+// Validate checks whether the helper can support a configuration.
 func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 
 	if err := s.baseFlavor.Validate(flavorProperties, allocation); err != nil {

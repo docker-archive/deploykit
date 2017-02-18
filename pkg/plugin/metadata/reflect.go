@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -48,9 +47,8 @@ func List(path []string, object interface{}) []string {
 		if err := any.Decode(&temp); err == nil {
 			if len(temp) > 0 {
 				return List([]string{"."}, temp)
-			} else {
-				return []string{}
 			}
+			return []string{}
 		}
 		return []string{}
 	}
