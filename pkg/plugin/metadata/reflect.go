@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -29,17 +30,31 @@ func Get(path []string, object interface{}) interface{} {
 
 // GetValue returns the attribute of the object at path, as serialized blob
 func GetValue(path []string, object interface{}) (*types.Any, error) {
+	if any, is := object.(*types.Any); is {
+		return any, nil
+	}
 	return types.AnyValue(Get(path, object))
 }
 
 // List lists the members at the path
 func List(path []string, object interface{}) []string {
 	list := []string{}
-
 	v := get(path, object)
 	if v == nil {
 		return list
 	}
+	if any, is := v.(*types.Any); is {
+		temp := map[string]interface{}{}
+		if err := any.Decode(&temp); err == nil {
+			if len(temp) > 0 {
+				return List([]string{"."}, temp)
+			} else {
+				return []string{}
+			}
+		}
+		return []string{}
+	}
+
 	val := reflect.Indirect(reflect.ValueOf(v))
 	switch val.Kind() {
 	case reflect.Slice:
@@ -102,6 +117,17 @@ func put(p []string, value interface{}, store map[string]interface{}) bool {
 }
 
 func get(path []string, object interface{}) interface{} {
+	if impl, is := object.(metadata.Plugin); is {
+		value, err := impl.Get(metadata.Path(path))
+		if err != nil {
+			return err
+		}
+		temp := map[string]interface{}{}
+		if err := value.Decode(&temp); err == nil {
+			return temp
+		}
+		return nil
+	}
 
 	if len(path) == 0 {
 		return object

@@ -83,3 +83,20 @@ func (p Path) Sub(child Path) Path {
 	pp := p.Clean()
 	return Path(append(pp, []string(child)...))
 }
+
+// Rel returns a new path that is a child of the input from this path.
+// e.g. For a path a/b/c/d Rel(a/b/) returns c/d.  NullPath is returned if
+// the two are not relative to one another.
+func (p Path) Rel(path Path) Path {
+	this := []string(p.Clean())
+	parent := []string(path.Clean())
+	if len(this) < len(parent) {
+		return NullPath
+	}
+	for i := 0; i < len(parent); i++ {
+		if parent[i] != this[i] {
+			return NullPath
+		}
+	}
+	return Path(this[len(parent):])
+}

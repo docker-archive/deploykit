@@ -100,69 +100,81 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 				return fmt.Errorf("No absolute path")
 			}
 
-			nodes := []metadata.Path{}
 			path := metadata_plugin.Path(p)
+			first := path.Index(0)
+
 			targets := []string{} // target plugins to query
 
-			if p == "." {
-
-				allMetadataPlugins := []string{} // name of all plugins implementing metadata spi
-
-				// Check all the plugins -- scanning via discovery
-				if err := forPlugin(plugins, func(name string, mp metadata.Plugin) error {
-					allMetadataPlugins = append(allMetadataPlugins, name)
-					if !*all {
-						// append the result only if this is not listing all nodes
-						// the all nodes case will run over all the targets so no need to
-						// include the child here.
-						nodes = append(nodes, path.Join(name))
+			// Check all the plugins -- scanning via discovery
+			if err := forPlugin(plugins,
+				func(name string, mp metadata.Plugin) error {
+					if p == "." || (first != nil && name == *first) {
+						targets = append(targets, name)
 					}
 					return nil
 				}); err != nil {
-					return err
-				}
-
-				if *all {
-					targets = allMetadataPlugins
-				}
-
-			} else if first := path.Index(0); first != nil {
-				targets = []string{*first}
+				return err
 			}
 
 			for _, target := range targets {
+
+				nodes := []metadata.Path{} // the result set to print
 
 				match, err := getPlugin(plugins, target)
 				if err != nil {
 					return err
 				}
 
-				if *all {
-					allPaths, err := listAll(match, path.Shift(1))
-					if err != nil {
-						log.Warningln("Cannot metadata ls on plugin", target, "err=", err)
-					}
-					for _, c := range allPaths {
-						nodes = append(nodes, path.Join(target).Sub(c))
+				if p == "." {
+					if *all {
+						allPaths, err := listAll(match, path.Shift(1))
+						if err != nil {
+							log.Warningln("Cannot metadata ls on plugin", target, "err=", err)
+						}
+						for _, c := range allPaths {
+							nodes = append(nodes, metadata_plugin.Path(target).Sub(c))
+						}
+					} else {
+						for _, t := range targets {
+							nodes = append(nodes, metadata_plugin.Path(t))
+						}
 					}
 				} else {
-					children, err := match.List(path.Shift(1))
-					if err != nil {
-						log.Warningln("Cannot metadata ls on plugin", target, "err=", err)
-					}
-					for _, c := range children {
-						nodes = append(nodes, path.Join(c))
+					if *all {
+						allPaths, err := listAll(match, path.Shift(1))
+						if err != nil {
+							log.Warningln("Cannot metadata ls on plugin", target, "err=", err)
+						}
+						for _, c := range allPaths {
+							nodes = append(nodes, metadata_plugin.Path(target).Sub(c))
+						}
+					} else {
+						children, err := match.List(path.Shift(1))
+						if err != nil {
+							log.Warningln("Cannot metadata ls on plugin", target, "err=", err)
+						}
+						for _, c := range children {
+							nodes = append(nodes, path.Join(c))
+						}
 					}
 				}
+
+				if len(targets) > 1 {
+					fmt.Printf("%s:\n", target)
+				}
+				if *long {
+					fmt.Printf("total %d:\n", len(nodes))
+				}
+				for _, l := range nodes {
+					if *long {
+						fmt.Println(metadata_plugin.String(l))
+					} else {
+						fmt.Println(metadata_plugin.String(l.Rel(path)))
+					}
+				}
+				fmt.Println()
 			}
 
-			for _, l := range nodes {
-				if *long {
-					fmt.Println(metadata_plugin.String(l))
-				} else {
-					fmt.Println(l.Base())
-				}
-			}
 		}
 		return nil
 	}

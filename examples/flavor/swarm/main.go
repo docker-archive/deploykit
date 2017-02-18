@@ -51,6 +51,9 @@ func main() {
 			return err
 		}
 
+		managerFlavor := NewManagerFlavor(DockerClient, mt)
+		workerFlavor := NewWorkerFlavor(DockerClient, wt)
+
 		cli.RunPlugin(*name,
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(map[string]interface{}{
 				"version":  cli.Version,
@@ -59,15 +62,17 @@ func main() {
 				map[string]metadata_spi.Plugin{
 					"manager": metadata.NewPluginFromData(map[string]interface{}{
 						"implements": flavor_spi.InterfaceSpec,
+						"local":      managerFlavor,
 					}),
 					"worker": metadata.NewPluginFromData(map[string]interface{}{
 						"implements": flavor_spi.InterfaceSpec,
+						"local":      workerFlavor,
 					}),
 				}),
 			flavor_plugin.PluginServerWithTypes(
 				map[string]flavor_spi.Plugin{
-					"manager": NewManagerFlavor(DockerClient, mt),
-					"worker":  NewWorkerFlavor(DockerClient, wt),
+					"manager": managerFlavor,
+					"worker":  workerFlavor,
 				}))
 		return nil
 	}

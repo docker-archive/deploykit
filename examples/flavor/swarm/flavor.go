@@ -11,8 +11,10 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/tlsconfig"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
@@ -62,6 +64,48 @@ func DockerClient(spec Spec) (client.APIClient, error) {
 type baseFlavor struct {
 	getDockerClient func(Spec) (client.APIClient, error)
 	initScript      *template.Template
+}
+
+// List implements the metadata.Plugin SPI's List method
+func (s *baseFlavor) List(path metadata.Path) ([]string, error) {
+	docker, err := s.getDockerClient(Spec{
+		Docker: ConnectInfo{
+			Host: "unix:///var/run/docker.sock", // defaults to local socket
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	status, node, err := swarmState(docker)
+	if err != nil {
+		return nil, err
+	}
+	data := map[string]interface{}{
+		"status": status,
+		"node":   node,
+	}
+	return metadata_plugin.List(path, data), nil
+}
+
+// Get implements the metadata.Plugin SPI's List method
+func (s *baseFlavor) Get(path metadata.Path) (*types.Any, error) {
+	docker, err := s.getDockerClient(Spec{
+		Docker: ConnectInfo{
+			Host: "unix:///var/run/docker.sock", // defaults to local socket
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	status, node, err := swarmState(docker)
+	if err != nil {
+		return nil, err
+	}
+	data := map[string]interface{}{
+		"status": status,
+		"node":   node,
+	}
+	return metadata_plugin.GetValue(path, data)
 }
 
 // Funcs implements the template.FunctionExporter interface that allows the RPC server to expose help on the

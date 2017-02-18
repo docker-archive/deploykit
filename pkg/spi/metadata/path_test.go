@@ -34,4 +34,6 @@ func TestPath(t *testing.T) {
 	require.Equal(t, Path(p("a/b/c/d")), Path(p("a/b/c/d/")).Clean())
 	require.Equal(t, Path(p("a/b/c/d")), Path(p("a/b/c/")).Join("d"))
 	require.Equal(t, Path(p("a/b/c/d/x/y")), Path(p("a/b/c/")).Sub(p("d/x/y")))
+
+	require.Equal(t, Path(p("c/d/e/f")), Path(p("a/b/c/d/e/f")).Rel(p("a/b/")))
 }
