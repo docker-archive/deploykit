@@ -56,8 +56,9 @@ func List(path []string, object interface{}) []string {
 	val := reflect.Indirect(reflect.ValueOf(v))
 	switch val.Kind() {
 	case reflect.Slice:
+		// this is a slice, so return the name as '[%d]'
 		for i := 0; i < val.Len(); i++ {
-			list = append(list, val.Index(i).String())
+			list = append(list, fmt.Sprintf("[%d]", i)) //val.Index(i).String())
 		}
 
 	case reflect.Map:
@@ -117,18 +118,6 @@ func put(p []string, value interface{}, store map[string]interface{}) bool {
 }
 
 func get(path []string, object interface{}) interface{} {
-	// if impl, is := object.(metadata.Plugin); is {
-	// 	value, err := impl.Get(metadata.Path(path))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	temp := map[string]interface{}{}
-	// 	if err := value.Decode(&temp); err == nil {
-	// 		return temp
-	// 	}
-	// 	return nil
-	// }
-
 	if len(path) == 0 {
 		return object
 	}
