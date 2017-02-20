@@ -6,8 +6,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
-	"github.com/docker/infrakit/pkg/spi/flavor"
+	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	flavor_spi "github.com/docker/infrakit/pkg/spi/flavor"
+	metadata_spi "github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
@@ -48,11 +51,28 @@ func main() {
 			return err
 		}
 
-		cli.RunPlugin(*name, flavor_plugin.PluginServerWithTypes(
-			map[string]flavor.Plugin{
-				"manager": NewManagerFlavor(DockerClient, mt),
-				"worker":  NewWorkerFlavor(DockerClient, wt),
-			}))
+		managerFlavor := NewManagerFlavor(DockerClient, mt)
+		workerFlavor := NewWorkerFlavor(DockerClient, wt)
+
+		cli.RunPlugin(*name,
+
+			// Metadata plugins
+			metadata_plugin.PluginServer(metadata.NewPluginFromData(map[string]interface{}{
+				"version":    cli.Version,
+				"revision":   cli.Revision,
+				"implements": flavor_spi.InterfaceSpec,
+			})).WithTypes(
+				map[string]metadata_spi.Plugin{
+					"manager": managerFlavor,
+					"worker":  workerFlavor,
+				}),
+
+			// Flavor plugins
+			flavor_plugin.PluginServerWithTypes(
+				map[string]flavor_spi.Plugin{
+					"manager": managerFlavor,
+					"worker":  workerFlavor,
+				}))
 		return nil
 	}
 

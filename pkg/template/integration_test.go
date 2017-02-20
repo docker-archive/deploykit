@@ -159,13 +159,31 @@ The message is {{str}}
 	require.Equal(t, 23, context.invokes) // note this is private state not accessible in template
 }
 
-func TestAddDef(t *testing.T) {
+func TestMissingGlobal(t *testing.T) {
+	s := `{{ if not (ref "/not/exist")}}none{{else}}here{{end}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "none", view)
+}
 
+func TestSourceAndDef(t *testing.T) {
+	r := `{{ def \"foo\" 100 }}`
+	s := `{{ source "str://` + r + `" }}foo={{ref "foo"}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "foo=100", view)
+}
+
+func TestAddDef(t *testing.T) {
 	s := `{{ ref "message" }}: x + y = {{ add (ref "x") (ref "y") }}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
 
-	view, err := tt.AddDef("x", 25, "Default value for x").AddDef("y", 100).AddDef("message", "hello").Render(nil)
+	view, err := tt.Def("x", 25, "Default value for x").Def("y", 100, "no doc").Def("message", "hello", "").Render(nil)
 	require.NoError(t, err)
 	require.Equal(t, "hello: x + y = 125", view)
 }
@@ -217,4 +235,24 @@ func TestIncludeAndGlobalWithContext(t *testing.T) {
 	view, err := tt.Render(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "a=1", view) // the included template cannot mutate the calling template's context.
+}
+
+func TestWithFunctions(t *testing.T) {
+	ctx := map[string]interface{}{
+		"a": 1,
+		"b": 2,
+	}
+	s := `hello={{hello .a }}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.WithFunctions(func() []Function {
+		return []Function{
+			{
+				Name: "hello",
+				Func: func(n interface{}) interface{} { return n },
+			},
+		}
+	}).Render(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "hello=1", view)
 }
