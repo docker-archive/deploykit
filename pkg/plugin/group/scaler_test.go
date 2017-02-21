@@ -1,11 +1,26 @@
 package group
 
 import (
+	"errors"
+	"testing"
+	"time"
+
 	mock_group "github.com/docker/infrakit/pkg/mock/plugin/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
-	"testing"
-	"time"
+)
+
+var (
+	withLabel = instance.Description{
+		ID:   instance.ID("withLabel"),
+		Tags: map[string]string{},
+	}
+	withoutLabel = instance.Description{
+		ID: instance.ID("withoutLabel"),
+		Tags: map[string]string{
+			"infrakit.config_sha": "bootstrap",
+		},
+	}
 )
 
 func TestScaleUp(t *testing.T) {
@@ -94,6 +109,58 @@ func TestBufferScaleDown(t *testing.T) {
 
 	scaled.EXPECT().Destroy(a)
 	scaled.EXPECT().Destroy(b)
+
+	scaler.Run()
+}
+
+func TestLabel(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	scaled := mock_group.NewMockScaled(ctrl)
+	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 1)
+
+	gomock.InOrder(
+		scaled.EXPECT().List().Do(func() {
+			go scaler.Stop()
+		}).Return([]instance.Description{withLabel, withoutLabel}, nil),
+		scaled.EXPECT().Label().Return(nil),
+		scaled.EXPECT().List().Return([]instance.Description{withLabel, withoutLabel}, nil),
+	)
+
+	scaler.Run()
+}
+
+func TestFailToLabel(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	scaled := mock_group.NewMockScaled(ctrl)
+	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 1)
+
+	gomock.InOrder(
+		scaled.EXPECT().List().Do(func() {
+			go scaler.Stop()
+		}).Return([]instance.Description{withLabel, withoutLabel}, nil),
+		scaled.EXPECT().Label().Return(errors.New("Unable to label")),
+	)
+
+	scaler.Run()
+}
+
+func TestFailToList(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	scaled := mock_group.NewMockScaled(ctrl)
+	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 1)
+
+	gomock.InOrder(
+		scaled.EXPECT().List().Return(nil, errors.New("Unable to list")),
+		scaled.EXPECT().List().Do(func() {
+			go scaler.Stop()
+		}).Return([]instance.Description{a, b}, nil),
+	)
 
 	scaler.Run()
 }
