@@ -79,6 +79,7 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	long := ls.Flags().BoolP("long", "l", false, "Print full path")
 	all := ls.Flags().BoolP("all", "a", false, "Find all under the paths given")
+	quick := ls.Flags().BoolP("quick", "q", false, "True to turn off headers, etc.")
 
 	ls.RunE = func(c *cobra.Command, args []string) error {
 		paths := []string{"."}
@@ -92,7 +93,7 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 			paths = args
 		}
 
-		for _, p := range paths {
+		for i, p := range paths {
 
 			if p == "/" {
 				// TODO(chungers) -- this is a 'local' infrakit ensemble.
@@ -116,7 +117,7 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			for _, target := range targets {
+			for j, target := range targets {
 
 				nodes := []metadata.Path{} // the result set to print
 
@@ -139,6 +140,7 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 							nodes = append(nodes, metadata_plugin.Path(t))
 						}
 					}
+
 				} else {
 					if *all {
 						allPaths, err := listAll(match, path.Shift(1))
@@ -159,10 +161,28 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 					}
 				}
 
+				if p == "." && !*all {
+					// special case of showing the top level plugin namespaces
+					if i > 0 && !*quick {
+						fmt.Println()
+					}
+					for _, l := range nodes {
+						if *long {
+							fmt.Println(metadata_plugin.String(l))
+						} else {
+							fmt.Println(metadata_plugin.String(l.Rel(path)))
+						}
+					}
+					break
+				}
+
 				if len(targets) > 1 {
+					if j > 0 && !*quick {
+						fmt.Println()
+					}
 					fmt.Printf("%s:\n", target)
 				}
-				if *long {
+				if *long && !*quick {
 					fmt.Printf("total %d:\n", len(nodes))
 				}
 				for _, l := range nodes {
@@ -172,7 +192,6 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 						fmt.Println(metadata_plugin.String(l.Rel(path)))
 					}
 				}
-				fmt.Println()
 			}
 
 		}
