@@ -61,7 +61,7 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 			//   - instances with the desired config are healthy
 
 			// TODO(wfarner): Get this information from the scaler to reduce redundant network calls.
-			instances, err := r.scaled.List()
+			instances, err := labelAndList(r.scaled)
 			if err != nil {
 				return err
 			}
@@ -116,7 +116,7 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 // TODO(wfarner): Make this routine more resilient to transient errors.
 func (r *rollingupdate) Run(pollInterval time.Duration) error {
 
-	instances, err := r.scaled.List()
+	instances, err := labelAndList(r.scaled)
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		}
 		log.Info("Scaler has quiesced")
 
-		instances, err := r.scaled.List()
+		instances, err := labelAndList(r.scaled)
 		if err != nil {
 			return err
 		}

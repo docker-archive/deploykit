@@ -70,7 +70,7 @@ func (q *quorum) Size() uint {
 }
 
 func (q *quorum) converge() {
-	descriptions, err := q.scaled.List()
+	descriptions, err := labelAndList(q.scaled)
 	if err != nil {
 		log.Errorf("Failed to check group: %s", err)
 		return
