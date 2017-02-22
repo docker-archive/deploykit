@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -15,8 +16,12 @@ import (
 )
 
 // NewWorkerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewWorkerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template) *WorkerFlavor {
-	return &WorkerFlavor{&baseFlavor{initScript: templ, getDockerClient: connect}}
+func NewWorkerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template,
+	stop <-chan struct{}) *WorkerFlavor {
+
+	base := &baseFlavor{initScript: templ, getDockerClient: connect}
+	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
+	return &WorkerFlavor{baseFlavor: base}
 }
 
 // WorkerFlavor implements the flavor and metadata plugins
