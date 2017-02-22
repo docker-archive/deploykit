@@ -64,52 +64,64 @@ func DockerClient(spec Spec) (client.APIClient, error) {
 type baseFlavor struct {
 	getDockerClient func(Spec) (client.APIClient, error)
 	initScript      *template.Template
+	metadataPlugin  metadata.Plugin
+}
+
+// Runs a poller that periodically samples the swarm status and node info.
+func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func(map[string]interface{}) {
+	// Start a poller to load the snapshot and make that available as metadata
+	updateSnapshot := make(chan func(map[string]interface{}))
+	go func() {
+		tick := time.Tick(1 * time.Second)
+		for {
+			select {
+			case <-tick:
+
+				snapshot := map[string]interface{}{}
+				if docker, err := s.getDockerClient(Spec{
+					Docker: ConnectInfo{
+						Host: "unix:///var/run/docker.sock", // defaults to local socket
+					},
+				}); err != nil {
+					snapshot["local"] = map[string]interface{}{"error": err}
+				} else {
+					if status, node, err := swarmState(docker); err != nil {
+						snapshot["local"] = map[string]interface{}{"error": err}
+					} else {
+						snapshot["local"] = map[string]interface{}{
+							"status": status,
+							"node":   node,
+						}
+					}
+				}
+
+				updateSnapshot <- func(view map[string]interface{}) {
+					metadata_plugin.Put([]string{"groups"}, snapshot, view)
+				}
+
+			case <-stopSnapshot:
+				log.Infoln("Snapshot updater stopped")
+				return
+			}
+		}
+	}()
+	return updateSnapshot
 }
 
 // List implements the metadata.Plugin SPI's List method
 func (s *baseFlavor) List(path metadata.Path) ([]string, error) {
-	docker, err := s.getDockerClient(Spec{
-		Docker: ConnectInfo{
-			Host: "unix:///var/run/docker.sock", // defaults to local socket
-		},
-	})
-	if err != nil {
-		return nil, err
+	if s.metadataPlugin != nil {
+		return s.metadataPlugin.List(path)
 	}
-	status, node, err := swarmState(docker)
-	if err != nil {
-		return nil, err
-	}
-	data := map[string]interface{}{
-		"local": map[string]interface{}{
-			"status": status,
-			"node":   node,
-		},
-	}
-	return metadata_plugin.List(path, data), nil
+	return nil, nil
 }
 
 // Get implements the metadata.Plugin SPI's List method
 func (s *baseFlavor) Get(path metadata.Path) (*types.Any, error) {
-	docker, err := s.getDockerClient(Spec{
-		Docker: ConnectInfo{
-			Host: "unix:///var/run/docker.sock", // defaults to local socket
-		},
-	})
-	if err != nil {
-		return nil, err
+	if s.metadataPlugin != nil {
+		return s.metadataPlugin.Get(path)
 	}
-	status, node, err := swarmState(docker)
-	if err != nil {
-		return nil, err
-	}
-	data := map[string]interface{}{
-		"local": map[string]interface{}{
-			"status": status,
-			"node":   node,
-		},
-	}
-	return metadata_plugin.GetValue(path, data)
+	return nil, nil
 }
 
 // Funcs implements the template.FunctionExporter interface that allows the RPC server to expose help on the

@@ -51,8 +51,10 @@ func main() {
 			return err
 		}
 
-		managerFlavor := NewManagerFlavor(DockerClient, mt)
-		workerFlavor := NewWorkerFlavor(DockerClient, wt)
+		managerStop := make(chan struct{})
+		workerStop := make(chan struct{})
+		managerFlavor := NewManagerFlavor(DockerClient, mt, managerStop)
+		workerFlavor := NewWorkerFlavor(DockerClient, wt, workerStop)
 
 		cli.RunPlugin(*name,
 
@@ -73,6 +75,9 @@ func main() {
 					"manager": managerFlavor,
 					"worker":  workerFlavor,
 				}))
+
+		close(managerStop)
+		close(workerStop)
 		return nil
 	}
 

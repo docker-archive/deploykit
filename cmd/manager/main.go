@@ -3,14 +3,17 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/leader"
 	"github.com/docker/infrakit/pkg/manager"
+	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
+	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
@@ -78,9 +81,47 @@ func runMain(cfg config) error {
 		return err
 	}
 
-	cli.RunPlugin(cfg.id, group_rpc.PluginServer(mgr), manager_rpc.PluginServer(mgr))
+	// Start a poller to load the snapshot and make that available as metadata
+	updateSnapshot := make(chan func(map[string]interface{}))
+	stopSnapshot := make(chan struct{})
+	go func() {
+		tick := time.Tick(1 * time.Second)
+		for {
+			select {
+			case <-tick:
+				snapshot := map[string]interface{}{}
+
+				// update leadership
+				if isLeader, err := mgr.IsLeader(); err == nil {
+					updateSnapshot <- func(view map[string]interface{}) {
+						metadata_plugin.Put([]string{"leader"}, isLeader, view)
+					}
+				} else {
+					log.Warningln("Cannot check leader for metadata:", err)
+				}
+
+				// update config
+				if err := cfg.snapshot.Load(&snapshot); err == nil {
+					updateSnapshot <- func(view map[string]interface{}) {
+						metadata_plugin.Put([]string{"configs"}, snapshot, view)
+					}
+				} else {
+					log.Warningln("Cannot load snapshot for metadata:", err)
+				}
+
+			case <-stopSnapshot:
+				log.Infoln("Snapshot updater stopped")
+				return
+			}
+		}
+	}()
+
+	cli.RunPlugin(cfg.id,
+		metadata_rpc.PluginServer(metadata_plugin.NewPluginFromChannel(updateSnapshot)),
+		group_rpc.PluginServer(mgr), manager_rpc.PluginServer(mgr))
 
 	mgr.Stop()
+	close(stopSnapshot)
 	log.Infoln("Manager stopped")
 
 	return err

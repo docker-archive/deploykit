@@ -6,14 +6,19 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewManagerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template) *ManagerFlavor {
-	return &ManagerFlavor{&baseFlavor{initScript: templ, getDockerClient: connect}}
+func NewManagerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template,
+	stop <-chan struct{}) *ManagerFlavor {
+
+	base := &baseFlavor{initScript: templ, getDockerClient: connect}
+	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
+	return &ManagerFlavor{baseFlavor: base}
 }
 
 // ManagerFlavor is the flavor for swarm managers
