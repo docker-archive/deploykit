@@ -153,6 +153,23 @@ func (s *scaledGroup) Label() error {
 	return nil
 }
 
+func labelAndList(scaled Scaled) ([]instance.Description, error) {
+	descriptions, err := scaled.List()
+	if err != nil {
+		return nil, err
+	}
+
+	if !needsLabel(descriptions) {
+		return descriptions, nil
+	}
+
+	if err := scaled.Label(); err != nil {
+		return nil, err
+	}
+
+	return scaled.List()
+}
+
 func needsLabel(instances []instance.Description) bool {
 	for _, inst := range instances {
 		if instanceNeedsLabel(inst) {

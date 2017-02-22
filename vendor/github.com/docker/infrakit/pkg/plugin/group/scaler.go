@@ -35,7 +35,7 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 
 	sizeChange := int(newSettings.config.Allocation.Size) - int(settings.config.Allocation.Size)
 
-	instances, err := scaled.List()
+	instances, err := labelAndList(s.scaled)
 	if err != nil {
 		return nil, err
 	}
@@ -220,24 +220,10 @@ func (s *scaler) waitIfReachParallelLimit(current int, batch *sync.WaitGroup) {
 }
 
 func (s *scaler) converge() {
-	descriptions, err := s.scaled.List()
+	descriptions, err := labelAndList(s.scaled)
 	if err != nil {
 		log.Errorf("Failed to list group instances: %s", err)
 		return
-	}
-
-	if needsLabel(descriptions) {
-		err := s.scaled.Label()
-		if err != nil {
-			log.Errorf("Failed to label the group instances: %s", err)
-			return
-		}
-
-		descriptions, err = s.scaled.List()
-		if err != nil {
-			log.Errorf("Failed to list group instances: %s", err)
-			return
-		}
 	}
 
 	log.Debugf("Found existing instances: %v", descriptions)
