@@ -139,6 +139,14 @@ func get(path []string, object interface{}) interface{} {
 		return get(path, object)
 	}
 
+	if any, is := object.(*types.Any); is {
+		temp := map[string]interface{}{}
+		if err := any.Decode(&temp); err == nil {
+			return get(path[1:], temp)
+		}
+		return nil
+	}
+
 	v := reflect.Indirect(reflect.ValueOf(object))
 	switch v.Kind() {
 	case reflect.Slice:
