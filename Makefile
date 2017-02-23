@@ -67,6 +67,7 @@ ifneq (,$(findstring .m,$(VERSION)))
 endif
 
 	$(call build_binary,infrakit-instance-aws,github.com/docker/infrakit.aws/plugin/instance/cmd)
+	$(call build_binary,infrakit-metadata-aws,github.com/docker/infrakit.aws/plugin/metadata/cmd)
 
 
 install:

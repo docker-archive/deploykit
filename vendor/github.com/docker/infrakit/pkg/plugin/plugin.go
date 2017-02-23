@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -18,8 +19,11 @@ type Spec struct {
 // Informer is the interface that gives information about the plugin such as version and interface methods
 type Informer interface {
 
-	// GetMeta returns metadata about the plugin
+	// GetInfo returns metadata about the plugin
 	GetInfo() (Info, error)
+
+	// GetFunctions returns metadata about the plugin's template functions, if the plugin supports templating.
+	GetFunctions() (map[string][]template.Function, error)
 }
 
 // Info is metadata for the plugin
