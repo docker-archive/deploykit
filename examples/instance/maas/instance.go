@@ -227,8 +227,6 @@ func (m maasPlugin) Destroy(id instance.ID) error {
 		} else if id == instance.ID(hostname) {
 			if err := os.RemoveAll(machineDir); err != nil {
 				return err
-			} else {
-				return nil
 			}
 		}
 	}

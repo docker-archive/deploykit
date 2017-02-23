@@ -18,7 +18,7 @@ func main() {
 	name := cmd.Flags().String("name", "instance-maas", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	apiKey := cmd.Flags().String("apikey", "aaaa:bbbb:ccccc", "MAAS API KEY. <consumer_key>:<key>:<secret>")
-	maasUrl := cmd.Flags().String("url", "127.0.0.1:80", "MAAS Server URL. <url>:<port>")
+	maasURL := cmd.Flags().String("url", "127.0.0.1:80", "MAAS Server URL. <url>:<port>")
 	apiVersion := cmd.Flags().String("apiversion", "1.0", "MAAS api Version. 1.0")
 	defaultDir, err := os.Getwd()
 	if err != nil {
@@ -29,7 +29,7 @@ func main() {
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(NewMaasPlugin(*dir, *apiKey, *maasUrl, *apiVersion)))
+		cli.RunPlugin(*name, instance_plugin.PluginServer(NewMaasPlugin(*dir, *apiKey, *maasURL, *apiVersion)))
 		return nil
 	}
 
