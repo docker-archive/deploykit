@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	docker_client "github.com/docker/docker/client"
+	"github.com/docker/infrakit/pkg/discovery"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -26,16 +27,24 @@ func templ(tpl string) *template.Template {
 	return t
 }
 
+func plugins() discovery.Plugins {
+	d, err := discovery.NewPluginDiscovery()
+	if err != nil {
+		panic(err)
+	}
+	return d
+}
+
 func TestValidate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
-	managerFlavor := NewManagerFlavor(func(Spec) (docker_client.APIClient, error) {
+	managerFlavor := NewManagerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
 		return mock_client.NewMockAPIClient(ctrl), nil
 	}, templ(DefaultManagerInitScriptTemplate), managerStop)
-	workerFlavor := NewWorkerFlavor(func(Spec) (docker_client.APIClient, error) {
+	workerFlavor := NewWorkerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
 		return mock_client.NewMockAPIClient(ctrl), nil
 	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
 
@@ -90,7 +99,7 @@ func TestWorker(t *testing.T) {
 
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	flavorImpl := NewWorkerFlavor(func(Spec) (docker_client.APIClient, error) {
+	flavorImpl := NewWorkerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
 		return client, nil
 	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
 
@@ -160,7 +169,7 @@ func TestManager(t *testing.T) {
 
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	flavorImpl := NewManagerFlavor(func(Spec) (docker_client.APIClient, error) {
+	flavorImpl := NewManagerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
 		return client, nil
 	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
