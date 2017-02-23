@@ -3,6 +3,7 @@ package instance
 import (
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 // MetadataKey is the identifier for a metadata entry.
@@ -30,6 +31,11 @@ const (
 	// MetadataAvailabilityZone - Availability zone
 	MetadataAvailabilityZone = MetadataKey("http://169.254.169.254/latest/meta-data/placement/availability-zone")
 )
+
+// MetadataKeyFromSlice returns a new metadata key with the given path, prefixed by the http://hostport/prefix
+func MetadataKeyFromSlice(p []string) MetadataKey {
+	return MetadataKey("http://169.254.169.254/latest/meta-data/" + strings.Join(p, "/"))
+}
 
 // GetMetadata returns the value of the metadata by key
 func GetMetadata(key MetadataKey) (string, error) {
