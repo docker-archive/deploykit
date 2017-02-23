@@ -6,7 +6,7 @@
         "Plugin": "instance-file",
         "Type": "a",
         "Properties": {
-          "Note": "Depends on {{.Resources.resource_b.ID}}"
+          "Note": "Depends on [[ .resource_b ]]"
         }
       },
       "resource_b": {

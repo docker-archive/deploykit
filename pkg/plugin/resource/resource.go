@@ -48,6 +48,10 @@ type plugin struct {
 }
 
 func (p *plugin) validate(config resource.Spec) (*Spec, []string, error) {
+	if config.Properties == nil {
+		return nil, nil, errors.New("Properties must be set")
+	}
+
 	spec := Spec{}
 	if err := config.Properties.Decode(&spec); err != nil {
 		return nil, nil, fmt.Errorf("Invalid properties %q: %s", config.Properties, err)
@@ -58,11 +62,12 @@ func (p *plugin) validate(config resource.Spec) (*Spec, []string, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("Failed to find plugin %s for %s: %s", resourceSpec.Plugin, name, err)
 		}
+
 		if err := instancePlugin.Validate(resourceSpec.Properties); err != nil {
 			return nil, nil, fmt.Errorf("Failed to validate spec for %s: %s", name, err)
 		}
 
-		template, err := template.New("").Option("missingkey=error").Parse(resourceSpec.Properties.String())
+		template, err := template.New("").Delims("[[", "]]").Option("missingkey=error").Parse(resourceSpec.Properties.String())
 		if err != nil {
 			return nil, nil, fmt.Errorf("Template parse error for %s: %s", name, err)
 		}
@@ -118,26 +123,21 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 		return "", err
 	}
 
-	idStructs := map[string]struct{ instance.ID }{}
-	for name, id := range ids {
-		idStructs[name] = struct{ instance.ID }{id}
-	}
-
 	for _, name := range provisioningOrder {
-		if _, ok := idStructs[name]; ok {
+		if _, ok := ids[name]; ok {
 			continue
 		}
 
 		resourceSpec := spec.Resources[name]
 
 		var b bytes.Buffer
-		if err := resourceSpec.template.Execute(&b, struct{ Resources interface{} }{idStructs}); err != nil {
+		if err := resourceSpec.template.Execute(&b, ids); err != nil {
 			return "", fmt.Errorf("Template execution error for %s: %s", name, err)
 		}
 		properties := types.AnyBytes(b.Bytes())
 
 		if pretend {
-			idStructs[name] = struct{ instance.ID }{instance.ID("unknown")}
+			ids[name] = instance.ID("unknown")
 		} else {
 			id, err := resourceSpec.plugin.Provision(instance.Spec{
 				Properties: properties,
@@ -147,8 +147,10 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 				return "", fmt.Errorf("Failed to provision %s: %s", name, err)
 			}
 
-			log.Infof("Provisioned %s (ID %s)", name, *id)
-			idStructs[name] = struct{ instance.ID }{*id}
+			if id != nil {
+				log.Infof("Provisioned %s (ID %s)", name, *id)
+				ids[name] = *id
+			}
 		}
 	}
 
@@ -161,8 +163,8 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 		} else {
 			verb = "Created"
 			idStr = "N/A"
-			if idStruct, ok := idStructs[name]; ok {
-				idStr = string(idStruct.ID)
+			if idStruct, ok := ids[name]; ok {
+				idStr = string(idStruct)
 			}
 		}
 		desc += fmt.Sprintf("\n%s %s (%s)", verb, name, idStr)
@@ -212,7 +214,7 @@ func (p *plugin) DescribeResources() ([]instance.Description, error) {
 	return nil, errors.New("unimplemented")
 }
 
-var resourceReferenceRegexp = regexp.MustCompile(`{{\s*\.Resources\.(\w+)`)
+var resourceReferenceRegexp = regexp.MustCompile(`\[\[\s*\.(\w+)\s*\]\]`)
 
 func getResourceReferences(properties json.RawMessage) []string {
 	var references []string

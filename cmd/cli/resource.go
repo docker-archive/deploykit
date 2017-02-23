@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
@@ -13,6 +11,8 @@ import (
 	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/resource"
+	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -44,8 +44,8 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	commit := cobra.Command{
-		Use:   "commit <resource configuration>",
-		Short: "commit a resource configuration",
+		Use:   "commit <template URL>",
+		Short: "commit a resource configuration specified by the URL",
 	}
 	commitPretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
@@ -56,14 +56,25 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		buff, err := ioutil.ReadFile(args[0])
+		templateURL := args[0]
+
+		log.Infof("Reading template from %v", templateURL)
+		engine, err := template.NewTemplate(templateURL, template.Options{
+			SocketDir: discovery.Dir(),
+		})
 		if err != nil {
-			log.Error(err)
-			os.Exit(1)
+			return err
+		}
+		view, err := engine.Render(nil)
+		if err != nil {
+			return err
 		}
 
+		log.Debugln(view)
+
 		spec := resource.Spec{}
-		if err := json.Unmarshal(buff, &spec); err != nil {
+		if err := types.AnyString(view).Decode(&spec); err != nil {
+			log.Warningln("Error parsing template")
 			return err
 		}
 
@@ -80,8 +91,8 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 	cmd.AddCommand(&commit)
 
 	destroy := cobra.Command{
-		Use:   "destroy <resource configuration>",
-		Short: "destroy a resource configuration",
+		Use:   "destroy <template URL>",
+		Short: "destroy a resource configuration specified by the URL",
 	}
 	destroyPretend := destroy.Flags().Bool("pretend", false, "Don't actually destroy, only explain the destroy")
 	destroy.RunE = func(cmd *cobra.Command, args []string) error {
@@ -92,14 +103,25 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		buff, err := ioutil.ReadFile(args[0])
+		templateURL := args[0]
+
+		log.Infof("Reading template from %v", templateURL)
+		engine, err := template.NewTemplate(templateURL, template.Options{
+			SocketDir: discovery.Dir(),
+		})
 		if err != nil {
-			log.Error(err)
-			os.Exit(1)
+			return err
+		}
+		view, err := engine.Render(nil)
+		if err != nil {
+			return err
 		}
 
+		log.Debugln(view)
+
 		spec := resource.Spec{}
-		if err := json.Unmarshal(buff, &spec); err != nil {
+		if err := types.AnyString(view).Decode(&spec); err != nil {
+			log.Warningln("Error parsing template")
 			return err
 		}
 
