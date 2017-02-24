@@ -1,10 +1,14 @@
-# Infrakit MaaS Instance Plugin
+# Infrakit Instance Plugin - MaaS
 An example of [Infrakit](https://github.com/docker/infrakit) Instance Pluging for [Canonical MaaS](https://maas.io/) node.
 Purpose of this plugin is to support Bare metal deploy with Infrakit.
-## Go get 
-`$go get github.com/YujiOshima/infrakit-maas-plugin`
 
-## Get start
+## Preperation
+Now this plugin need already setuped MaaS server and enlisted nodes.
+And all node should be `Ready` status.
+
+
+## Get start -- A demo with virtualbox
+
 Requires:
 * Needs virtualbox % sudo apt-get install virtualbox
 * Needs vagrant 1.6.x
@@ -57,7 +61,7 @@ $ build/infrakit-flavor-vanilla
 Run MaaS instance plugin.
 
 ```
-$ $GOPATH/bin/infrakit-maas-plugin --apikey $APIKEY --url http://localhost:8080/MAAS 
+$ build/infrakit-maas-plugin --apikey $APIKEY --url http://localhost:8080/MAAS 
 INFO[0000] Listening at: /home/ubuntu/.infrakit/plugins/instance-maas
 ```
 Group commit!
