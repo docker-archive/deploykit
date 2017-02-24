@@ -1,0 +1,25 @@
+package plugin
+
+import(
+    "fmt"
+
+    "github.com/spf13/cobra"
+)
+
+var (
+    // Version is the build release identifier.
+    Version = "Unspecified"
+    // Revision is the build source control revision.
+    Revision = "Unspecified"
+)
+
+func VersionCommand() *cobra.Command {
+    return &cobra.Command{
+        Use: "version",
+        Short: "print build version information",
+        Run: func(cmd *cobra.Command, args []string) {
+            fmt.Printf("Version: %s\n", Version)
+            fmt.Printf("Revision: %s\n", Revision)
+        }
+    }
+}
