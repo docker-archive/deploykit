@@ -67,7 +67,6 @@ ifneq (,$(findstring .m,$(VERSION)))
 endif
 
 	$(call build_binary,infrakit-instance-rackhd,github.com/docker/infrakit.rackhd/plugin/instance/cmd)
-	$(call build_binary,infrakit-metadata-rackhd,github.com/docker/infrakit.rackhd/plugin/metadata/cmd)
 
 
 install:
