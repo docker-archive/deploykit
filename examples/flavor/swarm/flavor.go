@@ -186,6 +186,11 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	spec := Spec{}
+
+	if s.plugins == nil {
+		return instanceSpec, fmt.Errorf("no plugin discovery")
+	}
+
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return instanceSpec, err
@@ -220,7 +225,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 		swarmStatus, node, err = swarmState(dockerClient)
 		if err != nil {
-			log.Warningln("Worker prepare:", err)
+			log.Warningln("Cannot prepare:", err)
 		}
 
 		swarmID = "?"
@@ -236,9 +241,21 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			swarmStatus:  swarmStatus,
 			nodeInfo:     node,
 			link:         *link,
-			plugins:      s.plugins,
 		}
 
+		initTemplate.WithFunctions(func() []template.Function {
+			return []template.Function{
+				{
+					Name: "metadata",
+					Description: []string{
+						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
+						"and calls GET on the plugin with the path \"path/to/data\".",
+						"It's identical to the CLI command infrakit metadata cat ...",
+					},
+					Func: metadata_template.MetadataFunc(s.plugins),
+				},
+			}
+		})
 		initScript, err = initTemplate.Render(context)
 
 		log.Debugln(role, ">>> context.retries =", context.retries, "err=", err, "i=", i)
@@ -364,21 +381,11 @@ type templateContext struct {
 	link         types.Link
 	retries      int
 	poll         time.Duration
-	plugins      func() discovery.Plugins
 }
 
 // Funcs implements the template.Context interface
 func (c *templateContext) Funcs() []template.Function {
 	return []template.Function{
-		{
-			Name: "metadata",
-			Description: []string{
-				"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-				"and calls GET on the plugin with the path \"path/to/data\".",
-				"It's identical to the CLI command infrakit metadata cat ...",
-			},
-			Func: metadata_template.MetadataFunc(c.plugins),
-		},
 		{
 			Name: "SPEC",
 			Description: []string{

@@ -11,8 +11,15 @@ import (
 )
 
 // MetadataFunc returns a template function to support metadata retrieval in templates.
-func MetadataFunc(plugins func() discovery.Plugins) func(string) (interface{}, error) {
+func MetadataFunc(discovery func() discovery.Plugins) func(string) (interface{}, error) {
+
+	plugins := discovery
+
 	return func(path string) (interface{}, error) {
+
+		if plugins == nil {
+			return nil, fmt.Errorf("no plugin discovery:%s", path)
+		}
 
 		mpath := metadata_plugin.Path(path)
 		first := mpath.Index(0)
@@ -27,7 +34,9 @@ func MetadataFunc(plugins func() discovery.Plugins) func(string) (interface{}, e
 
 		endpoint, has := lookup[*first]
 		if !has {
-			return nil, fmt.Errorf("plugin: %s not found", *first)
+			return false, nil // Don't return error.  Just return false for non-existence
+		} else if mpath.Len() == 1 {
+			return true, nil // This is a test for availability of the plugin
 		}
 
 		rpcClient, err := client.New(endpoint.Address, metadata.InterfaceSpec)
@@ -35,6 +44,15 @@ func MetadataFunc(plugins func() discovery.Plugins) func(string) (interface{}, e
 			return nil, fmt.Errorf("cannot connect to plugin: %s", *first)
 		}
 
-		return metadata_rpc.Adapt(rpcClient).Get(mpath.Shift(1))
+		any, err := metadata_rpc.Adapt(rpcClient).Get(mpath.Shift(1))
+		if err != nil {
+			return nil, err
+		}
+		var value interface{}
+		err = any.Decode(&value)
+		if err != nil {
+			return any.String(), err
+		}
+		return value, nil
 	}
 }

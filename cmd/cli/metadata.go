@@ -213,18 +213,21 @@ func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
 						return err
 					}
 
-					value, err := match.Get(path.Shift(1))
-					if err == nil {
-						if value != nil {
-							str := value.String()
-							if s, err := strconv.Unquote(value.String()); err == nil {
-								str = s
-							}
-							fmt.Println(str)
-						}
-
+					if path.Len() == 1 {
+						fmt.Printf("%v\n", match != nil)
 					} else {
-						log.Warningln("Cannot metadata cat on plugin", *first, "err=", err)
+						value, err := match.Get(path.Shift(1))
+						if err == nil {
+							if value != nil {
+								str := value.String()
+								if s, err := strconv.Unquote(value.String()); err == nil {
+									str = s
+								}
+								fmt.Println(str)
+							}
+						} else {
+							log.Warningln("Cannot metadata cat on plugin", *first, "err=", err)
+						}
 					}
 				}
 			}
