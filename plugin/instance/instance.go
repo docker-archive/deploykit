@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -134,7 +135,10 @@ func (p awsInstancePlugin) Label(id instance.ID, labels map[string]string) error
 	tags := []*ec2.Tag{}
 	for _, k := range keys {
 		key := k
-		tags = append(tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(merged[key])})
+		// filter out the special aws: key because it's reserved so leave them alone
+		if strings.Index(key, "aws:") == -1 {
+			tags = append(tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(merged[key])})
+		}
 	}
 
 	_, err = p.client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{aws.String(string(id))}, Tags: tags})
@@ -185,9 +189,6 @@ func (p awsInstancePlugin) findEBSVolumeAttachments(spec instance.Spec) ([]*stri
 
 	volumes, err := p.client.DescribeVolumes(&ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
-			// TODO(wfarner): Need a way to disambiguate between volumes associated with different
-			// clusters.  Currently, volume IDs are private IP addresses, which are not guaranteed
-			// unique in separate VPCs.
 			{
 				Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
 				Values: filterValues,
@@ -198,18 +199,39 @@ func (p awsInstancePlugin) findEBSVolumeAttachments(spec instance.Spec) ([]*stri
 		return nil, errors.New("Failed while looking up volume")
 	}
 
+	for _, volume := range volumes.Volumes {
+		if p.hasNamespaceTags(volume.Tags) {
+			found = append(found, volume.VolumeId)
+		}
+	}
+
 	// TODO(chungers) -- not dealing with if only a subset is found.
-	if len(volumes.Volumes) != len(spec.Attachments) {
+	if len(found) != len(spec.Attachments) {
 		return nil, fmt.Errorf(
 			"Not all required volumes found to attach.  Wanted %s, found %s",
 			spec.Attachments,
 			volumes.Volumes)
 	}
 
-	for _, volume := range volumes.Volumes {
-		found = append(found, volume.VolumeId)
-	}
 	return found, nil
+}
+
+func (p awsInstancePlugin) hasNamespaceTags(tags []*ec2.Tag) bool {
+	matches := 0
+	for k, v := range p.namespaceTags {
+		for _, t := range tags {
+
+			if t.Key == nil || t.Value == nil {
+				continue
+			}
+
+			if *t.Key == k && *t.Value == v {
+				matches++
+				break
+			}
+		}
+	}
+	return matches == len(p.namespaceTags)
 }
 
 // Provision creates a new instance.

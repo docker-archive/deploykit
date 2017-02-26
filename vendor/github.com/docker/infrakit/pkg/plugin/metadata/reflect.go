@@ -42,29 +42,27 @@ func List(path []string, object interface{}) []string {
 	if v == nil {
 		return list
 	}
-	if any, is := v.(*types.Any); is {
-		temp := map[string]interface{}{}
-		if err := any.Decode(&temp); err == nil {
-			if len(temp) > 0 {
-				return List([]string{"."}, temp)
-			}
-			return []string{}
-		}
-		return []string{}
-	}
 
 	val := reflect.Indirect(reflect.ValueOf(v))
+	if any, is := v.(*types.Any); is {
+		var temp interface{}
+		if err := any.Decode(&temp); err == nil {
+			val = reflect.ValueOf(temp)
+		}
+	}
+
 	switch val.Kind() {
 	case reflect.Slice:
 		// this is a slice, so return the name as '[%d]'
 		for i := 0; i < val.Len(); i++ {
-			list = append(list, fmt.Sprintf("[%d]", i)) //val.Index(i).String())
+			list = append(list, fmt.Sprintf("[%d]", i))
 		}
 
 	case reflect.Map:
 		for _, k := range val.MapKeys() {
 			list = append(list, k.String())
 		}
+
 	case reflect.Struct:
 		vt := val.Type()
 		for i := 0; i < vt.NumField(); i++ {
@@ -120,6 +118,14 @@ func put(p []string, value interface{}, store map[string]interface{}) bool {
 func get(path []string, object interface{}) interface{} {
 	if len(path) == 0 {
 		return object
+	}
+
+	if any, is := object.(*types.Any); is {
+		var temp interface{}
+		if err := any.Decode(&temp); err == nil {
+			return get(path, temp)
+		}
+		return nil
 	}
 
 	key := path[0]

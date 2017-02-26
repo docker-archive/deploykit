@@ -1,14 +1,17 @@
-FROM alpine:3.4
+FROM alpine:3.5
 
-# InfraKit.aws bundle: for AWS instance drivers
-# OSS - Use at your own risk - see project LICENSE for details
-
-MAINTAINER David Chung <david.chung@docker.com>
-
-RUN apk add --update ca-certificates && rm -Rf /tmp/* /var/lib/cache/apk/*
-RUN mkdir /lib64 && ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
+RUN apk add --update ca-certificates
 
 RUN mkdir -p /infrakit/plugins /infrakit/configs /infrakit/logs
+
 VOLUME /infrakit
 
+ENV INFRAKIT_HOME /infrakit
+ENV INFRAKIT_PLUGINS_DIR /infrakit/plugins
+
 ADD build/* /usr/local/bin/
+
+# Make symbolic links to make standardized bin names.
+# This makes for shorter names when containers are already scoped by the platform (eg. infrakit/aws)
+RUN ln -s /usr/local/bin/infrakit-instance-aws /usr/bin/instance
+RUN ln -s /usr/local/bin/infrakit-metadata-aws /usr/bin/metadata
