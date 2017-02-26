@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
@@ -12,6 +13,7 @@ import (
 
 func templateCommand(plugins func() discovery.Plugins) *cobra.Command {
 
+	globals := []string{}
 	templateURL := ""
 	cmd := &cobra.Command{
 		Use:   "template",
@@ -27,6 +29,18 @@ func templateCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			// Add functions
+			for _, global := range globals {
+				kv := strings.Split(global, "=")
+				if len(kv) != 2 {
+					continue
+				}
+				key := strings.Trim(kv[0], " \t\n")
+				val := strings.Trim(kv[1], " \t\n")
+				if key != "" && val != "" {
+					engine.Global(key, val)
+				}
+			}
+
 			engine.WithFunctions(func() []template.Function {
 				return []template.Function{
 					{
@@ -50,6 +64,7 @@ func templateCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&templateURL, "url", "", "URL for the template")
+	cmd.Flags().StringSliceVar(&globals, "global", []string{}, "key=value pairs of 'global' values")
 
 	return cmd
 }

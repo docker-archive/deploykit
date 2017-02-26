@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,9 +39,10 @@ func TestMap(t *testing.T) {
 	require.True(t, put(Path("region/us-west-2/vpc/vpc21/network/network210/id"), "id-network210", m))
 	require.True(t, put(Path("region/us-west-2/vpc/vpc21/network/network211/id"), "id-network211", m))
 	require.True(t, put(Path("region/us-west-2/metrics/instances/count"), 100, m))
+	require.True(t, put(Path("region/us-west-2/instances"), types.AnyValueMust([]string{"a", "b"}), m))
 
-	require.Equal(t, "id-network1", get(Path("region/us-west-1/vpc/vpc1/network/network1/id"), m))
-	require.Equal(t, "id-network1", get(Path("region/us-west-1/vpc/vpc1/network/network1/id/"), m))
+	require.Equal(t, "id-network1", Get(Path("region/us-west-1/vpc/vpc1/network/network1/id"), m))
+	require.Equal(t, "id-network1", Get(Path("region/us-west-1/vpc/vpc1/network/network1/id/"), m))
 	require.Equal(t, map[string]interface{}{"id": "id-network1"},
 		get(Path("region/us-west-1/vpc/vpc1/network/network1"), m))
 	require.Equal(t, map[string]interface{}{
@@ -65,6 +67,12 @@ func TestMap(t *testing.T) {
 	require.Equal(t, []string{"us-west-1", "us-west-2"}, List(Path("region"), m))
 	require.Equal(t, []string{"network1", "network2", "network3"}, List(Path("region/us-west-1/vpc/vpc1/network/"), m))
 	require.Equal(t, []string{}, List(Path("region/us-west-2/metrics/instances/count"), m))
+	require.Equal(t, []string{"[0]", "[1]"}, List(Path("region/us-west-2/instances"), m))
+	require.Equal(t, []string{}, List(Path("region/us-west-2/instances/[0]"), m))
+	require.Equal(t, "a", Get(Path("region/us-west-2/instances/[0]"), m))
+	require.Equal(t, "b", Get(Path("region/us-west-2/instances/[1]"), m))
+	require.Equal(t, "a", Get(Path("region/us-west-2/instances[0]"), m))
+	require.Equal(t, "b", Get(Path("region/us-west-2/instances[1]"), m))
 
 }
 
