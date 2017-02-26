@@ -10,8 +10,10 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/tlsconfig"
+	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
+	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -65,6 +67,7 @@ type baseFlavor struct {
 	getDockerClient func(Spec) (client.APIClient, error)
 	initScript      *template.Template
 	metadataPlugin  metadata.Plugin
+	plugins         func() discovery.Plugins
 }
 
 // Runs a poller that periodically samples the swarm status and node info.
@@ -183,6 +186,11 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	spec := Spec{}
+
+	if s.plugins == nil {
+		return instanceSpec, fmt.Errorf("no plugin discovery")
+	}
+
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return instanceSpec, err
@@ -217,7 +225,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 		swarmStatus, node, err = swarmState(dockerClient)
 		if err != nil {
-			log.Warningln("Worker prepare:", err)
+			log.Warningln("Cannot prepare:", err)
 		}
 
 		swarmID = "?"
@@ -235,6 +243,19 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			link:         *link,
 		}
 
+		initTemplate.WithFunctions(func() []template.Function {
+			return []template.Function{
+				{
+					Name: "metadata",
+					Description: []string{
+						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
+						"and calls GET on the plugin with the path \"path/to/data\".",
+						"It's identical to the CLI command infrakit metadata cat ...",
+					},
+					Func: metadata_template.MetadataFunc(s.plugins),
+				},
+			}
+		})
 		initScript, err = initTemplate.Render(context)
 
 		log.Debugln(role, ">>> context.retries =", context.retries, "err=", err, "i=", i)

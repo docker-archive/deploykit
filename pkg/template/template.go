@@ -180,6 +180,10 @@ func (t *Template) forkFrom(parent *Template) (dotCopy interface{}, err error) {
 	for k, v := range parent.funcs {
 		t.AddFunc(k, v)
 	}
+	// inherit other functions
+	for _, ff := range parent.functions {
+		t.functions = append(t.functions, ff)
+	}
 	if parent.context != nil {
 		return DeepCopyObject(parent.context)
 	}

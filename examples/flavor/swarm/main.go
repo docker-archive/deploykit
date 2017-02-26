@@ -29,10 +29,20 @@ var defaultTemplateOptions = template.Options{
 
 func main() {
 
+	plugins := func() discovery.Plugins {
+		d, err := discovery.NewPluginDiscovery()
+		if err != nil {
+			log.Fatalf("Failed to initialize plugin discovery: %s", err)
+			os.Exit(1)
+		}
+		return d
+	}
+
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Docker Swarm flavor plugin",
 	}
+
 	name := cmd.Flags().String("name", "flavor-swarm", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	managerInitScriptTemplURL := cmd.Flags().String("manager-init-template", "", "URL, init script template for managers")
@@ -53,8 +63,9 @@ func main() {
 
 		managerStop := make(chan struct{})
 		workerStop := make(chan struct{})
-		managerFlavor := NewManagerFlavor(DockerClient, mt, managerStop)
-		workerFlavor := NewWorkerFlavor(DockerClient, wt, workerStop)
+
+		managerFlavor := NewManagerFlavor(plugins, DockerClient, mt, managerStop)
+		workerFlavor := NewWorkerFlavor(plugins, DockerClient, wt, workerStop)
 
 		cli.RunPlugin(*name,
 
