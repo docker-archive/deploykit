@@ -7,6 +7,7 @@ import (
 
 // Iface provides an interface to enable mocking
 type Iface interface {
+	Login(string, string) (runtime.ClientAuthInfoWriter, error)
 	Nodes() NodeIface
 }
 

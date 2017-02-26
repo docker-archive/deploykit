@@ -5,6 +5,7 @@ package mock
 
 import (
 	monorail "github.com/codedellemc/infrakit.rackhd/monorail"
+	runtime "github.com/go-openapi/runtime"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -27,6 +28,17 @@ func NewMockIface(ctrl *gomock.Controller) *MockIface {
 
 func (_m *MockIface) EXPECT() *_MockIfaceRecorder {
 	return _m.recorder
+}
+
+func (_m *MockIface) Login(_param0 string, _param1 string) (runtime.ClientAuthInfoWriter, error) {
+	ret := _m.ctrl.Call(_m, "Login", _param0, _param1)
+	ret0, _ := ret[0].(runtime.ClientAuthInfoWriter)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockIfaceRecorder) Login(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Login", arg0, arg1)
 }
 
 func (_m *MockIface) Nodes() monorail.NodeIface {
