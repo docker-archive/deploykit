@@ -16,7 +16,13 @@ import (
 
 // NewMaasPlugin creates an instance plugin for MaaS.
 func NewMaasPlugin(dir string, key string, url string, version string) instance.Plugin {
-	authClient, err := maas.NewAuthenticatedClient(url, key, version)
+	var err error
+	var authClient *maas.Client
+	if key != "" {
+		authClient, err = maas.NewAuthenticatedClient(url, key, version)
+	} else {
+		authClient, err = maas.NewAnonymousClient(url, version)
+	}
 	if err != nil {
 		return nil
 	}
@@ -159,29 +165,46 @@ func (m maasPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 }
 
 // Label labels the instance
-func (m maasPlugin) Label(instance instance.ID, labels map[string]string) error {
-	machineDir := path.Join(m.MaasfilesDir, string(instance))
-	tagFile := path.Join(machineDir, "tags")
-	buff, err := ioutil.ReadFile(tagFile)
+func (m maasPlugin) Label(id instance.ID, labels map[string]string) error {
+	files, err := ioutil.ReadDir(m.MaasfilesDir)
 	if err != nil {
 		return err
 	}
+	for _, file := range files {
+		if !file.IsDir() {
+			continue
+		}
+		machineDir := path.Join(m.MaasfilesDir, file.Name())
+		hostname, err := ioutil.ReadFile(path.Join(machineDir, "MachineName"))
+		if err != nil {
+			return err
+		}
+		if id == instance.ID(hostname) {
 
-	tags := map[string]string{}
-	err = types.AnyBytes(buff).Decode(&tags)
-	if err != nil {
-		return err
-	}
+			tagFile := path.Join(machineDir, "tags")
+			buff, err := ioutil.ReadFile(tagFile)
+			if err != nil {
+				return err
+			}
 
-	for k, v := range labels {
-		tags[k] = v
-	}
+			tags := map[string]string{}
+			err = types.AnyBytes(buff).Decode(&tags)
+			if err != nil {
+				return err
+			}
 
-	encoded, err := types.AnyValue(tags)
-	if err != nil {
-		return err
+			for k, v := range labels {
+				tags[k] = v
+			}
+
+			encoded, err := types.AnyValue(tags)
+			if err != nil {
+				return err
+			}
+			return ioutil.WriteFile(tagFile, encoded.Bytes(), 0666)
+		}
 	}
-	return ioutil.WriteFile(tagFile, encoded.Bytes(), 0666)
+	return nil
 }
 
 // Destroy terminates an existing instance.
