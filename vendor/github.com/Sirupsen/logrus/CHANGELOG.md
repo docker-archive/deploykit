@@ -1,7 +1,12 @@
-# Unreleased
+# 0.11.4
+
+* bug: fix undefined variable on solaris (#493)
+
+# 0.11.3
 
 * formatter: configure quoting of empty values (#484)
 * formatter: configure quoting character (default is `"`) (#484)
+* bug: fix not importing io correctly in non-linux environments (#481)
 
 # 0.11.2
 

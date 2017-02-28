@@ -75,6 +75,8 @@ This will produce binaries for tools and several reference Plugin implementation
     an Instance plugin integrating [Terraform](https://www.terraform.io)
   + [`infrakit-instance-vagrant`](examples/instance/vagrant):
     an Instance plugin using [Vagrant](https://www.vagrantup.com/)
+  + [`infrakit-instance-maas`](examples/instance/maas):
+    an Instance plugin using [MaaS](https://maas.io)
   + [`infrakit-flavor-vanilla`](examples/flavor/vanilla):
     a Flavor plugin for plain vanilla set up with user data and labels
   + [`infrakit-flavor-zookeeper`](examples/flavor/zookeeper):
