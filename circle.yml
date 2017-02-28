@@ -6,7 +6,7 @@ machine:
   environment:
     OS: "linux"
     ARCH: "amd64"
-    GOVERSION: "1.7"
+    GOVERSION: "1.8"
     GOPATH: "$HOME/.go_workspace"
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     E2E_CLEANUP: "false"
