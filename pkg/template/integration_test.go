@@ -159,30 +159,100 @@ The message is {{str}}
 	require.Equal(t, 23, context.invokes) // note this is private state not accessible in template
 }
 
-func TestIndexIndexOf(t *testing.T) {
+func TestMissingGlobal(t *testing.T) {
+	s := `{{ if not (ref "/not/exist")}}none{{else}}here{{end}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "none", view)
+}
 
-	{
-		tt, err := NewTemplate("str://{{ index . 1 }}", Options{})
-		require.NoError(t, err)
+func TestSourceAndDef(t *testing.T) {
+	r := `{{ def \"foo\" 100 }}`
+	s := `{{ source "str://` + r + `" }}foo={{ref "foo"}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "foo=100", view)
+}
 
-		view, err := tt.Render([]string{"a", "b", "c", "d"})
-		require.NoError(t, err)
-		require.Equal(t, "b", view)
+func TestAddDef(t *testing.T) {
+	s := `{{ ref "message" }}: x + y = {{ add (ref "x") (ref "y") }}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+
+	view, err := tt.Def("x", 25, "Default value for x").Def("y", 100, "no doc").Def("message", "hello", "").Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "hello: x + y = 125", view)
+}
+
+func TestSourceAndGlobal(t *testing.T) {
+	r := `{{ global \"foo\" 100 }}`
+	s := `{{ source "str://` + r + `" }}foo={{ref "foo"}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "foo=100", view)
+}
+
+func TestIncludeAndGlobal(t *testing.T) {
+	r := `{{ global \"foo\" 100 }}` // the child template tries to mutate the global
+	s := `{{ include "str://` + r + `" }}foo={{ref "foo"}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	tt.Global("foo", 200) // set the global of the calling / parent template
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+	require.Equal(t, "foo=200", view) // parent's not affected by child template
+}
+
+func TestSourceAndGlobalWithContext(t *testing.T) {
+	ctx := map[string]interface{}{
+		"a": 1,
+		"b": 2,
 	}
-	{
-		tt, err := NewTemplate(`str://{{ index_of "c" . }}`, Options{})
-		require.NoError(t, err)
+	r := `{{ global \"foo\" 100 }}{{$void := set . \"a\" 100}}` // sourced mutates the context
+	s := `{{ source "str://` + r + `" }}a={{.a}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "a=100", view) // the sourced template mutated the calling template's context.
+}
 
-		view, err := tt.Render([]string{"a", "b", "c", "d"})
-		require.NoError(t, err)
-		require.Equal(t, "2", view)
+func TestIncludeAndGlobalWithContext(t *testing.T) {
+	ctx := map[string]interface{}{
+		"a": 1,
+		"b": 2,
 	}
-	{
-		tt, err := NewTemplate(`str://{{ index . 0 | cat "index-" | nospace }}`, Options{})
-		require.NoError(t, err)
+	r := `{{ global \"foo\" 100 }}{{$void := set . \"a\" 100}}` // included tries to mutate the context
+	s := `{{ include "str://` + r + `" }}a={{.a}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "a=1", view) // the included template cannot mutate the calling template's context.
+}
 
-		view, err := tt.Render([]string{"a", "b", "c", "d"})
-		require.NoError(t, err)
-		require.Equal(t, "index-a", view)
+func TestWithFunctions(t *testing.T) {
+	ctx := map[string]interface{}{
+		"a": 1,
+		"b": 2,
 	}
+	s := `hello={{hello .a }}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.WithFunctions(func() []Function {
+		return []Function{
+			{
+				Name: "hello",
+				Func: func(n interface{}) interface{} { return n },
+			},
+		}
+	}).Render(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "hello=1", view)
 }
