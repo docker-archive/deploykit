@@ -86,7 +86,7 @@ func httpClient(urlString string, opt Options) (*url.URL, *http.Client, error) {
 }
 
 // Subscribe subscribes to a topic hosted at given url.  It returns a channel of incoming events and errors
-func Subscribe(url, topic string, opt Options, headers ...map[string]string) (<-chan *types.Any, <-chan error, error) {
+func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error, error) {
 
 	u, connection, err := httpClient(url, opt)
 	if err != nil {
@@ -100,19 +100,14 @@ func Subscribe(url, topic string, opt Options, headers ...map[string]string) (<-
 
 	// Setup request, specify stream to connect to
 	query := req.URL.Query()
-	query.Add("topic", topic)
-	req.URL.RawQuery = query.Encode()
+	if query["topic"] == nil {
+		query.Add("topic", topic)
+		req.URL.RawQuery = query.Encode()
+	}
 
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Connection", "keep-alive")
-
-	// Add user specified headers
-	for _, h := range headers {
-		for k, v := range h {
-			req.Header.Set(k, v)
-		}
-	}
 
 	streamCh := make(chan *types.Any)
 	errCh := make(chan error)

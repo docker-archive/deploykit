@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"time"
@@ -71,7 +72,10 @@ func (b *Broker) Publish(topic string, data interface{}) error {
 		return fmt.Errorf("chan closed")
 	}
 
-	b.notifier <- &event{topic: topic, data: any.Bytes()}
+	select {
+	case b.notifier <- &event{topic: topic, data: any.Bytes()}:
+	}
+
 	return nil
 }
 
@@ -164,7 +168,9 @@ func (b *Broker) run() {
 				topic = "/" + topic
 			}
 
-			data := event.data
+			// Remove any \n because it's meaningful in SSE spec.
+			// We could use base64 encode, but it hurts interoperability with browser/ javascript clients.
+			data := bytes.Replace(event.data, []byte("\n"), nil, -1)
 
 			b.clients.WalkPath(topic,
 
@@ -176,6 +182,7 @@ func (b *Broker) run() {
 					}
 
 					select {
+
 					case ch <- data:
 					case <-time.After(patience):
 						log.Print("Skipping client.")
