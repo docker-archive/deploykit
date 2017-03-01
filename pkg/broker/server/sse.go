@@ -61,7 +61,7 @@ func (b *Broker) Stop() {
 	close(b.stop)
 }
 
-// Send dispatches the event object to all the listeners
+// Publish publishes a message at the topic
 func (b *Broker) Publish(topic string, data interface{}) error {
 	any, err := types.AnyValue(data)
 	if err != nil {

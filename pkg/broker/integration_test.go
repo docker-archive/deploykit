@@ -20,7 +20,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 	received1 := make(chan interface{})
 	received2 := make(chan interface{})
 
-	topic1, _, err := client.Subscribe("http://localhost:3000/", "local", nil)
+	topic1, _, err := client.Subscribe("http://localhost:3000/", "local", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -30,7 +30,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe("http://localhost:3000/", "local/time", nil)
+	topic2, _, err := client.Subscribe("http://localhost:3000/", "local/time", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -68,7 +68,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 	received1 := make(chan interface{})
 	received2 := make(chan interface{})
 
-	topic1, _, err := client.Subscribe("http://localhost:3001/", "local", nil)
+	topic1, _, err := client.Subscribe("http://localhost:3001/", "local", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -78,7 +78,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe("http://localhost:3001/", "local/time", nil)
+	topic2, _, err := client.Subscribe("http://localhost:3001/", "local/time", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
