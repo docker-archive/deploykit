@@ -36,7 +36,7 @@ func (f flavorCombo) Healthy(flavorProperties *types.Any, inst instance.Descript
 	// flavor.UnknownHealth is returned as soon as any Flavor reports that value.
 
 	s := Spec{}
-	if err := flavorProperties.Decode(s); err != nil {
+	if err := flavorProperties.Decode(&s); err != nil {
 		return flavor.Unknown, err
 	}
 
