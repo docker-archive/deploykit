@@ -35,7 +35,8 @@ func trimHeader(size int, data []byte) []byte {
 	return data
 }
 
-func Subscribe(url, topic string, headers map[string]string) (<-chan interface{}, <-chan error, error) {
+// Subscribe subscribes to a topic hosted at given url.  It returns a channel of incoming events and errors
+func Subscribe(url, topic string, headers map[string]string) (<-chan *types.Any, <-chan error, error) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -56,7 +57,7 @@ func Subscribe(url, topic string, headers map[string]string) (<-chan interface{}
 		req.Header.Set(k, v)
 	}
 
-	streamCh := make(chan interface{})
+	streamCh := make(chan *types.Any)
 	errCh := make(chan error)
 
 	go func() {
@@ -81,19 +82,17 @@ func Subscribe(url, topic string, headers map[string]string) (<-chan interface{}
 				return
 			}
 			if bytes.Contains(line, headerData) {
+
 				if data := trimHeader(len(headerData), line); data != nil {
-					var message interface{}
-					if err := types.AnyBytes(data).Decode(&message); err == nil {
-						streamCh <- message
-					} else {
-						select {
-						case errCh <- err:
-						}
-					}
+
+					streamCh <- types.AnyBytes(data)
+
 				} else {
+
 					select {
 					case errCh <- fmt.Errorf("no data: %v", line):
 					}
+
 				}
 			}
 		}

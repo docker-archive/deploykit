@@ -62,7 +62,7 @@ func (b *Broker) Stop() {
 }
 
 // Send dispatches the event object to all the listeners
-func (b *Broker) Send(topic string, data interface{}) error {
+func (b *Broker) Publish(topic string, data interface{}) error {
 	any, err := types.AnyValue(data)
 	if err != nil {
 		return err
