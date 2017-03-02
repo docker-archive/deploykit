@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -13,8 +15,6 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 	"gopkg.in/tylerb/graceful.v1"
-	"net/http/httptest"
-	"net/http/httputil"
 )
 
 // Stoppable support proactive stopping, and blocking until stopped.
