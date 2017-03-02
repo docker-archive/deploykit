@@ -287,6 +287,15 @@ func (t *Template) DefaultFuncs() []Function {
 			Func: ToJSON,
 		},
 		{
+			Name: "jsonEncode",
+			Description: []string{
+				"Encodes the input as a JSON string",
+				"This is useful for taking an object (interface{}) and render it inline as proper JSON.",
+				"Example: {{ include \"https://httpbin.org/get\" | from_json | to_json }}",
+			},
+			Func: ToJSON,
+		},
+		{
 			Name: "to_json_format",
 			Description: []string{
 				"Encodes the input as a JSON string with first arg as prefix, second arg the indentation, then the object",
@@ -294,7 +303,23 @@ func (t *Template) DefaultFuncs() []Function {
 			Func: ToJSONFormat,
 		},
 		{
+			Name: "jsonEncodeIndent",
+			Description: []string{
+				"Encodes the input as a JSON string with first arg as prefix, second arg the indentation, then the object",
+			},
+			Func: ToJSONFormat,
+		},
+		{
 			Name: "from_json",
+			Description: []string{
+				"Decodes the input (first arg) into a structure (a map[string]interface{} or []interface{}).",
+				"This is useful for parsing arbitrary resources in JSON format as object.  The object is the queryable via 'q'",
+				"For example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of request.",
+			},
+			Func: FromJSON,
+		},
+		{
+			Name: "jsonDecode",
 			Description: []string{
 				"Decodes the input (first arg) into a structure (a map[string]interface{} or []interface{}).",
 				"This is useful for parsing arbitrary resources in JSON format as object.  The object is the queryable via 'q'",
@@ -318,6 +343,14 @@ func (t *Template) DefaultFuncs() []Function {
 		},
 		{
 			Name: "index_of",
+			Description: []string{
+				"Returns the index of first argument in the second argument which is a slice.",
+				"Example: {{ index_of \"foo\" (from_json \"[\"bar\",\"foo\",\"baz\"]\") }} returns 1 (int).",
+			},
+			Func: IndexOf,
+		},
+		{
+			Name: "indexOf",
 			Description: []string{
 				"Returns the index of first argument in the second argument which is a slice.",
 				"Example: {{ index_of \"foo\" (from_json \"[\"bar\",\"foo\",\"baz\"]\") }} returns 1 (int).",
