@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBrokerMultiSubscribers(t *testing.T) {
+func _TestBrokerMultiSubscribers(t *testing.T) {
 
 	broker := NewBroker()
 	go http.ListenAndServe("localhost:7000", broker)
@@ -59,7 +59,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 
 }
 
-func TestBrokerMultiSubscribersProducers(t *testing.T) {
+func _TestBrokerMultiSubscribersProducers(t *testing.T) {
 
 	broker := NewBroker()
 	go http.ListenAndServe("localhost:7001", broker)
