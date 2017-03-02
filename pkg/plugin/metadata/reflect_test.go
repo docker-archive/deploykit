@@ -85,6 +85,38 @@ func TestGetFromStruct(t *testing.T) {
 
 	type region struct {
 		Metrics map[string]metric
+		Values  map[string]interface{}
+		Funcs   []interface{}
+	}
+
+	func1Called := make(chan struct{})
+	func2Called := make(chan struct{})
+	func3Called := make(chan struct{})
+
+	func1 := func() interface{} {
+		defer close(func1Called)
+		return "func1"
+	}
+
+	func2 := func() interface{} {
+		defer close(func2Called)
+		return "func2"
+	}
+
+	func3 := func() interface{} {
+		defer close(func3Called)
+		return "func3"
+	}
+
+	func4 := func() interface{} {
+		return []string{"func4"}
+	}
+
+	func5 := func() interface{} {
+		return map[string]interface{}{
+			"func5": 100,
+			"func6": false,
+		}
 	}
 
 	m := map[string]region{
@@ -93,6 +125,11 @@ func TestGetFromStruct(t *testing.T) {
 				"instances": {Name: "instances", Value: 2000},
 				"subnets":   {Name: "subnets", Value: 20},
 			},
+			Values: map[string]interface{}{
+				"func1": func1,
+				"func2": func2,
+			},
+			Funcs: []interface{}{func3, func4, func5},
 		},
 		"us-west-2": {
 			Metrics: map[string]metric{
@@ -104,5 +141,19 @@ func TestGetFromStruct(t *testing.T) {
 
 	require.Equal(t, nil, Get(Path("us-west-1/Metrics/instances/Count"), m))
 	require.Equal(t, 2000, Get(Path("us-west-1/Metrics/instances/Value"), m))
+	require.Equal(t, "func1", Get(Path("us-west-1/Values/func1"), m))
+	require.Equal(t, "func2", Get(Path("us-west-1/Values/func2"), m))
+	require.Equal(t, "func3", Get(Path("us-west-1/Funcs[0]"), m))
+
+	<-func1Called
+	<-func2Called
+	<-func3Called
+
+	require.Equal(t, []string{"[0]"}, List(Path("us-west-1/Funcs/[1]"), m))
+	require.Equal(t, "func4", Get(Path("us-west-1/Funcs/[1]/[0]"), m))
+	require.Equal(t, 100, Get(Path("us-west-1/Funcs/[2]/func5"), m))
+	require.Equal(t, []string{"[0]"}, List(Path("us-west-1/Funcs/[1]"), m))
+	require.Equal(t, []string{"func5", "func6"}, List(Path("us-west-1/Funcs/[2]"), m))
+	require.Equal(t, "func4", Get(Path("us-west-1/Funcs/[1]/[0]"), m))
 
 }
