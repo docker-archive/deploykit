@@ -14,12 +14,12 @@ import (
 func TestBrokerMultiSubscribers(t *testing.T) {
 
 	broker := NewBroker()
-	go http.ListenAndServe("localhost:3000", broker)
+	go http.ListenAndServe("localhost:7000", broker)
 
 	received1 := make(chan interface{})
 	received2 := make(chan interface{})
 
-	topic1, _, err := client.Subscribe("http://localhost:3000/", "local", client.Options{})
+	topic1, _, err := client.Subscribe("http://localhost:7000/", "local", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -29,7 +29,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe("http://localhost:3000/", "local/time", client.Options{})
+	topic2, _, err := client.Subscribe("http://localhost:7000/", "local/time", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -62,12 +62,12 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 func TestBrokerMultiSubscribersProducers(t *testing.T) {
 
 	broker := NewBroker()
-	go http.ListenAndServe("localhost:3001", broker)
+	go http.ListenAndServe("localhost:7001", broker)
 
 	received1 := make(chan interface{})
 	received2 := make(chan interface{})
 
-	topic1, _, err := client.Subscribe("http://localhost:3001/", "local", client.Options{})
+	topic1, _, err := client.Subscribe("http://localhost:7001/", "local", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -77,7 +77,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe("http://localhost:3001/?topic=/local/time", "", client.Options{})
+	topic2, _, err := client.Subscribe("http://localhost:7001/?topic=/local/time", "", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -87,7 +87,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic3, _, err := client.Subscribe("http://localhost:3001", "cluster/time", client.Options{})
+	topic3, _, err := client.Subscribe("http://localhost:7001", "cluster/time", client.Options{})
 	require.NoError(t, err)
 	go func() {
 		panic(<-topic3)

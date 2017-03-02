@@ -13,7 +13,7 @@ import (
 func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 
 	broker := server.NewBroker()
-	go http.ListenAndServe("localhost:3002", broker)
+	go http.ListenAndServe("localhost:6002", broker)
 
 	// Start sending events right away, continously
 	go func() {
@@ -35,7 +35,7 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 	received1 := make(chan interface{})
 	received2 := make(chan interface{})
 
-	topic1, _, err := Subscribe("http://localhost:3002/", "local", Options{})
+	topic1, _, err := Subscribe("http://localhost:6002/", "local", Options{})
 	require.NoError(t, err)
 	go func() {
 		// This subscriber will leave after receiving 5 messages
@@ -51,7 +51,7 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := Subscribe("http://localhost:3002/?topic=/local/time", "", Options{})
+	topic2, _, err := Subscribe("http://localhost:6002/?topic=/local/time", "", Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -94,12 +94,12 @@ func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
 	}
 
 	broker := server.NewBroker()
-	go http.ListenAndServe("localhost:3003", broker)
+	go http.ListenAndServe("localhost:6003", broker)
 
 	received1 := make(chan event)
 	received2 := make(chan event)
 
-	topic1, _, err := Subscribe("http://localhost:3003/", "local", Options{})
+	topic1, _, err := Subscribe("http://localhost:6003/", "local", Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -109,7 +109,7 @@ func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := Subscribe("http://localhost:3003/", "local/instance1", Options{})
+	topic2, _, err := Subscribe("http://localhost:6003/", "local/instance1", Options{})
 	require.NoError(t, err)
 	go func() {
 		for {
