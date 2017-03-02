@@ -9,9 +9,11 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group"
+	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_server "github.com/docker/infrakit/pkg/rpc/group"
 	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
+	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
@@ -52,8 +54,62 @@ func main() {
 			return flavor_client.NewClient(n, endpoint.Address)
 		}
 
-		cli.RunPlugin(*name, group_server.PluginServer(
-			group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup, *pollInterval, *maxParallelNum)))
+		groupPlugin := group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup, *pollInterval, *maxParallelNum)
+
+		// Start a poller to load the snapshot and make that available as metadata
+		updateSnapshot := make(chan func(map[string]interface{}))
+		stopSnapshot := make(chan struct{})
+		go func() {
+			tick := time.Tick(1 * time.Second)
+			tick30 := time.Tick(30 * time.Second)
+			for {
+				select {
+				case <-tick:
+					// load the specs for the groups
+					snapshot := map[string]interface{}{}
+					if specs, err := groupPlugin.InspectGroups(); err == nil {
+						for _, spec := range specs {
+							snapshot[string(spec.ID)] = spec
+						}
+					} else {
+						snapshot["err"] = err
+					}
+
+					updateSnapshot <- func(view map[string]interface{}) {
+						metadata_plugin.Put([]string{"specs"}, snapshot, view)
+					}
+
+				case <-tick30:
+					snapshot := map[string]interface{}{}
+					// describe the groups and expose info as metadata
+					if specs, err := groupPlugin.InspectGroups(); err == nil {
+						for _, spec := range specs {
+							if description, err := groupPlugin.DescribeGroup(spec.ID); err == nil {
+								snapshot[string(spec.ID)] = description
+							} else {
+								snapshot[string(spec.ID)] = err
+							}
+						}
+					} else {
+						snapshot["err"] = err
+					}
+
+					updateSnapshot <- func(view map[string]interface{}) {
+						metadata_plugin.Put([]string{"groups"}, snapshot, view)
+					}
+
+				case <-stopSnapshot:
+					log.Infoln("Snapshot updater stopped")
+					return
+				}
+			}
+		}()
+
+		cli.RunPlugin(*name,
+			metadata_rpc.PluginServer(metadata_plugin.NewPluginFromChannel(updateSnapshot)),
+			group_server.PluginServer(groupPlugin))
+
+		close(stopSnapshot)
 
 		return nil
 	}

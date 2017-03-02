@@ -5,23 +5,31 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/client"
+	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewManagerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template) flavor.Plugin {
-	return &managerFlavor{&baseFlavor{initScript: templ, getDockerClient: connect}}
+func NewManagerFlavor(plugins func() discovery.Plugins, connect func(Spec) (client.APIClient, error),
+	templ *template.Template,
+	stop <-chan struct{}) *ManagerFlavor {
+
+	base := &baseFlavor{initScript: templ, getDockerClient: connect, plugins: plugins}
+	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
+	return &ManagerFlavor{baseFlavor: base}
 }
 
-type managerFlavor struct {
+// ManagerFlavor is the flavor for swarm managers
+type ManagerFlavor struct {
 	*baseFlavor
 }
 
-func (s *managerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+// Validate checks whether the helper can support a configuration.
+func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 
 	if err := s.baseFlavor.Validate(flavorProperties, allocation); err != nil {
 		return err
@@ -46,7 +54,7 @@ func (s *managerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 }
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
-func (s *managerFlavor) Prepare(flavorProperties *types.Any,
+func (s *ManagerFlavor) Prepare(flavorProperties *types.Any,
 	instanceSpec instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error) {
 	return s.baseFlavor.prepare("manager", flavorProperties, instanceSpec, allocation)
 }

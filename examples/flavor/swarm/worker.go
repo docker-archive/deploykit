@@ -2,15 +2,14 @@ package main
 
 import (
 	"fmt"
-	//"time"
 
 	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	//"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
+	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -18,22 +17,28 @@ import (
 )
 
 // NewWorkerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewWorkerFlavor(connect func(Spec) (client.APIClient, error), templ *template.Template) flavor.Plugin {
-	return &workerFlavor{&baseFlavor{initScript: templ, getDockerClient: connect}}
+func NewWorkerFlavor(plugins func() discovery.Plugins, connect func(Spec) (client.APIClient, error),
+	templ *template.Template,
+	stop <-chan struct{}) *WorkerFlavor {
+
+	base := &baseFlavor{initScript: templ, getDockerClient: connect, plugins: plugins}
+	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
+	return &WorkerFlavor{baseFlavor: base}
 }
 
-type workerFlavor struct {
+// WorkerFlavor implements the flavor and metadata plugins
+type WorkerFlavor struct {
 	*baseFlavor
 }
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
-func (s *workerFlavor) Prepare(flavorProperties *types.Any, instanceSpec instance.Spec,
+func (s *WorkerFlavor) Prepare(flavorProperties *types.Any, instanceSpec instance.Spec,
 	allocation group_types.AllocationMethod) (instance.Spec, error) {
 	return s.baseFlavor.prepare("worker", flavorProperties, instanceSpec, allocation)
 }
 
 // Drain in the case of worker will force a node removal in the swarm.
-func (s *workerFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
+func (s *WorkerFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
 	if flavorProperties == nil {
 		return fmt.Errorf("missing config")
 	}

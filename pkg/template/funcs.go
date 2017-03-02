@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/jmespath/go-jmespath"
 )
 
@@ -59,6 +60,9 @@ func FromJSON(o interface{}) (interface{}, error) {
 		return ret, err
 	case []byte:
 		err := json.Unmarshal(o, &ret)
+		return ret, err
+	case *types.Any:
+		err := json.Unmarshal(o.Bytes(), &ret)
 		return ret, err
 	}
 	return ret, fmt.Errorf("not-supported-value-type")
@@ -219,6 +223,18 @@ func (t *Template) DefaultFuncs() []Function {
 			},
 		},
 		{
+			Name: "global",
+			Description: []string{
+				"Sets a global variable named after the first argument, with the value as the second argument.",
+				"This is similar to def (which sets the default value).",
+				"Global variables are propagated to all templates that are rendered via the 'include' function.",
+			},
+			Func: func(n string, v interface{}) Void {
+				t.Global(n, v)
+				return voidValue
+			},
+		},
+		{
 			Name: "def",
 			Description: []string{
 				"Defines a variable with the first argument as name and last argument value as the default.",
@@ -240,20 +256,8 @@ func (t *Template) DefaultFuncs() []Function {
 					doc = fmt.Sprintf("%v", args[0])
 					value = args[1]
 				}
-				t.AddDef(name, value, doc)
+				t.Def(name, value, doc)
 				return voidValue, nil
-			},
-		},
-		{
-			Name: "global",
-			Description: []string{
-				"Sets a global variable named after the first argument, with the value as the second argument.",
-				"This is similar to def (which sets the default value).",
-				"Global variables are propagated to all templates that are rendered via the 'include' function.",
-			},
-			Func: func(n string, v interface{}) Void {
-				t.Global(n, v)
-				return voidValue
 			},
 		},
 		{

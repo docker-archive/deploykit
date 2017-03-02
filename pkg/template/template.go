@@ -67,13 +67,14 @@ type defaultValue struct {
 type Template struct {
 	options Options
 
-	url      string
-	body     []byte
-	parsed   *template.Template
-	funcs    map[string]interface{}
-	globals  map[string]interface{}
-	defaults map[string]defaultValue
-	context  interface{}
+	url       string
+	body      []byte
+	parsed    *template.Template
+	functions []func() []Function
+	funcs     map[string]interface{}
+	globals   map[string]interface{}
+	defaults  map[string]defaultValue
+	context   interface{}
 
 	registered []Function
 	lock       sync.Mutex
@@ -114,12 +115,13 @@ func NewTemplateFromBytes(buff []byte, contextURL string, opt Options) (*Templat
 	}
 
 	return &Template{
-		options:  opt,
-		url:      contextURL,
-		body:     buff,
-		funcs:    map[string]interface{}{},
-		globals:  map[string]interface{}{},
-		defaults: map[string]defaultValue{},
+		options:   opt,
+		url:       contextURL,
+		body:      buff,
+		funcs:     map[string]interface{}{},
+		globals:   map[string]interface{}{},
+		defaults:  map[string]defaultValue{},
+		functions: []func() []Function{},
 	}, nil
 }
 
@@ -131,24 +133,19 @@ func (t *Template) SetOptions(opt Options) *Template {
 	return t
 }
 
+// WithFunctions allows client code to extend the template by adding its own functions.
+func (t *Template) WithFunctions(functions func() []Function) *Template {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.functions = append(t.functions, functions)
+	return t
+}
+
 // AddFunc adds a new function to support in template
 func (t *Template) AddFunc(name string, f interface{}) *Template {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.funcs[name] = f
-	return t
-}
-
-// AddDef is equivalent to a {{ def "key" value "description" }} in defining a variable with a default value.
-// The value is accessible via a {{ ref "key" }} in the template.
-func (t *Template) AddDef(name string, val interface{}, doc ...string) *Template {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.defaults[name] = defaultValue{
-		Name:  name,
-		Value: val,
-		Doc:   strings.Join(doc, " "),
-	}
 	return t
 }
 
@@ -175,9 +172,17 @@ func (t *Template) forkFrom(parent *Template) (dotCopy interface{}, err error) {
 	for k, v := range parent.globals {
 		t.globals[k] = v
 	}
+	// copy the defaults in the parent scope into the child
+	for k, v := range parent.defaults {
+		t.defaults[k] = v
+	}
 	// inherit the functions defined for this template
 	for k, v := range parent.funcs {
 		t.AddFunc(k, v)
+	}
+	// inherit other functions
+	for _, ff := range parent.functions {
+		t.functions = append(t.functions, ff)
 	}
 	if parent.context != nil {
 		return DeepCopyObject(parent.context)
@@ -187,16 +192,37 @@ func (t *Template) forkFrom(parent *Template) (dotCopy interface{}, err error) {
 
 // Global sets the a key, value in the context of this template.  It is visible to all the 'included'
 // and 'sourced' templates by the calling template.
-func (t *Template) Global(name string, value interface{}) {
+func (t *Template) Global(name string, value interface{}) *Template {
 	for here := t; here != nil; here = here.parent {
 		here.updateGlobal(name, value)
 	}
+	return t
 }
 
 func (t *Template) updateGlobal(name string, value interface{}) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.globals[name] = value
+}
+
+// Def is equivalent to a {{ def "key" value "description" }} in defining a variable with a default value.
+// The value is accessible via a {{ ref "key" }} in the template.
+func (t *Template) Def(name string, value interface{}, doc string) *Template {
+	for here := t; here != nil; here = here.parent {
+		here.updateDef(name, value, doc)
+	}
+	return t
+}
+
+func (t *Template) updateDef(name string, val interface{}, doc ...string) *Template {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.defaults[name] = defaultValue{
+		Name:  name,
+		Value: val,
+		Doc:   strings.Join(doc, " "),
+	}
+	return t
 }
 
 // Validate parses the template and checks for validity.
@@ -235,6 +261,30 @@ func (t *Template) build(context Context) error {
 		}
 	}
 
+	// the default functions cannot be overriden
+	for _, f := range t.DefaultFuncs() {
+		tf, err := makeTemplateFunc(context, f.Func)
+		if err != nil {
+			return err
+		}
+		fm[f.Name] = tf
+		registered = append(registered, f)
+	}
+
+	// If there are any function sources that was set via WithFunctions()
+	for _, exp := range t.functions {
+		for _, f := range exp() {
+			tf, err := makeTemplateFunc(context, f.Func)
+			if err != nil {
+				return err
+			}
+			fm[f.Name] = tf
+			registered = append(registered, f)
+		}
+	}
+
+	// If the context implements the FunctionExporter interface, it can add more functions
+	// and potentially override existing.
 	if context != nil {
 		for _, f := range context.Funcs() {
 			if tf, err := makeTemplateFunc(context, f.Func); err == nil {
@@ -244,12 +294,6 @@ func (t *Template) build(context Context) error {
 				return err
 			}
 		}
-	}
-
-	// the default functions cannot be overriden
-	for _, f := range t.DefaultFuncs() {
-		fm[f.Name] = f.Func
-		registered = append(registered, f)
 	}
 
 	t.registered = registered

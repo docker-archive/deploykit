@@ -2,12 +2,16 @@ package group
 
 import (
 	"fmt"
+	"sync"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
-	"sync"
+)
+
+const (
+	bootstrapConfigTag = "bootstrap"
 )
 
 // Scaled is a collection of instances that can be scaled up and down.
@@ -24,6 +28,9 @@ type Scaled interface {
 
 	// List returns all instances in the group.
 	List() ([]instance.Description, error)
+
+	// Label makes sure all instances in the group are labelled.
+	Label() error
 }
 
 type scaledGroup struct {
@@ -117,4 +124,62 @@ func (s *scaledGroup) List() ([]instance.Description, error) {
 	settings := s.latestSettings()
 
 	return settings.instancePlugin.DescribeInstances(s.memberTags)
+}
+
+func (s *scaledGroup) Label() error {
+	settings := s.latestSettings()
+
+	instances, err := settings.instancePlugin.DescribeInstances(s.memberTags)
+	if err != nil {
+		return err
+	}
+
+	tagsWithConfigSha := map[string]string{}
+	for k, v := range s.memberTags {
+		tagsWithConfigSha[k] = v
+	}
+	tagsWithConfigSha[configTag] = settings.config.InstanceHash()
+
+	for _, inst := range instances {
+		if instanceNeedsLabel(inst) {
+			log.Infof("Labelling instance %s", inst.ID)
+
+			if err := settings.instancePlugin.Label(inst.ID, tagsWithConfigSha); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func labelAndList(scaled Scaled) ([]instance.Description, error) {
+	descriptions, err := scaled.List()
+	if err != nil {
+		return nil, err
+	}
+
+	if !needsLabel(descriptions) {
+		return descriptions, nil
+	}
+
+	if err := scaled.Label(); err != nil {
+		return nil, err
+	}
+
+	return scaled.List()
+}
+
+func needsLabel(instances []instance.Description) bool {
+	for _, inst := range instances {
+		if instanceNeedsLabel(inst) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func instanceNeedsLabel(instance instance.Description) bool {
+	return instance.Tags[configTag] == bootstrapConfigTag
 }

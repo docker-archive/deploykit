@@ -2,11 +2,12 @@ package group
 
 import (
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/spi/instance"
 	"sort"
 	"sync"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 type scaler struct {
@@ -34,7 +35,7 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 
 	sizeChange := int(newSettings.config.Allocation.Size) - int(settings.config.Allocation.Size)
 
-	instances, err := scaled.List()
+	instances, err := labelAndList(s.scaled)
 	if err != nil {
 		return nil, err
 	}
@@ -219,9 +220,9 @@ func (s *scaler) waitIfReachParallelLimit(current int, batch *sync.WaitGroup) {
 }
 
 func (s *scaler) converge() {
-	descriptions, err := s.scaled.List()
+	descriptions, err := labelAndList(s.scaled)
 	if err != nil {
-		log.Errorf("Failed to check size of group: %s", err)
+		log.Errorf("Failed to list group instances: %s", err)
 		return
 	}
 

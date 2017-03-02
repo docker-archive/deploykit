@@ -10,9 +10,13 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/tlsconfig"
+	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
+	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
@@ -62,6 +66,65 @@ func DockerClient(spec Spec) (client.APIClient, error) {
 type baseFlavor struct {
 	getDockerClient func(Spec) (client.APIClient, error)
 	initScript      *template.Template
+	metadataPlugin  metadata.Plugin
+	plugins         func() discovery.Plugins
+}
+
+// Runs a poller that periodically samples the swarm status and node info.
+func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func(map[string]interface{}) {
+	// Start a poller to load the snapshot and make that available as metadata
+	updateSnapshot := make(chan func(map[string]interface{}))
+	go func() {
+		tick := time.Tick(1 * time.Second)
+		for {
+			select {
+			case <-tick:
+
+				snapshot := map[string]interface{}{}
+				if docker, err := s.getDockerClient(Spec{
+					Docker: ConnectInfo{
+						Host: "unix:///var/run/docker.sock", // defaults to local socket
+					},
+				}); err != nil {
+					snapshot["local"] = map[string]interface{}{"error": err}
+				} else {
+					if status, node, err := swarmState(docker); err != nil {
+						snapshot["local"] = map[string]interface{}{"error": err}
+					} else {
+						snapshot["local"] = map[string]interface{}{
+							"status": status,
+							"node":   node,
+						}
+					}
+				}
+
+				updateSnapshot <- func(view map[string]interface{}) {
+					metadata_plugin.Put([]string{"groups"}, snapshot, view)
+				}
+
+			case <-stopSnapshot:
+				log.Infoln("Snapshot updater stopped")
+				return
+			}
+		}
+	}()
+	return updateSnapshot
+}
+
+// List implements the metadata.Plugin SPI's List method
+func (s *baseFlavor) List(path metadata.Path) ([]string, error) {
+	if s.metadataPlugin != nil {
+		return s.metadataPlugin.List(path)
+	}
+	return nil, nil
+}
+
+// Get implements the metadata.Plugin SPI's List method
+func (s *baseFlavor) Get(path metadata.Path) (*types.Any, error) {
+	if s.metadataPlugin != nil {
+		return s.metadataPlugin.Get(path)
+	}
+	return nil, nil
 }
 
 // Funcs implements the template.FunctionExporter interface that allows the RPC server to expose help on the
@@ -123,6 +186,11 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	allocation group_types.AllocationMethod) (instance.Spec, error) {
 
 	spec := Spec{}
+
+	if s.plugins == nil {
+		return instanceSpec, fmt.Errorf("no plugin discovery")
+	}
+
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return instanceSpec, err
@@ -157,7 +225,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 		swarmStatus, node, err = swarmState(dockerClient)
 		if err != nil {
-			log.Warningln("Worker prepare:", err)
+			log.Warningln("Cannot prepare:", err)
 		}
 
 		swarmID = "?"
@@ -175,6 +243,19 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			link:         *link,
 		}
 
+		initTemplate.WithFunctions(func() []template.Function {
+			return []template.Function{
+				{
+					Name: "metadata",
+					Description: []string{
+						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
+						"and calls GET on the plugin with the path \"path/to/data\".",
+						"It's identical to the CLI command infrakit metadata cat ...",
+					},
+					Func: metadata_template.MetadataFunc(s.plugins),
+				},
+			}
+		})
 		initScript, err = initTemplate.Render(context)
 
 		log.Debugln(role, ">>> context.retries =", context.retries, "err=", err, "i=", i)

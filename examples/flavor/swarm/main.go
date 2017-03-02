@@ -6,8 +6,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
-	"github.com/docker/infrakit/pkg/spi/flavor"
+	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	flavor_spi "github.com/docker/infrakit/pkg/spi/flavor"
+	metadata_spi "github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
@@ -26,10 +29,20 @@ var defaultTemplateOptions = template.Options{
 
 func main() {
 
+	plugins := func() discovery.Plugins {
+		d, err := discovery.NewPluginDiscovery()
+		if err != nil {
+			log.Fatalf("Failed to initialize plugin discovery: %s", err)
+			os.Exit(1)
+		}
+		return d
+	}
+
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Docker Swarm flavor plugin",
 	}
+
 	name := cmd.Flags().String("name", "flavor-swarm", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	managerInitScriptTemplURL := cmd.Flags().String("manager-init-template", "", "URL, init script template for managers")
@@ -48,11 +61,34 @@ func main() {
 			return err
 		}
 
-		cli.RunPlugin(*name, flavor_plugin.PluginServerWithTypes(
-			map[string]flavor.Plugin{
-				"manager": NewManagerFlavor(DockerClient, mt),
-				"worker":  NewWorkerFlavor(DockerClient, wt),
-			}))
+		managerStop := make(chan struct{})
+		workerStop := make(chan struct{})
+
+		managerFlavor := NewManagerFlavor(plugins, DockerClient, mt, managerStop)
+		workerFlavor := NewWorkerFlavor(plugins, DockerClient, wt, workerStop)
+
+		cli.RunPlugin(*name,
+
+			// Metadata plugins
+			metadata_plugin.PluginServer(metadata.NewPluginFromData(map[string]interface{}{
+				"version":    cli.Version,
+				"revision":   cli.Revision,
+				"implements": flavor_spi.InterfaceSpec,
+			})).WithTypes(
+				map[string]metadata_spi.Plugin{
+					"manager": managerFlavor,
+					"worker":  workerFlavor,
+				}),
+
+			// Flavor plugins
+			flavor_plugin.PluginServerWithTypes(
+				map[string]flavor_spi.Plugin{
+					"manager": managerFlavor,
+					"worker":  workerFlavor,
+				}))
+
+		close(managerStop)
+		close(workerStop)
 		return nil
 	}
 

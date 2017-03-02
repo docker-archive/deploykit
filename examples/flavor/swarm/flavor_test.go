@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	docker_client "github.com/docker/docker/client"
+	"github.com/docker/infrakit/pkg/discovery"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -26,16 +27,26 @@ func templ(tpl string) *template.Template {
 	return t
 }
 
+func plugins() discovery.Plugins {
+	d, err := discovery.NewPluginDiscovery()
+	if err != nil {
+		panic(err)
+	}
+	return d
+}
+
 func TestValidate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+	managerStop := make(chan struct{})
+	workerStop := make(chan struct{})
 
-	managerFlavor := NewManagerFlavor(func(Spec) (docker_client.APIClient, error) {
+	managerFlavor := NewManagerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
 		return mock_client.NewMockAPIClient(ctrl), nil
-	}, templ(DefaultManagerInitScriptTemplate))
-	workerFlavor := NewWorkerFlavor(func(Spec) (docker_client.APIClient, error) {
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
+	workerFlavor := NewWorkerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
 		return mock_client.NewMockAPIClient(ctrl), nil
-	}, templ(DefaultWorkerInitScriptTemplate))
+	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
 
 	require.NoError(t, workerFlavor.Validate(
 		types.AnyString(`{"Docker" : {"Host":"unix:///var/run/docker.sock"}}`),
@@ -75,17 +86,22 @@ func TestValidate(t *testing.T) {
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
 	require.Error(t, err)
 	require.Equal(t, "Invalid attachment Type 'keyboard', only ebs is supported", err.Error())
+
+	close(managerStop)
+	close(workerStop)
 }
 
 func TestWorker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	workerStop := make(chan struct{})
+
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	flavorImpl := NewWorkerFlavor(func(Spec) (docker_client.APIClient, error) {
+	flavorImpl := NewWorkerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
 		return client, nil
-	}, templ(DefaultWorkerInitScriptTemplate))
+	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -137,6 +153,8 @@ func TestWorker(t *testing.T) {
 		instance.Description{Tags: map[string]string{associationTag: associationID}})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
+
+	close(workerStop)
 }
 
 const nodeID = "my-node-id"
@@ -147,11 +165,13 @@ func TestManager(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	managerStop := make(chan struct{})
+
 	client := mock_client.NewMockAPIClient(ctrl)
 
-	flavorImpl := NewManagerFlavor(func(Spec) (docker_client.APIClient, error) {
+	flavorImpl := NewManagerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate))
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -214,4 +234,6 @@ func TestManager(t *testing.T) {
 		instance.Description{Tags: map[string]string{associationTag: associationID}})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
+
+	close(managerStop)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
+	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
@@ -91,6 +92,21 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		if err != nil {
 			return err
 		}
+
+		engine.WithFunctions(func() []template.Function {
+			return []template.Function{
+				{
+					Name: "metadata",
+					Description: []string{
+						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
+						"and calls GET on the plugin with the path \"path/to/data\".",
+						"It's identical to the CLI command infrakit metadata cat ...",
+					},
+					Func: metadata_template.MetadataFunc(plugins),
+				},
+			}
+		})
+
 		view, err := engine.Render(nil)
 		if err != nil {
 			return err
