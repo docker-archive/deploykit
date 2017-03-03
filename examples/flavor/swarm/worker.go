@@ -6,18 +6,18 @@ import (
 	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/docker"
 	"golang.org/x/net/context"
 )
 
 // NewWorkerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewWorkerFlavor(plugins func() discovery.Plugins, connect func(Spec) (client.APIClient, error),
+func NewWorkerFlavor(plugins func() discovery.Plugins, connect func(Spec) (docker.APIClientCloser, error),
 	templ *template.Template,
 	stop <-chan struct{}) *WorkerFlavor {
 
@@ -49,11 +49,6 @@ func (s *WorkerFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 		return err
 	}
 
-	dockerClient, err := s.baseFlavor.getDockerClient(spec)
-	if err != nil {
-		return err
-	}
-
 	link := types.NewLinkFromMap(inst.Tags)
 	if !link.Valid() {
 		return fmt.Errorf("Unable to drain %s without an association tag", inst.ID)
@@ -61,6 +56,12 @@ func (s *WorkerFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 
 	filter := filters.NewArgs()
 	filter.Add("label", fmt.Sprintf("%s=%s", link.Label(), link.Value()))
+
+	dockerClient, err := s.baseFlavor.getDockerClient(spec)
+	if err != nil {
+		return err
+	}
+	defer dockerClient.Close()
 
 	nodes, err := dockerClient.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
@@ -29,7 +28,6 @@ const (
 
 // Spec is the value passed in the `Properties` field of configs
 type Spec struct {
-
 	// Attachments indicate the devices that are to be attached to the instance
 	Attachments map[instance.LogicalID][]instance.Attachment
 
@@ -50,7 +48,7 @@ type ConnectInfo struct {
 }
 
 // DockerClient checks the validity of input spec and connects to Docker engine
-func DockerClient(spec Spec) (client.APIClient, error) {
+func DockerClient(spec Spec) (docker.APIClientCloser, error) {
 	if spec.Docker.Host == "" && spec.Docker.TLS == nil {
 		return nil, fmt.Errorf("no docker connect info")
 	}
@@ -64,7 +62,7 @@ func DockerClient(spec Spec) (client.APIClient, error) {
 
 // baseFlavor is the base implementation.  The manager / worker implementations will provide override.
 type baseFlavor struct {
-	getDockerClient func(Spec) (client.APIClient, error)
+	getDockerClient func(Spec) (docker.APIClientCloser, error)
 	initScript      *template.Template
 	metadataPlugin  metadata.Plugin
 	plugins         func() discovery.Plugins
@@ -79,13 +77,13 @@ func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func
 		for {
 			select {
 			case <-tick:
-
 				snapshot := map[string]interface{}{}
-				if docker, err := s.getDockerClient(Spec{
+				docker, err := s.getDockerClient(Spec{
 					Docker: ConnectInfo{
 						Host: "unix:///var/run/docker.sock", // defaults to local socket
 					},
-				}); err != nil {
+				})
+				if err != nil {
 					snapshot["local"] = map[string]interface{}{"error": err}
 				} else {
 					if status, node, err := swarmState(docker); err != nil {
@@ -96,6 +94,7 @@ func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func
 							"node":   node,
 						}
 					}
+					docker.Close()
 				}
 
 				updateSnapshot <- func(view map[string]interface{}) {
@@ -175,11 +174,39 @@ func (s *baseFlavor) Healthy(flavorProperties *types.Any, inst instance.Descript
 	if err != nil {
 		return flavor.Unknown, err
 	}
+
+	link := types.NewLinkFromMap(inst.Tags)
+	if !link.Valid() {
+		log.Info("Reporting unhealthy for instance without an association tag", inst.ID)
+		return flavor.Unhealthy, nil
+	}
+
+	filter := filters.NewArgs()
+	filter.Add("label", fmt.Sprintf("%s=%s", link.Label(), link.Value()))
+
 	dockerClient, err := s.getDockerClient(spec)
 	if err != nil {
 		return flavor.Unknown, err
 	}
-	return healthy(dockerClient, inst)
+	defer dockerClient.Close()
+
+	nodes, err := dockerClient.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
+	if err != nil {
+		return flavor.Unknown, err
+	}
+
+	switch {
+	case len(nodes) == 0:
+		// The instance may not yet be joined, so we consider the health unknown.
+		return flavor.Unknown, nil
+
+	case len(nodes) == 1:
+		return flavor.Healthy, nil
+
+	default:
+		log.Warnf("Expected at most one node with label %s, but found %s", link.Value(), nodes)
+		return flavor.Healthy, nil
+	}
 }
 
 func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceSpec instance.Spec,
@@ -226,6 +253,10 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		swarmStatus, node, err = swarmState(dockerClient)
 		if err != nil {
 			log.Warningln("Cannot prepare:", err)
+		}
+
+		if dockerClient != nil {
+			dockerClient.Close()
 		}
 
 		swarmID = "?"
@@ -346,7 +377,7 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
 	return nil
 }
 
-func swarmState(docker client.APIClient) (status *swarm.Swarm, node *swarm.Node, err error) {
+func swarmState(docker docker.APIClientCloser) (status *swarm.Swarm, node *swarm.Node, err error) {
 	ctx := context.Background()
 	info, err := docker.Info(ctx)
 	if err != nil {
@@ -465,37 +496,5 @@ func (c *templateContext) Funcs() []template.Function {
 				return c.swarmStatus.ID, nil
 			},
 		},
-	}
-}
-
-// Healthy determines whether an instance is healthy.  This is determined by whether it has successfully joined the
-// Swarm.
-func healthy(client client.APIClient, inst instance.Description) (flavor.Health, error) {
-
-	link := types.NewLinkFromMap(inst.Tags)
-	if !link.Valid() {
-		log.Info("Reporting unhealthy for instance without an association tag", inst.ID)
-		return flavor.Unhealthy, nil
-	}
-
-	filter := filters.NewArgs()
-	filter.Add("label", fmt.Sprintf("%s=%s", link.Label(), link.Value()))
-
-	nodes, err := client.NodeList(context.Background(), docker_types.NodeListOptions{Filters: filter})
-	if err != nil {
-		return flavor.Unknown, err
-	}
-
-	switch {
-	case len(nodes) == 0:
-		// The instance may not yet be joined, so we consider the health unknown.
-		return flavor.Unknown, nil
-
-	case len(nodes) == 1:
-		return flavor.Healthy, nil
-
-	default:
-		log.Warnf("Expected at most one node with label %s, but found %s", link.Value(), nodes)
-		return flavor.Healthy, nil
 	}
 }
