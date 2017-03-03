@@ -1,4 +1,4 @@
-package main
+package flavor
 
 import (
 	"errors"

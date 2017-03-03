@@ -68,6 +68,7 @@ endif
 
 	$(call build_binary,infrakit-instance-gcp,github.com/docker/infrakit.gcp/plugin/instance/cmd)
 	$(call build_binary,infrakit-group-gcp,github.com/docker/infrakit.gcp/plugin/group/cmd)
+	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit.gcp/plugin/flavor/cmd)
 
 install:
 	@echo "+ $@"
