@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -136,4 +137,39 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 
 	broker.Stop()
 
+}
+
+func TestBrokerNoSubscribers(t *testing.T) {
+
+	// Tests for stability of having lots of producers but no subscribers.
+	socketFile := tempSocket()
+
+	broker, err := ListenAndServeOnSocket(socketFile)
+	require.NoError(t, err)
+
+	total := 100
+	var done sync.WaitGroup
+	for _, i := range []int{1, 10, 10, 10, 5, 15, 17, 12, 20} {
+		done.Add(1)
+		delay := time.Duration(i)
+		go func() {
+			defer done.Done()
+			for i := 0; i < total; i++ {
+				broker.Publish("local/time/now", time.Now().UnixNano(), 10*time.Millisecond)
+				<-time.After(delay * time.Millisecond)
+			}
+		}()
+	}
+
+	// We expect all the goroutines to complete and call done on the wait group.
+	done.Wait()
+
+	broker.Stop()
+
+	// This is still possible even after the broker stopped.
+	for i := 0; i < total; i++ {
+		err = broker.Publish("local/time/now", time.Now().UnixNano())
+		require.NoError(t, err)
+
+	}
 }

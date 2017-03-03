@@ -123,8 +123,6 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 
 		resp, err := connection.Do(req)
 		if err != nil {
-
-			fmt.Println("-===>", err)
 			errCh <- err
 			close(errCh)
 			close(streamCh)
@@ -161,6 +159,7 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 
 					select {
 					case errCh <- fmt.Errorf("no data: %v", line):
+					default:
 					}
 
 				}
