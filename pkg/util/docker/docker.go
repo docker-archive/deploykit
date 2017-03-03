@@ -3,13 +3,15 @@ package docker
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"runtime"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
-	"net/http"
-	"os"
-	"runtime"
 )
 
 var (
@@ -18,8 +20,14 @@ var (
 	ClientVersion = "1.24"
 )
 
+// APIClientCloser is a closeable API client.
+type APIClientCloser interface {
+	io.Closer
+	client.CommonAPIClient
+}
+
 // NewDockerClient creates a new API client.
-func NewDockerClient(host string, tls *tlsconfig.Options) (client.APIClient, error) {
+func NewDockerClient(host string, tls *tlsconfig.Options) (APIClientCloser, error) {
 	tlsOptions := tls
 	if tls.KeyFile == "" || tls.CAFile == "" || tls.CertFile == "" {
 		// The api doesn't like it when you pass in not nil but with zero field values...

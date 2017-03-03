@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,14 +12,18 @@ import (
 )
 
 func TestBrokerMultiSubscribers(t *testing.T) {
+	socketFile := tempSocket()
+	socket := "unix://broker" + socketFile
 
-	broker := NewBroker()
-	go http.ListenAndServe("localhost:7000", broker)
+	broker, err := ListenAndServeOnSocket(socketFile)
+	require.NoError(t, err)
 
 	received1 := make(chan interface{})
 	received2 := make(chan interface{})
 
-	topic1, _, err := client.Subscribe("http://localhost:7000/", "local", client.Options{})
+	opts := client.Options{SocketDir: filepath.Dir(socketFile)}
+
+	topic1, _, err := client.Subscribe(socket, "local", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -29,7 +33,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe("http://localhost:7000/", "local/time", client.Options{})
+	topic2, _, err := client.Subscribe(socket, "local/time", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -60,14 +64,18 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 }
 
 func TestBrokerMultiSubscribersProducers(t *testing.T) {
+	socketFile := tempSocket()
+	socket := "unix://broker" + socketFile
 
-	broker := NewBroker()
-	go http.ListenAndServe("localhost:7001", broker)
+	broker, err := ListenAndServeOnSocket(socketFile)
+	require.NoError(t, err)
 
 	received1 := make(chan interface{})
 	received2 := make(chan interface{})
 
-	topic1, _, err := client.Subscribe("http://localhost:7001/", "local", client.Options{})
+	opts := client.Options{SocketDir: filepath.Dir(socketFile)}
+
+	topic1, _, err := client.Subscribe(socket, "local", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -77,7 +85,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe("http://localhost:7001/?topic=/local/time", "", client.Options{})
+	topic2, _, err := client.Subscribe(socket+"/?topic=/local/time", "", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -87,7 +95,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic3, _, err := client.Subscribe("http://localhost:7001", "cluster/time", client.Options{})
+	topic3, _, err := client.Subscribe(socket, "cluster/time", opts)
 	require.NoError(t, err)
 	go func() {
 		panic(<-topic3)

@@ -29,7 +29,7 @@ func TestSwarmDetector(t *testing.T) {
 		},
 	}
 
-	mock := docker_mock.NewMockAPIClient(ctrl)
+	mock := docker_mock.NewMockAPIClientCloser(ctrl)
 	mock.EXPECT().Info(ctx).Return(nodeInfo, nil).AnyTimes()
 	mock.EXPECT().NodeInspectWithRaw(ctx, "node").Return(node, nil, nil).AnyTimes()
 
