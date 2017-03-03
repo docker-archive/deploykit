@@ -7,7 +7,6 @@ import (
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
-	docker_client "github.com/docker/docker/client"
 	"github.com/docker/infrakit/pkg/discovery"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
@@ -15,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -41,11 +41,11 @@ func TestValidate(t *testing.T) {
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
-	managerFlavor := NewManagerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
-		return mock_client.NewMockAPIClient(ctrl), nil
+	managerFlavor := NewManagerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+		return mock_client.NewMockAPIClientCloser(ctrl), nil
 	}, templ(DefaultManagerInitScriptTemplate), managerStop)
-	workerFlavor := NewWorkerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
-		return mock_client.NewMockAPIClient(ctrl), nil
+	workerFlavor := NewWorkerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+		return mock_client.NewMockAPIClientCloser(ctrl), nil
 	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
 
 	require.NoError(t, workerFlavor.Validate(
@@ -97,9 +97,9 @@ func TestWorker(t *testing.T) {
 
 	workerStop := make(chan struct{})
 
-	client := mock_client.NewMockAPIClient(ctrl)
+	client := mock_client.NewMockAPIClientCloser(ctrl)
 
-	flavorImpl := NewWorkerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
+	flavorImpl := NewWorkerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
 	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
 
@@ -115,6 +115,7 @@ func TestWorker(t *testing.T) {
 	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()
 	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
+	client.EXPECT().Close().AnyTimes()
 
 	details, err := flavorImpl.Prepare(
 		types.AnyString(`{}`),
@@ -167,9 +168,9 @@ func TestManager(t *testing.T) {
 
 	managerStop := make(chan struct{})
 
-	client := mock_client.NewMockAPIClient(ctrl)
+	client := mock_client.NewMockAPIClientCloser(ctrl)
 
-	flavorImpl := NewManagerFlavor(plugins, func(Spec) (docker_client.APIClient, error) {
+	flavorImpl := NewManagerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
 	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
@@ -185,6 +186,7 @@ func TestManager(t *testing.T) {
 	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()
 	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
+	client.EXPECT().Close().AnyTimes()
 
 	id := instance.LogicalID("127.0.0.1")
 	details, err := flavorImpl.Prepare(

@@ -31,7 +31,7 @@ var infoResponse = docker_types.Info{Swarm: swarm.Info{NodeID: nodeID}}
 func TestSaveLoadSnapshot(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	client := mock_client.NewMockAPIClient(ctrl)
+	client := mock_client.NewMockAPIClientCloser(ctrl)
 	snapshot, err := NewSnapshot(client)
 
 	swarmInfo := swarm.Swarm{}
