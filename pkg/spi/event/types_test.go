@@ -73,5 +73,6 @@ func TestEncodeDecode(t *testing.T) {
 		Topic: NewTopic("bar"),
 	}.Init().FromAny(any3)
 
-	require.Equal(t, event3, event4) // completely overwritten
+	// completely overwritten -- on linux there are problems with Equal for time.Time so compare strings
+	require.Equal(t, types.AnyValueMust(event3).String(), types.AnyValueMust(event4).String())
 }
