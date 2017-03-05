@@ -61,7 +61,7 @@ func TestEncodeDecode(t *testing.T) {
 	event2 := Event{}
 	err := any2.Decode(&event2)
 	require.NoError(t, err)
-	require.Equal(t, event.Timestamp, event2.Timestamp)
+	require.Equal(t, event.Timestamp.String(), event2.Timestamp.String())
 	require.Equal(t, event.Data, event2.Data)
 	require.Equal(t, any.Bytes(), types.AnyValueMust(event2).Bytes())
 
