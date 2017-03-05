@@ -70,9 +70,8 @@ func (c *client) SubscribeOn(t event.Topic) (<-chan *event.Event, error) {
 			case any, ok := <-raw:
 				if !ok {
 					return
-				} else {
-					typed <- new(event.Event).FromAny(any).ReceivedNow()
 				}
+				typed <- new(event.Event).FromAny(any).ReceivedNow()
 			}
 
 		}

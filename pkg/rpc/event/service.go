@@ -97,7 +97,7 @@ func asPublisher(p event.Plugin) event.Publisher {
 	return nil
 }
 
-// PublishChan sets the publish function of the plugin
+// PublishOn sets the publish function of the plugin
 func (p *Event) PublishOn(c chan<- *event.Event) {
 
 	if pub := asPublisher(p.plugin); pub != nil {

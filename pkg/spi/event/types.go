@@ -37,13 +37,13 @@ func NewTopic(s string) Topic {
 }
 
 // Under return the topic under the parent
-func (child Topic) Under(parent Topic) Topic {
-	return Topic(path.Join(string(parent), string(child)))
+func (t Topic) Under(parent Topic) Topic {
+	return Topic(path.Join(string(parent), string(t)))
 }
 
 // String return the string representation
-func (self Topic) String() string {
-	return string(self)
+func (t Topic) String() string {
+	return string(t)
 }
 
 // Event holds information about when, what, etc.
