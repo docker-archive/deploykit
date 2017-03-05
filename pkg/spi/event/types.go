@@ -31,6 +31,15 @@ func Sort(p []Topic) {
 	sort.Sort(topicSorter(p))
 }
 
+// Topics returns a slice of Topics
+func Topics(s string, more ...string) []Topic {
+	list := []Topic{NewTopic(s)}
+	for _, t := range more {
+		list = append(list, NewTopic(t))
+	}
+	return list
+}
+
 // NewTopic returns a topic
 func NewTopic(s string) Topic {
 	return Topic(s)
