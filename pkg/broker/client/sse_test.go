@@ -222,7 +222,7 @@ func TestBrokerMultiSubscriberCustomObjectConnectAtURLPrefix(t *testing.T) {
 		}
 	}()
 
-	opts.Path = "events"
+	opts.Path = "/events"
 	topic2, errs2, err := Subscribe(socket, "local/instance1", opts)
 	require.NoError(t, err)
 	go func() {

@@ -105,7 +105,9 @@ func (b *Broker) Publish(topic string, data interface{}, optionalTimeout ...time
 // ServerHTTP implements the HTTP handler
 func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	defer func() {
-		recover()
+		if v := recover(); v != nil {
+			log.Warningln("broker.ServeHTTP recovered:", v)
+		}
 	}()
 
 	topic := clean(req.URL.Query().Get("topic"))

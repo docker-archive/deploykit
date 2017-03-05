@@ -146,6 +146,7 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 			// Read each new line and process the type of event
 			line, err := reader.ReadBytes('\n')
 			if err != nil {
+				fmt.Println("!!!!!!!", topic, "err=", err)
 				errCh <- err
 				return
 			}
