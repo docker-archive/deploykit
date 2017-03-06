@@ -2,8 +2,10 @@ package flavor
 
 import (
 	"errors"
+	"log"
 	"strings"
 
+	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/plugin/group"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -16,13 +18,22 @@ type Spec struct {
 	Flavors []group_types.FlavorPlugin
 }
 
-// NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.  Each flavor
-func NewPlugin(flavorPlugins group.FlavorPluginLookup) flavor.Plugin {
-	return flavorCombo{flavorPlugins: flavorPlugins}
+type flavorCombo struct {
+	API           gcloud.API
+	flavorPlugins group.FlavorPluginLookup
 }
 
-type flavorCombo struct {
-	flavorPlugins group.FlavorPluginLookup
+// NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.
+func NewPlugin(flavorPlugins group.FlavorPluginLookup, project, zone string) flavor.Plugin {
+	api, err := gcloud.New(project, zone)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return flavorCombo{
+		API:           api,
+		flavorPlugins: flavorPlugins,
+	}
 }
 
 func (f flavorCombo) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
@@ -31,7 +42,23 @@ func (f flavorCombo) Validate(flavorProperties *types.Any, allocation group_type
 }
 
 func (f flavorCombo) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
-	return flavor.Healthy, nil
+	name := string(inst.ID)
+
+	instance, err := f.API.GetInstance(name)
+	if err != nil {
+		return flavor.Unknown, err
+	}
+
+	switch instance.Status {
+	case "STOPPED", "STOPPING", "SUSPENDED", "SUSPENDING", "TERMINATED":
+		return flavor.Unhealthy, nil
+	case "RUNNING":
+		return flavor.Healthy, nil
+	case "PROVISIONING", "STAGING":
+		return flavor.Unknown, nil
+	}
+
+	return flavor.Unknown, nil
 }
 
 func (f flavorCombo) Drain(flavorProperties *types.Any, inst instance.Description) error {
@@ -113,10 +140,7 @@ func mergeSpecs(initial instance.Spec, specs []instance.Spec) (instance.Spec, er
 	return result, nil
 }
 
-func (f flavorCombo) Prepare(flavor *types.Any,
-	inst instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
-
+func (f flavorCombo) Prepare(flavor *types.Any, inst instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error) {
 	combo := Spec{}
 	err := flavor.Decode(&combo)
 	if err != nil {
@@ -133,11 +157,11 @@ func (f flavorCombo) Prepare(flavor *types.Any,
 			return inst, err
 		}
 
-		flavorOutput, err := plugin.Prepare(pluginSpec.Properties, clone, allocation)
+		output, err := plugin.Prepare(pluginSpec.Properties, clone, allocation)
 		if err != nil {
 			return inst, err
 		}
-		specs = append(specs, flavorOutput)
+		specs = append(specs, output)
 	}
 
 	return mergeSpecs(inst, specs)

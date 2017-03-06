@@ -20,6 +20,8 @@ func main() {
 
 	name := cmd.Flags().String("name", "flavor-combo", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+	project := cmd.Flags().String("project", "", "Google Cloud project")
+	zone := cmd.Flags().String("zone", "", "Google Cloud zone")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 		cli.SetLogLevel(*logLevel)
@@ -37,7 +39,7 @@ func main() {
 			return flavor_client.NewClient(n, endpoint.Address)
 		}
 
-		cli.RunPlugin(*name, flavor_client.PluginServer(flavor.NewPlugin(flavorPluginLookup)))
+		cli.RunPlugin(*name, flavor_client.PluginServer(flavor.NewPlugin(flavorPluginLookup, *project, *zone)))
 
 		return nil
 	}

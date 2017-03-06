@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	mock_flavor "github.com/docker/infrakit.gcp/mock/flavor"
+	mock_gcloud "github.com/docker/infrakit.gcp/mock/gcloud"
+	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
@@ -13,6 +15,7 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/compute/v1"
 )
 
 func logicalID(v string) *instance.LogicalID {
@@ -38,6 +41,15 @@ func pluginLookup(plugins map[string]flavor.Plugin) group.FlavorPluginLookup {
 	}
 }
 
+func NewMockGCloud(t *testing.T) (*mock_gcloud.MockAPI, *gomock.Controller) {
+	ctrl := gomock.NewController(t)
+	return mock_gcloud.NewMockAPI(ctrl), ctrl
+}
+
+func NewFlavorPlugin(api gcloud.API) flavor.Plugin {
+	return &flavorCombo{api, nil}
+}
+
 func TestMergeBehavior(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -47,9 +59,9 @@ func TestMergeBehavior(t *testing.T) {
 
 	plugins := map[string]flavor.Plugin{"a": a, "b": b}
 
-	combo := NewPlugin(pluginLookup(plugins))
+	combo := flavorCombo{nil, pluginLookup(plugins)}
 
-	flavorProperties := types.AnyString(`{
+	properties := types.AnyString(`{
 	  "Flavors": [
 	    {
 	      "Plugin": "a",
@@ -80,7 +92,7 @@ func TestMergeBehavior(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
-	result, err := combo.Prepare(flavorProperties, inst, group_types.AllocationMethod{Size: 1})
+	result, err := combo.Prepare(properties, inst, group_types.AllocationMethod{Size: 1})
 	require.NoError(t, err)
 
 	expected := instance.Spec{
@@ -111,9 +123,9 @@ func TestMergeNoLogicalID(t *testing.T) {
 
 	plugins := map[string]flavor.Plugin{"a": a, "b": b}
 
-	combo := NewPlugin(pluginLookup(plugins))
+	combo := flavorCombo{nil, pluginLookup(plugins)}
 
-	flavorProperties := types.AnyString(`{
+	properties := types.AnyString(`{
 	  "Flavors": [
 	    {
 	      "Plugin": "a",
@@ -144,7 +156,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
-	result, err := combo.Prepare(flavorProperties, inst, group_types.AllocationMethod{Size: 1})
+	result, err := combo.Prepare(properties, inst, group_types.AllocationMethod{Size: 1})
 	require.NoError(t, err)
 
 	expected := instance.Spec{
@@ -155,4 +167,35 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}, {ID: "a", Type: "nic"}, {ID: "b", Type: "gpu"}},
 	}
 	require.Equal(t, expected, result)
+}
+
+func TestHealthy(t *testing.T) {
+	var tests = []struct {
+		status         string
+		expectedHealth flavor.Health
+		expectedError  error
+	}{
+		{"STOPPED", flavor.Unhealthy, nil},
+		{"STOPPING", flavor.Unhealthy, nil},
+		{"SUSPENDED", flavor.Unhealthy, nil},
+		{"SUSPENDING", flavor.Unhealthy, nil},
+		{"TERMINATED", flavor.Unhealthy, nil},
+		{"RUNNING", flavor.Healthy, nil},
+		{"PROVISIONING", flavor.Unknown, nil},
+		{"STAGING", flavor.Unknown, nil},
+		{"", flavor.Unknown, nil},
+	}
+
+	for _, test := range tests {
+		api, _ := NewMockGCloud(t)
+		api.EXPECT().GetInstance("vm-1").Return(&compute.Instance{Status: test.status}, nil)
+
+		plugin := NewFlavorPlugin(api)
+		health, err := plugin.Healthy(nil, instance.Description{
+			ID: "vm-1",
+		})
+
+		require.Equal(t, test.expectedHealth, health, test.status)
+		require.Equal(t, test.expectedError, err)
+	}
 }
