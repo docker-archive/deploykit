@@ -2,6 +2,7 @@ package event
 
 import (
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // InterfaceSpec is the current name and version of the Flavor API.
@@ -13,8 +14,9 @@ var InterfaceSpec = spi.InterfaceSpec{
 // Plugin must be implemented for the object to be able to publish events.
 type Plugin interface {
 
-	// Topics return a list of topics
-	Topics() ([]Topic, error)
+	// List returns a list of *child nodes* given a path for a topic.
+	// A topic of "." is the top level
+	List(topic types.Path) (child []string, err error)
 }
 
 // Publisher is the interface that event sources also implement to be assigned
@@ -29,5 +31,5 @@ type Publisher interface {
 type Subscriber interface {
 
 	// SubscribeOn returns the channel for the topic
-	SubscribeOn(Topic) (<-chan *Event, error)
+	SubscribeOn(topic types.Path) (<-chan *Event, error)
 }

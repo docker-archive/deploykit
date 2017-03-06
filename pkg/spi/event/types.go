@@ -1,8 +1,6 @@
 package event
 
 import (
-	"path"
-	"sort"
 	"time"
 
 	"github.com/docker/infrakit/pkg/types"
@@ -17,49 +15,11 @@ const (
 	TypeError = Type("error")
 )
 
-// Topic is the topic
-type Topic string
-
-type topicSorter []Topic
-
-func (p topicSorter) Len() int           { return len(p) }
-func (p topicSorter) Less(i, j int) bool { return string(p[i]) < string(p[j]) }
-func (p topicSorter) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
-// Sort sorts the topics
-func Sort(p []Topic) {
-	sort.Sort(topicSorter(p))
-}
-
-// Topics returns a slice of Topics
-func Topics(s string, more ...string) []Topic {
-	list := []Topic{NewTopic(s)}
-	for _, t := range more {
-		list = append(list, NewTopic(t))
-	}
-	return list
-}
-
-// NewTopic returns a topic
-func NewTopic(s string) Topic {
-	return Topic(s)
-}
-
-// Under return the topic under the parent
-func (t Topic) Under(parent Topic) Topic {
-	return Topic(path.Join(string(parent), string(t)))
-}
-
-// String return the string representation
-func (t Topic) String() string {
-	return string(t)
-}
-
 // Event holds information about when, what, etc.
 type Event struct {
 
 	// Topic is the topic to which this event is published
-	Topic Topic
+	Topic types.Path
 
 	// Type of the event. This is usually used as a hint to what struct types to use to unmarshal data
 	Type Type `json:",omitempty"`
@@ -94,7 +54,7 @@ func (event *Event) WithError(err error) *Event {
 
 // WithTopic sets the topic from input string
 func (event *Event) WithTopic(s string) *Event {
-	event.Topic = Topic(s)
+	event.Topic = types.PathFromString(s)
 	return event
 }
 
