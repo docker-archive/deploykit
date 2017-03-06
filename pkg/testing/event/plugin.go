@@ -2,19 +2,20 @@ package event
 
 import (
 	"github.com/docker/infrakit/pkg/spi/event"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // Plugin implements event.Plugin.  It is also a publisher. Initialize the struct with (*Publisher)(nil).
 type Plugin struct {
 	event.Publisher
 
-	// DoTopics implements Topics via function
-	DoTopics func() (child []event.Topic, err error)
+	// DoList implements List via function
+	DoList func(topic types.Path) (child []string, err error)
 }
 
-// Topics lists the topics
-func (t *Plugin) Topics() (child []event.Topic, err error) {
-	return t.DoTopics()
+// List lists the topics
+func (t *Plugin) List(topic types.Path) (child []string, err error) {
+	return t.DoList(topic)
 }
 
 // Publisher implements the event.Publisher interface

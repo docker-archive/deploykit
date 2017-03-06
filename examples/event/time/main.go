@@ -11,6 +11,7 @@ import (
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -19,12 +20,18 @@ const (
 )
 
 type timer struct {
-	stop chan struct{}
+	stop   chan struct{}
+	topics map[string]interface{}
 }
 
-// Topics returns the list of topics
-func (t *timer) Topics() ([]event.Topic, error) {
-	return event.Topics(
+func (t *timer) getEndpoint() interface{} {
+	return "to-be-implemented:the url endpoint"
+}
+
+func (t *timer) init() *timer {
+	t.topics = map[string]interface{}{}
+
+	for _, topic := range types.PathFromStrings(
 		"msec/100",
 		"msec/500",
 		"sec/1",
@@ -34,7 +41,16 @@ func (t *timer) Topics() ([]event.Topic, error) {
 		"min/5",
 		"min/30",
 		"hr/1",
-	), nil
+	) {
+		types.Put(topic, t.getEndpoint, t.topics)
+	}
+
+	return t
+}
+
+// List returns the nodes under the given topic
+func (t *timer) List(topic types.Path) ([]string, error) {
+	return types.List(topic, t.topics), nil
 }
 
 // PublishOn sets the channel to publish on
@@ -122,10 +138,10 @@ func main() {
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Event plugin",
+		Short: "Timer event plugin",
 	}
 
-	name := cmd.Flags().String("name", "event", "Plugin name to advertise for discovery")
+	name := cmd.Flags().String("name", "time", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
@@ -148,7 +164,7 @@ func main() {
 			timeQueries)
 
 		// For events
-		timerEvents := &timer{stop: stop}
+		timerEvents := (&timer{stop: stop}).init()
 
 		cli.RunPlugin(*name,
 
