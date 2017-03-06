@@ -151,7 +151,7 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 			}
 			if bytes.Contains(line, headerData) {
 
-				if data := trimHeader(len(headerData), line); data != nil {
+				if data := trimHeader(len(headerData), line); len(data) > 0 {
 
 					streamCh <- types.AnyBytes(data)
 

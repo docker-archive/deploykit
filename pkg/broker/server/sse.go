@@ -163,6 +163,21 @@ func (b *Broker) run() {
 	for {
 		select {
 		case <-b.finish:
+
+			// Disconnect all clients
+			b.clients.Walk(
+				func(key string, value interface{}) bool {
+					chset, ok := value.(map[chan []byte]int)
+					if !ok {
+						panic("assert-failed")
+					}
+					for ch := range chset {
+						log.Infoln("Closing client connection at", key, "ch=", ch)
+						close(ch)
+					}
+					return false
+				})
+
 			log.Infoln("Broker finished")
 			return
 

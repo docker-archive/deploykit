@@ -76,9 +76,11 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 
 	opts := client.Options{SocketDir: filepath.Dir(socketFile)}
 
+	sync := make(chan struct{})
 	topic1, _, err := client.Subscribe(socket, "local", opts)
 	require.NoError(t, err)
 	go func() {
+		<-sync
 		for {
 			var val interface{}
 			require.NoError(t, (<-topic1).Decode(&val))
@@ -89,6 +91,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 	topic2, _, err := client.Subscribe(socket+"/?topic=/local/time", "", opts)
 	require.NoError(t, err)
 	go func() {
+		<-sync
 		for {
 			var val interface{}
 			require.NoError(t, (<-topic2).Decode(&val))
@@ -99,7 +102,10 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 	topic3, _, err := client.Subscribe(socket, "cluster/time", opts)
 	require.NoError(t, err)
 	go func() {
-		panic(<-topic3)
+		<-sync
+		if v, ok := <-topic3; ok {
+			panic(v) // shouldn't receive a message here.
+		}
 	}()
 
 	total := 10
@@ -116,6 +122,8 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 			require.NoError(t, broker.Publish("local/time/now", fmt.Sprintf("b:%d", time.Now().UnixNano())))
 		}
 	}()
+
+	close(sync)
 
 	count1, count2 := 0, 0
 	// Test a few rounds to make sure all subscribers get the same messages each round.
