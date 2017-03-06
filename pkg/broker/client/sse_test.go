@@ -45,11 +45,30 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 		}
 	}()
 
+	received0 := make(chan interface{})
 	received1 := make(chan interface{})
 	received2 := make(chan interface{})
 
 	opts := Options{SocketDir: filepath.Dir(socketFile)}
 
+	// Note that two clients are subscribing to the same topic:
+
+	topic0, _, err := Subscribe(socket, "local", opts)
+	require.NoError(t, err)
+	go func() {
+		<-sync
+		// This subscriber will leave after receiving 5 messages
+		for {
+			var val int
+			require.NoError(t, (<-topic0).Decode(&val))
+			received0 <- val
+
+			if val == 10 {
+				close(received0)
+				return
+			}
+		}
+	}()
 	topic1, _, err := Subscribe(socket, "local", opts)
 	require.NoError(t, err)
 	go func() {
@@ -85,9 +104,16 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 
 	close(sync)
 
+	values0 := []interface{}{}
 	values1 := []interface{}{}
 	values2 := []interface{}{}
 
+	for v := range received0 {
+		if v == nil {
+			break
+		}
+		values0 = append(values0, v)
+	}
 	for v := range received1 {
 		if v == nil {
 			break
@@ -101,8 +127,9 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 		values2 = append(values2, v)
 	}
 
-	require.Equal(t, 10, len(values1))
 	require.Equal(t, 20, len(values2))
+	require.Equal(t, 10, len(values1))
+	require.Equal(t, 10, len(values0))
 }
 
 func TestBrokerMultiSubscriberCustomObject(t *testing.T) {

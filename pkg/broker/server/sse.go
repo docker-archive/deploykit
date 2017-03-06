@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -47,7 +46,8 @@ type Broker struct {
 	// Client connections registry
 	clients *radix.Tree
 
-	lock sync.Mutex
+	// how many clients
+	count int
 }
 
 // NewBroker returns an instance of the broker
@@ -170,14 +170,45 @@ func (b *Broker) run() {
 
 			// A new client has connected.
 			// Register their message channel
-			b.clients.Insert(subscription.topic, subscription.ch)
-			log.Infof("Added client for topic=%s. %d registered clients", subscription.topic, b.clients.Len())
+			subs := map[chan []byte]int{subscription.ch: 1}
+			v, has := b.clients.Get(subscription.topic)
+			if has {
+				if v, ok := v.(map[chan []byte]int); !ok {
+
+					panic("assert-failed: not a map of channels")
+
+				} else {
+					v[subscription.ch] = 1
+					subs = v
+				}
+			}
+
+			b.clients.Insert(subscription.topic, subs)
+			b.count++
+			log.Infof("Connected: topic=%s. %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
 
 		case subscription := <-b.closingClients:
 
 			// A client has dettached and we want to stop sending messages
-			b.clients.Delete(subscription.topic)
-			log.Infof("Removed client for topic=%s. %d registered clients", subscription.topic, b.clients.Len())
+			if v, has := b.clients.Get(subscription.topic); has {
+				if subs, ok := v.(map[chan []byte]int); !ok {
+
+					panic("assert-failed: not a map of channels")
+
+				} else {
+
+					delete(subs, subscription.ch)
+
+					if len(subs) == 0 {
+						b.clients.Delete(subscription.topic)
+					} else {
+						b.clients.Insert(subscription.topic, subs)
+					}
+
+					b.count--
+					log.Infof("Disconnected: topic=%s. %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
+				}
+			}
 
 		case event, open := <-b.notifier:
 
@@ -193,19 +224,19 @@ func (b *Broker) run() {
 			b.clients.WalkPath(event.topic,
 
 				func(key string, value interface{}) bool {
-					ch, ok := value.(chan []byte)
+					chset, ok := value.(map[chan []byte]int)
 					if !ok {
-						log.Warningln("Cannot send", key)
-						return false
+
+						panic("assert-failed")
 					}
 
-					select {
-
-					case ch <- data:
-					case <-time.After(patience):
-						log.Print("Skipping client.")
+					for ch := range chset {
+						select {
+						case ch <- data:
+						case <-time.After(patience):
+							log.Print("Skipping client.")
+						}
 					}
-
 					return false
 				})
 		}

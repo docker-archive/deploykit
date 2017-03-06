@@ -141,7 +141,7 @@ func main() {
 		Short: "Timer event plugin",
 	}
 
-	name := cmd.Flags().String("name", "time", "Plugin name to advertise for discovery")
+	name := cmd.Flags().String("name", "event-time", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
