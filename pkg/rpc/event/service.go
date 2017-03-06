@@ -2,9 +2,11 @@ package event
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // PluginServer returns a Event that conforms to the net/rpc rpc call convention.
@@ -64,29 +66,70 @@ func (p *Event) getPlugin(eventType string) event.Plugin {
 	return nil
 }
 
-// Topics return a set of topics
-func (p *Event) Topics(_ *http.Request, req *TopicsRequest, resp *TopicsResponse) error {
-	// We need to aggregate the events exposed by all the plugin objects
-	topics := []event.Topic{}
-
-	if p.plugin != nil {
-		n, err := p.plugin.Topics()
-		if err == nil {
-			topics = append(topics, n...)
-		}
+func self(p types.Path) bool {
+	if p.Len() == 0 {
+		return true
 	}
 
-	for typeName, typed := range p.typedPlugins {
-		parent := event.Topic(typeName)
-		if n, err := typed.Topics(); err == nil {
-			for _, t := range n {
-				// need to scope the topic by the name of the plugin
-				topics = append(topics, t.Under(parent))
+	first := p.Index(0)
+	if first == nil {
+		return true
+	}
+
+	switch *first {
+	case "", ".":
+		return true
+	}
+
+	return false
+}
+
+// List return a set of sub topics given the top level one
+func (p *Event) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
+
+	req.Topic = req.Topic.Clean()
+
+	nodes := []string{}
+	// the . case - list the typed plugins and the default's first level.
+	if self(req.Topic) {
+		if p.plugin != nil {
+			n, err := p.plugin.List(req.Topic)
+			if err != nil {
+				return err
 			}
+			nodes = append(nodes, n...)
 		}
+		for k := range p.typedPlugins {
+			nodes = append(nodes, k)
+		}
+		sort.Strings(nodes)
+		resp.Nodes = nodes
+		return nil
 	}
-	event.Sort(topics)
-	resp.Topics = topics
+
+	c, has := p.typedPlugins[req.Topic[0]]
+	if !has {
+
+		if p.plugin == nil {
+			return nil
+		}
+
+		nodes, err := p.plugin.List(req.Topic)
+		if err != nil {
+			return err
+		}
+		sort.Strings(nodes)
+		resp.Nodes = nodes
+		return nil
+	}
+
+	nodes, err := c.List(req.Topic[1:])
+	if err != nil {
+		return err
+	}
+
+	sort.Strings(nodes)
+	resp.Nodes = nodes
 	return nil
 }
 
@@ -114,7 +157,7 @@ func (p *Event) PublishOn(c chan<- *event.Event) {
 			go func() {
 				for {
 					if e, ok := <-cc; ok {
-						e.Topic = e.Topic.Under(event.NewTopic(namespace))
+						e.Topic = types.PathFromString(namespace).Join(e.Topic)
 						c <- e
 					} else {
 						return

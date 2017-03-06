@@ -1,14 +1,15 @@
 package event
 
 import (
-	"github.com/docker/infrakit/pkg/spi/event"
+	"github.com/docker/infrakit/pkg/types"
 )
 
-// TopicsRequest is the rpc wrapper for request parameters to Topics
-type TopicsRequest struct {
+// ListRequest is the rpc wrapper for request parameters to List
+type ListRequest struct {
+	Topic types.Path
 }
 
-// TopicsResponse is the rpc wrapper for the results of Topics
-type TopicsResponse struct {
-	Topics []event.Topic
+// ListResponse is the rpc wrapper for the results of List
+type ListResponse struct {
+	Nodes []string
 }
