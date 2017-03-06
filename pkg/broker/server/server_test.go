@@ -54,8 +54,9 @@ func TestListenAndServeOnSocket(t *testing.T) {
 
 	go func() {
 		for {
-			require.NoError(t, broker.Publish("local/time/now", time.Now().UnixNano()))
 			<-time.After(100 * time.Millisecond)
+
+			require.NoError(t, broker.Publish("local/time/now", time.Now().UnixNano()))
 		}
 	}()
 

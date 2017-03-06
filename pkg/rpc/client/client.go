@@ -13,6 +13,7 @@ import (
 
 type client struct {
 	http http.Client
+	addr string
 }
 
 // New creates a new Client that communicates with a unix socket and validates the remote API.
@@ -21,7 +22,7 @@ func New(socketPath string, api spi.InterfaceSpec) (Client, error) {
 		return net.Dial("unix", socketPath)
 	}
 
-	unvalidatedClient := &client{http: http.Client{Transport: &http.Transport{Dial: dialUnix}}}
+	unvalidatedClient := &client{addr: socketPath, http: http.Client{Transport: &http.Transport{Dial: dialUnix}}}
 	cl := &handshakingClient{client: unvalidatedClient, iface: api, lock: &sync.Mutex{}}
 
 	// check handshake
@@ -32,6 +33,10 @@ func New(socketPath string, api spi.InterfaceSpec) (Client, error) {
 		return cl, err
 	}
 	return cl, nil
+}
+
+func (c client) Addr() string {
+	return c.addr
 }
 
 func (c client) Call(method string, arg interface{}, result interface{}) error {

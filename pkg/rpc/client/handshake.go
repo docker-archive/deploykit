@@ -75,6 +75,10 @@ func (c *handshakingClient) handshake() error {
 	return c.handshakeResult.err
 }
 
+func (c *handshakingClient) Addr() string {
+	return c.client.Addr()
+}
+
 func (c *handshakingClient) Call(method string, arg interface{}, result interface{}) error {
 	if err := c.handshake(); err != nil {
 		return err
