@@ -255,6 +255,8 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			collector := make(chan *event.Event)
+			done := make(chan int)
+			running := 0
 
 			// now subscribe to each topic
 			for _, topic := range topics {
@@ -278,35 +280,48 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 				}
 
 				go func() {
+					defer func() { done <- -1 }()
+
 					for {
 						select {
 						case evt, ok := <-stream:
 							if !ok {
+								log.Infoln("Server disconnected -- topic=", topic)
 								return
 							}
+
+							// Scope the topic
+							evt.Topic = types.PathFromString(target).Join(evt.Topic)
 							collector <- evt
 						}
 					}
 				}()
+
+				running++
 			}
 
-			go func() {
-				for {
-					select {
-					case evt := <-collector:
-						buff, err := engine.Render(evt)
-						if err != nil {
-							log.Warningln("error rendering view: %v", err)
-						} else {
-							fmt.Println(buff)
-						}
+		loop:
+			for {
+				select {
+				case v := <-done:
+					running += v
+					if running == 0 {
+						break loop
+					}
+
+				case evt, ok := <-collector:
+					if !ok {
+						log.Infoln("Server disconnected.")
+						break loop
+					}
+					buff, err := engine.Render(evt)
+					if err != nil {
+						log.Warningln("error rendering view: %v", err)
+					} else {
+						fmt.Println(buff)
 					}
 				}
-
-			}()
-
-			block := make(chan struct{})
-			<-block
+			}
 
 			return nil
 		},
