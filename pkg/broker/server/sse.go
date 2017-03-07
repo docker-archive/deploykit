@@ -160,9 +160,9 @@ func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+//checkPath Compare the subscribed topic with the published topic to see if the message can be sent to the client.
 func (b *Broker) checkPath(subscribedPath string, publishedPath string) bool {
 	if subscribedPath != "/" {
-		// Make sure that the topic subscribed to by the client is the upper topic of the topic being notified or the topic exactly matched.
 		pPath := strings.Split(publishedPath, "/")
 		for i, sliceTopic := range strings.Split(subscribedPath, "/") {
 			if pPath[i] != sliceTopic {
@@ -258,6 +258,7 @@ func (b *Broker) run() {
 
 						panic("assert-failed")
 					}
+					// Make sure that the topic subscribed to by the client is the upper topic of the topic being notified or the topic exactly matched.
 					if !b.checkPath(key, event.topic) {
 						return false
 					}
