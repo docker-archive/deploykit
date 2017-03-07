@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -159,6 +160,19 @@ func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+//checkPath Compare the subscribed topic with the published topic to see if the message can be sent to the client.
+func (b *Broker) checkPath(subscribedPath string, publishedPath string) bool {
+	if subscribedPath != "/" {
+		pPath := strings.Split(publishedPath, "/")
+		for i, sliceTopic := range strings.Split(subscribedPath, "/") {
+			if pPath[i] != sliceTopic {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (b *Broker) run() {
 	for {
 		select {
@@ -243,6 +257,10 @@ func (b *Broker) run() {
 					if !ok {
 
 						panic("assert-failed")
+					}
+					// Make sure that the topic subscribed to by the client is the upper topic of the topic being notified or the topic exactly matched.
+					if !b.checkPath(key, event.topic) {
+						return false
 					}
 
 					for ch := range chset {

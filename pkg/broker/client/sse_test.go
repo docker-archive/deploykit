@@ -193,7 +193,6 @@ func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
 	go func() {
 		for {
 			<-time.After(10 * time.Millisecond)
-
 			now := time.Now()
 			evt := event{Time: now.UnixNano(), Message: fmt.Sprintf("Now is %v", now)}
 			require.NoError(t, broker.Publish("remote/instance1", evt))
@@ -208,6 +207,86 @@ func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
 		require.NotNil(t, a)
 		require.NotEqual(t, "", a.Message)
 		require.Equal(t, a, b)
+	}
+
+	broker.Stop()
+
+}
+
+func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
+	type event struct {
+		Time    int64
+		Message string
+	}
+
+	socketFile := tempSocket()
+	socket := "unix://broker" + socketFile
+
+	broker, err := server.ListenAndServeOnSocket(socketFile)
+	require.NoError(t, err)
+
+	received1 := make(chan event)
+	received2 := make(chan event)
+
+	opts := Options{SocketDir: filepath.Dir(socketFile)}
+
+	topic1, errs1, err := Subscribe(socket, "local/instance", opts)
+	require.NoError(t, err)
+	go func() {
+		for {
+			select {
+			case e := <-errs1:
+				panic(e)
+			case m, ok := <-topic1:
+				if ok {
+					var val event
+					require.NoError(t, m.Decode(&val))
+					received1 <- val
+				} else {
+					close(received1)
+				}
+			}
+		}
+	}()
+
+	topic2, errs2, err := Subscribe(socket, "local/instancetest", opts)
+	require.NoError(t, err)
+	go func() {
+		for {
+			select {
+			case e := <-errs2:
+				panic(e)
+			case m, ok := <-topic2:
+				if ok {
+					var val event
+					require.NoError(t, m.Decode(&val))
+					received2 <- val
+				} else {
+					close(received2)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			<-time.After(10 * time.Millisecond)
+			now := time.Now()
+			evt := event{Time: now.UnixNano(), Message: fmt.Sprintf("Now is %v", now)}
+			require.NoError(t, broker.Publish("local/instance", evt))
+			evt = event{Time: now.Add(1 * time.Minute).UnixNano(), Message: fmt.Sprintf("Now is %v", now.Add(1*time.Minute))}
+			require.NoError(t, broker.Publish("local/instancetest", evt))
+		}
+	}()
+
+	// Test a few rounds to make sure all subscribers get the same messages each round.
+	for i := 0; i < 5; i++ {
+		fmt.Print("runtestcycle")
+		b := <-received2
+		a := <-received1
+		require.NotNil(t, a)
+		require.NotEqual(t, "", a.Message)
+		require.NotEqual(t, a, b)
 	}
 
 	broker.Stop()
