@@ -245,11 +245,13 @@ func (b *Broker) run() {
 
 						panic("assert-failed")
 					}
-					// Make sure that the topic subscribed to by the client is the upper topic of the topic being notified or the topic exactly matched.
-					notfyTopic := strings.Split(event.topic, "/")
-					for i, sliceTopic := range strings.Split(key, "/") {
-						if notfyTopic[i] != sliceTopic {
-							return false
+					if key != "/" {
+						// Make sure that the topic subscribed to by the client is the upper topic of the topic being notified or the topic exactly matched.
+						notfyTopic := strings.Split(event.topic, "/")
+						for i, sliceTopic := range strings.Split(key, "/") {
+							if notfyTopic[i] != sliceTopic {
+								return false
+							}
 						}
 					}
 
