@@ -160,6 +160,19 @@ func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (b *Broker) checkPath(subscribedPath string, publishedPath string) bool {
+	if subscribedPath != "/" {
+		// Make sure that the topic subscribed to by the client is the upper topic of the topic being notified or the topic exactly matched.
+		pPath := strings.Split(publishedPath, "/")
+		for i, sliceTopic := range strings.Split(subscribedPath, "/") {
+			if pPath[i] != sliceTopic {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (b *Broker) run() {
 	for {
 		select {
@@ -245,14 +258,8 @@ func (b *Broker) run() {
 
 						panic("assert-failed")
 					}
-					if key != "/" {
-						// Make sure that the topic subscribed to by the client is the upper topic of the topic being notified or the topic exactly matched.
-						notfyTopic := strings.Split(event.topic, "/")
-						for i, sliceTopic := range strings.Split(key, "/") {
-							if notfyTopic[i] != sliceTopic {
-								return false
-							}
-						}
+					if !b.checkPath(key, event.topic) {
+						return false
 					}
 
 					for ch := range chset {
