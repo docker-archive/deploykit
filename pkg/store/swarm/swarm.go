@@ -10,8 +10,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/docker/infrakit/pkg/store"
+	"github.com/docker/infrakit/pkg/util/docker"
 	"golang.org/x/net/context"
 )
 
@@ -21,12 +21,12 @@ const (
 )
 
 type snapshot struct {
-	client client.APIClient
+	client docker.APIClientCloser
 }
 
 // NewSnapshot returns an instance of the snapshot service where data is stored as a label
 // in the swarm raft store.
-func NewSnapshot(client client.APIClient) (store.Snapshot, error) {
+func NewSnapshot(client docker.APIClientCloser) (store.Snapshot, error) {
 	return &snapshot{client: client}, nil
 }
 
@@ -53,7 +53,7 @@ func (s *snapshot) Load(output interface{}) error {
 
 var errNotFound = fmt.Errorf("not-found")
 
-func readSwarm(client client.APIClient) (string, error) {
+func readSwarm(client docker.APIClientCloser) (string, error) {
 	info, err := client.SwarmInspect(context.Background())
 	if err != nil {
 		return "", err
@@ -68,7 +68,7 @@ func readSwarm(client client.APIClient) (string, error) {
 	return "", errNotFound
 }
 
-func writeSwarm(client client.APIClient, value string) error {
+func writeSwarm(client docker.APIClientCloser, value string) error {
 	info, err := client.SwarmInspect(context.Background())
 	if err != nil {
 		return err

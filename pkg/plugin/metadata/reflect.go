@@ -44,6 +44,7 @@ func List(path []string, object interface{}) []string {
 	}
 
 	val := reflect.Indirect(reflect.ValueOf(v))
+
 	if any, is := v.(*types.Any); is {
 		var temp interface{}
 		if err := any.Decode(&temp); err == nil {
@@ -115,7 +116,11 @@ func put(p []string, value interface{}, store map[string]interface{}) bool {
 	return false
 }
 
-func get(path []string, object interface{}) interface{} {
+func get(path []string, object interface{}) (value interface{}) {
+	if f, is := object.(func() interface{}); is {
+		object = f()
+	}
+
 	if len(path) == 0 {
 		return object
 	}

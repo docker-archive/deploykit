@@ -4,17 +4,17 @@ import (
 	"errors"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/client"
 	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/docker"
 )
 
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewManagerFlavor(plugins func() discovery.Plugins, connect func(Spec) (client.APIClient, error),
+func NewManagerFlavor(plugins func() discovery.Plugins, connect func(Spec) (docker.APIClientCloser, error),
 	templ *template.Template,
 	stop <-chan struct{}) *ManagerFlavor {
 

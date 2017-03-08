@@ -44,6 +44,7 @@ func main() {
 	cmd.AddCommand(templateCommand(f))
 	cmd.AddCommand(managerCommand(f))
 	cmd.AddCommand(metadataCommand(f))
+	cmd.AddCommand(eventCommand(f))
 	cmd.AddCommand(pluginCommand(f))
 
 	cmd.AddCommand(instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))

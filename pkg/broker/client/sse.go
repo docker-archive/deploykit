@@ -21,6 +21,9 @@ var (
 type Options struct {
 	// SocketDir is the directory to look for socket files for unix:// urls
 	SocketDir string
+
+	// Path is the URL path, if the server's handler is at the mux path (e.g. /events)
+	Path string
 }
 
 func processEvent(msg []byte) []byte {
@@ -78,6 +81,7 @@ func httpClient(urlString string, opt Options) (*url.URL, *http.Client, error) {
 			return nil, nil, err
 		}
 		u.Scheme = "http"
+		u.Path = "/"
 		return u, c, nil
 	}
 
@@ -87,10 +91,13 @@ func httpClient(urlString string, opt Options) (*url.URL, *http.Client, error) {
 
 // Subscribe subscribes to a topic hosted at given url.  It returns a channel of incoming events and errors
 func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error, error) {
-
 	u, connection, err := httpClient(url, opt)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if opt.Path != "" {
+		u.Path = opt.Path
 	}
 
 	req, err := http.NewRequest("GET", u.String(), nil)
@@ -122,19 +129,29 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 			return
 		}
 
-		defer resp.Body.Close()
+		defer func() {
+			resp.Body.Close()
+			close(streamCh)
+			close(errCh)
+		}()
+
+		if resp.StatusCode != http.StatusOK {
+			errCh <- fmt.Errorf("http-status:%v", resp.StatusCode)
+			return
+		}
+
 		reader := bufio.NewReader(resp.Body)
 
 		for {
 			// Read each new line and process the type of event
 			line, err := reader.ReadBytes('\n')
 			if err != nil {
-				close(streamCh)
+				errCh <- err
 				return
 			}
 			if bytes.Contains(line, headerData) {
 
-				if data := trimHeader(len(headerData), line); data != nil {
+				if data := trimHeader(len(headerData), line); len(data) > 0 {
 
 					streamCh <- types.AnyBytes(data)
 
@@ -142,6 +159,7 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 
 					select {
 					case errCh <- fmt.Errorf("no data: %v", line):
+					default:
 					}
 
 				}
