@@ -1,18 +1,16 @@
 package resource
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"sort"
-	"text/template"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/discovery"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/resource"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/twmb/algoimpl/go/graph"
 )
@@ -28,8 +26,7 @@ type Spec struct {
 		Plugin     plugin_base.Name
 		Properties *types.Any
 
-		plugin   instance.Plugin
-		template *template.Template
+		plugin instance.Plugin
 	}
 }
 
@@ -67,13 +64,12 @@ func (p *plugin) validate(config resource.Spec) (*Spec, []string, error) {
 			return nil, nil, fmt.Errorf("Failed to validate spec for %s: %s", name, err)
 		}
 
-		template, err := template.New("").Delims("[[", "]]").Option("missingkey=error").Parse(resourceSpec.Properties.String())
+		_, err = template.NewTemplate("str://"+resourceSpec.Properties.String(), template.Options{SocketDir: discovery.Dir()})
 		if err != nil {
 			return nil, nil, fmt.Errorf("Template parse error for %s: %s", name, err)
 		}
 
 		resourceSpec.plugin = instancePlugin
-		resourceSpec.template = template
 		spec.Resources[name] = resourceSpec
 	}
 
@@ -123,6 +119,15 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 		return "", err
 	}
 
+	f := func(ref string) (string, error) {
+		fmt.Println(ref, ids)
+
+		if val, ok := ids[ref]; ok {
+			return string(val), nil
+		}
+		return "", fmt.Errorf("Unknown resource: %s", ref)
+	}
+
 	for _, name := range provisioningOrder {
 		if _, ok := ids[name]; ok {
 			continue
@@ -130,17 +135,21 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 
 		resourceSpec := spec.Resources[name]
 
-		var b bytes.Buffer
-		if err := resourceSpec.template.Execute(&b, ids); err != nil {
+		template, err := template.NewTemplate("str://"+resourceSpec.Properties.String(), template.Options{SocketDir: discovery.Dir()})
+		if err != nil {
+			return "", fmt.Errorf("Template parse error for %s: %s", name, err)
+		}
+
+		properties, err := template.AddFunc("resource", f).Render(nil)
+		if err != nil {
 			return "", fmt.Errorf("Template execution error for %s: %s", name, err)
 		}
-		properties := types.AnyBytes(b.Bytes())
 
 		if pretend {
 			ids[name] = instance.ID("unknown")
 		} else {
 			id, err := resourceSpec.plugin.Provision(instance.Spec{
-				Properties: properties,
+				Properties: types.AnyString(properties),
 				Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name},
 			})
 			if err != nil {
@@ -214,15 +223,24 @@ func (p *plugin) DescribeResources() ([]instance.Description, error) {
 	return nil, errors.New("unimplemented")
 }
 
-var resourceReferenceRegexp = regexp.MustCompile(`\[\[\s*\.(\w+)\s*\]\]`)
-
-func getResourceReferences(properties json.RawMessage) []string {
-	var references []string
-	// TODO: Use text/template.Template.Execute instead.
-	for _, submatches := range resourceReferenceRegexp.FindAllSubmatch(properties, -1) {
-		references = append(references, string(submatches[1]))
+func getResourceReferences(name string, properties *types.Any) ([]string, error) {
+	template, err := template.NewTemplate("str://"+properties.String(), template.Options{SocketDir: discovery.Dir()})
+	if err != nil {
+		return nil, fmt.Errorf("Template parse error for %s: %s", name, err)
 	}
-	return references
+
+	refs := map[string]bool{}
+	f := func(ref string) string { refs[ref] = true; return "" }
+
+	if _, err := template.AddFunc("resource", f).Render(nil); err != nil {
+		return nil, fmt.Errorf("Template execution error for %s: %s", name, err)
+	}
+
+	refList := []string{}
+	for ref := range refs {
+		refList = append(refList, ref)
+	}
+	return refList, nil
 }
 
 func getProvisioningOrder(spec Spec) ([]string, error) {
@@ -235,8 +253,12 @@ func getProvisioningOrder(spec Spec) ([]string, error) {
 	}
 
 	for name, resourceSpec := range spec.Resources {
+		references, err := getResourceReferences(name, resourceSpec.Properties)
+		if err != nil {
+			return nil, err
+		}
+
 		to := nodes[name]
-		references := getResourceReferences(json.RawMessage(*resourceSpec.Properties))
 		for _, reference := range references {
 			from, ok := nodes[reference]
 			if !ok {
