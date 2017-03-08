@@ -2,6 +2,7 @@ package fsm
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +26,8 @@ func TestDefinition(t *testing.T) {
 		},
 	}
 
-	require.Error(t, checkReferences(m))
+	_, err := compile(m)
+	require.Error(t, err)
 
 	// add missing
 	m[off] = State{
@@ -35,7 +37,8 @@ func TestDefinition(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, checkReferences(m))
+	_, err = compile(m)
+	require.NoError(t, err)
 
 	states := []State{}
 	for _, s := range m {
@@ -44,12 +47,95 @@ func TestDefinition(t *testing.T) {
 
 	spec, err := Define(states[0], states[1:]...)
 	require.NoError(t, err)
+	require.Equal(t, 2, len(spec.signals))
+	require.Equal(t, 2, len(spec.states))
 
-	spec = spec.CheckFlapping([]Flap{
+	spec = spec.CheckFlappingMust([]Flap{
 		{States: [2]Index{on, off}, Count: 100},
 	})
 
+	require.Equal(t, 1, len(spec.flaps))
 	t.Log(spec)
+}
+
+func TestSimple(t *testing.T) {
+
+	const (
+		on Index = iota
+		off
+		sleep
+	)
+
+	const (
+		turn_on Signal = iota
+		turn_off
+		unplug
+	)
+
+	saidHi := make(chan struct{})
+	var sayHi Action = func() error {
+		close(saidHi)
+		return nil
+	}
+	saidBye := make(chan struct{})
+	var sayBye Action = func() error {
+		close(saidBye)
+		return nil
+	}
+
+	spec, err := Define(
+		State{
+			Index: off,
+			Transitions: map[Signal]Index{
+				turn_on: on,
+			},
+			Actions: map[Signal]Action{
+				turn_on: sayHi,
+			},
+		},
+		State{
+			Index: on,
+			Transitions: map[Signal]Index{
+				turn_off: sleep,
+				unplug:   off,
+			},
+			Actions: map[Signal]Action{
+				turn_off: sayBye,
+			},
+		},
+		State{
+			Index: sleep,
+			Transitions: map[Signal]Index{
+				turn_on:  on,
+				turn_off: off,
+				unplug:   off,
+			},
+			Actions: map[Signal]Action{
+				turn_on:  sayHi,
+				turn_off: sayBye,
+			},
+		},
+	)
+
+	require.NoError(t, err)
+
+	// check transitions
+	next, action, err := spec.transition(on, turn_off)
+	require.NoError(t, err)
+	require.Equal(t, sleep, next)
+	action()
+	<-saidBye
+
+	// check transitions
+	next, action, err = spec.transition(off, turn_on)
+	require.NoError(t, err)
+	require.Equal(t, on, next)
+	action()
+	<-saidHi
+
+	// not allowed transition
+	_, _, err = spec.transition(on, turn_on)
+	require.Error(t, err)
 }
 
 func TestFsmUsage(t *testing.T) {
@@ -159,12 +245,12 @@ func TestFsmUsage(t *testing.T) {
 	require.NoError(t, err)
 
 	// set is a collection of fsm intances that follow the same rules.
-	set := NewSet(fsm.CheckFlapping([]Flap{
+	set := NewSet(fsm.CheckFlappingMust([]Flap{
 		{States: [2]Index{state_running, state_down}, Count: 10},
-	}))
+	}), time.Tick(1*time.Second))
 
 	// allocates a new instance of a fsm with an initial state.
-	instance := set.New(state_specified)
+	instance := set.Add(state_specified)
 
 	require.NotNil(t, instance)
 
