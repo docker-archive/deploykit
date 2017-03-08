@@ -12,7 +12,7 @@ type Index int
 // as some application-specific error state which is a state defined to correspond
 // to some external event indicating a real-world error event (as opposed to a
 // programming error here).
-type Action func() error
+type Action func(Instance)
 
 // Tick is a unit of time. Time is in relative terms and synchronized with an actual
 // timer that's provided by the client.

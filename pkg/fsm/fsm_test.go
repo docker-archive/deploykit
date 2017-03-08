@@ -73,14 +73,12 @@ func TestSimple(t *testing.T) {
 	)
 
 	saidHi := make(chan struct{})
-	var sayHi Action = func() error {
+	var sayHi Action = func(Instance) {
 		close(saidHi)
-		return nil
 	}
 	saidBye := make(chan struct{})
-	var sayBye Action = func() error {
+	var sayBye Action = func(Instance) {
 		close(saidBye)
-		return nil
 	}
 
 	spec, err := Define(
@@ -123,14 +121,14 @@ func TestSimple(t *testing.T) {
 	next, action, err := spec.transition(on, turn_off)
 	require.NoError(t, err)
 	require.Equal(t, sleep, next)
-	action()
+	action(nil)
 	<-saidBye
 
 	// check transitions
 	next, action, err = spec.transition(off, turn_on)
 	require.NoError(t, err)
 	require.Equal(t, on, next)
-	action()
+	action(nil)
 	<-saidHi
 
 	// not allowed transition
@@ -157,25 +155,20 @@ func TestFsmUsage(t *testing.T) {
 		state_decommissioned
 	)
 
-	createInstance := func() error {
+	createInstance := func(Instance) {
 		t.Log("creating instance")
-		return nil
 	}
-	deleteInstance := func() error {
+	deleteInstance := func(Instance) {
 		t.Log("delete instance")
-		return nil
 	}
-	cleanup := func() error {
+	cleanup := func(Instance) {
 		t.Log("cleanup")
-		return nil
 	}
-	recordFlapping := func() error {
+	recordFlapping := func(Instance) {
 		t.Log("flap is if this happens more than multiples of 2 calls")
-		return nil
 	}
-	sendAlert := func() error {
+	sendAlert := func(Instance) {
 		t.Log("alert")
-		return nil
 	}
 
 	fsm, err := Define(
