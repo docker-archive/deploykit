@@ -120,8 +120,6 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 	}
 
 	f := func(ref string) (string, error) {
-		fmt.Println(ref, ids)
-
 		if val, ok := ids[ref]; ok {
 			return string(val), nil
 		}
