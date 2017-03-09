@@ -45,7 +45,7 @@ func (m maasPlugin) convertSpecToMaasParam(spec map[string]interface{}) url.Valu
 	return param
 }
 
-func (m maasPlugin) checkDuplicate(hostname string) (bool, error) {
+func (m maasPlugin) checkDuplicate(systemID string) (bool, error) {
 	files, err := ioutil.ReadDir(m.MaasfilesDir)
 	if err != nil {
 		return false, err
@@ -56,14 +56,14 @@ func (m maasPlugin) checkDuplicate(hostname string) (bool, error) {
 			continue
 		}
 		machineDir := path.Join(m.MaasfilesDir, file.Name())
-		hnData, err := ioutil.ReadFile(path.Join(machineDir, "MachineName"))
+		hID, err := ioutil.ReadFile(path.Join(machineDir, "MachineID"))
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
 			}
 			return false, err
 		}
-		if hostname == string(hnData) {
+		if systemID == string(hID) {
 			return true, nil
 		}
 	}
@@ -99,11 +99,11 @@ func (m maasPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	notDuplicate := false
 	for range listNodes {
-		hostname, err := acquiredNode.GetField("hostname")
+		systemID, err := acquiredNode.GetField("system_id")
 		if err != nil {
 			return nil, err
 		}
-		isdup, err := m.checkDuplicate(hostname)
+		isdup, err := m.checkDuplicate(systemID)
 		if err != nil {
 			return nil, err
 		}
@@ -137,16 +137,16 @@ func (m maasPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if _, err = acquiredNode.CallPost("start", params); err != nil {
 		return nil, err
 	}
-	hostname, err := acquiredNode.GetField("hostname")
+	systemID, err := acquiredNode.GetField("system_id")
 	if err != nil {
 		return nil, err
 	}
-	id := instance.ID(hostname)
+	id := instance.ID(systemID)
 	machineDir, err := ioutil.TempDir(m.MaasfilesDir, "infrakit-")
 	if err != nil {
 		return nil, err
 	}
-	if err := ioutil.WriteFile(path.Join(machineDir, "MachineName"), []byte(hostname), 0755); err != nil {
+	if err := ioutil.WriteFile(path.Join(machineDir, "MachineID"), []byte(systemID), 0755); err != nil {
 		return nil, err
 	}
 	tagData, err := types.AnyValue(spec.Tags)
@@ -175,11 +175,11 @@ func (m maasPlugin) Label(id instance.ID, labels map[string]string) error {
 			continue
 		}
 		machineDir := path.Join(m.MaasfilesDir, file.Name())
-		hostname, err := ioutil.ReadFile(path.Join(machineDir, "MachineName"))
+		systemID, err := ioutil.ReadFile(path.Join(machineDir, "MachineID"))
 		if err != nil {
 			return err
 		}
-		if id == instance.ID(hostname) {
+		if id == instance.ID(systemID) {
 
 			tagFile := path.Join(machineDir, "tags")
 			buff, err := ioutil.ReadFile(tagFile)
@@ -218,8 +218,8 @@ func (m maasPlugin) Destroy(id instance.ID) error {
 	listNodes, err := listNodeObjects.GetArray()
 	for _, nodeObj := range listNodes {
 		node, err := nodeObj.GetMAASObject()
-		hostname, err := node.GetField("hostname")
-		if hostname == string(id) {
+		systemID, err := node.GetField("system_id")
+		if systemID == string(id) {
 			if state, _ := node.GetField("substatus_name"); state == "Deploying" {
 				params := url.Values{}
 				if _, err = node.CallPost("abort_operation", params); err != nil {
@@ -241,13 +241,13 @@ func (m maasPlugin) Destroy(id instance.ID) error {
 			continue
 		}
 		machineDir := path.Join(m.MaasfilesDir, file.Name())
-		hostname, err := ioutil.ReadFile(path.Join(machineDir, "MachineName"))
+		systemID, err := ioutil.ReadFile(path.Join(machineDir, "MachineID"))
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
 			}
 			return err
-		} else if id == instance.ID(hostname) {
+		} else if id == instance.ID(systemID) {
 			if err := os.RemoveAll(machineDir); err != nil {
 				return err
 			}
@@ -288,7 +288,7 @@ func (m maasPlugin) DescribeInstances(tags map[string]string) ([]instance.Descri
 			}
 		}
 		if allMatched {
-			hostname, err := ioutil.ReadFile(path.Join(machineDir, "MachineName"))
+			systemID, err := ioutil.ReadFile(path.Join(machineDir, "MachineID"))
 			if err == nil {
 			} else {
 				if !os.IsNotExist(err) {
@@ -296,7 +296,7 @@ func (m maasPlugin) DescribeInstances(tags map[string]string) ([]instance.Descri
 				}
 			}
 			descriptions = append(descriptions, instance.Description{
-				ID:   instance.ID(hostname),
+				ID:   instance.ID(systemID),
 				Tags: machineTags,
 			})
 		}
