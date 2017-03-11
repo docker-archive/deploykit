@@ -78,6 +78,7 @@ func (p *plugin) validate(config resource.Spec) (*Spec, []string, error) {
 		return nil, nil, err
 	}
 
+	log.Infof("Provisioning order: %s", provisioningOrder)
 	return &spec, provisioningOrder, nil
 }
 
@@ -117,6 +118,11 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 	ids, err := p.describe(*spec, config.ID)
 	if err != nil {
 		return "", err
+	}
+
+	foundIDs := map[string]instance.ID{}
+	for name, id := range ids {
+		foundIDs[name] = id
 	}
 
 	f := func(ref string) (string, error) {
@@ -164,14 +170,14 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 	var desc string
 	for _, name := range provisioningOrder {
 		var idStr, verb string
-		if id, ok := ids[name]; ok {
+		if id, ok := foundIDs[name]; ok {
 			verb = "Found"
 			idStr = string(id)
 		} else {
-			verb = "Created"
+			verb = "Provisioned"
 			idStr = "N/A"
-			if idStruct, ok := ids[name]; ok {
-				idStr = string(idStruct)
+			if id, ok := ids[name]; ok {
+				idStr = string(id)
 			}
 		}
 		desc += fmt.Sprintf("\n%s %s (%s)", verb, name, idStr)
