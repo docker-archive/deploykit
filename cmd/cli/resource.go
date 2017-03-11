@@ -65,7 +65,7 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		view, err := engine.AddFunc("resource", resourceIdentityFunc).Render(nil)
+		view, err := engine.Render(nil)
 		if err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		view, err := engine.AddFunc("resource", resourceIdentityFunc).Render(nil)
+		view, err := engine.Render(nil)
 		if err != nil {
 			return err
 		}
@@ -138,8 +138,4 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 	cmd.AddCommand(&destroy)
 
 	return cmd
-}
-
-func resourceIdentityFunc(name string) string {
-	return fmt.Sprintf("{{ resource `%s` }}", name)
 }
