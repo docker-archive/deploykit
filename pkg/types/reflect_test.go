@@ -56,10 +56,7 @@ func TestMap(t *testing.T) {
 		},
 	}, get(PathFromString("region/us-west-1/vpc/vpc1/network/"), m))
 
-	require.Equal(t, 100, get(PathFromString("region/us-west-2/metrics/instances/count"), m))
-
 	require.Equal(t, []string{"region"}, List(PathFromString("."), m))
-	require.Equal(t, []string{}, List(PathFromString("region/us-west-1/bogus"), m))
 	require.Equal(t, []string{}, List(PathFromString("region/us-west-1/vpc/vpc1/network/network1/id"), m))
 	require.Equal(t, []string{"id"}, List(PathFromString("region/us-west-1/vpc/vpc1/network/network1"), m))
 	require.Equal(t, []string{"us-west-1", "us-west-2"}, List(PathFromString("region/"), m))
@@ -72,6 +69,15 @@ func TestMap(t *testing.T) {
 	require.Equal(t, "b", Get(PathFromString("region/us-west-2/instances/[1]"), m))
 	require.Equal(t, "a", Get(PathFromString("region/us-west-2/instances[0]"), m))
 	require.Equal(t, "b", Get(PathFromString("region/us-west-2/instances[1]"), m))
+
+	// noexistent value list returns nil
+	require.Equal(t, []string(nil), List(PathFromString("region-not-found"), m))
+	require.Equal(t, []string(nil), List(PathFromString("region/us-west-1/bogus"), m))
+	require.Equal(t, []string(nil), List(PathFromString("region/us-west-2/nonexist"), m))
+
+	// existing non-list value list returns empty list
+	require.Equal(t, 100, get(PathFromString("region/us-west-2/metrics/instances/count"), m))
+	require.Equal(t, []string{}, List(PathFromString("region/us-west-2/metrics/instances/count"), m))
 
 }
 

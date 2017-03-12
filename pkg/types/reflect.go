@@ -34,7 +34,54 @@ func GetValue(path []string, object interface{}) (*Any, error) {
 }
 
 // List lists the members at the path
+// If the value at the path is listable, then a slice of the children (unqualified) will be
+// returned.  If the value at the path doesn't exist, a nil will be returned.
+// A value is listable if it is 1. a slice, 2. a map, 3. a struct (fields will be listed)
+// or a 4. a types.Any where the any object will be unpacked and the same rules above will be
+// applied to the decoded struct.
 func List(path []string, object interface{}) []string {
+	list := []string{}
+	v := get(path, object)
+	if v == nil {
+		return nil
+	}
+
+	val := reflect.Indirect(reflect.ValueOf(v))
+
+	if any, is := v.(*Any); is {
+		var temp interface{}
+		if err := any.Decode(&temp); err == nil {
+			val = reflect.ValueOf(temp)
+		}
+	}
+
+	switch val.Kind() {
+	case reflect.Slice:
+		// this is a slice, so return the name as '[%d]'
+		for i := 0; i < val.Len(); i++ {
+			list = append(list, fmt.Sprintf("[%d]", i))
+		}
+
+	case reflect.Map:
+		for _, k := range val.MapKeys() {
+			list = append(list, k.String())
+		}
+
+	case reflect.Struct:
+		vt := val.Type()
+		for i := 0; i < vt.NumField(); i++ {
+			if vt.Field(i).PkgPath == "" {
+				list = append(list, vt.Field(i).Name)
+			}
+		}
+	}
+
+	sort.Strings(list)
+	return list
+}
+
+// List lists the members at the path
+func List0(path []string, object interface{}) []string {
 	list := []string{}
 	v := get(path, object)
 	if v == nil {

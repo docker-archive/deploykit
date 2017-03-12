@@ -259,9 +259,9 @@ func (b *Broker) run() {
 						panic("assert-failed")
 					}
 					// Make sure that the topic subscribed to by the client is the upper topic of the topic being notified or the topic exactly matched.
-					if !b.checkPath(key, event.topic) {
-						return false
-					}
+					// if !b.checkPath(key, event.topic) {
+					// 	return false
+					// }
 
 					for ch := range chset {
 						select {

@@ -194,6 +194,15 @@ func TestEventPluginPublishSubscribe(t *testing.T) {
 	err = validator.Validate(types.PathFromString("storage"))
 	require.NoError(t, err)
 
+	err = validator.Validate(types.PathFromString("storage/instance"))
+	require.NoError(t, err)
+
+	err = validator.Validate(types.PathFromString("storage/instance/create"))
+	require.NoError(t, err)
+
+	err = validator.Validate(types.PathFromString("storage/instance/c"))
+	require.Error(t, err)
+
 	err = validator.Validate(types.PathFromString("stor"))
 	require.Error(t, err)
 

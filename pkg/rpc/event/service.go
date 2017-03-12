@@ -87,15 +87,26 @@ func self(p types.Path) bool {
 
 // Validate returns an error if the topic path is invalid
 func (p *Event) Validate(topic types.Path) error {
-	// if this gives a valid child then we consider it ok
+	// case where the topic can have sub topics
 	children, err := p.list(topic)
 	if err != nil {
 		return err
 	}
 
-	if len(children) > 0 {
+	// It can be zero length
+	if children != nil {
 		return nil
 	}
+
+	// case where the topic is exact
+	children, err = p.list(topic.Dir())
+	if err != nil {
+		return err
+	}
+	if len(children) > 0 && children[0] == topic.Base() {
+		return nil
+	}
+
 	return broker.ErrInvalidTopic(topic.String())
 }
 
