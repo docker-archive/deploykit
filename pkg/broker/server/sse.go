@@ -70,7 +70,7 @@ func (b *Broker) Stop() {
 }
 
 func clean(topic string) string {
-	if len(topic) == 0 {
+	if len(topic) == 0 || topic == "." {
 		return "/"
 	}
 
@@ -200,7 +200,7 @@ func (b *Broker) run() {
 
 			b.clients.Insert(subscription.topic, subs)
 			b.count++
-			log.Infof("Connected: topic=%s. %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
+			log.Infof("Connected: topic=%s => %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
 
 		case subscription := <-b.closingClients:
 
@@ -221,7 +221,7 @@ func (b *Broker) run() {
 					}
 
 					b.count--
-					log.Infof("Disconnected: topic=%s. %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
+					log.Infof("Disconnected: topic=%s => %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
 				}
 			}
 
