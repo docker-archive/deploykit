@@ -13,6 +13,7 @@ import (
 	rpc_server "github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
@@ -93,10 +94,11 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 	}
 
 	// events handler
-	broker := broker.NewBroker()
+	events := broker.NewBroker()
 
 	// wire up the publish event source channel to the plugin implementations
 	for _, t := range targets {
+
 		pub, is := t.(event.Publisher)
 		if !is {
 			continue
@@ -104,15 +106,15 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 
 		// We give one channel per source to provide some isolation.  This we won't have the
 		// whole event bus stop just because one plugin closes the channel.
-		events := make(chan *event.Event)
-		pub.PublishOn(events)
+		eventChan := make(chan *event.Event)
+		pub.PublishOn(eventChan)
 		go func() {
 			for {
-				event, ok := <-events
+				event, ok := <-eventChan
 				if !ok {
 					return
 				}
-				broker.Publish(event.Topic.String(), event, 1*time.Second)
+				events.Publish(event.Topic.String(), event, 1*time.Second)
 			}
 		}()
 	}
@@ -129,7 +131,24 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 	router := mux.NewRouter()
 	router.HandleFunc(rpc_server.URLAPI, info.ShowAPI)
 	router.HandleFunc(rpc_server.URLFunctions, info.ShowTemplateFunctions)
-	router.HandleFunc(rpc_server.URLEventsPrefix, broker.ServeHTTP)
+
+	intercept := broker.Interceptor{
+		Pre: func(topic string, headers map[string][]string) error {
+			for _, target := range targets {
+				if v, is := target.(event.Validator); is {
+					if err := v.Validate(types.PathFromString(topic)); err == nil {
+						return nil
+					}
+				}
+			}
+			return broker.ErrInvalidTopic(topic)
+		},
+		Do: events.ServeHTTP,
+		Post: func(topic string) {
+			log.Infoln("Client left", topic)
+		},
+	}
+	router.HandleFunc(rpc_server.URLEventsPrefix, intercept.ServeHTTP)
 
 	logger := loggingHandler{handler: server}
 	router.Handle("/", logger)
@@ -151,7 +170,7 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 		if err != nil {
 			log.Warn(err)
 		}
-		broker.Stop()
+		events.Stop()
 	}()
 
 	return &stoppableServer{server: &gracefulServer}, nil

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"sort"
 
+	broker "github.com/docker/infrakit/pkg/broker/server"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/types"
@@ -84,18 +85,39 @@ func self(p types.Path) bool {
 	return false
 }
 
-// List return a set of sub topics given the top level one
-func (p *Event) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
+// Validate returns an error if the topic path is invalid
+func (p *Event) Validate(topic types.Path) error {
+	// case where the topic can have sub topics
+	children, err := p.list(topic)
+	if err != nil {
+		return err
+	}
 
-	req.Topic = req.Topic.Clean()
+	// It can be zero length
+	if children != nil {
+		return nil
+	}
 
+	// case where the topic is exact
+	children, err = p.list(topic.Dir())
+	if err != nil {
+		return err
+	}
+	if len(children) > 0 && children[0] == topic.Base() {
+		return nil
+	}
+
+	return broker.ErrInvalidTopic(topic.String())
+}
+
+func (p *Event) list(topic types.Path) ([]string, error) {
 	nodes := []string{}
 	// the . case - list the typed plugins and the default's first level.
-	if self(req.Topic) {
+	if self(topic) {
 		if p.plugin != nil {
-			n, err := p.plugin.List(req.Topic)
+			n, err := p.plugin.List(topic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			nodes = append(nodes, n...)
 		}
@@ -103,32 +125,40 @@ func (p *Event) List(_ *http.Request, req *ListRequest, resp *ListResponse) erro
 			nodes = append(nodes, k)
 		}
 		sort.Strings(nodes)
-		resp.Nodes = nodes
-		return nil
+		return nodes, nil
 	}
 
-	c, has := p.typedPlugins[req.Topic[0]]
+	c, has := p.typedPlugins[topic[0]]
 	if !has {
 
 		if p.plugin == nil {
-			return nil
+			return nil, nil
 		}
 
-		nodes, err := p.plugin.List(req.Topic)
+		nodes, err := p.plugin.List(topic)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		sort.Strings(nodes)
-		resp.Nodes = nodes
-		return nil
+		return nodes, nil
 	}
 
-	nodes, err := c.List(req.Topic[1:])
+	nodes, err := c.List(topic[1:])
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	sort.Strings(nodes)
+	return nodes, nil
+}
+
+// List return a set of sub topics given the top level one
+func (p *Event) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
+	req.Topic = req.Topic.Clean()
+	nodes, err := p.list(req.Topic)
+	if err != nil {
+		return err
+	}
 	resp.Nodes = nodes
 	return nil
 }
