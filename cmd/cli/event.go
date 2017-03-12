@@ -274,6 +274,8 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 					return fmt.Errorf("not a subscriber: %s, %v", target, plugin)
 				}
 
+				log.Infoln("Subscribing to", eventTopic)
+
 				stream, err := client.SubscribeOn(eventTopic)
 				if err != nil {
 					return fmt.Errorf("cannot subscribe: %s, err=%v", topic, err)

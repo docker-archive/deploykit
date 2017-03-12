@@ -170,15 +170,44 @@ func TestEventPluginPublishSubscribe(t *testing.T) {
 	require.NotNil(t, pub1)
 	require.NotNil(t, pub2)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
+	var impl rpc_server.VersionedInterface = PluginServerWithTypes(
 		map[string]event.Plugin{
 			"compute": plugin0,
 			"storage": plugin1,
-		}))
+		})
+
+	server, err := rpc_server.StartPluginAtPath(socketPath, impl)
 	require.NoError(t, err)
 
 	<-calledPublisher0
 	<-calledPublisher1
+
+	validator, is := impl.(event.Validator)
+	require.True(t, is)
+
+	err = validator.Validate(types.PathFromString(""))
+	require.NoError(t, err)
+
+	err = validator.Validate(types.PathFromString("compute"))
+	require.NoError(t, err)
+
+	err = validator.Validate(types.PathFromString("storage"))
+	require.NoError(t, err)
+
+	err = validator.Validate(types.PathFromString("storage/instance"))
+	require.NoError(t, err)
+
+	err = validator.Validate(types.PathFromString("storage/instance/create"))
+	require.NoError(t, err)
+
+	err = validator.Validate(types.PathFromString("storage/instance/c"))
+	require.Error(t, err)
+
+	err = validator.Validate(types.PathFromString("stor"))
+	require.Error(t, err)
+
+	err = validator.Validate(types.PathFromString("computer"))
+	require.Error(t, err)
 
 	client := must(NewClient(socketPath)).(event.Subscriber)
 	require.NotNil(t, client)
