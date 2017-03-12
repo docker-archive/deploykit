@@ -19,6 +19,13 @@ type Plugin interface {
 	List(topic types.Path) (child []string, err error)
 }
 
+// Validator is the interface for validating the topic
+type Validator interface {
+
+	// Validate validates the topic
+	Validate(topic types.Path) error
+}
+
 // Publisher is the interface that event sources also implement to be assigned
 // a publish function.
 type Publisher interface {
