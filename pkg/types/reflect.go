@@ -80,48 +80,6 @@ func List(path []string, object interface{}) []string {
 	return list
 }
 
-// List lists the members at the path
-func List0(path []string, object interface{}) []string {
-	list := []string{}
-	v := get(path, object)
-	if v == nil {
-		return list
-	}
-
-	val := reflect.Indirect(reflect.ValueOf(v))
-
-	if any, is := v.(*Any); is {
-		var temp interface{}
-		if err := any.Decode(&temp); err == nil {
-			val = reflect.ValueOf(temp)
-		}
-	}
-
-	switch val.Kind() {
-	case reflect.Slice:
-		// this is a slice, so return the name as '[%d]'
-		for i := 0; i < val.Len(); i++ {
-			list = append(list, fmt.Sprintf("[%d]", i))
-		}
-
-	case reflect.Map:
-		for _, k := range val.MapKeys() {
-			list = append(list, k.String())
-		}
-
-	case reflect.Struct:
-		vt := val.Type()
-		for i := 0; i < vt.NumField(); i++ {
-			if vt.Field(i).PkgPath == "" {
-				list = append(list, vt.Field(i).Name)
-			}
-		}
-	}
-
-	sort.Strings(list)
-	return list
-}
-
 func put(p []string, value interface{}, store map[string]interface{}) bool {
 	if len(p) == 0 {
 		return false
