@@ -1,25 +1,24 @@
 package fsm
 
 import (
-	"time"
+	log "github.com/golang/glog"
 )
 
 // NewSet returns a new set
-func NewSet(spec *Spec, tick <-chan time.Time) *Set {
+func NewSet(spec *Spec, clock *Clock) *Set {
 	set := &Set{
 		spec:      *spec,
 		stop:      make(chan struct{}),
-		members:   map[id]*instance{},
+		clock:     clock,
+		members:   map[ID]*instance{},
 		reads:     make(chan func(Set)),
 		add:       make(chan Index),
-		delete:    make(chan id),
+		delete:    make(chan ID),
 		errors:    make(chan error),
 		new:       make(chan Instance),
 		deadlines: newQueue(),
 	}
-	if tick != nil {
-		set.inputs = set.run(tick)
-	}
+	set.inputs = set.run()
 	return set
 }
 
@@ -28,18 +27,20 @@ func NewSet(spec *Spec, tick <-chan time.Time) *Set {
 type Set struct {
 	spec      Spec
 	now       Time
-	next      id
-	members   map[id]*instance
+	next      ID
+	clock     *Clock
+	members   map[ID]*instance
 	reads     chan func(Set) // given a view which is a copy of the Set
 	stop      chan struct{}
 	add       chan Index // add an instance with initial state
 	new       chan Instance
-	delete    chan id // delete an instance with id
+	delete    chan ID // delete an instance with id
 	errors    chan error
 	inputs    map[Signal]chan<- *event
 	deadlines *queue
 }
 
+// Size returns the size of the set
 func (s *Set) Size() int {
 	result := make(chan int)
 	defer close(result)
@@ -49,32 +50,74 @@ func (s *Set) Size() int {
 	return <-result
 }
 
+// CountByState returns a count of instances in a given state.
+func (s *Set) CountByState(state Index) int {
+	total := 0
+	s.ForEachInstance(func(_ ID, test Index) bool {
+		if test == state {
+			total++
+		}
+		return true
+	})
+	return total
+}
+
+// ForEachInstance iterates through the set and provides a consistent view of the instances
+func (s *Set) ForEachInstance(view func(ID, Index) bool) {
+	blocker := make(chan struct{})
+	s.reads <- func(set Set) {
+		defer close(blocker)
+		for _, m := range set.members {
+			if view(m.id, m.state) {
+				continue
+			} else {
+				break
+			}
+		}
+	}
+	<-blocker
+}
+
+// Instance returns the instance by id
+func (s *Set) Instance(id ID) Instance {
+	blocker := make(chan Instance)
+	s.reads <- func(set Set) {
+		defer close(blocker)
+		blocker <- set.members[id]
+	}
+	return <-blocker
+}
+
+// Add adds an instance given initial state
 func (s *Set) Add(initial Index) Instance {
 	s.add <- initial
 	return <-s.new
 }
 
+// Delete deletes an instance
 func (s *Set) Delete(instance Instance) {
-	s.delete <- id(instance.ID())
+	s.delete <- instance.ID()
 }
 
+// Stop stops the state machine loop
 func (s *Set) Stop() {
 	if s.stop != nil {
 		close(s.stop)
 	}
+	s.clock.Stop()
 }
 
-type id uint64
+type ID uint64
 type event struct {
-	instance id
+	instance ID
 	signal   Signal
 }
 
-func (s *Set) run(tick <-chan time.Time) map[Signal]chan<- *event {
+func (s *Set) run() map[Signal]chan<- *event {
 
 	// Start up the goroutines to merge all the events/triggers.
 	// Note we use merge channel for performance (over the slower reflect.Select) and for readability.
-	collector := make(chan *event)
+	collector := make(chan *event, 1000)
 	inputs := map[Signal]chan<- *event{}
 	for _, signal := range s.spec.signals {
 		input := make(chan *event)
@@ -91,7 +134,6 @@ func (s *Set) run(tick <-chan time.Time) map[Signal]chan<- *event {
 	}
 
 	go func() {
-
 		defer func() {
 			// close all inputs
 			for _, ch := range inputs {
@@ -106,15 +148,18 @@ func (s *Set) run(tick <-chan time.Time) map[Signal]chan<- *event {
 			case <-s.stop:
 				break loop
 
-			case <-tick:
+			case <-s.clock.C:
 
-				// update the 'clock'
 				s.now++
 
 				// go through the priority queue by deadline and raise signals if expired.
-				for s.deadlines.Len() > 0 {
+				done := s.deadlines.Len() == 0
+				for !done {
 					instance := s.deadlines.dequeue()
-					if instance.deadline < s.now {
+
+					log.Infoln("t=", s.now, "id=", instance.id, "deadline=", instance.deadline)
+
+					if instance.deadline == s.now {
 
 						// check > 0 here because we could have already raised the signal
 						// when a real event came in.
@@ -128,10 +173,12 @@ func (s *Set) run(tick <-chan time.Time) map[Signal]chan<- *event {
 						instance.deadline = -1
 						instance.index = -1
 
+						done = s.deadlines.Len() == 0
+
 					} else {
 						// add the last one back...
 						s.deadlines.enqueue(instance)
-						break
+						done = true
 					}
 				}
 
@@ -149,16 +196,23 @@ func (s *Set) run(tick <-chan time.Time) map[Signal]chan<- *event {
 				}
 
 				s.members[id] = new
+
+				// if there's deadline then enqueue
+				// check for TTL
+				if exp, ok := s.spec.expiry(initial); ok {
+					new.update(initial, s.now, exp.TTL)
+					s.deadlines.enqueue(new)
+				}
+
 				s.new <- new
 
 			case id := <-s.delete:
-
 				// delete an instance
 				delete(s.members, id)
 
 			case event, ok := <-collector:
-
 				// state transition events
+
 				if !ok {
 					break loop
 				}
@@ -177,7 +231,7 @@ func (s *Set) run(tick <-chan time.Time) map[Signal]chan<- *event {
 
 					// any flap detection?
 					limit := s.spec.flap(current, next)
-					if limit.Count > 0 {
+					if limit != nil && limit.Count > 0 {
 						if instance.flaps.count(current, next) > limit.Count {
 							instance.raise(limit.Raise, inputs)
 

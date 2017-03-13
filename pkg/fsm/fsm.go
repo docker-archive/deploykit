@@ -1,8 +1,13 @@
 package fsm
 
 import (
+	"flag"
 	"sort"
 )
+
+func init() {
+	flag.Parse()
+}
 
 type Index int
 

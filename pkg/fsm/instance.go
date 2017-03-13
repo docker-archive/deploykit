@@ -1,12 +1,12 @@
 package fsm
 
 type Instance interface {
-	ID() uint64
+	ID() ID
 	State() (Index, bool)
 }
 
 type instance struct {
-	id       id
+	id       ID
 	state    Index
 	parent   *Set
 	error    error
@@ -16,8 +16,8 @@ type instance struct {
 	index    int // index used in the deadlines queue
 }
 
-func (i instance) ID() uint64 {
-	return uint64(i.id)
+func (i instance) ID() ID {
+	return i.id
 }
 
 func (i instance) State() (Index, bool) {

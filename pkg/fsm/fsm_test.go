@@ -237,14 +237,16 @@ func TestFsmUsage(t *testing.T) {
 
 	require.NoError(t, err)
 
+	clock := Wall(time.Tick(1 * time.Second))
+
 	// set is a collection of fsm intances that follow the same rules.
 	set := NewSet(fsm.CheckFlappingMust([]Flap{
 		{States: [2]Index{state_running, state_down}, Count: 10},
-	}), time.Tick(1*time.Second))
+	}), clock)
 
 	// allocates a new instance of a fsm with an initial state.
 	instance := set.Add(state_specified)
-
 	require.NotNil(t, instance)
 
+	set.Stop()
 }
