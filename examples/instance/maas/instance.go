@@ -45,6 +45,42 @@ func (m maasPlugin) convertSpecToMaasParam(spec map[string]interface{}) url.Valu
 	return param
 }
 
+func (m maasPlugin) addTagsToNode(systemID string, tags map[string]string) error {
+	tagListing := m.MaasObj.GetSubObject("tags")
+	for tag, value := range tags {
+		tagObj, err := tagListing.GetSubObject(tag).Get()
+		if err != nil {
+			_, err = tagListing.CallPost("new", url.Values{"name": {tag}, "comment": {value}})
+			if err != nil {
+				return err
+			}
+			tagObj, err = tagListing.GetSubObject(tag).Get()
+			if err != nil {
+				return err
+			}
+		}
+		_, err = tagObj.CallPost("update_nodes", url.Values{"add": {systemID}})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m maasPlugin) deleteTagsFromNode(systemID string, tags []maas.JSONObject) error {
+	for _, tag := range tags {
+		tagObj, err := tag.GetMAASObject()
+		if err != nil {
+			return err
+		}
+		_, err = tagObj.CallPost("update_nodes", url.Values{"remove": {systemID}})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
 func (m maasPlugin) checkDuplicate(systemID string) (bool, error) {
 	files, err := ioutil.ReadDir(m.MaasfilesDir)
 	if err != nil {
@@ -149,11 +185,8 @@ func (m maasPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err := ioutil.WriteFile(path.Join(machineDir, "MachineID"), []byte(systemID), 0755); err != nil {
 		return nil, err
 	}
-	tagData, err := types.AnyValue(spec.Tags)
+	err = m.addTagsToNode(systemID, spec.Tags)
 	if err != nil {
-		return nil, err
-	}
-	if err := ioutil.WriteFile(path.Join(machineDir, "tags"), tagData.Bytes(), 0666); err != nil {
 		return nil, err
 	}
 	if spec.LogicalID != nil {
@@ -166,45 +199,7 @@ func (m maasPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // Label labels the instance
 func (m maasPlugin) Label(id instance.ID, labels map[string]string) error {
-	files, err := ioutil.ReadDir(m.MaasfilesDir)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		if !file.IsDir() {
-			continue
-		}
-		machineDir := path.Join(m.MaasfilesDir, file.Name())
-		systemID, err := ioutil.ReadFile(path.Join(machineDir, "MachineID"))
-		if err != nil {
-			return err
-		}
-		if id == instance.ID(systemID) {
-
-			tagFile := path.Join(machineDir, "tags")
-			buff, err := ioutil.ReadFile(tagFile)
-			if err != nil {
-				return err
-			}
-
-			tags := map[string]string{}
-			err = types.AnyBytes(buff).Decode(&tags)
-			if err != nil {
-				return err
-			}
-
-			for k, v := range labels {
-				tags[k] = v
-			}
-
-			encoded, err := types.AnyValue(tags)
-			if err != nil {
-				return err
-			}
-			return ioutil.WriteFile(tagFile, encoded.Bytes(), 0666)
-		}
-	}
-	return nil
+	return m.addTagsToNode(string(id), labels)
 }
 
 // Destroy terminates an existing instance.
@@ -218,8 +213,16 @@ func (m maasPlugin) Destroy(id instance.ID) error {
 	listNodes, err := listNodeObjects.GetArray()
 	for _, nodeObj := range listNodes {
 		node, err := nodeObj.GetMAASObject()
+		if err != nil {
+			return err
+		}
 		systemID, err := node.GetField("system_id")
+		if err != nil {
+			return err
+		}
 		if systemID == string(id) {
+			tags, err := node.GetMap()["tag_names"].GetArray()
+			m.deleteTagsFromNode(string(id), tags)
 			if state, _ := node.GetField("substatus_name"); state == "Deploying" {
 				params := url.Values{}
 				if _, err = node.CallPost("abort_operation", params); err != nil {
