@@ -50,3 +50,13 @@ func (_m *MockIface) Nodes() monorail.NodeIface {
 func (_mr *_MockIfaceRecorder) Nodes() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Nodes")
 }
+
+func (_m *MockIface) Skus() monorail.SkuIface {
+	ret := _m.ctrl.Call(_m, "Skus")
+	ret0, _ := ret[0].(monorail.SkuIface)
+	return ret0
+}
+
+func (_mr *_MockIfaceRecorder) Skus() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Skus")
+}

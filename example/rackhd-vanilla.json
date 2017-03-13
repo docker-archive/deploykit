@@ -1,0 +1,28 @@
+{
+    "ID": "rackhd-example",
+    "Properties": {
+        "Allocation": {
+            "Size": 1
+        }
+    },
+    "Instance": {
+        "Plugin": "instance-rackhd",
+        "Properties": {
+            "RunInstancesInput": {
+                "WorkflowName": "Graph.InstallCentOS",
+                "SkuName": "SmallNode"
+            },
+            "Tags": {
+                "Name": "infrakit-example"
+            }
+        }
+    },
+    "Flavor": {
+        "Plugin": "flavor-vanilla",
+        "Properties": {
+            "Init": [
+                "sh -c \"Hello, World! > /hello\""
+            ]
+        }
+    }
+}

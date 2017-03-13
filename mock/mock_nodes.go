@@ -30,6 +30,17 @@ func (_m *MockNodeIface) EXPECT() *_MockNodeIfaceRecorder {
 	return _m.recorder
 }
 
+func (_m *MockNodeIface) DeleteNodesIdentifier(_param0 *nodes.DeleteNodesIdentifierParams, _param1 runtime.ClientAuthInfoWriter) (*nodes.DeleteNodesIdentifierOK, error) {
+	ret := _m.ctrl.Call(_m, "DeleteNodesIdentifier", _param0, _param1)
+	ret0, _ := ret[0].(*nodes.DeleteNodesIdentifierOK)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockNodeIfaceRecorder) DeleteNodesIdentifier(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteNodesIdentifier", arg0, arg1)
+}
+
 func (_m *MockNodeIface) GetNodes(_param0 *nodes.GetNodesParams, _param1 runtime.ClientAuthInfoWriter) (*nodes.GetNodesOK, error) {
 	ret := _m.ctrl.Call(_m, "GetNodes", _param0, _param1)
 	ret0, _ := ret[0].(*nodes.GetNodesOK)
@@ -39,4 +50,37 @@ func (_m *MockNodeIface) GetNodes(_param0 *nodes.GetNodesParams, _param1 runtime
 
 func (_mr *_MockNodeIfaceRecorder) GetNodes(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetNodes", arg0, arg1)
+}
+
+func (_m *MockNodeIface) GetNodesIdentifierObm(_param0 *nodes.GetNodesIdentifierObmParams, _param1 runtime.ClientAuthInfoWriter) (*nodes.GetNodesIdentifierObmOK, error) {
+	ret := _m.ctrl.Call(_m, "GetNodesIdentifierObm", _param0, _param1)
+	ret0, _ := ret[0].(*nodes.GetNodesIdentifierObmOK)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockNodeIfaceRecorder) GetNodesIdentifierObm(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetNodesIdentifierObm", arg0, arg1)
+}
+
+func (_m *MockNodeIface) PatchNodesIdentifierTags(_param0 *nodes.PatchNodesIdentifierTagsParams, _param1 runtime.ClientAuthInfoWriter) (*nodes.PatchNodesIdentifierTagsOK, error) {
+	ret := _m.ctrl.Call(_m, "PatchNodesIdentifierTags", _param0, _param1)
+	ret0, _ := ret[0].(*nodes.PatchNodesIdentifierTagsOK)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockNodeIfaceRecorder) PatchNodesIdentifierTags(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PatchNodesIdentifierTags", arg0, arg1)
+}
+
+func (_m *MockNodeIface) PostNodesIdentifierWorkflows(_param0 *nodes.PostNodesIdentifierWorkflowsParams, _param1 runtime.ClientAuthInfoWriter) (*nodes.PostNodesIdentifierWorkflowsCreated, error) {
+	ret := _m.ctrl.Call(_m, "PostNodesIdentifierWorkflows", _param0, _param1)
+	ret0, _ := ret[0].(*nodes.PostNodesIdentifierWorkflowsCreated)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockNodeIfaceRecorder) PostNodesIdentifierWorkflows(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PostNodesIdentifierWorkflows", arg0, arg1)
 }

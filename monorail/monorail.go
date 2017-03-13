@@ -53,3 +53,8 @@ func New(endpoint string) *Monorail {
 func (m *Monorail) Nodes() NodeIface {
 	return m.Client.Nodes
 }
+
+// Skus provides a RackHD Nodes client
+func (m *Monorail) Skus() SkuIface {
+	return m.Client.Skus
+}
