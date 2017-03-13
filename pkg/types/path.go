@@ -75,7 +75,10 @@ func (p Path) Clean() Path {
 	}
 	if len(copy) == 0 {
 		copy = []string{"."}
+	} else if this[len(this)-1] == "" || this[len(this)-1] == "." {
+		copy = append(copy, "")
 	}
+
 	return Path(copy)
 }
 
@@ -127,6 +130,10 @@ func (p Path) JoinString(child string) Path {
 // Join joins the child to the parent
 func (p Path) Join(child Path) Path {
 	pp := p.Clean()
+	this := []string(pp)
+	if this[len(this)-1] == "" {
+		pp = Path(this[:len(this)-1])
+	}
 	return Path(append(pp, []string(child)...))
 }
 
@@ -140,6 +147,9 @@ func (p Path) Rel(path Path) Path {
 
 	this := []string(p.Clean())
 	parent := []string(path.Clean())
+	if parent[len(parent)-1] == "" {
+		parent = parent[:len(parent)-1]
+	}
 	if len(this) < len(parent) {
 		return NullPath
 	}

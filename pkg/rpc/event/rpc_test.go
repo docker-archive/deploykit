@@ -191,7 +191,13 @@ func TestEventPluginPublishSubscribe(t *testing.T) {
 	err = validator.Validate(types.PathFromString("compute"))
 	require.NoError(t, err)
 
+	err = validator.Validate(types.PathFromString("compute/"))
+	require.NoError(t, err)
+
 	err = validator.Validate(types.PathFromString("storage"))
+	require.NoError(t, err)
+
+	err = validator.Validate(types.PathFromString("storage/"))
 	require.NoError(t, err)
 
 	err = validator.Validate(types.PathFromString("storage/instance"))
@@ -212,10 +218,10 @@ func TestEventPluginPublishSubscribe(t *testing.T) {
 	client := must(NewClient(socketPath)).(event.Subscriber)
 	require.NotNil(t, client)
 
-	compute, err := client.SubscribeOn(types.PathFromString("compute"))
+	compute, err := client.SubscribeOn(types.PathFromString("compute/"))
 	require.NoError(t, err)
 
-	storage, err := client.SubscribeOn(types.PathFromString("storage"))
+	storage, err := client.SubscribeOn(types.PathFromString("storage/"))
 	require.NoError(t, err)
 
 	all, err := client.SubscribeOn(types.PathFromString("."))

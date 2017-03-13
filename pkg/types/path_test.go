@@ -22,14 +22,14 @@ func TestPath(t *testing.T) {
 	require.True(t, PathFromString(".").Dot())
 	require.False(t, PathFromString("./a").Dot())
 
-	require.Equal(t, PathFromString("a/b/c/d"), PathFromString("a/b/c/d/").Clean())
-	require.Equal(t, PathFromString("a/b/c/d"), PathFromString("a/b/c/d/.").Clean())
+	//	require.Equal(t, PathFromString("a/b/c/d"), PathFromString("a/b/c/d/").Clean())
+	require.Equal(t, PathFromString("a/b/c/d/"), PathFromString("a/b/c/d/.").Clean())
 	require.Equal(t, PathFromString("a/b/c"), PathFromString("a/b/c/d/..").Clean())
-	require.Equal(t, PathFromString("a/b/c"), PathFromString("a/b/c/d/../").Clean())
-	require.Equal(t, PathFromString("a/b/c"), PathFromString("./a/b/c/d/../").Clean())
+	require.Equal(t, PathFromString("a/b/c/"), PathFromString("a/b/c/d/../").Clean())
+	require.Equal(t, PathFromString("a/b/c/"), PathFromString("./a/b/c/d/../").Clean())
 	require.Equal(t, PathFromString("."), PathFromString("a/..").Clean())
 
-	require.Equal(t, PathFromString("a/b/c/d"), PathFromString("a/b/c/d/").Clean())
+	require.Equal(t, PathFromString("a/b/c/d/"), PathFromString("a/b/c/d/").Clean())
 	require.Equal(t, PathFromString("a/b/c/d"), PathFromString("a/b/c/").JoinString("d"))
 	require.Equal(t, PathFromString("a/b/c/d/x/y"), PathFromString("a/b/c/").Join(PathFromString("d/x/y")))
 
