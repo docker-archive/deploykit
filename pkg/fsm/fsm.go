@@ -1,14 +1,10 @@
 package fsm
 
 import (
-	"flag"
 	"sort"
 )
 
-func init() {
-	flag.Parse()
-}
-
+// Index is the index of the state in a FSM
 type Index int
 
 // Action is the action to take when a signal is received, prior to transition
@@ -159,12 +155,12 @@ func (s *Spec) transition(current Index, signal Signal) (next Index, action Acti
 		return
 	}
 
-	if n, has := state.Transitions[signal]; !has {
+	n, has := state.Transitions[signal]
+	if !has {
 		err = unknownTransition(signal)
 		return
-	} else {
-		next = n
 	}
+	next = n
 
 	if a, has := state.Actions[signal]; has {
 		action = a
@@ -181,34 +177,34 @@ type Flap struct {
 	Raise  Signal
 }
 
-func (spec *Spec) flap(a, b Index) *Flap {
+func (s *Spec) flap(a, b Index) *Flap {
 	copy := []int{int(a), int(b)}
 	sort.Ints(copy)
 	key := [2]Index{Index(copy[0]), Index(copy[1])}
-	if f, has := spec.flaps[key]; has {
+	if f, has := s.flaps[key]; has {
 		return &f
 	}
 	return nil
 }
 
 // CheckFlappingMust is a Must version (will panic if err) of CheckFlapping
-func (spec *Spec) CheckFlappingMust(checks []Flap) *Spec {
-	_, err := spec.CheckFlapping(checks)
+func (s *Spec) CheckFlappingMust(checks []Flap) *Spec {
+	_, err := s.CheckFlapping(checks)
 	if err != nil {
 		panic(err)
 	}
-	return spec
+	return s
 }
 
 // CheckFlapping - Limit is the maximum of a->b b->a transitions allowable.  For detecting
 // oscillations between two adjacent states (no hops)
-func (spec *Spec) CheckFlapping(checks []Flap) (*Spec, error) {
+func (s *Spec) CheckFlapping(checks []Flap) (*Spec, error) {
 	flaps := map[[2]Index]Flap{}
 	for _, check := range checks {
 
 		// check the state
 		for _, state := range check.States {
-			if _, has := spec.states[state]; !has {
+			if _, has := s.states[state]; !has {
 				return nil, unknownState(state)
 			}
 		}
@@ -218,7 +214,7 @@ func (spec *Spec) CheckFlapping(checks []Flap) (*Spec, error) {
 		flaps[[2]Index{Index(copy[0]), Index(copy[1])}] = check
 	}
 
-	spec.flaps = flaps
+	s.flaps = flaps
 
-	return spec, nil
+	return s, nil
 }

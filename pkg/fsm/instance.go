@@ -1,5 +1,9 @@
 package fsm
 
+// ID is the id of the instance in a given set.  It's unique in that set.
+type ID uint64
+
+// Instance is the interface that returns ID and state of the fsm instance safely.
 type Instance interface {
 	ID() ID
 	State() (Index, bool)
@@ -16,10 +20,12 @@ type instance struct {
 	index    int // index used in the deadlines queue
 }
 
+// ID returns the ID of the fsm instance
 func (i instance) ID() ID {
 	return i.id
 }
 
+// State returns the state of the fsm instance
 func (i instance) State() (Index, bool) {
 	result := make(chan Index)
 	// we have to ask the set which actually holds the instance (this was returned by copy)

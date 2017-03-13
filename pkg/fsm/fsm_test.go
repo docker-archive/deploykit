@@ -10,8 +10,8 @@ import (
 func TestDefinition(t *testing.T) {
 
 	const (
-		turn_on Signal = iota
-		turn_off
+		turnOn Signal = iota
+		turnOff
 
 		on Index = iota
 		off
@@ -21,7 +21,7 @@ func TestDefinition(t *testing.T) {
 		on: {
 			Index: on,
 			Transitions: map[Signal]Index{
-				turn_off: off,
+				turnOff: off,
 			},
 		},
 	}
@@ -33,7 +33,7 @@ func TestDefinition(t *testing.T) {
 	m[off] = State{
 		Index: off,
 		Transitions: map[Signal]Index{
-			turn_on: on,
+			turnOn: on,
 		},
 	}
 
@@ -67,8 +67,8 @@ func TestSimple(t *testing.T) {
 	)
 
 	const (
-		turn_on Signal = iota
-		turn_off
+		turnOn Signal = iota
+		turnOff
 		unplug
 	)
 
@@ -85,32 +85,32 @@ func TestSimple(t *testing.T) {
 		State{
 			Index: off,
 			Transitions: map[Signal]Index{
-				turn_on: on,
+				turnOn: on,
 			},
 			Actions: map[Signal]Action{
-				turn_on: sayHi,
+				turnOn: sayHi,
 			},
 		},
 		State{
 			Index: on,
 			Transitions: map[Signal]Index{
-				turn_off: sleep,
-				unplug:   off,
+				turnOff: sleep,
+				unplug:  off,
 			},
 			Actions: map[Signal]Action{
-				turn_off: sayBye,
+				turnOff: sayBye,
 			},
 		},
 		State{
 			Index: sleep,
 			Transitions: map[Signal]Index{
-				turn_on:  on,
-				turn_off: off,
-				unplug:   off,
+				turnOn:  on,
+				turnOff: off,
+				unplug:  off,
 			},
 			Actions: map[Signal]Action{
-				turn_on:  sayHi,
-				turn_off: sayBye,
+				turnOn:  sayHi,
+				turnOff: sayBye,
 			},
 		},
 	)
@@ -118,41 +118,41 @@ func TestSimple(t *testing.T) {
 	require.NoError(t, err)
 
 	// check transitions
-	next, action, err := spec.transition(on, turn_off)
+	next, action, err := spec.transition(on, turnOff)
 	require.NoError(t, err)
 	require.Equal(t, sleep, next)
 	action(nil)
 	<-saidBye
 
 	// check transitions
-	next, action, err = spec.transition(off, turn_on)
+	next, action, err = spec.transition(off, turnOn)
 	require.NoError(t, err)
 	require.Equal(t, on, next)
 	action(nil)
 	<-saidHi
 
 	// not allowed transition
-	_, _, err = spec.transition(on, turn_on)
+	_, _, err = spec.transition(on, turnOn)
 	require.Error(t, err)
 }
 
 func TestFsmUsage(t *testing.T) {
 
 	const (
-		signal_specified Signal = iota
-		signal_create
-		signal_found
-		signal_healthy
-		signal_unhealthy
-		signal_startover
-		signal_stop
+		signalSpecified Signal = iota
+		signalCreate
+		signalFound
+		signalHealthy
+		signalUnhealthy
+		signalStartOver
+		signalStop
 
-		state_specified Index = iota
-		state_creating
-		state_up
-		state_running
-		state_down
-		state_decommissioned
+		specified Index = iota
+		creating
+		up
+		running
+		down
+		decommissioned
 	)
 
 	createInstance := func(Instance) {
@@ -173,65 +173,65 @@ func TestFsmUsage(t *testing.T) {
 
 	fsm, err := Define(
 		State{
-			Index: state_specified,
+			Index: specified,
 			Transitions: map[Signal]Index{
-				signal_create:    state_creating,
-				signal_found:     state_up,
-				signal_healthy:   state_running,
-				signal_unhealthy: state_down,
+				signalCreate:    creating,
+				signalFound:     up,
+				signalHealthy:   running,
+				signalUnhealthy: down,
 			},
 			Actions: map[Signal]Action{
-				signal_create: createInstance,
+				signalCreate: createInstance,
 			},
-			TTL: Expiry{1000, signal_create},
+			TTL: Expiry{1000, signalCreate},
 		},
 		State{
-			Index: state_creating,
+			Index: creating,
 			Transitions: map[Signal]Index{
-				signal_found:     state_up,
-				signal_startover: state_specified,
+				signalFound:     up,
+				signalStartOver: specified,
 			},
 			Actions: map[Signal]Action{
-				signal_startover: cleanup,
+				signalStartOver: cleanup,
 			},
-			TTL: Expiry{1000, signal_startover},
+			TTL: Expiry{1000, signalStartOver},
 		},
 		State{
-			Index: state_up,
+			Index: up,
 			Transitions: map[Signal]Index{
-				signal_healthy:   state_running,
-				signal_unhealthy: state_down,
+				signalHealthy:   running,
+				signalUnhealthy: down,
 			},
 			Actions: map[Signal]Action{
-				signal_unhealthy: recordFlapping, // note flapping between up and down
-			},
-		},
-		State{
-			Index: state_down,
-			Transitions: map[Signal]Index{
-				signal_startover: state_specified,
-				signal_healthy:   state_running,
-			},
-			Actions: map[Signal]Action{
-				signal_startover: cleanup,
-				signal_healthy:   recordFlapping, // note flapping between up and down
-			},
-			TTL: Expiry{10, signal_startover},
-		},
-		State{
-			Index: state_running,
-			Transitions: map[Signal]Index{
-				signal_healthy:   state_running,
-				signal_unhealthy: state_down, // do we want threshold e.g. more than N signals?
-				signal_stop:      state_decommissioned,
-			},
-			Actions: map[Signal]Action{
-				signal_unhealthy: sendAlert,
-				signal_stop:      deleteInstance,
+				signalUnhealthy: recordFlapping, // note flapping between up and down
 			},
 		},
 		State{
-			Index: state_decommissioned,
+			Index: down,
+			Transitions: map[Signal]Index{
+				signalStartOver: specified,
+				signalHealthy:   running,
+			},
+			Actions: map[Signal]Action{
+				signalStartOver: cleanup,
+				signalHealthy:   recordFlapping, // note flapping between up and down
+			},
+			TTL: Expiry{10, signalStartOver},
+		},
+		State{
+			Index: running,
+			Transitions: map[Signal]Index{
+				signalHealthy:   running,
+				signalUnhealthy: down, // do we want threshold e.g. more than N signals?
+				signalStop:      decommissioned,
+			},
+			Actions: map[Signal]Action{
+				signalUnhealthy: sendAlert,
+				signalStop:      deleteInstance,
+			},
+		},
+		State{
+			Index: decommissioned,
 		},
 	)
 
@@ -241,11 +241,11 @@ func TestFsmUsage(t *testing.T) {
 
 	// set is a collection of fsm intances that follow the same rules.
 	set := NewSet(fsm.CheckFlappingMust([]Flap{
-		{States: [2]Index{state_running, state_down}, Count: 10},
+		{States: [2]Index{running, down}, Count: 10},
 	}), clock)
 
 	// allocates a new instance of a fsm with an initial state.
-	instance := set.Add(state_specified)
+	instance := set.Add(specified)
 	require.NotNil(t, instance)
 
 	set.Stop()

@@ -107,7 +107,6 @@ func (s *Set) Stop() {
 	s.clock.Stop()
 }
 
-type ID uint64
 type event struct {
 	instance ID
 	signal   Signal
