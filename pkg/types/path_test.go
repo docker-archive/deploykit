@@ -22,7 +22,6 @@ func TestPath(t *testing.T) {
 	require.True(t, PathFromString(".").Dot())
 	require.False(t, PathFromString("./a").Dot())
 
-	//	require.Equal(t, PathFromString("a/b/c/d"), PathFromString("a/b/c/d/").Clean())
 	require.Equal(t, PathFromString("a/b/c/d/"), PathFromString("a/b/c/d/.").Clean())
 	require.Equal(t, PathFromString("a/b/c"), PathFromString("a/b/c/d/..").Clean())
 	require.Equal(t, PathFromString("a/b/c/"), PathFromString("a/b/c/d/../").Clean())
