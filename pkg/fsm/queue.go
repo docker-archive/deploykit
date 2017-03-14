@@ -22,8 +22,17 @@ func (pq *queue) dequeue() *instance {
 	return v.(*instance)
 }
 
+func (pq *queue) remove(instance *instance) {
+	if instance.index > 0 {
+		heap.Remove(pq, instance.index)
+		instance.index = -1
+	}
+}
+
 func (pq *queue) update(instance *instance) {
-	heap.Fix(pq, instance.index)
+	if instance.index > 0 {
+		heap.Fix(pq, instance.index)
+	}
 }
 
 func (pq queue) Len() int { return len(pq) }

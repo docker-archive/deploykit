@@ -20,7 +20,9 @@ func TestQueue(t *testing.T) {
 	q.enqueue(x)
 
 	q.enqueue(&instance{deadline: Time(5)})
-	q.enqueue(&instance{deadline: Time(4)})
+
+	y := &instance{deadline: Time(4)}
+	q.enqueue(y)
 	q.enqueue(&instance{deadline: Time(4)})
 	q.enqueue(&instance{deadline: Time(20)})
 
@@ -28,10 +30,13 @@ func TestQueue(t *testing.T) {
 	q.update(x)
 	q.update(&instance{deadline: Time(200), index: 5}) // no effect -- not tracked.
 
+	q.remove(y)
+	q.remove(&instance{deadline: Time(200), index: -1}) // no effect -- not tracked.
+
 	sorted := []int{}
 	for q.Len() > 0 {
 		sorted = append(sorted, int(q.dequeue().deadline))
 	}
 
-	require.Equal(t, []int{-1, 1, 2, 3, 4, 4, 5, 20}, sorted)
+	require.Equal(t, []int{-1, 1, 2, 3, 4, 5, 20}, sorted)
 }

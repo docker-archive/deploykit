@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -25,7 +24,6 @@ func NewClock() *Clock {
 
 // Tick makes one tick of the clock
 func (t *Clock) Tick() {
-	fmt.Println("TICK")
 	t.c <- Tick(1)
 }
 

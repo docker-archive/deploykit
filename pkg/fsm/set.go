@@ -11,6 +11,7 @@ func NewSet(spec *Spec, clock *Clock) *Set {
 		stop:      make(chan struct{}),
 		clock:     clock,
 		members:   map[ID]*instance{},
+		bystate:   map[Index]map[ID]*instance{},
 		reads:     make(chan func(Set)),
 		add:       make(chan Index),
 		delete:    make(chan ID),
@@ -18,6 +19,11 @@ func NewSet(spec *Spec, clock *Clock) *Set {
 		new:       make(chan Instance),
 		deadlines: newQueue(),
 	}
+
+	for i := range spec.states {
+		set.bystate[i] = map[ID]*instance{}
+	}
+
 	set.inputs = set.run()
 	return set
 }
@@ -30,6 +36,7 @@ type Set struct {
 	next      ID
 	clock     *Clock
 	members   map[ID]*instance
+	bystate   map[Index]map[ID]*instance
 	reads     chan func(Set) // given a view which is a copy of the Set
 	stop      chan struct{}
 	add       chan Index // add an instance with initial state
@@ -42,7 +49,7 @@ type Set struct {
 
 // Size returns the size of the set
 func (s *Set) Size() int {
-	result := make(chan int)
+	result := make(chan int, 1)
 	defer close(result)
 	s.reads <- func(view Set) {
 		result <- len(view.members)
@@ -52,14 +59,12 @@ func (s *Set) Size() int {
 
 // CountByState returns a count of instances in a given state.
 func (s *Set) CountByState(state Index) int {
-	total := 0
-	s.ForEachInstance(func(_ ID, test Index) bool {
-		if test == state {
-			total++
-		}
-		return true
-	})
-	return total
+	total := make(chan int, 1)
+	s.reads <- func(set Set) {
+		defer close(total)
+		total <- len(s.bystate[state])
+	}
+	return <-total
 }
 
 // ForEachInstance iterates through the set and provides a consistent view of the instances
@@ -80,7 +85,7 @@ func (s *Set) ForEachInstance(view func(ID, Index) bool) {
 
 // Instance returns the instance by id
 func (s *Set) Instance(id ID) Instance {
-	blocker := make(chan Instance)
+	blocker := make(chan Instance, 1)
 	s.reads <- func(set Set) {
 		defer close(blocker)
 		blocker <- set.members[id]
@@ -154,6 +159,7 @@ func (s *Set) run() map[Signal]chan<- *event {
 				// go through the priority queue by deadline and raise signals if expired.
 				done := s.deadlines.Len() == 0
 				for !done {
+
 					instance := s.deadlines.dequeue()
 
 					log.Infoln("t=", s.now, "id=", instance.id, "deadline=", instance.deadline)
@@ -190,11 +196,10 @@ func (s *Set) run() map[Signal]chan<- *event {
 				new := &instance{
 					id:     id,
 					state:  initial,
+					index:  -1,
 					parent: s,
 					flaps:  *newFlaps(),
 				}
-
-				s.members[id] = new
 
 				// if there's deadline then enqueue
 				// check for TTL
@@ -203,11 +208,21 @@ func (s *Set) run() map[Signal]chan<- *event {
 					s.deadlines.enqueue(new)
 				}
 
+				// update index
+				s.members[id] = new
+				s.bystate[initial][id] = new
+
 				s.new <- new
 
 			case id := <-s.delete:
-				// delete an instance
-				delete(s.members, id)
+
+				if instance, has := s.members[id]; has {
+					// delete an instance
+					delete(s.members, id)
+					delete(s.bystate[instance.state], id)
+				}
+
+				// update the index
 
 			case event, ok := <-collector:
 				// state transition events
@@ -218,6 +233,8 @@ func (s *Set) run() map[Signal]chan<- *event {
 
 				// process events here.
 				if instance, has := s.members[event.instance]; has {
+
+					log.V(100).Infoln("Transition:", instance.id, "deadline=", instance.deadline, "index=", instance.index)
 
 					current := instance.state
 					next, action, err := s.spec.transition(current, event.signal)
@@ -251,16 +268,28 @@ func (s *Set) run() map[Signal]chan<- *event {
 
 					instance.update(next, s.now, ttl)
 
-					// either enqueue this for deadline processing or update the queue entry
-					if instance.deadline > 0 {
+					log.V(100).Infoln("new deadline=", instance.deadline, "updated=", instance.index)
 
-						// the index is -1 when it's not in the queue.
-						if instance.index == -1 {
-							s.deadlines.enqueue(instance)
-						} else {
+					if instance.index > -1 {
+						// case where this instance is in the deadlines queue (since it has a > -1 index)
+						if instance.deadline > 0 {
+							// in the queue and deadline is different now
+							log.V(100).Infoln("updating instance", instance.id, "at", instance.index)
 							s.deadlines.update(instance)
+						} else {
+							log.V(100).Infoln("removing instance", instance.id, "at", instance.index)
+							s.deadlines.remove(instance)
 						}
+					} else if instance.deadline > 0 {
+						// index == -1 means it's not in the queue yet and we have a deadline
+						log.V(100).Infoln("enqueuing instance", instance.id, "at", instance.index)
+						s.deadlines.enqueue(instance)
 					}
+
+					// update the index
+					delete(s.bystate[current], instance.id)
+					s.bystate[next][instance.id] = instance
+
 				}
 
 			case reader := <-s.reads:

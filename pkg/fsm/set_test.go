@@ -106,24 +106,52 @@ func TestSetDeadlineTransition(t *testing.T) {
 
 	require.Equal(t, 100, set.CountByState(wait))
 	require.Equal(t, 100, set.deadlines.Len())
+	require.Equal(t, 100, len(set.bystate[wait]))
+	require.Equal(t, 0, len(set.bystate[running]))
 
 	clock.Tick() // t = 2
+
+	// transition a few instances
+	for i := 10; i < 20; i++ {
+
+		instance := set.Instance(ID(i))
+
+		if state, ok := instance.State(); ok && state == wait {
+			require.NoError(t, instance.Signal(start))
+		}
+	}
+
+	time.Sleep(1 * time.Second)
+
+	require.Equal(t, 10, set.CountByState(running))
+	require.Equal(t, 90, set.CountByState(wait))
+
 	clock.Tick() // t = 3
 
-	require.Equal(t, 100, set.CountByState(wait))
+	require.Equal(t, 10, set.CountByState(running))
+	require.Equal(t, 90, set.CountByState(wait))
+	require.Equal(t, 10, len(set.bystate[running]))
+	require.Equal(t, 90, len(set.bystate[wait]))
 
 	clock.Tick() // t = 4
 
-	require.Equal(t, 100, set.CountByState(wait))
+	require.Equal(t, 10, set.CountByState(running))
+	require.Equal(t, 90, set.CountByState(wait))
+	require.Equal(t, 10, len(set.bystate[running]))
+	require.Equal(t, 90, len(set.bystate[wait]))
 
 	clock.Tick() // t = 5
 
 	time.Sleep(1 * time.Second) // give a little time for the set to settle
 	require.Equal(t, 100, set.CountByState(running))
+	require.Equal(t, 0, set.CountByState(wait))
+	require.Equal(t, 100, len(set.bystate[running]))
+	require.Equal(t, 0, len(set.bystate[wait]))
 	require.Equal(t, 0, set.deadlines.Len())
 
 	clock.Tick() // t = 6
 
 	require.Equal(t, 100, set.CountByState(running))
 	require.Equal(t, 0, set.deadlines.Len())
+
 }

@@ -1,5 +1,9 @@
 package fsm
 
+import (
+	log "github.com/golang/glog"
+)
+
 // ID is the id of the instance in a given set.  It's unique in that set.
 type ID uint64
 
@@ -7,6 +11,7 @@ type ID uint64
 type Instance interface {
 	ID() ID
 	State() (Index, bool)
+	Signal(Signal) error
 }
 
 type instance struct {
@@ -39,7 +44,21 @@ func (i instance) State() (Index, bool) {
 	return v, ok
 }
 
+// Signal sends a signal to the instance
 func (i instance) Signal(s Signal) error {
+	log.Infoln("Signaling", i.id, "signal=", s)
+
+	dest, has := i.parent.inputs[s]
+	if !has {
+		return unknownSignal(s)
+	}
+
+	_, _, err := i.parent.spec.transition(i.state, s)
+	if err != nil {
+		return err
+	}
+
+	dest <- &event{instance: i.id, signal: s}
 	return nil
 }
 
