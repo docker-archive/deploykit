@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/codedellemc/gorackhd/client/nodes"
 	"github.com/codedellemc/gorackhd/client/skus"
 	"github.com/codedellemc/infrakit.rackhd/monorail"
@@ -19,16 +20,15 @@ type rackHDInstancePlugin struct {
 	Password string
 }
 
-// RackHDProperties are the details of the RackHD provision request to be processed by RackHD
-type RackHDProperties struct {
-	WorkflowName string
-	SKUName      string
+type RackHDWorkflow struct {
+	Name    string
+	Options interface{}
 }
 
-// CreateInstanceRequest combines the RackHDProperties and any tags to be assigned
-type CreateInstanceRequest struct {
-	Tags       map[string]string
-	Properties RackHDProperties
+// RackHDProperties are the details of the RackHD provision request to be processed by RackHD
+type RackHDProperties struct {
+	Workflow RackHDWorkflow
+	SKUName  string
 }
 
 // NewInstancePlugin creates a new plugin that creates instances in RackHD.
@@ -53,18 +53,34 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 	if spec.Properties == nil {
 		return &instanceID, errors.New("Properties must be set")
 	}
-	request := CreateInstanceRequest{}
-	err := json.Unmarshal(*spec.Properties, &request)
+	props := RackHDProperties{}
+	err := json.Unmarshal(*spec.Properties, &props)
 	if err != nil {
 		return &instanceID, fmt.Errorf("Invalid input formatting: %s", err)
 	}
 
-	skuName := request.Properties.SKUName
-	workflowName := request.Properties.WorkflowName
+	skuName := props.SKUName
 	auth, nil := p.Client.Login(p.Username, p.Password)
-	skuID, nil := p.getSKUIDForName(skuName, auth)
-	nodeID, nil := p.getAvailableNodeIDForSKU(skuID, auth)
-	err = p.applyWorkflowToNode(workflowName, nodeID, auth)
+	/*
+		if err != nil {
+			return &instanceID, fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+		}
+	*/
+	log.Infof("Logged into RackHD service as %s", p.Username)
+
+	skuID, err := p.getSKUIDForName(skuName, auth)
+	if err != nil {
+		return &instanceID, fmt.Errorf("Unable to lookup SKU ID: %s", err)
+	}
+	log.Infof("Found SKU ID, %s, for name \"%s\"", skuID, skuName)
+
+	nodeID, err := p.getAvailableNodeIDForSKU(skuID, auth)
+	if err != nil {
+		return &instanceID, fmt.Errorf("Unable to select node ID for SKU ID, %s. %s", skuID, err)
+	}
+	log.Infof("Found available node ID: %s", nodeID)
+
+	err = p.applyWorkflowToNode(props.Workflow, nodeID, auth)
 	if err != nil {
 		return &instanceID, fmt.Errorf("Unable to apply workflow: %s", err)
 	}
@@ -109,20 +125,26 @@ func (p rackHDInstancePlugin) getAvailableNodeIDForSKU(skuID string, auth runtim
 		}
 	}
 	if nodeID == "" {
-		return "", fmt.Errorf("no eligible nodes found matching SKU ID: %s",
-			skuID)
+		return "", fmt.Errorf("no eligible nodes found matching SKU ID: %s", skuID)
 	}
 	return nodeID, nil
 }
 
-func (p rackHDInstancePlugin) applyWorkflowToNode(workflowName string, nodeID string, auth runtime.ClientAuthInfoWriter) error {
-	if workflowName == "" {
+func (p rackHDInstancePlugin) applyWorkflowToNode(workflow RackHDWorkflow, nodeID string, auth runtime.ClientAuthInfoWriter) error {
+	log.Infof("%s", workflow)
+	if workflow.Name == "" {
 		return fmt.Errorf("No workflow name provided")
 	}
 
+	body := make(map[string]interface{})
+	body["name"] = workflow.Name
+	body["options"] = workflow.Options
+
 	params := nodes.NewPostNodesIdentifierWorkflowsParams().
 		WithIdentifier(nodeID).
-		WithName(workflowName)
+		WithName(workflow.Name).
+		WithBody(body)
+	log.Infof("POST PARAMS: %s", params)
 	_, err := p.Client.Nodes().PostNodesIdentifierWorkflows(params, auth)
 	if err != nil {
 		return err

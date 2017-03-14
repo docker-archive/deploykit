@@ -57,7 +57,7 @@ clean:
 
 define build_binary
 	go build -o build/$(1) \
-		-ldflags "-X github.com/docker/infrakit.rackhd/plugin.Version=$(VERSION) -X github.com/docker/infrakit.rackhd/plugin.Revision=$(REVISION)" $(2)
+		-ldflags "-X github.com/codedellemc/infrakit.rackhd/plugin.Version=$(VERSION) -X github.com/codedellemc/infrakit.rackhd/plugin.Revision=$(REVISION)" $(2)
 endef
 binaries: clean build-binaries
 build-binaries:
@@ -66,7 +66,7 @@ ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
 endif
 
-	$(call build_binary,infrakit-instance-rackhd,github.com/docker/infrakit.rackhd/plugin/instance/cmd)
+	$(call build_binary,infrakit-instance-rackhd,github.com/codedellemc/infrakit.rackhd/plugin/instance/cmd)
 
 
 install:
