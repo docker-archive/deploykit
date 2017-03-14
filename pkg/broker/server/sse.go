@@ -27,11 +27,6 @@ type event struct {
 	data  []byte
 }
 
-type clientValue struct {
-	value      int
-	exactMatch bool
-}
-
 // Broker is the event message broker
 type Broker struct {
 
@@ -87,11 +82,9 @@ func clean(topic string) string {
 	return topic
 }
 
+//Check the topic ends with `/`
 func checkExactMatch(topic string) bool {
-	if strings.LastIndex(topic, "/") == len(topic)-1 {
-		return false
-	}
-	return true
+	return strings.LastIndex(topic, "/") != len(topic)-1
 }
 
 // Publish publishes a message at the topic
@@ -181,7 +174,7 @@ func (b *Broker) run() {
 			// Disconnect all clients
 			b.clients.Walk(
 				func(key string, value interface{}) bool {
-					chset, ok := value.(map[chan []byte]clientValue)
+					chset, ok := value.(map[chan []byte]bool)
 					if !ok {
 						panic("assert-failed")
 					}
@@ -199,13 +192,13 @@ func (b *Broker) run() {
 
 			// A new client has connected.
 			// Register their message channel
-			subs := map[chan []byte]clientValue{subscription.ch: {value: 1, exactMatch: subscription.exactMatch}}
+			subs := map[chan []byte]bool{subscription.ch: subscription.exactMatch}
 			v, has := b.clients.Get(subscription.topic)
 			if has {
-				if v, ok := v.(map[chan []byte]clientValue); !ok {
+				if v, ok := v.(map[chan []byte]bool); !ok {
 					panic("assert-failed: not a map of channels")
 				} else {
-					v[subscription.ch] = clientValue{value: 1, exactMatch: subscription.exactMatch}
+					v[subscription.ch] = subscription.exactMatch
 					subs = v
 				}
 			}
@@ -218,7 +211,7 @@ func (b *Broker) run() {
 
 			// A client has dettached and we want to stop sending messages
 			if v, has := b.clients.Get(subscription.topic); has {
-				if subs, ok := v.(map[chan []byte]clientValue); !ok {
+				if subs, ok := v.(map[chan []byte]bool); !ok {
 					panic("assert-failed: not a map of channels")
 
 				} else {
@@ -250,17 +243,15 @@ func (b *Broker) run() {
 			b.clients.WalkPath(event.topic,
 
 				func(key string, value interface{}) bool {
-					chset, ok := value.(map[chan []byte]clientValue)
+					chset, ok := value.(map[chan []byte]bool)
 					if !ok {
 						panic("assert-failed")
 					}
 
-					for ch, value := range chset {
-						if value.exactMatch && event.topic != key {
-							fmt.Printf("skip notifier event.topic%v,  key %v\n", event.topic, key)
+					for ch, exact := range chset {
+						if exact && event.topic != key {
 							return false
 						}
-						fmt.Printf("notifier event.topic%v,  key %v\n", event.topic, key)
 						select {
 						case ch <- data:
 						case <-time.After(patience):
