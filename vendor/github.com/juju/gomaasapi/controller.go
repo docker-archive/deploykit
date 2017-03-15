@@ -152,6 +152,23 @@ func (c *controller) Spaces() ([]Space, error) {
 	return result, nil
 }
 
+// StaticRoutes implements Controller.
+func (c *controller) StaticRoutes() ([]StaticRoute, error) {
+	source, err := c.get("static-routes")
+	if err != nil {
+		return nil, NewUnexpectedError(err)
+	}
+	staticRoutes, err := readStaticRoutes(c.apiVersion, source)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	var result []StaticRoute
+	for _, staticRoute := range staticRoutes {
+		result = append(result, staticRoute)
+	}
+	return result, nil
+}
+
 // Zones implements Controller.
 func (c *controller) Zones() ([]Zone, error) {
 	source, err := c.get("zones")
