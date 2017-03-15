@@ -24,7 +24,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 
 	opts := client.Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, _, err := client.Subscribe(socket, "local", opts)
+	topic1, _, err := client.Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -34,7 +34,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe(socket, "local/time", opts)
+	topic2, _, err := client.Subscribe(socket, "local/time/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -77,7 +77,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 	opts := client.Options{SocketDir: filepath.Dir(socketFile)}
 
 	sync := make(chan struct{})
-	topic1, _, err := client.Subscribe(socket, "local", opts)
+	topic1, _, err := client.Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
@@ -88,7 +88,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe(socket+"/?topic=/local/time", "", opts)
+	topic2, _, err := client.Subscribe(socket+"/?topic=/local/time/", "", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
@@ -99,7 +99,7 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic3, _, err := client.Subscribe(socket, "cluster/time", opts)
+	topic3, _, err := client.Subscribe(socket, "cluster/time/", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
