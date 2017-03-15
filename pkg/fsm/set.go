@@ -1,8 +1,6 @@
 package fsm
 
 import (
-	"sync"
-
 	log "github.com/golang/glog"
 )
 
@@ -27,6 +25,7 @@ func NewSet(spec *Spec, clock *Clock) *Set {
 	}
 
 	set.inputs = set.run()
+	set.running = true
 	return set
 }
 
@@ -49,7 +48,6 @@ type Set struct {
 	deadlines *queue
 
 	running bool
-	lock    sync.Mutex
 }
 
 // Signal sends a signal to the instance
@@ -122,9 +120,6 @@ func (s *Set) Delete(instance Instance) {
 
 // Stop stops the state machine loop
 func (s *Set) Stop() {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	if s.running {
 		close(s.stop)
 		s.clock.Stop()
@@ -306,12 +301,6 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 }
 
 func (s *Set) run() chan<- *event {
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.running = true
-
 	events := make(chan *event)
 	transactions := make(chan func() (interface{}, error), BufferedChannelSize)
 
