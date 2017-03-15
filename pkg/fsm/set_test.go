@@ -13,6 +13,7 @@ func first(a, b interface{}) interface{} {
 }
 
 func TestSetDeadlineTransition(t *testing.T) {
+	t.Log(time.Now())
 
 	const (
 		running Index = iota
@@ -126,8 +127,6 @@ func TestSetDeadlineTransition(t *testing.T) {
 		}
 	}
 
-	time.Sleep(1 * time.Second)
-
 	require.Equal(t, 10, set.CountByState(running))
 	require.Equal(t, 90, set.CountByState(wait))
 
@@ -147,7 +146,8 @@ func TestSetDeadlineTransition(t *testing.T) {
 
 	clock.Tick() // t = 5
 
-	time.Sleep(3 * time.Second) // give a little time for the set to settle
+	time.Sleep(2 * time.Second) // give a little time for the set to settle
+
 	require.Equal(t, 100, set.CountByState(running))
 	require.Equal(t, 0, set.CountByState(wait))
 	require.Equal(t, 100, len(set.bystate[running]))
@@ -227,7 +227,9 @@ func TestSetFlapping(t *testing.T) {
 	clock.Tick()
 	clock.Tick()
 
-	time.Sleep(100 * time.Millisecond) // TODO - remove this
+	// A slight delay here to let states settle
+	time.Sleep(100 * time.Millisecond)
+
 	require.Equal(t, 1, set.CountByState(running))
 	require.Equal(t, running, first(instance.State()))
 
@@ -235,13 +237,11 @@ func TestSetFlapping(t *testing.T) {
 
 	set.Signal(timeout, id) // flap 1 - a
 
-	time.Sleep(100 * time.Millisecond)
 	require.Equal(t, 1, set.CountByState(down))
 	require.Equal(t, down, first(instance.State()))
 
 	clock.Tick()
 
-	time.Sleep(100 * time.Millisecond)
 	require.Equal(t, 1, set.CountByState(down))
 	require.Equal(t, down, first(instance.State()))
 
@@ -251,7 +251,6 @@ func TestSetFlapping(t *testing.T) {
 
 	set.Signal(ping, id) // flap 1 - b
 
-	time.Sleep(100 * time.Millisecond)
 	require.Equal(t, 1, set.CountByState(running))
 	require.Equal(t, running, first(instance.State()))
 
@@ -259,7 +258,6 @@ func TestSetFlapping(t *testing.T) {
 
 	set.Signal(timeout, id) // flap 2
 
-	time.Sleep(100 * time.Millisecond)
 	require.Equal(t, 1, set.CountByState(down))
 	require.Equal(t, down, first(instance.State()))
 
@@ -286,7 +284,9 @@ func TestSetFlapping(t *testing.T) {
 
 	set.Signal(ping, id) // flap 3
 
-	time.Sleep(1 * time.Second)
+	// note that there's a transition that will be triggered
+	time.Sleep(100 * time.Millisecond)
+
 	require.Equal(t, 0, set.CountByState(running))
 	require.Equal(t, 1, set.CountByState(cordoned))
 	require.Equal(t, cordoned, first(instance.State()))
