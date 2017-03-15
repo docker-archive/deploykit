@@ -1,9 +1,5 @@
 package fsm
 
-import (
-	"sort"
-)
-
 // Index is the index of the state in a FSM
 type Index int
 
@@ -110,14 +106,14 @@ type Limit int
 type Spec struct {
 	states  map[Index]State
 	signals map[Signal]Signal
-	flaps   map[[2]Index]Flap
+	flaps   map[[2]Index]*Flap
 }
 
 func newSpec() *Spec {
 	return &Spec{
 		states:  map[Index]State{},
 		signals: map[Signal]Signal{},
-		flaps:   map[[2]Index]Flap{},
+		flaps:   map[[2]Index]*Flap{},
 	}
 }
 
@@ -178,11 +174,12 @@ type Flap struct {
 }
 
 func (s *Spec) flap(a, b Index) *Flap {
-	copy := []int{int(a), int(b)}
-	sort.Ints(copy)
-	key := [2]Index{Index(copy[0]), Index(copy[1])}
+	key := [2]Index{a, b}
+	if a > b {
+		key = [2]Index{b, a}
+	}
 	if f, has := s.flaps[key]; has {
-		return &f
+		return f
 	}
 	return nil
 }
@@ -199,7 +196,7 @@ func (s *Spec) CheckFlappingMust(checks []Flap) *Spec {
 // CheckFlapping - Limit is the maximum of a->b b->a transitions allowable.  For detecting
 // oscillations between two adjacent states (no hops)
 func (s *Spec) CheckFlapping(checks []Flap) (*Spec, error) {
-	flaps := map[[2]Index]Flap{}
+	flaps := map[[2]Index]*Flap{}
 	for _, check := range checks {
 
 		// check the state
@@ -209,9 +206,13 @@ func (s *Spec) CheckFlapping(checks []Flap) (*Spec, error) {
 			}
 		}
 
-		copy := []int{int(check.States[0]), int(check.States[1])}
-		sort.Ints(copy)
-		flaps[[2]Index{Index(copy[0]), Index(copy[1])}] = check
+		key := [2]Index{check.States[0], check.States[1]}
+		if check.States[0] > check.States[1] {
+			key = [2]Index{check.States[1], check.States[0]}
+		}
+
+		copy := check
+		flaps[key] = &copy
 	}
 
 	s.flaps = flaps

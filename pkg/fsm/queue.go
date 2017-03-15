@@ -4,7 +4,7 @@ import (
 	"container/heap"
 )
 
-// A queue implements heap.Interface and holds instances prioritized by deadline (if > 0)
+// A priority queue implementing heap.Interface and holds instances prioritized by deadline (if > 0)
 type queue []*instance
 
 func newQueue() *queue {

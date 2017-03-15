@@ -28,6 +28,12 @@ func (e unknownSignal) Error() string {
 	return fmt.Sprintf("signal in action not found in transitions %d", e)
 }
 
+type unknownInstance ID
+
+func (e unknownInstance) Error() string {
+	return fmt.Sprintf("unknown instance %d", e)
+}
+
 type nilAction Signal
 
 func (e nilAction) Error() string {

@@ -47,6 +47,18 @@ type Set struct {
 	deadlines *queue
 }
 
+// Signal sends a signal to the instance
+func (s *Set) Signal(signal Signal, instance ID) error {
+	dest, has := s.inputs[signal]
+	if !has {
+		return unknownSignal(signal)
+	}
+
+	log.V(100).Infoln("signal", signal, "to instance=", instance)
+	dest <- &event{instance: instance, signal: signal}
+	return nil
+}
+
 // Size returns the size of the set
 func (s *Set) Size() int {
 	result := make(chan int, 1)
@@ -121,7 +133,7 @@ func (s *Set) run() map[Signal]chan<- *event {
 
 	// Start up the goroutines to merge all the events/triggers.
 	// Note we use merge channel for performance (over the slower reflect.Select) and for readability.
-	collector := make(chan *event, 1000)
+	collector := make(chan *event, BufferedChannelSize)
 	inputs := map[Signal]chan<- *event{}
 	for _, signal := range s.spec.signals {
 		input := make(chan *event)
@@ -234,8 +246,6 @@ func (s *Set) run() map[Signal]chan<- *event {
 				// process events here.
 				if instance, has := s.members[event.instance]; has {
 
-					log.V(100).Infoln("Transition:", instance.id, "deadline=", instance.deadline, "index=", instance.index)
-
 					current := instance.state
 					next, action, err := s.spec.transition(current, event.signal)
 					if err != nil {
@@ -243,12 +253,27 @@ func (s *Set) run() map[Signal]chan<- *event {
 						case s.errors <- err:
 						default:
 						}
+
+						log.Warningln(instance.id, ":", current, "transition err:", err)
+						continue
 					}
+
+					log.V(100).Infoln(instance.id, ":", current, "==[", event.signal, "]=>", next,
+						"deadline=", instance.deadline, "index=", instance.index)
 
 					// any flap detection?
 					limit := s.spec.flap(current, next)
 					if limit != nil && limit.Count > 0 {
-						if instance.flaps.count(current, next) > limit.Count {
+
+						instance.flaps.record(current, next)
+						flaps := instance.flaps.count(current, next)
+
+						log.V(100).Infoln("========= checking flap:", current, next, "flaps=", flaps)
+
+						if flaps > limit.Count {
+
+							log.Warningln("flap detected, raising", limit.Raise)
+
 							instance.raise(limit.Raise, inputs)
 
 							continue loop

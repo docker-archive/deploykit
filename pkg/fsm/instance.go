@@ -46,7 +46,7 @@ func (i instance) State() (Index, bool) {
 
 // Signal sends a signal to the instance
 func (i instance) Signal(s Signal) error {
-	log.Infoln("Signaling", i.id, "signal=", s)
+	log.V(100).Infoln("instance", i.id, "signal=", s)
 
 	dest, has := i.parent.inputs[s]
 	if !has {
@@ -63,7 +63,6 @@ func (i instance) Signal(s Signal) error {
 }
 
 func (i *instance) update(next Index, now Time, ttl Tick) {
-	i.flaps.record(i.state, next)
 	i.state = next
 	i.start = now
 	if ttl > 0 {
@@ -75,6 +74,7 @@ func (i *instance) update(next Index, now Time, ttl Tick) {
 
 func (i instance) raise(s Signal, inputs map[Signal]chan<- *event) {
 	if ch, has := inputs[s]; has {
+		log.V(100).Infoln("instance", i.id, "raising signal", s)
 		ch <- &event{instance: i.id, signal: s}
 	}
 }

@@ -3,8 +3,22 @@ package fsm
 import (
 	"testing"
 
+	"github.com/golang/glog"
 	"github.com/stretchr/testify/require"
 )
+
+func index(a int, b ...int) []Index {
+	out := []Index{Index(a)}
+	for _, bb := range b {
+		out = append(out, Index(bb))
+	}
+	return out
+}
+
+func TestHistory(t *testing.T) {
+	require.True(t, equals(index(1, 2, 3), index(1, 2, 3)))
+	require.False(t, equals(index(2, 3), index(1, 2, 3)))
+}
 
 func TestFlap(t *testing.T) {
 
@@ -16,41 +30,38 @@ func TestFlap(t *testing.T) {
 		y
 	)
 
-	counter := &flaps{index: map[[2]Index]int{}}
+	counter := newFlaps()
 	require.Equal(t, 0, counter.count(a, b))
 
 	counter.record(a, b)
+	glog.Infoln(counter.history)
+
 	counter.record(b, a)
-	require.Equal(t, 1, counter.count(a, b))
+	glog.Infoln(counter.history)
+
+	counter.record(a, c)
+	glog.Infoln(counter.history)
 
 	counter.record(a, b)
-	require.Equal(t, 1, counter.count(a, b))
+	glog.Infoln(counter.history)
+
 	counter.record(b, a)
+	glog.Infoln(counter.history)
+
+	counter.record(a, b)
+	glog.Infoln(counter.history)
+
+	counter.record(b, a)
+	glog.Infoln(counter.history)
+
 	require.Equal(t, 2, counter.count(a, b))
+	require.Equal(t, 2, counter.count(b, a))
+
 	counter.record(a, b)
+	glog.Infoln(counter.history)
+
 	counter.record(b, a)
+	glog.Infoln(counter.history)
+
 	require.Equal(t, 3, counter.count(a, b))
-
-	counter.reset(a, b)
-	require.Equal(t, 0, counter.count(b, a))
-	require.Equal(t, 0, counter.count(a, b))
-
-	counter.record(x, y)
-	require.Equal(t, 0, counter.count(x, y))
-	require.Equal(t, 0, counter.count(y, x))
-	counter.record(y, x)
-	require.Equal(t, 1, counter.count(x, y))
-	require.Equal(t, 1, counter.count(y, x))
-	counter.record(x, y)
-	require.Equal(t, 1, counter.count(x, y))
-	counter.record(y, x)
-	require.Equal(t, 2, counter.count(x, y))
-
-	counter.reset(x, y)
-	for i := 0; i < 5; i++ {
-		counter.record(x, y)
-		// some time later
-		counter.record(y, x)
-	}
-	require.Equal(t, 5, counter.count(y, x))
 }
