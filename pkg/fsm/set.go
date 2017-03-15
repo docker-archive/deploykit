@@ -45,7 +45,7 @@ type Set struct {
 	new       chan Instance
 	delete    chan ID // delete an instance with id
 	errors    chan error
-	inputs    map[Signal]chan<- *event
+	inputs    chan<- *event
 	deadlines *queue
 
 	running bool
@@ -54,13 +54,12 @@ type Set struct {
 
 // Signal sends a signal to the instance
 func (s *Set) Signal(signal Signal, instance ID) error {
-	dest, has := s.inputs[signal]
-	if !has {
+	if _, has := s.spec.signals[signal]; !has {
 		return unknownSignal(signal)
 	}
 
 	log.V(100).Infoln("signal", signal, "to instance=", instance)
-	dest <- &event{instance: instance, signal: signal}
+	s.inputs <- &event{instance: instance, signal: signal}
 	return nil
 }
 
@@ -138,41 +137,211 @@ type event struct {
 	signal   Signal
 }
 
-func (s *Set) run() map[Signal]chan<- *event {
+func (s *Set) handleError(err error, ctx interface{}) {
+	log.Warningln("error occurred:", err, "context=", ctx)
+	select {
+	case s.errors <- err:
+	default:
+	}
+}
+
+func (s *Set) handleAdd(initial Index) error {
+	// add a new instance
+	id := s.next
+	s.next++
+
+	new := &instance{
+		id:     id,
+		state:  initial,
+		index:  -1,
+		parent: s,
+		flaps:  *newFlaps(),
+	}
+
+	// if there's deadline then enqueue
+	// check for TTL
+	if exp, ok := s.spec.expiry(initial); ok {
+		new.update(initial, s.now, exp.TTL)
+		s.deadlines.enqueue(new)
+	}
+
+	// update index
+	s.members[id] = new
+	s.bystate[initial][id] = new
+
+	s.new <- new
+
+	return nil
+}
+
+func (s *Set) handleDelete(id ID) error {
+	instance, has := s.members[id]
+	if !has {
+		return unknownInstance(id)
+	}
+	// delete an instance and update index
+	delete(s.members, id)
+	delete(s.bystate[instance.state], id)
+	return nil
+}
+
+func (s *Set) handleClockTick(inputs chan<- *event) error {
+	s.now++
+
+	// go through the priority queue by deadline and raise signals if expired.
+	instance := s.deadlines.peek()
+	if instance == nil {
+		return nil
+	}
+
+	if instance.deadline > s.now {
+		return nil
+	}
+
+	for s.deadlines.Len() > 0 {
+
+		instance = s.deadlines.dequeue()
+
+		log.Infoln("t=", s.now, "id=", instance.id, "deadline=", instance.deadline)
+
+		if instance.deadline == s.now {
+
+			// check > 0 here because we could have already raised the signal
+			// when a real event came in.
+			if instance.deadline > 0 {
+				// raise the signal
+				if ttl, ok := s.spec.expiry(instance.state); ok {
+
+					log.V(100).Infoln("deadline exceeded:", instance.id, "raise=", ttl.Raise)
+
+					instance.Signal(ttl.Raise)
+				}
+			}
+			// reset the state for future queueing
+			instance.deadline = -1
+			instance.index = -1
+
+		}
+
+		instance = s.deadlines.peek()
+		if instance == nil {
+			break
+		}
+
+		if instance.deadline > s.now {
+			break
+		}
+	}
+	return nil
+}
+
+func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
+
+	instance, has := s.members[event.instance]
+	if !has {
+		return unknownInstance(event.instance)
+	}
+
+	current := instance.state
+	next, action, err := s.spec.transition(current, event.signal)
+	if err != nil {
+		return err
+	}
+
+	log.V(100).Infoln(instance.id, ":", current, "==[", event.signal, "]=>", next,
+		"deadline=", instance.deadline, "index=", instance.index)
+
+	// any flap detection?
+	limit := s.spec.flap(current, next)
+	if limit != nil && limit.Count > 0 {
+
+		instance.flaps.record(current, next)
+		flaps := instance.flaps.count(current, next)
+
+		if flaps >= limit.Count {
+
+			log.Warningln("flap detected, raising", limit.Raise)
+			instance.Signal(limit.Raise)
+
+			return nil
+		}
+	}
+
+	// call action before transitiion
+	if action != nil {
+		action(instance)
+	}
+
+	ttl := Tick(0)
+	// check for TTL
+	if exp, ok := s.spec.expiry(next); ok {
+		ttl = exp.TTL
+	}
+
+	instance.update(next, s.now, ttl)
+
+	log.V(100).Infoln("new deadline=", instance.deadline, "updated=", instance.index)
+
+	if instance.index > -1 {
+		// case where this instance is in the deadlines queue (since it has a > -1 index)
+		if instance.deadline > 0 {
+			// in the queue and deadline is different now
+			log.V(100).Infoln("updating instance", instance.id, "at", instance.index)
+			s.deadlines.update(instance)
+		} else {
+			log.V(100).Infoln("removing instance", instance.id, "at", instance.index)
+			s.deadlines.remove(instance)
+		}
+	} else if instance.deadline > 0 {
+		// index == -1 means it's not in the queue yet and we have a deadline
+		log.V(100).Infoln("enqueuing instance", instance.id, "at", instance.index)
+		s.deadlines.enqueue(instance)
+	}
+
+	// update the index
+	delete(s.bystate[current], instance.id)
+	s.bystate[next][instance.id] = instance
+
+	return nil
+}
+
+func (s *Set) run() chan<- *event {
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.running = true
 
-	// Start up the goroutines to merge all the events/triggers.
-	// Note we use merge channel for performance (over the slower reflect.Select) and for readability.
-	collector := make(chan *event, BufferedChannelSize)
-	inputs := map[Signal]chan<- *event{}
-	for _, signal := range s.spec.signals {
-		input := make(chan *event)
-		inputs[signal] = input
-		go func() {
-			for {
-				event, ok := <-input
-				if !ok {
-					return
-				}
-				collector <- event
-			}
-		}()
-	}
+	events := make(chan *event)
+	transactions := make(chan func() (interface{}, error), BufferedChannelSize)
 
+	// Core processing
 	go func() {
 		defer func() {
-			// close all inputs
-			for _, ch := range inputs {
-				close(ch)
-			}
+			log.Infoln("set shutting down.")
 		}()
+
+		for {
+			txn, open := <-transactions
+			if !open {
+				return
+			}
+
+			if ctx, err := txn(); err != nil {
+				s.handleError(err, ctx)
+			}
+
+		}
+	}()
+
+	// Input events
+	go func() {
 
 	loop:
 		for {
+
+			tx := func() (interface{}, error) { return nil, nil } // no-op
+
 			select {
 
 			case <-s.stop:
@@ -180,176 +349,58 @@ func (s *Set) run() map[Signal]chan<- *event {
 
 			case <-s.clock.C:
 
-				s.now++
-
-				// go through the priority queue by deadline and raise signals if expired.
-
-				instance := s.deadlines.peek()
-				if instance == nil {
-					continue loop
+				tx = func() (interface{}, error) {
+					return nil, s.handleClockTick(events)
 				}
 
-				if instance.deadline > s.now {
-					continue loop
-				}
-
-				for s.deadlines.Len() > 0 {
-
-					instance = s.deadlines.dequeue()
-
-					log.Infoln("t=", s.now, "id=", instance.id, "deadline=", instance.deadline)
-
-					if instance.deadline == s.now {
-
-						// check > 0 here because we could have already raised the signal
-						// when a real event came in.
-						if instance.deadline > 0 {
-							// raise the signal
-							if ttl, ok := s.spec.expiry(instance.state); ok {
-								instance.raise(ttl.Raise, inputs)
-							}
-						}
-						// reset the state for future queueing
-						instance.deadline = -1
-						instance.index = -1
-
-					}
-
-					instance = s.deadlines.peek()
-					if instance == nil {
-						break
-					}
-
-					if instance.deadline > s.now {
-						break
-					}
-				}
-
-			case initial := <-s.add:
-
-				// add a new instance
-				id := s.next
-				s.next++
-
-				new := &instance{
-					id:     id,
-					state:  initial,
-					index:  -1,
-					parent: s,
-					flaps:  *newFlaps(),
-				}
-
-				// if there's deadline then enqueue
-				// check for TTL
-				if exp, ok := s.spec.expiry(initial); ok {
-					new.update(initial, s.now, exp.TTL)
-					s.deadlines.enqueue(new)
-				}
-
-				// update index
-				s.members[id] = new
-				s.bystate[initial][id] = new
-
-				s.new <- new
-
-			case id := <-s.delete:
-
-				if instance, has := s.members[id]; has {
-					// delete an instance
-					delete(s.members, id)
-					delete(s.bystate[instance.state], id)
-				}
-
-				// update the index
-
-			case event, ok := <-collector:
-				// state transition events
-
+			case initial, ok := <-s.add:
+				// add new instance
 				if !ok {
 					break loop
 				}
 
-				// process events here.
-				if instance, has := s.members[event.instance]; has {
+				copy := initial
+				tx = func() (interface{}, error) {
+					return copy, s.handleAdd(copy)
+				}
 
-					current := instance.state
-					next, action, err := s.spec.transition(current, event.signal)
-					if err != nil {
-						select {
-						case s.errors <- err:
-						default:
-						}
+			case id, ok := <-s.delete:
+				// delete instance
+				if !ok {
+					break loop
+				}
 
-						log.Warningln(instance.id, ":", current, "transition err:", err)
-						continue
-					}
+				copy := id
+				tx = func() (interface{}, error) {
+					return copy, s.handleDelete(copy)
+				}
 
-					log.V(100).Infoln(instance.id, ":", current, "==[", event.signal, "]=>", next,
-						"deadline=", instance.deadline, "index=", instance.index)
+			case event, ok := <-events:
+				// state transition events
+				if !ok {
+					break loop
+				}
 
-					// any flap detection?
-					limit := s.spec.flap(current, next)
-					if limit != nil && limit.Count > 0 {
-
-						instance.flaps.record(current, next)
-						flaps := instance.flaps.count(current, next)
-
-						log.V(100).Infoln("========= checking flap:", current, next, "flaps=", flaps)
-
-						if flaps >= limit.Count {
-
-							log.Warningln("flap detected, raising", limit.Raise)
-
-							instance.raise(limit.Raise, inputs)
-
-							continue loop
-						}
-					}
-
-					// call action before transitiion
-					if action != nil {
-						action(instance)
-					}
-
-					ttl := Tick(0)
-					// check for TTL
-					if exp, ok := s.spec.expiry(next); ok {
-						ttl = exp.TTL
-					}
-
-					instance.update(next, s.now, ttl)
-
-					log.V(100).Infoln("new deadline=", instance.deadline, "updated=", instance.index)
-
-					if instance.index > -1 {
-						// case where this instance is in the deadlines queue (since it has a > -1 index)
-						if instance.deadline > 0 {
-							// in the queue and deadline is different now
-							log.V(100).Infoln("updating instance", instance.id, "at", instance.index)
-							s.deadlines.update(instance)
-						} else {
-							log.V(100).Infoln("removing instance", instance.id, "at", instance.index)
-							s.deadlines.remove(instance)
-						}
-					} else if instance.deadline > 0 {
-						// index == -1 means it's not in the queue yet and we have a deadline
-						log.V(100).Infoln("enqueuing instance", instance.id, "at", instance.index)
-						s.deadlines.enqueue(instance)
-					}
-
-					// update the index
-					delete(s.bystate[current], instance.id)
-					s.bystate[next][instance.id] = instance
-
+				copy := event
+				tx = func() (interface{}, error) {
+					return copy, s.handleEvent(copy, events)
 				}
 
 			case reader := <-s.reads:
-				// For reads on the Set itself.  All the reads are serialized.
-				view := *s // a copy (not quite deep copy) of the set
-				reader(view)
+				tx = func() (interface{}, error) {
+					// For reads on the Set itself.  All the reads are serialized.
+					view := *s // a copy (not quite deep copy) of the set
+					reader(view)
+					return nil, nil
+				}
+
 			}
+
+			// send to transaction processing pipeline
+			transactions <- tx
+
 		}
 	}()
 
-	return inputs
+	return events
 }

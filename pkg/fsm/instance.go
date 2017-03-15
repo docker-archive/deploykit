@@ -1,6 +1,8 @@
 package fsm
 
 import (
+	"errors"
+
 	log "github.com/golang/glog"
 )
 
@@ -48,9 +50,13 @@ func (i instance) State() (Index, bool) {
 func (i instance) Signal(s Signal) error {
 	log.V(100).Infoln("instance", i.id, "signal=", s)
 
-	dest, has := i.parent.inputs[s]
-	if !has {
+	if _, has := i.parent.spec.signals[s]; !has {
 		return unknownSignal(s)
+	}
+
+	dest := i.parent.inputs
+	if dest == nil {
+		return errors.New("not-initialized")
 	}
 
 	_, _, err := i.parent.spec.transition(i.state, s)
@@ -69,12 +75,5 @@ func (i *instance) update(next Index, now Time, ttl Tick) {
 		i.deadline = now + Time(ttl)
 	} else {
 		i.deadline = 0
-	}
-}
-
-func (i instance) raise(s Signal, inputs map[Signal]chan<- *event) {
-	if ch, has := inputs[s]; has {
-		log.V(100).Infoln("instance", i.id, "raising signal", s)
-		ch <- &event{instance: i.id, signal: s}
 	}
 }
