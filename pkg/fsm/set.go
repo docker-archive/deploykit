@@ -169,10 +169,19 @@ func (s *Set) run() map[Signal]chan<- *event {
 				s.now++
 
 				// go through the priority queue by deadline and raise signals if expired.
-				done := s.deadlines.Len() == 0
-				for !done {
 
-					instance := s.deadlines.dequeue()
+				instance := s.deadlines.peek()
+				if instance == nil {
+					continue loop
+				}
+
+				if instance.deadline > s.now {
+					continue loop
+				}
+
+				for s.deadlines.Len() > 0 {
+
+					instance = s.deadlines.dequeue()
 
 					log.Infoln("t=", s.now, "id=", instance.id, "deadline=", instance.deadline)
 
@@ -190,12 +199,15 @@ func (s *Set) run() map[Signal]chan<- *event {
 						instance.deadline = -1
 						instance.index = -1
 
-						done = s.deadlines.Len() == 0
+					}
 
-					} else {
-						// add the last one back...
-						s.deadlines.enqueue(instance)
-						done = true
+					instance = s.deadlines.peek()
+					if instance == nil {
+						break
+					}
+
+					if instance.deadline > s.now {
+						break
 					}
 				}
 
@@ -270,7 +282,7 @@ func (s *Set) run() map[Signal]chan<- *event {
 
 						log.V(100).Infoln("========= checking flap:", current, next, "flaps=", flaps)
 
-						if flaps > limit.Count {
+						if flaps >= limit.Count {
 
 							log.Warningln("flap detected, raising", limit.Raise)
 

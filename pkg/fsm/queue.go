@@ -63,3 +63,11 @@ func (pq *queue) Pop() interface{} {
 	*pq = old[0 : n-1]
 	return instance
 }
+
+func (pq *queue) peek() *instance {
+	view := *pq
+	if len(view) == 0 {
+		return nil
+	}
+	return view[0]
+}

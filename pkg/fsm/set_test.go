@@ -286,7 +286,7 @@ func TestSetFlapping(t *testing.T) {
 
 	set.Signal(ping, id) // flap 3
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 	require.Equal(t, 0, set.CountByState(running))
 	require.Equal(t, 1, set.CountByState(cordoned))
 	require.Equal(t, cordoned, first(instance.State()))

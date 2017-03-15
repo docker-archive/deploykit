@@ -16,6 +16,9 @@ func TestQueue(t *testing.T) {
 	q.enqueue(&instance{deadline: Time(3)})
 	q.enqueue(&instance{deadline: Time(2)})
 
+	peek := q.peek()
+	require.Equal(t, Time(1), peek.deadline)
+
 	x := &instance{deadline: Time(5)}
 	q.enqueue(x)
 
@@ -39,4 +42,26 @@ func TestQueue(t *testing.T) {
 	}
 
 	require.Equal(t, []int{-1, 1, 2, 3, 4, 5, 20}, sorted)
+}
+
+func TestQueue2(t *testing.T) {
+
+	// Tests the priority queue by deadline
+
+	q := newQueue()
+
+	q.enqueue(&instance{deadline: Time(1)})
+	require.Equal(t, Time(1), q.peek().deadline)
+
+	q.enqueue(&instance{deadline: Time(3)})
+	q.enqueue(&instance{deadline: Time(2)})
+
+	q.dequeue()
+	q.dequeue()
+
+	require.Equal(t, Time(3), q.peek().deadline)
+
+	q.dequeue()
+
+	require.Nil(t, q.peek())
 }
