@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -16,8 +17,9 @@ import (
 const patience time.Duration = time.Second * 1
 
 type subscription struct {
-	topic string
-	ch    chan []byte
+	topic      string
+	exactMatch bool
+	ch         chan []byte
 }
 
 type event struct {
@@ -80,6 +82,11 @@ func clean(topic string) string {
 	return topic
 }
 
+//Check the topic ends with `/`
+func checkExactMatch(topic string) bool {
+	return strings.LastIndex(topic, "/") != len(topic)-1
+}
+
 // Publish publishes a message at the topic
 func (b *Broker) Publish(topic string, data interface{}, optionalTimeout ...time.Duration) error {
 	any, err := types.AnyValue(data)
@@ -128,7 +135,7 @@ func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	messageChan := make(chan []byte)
 
 	// Signal the broker that we have a new connection
-	b.newClients <- subscription{topic: topic, ch: messageChan}
+	b.newClients <- subscription{topic: topic, exactMatch: checkExactMatch(topic), ch: messageChan}
 
 	// Remove this client from the map of connected clients
 	// when this handler exits.
@@ -167,7 +174,7 @@ func (b *Broker) run() {
 			// Disconnect all clients
 			b.clients.Walk(
 				func(key string, value interface{}) bool {
-					chset, ok := value.(map[chan []byte]int)
+					chset, ok := value.(map[chan []byte]bool)
 					if !ok {
 						panic("assert-failed")
 					}
@@ -185,15 +192,13 @@ func (b *Broker) run() {
 
 			// A new client has connected.
 			// Register their message channel
-			subs := map[chan []byte]int{subscription.ch: 1}
+			subs := map[chan []byte]bool{subscription.ch: subscription.exactMatch}
 			v, has := b.clients.Get(subscription.topic)
 			if has {
-				if v, ok := v.(map[chan []byte]int); !ok {
-
+				if v, ok := v.(map[chan []byte]bool); !ok {
 					panic("assert-failed: not a map of channels")
-
 				} else {
-					v[subscription.ch] = 1
+					v[subscription.ch] = subscription.exactMatch
 					subs = v
 				}
 			}
@@ -206,8 +211,7 @@ func (b *Broker) run() {
 
 			// A client has dettached and we want to stop sending messages
 			if v, has := b.clients.Get(subscription.topic); has {
-				if subs, ok := v.(map[chan []byte]int); !ok {
-
+				if subs, ok := v.(map[chan []byte]bool); !ok {
 					panic("assert-failed: not a map of channels")
 
 				} else {
@@ -239,13 +243,15 @@ func (b *Broker) run() {
 			b.clients.WalkPath(event.topic,
 
 				func(key string, value interface{}) bool {
-					chset, ok := value.(map[chan []byte]int)
+					chset, ok := value.(map[chan []byte]bool)
 					if !ok {
-
 						panic("assert-failed")
 					}
 
-					for ch := range chset {
+					for ch, exact := range chset {
+						if exact && event.topic != key {
+							return false
+						}
 						select {
 						case ch <- data:
 						case <-time.After(patience):

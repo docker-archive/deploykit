@@ -53,7 +53,7 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 
 	// Note that two clients are subscribing to the same topic:
 
-	topic0, _, err := Subscribe(socket, "local", opts)
+	topic0, _, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
@@ -69,7 +69,7 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 			}
 		}
 	}()
-	topic1, _, err := Subscribe(socket, "local", opts)
+	topic1, _, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
@@ -86,7 +86,7 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := Subscribe(socket+"/?topic=/local/time", "", opts)
+	topic2, _, err := Subscribe(socket+"/?topic=/local/time/", "", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
@@ -150,7 +150,7 @@ func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
 
 	opts := Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, errs1, err := Subscribe(socket, "local", opts)
+	topic1, errs1, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -281,7 +281,6 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 
 	// Test a few rounds to make sure all subscribers get the same messages each round.
 	for i := 0; i < 5; i++ {
-		fmt.Print("runtestcycle")
 		b := <-received2
 		a := <-received1
 		require.NotNil(t, a)
@@ -291,6 +290,108 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 
 	broker.Stop()
 
+}
+
+func TestBrokerSubscriberExactMatchTopic(t *testing.T) {
+	type event struct {
+		Time    int64
+		Message string
+	}
+
+	socketFile := tempSocket()
+	socket := "unix://broker" + socketFile
+
+	broker, err := server.ListenAndServeOnSocket(socketFile)
+	require.NoError(t, err)
+
+	received1 := make(chan event)
+	received2 := make(chan event)
+	received3 := make(chan event)
+
+	opts := Options{SocketDir: filepath.Dir(socketFile)}
+
+	topic1, errs1, err := Subscribe(socket, "local/instance", opts)
+	require.NoError(t, err)
+	go func() {
+		for {
+			select {
+			case e := <-errs1:
+				panic(e)
+			case m, ok := <-topic1:
+				if ok {
+					var val event
+					require.NoError(t, m.Decode(&val))
+					received1 <- val
+				} else {
+					close(received1)
+				}
+			}
+		}
+	}()
+
+	topic2, errs2, err := Subscribe(socket, "local/", opts)
+	require.NoError(t, err)
+	go func() {
+		for {
+			select {
+			case e := <-errs2:
+				panic(e)
+			case m, ok := <-topic2:
+				if ok {
+					var val event
+					require.NoError(t, m.Decode(&val))
+					received2 <- val
+				} else {
+					close(received2)
+				}
+			}
+		}
+	}()
+
+	topic3, errs3, err := Subscribe(socket, "local", opts)
+	require.NoError(t, err)
+	go func() {
+		for {
+			select {
+			case e := <-errs3:
+				panic(e)
+			case m, ok := <-topic3:
+				if ok {
+					var val event
+					require.NoError(t, m.Decode(&val))
+					received3 <- val
+				} else {
+					close(received3)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			<-time.After(10 * time.Millisecond)
+			now := time.Now()
+			evt := event{Time: now.UnixNano(), Message: fmt.Sprintf("Now is %v", now)}
+			require.NoError(t, broker.Publish("local/anotherinstance", evt))
+			evt = event{Time: now.Add(1 * time.Minute).UnixNano(), Message: fmt.Sprintf("Now is %v", now.Add(1*time.Minute))}
+			require.NoError(t, broker.Publish("local/instance", evt))
+			evt = event{Time: now.Add(1 * time.Minute).UnixNano(), Message: fmt.Sprintf("Now is %v", now.Add(2*time.Minute))}
+			require.NoError(t, broker.Publish("local", evt))
+		}
+	}()
+
+	// Test a few rounds to make sure all subscribers get the same messages each round.
+	for i := 0; i < 5; i++ {
+		c := <-received3
+		b := <-received2
+		a := <-received1
+		require.NotNil(t, a)
+		require.NotEqual(t, "", a.Message)
+		require.NotEqual(t, a, c)
+		require.NotEqual(t, b, c)
+		require.NotEqual(t, a, b)
+	}
+	broker.Stop()
 }
 
 // This tests the case where the broker is mapped to url route (e.g. /events)
@@ -314,7 +415,7 @@ func TestBrokerMultiSubscriberCustomObjectConnectAtURLPrefix(t *testing.T) {
 
 	opts := Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, errs1, err := Subscribe(socket, "local", opts)
+	topic1, errs1, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
