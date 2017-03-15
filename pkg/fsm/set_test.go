@@ -291,4 +291,5 @@ func TestSetFlapping(t *testing.T) {
 	require.Equal(t, 1, set.CountByState(cordoned))
 	require.Equal(t, cordoned, first(instance.State()))
 
+	set.Stop()
 }

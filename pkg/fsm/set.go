@@ -1,6 +1,8 @@
 package fsm
 
 import (
+	"sync"
+
 	log "github.com/golang/glog"
 )
 
@@ -45,6 +47,9 @@ type Set struct {
 	errors    chan error
 	inputs    map[Signal]chan<- *event
 	deadlines *queue
+
+	running bool
+	lock    sync.Mutex
 }
 
 // Signal sends a signal to the instance
@@ -118,10 +123,14 @@ func (s *Set) Delete(instance Instance) {
 
 // Stop stops the state machine loop
 func (s *Set) Stop() {
-	if s.stop != nil {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.running {
 		close(s.stop)
+		s.clock.Stop()
+		s.running = false
 	}
-	s.clock.Stop()
 }
 
 type event struct {
@@ -130,6 +139,11 @@ type event struct {
 }
 
 func (s *Set) run() map[Signal]chan<- *event {
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.running = true
 
 	// Start up the goroutines to merge all the events/triggers.
 	// Note we use merge channel for performance (over the slower reflect.Select) and for readability.

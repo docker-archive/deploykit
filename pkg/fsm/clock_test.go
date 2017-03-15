@@ -3,6 +3,8 @@ package fsm
 import (
 	"testing"
 	"time"
+
+	log "github.com/golang/glog"
 )
 
 func TestClock(t *testing.T) {
@@ -22,6 +24,7 @@ func TestClock(t *testing.T) {
 		}
 	}()
 
+	log.Infoln("Start")
 	close(start)
 	clock.Tick()
 	clock.Tick()
@@ -29,6 +32,7 @@ func TestClock(t *testing.T) {
 	clock.Stop()
 
 	<-done
+	log.Infoln("done")
 }
 
 func TestWallClock(t *testing.T) {
