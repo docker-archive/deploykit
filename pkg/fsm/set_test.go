@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -329,7 +330,7 @@ func TestMaxVisits(t *testing.T) {
 
 	require.NoError(t, err)
 
-	clock := NewClock()
+	clock := Wall(time.Tick(1 * time.Second))
 
 	// set is a collection of fsm intances that follow the same rules.
 	set := NewSet(spec, clock)
@@ -349,6 +350,100 @@ func TestMaxVisits(t *testing.T) {
 	err = instance.Signal(shutdown)
 	require.NoError(t, err)
 	require.Equal(t, down, instance.State()) // 2
+
+	// then automatically triggered to the unavailable state
+	require.Equal(t, unavailable, instance.State())
+}
+
+func TestActionErrors(t *testing.T) {
+	const (
+		up Index = iota
+		retrying
+		down
+		unavailable
+	)
+
+	const (
+		startup Signal = iota
+		shutdown
+		warn
+		cordon
+	)
+
+	spec, err := Define(
+		State{
+			Index: up,
+			Transitions: map[Signal]Index{
+				shutdown: down,
+			},
+		},
+		State{
+			Index: down,
+			Transitions: map[Signal]Index{
+				startup: up,
+				warn:    retrying,
+				cordon:  unavailable,
+			},
+			Actions: map[Signal]Action{
+				startup: func(Instance) error {
+					return fmt.Errorf("error")
+				},
+			},
+			Errors: map[Signal]Error{
+				startup: {warn},
+			},
+			Visit: Limit{2, cordon},
+		},
+		State{
+			Index: retrying,
+			Transitions: map[Signal]Index{
+				warn:    retrying,
+				startup: up,
+				cordon:  unavailable,
+			},
+			Actions: map[Signal]Action{
+				startup: func(Instance) error {
+					return fmt.Errorf("error- retrying")
+				},
+			},
+			Errors: map[Signal]Error{
+				startup: {warn},
+			},
+			Visit: Limit{2, cordon},
+		},
+		State{
+			Index: unavailable,
+		},
+	)
+
+	require.NoError(t, err)
+
+	clock := Wall(time.Tick(1 * time.Second))
+
+	// set is a collection of fsm intances that follow the same rules.
+	set := NewSet(spec, clock)
+
+	defer set.Stop()
+
+	instance := set.Add(up)
+
+	err = instance.Signal(shutdown)
+	require.NoError(t, err)
+	require.Equal(t, down, instance.State())
+
+	err = instance.Signal(startup)
+	require.NoError(t, err)
+	require.Equal(t, down, instance.State())
+
+	// try 1
+	err = instance.Signal(startup)
+	require.NoError(t, err)
+	require.Equal(t, retrying, instance.State())
+
+	// try 2
+	err = instance.Signal(startup)
+	require.NoError(t, err)
+	require.Equal(t, retrying, instance.State())
 
 	// then automatically triggered to the unavailable state
 	require.Equal(t, unavailable, instance.State())

@@ -50,10 +50,7 @@ func (i instance) State() Index {
 // Valid returns true if current state can receive the given signal
 func (i instance) CanReceive(s Signal) bool {
 	_, _, err := i.parent.spec.transition(i.State(), s)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 // Signal sends a signal to the instance

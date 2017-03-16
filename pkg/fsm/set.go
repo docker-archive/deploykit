@@ -261,7 +261,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 		return err
 	}
 
-	log.V(100).Infoln(instance.id, ":", current, "==[", event.signal, "]=>", next,
+	log.V(100).Infoln("transition @id=", instance.id, "::::", "[", current, "]--(", event.signal, ")-->", "[", next, "]",
 		"deadline=", instance.deadline, "index=", instance.index)
 
 	// any flap detection?
@@ -360,6 +360,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 }
 
 func (s *Set) run() chan<- *event {
+
 	events := make(chan *event)
 	transactions := make(chan func() (interface{}, error), BufferedChannelSize)
 

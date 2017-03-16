@@ -241,6 +241,10 @@ func (s *Spec) visit(next Index) (limit *Limit, err error) {
 // transition takes the fsm from a current state, with given signal, to the next state.
 // returns error if the transition is not possible.
 func (s *Spec) transition(current Index, signal Signal) (next Index, action Action, err error) {
+	defer func() {
+		log.V(100).Infoln("transition:", "[", current, "]--(", signal, ")-->[", next, "]", "action=", action, "err=", err)
+	}()
+
 	state, has := s.states[current]
 	if !has {
 		err = unknownState(current)

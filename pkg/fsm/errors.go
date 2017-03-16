@@ -43,5 +43,5 @@ func (e nilAction) Error() string {
 type noTransitions Spec
 
 func (e noTransitions) Error() string {
-	return fmt.Sprintf("no transitions defined: states=%d", len(e.states))
+	return fmt.Sprintf("no transitions defined: count(states)=%d", len(e.states))
 }
