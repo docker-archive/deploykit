@@ -191,11 +191,10 @@ func (s *Set) handleDelete(id ID) error {
 }
 
 func (s *Set) handleClockTick(inputs chan<- *event) error {
-	defer func(start Time) {
-		log.V(100).Infoln("CLOCK (", start, ",", s.now, ") ========================================================")
-	}(s.now)
 
 	s.now++
+
+	log.V(100).Infoln("CLOCK [", s.now, "] ========================================================")
 
 	// go through the priority queue by deadline and raise signals if expired.
 	instance := s.deadlines.peek()
@@ -211,9 +210,7 @@ func (s *Set) handleClockTick(inputs chan<- *event) error {
 
 		instance = s.deadlines.dequeue()
 
-		log.Infoln("t=", s.now, "id=", instance.id, "deadline=", instance.deadline)
-
-		if instance.deadline == s.now {
+		if s.now >= instance.deadline {
 
 			// check > 0 here because we could have already raised the signal
 			// when a real event came in.
@@ -258,8 +255,6 @@ func (s *Set) processDeadline(instance *instance, state Index) error {
 	}
 
 	instance.update(state, s.now, ttl)
-
-	log.V(100).Infoln("deadline: deadline=", instance.deadline, "priority=", instance.index)
 
 	if instance.index > -1 {
 		// case where this instance is in the deadlines queue (since it has a > -1 index)
@@ -314,7 +309,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 		return err
 	}
 
-	log.V(100).Infoln("transition @id=", instance.id, "::::", "[", current, "]--(", event.signal, ")-->", "[", next, "]",
+	log.V(100).Infoln("transition: @id=", instance.id, "::::", "[", current, "]--(", event.signal, ")-->", "[", next, "]",
 		"deadline=", instance.deadline, "index=", instance.index)
 
 	// any flap detection?
@@ -326,7 +321,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 
 		if flaps >= limit.Count {
 
-			log.Warningln("flap detected, raising", limit.Raise)
+			log.Warningln("flap detected:", "@id=", instance.id, "raising", limit.Raise)
 			instance.Signal(limit.Raise)
 
 			return nil // done -- another transition
@@ -343,7 +338,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 
 			} else if rule != nil {
 
-				log.Warningln("error executing action, raising", rule.Raise)
+				log.Warningln("error executing action:", "@id=", instance.id, "raising", rule.Raise)
 				instance.Signal(rule.Raise)
 
 				return nil // done - another transition
@@ -380,8 +375,8 @@ func (s *Set) run() chan<- *event {
 		}()
 
 		for {
-			txn, open := <-transactions
-			if !open {
+			txn := <-transactions
+			if txn == nil {
 				return
 			}
 
@@ -389,6 +384,22 @@ func (s *Set) run() chan<- *event {
 				s.handleError(err, ctx)
 			}
 
+		}
+	}()
+
+	stopTimer := make(chan struct{})
+	// timer
+	go func() {
+		for {
+			select {
+			case <-stopTimer:
+				return
+
+			case <-s.clock.C:
+				transactions <- func() (interface{}, error) {
+					return nil, s.handleClockTick(events)
+				}
+			}
 		}
 	}()
 
@@ -403,15 +414,8 @@ func (s *Set) run() chan<- *event {
 			select {
 
 			case <-s.stop:
+				close(stopTimer)
 				break loop
-
-			case <-s.clock.C:
-
-				log.V(100).Infoln("CLOCK")
-
-				tx = func() (interface{}, error) {
-					return nil, s.handleClockTick(events)
-				}
 
 			case initial, ok := <-s.add:
 				// add new instance

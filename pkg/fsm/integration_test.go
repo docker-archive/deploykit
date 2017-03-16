@@ -226,8 +226,15 @@ func TestSimpleProvisionFlow(t *testing.T) {
 		})
 	}
 
-	time.Sleep(8 * time.Second)
+	start := time.Now()
+	for {
+		count := myCluster.countCreated()
+		log.Infoln("We should be creating some instances:", count, "create calls made.")
 
-	log.Infoln("We should be creating some instances:", myCluster.countCreated(), "create calls made.")
-
+		if count == 20 {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	log.Info("elapsed:", time.Now().Sub(start))
 }

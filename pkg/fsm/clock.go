@@ -2,8 +2,6 @@ package fsm
 
 import (
 	"time"
-
-	log "github.com/golang/glog"
 )
 
 // Clock adapts a timer tick
@@ -76,8 +74,6 @@ func Wall(tick <-chan time.Time) *Clock {
 			case <-tick:
 				// note that golang's time ticker won't close the channel when stopped.
 				// so we will do the closing ourselves to avoid leaking the goroutine
-
-				log.V(100).Infoln("CLOCK ============= ")
 				clock.c <- Tick(1)
 			}
 		}

@@ -55,7 +55,7 @@ func (i instance) CanReceive(s Signal) bool {
 
 // Signal sends a signal to the instance
 func (i instance) Signal(s Signal) (err error) {
-	defer func() { log.V(100).Infoln("instance", i.id, "signal=", s, "err=", err) }()
+	defer func() { log.V(100).Infoln("instance.signal: @id=", i.id, "signal=", s, "err=", err) }()
 
 	if _, has := i.parent.spec.signals[s]; !has {
 		err = unknownSignal(s)

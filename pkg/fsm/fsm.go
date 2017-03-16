@@ -242,7 +242,7 @@ func (s *Spec) visit(next Index) (limit *Limit, err error) {
 // returns error if the transition is not possible.
 func (s *Spec) transition(current Index, signal Signal) (next Index, action Action, err error) {
 	defer func() {
-		log.V(100).Infoln("transition:", "[", current, "]--(", signal, ")-->[", next, "]", "action=", action, "err=", err)
+		log.V(200).Infoln("transition:", "[", current, "]--(", signal, ")-->[", next, "]", "action=", action, "err=", err)
 	}()
 
 	state, has := s.states[current]
