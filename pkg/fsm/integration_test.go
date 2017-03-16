@@ -1,6 +1,9 @@
 package fsm
 
 import (
+	"fmt"
+	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,7 +39,10 @@ func simpleProvisionModel(actions map[Signal]Action) *Spec {
 				found:  allocated,
 				create: creating,
 			},
-			TTL: Expiry{5, create},
+			Actions: map[Signal]Action{
+				create: actions[create],
+			},
+			TTL: Expiry{3, create},
 		},
 		State{
 			Index: creating,
@@ -103,24 +109,53 @@ type machine struct {
 }
 
 type cluster struct {
-	size  int
-	zones [3]*Set
+	size     int
+	zones    []*Set
+	machines [][]*machine
+
+	created    int
+	cordoned   int
+	terminated int
+
+	lock sync.Mutex
+}
+
+func (c *cluster) countCreated() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.created
 }
 
 func (c *cluster) create(Instance) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.created++
 	return nil
 }
 func (c *cluster) cordon(Instance) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.cordoned++
 	return nil
 }
 func (c *cluster) terminate(Instance) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.terminated++
 	return nil
 }
 
 func TestSimpleProvisionFlow(t *testing.T) {
 
+	total := 30
+	zones := 3
 	myCluster := &cluster{
-		size: 100,
+		size:     total,
+		zones:    make([]*Set, zones),
+		machines: make([][]*machine, zones),
 	}
 
 	actions := map[Signal]Action{
@@ -132,9 +167,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 	spec := simpleProvisionModel(actions)
 	require.NotNil(t, spec)
 
-	log.Infoln("Model:", spec)
-
-	clock := Wall(time.Tick(500 * time.Millisecond))
+	clock := Wall(time.Tick(1 * time.Second)) // 1 second per tick
 
 	for i := range myCluster.zones {
 		myCluster.zones[i] = NewSet(spec, clock)
@@ -145,5 +178,56 @@ func TestSimpleProvisionFlow(t *testing.T) {
 			myCluster.zones[i].Stop()
 		}
 	}()
+
+	log.Infoln("Creating", myCluster.size, "instances across", len(myCluster.zones), "zones.")
+
+	for i := 0; i < myCluster.size; i++ {
+		instance := myCluster.zones[i%zones].Add(specified)
+		m := &machine{Instance: instance}
+		myCluster.machines[i%zones] = append(myCluster.machines[i%zones], m)
+	}
+
+	log.Infoln("Specified all instances based on spec:")
+	require.Equal(t, myCluster.size, func() int {
+		total := 0
+		for i := range myCluster.zones {
+			total += myCluster.zones[i].Size()
+		}
+		return total
+	}())
+
+	// Here we call the infrastructure to list all known instances
+
+	described := make([][]string, zones) // sets of found ids across n zones
+	for i := range [10]int{} {
+		described[i%zones] = append(described[i%zones], fmt.Sprintf("instance-%d", rand.Intn(total)))
+	}
+	log.Infoln("Discover a few instances over 3 zones", described)
+
+	// label / associate with the fsm instances
+	for i := range make([]int, zones) {
+
+		az := myCluster.zones[i]
+		machines := myCluster.machines[i]
+
+		total := len(described[i]) // the discovered instances in this zone
+		j := 0
+		az.ForEachInstance(func(id ID, state Index) bool {
+			if state == specified {
+
+				require.NoError(t, az.Signal(found, id))
+				machines[id].id = described[i][j]
+
+				log.Infoln("associated", described[i][j], "to", machines[id])
+
+				j++
+			}
+			return j < total
+		})
+	}
+
+	time.Sleep(8 * time.Second)
+
+	log.Infoln("We should be creating some instances:", myCluster.countCreated(), "create calls made.")
 
 }

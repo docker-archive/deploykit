@@ -286,7 +286,7 @@ func TestSetFlapping(t *testing.T) {
 	set.Signal(ping, id) // flap 3
 
 	// note that there's a transition that will be triggered
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	require.Equal(t, 0, set.CountByState(running))
 	require.Equal(t, 1, set.CountByState(cordoned))

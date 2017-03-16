@@ -156,13 +156,9 @@ func (s *Set) handleAdd(initial Index) error {
 		},
 	}
 
-	// if there's deadline then enqueue
-	// check for TTL
-	if exp, err := s.spec.expiry(initial); err != nil {
-		s.handleError(err, initial)
-	} else if exp != nil {
-		new.update(initial, s.now, exp.TTL)
-		s.deadlines.enqueue(new)
+	log.V(100).Infoln("add:", "id=", id, "initial=", initial, "set deadline.")
+	if err := s.processDeadline(new, initial); err != nil {
+		s.handleError(err, new)
 	}
 
 	// update index
@@ -195,6 +191,10 @@ func (s *Set) handleDelete(id ID) error {
 }
 
 func (s *Set) handleClockTick(inputs chan<- *event) error {
+	defer func(start Time) {
+		log.V(100).Infoln("CLOCK (", start, ",", s.now, ") ========================================================")
+	}(s.now)
+
 	s.now++
 
 	// go through the priority queue by deadline and raise signals if expired.
@@ -225,7 +225,7 @@ func (s *Set) handleClockTick(inputs chan<- *event) error {
 
 				} else if ttl != nil {
 
-					log.V(100).Infoln("deadline exceeded:", instance.id, "raise=", ttl.Raise)
+					log.V(100).Infoln("deadline exceeded:", "@id=", instance.id, "raise=", ttl.Raise)
 
 					instance.Signal(ttl.Raise)
 				}
@@ -243,6 +243,59 @@ func (s *Set) handleClockTick(inputs chan<- *event) error {
 
 		if instance.deadline > s.now {
 			break
+		}
+	}
+	return nil
+}
+
+func (s *Set) processDeadline(instance *instance, state Index) error {
+	ttl := Tick(0)
+	// check for TTL
+	if exp, err := s.spec.expiry(state); err != nil {
+		return err
+	} else if exp != nil {
+		ttl = exp.TTL
+	}
+
+	instance.update(state, s.now, ttl)
+
+	log.V(100).Infoln("deadline: deadline=", instance.deadline, "priority=", instance.index)
+
+	if instance.index > -1 {
+		// case where this instance is in the deadlines queue (since it has a > -1 index)
+		if instance.deadline > 0 {
+			// in the queue and deadline is different now
+			log.V(100).Infoln("deadline: updating instance", instance.id, "deadline=", instance.deadline, "at", instance.index)
+			s.deadlines.update(instance)
+		} else {
+			log.V(100).Infoln("deadline: removing instance", instance.id, "deadline=", instance.deadline, "at", instance.index)
+			s.deadlines.remove(instance)
+		}
+	} else if instance.deadline > 0 {
+		// index == -1 means it's not in the queue yet and we have a deadline
+		log.V(100).Infoln("deadline: enqueuing instance", instance.id, "deadline=", instance.deadline, "at", instance.index)
+		s.deadlines.enqueue(instance)
+	}
+
+	return nil
+}
+
+func (s *Set) processVisitLimit(instance *instance, state Index) error {
+	// have we visited next state too many times?
+	if limit, err := s.spec.visit(state); err != nil {
+
+		return err
+
+	} else if limit != nil {
+
+		log.V(100).Infoln("found limit:", limit.Value, "target=", state, "visits=", instance.visits[state])
+
+		if limit.Value > 0 && instance.visits[state] == limit.Value {
+
+			log.Warningln("max visits hit, raising:", instance.state, "=[", limit.Raise, "]=>")
+			instance.Signal(limit.Raise)
+
+			return nil
 		}
 	}
 	return nil
@@ -276,7 +329,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 			log.Warningln("flap detected, raising", limit.Raise)
 			instance.Signal(limit.Raise)
 
-			return nil
+			return nil // done -- another transition
 		}
 	}
 
@@ -293,41 +346,14 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 				log.Warningln("error executing action, raising", rule.Raise)
 				instance.Signal(rule.Raise)
 
-				return nil
+				return nil // done - another transition
 			}
 		}
 	}
 
-	ttl := Tick(0)
-	// check for TTL
-	if exp, err := s.spec.expiry(next); err != nil {
-
+	// process deadline, if any
+	if err := s.processDeadline(instance, next); err != nil {
 		return err
-
-	} else if exp != nil {
-
-		ttl = exp.TTL
-
-	}
-
-	instance.update(next, s.now, ttl)
-
-	log.V(100).Infoln("new deadline=", instance.deadline, "updated=", instance.index)
-
-	if instance.index > -1 {
-		// case where this instance is in the deadlines queue (since it has a > -1 index)
-		if instance.deadline > 0 {
-			// in the queue and deadline is different now
-			log.V(100).Infoln("updating instance", instance.id, "at", instance.index)
-			s.deadlines.update(instance)
-		} else {
-			log.V(100).Infoln("removing instance", instance.id, "at", instance.index)
-			s.deadlines.remove(instance)
-		}
-	} else if instance.deadline > 0 {
-		// index == -1 means it's not in the queue yet and we have a deadline
-		log.V(100).Infoln("enqueuing instance", instance.id, "at", instance.index)
-		s.deadlines.enqueue(instance)
 	}
 
 	// update the index
@@ -335,25 +361,8 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 	s.bystate[next][instance.id] = instance
 
 	// visits limit trigger
-	{
-		target := next
-		// have we visited next state too many times?
-		if limit, err := s.spec.visit(target); err != nil {
-
-			s.handleError(err, []interface{}{current, next, instance})
-
-		} else if limit != nil {
-
-			log.V(100).Infoln("found limit:", limit.Value, "target=", target, "visits=", instance.visits[target])
-
-			if limit.Value > 0 && instance.visits[target] == limit.Value {
-
-				log.Warningln("max visits hit, raising:", instance.state, "=[", limit.Raise, "]=>")
-				instance.Signal(limit.Raise)
-
-				return nil
-			}
-		}
+	if err := s.processVisitLimit(instance, next); err != nil {
+		return err
 	}
 
 	return nil
@@ -397,6 +406,8 @@ func (s *Set) run() chan<- *event {
 				break loop
 
 			case <-s.clock.C:
+
+				log.V(100).Infoln("CLOCK")
 
 				tx = func() (interface{}, error) {
 					return nil, s.handleClockTick(events)
