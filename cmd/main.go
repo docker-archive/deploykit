@@ -3,13 +3,22 @@ package main
 import (
 	"os"
 
+	"strings"
+
 	log "github.com/Sirupsen/logrus"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/docker/infrakit.aws/plugin"
 	"github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/pkg/cli"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
-	"strings"
 )
 
 func main() {
@@ -41,8 +50,31 @@ func main() {
 				os.Exit(1)
 			}
 
+			autoscalingClient := autoscaling.New(builder.Config)
+			cloudWatchLogsClient := cloudwatchlogs.New(builder.Config)
+			dynamodbClient := dynamodb.New(builder.Config)
+			ec2Client := ec2.New(builder.Config)
+			elbClient := elb.New(builder.Config)
+			iamClient := iam.New(builder.Config)
+			sqsClient := sqs.New(builder.Config)
+
 			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name, instance_plugin.PluginServer(instancePlugin))
+			cli.RunPlugin(name, instance_plugin.PluginServerWithTypes(map[string]instance_spi.Plugin{
+				"autoscaling-autoscalinggroup":    instance.NewAutoScalingGroupPlugin(autoscalingClient, namespace),
+				"autoscaling-launchconfiguration": instance.NewLaunchConfigurationPlugin(autoscalingClient, namespace),
+				"cloudwatchlogs-loggroup":         instance.NewLogGroupPlugin(cloudWatchLogsClient, namespace),
+				"dynamodb-table":                  instance.NewTablePlugin(dynamodbClient, namespace),
+				"ec2-instance":                    instancePlugin,
+				"ec2-internetgateway":             instance.NewInternetGatewayPlugin(ec2Client, namespace),
+				"ec2-routetable":                  instance.NewRouteTablePlugin(ec2Client, namespace),
+				"ec2-securitygroup":               instance.NewSecurityGroupPlugin(ec2Client, namespace),
+				"ec2-subnet":                      instance.NewSubnetPlugin(ec2Client, namespace),
+				"ec2-vpc":                         instance.NewVpcPlugin(ec2Client, namespace),
+				"elb-loadbalancer":                instance.NewLoadBalancerPlugin(elbClient, namespace),
+				"iam-instanceprofile":             instance.NewInstanceProfilePlugin(iamClient, namespace),
+				"iam-role":                        instance.NewRolePlugin(iamClient, namespace),
+				"sqs-queue":                       instance.NewQueuePlugin(sqsClient, namespace),
+			}))
 		},
 	}
 
