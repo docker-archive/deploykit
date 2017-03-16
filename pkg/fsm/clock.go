@@ -9,6 +9,7 @@ type Clock struct {
 	C       <-chan Tick
 	c       chan<- Tick
 	stop    chan struct{}
+	start   chan struct{}
 	driver  func()
 	running bool
 }
@@ -18,11 +19,15 @@ func NewClock() *Clock {
 	c := make(chan Tick)
 	stop := make(chan struct{})
 	clock := &Clock{
-		C:    c,
-		c:    c,
-		stop: stop,
+		C:     c,
+		c:     c,
+		stop:  stop,
+		start: make(chan struct{}),
 	}
 	clock.driver = func() {
+		<-clock.start
+		clock.start = nil
+
 		for {
 			select {
 			case <-clock.stop:
@@ -32,6 +37,13 @@ func NewClock() *Clock {
 		}
 	}
 	return clock.run()
+}
+
+// Start starts the clock
+func (t *Clock) Start() {
+	if t.start != nil {
+		close(t.start)
+	}
 }
 
 // Tick makes one tick of the clock
@@ -60,12 +72,16 @@ func Wall(tick <-chan time.Time) *Clock {
 	out := make(chan Tick)
 	stop := make(chan struct{})
 	clock := &Clock{
-		C:    out,
-		c:    out,
-		stop: stop,
+		C:     out,
+		c:     out,
+		stop:  stop,
+		start: make(chan struct{}),
 	}
 
 	clock.driver = func() {
+		<-clock.start
+		clock.start = nil
+
 		for {
 			select {
 			case <-clock.stop:

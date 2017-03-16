@@ -167,7 +167,9 @@ func TestSimpleProvisionFlow(t *testing.T) {
 	spec := simpleProvisionModel(actions)
 	require.NotNil(t, spec)
 
-	clock := Wall(time.Tick(1 * time.Second)) // 1 second per tick
+	clock := Wall(time.Tick(100 * time.Millisecond)) // per tick
+	log.Infoln("Start the clock")
+	clock.Start()
 
 	for i := range myCluster.zones {
 		myCluster.zones[i] = NewSet(spec, clock)

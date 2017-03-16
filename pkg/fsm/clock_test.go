@@ -27,6 +27,7 @@ func TestClock(t *testing.T) {
 
 	log.Infoln("Start")
 	close(start)
+	clock.Start()
 	clock.Tick()
 	clock.Tick()
 	clock.Tick()
@@ -54,6 +55,7 @@ func TestWallClock(t *testing.T) {
 	}()
 
 	close(start) // from here receive just 1 tick
+	clock.Start()
 	<-clock.C
 }
 
@@ -82,7 +84,7 @@ func TestWallClock2(t *testing.T) {
 	}()
 
 	close(start)
-
+	clock.Start()
 	log.Infoln("starting")
 
 	time.Sleep(1 * time.Second)

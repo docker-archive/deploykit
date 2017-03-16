@@ -1,6 +1,9 @@
 package fsm
 
 import (
+	"sync"
+	"time"
+
 	log "github.com/golang/glog"
 )
 
@@ -48,6 +51,7 @@ type Set struct {
 	deadlines *queue
 
 	running bool
+	lock    sync.Mutex
 }
 
 // Signal sends a signal to the instance
@@ -132,15 +136,15 @@ type event struct {
 	signal   Signal
 }
 
-func (s *Set) handleError(err error, ctx interface{}) {
-	log.Warningln("error occurred:", err, "context=", ctx)
+func (s *Set) handleError(tid int64, err error, ctx interface{}) {
+	log.Warningln(tid, "error occurred:", err, "context=", ctx)
 	select {
 	case s.errors <- err:
 	default:
 	}
 }
 
-func (s *Set) handleAdd(initial Index) error {
+func (s *Set) handleAdd(tid int64, initial Index) error {
 	// add a new instance
 	id := s.next
 	s.next++
@@ -156,9 +160,9 @@ func (s *Set) handleAdd(initial Index) error {
 		},
 	}
 
-	log.V(100).Infoln("add:", "id=", id, "initial=", initial, "set deadline.")
-	if err := s.processDeadline(new, initial); err != nil {
-		s.handleError(err, new)
+	log.V(100).Infoln(tid, "add:", "id=", id, "initial=", initial, "set deadline.")
+	if err := s.processDeadline(tid, new, initial); err != nil {
+		return err //s.handleError(tid, err, new)
 	}
 
 	// update index
@@ -174,7 +178,7 @@ func (s *Set) handleAdd(initial Index) error {
 	return nil
 }
 
-func (s *Set) handleDelete(id ID) error {
+func (s *Set) handleDelete(tid int64, id ID) error {
 	instance, has := s.members[id]
 	if !has {
 		return unknownInstance(id)
@@ -190,62 +194,64 @@ func (s *Set) handleDelete(id ID) error {
 	return nil
 }
 
-func (s *Set) handleClockTick(inputs chan<- *event) error {
+func (s *Set) tick() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	s.now++
+}
 
-	log.V(100).Infoln("CLOCK [", s.now, "] ========================================================")
+func (s *Set) ct() Time {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.now
+}
 
-	// go through the priority queue by deadline and raise signals if expired.
-	instance := s.deadlines.peek()
-	if instance == nil {
-		return nil
-	}
+func (s *Set) handleClockTick(tid int64) error {
 
-	if instance.deadline > s.now {
-		return nil
-	}
+	s.tick()
+	now := s.ct()
+
+	log.V(100).Infoln(tid, "CLOCK [", now, "] ========================================================")
 
 	for s.deadlines.Len() > 0 {
 
+		instance := s.deadlines.peek()
+		if instance == nil {
+			return nil
+		}
+
+		if instance.deadline > now {
+			return nil
+		}
+
 		instance = s.deadlines.dequeue()
 
-		if s.now >= instance.deadline {
+		// check > 0 here because we could have already raised the signal
+		// when a real event came in.
+		if instance.deadline > 0 {
+			// raise the signal
+			if ttl, err := s.spec.expiry(instance.state); err != nil {
 
-			// check > 0 here because we could have already raised the signal
-			// when a real event came in.
-			if instance.deadline > 0 {
-				// raise the signal
-				if ttl, err := s.spec.expiry(instance.state); err != nil {
+				return err
 
-					return err
+			} else if ttl != nil {
 
-				} else if ttl != nil {
+				log.V(100).Infoln(tid, "deadline exceeded:", "@id=", instance.id, "raise=", ttl.Raise)
 
-					log.V(100).Infoln("deadline exceeded:", "@id=", instance.id, "raise=", ttl.Raise)
-
-					instance.Signal(ttl.Raise)
-				}
+				instance.Signal(ttl.Raise)
 			}
-			// reset the state for future queueing
-			instance.deadline = -1
-			instance.index = -1
-
 		}
+		// reset the state for future queueing
+		instance.deadline = -1
+		instance.index = -1
 
-		instance = s.deadlines.peek()
-		if instance == nil {
-			break
-		}
-
-		if instance.deadline > s.now {
-			break
-		}
 	}
 	return nil
 }
 
-func (s *Set) processDeadline(instance *instance, state Index) error {
+func (s *Set) processDeadline(tid int64, instance *instance, state Index) error {
+	now := s.ct()
 	ttl := Tick(0)
 	// check for TTL
 	if exp, err := s.spec.expiry(state); err != nil {
@@ -254,28 +260,31 @@ func (s *Set) processDeadline(instance *instance, state Index) error {
 		ttl = exp.TTL
 	}
 
-	instance.update(state, s.now, ttl)
+	instance.update(state, now, ttl)
 
 	if instance.index > -1 {
 		// case where this instance is in the deadlines queue (since it has a > -1 index)
 		if instance.deadline > 0 {
 			// in the queue and deadline is different now
-			log.V(100).Infoln("deadline: updating instance", instance.id, "deadline=", instance.deadline, "at", instance.index)
+			log.V(100).Infoln(tid,
+				"deadline: updating @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
 			s.deadlines.update(instance)
 		} else {
-			log.V(100).Infoln("deadline: removing instance", instance.id, "deadline=", instance.deadline, "at", instance.index)
+			log.V(100).Infoln(tid,
+				"deadline: removing @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
 			s.deadlines.remove(instance)
 		}
 	} else if instance.deadline > 0 {
 		// index == -1 means it's not in the queue yet and we have a deadline
-		log.V(100).Infoln("deadline: enqueuing instance", instance.id, "deadline=", instance.deadline, "at", instance.index)
+		log.V(100).Infoln(tid,
+			"deadline: enqueuing @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
 		s.deadlines.enqueue(instance)
 	}
 
 	return nil
 }
 
-func (s *Set) processVisitLimit(instance *instance, state Index) error {
+func (s *Set) processVisitLimit(tid int64, instance *instance, state Index) error {
 	// have we visited next state too many times?
 	if limit, err := s.spec.visit(state); err != nil {
 
@@ -283,11 +292,9 @@ func (s *Set) processVisitLimit(instance *instance, state Index) error {
 
 	} else if limit != nil {
 
-		log.V(100).Infoln("found limit:", limit.Value, "target=", state, "visits=", instance.visits[state])
-
 		if limit.Value > 0 && instance.visits[state] == limit.Value {
 
-			log.Warningln("max visits hit, raising:", instance.state, "=[", limit.Raise, "]=>")
+			log.V(100).Infoln(tid, "max visits hit.", "@id=", instance.id, "raising:", instance.state, "=[", limit.Raise, "]=>")
 			instance.Signal(limit.Raise)
 
 			return nil
@@ -296,7 +303,7 @@ func (s *Set) processVisitLimit(instance *instance, state Index) error {
 	return nil
 }
 
-func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
+func (s *Set) handleEvent(tid int64, event *event) error {
 
 	instance, has := s.members[event.instance]
 	if !has {
@@ -309,7 +316,8 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 		return err
 	}
 
-	log.V(100).Infoln("transition: @id=", instance.id, "::::", "[", current, "]--(", event.signal, ")-->", "[", next, "]",
+	log.V(100).Infoln(tid,
+		"transition: @id=", instance.id, "::::", "[", current, "]--(", event.signal, ")-->", "[", next, "]",
 		"deadline=", instance.deadline, "index=", instance.index)
 
 	// any flap detection?
@@ -321,7 +329,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 
 		if flaps >= limit.Count {
 
-			log.Warningln("flap detected:", "@id=", instance.id, "raising", limit.Raise)
+			log.Warningln(tid, "flap detected:", "@id=", instance.id, "raising", limit.Raise)
 			instance.Signal(limit.Raise)
 
 			return nil // done -- another transition
@@ -332,22 +340,22 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 	if action != nil {
 		if err := action(instance); err != nil {
 
-			if rule, err := s.spec.error(current, event.signal); err != nil {
+			if alternate, err := s.spec.error(current, event.signal); err != nil {
 
-				s.handleError(err, []interface{}{current, event, instance})
+				s.handleError(tid, err, []interface{}{current, event, instance})
 
-			} else if rule != nil {
+			} else {
 
-				log.Warningln("error executing action:", "@id=", instance.id, "raising", rule.Raise)
-				instance.Signal(rule.Raise)
+				log.Warningln(tid, "error executing action:", "@id=", instance.id,
+					"[", current, "]--(", event.signal, ")-->[", alternate, "] (was[", next, "])")
 
-				return nil // done - another transition
+				next = alternate
 			}
 		}
 	}
 
 	// process deadline, if any
-	if err := s.processDeadline(instance, next); err != nil {
+	if err := s.processDeadline(tid, instance, next); err != nil {
 		return err
 	}
 
@@ -356,7 +364,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 	s.bystate[next][instance.id] = instance
 
 	// visits limit trigger
-	if err := s.processVisitLimit(instance, next); err != nil {
+	if err := s.processVisitLimit(tid, instance, next); err != nil {
 		return err
 	}
 
@@ -366,7 +374,7 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 func (s *Set) run() chan<- *event {
 
 	events := make(chan *event)
-	transactions := make(chan func() (interface{}, error), BufferedChannelSize)
+	transactions := make(chan func(int64) (interface{}, error), BufferedChannelSize)
 
 	// Core processing
 	go func() {
@@ -380,8 +388,9 @@ func (s *Set) run() chan<- *event {
 				return
 			}
 
-			if ctx, err := txn(); err != nil {
-				s.handleError(err, ctx)
+			tid := time.Now().UnixNano()
+			if ctx, err := txn(tid); err != nil {
+				s.handleError(tid, err, ctx)
 			}
 
 		}
@@ -396,8 +405,8 @@ func (s *Set) run() chan<- *event {
 				return
 
 			case <-s.clock.C:
-				transactions <- func() (interface{}, error) {
-					return nil, s.handleClockTick(events)
+				transactions <- func(tid int64) (interface{}, error) {
+					return nil, s.handleClockTick(tid)
 				}
 			}
 		}
@@ -409,7 +418,7 @@ func (s *Set) run() chan<- *event {
 	loop:
 		for {
 
-			tx := func() (interface{}, error) { return nil, nil } // no-op
+			var tx func(tid int64) (interface{}, error)
 
 			select {
 
@@ -424,8 +433,8 @@ func (s *Set) run() chan<- *event {
 				}
 
 				copy := initial
-				tx = func() (interface{}, error) {
-					return copy, s.handleAdd(copy)
+				tx = func(tid int64) (interface{}, error) {
+					return copy, s.handleAdd(tid, copy)
 				}
 
 			case id, ok := <-s.delete:
@@ -435,8 +444,8 @@ func (s *Set) run() chan<- *event {
 				}
 
 				copy := id
-				tx = func() (interface{}, error) {
-					return copy, s.handleDelete(copy)
+				tx = func(tid int64) (interface{}, error) {
+					return copy, s.handleDelete(tid, copy)
 				}
 
 			case event, ok := <-events:
@@ -446,12 +455,12 @@ func (s *Set) run() chan<- *event {
 				}
 
 				copy := event
-				tx = func() (interface{}, error) {
-					return copy, s.handleEvent(copy, events)
+				tx = func(tid int64) (interface{}, error) {
+					return copy, s.handleEvent(tid, copy)
 				}
 
 			case reader := <-s.reads:
-				tx = func() (interface{}, error) {
+				tx = func(tid int64) (interface{}, error) {
 					// For reads on the Set itself.  All the reads are serialized.
 					view := *s // a copy (not quite deep copy) of the set
 					reader(view)

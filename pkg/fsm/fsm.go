@@ -29,19 +29,16 @@ type Expiry struct {
 	Raise Signal
 }
 
-// Limit is a numerical value indicating a limit of occurrences.
-//type Limit int
-
 // Limit is a struct that captures the limit and what signal to raise
 type Limit struct {
 	Value int
 	Raise Signal
 }
 
-// Error specifies what to do when an error occurs, like when an action resulted in an error.
-type Error struct {
-	Raise Signal
-}
+// // Error specifies what to do when an error occurs, like when an action resulted in an error.
+// type Error struct {
+// 	Raise Signal
+// }
 
 // Signal is a signal that can drive the state machine to transfer from one state to next.
 type Signal int
@@ -60,8 +57,8 @@ type State struct {
 	// Actions specify for each signal, what code / action is to be executed as the fsm transits from one state to next.
 	Actions map[Signal]Action
 
-	// Errors specifies the handling of errors when executing action.  On action error, another signal is raised.
-	Errors map[Signal]Error
+	// Errors specifies the handling of errors when executing action.  On action error, the mapped state is transitioned.
+	Errors map[Signal]Index
 
 	// TTL specifies how long this state can last before a signal is raised.
 	TTL Expiry
@@ -105,12 +102,16 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 	signals := map[Signal]Signal{}
 
 	for _, s := range m {
-		// Check all the state references in Transitions
-		for signal, next := range s.Transitions {
-			if _, has := m[next]; !has {
-				return nil, unknownState(next)
+		for _, transfer := range []map[Signal]Index{
+			s.Transitions,
+			s.Errors,
+		} {
+			for signal, next := range transfer {
+				if _, has := m[next]; !has {
+					return nil, unknownState(next)
+				}
+				signals[signal] = signal
 			}
-			signals[signal] = signal
 		}
 	}
 
@@ -131,20 +132,6 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 			if _, has := signals[signal]; !has {
 				return nil, unknownSignal(signal)
 			}
-		}
-
-		for signal, error := range s.Errors {
-			if _, has := s.Transitions[signal]; !has {
-				log.Warningln("error specifies signal that's not in state's transitions:", s.Index, signal)
-				return nil, unknownSignal(signal)
-			}
-			if _, has := s.Transitions[error.Raise]; !has {
-				log.Warningln("error handler raises signal that's not in state's transitions:", s.Index, error.Raise)
-				return nil, unknownSignal(error.Raise)
-			}
-
-			// register as valid signal
-			signals[signal] = signal
 		}
 	}
 
@@ -203,8 +190,22 @@ func (s *Spec) expiry(current Index) (expiry *Expiry, err error) {
 	return
 }
 
+// returns the limit on visiting this state
+func (s *Spec) visit(next Index) (limit *Limit, err error) {
+	state, has := s.states[next]
+	if !has {
+		err = unknownState(next)
+		return
+	}
+
+	if state.Visit.Value > 0 {
+		limit = &state.Visit
+	}
+	return
+}
+
 // returns an error handling rule
-func (s *Spec) error(current Index, signal Signal) (rule *Error, err error) {
+func (s *Spec) error(current Index, signal Signal) (next Index, err error) {
 	state, has := s.states[current]
 	if !has {
 		err = unknownState(current)
@@ -218,23 +219,11 @@ func (s *Spec) error(current Index, signal Signal) (rule *Error, err error) {
 	}
 
 	v, has := state.Errors[signal]
-	if has {
-		return &v, nil
-	}
-	return nil, nil
-}
-
-// returns the limit on visiting this state
-func (s *Spec) visit(next Index) (limit *Limit, err error) {
-	state, has := s.states[next]
 	if !has {
-		err = unknownState(next)
+		err = unknownTransition(signal)
 		return
 	}
-
-	if state.Visit.Value > 0 {
-		limit = &state.Visit
-	}
+	next = v
 	return
 }
 

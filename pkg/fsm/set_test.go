@@ -389,8 +389,8 @@ func TestActionErrors(t *testing.T) {
 					return fmt.Errorf("error")
 				},
 			},
-			Errors: map[Signal]Error{
-				startup: {warn},
+			Errors: map[Signal]Index{
+				startup: retrying,
 			},
 			Visit: Limit{2, cordon},
 		},
@@ -406,8 +406,8 @@ func TestActionErrors(t *testing.T) {
 					return fmt.Errorf("error- retrying")
 				},
 			},
-			Errors: map[Signal]Error{
-				startup: {warn},
+			Errors: map[Signal]Index{
+				startup: retrying,
 			},
 			Visit: Limit{2, cordon},
 		},
@@ -433,18 +433,19 @@ func TestActionErrors(t *testing.T) {
 
 	err = instance.Signal(startup)
 	require.NoError(t, err)
-	require.Equal(t, down, instance.State())
+	require.Equal(t, retrying, instance.State()) // visit 1
 
 	// try 1
 	err = instance.Signal(startup)
 	require.NoError(t, err)
-	require.Equal(t, retrying, instance.State())
+	require.Equal(t, retrying, instance.State()) // visit 2
 
 	// try 2
 	err = instance.Signal(startup)
 	require.NoError(t, err)
-	require.Equal(t, retrying, instance.State())
 
 	// then automatically triggered to the unavailable state
 	require.Equal(t, unavailable, instance.State())
+
+	log.Infoln("stopping")
 }
