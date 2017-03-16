@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
@@ -157,8 +158,24 @@ func (p *plugin) Destroy(config resource.Spec, pretend bool) (string, error) {
 	return desc, nil
 }
 
-func (p *plugin) DescribeResources() ([]instance.Description, error) {
-	return nil, errors.New("unimplemented")
+func (p *plugin) DescribeResources(config resource.Spec) (string, error) {
+	spec, _, err := validate(config, p.instancePluginLookup)
+	if err != nil {
+		return "", err
+	}
+
+	ids, err := describe(config.ID, *spec)
+	if err != nil {
+		return "", err
+	}
+
+	details := []string{}
+	for name, id := range ids {
+		details = append(details, fmt.Sprintf("Found %s (ID %s)", name, id))
+	}
+	sort.Strings(details)
+
+	return strings.Join(details, "\n"), nil
 }
 
 func describe(configID resource.ID, spec Spec) (map[string]instance.ID, error) {

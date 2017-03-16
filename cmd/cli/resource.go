@@ -25,6 +25,14 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access resource plugin",
 	}
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
+		if err := upTree(c, func(x *cobra.Command, argv []string) error {
+			if x.PersistentPreRunE != nil {
+				return x.PersistentPreRunE(x, argv)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 
 		plugins, err := discovery.NewPluginDiscovery()
 		if err != nil {
@@ -65,7 +73,12 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		view, err := engine.AddFunc("resource", resourceIdentityFunc).Render(nil)
+
+		engine.WithFunctions(func() []template.Function {
+			return []template.Function{{Name: "resource", Func: resourceFunc}}
+		})
+
+		view, err := engine.Render(nil)
 		if err != nil {
 			return err
 		}
@@ -112,7 +125,12 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		view, err := engine.AddFunc("resource", resourceIdentityFunc).Render(nil)
+
+		engine.WithFunctions(func() []template.Function {
+			return []template.Function{{Name: "resource", Func: resourceFunc}}
+		})
+
+		view, err := engine.Render(nil)
 		if err != nil {
 			return err
 		}
@@ -140,6 +158,6 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 	return cmd
 }
 
-func resourceIdentityFunc(name string) string {
-	return fmt.Sprintf("{{ resource `%s` }}", name)
+func resourceFunc(s string) string {
+	return fmt.Sprintf("{{ resource `%s` }}", s)
 }

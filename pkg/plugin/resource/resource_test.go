@@ -41,16 +41,16 @@ func newTestInstancePlugin() *testing_instance.Plugin {
 		DoDescribeInstances: func(tags map[string]string) ([]instance.Description, error) {
 			descriptions := []instance.Description{}
 		Loop:
-			for id, instnc := range instances {
+			for id, inst := range instances {
 				for k, v := range tags {
-					if v2, ok := instnc.Tags[k]; !ok || v2 != v {
+					if v2, ok := inst.Tags[k]; !ok || v2 != v {
 						continue Loop
 					}
 				}
 				descriptions = append(descriptions, instance.Description{
 					ID:        id,
-					LogicalID: instnc.LogicalID,
-					Tags:      instnc.Tags,
+					LogicalID: inst.LogicalID,
+					Tags:      inst.Tags,
 				})
 			}
 			return descriptions, nil
@@ -75,9 +75,9 @@ func TestCommitAndDestroy(t *testing.T) {
 	properties := types.AnyString(
 		`{"Resources": {"a": {"Plugin": "pluginA", "Properties": "{{ resource ` + "`b`" + ` }}"}, "b": {"Plugin": "pluginB", "Properties": ""}}}`)
 
-	const specID = "config"
+	const configID = "config"
 	spec := resource.Spec{
-		ID:         specID,
+		ID:         configID,
 		Properties: properties,
 	}
 
@@ -103,7 +103,7 @@ func TestCommitAndDestroy(t *testing.T) {
 
 	require.NotEqual(t, "", descriptions[0].ID)
 	require.Nil(t, descriptions[0].LogicalID)
-	require.Equal(t, map[string]string{resourceGroupTag: specID, resourceNameTag: "a"}, descriptions[0].Tags)
+	require.Equal(t, map[string]string{resourceGroupTag: configID, resourceNameTag: "a"}, descriptions[0].Tags)
 
 	descriptions, err = instancePluginB.DescribeInstances(nil)
 	require.NoError(t, err)
@@ -111,7 +111,7 @@ func TestCommitAndDestroy(t *testing.T) {
 
 	require.NotEqual(t, "", descriptions[0].ID)
 	require.Nil(t, descriptions[0].LogicalID)
-	require.Equal(t, map[string]string{resourceGroupTag: specID, resourceNameTag: "b"}, descriptions[0].Tags)
+	require.Equal(t, map[string]string{resourceGroupTag: configID, resourceNameTag: "b"}, descriptions[0].Tags)
 
 	// Commit with the same specification should create no additional resources.
 	_, err = p.Commit(spec, false)
@@ -155,8 +155,25 @@ func TestCommitAndDestroy(t *testing.T) {
 }
 
 func TestDescribeResources(t *testing.T) {
-	_, err := NewResourcePlugin(nil).DescribeResources()
-	require.Error(t, err)
+	const configID = "config"
+	instancePlugin := newTestInstancePlugin()
+	p := NewResourcePlugin(func(name plugin_base.Name) (instance.Plugin, error) {
+		return instancePlugin, nil
+	})
+
+	aID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourceGroupTag: configID, resourceNameTag: "a"}})
+	require.NoError(t, err)
+	bID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourceGroupTag: configID, resourceNameTag: "b"}})
+	require.NoError(t, err)
+
+	properties := types.AnyString(`{"Resources": {"a": {"Plugin": "p", "Properties": ""}, "b": {"Plugin": "p", "Properties": ""}}}`)
+	spec := resource.Spec{
+		ID:         configID,
+		Properties: properties,
+	}
+	details, err := p.DescribeResources(spec)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("Found a (ID %s)\nFound b (ID %s)", string(*aID), string(*bID)), details)
 }
 
 func TestDescribe(t *testing.T) {
