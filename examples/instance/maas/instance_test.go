@@ -39,7 +39,7 @@ func TestProvision_and_Destroy(t *testing.T) {
 	}, list)
 	err = maasPlugin.Label(*id, map[string]string{
 		"label1": "value1",
-		"label2": "changed",
+		"label3": "changed",
 	})
 	require.NoError(t, err)
 
@@ -50,19 +50,19 @@ func TestProvision_and_Destroy(t *testing.T) {
 			ID: *id,
 			Tags: map[string]string{
 				"label1": "value1",
-				"label2": "changed",
+				"label3": "changed",
 			},
 		},
 	}, list)
 
-	list, err = maasPlugin.DescribeInstances(map[string]string{"label2": "changed"})
+	list, err = maasPlugin.DescribeInstances(map[string]string{"label3": "changed"})
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{
 		{
 			ID: *id,
 			Tags: map[string]string{
 				"label1": "value1",
-				"label2": "changed",
+				"label3": "changed",
 			},
 		},
 	}, list)
