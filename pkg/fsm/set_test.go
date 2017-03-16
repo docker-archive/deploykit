@@ -13,7 +13,6 @@ func first(a, b interface{}) interface{} {
 }
 
 func TestSetDeadlineTransition(t *testing.T) {
-	t.Log(time.Now())
 
 	const (
 		running Index = iota
@@ -25,8 +24,9 @@ func TestSetDeadlineTransition(t *testing.T) {
 	)
 
 	started := 0
-	startAction := func(Instance) {
+	startAction := func(Instance) error {
 		started++
+		return nil
 	}
 
 	spec, err := Define(
@@ -102,8 +102,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 
 	for i, id := range ids {
 		require.Equal(t, id, instances[i].ID())
-		state, ok := instances[i].State()
-		require.True(t, ok)
+		state := instances[i].State()
 		require.Equal(t, wait, state)
 	}
 
@@ -122,7 +121,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 
 		instance := set.Instance(ID(i))
 
-		if state, ok := instance.State(); ok && state == wait {
+		if state := instance.State(); state == wait {
 			require.NoError(t, instance.Signal(start))
 		}
 	}
@@ -231,19 +230,18 @@ func TestSetFlapping(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	require.Equal(t, 1, set.CountByState(running))
-	require.Equal(t, running, first(instance.State()))
+	require.Equal(t, running, instance.State())
 
 	log.Infoln("************************* running -> down")
 
 	set.Signal(timeout, id) // flap 1 - a
 
 	require.Equal(t, 1, set.CountByState(down))
-	require.Equal(t, down, first(instance.State()))
-
+	require.Equal(t, down, instance.State())
 	clock.Tick()
 
 	require.Equal(t, 1, set.CountByState(down))
-	require.Equal(t, down, first(instance.State()))
+	require.Equal(t, down, instance.State())
 
 	clock.Tick()
 
@@ -252,19 +250,21 @@ func TestSetFlapping(t *testing.T) {
 	set.Signal(ping, id) // flap 1 - b
 
 	require.Equal(t, 1, set.CountByState(running))
-	require.Equal(t, running, first(instance.State()))
+	require.Equal(t, running, instance.State())
 
 	log.Infoln("************************* running -> down")
 
 	set.Signal(timeout, id) // flap 2
 
 	require.Equal(t, 1, set.CountByState(down))
-	require.Equal(t, down, first(instance.State()))
+	require.Equal(t, down, instance.State())
 
 	log.Infoln("************************* running -> down")
 
+	require.False(t, instance.CanReceive(timeout))
+
 	err = instance.Signal(timeout)
-	require.Error(t, err) // not allowed
+	require.NoError(t, err) // This does no checking
 
 	log.Infoln("************************* down -> running")
 
@@ -289,7 +289,67 @@ func TestSetFlapping(t *testing.T) {
 
 	require.Equal(t, 0, set.CountByState(running))
 	require.Equal(t, 1, set.CountByState(cordoned))
-	require.Equal(t, cordoned, first(instance.State()))
+	require.Equal(t, cordoned, instance.State())
 
 	set.Stop()
+}
+
+func TestMaxVisits(t *testing.T) {
+	const (
+		up Index = iota
+		down
+		unavailable
+	)
+
+	const (
+		startup Signal = iota
+		shutdown
+		error
+	)
+
+	spec, err := Define(
+		State{
+			Index: up,
+			Transitions: map[Signal]Index{
+				shutdown: down,
+			},
+		},
+		State{
+			Index: down,
+			Transitions: map[Signal]Index{
+				startup: up,
+				error:   unavailable,
+			},
+			Visit: Limit{2, error},
+		},
+		State{
+			Index: unavailable,
+		},
+	)
+
+	require.NoError(t, err)
+
+	clock := NewClock()
+
+	// set is a collection of fsm intances that follow the same rules.
+	set := NewSet(spec, clock)
+
+	defer set.Stop()
+
+	instance := set.Add(up)
+
+	err = instance.Signal(shutdown)
+	require.NoError(t, err)
+	require.Equal(t, down, instance.State()) // 1
+
+	err = instance.Signal(startup)
+	require.NoError(t, err)
+	require.Equal(t, up, instance.State())
+
+	err = instance.Signal(shutdown)
+	require.NoError(t, err)
+	require.Equal(t, down, instance.State()) // 2
+
+	// then automatically triggered to the unavailable state
+	require.Equal(t, unavailable, instance.State())
 }

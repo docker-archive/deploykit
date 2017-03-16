@@ -151,11 +151,16 @@ func (s *Set) handleAdd(initial Index) error {
 		index:  -1,
 		parent: s,
 		flaps:  *newFlaps(),
+		visits: map[Index]int{
+			initial: 1,
+		},
 	}
 
 	// if there's deadline then enqueue
 	// check for TTL
-	if exp, ok := s.spec.expiry(initial); ok {
+	if exp, err := s.spec.expiry(initial); err != nil {
+		s.handleError(err, initial)
+	} else if exp != nil {
 		new.update(initial, s.now, exp.TTL)
 		s.deadlines.enqueue(new)
 	}
@@ -164,7 +169,11 @@ func (s *Set) handleAdd(initial Index) error {
 	s.members[id] = new
 	s.bystate[initial][id] = new
 
-	s.new <- new
+	// return a copy here so we don't have problems with races trying to read / write the same pointer
+	s.new <- &instance{
+		id:     new.id,
+		parent: s,
+	}
 
 	return nil
 }
@@ -177,6 +186,11 @@ func (s *Set) handleDelete(id ID) error {
 	// delete an instance and update index
 	delete(s.members, id)
 	delete(s.bystate[instance.state], id)
+
+	// for safety
+	instance.id = ID(0)
+	instance.parent = nil
+
 	return nil
 }
 
@@ -205,7 +219,11 @@ func (s *Set) handleClockTick(inputs chan<- *event) error {
 			// when a real event came in.
 			if instance.deadline > 0 {
 				// raise the signal
-				if ttl, ok := s.spec.expiry(instance.state); ok {
+				if ttl, err := s.spec.expiry(instance.state); err != nil {
+
+					return err
+
+				} else if ttl != nil {
 
 					log.V(100).Infoln("deadline exceeded:", instance.id, "raise=", ttl.Raise)
 
@@ -264,13 +282,32 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 
 	// call action before transitiion
 	if action != nil {
-		action(instance)
+		if err := action(instance); err != nil {
+
+			if rule, err := s.spec.error(current, event.signal); err != nil {
+
+				s.handleError(err, []interface{}{current, event, instance})
+
+			} else if rule != nil {
+
+				log.Warningln("error executing action, raising", rule.Raise)
+				instance.Signal(rule.Raise)
+
+				return nil
+			}
+		}
 	}
 
 	ttl := Tick(0)
 	// check for TTL
-	if exp, ok := s.spec.expiry(next); ok {
+	if exp, err := s.spec.expiry(next); err != nil {
+
+		return err
+
+	} else if exp != nil {
+
 		ttl = exp.TTL
+
 	}
 
 	instance.update(next, s.now, ttl)
@@ -296,6 +333,28 @@ func (s *Set) handleEvent(event *event, inputs chan<- *event) error {
 	// update the index
 	delete(s.bystate[current], instance.id)
 	s.bystate[next][instance.id] = instance
+
+	// visits limit trigger
+	{
+		target := next
+		// have we visited next state too many times?
+		if limit, err := s.spec.visit(target); err != nil {
+
+			s.handleError(err, []interface{}{current, next, instance})
+
+		} else if limit != nil {
+
+			log.V(100).Infoln("found limit:", limit.Value, "target=", target, "visits=", instance.visits[target])
+
+			if limit.Value > 0 && instance.visits[target] == limit.Value {
+
+				log.Warningln("max visits hit, raising:", instance.state, "=[", limit.Raise, "]=>")
+				instance.Signal(limit.Raise)
+
+				return nil
+			}
+		}
+	}
 
 	return nil
 }

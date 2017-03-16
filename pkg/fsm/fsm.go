@@ -1,5 +1,9 @@
 package fsm
 
+import (
+	log "github.com/golang/glog"
+)
+
 // Index is the index of the state in a FSM
 type Index int
 
@@ -9,7 +13,7 @@ type Index int
 // as some application-specific error state which is a state defined to correspond
 // to some external event indicating a real-world error event (as opposed to a
 // programming error here).
-type Action func(Instance)
+type Action func(Instance) error
 
 // Tick is a unit of time. Time is in relative terms and synchronized with an actual
 // timer that's provided by the client.
@@ -25,6 +29,20 @@ type Expiry struct {
 	Raise Signal
 }
 
+// Limit is a numerical value indicating a limit of occurrences.
+//type Limit int
+
+// Limit is a struct that captures the limit and what signal to raise
+type Limit struct {
+	Value int
+	Raise Signal
+}
+
+// Error specifies what to do when an error occurs, like when an action resulted in an error.
+type Error struct {
+	Raise Signal
+}
+
 // Signal is a signal that can drive the state machine to transfer from one state to next.
 type Signal int
 
@@ -32,10 +50,24 @@ type Signal int
 // state transition.  A state can have a TTL so that it is allowed to be in that
 // state for a given TTL.  On expiration, a signal is raised.
 type State struct {
-	Index       Index
+
+	// Index is a unique key of the state
+	Index Index
+
+	// Transitions fully specifies all the possible transitions from this state, by the way of signals.
 	Transitions map[Signal]Index
-	Actions     map[Signal]Action
-	TTL         Expiry
+
+	// Actions specify for each signal, what code / action is to be executed as the fsm transits from one state to next.
+	Actions map[Signal]Action
+
+	// Errors specifies the handling of errors when executing action.  On action error, another signal is raised.
+	Errors map[Signal]Error
+
+	// TTL specifies how long this state can last before a signal is raised.
+	TTL Expiry
+
+	// Visit specifies a limit on the number of times the fsm can visit this state before raising a signal.
+	Visit Limit
 }
 
 // Define performs basic validation, consistency checks and returns a compiled spec.
@@ -64,14 +96,15 @@ func Define(s State, more ...State) (spec *Spec, err error) {
 	spec.states = states
 	spec.signals = signals
 
+	log.V(100).Infoln("signals=", signals)
 	return
 }
 
 func compile(m map[Index]State) (map[Signal]Signal, error) {
+
 	signals := map[Signal]Signal{}
 
 	for _, s := range m {
-
 		// Check all the state references in Transitions
 		for signal, next := range s.Transitions {
 			if _, has := m[next]; !has {
@@ -79,10 +112,15 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 			}
 			signals[signal] = signal
 		}
+	}
 
+	// all signals must be known here
+
+	for _, s := range m {
 		// Check all the signal references in Actions must be in transitions
 		for signal, action := range s.Actions {
 			if _, has := s.Transitions[signal]; !has {
+				log.Warningln("actions has signal that's not in state's transitions:", s.Index, signal)
 				return nil, unknownTransition(signal)
 			}
 
@@ -95,12 +133,47 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 			}
 		}
 
+		for signal, error := range s.Errors {
+			if _, has := s.Transitions[signal]; !has {
+				log.Warningln("error specifies signal that's not in state's transitions:", s.Index, signal)
+				return nil, unknownSignal(signal)
+			}
+			if _, has := s.Transitions[error.Raise]; !has {
+				log.Warningln("error handler raises signal that's not in state's transitions:", s.Index, error.Raise)
+				return nil, unknownSignal(error.Raise)
+			}
+
+			// register as valid signal
+			signals[signal] = signal
+		}
 	}
+
+	// what's raised in the TTL and in the Visit limit must be defined as well
+
+	for _, s := range m {
+		if s.TTL.TTL > 0 {
+			if _, has := s.Transitions[s.TTL.Raise]; !has {
+				log.Warningln("expiry raises signal that's not in state's transitions:", s.Index, s.TTL)
+				return nil, unknownSignal(s.TTL.Raise)
+			}
+
+			// register as valid signal
+			signals[s.TTL.Raise] = s.TTL.Raise
+
+		}
+		if s.Visit.Value > 0 {
+			if _, has := s.Transitions[s.Visit.Raise]; !has {
+				log.Warningln("visit limit raises signal that's not in state's transitions:", s.Index, s.Visit)
+				return nil, unknownSignal(s.Visit.Raise)
+			}
+
+			// register as valid signal
+			signals[s.Visit.Raise] = s.Visit.Raise
+		}
+	}
+
 	return signals, nil
 }
-
-// Limit is a numerical value indicating a limit of occurrences.
-type Limit int
 
 // Spec is a specification of all the rules for the fsm
 type Spec struct {
@@ -118,15 +191,49 @@ func newSpec() *Spec {
 }
 
 // returns an expiry for the state.  if the TTL is 0 then there's no expiry for the state.
-func (s *Spec) expiry(state Index) (expiry Expiry, found bool) {
-	st, has := s.states[state]
+func (s *Spec) expiry(current Index) (expiry *Expiry, err error) {
+	state, has := s.states[current]
 	if !has {
-		found = false
+		err = unknownState(current)
 		return
 	}
-	if st.TTL.TTL > 0 {
-		expiry = st.TTL
-		found = true
+	if state.TTL.TTL > 0 {
+		expiry = &state.TTL
+	}
+	return
+}
+
+// returns an error handling rule
+func (s *Spec) error(current Index, signal Signal) (rule *Error, err error) {
+	state, has := s.states[current]
+	if !has {
+		err = unknownState(current)
+		return
+	}
+
+	_, has = s.signals[signal]
+	if !has {
+		err = unknownSignal(signal)
+		return
+	}
+
+	v, has := state.Errors[signal]
+	if has {
+		return &v, nil
+	}
+	return nil, nil
+}
+
+// returns the limit on visiting this state
+func (s *Spec) visit(next Index) (limit *Limit, err error) {
+	state, has := s.states[next]
+	if !has {
+		err = unknownState(next)
+		return
+	}
+
+	if state.Visit.Value > 0 {
+		limit = &state.Visit
 	}
 	return
 }

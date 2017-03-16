@@ -11,6 +11,7 @@ import (
 const (
 	specified   Index = iota // first specified by the user's spec
 	allocated                // allocated is matched to an external resource found
+	creating                 // creating is when the instance is being created
 	running                  // running is healthy and running
 	down                     // down is not running / unhealthy
 	cordoned                 // cordoned is excluded and to be reaped
@@ -19,6 +20,7 @@ const (
 
 const (
 	found     Signal = iota // found is the signal when a resource is to be associated to an instance
+	create                  // create provision the instance
 	healthy                 // healthy is when the resource is determined healthy
 	unhealthy               // unhealthy is when the resource is not healthy
 	cordon                  // cordon marks the instance as off limits / use
@@ -31,10 +33,15 @@ func simpleProvisionModel(actions map[Signal]Action) *Spec {
 		State{
 			Index: specified,
 			Transitions: map[Signal]Index{
-				found: allocated,
+				found:  allocated,
+				create: creating,
 			},
-			Actions: map[Signal]Action{
-				found: actions[found],
+			TTL: Expiry{5, create},
+		},
+		State{
+			Index: creating,
+			Transitions: map[Signal]Index{
+				found: allocated,
 			},
 		},
 		State{
@@ -89,13 +96,38 @@ func simpleProvisionModel(actions map[Signal]Action) *Spec {
 	return spec
 }
 
+type machine struct {
+	Instance
+	id     string // hardware instance id
+	config interface{}
+}
+
+type cluster struct {
+	size  int
+	zones [3]*Set
+}
+
+func (c *cluster) create(Instance) error {
+	return nil
+}
+func (c *cluster) cordon(Instance) error {
+	return nil
+}
+func (c *cluster) terminate(Instance) error {
+	return nil
+}
+
 func TestSimpleProvisionFlow(t *testing.T) {
 
-	actions := map[Signal]Action{}
+	myCluster := &cluster{
+		size: 100,
+	}
 
-	actions[cordon] = func(Instance) {}
-	actions[terminate] = func(Instance) {}
-	actions[found] = func(Instance) {}
+	actions := map[Signal]Action{
+		create:    myCluster.create,
+		cordon:    myCluster.cordon,
+		terminate: myCluster.terminate,
+	}
 
 	spec := simpleProvisionModel(actions)
 	require.NotNil(t, spec)
@@ -104,15 +136,14 @@ func TestSimpleProvisionFlow(t *testing.T) {
 
 	clock := Wall(time.Tick(500 * time.Millisecond))
 
-	azs := make([]*Set, 3)
-
-	for i := range azs {
-		azs[i] = NewSet(spec, clock)
+	for i := range myCluster.zones {
+		myCluster.zones[i] = NewSet(spec, clock)
 	}
 
 	defer func() {
-		for i := range azs {
-			azs[i].Stop()
+		for i := range myCluster.zones {
+			myCluster.zones[i].Stop()
 		}
 	}()
+
 }

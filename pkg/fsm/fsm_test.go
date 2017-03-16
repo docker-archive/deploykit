@@ -35,6 +35,7 @@ func TestDefinition(t *testing.T) {
 		Transitions: map[Signal]Index{
 			turnOn: on,
 		},
+		Visit: Limit{5, turnOn},
 	}
 
 	_, err = compile(m)
@@ -53,6 +54,15 @@ func TestDefinition(t *testing.T) {
 	spec = spec.CheckFlappingMust([]Flap{
 		{States: [2]Index{on, off}, Count: 100},
 	})
+
+	limit, err := spec.visit(off)
+	require.NoError(t, err)
+	require.Equal(t, 5, limit.Value)
+	require.Equal(t, turnOn, limit.Raise)
+
+	limit, err = spec.visit(on)
+	require.NoError(t, err)
+	require.Nil(t, limit)
 
 	require.Equal(t, 1, len(spec.flaps))
 	t.Log(spec)
@@ -73,12 +83,14 @@ func TestSimple(t *testing.T) {
 	)
 
 	saidHi := make(chan struct{})
-	var sayHi Action = func(Instance) {
+	var sayHi Action = func(Instance) error {
 		close(saidHi)
+		return nil
 	}
 	saidBye := make(chan struct{})
-	var sayBye Action = func(Instance) {
+	var sayBye Action = func(Instance) error {
 		close(saidBye)
+		return nil
 	}
 
 	spec, err := Define(
@@ -155,20 +167,25 @@ func TestFsmUsage(t *testing.T) {
 		decommissioned
 	)
 
-	createInstance := func(Instance) {
+	createInstance := func(Instance) error {
 		t.Log("creating instance")
+		return nil
 	}
-	deleteInstance := func(Instance) {
+	deleteInstance := func(Instance) error {
 		t.Log("delete instance")
+		return nil
 	}
-	cleanup := func(Instance) {
+	cleanup := func(Instance) error {
 		t.Log("cleanup")
+		return nil
 	}
-	recordFlapping := func(Instance) {
+	recordFlapping := func(Instance) error {
 		t.Log("flap is if this happens more than multiples of 2 calls")
+		return nil
 	}
-	sendAlert := func(Instance) {
+	sendAlert := func(Instance) error {
 		t.Log("alert")
+		return nil
 	}
 
 	fsm, err := Define(

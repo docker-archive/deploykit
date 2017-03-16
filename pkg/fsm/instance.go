@@ -12,8 +12,9 @@ type ID uint64
 // Instance is the interface that returns ID and state of the fsm instance safely.
 type Instance interface {
 	ID() ID
-	State() (Index, bool)
+	State() Index
 	Signal(Signal) error
+	CanReceive(Signal) bool
 }
 
 type instance struct {
@@ -25,6 +26,7 @@ type instance struct {
 	start    Time
 	deadline Time
 	index    int // index used in the deadlines queue
+	visits   map[Index]int
 }
 
 // ID returns the ID of the fsm instance
@@ -33,35 +35,40 @@ func (i instance) ID() ID {
 }
 
 // State returns the state of the fsm instance
-func (i instance) State() (Index, bool) {
+func (i instance) State() Index {
 	result := make(chan Index)
+	defer close(result)
 	// we have to ask the set which actually holds the instance (this was returned by copy)
 	i.parent.reads <- func(view Set) {
 		if instance, has := view.members[i.id]; has {
 			result <- instance.state
 		}
-		close(result)
 	}
-	v, ok := <-result
-	return v, ok
+	return <-result
+}
+
+// Valid returns true if current state can receive the given signal
+func (i instance) CanReceive(s Signal) bool {
+	_, _, err := i.parent.spec.transition(i.State(), s)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 // Signal sends a signal to the instance
-func (i instance) Signal(s Signal) error {
-	log.V(100).Infoln("instance", i.id, "signal=", s)
+func (i instance) Signal(s Signal) (err error) {
+	defer func() { log.V(100).Infoln("instance", i.id, "signal=", s, "err=", err) }()
 
 	if _, has := i.parent.spec.signals[s]; !has {
-		return unknownSignal(s)
+		err = unknownSignal(s)
+		return
 	}
 
 	dest := i.parent.inputs
 	if dest == nil {
-		return errors.New("not-initialized")
-	}
-
-	_, _, err := i.parent.spec.transition(i.state, s)
-	if err != nil {
-		return err
+		err = errors.New("not-initialized")
+		return
 	}
 
 	dest <- &event{instance: i.id, signal: s}
@@ -69,6 +76,7 @@ func (i instance) Signal(s Signal) error {
 }
 
 func (i *instance) update(next Index, now Time, ttl Tick) {
+	i.visits[next] = i.visits[next] + 1
 	i.state = next
 	i.start = now
 	if ttl > 0 {
