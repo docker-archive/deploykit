@@ -35,11 +35,6 @@ type Limit struct {
 	Raise Signal
 }
 
-// // Error specifies what to do when an error occurs, like when an action resulted in an error.
-// type Error struct {
-// 	Raise Signal
-// }
-
 // Signal is a signal that can drive the state machine to transfer from one state to next.
 type Signal int
 

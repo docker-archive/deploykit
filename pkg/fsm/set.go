@@ -294,7 +294,7 @@ func (s *Set) processVisitLimit(tid int64, instance *instance, state Index) erro
 
 		if limit.Value > 0 && instance.visits[state] == limit.Value {
 
-			log.V(100).Infoln(tid, "max visits hit.", "@id=", instance.id, "raising:", instance.state, "=[", limit.Raise, "]=>")
+			log.V(100).Infoln(tid, "max visits hit.", "@id=", instance.id, "[", instance.state, "]--(", limit.Raise, ")-->")
 			instance.Signal(limit.Raise)
 
 			return nil
@@ -376,23 +376,29 @@ func (s *Set) run() chan<- *event {
 	events := make(chan *event)
 	transactions := make(chan func(int64) (interface{}, error), BufferedChannelSize)
 
+	stopTransactions := make(chan struct{})
 	// Core processing
 	go func() {
 		defer func() {
 			log.Infoln("set shutting down.")
+			close(transactions)
 		}()
 
 		for {
-			txn := <-transactions
-			if txn == nil {
+			select {
+			case <-stopTransactions:
 				return
-			}
 
-			tid := time.Now().UnixNano()
-			if ctx, err := txn(tid); err != nil {
-				s.handleError(tid, err, ctx)
-			}
+			case txn := <-transactions:
+				if txn == nil {
+					return
+				}
+				tid := time.Now().UnixNano()
+				if ctx, err := txn(tid); err != nil {
+					s.handleError(tid, err, ctx)
+				}
 
+			}
 		}
 	}()
 
@@ -473,6 +479,7 @@ func (s *Set) run() chan<- *event {
 			transactions <- tx
 
 		}
+
 	}()
 
 	return events
