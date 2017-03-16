@@ -130,19 +130,16 @@ func (p awsInstancePlugin) Label(id instance.ID, labels map[string]string) error
 		allTags[aws.StringValue(t.Key)] = aws.StringValue(t.Value)
 	}
 
-	keys, merged := mergeTags(allTags, labels)
+	_, merged := mergeTags(allTags, labels)
 
-	tags := []*ec2.Tag{}
-	for _, k := range keys {
-		key := k
+	for k := range merged {
 		// filter out the special aws: key because it's reserved so leave them alone
-		if strings.Index(key, "aws:") == -1 {
-			tags = append(tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(merged[key])})
+		if strings.HasPrefix(k, "aws:") {
+			delete(merged, k)
 		}
 	}
 
-	_, err = p.client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{aws.String(string(id))}, Tags: tags})
-	return err
+	return ec2CreateTags(p.client, id, merged)
 }
 
 // mergeTags merges multiple maps of tags, implementing 'last write wins' for colliding keys.
