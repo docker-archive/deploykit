@@ -172,7 +172,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 	clock.Start()
 
 	for i := range myCluster.zones {
-		myCluster.zones[i] = NewSet(spec, clock)
+		myCluster.zones[i] = NewSet(spec, clock, DefaultOptions(fmt.Sprintf("zone-%d", i)))
 	}
 
 	defer func() {
@@ -228,15 +228,24 @@ func TestSimpleProvisionFlow(t *testing.T) {
 		})
 	}
 
+	count := 0
 	start := time.Now()
 	for {
-		count := myCluster.countCreated()
-		log.Infoln("We should be creating some instances:", count, "create calls made.")
 
-		if count == 20 {
+		// check all the zones
+		for i := range myCluster.zones {
+			count += myCluster.zones[i].CountByState(allocated)
+		}
+
+		if count == 30 {
 			break
 		}
+
+		log.Infoln("We should be creating some instances:", count, "create calls made.")
 		time.Sleep(1 * time.Second)
 	}
 	log.Info("elapsed:", time.Now().Sub(start))
+
+	require.Equal(t, 20, myCluster.countCreated())
+
 }

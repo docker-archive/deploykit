@@ -445,8 +445,9 @@ func TestActionErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	time.Sleep(100 * time.Millisecond)
+
 	// then automatically triggered to the unavailable state
-	//require.Equal(t, unavailable, instance.State())
+	require.Equal(t, unavailable, instance.State())
 
 	log.Infoln("stopping")
 }

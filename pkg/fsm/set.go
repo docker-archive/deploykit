@@ -6,9 +6,24 @@ import (
 	log "github.com/golang/glog"
 )
 
+const (
+	defaultBufferSize = 100
+)
+
 // NewSet returns a new set
-func NewSet(spec *Spec, clock *Clock) *Set {
+func NewSet(spec *Spec, clock *Clock, optional ...Options) *Set {
+
+	options := Options{}
+	if len(optional) > 0 {
+		options = optional[0]
+	}
+
+	if options.BufferSize == 0 {
+		options.BufferSize = defaultBufferSize
+	}
+
 	set := &Set{
+		options:      options,
 		spec:         *spec,
 		stop:         make(chan struct{}),
 		clock:        clock,
@@ -19,7 +34,7 @@ func NewSet(spec *Spec, clock *Clock) *Set {
 		delete:       make(chan ID),
 		errors:       make(chan error),
 		events:       make(chan *event),
-		transactions: make(chan *txn, BufferedChannelSize),
+		transactions: make(chan *txn, options.BufferSize),
 		new:          make(chan Instance),
 		deadlines:    newQueue(),
 	}
@@ -33,9 +48,27 @@ func NewSet(spec *Spec, clock *Clock) *Set {
 	return set
 }
 
+// DefaultOptions returns default values
+func DefaultOptions(name string) Options {
+	return Options{
+		Name:       name,
+		BufferSize: defaultBufferSize,
+	}
+}
+
+// Options contains options for the set
+type Options struct {
+	// Name is the name of the set
+	Name string
+
+	// BufferSize is the size of transaction queue/buffered channel
+	BufferSize int
+}
+
 // Set is a collection of fsm instances that follow a given spec.  This is
 // the primary interface to manipulate the instances... by sending signals to it via channels.
 type Set struct {
+	options      Options
 	spec         Spec
 	now          Time
 	next         ID
@@ -51,8 +84,8 @@ type Set struct {
 	events       chan *event
 	transactions chan *txn
 	deadlines    *queue
-
-	running bool
+	name         string
+	running      bool
 }
 
 // Signal sends a signal to the instance
@@ -61,7 +94,7 @@ func (s *Set) Signal(signal Signal, instance ID) error {
 		return unknownSignal(signal)
 	}
 
-	log.V(100).Infoln("signal", signal, "to instance=", instance)
+	log.V(100).Infoln(s.options.Name, "signal", signal, "to instance=", instance)
 	s.events <- &event{instance: instance, signal: signal}
 	return nil
 }
@@ -161,7 +194,7 @@ func (s *Set) handleAdd(tid int64, initial Index) error {
 		},
 	}
 
-	log.V(100).Infoln(tid, "add:", "id=", id, "initial=", initial, "set deadline.")
+	log.V(100).Infoln(s.options.Name, tid, "add:", "id=", id, "initial=", initial, "set deadline.")
 	if err := s.processDeadline(tid, new, initial); err != nil {
 		return err
 	}
@@ -208,7 +241,7 @@ func (s *Set) handleClockTick(tid int64) error {
 	s.tick()
 	now := s.ct()
 
-	log.V(100).Infoln(tid, "CLOCK [", now, "] ========================================================")
+	log.V(100).Infoln(s.options.Name, tid, "CLOCK [", now, "] ========================================================")
 
 	for s.deadlines.Len() > 0 {
 
@@ -233,7 +266,7 @@ func (s *Set) handleClockTick(tid int64) error {
 
 			} else if ttl != nil {
 
-				log.V(100).Infoln(tid, "deadline exceeded:", "@id=", instance.id, "raise=", ttl.Raise)
+				log.V(100).Infoln(s.options.Name, tid, "deadline exceeded:", "@id=", instance.id, "raise=", ttl.Raise)
 
 				s.raise(tid, instance.id, ttl.Raise, instance.state)
 			}
@@ -262,17 +295,17 @@ func (s *Set) processDeadline(tid int64, instance *instance, state Index) error 
 		// case where this instance is in the deadlines queue (since it has a > -1 index)
 		if instance.deadline > 0 {
 			// in the queue and deadline is different now
-			log.V(100).Infoln(tid,
+			log.V(100).Infoln(s.options.Name, tid,
 				"deadline: updating @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
 			s.deadlines.update(instance)
 		} else {
-			log.V(100).Infoln(tid,
+			log.V(100).Infoln(s.options.Name, tid,
 				"deadline: removing @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
 			s.deadlines.remove(instance)
 		}
 	} else if instance.deadline > 0 {
 		// index == -1 means it's not in the queue yet and we have a deadline
-		log.V(100).Infoln(tid,
+		log.V(100).Infoln(s.options.Name, tid,
 			"deadline: enqueuing @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
 		s.deadlines.enqueue(instance)
 	}
@@ -290,7 +323,8 @@ func (s *Set) processVisitLimit(tid int64, instance *instance, state Index) erro
 
 		if limit.Value > 0 && instance.visits[state] == limit.Value {
 
-			log.V(100).Infoln(tid, "max visits hit.", "@id=", instance.id, "[", instance.state, "]--(", limit.Raise, ")-->")
+			log.V(100).Infoln(s.options.Name, tid,
+				"max visits hit.", "@id=", instance.id, "[", instance.state, "]--(", limit.Raise, ")-->")
 
 			s.raise(tid, instance.id, limit.Raise, instance.state)
 
@@ -303,7 +337,7 @@ func (s *Set) processVisitLimit(tid int64, instance *instance, state Index) erro
 // raises a signal by placing directly on the txn queue
 func (s *Set) raise(tid int64, id ID, signal Signal, current Index) (err error) {
 	defer func() {
-		log.V(100).Infoln("instance.signal: @id=", id, "signal=", signal, "current=", current, "err=", err)
+		log.V(100).Infoln(s.options.Name, "instance.signal: @id=", id, "signal=", signal, "current=", current, "err=", err)
 	}()
 
 	if _, has := s.spec.signals[signal]; !has {
@@ -335,7 +369,7 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 		return err
 	}
 
-	log.V(100).Infoln(tid,
+	log.V(100).Infoln(s.options.Name, tid,
 		"transition: @id=", instance.id, "::::", "[", current, "]--(", event.signal, ")-->", "[", next, "]",
 		"deadline=", instance.deadline, "index=", instance.index)
 
@@ -404,7 +438,7 @@ func (s *Set) run() {
 	// Core processing
 	go func() {
 		defer func() {
-			log.Infoln("set shutting down.")
+			log.Infoln(s.options.Name, "set shutting down.")
 			close(s.transactions)
 		}()
 
