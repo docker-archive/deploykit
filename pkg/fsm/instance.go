@@ -5,15 +5,27 @@ type ID uint64
 
 // Instance is the interface that returns ID and state of the fsm instance safely.
 type Instance interface {
+
+	// ID returns the ID of the instance
 	ID() ID
+
+	// State returns the state of the instance. This is an expensive call to be submitted to queue to view
 	State() Index
-	Signal(Signal) error
+
+	// Data returns the custom data attached to the instance.  It's set via the optional arg in Signal
+	Data() interface{}
+
+	// Signal signals the instance with optional custom data
+	Signal(Signal, ...interface{}) error
+
+	// CanReceive returns true if the current state of the instance can receive the given signal
 	CanReceive(Signal) bool
 }
 
 type instance struct {
 	id       ID
 	state    Index
+	data     interface{}
 	parent   *Set
 	error    error
 	flaps    flaps
@@ -26,6 +38,11 @@ type instance struct {
 // ID returns the ID of the fsm instance
 func (i instance) ID() ID {
 	return i.id
+}
+
+// Data returns a customer data value attached to this instance
+func (i instance) Data() interface{} {
+	return i.data
 }
 
 // State returns the state of the fsm instance
@@ -48,8 +65,8 @@ func (i instance) CanReceive(s Signal) bool {
 }
 
 // Signal sends a signal to the instance
-func (i instance) Signal(s Signal) (err error) {
-	return i.parent.Signal(s, i.id)
+func (i instance) Signal(s Signal, optionalData ...interface{}) (err error) {
+	return i.parent.Signal(s, i.id, optionalData...)
 }
 
 func (i *instance) update(next Index, now Time, ttl Tick) {

@@ -89,13 +89,18 @@ type Set struct {
 }
 
 // Signal sends a signal to the instance
-func (s *Set) Signal(signal Signal, instance ID) error {
+func (s *Set) Signal(signal Signal, instance ID, optionalData ...interface{}) error {
 	if _, has := s.spec.signals[signal]; !has {
 		return unknownSignal(signal)
 	}
 
+	var data interface{}
+	if len(optionalData) > 0 {
+		data = optionalData[0]
+	}
+
 	log.V(100).Infoln(s.options.Name, "signal", signal, "to instance=", instance)
-	s.events <- &event{instance: instance, signal: signal}
+	s.events <- &event{instance: instance, signal: signal, data: data}
 	return nil
 }
 
@@ -120,12 +125,33 @@ func (s *Set) CountByState(state Index) int {
 }
 
 // ForEachInstance iterates through the set and provides a consistent view of the instances
-func (s *Set) ForEachInstance(view func(ID, Index) bool) {
+func (s *Set) ForEachInstance(view func(ID, Index, interface{}) bool) {
 	blocker := make(chan struct{})
 	s.reads <- func(set Set) {
 		defer close(blocker)
 		for _, m := range set.members {
-			if view(m.id, m.state) {
+			if view(m.id, m.state, m.data) {
+				continue
+			} else {
+				break
+			}
+		}
+	}
+	<-blocker
+}
+
+// ForEachInstanceInState iterates through the set and provides a consistent view of the instances
+func (s *Set) ForEachInstanceInState(check Index, view func(ID, Index, interface{}) bool) {
+	blocker := make(chan struct{})
+	s.reads <- func(set Set) {
+		defer close(blocker)
+		members, has := set.bystate[check]
+		if !has {
+			return
+		}
+
+		for _, m := range members {
+			if view(m.id, m.state, m.data) {
 				continue
 			} else {
 				break
@@ -168,6 +194,7 @@ func (s *Set) Stop() {
 type event struct {
 	instance ID
 	signal   Signal
+	data     interface{}
 }
 
 func (s *Set) handleError(tid int64, err error, ctx interface{}) {
@@ -387,6 +414,11 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 
 			return nil // done -- another transition
 		}
+	}
+
+	// Associate custom data - do this before calling on the action so action can do something with it.
+	if event.data != nil {
+		instance.data = event.data
 	}
 
 	// call action before transitiion

@@ -71,7 +71,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 
 	// view the instances
 	set.ForEachInstance(
-		func(id ID, state Index) bool {
+		func(id ID, state Index, data interface{}) bool {
 			states = append(states, state)
 			return false
 		},
@@ -85,7 +85,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 	// view the instances
 	waiting := 0
 	set.ForEachInstance(
-		func(id ID, state Index) bool {
+		func(id ID, state Index, data interface{}) bool {
 			if state == wait {
 				waiting++
 				return true

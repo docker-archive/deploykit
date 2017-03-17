@@ -102,16 +102,9 @@ func simpleProvisionModel(actions map[Signal]Action) *Spec {
 	return spec
 }
 
-type machine struct {
-	Instance
-	id     string // hardware instance id
-	config interface{}
-}
-
 type cluster struct {
-	size     int
-	zones    []*Set
-	machines [][]*machine
+	size  int
+	zones []*Set
 
 	created    int
 	cordoned   int
@@ -148,14 +141,21 @@ func (c *cluster) terminate(Instance) error {
 	return nil
 }
 
+func (c *cluster) countByState(state Index) int {
+	total := 0
+	for i := range c.zones {
+		total += c.zones[i].CountByState(state)
+	}
+	return total
+}
+
 func TestSimpleProvisionFlow(t *testing.T) {
 
 	total := 30
 	zones := 3
 	myCluster := &cluster{
-		size:     total,
-		zones:    make([]*Set, zones),
-		machines: make([][]*machine, zones),
+		size:  total,
+		zones: make([]*Set, zones),
 	}
 
 	actions := map[Signal]Action{
@@ -184,9 +184,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 	log.Infoln("Creating", myCluster.size, "instances across", len(myCluster.zones), "zones.")
 
 	for i := 0; i < myCluster.size; i++ {
-		instance := myCluster.zones[i%zones].Add(specified)
-		m := &machine{Instance: instance}
-		myCluster.machines[i%zones] = append(myCluster.machines[i%zones], m)
+		myCluster.zones[i%zones].Add(specified)
 	}
 
 	log.Infoln("Specified all instances based on spec:")
@@ -200,52 +198,112 @@ func TestSimpleProvisionFlow(t *testing.T) {
 
 	// Here we call the infrastructure to list all known instances
 
+	world := []string{} // this is the list of all known instances
+
 	described := make([][]string, zones) // sets of found ids across n zones
 	for i := range [10]int{} {
-		described[i%zones] = append(described[i%zones], fmt.Sprintf("instance-%d", rand.Intn(total)))
+		id := fmt.Sprintf("instance-%d", rand.Intn(total))
+		described[i%zones] = append(described[i%zones], id)
+		world = append(world, id)
 	}
-	log.Infoln("Discover a few instances over 3 zones", described)
 
+	log.Infoln("Discover a few instances over 3 zones", described)
 	// label / associate with the fsm instances
+	associated := 0
 	for i := range make([]int, zones) {
 
 		az := myCluster.zones[i]
-		machines := myCluster.machines[i]
 
 		total := len(described[i]) // the discovered instances in this zone
 		j := 0
-		az.ForEachInstance(func(id ID, state Index) bool {
-			if state == specified {
+		az.ForEachInstanceInState(specified,
+			func(id ID, state Index, data interface{}) bool {
 
-				require.NoError(t, az.Signal(found, id))
-				machines[id].id = described[i][j]
-
-				log.Infoln("associated", described[i][j], "to", machines[id])
+				require.NoError(t, az.Signal(found, id, described[i][j]))
+				associated++
 
 				j++
-			}
-			return j < total
-		})
+				return j < total
+			})
 	}
 
-	count := 0
-	start := time.Now()
-	for {
+	// 10 instances have been associated
+	require.Equal(t, 10, associated)
 
-		// check all the zones
-		for i := range myCluster.zones {
-			count += myCluster.zones[i].CountByState(allocated)
-		}
+	time.Sleep(2 * time.Second)
 
-		if count == 30 {
-			break
-		}
+	require.Equal(t, 10, myCluster.countByState(allocated))
+	require.Equal(t, 20, myCluster.countByState(creating))
 
-		log.Infoln("We should be creating some instances:", count, "create calls made.")
-		time.Sleep(1 * time.Second)
+	// let's say 20 more instances are provisioned now and are coming back when we surveyed the infrastructure:
+
+	// suppose we do a set difference and compute the new ones we haven't seen before.  for each zone, let's
+	// put them in a buffered channel
+	newIds := map[int]chan string{
+		0: make(chan string, 10),
+		1: make(chan string, 10),
+		2: make(chan string, 10),
 	}
-	log.Info("elapsed:", time.Now().Sub(start))
+	for i := range [20]int{} {
+		id := fmt.Sprintf("instance-%d", rand.Intn(total))
+		described[i%zones] = append(described[i%zones], id)
+		world = append(world, id)
 
-	require.Equal(t, 20, myCluster.countCreated())
+		// push into the buffer channel to be read later when associating ids
+		newIds[i%zones] <- id
+	}
+	// close
+	for i := range newIds {
+		close(newIds[i])
+	}
 
+	require.Equal(t, 30, len(world))
+
+	// now we match the instances again
+	// those who are matched are already in allocated state.  so we scan for ones in the creating state
+
+	associated, unassociated := 0, 0
+	for i := range myCluster.zones {
+		az := myCluster.zones[i]
+		az.ForEachInstance(
+			func(id ID, s Index, d interface{}) bool {
+				switch {
+				case s == allocated && d != nil:
+					associated++
+				case s == creating && d == nil:
+					unassociated++
+
+					// get the first available id and attach it
+					instanceID := <-newIds[i]
+
+					az.Signal(found, id, instanceID)
+
+					log.Infoln("associated", id, "to", instanceID)
+
+				}
+
+				return true
+			},
+		)
+	}
+	require.Equal(t, 20, unassociated) // all the ones in creating all have no id attached to it.
+	require.Equal(t, 10, associated)   // the initial 10 that was first discovered.
+
+	time.Sleep(1 * time.Second) // wait a bit
+
+	require.Equal(t, 30, myCluster.countByState(allocated))
+
+	log.Infoln("make sure everyone is associated with an instance id from the infrastructure")
+
+	for i := range myCluster.zones {
+		az := myCluster.zones[i]
+		az.ForEachInstanceInState(allocated,
+			func(id ID, s Index, d interface{}) bool {
+				require.NotNil(t, d)
+				return true
+			},
+		)
+	}
+
+	// Now all instance are provisioned, in allocated state.
 }
