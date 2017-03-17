@@ -230,9 +230,13 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 
 	opts := Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, errs1, err := Subscribe(socket, "local/instance", opts)
-	require.NoError(t, err)
+	start := make(chan struct{})
 	go func() {
+		<-start
+
+		topic1, errs1, err := Subscribe(socket, "local/instance", opts)
+		require.NoError(t, err)
+
 		for {
 			select {
 			case e := <-errs1:
@@ -249,9 +253,12 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 		}
 	}()
 
-	topic2, errs2, err := Subscribe(socket, "local/instancetest", opts)
-	require.NoError(t, err)
 	go func() {
+		<-start
+
+		topic2, errs2, err := Subscribe(socket, "local/instancetest", opts)
+		require.NoError(t, err)
+
 		for {
 			select {
 			case e := <-errs2:
@@ -269,8 +276,9 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 	}()
 
 	go func() {
+		<-start
+
 		for {
-			<-time.After(10 * time.Millisecond)
 			now := time.Now()
 			evt := event{Time: now.UnixNano(), Message: fmt.Sprintf("Now is %v", now)}
 			require.NoError(t, broker.Publish("local/instance", evt))
@@ -278,6 +286,8 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 			require.NoError(t, broker.Publish("local/instancetest", evt))
 		}
 	}()
+
+	close(start)
 
 	// Test a few rounds to make sure all subscribers get the same messages each round.
 	for i := 0; i < 5; i++ {
