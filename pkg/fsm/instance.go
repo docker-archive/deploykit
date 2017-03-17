@@ -1,11 +1,5 @@
 package fsm
 
-import (
-	"errors"
-
-	log "github.com/golang/glog"
-)
-
 // ID is the id of the instance in a given set.  It's unique in that set.
 type ID uint64
 
@@ -55,23 +49,7 @@ func (i instance) CanReceive(s Signal) bool {
 
 // Signal sends a signal to the instance
 func (i instance) Signal(s Signal) (err error) {
-	defer func() {
-		log.V(100).Infoln("instance.signal: @id=", i.id, "signal=", s, "current=", i.state, "err=", err)
-	}()
-
-	if _, has := i.parent.spec.signals[s]; !has {
-		err = unknownSignal(s)
-		return
-	}
-
-	dest := i.parent.inputs
-	if dest == nil {
-		err = errors.New("not-initialized")
-		return
-	}
-
-	dest <- &event{instance: i.id, signal: s}
-	return nil
+	return i.parent.Signal(s, i.id)
 }
 
 func (i *instance) update(next Index, now Time, ttl Tick) {
