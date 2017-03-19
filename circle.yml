@@ -1,10 +1,8 @@
 machine:
-  # pre:
-  #   - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
-  #   - sudo container=yes service docker start
-  post:
-    - sudo curl -fsSLO https://get.docker.com/builds/Linux/x86_64/docker-1.13.1.tgz | sh
-    - sudo container=yes service docker start
+  pre:
+    - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
+  services:
+    - docker
 
   environment:
     OS: "linux"
