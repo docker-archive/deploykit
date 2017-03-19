@@ -1,8 +1,8 @@
 machine:
-  pre:
-    - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
-  services:
-    - docker
+  post:
+    - curl -fsSLO https://get.docker.com/builds/Linux/x86_64/docker-1.13.1.tgz && sudo tar --strip-components=1 -xvzf docker-1.13.1.tgz -C /usr/local/bin
+    - sudo container=yes docker daemon: { background: true }
+
   environment:
     OS: "linux"
     ARCH: "amd64"
@@ -10,6 +10,7 @@ machine:
     GOPATH: "$HOME/.go_workspace"
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     E2E_CLEANUP: "false"
+    SKIP_TESTS: "docker,etcd"
 
 dependencies:
   pre:
@@ -51,4 +52,3 @@ deployment:
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-    
