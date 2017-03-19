@@ -11,20 +11,20 @@ import (
 
 const (
 	busybox Command = `
-/usr/local/bin/docker run --rm \
+docker run --rm \
        busybox {{ call }} {{ argv | join " "}}
 `
 	busyboxHostname Command = `
-/usr/local/bin/docker run --rm \
+docker run --rm \
        busybox hostname
 `
-	busyboxLs Command = `/usr/local/bin/docker run --rm \
+	busyboxLs Command = `docker run --rm \
        busybox ls {{ arg 1 }}
 `
-	busyboxDateStream Command = `/usr/local/bin/docker run --rm --name {{ .container }} \
+	busyboxDateStream Command = `docker run --rm --name {{ .container }} \
 busybox /bin/sh -c 'while true; do date; sleep {{ .sleep }}; done'`
 
-	dockerStop Command = `/usr/local/bin/docker stop {{ arg 1 }}`
+	dockerStop Command = `docker stop {{ arg 1 }}`
 )
 
 func TestBuilder(t *testing.T) {
@@ -32,22 +32,22 @@ func TestBuilder(t *testing.T) {
 	b := busyboxHostname.builder()
 	cmd, err := b.generate()
 	require.NoError(t, err)
-	require.Equal(t, []string{"/usr/local/bin/docker", "run", "--rm", "busybox", "hostname"}, cmd)
+	require.Equal(t, []string{"docker", "run", "--rm", "busybox", "hostname"}, cmd)
 
 	b = busybox.builder().WithFunc("call", func() string { return "ls -al" })
 	cmd, err = b.generate("sys", "var")
 	require.NoError(t, err)
-	require.Equal(t, []string{"/usr/local/bin/docker", "run", "--rm", "busybox", "ls", "-al", "sys", "var"}, cmd)
+	require.Equal(t, []string{"docker", "run", "--rm", "busybox", "ls", "-al", "sys", "var"}, cmd)
 
 	b = busyboxLs.builder()
 	cmd, err = b.generate("sys", "var")
 	require.NoError(t, err)
-	require.Equal(t, []string{"/usr/local/bin/docker", "run", "--rm", "busybox", "ls", "sys"}, cmd)
+	require.Equal(t, []string{"docker", "run", "--rm", "busybox", "ls", "sys"}, cmd)
 
 	b = busyboxDateStream.builder().WithContext(map[string]interface{}{"container": "bob", "sleep": "1"})
 	cmd, err = b.generate()
 	require.NoError(t, err)
-	require.Equal(t, []string{"/usr/local/bin/docker", "run", "--rm", "--name", "bob", "busybox", "/bin/sh", "-c",
+	require.Equal(t, []string{"docker", "run", "--rm", "--name", "bob", "busybox", "/bin/sh", "-c",
 		"'while", "true;", "do", "date;", "sleep", "1;", "done'"}, cmd)
 
 }
