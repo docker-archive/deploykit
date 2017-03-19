@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,6 +53,11 @@ func TestBuilder(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+
+	if testutil.SkipTests("docker") {
+		t.SkipNow()
+	}
+
 	output, err := busyboxHostname.Output()
 	require.NoError(t, err)
 	require.True(t, len(output) > 0)
