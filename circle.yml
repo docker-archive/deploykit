@@ -1,7 +1,8 @@
 machine:
-  post:
-    - curl -fsSLO https://get.docker.com/builds/Linux/x86_64/docker-1.13.1.tgz && sudo tar --strip-components=1 -xvzf docker-1.13.1.tgz -C /usr/local/bin
-    - sudo container=yes docker daemon: { background: true }
+  pre:
+    - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
+  services:
+    - docker
 
   environment:
     OS: "linux"
@@ -42,6 +43,10 @@ test:
     - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)
 
 deployment:
+  pr:
+    branch: /pull\/.*/
+    commands:
+      - DOCKER_BUILD_FLAGS="--rm=false" make build-docker
   release:
     branch: /release-.*/
     commands:
