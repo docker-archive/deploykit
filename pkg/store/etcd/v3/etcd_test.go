@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/etcd/v3"
 	log "github.com/golang/glog"
@@ -13,6 +14,11 @@ import (
 )
 
 func TestWithRealEtcd(t *testing.T) {
+
+	if testutil.SkipTests("etcd") {
+		t.SkipNow()
+	}
+
 	ip := etcd.LocalIP()
 	containerName := "test-etcd-store"
 
@@ -35,6 +41,11 @@ func TestWithRealEtcd(t *testing.T) {
 }
 
 func testSaveLoad(t *testing.T) {
+
+	if testutil.SkipTests("etcd") {
+		t.SkipNow()
+	}
+
 	ip := etcd.LocalIP()
 	options := etcd.Options{
 		Config: clientv3.Config{

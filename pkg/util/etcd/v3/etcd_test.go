@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/docker/infrakit/pkg/types"
 	log "github.com/golang/glog"
 	"github.com/stretchr/testify/require"
@@ -30,6 +31,10 @@ func TestTypeAnyable(t *testing.T) {
 }
 
 func TestRunInContainer(t *testing.T) {
+
+	if testutil.SkipTests("etcd") {
+		t.SkipNow()
+	}
 
 	ip := LocalIP()
 	containerName := "etcd0"

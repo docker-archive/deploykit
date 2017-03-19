@@ -10,6 +10,7 @@ machine:
     GOPATH: "$HOME/.go_workspace"
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     E2E_CLEANUP: "false"
+    SKIP_TESTS: "docker,etcd"
 
 dependencies:
   pre:
