@@ -63,7 +63,7 @@ var (
 
 	// RunContainer is a command that shells out to Docker to run the etcd server in a container
 	RunContainer exec.Command = `
-/usr/local/bin/docker run --rm -d \
+docker run --rm -d \
        -v /usr/share/ca-certificates/:/etc/ssl/certs \
        -p 4001:4001 \
        -p 2380:2380 \
@@ -81,15 +81,15 @@ var (
        -initial-cluster-state new`
 
 	// StopContainer stops the etcd container
-	StopContainer exec.Command = `/usr/local/bin/docker stop {{ arg 1 }}`
+	StopContainer exec.Command = `docker stop {{ arg 1 }}`
 
 	// LsMembers lists the members in the cluster
 	LsMembers exec.Command = `
-/usr/local/bin/docker run --rm -e ETCDCTL_API=3 \
+docker run --rm -e ETCDCTL_API=3 \
        quay.io/coreos/etcd etcdctl --endpoints={{ arg 1 }}:2379 member list`
 
 	// Get fetches a value via etcdctl
 	Get exec.Command = `
-/usr/local/bin/docker run --rm -e ETCDCTL_API=3 \
+docker run --rm -e ETCDCTL_API=3 \
        quay.io/coreos/etcd etcdctl --endpoints={{ arg 1 }}:2379 get --print-value-only {{ arg 2 }}`
 )
