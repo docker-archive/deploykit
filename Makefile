@@ -115,6 +115,7 @@ endif
 	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
 	$(call build_binary,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
+	$(call build_binary,infrakit-resource,github.com/docker/infrakit/cmd/resource)
 	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
 	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
 	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)

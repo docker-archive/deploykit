@@ -7,16 +7,14 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
-	resource_plugin "github.com/docker/infrakit/pkg/plugin/resource"
-	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
-	"github.com/docker/infrakit/pkg/spi/instance"
+	resource_plugin "github.com/docker/infrakit/pkg/rpc/resource"
 	"github.com/docker/infrakit/pkg/spi/resource"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
-func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
+func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	var resourcePlugin resource.Plugin
 
@@ -24,6 +22,7 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "resource",
 		Short: "Access resource plugin",
 	}
+	name := cmd.PersistentFlags().String("name", "resource", "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		if err := upTree(c, func(x *cobra.Command, argv []string) error {
 			if x.PersistentPreRunE != nil {
@@ -34,20 +33,16 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		plugins, err := discovery.NewPluginDiscovery()
+		endpoint, err := plugins().Find(plugin.Name(*name))
 		if err != nil {
 			return err
 		}
 
-		instancePluginLookup := func(n plugin.Name) (instance.Plugin, error) {
-			endpoint, err := plugins.Find(n)
-			if err != nil {
-				return nil, err
-			}
-			return instance_client.NewClient(n, endpoint.Address)
+		p, err := resource_plugin.NewClient(endpoint.Address)
+		if err != nil {
+			return err
 		}
-
-		resourcePlugin = resource_plugin.NewResourcePlugin(instancePluginLookup)
+		resourcePlugin = p
 		return nil
 	}
 
@@ -64,34 +59,12 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		templateURL := args[0]
-
-		log.Infof("Reading template from %v", templateURL)
-		engine, err := template.NewTemplate(templateURL, template.Options{
-			SocketDir: discovery.Dir(),
-		})
+		spec, err := readSpecFromTemplateURL(args[0])
 		if err != nil {
 			return err
 		}
 
-		engine.WithFunctions(func() []template.Function {
-			return []template.Function{{Name: "resource", Func: resourceFunc}}
-		})
-
-		view, err := engine.Render(nil)
-		if err != nil {
-			return err
-		}
-
-		log.Debugln(view)
-
-		spec := resource.Spec{}
-		if err := types.AnyString(view).Decode(&spec); err != nil {
-			log.Warningln("Error parsing template")
-			return err
-		}
-
-		details, err := resourcePlugin.Commit(spec, *commitPretend)
+		details, err := resourcePlugin.Commit(*spec, *commitPretend)
 		if err == nil {
 			if *commitPretend {
 				fmt.Printf("Committing %s would involve: %s\n", spec.ID, details)
@@ -116,34 +89,12 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		templateURL := args[0]
-
-		log.Infof("Reading template from %v", templateURL)
-		engine, err := template.NewTemplate(templateURL, template.Options{
-			SocketDir: discovery.Dir(),
-		})
+		spec, err := readSpecFromTemplateURL(args[0])
 		if err != nil {
 			return err
 		}
 
-		engine.WithFunctions(func() []template.Function {
-			return []template.Function{{Name: "resource", Func: resourceFunc}}
-		})
-
-		view, err := engine.Render(nil)
-		if err != nil {
-			return err
-		}
-
-		log.Debugln(view)
-
-		spec := resource.Spec{}
-		if err := types.AnyString(view).Decode(&spec); err != nil {
-			log.Warningln("Error parsing template")
-			return err
-		}
-
-		details, err := resourcePlugin.Destroy(spec, *destroyPretend)
+		details, err := resourcePlugin.Destroy(*spec, *destroyPretend)
 		if err == nil {
 			if *destroyPretend {
 				fmt.Printf("Destroying %s would involve: %s\n", spec.ID, details)
@@ -155,9 +106,63 @@ func resourceCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	cmd.AddCommand(&destroy)
 
+	describe := cobra.Command{
+		Use:   "describe <template URL>",
+		Short: "describe a resource configuration specified by the URL",
+	}
+	describe.RunE = func(cmd *cobra.Command, args []string) error {
+		assertNotNil("no plugin", resourcePlugin)
+
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		spec, err := readSpecFromTemplateURL(args[0])
+		if err != nil {
+			return err
+		}
+
+		details, err := resourcePlugin.DescribeResources(*spec)
+		if err == nil {
+			if len(details) > 0 {
+				fmt.Println(details)
+			}
+		}
+		return err
+	}
+	cmd.AddCommand(&describe)
+
 	return cmd
 }
 
-func resourceFunc(s string) string {
-	return fmt.Sprintf("{{ resource `%s` }}", s)
+func readSpecFromTemplateURL(templateURL string) (*resource.Spec, error) {
+	log.Infof("Reading template from %v", templateURL)
+	engine, err := template.NewTemplate(templateURL, template.Options{
+		SocketDir: discovery.Dir(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	engine.WithFunctions(func() []template.Function {
+		return []template.Function{
+			{Name: "resource", Func: func(s string) string { return fmt.Sprintf("{{ resource `%s` }}", s) }},
+		}
+	})
+
+	view, err := engine.Render(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugln(view)
+
+	spec := resource.Spec{}
+	if err := types.AnyString(view).Decode(&spec); err != nil {
+		log.Warningln("Error parsing template")
+		return nil, err
+	}
+
+	return &spec, nil
 }
