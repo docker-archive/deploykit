@@ -55,8 +55,8 @@ Commit resources.json:
 $ build/infrakit resource commit file:$PWD/resources.json
 INFO[0000] Reading template from file:~/resources.json
 Committed Fancy Resources:
-Provisioned A (ID instance-9021654729849995625)
-Provisioned B (ID instance-2978607024592968517)
+Provisioned A (instance-9021654729849995625)
+Provisioned B (instance-2978607024592968517)
 ```
 
 Verify the presence of `A`'s ID in `B`:

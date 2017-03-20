@@ -173,7 +173,7 @@ func TestDescribeResources(t *testing.T) {
 	}
 	details, err := p.DescribeResources(spec)
 	require.NoError(t, err)
-	require.Equal(t, fmt.Sprintf("Found a (ID %s)\nFound b (ID %s)", string(*aID), string(*bID)), details)
+	require.Equal(t, fmt.Sprintf("Found a (%s)\nFound b (%s)", string(*aID), string(*bID)), details)
 }
 
 func TestDescribe(t *testing.T) {

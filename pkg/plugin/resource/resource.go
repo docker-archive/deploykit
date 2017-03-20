@@ -97,7 +97,7 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 			if err != nil {
 				return "", fmt.Errorf("Failed to provision %s: %s", name, err)
 			}
-			log.Infof("Provisioned %s (ID %s)", name, *id)
+			log.Infof("Provisioned %s (%s)", name, *id)
 			ids[name] = *id
 		}
 	}
@@ -115,7 +115,7 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 				idStr = string(id)
 			}
 		}
-		desc += fmt.Sprintf("\n%s %s (ID %s)", verb, name, idStr)
+		desc += fmt.Sprintf("\n%s %s (%s)", verb, name, idStr)
 	}
 
 	return desc, nil
@@ -143,16 +143,16 @@ func (p *plugin) Destroy(config resource.Spec, pretend bool) (string, error) {
 
 		if !pretend {
 			if err = spec.Resources[name].plugin.Destroy(id); err != nil {
-				return "", fmt.Errorf("Failed to destroy %s (ID %s): %s", name, id, err)
+				return "", fmt.Errorf("Failed to destroy %s (%s): %s", name, id, err)
 			}
 
-			log.Infof("Detroyed %s (ID %s)", name, id)
+			log.Infof("Detroyed %s (%s)", name, id)
 		}
 	}
 
 	var desc string
 	for name, id := range ids {
-		desc += fmt.Sprintf("\nDestroyed %s (ID %s)", name, id)
+		desc += fmt.Sprintf("\nDestroyed %s (%s)", name, id)
 	}
 
 	return desc, nil
@@ -171,7 +171,7 @@ func (p *plugin) DescribeResources(config resource.Spec) (string, error) {
 
 	details := []string{}
 	for name, id := range ids {
-		details = append(details, fmt.Sprintf("Found %s (ID %s)", name, id))
+		details = append(details, fmt.Sprintf("Found %s (%s)", name, id))
 	}
 	sort.Strings(details)
 
