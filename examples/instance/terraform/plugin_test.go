@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -13,10 +15,12 @@ import (
 )
 
 func TestUsage(t *testing.T) {
+	// Test a softlayer_virtual_guest with an @hostname_prefix
 	run(t, "softlayer_virtual_guest", `
 {
         "type": "softlayer_virtual_guest",
         "value": {
+          "@hostname_prefix": "softlayer-hostname",
           "cores": 2,
           "memory": 2048,
           "tags": [
@@ -37,6 +41,61 @@ func TestUsage(t *testing.T) {
           ]
         }
       }
+`)
+
+	// Test a softlayer_virtual_guest without an @hostname_prefix
+	run(t, "softlayer_virtual_guest", `
+{
+		"type": "softlayer_virtual_guest",
+		"value": {
+			"cores": 2,
+			"memory": 2048,
+			"tags": [
+				"terraform_demo_swarm_mgr_sl"
+			],
+			"connection": {
+				"user": "root",
+				"private_key": "${file(\"~/.ssh/id_rsa_de\")}"
+			},
+			"hourly_billing": true,
+			"local_disk": true,
+			"network_speed": 100,
+			"datacenter": "dal10",
+			"os_reference_code": "UBUNTU_14_64",
+			"domain": "softlayer.com",
+			"ssh_key_ids": [
+				"${data.softlayer_ssh_key.public_key.id}"
+			]
+		}
+	}
+`)
+
+	// Test a softlayer_virtual_guest with an empty @hostname_prefix
+	run(t, "softlayer_virtual_guest", `
+{
+		"type": "softlayer_virtual_guest",
+		"value": {
+			"@hostname_prefix": "   ",
+			"cores": 2,
+			"memory": 2048,
+			"tags": [
+				"terraform_demo_swarm_mgr_sl"
+			],
+			"connection": {
+				"user": "root",
+				"private_key": "${file(\"~/.ssh/id_rsa_de\")}"
+			},
+			"hourly_billing": true,
+			"local_disk": true,
+			"network_speed": 100,
+			"datacenter": "dal10",
+			"os_reference_code": "UBUNTU_14_64",
+			"domain": "softlayer.com",
+			"ssh_key_ids": [
+				"${data.softlayer_ssh_key.public_key.id}"
+			]
+		}
+	}
 `)
 
 	run(t, "aws_instance", `
@@ -112,6 +171,24 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NotNil(t, parsed.Resource)
 
 	props := parsed.Resource[resourceType][string(*id)]
+
+	// Unmarshal json for easy access
+	var testingData interface{}
+	json.Unmarshal([]byte(properties), &testingData)
+	m := testingData.(map[string]interface{})
+	value, _ := m["value"].(map[string]interface{})
+
+	// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
+	if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
+		newID := strings.Replace(string(*id), "instance-", "", -1)
+		expectedHostname := "softlayer-hostname-" + newID
+		require.Equal(t, expectedHostname, props["hostname"])
+	} else {
+		// If no hostname was specified, the hostname should equal the ID
+		require.Equal(t, string(*id), props["hostname"])
+	}
+	// Verify the hostname prefix key/value is no longer in the props
+	require.Nil(t, props["@hostname_prefix"])
 
 	switch resourceType {
 	case "softlayer_virtual_guest":
