@@ -18,7 +18,6 @@ import (
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
 )
 
 func init() {
@@ -38,11 +37,6 @@ type config struct {
 }
 
 func main() {
-
-	// glog flag compatibility
-	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	flag.Parse()
-	goflag.CommandLine.Parse([]string{})
 
 	cmd := &cobra.Command{
 		Use:   filepath.Base(os.Args[0]),
@@ -71,6 +65,10 @@ func main() {
 		swarmEnvironment(buildConfig),
 		etcdEnvironment(buildConfig),
 	)
+
+	// glog flag compatibility
+	cmd.PersistentFlags().AddGoFlagSet(goflag.CommandLine)
+	goflag.CommandLine.Parse([]string{})
 
 	err := cmd.Execute()
 	if err != nil {
