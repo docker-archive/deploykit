@@ -28,6 +28,9 @@ func (m *Monorail) Login(user string, pass string) (runtime.ClientAuthInfoWriter
 	buff := bytes.NewBufferString(body)
 
 	resp, err := http.Post(url, "application/json", buff)
+	if err != nil {
+		panic(err)
+	}
 	defer resp.Body.Close()
 
 	var retval map[string]string

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInstanceLifecycle(t *testing.T) {
+func TestInstanceProvision(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -47,6 +47,33 @@ func TestInstanceLifecycle(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, instanceID, string(*id))
+}
+
+func TestInstanceDestroy(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	instanceID := "58b028330b0d3789044b2ba3"
+
+	auth := jwt.BearerJWTToken("test-jwt-token")
+
+	clientMock := mock.NewMockIface(ctrl)
+	clientMock.EXPECT().Login("admin", "admin123").Return(auth, nil)
+
+	nodeMock := mock.NewMockNodeIface(ctrl)
+	nodeMock.EXPECT().PostNodesIdentifierWorkflows(gomock.Any(), gomock.Any()).
+		Return(nil, nil)
+
+	clientMock.EXPECT().Nodes().Times(1).Return(nodeMock)
+
+	pluginImpl := rackHDInstancePlugin{
+		Client:   clientMock,
+		Username: "admin",
+		Password: "admin123",
+	}
+	err := pluginImpl.Destroy(instance.ID(instanceID))
+
+	require.NoError(t, err)
 }
 
 func _Skus() []*models.Sku {
@@ -90,9 +117,15 @@ func _Nodes() []*models.Node {
 }
 
 var inputJSON = types.AnyString(`{
-	"Tags": {"cluster": "infrakit-example2"},
-	"Properties": {
-		"WorkflowName": "Graph.InstallCentOS",
-		"SkuName": "vQuanta D51 SKU"
+	"Workflow": {
+	"name": "Graph.InstallCentOS",
+	"options": {
+		"install-os": {
+		"version": "7.0",
+		"repo": "{{file.server}}/Centos/7.0",
+		"rootPassword": "root"
+		}
 	}
+	},
+	"SKUName": "vQuanta D51 SKU"
 }`)

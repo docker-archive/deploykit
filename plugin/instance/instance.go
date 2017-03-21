@@ -20,6 +20,7 @@ type rackHDInstancePlugin struct {
 	Password string
 }
 
+// RackHDWorkflow are the details of the Workflow to be applied
 type RackHDWorkflow struct {
 	Name    string
 	Options interface{}
@@ -41,6 +42,21 @@ func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string) ([]insta
 }
 
 func (p rackHDInstancePlugin) Destroy(id instance.ID) error {
+	auth, err := p.Client.Login(p.Username, p.Password)
+	if err != nil {
+		return fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+	}
+	log.Infof("Logged into RackHD service as %s", p.Username)
+
+	options := make(map[string]interface{})
+	options["useSecureErase"] = true
+	workflow := RackHDWorkflow{Name: "Graph.Bootstrap.Decommission.Node", Options: options}
+
+	err = p.applyWorkflowToNode(workflow, string(id), auth)
+	if err != nil {
+		return fmt.Errorf("Unable to apply decommision workflow: %s", err)
+	}
+
 	return nil
 }
 
@@ -60,12 +76,10 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 	}
 
 	skuName := props.SKUName
-	auth, nil := p.Client.Login(p.Username, p.Password)
-	/*
-		if err != nil {
-			return &instanceID, fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
-		}
-	*/
+	auth, err := p.Client.Login(p.Username, p.Password)
+	if err != nil {
+		return &instanceID, fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+	}
 	log.Infof("Logged into RackHD service as %s", p.Username)
 
 	skuID, err := p.getSKUIDForName(skuName, auth)
