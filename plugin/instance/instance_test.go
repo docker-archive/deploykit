@@ -1,80 +1,94 @@
 package instance
 
 import (
-	"testing"
-
 	"github.com/codedellemc/gorackhd/client/skus"
 	"github.com/codedellemc/gorackhd/models"
 	"github.com/codedellemc/infrakit.rackhd/jwt"
 	"github.com/codedellemc/infrakit.rackhd/mock"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/go-openapi/runtime"
 	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/require"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func TestInstanceProvision(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+var _ = Describe("Infrakit.Rackhd.Instance", func() {
+	var (
+		auth       runtime.ClientAuthInfoWriter
+		instanceID string
+		mockCtrl   *gomock.Controller
+		mockClient *mock.MockIface
+		pluginImpl instance.Plugin
+	)
 
-	instanceID := "58b028330b0d3789044b2ba3"
+	BeforeEach(func() {
+		auth = jwt.BearerJWTToken("test-jwt-token")
+		instanceID = "58b028330b0d3789044b2ba3"
+		mockCtrl = gomock.NewController(GinkgoT())
+		mockClient = mock.NewMockIface(mockCtrl)
 
-	auth := jwt.BearerJWTToken("test-jwt-token")
+		pluginImpl = rackHDInstancePlugin{
+			Client:   mockClient,
+			Username: "admin",
+			Password: "admin123",
+		}
+	})
 
-	clientMock := mock.NewMockIface(ctrl)
-	clientMock.EXPECT().Login("admin", "admin123").Return(auth, nil)
+	AfterEach(func() {
+		mockCtrl.Finish()
+	})
 
-	nodeMock := mock.NewMockNodeIface(ctrl)
-	nodeMock.EXPECT().PostNodesIdentifierWorkflows(gomock.Any(), gomock.Any()).
-		Return(nil, nil)
+	Context("While logged in", func() {
+		BeforeEach(func() {
+			mockClient.EXPECT().Login("admin", "admin123").Return(auth, nil)
+		})
 
-	skuMock := mock.NewMockSkuIface(ctrl)
-	skuMock.EXPECT().GetSkus(gomock.Any(), gomock.Any()).
-		Return(&skus.GetSkusOK{Payload: _Skus()}, nil)
+		Context("when working with nodes", func() {
+			BeforeEach(func() {
+				nodeMock := mock.NewMockNodeIface(mockCtrl)
+				nodeMock.EXPECT().
+					PostNodesIdentifierWorkflows(gomock.Any(), gomock.Any()).
+					Return(nil, nil)
 
-	skuMock.EXPECT().GetSkusIdentifierNodes(gomock.Any(), gomock.Any()).
-		Return(&skus.GetSkusIdentifierNodesOK{Payload: _Nodes()}, nil)
+				mockClient.EXPECT().
+					Nodes().Times(1).Return(nodeMock)
+			})
 
-	clientMock.EXPECT().Skus().Times(2).Return(skuMock)
-	clientMock.EXPECT().Nodes().Times(1).Return(nodeMock)
+			Context("when provisioning", func() {
+				BeforeEach(func() {
+					skuMock := mock.NewMockSkuIface(mockCtrl)
+					skuMock.EXPECT().
+						GetSkus(gomock.Any(), gomock.Any()).
+						Return(&skus.GetSkusOK{Payload: _Skus()}, nil)
 
-	pluginImpl := rackHDInstancePlugin{
-		Client:   clientMock,
-		Username: "admin",
-		Password: "admin123",
-	}
-	id, err := pluginImpl.Provision(instance.Spec{Properties: inputJSON})
+					skuMock.EXPECT().
+						GetSkusIdentifierNodes(gomock.Any(), gomock.Any()).
+						Return(&skus.GetSkusIdentifierNodesOK{Payload: _Nodes()}, nil)
 
-	require.NoError(t, err)
-	require.Equal(t, instanceID, string(*id))
-}
+					mockClient.EXPECT().
+						Skus().Times(2).Return(skuMock)
+				})
 
-func TestInstanceDestroy(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+				It("should return an ID without error", func() {
+					id, err := pluginImpl.Provision(instance.Spec{Properties: inputJSON})
+					Expect(err).To(BeNil())
+					Expect(string(*id)).To(Equal(instanceID))
+				})
+			})
 
-	instanceID := "58b028330b0d3789044b2ba3"
+			Context("when destroying", func() {
+				It("should delete without error", func() {
+					err := pluginImpl.Destroy(instance.ID(instanceID))
+					Expect(err).To(BeNil())
+				})
+			})
 
-	auth := jwt.BearerJWTToken("test-jwt-token")
+		})
 
-	clientMock := mock.NewMockIface(ctrl)
-	clientMock.EXPECT().Login("admin", "admin123").Return(auth, nil)
+	})
 
-	nodeMock := mock.NewMockNodeIface(ctrl)
-	nodeMock.EXPECT().PostNodesIdentifierWorkflows(gomock.Any(), gomock.Any()).
-		Return(nil, nil)
-
-	clientMock.EXPECT().Nodes().Times(1).Return(nodeMock)
-
-	pluginImpl := rackHDInstancePlugin{
-		Client:   clientMock,
-		Username: "admin",
-		Password: "admin123",
-	}
-	err := pluginImpl.Destroy(instance.ID(instanceID))
-
-	require.NoError(t, err)
-}
+})
 
 func _Skus() []*models.Sku {
 	skus := []*models.Sku{

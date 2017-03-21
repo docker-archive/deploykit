@@ -14,6 +14,7 @@ import (
 	"github.com/go-openapi/runtime"
 )
 
+// rackHDInstancePlugin is the public plugin client struct
 type rackHDInstancePlugin struct {
 	Client   monorail.Iface
 	Username string
@@ -37,10 +38,12 @@ func NewInstancePlugin(client monorail.Iface, username string, password string) 
 	return &rackHDInstancePlugin{Client: client, Username: username, Password: password}
 }
 
+// DescribeInstances Lists the instances running in RackHD by tags
 func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
 	return nil, nil
 }
 
+// Destroy reformats a RackHD instance and performs a secure erase of the system
 func (p rackHDInstancePlugin) Destroy(id instance.ID) error {
 	auth, err := p.Client.Login(p.Username, p.Password)
 	if err != nil {
@@ -60,10 +63,12 @@ func (p rackHDInstancePlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
+// Label writes tags with the infrakit metadata to the RackHD instance
 func (p rackHDInstancePlugin) Label(id instance.ID, labels map[string]string) error {
 	return nil
 }
 
+// Provision posts a new workflow to an existing RackHD instance
 func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	var instanceID instance.ID
 	if spec.Properties == nil {
@@ -103,6 +108,7 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 	return &instanceID, nil
 }
 
+// Validate ensures that the specified instances are running within RackHD
 func (p rackHDInstancePlugin) Validate(req *types.Any) error {
 	return nil
 }
