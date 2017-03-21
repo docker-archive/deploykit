@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Infrakit.Rackhd.Instance", func() {
+var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 	var (
 		auth       runtime.ClientAuthInfoWriter
 		instanceID string

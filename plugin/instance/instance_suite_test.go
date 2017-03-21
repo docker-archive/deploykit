@@ -9,5 +9,5 @@ import (
 
 func TestInfrakitRackhd(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Infrakit.Rackhd Suite")
+	RunSpecs(t, "Infrakit.Rackhd.Plugin.Instance Suite")
 }
