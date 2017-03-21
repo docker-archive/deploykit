@@ -1,6 +1,7 @@
 package main
 
 import (
+	goflag "flag"
 	"os"
 	"path/filepath"
 	"time"
@@ -20,6 +21,7 @@ import (
 )
 
 func init() {
+
 	cli.RegisterInfo("manager - swarm option",
 		map[string]interface{}{
 			"DockerClientAPIVersion": docker.ClientVersion,
@@ -58,7 +60,15 @@ func main() {
 		}
 	}
 
-	cmd.AddCommand(cli.VersionCommand(), osEnvironment(buildConfig), swarmEnvironment(buildConfig))
+	cmd.AddCommand(cli.VersionCommand(),
+		osEnvironment(buildConfig),
+		swarmEnvironment(buildConfig),
+		etcdEnvironment(buildConfig),
+	)
+
+	// glog flag compatibility
+	cmd.PersistentFlags().AddGoFlagSet(goflag.CommandLine)
+	goflag.CommandLine.Parse([]string{})
 
 	err := cmd.Execute()
 	if err != nil {

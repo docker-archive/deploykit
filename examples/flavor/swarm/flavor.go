@@ -57,7 +57,7 @@ func DockerClient(spec Spec) (docker.APIClientCloser, error) {
 		tls = &tlsconfig.Options{}
 	}
 
-	return docker.NewDockerClient(spec.Docker.Host, tls)
+	return docker.NewClient(spec.Docker.Host, tls)
 }
 
 // baseFlavor is the base implementation.  The manager / worker implementations will provide override.
