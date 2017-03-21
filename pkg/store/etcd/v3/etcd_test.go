@@ -54,7 +54,9 @@ func testSaveLoad(t *testing.T) {
 		RequestTimeout: 1 * time.Second,
 	}
 
-	snap, err := NewSnapshot(options)
+	etcdClient, err := etcd.NewClient(options)
+	require.NoError(t, err)
+	snap, err := NewSnapshot(etcdClient)
 	require.NoError(t, err)
 
 	defer snap.Close()

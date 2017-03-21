@@ -1,6 +1,7 @@
 package main
 
 import (
+	goflag "flag"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,9 +18,11 @@ import (
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 )
 
 func init() {
+
 	cli.RegisterInfo("manager - swarm option",
 		map[string]interface{}{
 			"DockerClientAPIVersion": docker.ClientVersion,
@@ -35,6 +38,11 @@ type config struct {
 }
 
 func main() {
+
+	// glog flag compatibility
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	flag.Parse()
+	goflag.CommandLine.Parse([]string{})
 
 	cmd := &cobra.Command{
 		Use:   filepath.Base(os.Args[0]),
@@ -58,7 +66,11 @@ func main() {
 		}
 	}
 
-	cmd.AddCommand(cli.VersionCommand(), osEnvironment(buildConfig), swarmEnvironment(buildConfig))
+	cmd.AddCommand(cli.VersionCommand(),
+		osEnvironment(buildConfig),
+		swarmEnvironment(buildConfig),
+		etcdEnvironment(buildConfig),
+	)
 
 	err := cmd.Execute()
 	if err != nil {
