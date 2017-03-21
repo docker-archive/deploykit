@@ -15,14 +15,10 @@ const (
 	DefaultKey = "infrakit/configs/groups.json"
 )
 
-// NewSnapshot returns a snapshot given the options
-func NewSnapshot(options etcd.Options) (store.Snapshot, error) {
-	cli, err := etcd.NewClient(options)
-	if err != nil {
-		return nil, err
-	}
+// NewSnapshot returns a snapshot given the client
+func NewSnapshot(client *etcd.Client) (store.Snapshot, error) {
 	return &snapshot{
-		client: cli,
+		client: client,
 		key:    DefaultKey,
 	}, nil
 }
@@ -78,8 +74,18 @@ func (s *snapshot) Load(output interface{}) error {
 		}
 	}
 
+	if resp == nil {
+		log.Warningln("response is nil. server down?")
+		return nil
+	}
+
 	if resp.Count > 1 {
 		log.Warningf("more than 1 config %v", resp)
+		return nil
+	}
+
+	if resp.Count == 0 {
+		// no data. therefore no effect on the input
 		return nil
 	}
 
