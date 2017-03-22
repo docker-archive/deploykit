@@ -48,7 +48,7 @@ test:
     - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)
     # Install minio.io for S3 bucket uploads
     - wget https://dl.minio.io/client/mc/release/linux-amd64/mc && chmod a+x ./mc && sudo cp ./mc /usr/local/bin
-    - mc config host add $S3_MINIO https://s3.amazonaws.com $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY S3v4
+    - mc config host add $S3_MINIO https://s3.amazonaws.com $S3_KEY_ID $S3_SECRET_KEY S3v4
     - mc policy public $S3_BUCKET
 
 deployment:
