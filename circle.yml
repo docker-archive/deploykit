@@ -12,6 +12,7 @@ machine:
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     E2E_CLEANUP: "false"
     SKIP_TESTS: "docker,etcd"
+    S3_BUCKET: "s3://infrakit/build/linux-amd64"
 
 dependencies:
   pre:
@@ -47,19 +48,22 @@ deployment:
     branch: /pull\/.*/
     commands:
       - DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-      - tar cvfz ./infrakit-$CIRCLE_BUILD_NUM.tar.gz -C build .
-      - aws s3 sync ./infrakit-$CIRCLE_BUILD_NUM.tar.gz s3://infrakit/build/linux-amd64 --delete
+      - tar cvfz ./infrakit-dev.tar.gz -C build .
+      - aws s3 cp --acl public-read ./infrakit-dev.tar.gz $S3_BUCKET/infrakit-dev.tar.gz
 
   release:
     branch: /release-.*/
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=false DOCKER_TAG=$(echo $CIRCLE_BRANCH | awk -F - '{print $2}') DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+      - tar cvfz ./infrakit-$CIRCLE_BRANCH--$CIRCLE_BUILD_NUM.tar.gz -C build .
+      - aws s3 cp --acl public-read ./infrakit-$CIRCLE_BRANCH.tar.gz $S3_BUCKET/infrakit-$CIRCLE_BRANCH.tar.gz
 
   docker:
     branch: master
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-      - tar cvfz ./infrakit-$CIRCLE_BUILD_NUM.tar.gz -C build .
-      - aws s3 sync ./infrakit-$CIRCLE_BUILD_NUM.tar.gz s3://infrakit/build/linux-amd64 --delete
+      - tar cvfz ./infrakit-$CIRCLE_BRANCH--$CIRCLE_BUILD_NUM.tar.gz -C build .
+      - aws s3 cp --acl public-read ./infrakit-$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM.tar.gz $S3_BUCKET/infrakit-$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM.tar.gz
+      - aws s3 cp --acl public-read ./infrakit-$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM.tar.gz $S3_BUCKET/infrakit-$CIRCLE_BRANCH-latest.gz
