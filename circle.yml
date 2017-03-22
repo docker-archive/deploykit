@@ -13,7 +13,7 @@ machine:
     E2E_CLEANUP: "false"
     SKIP_TESTS: "docker,etcd"
     S3_BUCKET: "s3://infrakit/build/linux-amd64"
-    S3_BUILD_PR: "infrakit-pr-$(echo $CIRCLE_BRANCH | sed -e 's/pull\///g')-tar.gz"
+    S3_BUILD_PR: "infrakit-pr-tar.gz"
     S3_BUILD_RELEASE: "infrakit-$CIRCLE_BRANCH.tar.gz"
     S3_BUILD_MASTER: "infrakit-master-$CIRCLE_BUILD_NUM.tar.gz"
 
