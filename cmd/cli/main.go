@@ -47,7 +47,7 @@ func main() {
 	cmd.AddCommand(eventCommand(f))
 	cmd.AddCommand(pluginCommand(f))
 
-	cmd.AddCommand(instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f))
+	cmd.AddCommand(instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f), resourcePluginCommand(f))
 
 	err := cmd.Execute()
 	if err != nil {
