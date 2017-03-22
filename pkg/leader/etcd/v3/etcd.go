@@ -6,10 +6,12 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/docker/infrakit/pkg/leader"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/util/etcd/v3"
-	log "github.com/golang/glog"
 	"golang.org/x/net/context"
 )
+
+var log = logutil.New("module", "etcd/leader")
 
 // NewDetector return an implementation of leader detector
 func NewDetector(pollInterval time.Duration, client *etcd.Client) leader.Detector {
@@ -25,7 +27,7 @@ func AmILeader(ctx context.Context, client *etcd.Client) (isLeader bool, err err
 	var statusResp *clientv3.StatusResponse
 
 	defer func() {
-		log.V(100).Infoln("checking status at", endpoint, "resp=", statusResp, "err=", err, "leader=", isLeader)
+		log.Debug("checking status", "endpoint", endpoint, "resp", statusResp, "err", err, "leader", isLeader)
 	}()
 
 	// get status of node
