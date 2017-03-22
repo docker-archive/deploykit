@@ -26,7 +26,7 @@ func swarmEnvironment(getConfig func() config) *cobra.Command {
 	insecureSkipVerify := cmd.Flags().Bool("tlsverify", true, "True to skip TLS")
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
-		dockerClient, err := docker.NewDockerClient(*host, &tlsconfig.Options{
+		dockerClient, err := docker.NewClient(*host, &tlsconfig.Options{
 			CAFile:             *caFile,
 			CertFile:           *certFile,
 			KeyFile:            *tlsKey,

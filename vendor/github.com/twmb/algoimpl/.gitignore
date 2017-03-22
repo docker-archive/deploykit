@@ -1,0 +1,7 @@
+*.sw[a-z]
+.metadata
+.classpath
+.project
+.settings
+bin/
+

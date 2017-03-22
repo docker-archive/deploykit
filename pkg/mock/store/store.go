@@ -28,6 +28,16 @@ func (_m *MockSnapshot) EXPECT() *_MockSnapshotRecorder {
 	return _m.recorder
 }
 
+func (_m *MockSnapshot) Close() error {
+	ret := _m.ctrl.Call(_m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockSnapshotRecorder) Close() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Close")
+}
+
 func (_m *MockSnapshot) Load(_param0 interface{}) error {
 	ret := _m.ctrl.Call(_m, "Load", _param0)
 	ret0, _ := ret[0].(error)
