@@ -47,13 +47,19 @@ deployment:
     branch: /pull\/.*/
     commands:
       - DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+      - tar cvfz ./infrakit-$CIRCLE_BUILD_NUM.tar.gz -C build .
+      - aws s3 sync ./infrakit-$CIRCLE_BUILD_NUM.tar.gz s3://infrakit/build/linux-amd64 --delete
+
   release:
     branch: /release-.*/
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=false DOCKER_TAG=$(echo $CIRCLE_BRANCH | awk -F - '{print $2}') DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+
   docker:
     branch: master
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+      - tar cvfz ./infrakit-$CIRCLE_BUILD_NUM.tar.gz -C build .
+      - aws s3 sync ./infrakit-$CIRCLE_BUILD_NUM.tar.gz s3://infrakit/build/linux-amd64 --delete
