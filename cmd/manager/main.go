@@ -1,15 +1,16 @@
 package main
 
 import (
-	goflag "flag"
+	"flag"
 	"os"
 	"path/filepath"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/leader"
+	"github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
@@ -43,15 +44,20 @@ func main() {
 		Short: "Manager",
 	}
 
-	logLevel := cmd.PersistentFlags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+	// Log setup
+	logOptions := &log.ProdDefaults
+
+	cmd.PersistentPreRun = func(c *cobra.Command, args []string) {
+		log.Configure(logOptions)
+	}
+	cmd.PersistentFlags().AddFlagSet(cli.Flags(logOptions))
+	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+
 	pluginName := cmd.PersistentFlags().String("name", "group", "Name of the manager")
 	backendPlugin := cmd.PersistentFlags().String(
 		"proxy-for-group",
 		"group-stateless",
 		"Name of the group plugin to proxy for.")
-	cmd.PersistentPreRun = func(c *cobra.Command, args []string) {
-		cli.SetLogLevel(*logLevel)
-	}
 
 	buildConfig := func() config {
 		return config{
@@ -66,20 +72,16 @@ func main() {
 		etcdEnvironment(buildConfig),
 	)
 
-	// glog flag compatibility
-	cmd.PersistentFlags().AddGoFlagSet(goflag.CommandLine)
-	goflag.CommandLine.Parse([]string{})
-
 	err := cmd.Execute()
 	if err != nil {
-		log.Error(err)
+		logrus.Error(err)
 		os.Exit(1)
 	}
 }
 
 func runMain(cfg config) error {
 
-	log.Infoln("Starting up manager:", cfg)
+	logrus.Infoln("Starting up manager:", cfg)
 
 	mgr, err := manager.NewManager(cfg.plugins, cfg.leader, cfg.snapshot, cfg.pluginName)
 	if err != nil {
@@ -107,7 +109,7 @@ func runMain(cfg config) error {
 						metadata_plugin.Put([]string{"leader"}, isLeader, view)
 					}
 				} else {
-					log.Warningln("Cannot check leader for metadata:", err)
+					logrus.Warningln("Cannot check leader for metadata:", err)
 				}
 
 				// update config
@@ -116,11 +118,11 @@ func runMain(cfg config) error {
 						metadata_plugin.Put([]string{"configs"}, snapshot, view)
 					}
 				} else {
-					log.Warningln("Cannot load snapshot for metadata:", err)
+					logrus.Warningln("Cannot load snapshot for metadata:", err)
 				}
 
 			case <-stopSnapshot:
-				log.Infoln("Snapshot updater stopped")
+				logrus.Infoln("Snapshot updater stopped")
 				return
 			}
 		}
@@ -132,7 +134,7 @@ func runMain(cfg config) error {
 
 	mgr.Stop()
 	close(stopSnapshot)
-	log.Infoln("Manager stopped")
+	logrus.Infoln("Manager stopped")
 
 	return err
 }
