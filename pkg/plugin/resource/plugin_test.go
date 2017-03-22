@@ -110,7 +110,7 @@ func TestCommitAndDestroy(t *testing.T) {
 
 	require.NotEqual(t, "", descriptions[0].ID)
 	require.Nil(t, descriptions[0].LogicalID)
-	require.Equal(t, map[string]string{resourceGroupTag: configID, resourceNameTag: "a"}, descriptions[0].Tags)
+	require.Equal(t, map[string]string{resourcesTag: configID, resourcesIDTag: "a"}, descriptions[0].Tags)
 
 	descriptions, err = instancePluginB.DescribeInstances(nil)
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestCommitAndDestroy(t *testing.T) {
 
 	require.NotEqual(t, "", descriptions[0].ID)
 	require.Nil(t, descriptions[0].LogicalID)
-	require.Equal(t, map[string]string{resourceGroupTag: configID, resourceNameTag: "b"}, descriptions[0].Tags)
+	require.Equal(t, map[string]string{resourcesTag: configID, resourcesIDTag: "b"}, descriptions[0].Tags)
 
 	// Commit with the same specification should create no additional resources.
 	_, err = p.Commit(spec, false)
@@ -167,9 +167,9 @@ func TestDescribeResources(t *testing.T) {
 		return instancePlugin, nil
 	})
 
-	aID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourceGroupTag: configID, resourceNameTag: "a"}})
+	aID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourcesTag: configID, resourcesIDTag: "a"}})
 	require.NoError(t, err)
-	bID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourceGroupTag: configID, resourceNameTag: "b"}})
+	bID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourcesTag: configID, resourcesIDTag: "b"}})
 	require.NoError(t, err)
 
 	spec := resource.Spec{
@@ -184,11 +184,11 @@ func TestDescribeResources(t *testing.T) {
 func TestDescribe(t *testing.T) {
 	instancePlugin := newTestInstancePlugin()
 
-	aID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourceGroupTag: configID, resourceNameTag: "a"}})
+	aID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourcesTag: configID, resourcesIDTag: "a"}})
 	require.NoError(t, err)
-	bID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourceGroupTag: configID, resourceNameTag: "b"}})
+	bID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourcesTag: configID, resourcesIDTag: "b"}})
 	require.NoError(t, err)
-	cID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourceGroupTag: configID, resourceNameTag: "c"}})
+	cID, err := instancePlugin.Provision(instance.Spec{Tags: map[string]string{resourcesTag: configID, resourcesIDTag: "c"}})
 	require.NoError(t, err)
 
 	configs := map[string]resourceConfig{
@@ -226,7 +226,7 @@ func TestDescribe(t *testing.T) {
 	require.Error(t, err)
 
 	// Multiple resources with the same name.
-	instanceSpec := instance.Spec{Tags: map[string]string{resourceGroupTag: configID, resourceNameTag: "x"}}
+	instanceSpec := instance.Spec{Tags: map[string]string{resourcesTag: configID, resourcesIDTag: "x"}}
 	_, err = instancePlugin.Provision(instanceSpec)
 	require.NoError(t, err)
 	_, err = instancePlugin.Provision(instanceSpec)

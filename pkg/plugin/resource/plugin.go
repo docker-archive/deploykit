@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	resourceGroupTag = "infrakit.resource-group"
-	resourceNameTag  = "infrakit.resource-name"
+	resourcesTag   = "infrakit.resources"
+	resourcesIDTag = "infrakit.resources.id"
 )
 
 // Spec is the configuration schema for this plugin, provided in resource.Spec.Properties.
@@ -94,7 +94,10 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 		} else {
 			id, err := resourceConfigs[name].plugin.Provision(instance.Spec{
 				Properties: types.AnyString(properties),
-				Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name},
+				Tags: map[string]string{
+					resourcesTag:   string(config.ID),
+					resourcesIDTag: name,
+				},
 			})
 			if err != nil {
 				return "", fmt.Errorf("Failed to provision resource '%s': %s", name, err)
@@ -182,8 +185,8 @@ func describe(id resource.ID, resourceConfigs map[string]resourceConfig) (map[st
 
 	for name, resourceConfig := range resourceConfigs {
 		descriptions, err := resourceConfig.plugin.DescribeInstances(map[string]string{
-			resourceGroupTag: string(id),
-			resourceNameTag:  name,
+			resourcesTag:   string(id),
+			resourcesIDTag: name,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("Failed to describe resource '%s': %s", name, err)
