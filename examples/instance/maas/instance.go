@@ -67,13 +67,9 @@ func (m maasPlugin) addTagsToNode(systemID string, tags map[string]string) error
 	return nil
 }
 
-func (m maasPlugin) deleteTagsFromNode(systemID string, tags []maas.JSONObject) error {
+func (m maasPlugin) deleteTagsFromNode(systemID string, tags []maas.MAASObject) error {
 	for _, tag := range tags {
-		tagObj, err := tag.GetMAASObject()
-		if err != nil {
-			return err
-		}
-		_, err = tagObj.CallPost("update_nodes", url.Values{"remove": {systemID}})
+		_, err := tag.CallPost("update_nodes", url.Values{"remove": {systemID}})
 		if err != nil {
 			return err
 		}
@@ -251,10 +247,19 @@ func (m maasPlugin) Label(id instance.ID, labels map[string]string) error {
 		}
 		systemID, err := node.GetField("system_id")
 		if string(id) == systemID {
-			tags, err := node.GetMap()["tag_names"].GetArray()
+			tagObjs, err := node.GetMap()["tag_names"].GetArray()
 			if err != nil {
 				return err
 			}
+			tags := make([]maas.MAASObject, len(tagObjs))
+			for i, tagObj := range tagObjs {
+				tag, err := tagObj.GetMAASObject()
+				if err != nil {
+					return err
+				}
+				tags[i] = tag
+			}
+
 			m.deleteTagsFromNode(systemID, tags)
 		}
 	}
@@ -280,7 +285,15 @@ func (m maasPlugin) Destroy(id instance.ID) error {
 			return err
 		}
 		if systemID == string(id) {
-			tags, err := node.GetMap()["tag_names"].GetArray()
+			tagObjs, err := node.GetMap()["tag_names"].GetArray()
+			tags := make([]maas.MAASObject, len(tagObjs))
+			for i, tagObj := range tagObjs {
+				tag, err := tagObj.GetMAASObject()
+				if err != nil {
+					return err
+				}
+				tags[i] = tag
+			}
 			m.deleteTagsFromNode(string(id), tags)
 			if state, _ := node.GetField("substatus_name"); state == "Deploying" {
 				params := url.Values{}
