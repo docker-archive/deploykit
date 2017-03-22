@@ -9,7 +9,6 @@ import (
 	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/etcd/v3"
-	log "github.com/golang/glog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,12 +24,12 @@ func TestWithRealEtcd(t *testing.T) {
 	err := etcd.RunContainer.Start(ip, containerName)
 	require.NoError(t, err)
 
-	// wait until readyr
+	// wait until ready
 	for {
 		<-time.After(1 * time.Second)
 		_, err := etcd.LsMembers.Output(ip)
 		if err == nil {
-			log.Infoln("etcd running")
+			log.Info("etcd running")
 			break
 		}
 	}
@@ -82,14 +81,14 @@ func testSaveLoad(t *testing.T) {
 	require.NotEqual(t, config, config2)
 
 	err = snap.Load(&config2)
-	log.Infoln("snapshot from etcd:", config2)
+	log.Info("snapshot from etcd", "config", config2)
 	require.Equal(t, config, config2)
 
 	// verify with the etcdctl client
 	output, err := etcd.Get.Output(ip, DefaultKey)
 	require.NoError(t, err)
 
-	log.Infoln("read by etcdctl:", string(output))
+	log.Info("read by etcdctl", "result", string(output))
 
 	any2 := types.AnyString(strings.Trim(string(output), " \t\n"))
 	config2 = map[string]interface{}{}
