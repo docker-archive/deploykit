@@ -51,6 +51,14 @@ func (s *snapshot) Load(output interface{}) error {
 	return nil
 }
 
+// Close implements io.Closer
+func (s *snapshot) Close() error {
+	if s.client == nil {
+		return nil
+	}
+	return s.client.Close()
+}
+
 var errNotFound = fmt.Errorf("not-found")
 
 func readSwarm(client docker.APIClientCloser) (string, error) {

@@ -26,8 +26,8 @@ type APIClientCloser interface {
 	client.CommonAPIClient
 }
 
-// NewDockerClient creates a new API client.
-func NewDockerClient(host string, tls *tlsconfig.Options) (APIClientCloser, error) {
+// NewClient creates a new API client.
+func NewClient(host string, tls *tlsconfig.Options) (APIClientCloser, error) {
 	tlsOptions := tls
 	if tls.KeyFile == "" || tls.CAFile == "" || tls.CertFile == "" {
 		// The api doesn't like it when you pass in not nil but with zero field values...

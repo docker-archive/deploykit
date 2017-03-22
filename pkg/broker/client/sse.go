@@ -158,7 +158,7 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 				} else {
 
 					select {
-					case errCh <- fmt.Errorf("no data: %v", line):
+					case errCh <- fmt.Errorf("no data: %s", string(line)):
 					default:
 					}
 
