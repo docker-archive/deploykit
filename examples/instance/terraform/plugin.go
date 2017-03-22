@@ -359,6 +359,23 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 	}
 
+	// Use the given hostname value as a prefix if it is a non-empty string
+	if hostnamePrefix, is := properties.Value["@hostname_prefix"].(string); is {
+		hostnamePrefix = strings.Trim(hostnamePrefix, " ")
+		// Use the default behavior if hostnamePrefix was either not a string, or an empty string
+		if hostnamePrefix == "" {
+			properties.Value["hostname"] = name
+		} else {
+			// Remove "instance-" from "instance-XXXX", then append that string to the hostnamePrefix to create the new hostname
+			properties.Value["hostname"] = fmt.Sprintf("%s-%s", hostnamePrefix, strings.Replace(name, "instance-", "", -1))
+		}
+	} else {
+		properties.Value["hostname"] = name
+	}
+	// Delete hostnamePrefix so it will not be written in the *.tf.json file
+	delete(properties.Value, "@hostname_prefix")
+	log.Debugln("Adding hostname to properties: hostname=", properties.Value["hostname"])
+
 	switch properties.Type {
 	case "aws_instance", "azurerm_virtual_machine", "digitalocean_droplet", "google_compute_instance":
 		if t, exists := properties.Value["tags"]; !exists {
@@ -370,9 +387,6 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 			}
 		}
 	case "softlayer_virtual_guest":
-		log.Debugln("softlayer_virtual_guest detected, adding hostname to properties: hostname=", name)
-		properties.Value["hostname"] = name
-
 		if _, has := properties.Value["tags"]; !has {
 			properties.Value["tags"] = []interface{}{}
 		}
