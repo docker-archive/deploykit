@@ -13,6 +13,9 @@ machine:
     E2E_CLEANUP: "false"
     SKIP_TESTS: "docker,etcd"
     S3_BUCKET: "s3://infrakit/build/linux-amd64"
+    S3_BUILD_PR: "infrakit-pr-$(echo $CIRCLE_BRANCH | sed -e 's/pull\///g')-tar.gz"
+    S3_BUILD_RELEASE: "infrakit-$CIRCLE_BRANCH.tar.gz"
+    S3_BUILD_MASTER: "infrakit-master-$CIRCLE_BUILD_NUM.tar.gz"
 
 dependencies:
   pre:
@@ -48,22 +51,22 @@ deployment:
     branch: /pull\/.*/
     commands:
       - DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-      - tar cvfz ./infrakit-dev.tar.gz -C build .
-      - aws s3 cp --acl public-read ./infrakit-dev.tar.gz $S3_BUCKET/infrakit-dev.tar.gz
+      - tar cvfz ./$S3_BUILD_PR -C build .
+      - aws s3 cp --acl public-read ./$S3_BUILD_PR $S3_BUCKET/$S3_BUILD_PR
 
   release:
     branch: /release-.*/
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=false DOCKER_TAG=$(echo $CIRCLE_BRANCH | awk -F - '{print $2}') DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-      - tar cvfz ./infrakit-$CIRCLE_BRANCH--$CIRCLE_BUILD_NUM.tar.gz -C build .
-      - aws s3 cp --acl public-read ./infrakit-$CIRCLE_BRANCH.tar.gz $S3_BUCKET/infrakit-$CIRCLE_BRANCH.tar.gz
+      - tar cvfz ./$S3_BUILD_PR -C build .
+      - aws s3 cp --acl public-read ./$S3_BUILD_PR $S3_BUCKET/$S3_BUILD_PR
 
   docker:
     branch: master
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-      - tar cvfz ./infrakit-$CIRCLE_BRANCH--$CIRCLE_BUILD_NUM.tar.gz -C build .
-      - aws s3 cp --acl public-read ./infrakit-$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM.tar.gz $S3_BUCKET/infrakit-$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM.tar.gz
-      - aws s3 cp --acl public-read ./infrakit-$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM.tar.gz $S3_BUCKET/infrakit-$CIRCLE_BRANCH-latest.gz
+      - tar cvfz ./$CIRCLE_BUILD_MASTER -C build .
+      - aws s3 cp --acl public-read ./$CIRCLE_BUILD_MASTER $S3_BUCKET/$CIRCLE_BUILD_MASTER
+      - aws s3 cp --acl public-read ./$CIRCLE_BUILD_MASTER $S3_BUCKET/infrakit-latest.gz
