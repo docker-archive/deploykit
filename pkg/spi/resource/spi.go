@@ -11,7 +11,7 @@ var InterfaceSpec = spi.InterfaceSpec{
 	Version: "0.1.0",
 }
 
-// ID is a unique identifier for a collection of resources.
+// ID is the unique identifier for a collection of resources.
 type ID string
 
 // Spec is a specification of resources to provision.

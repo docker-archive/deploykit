@@ -34,18 +34,20 @@ Save the following in a file named resources.json.
 {
   "ID": "Fancy Resources",
   "Properties": {
-    "Resources": {
-      "A": {
+    "Resources": [
+      {
+        "ID": "A",
         "Plugin": "instance-file",
         "Properties": {}
       },
-      "B": {
+      {
+        "ID": "B",
         "Plugin": "instance-file",
         "Properties": {
           "Note": "Depends on {{ resource `A` }}"
         }
       }
-    }
+    ]
   }
 }
 ```

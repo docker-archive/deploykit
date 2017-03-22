@@ -23,14 +23,11 @@ const (
 
 // Spec is the configuration schema for this plugin, provided in resource.Spec.Properties.
 type Spec struct {
-	Resources map[string]resourceSpec
-}
-
-type resourceSpec struct {
-	Plugin     plugin_base.Name
-	Properties *types.Any
-
-	plugin instance.Plugin
+	Resources []struct {
+		ID         string
+		Plugin     plugin_base.Name
+		Properties *types.Any
+	}
 }
 
 // InstancePluginLookup looks up a plugin by name.
@@ -47,168 +44,174 @@ type plugin struct {
 	instancePluginLookup InstancePluginLookup
 }
 
+type resourceConfig struct {
+	plugin     instance.Plugin
+	properties string
+}
+
 func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
-	spec, provisioningOrder, err := validate(config, p.instancePluginLookup)
+	resourceConfigs, provisioningOrder, err := validate(config, p.instancePluginLookup)
 	if err != nil {
 		return "", err
 	}
 
-	ids, err := describe(config.ID, *spec)
+	log.Infof("Committing %s (pretend=%t)", config.ID, pretend)
+
+	instanceIDs, err := describe(config.ID, resourceConfigs)
 	if err != nil {
 		return "", err
 	}
 
-	foundIDs := map[string]instance.ID{}
-	for name, id := range ids {
-		foundIDs[name] = id
-	}
-
-	f := func(ref string) (string, error) {
-		if val, ok := ids[ref]; ok {
-			return string(val), nil
+	resourceTemplateFunc := func(name string) (string, error) {
+		if id, ok := instanceIDs[name]; ok {
+			return string(id), nil
 		}
-		return "", fmt.Errorf("Undefined resource %s", ref)
+		return "", fmt.Errorf("Undefined resource '%s'", name)
 	}
 
+	details := []string{}
 	for _, name := range provisioningOrder {
-		if _, ok := ids[name]; ok {
+		if id, ok := instanceIDs[name]; ok {
+			details = append(details, fmt.Sprintf("Found %s (%s)", name, id))
 			continue
 		}
 
-		resourceSpec := spec.Resources[name]
-
-		template, err := template.NewTemplate("str://"+resourceSpec.Properties.String(), template.Options{SocketDir: discovery.Dir()})
+		template, err := template.NewTemplate("str://"+resourceConfigs[name].properties, template.Options{SocketDir: discovery.Dir()})
 		if err != nil {
-			return "", fmt.Errorf("Template parse error for %s: %s", name, err)
+			return "", fmt.Errorf("Failed to parse template '%s' for resource '%s': %s", resourceConfigs[name].properties, name, err)
 		}
 
-		properties, err := template.AddFunc("resource", f).Render(nil)
+		properties, err := template.AddFunc("resource", resourceTemplateFunc).Render(nil)
 		if err != nil {
-			return "", fmt.Errorf("Template execution error for %s: %s", name, err)
+			return "", fmt.Errorf("Failed to execute template '%s' for resource '%s': %s", resourceConfigs[name].properties, name, err)
 		}
 
+		detail := ""
 		if pretend {
-			ids[name] = instance.ID("unknown")
+			instanceIDs[name] = instance.ID("unknown")
+
+			detail = fmt.Sprintf("Would provision %s", name)
 		} else {
-			id, err := resourceSpec.plugin.Provision(instance.Spec{
+			id, err := resourceConfigs[name].plugin.Provision(instance.Spec{
 				Properties: types.AnyString(properties),
 				Tags:       map[string]string{resourceGroupTag: string(config.ID), resourceNameTag: name},
 			})
 			if err != nil {
-				return "", fmt.Errorf("Failed to provision %s: %s", name, err)
+				return "", fmt.Errorf("Failed to provision resource '%s': %s", name, err)
 			}
-			log.Infof("Provisioned %s (%s)", name, *id)
-			ids[name] = *id
+			instanceIDs[name] = *id
+
+			detail = fmt.Sprintf("Provisioned %s (%s)", name, *id)
+			log.Info(detail)
 		}
+
+		details = append(details, detail)
 	}
 
-	var desc string
-	for _, name := range provisioningOrder {
-		var idStr, verb string
-		if id, ok := foundIDs[name]; ok {
-			verb = "Found"
-			idStr = string(id)
-		} else {
-			verb = "Provisioned"
-			idStr = "N/A"
-			if id, ok := ids[name]; ok {
-				idStr = string(id)
-			}
-		}
-		desc += fmt.Sprintf("\n%s %s (%s)", verb, name, idStr)
-	}
-
-	return desc, nil
+	sort.Strings(details)
+	return strings.Join(details, "\n"), nil
 }
 
 func (p *plugin) Destroy(config resource.Spec, pretend bool) (string, error) {
-	spec, provisioningOrder, err := validate(config, p.instancePluginLookup)
+	resourceConfigs, provisioningOrder, err := validate(config, p.instancePluginLookup)
 	if err != nil {
 		return "", err
 	}
 
-	ids, err := describe(config.ID, *spec)
-	if err != nil {
-		return "", err
-	}
+	log.Infof("Destroying %s (pretend=%t)", config.ID, pretend)
 
-	// Traverse provisioningOrder in reverse.
-	for i := len(provisioningOrder) - 1; i >= 0; i-- {
-		name := provisioningOrder[i]
-
-		id, ok := ids[name]
-		if !ok {
-			continue
-		}
-
-		if !pretend {
-			if err = spec.Resources[name].plugin.Destroy(id); err != nil {
-				return "", fmt.Errorf("Failed to destroy %s (%s): %s", name, id, err)
-			}
-
-			log.Infof("Detroyed %s (%s)", name, id)
-		}
-	}
-
-	var desc string
-	for name, id := range ids {
-		desc += fmt.Sprintf("\nDestroyed %s (%s)", name, id)
-	}
-
-	return desc, nil
-}
-
-func (p *plugin) DescribeResources(config resource.Spec) (string, error) {
-	spec, _, err := validate(config, p.instancePluginLookup)
-	if err != nil {
-		return "", err
-	}
-
-	ids, err := describe(config.ID, *spec)
+	instanceIDs, err := describe(config.ID, resourceConfigs)
 	if err != nil {
 		return "", err
 	}
 
 	details := []string{}
-	for name, id := range ids {
-		details = append(details, fmt.Sprintf("Found %s (%s)", name, id))
-	}
-	sort.Strings(details)
 
+	// Traverse provisioningOrder in reverse.
+	for i := len(provisioningOrder) - 1; i >= 0; i-- {
+		name := provisioningOrder[i]
+
+		id, ok := instanceIDs[name]
+		if !ok {
+			continue
+		}
+
+		detail := ""
+		if pretend {
+			detail = fmt.Sprintf("Would destroy %s (%s)", name, id)
+		} else {
+			if err = resourceConfigs[name].plugin.Destroy(id); err != nil {
+				return "", fmt.Errorf("Failed to destroy resource '%s' (%s): %s", name, id, err)
+			}
+
+			detail = fmt.Sprintf("Destroyed %s (%s)", name, id)
+			log.Infof(detail)
+		}
+
+		details = append(details, detail)
+	}
+
+	sort.Strings(details)
 	return strings.Join(details, "\n"), nil
 }
 
-func describe(configID resource.ID, spec Spec) (map[string]instance.ID, error) {
-	ids := map[string]instance.ID{}
-	for name, resourceSpec := range spec.Resources {
-		tags := map[string]string{resourceGroupTag: string(configID), resourceNameTag: name}
-		descriptions, err := resourceSpec.plugin.DescribeInstances(tags)
+func (p *plugin) DescribeResources(config resource.Spec) (string, error) {
+	resourceConfigs, _, err := validate(config, p.instancePluginLookup)
+	if err != nil {
+		return "", err
+	}
+
+	log.Infof("Describing %s", config.ID)
+
+	instanceIDs, err := describe(config.ID, resourceConfigs)
+	if err != nil {
+		return "", err
+	}
+
+	details := []string{}
+	for name, id := range instanceIDs {
+		details = append(details, fmt.Sprintf("Found %s (%s)", name, id))
+	}
+
+	sort.Strings(details)
+	return strings.Join(details, "\n"), nil
+}
+
+func describe(id resource.ID, resourceConfigs map[string]resourceConfig) (map[string]instance.ID, error) {
+	instanceIDs := map[string]instance.ID{}
+
+	for name, resourceConfig := range resourceConfigs {
+		descriptions, err := resourceConfig.plugin.DescribeInstances(map[string]string{
+			resourceGroupTag: string(id),
+			resourceNameTag:  name,
+		})
 		if err != nil {
-			return nil, fmt.Errorf("Describe failed for %s: %s", name, err)
+			return nil, fmt.Errorf("Failed to describe resource '%s': %s", name, err)
 		}
 
 		switch len(descriptions) {
 		case 0:
 			break
 		case 1:
-			log.Infof("Found %s with ID %s", name, descriptions[0].ID)
-			ids[name] = descriptions[0].ID
+			instanceIDs[name] = descriptions[0].ID
+			log.Infof("Found %s (%s)'", name, descriptions[0].ID)
 		default:
-			var idList []instance.ID
+			ids := []instance.ID{}
 			for _, d := range descriptions {
-				idList = append(idList, d.ID)
+				ids = append(ids, d.ID)
 			}
-			return nil, fmt.Errorf("Found multiple resources for %s: %v", name, idList)
+			return nil, fmt.Errorf("Found multiple instance IDs for resource '%s': %v", name, ids)
 		}
 	}
 
-	return ids, nil
+	return instanceIDs, nil
 }
 
-func validate(config resource.Spec, instancePluginLookup InstancePluginLookup) (*Spec, []string, error) {
+func validate(config resource.Spec, instancePluginLookup InstancePluginLookup) (map[string]resourceConfig, []string, error) {
 	if config.ID == "" {
 		return nil, nil, errors.New("ID must be set")
 	}
+
 	if config.Properties == nil {
 		return nil, nil, errors.New("Properties must be set")
 	}
@@ -218,60 +221,72 @@ func validate(config resource.Spec, instancePluginLookup InstancePluginLookup) (
 		return nil, nil, fmt.Errorf("Invalid properties '%s': %s", config.Properties, err)
 	}
 
-	for name, resourceSpec := range spec.Resources {
+	resourceConfigs := map[string]resourceConfig{}
+	for _, resourceSpec := range spec.Resources {
+		if resourceSpec.ID == "" {
+			return nil, nil, errors.New("Resource ID must be set")
+		}
+
+		if _, ok := resourceConfigs[resourceSpec.ID]; ok {
+			return nil, nil, fmt.Errorf("Duplicate resource ID '%s'", resourceSpec.ID)
+		}
+
 		instancePlugin, err := instancePluginLookup(resourceSpec.Plugin)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to find plugin %s for %s: %s", resourceSpec.Plugin, name, err)
+			return nil, nil, fmt.Errorf("Failed to find plugin '%s' for resource '%s': %s", resourceSpec.Plugin, resourceSpec.ID, err)
 		}
 
 		if resourceSpec.Properties == nil {
-			return nil, nil, fmt.Errorf("Properties must be set for %s", name)
+			return nil, nil, fmt.Errorf("Properties must be set for resource '%s'", resourceSpec.ID)
 		}
 
 		if err := instancePlugin.Validate(resourceSpec.Properties); err != nil {
-			return nil, nil, fmt.Errorf("Failed to validate spec for %s: %s", name, err)
+			return nil, nil, fmt.Errorf("Failed to validate spec '%s' for resource '%s': %s", resourceSpec.Properties, resourceSpec.ID, err)
 		}
 
-		if _, err = template.NewTemplate("str://"+resourceSpec.Properties.String(), template.Options{SocketDir: discovery.Dir()}); err != nil {
-			return nil, nil, fmt.Errorf("Template parse error for %s: %s", name, err)
+		resourceConfigs[resourceSpec.ID] = resourceConfig{
+			plugin:     instancePlugin,
+			properties: resourceSpec.Properties.String(),
 		}
-
-		resourceSpec.plugin = instancePlugin
-		spec.Resources[name] = resourceSpec
 	}
 
-	provisioningOrder, err := getProvisioningOrder(spec)
+	provisioningOrder, err := getProvisioningOrder(resourceConfigs)
 	if err != nil {
 		return nil, nil, err
 	}
-
 	log.Infof("Provisioning order: %s", provisioningOrder)
-	return &spec, provisioningOrder, nil
+
+	return resourceConfigs, provisioningOrder, nil
 }
 
-func getProvisioningOrder(spec Spec) ([]string, error) {
+func getProvisioningOrder(resourceConfigs map[string]resourceConfig) ([]string, error) {
 	g := graph.New(graph.Directed)
 
 	nodes := map[string]graph.Node{}
-	for name := range spec.Resources {
+	for name := range resourceConfigs {
 		nodes[name] = g.MakeNode()
 		*nodes[name].Value = name
 	}
 
-	for name, resourceSpec := range spec.Resources {
-		references, err := getResourceReferences(resourceSpec.Properties)
+	for name, resourceConfig := range resourceConfigs {
+		template, err := template.NewTemplate("str://"+resourceConfig.properties, template.Options{SocketDir: discovery.Dir()})
 		if err != nil {
-			return nil, fmt.Errorf("%s for resource %s with properties %s ", err, name, resourceSpec.Properties.String())
+			return nil, fmt.Errorf("Failed to parse template for resource '%s': %s", name, err)
+		}
+
+		dependencies, err := getResourceDependencies(template)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get dependencies for resource '%s': %s", name, err)
 		}
 
 		to := nodes[name]
-		for _, reference := range references {
-			from, ok := nodes[reference]
+		for dependency := range dependencies {
+			from, ok := nodes[dependency]
 			if !ok {
-				return nil, fmt.Errorf("Resource %s depends on undefined resource %s", name, reference)
+				return nil, fmt.Errorf("Resource '%s' depends on undefined resource '%s'", name, dependency)
 			}
 			if from == to {
-				return nil, fmt.Errorf("Resource %s depends on itself", name)
+				return nil, fmt.Errorf("Resource '%s' depends on itself", name)
 			}
 			if err := g.MakeEdge(from, to); err != nil {
 				return nil, err
@@ -298,22 +313,15 @@ func getProvisioningOrder(spec Spec) ([]string, error) {
 	return order, nil
 }
 
-func getResourceReferences(properties *types.Any) ([]string, error) {
-	template, err := template.NewTemplate("str://"+properties.String(), template.Options{SocketDir: discovery.Dir()})
-	if err != nil {
-		return nil, fmt.Errorf("Template parse error: %s", err)
+func getResourceDependencies(template *template.Template) (map[string]bool, error) {
+	dependencies := map[string]bool{}
+	resourceTemplateFunc := func(name string) string {
+		dependencies[name] = true
+		return ""
+	}
+	if _, err := template.AddFunc("resource", resourceTemplateFunc).Render(nil); err != nil {
+		return nil, err
 	}
 
-	refMap := map[string]bool{}
-	f := func(ref string) string { refMap[ref] = true; return "" }
-
-	if _, err := template.AddFunc("resource", f).Render(nil); err != nil {
-		return nil, fmt.Errorf("Template execution error: %s", err)
-	}
-
-	refList := []string{}
-	for ref := range refMap {
-		refList = append(refList, ref)
-	}
-	return refList, nil
+	return dependencies, nil
 }

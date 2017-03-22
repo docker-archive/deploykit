@@ -67,9 +67,9 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		details, err := resourcePlugin.Commit(*spec, *commitPretend)
 		if err == nil {
 			if *commitPretend {
-				fmt.Printf("Committing %s would involve: %s\n", spec.ID, details)
+				fmt.Printf("Committing %s would involve:\n%s\n", spec.ID, details)
 			} else {
-				fmt.Printf("Committed %s: %s\n", spec.ID, details)
+				fmt.Printf("Committed %s:\n%s\n", spec.ID, details)
 			}
 		}
 		return err
@@ -97,9 +97,9 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		details, err := resourcePlugin.Destroy(*spec, *destroyPretend)
 		if err == nil {
 			if *destroyPretend {
-				fmt.Printf("Destroying %s would involve: %s\n", spec.ID, details)
+				fmt.Printf("Destroying %s would involve:\n%s\n", spec.ID, details)
 			} else {
-				fmt.Printf("Destroyed %s: %s\n", spec.ID, details)
+				fmt.Printf("Destroyed %s:\n%s\n", spec.ID, details)
 			}
 		}
 		return err
