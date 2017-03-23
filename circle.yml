@@ -56,8 +56,6 @@ deployment:
     branch: /pull\/.*/
     commands:
       - DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-      - tar cvfz ./$S3_BUILD_PR -C build .
-      - mc cp ./$S3_BUILD_PR $S3_BUCKET/
 
   release:
     branch: /release-.*/
@@ -72,6 +70,6 @@ deployment:
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-      - tar cvfz ./$CIRCLE_BUILD_MASTER -C build .
+      - tar cvfz ./$S3_BUILD_MASTER -C build .
       - mc cp ./$S3_BUILD_MASTER $S3_BUCKET/
       - mc cp ./$S3_BUILD_MASTER $S3_BUCKET/infrakit-latest.gz
