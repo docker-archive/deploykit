@@ -14,7 +14,6 @@ machine:
     SKIP_TESTS: "docker,etcd"
     S3_MINIO: "s3bucket"
     S3_BUCKET: "s3bucket/infrakit/build/linux-amd64"
-    S3_BUILD_PR: "infrakit-pr-$CIRCLE_PR_NUMBER-tar.gz"
     S3_BUILD_RELEASE: "infrakit-$CIRCLE_BRANCH.tar.gz"
     S3_BUILD_MASTER: "infrakit-master-$CIRCLE_BUILD_NUM.tar.gz"
 
