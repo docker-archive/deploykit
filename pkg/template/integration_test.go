@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var logger = log.New("template", "core")
+var logger = log.New("module", "template")
 
 func TestTemplateInclusionFromDifferentSources(t *testing.T) {
 	prefix := testSetupTemplates(t, testFiles)
