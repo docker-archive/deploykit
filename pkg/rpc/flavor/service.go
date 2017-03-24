@@ -150,7 +150,7 @@ func (p *Flavor) Prepare(_ *http.Request, req *PrepareRequest, resp *PrepareResp
 	if c == nil {
 		return fmt.Errorf("no-plugin:%s", req.Type)
 	}
-	spec, err := c.Prepare(req.Properties, req.Spec, req.Allocation)
+	spec, err := c.Prepare(req.Properties, req.Spec, req.Allocation, req.Index)
 	if err != nil {
 		return err
 	}

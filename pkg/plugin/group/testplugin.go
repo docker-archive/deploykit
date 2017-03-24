@@ -144,7 +144,8 @@ func (t testFlavor) Validate(flavorProperties *types.Any, allocation group_types
 
 func (t testFlavor) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
 
 	s := flavorSchema{}
 	err := flavorProperties.Decode(&s)

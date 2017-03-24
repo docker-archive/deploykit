@@ -2,6 +2,7 @@ package group
 
 import (
 	mock_group "github.com/docker/infrakit/pkg/mock/plugin/group"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
 	"testing"
@@ -30,8 +31,9 @@ func TestQuorumOK(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("quorum")
 	scaled := mock_group.NewMockScaled(ctrl)
-	quorum := NewQuorum(scaled, logicalIDs, 1*time.Millisecond)
+	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
@@ -49,8 +51,10 @@ func TestRestoreQuorum(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("quorum")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	quorum := NewQuorum(scaled, logicalIDs, 1*time.Millisecond)
+	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
 
 	logicalID := *c.LogicalID
 	gomock.InOrder(
@@ -72,8 +76,10 @@ func TestRemoveUnknown(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("quorum")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	quorum := NewQuorum(scaled, logicalIDs, 1*time.Millisecond)
+	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, c, b}, nil),

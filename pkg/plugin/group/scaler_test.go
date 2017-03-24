@@ -6,6 +6,7 @@ import (
 	"time"
 
 	mock_group "github.com/docker/infrakit/pkg/mock/plugin/group"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
 )
@@ -27,8 +28,10 @@ func TestScaleUp(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("scaler")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 3, 1*time.Millisecond, 0)
+	scaler := NewScalingGroup(groupID, scaled, 3, 1*time.Millisecond, 0)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
@@ -49,8 +52,10 @@ func TestBufferScaleUp(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("scaler")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 3, 1*time.Millisecond, 1)
+	scaler := NewScalingGroup(groupID, scaled, 3, 1*time.Millisecond, 1)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil),
@@ -71,8 +76,10 @@ func TestScaleDown(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("scaler")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 0)
+	scaler := NewScalingGroup(groupID, scaled, 2, 1*time.Millisecond, 0)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{c, b}, nil),
@@ -94,8 +101,10 @@ func TestBufferScaleDown(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("scaler")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 1)
+	scaler := NewScalingGroup(groupID, scaled, 2, 1*time.Millisecond, 1)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return([]instance.Description{c, b}, nil),
@@ -117,8 +126,10 @@ func TestLabel(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("scaler")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 1)
+	scaler := NewScalingGroup(groupID, scaled, 2, 1*time.Millisecond, 1)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Do(func() {
@@ -135,8 +146,10 @@ func TestFailToLabel(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("scaler")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 1)
+	scaler := NewScalingGroup(groupID, scaled, 2, 1*time.Millisecond, 1)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Do(func() {
@@ -152,8 +165,10 @@ func TestFailToList(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	groupID := group.ID("scaler")
+
 	scaled := mock_group.NewMockScaled(ctrl)
-	scaler := NewScalingGroup(scaled, 2, 1*time.Millisecond, 1)
+	scaler := NewScalingGroup(groupID, scaled, 2, 1*time.Millisecond, 1)
 
 	gomock.InOrder(
 		scaled.EXPECT().List().Return(nil, errors.New("Unable to list")),
