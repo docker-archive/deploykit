@@ -11,6 +11,7 @@ import (
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -117,10 +118,12 @@ func TestWorker(t *testing.T) {
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
 	client.EXPECT().Close().AnyTimes()
 
+	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
 	details, err := flavorImpl.Prepare(
 		types.AnyString(`{}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}},
-		group_types.AllocationMethod{Size: 5})
+		group_types.AllocationMethod{Size: 5},
+		index)
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
 
@@ -188,11 +191,13 @@ func TestManager(t *testing.T) {
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
 	client.EXPECT().Close().AnyTimes()
 
+	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
 	id := instance.LogicalID("127.0.0.1")
 	details, err := flavorImpl.Prepare(
 		types.AnyString(`{"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}},
+		index)
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
 
@@ -208,11 +213,13 @@ func TestManager(t *testing.T) {
 	require.Contains(t, details.Init, associationID)
 
 	// another instance -- note that this id is not the first in the allocation list of logical ids.
+	index = group_types.Index{Group: group.ID("group"), Sequence: 1}
 	id = instance.LogicalID("172.200.100.2")
 	details, err = flavorImpl.Prepare(
 		types.AnyString(`{"Attachments": {"172.200.100.2": [{"ID": "a", "Type": "gpu"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"172.200.100.1", "172.200.100.2"}})
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"172.200.100.1", "172.200.100.2"}},
+		index)
 	require.NoError(t, err)
 
 	require.Contains(t, details.Init, swarmInfo.JoinTokens.Manager)
@@ -236,6 +243,53 @@ func TestManager(t *testing.T) {
 		instance.Description{Tags: map[string]string{associationTag: associationID}})
 	require.NoError(t, err)
 	require.Equal(t, flavor.Healthy, health)
+
+	close(managerStop)
+}
+
+func TestTemplateFunctions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	managerStop := make(chan struct{})
+
+	client := mock_client.NewMockAPIClientCloser(ctrl)
+
+	flavorImpl := NewManagerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+		return client, nil
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
+
+	swarmInfo := swarm.Swarm{
+		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
+		JoinTokens: swarm.JoinTokens{
+			Manager: "ManagerToken",
+			Worker:  "WorkerToken",
+		},
+	}
+
+	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarmInfo, nil).AnyTimes()
+	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()
+	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
+	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
+	client.EXPECT().Close().AnyTimes()
+
+	initTemplate := `{{/* totally not useful init script just for test*/}}{{ INDEX.Group }},{{ INDEX.Sequence }}`
+
+	properties := types.AnyString(`
+{
+ "Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]},
+ "InitScriptTemplateURL" : "str://` + initTemplate + `"
+}
+`)
+
+	index := group_types.Index{Group: group.ID("group"), Sequence: 100}
+	id := instance.LogicalID("127.0.0.1")
+	details, err := flavorImpl.Prepare(properties,
+		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}},
+		index)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%v,%v", index.Group, index.Sequence), details.Init)
 
 	close(managerStop)
 }

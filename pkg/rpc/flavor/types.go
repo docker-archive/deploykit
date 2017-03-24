@@ -26,6 +26,7 @@ type PrepareRequest struct {
 	Properties *types.Any
 	Spec       instance.Spec
 	Allocation group_types.AllocationMethod
+	Index      group_types.Index
 }
 
 // PrepareResponse is the rpc wrapper of the result of Prepare

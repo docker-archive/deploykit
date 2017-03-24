@@ -14,6 +14,8 @@ import (
 type Supervisor interface {
 	util.RunStop
 
+	ID() group.ID
+
 	Size() uint
 
 	PlanUpdate(scaled Scaled, settings groupSettings, newSettings groupSettings) (updatePlan, error)

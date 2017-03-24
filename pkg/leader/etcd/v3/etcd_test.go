@@ -7,7 +7,6 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/docker/infrakit/pkg/util/etcd/v3"
-	log "github.com/golang/glog"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 )
@@ -29,7 +28,7 @@ func TestWithRealEtcd(t *testing.T) {
 		<-time.After(1 * time.Second)
 		_, err := etcd.LsMembers.Output(ip)
 		if err == nil {
-			log.Infoln("etcd running")
+			log.Info("etcd running")
 			break
 		}
 	}

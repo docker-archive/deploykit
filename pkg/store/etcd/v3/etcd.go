@@ -2,10 +2,10 @@ package etcd
 
 import (
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/etcd/v3"
-	log "github.com/golang/glog"
 	"golang.org/x/net/context"
 )
 
@@ -15,14 +15,12 @@ const (
 	DefaultKey = "infrakit/configs/groups.json"
 )
 
-// NewSnapshot returns a snapshot given the options
-func NewSnapshot(options etcd.Options) (store.Snapshot, error) {
-	cli, err := etcd.NewClient(options)
-	if err != nil {
-		return nil, err
-	}
+var log = logutil.New("module", "etcd/store")
+
+// NewSnapshot returns a snapshot given the client
+func NewSnapshot(client *etcd.Client) (store.Snapshot, error) {
 	return &snapshot{
-		client: cli,
+		client: client,
 		key:    DefaultKey,
 	}, nil
 }
@@ -46,13 +44,13 @@ func (s *snapshot) Save(obj interface{}) error {
 	if err != nil {
 		switch err {
 		case context.Canceled:
-			log.Warningf("ctx is canceled by another routine: %v", err)
+			log.Warn("ctx is canceled by another routine", "err", err)
 		case context.DeadlineExceeded:
-			log.Warningf("ctx is attached with a deadline is exceeded: %v", err)
+			log.Warn("ctx is attached with a deadline is exceeded", "err", err)
 		case rpctypes.ErrEmptyKey:
-			log.Warningf("client-side error: %v", err)
+			log.Warn("client-side error", "err", err)
 		default:
-			log.Warningf("bad cluster endpoints, which are not etcd servers: %v", err)
+			log.Warn("bad cluster endpoints, which are not etcd servers", "err", err)
 		}
 	}
 	return err
@@ -68,18 +66,28 @@ func (s *snapshot) Load(output interface{}) error {
 	if err != nil {
 		switch err {
 		case context.Canceled:
-			log.Warningf("ctx is canceled by another routine: %v", err)
+			log.Warn("ctx is canceled by another routine", "err", err)
 		case context.DeadlineExceeded:
-			log.Warningf("ctx is attached with a deadline is exceeded: %v", err)
+			log.Warn("ctx is attached with a deadline is exceeded", "err", err)
 		case rpctypes.ErrEmptyKey:
-			log.Warningf("client-side error: %v", err)
+			log.Warn("client-side error", "err", err)
 		default:
-			log.Warningf("bad cluster endpoints, which are not etcd servers: %v", err)
+			log.Warn("bad cluster endpoints, which are not etcd servers", "err", err)
 		}
 	}
 
+	if resp == nil {
+		log.Warn("response is nil. server down?")
+		return nil
+	}
+
 	if resp.Count > 1 {
-		log.Warningf("more than 1 config %v", resp)
+		log.Warn("more than 1 config", "resp", resp)
+		return nil
+	}
+
+	if resp.Count == 0 {
+		// no data. therefore no effect on the input
 		return nil
 	}
 
