@@ -215,7 +215,7 @@ func (s *scaler) ID() group.ID {
 }
 
 func (s *scaler) Size() uint {
-	return s.size
+	return s.getSize()
 }
 
 func (s *scaler) waitIfReachParallelLimit(current int, batch *sync.WaitGroup) {
