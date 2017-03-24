@@ -11,7 +11,7 @@ import (
 )
 
 // Fetch fetchs content from the given URL string.  Supported schemes are http:// https:// file:// unix://
-func Fetch(s string, opt Options) ([]byte, error) {
+func Fetch(s string, opt Options, customize func(*http.Request)) ([]byte, error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		return nil, err
@@ -21,12 +21,7 @@ func Fetch(s string, opt Options) ([]byte, error) {
 		return ioutil.ReadFile(u.Path)
 
 	case "http", "https":
-		resp, err := http.Get(u.String())
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-		return ioutil.ReadAll(resp.Body)
+		return doHttpGet(u, customize, &http.Client{})
 
 	case "unix":
 		// unix: will look for a socket that matches the host name at a
@@ -36,15 +31,28 @@ func Fetch(s string, opt Options) ([]byte, error) {
 			return nil, err
 		}
 		u.Scheme = "http"
-		resp, err := c.Get(u.String())
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-		return ioutil.ReadAll(resp.Body)
+		return doHttpGet(u, customize, c)
 	}
 
 	return nil, fmt.Errorf("unsupported url:%s", s)
+}
+
+func doHttpGet(u *url.URL, customize func(*http.Request), client *http.Client) ([]byte, error) {
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if customize != nil {
+		customize(req)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return ioutil.ReadAll(resp.Body)
 }
 
 func socketClient(u *url.URL, socketDir string) (*http.Client, error) {

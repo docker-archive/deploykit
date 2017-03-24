@@ -8,8 +8,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
+
+var logger = log.New("template", "core")
 
 func TestTemplateInclusionFromDifferentSources(t *testing.T) {
 	prefix := testSetupTemplates(t, testFiles)
@@ -255,4 +259,53 @@ func TestWithFunctions(t *testing.T) {
 	}).Render(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "hello=1", view)
+}
+
+func TestSourceWithHeaders(t *testing.T) {
+
+	h, context := headersAndContext("foo=bar")
+	logger.Info("result", "context", context, "headers", h)
+	require.Equal(t, interface{}(nil), context)
+	require.Equal(t, map[string][]string{"foo": {"bar"}}, h)
+
+	h, context = headersAndContext("foo=bar", "bar=baz", 224)
+	logger.Info("result", "context", context, "headers", h)
+	require.Equal(t, 224, context)
+	require.Equal(t, map[string][]string{"foo": {"bar"}, "bar": {"baz"}}, h)
+
+	h, context = headersAndContext("foo=bar", "bar=baz")
+	logger.Info("result", "context", context, "headers", h)
+	require.Equal(t, nil, context)
+	require.Equal(t, map[string][]string{"foo": {"bar"}, "bar": {"baz"}}, h)
+
+	h, context = headersAndContext("foo")
+	logger.Info("result", "context", context, "headers", h)
+	require.Equal(t, "foo", context)
+	require.Equal(t, map[string][]string{}, h)
+
+	h, context = headersAndContext("foo=bar", map[string]string{"hello": "world"})
+	logger.Info("result", "context", context, "headers", h)
+	require.Equal(t, map[string]string{"hello": "world"}, context)
+	require.Equal(t, map[string][]string{"foo": {"bar"}}, h)
+
+	// note we don't have to escape -- use the back quote and the string value is valid
+	r := "{{ include `https://httpbin.org/headers` `A=B` `Foo=Bar` `Foo=Bar` `X=1` 100 }}"
+	s := `{{ $resp := (source "str://` + r + `" | jsonDecode) }}{{ $resp.headers | jsonEncode}}`
+	tt, err := NewTemplate("str://"+s, Options{})
+	require.NoError(t, err)
+	view, err := tt.Render(nil)
+	require.NoError(t, err)
+
+	any := types.AnyString(view)
+	headers := map[string]interface{}{}
+	require.NoError(t, any.Decode(&headers))
+	require.Equal(t, map[string]interface{}{
+		"Foo":             "Bar,Bar",
+		"Host":            "httpbin.org",
+		"User-Agent":      "Go-http-client/1.1",
+		"A":               "B",
+		"X":               "1",
+		"Accept-Encoding": "gzip",
+		"Connection":      "close",
+	}, headers)
 }
