@@ -15,7 +15,7 @@ type Plugin struct {
 
 	// DoPrepare implements Prepare via function
 	DoPrepare func(flavorProperties *types.Any, spec instance.Spec,
-		allocation group_types.AllocationMethod) (instance.Spec, error)
+		allocation group_types.AllocationMethod, index group_types.Index) (instance.Spec, error)
 
 	// DoHealthy implements Healthy via function
 	DoHealthy func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error)
@@ -34,9 +34,10 @@ func (t *Plugin) Validate(flavorProperties *types.Any, allocation group_types.Al
 // the flavor configuration.
 func (t *Plugin) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
 
-	return t.DoPrepare(flavorProperties, spec, allocation)
+	return t.DoPrepare(flavorProperties, spec, allocation, index)
 }
 
 // Healthy determines the Health of this Flavor on an instance.

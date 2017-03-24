@@ -33,8 +33,9 @@ type WorkerFlavor struct {
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
 func (s *WorkerFlavor) Prepare(flavorProperties *types.Any, instanceSpec instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
-	return s.baseFlavor.prepare("worker", flavorProperties, instanceSpec, allocation)
+	allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
+	return s.baseFlavor.prepare("worker", flavorProperties, instanceSpec, allocation, index)
 }
 
 // Drain in the case of worker will force a node removal in the swarm.

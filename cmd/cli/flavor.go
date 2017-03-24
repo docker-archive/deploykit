@@ -13,6 +13,7 @@ import (
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
@@ -53,6 +54,9 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 	logicalIDs := []string{}
 	groupSize := uint(0)
+	groupID := ""
+	groupSequence := uint(0)
+
 	addAllocationMethodFlags := func(cmd *cobra.Command) {
 		cmd.Flags().StringSliceVar(
 			&logicalIDs,
@@ -65,7 +69,6 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			0,
 			"Group Size to use as the Allocation method")
 	}
-
 	allocationMethodFromFlags := func() group_types.AllocationMethod {
 		ids := []instance.LogicalID{}
 		for _, id := range logicalIDs {
@@ -76,6 +79,23 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			Size:       groupSize,
 			LogicalIDs: ids,
 		}
+	}
+
+	indexFlags := func(cmd *cobra.Command) {
+		cmd.Flags().StringVar(
+			&groupID,
+			"index-group",
+			"",
+			"ID of the group")
+		cmd.Flags().UintVar(
+			&groupSequence,
+			"index-sequence",
+			0,
+			"Sequence number within the group")
+	}
+
+	indexFromFlags := func() group_types.Index {
+		return group_types.Index{Group: group.ID(groupID), Sequence: groupSequence}
 	}
 
 	validate := &cobra.Command{
@@ -132,7 +152,9 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			spec, err = flavorPlugin.Prepare(
 				types.AnyBytes(flavorProperties),
 				spec,
-				allocationMethodFromFlags())
+				allocationMethodFromFlags(),
+				indexFromFlags(),
+			)
 			if err == nil {
 				buff, err = json.MarshalIndent(spec, "  ", "  ")
 				if err == nil {
@@ -143,6 +165,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 	addAllocationMethodFlags(prepare)
+	indexFlags(prepare)
 	cmd.AddCommand(prepare)
 
 	healthy := &cobra.Command{

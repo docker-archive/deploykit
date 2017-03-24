@@ -44,7 +44,8 @@ func (f vanillaFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 
 func (f vanillaFlavor) Prepare(flavor *types.Any,
 	instance instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
 
 	s := Spec{}
 	err := flavor.Decode(&s)

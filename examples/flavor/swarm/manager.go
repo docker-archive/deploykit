@@ -55,6 +55,7 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
 func (s *ManagerFlavor) Prepare(flavorProperties *types.Any,
-	instanceSpec instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error) {
-	return s.baseFlavor.prepare("manager", flavorProperties, instanceSpec, allocation)
+	instanceSpec instance.Spec, allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
+	return s.baseFlavor.prepare("manager", flavorProperties, instanceSpec, allocation, index)
 }

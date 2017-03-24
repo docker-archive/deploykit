@@ -1,6 +1,6 @@
 # Flavor plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/flavor/* 76aecf22acb4af73f36857bb2fad861896ae0b62 -->
+<!-- SOURCE-CHECKSUM pkg/spi/flavor/* e27841cf1ead137533b608b3ccc90ab72596532a -->
 
 ## API
 
@@ -52,6 +52,10 @@ may add, remove, or modify any fields in the Instance `Spec` by returning the de
   "Allocation": {
     "Size": 1,
     "LogicalIDs": ["logical_id_1"]
+  },
+  "Index" : {
+    "Group" : "workers",
+    "Sequence" : 100
   }
 }
 ```
@@ -60,6 +64,7 @@ Parameters:
 - `Properties`: A JSON object representing the Flavor.  The schema is defined by the Flavor plugin in use.
 - `Spec`: The [Spec](types.md#instance-spec) of the Instance being prepared.
 - `Allocation`: An [Allocation](types.md#allocation)
+- `Index`: an [Index](types.md#index)
 
 #### Response
 ```json

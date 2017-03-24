@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"reflect"
 	"sync"
@@ -13,6 +14,7 @@ import (
 // TODO(wfarner): Converge this implementation with scaler.go, they share a lot of behavior.
 
 type quorum struct {
+	id           group.ID
 	scaled       Scaled
 	LogicalIDs   []instance.LogicalID
 	pollInterval time.Duration
@@ -20,8 +22,9 @@ type quorum struct {
 }
 
 // NewQuorum creates a supervisor for a group of instances operating in a quorum.
-func NewQuorum(scaled Scaled, logicalIDs []instance.LogicalID, pollInterval time.Duration) Supervisor {
+func NewQuorum(id group.ID, scaled Scaled, logicalIDs []instance.LogicalID, pollInterval time.Duration) Supervisor {
 	return &quorum{
+		id:           id,
 		scaled:       scaled,
 		LogicalIDs:   logicalIDs,
 		pollInterval: pollInterval,
@@ -63,6 +66,10 @@ func (q *quorum) Run() {
 			return
 		}
 	}
+}
+
+func (q *quorum) ID() group.ID {
+	return q.id
 }
 
 func (q *quorum) Size() uint {
