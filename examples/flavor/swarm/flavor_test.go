@@ -246,3 +246,50 @@ func TestManager(t *testing.T) {
 
 	close(managerStop)
 }
+
+func TestTemplateFunctions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	managerStop := make(chan struct{})
+
+	client := mock_client.NewMockAPIClientCloser(ctrl)
+
+	flavorImpl := NewManagerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+		return client, nil
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
+
+	swarmInfo := swarm.Swarm{
+		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
+		JoinTokens: swarm.JoinTokens{
+			Manager: "ManagerToken",
+			Worker:  "WorkerToken",
+		},
+	}
+
+	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarmInfo, nil).AnyTimes()
+	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()
+	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
+	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
+	client.EXPECT().Close().AnyTimes()
+
+	initTemplate := `{{/* totally not useful init script just for test*/}}{{ INDEX.Group }},{{ INDEX.Sequence }}`
+
+	properties := types.AnyString(`
+{
+ "Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]},
+ "InitScriptTemplateURL" : "str://` + initTemplate + `"
+}
+`)
+
+	index := group_types.Index{Group: group.ID("group"), Sequence: 100}
+	id := instance.LogicalID("127.0.0.1")
+	details, err := flavorImpl.Prepare(properties,
+		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}},
+		index)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%v,%v", index.Group, index.Sequence), details.Init)
+
+	close(managerStop)
+}
