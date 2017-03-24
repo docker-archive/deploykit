@@ -210,7 +210,8 @@ func (s *baseFlavor) Healthy(flavorProperties *types.Any, inst instance.Descript
 }
 
 func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceSpec instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
 
 	spec := Spec{}
 
