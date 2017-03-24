@@ -80,40 +80,28 @@ func (m maasPlugin) deleteTagsFromNode(systemID string, tags []maas.MAASObject) 
 
 func (m maasPlugin) getTagsFromNode(systemID string) (map[string]string, error) {
 	ret := map[string]string{}
-	nodeListing := m.MaasObj.GetSubObject("nodes")
-	listNodeObjects, err := nodeListing.CallGet("list", url.Values{})
+	node, err := m.MaasObj.GetSubObject("nodes").GetSubObject(systemID).Get()
 	if err != nil {
 		return nil, err
 	}
-	listNodes, err := listNodeObjects.GetArray()
-	for _, nodeObj := range listNodes {
-		node, err := nodeObj.GetMAASObject()
+	tags, err := node.GetMap()["tag_names"].GetArray()
+	if err != nil {
+		return nil, err
+	}
+	for _, tagObj := range tags {
+		tag, err := tagObj.GetMAASObject()
 		if err != nil {
 			return nil, err
 		}
-		id, err := node.GetField("system_id")
-		if id == systemID {
-			tags, err := node.GetMap()["tag_names"].GetArray()
-			if err != nil {
-				return nil, err
-			}
-			for _, tagObj := range tags {
-				tag, err := tagObj.GetMAASObject()
-				if err != nil {
-					return nil, err
-				}
-				tagname, err := tag.GetField("name")
-				if err != nil {
-					return nil, err
-				}
-				tagcomment, err := tag.GetField("comment")
-				if err != nil {
-					return nil, err
-				}
-				ret[tagname] = tagcomment
-			}
-			return ret, nil
+		tagname, err := tag.GetField("name")
+		if err != nil {
+			return nil, err
 		}
+		tagcomment, err := tag.GetField("comment")
+		if err != nil {
+			return nil, err
+		}
+		ret[tagname] = tagcomment
 	}
 	return ret, nil
 }
@@ -234,78 +222,52 @@ func (m maasPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // Label labels the instance
 func (m maasPlugin) Label(id instance.ID, labels map[string]string) error {
-	nodeListing := m.MaasObj.GetSubObject("nodes")
-	listNodeObjects, err := nodeListing.CallGet("list", url.Values{})
+	node, err := m.MaasObj.GetSubObject("nodes").GetSubObject(string(id)).Get()
 	if err != nil {
 		return err
 	}
-	listNodes, err := listNodeObjects.GetArray()
-	for _, nodeObj := range listNodes {
-		node, err := nodeObj.GetMAASObject()
+	tagObjs, err := node.GetMap()["tag_names"].GetArray()
+	if err != nil {
+		return err
+	}
+	tags := make([]maas.MAASObject, len(tagObjs))
+	for i, tagObj := range tagObjs {
+		tag, err := tagObj.GetMAASObject()
 		if err != nil {
 			return err
 		}
-		systemID, err := node.GetField("system_id")
-		if string(id) == systemID {
-			tagObjs, err := node.GetMap()["tag_names"].GetArray()
-			if err != nil {
-				return err
-			}
-			tags := make([]maas.MAASObject, len(tagObjs))
-			for i, tagObj := range tagObjs {
-				tag, err := tagObj.GetMAASObject()
-				if err != nil {
-					return err
-				}
-				tags[i] = tag
-			}
-
-			m.deleteTagsFromNode(systemID, tags)
-		}
+		tags[i] = tag
 	}
+
+	m.deleteTagsFromNode(string(id), tags)
 	return m.addTagsToNode(string(id), labels)
 }
 
 // Destroy terminates an existing instance.
 func (m maasPlugin) Destroy(id instance.ID) error {
-	fmt.Println("Destroying ", id)
-	nodeListing := m.MaasObj.GetSubObject("nodes")
-	listNodeObjects, err := nodeListing.CallGet("list", url.Values{})
+	node, err := m.MaasObj.GetSubObject("nodes").GetSubObject(string(id)).Get()
 	if err != nil {
 		return err
 	}
-	listNodes, err := listNodeObjects.GetArray()
-	for _, nodeObj := range listNodes {
-		node, err := nodeObj.GetMAASObject()
+	tagObjs, err := node.GetMap()["tag_names"].GetArray()
+	tags := make([]maas.MAASObject, len(tagObjs))
+	for i, tagObj := range tagObjs {
+		tag, err := tagObj.GetMAASObject()
 		if err != nil {
 			return err
 		}
-		systemID, err := node.GetField("system_id")
-		if err != nil {
+		tags[i] = tag
+	}
+	m.deleteTagsFromNode(string(id), tags)
+	if state, _ := node.GetField("substatus_name"); state == "Deploying" {
+		params := url.Values{}
+		if _, err = node.CallPost("abort_operation", params); err != nil {
 			return err
 		}
-		if systemID == string(id) {
-			tagObjs, err := node.GetMap()["tag_names"].GetArray()
-			tags := make([]maas.MAASObject, len(tagObjs))
-			for i, tagObj := range tagObjs {
-				tag, err := tagObj.GetMAASObject()
-				if err != nil {
-					return err
-				}
-				tags[i] = tag
-			}
-			m.deleteTagsFromNode(string(id), tags)
-			if state, _ := node.GetField("substatus_name"); state == "Deploying" {
-				params := url.Values{}
-				if _, err = node.CallPost("abort_operation", params); err != nil {
-					return err
-				}
-			}
-			params := url.Values{}
-			if _, err = node.CallPost("release", params); err != nil {
-				return err
-			}
-		}
+	}
+	params := url.Values{}
+	if _, err = node.CallPost("release", params); err != nil {
+		return err
 	}
 	files, err := ioutil.ReadDir(m.MaasfilesDir)
 	if err != nil {
