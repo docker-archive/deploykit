@@ -21,7 +21,7 @@ func Fetch(s string, opt Options, customize func(*http.Request)) ([]byte, error)
 		return ioutil.ReadFile(u.Path)
 
 	case "http", "https":
-		return doHttpGet(u, customize, &http.Client{})
+		return doHTTPGet(u, customize, &http.Client{})
 
 	case "unix":
 		// unix: will look for a socket that matches the host name at a
@@ -31,13 +31,13 @@ func Fetch(s string, opt Options, customize func(*http.Request)) ([]byte, error)
 			return nil, err
 		}
 		u.Scheme = "http"
-		return doHttpGet(u, customize, c)
+		return doHTTPGet(u, customize, c)
 	}
 
 	return nil, fmt.Errorf("unsupported url:%s", s)
 }
 
-func doHttpGet(u *url.URL, customize func(*http.Request), client *http.Client) ([]byte, error) {
+func doHTTPGet(u *url.URL, customize func(*http.Request), client *http.Client) ([]byte, error) {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err

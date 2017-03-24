@@ -159,7 +159,8 @@ func (z zkFlavor) Drain(flavorProperties *types.Any, inst instance.Description) 
 
 func (z zkFlavor) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
 
 	properties, err := parseSpec(flavorProperties)
 	if err != nil {

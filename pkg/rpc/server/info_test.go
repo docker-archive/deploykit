@@ -34,7 +34,7 @@ func TestFetchAPIInfoFromPlugin(t *testing.T) {
 	server, err := StartPluginAtPath(socketPath, rpc_instance.PluginServer(&testing_instance.Plugin{}))
 	require.NoError(t, err)
 
-	buff, err := template.Fetch(url, template.Options{SocketDir: dir})
+	buff, err := template.Fetch(url, template.Options{SocketDir: dir}, nil)
 	require.NoError(t, err)
 
 	decoded, err := template.FromJSON(buff)
@@ -45,7 +45,7 @@ func TestFetchAPIInfoFromPlugin(t *testing.T) {
 	require.Equal(t, "Instance", result)
 
 	url = "unix://" + host + "/info/functions.json"
-	buff, err = template.Fetch(url, template.Options{SocketDir: dir})
+	buff, err = template.Fetch(url, template.Options{SocketDir: dir}, nil)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -91,7 +91,7 @@ func TestFetchFunctionsFromPlugin(t *testing.T) {
 	server, err := StartPluginAtPath(socketPath, rpc_flavor.PluginServer(&exporter{&testing_flavor.Plugin{}}))
 	require.NoError(t, err)
 
-	buff, err := template.Fetch(url, template.Options{SocketDir: dir})
+	buff, err := template.Fetch(url, template.Options{SocketDir: dir}, nil)
 	require.NoError(t, err)
 
 	decoded, err := template.FromJSON(buff)

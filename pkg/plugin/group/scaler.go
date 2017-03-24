@@ -7,10 +7,12 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 type scaler struct {
+	id             group.ID
 	scaled         Scaled
 	size           uint
 	pollInterval   time.Duration
@@ -21,8 +23,9 @@ type scaler struct {
 
 // NewScalingGroup creates a supervisor that monitors a group of instances on a provisioner, attempting to maintain a
 // desired size.
-func NewScalingGroup(scaled Scaled, size uint, pollInterval time.Duration, maxParallelNum uint) Supervisor {
+func NewScalingGroup(id group.ID, scaled Scaled, size uint, pollInterval time.Duration, maxParallelNum uint) Supervisor {
 	return &scaler{
+		id:             id,
 		scaled:         scaled,
 		size:           size,
 		pollInterval:   pollInterval,
@@ -205,6 +208,10 @@ func (s *scaler) Run() {
 			return
 		}
 	}
+}
+
+func (s *scaler) ID() group.ID {
+	return s.id
 }
 
 func (s *scaler) Size() uint {

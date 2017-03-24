@@ -25,6 +25,17 @@ type AllocationMethod struct {
 	LogicalIDs []instance.LogicalID
 }
 
+// Index is the index of the instance's creation.  It provides a context for knowing
+// what is being created.
+type Index struct {
+
+	// Group is the name of the group
+	Group group.ID
+
+	// Sequence is a sequence number that's per instance.
+	Sequence uint
+}
+
 // InstancePlugin is the structure that describes an instance plugin.
 type InstancePlugin struct {
 	Plugin     plugin.Name

@@ -81,17 +81,21 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 		Tags:       map[string]string{"foo": "bar2"},
 	}
 
+	inputInstanceIndexActual1 := make(chan group_types.Index, 1)
+	inputInstanceIndexActual2 := make(chan group_types.Index, 1)
+
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
 			"type1": &testing_flavor.Plugin{
 				DoPrepare: func(
 					flavorProperties *types.Any,
 					instanceSpec instance.Spec,
-					allocation group_types.AllocationMethod) (instance.Spec, error) {
+					allocation group_types.AllocationMethod,
+					idx group_types.Index) (instance.Spec, error) {
 
 					inputFlavorPropertiesActual1 <- flavorProperties
 					inputInstanceSpecActual1 <- instanceSpec
-
+					inputInstanceIndexActual1 <- idx
 					return instanceSpec, nil
 				},
 			},
@@ -99,10 +103,12 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 				DoPrepare: func(
 					flavorProperties *types.Any,
 					instanceSpec instance.Spec,
-					allocation group_types.AllocationMethod) (instance.Spec, error) {
+					allocation group_types.AllocationMethod,
+					idx group_types.Index) (instance.Spec, error) {
 
 					inputFlavorPropertiesActual2 <- flavorProperties
 					inputInstanceSpecActual2 <- instanceSpec
+					inputInstanceIndexActual2 <- idx
 
 					return instanceSpec, errors.New("bad-thing-happened")
 				},
@@ -114,14 +120,16 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 	spec, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).Prepare(
 		inputFlavorProperties1,
 		inputInstanceSpec1,
-		allocation)
+		allocation,
+		index)
 	require.NoError(t, err)
 	require.Equal(t, inputInstanceSpec1, spec)
 
 	_, err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Prepare(
 		inputFlavorProperties2,
 		inputInstanceSpec2,
-		allocation)
+		allocation,
+		index)
 	require.Error(t, err)
 	require.Equal(t, "bad-thing-happened", err.Error())
 
@@ -129,9 +137,11 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 
 	require.Equal(t, inputFlavorProperties1, <-inputFlavorPropertiesActual1)
 	require.Equal(t, inputInstanceSpec1, <-inputInstanceSpecActual1)
+	require.Equal(t, index, <-inputInstanceIndexActual1)
 
 	require.Equal(t, inputFlavorProperties2, <-inputFlavorPropertiesActual2)
 	require.Equal(t, inputInstanceSpec2, <-inputInstanceSpecActual2)
+	require.Equal(t, index, <-inputInstanceIndexActual2)
 }
 
 func TestFlavorMultiPluginHealthy(t *testing.T) {

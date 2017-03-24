@@ -13,6 +13,17 @@ Fields:
 - `Size`: An integer, the number of instances to maintain in the Group.
 - `LogicalIDs`: An array of strings, the logical identifeirs to maintain in the group.
 
+# Index
+Index is a context object that is used to denote the instance's relationship with respect to the group it belongs.
+An Index has two fields: a group ID and a sequence number.  The group ID is the identifier of the group, while the
+sequence number represents the order in which the instance is created with respect to the group.  So for a group of
+size N, the sequence number will be 0, 1, 2, ... N-1.  This can be used by the flavor plugin to determine which one
+of the instances, as represented by a fixed set of nodes (e.g. pets, or stateful nodes), the current instance is.
+In cases where provisioning instances where IP addresses cannot be assigned upfront, this provides a mechanism for
+looking up which IP address a particular node represents if given a list of IP addresses as a result of instance
+creations for this group.  A similar concept can be found in AWS Autoscaling group's Launch index.
+
+
 # Group ID
 A globally-unique string identifier for an Group.
 
