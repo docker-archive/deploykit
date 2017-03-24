@@ -56,6 +56,10 @@ func (s *stoppableServer) AwaitStopped() {
 	<-s.server.StopChan()
 }
 
+func (s *stoppableServer) Wait() <-chan struct{} {
+	return s.server.StopChan()
+}
+
 type loggingHandler struct {
 	handler http.Handler
 }
@@ -81,7 +85,7 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	responseData, err := httputil.DumpResponse(recorder.Result(), true)
 	if err == nil {
-		log.V(100).Infoln("Sending response %s", string(responseData))
+		log.V(100).Infoln("Sending response", string(responseData))
 	} else {
 		log.Error(err)
 	}

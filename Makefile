@@ -126,6 +126,14 @@ endif
 	$(call build_binary,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
 	$(call build_binary,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
 
+cli: build-cli
+build-cli:
+	@echo "+ $@"
+ifneq (,$(findstring .m,$(VERSION)))
+	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
+endif
+	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
+
 install:
 	@echo "+ $@"
 	@go install ${GO_LDFLAGS} $(PKGS)

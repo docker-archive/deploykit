@@ -1,7 +1,6 @@
 package mux
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/types"
 	log "github.com/golang/glog"
 )
 
@@ -18,21 +18,59 @@ import (
 // backends, including socket-based plugins.
 type ReverseProxy struct {
 	http.Handler
-	plugins      func() discovery.Plugins
-	errorHandler func(http.ResponseWriter, *http.Request, string, int)
+	plugins func() discovery.Plugins
 }
 
 // NewReverseProxy creates a mux reverse proxy
 func NewReverseProxy(plugins func() discovery.Plugins) *ReverseProxy {
 	rp := &ReverseProxy{
-		plugins:      plugins,
-		errorHandler: defaultErrorRenderer,
+		plugins: plugins,
 	}
 	return rp
 }
 
+func (rp *ReverseProxy) listPlugins(resp http.ResponseWriter, req *http.Request) {
+	found, err := rp.plugins().List()
+	if err != nil {
+		http.Error(resp, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	result := []string{}
+	for name := range found {
+		result = append(result, name)
+	}
+
+	resp.Write(types.AnyValueMust(result).Bytes())
+	return
+}
+
 // ServeHTTP implements HTTP handler
 func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+
+	if req.URL.Path == "/" {
+		switch req.Method {
+		case http.MethodOptions:
+			rp.listPlugins(resp, req)
+		default:
+			http.NotFound(resp, req)
+		}
+		return
+	}
+
+	p := strings.Split(req.URL.Path, "/")
+	if len(p) < 3 {
+		http.NotFound(resp, req)
+		return
+	}
+
+	if p[2] == "events" {
+		log.V(100).Infoln("TODO - event stream proxy")
+
+		return
+	}
+
+	// standard handling
 	handler, prefix := rp.reverseProxyHandler(req.URL)
 	if handler != nil {
 		if p := strings.TrimPrefix(req.URL.Path, "/"+prefix); len(p) < len(req.URL.Path) {
@@ -44,8 +82,9 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
-	// TODO - set up a default backend that will serve the request??
-	rp.errorHandler(resp, req, "cannot resolve handler", http.StatusInternalServerError)
+
+	http.NotFound(resp, req)
+	return
 }
 
 // returns the handler and the corresponding prefix
@@ -125,13 +164,4 @@ func pluginName(u *url.URL) string {
 		return ""
 	}
 	return root
-}
-
-func defaultErrorRenderer(resp http.ResponseWriter, req *http.Request, message string, code int) {
-	resp.WriteHeader(code)
-	escaped := message
-	if len(message) > 0 {
-		escaped = strings.Replace(message, "\"", "'", -1)
-	}
-	resp.Write([]byte(fmt.Sprintf("{ \"error\": \"%s\" }", escaped)))
 }

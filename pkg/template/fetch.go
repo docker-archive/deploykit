@@ -38,7 +38,7 @@ func Fetch(s string, opt Options, customize func(*http.Request)) ([]byte, error)
 }
 
 func doHTTPGet(u *url.URL, customize func(*http.Request), client *http.Client) ([]byte, error) {
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
