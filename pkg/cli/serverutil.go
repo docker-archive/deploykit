@@ -7,7 +7,7 @@ import (
 	"path"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/rpc/server"
 )
 
@@ -20,7 +20,7 @@ func EnsureDirExists(dir string) {
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
 func RunPlugin(name string, plugin server.VersionedInterface, more ...server.VersionedInterface) {
 
-	dir := discovery.Dir()
+	dir := local.Dir()
 	EnsureDirExists(dir)
 
 	socketPath := path.Join(dir, name)

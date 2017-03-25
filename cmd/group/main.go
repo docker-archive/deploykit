@@ -6,7 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
@@ -33,7 +33,7 @@ func main() {
 
 		cli.SetLogLevel(*logLevel)
 
-		plugins, err := discovery.NewPluginDiscovery()
+		plugins, err := local.NewPluginDiscovery()
 		if err != nil {
 			return err
 		}

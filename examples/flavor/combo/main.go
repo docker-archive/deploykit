@@ -5,7 +5,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -22,7 +22,7 @@ func main() {
 	name := cmd.Flags().String("name", "flavor-combo", "Plugin name to advertise for discovery")
 	cmd.Run = func(c *cobra.Command, args []string) {
 
-		plugins, err := discovery.NewPluginDiscovery()
+		plugins, err := local.NewPluginDiscovery()
 		if err != nil {
 			log.Error(err)
 			os.Exit(1)

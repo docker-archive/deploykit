@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	plugin_metadata "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
@@ -22,7 +23,7 @@ func TestMuxServer(t *testing.T) {
 	socketPath, server := startPlugin(t, pluginName)
 	defer server.Stop()
 
-	lookup, err := discovery.NewPluginDiscoveryWithDirectory(filepath.Dir(socketPath))
+	lookup, err := local.NewPluginDiscoveryWithDirectory(filepath.Dir(socketPath))
 	require.NoError(t, err)
 
 	log.Infoln("checking to see if discovery works")
