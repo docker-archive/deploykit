@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 	log "github.com/golang/glog"
@@ -29,7 +30,7 @@ func NewReverseProxy(plugins func() discovery.Plugins) *ReverseProxy {
 	return rp
 }
 
-func (rp *ReverseProxy) listPlugins(resp http.ResponseWriter, req *http.Request) {
+func (rp *ReverseProxy) listPlugins(resp http.ResponseWriter, req *http.Request, leader bool) {
 	found, err := rp.plugins().List()
 	if err != nil {
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
@@ -41,7 +42,15 @@ func (rp *ReverseProxy) listPlugins(resp http.ResponseWriter, req *http.Request)
 		result = append(result, name)
 	}
 
-	resp.Write(types.AnyValueMust(result).Bytes())
+	data := struct {
+		Leader  bool
+		Plugins []string
+	}{
+		Leader:  leader,
+		Plugins: result,
+	}
+
+	resp.Write(types.AnyValueMust(data).Bytes())
 	return
 }
 
@@ -51,7 +60,15 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/" {
 		switch req.Method {
 		case http.MethodOptions:
-			rp.listPlugins(resp, req)
+
+			leader := false
+			if manager, err := manager_discovery.Locate(rp.plugins); err == nil {
+				if l, err := manager.IsLeader(); err == nil {
+					leader = l
+				}
+			}
+			rp.listPlugins(resp, req, leader)
+
 		default:
 			http.NotFound(resp, req)
 		}

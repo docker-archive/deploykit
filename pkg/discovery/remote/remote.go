@@ -52,18 +52,35 @@ func (r *remotePluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 			return nil, err
 		}
 
-		list := []string{}
-		if err := types.AnyBytes(body).Decode(&list); err != nil {
+		data := struct {
+			Leader  bool
+			Plugins []string
+		}{}
+
+		if err := types.AnyBytes(body).Decode(&data); err != nil {
 			return nil, err
 		}
 
-		for _, p := range list {
-			plugins[p] = &plugin.Endpoint{
-				Name: p,
-				// Protocol is the transport protocol -- unix, tcp, etc.
-				Protocol: remote.Scheme,
-				// Address is the how to connect - socket file, host:port, etc.
-				Address: remote.Host,
+		for _, p := range data.Plugins {
+
+			copy := *remote
+
+			if p[len(p)-1] == '/' {
+				copy.Path = p
+			} else {
+				copy.Path = p + "/"
+			}
+
+			// Only if it's the leader or if it's the only remote do we actually include the endpoints
+			// This way, we ensure the proxy has only one set of plugins (those on the leader) and not the replicas.
+			if data.Leader || len(r.remotes) == 1 {
+				plugins[p] = &plugin.Endpoint{
+					Name: p,
+					// Protocol is the transport protocol -- unix, tcp, etc.
+					Protocol: copy.Scheme,
+					// Address is the how to connect - socket file, host:port, URL, etc.
+					Address: copy.String(),
+				}
 			}
 		}
 	}
