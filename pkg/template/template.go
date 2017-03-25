@@ -53,9 +53,8 @@ type Context interface {
 // Options contains parameters for customizing the behavior of the engine
 type Options struct {
 
-	// SocketDir is the directory for locating the socket file for
-	// a template URL of the form unix://socket_file/path/to/resource
-	SocketDir string
+	// CustomizeFetch allows setting of http request header, etc. during fetch
+	CustomizeFetch func(*http.Request)
 }
 
 type defaultValue struct {
@@ -89,25 +88,6 @@ type Void string
 
 const voidValue Void = ""
 
-// NewTemplateCustom fetches the content at the url and allows configuration of the request
-// If the string begins with str:// as scheme, then the rest of the string is interpreted as the body of the template.
-func NewTemplateCustom(s string, opt Options, custom func(*http.Request)) (*Template, error) {
-	var buff []byte
-	contextURL := s
-	// Special case of specifying the entire template as a string; otherwise treat as url
-	if strings.Index(s, "str://") == 0 {
-		buff = []byte(strings.Replace(s, "str://", "", 1))
-		contextURL = defaultContextURL()
-	} else {
-		b, err := Fetch(s, opt, custom)
-		if err != nil {
-			return nil, err
-		}
-		buff = b
-	}
-	return NewTemplateFromBytes(buff, contextURL, opt)
-}
-
 // NewTemplate fetches the content at the url and returns a template.  If the string begins
 // with str:// as scheme, then the rest of the string is interpreted as the body of the template.
 func NewTemplate(s string, opt Options) (*Template, error) {
@@ -118,7 +98,7 @@ func NewTemplate(s string, opt Options) (*Template, error) {
 		buff = []byte(strings.Replace(s, "str://", "", 1))
 		contextURL = defaultContextURL()
 	} else {
-		b, err := Fetch(s, opt, nil)
+		b, err := Fetch(s, opt)
 		if err != nil {
 			return nil, err
 		}

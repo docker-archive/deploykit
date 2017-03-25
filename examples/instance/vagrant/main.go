@@ -7,7 +7,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -33,9 +32,7 @@ func main() {
 	templFile := cmd.Flags().String("template", "", "Vagrant Template file, in URL form")
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
-		opts := template.Options{
-			SocketDir: local.Dir(),
-		}
+		opts := template.Options{}
 
 		var templ *template.Template
 		if *templFile == "" {

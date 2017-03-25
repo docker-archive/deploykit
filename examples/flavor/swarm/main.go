@@ -24,9 +24,7 @@ func init() {
 		})
 }
 
-var defaultTemplateOptions = template.Options{
-	SocketDir: local.Dir(),
-}
+var defaultTemplateOptions = template.Options{}
 
 func main() {
 
