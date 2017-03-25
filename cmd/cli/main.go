@@ -2,38 +2,73 @@ package main
 
 import (
 	"errors"
+	"flag"
+	"net/url"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/remote"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
 )
 
 // A generic client for infrakit
-
 func main() {
+
+	log := logutil.New("module", "main")
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "infrakit cli",
 	}
-	logLevel := cmd.PersistentFlags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
+
+	// Log setup
+	logOptions := &logutil.ProdDefaults
+	ulist := []*url.URL{}
+	remotes := []string{}
+
+	cmd.PersistentFlags().AddFlagSet(cli.Flags(logOptions))
+	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+
+	cmd.PersistentFlags().StringSliceVarP(&remotes, "host", "H", remotes, "host list. Default is local sockets")
+
+	// parse the list of hosts
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
-		cli.SetLogLevel(*logLevel)
+		logutil.Configure(logOptions)
+
+		if len(remotes) > 0 {
+			for _, h := range remotes {
+				u, err := url.Parse(h)
+				if err != nil {
+					return err
+				}
+				ulist = append(ulist, u)
+			}
+		}
 		return nil
 	}
 
-	// Don't print usage text for any error returned from a RunE function.  Only print it when explicitly requested.
+	// Don't print usage text for any error returned from a RunE function.
+	// Only print it when explicitly requested.
 	cmd.SilenceUsage = true
 
-	// Don't automatically print errors returned from a RunE function.  They are returned from cmd.Execute() below
-	// and we print it ourselves.
+	// Don't automatically print errors returned from a RunE function.
+	// They are returned from cmd.Execute() below and we print it ourselves.
 	cmd.SilenceErrors = true
 	f := func() discovery.Plugins {
-		d, err := discovery.NewPluginDiscovery()
+		if len(ulist) == 0 {
+			d, err := discovery.NewPluginDiscovery()
+			if err != nil {
+				log.Crit("Failed to initialize plugin discovery", "err", err)
+				os.Exit(1)
+			}
+			return d
+		}
+
+		d, err := remote.NewPluginDiscovery(ulist)
 		if err != nil {
-			log.Fatalf("Failed to initialize plugin discovery: %s", err)
+			log.Crit("Failed to initialize remote plugin discovery", "err", err)
 			os.Exit(1)
 		}
 		return d
@@ -46,19 +81,20 @@ func main() {
 	cmd.AddCommand(metadataCommand(f))
 	cmd.AddCommand(eventCommand(f))
 	cmd.AddCommand(pluginCommand(f))
+	cmd.AddCommand(utilCommand(f))
 
 	cmd.AddCommand(instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f), resourcePluginCommand(f))
 
 	err := cmd.Execute()
 	if err != nil {
-		log.Fatal(err)
+		log.Crit("error executing", "err", err)
 		os.Exit(1)
 	}
 }
 
 func assertNotNil(message string, f interface{}) {
 	if f == nil {
-		log.Error(errors.New(message))
+		logutil.New("main", "assert").Error("assert failed", "err", errors.New(message))
 		os.Exit(1)
 	}
 }
