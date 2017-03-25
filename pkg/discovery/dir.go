@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
+	"path"
 	"path/filepath"
 	"sync"
 
@@ -11,16 +13,42 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 )
 
-type errNotUnixSocket string
+// Dir returns the directory to use for plugin discovery, which may be customized by the environment.
+func Dir() string {
+	if pluginDir := os.Getenv(PluginDirEnvVar); pluginDir != "" {
+		return pluginDir
+	}
 
-func (e errNotUnixSocket) Error() string {
-	return string(e)
+	home := os.Getenv("HOME")
+	if usr, err := user.Current(); err == nil {
+		home = usr.HomeDir
+	}
+	return path.Join(home, ".infrakit/plugins")
 }
 
-// IsErrNotUnixSocket returns true if the error is due to the file not being a valid unix socket.
-func IsErrNotUnixSocket(e error) bool {
-	_, is := e.(errNotUnixSocket)
-	return is
+// NewPluginDiscovery creates a plugin discovery based on the environment configuration.
+func NewPluginDiscovery() (Plugins, error) {
+	return NewPluginDiscoveryWithDirectory(Dir())
+}
+
+// NewPluginDiscoveryWithDirectory creates a plugin discovery based on the directory given.
+func NewPluginDiscoveryWithDirectory(pluginDir string) (Plugins, error) {
+	stat, err := os.Stat(pluginDir)
+	if err == nil {
+		if !stat.IsDir() {
+			return nil, fmt.Errorf("Plugin dir %s is a file", pluginDir)
+		}
+	} else {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(pluginDir, 0700); err != nil {
+				return nil, fmt.Errorf("Failed to create plugin dir %s: %s", pluginDir, err)
+			}
+		} else {
+			return nil, fmt.Errorf("Failed to access plugin dir %s: %s", pluginDir, err)
+		}
+	}
+
+	return newDirPluginDiscovery(pluginDir)
 }
 
 type dirPluginDiscovery struct {
@@ -38,7 +66,7 @@ func (r *dirPluginDiscovery) Find(name plugin.Name) (*plugin.Endpoint, error) {
 
 	p, exists := plugins[lookup]
 	if !exists {
-		return nil, fmt.Errorf("Plugin not found: %s (looked up using %s)", name, lookup)
+		return nil, ErrNotFound(string(name))
 	}
 
 	return p, nil
@@ -54,8 +82,8 @@ func newDirPluginDiscovery(dir string) (*dirPluginDiscovery, error) {
 }
 
 func (r *dirPluginDiscovery) dirLookup(entry os.FileInfo) (*plugin.Endpoint, error) {
+	socketPath := filepath.Join(r.dir, entry.Name())
 	if entry.Mode()&os.ModeSocket != 0 {
-		socketPath := filepath.Join(r.dir, entry.Name())
 		return &plugin.Endpoint{
 			Protocol: "unix",
 			Address:  socketPath,
@@ -63,7 +91,7 @@ func (r *dirPluginDiscovery) dirLookup(entry os.FileInfo) (*plugin.Endpoint, err
 		}, nil
 	}
 
-	return nil, errNotUnixSocket(fmt.Sprintf("File is not a socket: %s", entry))
+	return nil, ErrNotUnixSocket(socketPath)
 }
 
 // List returns a list of plugins known, keyed by the name
