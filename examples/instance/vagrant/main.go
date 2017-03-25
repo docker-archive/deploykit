@@ -7,7 +7,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -34,7 +34,7 @@ func main() {
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
 		opts := template.Options{
-			SocketDir: discovery.Dir(),
+			SocketDir: local.Dir(),
 		}
 
 		var templ *template.Template

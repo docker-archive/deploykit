@@ -1,4 +1,4 @@
-package discovery
+package local
 
 import (
 	"io/ioutil"
@@ -12,12 +12,6 @@ import (
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/stretchr/testify/require"
 )
-
-func TestErrNotUnixSocket(t *testing.T) {
-	err := ErrNotUnixSocket("no socket!")
-	require.Error(t, err)
-	require.True(t, IsErrNotUnixSocket(err))
-}
 
 func blockWhileFileExists(name string) {
 	for {

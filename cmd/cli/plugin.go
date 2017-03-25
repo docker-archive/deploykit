@@ -11,6 +11,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/os"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -59,7 +60,7 @@ func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	start.RunE = func(c *cobra.Command, args []string) error {
 
 		configTemplate, err := template.NewTemplate(*configURL, template.Options{
-			SocketDir: discovery.Dir(),
+			SocketDir: local.Dir(),
 		})
 		if err != nil {
 			return err
