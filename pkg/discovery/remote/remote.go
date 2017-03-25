@@ -1,7 +1,6 @@
 package remote
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,6 +14,19 @@ import (
 
 var log = logutil.New("module", "discovery/remote")
 
+// ParseURLMust returns a list of urls from string. Panics on any errors
+func ParseURLMust(s ...string) []*url.URL {
+	out := []*url.URL{}
+	for _, ss := range s {
+		u, err := url.Parse(ss)
+		if err != nil {
+			panic(err)
+		}
+		out = append(out, u)
+	}
+	return out
+}
+
 // NewPluginDiscovery creates plugin lookup given a list of urls
 func NewPluginDiscovery(remotes []*url.URL) (discovery.Plugins, error) {
 	d := &remotePluginDiscovery{
@@ -23,6 +35,16 @@ func NewPluginDiscovery(remotes []*url.URL) (discovery.Plugins, error) {
 
 	_, err := d.List()
 	return d, err
+}
+
+// DiscoveryResponse captures information about the remote node/proxy
+type DiscoveryResponse struct {
+
+	// Leader indicates if this node responding is a leader
+	Leader bool
+
+	// Plugins is a slice of plugin names on that node
+	Plugins []string
 }
 
 type remotePluginDiscovery struct {
@@ -48,15 +70,15 @@ func (r *remotePluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 
 		log.Debug("http options", "remote", remote, "body", string(body), "err", err)
 
+		// If an error occurs, we continue -- with the assumption that at some point
+		// one of the remotes which responded would be a leader.  In that case, we
+		// don't care about the other ones that failed to respond.
 		if err != nil {
-			return nil, err
+			log.Warn("error getting remote plugin info", "err", err)
+			continue
 		}
 
-		data := struct {
-			Leader  bool
-			Plugins []string
-		}{}
-
+		data := DiscoveryResponse{}
 		if err := types.AnyBytes(body).Decode(&data); err != nil {
 			return nil, err
 		}
@@ -97,7 +119,7 @@ func (r *remotePluginDiscovery) Find(name plugin.Name) (*plugin.Endpoint, error)
 	}
 	p, exists := plugins[lookup]
 	if !exists {
-		return nil, fmt.Errorf("Plugin not found: %s (looked up using %s)", name, lookup)
+		return nil, discovery.ErrNotFound(string(name))
 	}
 	return p, nil
 }

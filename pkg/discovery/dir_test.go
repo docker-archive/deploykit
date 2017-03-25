@@ -14,7 +14,7 @@ import (
 )
 
 func TestErrNotUnixSocket(t *testing.T) {
-	err := errNotUnixSocket("no socket!")
+	err := ErrNotUnixSocket("no socket!")
 	require.Error(t, err)
 	require.True(t, IsErrNotUnixSocket(err))
 }
