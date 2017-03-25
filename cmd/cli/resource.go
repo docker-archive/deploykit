@@ -6,6 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
 	resource_plugin "github.com/docker/infrakit/pkg/rpc/resource"
 	"github.com/docker/infrakit/pkg/spi/resource"
@@ -139,7 +140,7 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 func readSpecFromTemplateURL(templateURL string) (*resource.Spec, error) {
 	log.Infof("Reading template from %v", templateURL)
 	engine, err := template.NewTemplate(templateURL, template.Options{
-		SocketDir: discovery.Dir(),
+		SocketDir: local.Dir(),
 	})
 	if err != nil {
 		return nil, err

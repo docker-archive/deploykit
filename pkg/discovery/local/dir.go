@@ -1,4 +1,4 @@
-package discovery
+package local
 
 import (
 	"fmt"
@@ -10,12 +10,13 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 )
 
 // Dir returns the directory to use for plugin discovery, which may be customized by the environment.
 func Dir() string {
-	if pluginDir := os.Getenv(PluginDirEnvVar); pluginDir != "" {
+	if pluginDir := os.Getenv(discovery.PluginDirEnvVar); pluginDir != "" {
 		return pluginDir
 	}
 
@@ -27,12 +28,12 @@ func Dir() string {
 }
 
 // NewPluginDiscovery creates a plugin discovery based on the environment configuration.
-func NewPluginDiscovery() (Plugins, error) {
+func NewPluginDiscovery() (discovery.Plugins, error) {
 	return NewPluginDiscoveryWithDirectory(Dir())
 }
 
 // NewPluginDiscoveryWithDirectory creates a plugin discovery based on the directory given.
-func NewPluginDiscoveryWithDirectory(pluginDir string) (Plugins, error) {
+func NewPluginDiscoveryWithDirectory(pluginDir string) (discovery.Plugins, error) {
 	stat, err := os.Stat(pluginDir)
 	if err == nil {
 		if !stat.IsDir() {
@@ -66,7 +67,7 @@ func (r *dirPluginDiscovery) Find(name plugin.Name) (*plugin.Endpoint, error) {
 
 	p, exists := plugins[lookup]
 	if !exists {
-		return nil, ErrNotFound(string(name))
+		return nil, discovery.ErrNotFound(string(name))
 	}
 
 	return p, nil
@@ -91,7 +92,7 @@ func (r *dirPluginDiscovery) dirLookup(entry os.FileInfo) (*plugin.Endpoint, err
 		}, nil
 	}
 
-	return nil, ErrNotUnixSocket(socketPath)
+	return nil, discovery.ErrNotUnixSocket(socketPath)
 }
 
 // List returns a list of plugins known, keyed by the name
@@ -114,7 +115,7 @@ func (r *dirPluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 			instance, err := r.dirLookup(entry)
 
 			if err != nil {
-				if !IsErrNotUnixSocket(err) {
+				if !discovery.IsErrNotUnixSocket(err) {
 					log.Warningln("Loading plugin err=", err)
 				}
 				continue

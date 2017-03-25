@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	file_leader "github.com/docker/infrakit/pkg/leader/file"
 	file_store "github.com/docker/infrakit/pkg/store/file"
 	"github.com/spf13/cobra"
@@ -52,7 +52,7 @@ func osEnvironment(getConfig func() config) *cobra.Command {
 	pollInterval := cmd.Flags().Duration("poll-interval", 5*time.Second, "Leader polling interval")
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
-		plugins, err := discovery.NewPluginDiscovery()
+		plugins, err := local.NewPluginDiscovery()
 		if err != nil {
 			return err
 		}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
@@ -58,7 +59,7 @@ func main() {
 	cmd.SilenceErrors = true
 	f := func() discovery.Plugins {
 		if len(ulist) == 0 {
-			d, err := discovery.NewPluginDiscovery()
+			d, err := local.NewPluginDiscovery()
 			if err != nil {
 				log.Crit("Failed to initialize plugin discovery", "err", err)
 				os.Exit(1)

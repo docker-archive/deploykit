@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group/util"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -377,7 +377,7 @@ func TestGetProvisioningOrder(t *testing.T) {
 
 func TestGetResourceDependencies(t *testing.T) {
 	newTemplate := func(s string) *template.Template {
-		t, err := template.NewTemplate("str://"+s, template.Options{SocketDir: discovery.Dir()})
+		t, err := template.NewTemplate("str://"+s, template.Options{SocketDir: local.Dir()})
 		if err != nil {
 			panic(err)
 		}

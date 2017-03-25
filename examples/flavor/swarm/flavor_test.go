@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -29,7 +30,7 @@ func templ(tpl string) *template.Template {
 }
 
 func plugins() discovery.Plugins {
-	d, err := discovery.NewPluginDiscovery()
+	d, err := local.NewPluginDiscovery()
 	if err != nil {
 		panic(err)
 	}
