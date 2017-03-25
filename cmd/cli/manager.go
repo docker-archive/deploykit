@@ -6,7 +6,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
@@ -87,9 +86,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		templateURL := args[0]
 
 		log.Infof("Using %v for reading template\n", templateURL)
-		engine, err := template.NewTemplate(templateURL, template.Options{
-			SocketDir: local.Dir(),
-		})
+		engine, err := template.NewTemplate(templateURL, template.Options{})
 		if err != nil {
 			return err
 		}

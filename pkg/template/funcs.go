@@ -181,7 +181,8 @@ func (t *Template) DefaultFuncs() []Function {
 				"Source / evaluate the template at the input location (as URL).",
 				"This will make all of the global variables declared there visible in this template's context.",
 				"Similar to 'source' in bash, sourcing another template means applying it in the same context ",
-				"as the calling template.  The context (e.g. variables) of the calling template as a result can be mutated.",
+				"as the calling template.  The context (e.g. variables) of the calling template as a result can",
+				"be mutated.",
 			},
 			Func: func(p string, opt ...interface{}) (string, error) {
 				headers, context := headersAndContext(opt...)
@@ -193,7 +194,15 @@ func (t *Template) DefaultFuncs() []Function {
 					}
 					loc = buff
 				}
-				sourced, err := NewTemplateCustom(loc, t.options, func(req *http.Request) { setHeaders(req, headers) })
+
+				prev := t.options.CustomizeFetch
+				t.options.CustomizeFetch = func(req *http.Request) {
+					setHeaders(req, headers)
+					if prev != nil {
+						prev(req)
+					}
+				}
+				sourced, err := NewTemplate(loc, t.options)
 				if err != nil {
 					return "", err
 				}
@@ -228,7 +237,16 @@ func (t *Template) DefaultFuncs() []Function {
 					}
 					loc = buff
 				}
-				included, err := NewTemplateCustom(loc, t.options, func(req *http.Request) { setHeaders(req, headers) })
+
+				prev := t.options.CustomizeFetch
+				t.options.CustomizeFetch = func(req *http.Request) {
+					setHeaders(req, headers)
+					if prev != nil {
+						prev(req)
+					}
+				}
+
+				included, err := NewTemplate(loc, t.options)
 				if err != nil {
 					return "", err
 				}

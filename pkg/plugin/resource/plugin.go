@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/discovery/local"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/resource"
@@ -76,7 +75,7 @@ func (p *plugin) Commit(config resource.Spec, pretend bool) (string, error) {
 			continue
 		}
 
-		template, err := template.NewTemplate("str://"+resourceConfigs[name].properties, template.Options{SocketDir: local.Dir()})
+		template, err := template.NewTemplate("str://"+resourceConfigs[name].properties, template.Options{})
 		if err != nil {
 			return "", fmt.Errorf("Failed to parse template '%s' for resource '%s': %s", resourceConfigs[name].properties, name, err)
 		}
@@ -272,7 +271,7 @@ func getProvisioningOrder(resourceConfigs map[string]resourceConfig) ([]string, 
 	}
 
 	for name, resourceConfig := range resourceConfigs {
-		template, err := template.NewTemplate("str://"+resourceConfig.properties, template.Options{SocketDir: local.Dir()})
+		template, err := template.NewTemplate("str://"+resourceConfig.properties, template.Options{})
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse template for resource '%s': %s", name, err)
 		}

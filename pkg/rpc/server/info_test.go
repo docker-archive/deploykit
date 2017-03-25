@@ -2,8 +2,8 @@ package server
 
 import (
 	"io/ioutil"
+	"net/http"
 	"path"
-	"path/filepath"
 	"testing"
 
 	rpc_flavor "github.com/docker/infrakit/pkg/rpc/flavor"
@@ -26,15 +26,18 @@ func tempSocket() string {
 
 func TestFetchAPIInfoFromPlugin(t *testing.T) {
 	socketPath := tempSocket()
-	dir := filepath.Dir(socketPath)
-	host := filepath.Base(socketPath)
 
-	url := "unix://" + host + "/info/api.json"
+	url := "unix://" + socketPath
 
 	server, err := StartPluginAtPath(socketPath, rpc_instance.PluginServer(&testing_instance.Plugin{}))
 	require.NoError(t, err)
 
-	buff, err := template.Fetch(url, template.Options{SocketDir: dir}, nil)
+	buff, err := template.Fetch(url, template.Options{
+		CustomizeFetch: func(req *http.Request) {
+			req.URL.Path = "/info/api.json"
+			req.URL.Host = "h"
+		},
+	})
 	require.NoError(t, err)
 
 	decoded, err := template.FromJSON(buff)
@@ -44,8 +47,13 @@ func TestFetchAPIInfoFromPlugin(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Instance", result)
 
-	url = "unix://" + host + "/info/functions.json"
-	buff, err = template.Fetch(url, template.Options{SocketDir: dir}, nil)
+	url = "unix://" + socketPath
+	buff, err = template.Fetch(url, template.Options{
+		CustomizeFetch: func(req *http.Request) {
+			req.URL.Path = "/info/functions.json"
+			req.URL.Host = "h"
+		},
+	})
 	require.NoError(t, err)
 
 	server.Stop()
@@ -83,15 +91,18 @@ func (p *exporter) Funcs() []template.Function {
 
 func TestFetchFunctionsFromPlugin(t *testing.T) {
 	socketPath := tempSocket()
-	dir := filepath.Dir(socketPath)
-	host := filepath.Base(socketPath)
 
-	url := "unix://" + host + "/info/functions.json"
+	url := "unix://" + socketPath
 
 	server, err := StartPluginAtPath(socketPath, rpc_flavor.PluginServer(&exporter{&testing_flavor.Plugin{}}))
 	require.NoError(t, err)
 
-	buff, err := template.Fetch(url, template.Options{SocketDir: dir}, nil)
+	buff, err := template.Fetch(url, template.Options{
+		CustomizeFetch: func(req *http.Request) {
+			req.URL.Path = "/info/functions.json"
+			req.URL.Host = "d"
+		},
+	})
 	require.NoError(t, err)
 
 	decoded, err := template.FromJSON(buff)
