@@ -7,10 +7,10 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
@@ -20,6 +20,8 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/flavor")
 
 func init() {
 	base.Register(Command)
@@ -114,7 +116,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			buff, err := ioutil.ReadFile(args[0])
 			if err != nil {
-				log.Error(err)
+				log.Warn("error", "err", err)
 				os.Exit(1)
 			}
 
@@ -136,13 +138,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			flavorProperties, err := ioutil.ReadFile(args[0])
 			if err != nil {
-				log.Error(err)
+				log.Warn("error", "err", err)
 				os.Exit(1)
 			}
 
 			buff, err := ioutil.ReadFile(args[1])
 			if err != nil {
-				log.Error(err)
+				log.Warn("error", "err", err)
 				os.Exit(1)
 			}
 
@@ -186,7 +188,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		flavorProperties, err := ioutil.ReadFile(args[0])
 		if err != nil {
-			log.Error(err)
+			log.Warn("error", "err", err)
 			os.Exit(1)
 		}
 

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
@@ -19,6 +19,8 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/manager")
 
 func init() {
 	base.Register(Command)
@@ -57,13 +59,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					return err
 				}
 
-				log.Infoln("Found manager", name, "is leader = ", isLeader)
+				log.Info("Found manager", "name", name, "leader", isLeader)
 				if isLeader {
 
 					groupPlugin = group_plugin.Adapt(rpcClient)
 					groupPluginName = name
 
-					log.Infoln("Found manager as", name, "at", endpoint.Address)
+					log.Info("Found manager", "name", name, "addrr", endpoint.Address)
 
 					break
 				}
@@ -86,7 +88,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		templateURL := args[0]
 
-		log.Infof("Using %v for reading template\n", templateURL)
+		log.Info("reading template", "url", templateURL)
 		engine, err := template.NewTemplate(templateURL, template.Options{})
 		if err != nil {
 			return err
@@ -111,7 +113,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		log.Debugln(view)
+		log.Debug("rendered", "view", view)
 
 		// Treat this as an Any and then convert
 		any := types.AnyString(view)
@@ -119,7 +121,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		groups := []plugin.Spec{}
 		err = any.Decode(&groups)
 		if err != nil {
-			log.Warningln("Error parsing the template for plugin specs.")
+			log.Warn("Error parsing the template for plugin specs.")
 			return err
 		}
 
@@ -144,7 +146,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			// Right now we assume the RPC endpoint is indeed a group.
 			target, err := group_plugin.NewClient(endpoint.Address)
 
-			log.Debugln("For group", gp.Plugin, "address=", endpoint.Address, "err=", err, "spec=", spec)
+			log.Debug("commit", "plugin", gp.Plugin, "address", endpoint.Address, "err", err, "spec", spec)
 
 			if err != nil {
 				return err

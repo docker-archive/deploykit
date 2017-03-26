@@ -9,15 +9,17 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/os"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/plugin")
 
 // Command is the entrypoint
 func Command(plugins func() discovery.Plugins) *cobra.Command {
@@ -127,7 +129,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		var before, after = 0, 0
 
 		if m, err := plugins().List(); err != nil {
-			log.Warningln("Problem listing current plugins:", err, "continue.")
+			log.Warn("Problem listing current plugins, continue", "err", err)
 		} else {
 			before = len(m)
 		}
@@ -176,7 +178,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				for {
 					select {
 					case <-pluginScanDone:
-						log.Infoln("--wait mode: stop scanning.")
+						log.Info("--wait mode: stop scanning.")
 						return
 
 					case <-checkNow:
@@ -184,7 +186,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 							now = len(m)
 						}
 						if now == 0 {
-							log.Infoln("--wait mode: scan found no plugins.")
+							log.Info("--wait mode: scan found no plugins.")
 							close(noRunningPlugins)
 						}
 					}
@@ -195,9 +197,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		// Here we wait for either wait group to be done or if they are killed out of band.
 		select {
 		case <-waitDone:
-			log.Infoln("All plugins completed. Exiting.")
+			log.Info("All plugins completed. Exiting.")
 		case <-noRunningPlugins:
-			log.Infoln("Plugins aren't running anymore.  Exiting.")
+			log.Info("Plugins aren't running anymore.  Exiting.")
 		}
 
 		for _, monitor := range monitors {
@@ -239,7 +241,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			if p.Protocol != "unix" {
-				log.Warningf("Plugin is not a local process", n)
+				log.Warn("Plugin is not a local process", "name", n)
 				continue
 			}
 
@@ -248,26 +250,26 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			buff, err := ioutil.ReadFile(pidFile)
 			if err != nil {
-				log.Warningf("Cannot read PID file for %s: %s", n, pidFile)
+				log.Warn("Cannot read PID file", "name", n, "pid", pidFile)
 				continue
 			}
 
 			pid, err := strconv.Atoi(string(buff))
 			if err != nil {
-				log.Warningf("Cannot determine PID for %s from file: %s", n, pidFile)
+				log.Warn("Cannot determine PID", "name", n, "pid", pidFile)
 				continue
 			}
 
 			process, err := sys_os.FindProcess(pid)
 			if err != nil {
-				log.Warningf("Error finding process of plugin %s", n)
+				log.Warn("Error finding process of plugin", "name", n)
 				continue
 			}
 
-			log.Infoln("Stopping", n, "at PID=", pid)
+			log.Info("Stopping", "name", n, "pid", pid)
 			if err := process.Signal(syscall.SIGTERM); err == nil {
 				process.Wait()
-				log.Infoln("Process for", n, "exited")
+				log.Info("Process exited", "name", n)
 			}
 
 		}

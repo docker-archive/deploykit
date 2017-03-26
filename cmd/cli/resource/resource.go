@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	resource_plugin "github.com/docker/infrakit/pkg/rpc/resource"
 	"github.com/docker/infrakit/pkg/spi/resource"
@@ -15,6 +15,8 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/resource")
 
 func init() {
 	base.Register(Command)
@@ -137,7 +139,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 }
 
 func readSpecFromTemplateURL(templateURL string) (*resource.Spec, error) {
-	log.Infof("Reading template from %v", templateURL)
+	log.Info("Reading template", "url", templateURL)
 	engine, err := template.NewTemplate(templateURL, template.Options{})
 	if err != nil {
 		return nil, err
@@ -154,11 +156,11 @@ func readSpecFromTemplateURL(templateURL string) (*resource.Spec, error) {
 		return nil, err
 	}
 
-	log.Debugln(view)
+	log.Debug("rendered", "view", view)
 
 	spec := resource.Spec{}
 	if err := types.AnyString(view).Decode(&spec); err != nil {
-		log.Warningln("Error parsing template")
+		log.Warn("Error parsing template", "err", err)
 		return nil, err
 	}
 

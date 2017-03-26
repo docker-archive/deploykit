@@ -8,16 +8,18 @@ import (
 	"sort"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/instance")
 
 func init() {
 	base.Register(Command)
@@ -65,7 +67,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			buff, err := ioutil.ReadFile(args[0])
 			if err != nil {
-				log.Error(err)
+				log.Warn("error", "err", err)
 				os.Exit(1)
 			}
 
@@ -89,7 +91,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			buff, err := ioutil.ReadFile(args[0])
 			if err != nil {
-				log.Error(err)
+				log.Warn("error", "err", err)
 				os.Exit(1)
 			}
 

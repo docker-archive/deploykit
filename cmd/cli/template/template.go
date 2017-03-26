@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/template")
 
 func init() {
 	base.Register(Command)
@@ -26,7 +28,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Render an infrakit template",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			log.Infof("Using %v for reading template\n", templateURL)
+			log.Info("reading template", "url", templateURL)
 			engine, err := template.NewTemplate(templateURL, template.Options{})
 			if err != nil {
 				return err

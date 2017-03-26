@@ -8,15 +8,17 @@ import (
 	"sort"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/group")
 
 const (
 	// DefaultGroupPluginName specifies the default name of the group plugin if name flag isn't specified.
@@ -71,7 +73,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		buff, err := ioutil.ReadFile(args[0])
 		if err != nil {
-			log.Error(err)
+			log.Warn("error", "err", err)
 			os.Exit(1)
 		}
 

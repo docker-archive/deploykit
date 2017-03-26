@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"strconv"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/metadata")
 
 func init() {
 	base.Register(Command)
@@ -136,7 +138,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					if *all {
 						allPaths, err := listAll(match, path.Shift(1))
 						if err != nil {
-							log.Warningln("Cannot metadata ls on plugin", target, "err=", err)
+							log.Warn("Cannot metadata ls on plugin", "target", target, "err", err)
 						}
 						for _, c := range allPaths {
 							nodes = append(nodes, metadata_plugin.Path(target).Sub(c))
@@ -151,7 +153,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					if *all {
 						allPaths, err := listAll(match, path.Shift(1))
 						if err != nil {
-							log.Warningln("Cannot metadata ls on plugin", target, "err=", err)
+							log.Warn("Cannot metadata ls on plugin", "target", target, "err", err)
 						}
 						for _, c := range allPaths {
 							nodes = append(nodes, metadata_plugin.Path(target).Sub(c))
@@ -159,7 +161,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					} else {
 						children, err := match.List(path.Shift(1))
 						if err != nil {
-							log.Warningln("Cannot metadata ls on plugin", target, "err=", err)
+							log.Warn("Cannot metadata ls on plugin", "target", target, "err", err)
 						}
 						for _, c := range children {
 							nodes = append(nodes, path.Join(c))
@@ -232,7 +234,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 								fmt.Println(str)
 							}
 						} else {
-							log.Warningln("Cannot metadata cat on plugin", *first, "err=", err)
+							log.Warn("Cannot metadata cat on plugin", "target", *first, "err", err)
 						}
 					}
 				}
