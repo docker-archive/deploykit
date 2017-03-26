@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "github.com/docker/infrakit/cmd/cli/event"
 	_ "github.com/docker/infrakit/cmd/cli/flavor"
 	_ "github.com/docker/infrakit/cmd/cli/group"
 	_ "github.com/docker/infrakit/cmd/cli/info"

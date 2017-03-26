@@ -5,17 +5,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/docker/infrakit/cmd/cli/event"
-	"github.com/docker/infrakit/cmd/cli/flavor"
-	"github.com/docker/infrakit/cmd/cli/group"
-	"github.com/docker/infrakit/cmd/cli/info"
-	"github.com/docker/infrakit/cmd/cli/instance"
-	"github.com/docker/infrakit/cmd/cli/manager"
-	"github.com/docker/infrakit/cmd/cli/metadata"
-	"github.com/docker/infrakit/cmd/cli/plugin"
-	"github.com/docker/infrakit/cmd/cli/resource"
-	"github.com/docker/infrakit/cmd/cli/template"
-	"github.com/docker/infrakit/cmd/cli/util"
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
@@ -85,18 +75,11 @@ func main() {
 		return d
 	}
 
-	cmd.AddCommand(cli.VersionCommand(),
-		info.Command(f),
-		template.Command(f),
-		manager.Command(f),
-		metadata.Command(f),
-		event.Command(f),
-		plugin.Command(f),
-		util.Command(f),
-		instance.Command(f),
-		group.Command(f),
-		flavor.Command(f),
-		resource.Command(f))
+	cmd.AddCommand(cli.VersionCommand())
+
+	base.VisitModules(f, func(c *cobra.Command) {
+		cmd.AddCommand(c)
+	})
 
 	usage := banner + "\n\n" + cmd.UsageTemplate()
 	cmd.SetUsageTemplate(usage)

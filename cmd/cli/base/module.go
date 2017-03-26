@@ -25,12 +25,12 @@ func Register(f module) {
 }
 
 // VisitModules iterate through all the modules known
-func VisitModules(p discovery.Plugins, f func(*cobra.Command)) {
+func VisitModules(p func() discovery.Plugins, f func(*cobra.Command)) {
 	lock.Lock()
 	defer lock.Unlock()
 
 	for _, m := range modules {
-		command := m(func() discovery.Plugins { return p })
+		command := m(p)
 		f(command)
 	}
 }
