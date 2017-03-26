@@ -62,6 +62,7 @@ func listAllTopics(m event.Plugin, path types.Path) ([]types.Path, error) {
 	return result, nil
 }
 
+// Command is the entry point of the module
 func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd := &cobra.Command{

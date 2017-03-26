@@ -20,7 +20,7 @@ func UpTree(c *cobra.Command, do func(*cobra.Command, []string) error) error {
 	return do(c, c.Flags().Args())
 }
 
-// EnsurePresistenPreRunE works around a limit of COBRA where only the persistent runE is executed at the
+// EnsurePersistentPreRunE works around a limit of COBRA where only the persistent runE is executed at the
 // parent of the leaf node.
 func EnsurePersistentPreRunE(c *cobra.Command) error {
 	return UpTree(c, func(x *cobra.Command, argv []string) error {
