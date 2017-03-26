@@ -1,9 +1,10 @@
-package main
+package info
 
 import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
@@ -11,19 +12,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// infoCommand creates a cobra Command that prints build version information.
-func infoCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command creates a cobra Command that prints build version information.
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "print plugin info",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
-			// Cobra doesn't go past one level of PersistentRunE
-			return upTree(c, func(x *cobra.Command, argv []string) error {
-				if x.PersistentPreRunE != nil {
-					return x.PersistentPreRunE(x, argv)
-				}
-				return nil
-			})
+			return cli.EnsurePersistentPreRunE(c)
 		},
 	}
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")

@@ -1,11 +1,21 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"net/url"
 	"os"
 
+	"github.com/docker/infrakit/cmd/cli/event"
+	"github.com/docker/infrakit/cmd/cli/flavor"
+	"github.com/docker/infrakit/cmd/cli/group"
+	"github.com/docker/infrakit/cmd/cli/info"
+	"github.com/docker/infrakit/cmd/cli/instance"
+	"github.com/docker/infrakit/cmd/cli/manager"
+	"github.com/docker/infrakit/cmd/cli/metadata"
+	"github.com/docker/infrakit/cmd/cli/plugin"
+	"github.com/docker/infrakit/cmd/cli/resource"
+	"github.com/docker/infrakit/cmd/cli/template"
+	"github.com/docker/infrakit/cmd/cli/util"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
@@ -75,16 +85,21 @@ func main() {
 		return d
 	}
 
-	cmd.AddCommand(cli.VersionCommand())
-	cmd.AddCommand(infoCommand(f))
-	cmd.AddCommand(templateCommand(f))
-	cmd.AddCommand(managerCommand(f))
-	cmd.AddCommand(metadataCommand(f))
-	cmd.AddCommand(eventCommand(f))
-	cmd.AddCommand(pluginCommand(f))
-	cmd.AddCommand(utilCommand(f))
+	cmd.AddCommand(cli.VersionCommand(),
+		info.Command(f),
+		template.Command(f),
+		manager.Command(f),
+		metadata.Command(f),
+		event.Command(f),
+		plugin.Command(f),
+		util.Command(f),
+		instance.Command(f),
+		group.Command(f),
+		flavor.Command(f),
+		resource.Command(f))
 
-	cmd.AddCommand(instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f), resourcePluginCommand(f))
+	usage := banner + "\n\n" + cmd.UsageTemplate()
+	cmd.SetUsageTemplate(usage)
 
 	err := cmd.Execute()
 	if err != nil {
@@ -93,20 +108,12 @@ func main() {
 	}
 }
 
-func assertNotNil(message string, f interface{}) {
-	if f == nil {
-		logutil.New("main", "assert").Error("assert failed", "err", errors.New(message))
-		os.Exit(1)
-	}
-}
-
-// upTree traverses up the command tree and starts executing the do function in the order from top
-// of the command tree to the bottom.  Cobra commands executes only one level of PersistentPreRunE
-// in reverse order.  This breaks our model of setting log levels at the very top and have the log level
-// set throughout the entire hierarchy of command execution.
-func upTree(c *cobra.Command, do func(*cobra.Command, []string) error) error {
-	if p := c.Parent(); p != nil {
-		return upTree(p, do)
-	}
-	return do(c, c.Flags().Args())
-}
+const banner = `
+ ___  ________   ________ ________  ________  ___  __    ___  _________   
+|\  \|\   ___  \|\  _____\\   __  \|\   __  \|\  \|\  \ |\  \|\___   ___\ 
+\ \  \ \  \\ \  \ \  \__/\ \  \|\  \ \  \|\  \ \  \/  /|\ \  \|___ \  \_| 
+ \ \  \ \  \\ \  \ \   __\\ \   _  _\ \   __  \ \   ___  \ \  \   \ \  \  
+  \ \  \ \  \\ \  \ \  \_| \ \  \\  \\ \  \ \  \ \  \\ \  \ \  \   \ \  \ 
+   \ \__\ \__\\ \__\ \__\   \ \__\\ _\\ \__\ \__\ \__\\ \__\ \__\   \ \__\
+    \|__|\|__| \|__|\|__|    \|__|\|__|\|__|\|__|\|__| \|__|\|__|    \|__|
+`

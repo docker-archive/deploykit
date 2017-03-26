@@ -1,4 +1,4 @@
-package main
+package event
 
 import (
 	"fmt"
@@ -62,7 +62,7 @@ func listAllTopics(m event.Plugin, path types.Path) ([]types.Path, error) {
 	return result, nil
 }
 
-func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "event",

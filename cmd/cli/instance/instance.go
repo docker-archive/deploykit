@@ -1,4 +1,4 @@
-package main
+package instance
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
@@ -17,7 +18,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the entry point to this module
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	var instancePlugin instance.Plugin
 
@@ -27,12 +29,7 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
-		if err := upTree(c, func(x *cobra.Command, argv []string) error {
-			if x.PersistentPreRunE != nil {
-				return x.PersistentPreRunE(x, argv)
-			}
-			return nil
-		}); err != nil {
+		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
 		}
 
@@ -46,6 +43,8 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 		instancePlugin = p
+
+		cli.MustNotNil(instancePlugin, "instance plugin not found", "name", *name)
 		return nil
 	}
 
@@ -53,7 +52,6 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "validate <instance configuration file>",
 		Short: "validates an instance configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", instancePlugin)
 
 			if len(args) != 1 {
 				cmd.Usage()
@@ -78,7 +76,6 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "provision <instance configuration file>",
 		Short: "provisions an instance",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", instancePlugin)
 
 			if len(args) != 1 {
 				cmd.Usage()
@@ -108,7 +105,6 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "destroy <instance ID>",
 		Short: "destroy the resource",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", instancePlugin)
 
 			if len(args) != 1 {
 				cmd.Usage()
@@ -132,7 +128,6 @@ func instancePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
 	quiet := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", instancePlugin)
 
 		filter := map[string]string{}
 		for _, t := range *tags {

@@ -1,10 +1,11 @@
-package main
+package resource
 
 import (
 	"fmt"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	resource_plugin "github.com/docker/infrakit/pkg/rpc/resource"
@@ -14,7 +15,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the top level command
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	var resourcePlugin resource.Plugin
 
@@ -24,12 +26,7 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	name := cmd.PersistentFlags().String("name", "resource", "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
-		if err := upTree(c, func(x *cobra.Command, argv []string) error {
-			if x.PersistentPreRunE != nil {
-				return x.PersistentPreRunE(x, argv)
-			}
-			return nil
-		}); err != nil {
+		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
 		}
 
@@ -43,6 +40,8 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 		resourcePlugin = p
+
+		cli.MustNotNil(resourcePlugin, "no resource plugin", "name", *name)
 		return nil
 	}
 
@@ -52,8 +51,6 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	commitPretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", resourcePlugin)
-
 		if len(args) != 1 {
 			cmd.Usage()
 			os.Exit(1)
@@ -82,7 +79,6 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	destroyPretend := destroy.Flags().Bool("pretend", false, "Don't actually destroy, only explain the destroy")
 	destroy.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", resourcePlugin)
 
 		if len(args) != 1 {
 			cmd.Usage()
@@ -111,7 +107,6 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "describe a resource configuration specified by the URL",
 	}
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", resourcePlugin)
 
 		if len(args) != 1 {
 			cmd.Usage()

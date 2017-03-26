@@ -1,4 +1,4 @@
-package main
+package plugin
 
 import (
 	"fmt"
@@ -19,7 +19,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func pluginCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the entrypoint
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "plugin",

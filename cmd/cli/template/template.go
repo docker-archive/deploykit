@@ -1,4 +1,4 @@
-package main
+package template
 
 import (
 	"fmt"
@@ -11,7 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func templateCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the entrypoint
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	globals := []string{}
 	templateURL := ""

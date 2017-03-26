@@ -1,4 +1,4 @@
-package main
+package metadata
 
 import (
 	"fmt"
@@ -65,7 +65,8 @@ func listAll(m metadata.Plugin, path metadata.Path) ([]metadata.Path, error) {
 	return result, nil
 }
 
-func metadataCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the entry point to this module
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "metadata",

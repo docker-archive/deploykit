@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"time"
@@ -61,7 +61,8 @@ func muxCommand(plugins func() discovery.Plugins) *cobra.Command {
 	return cmd
 }
 
-func utilCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the head of this module
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	util := &cobra.Command{
 		Use:   "util",

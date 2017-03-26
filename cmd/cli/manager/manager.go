@@ -1,10 +1,11 @@
-package main
+package manager
 
 import (
 	"fmt"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -18,7 +19,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the entrypoint
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	var groupPlugin group.Plugin
 	var groupPluginName string
@@ -28,12 +30,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access the manager",
 	}
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
-		if err := upTree(c, func(x *cobra.Command, argv []string) error {
-			if x.PersistentPreRunE != nil {
-				return x.PersistentPreRunE(x, argv)
-			}
-			return nil
-		}); err != nil {
+		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
 		}
 
@@ -76,7 +73,6 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	pretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", groupPlugin)
 
 		if len(args) != 1 {
 			cmd.Usage()
@@ -165,7 +161,6 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "inspect returns the plugin configurations known by the manager",
 	}
 	inspect.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", groupPlugin)
 
 		if len(args) != 0 {
 			cmd.Usage()

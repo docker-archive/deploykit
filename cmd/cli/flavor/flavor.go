@@ -1,4 +1,4 @@
-package main
+package flavor
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
@@ -19,7 +20,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the entry point of this module
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	var flavorPlugin flavor.Plugin
 
@@ -30,12 +32,7 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
 
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
-		if err := upTree(c, func(x *cobra.Command, argv []string) error {
-			if x.PersistentPreRunE != nil {
-				return x.PersistentPreRunE(x, argv)
-			}
-			return nil
-		}); err != nil {
+		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
 		}
 
@@ -49,6 +46,8 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 		flavorPlugin = p
+
+		cli.MustNotNil(flavorPlugin, "flavor plugin not found", "name", *name)
 		return nil
 	}
 
@@ -102,7 +101,6 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "validate <flavor configuration file>",
 		Short: "validate a flavor configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", flavorPlugin)
 
 			if len(args) != 1 {
 				cmd.Usage()
@@ -125,7 +123,6 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "prepare <flavor configuration file> <instance Spec JSON file>",
 		Short: "prepare provisioning inputs for an instance",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			assertNotNil("no plugin", flavorPlugin)
 
 			if len(args) != 2 {
 				cmd.Usage()
@@ -176,7 +173,6 @@ func flavorPluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	id := healthy.Flags().String("id", "", "ID of resource")
 	logicalID := healthy.Flags().String("logical-id", "", "Logical ID of resource")
 	healthy.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", flavorPlugin)
 
 		if len(args) != 1 {
 			cmd.Usage()
