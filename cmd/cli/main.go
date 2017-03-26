@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
@@ -76,7 +77,7 @@ func main() {
 
 	cmd.AddCommand(cli.VersionCommand())
 
-	VisitModules(f, func(c *cobra.Command) {
+	base.VisitModules(f, func(c *cobra.Command) {
 		cmd.AddCommad(c)
 	})
 
