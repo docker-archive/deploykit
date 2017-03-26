@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -21,6 +22,10 @@ const (
 	// DefaultGroupPluginName specifies the default name of the group plugin if name flag isn't specified.
 	DefaultGroupPluginName = "group"
 )
+
+func init() {
+	base.Register(Command)
+}
 
 // Command is the entrypoint to this module
 func Command(plugins func() discovery.Plugins) *cobra.Command {

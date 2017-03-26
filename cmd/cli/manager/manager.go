@@ -5,6 +5,7 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/manager"
@@ -18,6 +19,10 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	base.Register(Command)
+}
 
 // Command is the entrypoint
 func Command(plugins func() discovery.Plugins) *cobra.Command {

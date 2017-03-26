@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/discovery"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/rpc/client"
@@ -14,6 +15,10 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	base.Register(Command)
+}
 
 func getEventPlugin(plugins func() discovery.Plugins, name string) (found event.Plugin, err error) {
 	err = forEventPlugins(plugins, func(n string, p event.Plugin) error {

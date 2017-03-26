@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/discovery"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc/client"
@@ -12,6 +13,10 @@ import (
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	base.Register(Command)
+}
 
 func getPlugin(plugins func() discovery.Plugins, name string) (found metadata.Plugin, err error) {
 	err = forPlugin(plugins, func(n string, p metadata.Plugin) error {
