@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/os"
@@ -20,6 +21,10 @@ import (
 )
 
 var log = logutil.New("module", "cli/plugin")
+
+func init() {
+	base.Register(Command)
+}
 
 // Command is the entrypoint
 func Command(plugins func() discovery.Plugins) *cobra.Command {
