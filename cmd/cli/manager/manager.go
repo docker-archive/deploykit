@@ -1,11 +1,13 @@
-package main
+package manager
 
 import (
 	"fmt"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/cmd/cli/base"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
@@ -18,7 +20,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
+var log = logutil.New("module", "cli/manager")
+
+func init() {
+	base.Register(Command)
+}
+
+// Command is the entrypoint
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	var groupPlugin group.Plugin
 	var groupPluginName string
@@ -28,12 +37,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access the manager",
 	}
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
-		if err := upTree(c, func(x *cobra.Command, argv []string) error {
-			if x.PersistentPreRunE != nil {
-				return x.PersistentPreRunE(x, argv)
-			}
-			return nil
-		}); err != nil {
+		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
 		}
 
@@ -55,13 +59,13 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 					return err
 				}
 
-				log.Infoln("Found manager", name, "is leader = ", isLeader)
+				log.Info("Found manager", "name", name, "leader", isLeader)
 				if isLeader {
 
 					groupPlugin = group_plugin.Adapt(rpcClient)
 					groupPluginName = name
 
-					log.Infoln("Found manager as", name, "at", endpoint.Address)
+					log.Info("Found manager", "name", name, "addr", endpoint.Address)
 
 					break
 				}
@@ -76,7 +80,6 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	pretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", groupPlugin)
 
 		if len(args) != 1 {
 			cmd.Usage()
@@ -85,7 +88,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 		templateURL := args[0]
 
-		log.Infof("Using %v for reading template\n", templateURL)
+		log.Info("reading template", "url", templateURL)
 		engine, err := template.NewTemplate(templateURL, template.Options{})
 		if err != nil {
 			return err
@@ -110,7 +113,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		log.Debugln(view)
+		log.Debug("rendered", "view", view)
 
 		// Treat this as an Any and then convert
 		any := types.AnyString(view)
@@ -118,7 +121,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		groups := []plugin.Spec{}
 		err = any.Decode(&groups)
 		if err != nil {
-			log.Warningln("Error parsing the template for plugin specs.")
+			log.Warn("Error parsing the template for plugin specs.")
 			return err
 		}
 
@@ -143,7 +146,7 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 			// Right now we assume the RPC endpoint is indeed a group.
 			target, err := group_plugin.NewClient(endpoint.Address)
 
-			log.Debugln("For group", gp.Plugin, "address=", endpoint.Address, "err=", err, "spec=", spec)
+			log.Debug("commit", "plugin", gp.Plugin, "address", endpoint.Address, "err", err, "spec", spec)
 
 			if err != nil {
 				return err
@@ -165,7 +168,6 @@ func managerCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "inspect returns the plugin configurations known by the manager",
 	}
 	inspect.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", groupPlugin)
 
 		if len(args) != 0 {
 			cmd.Usage()

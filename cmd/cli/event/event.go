@@ -1,11 +1,12 @@
-package main
+package event
 
 import (
 	"fmt"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
@@ -14,6 +15,12 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
+
+var log = logutil.New("module", "cli/event")
+
+func init() {
+	base.Register(Command)
+}
 
 func getEventPlugin(plugins func() discovery.Plugins, name string) (found event.Plugin, err error) {
 	err = forEventPlugins(plugins, func(n string, p event.Plugin) error {
@@ -62,7 +69,8 @@ func listAllTopics(m event.Plugin, path types.Path) ([]types.Path, error) {
 	return result, nil
 }
 
-func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the entry point of the module
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "event",
@@ -124,7 +132,7 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 				if *all {
 					allPaths, err := listAllTopics(match, path.Shift(1))
 					if err != nil {
-						log.Warningln("Cannot event ls on plugin", target, "err=", err)
+						log.Warn("Cannot event ls on plugin", "target", target, "err", err)
 					}
 					for _, c := range allPaths {
 						nodes = append(nodes, types.PathFromString(target).Join(c))
@@ -137,7 +145,7 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 					} else {
 						children, err := match.List(path.Shift(1))
 						if err != nil {
-							log.Warningln("Cannot event ls on plugin", target, "err=", err)
+							log.Warn("Cannot event ls on plugin", "target", target, "err", err)
 						}
 						for _, c := range children {
 							nodes = append(nodes, path.JoinString(c))
@@ -191,7 +199,7 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "tail a stream by topic",
 		RunE: func(c *cobra.Command, args []string) error {
 
-			log.Infof("Using %v for rendering view.", templateURL)
+			log.Info("rendering view", "template=", templateURL)
 			engine, err := template.NewTemplate(templateURL, template.Options{})
 			if err != nil {
 				return err
@@ -272,7 +280,7 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 					return fmt.Errorf("not a subscriber: %s, %v", target, plugin)
 				}
 
-				log.Infoln("Subscribing to", eventTopic)
+				log.Info("Subscribing", "topic", eventTopic)
 
 				stream, err := client.SubscribeOn(eventTopic)
 				if err != nil {
@@ -286,7 +294,7 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 						select {
 						case evt, ok := <-stream:
 							if !ok {
-								log.Infoln("Server disconnected -- topic=", topic)
+								log.Info("Server disconnected", "topic", topic)
 								return
 							}
 
@@ -311,12 +319,12 @@ func eventCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 				case evt, ok := <-collector:
 					if !ok {
-						log.Infoln("Server disconnected.")
+						log.Info("Server disconnected.")
 						break loop
 					}
 					buff, err := engine.Render(evt)
 					if err != nil {
-						log.Warningln("error rendering view: %v", err)
+						log.Warn("error rendering view", "err=", err)
 					} else {
 						fmt.Println(buff)
 					}

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+{{/* The directive here tells infrakit to run this script with sh:  =% sh %=  */}}
+
+{{/* The function 'flag' will create a flag in the CLI; the function 'prompt' will ask user for input */}}
+
+{{ $doCommit := flag "commit" "bool" "true to commit" false }}
+{{ $clusterName := flag "cluster-name" "string" "the name of the cluster" "swarm" }}
+{{ $clusterSize := flag "size" "int" "the size of the cluster" 20 }}
+
+{{ $user := prompt "Please enter your user name" "string" }}
+
+{{/* An example here where we expose a flag and if not set, ask the user */}}
+{{ $instanceType := flag "instance-type" "string" "VM instance type" | prompt "Please specify vm instance type:" "string"}}
+
+echo "Hello {{$user}}, the instance you selected is {{ $instanceType }}.  Creating {{$clusterSize}} instances."
+
+# creating the instances
+
+{{ range $i, $instance := until $clusterSize }}
+create instance --cluster {{$clusterName}} --instance-type {{$instanceType}} id-{{$i}}
+{{ end }}
+
+{{ if $doCommit }}
+commit
+{{ end }}

@@ -1,8 +1,9 @@
-package main
+package util
 
 import (
 	"time"
 
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/rpc/mux"
@@ -10,6 +11,10 @@ import (
 )
 
 var logger = log.New("module", "cli/util")
+
+func init() {
+	base.Register(Command)
+}
 
 func muxCommand(plugins func() discovery.Plugins) *cobra.Command {
 	cmd := &cobra.Command{
@@ -61,7 +66,8 @@ func muxCommand(plugins func() discovery.Plugins) *cobra.Command {
 	return cmd
 }
 
-func utilCommand(plugins func() discovery.Plugins) *cobra.Command {
+// Command is the head of this module
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	util := &cobra.Command{
 		Use:   "util",
