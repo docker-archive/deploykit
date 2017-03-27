@@ -65,7 +65,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					groupPlugin = group_plugin.Adapt(rpcClient)
 					groupPluginName = name
 
-					log.Info("Found manager", "name", name, "addrr", endpoint.Address)
+					log.Info("Found manager", "name", name, "addr", endpoint.Address)
 
 					break
 				}

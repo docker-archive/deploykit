@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/user"
-	"path"
 	"path/filepath"
 	"sync"
 
@@ -24,7 +23,7 @@ func Dir() string {
 	if usr, err := user.Current(); err == nil {
 		home = usr.HomeDir
 	}
-	return path.Join(home, ".infrakit/plugins")
+	return filepath.Join(home, ".infrakit/plugins")
 }
 
 // NewPluginDiscovery creates a plugin discovery based on the environment configuration.

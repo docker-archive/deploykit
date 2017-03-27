@@ -7,12 +7,17 @@ import (
 
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
+	cli_local "github.com/docker/infrakit/pkg/cli/local"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	logutil.Configure(&logutil.ProdDefaults)
+}
 
 // A generic client for infrakit
 func main() {
@@ -81,10 +86,29 @@ func main() {
 		cmd.AddCommand(c)
 	})
 
+	// additional modules
+	modules, err := cli_local.NewModules(cli_local.Dir())
+	if err != nil {
+		log.Crit("error executing", "err", err)
+		os.Exit(1)
+	}
+
+	mods, err := modules.List()
+	log.Debug("modules", "mods", mods)
+	if err != nil {
+		log.Crit("error executing", "err", err)
+		os.Exit(1)
+	}
+
+	for _, mod := range mods {
+		log.Debug("Adding", "module", mod.Use)
+		cmd.AddCommand(mod)
+	}
+
 	usage := banner + "\n\n" + cmd.UsageTemplate()
 	cmd.SetUsageTemplate(usage)
 
-	err := cmd.Execute()
+	err = cmd.Execute()
 	if err != nil {
 		log.Crit("error executing", "err", err)
 		os.Exit(1)
