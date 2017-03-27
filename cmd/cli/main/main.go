@@ -1,21 +1,33 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"net/url"
 	"os"
 
+	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
+	cli_local "github.com/docker/infrakit/pkg/cli/local"
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/discovery/local"
+	discovery_local "github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	logutil.Configure(&logutil.ProdDefaults)
+}
+
 // A generic client for infrakit
 func main() {
+
+	if err := discovery_local.Setup(); err != nil {
+		panic(err)
+	}
+	if err := cli_local.Setup(); err != nil {
+		panic(err)
+	}
 
 	log := logutil.New("module", "main")
 
@@ -59,7 +71,7 @@ func main() {
 	cmd.SilenceErrors = true
 	f := func() discovery.Plugins {
 		if len(ulist) == 0 {
-			d, err := local.NewPluginDiscovery()
+			d, err := discovery_local.NewPluginDiscovery()
 			if err != nil {
 				log.Crit("Failed to initialize plugin discovery", "err", err)
 				os.Exit(1)
@@ -76,37 +88,46 @@ func main() {
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
-	cmd.AddCommand(infoCommand(f))
-	cmd.AddCommand(templateCommand(f))
-	cmd.AddCommand(managerCommand(f))
-	cmd.AddCommand(metadataCommand(f))
-	cmd.AddCommand(eventCommand(f))
-	cmd.AddCommand(pluginCommand(f))
-	cmd.AddCommand(utilCommand(f))
 
-	cmd.AddCommand(instancePluginCommand(f), groupPluginCommand(f), flavorPluginCommand(f), resourcePluginCommand(f))
+	base.VisitModules(f, func(c *cobra.Command) {
+		cmd.AddCommand(c)
+	})
 
-	err := cmd.Execute()
+	// additional modules
+	modules, err := cli_local.NewModules(cli_local.Dir())
+	if err != nil {
+		log.Crit("error executing", "err", err)
+		os.Exit(1)
+	}
+
+	mods, err := modules.List()
+	log.Debug("modules", "mods", mods)
+	if err != nil {
+		log.Crit("error executing", "err", err)
+		os.Exit(1)
+	}
+
+	for _, mod := range mods {
+		log.Debug("Adding", "module", mod.Use)
+		cmd.AddCommand(mod)
+	}
+
+	usage := banner + "\n\n" + cmd.UsageTemplate()
+	cmd.SetUsageTemplate(usage)
+
+	err = cmd.Execute()
 	if err != nil {
 		log.Crit("error executing", "err", err)
 		os.Exit(1)
 	}
 }
 
-func assertNotNil(message string, f interface{}) {
-	if f == nil {
-		logutil.New("main", "assert").Error("assert failed", "err", errors.New(message))
-		os.Exit(1)
-	}
-}
-
-// upTree traverses up the command tree and starts executing the do function in the order from top
-// of the command tree to the bottom.  Cobra commands executes only one level of PersistentPreRunE
-// in reverse order.  This breaks our model of setting log levels at the very top and have the log level
-// set throughout the entire hierarchy of command execution.
-func upTree(c *cobra.Command, do func(*cobra.Command, []string) error) error {
-	if p := c.Parent(); p != nil {
-		return upTree(p, do)
-	}
-	return do(c, c.Flags().Args())
-}
+const banner = `
+ ___  ________   ________ ________  ________  ___  __    ___  _________   
+|\  \|\   ___  \|\  _____\\   __  \|\   __  \|\  \|\  \ |\  \|\___   ___\ 
+\ \  \ \  \\ \  \ \  \__/\ \  \|\  \ \  \|\  \ \  \/  /|\ \  \|___ \  \_| 
+ \ \  \ \  \\ \  \ \   __\\ \   _  _\ \   __  \ \   ___  \ \  \   \ \  \  
+  \ \  \ \  \\ \  \ \  \_| \ \  \\  \\ \  \ \  \ \  \\ \  \ \  \   \ \  \ 
+   \ \__\ \__\\ \__\ \__\   \ \__\\ _\\ \__\ \__\ \__\\ \__\ \__\   \ \__\
+    \|__|\|__| \|__|\|__|    \|__|\|__|\|__|\|__|\|__| \|__|\|__|    \|__|
+`

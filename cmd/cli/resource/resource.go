@@ -1,11 +1,13 @@
-package main
+package resource
 
 import (
 	"fmt"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/cmd/cli/base"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	resource_plugin "github.com/docker/infrakit/pkg/rpc/resource"
 	"github.com/docker/infrakit/pkg/spi/resource"
@@ -14,7 +16,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
+var log = logutil.New("module", "cli/resource")
+
+func init() {
+	base.Register(Command)
+}
+
+// Command is the top level command
+func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	var resourcePlugin resource.Plugin
 
@@ -24,12 +33,7 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	name := cmd.PersistentFlags().String("name", "resource", "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
-		if err := upTree(c, func(x *cobra.Command, argv []string) error {
-			if x.PersistentPreRunE != nil {
-				return x.PersistentPreRunE(x, argv)
-			}
-			return nil
-		}); err != nil {
+		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
 		}
 
@@ -43,6 +47,8 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 		resourcePlugin = p
+
+		cli.MustNotNil(resourcePlugin, "no resource plugin", "name", *name)
 		return nil
 	}
 
@@ -52,8 +58,6 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	commitPretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", resourcePlugin)
-
 		if len(args) != 1 {
 			cmd.Usage()
 			os.Exit(1)
@@ -82,7 +86,6 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	destroyPretend := destroy.Flags().Bool("pretend", false, "Don't actually destroy, only explain the destroy")
 	destroy.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", resourcePlugin)
 
 		if len(args) != 1 {
 			cmd.Usage()
@@ -111,7 +114,6 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "describe a resource configuration specified by the URL",
 	}
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
-		assertNotNil("no plugin", resourcePlugin)
 
 		if len(args) != 1 {
 			cmd.Usage()
@@ -137,7 +139,7 @@ func resourcePluginCommand(plugins func() discovery.Plugins) *cobra.Command {
 }
 
 func readSpecFromTemplateURL(templateURL string) (*resource.Spec, error) {
-	log.Infof("Reading template from %v", templateURL)
+	log.Info("Reading template", "url", templateURL)
 	engine, err := template.NewTemplate(templateURL, template.Options{})
 	if err != nil {
 		return nil, err
@@ -154,11 +156,11 @@ func readSpecFromTemplateURL(templateURL string) (*resource.Spec, error) {
 		return nil, err
 	}
 
-	log.Debugln(view)
+	log.Debug("rendered", "view", view)
 
 	spec := resource.Spec{}
 	if err := types.AnyString(view).Decode(&spec); err != nil {
-		log.Warningln("Error parsing template")
+		log.Warn("Error parsing template", "err", err)
 		return nil, err
 	}
 

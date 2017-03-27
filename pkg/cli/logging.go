@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/log"
+	logutil "github.com/docker/infrakit/pkg/log"
 )
 
 // DefaultLogLevel is the default log level value.
@@ -21,7 +21,7 @@ func SetLogLevel(level int) {
 }
 
 // Flags returns the set of logging flags
-func Flags(o *log.Options) *pflag.FlagSet {
+func Flags(o *logutil.Options) *pflag.FlagSet {
 	f := pflag.NewFlagSet("logging", pflag.ExitOnError)
 	f.IntVar(&o.Level, "log", o.Level, "log level")
 	f.BoolVar(&o.Stdout, "log-stdout", o.Stdout, "log to stdout")
