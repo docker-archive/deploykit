@@ -117,6 +117,7 @@ func zero(t string, v interface{}) bool {
 	return true
 }
 
+// Funcs returns the template functions
 func (c *Context) Funcs() []template.Function {
 	return []template.Function{
 		{
