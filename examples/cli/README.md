@@ -10,7 +10,7 @@ up as a command with child commands, while the file `CreateCluster` will show up
 
 
 ```
-~/projects/src/github.com/docker/infrakit$ INFRAKIT_CLI_DIR=$PWD/pkg/cli/examples infrakit -h
+~/projects/src/github.com/docker/infrakit$ INFRAKIT_CLI_DIR=$PWD/examples/cli infrakit -h
 infrakit cli
 
 
@@ -67,7 +67,7 @@ In this example, the folder `build` has a nested folder `infrakit`, which has a 
 show up as
 
 ```
-~/projects/src/github.com/docker/infrakit$ INFRAKIT_CLI_DIR=$PWD/pkg/cli/examples infrakit build infrakit -h
+~/projects/src/github.com/docker/infrakit$ INFRAKIT_CLI_DIR=$PWD/examples/cli infrakit build infrakit -h
 Self building infrakit
 
 
@@ -147,7 +147,7 @@ Note that there are calls to the `flag` function:
 This function will result in a command line flag bound to the command `CreateCluster`:
 
 ```
-~/projects/src/github.com/docker/infrakit$ INFRAKIT_CLI_DIR=$PWD/pkg/cli/examples infrakit CreateCluster -h
+~/projects/src/github.com/docker/infrakit$ INFRAKIT_CLI_DIR=$PWD/examples/cli infrakit CreateCluster -h
 CreateCluster
 
 
@@ -197,7 +197,7 @@ It has the form:
 For example, running the `CreateCluster command will look like:
 
 ```
-~/projects/src/github.com/docker/infrakit$ INFRAKIT_CLI_DIR=$PWD/pkg/cli/examples infrakit CreateCluster
+~/projects/src/github.com/docker/infrakit$ INFRAKIT_CLI_DIR=$PWD/examples/cli infrakit CreateCluster
 Please enter your user name chungers
 Please specify vm instance type: m2-small
 
