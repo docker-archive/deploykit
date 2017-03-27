@@ -3,6 +3,7 @@ package resource
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -31,6 +32,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "resource",
 		Short: "Access resource plugin",
 	}
+	globals := cmd.PersistentFlags().StringArray("global", []string{}, "key=value pairs of 'global' values")
 	name := cmd.PersistentFlags().String("name", "resource", "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		if err := cli.EnsurePersistentPreRunE(c); err != nil {
@@ -63,7 +65,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		spec, err := readSpecFromTemplateURL(args[0])
+		spec, err := readSpecFromTemplateURL(args[0], *globals)
 		if err != nil {
 			return err
 		}
@@ -92,7 +94,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		spec, err := readSpecFromTemplateURL(args[0])
+		spec, err := readSpecFromTemplateURL(args[0], *globals)
 		if err != nil {
 			return err
 		}
@@ -120,7 +122,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		spec, err := readSpecFromTemplateURL(args[0])
+		spec, err := readSpecFromTemplateURL(args[0], *globals)
 		if err != nil {
 			return err
 		}
@@ -138,11 +140,23 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	return cmd
 }
 
-func readSpecFromTemplateURL(templateURL string) (*resource.Spec, error) {
+func readSpecFromTemplateURL(templateURL string, globals []string) (*resource.Spec, error) {
 	log.Info("Reading template", "url", templateURL)
 	engine, err := template.NewTemplate(templateURL, template.Options{})
 	if err != nil {
 		return nil, err
+	}
+
+	for _, global := range globals {
+		kv := strings.SplitN(global, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(kv[0])
+		val := strings.TrimSpace(kv[1])
+		if key != "" && val != "" {
+			engine.Global(key, val)
+		}
 	}
 
 	engine.WithFunctions(func() []template.Function {

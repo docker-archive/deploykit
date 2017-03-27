@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -78,6 +79,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "commit <template_URL>",
 		Short: "commit a multi-group configuration, as specified by the URL",
 	}
+	globals := commit.Flags().StringArray("global", []string{}, "key=value pairs of 'global' values")
 	pretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
 
@@ -92,6 +94,18 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		engine, err := template.NewTemplate(templateURL, template.Options{})
 		if err != nil {
 			return err
+		}
+
+		for _, global := range *globals {
+			kv := strings.SplitN(global, "=", 2)
+			if len(kv) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(kv[0])
+			val := strings.TrimSpace(kv[1])
+			if key != "" && val != "" {
+				engine.Global(key, val)
+			}
 		}
 
 		engine.WithFunctions(func() []template.Function {
