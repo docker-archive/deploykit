@@ -13,6 +13,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Setup sets up the necessary environment for running this module -- ie make sure
+// the CLI module directories are present, etc.
+func Setup() error {
+	dir := Dir()
+	if dir == "" {
+		return fmt.Errorf("Env not set:%s", cli.CliDirEnvVar)
+	}
+	fs := afero.NewOsFs()
+	exists, err := afero.Exists(fs, dir)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		log.Warn("Creating directory", "dir", dir)
+		err = fs.MkdirAll(dir, 0600)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 var log = logutil.New("module", "cli/local")
 
 // Dir returns the directory to use for modules, which may be customized by the environment.
@@ -47,7 +69,7 @@ func IsMissingDir(e error) bool {
 
 // NewModules returns an implementation of Modules using data found locally on disk
 func NewModules(dir string) (cli.Modules, error) {
-	log.Debug("local modules", "dir", dir)
+	log.Debug("Local modules", "dir", dir)
 
 	fs := afero.NewOsFs()
 

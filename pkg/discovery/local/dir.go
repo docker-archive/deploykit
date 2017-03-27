@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 )
@@ -100,7 +99,6 @@ func (r *dirPluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	log.Debugln("Opening:", r.dir)
 	entries, err := ioutil.ReadDir(r.dir)
 	if err != nil {
 		return nil, err
@@ -115,17 +113,17 @@ func (r *dirPluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 
 			if err != nil {
 				if !discovery.IsErrNotUnixSocket(err) {
-					log.Warningln("Loading plugin err=", err)
+					log.Warn("Err loading plugin", "err", err)
 				}
 				continue
 			}
 
 			if instance == nil {
-				log.Warningln("Plugin in nil=")
+				log.Warn("Plugin is nil")
 				continue
 			}
 
-			log.Debugln("Discovered plugin at", instance.Address)
+			log.Debug("Discovered plugin", "address", instance.Address)
 			plugins[instance.Name] = instance
 		}
 	}

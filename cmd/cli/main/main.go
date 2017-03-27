@@ -9,7 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	cli_local "github.com/docker/infrakit/pkg/cli/local"
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/discovery/local"
+	discovery_local "github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
@@ -21,6 +21,13 @@ func init() {
 
 // A generic client for infrakit
 func main() {
+
+	if err := discovery_local.Setup(); err != nil {
+		panic(err)
+	}
+	if err := cli_local.Setup(); err != nil {
+		panic(err)
+	}
 
 	log := logutil.New("module", "main")
 
@@ -64,7 +71,7 @@ func main() {
 	cmd.SilenceErrors = true
 	f := func() discovery.Plugins {
 		if len(ulist) == 0 {
-			d, err := local.NewPluginDiscovery()
+			d, err := discovery_local.NewPluginDiscovery()
 			if err != nil {
 				log.Crit("Failed to initialize plugin discovery", "err", err)
 				os.Exit(1)
