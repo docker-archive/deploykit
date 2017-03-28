@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/cobra"
 )
 
@@ -160,17 +161,31 @@ func (c *Context) loadBackend() error {
 	}
 	t.AddFunc("print",
 		func() string {
-			c.run = func(view string) error {
-				fmt.Println(view)
+			c.run = func(script string) error {
+				fmt.Println(script)
 				return nil
 			}
 			return ""
 		})
 	t.AddFunc("sh",
-		func() string {
-			c.run = func(view string) error {
-				fmt.Println(view)
-				return nil
+		func(opts ...string) string {
+			c.run = func(script string) error {
+
+				cmd := strings.Join(append([]string{"/bin/sh"}, opts...), " ")
+				log.Debug("sh", "cmd", cmd)
+
+				return exec.Command(cmd).
+					InheritEnvs(true).StartWithStreams(
+
+					exec.Do(exec.SendInput(
+						func(stdin io.WriteCloser) error {
+							_, err := stdin.Write([]byte(script))
+							return err
+						})).Then(
+						exec.RedirectStdout(os.Stdout)).Then(
+						exec.RedirectStderr(os.Stderr),
+					).Done(),
+				)
 			}
 			return ""
 		})
