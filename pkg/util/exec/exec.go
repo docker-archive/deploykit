@@ -174,6 +174,22 @@ func SendInput(f func(io.WriteCloser) error) Step {
 	}
 }
 
+// RedirectStdout sends stdout to given writer
+func RedirectStdout(out io.Writer) Step {
+	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
+		_, err := io.Copy(out, stdout)
+		return err
+	}
+}
+
+// RedirectStderr sends stdout to given writer
+func RedirectStderr(out io.Writer) Step {
+	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
+		_, err := io.Copy(out, stderr)
+		return err
+	}
+}
+
 // MergeOutput combines the stdout and stderr into the given stream
 func MergeOutput(out io.Writer) Step {
 	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
