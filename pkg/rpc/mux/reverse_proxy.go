@@ -12,7 +12,6 @@ import (
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
-	log "github.com/golang/glog"
 )
 
 // ReverseProxy is the mux reverse proxy that is able to multiplex calls to this to different
@@ -82,7 +81,7 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	if p[2] == "events" {
-		log.V(100).Infoln("TODO - event stream proxy")
+		log.Warn("TODO - event stream proxy")
 
 		return
 	}
@@ -92,7 +91,7 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if handler != nil {
 		if p := strings.TrimPrefix(req.URL.Path, "/"+prefix); len(p) < len(req.URL.Path) {
 			req.URL.Path = p
-			log.V(100).Infoln("proxying to plugin", prefix, "url=", req.URL.String(), "uri=", req.URL.RequestURI())
+			log.Debug("proxying to plugin", "prefix", prefix, "url", req.URL.String(), "uri", req.URL.RequestURI())
 			handler.ServeHTTP(resp, req)
 		} else {
 			http.NotFound(resp, req)
@@ -109,7 +108,7 @@ func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, pre
 	var socketPath string
 
 	defer func() {
-		log.V(100).Infoln("reverse proxy lookup for url:", u, "socket=", socketPath, "prefix=", prefix)
+		log.Debug("reverse proxy lookup", "url", u, "socket", socketPath, "prefix", prefix)
 	}()
 
 	reversep := httputil.NewSingleHostReverseProxy(u)
@@ -117,7 +116,7 @@ func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, pre
 	if socketPath != "" {
 		reversep.Transport = &http.Transport{
 			Dial: func(proto, addr string) (conn net.Conn, err error) {
-				log.V(100).Infoln("connecting:", proto, socketPath)
+				log.Debug("connecting", "proto", proto, "socket", socketPath)
 				return net.Dial("unix", socketPath)
 			},
 		}
