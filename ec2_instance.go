@@ -63,8 +63,9 @@ func (p awsInstancePlugin) tagInstance(
 
 // CreateInstanceRequest is the concrete provision request type.
 type CreateInstanceRequest struct {
-	Tags              map[string]string
-	RunInstancesInput ec2.RunInstancesInput
+	Tags               map[string]string
+	RunInstancesInput  ec2.RunInstancesInput
+	AttachVolumeInputs []ec2.AttachVolumeInput
 }
 
 // VendorInfo returns a vendor specific name and version
@@ -316,6 +317,17 @@ func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 			if err != nil {
 				return id, err
 			}
+		}
+	}
+
+	for _, attachVolumeInput := range request.AttachVolumeInputs {
+		attachVolumeInput.InstanceId = ec2Instance.InstanceId
+		err := retry(30*time.Second, 500*time.Millisecond, func() error {
+			_, err := p.client.AttachVolume(&attachVolumeInput)
+			return err
+		})
+		if err != nil {
+			return id, fmt.Errorf("AttachVolume failed: %s", err)
 		}
 	}
 
