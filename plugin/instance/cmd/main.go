@@ -69,6 +69,7 @@ func main() {
 				"ec2-routetable":                  instance.NewRouteTablePlugin(ec2Client, namespace),
 				"ec2-securitygroup":               instance.NewSecurityGroupPlugin(ec2Client, namespace),
 				"ec2-subnet":                      instance.NewSubnetPlugin(ec2Client, namespace),
+				"ec2-volume":                      instance.NewVolumePlugin(ec2Client, namespace),
 				"ec2-vpc":                         instance.NewVpcPlugin(ec2Client, namespace),
 				"elb-loadbalancer":                instance.NewLoadBalancerPlugin(elbClient, namespace),
 				"iam-instanceprofile":             instance.NewInstanceProfilePlugin(iamClient, namespace),
