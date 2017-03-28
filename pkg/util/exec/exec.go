@@ -165,9 +165,11 @@ func (t *Thenable) Done() Step {
 	}
 }
 
-// SendInput
+// SendInput is a convenience function for writing to the exec process's stdin. When the function completes, the
+// stdin is closed.
 func SendInput(f func(io.WriteCloser) error) Step {
 	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
+		defer stdin.Close()
 		return f(stdin)
 	}
 }

@@ -91,7 +91,6 @@ func TestRun(t *testing.T) {
 		Do(SendInput(
 			func(stdin io.WriteCloser) error {
 				stdin.Write([]byte(`for i in $(seq 10); do echo $i; sleep 1; done`))
-				stdin.Close() // Don't forget to close...
 				return nil
 			})).Then(MergeOutput(os.Stderr)).Done(),
 		name, // arg 1 for container name
