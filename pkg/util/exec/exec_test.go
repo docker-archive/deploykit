@@ -1,6 +1,8 @@
 package exec
 
 import (
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -21,10 +23,11 @@ docker run --rm \
 	busyboxLs Command = `docker run --rm \
        busybox ls {{ arg 1 }}
 `
-	busyboxDateStream Command = `docker run --rm --name {{ .container }} \
-busybox /bin/sh -c 'while true; do date; sleep {{ .sleep }}; done'`
+	busyboxSh Command = `docker run --rm -ti --name {{ .container }} busybox /bin/sh`
 
 	dockerStop Command = `docker stop {{ arg 1 }}`
+
+	dateStream Command = `docker run --rm --name {{ arg 1 }} chungers/timer streamer`
 )
 
 func TestBuilder(t *testing.T) {
@@ -44,11 +47,10 @@ func TestBuilder(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"docker", "run", "--rm", "busybox", "ls", "sys"}, cmd)
 
-	b = busyboxDateStream.builder().WithContext(map[string]interface{}{"container": "bob", "sleep": "1"})
+	b = busyboxSh.builder().WithContext(map[string]interface{}{"container": "bob"})
 	cmd, err = b.generate()
 	require.NoError(t, err)
-	require.Equal(t, []string{"docker", "run", "--rm", "--name", "bob", "busybox", "/bin/sh", "-c",
-		"'while", "true;", "do", "date;", "sleep", "1;", "done'"}, cmd)
+	require.Equal(t, []string{"docker", "run", "--rm", "-ti", "--name", "bob", "busybox", "/bin/sh"}, cmd)
 
 }
 
@@ -71,11 +73,29 @@ func TestRun(t *testing.T) {
 	require.Equal(t, []string{"spool", "www"}, strings.Split(strings.Trim(string(output), " \n"), "\n"))
 
 	name := "stream-test"
-	err = busyboxDateStream.WithContext(map[string]interface{}{"container": name, "sleep": 1}).Start()
+	go func() {
+		<-time.After(2 * time.Second)
+		err := dockerStop.Run(name)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	err = dateStream.InheritEnvs(true).StartWithStreams(MergeOutput(os.Stderr),
+		name, // arg 1 for container name
+	)
 	require.NoError(t, err)
 
-	time.Sleep(1 * time.Second)
-
-	err = dockerStop.Run(name)
+	// testing with stdin
+	err = Command("/bin/sh").InheritEnvs(true).StartWithStreams(
+		Do(SendInput(
+			func(stdin io.WriteCloser) error {
+				stdin.Write([]byte(`for i in $(seq 10); do echo $i; sleep 1; done`))
+				stdin.Close() // Don't forget to close...
+				return nil
+			})).Then(MergeOutput(os.Stderr)).Done(),
+		name, // arg 1 for container name
+	)
 	require.NoError(t, err)
+
 }
