@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,9 +26,9 @@ import (
 // This example uses terraform as the instance plugin.
 // It is very similar to the file instance plugin.  When we
 // provision an instance, we write a *.tf.json file in the directory
-// and call terra apply.  For describing instances, we parse the
-// result of terra show.  Destroying an instance is simply removing a
-// tf.json file and call terra apply again.
+// and call terraform apply.  For describing instances, we parse the
+// result of terraform show.  Destroying an instance is simply removing a
+// tf.json file and call terraform apply again.
 
 type plugin struct {
 	Dir       string
@@ -324,7 +325,7 @@ func (p *plugin) ensureUniqueFile() string {
 
 func ensureUniqueFile(dir string) string {
 	n := fmt.Sprintf("instance-%d", time.Now().Unix())
-	// if we can open then we have to try again...  the file cannot exist currently
+	// if we can open then we have to try again... the file cannot exist currently
 	if f, err := os.Open(filepath.Join(dir, n) + ".tf.json"); err == nil {
 		f.Close()
 		return ensureUniqueFile(dir)
@@ -434,7 +435,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// merge the inits
 	switch properties.Type {
 	case "aws_instance", "digitalocean_droplet":
-		addUserData(properties.Value, "user_data", spec.Init)
+		addUserData(properties.Value, "user_data", base64.StdEncoding.EncodeToString([]byte(spec.Init)))
 	case "softlayer_virtual_guest":
 		addUserData(properties.Value, "user_metadata", spec.Init)
 	case "azurerm_virtual_machine":
