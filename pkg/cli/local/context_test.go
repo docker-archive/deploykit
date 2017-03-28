@@ -23,7 +23,7 @@ func TestContext(t *testing.T) {
 	// the cobra command
 
 	script := `
-{{/* The directive here tells infrakit to run this script with sh:  =% sh %=  */}}
+{{/* The directive here tells infrakit to run this script with sh:  =% print %=  */}}
 
 {{/* The function 'flag' will create a flag in the CLI; the function 'prompt' will ask user for input */}}
 
@@ -88,4 +88,39 @@ func TestContext(t *testing.T) {
 		"doCommit":     true,
 		"instanceType": "large",
 	}).String(), types.AnyValueMust(m).String())
+}
+
+func TestContextRunShell(t *testing.T) {
+
+	script := `#!/bin/bash
+{{/* The directive here tells infrakit to run this script with sh:  =% sh "-s" "--"  %=  */}}
+{{ $lines := flag "lines" "int" "the number of lines" 5 }}
+
+for i in $(seq {{$lines}}); do
+echo line $i
+done
+`
+
+	c := &Context{
+		cmd: &cobra.Command{
+			Use:   "test",
+			Short: "test",
+		},
+		src: "str://" + script,
+	}
+
+	c.exec = false
+	err := c.buildFlags()
+	require.NoError(t, err)
+
+	err = c.cmd.Flags().Parse(strings.Split("--lines 3", " "))
+	require.NoError(t, err)
+
+	err = c.loadBackend()
+	require.NoError(t, err)
+	require.NotNil(t, c.run)
+
+	err = c.execute()
+	require.NoError(t, err)
+
 }
