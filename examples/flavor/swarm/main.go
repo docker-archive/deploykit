@@ -6,6 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -23,14 +24,12 @@ func init() {
 		})
 }
 
-var defaultTemplateOptions = template.Options{
-	SocketDir: discovery.Dir(),
-}
+var defaultTemplateOptions = template.Options{}
 
 func main() {
 
 	plugins := func() discovery.Plugins {
-		d, err := discovery.NewPluginDiscovery()
+		d, err := local.NewPluginDiscovery()
 		if err != nil {
 			log.Fatalf("Failed to initialize plugin discovery: %s", err)
 			os.Exit(1)

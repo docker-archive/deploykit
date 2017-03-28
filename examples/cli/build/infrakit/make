@@ -1,0 +1,41 @@
+{{/* =% print %=  */}}
+
+{{ $version := flag "version" "string" "version string" | prompt "What's the version string?" "string" }}
+{{ $revision := flag "revision" "string" "revision string" | prompt "What's the revisioon?" "string" }}
+{{ $dockerClientVersion := flag "docker-client-version" "string" "Docker client version" | prompt "Docker Client version?" "string" }}
+
+VERSION?="{{$version}}"
+REVISION?="{{$revision}}"
+DOCKER_CLIENT_VERSION?="{{$dockerClientVersion}}"
+
+clean:
+	@echo "+ $@"
+	rm -rf build
+	mkdir -p build
+
+define build_binary
+	go build -o build/$(1) \
+		-ldflags "-X github.com/docker/infrakit/pkg/cli.Version=$(VERSION) -X github.com/docker/infrakit/pkg/cli.Revision=$(REVISION) -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=$(DOCKER_CLIENT_VERSION)" $(2)
+endef
+
+binaries: clean build-binaries
+build-binaries:
+	@echo "+ $@"
+	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli/main)
+	$(call build_binary,infrakit-manager,github.com/docker/infrakit/cmd/manager)
+	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
+	$(call build_binary,infrakit-resource,github.com/docker/infrakit/cmd/resource)
+	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
+	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
+	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
+	$(call build_binary,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
+	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
+	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
+	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
+	$(call build_binary,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
+	$(call build_binary,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
+
+cli: build-cli
+build-cli:
+	@echo "+ $@"
+	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli/main)

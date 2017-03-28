@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -16,8 +17,9 @@ import (
 const patience time.Duration = time.Second * 1
 
 type subscription struct {
-	topic string
-	ch    chan []byte
+	topic      string
+	exactMatch bool
+	ch         chan []byte
 }
 
 type event struct {
@@ -31,6 +33,9 @@ type Broker struct {
 	// Close this to stop
 	stop chan struct{}
 
+	// Close this to stop the run loop
+	finish chan struct{}
+
 	// Events are pushed to this channel by the main events-gathering routine
 	notifier chan *event
 
@@ -42,13 +47,17 @@ type Broker struct {
 
 	// Client connections registry
 	clients *radix.Tree
+
+	// how many clients
+	count int
 }
 
 // NewBroker returns an instance of the broker
 func NewBroker() *Broker {
 	b := &Broker{
 		stop:           make(chan struct{}),
-		notifier:       make(chan *event),
+		finish:         make(chan struct{}),
+		notifier:       make(chan *event, 1),
 		newClients:     make(chan subscription),
 		closingClients: make(chan subscription),
 		clients:        radix.New(),
@@ -62,18 +71,39 @@ func (b *Broker) Stop() {
 	close(b.stop)
 }
 
+func clean(topic string) string {
+	if len(topic) == 0 || topic == "." {
+		return "/"
+	}
+
+	if topic[0] != '/' {
+		return "/" + topic
+	}
+	return topic
+}
+
+//Check the topic ends with `/`
+func checkExactMatch(topic string) bool {
+	return strings.LastIndex(topic, "/") != len(topic)-1
+}
+
 // Publish publishes a message at the topic
-func (b *Broker) Publish(topic string, data interface{}) error {
+func (b *Broker) Publish(topic string, data interface{}, optionalTimeout ...time.Duration) error {
 	any, err := types.AnyValue(data)
 	if err != nil {
 		return err
 	}
-	if b.notifier == nil {
-		return fmt.Errorf("chan closed")
-	}
 
-	select {
-	case b.notifier <- &event{topic: topic, data: any.Bytes()}:
+	topic = clean(topic)
+
+	if len(optionalTimeout) > 0 {
+		select {
+		case b.notifier <- &event{topic: topic, data: any.Bytes()}:
+		case <-time.After(optionalTimeout[0]):
+			return fmt.Errorf("timeout sending %v", topic)
+		}
+	} else {
+		b.notifier <- &event{topic: topic, data: any.Bytes()}
 	}
 
 	return nil
@@ -81,16 +111,13 @@ func (b *Broker) Publish(topic string, data interface{}) error {
 
 // ServerHTTP implements the HTTP handler
 func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if v := recover(); v != nil {
+			log.Warningln("broker.ServeHTTP recovered:", v)
+		}
+	}()
 
-	topic := req.URL.Query().Get("topic")
-	if topic == "" {
-		topic = "/" // This subscribes to everything.  We may regret this...
-	}
-
-	// Prepend / if it's not already there
-	if topic[0] != '/' {
-		topic = "/" + topic
-	}
+	topic := clean(req.URL.Query().Get("topic"))
 
 	// flusher is required for streaming
 	flusher, ok := rw.(http.Flusher)
@@ -108,7 +135,7 @@ func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	messageChan := make(chan []byte)
 
 	// Signal the broker that we have a new connection
-	b.newClients <- subscription{topic: topic, ch: messageChan}
+	b.newClients <- subscription{topic: topic, exactMatch: checkExactMatch(topic), ch: messageChan}
 
 	// Remove this client from the map of connected clients
 	// when this handler exits.
@@ -122,7 +149,9 @@ func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for {
 		select {
 		case <-b.stop:
+			close(b.finish)
 			return
+
 		case <-notify:
 			return
 		default:
@@ -140,19 +169,65 @@ func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 func (b *Broker) run() {
 	for {
 		select {
+		case <-b.finish:
+
+			// Disconnect all clients
+			b.clients.Walk(
+				func(key string, value interface{}) bool {
+					chset, ok := value.(map[chan []byte]bool)
+					if !ok {
+						panic("assert-failed")
+					}
+					for ch := range chset {
+						log.Infoln("Closing client connection at", key, "ch=", ch)
+						close(ch)
+					}
+					return false
+				})
+
+			log.Infoln("Broker finished")
+			return
 
 		case subscription := <-b.newClients:
 
 			// A new client has connected.
 			// Register their message channel
-			b.clients.Insert(subscription.topic, subscription.ch)
-			log.Infof("Added client for topic=%s. %d registered clients", subscription.topic, b.clients.Len())
+			subs := map[chan []byte]bool{subscription.ch: subscription.exactMatch}
+			v, has := b.clients.Get(subscription.topic)
+			if has {
+				if v, ok := v.(map[chan []byte]bool); !ok {
+					panic("assert-failed: not a map of channels")
+				} else {
+					v[subscription.ch] = subscription.exactMatch
+					subs = v
+				}
+			}
+
+			b.clients.Insert(subscription.topic, subs)
+			b.count++
+			log.Infof("Connected: topic=%s => %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
 
 		case subscription := <-b.closingClients:
 
 			// A client has dettached and we want to stop sending messages
-			b.clients.Delete(subscription.topic)
-			log.Infof("Removed client for topic=%s. %d registered clients", subscription.topic, b.clients.Len())
+			if v, has := b.clients.Get(subscription.topic); has {
+				if subs, ok := v.(map[chan []byte]bool); !ok {
+					panic("assert-failed: not a map of channels")
+
+				} else {
+
+					delete(subs, subscription.ch)
+
+					if len(subs) == 0 {
+						b.clients.Delete(subscription.topic)
+					} else {
+						b.clients.Insert(subscription.topic, subs)
+					}
+
+					b.count--
+					log.Infof("Disconnected: topic=%s => %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
+				}
+			}
 
 		case event, open := <-b.notifier:
 
@@ -161,33 +236,28 @@ func (b *Broker) run() {
 				return
 			}
 
-			// We got a new event from the outside!
-			// Send event to all connected clients under the topic... use prefix match
-			topic := event.topic
-			if topic[0] != '/' {
-				topic = "/" + topic
-			}
-
 			// Remove any \n because it's meaningful in SSE spec.
 			// We could use base64 encode, but it hurts interoperability with browser/ javascript clients.
 			data := bytes.Replace(event.data, []byte("\n"), nil, -1)
 
-			b.clients.WalkPath(topic,
+			b.clients.WalkPath(event.topic,
 
 				func(key string, value interface{}) bool {
-					ch, ok := value.(chan []byte)
+					chset, ok := value.(map[chan []byte]bool)
 					if !ok {
-						log.Warningln("Cannot send", key)
-						return false
+						panic("assert-failed")
 					}
 
-					select {
-
-					case ch <- data:
-					case <-time.After(patience):
-						log.Print("Skipping client.")
+					for ch, exact := range chset {
+						if exact && event.topic != key {
+							return false
+						}
+						select {
+						case ch <- data:
+						case <-time.After(patience):
+							log.Print("Skipping client.")
+						}
 					}
-
 					return false
 				})
 		}

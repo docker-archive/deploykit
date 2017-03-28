@@ -52,3 +52,8 @@ func (s *snapshot) Load(output interface{}) error {
 	}
 	return nil
 }
+
+// Close implements Closer
+func (s *snapshot) Close() error {
+	return nil
+}

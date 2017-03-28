@@ -57,7 +57,7 @@ func DockerClient(spec Spec) (docker.APIClientCloser, error) {
 		tls = &tlsconfig.Options{}
 	}
 
-	return docker.NewDockerClient(spec.Docker.Host, tls)
+	return docker.NewClient(spec.Docker.Host, tls)
 }
 
 // baseFlavor is the base implementation.  The manager / worker implementations will provide override.
@@ -210,7 +210,8 @@ func (s *baseFlavor) Healthy(flavorProperties *types.Any, inst instance.Descript
 }
 
 func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceSpec instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
 
 	spec := Spec{}
 
@@ -269,6 +270,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			flavorSpec:   spec,
 			instanceSpec: instanceSpec,
 			allocation:   allocation,
+			index:        index,
 			swarmStatus:  swarmStatus,
 			nodeInfo:     node,
 			link:         *link,
@@ -407,6 +409,7 @@ type templateContext struct {
 	flavorSpec   Spec
 	instanceSpec instance.Spec
 	allocation   group_types.AllocationMethod
+	index        group_types.Index
 	swarmStatus  *swarm.Swarm
 	nodeInfo     *swarm.Node
 	link         types.Link
@@ -444,6 +447,13 @@ func (c *templateContext) Funcs() []template.Function {
 			Description: []string{"The allocations contain fields such as the size of the group or the list of logical ids."},
 			Func: func() interface{} {
 				return c.allocation
+			},
+		},
+		{
+			Name:        "INDEX",
+			Description: []string{"The launch index of this instance. Contains the group ID and the sequence number of instance."},
+			Func: func() interface{} {
+				return c.index
 			},
 		},
 		{

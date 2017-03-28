@@ -32,6 +32,9 @@ type Controller interface {
 	// Spaces returns the list of Spaces defined in the MAAS controller.
 	Spaces() ([]Space, error)
 
+	// StaticRoutes returns the list of StaticRoutes defined in the MAAS controller.
+	StaticRoutes() ([]StaticRoute, error)
+
 	// Zones lists all the zones known to the MAAS controller.
 	Zones() ([]Zone, error)
 
@@ -252,6 +255,24 @@ type Subnet interface {
 	// DNSServers is a list of ip addresses of the DNS servers for the subnet.
 	// This list may be empty.
 	DNSServers() []string
+}
+
+// StaticRoute defines an explicit route that users have requested to be added
+// for a given subnet.
+type StaticRoute interface {
+	// Source is the subnet that should have the route configured. (Machines
+	// inside Source should use GatewayIP to reach Destination addresses.)
+	Source() Subnet
+	// Destination is the subnet that a machine wants to send packets to. We
+	// want to configure a route to that subnet via GatewayIP.
+	Destination() Subnet
+	// GatewayIP is the IPAddress to direct traffic to.
+	GatewayIP() string
+	// Metric is the routing metric that determines whether this route will
+	// take precedence over similar routes (there may be a route for 10/8, but
+	// also a more concrete route for 10.0/16 that should take precedence if it
+	// applies.) Metric should be a non-negative integer.
+	Metric() int
 }
 
 // Interface represents a physical or virtual network interface on a Machine.

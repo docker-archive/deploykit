@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"time"
@@ -134,8 +135,45 @@ func IndexOf(srch interface{}, array interface{}, strictOptional ...bool) int {
 	return -1
 }
 
+// given optional args in a template function call, extra headers and the context
+func headersAndContext(opt ...interface{}) (headers map[string][]string, context interface{}) {
+	if len(opt) == 0 {
+		return
+	}
+	// scan through all the args and if it's a string of the form x=y, then use as header
+	// the element that doesn't follow the form is the context
+	headers = map[string][]string{}
+	for _, v := range opt {
+		if vv, is := v.(string); is && strings.Index(vv, "=") > 0 {
+			kv := strings.Split(vv, "=")
+			key := kv[0]
+			value := ""
+			if len(kv) == 2 {
+				value = kv[1]
+			}
+			if _, has := headers[key]; !has {
+				headers[key] = []string{value}
+			} else {
+				headers[key] = append(headers[key], value)
+			}
+		} else {
+			context = v
+		}
+	}
+	return
+}
+
+func setHeaders(req *http.Request, headers map[string][]string) {
+	for k, vv := range headers {
+		for _, v := range vv {
+			req.Header.Add(k, v)
+		}
+	}
+}
+
 // DefaultFuncs returns a list of default functions for binding in the template
 func (t *Template) DefaultFuncs() []Function {
+
 	return []Function{
 		{
 			Name: "source",
@@ -143,13 +181,11 @@ func (t *Template) DefaultFuncs() []Function {
 				"Source / evaluate the template at the input location (as URL).",
 				"This will make all of the global variables declared there visible in this template's context.",
 				"Similar to 'source' in bash, sourcing another template means applying it in the same context ",
-				"as the calling template.  The context (e.g. variables) of the calling template as a result can be mutated.",
+				"as the calling template.  The context (e.g. variables) of the calling template as a result can",
+				"be mutated.",
 			},
 			Func: func(p string, opt ...interface{}) (string, error) {
-				var o interface{}
-				if len(opt) > 0 {
-					o = opt[0]
-				}
+				headers, context := headersAndContext(opt...)
 				loc := p
 				if strings.Index(loc, "str://") == -1 {
 					buff, err := getURL(t.url, p)
@@ -157,6 +193,14 @@ func (t *Template) DefaultFuncs() []Function {
 						return "", err
 					}
 					loc = buff
+				}
+
+				prev := t.options.CustomizeFetch
+				t.options.CustomizeFetch = func(req *http.Request) {
+					setHeaders(req, headers)
+					if prev != nil {
+						prev(req)
+					}
 				}
 				sourced, err := NewTemplate(loc, t.options)
 				if err != nil {
@@ -167,11 +211,11 @@ func (t *Template) DefaultFuncs() []Function {
 				sourced.forkFrom(t)
 				sourced.context = t.context
 
-				if o == nil {
-					o = sourced.context
+				if context == nil {
+					context = sourced.context
 				}
 				// TODO(chungers) -- let the sourced template define new functions that can be called in the parent.
-				return sourced.Render(o)
+				return sourced.Render(context)
 			},
 		},
 		{
@@ -184,10 +228,7 @@ func (t *Template) DefaultFuncs() []Function {
 				"be visible in the calling template's context.",
 			},
 			Func: func(p string, opt ...interface{}) (string, error) {
-				var o interface{}
-				if len(opt) > 0 {
-					o = opt[0]
-				}
+				headers, context := headersAndContext(opt...)
 				loc := p
 				if strings.Index(loc, "str://") == -1 {
 					buff, err := getURL(t.url, p)
@@ -196,6 +237,15 @@ func (t *Template) DefaultFuncs() []Function {
 					}
 					loc = buff
 				}
+
+				prev := t.options.CustomizeFetch
+				t.options.CustomizeFetch = func(req *http.Request) {
+					setHeaders(req, headers)
+					if prev != nil {
+						prev(req)
+					}
+				}
+
 				included, err := NewTemplate(loc, t.options)
 				if err != nil {
 					return "", err
@@ -206,11 +256,11 @@ func (t *Template) DefaultFuncs() []Function {
 				}
 				included.context = dotCopy
 
-				if o == nil {
-					o = included.context
+				if context == nil {
+					context = included.context
 				}
 
-				return included.Render(o)
+				return included.Render(context)
 			},
 		},
 		{

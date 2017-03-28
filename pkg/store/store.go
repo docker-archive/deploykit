@@ -1,8 +1,13 @@
 package store
 
+import (
+	"io"
+)
+
 // Snapshot provides means to save and load an object.  This is not meant to be
 // a generic k-v store.
 type Snapshot interface {
+	io.Closer
 
 	// Save marshals (encodes) and saves a snapshot of the given object.
 	Save(obj interface{}) error

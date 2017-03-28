@@ -34,11 +34,11 @@ func (c client) Validate(flavorProperties *types.Any, allocation group_types.All
 // Prepare allows the Flavor to modify the provisioning instructions for an instance.  For example, a
 // helper could be used to place additional tags on the machine, or generate a specialized Init command based on
 // the flavor configuration.
-func (c client) Prepare(flavorProperties *types.Any,
-	spec instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error) {
+func (c client) Prepare(flavorProperties *types.Any, spec instance.Spec,
+	allocation group_types.AllocationMethod, index group_types.Index) (instance.Spec, error) {
 
 	_, flavorType := c.name.GetLookupAndType()
-	req := PrepareRequest{Type: flavorType, Properties: flavorProperties, Spec: spec, Allocation: allocation}
+	req := PrepareRequest{Type: flavorType, Properties: flavorProperties, Spec: spec, Allocation: allocation, Index: index}
 	resp := PrepareResponse{}
 	err := c.client.Call("Flavor.Prepare", req, &resp)
 	if err != nil {

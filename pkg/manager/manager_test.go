@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/leader"
 	group_mock "github.com/docker/infrakit/pkg/mock/spi/group"
 	store_mock "github.com/docker/infrakit/pkg/mock/store"
@@ -59,7 +59,7 @@ func testEnsemble(t *testing.T,
 	configStore func(*store_mock.MockSnapshot),
 	configureGroup func(*group_mock.MockPlugin)) (Backend, server.Stoppable) {
 
-	disc, err := discovery.NewPluginDiscoveryWithDirectory(dir)
+	disc, err := local.NewPluginDiscoveryWithDirectory(dir)
 	require.NoError(t, err)
 
 	detector := &testLeaderDetector{t: t, me: id, input: leader}

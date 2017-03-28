@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 
 	opts := client.Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, _, err := client.Subscribe(socket, "local", opts)
+	topic1, _, err := client.Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -33,7 +34,7 @@ func TestBrokerMultiSubscribers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe(socket, "local/time", opts)
+	topic2, _, err := client.Subscribe(socket, "local/time/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -75,9 +76,11 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 
 	opts := client.Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, _, err := client.Subscribe(socket, "local", opts)
+	sync := make(chan struct{})
+	topic1, _, err := client.Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
+		<-sync
 		for {
 			var val interface{}
 			require.NoError(t, (<-topic1).Decode(&val))
@@ -85,9 +88,10 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe(socket+"/?topic=/local/time", "", opts)
+	topic2, _, err := client.Subscribe(socket+"/?topic=/local/time/", "", opts)
 	require.NoError(t, err)
 	go func() {
+		<-sync
 		for {
 			var val interface{}
 			require.NoError(t, (<-topic2).Decode(&val))
@@ -95,10 +99,13 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 		}
 	}()
 
-	topic3, _, err := client.Subscribe(socket, "cluster/time", opts)
+	topic3, _, err := client.Subscribe(socket, "cluster/time/", opts)
 	require.NoError(t, err)
 	go func() {
-		panic(<-topic3)
+		<-sync
+		if v, ok := <-topic3; ok {
+			panic(v) // shouldn't receive a message here.
+		}
 	}()
 
 	total := 10
@@ -115,6 +122,8 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 			require.NoError(t, broker.Publish("local/time/now", fmt.Sprintf("b:%d", time.Now().UnixNano())))
 		}
 	}()
+
+	close(sync)
 
 	count1, count2 := 0, 0
 	// Test a few rounds to make sure all subscribers get the same messages each round.
@@ -136,4 +145,39 @@ func TestBrokerMultiSubscribersProducers(t *testing.T) {
 
 	broker.Stop()
 
+}
+
+func TestBrokerNoSubscribers(t *testing.T) {
+
+	// Tests for stability of having lots of producers but no subscribers.
+	socketFile := tempSocket()
+
+	broker, err := ListenAndServeOnSocket(socketFile)
+	require.NoError(t, err)
+
+	total := 100
+	var done sync.WaitGroup
+	for _, i := range []int{1, 10, 10, 10, 5, 15, 17, 12, 20} {
+		done.Add(1)
+		delay := time.Duration(i)
+		go func() {
+			defer done.Done()
+			for i := 0; i < total; i++ {
+				broker.Publish("local/time/now", time.Now().UnixNano(), 10*time.Millisecond)
+				<-time.After(delay * time.Millisecond)
+			}
+		}()
+	}
+
+	// We expect all the goroutines to complete and call done on the wait group.
+	done.Wait()
+
+	broker.Stop()
+
+	// This is still possible even after the broker stopped.
+	for i := 0; i < total; i++ {
+		err = broker.Publish("local/time/now", time.Now().UnixNano())
+		require.NoError(t, err)
+
+	}
 }

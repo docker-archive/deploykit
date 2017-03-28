@@ -5,7 +5,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/go-connections/tlsconfig"
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	swarm_leader "github.com/docker/infrakit/pkg/leader/swarm"
 	swarm_store "github.com/docker/infrakit/pkg/store/swarm"
 	"github.com/docker/infrakit/pkg/util/docker"
@@ -26,7 +26,7 @@ func swarmEnvironment(getConfig func() config) *cobra.Command {
 	insecureSkipVerify := cmd.Flags().Bool("tlsverify", true, "True to skip TLS")
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
-		dockerClient, err := docker.NewDockerClient(*host, &tlsconfig.Options{
+		dockerClient, err := docker.NewClient(*host, &tlsconfig.Options{
 			CAFile:             *caFile,
 			CertFile:           *certFile,
 			KeyFile:            *tlsKey,
@@ -44,7 +44,7 @@ func swarmEnvironment(getConfig func() config) *cobra.Command {
 			return err
 		}
 
-		plugins, err := discovery.NewPluginDiscovery()
+		plugins, err := local.NewPluginDiscovery()
 		if err != nil {
 			return err
 		}
