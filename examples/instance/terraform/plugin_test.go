@@ -185,7 +185,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"terraform_demo_swarm_mgr_sl",
 			"label1:value1",
 			"label2:value2",
-			"Name:" + string(*id),
+			"name:" + string(*id),
 		}), conv(props["tags"].([]interface{})))
 		require.Equal(t, instanceSpec.Init, props["user_metadata"])
 
@@ -233,7 +233,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label1:changed1",
 			"label2:value2",
 			"label3:value3",
-			"Name:" + string(*id),
+			"name:" + string(*id),
 		}), conv(props["tags"].([]interface{})))
 	case "aws_instance":
 		require.Equal(t, map[string]interface{}{
@@ -258,7 +258,7 @@ func run(t *testing.T, resourceType, properties string) {
 					"label1":                      "changed1",
 					"label2":                      "value2",
 					"label3":                      "value3",
-					"Name":                        string(*id),
+					"name":                        string(*id),
 				},
 			},
 		}, list)
