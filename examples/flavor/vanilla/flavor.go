@@ -16,6 +16,9 @@ type Spec struct {
 
 	// Tags
 	Tags map[string]string
+
+	// Attachments are instructions for external entities that should be attached to the instance.
+	Attachments []instance.Attachment
 }
 
 // NewPlugin creates a Flavor plugin that doesn't do very much. It assumes instances are
@@ -68,6 +71,11 @@ func (f vanillaFlavor) Prepare(flavor *types.Any,
 			instance.Tags = map[string]string{}
 		}
 		instance.Tags[k] = v
+	}
+
+	// Attachements
+	for _, a := range s.Attachments {
+		instance.Attachments = append(instance.Attachments, a)
 	}
 	return instance, nil
 }

@@ -95,7 +95,8 @@ Putting everything together, we have the configuration to give to the default Gr
         "Tags": {
           "tier": "web",
           "project": "infrakit"
-        }
+        },
+        "Attachments" :  [{"ID":"attachid", "Type": "attachtype"}]
       }
     }
   }
@@ -192,7 +193,8 @@ Now let's update the configuration by changing the size of the group and a prope
         "Tags": {
           "tier": "web",
           "project": "infrakit"
-        }
+        },
+        "Attachments" :  [{"ID":"attachid", "Type": "attachtype"}]
       }
     }
   }

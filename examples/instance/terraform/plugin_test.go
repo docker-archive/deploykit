@@ -178,18 +178,6 @@ func run(t *testing.T, resourceType, properties string) {
 	m := testingData.(map[string]interface{})
 	value, _ := m["value"].(map[string]interface{})
 
-	// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
-	if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
-		newID := strings.Replace(string(*id), "instance-", "", -1)
-		expectedHostname := "softlayer-hostname-" + newID
-		require.Equal(t, expectedHostname, props["hostname"])
-	} else {
-		// If no hostname was specified, the hostname should equal the ID
-		require.Equal(t, string(*id), props["hostname"])
-	}
-	// Verify the hostname prefix key/value is no longer in the props
-	require.Nil(t, props["@hostname_prefix"])
-
 	switch resourceType {
 	case "softlayer_virtual_guest":
 		require.Equal(t, conv([]interface{}{
@@ -199,6 +187,19 @@ func run(t *testing.T, resourceType, properties string) {
 			"Name:" + string(*id),
 		}), conv(props["tags"].([]interface{})))
 		require.Equal(t, instanceSpec.Init, props["user_metadata"])
+
+		// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
+		if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
+			newID := strings.Replace(string(*id), "instance-", "", -1)
+			expectedHostname := "softlayer-hostname-" + newID
+			require.Equal(t, expectedHostname, props["hostname"])
+		} else {
+			// If no hostname was specified, the hostname should equal the ID
+			require.Equal(t, string(*id), props["hostname"])
+		}
+		// Verify the hostname prefix key/value is no longer in the props
+		require.Nil(t, props["@hostname_prefix"])
+
 	case "aws_instance":
 		require.Equal(t, map[string]interface{}{
 			"InstancePlugin": "terraform",
