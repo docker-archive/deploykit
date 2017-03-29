@@ -2,9 +2,10 @@ package types
 
 import (
 	"crypto/sha1"
-	"encoding/base64"
+	"encoding/base32"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -109,5 +110,10 @@ func (c Spec) InstanceHash() string {
 	hasher := sha1.New()
 	hasher.Write(stableFormat(c.Instance))
 	hasher.Write(stableFormat(c.Flavor))
-	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+	encoded := base32.StdEncoding.EncodeToString(hasher.Sum(nil))
+	// Only valid characters are [a-z][0-9] for support on specific platforms
+	encoded = strings.ToLower(encoded)
+	// Remove extra padding
+	encoded = strings.TrimRight(encoded, "=")
+	return encoded
 }
