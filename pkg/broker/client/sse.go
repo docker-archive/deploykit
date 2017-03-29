@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
+	"path"
 
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -49,7 +49,7 @@ func trimHeader(size int, data []byte) []byte {
 }
 
 func socketClient(u *url.URL, socketDir string) (*http.Client, error) {
-	socketPath := filepath.Join(socketDir, u.Host)
+	socketPath := path.Join(socketDir, u.Host)
 	if f, err := os.Stat(socketPath); err != nil {
 		return nil, err
 	} else if f.Mode()&os.ModeSocket == 0 {
@@ -81,6 +81,7 @@ func httpClient(urlString string, opt Options) (*url.URL, *http.Client, error) {
 			return nil, nil, err
 		}
 		u.Scheme = "http"
+		u.Host = "e"
 		u.Path = "/"
 		return u, c, nil
 	}
@@ -97,7 +98,7 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 	}
 
 	if opt.Path != "" {
-		u.Path = opt.Path
+		u.Path = path.Join(u.Path, opt.Path)
 	}
 
 	req, err := http.NewRequest("GET", u.String(), nil)
@@ -145,6 +146,7 @@ func Subscribe(url, topic string, opt Options) (<-chan *types.Any, <-chan error,
 		for {
 			// Read each new line and process the type of event
 			line, err := reader.ReadBytes('\n')
+
 			if err != nil {
 				errCh <- err
 				return

@@ -2,7 +2,8 @@ package event
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -14,22 +15,22 @@ import (
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
-func NewClient(socketPath string) (event.Plugin, error) {
-	rpcClient, err := rpc_client.New(socketPath, event.InterfaceSpec)
+func NewClient(address string) (event.Plugin, error) {
+	rpcClient, err := rpc_client.New(address, event.InterfaceSpec)
 	if err != nil {
 		return nil, err
 	}
-	return &client{client: rpcClient, socketPath: socketPath}, nil
+	return &client{client: rpcClient, address: address}, nil
 }
 
 // Adapt converts a rpc client to a event plugin object
 func Adapt(rpcClient rpc_client.Client) event.Plugin {
-	return &client{client: rpcClient, socketPath: rpcClient.Addr()}
+	return &client{client: rpcClient, address: rpcClient.Addr()}
 }
 
 type client struct {
-	client     rpc_client.Client
-	socketPath string
+	client  rpc_client.Client
+	address string
 }
 
 // List returns the nodes under a topic
@@ -43,8 +44,15 @@ func (c client) List(topic types.Path) ([]string, error) {
 // SubscribeOn returns the subscriber channel for the topic
 func (c *client) SubscribeOn(topic types.Path) (<-chan *event.Event, error) {
 
-	opts := broker.Options{SocketDir: filepath.Dir(c.socketPath), Path: rpc.URLEventsPrefix}
-	url := fmt.Sprintf("unix://%s", filepath.Base(c.socketPath))
+	opts := broker.Options{SocketDir: path.Dir(c.address), Path: rpc.URLEventsPrefix}
+
+	url := fmt.Sprintf("unix://%s", path.Base(c.address))
+
+	// check to see the address isn't a url
+	if strings.Contains(c.address, "://") {
+		url = c.address
+		log.Infoln("Connecting to network event stream:", url, "opts", opts)
+	}
 
 	topicStr := topic.String()
 	if topic.Equal(types.PathFromString(".")) {

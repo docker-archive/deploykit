@@ -18,10 +18,9 @@ import (
 func NewServer(listen string, plugins func() discovery.Plugins) (rpc_server.Stoppable, error) {
 
 	proxy := NewReverseProxy(plugins)
-	logger := loggingHandler{handler: proxy}
 	server := &graceful.Server{
 		Timeout: 10 * time.Second,
-		Server:  &http.Server{Addr: listen, Handler: logger},
+		Server:  &http.Server{Addr: listen, Handler: proxy},
 	}
 
 	listener, err := net.Listen("tcp", listen)

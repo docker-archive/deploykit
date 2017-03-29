@@ -20,8 +20,6 @@ import (
 
 func TestMuxServer(t *testing.T) {
 
-	T(100).Infoln("TestMuxServer!!!")
-
 	pluginName := "metadata"
 	socketPath, server := startPlugin(t, pluginName)
 	defer server.Stop()
