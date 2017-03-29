@@ -625,7 +625,9 @@ func terraformTags(v interface{}, key string) map[string]string {
 			value := fmt.Sprintf("%v", v)
 			if strings.Contains(value, ":") {
 				log.Debugln("terraformTags system tags detected v=", v)
-				vv := strings.Split(value, ":")
+				// This assumes that the first colon is separating the key and the value of the tag.
+				// This is done so that colons are valid characters in the value.
+				vv := strings.SplitN(value, ":", 2)
 				if len(vv) == 2 {
 					tags[vv[0]] = vv[1]
 				} else {

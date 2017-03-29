@@ -265,7 +265,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			swarmID = swarmStatus.ID
 		}
 
-		link = types.NewLink().WithContext("swarm/" + swarmID + "/" + role)
+		link = types.NewLink().WithContext("swarm::" + swarmID + "::" + role)
 		context := &templateContext{
 			flavorSpec:   spec,
 			instanceSpec: instanceSpec,
