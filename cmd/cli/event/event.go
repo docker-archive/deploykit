@@ -282,10 +282,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 				log.Info("Subscribing", "topic", eventTopic)
 
-				stream, err := client.SubscribeOn(eventTopic)
+				stream, stop, err := client.SubscribeOn(eventTopic)
 				if err != nil {
 					return fmt.Errorf("cannot subscribe: %s, err=%v", topic, err)
 				}
+
+				defer close(stop)
 
 				go func() {
 					defer func() { done <- -1 }()

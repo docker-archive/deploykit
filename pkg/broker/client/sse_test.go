@@ -53,7 +53,7 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 
 	// Note that two clients are subscribing to the same topic:
 
-	topic0, _, err := Subscribe(socket, "local/", opts)
+	topic0, _, done0, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
@@ -69,7 +69,7 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 			}
 		}
 	}()
-	topic1, _, err := Subscribe(socket, "local/", opts)
+	topic1, _, done1, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
@@ -86,7 +86,7 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := Subscribe(socket+"/?topic=/local/time/", "", opts)
+	topic2, _, done2, err := Subscribe(socket+"/?topic=/local/time/", "", opts)
 	require.NoError(t, err)
 	go func() {
 		<-sync
@@ -130,6 +130,10 @@ func TestBrokerMultiSubscribersEarlyDisconnects(t *testing.T) {
 	require.Equal(t, 20, len(values2))
 	require.Equal(t, 10, len(values1))
 	require.Equal(t, 10, len(values0))
+
+	close(done0)
+	close(done1)
+	close(done2)
 }
 
 func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
@@ -150,7 +154,7 @@ func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
 
 	opts := Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, errs1, err := Subscribe(socket, "local/", opts)
+	topic1, errs1, done1, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -170,7 +174,7 @@ func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
 		}
 	}()
 
-	topic2, errs2, err := Subscribe(socket, "local/instance1", opts)
+	topic2, errs2, done2, err := Subscribe(socket, "local/instance1", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -209,6 +213,9 @@ func TestBrokerMultiSubscriberCustomObject(t *testing.T) {
 		require.Equal(t, a, b)
 	}
 
+	close(done1)
+	close(done2)
+
 	broker.Stop()
 
 }
@@ -234,7 +241,7 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 	go func() {
 		<-start
 
-		topic1, errs1, err := Subscribe(socket, "local/instance", opts)
+		topic1, errs1, done1, err := Subscribe(socket, "local/instance", opts)
 		require.NoError(t, err)
 
 		for {
@@ -251,12 +258,13 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 				}
 			}
 		}
+		close(done1)
 	}()
 
 	go func() {
 		<-start
 
-		topic2, errs2, err := Subscribe(socket, "local/instancetest", opts)
+		topic2, errs2, done2, err := Subscribe(socket, "local/instancetest", opts)
 		require.NoError(t, err)
 
 		for {
@@ -273,6 +281,8 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 				}
 			}
 		}
+
+		close(done2)
 	}()
 
 	go func() {
@@ -320,7 +330,7 @@ func TestBrokerSubscriberExactMatchTopic(t *testing.T) {
 
 	opts := Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, errs1, err := Subscribe(socket, "local/instance", opts)
+	topic1, errs1, done1, err := Subscribe(socket, "local/instance", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -339,7 +349,7 @@ func TestBrokerSubscriberExactMatchTopic(t *testing.T) {
 		}
 	}()
 
-	topic2, errs2, err := Subscribe(socket, "local/", opts)
+	topic2, errs2, done2, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -358,7 +368,7 @@ func TestBrokerSubscriberExactMatchTopic(t *testing.T) {
 		}
 	}()
 
-	topic3, errs3, err := Subscribe(socket, "local", opts)
+	topic3, errs3, done3, err := Subscribe(socket, "local", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -401,6 +411,11 @@ func TestBrokerSubscriberExactMatchTopic(t *testing.T) {
 		require.NotEqual(t, b, c)
 		require.NotEqual(t, a, b)
 	}
+
+	close(done1)
+	close(done2)
+	close(done3)
+
 	broker.Stop()
 }
 
@@ -425,7 +440,7 @@ func TestBrokerMultiSubscriberCustomObjectConnectAtURLPrefix(t *testing.T) {
 
 	opts := Options{SocketDir: filepath.Dir(socketFile)}
 
-	topic1, errs1, err := Subscribe(socket, "local/", opts)
+	topic1, errs1, done1, err := Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -440,7 +455,7 @@ func TestBrokerMultiSubscriberCustomObjectConnectAtURLPrefix(t *testing.T) {
 	}()
 
 	opts.Path = "/events"
-	topic2, errs2, err := Subscribe(socket, "local/instance1", opts)
+	topic2, errs2, done2, err := Subscribe(socket, "local/instance1", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -470,6 +485,9 @@ func TestBrokerMultiSubscriberCustomObjectConnectAtURLPrefix(t *testing.T) {
 
 	<-got404
 	<-gotData
+
+	close(done1)
+	close(done2)
 	broker.Stop()
 
 }

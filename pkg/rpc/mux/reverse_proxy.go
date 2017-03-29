@@ -126,7 +126,7 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		events, err := subscriber.SubscribeOn(topicPath)
+		events, stop, err := subscriber.SubscribeOn(topicPath)
 		if err != nil {
 			http.Error(resp, "cannot conne", http.StatusInternalServerError)
 			return
@@ -143,10 +143,8 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		for {
 			select {
 			case <-notify:
-				log.Debug("disconnect")
-
-				// TODO - need to close the subscriber connection
-
+				close(stop)
+				log.Debug("disconnected")
 				return
 
 			default:

@@ -42,7 +42,7 @@ func (c client) List(topic types.Path) ([]string, error) {
 }
 
 // SubscribeOn returns the subscriber channel for the topic
-func (c *client) SubscribeOn(topic types.Path) (<-chan *event.Event, error) {
+func (c *client) SubscribeOn(topic types.Path) (<-chan *event.Event, chan<- struct{}, error) {
 
 	opts := broker.Options{SocketDir: path.Dir(c.address), Path: rpc.URLEventsPrefix}
 
@@ -60,9 +60,9 @@ func (c *client) SubscribeOn(topic types.Path) (<-chan *event.Event, error) {
 	}
 
 	log.Infoln("Connecting to broker url=", url, "topic=", topicStr, "opts=", opts)
-	raw, errors, err := broker.Subscribe(url, topicStr, opts)
+	raw, errors, done, err := broker.Subscribe(url, topicStr, opts)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	typed := make(chan *event.Event)
@@ -90,5 +90,5 @@ func (c *client) SubscribeOn(topic types.Path) (<-chan *event.Event, error) {
 		}
 	}()
 
-	return typed, nil
+	return typed, done, nil
 }
