@@ -25,7 +25,7 @@ func TMustNoError(args ...interface{}) []interface{} {
 }
 
 // SkipTests returns true if the environment SKIP_TESTS has the input value in its comma-delimited list
-func SkipTest(check string) bool {
+func SkipTests(check string) bool {
 	list := strings.Split(os.Getenv("SKIP_TESTS"), ",")
 	for _, v := range list {
 		if v == check {

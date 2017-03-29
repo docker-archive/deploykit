@@ -167,7 +167,6 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 			}
 		}
-		return
 
 	default:
 		target := strings.TrimPrefix(req.URL.Path, "/"+prefix)
