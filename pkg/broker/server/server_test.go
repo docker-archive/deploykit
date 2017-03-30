@@ -31,7 +31,7 @@ func TestListenAndServeOnSocket(t *testing.T) {
 	received2 := make(chan interface{})
 
 	opts := client.Options{SocketDir: filepath.Dir(socketFile)}
-	topic1, _, err := client.Subscribe(socket, "local/", opts)
+	topic1, _, stop1, err := client.Subscribe(socket, "local/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -42,7 +42,7 @@ func TestListenAndServeOnSocket(t *testing.T) {
 		}
 	}()
 
-	topic2, _, err := client.Subscribe(socket, "local/time/", opts)
+	topic2, _, stop2, err := client.Subscribe(socket, "local/time/", opts)
 	require.NoError(t, err)
 	go func() {
 		for {
@@ -69,6 +69,8 @@ func TestListenAndServeOnSocket(t *testing.T) {
 		require.Equal(t, a, b)
 	}
 
+	close(stop1)
+	close(stop2)
 	broker.Stop()
 
 }

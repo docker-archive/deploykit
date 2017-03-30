@@ -1,6 +1,8 @@
 package mux
 
 import (
+	"bytes"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -11,8 +13,9 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc/event"
+	event_spi "github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/types"
-	log "github.com/golang/glog"
 )
 
 // ReverseProxy is the mux reverse proxy that is able to multiplex calls to this to different
@@ -75,29 +78,104 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	p := strings.Split(req.URL.Path, "/")
+	// URL has the form /plugin_name/
+	// There are therefore 3 components
+	p := strings.SplitN(req.URL.Path, "/", 3)
 	if len(p) < 3 {
 		http.NotFound(resp, req)
 		return
 	}
-
-	if p[2] == "events" {
-		log.V(100).Infoln("TODO - event stream proxy")
-
+	// standard handling
+	handler, prefix := rp.reverseProxyHandler(req.URL)
+	if handler == nil {
+		http.NotFound(resp, req)
 		return
 	}
 
-	// standard handling
-	handler, prefix := rp.reverseProxyHandler(req.URL)
-	if handler != nil {
-		if p := strings.TrimPrefix(req.URL.Path, "/"+prefix); len(p) < len(req.URL.Path) {
-			req.URL.Path = p
-			log.V(100).Infoln("proxying to plugin", prefix, "url=", req.URL.String(), "uri=", req.URL.RequestURI())
-			handler.ServeHTTP(resp, req)
-		} else {
-			http.NotFound(resp, req)
+	handler = &loggingHandler{handler: handler}
+
+	switch p[2] {
+
+	case "events":
+
+		// flusher is required for streaming
+		flusher, ok := resp.(http.Flusher)
+		if !ok {
+			http.Error(resp, "streaming unsupported", http.StatusInternalServerError)
+			return
 		}
-		return
+
+		topic := req.URL.Query().Get("topic")
+		log.Info("events", "plugin", prefix, "topic", topic)
+
+		topicPath := types.PathFromString(topic)
+		socketPath, _ := rp.socketPath(req.URL)
+		if socketPath == "" {
+			http.NotFound(resp, req)
+			return
+		}
+
+		ep, err := event.NewClient(socketPath)
+		if err != nil {
+			http.Error(resp, "cannot connect to events", http.StatusInternalServerError)
+			return
+		}
+		subscriber, is := ep.(event_spi.Subscriber)
+		if !is {
+			http.Error(resp, "no subscriber implementation", http.StatusInternalServerError)
+			return
+		}
+
+		events, stop, err := subscriber.SubscribeOn(topicPath)
+		if err != nil {
+			http.Error(resp, "cannot conne", http.StatusInternalServerError)
+			return
+		}
+
+		resp.Header().Set("Content-Type", "text/event-stream")
+		resp.Header().Set("Cache-Control", "no-cache")
+		resp.Header().Set("Connection", "keep-alive")
+		resp.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// Listen to connection close and un-register messageChan
+		notify := resp.(http.CloseNotifier).CloseNotify()
+
+		for {
+			select {
+			case <-notify:
+				close(stop)
+				log.Debug("disconnected")
+				return
+
+			default:
+
+				event := <-events
+				buff, err := event.Bytes()
+				if err != nil {
+					log.Error("proxy error", "topic", topic, "err", err)
+					continue
+				}
+
+				// Write to the ResponseWriter
+				// Server Sent Events compatible
+				fmt.Fprintf(resp, "data: %s\n\n", bytes.Replace(buff, []byte{'\n'}, nil, -1))
+
+				// Flush the data immediatly instead of buffering it for later.
+				flusher.Flush()
+
+			}
+		}
+
+	default:
+		target := strings.TrimPrefix(req.URL.Path, "/"+prefix)
+
+		// sanity check -- the target should be shorter
+		if len(target) < len(req.URL.Path) {
+			req.URL.Path = target
+			log.Debug("proxying to plugin", "prefix", prefix, "url", req.URL.String(), "uri", req.URL.RequestURI())
+			handler.ServeHTTP(resp, req)
+			return
+		}
 	}
 
 	http.NotFound(resp, req)
@@ -109,7 +187,7 @@ func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, pre
 	var socketPath string
 
 	defer func() {
-		log.V(100).Infoln("reverse proxy lookup for url:", u, "socket=", socketPath, "prefix=", prefix)
+		log.Debug("reverse proxy lookup", "url", u, "socket", socketPath, "prefix", prefix)
 	}()
 
 	reversep := httputil.NewSingleHostReverseProxy(u)
@@ -117,7 +195,7 @@ func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, pre
 	if socketPath != "" {
 		reversep.Transport = &http.Transport{
 			Dial: func(proto, addr string) (conn net.Conn, err error) {
-				log.V(100).Infoln("connecting:", proto, socketPath)
+				log.Debug("connecting", "proto", proto, "socket", socketPath)
 				return net.Dial("unix", socketPath)
 			},
 		}
