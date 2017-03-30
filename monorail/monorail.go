@@ -61,3 +61,8 @@ func (m *Monorail) Nodes() NodeIface {
 func (m *Monorail) Skus() SkuIface {
 	return m.Client.Skus
 }
+
+// Tags provides a RackHD Tags client
+func (m *Monorail) Tags() TagIface {
+	return m.Client.Tags
+}

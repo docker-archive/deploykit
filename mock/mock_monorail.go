@@ -60,3 +60,13 @@ func (_m *MockIface) Skus() monorail.SkuIface {
 func (_mr *_MockIfaceRecorder) Skus() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Skus")
 }
+
+func (_m *MockIface) Tags() monorail.TagIface {
+	ret := _m.ctrl.Call(_m, "Tags")
+	ret0, _ := ret[0].(monorail.TagIface)
+	return ret0
+}
+
+func (_mr *_MockIfaceRecorder) Tags() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Tags")
+}

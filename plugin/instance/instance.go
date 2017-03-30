@@ -1,13 +1,17 @@
 package instance
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codedellemc/gorackhd/client/nodes"
 	"github.com/codedellemc/gorackhd/client/skus"
+	"github.com/codedellemc/gorackhd/client/tags"
+	"github.com/codedellemc/gorackhd/models"
 	"github.com/codedellemc/infrakit.rackhd/monorail"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -40,7 +44,52 @@ func NewInstancePlugin(client monorail.Iface, username string, password string) 
 
 // DescribeInstances Lists the instances running in RackHD by tags
 func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
-	return nil, nil
+	auth, err := p.Client.Login(p.Username, p.Password)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+	}
+	log.Infof("Logged into RackHD service as %s", p.Username)
+
+	nodes, nil := p.Client.Nodes().GetNodes(nodes.NewGetNodesParams(), auth)
+
+	descriptions := []instance.Description{}
+	for _, node := range nodes.Payload {
+		nodeTags, err := getTagMapForNode(node)
+		if err != nil {
+			return descriptions, err
+		}
+		keep := true
+		for tagKey, tagVal := range tags {
+			if nodeTags[tagKey] != tagVal {
+				keep = false
+			}
+		}
+		logID := instance.LogicalID(node.ID)
+		if keep {
+			descriptions = append(descriptions, instance.Description{
+				ID:        instance.ID(node.ID),
+				LogicalID: &logID,
+				Tags:      nodeTags,
+			})
+		}
+	}
+	return descriptions, nil
+}
+
+func getTagMapForNode(node *models.Node) (map[string]string, error) {
+	tags := make(map[string]string)
+	for _, tag := range node.Tags {
+		if t, ok := tag.(string); ok {
+			tagSlice := strings.SplitN(t, "=", 2)
+			// Only worry about tags with a key/value format:w
+			if len(tagSlice) == 2 {
+				tags[tagSlice[0]] = tagSlice[1]
+			}
+		} else {
+			return nil, fmt.Errorf("Cannot convert tag to string: %s", tag)
+		}
+	}
+	return tags, nil
 }
 
 // Destroy reformats a RackHD instance and performs a secure erase of the system
@@ -65,6 +114,28 @@ func (p rackHDInstancePlugin) Destroy(id instance.ID) error {
 
 // Label writes tags with the infrakit metadata to the RackHD instance
 func (p rackHDInstancePlugin) Label(id instance.ID, labels map[string]string) error {
+	auth, err := p.Client.Login(p.Username, p.Password)
+	if err != nil {
+		return fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+	}
+	log.Infof("Logged into RackHD service as %s", p.Username)
+
+	var tagList []string
+	for k, v := range labels {
+		var tag bytes.Buffer
+		tag.WriteString(k)
+		tag.WriteString("=")
+		tag.WriteString(v)
+		tagList = append(tagList, tag.String())
+	}
+	tagParams := tags.NewPatchNodesIdentifierTagsParams().
+		WithIdentifier(string(id)).
+		WithBody(tagList)
+
+	_, err = p.Client.Tags().PatchNodesIdentifierTags(tagParams, auth)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -98,6 +169,8 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 		return &instanceID, fmt.Errorf("Unable to select node ID for SKU ID, %s. %s", skuID, err)
 	}
 	log.Infof("Found available node ID: %s", nodeID)
+
+	// TODO: Tag nodes so that it isn't found
 
 	err = p.applyWorkflowToNode(props.Workflow, nodeID, auth)
 	if err != nil {
