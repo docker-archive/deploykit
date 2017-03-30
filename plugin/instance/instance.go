@@ -151,7 +151,6 @@ func (p rackHDInstancePlugin) getAvailableNodeIDForSKU(skuID string, auth runtim
 }
 
 func (p rackHDInstancePlugin) applyWorkflowToNode(workflow RackHDWorkflow, nodeID string, auth runtime.ClientAuthInfoWriter) error {
-	log.Infof("%s", workflow)
 	if workflow.Name == "" {
 		return fmt.Errorf("No workflow name provided")
 	}

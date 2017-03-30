@@ -8,13 +8,20 @@
     "Instance": {
         "Plugin": "instance-rackhd",
         "Properties": {
-            "RunInstancesInput": {
-                "WorkflowName": "Graph.InstallCentOS",
-                "SkuName": "SmallNode"
-            },
-            "Tags": {
-                "Name": "infrakit-example"
+          "Workflow": {
+            "name": "Graph.InstallCentOS",
+            "options": {
+              "install-os": {
+                "version": "7.0",
+                "repo": "{{file.server}}/Centos/7.0",
+                "rootPassword": "root"
+              }
             }
+          },
+          "SKUName": "vQuanta D51 SKU"
+        },
+        "Tags": {
+          "Name": "infrakit-example"
         }
     },
     "Flavor": {
