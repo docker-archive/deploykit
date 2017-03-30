@@ -11,7 +11,6 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/rpc"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
-	log "github.com/golang/glog"
 	"gopkg.in/tylerb/graceful.v1"
 )
 
@@ -19,10 +18,9 @@ import (
 func NewServer(listen string, plugins func() discovery.Plugins) (rpc_server.Stoppable, error) {
 
 	proxy := NewReverseProxy(plugins)
-	logger := loggingHandler{handler: proxy}
 	server := &graceful.Server{
 		Timeout: 10 * time.Second,
-		Server:  &http.Server{Addr: listen, Handler: logger},
+		Server:  &http.Server{Addr: listen, Handler: proxy},
 	}
 
 	listener, err := net.Listen("tcp", listen)
@@ -30,14 +28,14 @@ func NewServer(listen string, plugins func() discovery.Plugins) (rpc_server.Stop
 		return nil, err
 	}
 
-	log.Infof("Listening at: %s", listen)
+	log.Info("Listening", "listen", listen)
 
 	go func() {
-		defer log.Warningln("listener stopped")
+		defer log.Warn("listener stopped")
 
 		err := server.Serve(listener)
 		if err != nil {
-			log.Warningln(err)
+			log.Warn("err", "err", err)
 			return
 		}
 	}()
@@ -67,16 +65,16 @@ type loggingHandler struct {
 func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if strings.Index(req.URL.Path, rpc.URLEventsPrefix) == 0 {
 		// this is an event stream... do not record
-		log.V(100).Infoln("Requesting event stream:", req.URL.String())
+		log.Debug("Requesting event stream", "url", req.URL)
 		h.handler.ServeHTTP(w, req)
 		return
 	}
 
 	requestData, err := httputil.DumpRequest(req, true)
 	if err == nil {
-		log.V(100).Infoln("Received request %s", string(requestData))
+		log.Debug("Received", "request", string(requestData))
 	} else {
-		log.Errorln(err)
+		log.Error("err", "err", err)
 	}
 
 	recorder := httptest.NewRecorder()
@@ -85,9 +83,9 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	responseData, err := httputil.DumpResponse(recorder.Result(), true)
 	if err == nil {
-		log.V(100).Infoln("Sending response", string(responseData))
+		log.Debug("Responding", "response", string(responseData))
 	} else {
-		log.Error(err)
+		log.Error("err", "err", err)
 	}
 
 	w.WriteHeader(recorder.Code)

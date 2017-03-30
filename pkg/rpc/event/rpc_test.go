@@ -218,13 +218,13 @@ func TestEventPluginPublishSubscribe(t *testing.T) {
 	client := must(NewClient(socketPath)).(event.Subscriber)
 	require.NotNil(t, client)
 
-	compute, err := client.SubscribeOn(types.PathFromString("compute/"))
+	compute, doneCompute, err := client.SubscribeOn(types.PathFromString("compute/"))
 	require.NoError(t, err)
 
-	storage, err := client.SubscribeOn(types.PathFromString("storage/"))
+	storage, doneStorage, err := client.SubscribeOn(types.PathFromString("storage/"))
 	require.NoError(t, err)
 
-	all, err := client.SubscribeOn(types.PathFromString("."))
+	all, doneAll, err := client.SubscribeOn(types.PathFromString("."))
 	require.NoError(t, err)
 
 	computeEvents := []*event.Event{}
@@ -250,6 +250,10 @@ loop:
 			storageEvents = append(storageEvents, m)
 		}
 	}
+
+	close(doneCompute)
+	close(doneStorage)
+	close(doneAll)
 
 	server.Stop()
 

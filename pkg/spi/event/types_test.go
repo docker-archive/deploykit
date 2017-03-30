@@ -57,4 +57,11 @@ func TestEncodeDecode(t *testing.T) {
 
 	// completely overwritten -- on linux there are problems with Equal for time.Time so compare strings
 	require.Equal(t, types.AnyValueMust(event3).String(), types.AnyValueMust(event4).String())
+
+	// get bytes
+	a, err := event3.Bytes()
+	require.NoError(t, err)
+	b, err := event4.Bytes()
+	require.NoError(t, err)
+	require.Equal(t, a, b)
 }

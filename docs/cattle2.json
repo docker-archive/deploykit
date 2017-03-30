@@ -20,7 +20,8 @@
         "Tags": {
           "tier": "web",
           "project": "infrakit"
-        }
+        },
+        "Attachments" :  [{"ID":"attachid", "Type": "attachtype"}]
       }
     }
   }
