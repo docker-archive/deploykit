@@ -190,6 +190,16 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 
 // Validate ensures that the specified instances are running within RackHD
 func (p rackHDInstancePlugin) Validate(req *types.Any) error {
+	parsed := RackHDProperties{}
+	req.Decode(&parsed)
+
+	if parsed.Workflow.Name == "" {
+		return fmt.Errorf("no-workflow:%s", req.String())
+	}
+
+	if parsed.SKUName == "" {
+		return fmt.Errorf("no-sku-name:%s", req.String())
+	}
 	return nil
 }
 

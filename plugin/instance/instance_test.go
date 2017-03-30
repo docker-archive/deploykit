@@ -1,6 +1,8 @@
 package instance
 
 import (
+	"strings"
+
 	"github.com/codedellemc/gorackhd/client/nodes"
 	"github.com/codedellemc/gorackhd/client/skus"
 	"github.com/codedellemc/gorackhd/client/tags"
@@ -155,6 +157,29 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 			})
 		})
 	})
+
+	It("should return no error when validating valid specs", func() {
+		err := pluginImpl.Validate(inputJSON)
+		Expect(err).To(BeNil())
+	})
+
+	It("should error when no workflow is provided", func() {
+		var errorJSON = types.AnyString(`{
+			"SKUName": "vQuanta D51 SKU"
+		}`)
+		err := pluginImpl.Validate(errorJSON)
+		Expect(strings.HasPrefix(err.Error(), "no-workflow")).To(BeTrue())
+	})
+
+	It("should error when no SKU name is provided", func() {
+		var errorJSON = types.AnyString(`{
+			"Workflow": {
+				"name": "Graph.InstallCentOS"
+			}
+		}`)
+		err := pluginImpl.Validate(errorJSON)
+		Expect(strings.HasPrefix(err.Error(), "no-sku-name")).To(BeTrue())
+	})
 })
 
 func _Skus() []*models.Sku {
@@ -213,14 +238,14 @@ func _Nodes(provisioned bool) []*models.Node {
 
 var inputJSON = types.AnyString(`{
 	"Workflow": {
-	"name": "Graph.InstallCentOS",
-	"options": {
-		"install-os": {
-		"version": "7.0",
-		"repo": "{{file.server}}/Centos/7.0",
-		"rootPassword": "root"
+		"name": "Graph.InstallCentOS",
+		"options": {
+			"install-os": {
+				"version": "7.0",
+				"repo": "{{file.server}}/Centos/7.0",
+				"rootPassword": "root"
+			}
 		}
-	}
 	},
 	"SKUName": "vQuanta D51 SKU"
 }`)
