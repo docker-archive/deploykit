@@ -170,7 +170,14 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 	}
 	log.Infof("Found available node ID: %s", nodeID)
 
-	// TODO: Tag nodes so that it isn't found
+	tagParams := tags.NewPatchNodesIdentifierTagsParams().
+		WithIdentifier(nodeID).
+		WithBody([]string{"infrakitLocked"})
+
+	_, err = p.Client.Tags().PatchNodesIdentifierTags(tagParams, auth)
+	if err != nil {
+		return nil, err
+	}
 
 	err = p.applyWorkflowToNode(props.Workflow, nodeID, auth)
 	if err != nil {

@@ -73,6 +73,14 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 						Times(1).
 						Return(&skus.GetSkusIdentifierNodesOK{Payload: _Nodes(false)}, nil)
 
+					tagsMock := mock.NewMockTagIface(mockCtrl)
+					tagsMock.EXPECT().
+						PatchNodesIdentifierTags(gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(&tags.PatchNodesIdentifierTagsOK{}, nil)
+
+					mockClient.EXPECT().
+						Tags().Times(1).Return(tagsMock)
 					mockClient.EXPECT().
 						Skus().Times(2).Return(skuMock)
 				})
