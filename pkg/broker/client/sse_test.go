@@ -238,11 +238,14 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 	opts := Options{SocketDir: filepath.Dir(socketFile)}
 
 	start := make(chan struct{})
+
 	go func() {
 		<-start
 
 		topic1, errs1, done1, err := Subscribe(socket, "local/instance", opts)
 		require.NoError(t, err)
+
+		defer close(done1)
 
 		for {
 			select {
@@ -258,7 +261,6 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 				}
 			}
 		}
-		close(done1)
 	}()
 
 	go func() {
@@ -266,6 +268,8 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 
 		topic2, errs2, done2, err := Subscribe(socket, "local/instancetest", opts)
 		require.NoError(t, err)
+
+		defer close(done2)
 
 		for {
 			select {
@@ -282,7 +286,6 @@ func TestBrokerMultiSubscriberPartialMatchTopic(t *testing.T) {
 			}
 		}
 
-		close(done2)
 	}()
 
 	go func() {
