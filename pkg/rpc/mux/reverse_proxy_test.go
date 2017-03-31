@@ -19,9 +19,10 @@ import (
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	testing_metadata "github.com/docker/infrakit/pkg/testing/metadata"
 	"github.com/docker/infrakit/pkg/types"
-	log "github.com/golang/glog"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/tylerb/graceful.v1"
+
+	. "github.com/docker/infrakit/pkg/testing"
 )
 
 func TestPluginNameFromURL(t *testing.T) {
@@ -74,13 +75,10 @@ func startProxy(t *testing.T, listen string, rp *ReverseProxy) (*graceful.Server
 		return nil, err
 	}
 
-	log.Infof("Listening at: %s", listen)
+	T(100).Infof("Listening at: %s", listen)
 
 	go func() {
-		err := gracefulServer.Serve(listener)
-		if err != nil {
-			log.Warningln(err)
-		}
+		TMustNoError(gracefulServer.Serve(listener))
 	}()
 
 	return gracefulServer, nil
@@ -110,7 +108,7 @@ func startPlugin(t *testing.T, name string) (string, rpc_server.Stoppable) {
 			},
 		}))
 	require.NoError(t, err)
-	log.Infoln("started plugin", server, "as", name, "at", socketPath)
+	T(100).Infoln("started plugin", server, "as", name, "at", socketPath)
 
 	return socketPath, server
 }
@@ -124,22 +122,22 @@ func TestMuxPlugins(t *testing.T) {
 	lookup, err := local.NewPluginDiscoveryWithDirectory(filepath.Dir(socketPath))
 	require.NoError(t, err)
 
-	log.Infoln("checking to see if discovery works")
+	T(100).Infoln("checking to see if discovery works")
 	all, err := lookup.List()
 	require.NoError(t, err)
 	require.Equal(t, 1, len(all))
 	require.Equal(t, pluginName, all[pluginName].Name)
 
-	log.Infoln("Basic client")
+	T(100).Infoln("Basic client")
 	require.Equal(t, []string{"region"},
 		first(must(rpc_metadata.NewClient(socketPath)).List(plugin_metadata.Path("aws"))))
 
 	infoClient := client.NewPluginInfoClient(socketPath)
 	info, err := infoClient.GetInfo()
 	require.NoError(t, err)
-	log.Infoln("info=", info)
+	T(100).Infoln("info=", info)
 
-	log.Infoln("Starting mux")
+	T(100).Infoln("Starting mux")
 	rp := NewReverseProxy(func() discovery.Plugins {
 		return lookup
 	})
@@ -151,10 +149,10 @@ func TestMuxPlugins(t *testing.T) {
 
 	get := "http://localhost:8080/" + pluginName + rpc.URLAPI
 
-	log.Infoln("Basic info client:", get)
+	T(100).Infoln("Basic info client:", get)
 	resp, err := http.Get(get)
 	defer resp.Body.Close()
-	log.Infoln("resp=", resp, "err=", err)
+	T(100).Infoln("resp=", resp, "err=", err)
 
 	body, err := ioutil.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -164,6 +162,6 @@ func TestMuxPlugins(t *testing.T) {
 	err = any.Decode(&m)
 	require.NoError(t, err)
 	require.Equal(t, "Metadata", m["Implements"].([]interface{})[0].(map[string]interface{})["Name"])
-	log.Infoln("body=", string(body))
+	T(100).Infoln("body=", string(body))
 
 }
