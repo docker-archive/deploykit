@@ -33,6 +33,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access instance plugin",
 	}
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
+	quiet := cmd.PersistentFlags().BoolP("quiet", "q", false, "Print rows without column headers")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
@@ -53,64 +54,76 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
+	///////////////////////////////////////////////////////////////////////////////////
+	// validate
+	validateTemplateFlags, validateProcessTemplate := base.TemplateProcessor(plugins)
 	validate := &cobra.Command{
 		Use:   "validate <instance configuration url>",
-		Short: "validates an instance configuration",
-	}
-	validateTemplateFlags, validateProcessTemplate := base.TemplateProcessor(plugins)
-	validate.Flags().AddFlagSet(validateTemplateFlags)
-	validate.RunE = func(cmd *cobra.Command, args []string) error {
+		Short: "Validates an instance configuration. Read from stdin if url is '-'",
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		if len(args) != 1 {
-			cmd.Usage()
-			os.Exit(1)
-		}
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
 
-		buff, err := validateProcessTemplate(args[0])
-		if err != nil {
+			view, err := base.ReadFromStdinIfElse(
+				func() bool { return args[0] == "-" },
+				func() (string, error) { return validateProcessTemplate(args[0]) },
+			)
+			if err != nil {
+				return err
+			}
+
+			err = instancePlugin.Validate(types.AnyString(view))
+			if err == nil {
+				fmt.Println("validate:ok")
+			}
 			return err
-		}
-
-		err = instancePlugin.Validate(types.AnyString(buff))
-		if err == nil {
-			fmt.Println("validate:ok")
-		}
-		return err
+		},
 	}
+	validate.Flags().AddFlagSet(validateTemplateFlags)
 
+	///////////////////////////////////////////////////////////////////////////////////
+	// provision
+	provisionTemplateFlags, provisionProcessTemplate := base.TemplateProcessor(plugins)
 	provision := &cobra.Command{
 		Use:   "provision <instance configuration url>",
-		Short: "provisions an instance",
+		Short: "Provisions an instance.  Read from stdin if url is '-'",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			view, err := base.ReadFromStdinIfElse(
+				func() bool { return args[0] == "-" },
+				func() (string, error) { return provisionProcessTemplate(args[0]) },
+			)
+			if err != nil {
+				return err
+			}
+
+			spec := instance.Spec{}
+			if err := types.AnyString(view).Decode(&spec); err != nil {
+				return err
+			}
+
+			id, err := instancePlugin.Provision(spec)
+			if err == nil && id != nil {
+				fmt.Printf("%s\n", *id)
+			}
+			return err
+		},
 	}
-	provisionTemplateFlags, provisionProcessTemplate := base.TemplateProcessor(plugins)
 	provision.Flags().AddFlagSet(provisionTemplateFlags)
-	provision.RunE = func(cmd *cobra.Command, args []string) error {
 
-		if len(args) != 1 {
-			cmd.Usage()
-			os.Exit(1)
-		}
-
-		buff, err := provisionProcessTemplate(args[0])
-		if err != nil {
-			return err
-		}
-
-		spec := instance.Spec{}
-		if err := types.AnyString(buff).Decode(&spec); err != nil {
-			return err
-		}
-
-		id, err := instancePlugin.Provision(spec)
-		if err == nil && id != nil {
-			fmt.Printf("%s\n", *id)
-		}
-		return err
-	}
-
+	///////////////////////////////////////////////////////////////////////////////////
+	// destroy
 	destroy := &cobra.Command{
 		Use:   "destroy <instance ID>",
-		Short: "destroy the resource",
+		Short: "Destroy the instance",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) != 1 {
@@ -128,12 +141,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 
+	///////////////////////////////////////////////////////////////////////////////////
+	// describe
 	describe := &cobra.Command{
 		Use:   "describe",
-		Short: "describe the instances",
+		Short: "Describe all managed instances across all groups, subject to filter",
 	}
 	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
-	quiet := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 
 		filter := map[string]string{}
@@ -170,7 +184,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		return err
 	}
-	cmd.AddCommand(validate, provision, destroy, describe)
+
+	cmd.AddCommand(
+		validate,
+		provision,
+		destroy,
+		describe,
+	)
 
 	return cmd
 }

@@ -2,22 +2,29 @@ package base
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/docker/infrakit/pkg/discovery"
-	logutil "github.com/docker/infrakit/pkg/log"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/pflag"
 )
 
-var log = logutil.New("module", "cli/base/template")
-
 // ProcessTemplateFunc is the function that processes the template at url and returns view or error.
 type ProcessTemplateFunc func(url string) (rendered string, err error)
+
+// ReadFromStdinIfElse checks condition and reads from stdin if true; otherwise it executes other.
+func ReadFromStdinIfElse(condition func() bool, otherwise func() (string, error)) (rendered string, err error) {
+	if condition() {
+		buff, err := ioutil.ReadAll(os.Stdin)
+		return string(buff), err
+	}
+	return otherwise()
+}
 
 // TemplateProcessor returns a flagset and a function for processing template input.
 func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ProcessTemplateFunc) {
