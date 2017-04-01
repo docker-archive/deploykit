@@ -32,7 +32,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "resource",
 		Short: "Access resource plugin",
 	}
-	globals := cmd.PersistentFlags().StringArray("global", []string{}, "key=value pairs of 'global' values")
+
 	name := cmd.PersistentFlags().String("name", "resource", "Name of plugin")
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		if err := cli.EnsurePersistentPreRunE(c); err != nil {
@@ -59,18 +59,26 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "commit a resource configuration specified by the URL",
 	}
 	commitPretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
+	commitTemplateFlags, commitProcessTemplate := base.TemplateProcessor(plugins)
+	commit.Flags().AddFlagSet(commitTemplateFlags)
+
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
 			cmd.Usage()
 			os.Exit(1)
 		}
 
-		spec, err := readSpecFromTemplateURL(args[0], *globals)
+		view, err := commitProcessTemplate(args[0])
 		if err != nil {
 			return err
 		}
 
-		details, err := resourcePlugin.Commit(*spec, *commitPretend)
+		spec := resource.Spec{}
+		if err := types.AnyString(view).Decode(&spec); err != nil {
+			return err
+		}
+
+		details, err := resourcePlugin.Commit(spec, *commitPretend)
 		if err == nil {
 			if *commitPretend {
 				fmt.Printf("Committing %s would involve:\n%s\n", spec.ID, details)
@@ -87,6 +95,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "destroy a resource configuration specified by the URL",
 	}
 	destroyPretend := destroy.Flags().Bool("pretend", false, "Don't actually destroy, only explain the destroy")
+	destroyTemplateFlags, destroyProcessTemplate := base.TemplateProcessor(plugins)
+	destroy.Flags().AddFlagSet(destroyTemplateFlags)
 	destroy.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 1 {
@@ -94,12 +104,17 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		spec, err := readSpecFromTemplateURL(args[0], *globals)
+		view, err := destroyProcessTemplate(args[0])
 		if err != nil {
 			return err
 		}
 
-		details, err := resourcePlugin.Destroy(*spec, *destroyPretend)
+		spec := resource.Spec{}
+		if err := types.AnyString(view).Decode(&spec); err != nil {
+			return err
+		}
+
+		details, err := resourcePlugin.Destroy(spec, *destroyPretend)
 		if err == nil {
 			if *destroyPretend {
 				fmt.Printf("Destroying %s would involve:\n%s\n", spec.ID, details)
@@ -115,6 +130,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "describe <template URL>",
 		Short: "describe a resource configuration specified by the URL",
 	}
+	describeTemplateFlags, describeProcessTemplate := base.TemplateProcessor(plugins)
+	describe.Flags().AddFlagSet(describeTemplateFlags)
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 1 {
@@ -122,12 +139,17 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		spec, err := readSpecFromTemplateURL(args[0], *globals)
+		view, err := describeProcessTemplate(args[0])
 		if err != nil {
 			return err
 		}
 
-		details, err := resourcePlugin.DescribeResources(*spec)
+		spec := resource.Spec{}
+		if err := types.AnyString(view).Decode(&spec); err != nil {
+			return err
+		}
+
+		details, err := resourcePlugin.DescribeResources(spec)
 		if err == nil {
 			if len(details) > 0 {
 				fmt.Println(details)
@@ -140,7 +162,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	return cmd
 }
 
-func readSpecFromTemplateURL(templateURL string, globals []string) (*resource.Spec, error) {
+func _readSpecFromTemplateURL(templateURL string, globals []string) (*resource.Spec, error) {
 	log.Info("Reading template", "url", templateURL)
 	engine, err := template.NewTemplate(templateURL, template.Options{})
 	if err != nil {

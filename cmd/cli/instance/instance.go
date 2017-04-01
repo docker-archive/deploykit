@@ -1,9 +1,7 @@
 package instance
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -56,56 +54,58 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	validate := &cobra.Command{
-		Use:   "validate <instance configuration file>",
+		Use:   "validate <instance configuration url>",
 		Short: "validates an instance configuration",
-		RunE: func(cmd *cobra.Command, args []string) error {
+	}
+	validateTemplateFlags, validateProcessTemplate := base.TemplateProcessor(plugins)
+	validate.Flags().AddFlagSet(validateTemplateFlags)
+	validate.RunE = func(cmd *cobra.Command, args []string) error {
 
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
 
-			buff, err := ioutil.ReadFile(args[0])
-			if err != nil {
-				log.Warn("error", "err", err)
-				os.Exit(1)
-			}
-
-			err = instancePlugin.Validate(types.AnyBytes(buff))
-			if err == nil {
-				fmt.Println("validate:ok")
-			}
+		buff, err := validateProcessTemplate(args[0])
+		if err != nil {
 			return err
-		},
+		}
+
+		err = instancePlugin.Validate(types.AnyString(buff))
+		if err == nil {
+			fmt.Println("validate:ok")
+		}
+		return err
 	}
 
 	provision := &cobra.Command{
-		Use:   "provision <instance configuration file>",
+		Use:   "provision <instance configuration url>",
 		Short: "provisions an instance",
-		RunE: func(cmd *cobra.Command, args []string) error {
+	}
+	provisionTemplateFlags, provisionProcessTemplate := base.TemplateProcessor(plugins)
+	provision.Flags().AddFlagSet(provisionTemplateFlags)
+	provision.RunE = func(cmd *cobra.Command, args []string) error {
 
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
 
-			buff, err := ioutil.ReadFile(args[0])
-			if err != nil {
-				log.Warn("error", "err", err)
-				os.Exit(1)
-			}
-
-			spec := instance.Spec{}
-			if err := json.Unmarshal(buff, &spec); err != nil {
-				return err
-			}
-
-			id, err := instancePlugin.Provision(spec)
-			if err == nil && id != nil {
-				fmt.Printf("%s\n", *id)
-			}
+		buff, err := provisionProcessTemplate(args[0])
+		if err != nil {
 			return err
-		},
+		}
+
+		spec := instance.Spec{}
+		if err := types.AnyString(buff).Decode(&spec); err != nil {
+			return err
+		}
+
+		id, err := instancePlugin.Provision(spec)
+		if err == nil && id != nil {
+			fmt.Printf("%s\n", *id)
+		}
+		return err
 	}
 
 	destroy := &cobra.Command{

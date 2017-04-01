@@ -3,7 +3,6 @@ package manager
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -11,12 +10,10 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/spi/group"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -79,8 +76,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "commit <template_URL>",
 		Short: "commit a multi-group configuration, as specified by the URL",
 	}
-	globals := commit.Flags().StringArray("global", []string{}, "key=value pairs of 'global' values")
+
 	pretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
+
+	tflags, processTemplate := base.TemplateProcessor(plugins)
+	commit.Flags().AddFlagSet(tflags)
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 1 {
@@ -90,44 +90,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		templateURL := args[0]
 
-		log.Info("reading template", "url", templateURL)
-		engine, err := template.NewTemplate(templateURL, template.Options{})
+		view, err := processTemplate(templateURL)
 		if err != nil {
 			return err
 		}
 
-		for _, global := range *globals {
-			kv := strings.SplitN(global, "=", 2)
-			if len(kv) != 2 {
-				continue
-			}
-			key := strings.TrimSpace(kv[0])
-			val := strings.TrimSpace(kv[1])
-			if key != "" && val != "" {
-				engine.Global(key, val)
-			}
-		}
-
-		engine.WithFunctions(func() []template.Function {
-			return []template.Function{
-				{
-					Name: "metadata",
-					Description: []string{
-						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-						"and calls GET on the plugin with the path \"path/to/data\".",
-						"It's identical to the CLI command infrakit metadata cat ...",
-					},
-					Func: metadata_template.MetadataFunc(plugins),
-				},
-			}
-		})
-
-		view, err := engine.Render(nil)
-		if err != nil {
-			return err
-		}
-
-		log.Debug("rendered", "view", view)
+		// In any case, the view should be in JSON format
 
 		// Treat this as an Any and then convert
 		any := types.AnyString(view)

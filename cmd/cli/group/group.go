@@ -3,7 +3,6 @@ package group
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +64,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "commit a group configuration",
 	}
 	pretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
+
+	tflags, processTemplate := base.TemplateProcessor(plugins)
+	commit.Flags().AddFlagSet(tflags)
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 1 {
@@ -71,14 +74,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		buff, err := ioutil.ReadFile(args[0])
+		buff, err := processTemplate(args[0])
 		if err != nil {
-			log.Warn("error", "err", err)
-			os.Exit(1)
+			return err
 		}
 
 		spec := group.Spec{}
-		if err := json.Unmarshal(buff, &spec); err != nil {
+		if err := types.AnyString(buff).Decode(&spec); err != nil {
 			return err
 		}
 
