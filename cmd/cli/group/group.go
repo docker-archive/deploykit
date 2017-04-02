@@ -40,7 +40,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	name := cmd.PersistentFlags().String("name", DefaultGroupPluginName, "Name of plugin")
-	pretend := cmd.PersistentFlags().Bool("pretend", true, "Don't actually commit, only explain where appropriate")
+	pretend := cmd.PersistentFlags().Bool("pretend", false, "Don't actually commit, only explain where appropriate")
 	quiet := cmd.PersistentFlags().BoolP("quiet", "q", false, "Print rows without column headers")
 
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {

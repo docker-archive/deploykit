@@ -13,7 +13,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const none = "none"
+// none is used to determine if the user has set the bool flag value. this allows the
+// use of pipe to a prompt like {{ $foo = flag "flag" "bool" "message" | prompt "foo?" "bool" }}
+const none = ""
 
 // Context is the context for the running module
 type Context struct {

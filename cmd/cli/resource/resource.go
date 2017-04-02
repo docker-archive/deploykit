@@ -32,7 +32,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	name := cmd.PersistentFlags().String("name", "resource", "Name of plugin")
-	pretend := cmd.PersistentFlags().Bool("pretend", true, "Don't actually do changes. Explain only where appropriate")
+	pretend := cmd.PersistentFlags().Bool("pretend", false, "Don't actually do changes. Explain only where appropriate")
 
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		if err := cli.EnsurePersistentPreRunE(c); err != nil {
