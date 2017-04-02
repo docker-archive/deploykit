@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const none = "none"
+
 // Context is the context for the running module
 type Context struct {
 	cmd    *cobra.Command
@@ -24,36 +26,48 @@ type Context struct {
 }
 
 func (c *Context) defineFlag(name, ftype, desc string, v interface{}) (interface{}, error) {
-
 	switch ftype {
 	case "string":
 		defaultValue := ""
-		if v, ok := v.(string); ok {
-			defaultValue = v
+		if v != nil {
+			if v, ok := v.(string); ok {
+				defaultValue = v
+			}
 		}
 		c.cmd.Flags().String(name, defaultValue, desc)
 		return defaultValue, nil
 
 	case "int":
 		defaultValue := 0
-		if v, ok := v.(int); ok {
-			defaultValue = v
+		if v != nil {
+			if v, ok := v.(int); ok {
+				defaultValue = v
+			}
 		}
 		c.cmd.Flags().Int(name, defaultValue, desc)
 		return defaultValue, nil
 
 	case "bool":
-		defaultValue := false
-		if v, ok := v.(bool); ok {
-			defaultValue = v
+		defaultValue := none
+		if v != nil {
+			switch v := v.(type) {
+			case bool:
+				defaultValue = fmt.Sprintf("%v", v)
+			case string:
+				if b, err := strconv.ParseBool(v); err == nil {
+					defaultValue = fmt.Sprintf("%v", b)
+				}
+			}
 		}
-		c.cmd.Flags().Bool(name, defaultValue, desc)
+		c.cmd.Flags().String(name, defaultValue, desc)
 		return defaultValue, nil
 
 	case "float":
 		defaultValue := 0.
-		if v, ok := v.(float64); ok {
-			defaultValue = v
+		if v != nil {
+			if v, ok := v.(float64); ok {
+				defaultValue = v
+			}
 		}
 		c.cmd.Flags().Float64(name, defaultValue, desc)
 		return defaultValue, nil
@@ -71,7 +85,14 @@ func (c *Context) getFromFlag(name, ftype, desc string, v interface{}) (interfac
 		return c.cmd.Flags().GetInt(name)
 
 	case "bool":
-		return c.cmd.Flags().GetBool(name)
+		v, err := c.cmd.Flags().GetString(name)
+		if err != nil {
+			return none, err
+		}
+		if v == none {
+			return none, nil
+		}
+		return strconv.ParseBool(v)
 
 	case "float":
 		return c.cmd.Flags().GetFloat64(name)
@@ -110,7 +131,15 @@ func zero(t string, v interface{}) bool {
 	case "int":
 		return v.(int) == 0
 	case "bool":
-		return v.(bool) == false
+		if v, ok := v.(string); ok {
+			if v == none {
+				return true
+			}
+			if b, err := strconv.ParseBool(v); err == nil {
+				return b
+			}
+		}
+		return false
 	case "float":
 		return v.(float64) == 0.
 	}
@@ -140,6 +169,7 @@ func (c *Context) Funcs() []template.Function {
 		{
 			Name: "prompt",
 			Func: func(prompt, ftype string, optional ...interface{}) (interface{}, error) {
+
 				if ftype == "" {
 					return nil, fmt.Errorf("missing type for variable prompted")
 				}
