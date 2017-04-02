@@ -2,7 +2,7 @@
 
 {{/* =% sh %= */}}
 
-{{ $userDocker := flag "docker" "bool" "True to use docker container" | prompt "Docker?" "bool" }}
+{{ $userDocker := flag "docker" "bool" ">0 use docker container" | prompt "Run as Docker container?" "bool" }}
 {{ $profile := flag "profile" "string" "aws credential profilename" | prompt "What's your AWS credential profile?" "string"}}
 {{ $region := flag "region" "string" "aws region" | prompt "What's the region?" "string" }}
 {{ $stackName := flag "stack" "string" "stack name" | prompt "What's the name of the stack?" "string" }}

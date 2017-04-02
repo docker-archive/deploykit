@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/url"
 	"os"
 
@@ -118,6 +119,7 @@ func main() {
 	err = cmd.Execute()
 	if err != nil {
 		log.Crit("error executing", "err", err)
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 }
