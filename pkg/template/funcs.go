@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -115,14 +116,13 @@ func FromINI(v string) (map[string]interface{}, error) {
 	}
 	out := map[string]interface{}{}
 	for n, section := range file {
-		out[n] = section
+		m := map[string]interface{}{}
+		for k, v := range section {
+			m[k] = v
+		}
+		out[n] = m
 	}
 	return out, nil
-}
-
-// MapIndex gets the value of key from map
-func MapIndex(k string, m map[string]interface{}) interface{} {
-	return m[k]
 }
 
 // FromMap decodes map into raw struct
@@ -456,7 +456,27 @@ func (t *Template) DefaultFuncs() []Function {
 			Description: []string{
 				"Get value from dictionary by key. First arg is the key, second must be a map[string]interface{}",
 			},
-			Func: MapIndex,
+			Func: // MapIndex gets the value of key from map
+			func(k interface{}, m map[string]interface{}) interface{} {
+				return m[fmt.Sprintf("%v", k)]
+			},
+		},
+		{
+			Name: "echo",
+			Description: []string{
+				"Print the args to stderr. This does not affect the evaluation of the template and result is not in the template.",
+			},
+			Func: // echo out to stderr
+			func(args ...interface{}) string {
+				var out io.Writer
+				if t.options.Stderr != nil {
+					out = t.options.Stderr()
+				}
+				if out != nil {
+					fmt.Fprintln(out, args...)
+				}
+				return ""
+			},
 		},
 
 		// Deprecated

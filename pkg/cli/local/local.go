@@ -102,8 +102,14 @@ func skip(fn string) bool {
 		return true
 	case strings.Contains(fn, ".md"):
 		return true
+	case strings.Contains(fn, ".ikt"):
+		return false
 	}
-	return false
+	return true
+}
+
+func commandName(s string) string {
+	return strings.Replace(s, ".ikt", "", -1)
 }
 
 func list(fs afero.Fs, dir string, parent *cobra.Command) ([]*cobra.Command, error) {
@@ -133,14 +139,14 @@ entries:
 			continue entries
 
 		default:
-			if skip(entry.Name()) {
+			if !entry.IsDir() && skip(entry.Name()) {
 				continue entries
 			}
 		}
 
 		cmd := &cobra.Command{
-			Use:   entry.Name(),
-			Short: entry.Name(),
+			Use:   commandName(entry.Name()),
+			Short: commandName(entry.Name()),
 		}
 
 		if entry.IsDir() {
@@ -151,6 +157,7 @@ entries:
 			for _, sub := range subs {
 				cmd.AddCommand(sub)
 			}
+
 		} else {
 
 			url := "file://" + filepath.Join(dir, entry.Name())
@@ -161,7 +168,7 @@ entries:
 			}
 
 			cmd.RunE = func(c *cobra.Command, args []string) error {
-				log.Debug("Running", "command", entry.Name(), "args", args)
+				log.Debug("Running", "command", entry.Name(), "url", url, "args", args)
 
 				err := context.loadBackend()
 				if err != nil {

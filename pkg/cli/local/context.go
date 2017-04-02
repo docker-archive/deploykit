@@ -124,6 +124,9 @@ func (c *Context) Funcs() []template.Function {
 		{
 			Name: "flag",
 			Func: func(n, ftype, desc string, optional ...interface{}) (interface{}, error) {
+				if ftype == "" {
+					return nil, fmt.Errorf("missing type for variable %v", n)
+				}
 				var v interface{}
 				if len(optional) > 0 {
 					v = optional[0]
@@ -137,6 +140,9 @@ func (c *Context) Funcs() []template.Function {
 		{
 			Name: "prompt",
 			Func: func(prompt, ftype string, optional ...interface{}) (interface{}, error) {
+				if ftype == "" {
+					return nil, fmt.Errorf("missing type for variable prompted")
+				}
 				if !c.exec {
 					return "", nil
 				}
@@ -205,7 +211,9 @@ func (c *Context) buildFlags() error {
 }
 
 func (c *Context) execute() error {
-	t, err := template.NewTemplate(c.src, template.Options{})
+	t, err := template.NewTemplate(c.src, template.Options{
+		Stderr: func() io.Writer { return os.Stderr },
+	})
 	if err != nil {
 		return err
 	}
