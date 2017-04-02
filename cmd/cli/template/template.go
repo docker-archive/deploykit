@@ -27,7 +27,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Render an infrakit template at given url.  If url is '-', read from stdin",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if len(args) != 0 {
+			if len(args) != 1 {
 				cmd.Usage()
 				os.Exit(1)
 			}

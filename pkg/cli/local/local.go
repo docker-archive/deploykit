@@ -27,7 +27,7 @@ func Setup() error {
 	}
 	if !exists {
 		log.Warn("Creating directory", "dir", dir)
-		err = fs.MkdirAll(dir, 0600)
+		err = fs.MkdirAll(dir, 0644)
 		if err != nil {
 			return err
 		}
