@@ -13,8 +13,10 @@ import (
 func TestZero(t *testing.T) {
 	require.True(t, zero("string", ""))
 	require.True(t, zero("int", 0))
-	require.True(t, zero("bool", false))
 	require.True(t, zero("float", 0.))
+	require.True(t, zero("bool", ""))
+	require.False(t, zero("bool", false))
+	require.False(t, zero("bool", true))
 }
 
 func TestContext(t *testing.T) {
@@ -65,7 +67,7 @@ func TestContext(t *testing.T) {
 		require.NotNil(t, c.cmd.Flag(n))
 	}
 
-	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --commit --size 20 --instance-type large", " "))
+	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --commit true --size 20 --instance-type large", " "))
 	require.NoError(t, err)
 
 	err = c.loadBackend()
