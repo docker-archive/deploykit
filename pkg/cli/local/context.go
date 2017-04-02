@@ -83,20 +83,19 @@ func (c *Context) defineFlag(name, ftype, desc string, def interface{}) (interfa
 			case bool:
 				defaultValue = v
 			case string:
-				if b, err := strconv.ParseBool(v); err != nil {
+				b, err := strconv.ParseBool(v)
+				if err != nil {
 					return nil, err
-				} else {
-					defaultValue = b
 				}
+				defaultValue = b
 			}
 			c.cmd.Flags().Bool(name, defaultValue, desc)
 			return defaultValue, nil
-		} else {
-			// At definition time, there is no default value, so we use string
-			// to model three states: true, false, none
-			c.cmd.Flags().Int(name, none, desc)
-			return none, nil
 		}
+		// At definition time, there is no default value, so we use string
+		// to model three states: true, false, none
+		c.cmd.Flags().Int(name, none, desc)
+		return none, nil
 	}
 	return nil, fmt.Errorf("unknown type %v", ftype)
 }
@@ -127,9 +126,8 @@ func (c *Context) getFromFlag(name, ftype, desc string, def interface{}) (interf
 				return none, nil //
 			}
 			return v > 0, nil
-		} else {
-			return c.cmd.Flags().GetBool(name)
 		}
+		return c.cmd.Flags().GetBool(name)
 	}
 
 	return nil, nil
