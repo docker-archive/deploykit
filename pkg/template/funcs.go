@@ -12,6 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/ghodss/yaml"
 	"github.com/jmespath/go-jmespath"
+	"github.com/vaughan0/go-ini"
 )
 
 // DeepCopyObject makes a deep copy of the argument, using encoding/gob encode/decode.
@@ -103,6 +104,25 @@ func FromYAML(o interface{}) (interface{}, error) {
 func ToYAML(o interface{}) (string, error) {
 	buff, err := yaml.Marshal(o)
 	return string(buff), err
+}
+
+// FromINI decodes content formatted in INI format at path
+func FromINI(v string) (map[string]interface{}, error) {
+	buff := bytes.NewBufferString(v)
+	file, err := ini.Load(buff)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]interface{}{}
+	for n, section := range file {
+		out[n] = section
+	}
+	return out, nil
+}
+
+// MapIndex gets the value of key from map
+func MapIndex(k string, m map[string]interface{}) interface{} {
+	return m[k]
 }
 
 // FromMap decodes map into raw struct
@@ -422,6 +442,21 @@ func (t *Template) DefaultFuncs() []Function {
 				"Example: {{ index_of \"foo\" (from_json \"[\"bar\",\"foo\",\"baz\"]\") }} returns 1 (int).",
 			},
 			Func: IndexOf,
+		},
+		{
+			Name: "iniDecode",
+			Description: []string{
+				"Decodes the input INI into a structure (a map[string]interface{}).",
+				"This is useful for parsing arbitrary resources in INI format as object.  The object is the queryable via 'q'",
+			},
+			Func: FromINI,
+		},
+		{
+			Name: "k",
+			Description: []string{
+				"Get value from dictionary by key. First arg is the key, second must be a map[string]interface{}",
+			},
+			Func: MapIndex,
 		},
 
 		// Deprecated
