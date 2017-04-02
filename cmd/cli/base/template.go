@@ -91,16 +91,19 @@ func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, Proces
 
 		if *yamlDoc {
 
-			log.Debug("converting yaml to json")
-
 			// Convert this to json if it's not in JSON -- the default is for the template to be in YAML
-			if converted, e := yaml.YAMLToJSON([]byte(view)); err == nil {
-				view = string(converted)
-			} else {
+			converted, e := yaml.YAMLToJSON([]byte(view))
+			log.Debug("converting yaml to json", "before", view, "after", string(converted))
+
+			if e != nil {
 				err = e
 				return
 			}
+
+			view = string(converted)
+			log.Debug("view", "rendered", view)
 		}
+
 		log.Debug("rendered", "view", view)
 		return
 	}

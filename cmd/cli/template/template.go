@@ -2,6 +2,7 @@ package template
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/docker/infrakit/cmd/cli/base"
@@ -32,11 +33,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			log.Debug("reading template", "url", args[0])
-			view, err := base.ReadFromStdinIfElse(
-				func() bool { return args[0] == "-" },
-				func() (string, error) { return processTemplate(args[0]) },
-			)
+			url := args[0]
+			if url == "-" {
+				buff, err := ioutil.ReadAll(os.Stdin)
+				if err != nil {
+					return err
+				}
+				url = fmt.Sprintf("str://%s", string(buff))
+			}
+
+			view, err := processTemplate(url)
 			if err != nil {
 				return err
 			}
