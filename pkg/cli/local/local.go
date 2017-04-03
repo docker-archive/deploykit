@@ -13,6 +13,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	// DefaultCLIExtension is the file extension used to mark a file as an infrakit cli command.
+	// Typically templates have the .ikt extension, while CLI commands have .ikc extension
+	DefaultCLIExtension = ".ikc"
+)
+
 // Setup sets up the necessary environment for running this module -- ie make sure
 // the CLI module directories are present, etc.
 func Setup() error {
@@ -27,7 +33,7 @@ func Setup() error {
 	}
 	if !exists {
 		log.Warn("Creating directory", "dir", dir)
-		err = fs.MkdirAll(dir, 0600)
+		err = fs.MkdirAll(dir, 0755)
 		if err != nil {
 			return err
 		}
@@ -102,8 +108,14 @@ func skip(fn string) bool {
 		return true
 	case strings.Contains(fn, ".md"):
 		return true
+	case strings.Contains(fn, DefaultCLIExtension):
+		return false
 	}
-	return false
+	return true
+}
+
+func commandName(s string) string {
+	return strings.Replace(s, DefaultCLIExtension, "", -1)
 }
 
 func list(fs afero.Fs, dir string, parent *cobra.Command) ([]*cobra.Command, error) {
@@ -133,14 +145,14 @@ entries:
 			continue entries
 
 		default:
-			if skip(entry.Name()) {
+			if !entry.IsDir() && skip(entry.Name()) {
 				continue entries
 			}
 		}
 
 		cmd := &cobra.Command{
-			Use:   entry.Name(),
-			Short: entry.Name(),
+			Use:   commandName(entry.Name()),
+			Short: commandName(entry.Name()),
 		}
 
 		if entry.IsDir() {
@@ -151,6 +163,7 @@ entries:
 			for _, sub := range subs {
 				cmd.AddCommand(sub)
 			}
+
 		} else {
 
 			url := "file://" + filepath.Join(dir, entry.Name())
@@ -161,7 +174,7 @@ entries:
 			}
 
 			cmd.RunE = func(c *cobra.Command, args []string) error {
-				log.Debug("Running", "command", entry.Name(), "args", args)
+				log.Debug("Running", "command", entry.Name(), "url", url, "args", args)
 
 				err := context.loadBackend()
 				if err != nil {

@@ -3,7 +3,6 @@ package flavor
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -37,6 +36,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Access flavor plugin",
 	}
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
+	flavorPropertiesURL := cmd.PersistentFlags().String("properties", "", "Properties of the flavor plugin, a url")
 
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		if err := cli.EnsurePersistentPreRunE(c); err != nil {
@@ -104,9 +104,41 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return group_types.Index{Group: group.ID(groupID), Sequence: groupSequence}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////////
+	// validate
+	validateTemplateFlags, toJSON, _, validateProcessTemplate := base.TemplateProcessor(plugins)
 	validate := &cobra.Command{
-		Use:   "validate <flavor configuration file>",
-		Short: "validate a flavor configuration",
+		Use:   "validate",
+		Short: "Validate a flavor configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if len(args) != 0 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			view, err := validateProcessTemplate(*flavorPropertiesURL)
+			if err != nil {
+				return err
+			}
+
+			buff, err := toJSON([]byte(view))
+			if err != nil {
+				return err
+			}
+
+			return flavorPlugin.Validate(types.AnyBytes(buff), allocationMethodFromFlags())
+		},
+	}
+	validate.Flags().AddFlagSet(validateTemplateFlags)
+	addAllocationMethodFlags(validate)
+
+	///////////////////////////////////////////////////////////////////////////////////
+	// prepare
+	prepareTemplateFlags, toJSON, _, prepareProcessTemplate := base.TemplateProcessor(plugins)
+	prepare := &cobra.Command{
+		Use:   "prepare <instance Spec template url>",
+		Short: "Prepare provisioning inputs for an instance. Read from stdin if url is '-'",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) != 1 {
@@ -114,82 +146,66 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			buff, err := ioutil.ReadFile(args[0])
+			flavorProperties, err := prepareProcessTemplate(*flavorPropertiesURL)
 			if err != nil {
-				log.Warn("error", "err", err)
-				os.Exit(1)
+				return err
 			}
 
-			return flavorPlugin.Validate(types.AnyBytes(buff), allocationMethodFromFlags())
-		},
-	}
-	addAllocationMethodFlags(validate)
-	cmd.AddCommand(validate)
-
-	prepare := &cobra.Command{
-		Use:   "prepare <flavor configuration file> <instance Spec JSON file>",
-		Short: "prepare provisioning inputs for an instance",
-		RunE: func(cmd *cobra.Command, args []string) error {
-
-			if len(args) != 2 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			flavorProperties, err := ioutil.ReadFile(args[0])
+			view, err := base.ReadFromStdinIfElse(
+				func() bool { return args[0] == "-" },
+				func() (string, error) { return prepareProcessTemplate(args[0]) },
+				toJSON,
+			)
 			if err != nil {
-				log.Warn("error", "err", err)
-				os.Exit(1)
-			}
-
-			buff, err := ioutil.ReadFile(args[1])
-			if err != nil {
-				log.Warn("error", "err", err)
-				os.Exit(1)
+				return err
 			}
 
 			spec := instance.Spec{}
-			if err := json.Unmarshal(buff, &spec); err != nil {
+			if err := types.AnyString(view).Decode(&spec); err != nil {
 				return err
 			}
 
 			spec, err = flavorPlugin.Prepare(
-				types.AnyBytes(flavorProperties),
+				types.AnyString(flavorProperties),
 				spec,
 				allocationMethodFromFlags(),
 				indexFromFlags(),
 			)
-			if err == nil {
-				buff, err = json.MarshalIndent(spec, "  ", "  ")
-				if err == nil {
-					fmt.Println(string(buff))
-				}
+			if err != nil {
+				return err
+			}
+
+			if buff, err := json.MarshalIndent(spec, "  ", "  "); err == nil {
+				fmt.Println(string(buff))
 			}
 			return err
 		},
 	}
+	prepare.Flags().AddFlagSet(prepareTemplateFlags)
 	addAllocationMethodFlags(prepare)
 	indexFlags(prepare)
-	cmd.AddCommand(prepare)
 
+	///////////////////////////////////////////////////////////////////////////////////
+	// healthy
+	healthyTemplateFlags, toJSON, _, healthyProcessTemplate := base.TemplateProcessor(plugins)
 	healthy := &cobra.Command{
-		Use:   "healthy <flavor configuration file>",
+		Use:   "healthy",
 		Short: "checks if an instance is considered healthy",
 	}
 	tags := healthy.Flags().StringSlice("tags", []string{}, "Tags to filter")
 	id := healthy.Flags().String("id", "", "ID of resource")
 	logicalID := healthy.Flags().String("logical-id", "", "Logical ID of resource")
+	healthy.Flags().AddFlagSet(healthyTemplateFlags)
 	healthy.RunE = func(cmd *cobra.Command, args []string) error {
 
-		if len(args) != 1 {
+		if len(args) != 0 {
 			cmd.Usage()
 			os.Exit(1)
 		}
 
-		flavorProperties, err := ioutil.ReadFile(args[0])
+		flavorProperties, err := healthyProcessTemplate(*flavorPropertiesURL)
 		if err != nil {
-			log.Warn("error", "err", err)
-			os.Exit(1)
+			return err
 		}
 
 		filter := map[string]string{}
@@ -214,13 +230,18 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			desc.LogicalID = &logical
 		}
 
-		healthy, err := flavorPlugin.Healthy(types.AnyBytes(flavorProperties), desc)
+		healthy, err := flavorPlugin.Healthy(types.AnyString(flavorProperties), desc)
 		if err == nil {
 			fmt.Printf("%v\n", healthy)
 		}
 		return err
 	}
-	cmd.AddCommand(healthy)
+
+	cmd.AddCommand(
+		validate,
+		prepare,
+		healthy,
+	)
 
 	return cmd
 }

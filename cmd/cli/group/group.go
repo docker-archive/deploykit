@@ -3,7 +3,6 @@ package group
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +38,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "group",
 		Short: "Access group plugin",
 	}
+
 	name := cmd.PersistentFlags().String("name", DefaultGroupPluginName, "Name of plugin")
+	pretend := cmd.PersistentFlags().Bool("pretend", false, "Don't actually commit, only explain where appropriate")
+	quiet := cmd.PersistentFlags().BoolP("quiet", "q", false, "Print rows without column headers")
+
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
@@ -59,44 +63,51 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
-	commit := cobra.Command{
-		Use:   "commit <group configuration>",
-		Short: "commit a group configuration",
-	}
-	pretend := commit.Flags().Bool("pretend", false, "Don't actually commit, only explain the commit")
-	commit.RunE = func(cmd *cobra.Command, args []string) error {
+	///////////////////////////////////////////////////////////////////////////////////
+	// commit
+	tflags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
+	commit := &cobra.Command{
+		Use:   "commit <group configuration url>",
+		Short: "Commit a group configuration. Read from stdin if url is '-'",
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		if len(args) != 1 {
-			cmd.Usage()
-			os.Exit(1)
-		}
-
-		buff, err := ioutil.ReadFile(args[0])
-		if err != nil {
-			log.Warn("error", "err", err)
-			os.Exit(1)
-		}
-
-		spec := group.Spec{}
-		if err := json.Unmarshal(buff, &spec); err != nil {
-			return err
-		}
-
-		details, err := groupPlugin.CommitGroup(spec, *pretend)
-		if err == nil {
-			if *pretend {
-				fmt.Printf("Committing %s would involve: %s\n", spec.ID, details)
-			} else {
-				fmt.Printf("Committed %s: %s\n", spec.ID, details)
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
 			}
-		}
-		return err
-	}
-	cmd.AddCommand(&commit)
 
-	cmd.AddCommand(&cobra.Command{
+			view, err := base.ReadFromStdinIfElse(
+				func() bool { return args[0] == "-" },
+				func() (string, error) { return processTemplate(args[0]) },
+				toJSON,
+			)
+			if err != nil {
+				return err
+			}
+
+			spec := group.Spec{}
+			if err := types.AnyString(view).Decode(&spec); err != nil {
+				return err
+			}
+
+			details, err := groupPlugin.CommitGroup(spec, *pretend)
+			if err == nil {
+				if *pretend {
+					fmt.Printf("Committing %s would involve: %s\n", spec.ID, details)
+				} else {
+					fmt.Printf("Committed %s: %s\n", spec.ID, details)
+				}
+			}
+			return err
+		},
+	}
+	commit.Flags().AddFlagSet(tflags)
+
+	///////////////////////////////////////////////////////////////////////////////////
+	// free
+	free := &cobra.Command{
 		Use:   "free <group ID>",
-		Short: "free a group from active monitoring, nondestructive",
+		Short: "Free a group from active monitoring, nondestructive",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) != 1 {
@@ -111,49 +122,52 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	})
+	}
 
+	///////////////////////////////////////////////////////////////////////////////////
+	// describe
 	describe := &cobra.Command{
 		Use:   "describe <group ID>",
-		Short: "describe the live instances that make up a group",
-	}
-	quietDescribe := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
-	describe.RunE = func(cmd *cobra.Command, args []string) error {
+		Short: "Describe the live instances that make up a group",
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		if len(args) != 1 {
-			cmd.Usage()
-			os.Exit(1)
-		}
-
-		groupID := group.ID(args[0])
-		desc, err := groupPlugin.DescribeGroup(groupID)
-
-		if err == nil {
-			if !*quietDescribe {
-				fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
 			}
-			for _, d := range desc.Instances {
-				logical := "  -   "
-				if d.LogicalID != nil {
-					logical = string(*d.LogicalID)
-				}
 
-				printTags := []string{}
-				for k, v := range d.Tags {
-					printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
-				}
-				sort.Strings(printTags)
+			groupID := group.ID(args[0])
+			desc, err := groupPlugin.DescribeGroup(groupID)
 
-				fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
+			if err == nil {
+				if !*quiet {
+					fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+				}
+				for _, d := range desc.Instances {
+					logical := "  -   "
+					if d.LogicalID != nil {
+						logical = string(*d.LogicalID)
+					}
+
+					printTags := []string{}
+					for k, v := range d.Tags {
+						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
+					}
+					sort.Strings(printTags)
+
+					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
+				}
 			}
-		}
-		return err
+			return err
+		},
 	}
-	cmd.AddCommand(describe)
 
-	cmd.AddCommand(&cobra.Command{
+	///////////////////////////////////////////////////////////////////////////////////
+	// inspect
+	inspectTemplateFlags, _, fromJSON, _ := base.TemplateProcessor(plugins)
+	inspect := &cobra.Command{
 		Use:   "inspect <group ID>",
-		Short: "return the raw configuration associated with a group",
+		Short: "Insepct a group. Returns the raw configuration associated with a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) != 1 {
@@ -173,6 +187,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 							return err
 						}
 
+						data, err = fromJSON(data)
+						if err != nil {
+							return err
+						}
+
 						fmt.Println(string(data))
 
 						return nil
@@ -183,11 +202,14 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	})
+	}
+	inspect.Flags().AddFlagSet(inspectTemplateFlags)
 
-	cmd.AddCommand(&cobra.Command{
+	///////////////////////////////////////////////////////////////////////////////////
+	//  destroy
+	destroy := &cobra.Command{
 		Use:   "destroy <group ID>",
-		Short: "destroy a group",
+		Short: "Destroy a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) != 1 {
@@ -203,28 +225,37 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			return err
 		},
-	})
+	}
 
-	describeGroups := &cobra.Command{
+	///////////////////////////////////////////////////////////////////////////////////
+	//  ls
+	ls := &cobra.Command{
 		Use:   "ls",
-		Short: "list groups",
-	}
-	quietls := describeGroups.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
-	describeGroups.RunE = func(cmd *cobra.Command, args []string) error {
+		Short: "List groups",
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		groups, err := groupPlugin.InspectGroups()
-		if err == nil {
-			if !*quietls {
-				fmt.Printf("%s\n", "ID")
+			groups, err := groupPlugin.InspectGroups()
+			if err == nil {
+				if !*quiet {
+					fmt.Printf("%s\n", "ID")
+				}
+				for _, g := range groups {
+					fmt.Printf("%s\n", g.ID)
+				}
 			}
-			for _, g := range groups {
-				fmt.Printf("%s\n", g.ID)
-			}
-		}
 
-		return err
+			return err
+		},
 	}
-	cmd.AddCommand(describeGroups)
+
+	cmd.AddCommand(
+		commit,
+		free,
+		describe,
+		inspect,
+		destroy,
+		ls,
+	)
 
 	return cmd
 }

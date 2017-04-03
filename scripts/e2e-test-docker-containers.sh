@@ -27,6 +27,10 @@ plugins=$TEST_DIR/plugins
 mkdir -p $plugins
 rm -rf $plugins/*
 
+cli=$TEST_DIR/cli
+mkdir -p $cli
+rm -rf $cli/*
+
 configstore=$TEST_DIR/configs
 mkdir -p $configstore
 rm -rf $configstore/*
