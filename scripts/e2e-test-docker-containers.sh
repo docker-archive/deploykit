@@ -40,11 +40,11 @@ rm -rf $TEST_DIR/tutorial/*
 
 
 # bind mounts
-volumes="-v $TEST_DIR:/root -v $PWD/docs:/root/docs"
+volumes="-v $TEST_DIR:/ikt -v $PWD/docs:/root/docs"
 
 # set the environment variable to use a shorter path so we don't have
 # problems with Docker for Mac.  See https://github.com/docker/docker/issues/23545
-envs="-e INFRAKIT_PLUGINS_DIR=/root/plugins"
+envs=" -e INFRAKIT_HOME=/ikt -e INFRAKIT_PLUGINS_DIR=/ikt/plugins"
 
 log="--log 5"
 
@@ -64,13 +64,13 @@ echo group > $leaderfile
 
 # start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
 # but here for simplicity just start up with multiple managers and one set of plugins
-server manager infrakit-manager $log --name group --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
-server manager1 infrakit-manager $log --name group1 --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
-server manager2 infrakit-manager $log --name group2 --proxy-for-group group-stateless os --leader-file /root/leader --store-dir /root/configs
+server manager infrakit-manager $log --name group --proxy-for-group group-stateless os --leader-file /ikt/leader --store-dir /ikt/configs
+server manager1 infrakit-manager $log --name group1 --proxy-for-group group-stateless os --leader-file /ikt/leader --store-dir /ikt/configs
+server manager2 infrakit-manager $log --name group2 --proxy-for-group group-stateless os --leader-file /ikt/leader --store-dir /ikt/configs
 
 sleep 5 # wait for leadership detection to run
 
-server instance-file infrakit-instance-file --dir /root/tutorial/ $log
+server instance-file infrakit-instance-file --dir /ikt/tutorial/ $log
 server group-default infrakit-group-default --poll-interval 500ms --name group-stateless $log
 server flavor-vanilla infrakit-flavor-vanilla $log
 
