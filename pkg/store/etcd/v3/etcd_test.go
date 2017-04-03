@@ -34,7 +34,7 @@ func TestWithRealEtcd(t *testing.T) {
 		}
 	}
 
-	defer etcd.StopContainer.Run(containerName)
+	defer etcd.StopContainer.Start(containerName)
 
 	t.Run("SaveLoad", testSaveLoad)
 }

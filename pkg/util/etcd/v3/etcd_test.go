@@ -90,6 +90,6 @@ func TestRunInContainer(t *testing.T) {
 	}
 
 	log.Infoln("Stopping etcd")
-	err = StopContainer.Run(containerName)
+	err = StopContainer.Start(containerName)
 	require.NoError(t, err)
 }
