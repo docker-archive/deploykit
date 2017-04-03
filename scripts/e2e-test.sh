@@ -31,6 +31,10 @@ plugins=$INFRAKIT_HOME/plugins
 mkdir -p $plugins
 rm -rf $plugins/*
 
+cli=$INFRAKIT_HOME/cli
+mkdir -p $cli
+rm -rf $cli/*
+
 configstore=$INFRAKIT_HOME/configs
 mkdir -p $configstore
 rm -rf $configstore/*

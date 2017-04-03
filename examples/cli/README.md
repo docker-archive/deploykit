@@ -1,16 +1,17 @@
 Infrakit Extensible CLI - Examples
 ==================================
 
-Any subfolders here will be added as a command.  The directory tree will be followed recursively
-and commands will follow the hierarchy of the file system from the point set by the
-`INFRAKIT_CLI_DIR` environment variable.
+Any subfolders here will be added as a command, as in any file with the `.ikc` extension.
+The directory tree will be followed recursively and commands will follow the hierarchy of
+the file system from the point set by the `INFRAKIT_CLI_DIR` environment variable.
 
 For example, if we point the enviroment variable to this directory, the folder `build` will show
-up as a command with child commands, while the file `CreateCluster` will show up as a command.
+up as a command with child commands, while the file `CreateCluster.ikc` will show up as a command.
 
 
 ```
-~/infrakit$ INFRAKIT_CLI_DIR=$PWD/pkg/cli/examples infrakit -h
+~/infrakit$ export INFRAKIT_CLI_DIR=$PWD/pkg/cli/examples
+~/infrakit$ infrakit -h
 infrakit cli
 
 
@@ -28,7 +29,7 @@ Usage:
 
 Available Commands:
   CreateCluster CreateCluster
-  build         Infrakit build tools
+  aws           Manage AWS resources
   event         Access event exposed by infrakit plugins
   flavor        Access flavor plugin
   group         Access group plugin
@@ -63,15 +64,21 @@ Use "infrakit [command] --help" for more information about a command.
 
 ## Command Hierarchy follows Files Hierarchy
 
-In this example, the folder `build` has a nested folder `infrakit`, which has a file `make`.  This will
-show up as
+In this example, the folder `aws` has two `.ikc` files:
+
+```shell
+~/infrakit$ tree examples/cli/aws
+examples/cli/aws
+├── provision-instance.ikc
+└── start-plugin.ikc
+```
+This will show up as
 
 ```
-~/infrakit$ INFRAKIT_CLI_DIR=$PWD/pkg/cli/examples infrakit build infrakit -h
-Self building infrakit
+~/infrakit$ infrakit aws -h
 
 
- ___  ________   ________ ________  ________  ___  __    ___  _________
+___  ________   ________ ________  ________  ___  __    ___  _________
 |\  \|\   ___  \|\  _____\\   __  \|\   __  \|\  \|\  \ |\  \|\___   ___\
 \ \  \ \  \\ \  \ \  \__/\ \  \|\  \ \  \|\  \ \  \/  /|\ \  \|___ \  \_|
  \ \  \ \  \\ \  \ \   __\\ \   _  _\ \   __  \ \   ___  \ \  \   \ \  \
@@ -80,35 +87,32 @@ Self building infrakit
     \|__|\|__| \|__|\|__|    \|__|\|__|\|__|\|__|\|__| \|__|\|__|    \|__|
 
 
+Manage AWS resources
+
 Usage:
-  infrakit build infrakit [command]
+  infrakit aws [command]
 
 Available Commands:
-  make        make
+  provision-instance provision-instance
+  start-plugin       start-plugin
 
 Global Flags:
-      --alsologtostderr                  log to standard error as well as files
-  -H, --host stringSlice                 host list. Default is local sockets
-      --httptest.serve string            if non-empty, httptest.NewServer serves on this address and blocks
-      --log int                          log level (default 4)
-      --log-caller                       include caller function (default true)
-      --log-format string                log format: logfmt|term|json (default "term")
-      --log-stack                        include caller stack
-      --log-stdout                       log to stdout
-      --log_backtrace_at traceLocation   when logging hits line file:N, emit a stack trace (default :0)
-      --log_dir string                   If non-empty, write log files in this directory
-      --logtostderr                      log to standard error instead of files
-      --stderrthreshold severity         logs at or above this threshold go to stderr (default 2)
-  -v, --v Level                          log level for V logs
-      --vmodule moduleSpec               comma-separated list of pattern=N settings for file-filtered logging
+  -H, --host stringSlice        host list. Default is local sockets
+      --httptest.serve string   if non-empty, httptest.NewServer serves on this address and blocks
+      --log int                 log level (default 4)
+      --log-caller              include caller function (default true)
+      --log-format string       log format: logfmt|term|json (default "term")
+      --log-stack               include caller stack
+      --log-stdout              log to stdout
 
-Use "infrakit build infrakit [command] --help" for more information about a command.
+Use "infrakit aws [command] --help" for more information about a command.
+
 ```
 
 ## CLI Flags
 
 Each file that corresponds to a command is a Golang template.  In the template, you can call functions to
-bind to command line flags or to prompt the user.  For example, the file `CreateCluster` looks like:
+bind to command line flags or to prompt the user.  For example, the file `CreateCluster.ikc` looks like:
 
 ```
 #!/bin/bash
@@ -224,9 +228,85 @@ this template:
 This is parsed and used to determine what will actually interpret this rendered template.  We will be
 adding different backends such as `sh`, `docker`, `runc`, `make`, etc.
 
+For example, the file `aws/provision-instance.ikc` look like this:
+
+```
+# Input to create instance using the AWS instance plugin
+{{/* =% sh %= */}}
+
+{{ $user := flag "user" "string" "username" | prompt "Please enter your user name:" "string" }}
+{{ $name := flag "name" "string" "name" | prompt "Name?" "string"}}
+{{ $imageId := flag "ami" "string" "ami" | prompt "AMI?" "string"}}
+{{ $instanceType := flag "instance-type" "string" "instance type" | prompt "Instance type?" "string"}}
+{{ $keyName := flag "key" "string" "ssh key name" | prompt "SSH key?" "string"}}
+{{ $az := flag "az" "string" "availability zone" | prompt "Availability zone?" "string"}}
+{{ $subnetId := flag "subnet" "string" "subnet id" | prompt "Subnet ID?" "string"}}
+{{ $securityGroupId := flag "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" }}
+
+infrakit --log 3 --log-stack --name instance-aws/ec2-instance instance provision -y - <<EOF
+
+Tags:
+  infrakit.name: {{ $name }}
+  infrakit.created: {{ now | htmlDate }}
+  infrakit.user: {{ $user }}
+
+Init: |
+  #!/bin/bash
+  sudo apt-get update -y
+  sudo apt-get install wget curl
+  wget -q0- https://get.docker.com | sh
+
+Properties:
+  RunInstancesInput:
+    BlockDeviceMappings: null
+    DisableApiTermination: null
+    EbsOptimized: null
+    IamInstanceProfile: null
+    ImageId: {{ $imageId }}
+    InstanceInitiatedShutdownBehavior: null
+    InstanceType: {{ $instanceType }}
+    KeyName: {{ $keyName }}
+    NetworkInterfaces:
+    - AssociatePublicIpAddress: true
+      DeleteOnTermination: true
+      DeviceIndex: 0
+      Groups:
+      - {{ $securityGroupId }}
+      NetworkInterfaceId: null
+      SubnetId: {{ $subnetId }}
+    Placement:
+      Affinity: null
+      AvailabilityZone: {{ $az }}
+      Tenancy: null
+    RamdiskId: null
+    SubnetId: null
+    UserData: null
+  Tags:
+    infrakit.name: {{ $name }}
+
+EOF
+```
+
+Note the line `{{/* =% sh %= */}}` tells Infrakit to use `sh` as the backend.  Infrakit will render this template
+interactively (since there are `prompts`).  When the template is successfully rendered, this shell script is
+piped to `sh` for execution.  In this case, we are using heredocs `<<EOF` to pipe the YAML content to the
+infrakit instance plugin, which will provision a new instance on AWS based on user's input.
+
+
 ## TO DO
 
-The current implementation doesn't actually do anything yet.  First we will implement the `sh` backend
-where the content of the rendered template is piped to the `stdin` of `sh`.  We will also hook up the
-output streams so that the user can interact with the actual process.  In the case of Docker as backend,
-we plan to use the Docker API and use the hijacked connection returned from starting the container.
+- [ ] Implement additional backends like Docker / wire the hijacked connections
+- [ ] SSH backend (can be implemented using `sh` today)
+
+Currently `.ikc` are CLI command templates and thus support `flag` and `prompt` functions, while
+the base `.ikt` templates rendered by servers don't have these functions.  However, we should unify these
+via a pipeline mechanism similar to what was described here.  For example we could define something like
+
+```
+{{ $clusterName := ref "/cluster/name" | flag "cluster-name" "string" "Name of the cluster" | prompt "What's the name of cluster?" }}
+```
+
+For templates that are rendered by servers that do not have access to CLI or user tty, the values will obviously be
+retrieved via the `ref` mechanism, which can be set via the `--global` flags or via sourcing of `.ikt` templates.
+In environments where user interaction is possible, the user will be prompted if the value cannot be retrieved
+via command line flags or via pre-sourced templates.

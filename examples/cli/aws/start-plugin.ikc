@@ -1,0 +1,42 @@
+#!/bin/bash
+
+{{/* =% sh %= */}}
+
+{{ $userDocker := flag "docker" "bool" ">0 use docker container" | prompt "Run as Docker container?" "bool" }}
+{{ $profile := flag "profile" "string" "aws credential profilename" | prompt "What's your AWS credential profile?" "string"}}
+{{ $region := flag "region" "string" "aws region" | prompt "What's the region?" "string" }}
+{{ $stackName := flag "stack" "string" "stack name" | prompt "What's the name of the stack?" "string" }}
+
+{{ $instanceImage := "infrakit/aws:dev" }}
+{{ $instanceCmd := (cat "instance --log 5 --namespace-tags" (cat "infrakit.scope=" $stackName | nospace)) }}
+
+{{ $infrakit := (cat (env "HOME") "/.infrakit/" | nospace) }}
+{{ $dockerMounts := (cat "-v /var/run/docker.sock:/var/run/docker.sock -v" (cat $infrakit ":/infrakit/" | nospace)) }}
+{{ $dockerEnvs := "-e INFRAKIT_HOME=/infrakit -e INFRAKIT_PLUGINS_DIR=/infrakit/plugins" }}
+
+{{ $creds := (source (cat "file://" (env "HOME") "/.aws/credentials" | nospace) | iniDecode | k $profile ) }}
+
+{{/* show helpful message to user if we can find the credentials */}}
+{{ if not (empty $creds) }}{{ echo "Found your credential for profile" $profile }}{{ end }}
+
+{{ if $userDocker }}
+# Starting docker container for aws instance plugin
+docker run -d --rm --name instance-plugin \
+       {{$dockerMounts}} {{$dockerEnvs}} {{$instanceImage}} {{$instanceCmd}} \
+       --access-key-id {{ $creds.aws_access_key_id }} \
+       --secret-access-key {{ $creds.aws_secret_access_key }} \
+       --region {{ $region }} --log 5
+
+{{ else }}
+
+echo "Starting daemon"
+infrakit-instance-aws --access-key-id {{ $creds.aws_access_key_id }} \
+       --namespace-tags {{cat "infrakit.scope=" $stackName | nospace}} \
+       --secret-access-key {{ $creds.aws_secret_access_key }} \
+       --region {{ $region }} --log 5 \
+       > {{env "INFRAKIT_HOME"}}/logs/instance-aws.log 2>&1  &
+
+echo "Tailing log"
+tail -f {{env "INFRAKIT_HOME"}}/logs/instance-aws.log
+
+{{ end }}

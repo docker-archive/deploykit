@@ -61,6 +61,8 @@ type Options struct {
 
 	// CustomizeFetch allows setting of http request header, etc. during fetch
 	CustomizeFetch func(*http.Request)
+
+	Stderr func() io.Writer
 }
 
 type defaultValue struct {

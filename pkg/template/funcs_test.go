@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
+
+	. "github.com/docker/infrakit/pkg/testing"
 )
 
 type testParameter struct {
@@ -359,4 +362,54 @@ func TestIndexIndexOf(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "index-a", view)
 	}
+}
+
+func TestYAML(t *testing.T) {
+
+	type instance struct {
+		Type     string
+		CPUCores int
+		Memory   int
+	}
+
+	properties := types.AnyValueMust(instance{
+		Type:     "large",
+		CPUCores: 64,
+		Memory:   512,
+	})
+
+	request := map[string]interface{}{
+		"Plugin":     "instance",
+		"Properties": properties,
+	}
+
+	yaml, err := ToYAML(request)
+	require.NoError(t, err)
+
+	T(100).Info(yaml)
+
+	request2 := map[string]interface{}{
+		"Plugin": "instance",
+		"Properties": types.AnyString(`
+{ "Type":"large", "CPUCores":64, "Memory":512 }
+`),
+	}
+
+	yaml2, err := ToYAML(request2)
+	require.NoError(t, err)
+	T(100).Info(yaml2)
+
+	require.Equal(t, yaml, yaml2)
+
+	v, err := FromYAML(yaml)
+	require.NoError(t, err)
+
+	T(100).Info(v)
+
+	v2, err := FromYAML(yaml2)
+	require.NoError(t, err)
+
+	T(100).Info(v2)
+
+	require.Equal(t, v, v2)
 }

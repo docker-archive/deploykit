@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/ghodss/yaml"
 	"github.com/jmespath/go-jmespath"
+	"github.com/vaughan0/go-ini"
 )
 
 // DeepCopyObject makes a deep copy of the argument, using encoding/gob encode/decode.
@@ -79,6 +82,47 @@ func ToJSON(o interface{}) (string, error) {
 func ToJSONFormat(prefix, indent string, o interface{}) (string, error) {
 	buff, err := json.MarshalIndent(o, prefix, indent)
 	return string(buff), err
+}
+
+// FromYAML decode the input YAML encoded as string or byte slice into a map.
+func FromYAML(o interface{}) (interface{}, error) {
+	var ret interface{}
+	switch o := o.(type) {
+	case string:
+		err := yaml.Unmarshal([]byte(o), &ret)
+		return ret, err
+	case []byte:
+		err := yaml.Unmarshal(o, &ret)
+		return ret, err
+	case *types.Any:
+		err := yaml.Unmarshal(o.Bytes(), &ret)
+		return ret, err
+	}
+	return ret, fmt.Errorf("not-supported-value-type")
+}
+
+// ToYAML encodes the input struct into a YAML string.
+func ToYAML(o interface{}) (string, error) {
+	buff, err := yaml.Marshal(o)
+	return string(buff), err
+}
+
+// FromINI decodes content formatted in INI format at path
+func FromINI(v string) (map[string]interface{}, error) {
+	buff := bytes.NewBufferString(v)
+	file, err := ini.Load(buff)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]interface{}{}
+	for n, section := range file {
+		m := map[string]interface{}{}
+		for k, v := range section {
+			m[k] = v
+		}
+		out[n] = m
+	}
+	return out, nil
 }
 
 // FromMap decodes map into raw struct
@@ -328,29 +372,30 @@ func (t *Template) DefaultFuncs() []Function {
 			Func: QueryObject,
 		},
 		{
-			Name: "to_json",
+			Name: "yamlEncode",
 			Description: []string{
-				"Encodes the input as a JSON string",
-				"This is useful for taking an object (interface{}) and render it inline as proper JSON.",
-				"Example: {{ include \"https://httpbin.org/get\" | from_json | to_json }}",
+				"Encodes the input as a YAML string",
+				"This is useful for taking an object (interface{}) and render it inline as proper YAML.",
+				"Example: {{ include \"https://httpbin.org/get\" | jsonDecode | yamlEncode }}",
 			},
-			Func: ToJSON,
+			Func: ToYAML,
+		},
+		{
+			Name: "yamlDecode",
+			Description: []string{
+				"Decodes the input YAML (first arg) into a structure (a map[string]interface{} or []interface{}).",
+				"This is useful for parsing arbitrary resources in YAML format as object.  The object is the queryable via 'q'",
+			},
+			Func: FromYAML,
 		},
 		{
 			Name: "jsonEncode",
 			Description: []string{
 				"Encodes the input as a JSON string",
 				"This is useful for taking an object (interface{}) and render it inline as proper JSON.",
-				"Example: {{ include \"https://httpbin.org/get\" | from_json | to_json }}",
+				"Example: {{ include \"https://httpbin.org/get\" | jsonDecode | jsonEncode }}",
 			},
 			Func: ToJSON,
-		},
-		{
-			Name: "to_json_format",
-			Description: []string{
-				"Encodes the input as a JSON string with first arg as prefix, second arg the indentation, then the object",
-			},
-			Func: ToJSONFormat,
 		},
 		{
 			Name: "jsonEncodeIndent",
@@ -360,20 +405,11 @@ func (t *Template) DefaultFuncs() []Function {
 			Func: ToJSONFormat,
 		},
 		{
-			Name: "from_json",
-			Description: []string{
-				"Decodes the input (first arg) into a structure (a map[string]interface{} or []interface{}).",
-				"This is useful for parsing arbitrary resources in JSON format as object.  The object is the queryable via 'q'",
-				"For example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of request.",
-			},
-			Func: FromJSON,
-		},
-		{
 			Name: "jsonDecode",
 			Description: []string{
 				"Decodes the input (first arg) into a structure (a map[string]interface{} or []interface{}).",
 				"This is useful for parsing arbitrary resources in JSON format as object.  The object is the queryable via 'q'",
-				"For example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of request.",
+				"For example: {{ include \"https://httpbin.org/get\" | jsonDecode | q \"origin\" }} returns the origin of request.",
 			},
 			Func: FromJSON,
 		},
@@ -406,6 +442,68 @@ func (t *Template) DefaultFuncs() []Function {
 				"Example: {{ index_of \"foo\" (from_json \"[\"bar\",\"foo\",\"baz\"]\") }} returns 1 (int).",
 			},
 			Func: IndexOf,
+		},
+		{
+			Name: "iniDecode",
+			Description: []string{
+				"Decodes the input INI into a structure (a map[string]interface{}).",
+				"This is useful for parsing arbitrary resources in INI format as object.  The object is the queryable via 'q'",
+			},
+			Func: FromINI,
+		},
+		{
+			Name: "k",
+			Description: []string{
+				"Get value from dictionary by key. First arg is the key, second must be a map[string]interface{}",
+			},
+			Func: // MapIndex gets the value of key from map
+			func(k interface{}, m map[string]interface{}) interface{} {
+				return m[fmt.Sprintf("%v", k)]
+			},
+		},
+		{
+			Name: "echo",
+			Description: []string{
+				"Print the args to stderr. This does not affect the evaluation of the template and result is not in the template.",
+			},
+			Func: // echo out to stderr
+			func(args ...interface{}) string {
+				var out io.Writer
+				if t.options.Stderr != nil {
+					out = t.options.Stderr()
+				}
+				if out != nil {
+					fmt.Fprintln(out, args...)
+				}
+				return ""
+			},
+		},
+
+		// Deprecated
+		{
+			Name: "to_json",
+			Description: []string{
+				"Encodes the input as a JSON string",
+				"This is useful for taking an object (interface{}) and render it inline as proper JSON.",
+				"Example: {{ include \"https://httpbin.org/get\" | from_json | to_json }}",
+			},
+			Func: ToJSON,
+		},
+		{
+			Name: "to_json_format",
+			Description: []string{
+				"Encodes the input as a JSON string with first arg as prefix, second arg the indentation, then the object",
+			},
+			Func: ToJSONFormat,
+		},
+		{
+			Name: "from_json",
+			Description: []string{
+				"Decodes the input (first arg) into a structure (a map[string]interface{} or []interface{}).",
+				"This is useful for parsing arbitrary resources in JSON format as object.  The object is the queryable via 'q'",
+				"For example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of request.",
+			},
+			Func: FromJSON,
 		},
 	}
 }

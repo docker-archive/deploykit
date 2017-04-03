@@ -10,11 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestZero(t *testing.T) {
-	require.True(t, zero("string", ""))
-	require.True(t, zero("int", 0))
-	require.True(t, zero("bool", false))
-	require.True(t, zero("float", 0.))
+func TestMissing(t *testing.T) {
+	require.True(t, missing("string", ""))
+	require.True(t, missing("int", 0))
+	require.True(t, missing("float", 0.))
+	require.True(t, missing("bool", none))
+	require.False(t, missing("bool", false))
+	require.False(t, missing("bool", true))
 }
 
 func TestContext(t *testing.T) {
@@ -65,7 +67,7 @@ func TestContext(t *testing.T) {
 		require.NotNil(t, c.cmd.Flag(n))
 	}
 
-	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --commit --size 20 --instance-type large", " "))
+	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --commit true --size 20 --instance-type large", " "))
 	require.NoError(t, err)
 
 	err = c.loadBackend()
