@@ -17,94 +17,169 @@ import (
 // ProcessTemplateFunc is the function that processes the template at url and returns view or error.
 type ProcessTemplateFunc func(url string) (rendered string, err error)
 
+// ToJSONFunc converts the input buffer to json format
+type ToJSONFunc func(in []byte) (json []byte, err error)
+
+// FromJSONFunc converts json formatted input to output buffer
+type FromJSONFunc func(json []byte) (out []byte, err error)
+
 // ReadFromStdinIfElse checks condition and reads from stdin if true; otherwise it executes other.
-func ReadFromStdinIfElse(condition func() bool, otherwise func() (string, error)) (rendered string, err error) {
+func ReadFromStdinIfElse(
+	condition func() bool,
+	otherwise func() (string, error),
+	toJSON ToJSONFunc) (rendered string, err error) {
+
 	if condition() {
 		buff, err := ioutil.ReadAll(os.Stdin)
-		return string(buff), err
+		if err != nil {
+			return "", err
+		}
+		json, err := toJSON(buff)
+		log.Debug("stdin", "buffer", string(json))
+		return string(json), err
 	}
-	return otherwise()
+	rendered, err = otherwise()
+	if err != nil {
+		return
+	}
+	var buff []byte
+	buff, err = toJSON([]byte(rendered))
+	if err != nil {
+		return
+	}
+	return string(buff), nil
 }
 
 // TemplateProcessor returns a flagset and a function for processing template input.
-func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ProcessTemplateFunc) {
+func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSONFunc, FromJSONFunc, ProcessTemplateFunc) {
 
 	fs := pflag.NewFlagSet("template", pflag.ExitOnError)
 
 	globals := fs.StringSliceP("global", "g", []string{}, "key=value pairs of 'global' values in template")
 	yamlDoc := fs.BoolP("yaml", "y", false, "True if input is in yaml format; json is the default")
+	dump := fs.BoolP("dump", "x", false, "True to dump to output instead of executing")
 
-	return fs, func(url string) (view string, err error) {
+	return fs,
+		// ToJSONFunc
+		func(in []byte) (json []byte, err error) {
 
-		if !strings.Contains(url, "://") {
-			p := url
-			if dir, err := os.Getwd(); err == nil {
-				p = path.Join(dir, url)
+			defer func() {
+
+				if *dump {
+					fmt.Println("Raw:")
+					fmt.Println(string(in))
+					fmt.Println("Converted")
+					fmt.Println(string(json))
+					os.Exit(0) // special for debugging
+				}
+			}()
+
+			if *yamlDoc {
+				json, err = yaml.YAMLToJSON(in)
+				return
 			}
-			url = "file://" + p
-		}
-
-		log.Debug("reading template", "url", url)
-
-		engine, err := template.NewTemplate(url, template.Options{})
-		if err != nil {
+			json = in
 			return
-		}
 
-		for _, global := range *globals {
-			kv := strings.SplitN(global, "=", 2)
-			if len(kv) != 2 {
-				log.Warn("bad format kv", "input", global)
-				continue
-			}
-			key := strings.TrimSpace(kv[0])
-			val := strings.TrimSpace(kv[1])
-			if key != "" && val != "" {
-				engine.Global(key, val)
-			}
-		}
+		},
+		// FromJSONFunc
+		func(json []byte) (out []byte, err error) {
 
-		engine.WithFunctions(func() []template.Function {
-			return []template.Function{
-				{
-					Name: "metadata",
-					Description: []string{
-						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-						"and calls GET on the plugin with the path \"path/to/data\".",
-						"It's identical to the CLI command infrakit metadata cat ...",
-					},
-					Func: metadata_template.MetadataFunc(plugins),
-				},
-				{
-					Name: "resource",
-					Func: func(s string) string {
-						return fmt.Sprintf("{{ resource `%s` }}", s)
-					},
-				},
-			}
-		})
+			defer func() {
 
-		view, err = engine.Render(nil)
-		if err != nil {
+				if *dump {
+					fmt.Println("Raw:")
+					fmt.Println(string(json))
+					fmt.Println("Converted")
+					fmt.Println(string(out))
+					os.Exit(0) // special for debugging
+				}
+			}()
+
+			if *yamlDoc {
+				out, err = yaml.JSONToYAML(json)
+				return
+			}
+			out = json
 			return
-		}
 
-		if *yamlDoc {
+		},
+		// ProcessTemplateFunc
+		func(url string) (view string, err error) {
 
-			// Convert this to json if it's not in JSON -- the default is for the template to be in YAML
-			converted, e := yaml.YAMLToJSON([]byte(view))
-			log.Debug("converting yaml to json", "before", view, "after", string(converted))
+			if !strings.Contains(url, "://") {
+				p := url
+				if dir, err := os.Getwd(); err == nil {
+					p = path.Join(dir, url)
+				}
+				url = "file://" + p
+			}
 
-			if e != nil {
-				err = e
+			log.Debug("reading template", "url", url)
+			engine, err := template.NewTemplate(url, template.Options{})
+			if err != nil {
 				return
 			}
 
-			view = string(converted)
-			log.Debug("view", "rendered", view)
-		}
+			for _, global := range *globals {
+				kv := strings.SplitN(global, "=", 2)
+				if len(kv) != 2 {
+					log.Warn("bad format kv", "input", global)
+					continue
+				}
+				key := strings.TrimSpace(kv[0])
+				val := strings.TrimSpace(kv[1])
+				if key != "" && val != "" {
+					engine.Global(key, val)
+				}
+			}
 
-		log.Debug("rendered", "view", view)
-		return
-	}
+			engine.WithFunctions(func() []template.Function {
+				return []template.Function{
+					{
+						Name: "metadata",
+						Description: []string{
+							"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
+							"and calls GET on the plugin with the path \"path/to/data\".",
+							"It's identical to the CLI command infrakit metadata cat ...",
+						},
+						Func: metadata_template.MetadataFunc(plugins),
+					},
+					{
+						Name: "resource",
+						Func: func(s string) string {
+							return fmt.Sprintf("{{ resource `%s` }}", s)
+						},
+					},
+				}
+			})
+
+			view, err = engine.Render(nil)
+			if err != nil {
+				return
+			}
+
+			// if *yamlDoc {
+
+			// 	// Convert this to json if it's not in JSON -- the default is for the template to be in YAML
+			// 	converted, e := yaml.YAMLToJSON([]byte(view))
+			// 	log.Debug("converting yaml to json", "before", view, "after", string(converted))
+
+			// 	if e != nil {
+			// 		err = e
+			// 		return
+			// 	}
+
+			// 	view = string(converted)
+			// 	log.Debug("view", "rendered", view)
+			// }
+
+			log.Debug("rendered", "view", view)
+			if *dump {
+				fmt.Println("Final:")
+				fmt.Println(string(view))
+				os.Exit(0)
+			}
+			return
+		}
 }

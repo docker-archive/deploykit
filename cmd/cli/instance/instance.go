@@ -56,7 +56,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// validate
-	validateTemplateFlags, validateProcessTemplate := base.TemplateProcessor(plugins)
+	validateTemplateFlags, toJSON, _, validateProcessTemplate := base.TemplateProcessor(plugins)
 	validate := &cobra.Command{
 		Use:   "validate <instance configuration url>",
 		Short: "Validates an instance configuration. Read from stdin if url is '-'",
@@ -70,6 +70,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
 				func() (string, error) { return validateProcessTemplate(args[0]) },
+				toJSON,
 			)
 			if err != nil {
 				return err
@@ -86,7 +87,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// provision
-	provisionTemplateFlags, provisionProcessTemplate := base.TemplateProcessor(plugins)
+	provisionTemplateFlags, toJSON, _, provisionProcessTemplate := base.TemplateProcessor(plugins)
 	provision := &cobra.Command{
 		Use:   "provision <instance configuration url>",
 		Short: "Provisions an instance.  Read from stdin if url is '-'",
@@ -100,6 +101,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
 				func() (string, error) { return provisionProcessTemplate(args[0]) },
+				toJSON,
 			)
 			if err != nil {
 				return err

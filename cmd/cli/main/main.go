@@ -118,7 +118,7 @@ func main() {
 
 	err = cmd.Execute()
 	if err != nil {
-		log.Crit("error executing", "err", err)
+		log.Crit("error executing", "cmd", cmd.Use, "err", err)
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}

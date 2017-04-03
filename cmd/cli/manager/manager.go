@@ -80,7 +80,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// commit
-	tflags, processTemplate := base.TemplateProcessor(plugins)
+	tflags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
 	commit := &cobra.Command{
 		Use:   "commit <template_URL>",
 		Short: "Commit a multi-group configuration, as specified by the URL.  Read from stdin if url is '-'",
@@ -94,6 +94,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
 				func() (string, error) { return processTemplate(args[0]) },
+				toJSON,
 			)
 			if err != nil {
 				return err
@@ -153,6 +154,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// inspect
+	inspectFlags, _, fromJSON, _ := base.TemplateProcessor(plugins)
 	inspect := &cobra.Command{
 		Use:   "inspect",
 		Short: "Inspect returns the plugin configurations known by the manager",
@@ -187,11 +189,18 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(view.String())
+
+			buff, err := fromJSON(view.Bytes())
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(string(buff))
 
 			return nil
 		},
 	}
+	inspect.Flags().AddFlagSet(inspectFlags)
 
 	cmd.AddCommand(commit, inspect)
 

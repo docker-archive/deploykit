@@ -106,7 +106,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// validate
-	validateTemplateFlags, validateProcessTemplate := base.TemplateProcessor(plugins)
+	validateTemplateFlags, toJSON, _, validateProcessTemplate := base.TemplateProcessor(plugins)
 	validate := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate a flavor configuration",
@@ -122,7 +122,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			return flavorPlugin.Validate(types.AnyString(view), allocationMethodFromFlags())
+			buff, err := toJSON([]byte(view))
+			if err != nil {
+				return err
+			}
+
+			return flavorPlugin.Validate(types.AnyBytes(buff), allocationMethodFromFlags())
 		},
 	}
 	validate.Flags().AddFlagSet(validateTemplateFlags)
@@ -130,7 +135,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// prepare
-	prepareTemplateFlags, prepareProcessTemplate := base.TemplateProcessor(plugins)
+	prepareTemplateFlags, toJSON, _, prepareProcessTemplate := base.TemplateProcessor(plugins)
 	prepare := &cobra.Command{
 		Use:   "prepare <instance Spec template url>",
 		Short: "Prepare provisioning inputs for an instance. Read from stdin if url is '-'",
@@ -149,6 +154,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
 				func() (string, error) { return prepareProcessTemplate(args[0]) },
+				toJSON,
 			)
 			if err != nil {
 				return err
@@ -181,7 +187,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// healthy
-	healthyTemplateFlags, healthyProcessTemplate := base.TemplateProcessor(plugins)
+	healthyTemplateFlags, toJSON, _, healthyProcessTemplate := base.TemplateProcessor(plugins)
 	healthy := &cobra.Command{
 		Use:   "healthy",
 		Short: "checks if an instance is considered healthy",

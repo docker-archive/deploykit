@@ -22,7 +22,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// template
-	tflags, processTemplate := base.TemplateProcessor(plugins)
+	tflags, _, _, processTemplate := base.TemplateProcessor(plugins)
 	cmd := &cobra.Command{
 		Use:   "template <url>",
 		Short: "Render an infrakit template at given url.  If url is '-', read from stdin",
