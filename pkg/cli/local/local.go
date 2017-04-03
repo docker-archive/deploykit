@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	// DefaultCLIExttension is the file extension used to mark a file as an infrakit cli command.
+	// DefaultCLIExtension is the file extension used to mark a file as an infrakit cli command.
 	// Typically templates have the .ikt extension, while CLI commands have .ikc extension
 	DefaultCLIExtension = ".ikc"
 )
