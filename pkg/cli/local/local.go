@@ -13,6 +13,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	// DefaultCLIExttension is the file extension used to mark a file as an infrakit cli command.
+	// Typically templates have the .ikt extension, while CLI commands have .ikc extension
+	DefaultCLIExtension = ".ikc"
+)
+
 // Setup sets up the necessary environment for running this module -- ie make sure
 // the CLI module directories are present, etc.
 func Setup() error {
@@ -102,14 +108,14 @@ func skip(fn string) bool {
 		return true
 	case strings.Contains(fn, ".md"):
 		return true
-	case strings.Contains(fn, ".ikt"):
+	case strings.Contains(fn, DefaultCLIExtension):
 		return false
 	}
 	return true
 }
 
 func commandName(s string) string {
-	return strings.Replace(s, ".ikt", "", -1)
+	return strings.Replace(s, DefaultCLIExtension, "", -1)
 }
 
 func list(fs afero.Fs, dir string, parent *cobra.Command) ([]*cobra.Command, error) {
