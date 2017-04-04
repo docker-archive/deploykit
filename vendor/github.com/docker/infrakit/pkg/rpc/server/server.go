@@ -4,23 +4,27 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	broker "github.com/docker/infrakit/pkg/broker/server"
 	rpc_server "github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/event"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 	"gopkg.in/tylerb/graceful.v1"
-	"net/http/httptest"
-	"net/http/httputil"
 )
 
 // Stoppable support proactive stopping, and blocking until stopped.
 type Stoppable interface {
 	Stop()
 	AwaitStopped()
+	Wait() <-chan struct{}
 }
 
 type stoppableServer struct {
@@ -29,6 +33,10 @@ type stoppableServer struct {
 
 func (s *stoppableServer) Stop() {
 	s.server.Stop(10 * time.Second)
+}
+
+func (s *stoppableServer) Wait() <-chan struct{} {
+	return s.server.StopChan()
 }
 
 func (s *stoppableServer) AwaitStopped() {
@@ -74,26 +82,46 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 	server := rpc.NewServer()
 	server.RegisterCodec(json2.NewCodec(), "application/json")
 
+	targets := append([]VersionedInterface{receiver}, more...)
+
 	interfaces := []spi.InterfaceSpec{}
+	for _, t := range targets {
+		interfaces = append(interfaces, t.ImplementedInterface())
 
-	if err := server.RegisterService(receiver, ""); err != nil {
-		return nil, err
-	}
-
-	interfaces = append(interfaces, receiver.ImplementedInterface())
-
-	// Additional interfaces to publish
-	for _, obj := range more {
-		// the object can export 0 or more methods.  In any case we show the implemented interface
-		interfaces = append(interfaces, obj.ImplementedInterface())
-		if err := server.RegisterService(obj, ""); err != nil {
-			log.Warningln(err)
+		if err := server.RegisterService(t, ""); err != nil {
+			return nil, err
 		}
 	}
 
-	// TODO - deprecate this in favor of the more information-rich /info/api.json endpoint
+	// handshake service that can exchange interface versions with client
 	if err := server.RegisterService(rpc_server.Handshake(interfaces), ""); err != nil {
 		return nil, err
+	}
+
+	// events handler
+	events := broker.NewBroker()
+
+	// wire up the publish event source channel to the plugin implementations
+	for _, t := range targets {
+
+		pub, is := t.(event.Publisher)
+		if !is {
+			continue
+		}
+
+		// We give one channel per source to provide some isolation.  This we won't have the
+		// whole event bus stop just because one plugin closes the channel.
+		eventChan := make(chan *event.Event)
+		pub.PublishOn(eventChan)
+		go func() {
+			for {
+				event, ok := <-eventChan
+				if !ok {
+					return
+				}
+				events.Publish(event.Topic.String(), event, 1*time.Second)
+			}
+		}()
 	}
 
 	// info handler
@@ -106,14 +134,33 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 	httpLog.Level = log.GetLevel()
 
 	router := mux.NewRouter()
-	router.HandleFunc(rpc_server.APIURL, info.ShowAPI)
-	router.HandleFunc(rpc_server.FunctionsURL, info.ShowTemplateFunctions)
-	router.Handle("/", server)
+	router.HandleFunc(rpc_server.URLAPI, info.ShowAPI)
+	router.HandleFunc(rpc_server.URLFunctions, info.ShowTemplateFunctions)
 
-	handler := loggingHandler{handler: router}
+	intercept := broker.Interceptor{
+		Pre: func(topic string, headers map[string][]string) error {
+			for _, target := range targets {
+				if v, is := target.(event.Validator); is {
+					if err := v.Validate(types.PathFromString(topic)); err == nil {
+						return nil
+					}
+				}
+			}
+			return broker.ErrInvalidTopic(topic)
+		},
+		Do: events.ServeHTTP,
+		Post: func(topic string) {
+			log.Infoln("Client left", topic)
+		},
+	}
+	router.HandleFunc(rpc_server.URLEventsPrefix, intercept.ServeHTTP)
+
+	logger := loggingHandler{handler: server}
+	router.Handle("/", logger)
+
 	gracefulServer := graceful.Server{
 		Timeout: 10 * time.Second,
-		Server:  &http.Server{Addr: fmt.Sprintf("unix://%s", socketPath), Handler: handler},
+		Server:  &http.Server{Addr: fmt.Sprintf("unix://%s", socketPath), Handler: router},
 	}
 
 	listener, err := net.Listen("unix", socketPath)
@@ -128,6 +175,7 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 		if err != nil {
 			log.Warn(err)
 		}
+		events.Stop()
 	}()
 
 	return &stoppableServer{server: &gracefulServer}, nil
