@@ -556,7 +556,7 @@ func (p *plugin) Destroy(instance instance.ID) error {
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
-func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 
 	show, err := p.terraformShow()

@@ -267,6 +267,7 @@ func TestInstanceTypedPluginDescribeInstances(t *testing.T) {
 
 	tags1 := map[string]string{}
 	tagsActual1 := make(chan map[string]string, 1)
+	propertiesActual1 := make(chan bool, 1)
 	list1 := []instance.Description{
 		{ID: instance.ID("boo1")}, {ID: instance.ID("boop")},
 	}
@@ -274,6 +275,7 @@ func TestInstanceTypedPluginDescribeInstances(t *testing.T) {
 		"foo": "bar",
 	}
 	tagsActual2 := make(chan map[string]string, 1)
+	propertiesActual2 := make(chan bool, 1)
 	list2 := []instance.Description{
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop2")},
 	}
@@ -281,40 +283,44 @@ func TestInstanceTypedPluginDescribeInstances(t *testing.T) {
 		"foo": "bar",
 	}
 	tagsActual3 := make(chan map[string]string, 1)
+	propertiesActual3 := make(chan bool, 1)
 	list3 := []instance.Description{
 		{ID: instance.ID("boo3")}, {ID: instance.ID("boop")},
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]instance.Plugin{
 			"type1": &testing_instance.Plugin{
-				DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+				DoDescribeInstances: func(req map[string]string, properties bool) ([]instance.Description, error) {
 					tagsActual1 <- req
+					propertiesActual1 <- properties
 					return list1, nil
 				},
 			},
 			"type2": &testing_instance.Plugin{
-				DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+				DoDescribeInstances: func(req map[string]string, properties bool) ([]instance.Description, error) {
 					tagsActual2 <- req
+					propertiesActual2 <- properties
 					return list2, nil
 				},
 			},
 			"type3": &testing_instance.Plugin{
-				DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+				DoDescribeInstances: func(req map[string]string, properties bool) ([]instance.Description, error) {
 					tagsActual3 <- req
+					propertiesActual3 <- properties
 					return list3, errors.New("bad")
 				},
 			},
 		}))
 
-	l, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).DescribeInstances(tags1)
+	l, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).DescribeInstances(tags1, false)
 	require.NoError(t, err)
 	require.Equal(t, list1, l)
 
-	l, err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).DescribeInstances(tags2)
+	l, err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).DescribeInstances(tags2, true)
 	require.NoError(t, err)
 	require.Equal(t, list2, l)
 
-	_, err = must(NewClient(plugin.Name(name+"/type3"), socketPath)).DescribeInstances(tags3)
+	_, err = must(NewClient(plugin.Name(name+"/type3"), socketPath)).DescribeInstances(tags3, false)
 	require.Error(t, err)
 	require.Equal(t, "bad", err.Error())
 
@@ -322,4 +328,7 @@ func TestInstanceTypedPluginDescribeInstances(t *testing.T) {
 	require.Equal(t, tags1, <-tagsActual1)
 	require.Equal(t, tags2, <-tagsActual2)
 	require.Equal(t, tags3, <-tagsActual3)
+	require.Equal(t, false, <-propertiesActual1)
+	require.Equal(t, true, <-propertiesActual2)
+	require.Equal(t, false, <-propertiesActual3)
 }

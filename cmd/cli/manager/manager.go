@@ -76,7 +76,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
-	pretend := cmd.PersistentFlags().Bool("pretend", true, "Don't actually make changes; explain where appropriate")
+	pretend := cmd.PersistentFlags().Bool("pretend", false, "Don't actually make changes; explain where appropriate")
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// commit

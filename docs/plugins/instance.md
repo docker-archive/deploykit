@@ -1,6 +1,6 @@
 # Instance plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/instance/* befb47292c2f062637d65e9777d88c322856baf650feb6b527cd3a4242f86d3482b656246051d2ca -->
+<!-- SOURCE-CHECKSUM pkg/spi/instance/* af33b7b157a24a90e4ecef4b99c997a4039edf7832ae259bfe527c06caec5455f3c083481586eda2 -->
 
 ## API
 
@@ -115,13 +115,14 @@ Fetches details about Instances.
 #### Request
 ```json
 {
-  "Tags": {"tag_key": "tag_value"}
+  "Tags": {"tag_key": "tag_value"},
+  "Properties" : true
 }
 ```
 
 Parameters:
 - `Tags`: Instance tags to match.  If multiple tags are specified, only Instances matching all tags are returned.
-
+- `Properties`: Boolean to indicate whether the client requests additional details via the `Description.Properties` field.
 #### Response
 ```json
 {
@@ -129,7 +130,8 @@ Parameters:
     {
       "ID": "instance_id",
       "LogicalID": "logical_id",
-      "Tags": {"tag_key": "tag_value"}
+      "Tags": {"tag_key": "tag_value"},
+      "Properties" : { "some_status" : "ok", "some_state" : 10 }
     }
   ]
 }

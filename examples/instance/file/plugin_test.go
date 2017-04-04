@@ -87,7 +87,7 @@ func run(t *testing.T, properties string) {
 		"label3": "value3",
 	}, parsed.Description.Tags)
 
-	list, err := fileinst.DescribeInstances(map[string]string{"label1": "changed1"})
+	list, err := fileinst.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{
 		{
@@ -99,7 +99,7 @@ func run(t *testing.T, properties string) {
 	err = fileinst.Destroy(*id)
 	require.NoError(t, err)
 
-	list, err = fileinst.DescribeInstances(map[string]string{"label1": "changed1"})
+	list, err = fileinst.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
 

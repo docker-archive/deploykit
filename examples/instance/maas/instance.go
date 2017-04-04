@@ -294,7 +294,7 @@ func (m maasPlugin) Destroy(id instance.ID) error {
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
-func (m maasPlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (m maasPlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	var ret []instance.Description
 	nodeListing := m.MaasObj.GetSubObject("nodes")
 	listNodeObjects, err := nodeListing.CallGet("list", url.Values{})

@@ -214,7 +214,7 @@ func (v vagrantPlugin) Destroy(id instance.ID) error {
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
-func (v vagrantPlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (v vagrantPlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	files, err := ioutil.ReadDir(v.VagrantfilesDir)
 	if err != nil {
 		return nil, err

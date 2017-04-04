@@ -244,7 +244,7 @@ func run(t *testing.T, resourceType, properties string) {
 		}, props["tags"])
 	}
 
-	list, err := terraform.DescribeInstances(map[string]string{"label1": "changed1"})
+	list, err := terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
 
 	switch resourceType {
@@ -279,7 +279,7 @@ func run(t *testing.T, resourceType, properties string) {
 	err = terraform.Destroy(*id)
 	require.NoError(t, err)
 
-	list, err = terraform.DescribeInstances(map[string]string{"label1": "changed1"})
+	list, err = terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
 }

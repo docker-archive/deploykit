@@ -108,7 +108,7 @@ func TestProvision_and_Destroy(t *testing.T) {
 	id, err := maasPlugin.Provision(instanceSpec)
 	require.NoError(t, err)
 
-	list, err := maasPlugin.DescribeInstances(map[string]string{"label1": "value1"})
+	list, err := maasPlugin.DescribeInstances(map[string]string{"label1": "value1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{
 		{
@@ -125,7 +125,7 @@ func TestProvision_and_Destroy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	list, err = maasPlugin.DescribeInstances(map[string]string{"label1": "value1"})
+	list, err = maasPlugin.DescribeInstances(map[string]string{"label1": "value1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{
 		{
@@ -137,7 +137,7 @@ func TestProvision_and_Destroy(t *testing.T) {
 		},
 	}, list)
 
-	list, err = maasPlugin.DescribeInstances(map[string]string{"label3": "changed"})
+	list, err = maasPlugin.DescribeInstances(map[string]string{"label3": "changed"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{
 		{

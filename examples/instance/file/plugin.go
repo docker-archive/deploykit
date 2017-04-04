@@ -142,7 +142,7 @@ func (p *plugin) Destroy(instance instance.ID) error {
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 // TODO - need to define the fitlering of tags => AND or OR of matches?
-func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 	entries, err := afero.ReadDir(p.fs, p.Dir)
 	if err != nil {
@@ -166,6 +166,11 @@ scan:
 			continue scan
 		}
 
+		if properties {
+			if blob, err := types.AnyValue(inst.Spec); err == nil {
+				inst.Properties = blob
+			}
+		}
 		if len(tags) == 0 {
 			result = append(result, inst.Description)
 		} else {

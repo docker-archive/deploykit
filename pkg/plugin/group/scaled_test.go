@@ -28,7 +28,7 @@ func TestLabelEmpty(t *testing.T) {
 	}
 
 	gomock.InOrder(
-		instancePlugin.EXPECT().DescribeInstances(tags).Return([]instance.Description{}, nil),
+		instancePlugin.EXPECT().DescribeInstances(tags, false).Return([]instance.Description{}, nil),
 	)
 
 	err := scaled.Label()
@@ -53,7 +53,7 @@ func TestLabelError(t *testing.T) {
 	}
 
 	gomock.InOrder(
-		instancePlugin.EXPECT().DescribeInstances(tags).Return(nil, errors.New("BUG")),
+		instancePlugin.EXPECT().DescribeInstances(tags, false).Return(nil, errors.New("BUG")),
 	)
 
 	err := scaled.Label()
@@ -78,7 +78,7 @@ func TestLabelAllLabelled(t *testing.T) {
 	}
 
 	gomock.InOrder(
-		instancePlugin.EXPECT().DescribeInstances(tags).Return([]instance.Description{
+		instancePlugin.EXPECT().DescribeInstances(tags, false).Return([]instance.Description{
 			{
 				ID: instance.ID("labbeled1"),
 				Tags: map[string]string{
@@ -120,7 +120,7 @@ func TestLabelOneUnlabelled(t *testing.T) {
 	}
 
 	gomock.InOrder(
-		instancePlugin.EXPECT().DescribeInstances(tags).Return([]instance.Description{
+		instancePlugin.EXPECT().DescribeInstances(tags, false).Return([]instance.Description{
 			{
 				ID: instance.ID("labbeled"),
 				Tags: map[string]string{
@@ -166,7 +166,7 @@ func TestUnableToLabel(t *testing.T) {
 	}
 
 	gomock.InOrder(
-		instancePlugin.EXPECT().DescribeInstances(tags).Return([]instance.Description{
+		instancePlugin.EXPECT().DescribeInstances(tags, false).Return([]instance.Description{
 			{
 				ID: instance.ID("labbeled"),
 				Tags: map[string]string{

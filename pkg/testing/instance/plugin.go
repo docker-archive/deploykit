@@ -20,7 +20,7 @@ type Plugin struct {
 	DoDestroy func(instance instance.ID) error
 
 	// DoDescribeInstances returns descriptions of all instances matching all of the provided tags.
-	DoDescribeInstances func(tags map[string]string) ([]instance.Description, error)
+	DoDescribeInstances func(tags map[string]string, details bool) ([]instance.Description, error)
 }
 
 // Validate performs local validation on a provision request.
@@ -44,6 +44,6 @@ func (t *Plugin) Destroy(instance instance.ID) error {
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
-func (t *Plugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
-	return t.DoDescribeInstances(tags)
+func (t *Plugin) DescribeInstances(tags map[string]string, details bool) ([]instance.Description, error) {
+	return t.DoDescribeInstances(tags, details)
 }

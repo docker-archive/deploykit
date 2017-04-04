@@ -186,7 +186,7 @@ func describe(id resource.ID, resourceConfigs map[string]resourceConfig) (map[st
 		descriptions, err := resourceConfig.plugin.DescribeInstances(map[string]string{
 			resourcesTag:   string(id),
 			resourcesIDTag: name,
-		})
+		}, false)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to describe resource '%s': %s", name, err)
 		}
