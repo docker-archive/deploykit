@@ -2,8 +2,11 @@ package types
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/require"
+	"fmt"
+	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -77,4 +80,13 @@ func TestInstanceHash(t *testing.T) {
 	require.Equal(t, hash(specA), hash(specA))
 	require.Equal(t, hash(specA), hash(reordered))
 	require.NotEqual(t, hash(specA), hash(different))
+	VerifyValidCharsInHash(t, hash(specA))
+	VerifyValidCharsInHash(t, hash(reordered))
+	VerifyValidCharsInHash(t, hash(different))
+}
+
+func VerifyValidCharsInHash(t *testing.T, hash string) {
+	regex := "[a-z0-9]"
+	validString := regexp.MustCompile(regex)
+	require.True(t, validString.MatchString(hash), fmt.Sprintf("Invalid characters found in string: %v. Valid characters are %v", hash, regex))
 }

@@ -103,7 +103,7 @@ JSON looks like below, where the value of `value` is the instance body of the TF
             "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
             "subnet_id": "${aws_subnet.default.id}",
             "tags" :  {
-                "Name" : "web4",
+                "name" : "web4",
                 "InstancePlugin" : "terraform"
             },
             "connection" : {
@@ -383,8 +383,17 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// set the tags.
 	// add a name
 	if spec.Tags != nil {
-		if _, has := spec.Tags["Name"]; !has {
-			spec.Tags["Name"] = string(id)
+		switch properties.Type {
+		case "softlayer_virtual_guest":
+			// Set the "name" tag to be lowercase to meet platform requirements
+			if _, has := spec.Tags["name"]; !has {
+				spec.Tags["name"] = string(id)
+			}
+		default:
+			// Set the first character of the "Name" tag to be uppercase to meet platform requirements
+			if _, has := spec.Tags["Name"]; !has {
+				spec.Tags["Name"] = string(id)
+			}
 		}
 	}
 
@@ -616,7 +625,9 @@ func terraformTags(v interface{}, key string) map[string]string {
 			value := fmt.Sprintf("%v", v)
 			if strings.Contains(value, ":") {
 				log.Debugln("terraformTags system tags detected v=", v)
-				vv := strings.Split(value, ":")
+				// This assumes that the first colon is separating the key and the value of the tag.
+				// This is done so that colons are valid characters in the value.
+				vv := strings.SplitN(value, ":", 2)
 				if len(vv) == 2 {
 					tags[vv[0]] = vv[1]
 				} else {
