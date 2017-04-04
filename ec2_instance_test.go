@@ -170,7 +170,7 @@ func TestListGroup(t *testing.T) {
 	)
 
 	pluginImpl := NewInstancePlugin(clientMock, testNamespace)
-	descriptions, err := pluginImpl.DescribeInstances(tags)
+	descriptions, err := pluginImpl.DescribeInstances(tags, false)
 
 	require.NoError(t, err)
 	id := instance.LogicalID("127.0.0.1")

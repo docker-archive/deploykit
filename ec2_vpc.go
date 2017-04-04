@@ -64,7 +64,7 @@ func (p awsVpcPlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsVpcPlugin) DescribeInstances(labels map[string]string) ([]instance.Description, error) {
+func (p awsVpcPlugin) DescribeInstances(labels map[string]string, properties bool) ([]instance.Description, error) {
 	_, tags := mergeTags(labels, p.namespaceTags)
 
 	filters := []*ec2.Filter{}

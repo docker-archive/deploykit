@@ -86,7 +86,7 @@ func (p awsRouteTablePlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsRouteTablePlugin) DescribeInstances(labels map[string]string) ([]instance.Description, error) {
+func (p awsRouteTablePlugin) DescribeInstances(labels map[string]string, properties bool) ([]instance.Description, error) {
 	_, tags := mergeTags(labels, p.namespaceTags)
 
 	filters := []*ec2.Filter{}

@@ -374,7 +374,7 @@ func describeGroupRequest(namespaceTags, tags map[string]string, nextToken *stri
 	return &ec2.DescribeInstancesInput{NextToken: nextToken, Filters: filters}
 }
 
-func (p awsInstancePlugin) describeInstances(tags map[string]string, nextToken *string) ([]instance.Description, error) {
+func (p awsInstancePlugin) describeInstances(tags map[string]string, properties bool, nextToken *string) ([]instance.Description, error) {
 
 	result, err := p.client.DescribeInstances(describeGroupRequest(p.namespaceTags, tags, nextToken))
 	if err != nil {
@@ -393,17 +393,26 @@ func (p awsInstancePlugin) describeInstances(tags map[string]string, nextToken *
 				}
 			}
 
+			var status *types.Any
+			if properties {
+				if v, err := types.AnyValue(ec2Instance); err == nil {
+					status = v
+				} else {
+					log.Warningln("cannot encode ec2Instance:", err)
+				}
+			}
 			descriptions = append(descriptions, instance.Description{
-				ID:        instance.ID(*ec2Instance.InstanceId),
-				LogicalID: (*instance.LogicalID)(ec2Instance.PrivateIpAddress),
-				Tags:      tags,
+				ID:         instance.ID(*ec2Instance.InstanceId),
+				LogicalID:  (*instance.LogicalID)(ec2Instance.PrivateIpAddress),
+				Tags:       tags,
+				Properties: status,
 			})
 		}
 	}
 
 	if result.NextToken != nil {
 		// There are more pages of results.
-		remainingPages, err := p.describeInstances(tags, result.NextToken)
+		remainingPages, err := p.describeInstances(tags, properties, result.NextToken)
 		if err != nil {
 			return nil, err
 		}
@@ -415,8 +424,8 @@ func (p awsInstancePlugin) describeInstances(tags map[string]string, nextToken *
 }
 
 // DescribeInstances implements instance.Provisioner.DescribeInstances.
-func (p awsInstancePlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
-	return p.describeInstances(tags, nil)
+func (p awsInstancePlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
+	return p.describeInstances(tags, properties, nil)
 }
 
 func (p awsInstancePlugin) describeInstance(id instance.ID) (*ec2.Instance, error) {

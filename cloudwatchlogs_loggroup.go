@@ -65,7 +65,7 @@ func (p awsLogGroupPlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsLogGroupPlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p awsLogGroupPlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	name := newQueueName(tags, p.namespaceTags)
 
 	output, err := p.client.DescribeLogGroups(&cloudwatchlogs.DescribeLogGroupsInput{LogGroupNamePrefix: &name})
