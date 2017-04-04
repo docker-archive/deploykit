@@ -7,7 +7,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.aws/plugin/metadata"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
@@ -33,7 +32,7 @@ func main() {
 
 			plugin, err := metadata.NewPlugin(
 				templateURL,
-				template.Options{SocketDir: discovery.Dir()},
+				template.Options{},
 				poll,
 				stack,
 				*options,

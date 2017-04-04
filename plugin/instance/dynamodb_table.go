@@ -59,7 +59,7 @@ func (p awsTablePlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsTablePlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p awsTablePlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	name := newTableName(tags, p.namespaceTags)
 
 	if _, err := p.client.DescribeTable(&dynamodb.DescribeTableInput{TableName: aws.String(name)}); err != nil {

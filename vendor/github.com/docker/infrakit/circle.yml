@@ -3,13 +3,19 @@ machine:
     - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
   services:
     - docker
+
   environment:
     OS: "linux"
     ARCH: "amd64"
-    GOVERSION: "1.7"
+    GOVERSION: "1.7.5"
     GOPATH: "$HOME/.go_workspace"
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     E2E_CLEANUP: "false"
+    SKIP_TESTS: "docker,etcd"
+    S3_MINIO: "s3bucket"
+    S3_BUCKET: "s3bucket/infrakit/build/linux-amd64"
+    S3_BUILD_RELEASE: "infrakit-$CIRCLE_BRANCH.tar.gz"
+    S3_BUILD_MASTER: "infrakit-master-$CIRCLE_BUILD_NUM.tar.gz"
 
 dependencies:
   pre:
@@ -39,16 +45,34 @@ test:
   post:
     # Report to codecov
     - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)
-
+      
 deployment:
+  pr:
+    branch: /pull\/.*/
+    commands:
+      - DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+
   release:
     branch: /release-.*/
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=false DOCKER_TAG=$(echo $CIRCLE_BRANCH | awk -F - '{print $2}') DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+      # Install minio.io for S3 bucket uploads
+      - wget https://dl.minio.io/client/mc/release/linux-amd64/mc && chmod a+x ./mc && sudo cp ./mc /usr/local/bin
+      - mc config host add $S3_MINIO https://s3.amazonaws.com $S3_KEY_ID $S3_SECRET_KEY S3v4
+      - mc policy download $S3_BUCKET
+      - tar cvfz ./$S3_BUILD_PR -C build .
+      - mc cp ./$S3_BUILD_PR $S3_BUCKET/
+
   docker:
     branch: master
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-    
+      # Install minio.io for S3 bucket uploads
+      - wget https://dl.minio.io/client/mc/release/linux-amd64/mc && chmod a+x ./mc && sudo cp ./mc /usr/local/bin
+      - mc config host add $S3_MINIO https://s3.amazonaws.com $S3_KEY_ID $S3_SECRET_KEY S3v4
+      - mc policy download $S3_BUCKET
+      - tar cvfz ./$S3_BUILD_MASTER -C build .
+      - mc cp ./$S3_BUILD_MASTER $S3_BUCKET/
+      - mc cp ./$S3_BUILD_MASTER $S3_BUCKET/infrakit-latest.gz

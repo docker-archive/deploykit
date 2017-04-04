@@ -81,7 +81,7 @@ func (p awsInternetGatewayPlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsInternetGatewayPlugin) DescribeInstances(labels map[string]string) ([]instance.Description, error) {
+func (p awsInternetGatewayPlugin) DescribeInstances(labels map[string]string, properties bool) ([]instance.Description, error) {
 	_, tags := mergeTags(labels, p.namespaceTags)
 
 	filters := []*ec2.Filter{}

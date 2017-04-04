@@ -1,11 +1,14 @@
 package rpc
 
 const (
-	// APIURL is the well-known HTTP GET endpoint that retrieves description of the plugin's interfaces.
-	APIURL = "/info/api.json"
+	// URLAPI is the well-known HTTP GET endpoint that retrieves description of the plugin's interfaces.
+	URLAPI = "/info/api.json"
 
-	// FunctionsURL exposes the templates functions that are available via this plugin
-	FunctionsURL = "/info/functions.json"
+	// URLFunctions exposes the templates functions that are available via this plugin
+	URLFunctions = "/info/functions.json"
+
+	// URLEventsPrefix is the prefix of the events endpoint
+	URLEventsPrefix = "/events"
 )
 
 // InputExample is the interface implemented by the rpc implementations for

@@ -112,9 +112,10 @@ ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
 endif
 
-	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
+	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli/main)
 	$(call build_binary,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
+	$(call build_binary,infrakit-resource,github.com/docker/infrakit/cmd/resource)
 	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
 	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
 	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
@@ -122,6 +123,16 @@ endif
 	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
 	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
 	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
+	$(call build_binary,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
+	$(call build_binary,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
+
+cli: build-cli
+build-cli:
+	@echo "+ $@"
+ifneq (,$(findstring .m,$(VERSION)))
+	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
+endif
+	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli/main)
 
 install:
 	@echo "+ $@"

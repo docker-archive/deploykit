@@ -72,7 +72,7 @@ func (p awsLaunchConfigurationPlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsLaunchConfigurationPlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p awsLaunchConfigurationPlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	name := newUnrestrictedName(tags, p.namespaceTags)
 
 	output, err := p.client.DescribeLaunchConfigurations(&autoscaling.DescribeLaunchConfigurationsInput{

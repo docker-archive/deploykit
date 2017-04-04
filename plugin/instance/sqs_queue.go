@@ -82,7 +82,7 @@ func (p awsQueuePlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsQueuePlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p awsQueuePlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	name := newQueueName(tags, p.namespaceTags)
 
 	output, err := p.client.ListQueues(&sqs.ListQueuesInput{QueueNamePrefix: aws.String(name)})

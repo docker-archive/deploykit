@@ -26,7 +26,7 @@ type InfoClient struct {
 // GetInfo implements the Info interface and returns the metadata about the plugin
 func (i *InfoClient) GetInfo() (plugin.Info, error) {
 	meta := plugin.Info{}
-	resp, err := i.client.Get("http://d" + rpc.APIURL)
+	resp, err := i.client.Get("http://d" + rpc.URLAPI)
 	if err != nil {
 		return meta, err
 	}
@@ -38,7 +38,7 @@ func (i *InfoClient) GetInfo() (plugin.Info, error) {
 // GetFunctions returns metadata about the plugin's template functions, if the plugin supports templating.
 func (i *InfoClient) GetFunctions() (map[string][]template.Function, error) {
 	meta := map[string][]template.Function{}
-	resp, err := i.client.Get("http://d" + rpc.FunctionsURL)
+	resp, err := i.client.Get("http://d" + rpc.URLFunctions)
 	if err != nil {
 		return meta, err
 	}

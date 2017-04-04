@@ -71,7 +71,7 @@ func (p awsAutoScalingGroupPlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsAutoScalingGroupPlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p awsAutoScalingGroupPlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	name := newUnrestrictedName(tags, p.namespaceTags)
 
 	output, err := p.client.DescribeAutoScalingGroups(&autoscaling.DescribeAutoScalingGroupsInput{
