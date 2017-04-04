@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -207,7 +208,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label2":         "value2",
 			"Name":           string(*id),
 		}, props["tags"])
-		require.Equal(t, instanceSpec.Init, props["user_data"])
+		require.Equal(t, base64.StdEncoding.EncodeToString([]byte(instanceSpec.Init)), props["user_data"])
 	}
 
 	// label resources
