@@ -5,7 +5,7 @@ import (
 
 	"github.com/docker/infrakit.gcp/plugin/group"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
@@ -27,7 +27,7 @@ func main() {
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 		cli.SetLogLevel(*logLevel)
 
-		plugins, err := discovery.NewPluginDiscovery()
+		plugins, err := local.NewPluginDiscovery()
 		if err != nil {
 			return err
 		}

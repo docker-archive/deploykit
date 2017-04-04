@@ -106,7 +106,7 @@ func (p *plugin) Destroy(id instance.ID) error {
 	return err
 }
 
-func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 
 	instances, err := p.API.ListInstances()
@@ -136,6 +136,13 @@ func (p *plugin) DescribeInstances(tags map[string]string) ([]instance.Descripti
 			description.LogicalID = &id
 		}
 
+		if properties {
+			if any, err := types.AnyValue(inst); err == nil {
+				description.Properties = any
+			} else {
+				log.Warningln("error encoding instance properties:", err)
+			}
+		}
 		result = append(result, description)
 	}
 
