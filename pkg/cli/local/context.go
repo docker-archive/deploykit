@@ -151,6 +151,20 @@ func missing(t string, v interface{}) bool {
 	return true
 }
 
+func parseBool(text string) (bool, error) {
+	if b, err := strconv.ParseBool(text); err == nil {
+		return b, nil
+	}
+	switch text {
+	case "y", "Y", "yes", "ok", "OK":
+		return true, nil
+	case "n", "N", "no", "nope":
+		return false, nil
+	}
+	v, err := strconv.Atoi(text)
+	return v > 0, err
+}
+
 func (c *Context) prompt(prompt, ftype string) (interface{}, error) {
 	input := bufio.NewReader(c.input)
 	fmt.Fprintf(os.Stderr, "%s ", prompt)
@@ -159,24 +173,29 @@ func (c *Context) prompt(prompt, ftype string) (interface{}, error) {
 	switch ftype {
 	case "string":
 		return text, nil
-	case "int":
-		return strconv.Atoi(text)
 	case "float":
 		return strconv.ParseFloat(text, 64)
+	case "int":
+		if i, err := strconv.Atoi(text); err == nil {
+			return i, nil
+		}
+		// special case -- int can be used to implement a bool if a default is not provided
+		// so we need to handle parsing int from text for purpose of determining a bool
+		b, err := parseBool(text)
+		if err != nil {
+			return b, err
+		}
+		if b {
+			return 1, nil
+		}
+		return 0, nil
 	case "bool":
-		if b, err := strconv.ParseBool(text); err == nil {
+		if b, err := parseBool(text); err == nil {
 			return b, nil
-		}
-		switch text {
-		case "y", "Y", "yes", "ok", "OK":
-			return true, nil
-		}
-		if v, err := strconv.Atoi(text); err == nil {
-			return v > 0, nil
 		}
 		return nil, fmt.Errorf("cannot parse input for boolean: %v", text)
 	}
-	return nil, nil
+	return nil, nil // don't err, just pass through
 }
 
 // Funcs returns the template functions
