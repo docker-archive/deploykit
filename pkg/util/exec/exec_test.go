@@ -7,56 +7,57 @@ import (
 	"testing"
 	"time"
 
-	testutil "github.com/docker/infrakit/pkg/testing"
+	. "github.com/docker/infrakit/pkg/testing"
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	busybox Command = `
+var (
+	busybox = Command(`
 docker run --rm \
        busybox {{ call }} {{ argv | join " "}}
-`
-	busyboxHostname Command = `
+`)
+	busyboxHostname = Command(`
 docker run --rm \
        busybox hostname
-`
-	busyboxLs Command = `docker run --rm \
+`)
+	busyboxLs = Command(`docker run --rm \
        busybox ls {{ arg 1 }}
-`
-	busyboxSh Command = `docker run --rm -ti --name {{ .container }} busybox /bin/sh`
+`)
 
-	dockerStop Command = `docker stop {{ arg 1 }}`
+	busyboxSh = Command(`docker run --rm -ti --name {{ .container }} busybox /bin/sh`)
 
-	dateStream Command = `docker run --rm --name {{ arg 1 }} chungers/timer streamer`
+	dockerStop = Command(`docker stop {{ arg 1 }}`)
+
+	dateStream = Command(`docker run --rm --name {{ arg "container" }} chungers/timer streamer`)
 )
 
 func TestBuilder(t *testing.T) {
 
-	b := busyboxHostname.builder()
+	b := busyboxHostname
 	cmd, err := b.generate()
 	require.NoError(t, err)
 	require.Equal(t, []string{"docker", "run", "--rm", "busybox", "hostname"}, cmd)
 
-	b = busybox.builder().WithFunc("call", func() string { return "ls -al" })
+	b = busybox.WithFunc("call", func() string { return "ls -al" })
 	cmd, err = b.generate("sys", "var")
 	require.NoError(t, err)
 	require.Equal(t, []string{"docker", "run", "--rm", "busybox", "ls", "-al", "sys", "var"}, cmd)
 
-	b = busyboxLs.builder()
+	b = busyboxLs
 	cmd, err = b.generate("sys", "var")
 	require.NoError(t, err)
 	require.Equal(t, []string{"docker", "run", "--rm", "busybox", "ls", "sys"}, cmd)
 
-	b = busyboxSh.builder().WithContext(map[string]interface{}{"container": "bob"})
+	b = busyboxSh.WithContext(map[string]interface{}{"container": "bob"})
 	cmd, err = b.generate()
 	require.NoError(t, err)
 	require.Equal(t, []string{"docker", "run", "--rm", "-ti", "--name", "bob", "busybox", "/bin/sh"}, cmd)
 
 }
 
-func TestRun(t *testing.T) {
+func _TestRun(t *testing.T) {
 
-	if testutil.SkipTests("docker") {
+	if SkipTests("docker") {
 		t.SkipNow()
 	}
 
@@ -64,7 +65,7 @@ func TestRun(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, len(output) > 0)
 
-	output, err = busybox.builder().WithFunc("call", func() string { return "whoami" }).Output()
+	output, err = busybox.WithFunc("call", func() string { return "whoami" }).Output()
 	require.NoError(t, err)
 	require.Equal(t, "root\n", string(output))
 
@@ -75,26 +76,76 @@ func TestRun(t *testing.T) {
 	name := "stream-test"
 	go func() {
 		<-time.After(2 * time.Second)
-		err := dockerStop.Run(name)
+		err := dockerStop.Start(name)
 		if err != nil {
 			panic(err)
 		}
+		dockerStop.Wait()
 	}()
 
-	err = dateStream.InheritEnvs(true).StartWithStreams(MergeOutput(os.Stderr),
-		name, // arg 1 for container name
-	)
+	err = dateStream.InheritEnvs(true).WithArg("container", name).StartWithStreams(MergeOutput(os.Stderr))
 	require.NoError(t, err)
 
 	// testing with stdin
 	err = Command("/bin/sh").InheritEnvs(true).StartWithStreams(
 		Do(SendInput(
 			func(stdin io.WriteCloser) error {
+				T(100).Info("about to write to stdin")
 				stdin.Write([]byte(`for i in $(seq 10); do echo $i; sleep 1; done`))
+				T(100).Info("wrote to stdin")
 				return nil
 			})).Then(MergeOutput(os.Stderr)).Done(),
-		name, // arg 1 for container name
 	)
 	require.NoError(t, err)
 
+}
+
+func TestPipeline1(t *testing.T) {
+
+	source := Command("echo hello")
+	stage1 := Command("/bin/cat -b -n")
+
+	source.Prepare()
+	stage1.Prepare()
+
+	require.NotNil(t, source.cmd)
+	require.NotNil(t, stage1.cmd)
+
+	source.Stdin(func(w io.Writer) error { return nil })
+	source.StdoutTo(stage1)
+	stage1.Stdout(os.Stdout)
+
+	source.cmd.Start()
+	stage1.cmd.Start()
+
+	source.cmd.Wait()
+}
+
+func TestPipeline2(t *testing.T) {
+	// testing with stdin
+
+	source := Command("/bin/sh")
+	stage1 := Command("/bin/cat -b -n")
+
+	source.Prepare()
+	stage1.Prepare()
+
+	err := source.Stdin(func(w io.Writer) error {
+		T(100).Info("**** about to write")
+		w.Write([]byte(`for i in $(seq 10); do echo $i; sleep 1; done;`))
+		T(100).Info("written input")
+		w.Write([]byte(`exit`))
+		T(100).Info("sent exit")
+		return nil
+	})
+	require.NoError(t, err)
+
+	source.StdoutTo(stage1)
+	stage1.Stdout(os.Stderr)
+
+	source.cmd.Start()
+	stage1.cmd.Start()
+
+	T(100).Info("wait on source")
+	source.cmd.Wait()
 }
