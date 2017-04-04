@@ -155,6 +155,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	properties := describe.Flags().BoolP("properties", "p", false, "Also returns current status/ properties")
 	propertiesTemplate := describe.Flags().StringP("view", "v", "{{.}}", "Template to render properties")
 
+	rawOutputFlags, rawOutput := base.RawOutput()
+	describe.Flags().AddFlagSet(rawOutputFlags)
+
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 
 		view, err := template.New("describe-instances").Parse(*propertiesTemplate)
@@ -175,6 +178,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		desc, err := instancePlugin.DescribeInstances(filter, *properties)
 		if err == nil {
 
+			rendered, err := rawOutput(os.Stdout, desc)
+			if err != nil {
+				return err
+			}
+
+			if rendered {
+				return nil
+			}
+
 			if !*quiet {
 				if *properties {
 					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS", "PROPERTIES")
@@ -184,6 +196,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				}
 			}
 			for _, d := range desc {
+
 				logical := "  -   "
 				if d.LogicalID != nil {
 					logical = string(*d.LogicalID)
