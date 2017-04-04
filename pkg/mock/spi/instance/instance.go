@@ -30,15 +30,15 @@ func (_m *MockPlugin) EXPECT() *_MockPluginRecorder {
 	return _m.recorder
 }
 
-func (_m *MockPlugin) DescribeInstances(_param0 map[string]string) ([]instance.Description, error) {
-	ret := _m.ctrl.Call(_m, "DescribeInstances", _param0)
+func (_m *MockPlugin) DescribeInstances(_param0 map[string]string, _param1 bool) ([]instance.Description, error) {
+	ret := _m.ctrl.Call(_m, "DescribeInstances", _param0, _param1)
 	ret0, _ := ret[0].([]instance.Description)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-func (_mr *_MockPluginRecorder) DescribeInstances(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeInstances", arg0)
+func (_mr *_MockPluginRecorder) DescribeInstances(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeInstances", arg0, arg1)
 }
 
 func (_m *MockPlugin) Destroy(_param0 instance.ID) error {

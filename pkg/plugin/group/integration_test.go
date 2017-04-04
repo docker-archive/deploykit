@@ -148,7 +148,7 @@ func TestNoopUpdate(t *testing.T) {
 	_, err = grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	instances, err := plugin.DescribeInstances(memberTags(minions.ID))
+	instances, err := plugin.DescribeInstances(memberTags(minions.ID), false)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
@@ -206,7 +206,7 @@ func TestRollingUpdate(t *testing.T) {
 
 	awaitGroupConvergence(t, grp)
 
-	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
@@ -241,7 +241,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 
 	awaitGroupConvergence(t, grp)
 
-	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
 	// TODO(wfarner): The updater currently exits as soon as the scaler is adjusted, before action has been
 	// taken.  This means the number of instances cannot be precisely checked here as the scaler has not necessarily
@@ -274,7 +274,7 @@ func TestScaleIncrease(t *testing.T) {
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
-	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
 	// TODO(wfarner): The updater currently exits as soon as the scaler is adjusted, before action has been
 	// taken.  This means the number of instances cannot be precisely checked here as the scaler has not necessarily
@@ -307,7 +307,7 @@ func TestScaleDecrease(t *testing.T) {
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
-	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
 	// TODO(wfarner): The updater currently exits as soon as the scaler is adjusted, before action has been
 	// taken.  This means the number of instances cannot be precisely checked here as the scaler has not necessarily
@@ -347,7 +347,7 @@ func TestDestroyGroup(t *testing.T) {
 
 	require.NoError(t, grp.DestroyGroup(minions.ID))
 
-	instances, err := plugin.DescribeInstances(memberTags(minions.ID))
+	instances, err := plugin.DescribeInstances(memberTags(minions.ID), false)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(instances))
 }
@@ -376,7 +376,7 @@ func TestSuperviseQuorum(t *testing.T) {
 
 	awaitGroupConvergence(t, grp)
 
-	instances, err := plugin.DescribeInstances(memberTags(updated.ID))
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {

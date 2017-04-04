@@ -131,13 +131,13 @@ func (s *scaledGroup) Destroy(inst instance.Description) {
 func (s *scaledGroup) List() ([]instance.Description, error) {
 	settings := s.latestSettings()
 
-	return settings.instancePlugin.DescribeInstances(s.memberTags)
+	return settings.instancePlugin.DescribeInstances(s.memberTags, false)
 }
 
 func (s *scaledGroup) Label() error {
 	settings := s.latestSettings()
 
-	instances, err := settings.instancePlugin.DescribeInstances(s.memberTags)
+	instances, err := settings.instancePlugin.DescribeInstances(s.memberTags, false)
 	if err != nil {
 		return err
 	}

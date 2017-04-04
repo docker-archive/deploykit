@@ -273,13 +273,13 @@ func TestInstancePluginDescribeInstancesNiInput(t *testing.T) {
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_instance.Plugin{
-		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+		DoDescribeInstances: func(req map[string]string, properties bool) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, nil
 		},
 	}))
 
-	l, err := must(NewClient(name, socketPath)).DescribeInstances(tags)
+	l, err := must(NewClient(name, socketPath)).DescribeInstances(tags, false)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -299,14 +299,14 @@ func TestInstancePluginDescribeInstances(t *testing.T) {
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_instance.Plugin{
-		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+		DoDescribeInstances: func(req map[string]string, properties bool) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, nil
 		},
 	}))
 	require.NoError(t, err)
 
-	l, err := must(NewClient(name, socketPath)).DescribeInstances(tags)
+	l, err := must(NewClient(name, socketPath)).DescribeInstances(tags, false)
 	require.NoError(t, err)
 	require.Equal(t, list, l)
 
@@ -326,14 +326,14 @@ func TestInstancePluginDescribeInstancesError(t *testing.T) {
 		{ID: instance.ID("boo")}, {ID: instance.ID("boop")},
 	}
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_instance.Plugin{
-		DoDescribeInstances: func(req map[string]string) ([]instance.Description, error) {
+		DoDescribeInstances: func(req map[string]string, properties bool) ([]instance.Description, error) {
 			tagsActual <- req
 			return list, errors.New("bad")
 		},
 	}))
 	require.NoError(t, err)
 
-	_, err = must(NewClient(name, socketPath)).DescribeInstances(tags)
+	_, err = must(NewClient(name, socketPath)).DescribeInstances(tags, false)
 	require.Error(t, err)
 	require.Equal(t, "bad", err.Error())
 

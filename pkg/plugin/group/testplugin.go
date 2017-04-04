@@ -77,7 +77,7 @@ func (d *testplugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (d *testplugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

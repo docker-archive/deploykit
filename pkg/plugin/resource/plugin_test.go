@@ -39,7 +39,7 @@ func newTestInstancePlugin() *testing_instance.Plugin {
 			delete(instances, id)
 			return nil
 		},
-		DoDescribeInstances: func(tags map[string]string) ([]instance.Description, error) {
+		DoDescribeInstances: func(tags map[string]string, properties bool) ([]instance.Description, error) {
 			descriptions := []instance.Description{}
 		Loop:
 			for id, inst := range instances {
@@ -91,11 +91,11 @@ func TestCommitAndDestroy(t *testing.T) {
 	_, err := p.Commit(spec, true)
 	require.NoError(t, err)
 
-	descriptions, err := instancePluginA.DescribeInstances(nil)
+	descriptions, err := instancePluginA.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 0)
 
-	descriptions, err = instancePluginB.DescribeInstances(nil)
+	descriptions, err = instancePluginB.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 0)
 
@@ -103,7 +103,7 @@ func TestCommitAndDestroy(t *testing.T) {
 	_, err = p.Commit(spec, false)
 	require.NoError(t, err)
 
-	descriptions, err = instancePluginA.DescribeInstances(nil)
+	descriptions, err = instancePluginA.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 1)
 
@@ -111,7 +111,7 @@ func TestCommitAndDestroy(t *testing.T) {
 	require.Nil(t, descriptions[0].LogicalID)
 	require.Equal(t, map[string]string{resourcesTag: configID, resourcesIDTag: "a"}, descriptions[0].Tags)
 
-	descriptions, err = instancePluginB.DescribeInstances(nil)
+	descriptions, err = instancePluginB.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 1)
 
@@ -123,11 +123,11 @@ func TestCommitAndDestroy(t *testing.T) {
 	_, err = p.Commit(spec, false)
 	require.NoError(t, err)
 
-	descriptions, err = instancePluginA.DescribeInstances(nil)
+	descriptions, err = instancePluginA.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 1)
 
-	descriptions, err = instancePluginB.DescribeInstances(nil)
+	descriptions, err = instancePluginB.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 1)
 
@@ -135,11 +135,11 @@ func TestCommitAndDestroy(t *testing.T) {
 	_, err = p.Destroy(spec, true)
 	require.NoError(t, err)
 
-	descriptions, err = instancePluginA.DescribeInstances(nil)
+	descriptions, err = instancePluginA.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 1)
 
-	descriptions, err = instancePluginB.DescribeInstances(nil)
+	descriptions, err = instancePluginB.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 1)
 
@@ -147,11 +147,11 @@ func TestCommitAndDestroy(t *testing.T) {
 	_, err = p.Destroy(spec, false)
 	require.NoError(t, err)
 
-	descriptions, err = instancePluginA.DescribeInstances(nil)
+	descriptions, err = instancePluginA.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 0)
 
-	descriptions, err = instancePluginB.DescribeInstances(nil)
+	descriptions, err = instancePluginB.DescribeInstances(nil, false)
 	require.NoError(t, err)
 	require.Len(t, descriptions, 0)
 
@@ -214,7 +214,7 @@ func TestDescribe(t *testing.T) {
 
 	// Error from instance.Plugin.DescribeInstances.
 	errorPlugin := &testing_instance.Plugin{
-		DoDescribeInstances: func(tags map[string]string) ([]instance.Description, error) {
+		DoDescribeInstances: func(tags map[string]string, properties bool) ([]instance.Description, error) {
 			return nil, errors.New("kaboom")
 		},
 	}

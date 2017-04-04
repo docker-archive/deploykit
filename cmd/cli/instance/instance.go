@@ -1,10 +1,12 @@
 package instance
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -150,7 +152,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Describe all managed instances across all groups, subject to filter",
 	}
 	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
+	properties := describe.Flags().BoolP("properties", "p", false, "Also returns current status/ properties")
+	propertiesTemplate := describe.Flags().StringP("view", "v", "{{.}}", "Template to render properties")
+
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
+
+		view, err := template.New("describe-instances").Parse(*propertiesTemplate)
+		if err != nil {
+			return err
+		}
 
 		filter := map[string]string{}
 		for _, t := range *tags {
@@ -162,11 +172,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 		}
 
-		desc, err := instancePlugin.DescribeInstances(filter)
+		desc, err := instancePlugin.DescribeInstances(filter, *properties)
 		if err == nil {
 
 			if !*quiet {
-				fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+				if *properties {
+					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS", "PROPERTIES")
+
+				} else {
+					fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+				}
 			}
 			for _, d := range desc {
 				logical := "  -   "
@@ -180,7 +195,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				}
 				sort.Strings(printTags)
 
-				fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
+				if *properties {
+					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","),
+						renderProperties(d.Properties, view))
+				} else {
+					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
+				}
 			}
 		}
 
@@ -195,4 +215,19 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	)
 
 	return cmd
+}
+
+func renderProperties(properties *types.Any, view *template.Template) string {
+	var v interface{}
+	err := properties.Decode(&v)
+	if err != nil {
+		return err.Error()
+	}
+
+	buff := new(bytes.Buffer)
+	err = view.Execute(buff, v)
+	if err != nil {
+		return err.Error()
+	}
+	return buff.String()
 }
