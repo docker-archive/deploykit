@@ -13,7 +13,7 @@ export CLOUDSDK_COMPUTE_ZONE="${CLOUDSDK_COMPUTE_ZONE:-us-central1-f}"
 cleanup() {
   echo Clean up
 
-  docker rm -f flavor group 2>/dev/null || true
+  docker rm -f flavor group instance-gcp 2>/dev/null || true
   docker volume rm infrakit 2>/dev/null || true
   docker volume rm gcloud-config 2>/dev/null || true
 }
