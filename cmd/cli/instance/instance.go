@@ -153,14 +153,19 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
 	properties := describe.Flags().BoolP("properties", "p", false, "Also returns current status/ properties")
-	propertiesTemplate := describe.Flags().StringP("view", "v", "{{.}}", "Template to render properties")
+	tagsTemplate := describe.Flags().StringP("tags-view", "t", "*", "Template to render tags")
+	propertiesTemplate := describe.Flags().StringP("properties-view", "v", "{{.}}", "Template to render properties")
 
 	rawOutputFlags, rawOutput := base.RawOutput()
 	describe.Flags().AddFlagSet(rawOutputFlags)
 
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 
-		view, err := template.New("describe-instances").Parse(*propertiesTemplate)
+		tagsView, err := template.New("describe-instances-tags").Parse(*tagsTemplate)
+		if err != nil {
+			return err
+		}
+		propertiesView, err := template.New("describe-instances-properties").Parse(*propertiesTemplate)
 		if err != nil {
 			return err
 		}
@@ -202,17 +207,24 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					logical = string(*d.LogicalID)
 				}
 
-				printTags := []string{}
-				for k, v := range d.Tags {
-					printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
+				tagViewBuff := ""
+				if *tagsTemplate == "*" {
+					// default -- this is a hack
+					printTags := []string{}
+					for k, v := range d.Tags {
+						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
+					}
+					sort.Strings(printTags)
+					tagViewBuff = strings.Join(printTags, ",")
+				} else {
+					tagViewBuff = renderTags(d.Tags, tagsView)
 				}
-				sort.Strings(printTags)
 
 				if *properties {
-					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","),
-						renderProperties(d.Properties, view))
+					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff,
+						renderProperties(d.Properties, propertiesView))
 				} else {
-					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
+					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff)
 				}
 			}
 		}
@@ -228,6 +240,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	)
 
 	return cmd
+}
+
+func renderTags(m map[string]string, view *template.Template) string {
+	buff := new(bytes.Buffer)
+	err := view.Execute(buff, m)
+	if err != nil {
+		return err.Error()
+	}
+	return buff.String()
 }
 
 func renderProperties(properties *types.Any, view *template.Template) string {

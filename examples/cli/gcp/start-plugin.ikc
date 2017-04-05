@@ -1,0 +1,35 @@
+#!/bin/bash
+
+{{/* =% sh %= */}}
+
+{{ $useDocker := flag "docker" "bool" ">0 use docker container" | prompt "Run as Docker container?" "bool" }}
+
+{{ $zone := flag "zone" "string" "GCP zone" | prompt "What's the zone?" "string" }}
+{{ $project := flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" }}
+
+{{ $instanceImage := "infrakit/gcp:dev" }}
+
+{{ $infrakit := (cat (env "HOME") "/.infrakit/" | nospace) }}
+{{ $dockerMounts := (cat "-v /var/run/docker.sock:/var/run/docker.sock -v" (cat $infrakit ":/infrakit/" | nospace)) }}
+{{ $dockerEnvs := "-e INFRAKIT_HOME=/infrakit -e INFRAKIT_PLUGINS_DIR=/infrakit/plugins" }}
+
+
+{{ if $useDocker }}
+# Starting docker container for instance plugin
+docker run -d --rm --name instance-plugin \
+       {{$dockerMounts}} {{$dockerEnvs}} {{$instanceImage}} infrakit-instance-gcp  \
+       --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
+       --zone {{ $zone }} --log 5 --project {{ $project }}
+
+{{ else }}
+
+echo "Starting daemon"
+infrakit-instance-gcp \
+       --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
+       --zone {{ $zone }} --log 5 --project {{ $project }} \
+       > {{env "INFRAKIT_HOME"}}/logs/instance-gcp.log 2>&1  &
+
+echo "Tailing log"
+tail -f {{env "INFRAKIT_HOME"}}/logs/instance-gcp.log
+
+{{ end }}

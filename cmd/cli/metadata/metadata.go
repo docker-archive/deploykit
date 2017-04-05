@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/docker/infrakit/cmd/cli/base"
@@ -206,6 +207,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
+	catFlags, catOutput := base.Output()
 	cat := &cobra.Command{
 		Use:   "cat",
 		Short: "Get metadata entry by path",
@@ -221,6 +223,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 						return err
 					}
 
+					if match == nil {
+						return fmt.Errorf("plugin not found:%v", *first)
+					}
+
 					if path.Len() == 1 {
 						fmt.Printf("%v\n", match != nil)
 					} else {
@@ -231,7 +237,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 								if s, err := strconv.Unquote(value.String()); err == nil {
 									str = s
 								}
-								fmt.Println(str)
+
+								catOutput(os.Stdout, str)
 							}
 						} else {
 							log.Warn("Cannot metadata cat on plugin", "target", *first, "err", err)
@@ -242,6 +249,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
+	cat.Flags().AddFlagSet(catFlags)
 
 	cmd.AddCommand(ls, cat)
 
