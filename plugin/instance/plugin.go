@@ -62,10 +62,13 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
+	// Parse the metadata in the spec, also merge in namespace tags to create the final metadata
 	metadata, err := instance_types.ParseMetadata(spec)
 	if err != nil {
 		return nil, err
 	}
+
+	instanceSettings := properties.InstanceSettings
 
 	var name string
 	if spec.LogicalID != nil {
@@ -74,23 +77,18 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		name = fmt.Sprintf("%s-%s", properties.NamePrefix, util.RandomSuffix(6))
 	}
 	id := instance.ID(name)
-
 	_, metadata = mergeTags(metadata, p.namespace) // scope this resource with namespace tags
 
-	if err = p.API.CreateInstance(name, &gcloud.InstanceSettings{
-		Description:       properties.Description,
-		MachineType:       properties.MachineType,
-		Network:           properties.Network,
-		Tags:              properties.Tags,
-		DiskSizeMb:        properties.DiskSizeMb,
-		DiskImage:         properties.DiskImage,
-		DiskType:          properties.DiskType,
-		Scopes:            properties.Scopes,
-		Preemptible:       properties.Preemptible,
-		AutoDeleteDisk:    spec.LogicalID == nil,
-		ReuseExistingDisk: spec.LogicalID != nil,
-		MetaData:          gcloud.TagsToMetaData(metadata),
-	}); err != nil {
+	// Some modifications
+	// TODO - for now we overwrite, but support merging of MetaData field in the future, if the
+	// user also provided them.
+	instanceSettings.MetaData = gcloud.TagsToMetaData(metadata)
+
+	// Disks -- TODO - these may be better set externally.
+	instanceSettings.AutoDeleteDisk = spec.LogicalID == nil
+	instanceSettings.ReuseExistingDisk = spec.LogicalID != nil
+
+	if err = p.API.CreateInstance(name, instanceSettings); err != nil {
 		return nil, err
 	}
 

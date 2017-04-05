@@ -27,6 +27,7 @@ func TestProvision(t *testing.T) {
 	properties := types.AnyString(`{
 		"NamePrefix":"worker",
 		"MachineType":"n1-standard-1",
+                "PrivateIP" : "10.20.2.100",
 		"Network":"NETWORK",
 		"Tags":["TAG1", "TAG2"],
 		"DiskSizeMb":100,
@@ -47,6 +48,7 @@ func TestProvision(t *testing.T) {
 	api.EXPECT().CreateInstance("worker-ssnk9q", &gcloud.InstanceSettings{
 		Description:       "vm",
 		MachineType:       "n1-standard-1",
+		PrivateIP:         "10.20.2.100",
 		Network:           "NETWORK",
 		Tags:              []string{"TAG1", "TAG2"},
 		DiskSizeMb:        100,
