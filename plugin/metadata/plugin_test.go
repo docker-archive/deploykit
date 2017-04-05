@@ -38,7 +38,7 @@ func TestListInstance(t *testing.T) {
 	plugin := NewPlugin(api, apiMetadata)
 	children, err := plugin.List(metadata.Path([]string{"instance"}))
 
-	require.EqualValues(t, []string{"ID", "externalIP", "hostname", "internalIP", "name", "numericalProjectID", "projectID", "zone"}, children)
+	require.EqualValues(t, []string{"ID", "externalIP", "hostname", "internalIP", "name", "network", "numericalProjectID", "projectID", "zone"}, children)
 	require.NoError(t, err)
 }
 
@@ -149,5 +149,16 @@ func TestGetInstanceZone(t *testing.T) {
 	value, err := plugin.Get(metadata.Path([]string{"instance", "zone"}))
 
 	require.EqualValues(t, `"ZONE"`, value.String())
+	require.NoError(t, err)
+}
+
+func TestGetInstanceNetwork(t *testing.T) {
+	api, apiMetadata, _ := NewMockAPI(t)
+	apiMetadata.EXPECT().Get("instance/network-interfaces/0/network").Return("path/to/network", nil)
+
+	plugin := NewPlugin(api, apiMetadata)
+	value, err := plugin.Get(metadata.Path([]string{"instance", "network"}))
+
+	require.EqualValues(t, `"network"`, value.String())
 	require.NoError(t, err)
 }

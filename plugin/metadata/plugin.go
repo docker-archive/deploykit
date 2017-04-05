@@ -6,6 +6,7 @@ import (
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
+	"strings"
 	"sync"
 )
 
@@ -36,8 +37,8 @@ func NewGCEMetadataPlugin(project, zone string) metadata.Plugin {
 func (p *plugin) buildTopics() map[string]interface{} {
 	topics := map[string]interface{}{}
 
-	p.addTopic(topics, "project", p.GetProject)
-	p.addTopic(topics, "zone", p.GetZone)
+	p.addTopic(topics, "project", p.getProject)
+	p.addTopic(topics, "zone", p.getZone)
 
 	p.addTopic(topics, "instance/projectID", p.apiMetadata.ProjectID)
 	p.addTopic(topics, "instance/numericalProjectID", p.apiMetadata.NumericProjectID)
@@ -47,6 +48,7 @@ func (p *plugin) buildTopics() map[string]interface{} {
 	p.addTopic(topics, "instance/ID", p.apiMetadata.InstanceID)
 	p.addTopic(topics, "instance/name", p.apiMetadata.InstanceName)
 	p.addTopic(topics, "instance/zone", p.apiMetadata.Zone)
+	p.addTopic(topics, "instance/network", p.getNetwork)
 
 	return topics
 }
@@ -80,10 +82,24 @@ func (p *plugin) loadTopics() {
 	p.once.Do(func() { p.topics = p.buildTopics() })
 }
 
-func (p *plugin) GetProject() (string, error) {
+func (p *plugin) getProject() (string, error) {
 	return p.api.GetProject(), nil
 }
 
-func (p *plugin) GetZone() (string, error) {
+func (p *plugin) getZone() (string, error) {
 	return p.api.GetZone(), nil
+}
+
+func (p *plugin) getNetwork() (string, error) {
+	value, err := p.apiMetadata.Get("instance/network-interfaces/0/network")
+	if err != nil {
+		return "", err
+	}
+
+	return last(value), nil
+}
+
+func last(url string) string {
+	parts := strings.Split(url, "/")
+	return parts[len(parts)-1]
 }
