@@ -2,6 +2,7 @@ package instance
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -14,19 +15,21 @@ import (
 )
 
 type plugin struct {
-	API gcloud.API
+	API       gcloud.API
+	namespace map[string]string
 }
 
 // NewGCEInstancePlugin creates a new GCE instance plugin for a given project
 // and zone.
-func NewGCEInstancePlugin(project, zone string) instance.Plugin {
+func NewGCEInstancePlugin(project, zone string, namespace map[string]string) instance.Plugin {
 	api, err := gcloud.New(project, zone)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return &plugin{
-		API: api,
+		API:       api,
+		namespace: namespace,
 	}
 }
 
@@ -34,7 +37,7 @@ func (p *plugin) VendorInfo() *spi.VendorInfo {
 	return &spi.VendorInfo{
 		InterfaceSpec: spi.InterfaceSpec{
 			Name:    "infrakit-instance-gcp",
-			Version: "0.3.0",
+			Version: "0.5.0",
 		},
 		URL: "https://github.com/docker/infrakit.gcp",
 	}
@@ -72,6 +75,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	id := instance.ID(name)
 
+	_, metadata = mergeTags(metadata, p.namespace) // scope this resource with namespace tags
+
 	if err = p.API.CreateInstance(name, &gcloud.InstanceSettings{
 		Description:       properties.Description,
 		MachineType:       properties.MachineType,
@@ -108,6 +113,9 @@ func (p *plugin) Destroy(id instance.ID) error {
 
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
+
+	// apply the scoping namespace to restrict what we search for
+	_, tags = mergeTags(tags, p.namespace)
 
 	instances, err := p.API.ListInstances()
 	if err != nil {
@@ -154,4 +162,24 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 func last(url string) string {
 	parts := strings.Split(url, "/")
 	return parts[len(parts)-1]
+}
+
+// mergeTags merges multiple maps of tags, implementing 'last write wins' for colliding keys.
+// Returns a sorted slice of all keys, and the map of merged tags.  Sorted keys are particularly useful to assist in
+// preparing predictable output such as for tests.
+func mergeTags(tagMaps ...map[string]string) ([]string, map[string]string) {
+	keys := []string{}
+	tags := map[string]string{}
+	for _, tagMap := range tagMaps {
+		for k, v := range tagMap {
+			if _, exists := tags[k]; exists {
+				log.Warnf("Ovewriting tag value for key %s", k)
+			} else {
+				keys = append(keys, k)
+			}
+			tags[k] = v
+		}
+	}
+	sort.Strings(keys)
+	return keys, tags
 }

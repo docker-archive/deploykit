@@ -19,8 +19,8 @@ func NewMockGCloud(t *testing.T) (*mock_gcloud.MockAPI, *gomock.Controller) {
 	return mock_gcloud.NewMockAPI(ctrl), ctrl
 }
 
-func NewPlugin(api gcloud.API) instance.Plugin {
-	return &plugin{api}
+func NewPlugin(api gcloud.API, namespace map[string]string) instance.Plugin {
+	return &plugin{API: api, namespace: namespace}
 }
 
 func TestProvision(t *testing.T) {
@@ -65,7 +65,7 @@ func TestProvision(t *testing.T) {
 	api.EXPECT().AddInstanceToTargetPool("POOL1", "worker-ssnk9q").Return(nil)
 	api.EXPECT().AddInstanceToTargetPool("POOL2", "worker-ssnk9q").Return(nil)
 
-	plugin := NewPlugin(api)
+	plugin := NewPlugin(api, nil)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: properties,
@@ -97,7 +97,7 @@ func TestProvisionLogicalID(t *testing.T) {
 
 	logicalID := instance.LogicalID("LOGICAL-ID")
 
-	plugin := NewPlugin(api)
+	plugin := NewPlugin(api, nil)
 	id, err := plugin.Provision(instance.Spec{
 		LogicalID:  &logicalID,
 		Tags:       tags,
@@ -127,7 +127,7 @@ func TestProvisionFails(t *testing.T) {
 		MetaData:          gcloud.TagsToMetaData(tags),
 	}).Return(errors.New("BUG"))
 
-	plugin := NewPlugin(api)
+	plugin := NewPlugin(api, nil)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: properties,
@@ -155,7 +155,7 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 	}).Return(nil)
 	api.EXPECT().AddInstanceToTargetPool("POOL", "instance-ssnk9q").Return(errors.New("BUG"))
 
-	plugin := NewPlugin(api)
+	plugin := NewPlugin(api, nil)
 	id, err := plugin.Provision(instance.Spec{
 		Tags:       tags,
 		Properties: properties,
@@ -181,7 +181,7 @@ func TestDestroy(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().DeleteInstance("instance-id").Return(nil)
 
-	plugin := NewPlugin(api)
+	plugin := NewPlugin(api, nil)
 	err := plugin.Destroy("instance-id")
 
 	require.NoError(t, err)
@@ -191,7 +191,7 @@ func TestDestroyFails(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().DeleteInstance("instance-wrong-id").Return(errors.New("BUG"))
 
-	plugin := NewPlugin(api)
+	plugin := NewPlugin(api, nil)
 	err := plugin.Destroy("instance-wrong-id")
 
 	require.EqualError(t, err, "BUG")
@@ -201,8 +201,8 @@ func TestDescribeEmptyInstances(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return([]*compute.Instance{}, nil)
 
-	plugin := NewPlugin(api)
-	instances, err := plugin.DescribeInstances(nil)
+	plugin := NewPlugin(api, nil)
+	instances, err := plugin.DescribeInstances(nil, false)
 
 	require.NoError(t, err)
 	require.Empty(t, instances)
@@ -221,6 +221,8 @@ func TestDescribeInstances(t *testing.T) {
 		"key2": "value2",
 	}
 
+	namespace := map[string]string{"scope": "test"}
+
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return([]*compute.Instance{
 		{
@@ -229,6 +231,7 @@ func TestDescribeInstances(t *testing.T) {
 				Items: []*compute.MetadataItems{
 					NewMetadataItems("key1", "value1"),
 					NewMetadataItems("key2", "value2"),
+					NewMetadataItems("scope", "test"),
 				},
 			},
 			Disks: []*compute.AttachedDisk{
@@ -244,6 +247,7 @@ func TestDescribeInstances(t *testing.T) {
 				Items: []*compute.MetadataItems{
 					NewMetadataItems("key1", "value1"),
 					NewMetadataItems("key2", "value2"),
+					NewMetadataItems("scope", "test"),
 				},
 			},
 			Disks: []*compute.AttachedDisk{
@@ -257,6 +261,7 @@ func TestDescribeInstances(t *testing.T) {
 			Metadata: &compute.Metadata{
 				Items: []*compute.MetadataItems{
 					NewMetadataItems("key2", "value2"),
+					NewMetadataItems("scope", "test"),
 				},
 			},
 		},
@@ -266,13 +271,14 @@ func TestDescribeInstances(t *testing.T) {
 				Items: []*compute.MetadataItems{
 					NewMetadataItems("key1", "invalid"),
 					NewMetadataItems("key2", "value2"),
+					NewMetadataItems("scope", "test"),
 				},
 			},
 		},
 	}, nil)
 
-	plugin := NewPlugin(api)
-	instances, err := plugin.DescribeInstances(tags)
+	plugin := NewPlugin(api, namespace)
+	instances, err := plugin.DescribeInstances(tags, false)
 
 	require.NoError(t, err)
 	require.Equal(t, len(instances), 2)
@@ -286,8 +292,8 @@ func TestDescribeInstancesFails(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().ListInstances().Return(nil, errors.New("BUG"))
 
-	plugin := NewPlugin(api)
-	instances, err := plugin.DescribeInstances(nil)
+	plugin := NewPlugin(api, nil)
+	instances, err := plugin.DescribeInstances(nil, false)
 
 	require.EqualError(t, err, "BUG")
 	require.Nil(t, instances)

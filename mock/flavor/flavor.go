@@ -53,15 +53,15 @@ func (_mr *_MockPluginRecorder) Healthy(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Healthy", arg0, arg1)
 }
 
-func (_m *MockPlugin) Prepare(_param0 *types0.Any, _param1 instance.Spec, _param2 types.AllocationMethod) (instance.Spec, error) {
-	ret := _m.ctrl.Call(_m, "Prepare", _param0, _param1, _param2)
+func (_m *MockPlugin) Prepare(_param0 *types0.Any, _param1 instance.Spec, _param2 types.AllocationMethod, _param3 types.Index) (instance.Spec, error) {
+	ret := _m.ctrl.Call(_m, "Prepare", _param0, _param1, _param2, _param3)
 	ret0, _ := ret[0].(instance.Spec)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-func (_mr *_MockPluginRecorder) Prepare(arg0, arg1, arg2 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Prepare", arg0, arg1, arg2)
+func (_mr *_MockPluginRecorder) Prepare(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Prepare", arg0, arg1, arg2, arg3)
 }
 
 func (_m *MockPlugin) Validate(_param0 *types0.Any, _param1 types.AllocationMethod) error {
