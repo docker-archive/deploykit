@@ -8,7 +8,6 @@
 {{ $stackName := flag "stack" "string" "stack name" | prompt "What's the name of the stack?" "string" }}
 
 {{ $instanceImage := "infrakit/aws:dev" }}
-{{ $instanceCmd := (cat "instance --log 5 --namespace-tags" (cat "infrakit.scope=" $stackName | nospace)) }}
 
 {{ $infrakit := (cat (env "HOME") "/.infrakit/" | nospace) }}
 {{ $dockerMounts := (cat "-v /var/run/docker.sock:/var/run/docker.sock -v" (cat $infrakit ":/infrakit/" | nospace)) }}
@@ -22,7 +21,8 @@
 {{ if $userDocker }}
 # Starting docker container for aws instance plugin
 docker run -d --rm --name instance-plugin \
-       {{$dockerMounts}} {{$dockerEnvs}} {{$instanceImage}} {{$instanceCmd}} \
+       {{$dockerMounts}} {{$dockerEnvs}} {{$instanceImage}} infrakit-instance-aws \
+       --namespace-tags {{cat "infrakit.scope=" $stackName | nospace}} \
        --access-key-id {{ $creds.aws_access_key_id }} \
        --secret-access-key {{ $creds.aws_secret_access_key }} \
        --region {{ $region }} --log 5
