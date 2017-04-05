@@ -6,9 +6,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.gcp/plugin"
-	"github.com/docker/infrakit.gcp/plugin/instance"
+	instance_plugin "github.com/docker/infrakit.gcp/plugin/instance"
+	metadata_plugin "github.com/docker/infrakit.gcp/plugin/metadata"
 	"github.com/docker/infrakit/pkg/cli"
-	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +42,10 @@ func main() {
 
 		log.Debug("Using namespace", namespace)
 
-		cli.RunPlugin(*name, instance_plugin.PluginServer(instance.NewGCEInstancePlugin(*project, *zone, namespace)))
+		cli.RunPlugin(*name,
+			instance_rpc.PluginServer(instance_plugin.NewGCEInstancePlugin(*project, *zone, namespace)),
+			metadata_rpc.PluginServer(metadata_plugin.NewGCEMetadataPlugin(*project, *zone)),
+		)
 	}
 
 	cmd.AddCommand(plugin.VersionCommand())
