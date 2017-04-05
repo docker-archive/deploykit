@@ -102,8 +102,8 @@ type computeServiceWrapper struct {
 	service *compute.Service
 }
 
-// New creates a new API instance.
-func New(project, zone string) (API, error) {
+// NewAPI creates a new API instance.
+func NewAPI(project, zone string) (API, error) {
 	if project == "" {
 		log.Debugln("Project not passed on the command line")
 

@@ -36,7 +36,7 @@ type plugin struct {
 // NewGCEGroupPlugin creates a new GCE group plugin for a given project
 // and zone.
 func NewGCEGroupPlugin(project, zone string, flavorPlugins group_plugin.FlavorPluginLookup) group.Plugin {
-	api, err := gcloud.New(project, zone)
+	api, err := gcloud.NewAPI(project, zone)
 	if err != nil {
 		log.Fatal(err)
 	}

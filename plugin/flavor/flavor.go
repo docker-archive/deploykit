@@ -25,7 +25,7 @@ type flavorCombo struct {
 
 // NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.
 func NewPlugin(flavorPlugins group.FlavorPluginLookup, project, zone string) flavor.Plugin {
-	api, err := gcloud.New(project, zone)
+	api, err := gcloud.NewAPI(project, zone)
 	if err != nil {
 		log.Fatal(err)
 	}
