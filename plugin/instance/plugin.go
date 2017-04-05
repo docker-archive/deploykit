@@ -22,7 +22,7 @@ type plugin struct {
 // NewGCEInstancePlugin creates a new GCE instance plugin for a given project
 // and zone.
 func NewGCEInstancePlugin(project, zone string, namespace map[string]string) instance.Plugin {
-	api, err := gcloud.New(project, zone)
+	api, err := gcloud.NewAPI(project, zone)
 	if err != nil {
 		log.Fatal(err)
 	}

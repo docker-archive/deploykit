@@ -25,6 +25,12 @@ const (
 
 // API is the list of operations that can execute on Google Cloud Platform.
 type API interface {
+	// GetProject returns the project name.
+	GetProject() string
+
+	// GetZone returns the zone short name.
+	GetZone() string
+
 	// ListInstances lists the instances.
 	ListInstances() ([]*compute.Instance, error)
 
@@ -96,8 +102,8 @@ type computeServiceWrapper struct {
 	service *compute.Service
 }
 
-// New creates a new API instance.
-func New(project, zone string) (API, error) {
+// NewAPI creates a new API instance.
+func NewAPI(project, zone string) (API, error) {
 	if project == "" {
 		log.Debugln("Project not passed on the command line")
 
@@ -179,6 +185,14 @@ func findZone() string {
 	}
 
 	return ""
+}
+
+func (g *computeServiceWrapper) GetProject() string {
+	return g.project
+}
+
+func (g *computeServiceWrapper) GetZone() string {
+	return g.zone
 }
 
 func (g *computeServiceWrapper) ListInstances() ([]*compute.Instance, error) {
