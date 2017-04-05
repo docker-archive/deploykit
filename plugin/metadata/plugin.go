@@ -6,9 +6,14 @@ import (
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
+	"sync"
 )
 
 type plugin struct {
+	api  gcloud.API
+	zone string
+
+	once   sync.Once
 	topics map[string]interface{}
 }
 
@@ -21,35 +26,43 @@ func NewGCEMetadataPlugin(project, zone string) metadata.Plugin {
 	}
 
 	return &plugin{
-		topics: buildTopics(api),
+		api:  api,
+		zone: zone,
 	}
 }
 
-func buildTopics(api gcloud.API) map[string]interface{} {
+func (p *plugin) buildTopics() map[string]interface{} {
 	topics := map[string]interface{}{}
 
-	metadata_plugin.Put(metadata_plugin.Path("path/1"),
-		func() interface{} {
-			return "value1"
-		},
-		topics)
-
-	metadata_plugin.Put(metadata_plugin.Path("path/2"),
-		func() interface{} {
-			return "value2"
-		},
-		topics)
+	p.addTopic(topics, "project", p.GetProject)
+	p.addTopic(topics, "zone", p.GetZone)
 
 	return topics
+}
+
+func (p *plugin) addTopic(topics map[string]interface{}, path string, getter func() string) {
+	metadata_plugin.Put(metadata_plugin.Path(path), func() interface{} { return getter() }, topics)
 }
 
 // List returns a list of *child nodes* given a path, which is specified as a slice
 // where for i > j path[i] is the parent of path[j]
 func (p *plugin) List(topic metadata.Path) ([]string, error) {
+	p.once.Do(func() { p.topics = p.buildTopics() })
+
 	return types.List(topic, p.topics), nil
 }
 
 // Get retrieves the value at path given.
 func (p *plugin) Get(topic metadata.Path) (*types.Any, error) {
+	p.once.Do(func() { p.topics = p.buildTopics() })
+
 	return types.GetValue(topic, p.topics)
+}
+
+func (p *plugin) GetProject() string {
+	return p.api.GetProject()
+
+}
+func (p *plugin) GetZone() string {
+	return p.api.GetZone()
 }

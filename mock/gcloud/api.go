@@ -126,6 +126,26 @@ func (_mr *_MockAPIRecorder) GetInstance(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetInstance", arg0)
 }
 
+func (_m *MockAPI) GetProject() string {
+	ret := _m.ctrl.Call(_m, "GetProject")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) GetProject() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetProject")
+}
+
+func (_m *MockAPI) GetZone() string {
+	ret := _m.ctrl.Call(_m, "GetZone")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+func (_mr *_MockAPIRecorder) GetZone() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetZone")
+}
+
 func (_m *MockAPI) ListInstanceGroupInstances(_param0 string) ([]*v1.InstanceWithNamedPorts, error) {
 	ret := _m.ctrl.Call(_m, "ListInstanceGroupInstances", _param0)
 	ret0, _ := ret[0].([]*v1.InstanceWithNamedPorts)

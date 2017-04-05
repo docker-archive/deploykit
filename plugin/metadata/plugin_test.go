@@ -16,29 +16,37 @@ func NewMockGCloud(t *testing.T) (*mock_gcloud.MockAPI, *gomock.Controller) {
 }
 
 func NewPlugin(api gcloud.API) metadata.Plugin {
-	return &plugin{buildTopics(api)}
+	return &plugin{api: api}
 }
 
 func TestList(t *testing.T) {
 	api, _ := NewMockGCloud(t)
 
 	plugin := NewPlugin(api)
-	children, err := plugin.List(metadata.Path([]string{"path"}))
+	children, err := plugin.List(metadata.Path([]string{""}))
 
-	require.EqualValues(t, []string{"1", "2"}, children)
+	require.EqualValues(t, []string{"project", "zone"}, children)
 	require.NoError(t, err)
 }
 
-func TestGetValues(t *testing.T) {
+func TestGetProject(t *testing.T) {
 	api, _ := NewMockGCloud(t)
+	api.EXPECT().GetProject().Return("PROJECT")
 
 	plugin := NewPlugin(api)
+	value, err := plugin.Get(metadata.Path([]string{"project"}))
 
-	value, err := plugin.Get(metadata.Path([]string{"path", "1"}))
-	require.EqualValues(t, `"value1"`, value.String())
+	require.EqualValues(t, `"PROJECT"`, value.String())
 	require.NoError(t, err)
+}
 
-	value, err = plugin.Get(metadata.Path([]string{"path", "2"}))
-	require.EqualValues(t, `"value2"`, value.String())
+func TestGetZone(t *testing.T) {
+	api, _ := NewMockGCloud(t)
+	api.EXPECT().GetZone().Return("ZONE")
+
+	plugin := NewPlugin(api)
+	value, err := plugin.Get(metadata.Path([]string{"zone"}))
+
+	require.EqualValues(t, `"ZONE"`, value.String())
 	require.NoError(t, err)
 }
