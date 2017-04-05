@@ -101,13 +101,14 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 
 	var supervisor Supervisor
 	if settings.config.Allocation.Size != 0 {
-		supervisor = NewScalingGroup(scaled, settings.config.Allocation.Size, p.pollInterval, p.maxParallelNum)
+		supervisor = NewScalingGroup(config.ID, scaled, settings.config.Allocation.Size, p.pollInterval, p.maxParallelNum)
 	} else if len(settings.config.Allocation.LogicalIDs) > 0 {
-		supervisor = NewQuorum(scaled, settings.config.Allocation.LogicalIDs, p.pollInterval)
+		supervisor = NewQuorum(config.ID, scaled, settings.config.Allocation.LogicalIDs, p.pollInterval)
 	} else {
 		panic("Invalid empty allocation method")
 	}
 
+	scaled.supervisor = supervisor
 	if !pretend {
 		p.groups.put(config.ID, &groupContext{supervisor: supervisor, scaled: scaled, settings: settings})
 		go supervisor.Run()

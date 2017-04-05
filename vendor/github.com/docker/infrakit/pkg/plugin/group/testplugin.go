@@ -77,7 +77,7 @@ func (d *testplugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (d *testplugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (d *testplugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -144,7 +144,8 @@ func (t testFlavor) Validate(flavorProperties *types.Any, allocation group_types
 
 func (t testFlavor) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation group_types.AllocationMethod) (instance.Spec, error) {
+	allocation group_types.AllocationMethod,
+	index group_types.Index) (instance.Spec, error) {
 
 	s := flavorSchema{}
 	err := flavorProperties.Decode(&s)

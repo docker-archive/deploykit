@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -34,6 +35,8 @@ type Scaled interface {
 }
 
 type scaledGroup struct {
+	supervisor Supervisor
+	scaler     *scaler
 	settings   groupSettings
 	memberTags map[string]string
 	lock       sync.Mutex
@@ -72,9 +75,14 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 		Properties: types.AnyCopy(settings.config.Instance.Properties),
 	}
 
+	index := group_types.Index{
+		Group:    s.supervisor.ID(),
+		Sequence: s.supervisor.Size(),
+	}
 	spec, err := settings.flavorPlugin.Prepare(types.AnyCopy(settings.config.Flavor.Properties),
 		spec,
-		settings.config.Allocation)
+		settings.config.Allocation,
+		index)
 	if err != nil {
 		log.Errorf("Failed to Prepare instance: %s", err)
 		return
@@ -123,13 +131,13 @@ func (s *scaledGroup) Destroy(inst instance.Description) {
 func (s *scaledGroup) List() ([]instance.Description, error) {
 	settings := s.latestSettings()
 
-	return settings.instancePlugin.DescribeInstances(s.memberTags)
+	return settings.instancePlugin.DescribeInstances(s.memberTags, false)
 }
 
 func (s *scaledGroup) Label() error {
 	settings := s.latestSettings()
 
-	instances, err := settings.instancePlugin.DescribeInstances(s.memberTags)
+	instances, err := settings.instancePlugin.DescribeInstances(s.memberTags, false)
 	if err != nil {
 		return err
 	}

@@ -3,9 +3,10 @@
 set -e
 
 BASEDIR=$(dirname "$0")
-INFRAKIT_IMAGE=infrakit/devbundle:0.3.0
+INFRAKIT_IMAGE=infrakit/devbundle:master-1580
 GCLOUD="docker run -e CLOUDSDK_CORE_PROJECT --rm -v gcloud-config:/.config google/cloud-sdk gcloud"
 TAG="ci-infrakit-gcp-instance-${CIRCLE_BUILD_NUM:-local}"
+docker_run="docker run -v infrakit:/infrakit -e INFRAKIT_PLUGINS_DIR=/infrakit"
 
 export CLOUDSDK_CORE_PROJECT="${CLOUDSDK_CORE_PROJECT:-docker4x}"
 export CLOUDSDK_COMPUTE_ZONE="${CLOUDSDK_COMPUTE_ZONE:-us-central1-f}"
@@ -40,10 +41,8 @@ run_infrakit() {
 
   docker volume create --name infrakit
 
-  run_plugin='docker run -d -v infrakit:/root/.infrakit/'
-
-  $run_plugin --name=flavor ${INFRAKIT_IMAGE} infrakit-flavor-vanilla --log=5
-  $run_plugin --name=group ${INFRAKIT_IMAGE} infrakit-group-default --log=5
+  $docker_run -d --name=flavor ${INFRAKIT_IMAGE} infrakit-flavor-vanilla --log=5
+  $docker_run -d --name=group ${INFRAKIT_IMAGE} infrakit-group-default --log=5
 }
 
 build_infrakit_gcp() {
@@ -57,8 +56,7 @@ build_infrakit_gcp() {
 run_infrakit_gcp_instance() {
   echo Run Infrakit GCP Instance Plugin
 
-  docker run -d --name=instance-gcp \
-    -v infrakit:/root/.infrakit/ \
+  $docker_run -d --name=instance-gcp \
     -v gcloud-config:/.config \
     -e CLOUDSDK_CORE_PROJECT \
     -e CLOUDSDK_COMPUTE_ZONE \
@@ -70,11 +68,11 @@ run_infrakit_gcp_instance() {
 create_group() {
   echo Create Instance Group
 
-  docker_run="docker run --rm -v infrakit:/root/.infrakit/"
-  docker cp ${BASEDIR}/instances.json group:/root/.infrakit/
-  $docker_run busybox sed -i.bak s/{{TAG}}/${TAG}/g /root/.infrakit/instances.json
-  $docker_run busybox cat /root/.infrakit/instances.json
-  $docker_run ${INFRAKIT_IMAGE} infrakit group commit /root/.infrakit/instances.json
+  docker cp ${BASEDIR}/instances.json group:/infrakit/
+
+  $docker_run --rm busybox sed -i.bak s/{{TAG}}/${TAG}/g /infrakit/instances.json
+  $docker_run --rm busybox cat /infrakit/instances.json
+  $docker_run --rm ${INFRAKIT_IMAGE} infrakit group commit /infrakit/instances.json
 }
 
 check_instances_created() {
@@ -145,7 +143,7 @@ delete_instances() {
 destroy_group() {
   echo Destroy Instance Group
 
-  docker run --rm -v infrakit:/root/.infrakit/ ${INFRAKIT_IMAGE} infrakit group destroy instances
+  $docker_run --rm ${INFRAKIT_IMAGE} infrakit group destroy instances
 }
 
 check_instances_gone() {

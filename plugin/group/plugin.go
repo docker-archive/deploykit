@@ -93,7 +93,16 @@ func (p *plugin) validate(groupSpec group.Spec) (settings, error) {
 		Properties: spec.Instance.Properties,
 	}
 
-	instanceSpec, err = flavorPlugin.Prepare(spec.Flavor.Properties, instanceSpec, spec.Allocation)
+	instanceGroupInstances, err := p.API.ListInstanceGroupInstances(string(groupSpec.ID))
+	if err != nil {
+		return noSettings, err
+	}
+
+	index := types.Index{
+		Group:    groupSpec.ID,
+		Sequence: uint(len(instanceGroupInstances)),
+	}
+	instanceSpec, err = flavorPlugin.Prepare(spec.Flavor.Properties, instanceSpec, spec.Allocation, index)
 	if err != nil {
 		return noSettings, err
 	}

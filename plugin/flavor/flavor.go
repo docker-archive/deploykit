@@ -140,7 +140,9 @@ func mergeSpecs(initial instance.Spec, specs []instance.Spec) (instance.Spec, er
 	return result, nil
 }
 
-func (f flavorCombo) Prepare(flavor *types.Any, inst instance.Spec, allocation group_types.AllocationMethod) (instance.Spec, error) {
+func (f flavorCombo) Prepare(flavor *types.Any, inst instance.Spec, allocation group_types.AllocationMethod,
+	context group_types.Index) (instance.Spec, error) {
+
 	combo := Spec{}
 	err := flavor.Decode(&combo)
 	if err != nil {
@@ -157,7 +159,7 @@ func (f flavorCombo) Prepare(flavor *types.Any, inst instance.Spec, allocation g
 			return inst, err
 		}
 
-		output, err := plugin.Prepare(pluginSpec.Properties, clone, allocation)
+		output, err := plugin.Prepare(pluginSpec.Properties, clone, allocation, context)
 		if err != nil {
 			return inst, err
 		}
