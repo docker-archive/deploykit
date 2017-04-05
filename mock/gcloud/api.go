@@ -115,17 +115,6 @@ func (_mr *_MockAPIRecorder) DeleteInstanceTemplate(arg0 interface{}) *gomock.Ca
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteInstanceTemplate", arg0)
 }
 
-func (_m *MockAPI) GetHostname() (string, error) {
-	ret := _m.ctrl.Call(_m, "GetHostname")
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-func (_mr *_MockAPIRecorder) GetHostname() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetHostname")
-}
-
 func (_m *MockAPI) GetInstance(_param0 string) (*v1.Instance, error) {
 	ret := _m.ctrl.Call(_m, "GetInstance", _param0)
 	ret0, _ := ret[0].(*v1.Instance)

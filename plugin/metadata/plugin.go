@@ -39,13 +39,26 @@ func (p *plugin) buildTopics() map[string]interface{} {
 	p.addTopic(topics, "project", p.GetProject)
 	p.addTopic(topics, "zone", p.GetZone)
 
-	p.addTopic(topics, "instance/hostname", p.GetInstanceHostname)
+	p.addTopic(topics, "instance/projectID", p.apiMetadata.ProjectID)
+	p.addTopic(topics, "instance/numericalProjectID", p.apiMetadata.NumericProjectID)
+	p.addTopic(topics, "instance/internalIP", p.apiMetadata.InternalIP)
+	p.addTopic(topics, "instance/externalIP", p.apiMetadata.ExternalIP)
+	p.addTopic(topics, "instance/hostname", p.apiMetadata.Hostname)
+	p.addTopic(topics, "instance/ID", p.apiMetadata.InstanceID)
+	p.addTopic(topics, "instance/name", p.apiMetadata.InstanceName)
+	p.addTopic(topics, "instance/zone", p.apiMetadata.Zone)
 
 	return topics
 }
 
-func (p *plugin) addTopic(topics map[string]interface{}, path string, getter func() string) {
-	metadata_plugin.Put(metadata_plugin.Path(path), func() interface{} { return getter() }, topics)
+func (p *plugin) addTopic(topics map[string]interface{}, path string, getter func() (string, error)) {
+	metadata_plugin.Put(metadata_plugin.Path(path), func() interface{} {
+		value, err := getter()
+		if err != nil {
+			return nil // TODO
+		}
+		return value
+	}, topics)
 }
 
 // List returns a list of *child nodes* given a path, which is specified as a slice
@@ -67,20 +80,10 @@ func (p *plugin) loadTopics() {
 	p.once.Do(func() { p.topics = p.buildTopics() })
 }
 
-func (p *plugin) GetProject() string {
-	return p.api.GetProject()
-
+func (p *plugin) GetProject() (string, error) {
+	return p.api.GetProject(), nil
 }
 
-func (p *plugin) GetZone() string {
-	return p.api.GetZone()
-}
-
-func (p *plugin) GetInstanceHostname() string {
-	hostname, err := p.apiMetadata.GetHostname()
-	if err != nil {
-		return "" // TODO
-	}
-
-	return hostname
+func (p *plugin) GetZone() (string, error) {
+	return p.api.GetZone(), nil
 }

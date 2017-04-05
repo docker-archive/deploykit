@@ -38,7 +38,7 @@ func TestListInstance(t *testing.T) {
 	plugin := NewPlugin(api, apiMetadata)
 	children, err := plugin.List(metadata.Path([]string{"instance"}))
 
-	require.EqualValues(t, []string{"hostname"}, children)
+	require.EqualValues(t, []string{"ID", "externalIP", "hostname", "internalIP", "name", "numericalProjectID", "projectID", "zone"}, children)
 	require.NoError(t, err)
 }
 
@@ -64,13 +64,90 @@ func TestGetZone(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestGetHostname(t *testing.T) {
+func TestGetInstanceProjectID(t *testing.T) {
 	api, apiMetadata, _ := NewMockAPI(t)
-	apiMetadata.EXPECT().GetHostname().Return("HOSTNAME", nil)
+	apiMetadata.EXPECT().ProjectID().Return("PROJECT_ID", nil)
+
+	plugin := NewPlugin(api, apiMetadata)
+	value, err := plugin.Get(metadata.Path([]string{"instance", "projectID"}))
+
+	require.EqualValues(t, `"PROJECT_ID"`, value.String())
+	require.NoError(t, err)
+}
+
+func TestGetInstanceNumericProjectID(t *testing.T) {
+	api, apiMetadata, _ := NewMockAPI(t)
+	apiMetadata.EXPECT().NumericProjectID().Return("421337", nil)
+
+	plugin := NewPlugin(api, apiMetadata)
+	value, err := plugin.Get(metadata.Path([]string{"instance", "numericalProjectID"}))
+
+	require.EqualValues(t, `"421337"`, value.String())
+	require.NoError(t, err)
+}
+
+func TestGetInstanceInternalIP(t *testing.T) {
+	api, apiMetadata, _ := NewMockAPI(t)
+	apiMetadata.EXPECT().InternalIP().Return("10.0.0.1", nil)
+
+	plugin := NewPlugin(api, apiMetadata)
+	value, err := plugin.Get(metadata.Path([]string{"instance", "internalIP"}))
+
+	require.EqualValues(t, `"10.0.0.1"`, value.String())
+	require.NoError(t, err)
+}
+
+func TestGetInstanceExternalIP(t *testing.T) {
+	api, apiMetadata, _ := NewMockAPI(t)
+	apiMetadata.EXPECT().ExternalIP().Return("134.45.45.1", nil)
+
+	plugin := NewPlugin(api, apiMetadata)
+	value, err := plugin.Get(metadata.Path([]string{"instance", "externalIP"}))
+
+	require.EqualValues(t, `"134.45.45.1"`, value.String())
+	require.NoError(t, err)
+}
+
+func TestGetInstanceHostname(t *testing.T) {
+	api, apiMetadata, _ := NewMockAPI(t)
+	apiMetadata.EXPECT().Hostname().Return("HOSTNAME", nil)
 
 	plugin := NewPlugin(api, apiMetadata)
 	value, err := plugin.Get(metadata.Path([]string{"instance", "hostname"}))
 
 	require.EqualValues(t, `"HOSTNAME"`, value.String())
+	require.NoError(t, err)
+}
+
+func TestGetInstanceID(t *testing.T) {
+	api, apiMetadata, _ := NewMockAPI(t)
+	apiMetadata.EXPECT().InstanceID().Return("ID", nil)
+
+	plugin := NewPlugin(api, apiMetadata)
+	value, err := plugin.Get(metadata.Path([]string{"instance", "ID"}))
+
+	require.EqualValues(t, `"ID"`, value.String())
+	require.NoError(t, err)
+}
+
+func TestGetInstanceName(t *testing.T) {
+	api, apiMetadata, _ := NewMockAPI(t)
+	apiMetadata.EXPECT().InstanceName().Return("NAME", nil)
+
+	plugin := NewPlugin(api, apiMetadata)
+	value, err := plugin.Get(metadata.Path([]string{"instance", "name"}))
+
+	require.EqualValues(t, `"NAME"`, value.String())
+	require.NoError(t, err)
+}
+
+func TestGetInstanceZone(t *testing.T) {
+	api, apiMetadata, _ := NewMockAPI(t)
+	apiMetadata.EXPECT().Zone().Return("ZONE", nil)
+
+	plugin := NewPlugin(api, apiMetadata)
+	value, err := plugin.Get(metadata.Path([]string{"instance", "zone"}))
+
+	require.EqualValues(t, `"ZONE"`, value.String())
 	require.NoError(t, err)
 }
