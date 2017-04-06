@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.gcp/plugin/gcloud"
@@ -13,7 +14,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"google.golang.org/api/compute/v1"
-	"strings"
 )
 
 type plugin struct {
@@ -94,10 +94,6 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// TODO - for now we overwrite, but support merging of MetaData field in the future, if the
 	// user provided some.
 	settings.MetaData = gcloud.TagsToMetaData(tags)
-
-	// Disks -- TODO - these may be better set externally.
-	settings.AutoDeleteDisk = spec.LogicalID == nil
-	settings.ReuseExistingDisk = spec.LogicalID != nil
 
 	if err = p.API.CreateInstance(name, settings); err != nil {
 		return nil, err
