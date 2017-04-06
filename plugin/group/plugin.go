@@ -169,26 +169,18 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		settings.createdTemplates = append(settings.createdTemplates, templateName)
 
 		if createTemplate {
-			metadata, err := instance_types.ParseTags(settings.instanceSpec)
+			spec := settings.instanceSpec
+			settings := settings.instanceProperties.InstanceSettings
+
+			// TODO - for now we overwrite, but support merging of MetaData field in the future, if the
+			// user provided some.
+			tags, err := instance_types.ParseTags(spec)
 			if err != nil {
 				return "", err
 			}
+			settings.MetaData = gcloud.TagsToMetaData(tags)
 
-			if err = p.API.CreateInstanceTemplate(templateName, &gcloud.InstanceSettings{
-				Description:       settings.instanceProperties.Description,
-				MachineType:       settings.instanceProperties.MachineType,
-				Network:           settings.instanceProperties.Network,
-				Subnetwork:        settings.instanceProperties.Subnetwork,
-				Tags:              settings.instanceProperties.Tags,
-				DiskSizeMb:        settings.instanceProperties.DiskSizeMb,
-				DiskImage:         settings.instanceProperties.DiskImage,
-				DiskType:          settings.instanceProperties.DiskType,
-				Scopes:            settings.instanceProperties.Scopes,
-				Preemptible:       settings.instanceProperties.Preemptible,
-				AutoDeleteDisk:    true,
-				ReuseExistingDisk: false,
-				MetaData:          gcloud.TagsToMetaData(metadata),
-			}); err != nil {
+			if err = p.API.CreateInstanceTemplate(templateName, settings); err != nil {
 				return "", err
 			}
 		}
@@ -206,7 +198,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		}
 
 		if updateManager {
-			// TODO: should be trigger a recreation of the VMS
+			// TODO: should we trigger a recreation of the VMS
 			// TODO: What about the instances already being updated
 			if err = p.API.SetInstanceTemplate(name, templateName); err != nil {
 				return "", err
