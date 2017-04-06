@@ -135,6 +135,7 @@ endif
 	$(call build_binary,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
 	$(call build_binary,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
 	$(call build_binary,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
+	$(call build_binary,infrakit-application-repeater,github.com/docker/infrakit/examples/application/event-repeater)
 
 cli: build-cli
 build-cli:
