@@ -76,6 +76,7 @@ type InstanceSettings struct {
 	Description       string
 	MachineType       string
 	Network           string
+	PrivateIP         string
 	Tags              []string
 	Scopes            []string
 	DiskSizeMb        int64
@@ -255,7 +256,8 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		},
 		NetworkInterfaces: []*compute.NetworkInterface{
 			{
-				Network: network,
+				Network:   network,
+				NetworkIP: settings.PrivateIP,
 				AccessConfigs: []*compute.AccessConfig{
 					{
 						Type: "ONE_TO_ONE_NAT",

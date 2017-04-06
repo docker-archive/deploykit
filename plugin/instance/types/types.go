@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 
+	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -18,29 +19,24 @@ const (
 
 // Properties is the configuration schema for the plugin, provided in instance.Spec.Properties
 type Properties struct {
+	*gcloud.InstanceSettings
+
 	NamePrefix  string
-	Description string
-	MachineType string
-	Network     string
-	DiskSizeMb  int64
-	DiskImage   string
-	DiskType    string
-	Tags        []string
-	Scopes      []string
 	TargetPools []string
 	Connect     bool
-	Preemptible bool
 }
 
 // ParseProperties parses instance Properties from a json description.
 func ParseProperties(req *types.Any) (Properties, error) {
 	parsed := Properties{
-		NamePrefix:  defaultNamePrefix,
-		MachineType: defaultMachineType,
-		Network:     defaultNetwork,
-		DiskSizeMb:  defaultDiskSizeMb,
-		DiskImage:   defaultDiskImage,
-		DiskType:    defaultDiskType,
+		InstanceSettings: &gcloud.InstanceSettings{
+			MachineType: defaultMachineType,
+			Network:     defaultNetwork,
+			DiskSizeMb:  defaultDiskSizeMb,
+			DiskImage:   defaultDiskImage,
+			DiskType:    defaultDiskType,
+		},
+		NamePrefix: defaultNamePrefix,
 	}
 
 	if err := req.Decode(&parsed); err != nil {
