@@ -76,6 +76,7 @@ type InstanceSettings struct {
 	Description       string
 	MachineType       string
 	Network           string
+	Subnetwork        string
 	PrivateIP         string
 	Tags              []string
 	Scopes            []string
@@ -224,6 +225,9 @@ func (g *computeServiceWrapper) GetInstance(name string) (*compute.Instance, err
 }
 
 func (g *computeServiceWrapper) addAPIUrlPrefix(value string, prefix string) string {
+	if value == "" {
+		return ""
+	}
 	if strings.HasPrefix(value, g.service.BasePath+prefix) {
 		return value
 	}
@@ -236,6 +240,7 @@ func (g *computeServiceWrapper) addAPIUrlPrefix(value string, prefix string) str
 func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSettings) error {
 	machineType := g.addAPIUrlPrefix(settings.MachineType, g.project+"/zones/"+g.zone+"/machineTypes/")
 	network := g.addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
+	subnetwork := g.addAPIUrlPrefix(settings.Subnetwork, g.project+"/regions/"+g.region()+"/subnetworks/")
 	sourceImage := g.addAPIUrlPrefix(settings.DiskImage, "")
 	diskType := g.addAPIUrlPrefix(settings.DiskType, g.project+"/zones/"+g.zone+"/diskTypes/")
 
@@ -256,8 +261,9 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		},
 		NetworkInterfaces: []*compute.NetworkInterface{
 			{
-				Network:   network,
-				NetworkIP: settings.PrivateIP,
+				Network:    network,
+				Subnetwork: subnetwork,
+				NetworkIP:  settings.PrivateIP,
 				AccessConfigs: []*compute.AccessConfig{
 					{
 						Type: "ONE_TO_ONE_NAT",
@@ -392,6 +398,7 @@ func (g *computeServiceWrapper) ListInstanceGroupInstances(name string) ([]*comp
 
 func (g *computeServiceWrapper) CreateInstanceTemplate(name string, settings *InstanceSettings) error {
 	network := g.addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
+	subnetwork := g.addAPIUrlPrefix(settings.Subnetwork, g.project+"/regions/"+g.region()+"/subnetworks/")
 	sourceImage := g.addAPIUrlPrefix(settings.DiskImage, "")
 
 	template := &compute.InstanceTemplate{
@@ -418,7 +425,8 @@ func (g *computeServiceWrapper) CreateInstanceTemplate(name string, settings *In
 			},
 			NetworkInterfaces: []*compute.NetworkInterface{
 				{
-					Network: network,
+					Network:    network,
+					Subnetwork: subnetwork,
 					AccessConfigs: []*compute.AccessConfig{
 						{
 							Type: "ONE_TO_ONE_NAT",

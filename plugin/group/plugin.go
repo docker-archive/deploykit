@@ -178,6 +178,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 				Description:       settings.instanceProperties.Description,
 				MachineType:       settings.instanceProperties.MachineType,
 				Network:           settings.instanceProperties.Network,
+				Subnetwork:        settings.instanceProperties.Subnetwork,
 				Tags:              settings.instanceProperties.Tags,
 				DiskSizeMb:        settings.instanceProperties.DiskSizeMb,
 				DiskImage:         settings.instanceProperties.DiskImage,
