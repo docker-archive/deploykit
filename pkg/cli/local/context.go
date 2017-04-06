@@ -165,11 +165,23 @@ func parseBool(text string) (bool, error) {
 	return v > 0, err
 }
 
-func (c *Context) prompt(prompt, ftype string) (interface{}, error) {
+func (c *Context) prompt(prompt, ftype string, optional ...interface{}) (interface{}, error) {
+	def, label := "", ""
+	if len(optional) > 0 {
+		def = fmt.Sprintf("%v", optional[0])
+		if def != "" {
+			label = fmt.Sprintf("[%s]", def)
+		}
+	}
+
 	input := bufio.NewReader(c.input)
-	fmt.Fprintf(os.Stderr, "%s ", prompt)
+	fmt.Fprintf(os.Stderr, "%s %s: ", prompt, label)
 	text, _ := input.ReadString('\n')
 	text = strings.Trim(text, " \t\n")
+	if len(text) == 0 {
+		text = def
+	}
+
 	switch ftype {
 	case "string":
 		return text, nil
@@ -229,10 +241,13 @@ func (c *Context) Funcs() []template.Function {
 				if !c.exec {
 					return "", nil
 				}
-				if len(optional) > 0 && !missing(ftype, optional[0]) {
-					return optional[0], nil
+				// The last value in the optional var args is the value from the previous
+				// pipeline.
+				if len(optional) > 0 && !missing(ftype, optional[len(optional)-1]) {
+					return optional[len(optional)-1], nil
 				}
-				return c.prompt(prompt, ftype)
+
+				return c.prompt(prompt, ftype, optional...)
 			},
 		},
 	}
