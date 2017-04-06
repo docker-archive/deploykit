@@ -2,6 +2,7 @@ package instance
 
 import (
 	"fmt"
+	"net"
 	"sort"
 	"strings"
 
@@ -70,18 +71,29 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	instanceSettings := properties.InstanceSettings
 
-	var name string
+	// Default name is a unique string
+	name := fmt.Sprintf("%s-%s", properties.NamePrefix, util.RandomSuffix(6))
+
 	if spec.LogicalID != nil {
-		name = string(*spec.LogicalID)
-	} else {
-		name = fmt.Sprintf("%s-%s", properties.NamePrefix, util.RandomSuffix(6))
+
+		// IP addresses / Logical ID
+		// If the logical ID is set and is parsable as an IP address, then use that as the private IP
+		// address. This will override the private IP address set in the struct because it's likely
+		// that an orchestrator has determine the correct IP address to use.
+		if ip := net.ParseIP(string(*spec.LogicalID)); len(ip) > 0 {
+			instanceSettings.PrivateIP = ip.String()
+			name = fmt.Sprintf("%s-%s", properties.NamePrefix, util.RandomSuffix(6))
+		} else {
+			name = string(*spec.LogicalID)
+		}
 	}
+
 	id := instance.ID(name)
-	_, metadata = mergeTags(metadata, p.namespace) // scope this resource with namespace tags
 
 	// Some modifications
 	// TODO - for now we overwrite, but support merging of MetaData field in the future, if the
 	// user also provided them.
+	_, metadata = mergeTags(metadata, p.namespace) // scope this resource with namespace tags
 	instanceSettings.MetaData = gcloud.TagsToMetaData(metadata)
 
 	// Disks -- TODO - these may be better set externally.

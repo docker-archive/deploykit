@@ -110,6 +110,41 @@ func TestProvisionLogicalID(t *testing.T) {
 	require.Equal(t, *id, instance.ID("LOGICAL-ID"))
 }
 
+func TestProvisionLogicalIDIsIPAddress(t *testing.T) {
+	properties := types.AnyString(`{ "PrivateIP" : "10.20.1.0" }`) // to be overwritten
+	tags := map[string]string{}
+
+	rand.Seed(0)
+	api, ctrl := NewMockGCloud(t)
+	defer ctrl.Finish()
+
+	addr := "10.20.1.100"
+	api.EXPECT().CreateInstance(gomock.Any(), &gcloud.InstanceSettings{
+		MachineType:       "g1-small",
+		Network:           "default",
+		DiskSizeMb:        10,
+		DiskImage:         "docker",
+		DiskType:          "pd-standard",
+		AutoDeleteDisk:    false,
+		ReuseExistingDisk: true,
+		Preemptible:       false,
+		PrivateIP:         addr,
+		MetaData:          gcloud.TagsToMetaData(map[string]string{}),
+	}).Return(nil)
+
+	logicalID := instance.LogicalID(addr)
+
+	plugin := NewPlugin(api, nil)
+	id, err := plugin.Provision(instance.Spec{
+		LogicalID:  &logicalID,
+		Tags:       tags,
+		Properties: properties,
+	})
+
+	require.NoError(t, err)
+	require.NotEqual(t, addr, string(*id)) // the name is still generated in this case since the logical id is ip.
+}
+
 func TestProvisionFails(t *testing.T) {
 	properties := types.AnyString(`{}`)
 	tags := map[string]string{
