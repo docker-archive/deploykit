@@ -169,7 +169,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		settings.createdTemplates = append(settings.createdTemplates, templateName)
 
 		if createTemplate {
-			metadata, err := instance_types.ParseMetadata(settings.instanceSpec)
+			metadata, err := instance_types.ParseTags(settings.instanceSpec)
 			if err != nil {
 				return "", err
 			}
