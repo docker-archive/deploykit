@@ -2,9 +2,10 @@ package loadbalancer
 
 import (
 	"fmt"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
-	"time"
 )
 
 const (
@@ -13,7 +14,7 @@ const (
 	// The value is a url.  The protocol, host and port will be extracted from the URL
 	// to configure the external load balancer.  The ELB will be configured to listen
 	// at the specified port (or 80), using the specified protocol, and the host is used to
-	// select which load balancer in the config file on the manager nodes /var/lib/docker/swarm/lb.config
+	// select which load balancer in the config file on the manager nodes /var/lib/docker/editions/lb.config
 	// TODO(chungers) - While the hostname is used to select the ELB to use, we will also provide support
 	// for HTTP/S vhosts in the future if the hostname is not matched to an ELB, we will select a top level ELB
 	// and then use the subdomain in the hostname to configure a HAProxy with http header routing.
