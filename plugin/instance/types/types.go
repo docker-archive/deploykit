@@ -15,6 +15,17 @@ const (
 	defaultDiskSizeMb  = 10
 	defaultDiskImage   = "docker"
 	defaultDiskType    = "pd-standard"
+
+	// InfrakitLogicalID is a metadata key that is used to tag instances created with a LogicalId.
+	InfrakitLogicalID = "infrakit-logical-id"
+
+	// InfrakitGCPVersion is a metadata key that is used to know which version of the plugin was used to create
+	// the instance.
+	InfrakitGCPVersion = "infrakit-gcp-version"
+
+	// InfrakitGCPCurrentVersion is incremented each time the plugin introduces incompatibilities with previous
+	// versions
+	InfrakitGCPCurrentVersion = "1"
 )
 
 // Properties is the configuration schema for the plugin, provided in instance.Spec.Properties
@@ -46,15 +57,16 @@ func ParseProperties(req *types.Any) (Properties, error) {
 	return parsed, nil
 }
 
-// ParseMetadata returns a metadata key/value map from the instance specification.
-func ParseMetadata(spec instance.Spec) (map[string]string, error) {
-	metadata := make(map[string]string)
+// ParseTags returns a key/value map from the instance specification.
+func ParseTags(spec instance.Spec) (map[string]string, error) {
+	tags := make(map[string]string)
+
 	for k, v := range spec.Tags {
-		metadata[k] = v
+		tags[k] = v
 	}
 
 	if spec.Init != "" {
-		metadata["startup-script"] = spec.Init
+		tags["startup-script"] = spec.Init
 	}
 
 	properties, err := ParseProperties(spec.Properties)
@@ -62,8 +74,14 @@ func ParseMetadata(spec instance.Spec) (map[string]string, error) {
 		return nil, err
 	}
 	if properties.Connect {
-		metadata["serial-port-enable"] = "true"
+		tags["serial-port-enable"] = "true"
 	}
 
-	return metadata, nil
+	if spec.LogicalID != nil {
+		tags[InfrakitLogicalID] = string(*spec.LogicalID)
+	}
+
+	tags[InfrakitGCPVersion] = InfrakitGCPCurrentVersion
+
+	return tags, nil
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"sort"
-	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.gcp/plugin/gcloud"
@@ -13,6 +12,8 @@ import (
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
+	"google.golang.org/api/compute/v1"
+	"strings"
 )
 
 type plugin struct {
@@ -63,26 +64,19 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	// Parse the metadata in the spec, also merge in namespace tags to create the final metadata
-	metadata, err := instance_types.ParseMetadata(spec)
-	if err != nil {
-		return nil, err
-	}
+	settings := properties.InstanceSettings
 
-	instanceSettings := properties.InstanceSettings
-
-	// Default name is a unique string
-	name := fmt.Sprintf("%s-%s", properties.NamePrefix, util.RandomSuffix(6))
-
-	if spec.LogicalID != nil {
-
+	var name string
+	if spec.LogicalID == nil {
+		name = fmt.Sprintf("%s-%s", properties.NamePrefix, util.RandomSuffix(6))
+	} else {
 		// IP addresses / Logical ID
 		// If the logical ID is set and is parsable as an IP address, then use that as the private IP
 		// address. This will override the private IP address set in the struct because it's likely
 		// that an orchestrator has determine the correct IP address to use.
 		if ip := net.ParseIP(string(*spec.LogicalID)); len(ip) > 0 {
-			instanceSettings.PrivateIP = ip.String()
-			name = fmt.Sprintf("%s-%s", properties.NamePrefix, util.RandomSuffix(6))
+			settings.PrivateIP = ip.String()
+			name = fmt.Sprintf("%s-%s", properties.NamePrefix, strings.Replace(ip.String(), ".", "-", -1))
 		} else {
 			name = string(*spec.LogicalID)
 		}
@@ -90,17 +84,22 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	id := instance.ID(name)
 
-	// Some modifications
+	// Parse the metadata in the spec, also merge in namespace tags to create the final metadata
+	tags, err := instance_types.ParseTags(spec)
+	if err != nil {
+		return nil, err
+	}
+	_, tags = mergeTags(tags, p.namespace) // scope this resource with namespace tags
+
 	// TODO - for now we overwrite, but support merging of MetaData field in the future, if the
-	// user also provided them.
-	_, metadata = mergeTags(metadata, p.namespace) // scope this resource with namespace tags
-	instanceSettings.MetaData = gcloud.TagsToMetaData(metadata)
+	// user provided some.
+	settings.MetaData = gcloud.TagsToMetaData(tags)
 
 	// Disks -- TODO - these may be better set externally.
-	instanceSettings.AutoDeleteDisk = spec.LogicalID == nil
-	instanceSettings.ReuseExistingDisk = spec.LogicalID != nil
+	settings.AutoDeleteDisk = spec.LogicalID == nil
+	settings.ReuseExistingDisk = spec.LogicalID != nil
 
-	if err = p.API.CreateInstance(name, instanceSettings); err != nil {
+	if err = p.API.CreateInstance(name, settings); err != nil {
 		return nil, err
 	}
 
@@ -143,15 +142,9 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		}
 
 		description := instance.Description{
-			ID:   instance.ID(inst.Name),
-			Tags: instTags,
-		}
-
-		// When pets are deleted, we keep the disk. So a machine with a disk that's not auto-deleted is
-		// assumed to be a pet and its logicalID is the name of the disk.
-		if len(inst.Disks) > 0 && !inst.Disks[0].AutoDelete {
-			id := instance.LogicalID(last(inst.Disks[0].Source))
-			description.LogicalID = &id
+			ID:        instance.ID(inst.Name),
+			Tags:      instTags,
+			LogicalID: logicalID(inst, instTags),
 		}
 
 		if properties {
@@ -161,12 +154,36 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 				log.Warningln("error encoding instance properties:", err)
 			}
 		}
+
 		result = append(result, description)
 	}
 
 	log.Debugln("matching count:", len(result))
 
 	return result, nil
+}
+
+func logicalID(inst *compute.Instance, tags map[string]string) *instance.LogicalID {
+	_, present := tags[instance_types.InfrakitGCPVersion]
+	if !present {
+		// Instances created by old version of the plugin don't have a LogicalID metadata. We have to
+		// infer whether it's a Pet or not using this heuristic:
+		// When pets are deleted, we keep the disk. So a machine with a disk that's not auto-deleted is
+		// assumed to be a pet and its logicalID is the name of the disk.
+		if len(inst.Disks) > 0 && !inst.Disks[0].AutoDelete {
+			id := instance.LogicalID(last(inst.Disks[0].Source))
+			return &id
+		}
+		return nil
+	}
+
+	logicalID, present := tags[instance_types.InfrakitLogicalID]
+	if present {
+		id := instance.LogicalID(logicalID)
+		return &id
+	}
+
+	return nil
 }
 
 func last(url string) string {
@@ -183,7 +200,7 @@ func mergeTags(tagMaps ...map[string]string) ([]string, map[string]string) {
 	for _, tagMap := range tagMaps {
 		for k, v := range tagMap {
 			if _, exists := tags[k]; exists {
-				log.Warnf("Ovewriting tag value for key %s", k)
+				log.Warnf("Overwriting tag value for key %s", k)
 			} else {
 				keys = append(keys, k)
 			}

@@ -59,9 +59,10 @@ func TestProvision(t *testing.T) {
 		ReuseExistingDisk: false,
 		Preemptible:       true,
 		MetaData: gcloud.TagsToMetaData(map[string]string{
-			"key1":           "value1",
-			"key2":           "value2",
-			"startup-script": "echo 'Startup'",
+			"key1":                 "value1",
+			"key2":                 "value2",
+			"startup-script":       "echo 'Startup'",
+			"infrakit-gcp-version": "1",
 		}),
 	}).Return(nil)
 	api.EXPECT().AddInstanceToTargetPool("POOL1", "worker-ssnk9q").Return(nil)
@@ -82,7 +83,6 @@ func TestProvisionLogicalID(t *testing.T) {
 	properties := types.AnyString(`{}`)
 	tags := map[string]string{}
 
-	rand.Seed(0)
 	api, ctrl := NewMockGCloud(t)
 	defer ctrl.Finish()
 	api.EXPECT().CreateInstance("LOGICAL-ID", &gcloud.InstanceSettings{
@@ -94,7 +94,10 @@ func TestProvisionLogicalID(t *testing.T) {
 		AutoDeleteDisk:    false,
 		ReuseExistingDisk: true,
 		Preemptible:       false,
-		MetaData:          gcloud.TagsToMetaData(map[string]string{}),
+		MetaData: gcloud.TagsToMetaData(map[string]string{
+			"infrakit-logical-id":  "LOGICAL-ID",
+			"infrakit-gcp-version": "1",
+		}),
 	}).Return(nil)
 
 	logicalID := instance.LogicalID("LOGICAL-ID")
@@ -111,14 +114,12 @@ func TestProvisionLogicalID(t *testing.T) {
 }
 
 func TestProvisionLogicalIDIsIPAddress(t *testing.T) {
-	properties := types.AnyString(`{ "PrivateIP" : "10.20.1.0" }`) // to be overwritten
+	properties := types.AnyString(`{ "PrivateIP" : "10.20.1.0" }`) // to be overwritten by LogicalID
 	tags := map[string]string{}
 
-	rand.Seed(0)
 	api, ctrl := NewMockGCloud(t)
 	defer ctrl.Finish()
 
-	addr := "10.20.1.100"
 	api.EXPECT().CreateInstance(gomock.Any(), &gcloud.InstanceSettings{
 		MachineType:       "g1-small",
 		Network:           "default",
@@ -128,11 +129,14 @@ func TestProvisionLogicalIDIsIPAddress(t *testing.T) {
 		AutoDeleteDisk:    false,
 		ReuseExistingDisk: true,
 		Preemptible:       false,
-		PrivateIP:         addr,
-		MetaData:          gcloud.TagsToMetaData(map[string]string{}),
+		PrivateIP:         "10.20.1.100",
+		MetaData: gcloud.TagsToMetaData(map[string]string{
+			"infrakit-logical-id":  "10.20.1.100",
+			"infrakit-gcp-version": "1",
+		}),
 	}).Return(nil)
 
-	logicalID := instance.LogicalID(addr)
+	logicalID := instance.LogicalID("10.20.1.100")
 
 	plugin := NewPlugin(api, nil)
 	id, err := plugin.Provision(instance.Spec{
@@ -142,7 +146,7 @@ func TestProvisionLogicalIDIsIPAddress(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.NotEqual(t, addr, string(*id)) // the name is still generated in this case since the logical id is ip.
+	require.Equal(t, "instance-10-20-1-100", string(*id))
 }
 
 func TestProvisionFails(t *testing.T) {
@@ -161,7 +165,10 @@ func TestProvisionFails(t *testing.T) {
 		DiskType:          "pd-standard",
 		AutoDeleteDisk:    true,
 		ReuseExistingDisk: false,
-		MetaData:          gcloud.TagsToMetaData(tags),
+		MetaData: gcloud.TagsToMetaData(map[string]string{
+			"key1":                 "value1",
+			"infrakit-gcp-version": "1",
+		}),
 	}).Return(errors.New("BUG"))
 
 	plugin := NewPlugin(api, nil)
@@ -188,7 +195,9 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 		DiskType:          "pd-standard",
 		AutoDeleteDisk:    true,
 		ReuseExistingDisk: false,
-		MetaData:          gcloud.TagsToMetaData(tags),
+		MetaData: gcloud.TagsToMetaData(map[string]string{
+			"infrakit-gcp-version": "1",
+		}),
 	}).Return(nil)
 	api.EXPECT().AddInstanceToTargetPool("POOL", "instance-ssnk9q").Return(errors.New("BUG"))
 
@@ -269,11 +278,28 @@ func TestDescribeInstances(t *testing.T) {
 					NewMetadataItems("key1", "value1"),
 					NewMetadataItems("key2", "value2"),
 					NewMetadataItems("scope", "test"),
+					NewMetadataItems("infrakit-logical-id", "instance-pet-valid"),
+					NewMetadataItems("infrakit-gcp-version", "1"),
 				},
 			},
 			Disks: []*compute.AttachedDisk{
 				{
-					Source:     "/projects/p/zones/z/disks/instance-pet-valid-disk",
+					Source: "/projects/p/zones/z/disks/instance-pet-valid",
+				},
+			},
+		},
+		{
+			Name: "instance-pet-valid-with-old-version",
+			Metadata: &compute.Metadata{
+				Items: []*compute.MetadataItems{
+					NewMetadataItems("key1", "value1"),
+					NewMetadataItems("key2", "value2"),
+					NewMetadataItems("scope", "test"),
+				},
+			},
+			Disks: []*compute.AttachedDisk{
+				{
+					Source:     "/projects/p/zones/z/disks/instance-pet-valid-with-old-version",
 					AutoDelete: false,
 				},
 			},
@@ -318,11 +344,13 @@ func TestDescribeInstances(t *testing.T) {
 	instances, err := plugin.DescribeInstances(tags, false)
 
 	require.NoError(t, err)
-	require.Equal(t, len(instances), 2)
+	require.Equal(t, len(instances), 3)
 	require.Equal(t, "instance-pet-valid", string(instances[0].ID))
-	require.Equal(t, "instance-pet-valid-disk", string(*instances[0].LogicalID))
-	require.Equal(t, "instance-cattle-valid", string(instances[1].ID))
-	require.Nil(t, instances[1].LogicalID)
+	require.Equal(t, "instance-pet-valid", string(*instances[0].LogicalID))
+	require.Equal(t, "instance-pet-valid-with-old-version", string(instances[1].ID))
+	require.Equal(t, "instance-pet-valid-with-old-version", string(*instances[1].LogicalID))
+	require.Equal(t, "instance-cattle-valid", string(instances[2].ID))
+	require.Nil(t, instances[2].LogicalID)
 }
 
 func TestDescribeInstancesFails(t *testing.T) {
