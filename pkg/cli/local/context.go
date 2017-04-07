@@ -278,18 +278,22 @@ func (c *Context) loadBackend() error {
 				cmd := strings.Join(append([]string{"/bin/sh"}, opts...), " ")
 				log.Debug("sh", "cmd", cmd)
 
-				return exec.Command(cmd).
-					InheritEnvs(true).StartWithStreams(
-
-					exec.Do(exec.SendInput(
-						func(stdin io.WriteCloser) error {
-							_, err := stdin.Write([]byte(script))
-							return err
-						})).Then(
-						exec.RedirectStdout(os.Stdout)).Then(
-						exec.RedirectStderr(os.Stderr),
-					).Done(),
+				run := exec.Command(cmd)
+				run.InheritEnvs(true).StartWithHandlers(
+					func(stdin io.Writer) error {
+						_, err := stdin.Write([]byte(script))
+						return err
+					},
+					func(stdout io.Reader) error {
+						_, err := io.Copy(os.Stdout, stdout)
+						return err
+					},
+					func(stderr io.Reader) error {
+						_, err := io.Copy(os.Stderr, stderr)
+						return err
+					},
 				)
+				return run.Wait()
 			}
 			return ""
 		})
