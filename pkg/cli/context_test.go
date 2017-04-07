@@ -1,4 +1,4 @@
-package local
+package cli
 
 import (
 	"bytes"
@@ -60,7 +60,7 @@ func TestContext(t *testing.T) {
 	}
 
 	c.exec = false
-	err := c.buildFlags()
+	err := c.BuildFlags()
 	require.NoError(t, err)
 
 	for _, n := range []string{"commit", "cluster-name", "size", "instance-type", "param"} {
@@ -70,11 +70,7 @@ func TestContext(t *testing.T) {
 	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --commit true --size 20 --instance-type large", " "))
 	require.NoError(t, err)
 
-	err = c.loadBackend()
-	require.NoError(t, err)
-	require.NotNil(t, c.run)
-
-	err = c.execute()
+	err = c.Execute()
 	require.NoError(t, err)
 
 	m := map[string]interface{}{}
@@ -112,17 +108,13 @@ done
 	}
 
 	c.exec = false
-	err := c.buildFlags()
+	err := c.BuildFlags()
 	require.NoError(t, err)
 
 	err = c.cmd.Flags().Parse(strings.Split("--lines 3", " "))
 	require.NoError(t, err)
 
-	err = c.loadBackend()
-	require.NoError(t, err)
-	require.NotNil(t, c.run)
-
-	err = c.execute()
+	err = c.Execute()
 	require.NoError(t, err)
 
 }

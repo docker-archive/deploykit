@@ -106,6 +106,8 @@ func skip(fn string) bool {
 		return true
 	case strings.Index(fn, ".") == 0:
 		return true
+	case strings.Index(fn, "#") == 0:
+		return true
 	case strings.Contains(fn, ".md"):
 		return true
 	case strings.Contains(fn, DefaultCLIExtension):
@@ -167,23 +169,14 @@ entries:
 		} else {
 
 			url := "file://" + filepath.Join(dir, entry.Name())
-			context := &Context{
-				cmd:   cmd,
-				src:   url,
-				input: os.Stdin,
-			}
+			context := cli.NewContext(cmd, url, os.Stdin)
 
 			cmd.RunE = func(c *cobra.Command, args []string) error {
 				log.Debug("Running", "command", entry.Name(), "url", url, "args", args)
-
-				err := context.loadBackend()
-				if err != nil {
-					return err
-				}
-				return context.execute()
+				return context.Execute()
 			}
 
-			err = context.buildFlags()
+			err = context.BuildFlags()
 			if err != nil {
 				return nil, err
 			}

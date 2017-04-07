@@ -1,0 +1,3 @@
+mod1 : mod1/index.ikm
+mod2 : mod2/index.ikm
+mod3 : mod3.ikc
