@@ -55,7 +55,7 @@ func TestBuilder(t *testing.T) {
 
 }
 
-func _TestRun(t *testing.T) {
+func TestRunDocker(t *testing.T) {
 
 	if SkipTests("docker") {
 		t.SkipNow()
@@ -83,21 +83,24 @@ func _TestRun(t *testing.T) {
 		dockerStop.Wait()
 	}()
 
-	err = dateStream.InheritEnvs(true).WithArg("container", name).StartWithStreams(MergeOutput(os.Stderr))
+	err = dateStream.InheritEnvs(true).WithArg("container", name).
+		WithStdout(os.Stderr).
+		WithStderr(os.Stderr).
+		Start()
 	require.NoError(t, err)
 
 	// testing with stdin
-	err = Command("/bin/sh").InheritEnvs(true).StartWithStreams(
-		Do(SendInput(
-			func(stdin io.WriteCloser) error {
+	err = Command("/bin/sh").InheritEnvs(true).
+		WithStdout(os.Stderr).
+		WithStderr(os.Stderr).
+		StartWithHandlers(
+			func(stdin io.Writer) error {
 				T(100).Info("about to write to stdin")
 				stdin.Write([]byte(`for i in $(seq 10); do echo $i; sleep 1; done`))
 				T(100).Info("wrote to stdin")
 				return nil
-			})).Then(MergeOutput(os.Stderr)).Done(),
-	)
+			}, nil, nil)
 	require.NoError(t, err)
-
 }
 
 func TestPipeline1(t *testing.T) {

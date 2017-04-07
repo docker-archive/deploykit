@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/template"
@@ -34,6 +35,28 @@ type Builder struct {
 	context     interface{}
 	rendered    string // rendered command string
 	cmd         *exec.Cmd
+	stdout      io.Writer
+	stderr      io.Writer
+	stdin       io.Reader
+	wg          sync.WaitGroup
+}
+
+// WithStdin sets the stdin reader
+func (b *Builder) WithStdin(r io.Reader) *Builder {
+	b.stdin = r
+	return b
+}
+
+// WithStdout sets the stdout writer
+func (b *Builder) WithStdout(w io.Writer) *Builder {
+	b.stdout = w
+	return b
+}
+
+// WithStderr sets the stderr writer
+func (b *Builder) WithStderr(w io.Writer) *Builder {
+	b.stdout = w
+	return b
 }
 
 // WithArg sets the arg key, value pair that can be accessed via the 'arg' function
@@ -80,108 +103,81 @@ func (b *Builder) WithContext(context interface{}) *Builder {
 	return b
 }
 
-// Step is something you do with the processes streams
-type Step func(stdin io.WriteCloser, stdout io.ReadCloser, stderr io.ReadCloser) error
+var noop = func() error { return nil }
 
-// Thenable is a fluent builder for chaining tasks
-type Thenable struct {
-	steps []Step
-}
-
-// Do creates a thenable
-func Do(f Step) *Thenable {
-	return &Thenable{
-		steps: []Step{f},
-	}
-}
-
-// Then adds another step
-func (t *Thenable) Then(then Step) *Thenable {
-	t.steps = append(t.steps, then)
-	return t
-}
-
-// Done returns the final function
-func (t *Thenable) Done() Step {
-	all := t.steps
-	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
-		for _, next := range all {
-			if err := next(stdin, stdout, stderr); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-}
-
-// SendInput is a convenience function for writing to the exec process's stdin. When the function completes, the
-// stdin is closed.
-func SendInput(f func(io.WriteCloser) error) Step {
-	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
-		defer stdin.Close()
-		return f(stdin)
-	}
-}
-
-// RedirectStdout sends stdout to given writer
-func RedirectStdout(out io.Writer) Step {
-	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
-		_, err := io.Copy(out, stdout)
-		return err
-	}
-}
-
-// RedirectStderr sends stdout to given writer
-func RedirectStderr(out io.Writer) Step {
-	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
-		_, err := io.Copy(out, stderr)
-		return err
-	}
-}
-
-// MergeOutput combines the stdout and stderr into the given stream
-func MergeOutput(out io.Writer) Step {
-	return func(stdin io.WriteCloser, stdout, stderr io.ReadCloser) error {
-		_, err := io.Copy(out, io.MultiReader(stdout, stderr))
-		return err
-	}
-}
-
-// StartWithStreams starts the the process and then calls the function which allows
-// the streams to be wired.  Calling the provided function blocks.
-func (b *Builder) StartWithStreams(f Step, args ...interface{}) error {
+// StartWithHandlers starts the cmd non blocking and calls the given handlers to process input / output
+func (b *Builder) StartWithHandlers(stdinFunc func(io.Writer) error,
+	stdoutFunc func(io.Reader) error,
+	stderrFunc func(io.Reader) error,
+	args ...interface{}) error {
 
 	if err := b.Prepare(args...); err != nil {
 		return err
 	}
 
-	run := func() error { return nil }
-	if f != nil {
+	// There's a race between the input/output streams reads and cmd.wait() which
+	// will close the pipes even while others are trying to read.
+	// So we need to ensure that all the input/output are done before actually waiting
+	// on the cmd to complete.
+	// To do so, we use a waitgroup
+
+	handleInput := noop
+	if stdinFunc != nil {
 		pIn, err := b.cmd.StdinPipe()
 		if err != nil {
 			return err
 		}
 
+		handleInput = func() error {
+			defer func() {
+				pIn.Close()
+				b.wg.Done()
+			}()
+			return stdinFunc(pIn)
+		}
+		b.wg.Add(1)
+	}
+
+	handleStdout := noop
+	if stdoutFunc != nil {
 		pOut, err := b.cmd.StdoutPipe()
 		if err != nil {
 			return err
 		}
-
+		handleStdout = func() error {
+			defer func() {
+				pOut.Close()
+				b.wg.Done()
+			}()
+			return stdoutFunc(pOut)
+		}
+		b.wg.Add(1)
+	}
+	handleStderr := noop
+	if stderrFunc != nil {
 		pErr, err := b.cmd.StderrPipe()
 		if err != nil {
 			return err
 		}
-
-		run = func() error {
-			return f(pIn, pOut, pErr)
+		handleStderr = func() error {
+			defer func() {
+				pErr.Close()
+				b.wg.Done()
+			}()
+			return stderrFunc(pErr)
 		}
+		b.wg.Add(1)
 	}
 
 	if err := b.cmd.Start(); err != nil {
 		return err
 	}
 
-	return run()
+	go handleStdout()
+	go handleStderr()
+	go handleInput()
+
+	return nil
 }
 
 // Start does a Cmd.Start on the command
@@ -189,11 +185,12 @@ func (b *Builder) Start(args ...interface{}) error {
 	if err := b.Prepare(args...); err != nil {
 		return err
 	}
-	return b.StartWithStreams(nil, args...)
+	return b.StartWithHandlers(nil, nil, nil, args...)
 }
 
 // Wait waits for the command to complete
 func (b *Builder) Wait() error {
+	b.wg.Wait()
 	return b.cmd.Wait()
 }
 
@@ -259,6 +256,15 @@ func (b *Builder) Prepare(args ...interface{}) error {
 	b.cmd = exec.Command(command[0], command[1:]...)
 	if b.inheritEnvs {
 		b.cmd.Env = append(os.Environ(), b.envs...)
+	}
+	if b.stdin != nil {
+		b.cmd.Stdin = b.stdin
+	}
+	if b.stdout != nil {
+		b.cmd.Stdout = b.stdout
+	}
+	if b.stderr != nil {
+		b.cmd.Stderr = b.stderr
 	}
 	return nil
 }
