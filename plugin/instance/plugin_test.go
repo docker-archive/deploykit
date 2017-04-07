@@ -82,7 +82,7 @@ func TestProvision(t *testing.T) {
 }
 
 func TestProvisionLogicalID(t *testing.T) {
-	properties := types.AnyString(`{}`)
+	properties := types.AnyString(`{ "AutoDeleteDisk":false, "ReuseExistingDisk":true }`)
 	tags := map[string]string{}
 
 	api, ctrl := NewMockGCloud(t)
@@ -128,8 +128,8 @@ func TestProvisionLogicalIDIsIPAddress(t *testing.T) {
 		DiskSizeMb:        10,
 		DiskImage:         "docker",
 		DiskType:          "pd-standard",
-		AutoDeleteDisk:    false,
-		ReuseExistingDisk: true,
+		AutoDeleteDisk:    true,
+		ReuseExistingDisk: false,
 		Preemptible:       false,
 		PrivateIP:         "10.20.1.100",
 		MetaData: gcloud.TagsToMetaData(map[string]string{

@@ -129,6 +129,8 @@ by GCP.
         "DiskSizeMb": 60,
         "DiskImage": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
         "DiskType": "pd-standard",
+        "AutoDeleteDisk": false,
+        "ReuseExistingDisk": true,
         "Scopes": [
           "https://www.googleapis.com/auth/cloudruntimeconfig",
           "https://www.googleapis.com/auth/logging.write"
