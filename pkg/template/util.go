@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// returns a url string of the base and a relative path.
+// GetURL returns a url string of the base and a relative path.
 // e.g. http://host/foo/bar/baz, ./boo.tpl gives http://host/foo/bar/boo.tpl
-func getURL(root, rel string) (string, error) {
+func GetURL(root, rel string) (string, error) {
 
 	// handle the case when rel is actually a full url
 	if strings.Index(rel, "://") > 0 {

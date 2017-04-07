@@ -22,7 +22,7 @@ func muxCommand(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "API mux service",
 	}
 
-	listen := cmd.Flags().StringP("listen", "l", ":8080", "Listening port")
+	listen := cmd.Flags().StringP("listen", "l", ":4358", "Listening port")
 	autoStop := cmd.Flags().BoolP("auto-stop", "a", false, "True to stop when no plugins are running")
 	interval := cmd.Flags().DurationP("scan", "s", 1*time.Minute, "Scan interval to check for plugins")
 

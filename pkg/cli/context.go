@@ -1,4 +1,4 @@
-package local
+package cli
 
 import (
 	"bufio"
@@ -27,6 +27,15 @@ type Context struct {
 	exec   bool
 	run    func(string) error
 	script string
+}
+
+// NewContext creates a context
+func NewContext(cmd *cobra.Command, src string, input io.Reader) *Context {
+	return &Context{
+		cmd:   cmd,
+		src:   src,
+		input: input,
+	}
 }
 
 // name, type, description of the flag, and a default value, which can be nil
@@ -255,7 +264,7 @@ func (c *Context) Funcs() []template.Function {
 
 // loadBackend determines the backend to use for executing the rendered template text (e.g. run in shell).
 // During this phase, the template delimiters are changed to =% %= so put this in the comment {{/* */}}
-func (c *Context) loadBackend() error {
+func (c *Context) loadBackends() error {
 	t, err := template.NewTemplate(c.src, template.Options{
 		DelimLeft:  "=%",
 		DelimRight: "%=",
@@ -302,8 +311,8 @@ func (c *Context) loadBackend() error {
 	return err
 }
 
-// buildFlags from parsing the body which is a template
-func (c *Context) buildFlags() error {
+// BuildFlags from parsing the body which is a template
+func (c *Context) BuildFlags() error {
 	t, err := template.NewTemplate(c.src, template.Options{})
 	if err != nil {
 		return err
@@ -312,7 +321,13 @@ func (c *Context) buildFlags() error {
 	return err
 }
 
-func (c *Context) execute() error {
+// Execute runs the command
+func (c *Context) Execute() error {
+
+	if err := c.loadBackends(); err != nil {
+		return err
+	}
+
 	t, err := template.NewTemplate(c.src, template.Options{
 		Stderr: func() io.Writer { return os.Stderr },
 	})

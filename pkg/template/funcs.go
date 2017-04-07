@@ -232,7 +232,7 @@ func (t *Template) DefaultFuncs() []Function {
 				headers, context := headersAndContext(opt...)
 				loc := p
 				if strings.Index(loc, "str://") == -1 {
-					buff, err := getURL(t.url, p)
+					buff, err := GetURL(t.url, p)
 					if err != nil {
 						return "", err
 					}
@@ -275,7 +275,7 @@ func (t *Template) DefaultFuncs() []Function {
 				headers, context := headersAndContext(opt...)
 				loc := p
 				if strings.Index(loc, "str://") == -1 {
-					buff, err := getURL(t.url, p)
+					buff, err := GetURL(t.url, p)
 					if err != nil {
 						return "", err
 					}
