@@ -10,13 +10,16 @@ import (
 
 const (
 	defaultNamePrefix        = "instance"
+	defaultDescription       = ""
 	defaultMachineType       = "g1-small"
 	defaultNetwork           = "default"
-	defaultDiskSizeMb        = 10
+	defaultPreemptible       = false
+	defaultDiskBoot          = true
+	defaultDiskSizeMb        = int64(10)
 	defaultDiskImage         = "docker"
 	defaultDiskType          = "pd-standard"
-	defaultAutoDeleteDisk    = true
-	defaultReuseExistingDisk = false
+	defaultDiskAutoDelete    = true
+	defaultDiskReuseExisting = false
 
 	// InfrakitLogicalID is a metadata key that is used to tag instances created with a LogicalId.
 	InfrakitLogicalID = "infrakit-logical-id"
@@ -44,13 +47,20 @@ func ParseProperties(req *types.Any) (Properties, error) {
 	parsed := Properties{
 		NamePrefix: defaultNamePrefix,
 		InstanceSettings: &gcloud.InstanceSettings{
-			MachineType:       defaultMachineType,
-			Network:           defaultNetwork,
-			DiskSizeMb:        defaultDiskSizeMb,
-			DiskImage:         defaultDiskImage,
-			DiskType:          defaultDiskType,
-			AutoDeleteDisk:    defaultAutoDeleteDisk,
-			ReuseExistingDisk: defaultReuseExistingDisk,
+			Description: defaultDescription,
+			MachineType: defaultMachineType,
+			Network:     defaultNetwork,
+			Preemptible: defaultPreemptible,
+			Disks: []gcloud.DiskSettings{
+				{
+					Boot:          defaultDiskBoot,
+					SizeMb:        defaultDiskSizeMb,
+					Image:         defaultDiskImage,
+					Type:          defaultDiskType,
+					AutoDelete:    defaultDiskAutoDelete,
+					ReuseExisting: defaultDiskReuseExisting,
+				},
+			},
 		},
 	}
 
