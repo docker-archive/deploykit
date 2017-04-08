@@ -1,0 +1,41 @@
+{
+    "ID": "rackhd-example",
+    "Properties": {
+        "Allocation": {
+            "Size": 1
+        },
+        "Instance": {
+            "Plugin": "instance-rackhd",
+            "Properties": {
+                "Workflow": {
+                    "name": "Graph.InstallCentOS",
+                    "options": {
+                        "install-os": {
+                            "version": "7.0",
+                            "rootPassword": "root"
+                        }
+                    }
+                },
+                "SKUName": "VirtualBox"
+            },
+            "Tags": {
+                "Name": "infrakit-example"
+            }
+        },
+        "Flavor": {
+            "Plugin": "flavor-vanilla",
+            "Properties": {
+                "Init": [
+                    "docker pull nginx:alpine",
+                    "docker run -d -p 80:80 nginx-alpine"
+
+                ],
+                "Tags": {
+                    "tier": "web",
+                    "project": "infrakit"
+                },
+                "Attachments" :  [{"ID":"attachid", "Type": "attachtype"}]
+            }
+        }
+    }
+}
