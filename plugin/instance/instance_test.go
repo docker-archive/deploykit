@@ -105,7 +105,7 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 				It("should read tags back during a describe operation", func() {
 					tags := make(map[string]string)
 					tags["tier"] = "web"
-					descriptions, err := pluginImpl.DescribeInstances(tags)
+					descriptions, err := pluginImpl.DescribeInstances(tags, false)
 					Expect(len(descriptions)).To(Equal(1))
 					Expect(descriptions[0].ID).To(Equal(instanceID))
 					// Expect(descriptions[0].LogicalID).To(Exist())

@@ -39,11 +39,11 @@ type RackHDProperties struct {
 
 // NewInstancePlugin creates a new plugin that creates instances in RackHD.
 func NewInstancePlugin(client monorail.Iface, username string, password string) instance.Plugin {
-	return &rackHDInstancePlugin{Client: client, Username: username, Password: password}
+	return rackHDInstancePlugin{Client: client, Username: username, Password: password}
 }
 
 // DescribeInstances Lists the instances running in RackHD by tags
-func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string) ([]instance.Description, error) {
+func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	auth, err := p.Client.Login(p.Username, p.Password)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
@@ -51,6 +51,7 @@ func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string) ([]insta
 	log.Infof("Logged into RackHD service as %s", p.Username)
 
 	nodes, nil := p.Client.Nodes().GetNodes(nodes.NewGetNodesParams(), auth)
+	log.Infof("NODES L56: %s", nodes)
 
 	descriptions := []instance.Description{}
 	for _, node := range nodes.Payload {

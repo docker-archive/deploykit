@@ -47,7 +47,7 @@ func New(endpoint string) *Monorail {
 	if err != nil {
 		panic(err)
 	}
-	transport := rc.New(u.Host, "/api/1.1", []string{u.Scheme})
+	transport := rc.New(u.Host, "/api/2.0/", []string{u.Scheme})
 	monorail := client.New(transport, strfmt.Default)
 	return &Monorail{Client: monorail, Endpoint: u}
 }
