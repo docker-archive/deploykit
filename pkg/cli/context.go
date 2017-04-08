@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/cobra"
@@ -21,20 +22,22 @@ const (
 
 // Context is the context for the running module
 type Context struct {
-	cmd    *cobra.Command
-	src    string
-	input  io.Reader
-	exec   bool
-	run    func(string) error
-	script string
+	cmd     *cobra.Command
+	src     string
+	input   io.Reader
+	exec    bool
+	run     func(string) error
+	script  string
+	plugins func() discovery.Plugins
 }
 
 // NewContext creates a context
-func NewContext(cmd *cobra.Command, src string, input io.Reader) *Context {
+func NewContext(plugins func() discovery.Plugins, cmd *cobra.Command, src string, input io.Reader) *Context {
 	return &Context{
-		cmd:   cmd,
-		src:   src,
-		input: input,
+		plugins: plugins,
+		cmd:     cmd,
+		src:     src,
+		input:   input,
 	}
 }
 
@@ -317,7 +320,8 @@ func (c *Context) BuildFlags() error {
 	if err != nil {
 		return err
 	}
-	_, err = t.Render(c)
+
+	_, err = ConfigureTemplate(t, c.plugins).Render(c)
 	return err
 }
 
@@ -334,8 +338,9 @@ func (c *Context) Execute() error {
 	if err != nil {
 		return err
 	}
+
 	c.exec = true
-	script, err := t.Render(c)
+	script, err := ConfigureTemplate(t, c.plugins).Render(c)
 	if err != nil {
 		return err
 	}
