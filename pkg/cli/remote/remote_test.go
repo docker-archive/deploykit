@@ -43,7 +43,7 @@ func TestLoadModules(t *testing.T) {
 
 	T(100).Infoln(m)
 
-	commands, err := list(m, os.Stdin, nil, &root)
+	commands, err := list(nil, m, os.Stdin, nil, &root)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(commands))
 }
@@ -57,7 +57,7 @@ func TestLoadAll(t *testing.T) {
 		Op("testdata"): root,
 	}
 
-	modules, err := NewModules(top, os.Stdin)
+	modules, err := NewModules(nil, top, os.Stdin)
 	require.NoError(t, err)
 
 	commands, err := modules.List()

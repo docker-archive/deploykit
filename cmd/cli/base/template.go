@@ -7,8 +7,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/pflag"
@@ -134,25 +134,7 @@ func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 				}
 			}
 
-			engine.WithFunctions(func() []template.Function {
-				return []template.Function{
-					{
-						Name: "metadata",
-						Description: []string{
-							"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-							"and calls GET on the plugin with the path \"path/to/data\".",
-							"It's identical to the CLI command infrakit metadata cat ...",
-						},
-						Func: metadata_template.MetadataFunc(plugins),
-					},
-					{
-						Name: "resource",
-						Func: func(s string) string {
-							return fmt.Sprintf("{{ resource `%s` }}", s)
-						},
-					},
-				}
-			})
+			cli.ConfigureTemplate(engine, plugins)
 
 			view, err = engine.Render(nil)
 			if err != nil {

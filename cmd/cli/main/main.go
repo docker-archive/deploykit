@@ -5,17 +5,26 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/docker/infrakit/cmd/cli/base"
-	"github.com/docker/infrakit/cmd/cli/playbook"
 	"github.com/docker/infrakit/pkg/cli"
 	cli_local "github.com/docker/infrakit/pkg/cli/local"
-	cli_remote "github.com/docker/infrakit/pkg/cli/remote"
 	"github.com/docker/infrakit/pkg/discovery"
 	discovery_local "github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
+
+	_ "github.com/docker/infrakit/cmd/cli/event"
+	_ "github.com/docker/infrakit/cmd/cli/flavor"
+	_ "github.com/docker/infrakit/cmd/cli/group"
+	_ "github.com/docker/infrakit/cmd/cli/manager"
+	_ "github.com/docker/infrakit/cmd/cli/playbook"
+	_ "github.com/docker/infrakit/cmd/cli/plugin"
+	_ "github.com/docker/infrakit/cmd/cli/resource"
+	_ "github.com/docker/infrakit/cmd/cli/template"
+	_ "github.com/docker/infrakit/cmd/cli/util"
 )
 
 func init() {
@@ -55,10 +64,19 @@ func main() {
 
 		if len(remotes) > 0 {
 			for _, h := range remotes {
+				addProtocol := false
+				if !strings.Contains(h, "://") {
+					h = "http://" + h
+					addProtocol = true
+				}
 				u, err := url.Parse(h)
 				if err != nil {
 					return err
 				}
+				if addProtocol {
+					u.Scheme = "http"
+				}
+
 				ulist = append(ulist, u)
 			}
 		}
@@ -96,48 +114,11 @@ func main() {
 		cmd.AddCommand(c)
 	})
 
-	mods := []*cobra.Command{}
-	// additional modules
-	if os.Getenv(cli.CliDirEnvVar) != "" {
-		modules, err := cli_local.NewModules(cli_local.Dir())
-		if err != nil {
-			log.Crit("error executing", "err", err)
-			os.Exit(1)
-		}
-		localModules, err := modules.List()
-		log.Debug("modules", "local", localModules)
-		if err != nil {
-			log.Crit("error executing", "err", err)
-			os.Exit(1)
-		}
-		mods = append(mods, localModules...)
-	}
-
-	// any remote modules?
-	pmod, err := playbook.Load()
-	if err != nil {
-		log.Warn("playbooks failed to load", "err", err)
-	} else {
-		if playbooks, err := cli_remote.NewModules(pmod, os.Stdin); err != nil {
-			log.Warn("error loading playbooks", "err", err)
-		} else {
-			if more, err := playbooks.List(); err != nil {
-				log.Warn("cannot list playbooks", "err", err)
-			} else {
-				mods = append(mods, more...)
-			}
-		}
-	}
-
-	for _, mod := range mods {
-		log.Debug("Adding", "module", mod.Use)
-		cmd.AddCommand(mod)
-	}
-
-	cmd.SetUsageTemplate(usageTemplate)
+	// Help template includes the usage string, which is configure below
 	cmd.SetHelpTemplate(helpTemplate)
+	cmd.SetUsageTemplate(usageTemplate)
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		log.Crit("error executing", "cmd", cmd.Use, "err", err)
 		fmt.Println(err.Error())

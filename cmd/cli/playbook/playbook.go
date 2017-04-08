@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/docker/infrakit/cmd/cli/base"
+	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/cli/local"
 	"github.com/docker/infrakit/pkg/cli/remote"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -184,6 +186,52 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	list.Flags().AddFlagSet(rawOutputFlags)
 
 	cmd.AddCommand(add, remove, list)
+
+	reserved := map[*cobra.Command]int{add: 1, remove: 1, list: 1}
+
+	// Modules
+	mods := []*cobra.Command{}
+	// additional modules
+	if os.Getenv(cli.CliDirEnvVar) != "" {
+		modules, err := local.NewModules(plugins, local.Dir())
+		if err != nil {
+			log.Crit("error executing", "err", err)
+			os.Exit(1)
+		}
+		localModules, err := modules.List()
+		log.Debug("modules", "local", localModules)
+		if err != nil {
+			log.Crit("error executing", "err", err)
+			os.Exit(1)
+		}
+		mods = append(mods, localModules...)
+	}
+
+	// any remote modules?
+	pmod, err := Load()
+	if err != nil {
+		log.Warn("playbooks failed to load", "err", err)
+	} else {
+		if playbooks, err := remote.NewModules(plugins, pmod, os.Stdin); err != nil {
+			log.Warn("error loading playbooks", "err", err)
+		} else {
+			if more, err := playbooks.List(); err != nil {
+				log.Warn("cannot list playbooks", "err", err)
+			} else {
+				mods = append(mods, more...)
+			}
+		}
+	}
+
+	for _, mod := range mods {
+		if _, has := reserved[mod]; has {
+			log.Warn("cannot override reserverd command; igored", "conflict", mod.Use)
+			continue
+		}
+
+		log.Debug("Adding", "module", mod.Use)
+		cmd.AddCommand(mod)
+	}
 
 	return cmd
 }

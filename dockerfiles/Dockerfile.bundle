@@ -1,13 +1,24 @@
-FROM alpine:3.5
-
-RUN apk add --update ca-certificates
+FROM docker:latest
 
 RUN mkdir -p /infrakit/plugins /infrakit/configs /infrakit/logs /infrakit/cli
 
 VOLUME /infrakit
 
 ENV INFRAKIT_HOME /infrakit
+
+# Defined in pkg/discovery
 ENV INFRAKIT_PLUGINS_DIR /infrakit/plugins
+
+# Defined in pkg/cli
 ENV INFRAKIT_CLI_DIR /infrakit/cli
+
+# Defined in cmd/cli/playbook
+ENV INFRAKIT_PLAYBOOKS_FILE /infrakit/playbooks
+
+# When using the manager 'os' option
+ENV INFRAKIT_LEADER_FILE /infrakit/leader
+ENV INFRAKIT_STORE_DIR /infrakit/configs
+
+
 
 ADD build/* /usr/local/bin/

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -18,6 +19,7 @@ var log = logutil.New("module", "cli/remote")
 type remote struct {
 	modules Modules
 	input   io.Reader
+	plugins func() discovery.Plugins
 }
 
 // Op is the name of the operation / sub-command
@@ -30,10 +32,11 @@ type SourceURL string
 type Modules map[Op]SourceURL
 
 // NewModules returns an implementation of Modules using a file at given URL. The file is in YAML format
-func NewModules(modules Modules, input io.Reader) (cli.Modules, error) {
+func NewModules(plugins func() discovery.Plugins, modules Modules, input io.Reader) (cli.Modules, error) {
 	return &remote{
 		modules: modules,
 		input:   input,
+		plugins: plugins,
 	}, nil
 }
 
@@ -75,7 +78,8 @@ func dir(url SourceURL) (Modules, error) {
 	return m, err
 }
 
-func list(modules Modules, input io.Reader, parent *cobra.Command, parentURL *SourceURL) ([]*cobra.Command, error) {
+func list(plugins func() discovery.Plugins, modules Modules, input io.Reader,
+	parent *cobra.Command, parentURL *SourceURL) ([]*cobra.Command, error) {
 
 	found := []*cobra.Command{}
 
@@ -101,22 +105,24 @@ loop:
 		mods, err := dir(url)
 		if err == nil {
 			copy := url
-			subs, err := list(mods, input, cmd, &copy)
+			subs, err := list(plugins, mods, input, cmd, &copy)
 			if err != nil {
-				return nil, err
+				log.Warn("cannot list", "op", op, "url", url)
+				continue loop
 			}
 			for _, sub := range subs {
 				cmd.AddCommand(sub)
 			}
 		} else {
-			ctx := cli.NewContext(cmd, string(url), input)
+			ctx := cli.NewContext(plugins, cmd, string(url), input)
 			cmd.RunE = func(c *cobra.Command, args []string) error {
 				log.Debug("Running", "command", op, "url", url, "args", args)
 				return ctx.Execute()
 			}
 			err := ctx.BuildFlags()
 			if err != nil {
-				return nil, err
+				log.Warn("cannot build flags", "op", op, "url", url)
+				continue loop
 			}
 		}
 		found = append(found, cmd)
@@ -130,7 +136,7 @@ func (r *remote) List() ([]*cobra.Command, error) {
 	if err := resolved(r.modules); err != nil {
 		return nil, err
 	}
-	return list(r.modules, r.input, nil, nil)
+	return list(r.plugins, r.modules, r.input, nil, nil)
 }
 
 func resolved(m Modules) error {
