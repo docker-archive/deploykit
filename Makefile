@@ -60,6 +60,13 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
+build-docker-dev:
+	@echo "+ $@"
+	GOOS=linux GOARCH=amd64 make build-in-container
+	@docker build ${DOCKER_BUILD_FLAGS} \
+	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
+	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+
 get-tools:
 	@echo "+ $@"
 	@go get -u \

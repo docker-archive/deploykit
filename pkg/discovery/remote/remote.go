@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/docker/infrakit/pkg/discovery"
@@ -18,9 +19,19 @@ var log = logutil.New("module", "discovery/remote")
 func ParseURLMust(s ...string) []*url.URL {
 	out := []*url.URL{}
 	for _, ss := range s {
+
+		addProtocol := false
+		if !strings.Contains(ss, "://") {
+			ss = "http://" + ss
+			addProtocol = true
+		}
+
 		u, err := url.Parse(ss)
 		if err != nil {
 			panic(err)
+		}
+		if addProtocol {
+			u.Scheme = "http"
 		}
 		out = append(out, u)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -63,10 +64,19 @@ func main() {
 
 		if len(remotes) > 0 {
 			for _, h := range remotes {
+				addProtocol := false
+				if !strings.Contains(h, "://") {
+					h = "http://" + h
+					addProtocol = true
+				}
 				u, err := url.Parse(h)
 				if err != nil {
 					return err
 				}
+				if addProtocol {
+					u.Scheme = "http"
+				}
+
 				ulist = append(ulist, u)
 			}
 		}
