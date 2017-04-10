@@ -55,7 +55,7 @@ func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 
 	fs := pflag.NewFlagSet("template", pflag.ExitOnError)
 
-	globals := fs.StringSliceP("global", "g", []string{}, "key=value pairs of 'global' values in template")
+	globals := fs.StringSliceP("var", "v", []string{}, "key=value pairs of globally scoped variagbles")
 	yamlDoc := fs.BoolP("yaml", "y", false, "True if input is in yaml format; json is the default")
 	dump := fs.BoolP("dump", "x", false, "True to dump to output instead of executing")
 
