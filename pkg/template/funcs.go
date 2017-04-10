@@ -316,58 +316,64 @@ func (t *Template) DefaultFuncs() []Function {
 				return make([]struct{}, c)
 			},
 		},
+		// {
+		// 	Name: "global",
+		// 	Description: []string{
+		// 		"Sets a global variable named after the first argument, with the value as",
+		// 		"the second argument. This is similar to def (which sets the default value).",
+		// 		"Global variables are propagated to all templates that are rendered via the 'include' function.",
+		// 		"DEPRECATED - use var",
+		// 	},
+		// 	Func: func(n string, v interface{}) Void {
+		// 		log.Warn("deprecated -- use var instead")
+		// 		t.Global(n, v)
+		// 		return voidValue
+		// 	},
+		// },
+		// {
+		// 	Name: "ref",
+		// 	Description: []string{
+		// 		"References / gets the variable named after the first argument.",
+		// 		"The values must be set first by either def or global.",
+		// 		"DEPRECATED - use var",
+		// 	},
+		// 	Func: func(n string) interface{} {
+		// 		log.Warn("deprecated -- use var instead")
+		// 		return t.Ref(n)
+		// 	},
+		// },
 		{
-			Name: "global",
+			Name: "var",
 			Description: []string{
-				"Sets a global variable named after the first argument, with the value as the second argument.",
-				"This is similar to def (which sets the default value).",
-				"Global variables are propagated to all templates that are rendered via the 'include' function.",
+				"References or sets a variable.  If single argument, returns the value.",
+				"If second argument is provided, sets the variable. The scope is global.",
 			},
-			Func: func(n string, v interface{}) Void {
-				t.Global(n, v)
+			Func: func(n string, optional ...interface{}) interface{} {
+				if len(optional) == 0 {
+					return t.Ref(n)
+				}
+				t.Global(n, optional[len(optional)-1])
 				return voidValue
 			},
 		},
 		{
-			Name: "def",
+			Name: "k",
 			Description: []string{
-				"Defines a variable with the first argument as name and last argument value as the default.",
-				"It's also ok to pass a third optional parameter, in the middle, as the documentation string.",
+				"Get value from dictionary by key.",
+				"First arg is the key, second must be a map[string]interface{}",
 			},
-			Func: func(name string, args ...interface{}) (Void, error) {
-				if _, has := t.defaults[name]; has {
-					// not sure if this is good, but should complain loudly
-					return voidValue, fmt.Errorf("already defined: %v", name)
-				}
-				var doc string
-				var value interface{}
-				switch len(args) {
-				case 1:
-					// just value, no docs
-					value = args[0]
-				case 2:
-					// docs and value
-					doc = fmt.Sprintf("%v", args[0])
-					value = args[1]
-				}
-				t.Def(name, value, doc)
-				return voidValue, nil
+			Func: // MapIndex gets the value of key from map
+			func(k interface{}, m map[string]interface{}) interface{} {
+				return m[fmt.Sprintf("%v", k)]
 			},
-		},
-		{
-			Name: "ref",
-			Description: []string{
-				"References / gets the variable named after the first argument.",
-				"The values must be set first by either def or global.",
-			},
-			Func: t.Ref,
 		},
 		{
 			Name: "q",
 			Description: []string{
 				"Runs a JMESPath (http://jmespath.org/) query (first arg) on the object (second arg).",
 				"The return value is an object which needs to be rendered properly for the format of the document.",
-				"Example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of http request.",
+				"Example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }}",
+				"returns the origin of http request.",
 			},
 			Func: QueryObject,
 		},
@@ -450,16 +456,6 @@ func (t *Template) DefaultFuncs() []Function {
 				"This is useful for parsing arbitrary resources in INI format as object.  The object is the queryable via 'q'",
 			},
 			Func: FromINI,
-		},
-		{
-			Name: "k",
-			Description: []string{
-				"Get value from dictionary by key. First arg is the key, second must be a map[string]interface{}",
-			},
-			Func: // MapIndex gets the value of key from map
-			func(k interface{}, m map[string]interface{}) interface{} {
-				return m[fmt.Sprintf("%v", k)]
-			},
 		},
 		{
 			Name: "echo",

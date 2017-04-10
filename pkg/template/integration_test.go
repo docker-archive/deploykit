@@ -8,12 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
-
-var logger = log.New("module", "template")
 
 func TestTemplateInclusionFromDifferentSources(t *testing.T) {
 	prefix := testSetupTemplates(t, testFiles)
@@ -164,7 +161,7 @@ The message is {{str}}
 }
 
 func TestMissingGlobal(t *testing.T) {
-	s := `{{ if not (ref "/not/exist")}}none{{else}}here{{end}}`
+	s := `{{ if not (var "/not/exist")}}none{{else}}here{{end}}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
 	view, err := tt.Render(nil)
@@ -173,8 +170,8 @@ func TestMissingGlobal(t *testing.T) {
 }
 
 func TestSourceAndDef(t *testing.T) {
-	r := `{{ def \"foo\" 100 }}`
-	s := `{{ source "str://` + r + `" }}foo={{ref "foo"}}`
+	r := `{{ var \"foo\" 100 }}`
+	s := `{{ source "str://` + r + `" }}foo={{var "foo"}}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
 	view, err := tt.Render(nil)
@@ -182,19 +179,9 @@ func TestSourceAndDef(t *testing.T) {
 	require.Equal(t, "foo=100", view)
 }
 
-func TestAddDef(t *testing.T) {
-	s := `{{ ref "message" }}: x + y = {{ add (ref "x") (ref "y") }}`
-	tt, err := NewTemplate("str://"+s, Options{})
-	require.NoError(t, err)
-
-	view, err := tt.Def("x", 25, "Default value for x").Def("y", 100, "no doc").Def("message", "hello", "").Render(nil)
-	require.NoError(t, err)
-	require.Equal(t, "hello: x + y = 125", view)
-}
-
 func TestSourceAndGlobal(t *testing.T) {
-	r := `{{ global \"foo\" 100 }}`
-	s := `{{ source "str://` + r + `" }}foo={{ref "foo"}}`
+	r := `{{ var \"foo\" 100 }}`
+	s := `{{ source "str://` + r + `" }}foo={{var "foo"}}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
 	view, err := tt.Render(nil)
@@ -203,8 +190,8 @@ func TestSourceAndGlobal(t *testing.T) {
 }
 
 func TestIncludeAndGlobal(t *testing.T) {
-	r := `{{ global \"foo\" 100 }}` // the child template tries to mutate the global
-	s := `{{ include "str://` + r + `" }}foo={{ref "foo"}}`
+	r := `{{ var \"foo\" 100 }}` // the child template tries to mutate the global
+	s := `{{ include "str://` + r + `" }}foo={{var "foo"}}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
 	tt.Global("foo", 200) // set the global of the calling / parent template
@@ -218,7 +205,7 @@ func TestSourceAndGlobalWithContext(t *testing.T) {
 		"a": 1,
 		"b": 2,
 	}
-	r := `{{ global \"foo\" 100 }}{{$void := set . \"a\" 100}}` // sourced mutates the context
+	r := `{{ var \"foo\" 100 }}{{$void := set . \"a\" 100}}` // sourced mutates the context
 	s := `{{ source "str://` + r + `" }}a={{.a}}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
@@ -232,7 +219,7 @@ func TestIncludeAndGlobalWithContext(t *testing.T) {
 		"a": 1,
 		"b": 2,
 	}
-	r := `{{ global \"foo\" 100 }}{{$void := set . \"a\" 100}}` // included tries to mutate the context
+	r := `{{ var \"foo\" 100 }}{{$void := set . \"a\" 100}}` // included tries to mutate the context
 	s := `{{ include "str://` + r + `" }}a={{.a}}`
 	tt, err := NewTemplate("str://"+s, Options{})
 	require.NoError(t, err)
@@ -264,27 +251,27 @@ func TestWithFunctions(t *testing.T) {
 func TestSourceWithHeaders(t *testing.T) {
 
 	h, context := headersAndContext("foo=bar")
-	logger.Info("result", "context", context, "headers", h)
+	log.Info("result", "context", context, "headers", h)
 	require.Equal(t, interface{}(nil), context)
 	require.Equal(t, map[string][]string{"foo": {"bar"}}, h)
 
 	h, context = headersAndContext("foo=bar", "bar=baz", 224)
-	logger.Info("result", "context", context, "headers", h)
+	log.Info("result", "context", context, "headers", h)
 	require.Equal(t, 224, context)
 	require.Equal(t, map[string][]string{"foo": {"bar"}, "bar": {"baz"}}, h)
 
 	h, context = headersAndContext("foo=bar", "bar=baz")
-	logger.Info("result", "context", context, "headers", h)
+	log.Info("result", "context", context, "headers", h)
 	require.Equal(t, nil, context)
 	require.Equal(t, map[string][]string{"foo": {"bar"}, "bar": {"baz"}}, h)
 
 	h, context = headersAndContext("foo")
-	logger.Info("result", "context", context, "headers", h)
+	log.Info("result", "context", context, "headers", h)
 	require.Equal(t, "foo", context)
 	require.Equal(t, map[string][]string{}, h)
 
 	h, context = headersAndContext("foo=bar", map[string]string{"hello": "world"})
-	logger.Info("result", "context", context, "headers", h)
+	log.Info("result", "context", context, "headers", h)
 	require.Equal(t, map[string]string{"hello": "world"}, context)
 	require.Equal(t, map[string][]string{"foo": {"bar"}}, h)
 

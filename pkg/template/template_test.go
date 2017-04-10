@@ -31,18 +31,18 @@ func TestRunTemplateWithJMESPath(t *testing.T) {
 }
 
 func TestVarAndGlobal(t *testing.T) {
-	str := `{{ q "locations[?state == 'WA'].name | sort(@) | {WashingtonCities: join(', ', @)}" . | global "washington-cities"}}
+	str := `{{ q "locations[?state == 'WA'].name | sort(@) | {WashingtonCities: join(', ', @)}" . | var "washington-cities"}}
 
 {{/* The query above is exported and referenced somewhere else */}}
-{{ from_json "[\"SF\",\"LA\"]" | def "california-cities" "Default value for California cities" }}
-{{ from_json "{\"SF\":\"94109\",\"LA\":\"90210\"}" | def "zip-codes" "Default value for zip codes" }}
+{{ from_json "[\"SF\",\"LA\"]" | var "california-cities" "Default value for California cities" }}
+{{ from_json "{\"SF\":\"94109\",\"LA\":\"90210\"}" | var "zip-codes" "Default value for zip codes" }}
 
 {
   "test" : "hello",
   "val"  : true,
-  "result" : {{ref "washington-cities" | to_json}},
-  "california" : {{ ref "california-cities" | to_json}},
-  "sf_zip" : {{ ref "zip-codes" | q "SF" | to_json }}
+  "result" : {{ var "washington-cities" | to_json}},
+  "california" : {{ var "california-cities" | to_json}},
+  "sf_zip" : {{ var "zip-codes" | q "SF" | to_json }}
 }
 `
 
