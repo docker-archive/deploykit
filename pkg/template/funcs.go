@@ -316,32 +316,6 @@ func (t *Template) DefaultFuncs() []Function {
 				return make([]struct{}, c)
 			},
 		},
-		// {
-		// 	Name: "global",
-		// 	Description: []string{
-		// 		"Sets a global variable named after the first argument, with the value as",
-		// 		"the second argument. This is similar to def (which sets the default value).",
-		// 		"Global variables are propagated to all templates that are rendered via the 'include' function.",
-		// 		"DEPRECATED - use var",
-		// 	},
-		// 	Func: func(n string, v interface{}) Void {
-		// 		log.Warn("deprecated -- use var instead")
-		// 		t.Global(n, v)
-		// 		return voidValue
-		// 	},
-		// },
-		// {
-		// 	Name: "ref",
-		// 	Description: []string{
-		// 		"References / gets the variable named after the first argument.",
-		// 		"The values must be set first by either def or global.",
-		// 		"DEPRECATED - use var",
-		// 	},
-		// 	Func: func(n string) interface{} {
-		// 		log.Warn("deprecated -- use var instead")
-		// 		return t.Ref(n)
-		// 	},
-		// },
 		{
 			Name: "var",
 			Description: []string{
@@ -473,33 +447,6 @@ func (t *Template) DefaultFuncs() []Function {
 				}
 				return ""
 			},
-		},
-
-		// Deprecated
-		{
-			Name: "to_json",
-			Description: []string{
-				"Encodes the input as a JSON string",
-				"This is useful for taking an object (interface{}) and render it inline as proper JSON.",
-				"Example: {{ include \"https://httpbin.org/get\" | from_json | to_json }}",
-			},
-			Func: ToJSON,
-		},
-		{
-			Name: "to_json_format",
-			Description: []string{
-				"Encodes the input as a JSON string with first arg as prefix, second arg the indentation, then the object",
-			},
-			Func: ToJSONFormat,
-		},
-		{
-			Name: "from_json",
-			Description: []string{
-				"Decodes the input (first arg) into a structure (a map[string]interface{} or []interface{}).",
-				"This is useful for parsing arbitrary resources in JSON format as object.  The object is the queryable via 'q'",
-				"For example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of request.",
-			},
-			Func: FromJSON,
 		},
 	}
 }

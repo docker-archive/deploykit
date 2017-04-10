@@ -85,11 +85,11 @@ echo "this is common/setup.sh"
    "test" : "test1",
    "description" : "simple template to test the various template functions",
    {{/* Load from from ./ using relative path notation. Then split into lines and json encode */}}
-   "userData" : {{ include "script.tpl" . | lines | to_json }},
+   "userData" : {{ include "script.tpl" . | lines | jsonEncode }},
    {{/* Load from an URL */}}
    "sample" : {{ include "https://httpbin.org/get" }},
    {{/* Load from URL and then parse as JSON then select an attribute */}}
-   "originIp" : "{{ include "https://httpbin.org/get" | from_json | q "origin" }}"
+   "originIp" : "{{ include "https://httpbin.org/get" | jsonDecode | q "origin" }}"
 }`,
 
 		"plugin/script.tpl": `
