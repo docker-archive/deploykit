@@ -67,7 +67,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		view, err := renderer.Def("plugin", *name, "Plugin name").Render(info)
+		view, err := renderer.Global("plugin", *name).Render(info)
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		view, err := renderer.Def("plugin", *name, "Plugin name").Render(info)
+		view, err := renderer.Global("plugin", *name).Render(info)
 		if err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 const (
 	apiViewTemplate = `
-Plugin:     {{ref "plugin"}}
+Plugin:     {{var "plugin"}}
 Implements: {{range $spi := .Implements}}{{$spi.Name}}/{{$spi.Version}} {{end}}
 Interfaces: {{range $iface := .Interfaces}}
   SPI:      {{$iface.Name}}/{{$iface.Version}}
@@ -136,7 +136,7 @@ Interfaces: {{range $iface := .Interfaces}}
 
 	funcsViewTemplate = `
 {{range $category, $functions := .}}
-{{ref "plugin"}}/{{$category}} _________________________________________________________________________________________
+{{var "plugin"}}/{{$category}} _________________________________________________________________________________________
   {{range $f := $functions}}
     Name:        {{$f.Name}}
     Description: {{join "\n                 " $f.Description}}
