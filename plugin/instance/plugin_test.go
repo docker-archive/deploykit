@@ -64,6 +64,7 @@ func TestProvision(t *testing.T) {
 			"key1":                 "value1",
 			"key2":                 "value2",
 			"startup-script":       "echo 'Startup'",
+			"userdata":             "echo 'Startup'",
 			"infrakit-gcp-version": "1",
 		}),
 	}).Return(nil)

@@ -70,7 +70,11 @@ func ParseTags(spec instance.Spec) (map[string]string, error) {
 	}
 
 	if spec.Init != "" {
+		// spec.Init is special. Some plugins customise it via
+		// the templating mechanism and it can either be a
+		// startup script or just userdata. Store it twice.
 		tags["startup-script"] = spec.Init
+		tags["userdata"] = spec.Init
 	}
 
 	properties, err := ParseProperties(spec.Properties)
