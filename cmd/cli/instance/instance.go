@@ -56,9 +56,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
+	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
+
 	///////////////////////////////////////////////////////////////////////////////////
 	// validate
-	validateTemplateFlags, toJSON, _, validateProcessTemplate := base.TemplateProcessor(plugins)
 	validate := &cobra.Command{
 		Use:   "validate <instance configuration url>",
 		Short: "Validates an instance configuration. Read from stdin if url is '-'",
@@ -71,7 +72,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return validateProcessTemplate(args[0]) },
+				func() (string, error) { return processTemplate(args[0]) },
 				toJSON,
 			)
 			if err != nil {
@@ -85,11 +86,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	validate.Flags().AddFlagSet(validateTemplateFlags)
+	validate.Flags().AddFlagSet(templateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// provision
-	provisionTemplateFlags, toJSON, _, provisionProcessTemplate := base.TemplateProcessor(plugins)
 	provision := &cobra.Command{
 		Use:   "provision <instance configuration url>",
 		Short: "Provisions an instance.  Read from stdin if url is '-'",
@@ -102,7 +102,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return provisionProcessTemplate(args[0]) },
+				func() (string, error) { return processTemplate(args[0]) },
 				toJSON,
 			)
 			if err != nil {
@@ -121,7 +121,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	provision.Flags().AddFlagSet(provisionTemplateFlags)
+	provision.Flags().AddFlagSet(templateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// destroy

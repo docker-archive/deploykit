@@ -54,9 +54,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
+	templateFlags, toJSON, fromJSON, processTemplate := base.TemplateProcessor(plugins)
+
 	///////////////////////////////////////////////////////////////////////////////////
 	// commit
-	commitTemplateFlags, toJSON, _, commitProcessTemplate := base.TemplateProcessor(plugins)
 	commit := &cobra.Command{
 		Use:   "commit <template URL>",
 		Short: "Commit a resource configuration at url.  Read from stdin if url is '-'",
@@ -68,7 +69,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return commitProcessTemplate(args[0]) },
+				func() (string, error) { return processTemplate(args[0]) },
 				toJSON,
 			)
 			if err != nil {
@@ -91,16 +92,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	commit.Flags().AddFlagSet(commitTemplateFlags)
+	commit.Flags().AddFlagSet(templateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// destroy
-	destroyTemplateFlags, toJSON, _, destroyProcessTemplate := base.TemplateProcessor(plugins)
 	destroy := &cobra.Command{
 		Use:   "destroy <template URL>",
 		Short: "Destroy a resource configuration specified by the URL. Read from stdin if url is '-'",
 	}
-	destroy.Flags().AddFlagSet(destroyTemplateFlags)
+	destroy.Flags().AddFlagSet(templateFlags)
 	destroy.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 1 {
@@ -110,7 +110,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		view, err := base.ReadFromStdinIfElse(
 			func() bool { return args[0] == "-" },
-			func() (string, error) { return destroyProcessTemplate(args[0]) },
+			func() (string, error) { return processTemplate(args[0]) },
 			toJSON,
 		)
 		if err != nil {
@@ -135,7 +135,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// describe
-	describeTemplateFlags, toJSON, fromJSON, describeProcessTemplate := base.TemplateProcessor(plugins)
 	describe := &cobra.Command{
 		Use:   "describe <template URL>",
 		Short: "Describe a resource configuration specified by the URL. Read from stdin if url is '-'",
@@ -148,7 +147,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return describeProcessTemplate(args[0]) },
+				func() (string, error) { return processTemplate(args[0]) },
 				toJSON,
 			)
 			if err != nil {
@@ -175,7 +174,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	describe.Flags().AddFlagSet(describeTemplateFlags)
+	describe.Flags().AddFlagSet(templateFlags)
 
 	cmd.AddCommand(
 		commit,
