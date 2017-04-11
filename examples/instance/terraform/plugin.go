@@ -147,16 +147,25 @@ type TFormat struct {
 }
 
 const (
-	VM_AWS   = TResourceType("aws_instance")
-	VM_AZURE = TResourceType("azurerm_virtual_machine")
-	VM_DO    = TResourceType("digitalocean_droplet")
-	VM_GCP   = TResourceType("google_compute_instance")
-	VM_SL    = TResourceType("softlayer_virtual_guest")
+	//VMAmazon is the resource type for aws
+	VMAmazon = TResourceType("aws_instance")
+
+	// VMAzure is the resource type for azure
+	VMAzure = TResourceType("azurerm_virtual_machine")
+
+	// VMDigitalOcean is the resource type for digital ocean
+	VMDigitalOcean = TResourceType("digitalocean_droplet")
+
+	// VMGoogleCloud is the resource type for google
+	VMGoogleCloud = TResourceType("google_compute_instance")
+
+	// VMSoftLayer is the resource type for softlayer
+	VMSoftLayer = TResourceType("softlayer_virtual_guest")
 )
 
 var (
 	// VMTypes is a list of supported vm types.
-	VMTypes = []interface{}{VM_AWS, VM_AZURE, VM_DO, VM_GCP, VM_SL}
+	VMTypes = []interface{}{VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud, VMSoftLayer}
 )
 
 // first returns the first entry.  This is based on our assumption that exactly one vm resource per file.
@@ -196,15 +205,18 @@ func (p *plugin) Validate(req *types.Any) error {
 		return err
 	}
 
-	_, _, vm, err := FindVM(&tf)
-	if err != nil {
-		return err
+	vmTypes := mapset.NewSetFromSlice(VMTypes)
+	vms := 0
+	for k := range tf.Resource {
+		if vmTypes.Contains(k) {
+			vms++
+		}
 	}
 
-	if vm == nil {
-		// we need exactly 1 vm per file
-		return fmt.Errorf("exactly 1 vm instance per file: %v", vm)
+	if vms > 1 {
+		return fmt.Errorf("zero or 1 vm instance per request: %d", vms)
 	}
+
 	return nil
 }
 
@@ -383,7 +395,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// add a name
 	if spec.Tags != nil {
 		switch vmType {
-		case VM_SL:
+		case VMSoftLayer:
 			// Set the "name" tag to be lowercase to meet platform requirements
 			if _, has := spec.Tags["name"]; !has {
 				spec.Tags["name"] = string(id)
@@ -399,7 +411,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	p.optionalProcessHostname(vmType, TResourceName(name), properties)
 
 	switch vmType {
-	case VM_AWS, VM_AZURE, VM_DO, VM_GCP:
+	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
 		if t, exists := properties["tags"]; !exists {
 			properties["tags"] = spec.Tags
 		} else if mm, ok := t.(map[string]interface{}); ok {
@@ -408,7 +420,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 				mm[tt] = vv
 			}
 		}
-	case VM_SL:
+	case VMSoftLayer:
 		if _, has := properties["tags"]; !has {
 			properties["tags"] = []interface{}{}
 		}
@@ -426,7 +438,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 	}
 	switch vmType {
-	case VM_AWS:
+	case VMAmazon:
 		if p, exists := properties["private_ip"]; exists {
 			if p == "INSTANCE_LOGICAL_ID" {
 				if spec.LogicalID != nil {
@@ -442,11 +454,11 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	// merge the inits
 	switch vmType {
-	case VM_AWS, VM_DO:
+	case VMAmazon, VMDigitalOcean:
 		addUserData(properties, "user_data", base64.StdEncoding.EncodeToString([]byte(spec.Init)))
-	case VM_SL:
+	case VMSoftLayer:
 		addUserData(properties, "user_metadata", spec.Init)
-	case VM_AZURE:
+	case VMAzure:
 		// os_profile.custom_data
 		if m, has := properties["os_profile"]; !has {
 			properties["os_profile"] = map[string]interface{}{
@@ -455,7 +467,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		} else if mm, ok := m.(map[string]interface{}); ok {
 			addUserData(mm, "custom_data", spec.Init)
 		}
-	case VM_GCP:
+	case VMGoogleCloud:
 		// metadata_startup_script
 		addUserData(properties, "metadata_startup_script", spec.Init)
 	}
@@ -501,7 +513,7 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 	}
 
 	switch vmType {
-	case VM_AWS, VM_AZURE, VM_DO, VM_GCP:
+	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
 		if _, has := props["tags"]; !has {
 			props["tags"] = map[string]interface{}{}
 		}
@@ -512,7 +524,7 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 			}
 		}
 
-	case VM_SL:
+	case VMSoftLayer:
 		if _, has := props["tags"]; !has {
 			props["tags"] = []interface{}{}
 		}

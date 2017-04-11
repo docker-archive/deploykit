@@ -208,7 +208,7 @@ func run(t *testing.T, resourceType, properties string) {
 	value, _ := v.(map[string]interface{})
 
 	switch vmType {
-	case VM_SL:
+	case VMSoftLayer:
 		require.Equal(t, conv([]interface{}{
 			"terraform_demo_swarm_mgr_sl",
 			"label1:value1",
@@ -229,7 +229,7 @@ func run(t *testing.T, resourceType, properties string) {
 		// Verify the hostname prefix key/value is no longer in the props
 		require.Nil(t, props["@hostname_prefix"])
 
-	case VM_AWS:
+	case VMAmazon:
 		require.Equal(t, map[string]interface{}{
 			"InstancePlugin": "terraform",
 			"label1":         "value1",
@@ -256,7 +256,7 @@ func run(t *testing.T, resourceType, properties string) {
 
 	vmType, _, props, err = FindVM(&parsed)
 	switch vmType {
-	case VM_SL:
+	case VMSoftLayer:
 		require.Equal(t, conv([]interface{}{
 			"terraform_demo_swarm_mgr_sl",
 			"label1:changed1",
@@ -264,7 +264,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label3:value3",
 			"name:" + string(*id),
 		}), conv(props["tags"].([]interface{})))
-	case VM_AWS:
+	case VMAmazon:
 		require.Equal(t, map[string]interface{}{
 			"InstancePlugin": "terraform",
 			"label1":         "changed1",
@@ -278,7 +278,7 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NoError(t, err)
 
 	switch vmType {
-	case VM_SL:
+	case VMSoftLayer:
 		require.Equal(t, []instance.Description{
 			{
 				ID: *id,
@@ -291,7 +291,7 @@ func run(t *testing.T, resourceType, properties string) {
 				},
 			},
 		}, list)
-	case VM_AWS:
+	case VMAmazon:
 		require.Equal(t, []instance.Description{
 			{
 				ID: *id,
