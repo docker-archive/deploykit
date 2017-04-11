@@ -24,11 +24,16 @@ import (
 
 const (
 	ebsAttachment string = "ebs"
+
+	// AllInstances as a special logical ID for use in the Attachments map
+	AllInstances = instance.LogicalID("*")
 )
 
 // Spec is the value passed in the `Properties` field of configs
 type Spec struct {
-	// Attachments indicate the devices that are to be attached to the instance
+
+	// Attachments indicate the devices that are to be attached to the instance.
+	// If the logical ID is '*' (the AllInstances const) then the attachment applies to all instances.
 	Attachments map[instance.LogicalID][]instance.Attachment
 
 	// InitScriptTemplateURL overrides the template specified when the plugin started up.
@@ -316,6 +321,13 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		}
 	}
 
+	// look for the AllInstances logicalID in shared attachments
+	for logicalID, attachments := range spec.Attachments {
+		if logicalID == AllInstances {
+			instanceSpec.Attachments = append(instanceSpec.Attachments, attachments...)
+		}
+	}
+
 	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
 	// swarm.  This will require plumbing back to Scaled (membership tags).
 	instanceSpec.Tags["swarm-id"] = swarmID
@@ -341,7 +353,7 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
 		idsMap[id] = true
 	}
 	for id := range attachments {
-		if _, exists := idsMap[id]; !exists {
+		if _, exists := idsMap[id]; !exists && id != AllInstances {
 			return fmt.Errorf("LogicalID %v used for an attachment but is not in group LogicalIDs", id)
 		}
 	}
@@ -350,17 +362,7 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
 	for _, atts := range attachments {
 		for _, attachment := range atts {
 			if attachment.Type == "" {
-				return fmt.Errorf(
-					"Attachment Type %s must be specified for '%s'",
-					ebsAttachment,
-					attachment.ID)
-			}
-
-			if attachment.Type != ebsAttachment {
-				return fmt.Errorf(
-					"Invalid attachment Type '%s', only %s is supported",
-					attachment.Type,
-					ebsAttachment)
+				return fmt.Errorf("no attachment type")
 			}
 		}
 	}

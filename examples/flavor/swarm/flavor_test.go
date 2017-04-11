@@ -80,14 +80,13 @@ func TestValidate(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "Attachment a specified more than once", err.Error())
 
-	// Unsupported Attachment Type.
+	// Attachment for all
 	err = managerFlavor.Validate(
 		types.AnyString(`{
                         "Docker" : {"Host":"unix:///var/run/docker.sock"},
-			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "keyboard"}]}}`),
+			"Attachments": {"*": [{"ID": "a", "Type": "NFSVolume"}]}}`),
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
-	require.Error(t, err)
-	require.Equal(t, "Invalid attachment Type 'keyboard', only ebs is supported", err.Error())
+	require.NoError(t, err)
 
 	close(managerStop)
 	close(workerStop)
@@ -192,15 +191,27 @@ func TestManager(t *testing.T) {
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
 	client.EXPECT().Close().AnyTimes()
 
+	flavorSpec := types.AnyString(`
+{
+  "Attachments" : {
+    "10.20.100.1" : [ { "ID" : "disk01", "Type" : "disk" }, { "ID" : "nic01", "Type" : "nic" } ],
+    "10.20.100.2" : [ { "ID" : "disk02", "Type" : "disk" }, { "ID" : "nic02", "Type" : "nic" } ],
+    "10.20.100.3" : [ { "ID" : "disk03", "Type" : "disk" }, { "ID" : "nic03", "Type" : "nic" } ]
+  }
+}
+`)
+
 	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
-	id := instance.LogicalID("127.0.0.1")
-	details, err := flavorImpl.Prepare(
-		types.AnyString(`{"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]}}`),
+	id := instance.LogicalID("10.20.100.1")
+	details, err := flavorImpl.Prepare(flavorSpec,
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}},
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1"}},
 		index)
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
+
+	// ensures that the attachments are matched to the logical ID of the instance and in the attachments map
+	require.Equal(t, []instance.Attachment{{ID: "disk01", Type: "disk"}, {ID: "nic01", Type: "nic"}}, details.Attachments)
 
 	link := types.NewLinkFromMap(details.Tags)
 	require.True(t, link.Valid())
@@ -227,6 +238,31 @@ func TestManager(t *testing.T) {
 	require.NotContains(t, details.Init, swarmInfo.JoinTokens.Worker)
 
 	require.Equal(t, []instance.Attachment{{ID: "a", Type: "gpu"}}, details.Attachments)
+
+	// Shared AllInstances for attachment
+	for _, id := range []instance.LogicalID{
+		instance.LogicalID("10.20.100.1"),
+		instance.LogicalID("10.20.100.2"),
+		instance.LogicalID("10.20.100.3"),
+	} {
+
+		details, err = flavorImpl.Prepare(
+			types.AnyString(`{"Attachments": {"*": [{"ID": "nfs", "Type": "NFSVolume"}]}}`),
+			instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
+			group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
+			index)
+		require.NoError(t, err)
+		require.Equal(t, []instance.Attachment{{ID: "nfs", Type: "NFSVolume"}}, details.Attachments)
+	}
+
+	// Shared AllInstances for attachment -- for workers / no special logical IDs
+	details, err = flavorImpl.Prepare(
+		types.AnyString(`{"Attachments": {"*": [{"ID": "nfs", "Type": "NFSVolume"}]}}`),
+		instance.Spec{Tags: map[string]string{"a": "b"}},
+		group_types.AllocationMethod{Size: 10},
+		index)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Attachment{{ID: "nfs", Type: "NFSVolume"}}, details.Attachments)
 
 	// An instance with no association information is considered unhealthy.
 	health, err := flavorImpl.Healthy(types.AnyString("{}"), instance.Description{})
@@ -278,16 +314,16 @@ func TestTemplateFunctions(t *testing.T) {
 
 	properties := types.AnyString(`
 {
- "Attachments": {"127.0.0.1": [{"ID": "a", "Type": "gpu"}]},
+ "Attachments": {"10.20.100.1": [{"ID": "a", "Type": "gpu"}]},
  "InitScriptTemplateURL" : "str://` + initTemplate + `"
 }
 `)
 
 	index := group_types.Index{Group: group.ID("group"), Sequence: 100}
-	id := instance.LogicalID("127.0.0.1")
+	id := instance.LogicalID("10.20.100.1")
 	details, err := flavorImpl.Prepare(properties,
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}},
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1"}},
 		index)
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("%v,%v", index.Group, index.Sequence), details.Init)
