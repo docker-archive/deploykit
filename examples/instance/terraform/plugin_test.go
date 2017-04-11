@@ -19,8 +19,9 @@ func TestUsage(t *testing.T) {
 	// Test a softlayer_virtual_guest with an @hostname_prefix
 	run(t, "softlayer_virtual_guest", `
 {
-        "type": "softlayer_virtual_guest",
-        "value": {
+  "resource" : {
+    "softlayer_virtual_guest": {
+      "host" : {
           "@hostname_prefix": "softlayer-hostname",
           "cores": 2,
           "memory": 2048,
@@ -41,41 +42,51 @@ func TestUsage(t *testing.T) {
             "${data.softlayer_ssh_key.public_key.id}"
           ]
         }
-      }
+    }
+  }
+}
 `)
 
 	// Test a softlayer_virtual_guest without an @hostname_prefix
 	run(t, "softlayer_virtual_guest", `
 {
-		"type": "softlayer_virtual_guest",
-		"value": {
-			"cores": 2,
-			"memory": 2048,
-			"tags": [
-				"terraform_demo_swarm_mgr_sl"
-			],
-			"connection": {
-				"user": "root",
-				"private_key": "${file(\"~/.ssh/id_rsa_de\")}"
-			},
-			"hourly_billing": true,
-			"local_disk": true,
-			"network_speed": 100,
-			"datacenter": "dal10",
-			"os_reference_code": "UBUNTU_14_64",
-			"domain": "softlayer.com",
-			"ssh_key_ids": [
-				"${data.softlayer_ssh_key.public_key.id}"
-			]
-		}
-	}
+  "resource" : {
+    "ibmcloud_infra_file_storage": {
+      "csy_test_file_storage1": {
+        "iops" : 0.25,
+        "type" : "Endurance",
+        "datacenter" : "dal10",
+        "capacity" : 20
+      }
+    },
+    "softlayer_virtual_guest" : {
+       "host" : {
+	  "cores": 2,
+	  "memory": 2048,
+	  "tags": [ "terraform_demo_swarm_mgr_sl" ],
+	  "connection": {
+	     "user": "root",
+	     "private_key": "${file(\"~/.ssh/id_rsa_de\")}"
+	     },
+	  "hourly_billing": true,
+	  "local_disk": true,
+	  "network_speed": 100,
+	  "datacenter": "dal10",
+	  "os_reference_code": "UBUNTU_14_64",
+	  "domain": "softlayer.com",
+	  "ssh_key_ids": [ "${data.softlayer_ssh_key.public_key.id}" ]
+       }
+    }
+  }
+}
 `)
 
 	// Test a softlayer_virtual_guest with an empty @hostname_prefix
 	run(t, "softlayer_virtual_guest", `
 {
-		"type": "softlayer_virtual_guest",
-		"value": {
+  "resource" : {
+    "softlayer_virtual_guest" : {
+      "host" : {
 			"@hostname_prefix": "   ",
 			"cores": 2,
 			"memory": 2048,
@@ -96,37 +107,50 @@ func TestUsage(t *testing.T) {
 				"${data.softlayer_ssh_key.public_key.id}"
 			]
 		}
-	}
+    }
+  }
+}
 `)
 
 	run(t, "aws_instance", `
 {
-        "type" : "aws_instance",
-        "value" : {
-            "ami" : "${lookup(var.aws_amis, var.aws_region)}",
-            "instance_type" : "m1.small",
-            "key_name": "PUBKEY",
-            "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
-            "subnet_id": "${aws_subnet.default.id}",
-            "private_ip": "INSTANCE_LOGICAL_ID",
-            "tags" :  {
-                "Name" : "web4",
-                "InstancePlugin" : "terraform"
-            },
-            "connection" : {
-                "user" : "ubuntu"
-            },
-            "provisioner" : {
-                "remote_exec" : {
-                    "inline" : [
-                        "sudo apt-get -y update",
-                        "sudo apt-get -y install nginx",
-                        "sudo service nginx start"
-                    ]
-                }
-            }
-        }
-}`)
+  "resource" : {
+    "aws_instance" : {
+      "host" : {
+         "ami" : "${lookup(var.aws_amis, var.aws_region)}",
+         "instance_type" : "m1.small",
+         "key_name": "PUBKEY",
+         "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
+         "subnet_id": "${aws_subnet.default.id}",
+         "private_ip": "INSTANCE_LOGICAL_ID",
+         "tags" :  {
+             "Name" : "web4",
+             "InstancePlugin" : "terraform"
+         },
+         "connection" : {
+             "user" : "ubuntu"
+         },
+         "provisioner" : {
+             "remote_exec" : {
+                 "inline" : [
+                     "sudo apt-get -y update",
+                     "sudo apt-get -y install nginx",
+                     "sudo service nginx start"
+                 ]
+             }
+         }
+      }
+    }
+  }
+}
+`)
+}
+
+func firstInMap(m map[string]interface{}) (string, interface{}) {
+	for k, v := range m {
+		return k, v
+	}
+	return "", nil
 }
 
 func run(t *testing.T, resourceType, properties string) {
@@ -166,21 +190,25 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NoError(t, err)
 
 	any := types.AnyBytes(buff)
-	parsed := TFormat{}
-	err = any.Decode(&parsed)
+	tformat := TFormat{}
+	err = any.Decode(&tformat)
 	require.NoError(t, err)
-	require.NotNil(t, parsed.Resource)
 
-	props := parsed.Resource[resourceType][string(*id)]
+	vmType, _, props, err := FindVM(&tformat)
+	require.NoError(t, err)
+	require.NotNil(t, props)
 
 	// Unmarshal json for easy access
 	var testingData interface{}
 	json.Unmarshal([]byte(properties), &testingData)
 	m := testingData.(map[string]interface{})
-	value, _ := m["value"].(map[string]interface{})
 
-	switch resourceType {
-	case "softlayer_virtual_guest":
+	_, vms := firstInMap(m["resource"].(map[string]interface{}))
+	_, v := firstInMap(vms.(map[string]interface{}))
+	value, _ := v.(map[string]interface{})
+
+	switch vmType {
+	case VM_SL:
 		require.Equal(t, conv([]interface{}{
 			"terraform_demo_swarm_mgr_sl",
 			"label1:value1",
@@ -201,7 +229,7 @@ func run(t *testing.T, resourceType, properties string) {
 		// Verify the hostname prefix key/value is no longer in the props
 		require.Nil(t, props["@hostname_prefix"])
 
-	case "aws_instance":
+	case VM_AWS:
 		require.Equal(t, map[string]interface{}{
 			"InstancePlugin": "terraform",
 			"label1":         "value1",
@@ -221,13 +249,14 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NoError(t, err)
 
 	any = types.AnyBytes(buff)
-	parsed = TFormat{}
+
+	parsed := TFormat{}
 	err = any.Decode(&parsed)
 	require.NoError(t, err)
 
-	props = parsed.Resource[resourceType][string(*id)]
-	switch resourceType {
-	case "softlayer_virtual_guest":
+	vmType, _, props, err = FindVM(&parsed)
+	switch vmType {
+	case VM_SL:
 		require.Equal(t, conv([]interface{}{
 			"terraform_demo_swarm_mgr_sl",
 			"label1:changed1",
@@ -235,7 +264,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label3:value3",
 			"name:" + string(*id),
 		}), conv(props["tags"].([]interface{})))
-	case "aws_instance":
+	case VM_AWS:
 		require.Equal(t, map[string]interface{}{
 			"InstancePlugin": "terraform",
 			"label1":         "changed1",
@@ -248,8 +277,8 @@ func run(t *testing.T, resourceType, properties string) {
 	list, err := terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
 
-	switch resourceType {
-	case "softlayer_virtual_guest":
+	switch vmType {
+	case VM_SL:
 		require.Equal(t, []instance.Description{
 			{
 				ID: *id,
@@ -262,7 +291,7 @@ func run(t *testing.T, resourceType, properties string) {
 				},
 			},
 		}, list)
-	case "aws_instance":
+	case VM_AWS:
 		require.Equal(t, []instance.Description{
 			{
 				ID: *id,
