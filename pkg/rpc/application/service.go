@@ -151,6 +151,7 @@ func (p *Application) Healthy(_ *http.Request, req *HealthyRequest, resp *Health
 	return nil
 }
 
+// Update specify resource information
 func (p *Application) Update(_ *http.Request, req *UpdateRequest, resp *UpdateResponse) error {
 	resp.Type = req.Type
 	c := p.getPlugin(req.Type)

@@ -13,6 +13,7 @@ import (
 	"sync"
 )
 
+// NewEventRepeater creates an event repeater application.
 func NewEventRepeater(eSource string, eSink string, protocol string, allowall bool) application.Plugin {
 	sub, err := event_rpc.NewClient(eSource)
 	if err != nil {
@@ -71,6 +72,7 @@ type eventRepeater struct {
 	eventListMt   *sync.Mutex
 }
 
+// RepeatRule for each event
 type RepeatRule struct {
 	SourceTopic  string
 	SinkTopic    string
@@ -80,8 +82,8 @@ type RepeatRule struct {
 }
 
 type messageData struct {
-	SourceTopic string `json:"sourcetopic",omitempty"`
-	SinkTopic   string `json:"sinktopic",omitempty"`
+	SourceTopic string `json:"sourcetopic, omitempty"`
+	SinkTopic   string `json:"sinktopic, omitempty"`
 }
 
 func (e eventRepeater) Validate(applicationProperties *types.Any) error {
@@ -92,7 +94,7 @@ func (e eventRepeater) Healthy(applicationProperties *types.Any) (application.He
 	return application.Healthy, nil
 }
 
-func (e eventRepeater) AddEvent(sourcesTopic string, sinkTopic string) error {
+func (e eventRepeater) addEvent(sourcesTopic string, sinkTopic string) error {
 	if sourcesTopic == "" {
 		return fmt.Errorf("Error: %s", "You must have a topic of source for add repeat event.")
 	}
@@ -120,7 +122,7 @@ func (e eventRepeater) AddEvent(sourcesTopic string, sinkTopic string) error {
 	return nil
 }
 
-func (e eventRepeater) DelEvent(sourcesTopic string) error {
+func (e eventRepeater) delEvent(sourcesTopic string) error {
 	if sourcesTopic == "" {
 		return fmt.Errorf("Error: %s", "You must have a topic of source for delete repeat event.")
 	}
@@ -167,7 +169,6 @@ func (e eventRepeater) publishToSink(rr *RepeatRule) error {
 			}
 		}
 	}
-	return nil
 }
 
 func (e eventRepeater) Update(message *application.Message) error {
@@ -183,25 +184,25 @@ func (e eventRepeater) Update(message *application.Message) error {
 		case application.ADD:
 			for _, d := range dataStruct {
 				log.Debugf("Add message %v \n", d)
-				err := e.AddEvent(d.SourceTopic, d.SinkTopic)
+				err := e.addEvent(d.SourceTopic, d.SinkTopic)
 				if err != nil {
 					return err
 				}
 			}
 		case application.DELETE:
 			for _, d := range dataStruct {
-				err := e.DelEvent(d.SourceTopic)
+				err := e.delEvent(d.SourceTopic)
 				if err != nil {
 					return err
 				}
 			}
 		case application.UPDATE:
 			for _, d := range dataStruct {
-				err := e.DelEvent(d.SourceTopic)
+				err := e.delEvent(d.SourceTopic)
 				if err != nil {
 					return err
 				}
-				err = e.AddEvent(d.SourceTopic, d.SinkTopic)
+				err = e.addEvent(d.SourceTopic, d.SinkTopic)
 				if err != nil {
 					return err
 				}
@@ -218,7 +219,7 @@ func (e eventRepeater) Update(message *application.Message) error {
 
 func (e eventRepeater) serve() error {
 	if e.allowAll {
-		e.AddEvent(".", "")
+		e.addEvent(".", "")
 	}
 	for {
 		select {

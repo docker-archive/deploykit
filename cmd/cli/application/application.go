@@ -16,6 +16,7 @@ import (
 
 var log = logutil.New("module", "cli/event")
 
+//OPERATIONS code of update command
 var OPERATIONS = map[int]string{1: "Add", 2: "Delete", 3: "Update", 4: "Read"}
 
 func init() {

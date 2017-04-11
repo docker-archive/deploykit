@@ -40,7 +40,3 @@ type Subscriber interface {
 	// SubscribeOn returns the channel for the topic
 	SubscribeOn(topic types.Path) (<-chan *Event, chan<- struct{}, error)
 }
-
-type Application interface {
-	List(topic types.Path) ([]string, error)
-}
