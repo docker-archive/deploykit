@@ -1,0 +1,14 @@
+
+# An index file.  This file can be of any extension but the convention is to use .ikb (for InfraKit playBook)
+
+# Starts the infrakit daemons using a common data volume for sockets and files
+start-infrakit : start-infrakit.ikt
+
+# Stops all the infrakit daemons
+stop-infrakit  : stop-infrakit.ikt
+
+# Here is a submodule.  We point to a index.ikb (you can call whatever but nice to have convention) in a sub folder:
+events         : events/index.ikb
+
+aws : aws/index.ikb
+gcp : gcp/index.ikb

@@ -124,7 +124,7 @@ loop:
 			copy := url
 			subs, err := list(plugins, mods, input, cmd, &copy)
 			if err != nil {
-				log.Warn("cannot list", "op", op, "url", url)
+				log.Warn("cannot list", "op", op, "url", url, "err", err)
 				continue loop
 			}
 			for _, sub := range subs {
@@ -138,7 +138,7 @@ loop:
 			}
 			err := ctx.BuildFlags()
 			if err != nil {
-				log.Warn("cannot build flags", "op", op, "url", url)
+				log.Warn("cannot build flags", "op", op, "url", url, "err", err)
 				continue loop
 			}
 		}
