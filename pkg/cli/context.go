@@ -146,7 +146,7 @@ func (c *Context) getFromFlag(name, ftype, desc string, def interface{}) (interf
 }
 
 // returns true if the value v is missing of the type t
-func missing(t string, v interface{}) bool {
+func Missing(t string, v interface{}) bool {
 	if v == nil {
 		return true
 	}
@@ -177,7 +177,7 @@ func parseBool(text string) (bool, error) {
 	return v > 0, err
 }
 
-func (c *Context) prompt(prompt, ftype string, optional ...interface{}) (interface{}, error) {
+func Prompt(in io.Reader, prompt, ftype string, optional ...interface{}) (interface{}, error) {
 	def, label := "", ""
 	if len(optional) > 0 {
 		def = fmt.Sprintf("%v", optional[0])
@@ -186,7 +186,7 @@ func (c *Context) prompt(prompt, ftype string, optional ...interface{}) (interfa
 		}
 	}
 
-	input := bufio.NewReader(c.input)
+	input := bufio.NewReader(in)
 	fmt.Fprintf(os.Stderr, "%s %s: ", prompt, label)
 	text, _ := input.ReadString('\n')
 	text = strings.Trim(text, " \t\n")
@@ -255,11 +255,11 @@ func (c *Context) Funcs() []template.Function {
 				}
 				// The last value in the optional var args is the value from the previous
 				// pipeline.
-				if len(optional) > 0 && !missing(ftype, optional[len(optional)-1]) {
+				if len(optional) > 0 && !Missing(ftype, optional[len(optional)-1]) {
 					return optional[len(optional)-1], nil
 				}
 
-				return c.prompt(prompt, ftype, optional...)
+				return Prompt(c.input, prompt, ftype, optional...)
 			},
 		},
 	}
