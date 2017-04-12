@@ -5,12 +5,12 @@
             "Size": 1
         },
         "Instance": {
-            "Plugin": "instance-rackhd",
+            "Plugin": "rackhd",
             "Properties": {
                 "Workflow": {
                     "name": "Graph.InstallCentOS",
                     "options": {
-                        "install-os": {
+                        "defaults": {
                             "version": "7.0",
                             "rootPassword": "root"
                         }
@@ -24,17 +24,15 @@
         },
         "Flavor": {
             "Plugin": "flavor-vanilla",
+            "Init": [
+                "sudo yum install -y nginx",
+                "sudo service nginx start"
+            ],
             "Properties": {
-                "Init": [
-                    "docker pull nginx:alpine",
-                    "docker run -d -p 80:80 nginx-alpine"
-
-                ],
                 "Tags": {
                     "tier": "web",
                     "project": "infrakit"
-                },
-                "Attachments" :  [{"ID":"attachid", "Type": "attachtype"}]
+                }
             }
         }
     }

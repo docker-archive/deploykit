@@ -1,7 +1,7 @@
 # vim:set ft=ruby
 Vagrant.configure("2") do |config|
     config.vm.box = "rackhd/rackhd"
-    config.vm.box_version = "1.3.0"
+    config.vm.box_version = "2.1.0"
     config.vm.provider "virtualbox" do |v|
         v.memory = 4096
         v.cpus = 4
@@ -20,13 +20,41 @@ Vagrant.configure("2") do |config|
 
     config.ssh.forward_agent = true
 
+    # Enable admin user
     config.vm.provision "shell", inline: <<-EOS
-      /usr/bin/apt-get install -y gccgo-go
       /usr/bin/curl -sk -H "Content-Type: application/json" -X POST https://localhost:8443/api/current/users -d '{"username": "admin", "password": "admin123", "role": "Administrator"}'
+      if [ ! -f on-tools ]
+      then
+        git clone https://github.com/RackHD/on-tools.git
+      fi
+      if [ ! -f /var/mirrors/Centos/7.0 ]
+      then
+        sudo python ./on-tools/scripts/setup_iso.py /vagrant/CentOS-7-x86_64-DVD-1611.iso /var/mirrors --link /var/renasar
+      fi
+      sudo ln -s /var/mirrors/Centos /var/renasar/on-http/static/http/centos
+      sudo mkdir /var/mirrors/Centos/7.0/os
+      sudo ln -s /var/mirrors/Centos/7.0 /var/mirors/Centos/7.0/os/x86_64
+      sudo ln -s /var/mirrors/Centos /var/renasar/on-http/static/http/centos
+      sudo perl -pi -e 's|monorail-undionly.kpxe|monorail.ipxe|g' /var/renasar/on-dhcp-proxy/lib/message-handler.js
+      sudo service on-dhcp-proxy restart
     EOS
-    #   git clone https://github.com/docker/infrakit.git
-    #   cd infrakit
-    #   make binaries
-    #   build/infrakit-group-default &
-    #   build/infrakit-flavor-vanilla &
+
+    # Install Docker Infrakit
+    # config.vm.provision "shell",
+    #   env: {
+    #     "GOROOT" => "/home/vagrant/go",
+    #     "GOPATH" => "/home/vagrant/gocode"
+    #   },
+    #   inline: <<-EOS
+    #     mkdir /home/vagrant/go
+    #     mkdir /home/vagrant/gocode
+    #     /usr/bin/apt-get install -y gccgo-go
+    #     go get gofmt
+    #     go get github.com/docker/infrakit
+    #     go get github.com/codedellemc/infrakit.rackhd
+    #     cd infrakit
+    #     make binaries
+    #     build/infrakit-group-default &
+    #     build/infrakit-flavor-vanilla &
+    #   EOS
 end
