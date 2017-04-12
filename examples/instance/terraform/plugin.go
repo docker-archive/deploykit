@@ -17,6 +17,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/deckarep/golang-set"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/nightlyone/lockfile"
@@ -129,35 +130,93 @@ JSON looks like below, where the value of `value` is the instance body of the TF
 }
 
 */
-type TFormat struct {
 
-	// Resource : resource_type : name : map[string]interface{}
-	Resource map[string]map[string]map[string]interface{} `json:"resource"`
+// TResourceType is the type name of the resource: e.g. ibmcloud_infra_virtual_guest
+type TResourceType string
+
+// TResourceName is the name of the resource e.g. host1
+type TResourceName string
+
+// TResourceProperties is a dictionary for the resource
+type TResourceProperties map[string]interface{}
+
+// TFormat is the on-disk file format for the instance-xxxx.json.  This supports multiple resources.
+type TFormat struct {
+	// Resource matches the resource structure of the tf.json resource section
+	Resource map[TResourceType]map[TResourceName]TResourceProperties `json:"resource"`
 }
 
-// SpecPropertiesFormat is the schema in the Properties field of the instance.Spec JSON
-type SpecPropertiesFormat struct {
-	Type  string                 `json:"type"`
-	Value map[string]interface{} `json:"value"`
+const (
+	//VMAmazon is the resource type for aws
+	VMAmazon = TResourceType("aws_instance")
+
+	// VMAzure is the resource type for azure
+	VMAzure = TResourceType("azurerm_virtual_machine")
+
+	// VMDigitalOcean is the resource type for digital ocean
+	VMDigitalOcean = TResourceType("digitalocean_droplet")
+
+	// VMGoogleCloud is the resource type for google
+	VMGoogleCloud = TResourceType("google_compute_instance")
+
+	// VMSoftLayer is the resource type for softlayer
+	VMSoftLayer = TResourceType("softlayer_virtual_guest")
+)
+
+var (
+	// VMTypes is a list of supported vm types.
+	VMTypes = []interface{}{VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud, VMSoftLayer}
+)
+
+// first returns the first entry.  This is based on our assumption that exactly one vm resource per file.
+func first(vms map[TResourceName]TResourceProperties) (TResourceName, TResourceProperties) {
+	for k, v := range vms {
+		return k, v
+	}
+	return TResourceName(""), nil
+}
+
+// FindVM finds the resource block representing the vm instance from the tf.json representation
+func FindVM(tf *TFormat) (vmType TResourceType, vmName TResourceName, properties TResourceProperties, err error) {
+	if tf.Resource == nil {
+		err = fmt.Errorf("no resource section")
+		return
+	}
+
+	supported := mapset.NewSetFromSlice(VMTypes)
+	for resourceType, objs := range tf.Resource {
+		if supported.Contains(resourceType) {
+			vmType = resourceType
+			vmName, properties = first(objs)
+			return
+		}
+	}
+	err = fmt.Errorf("not found")
+	return
 }
 
 // Validate performs local validation on a provision request.
 func (p *plugin) Validate(req *types.Any) error {
 	log.Debugln("validate", req.String())
 
-	parsed := SpecPropertiesFormat{}
-	err := req.Decode(&parsed)
+	tf := TFormat{}
+	err := req.Decode(&tf)
 	if err != nil {
 		return err
 	}
 
-	if parsed.Type == "" {
-		return fmt.Errorf("no-resource-type:%s", req.String())
+	vmTypes := mapset.NewSetFromSlice(VMTypes)
+	vms := 0
+	for k := range tf.Resource {
+		if vmTypes.Contains(k) {
+			vms++
+		}
 	}
 
-	if len(parsed.Value) == 0 {
-		return fmt.Errorf("no-value:%s", req.String())
+	if vms > 1 {
+		return fmt.Errorf("zero or 1 vm instance per request: %d", vms)
 	}
+
 	return nil
 }
 
@@ -221,10 +280,10 @@ func doTerraformApply(dir string) error {
 	return cmd.Run() // blocks
 }
 
-func (p *plugin) terraformShow() (map[string]interface{}, error) {
+func (p *plugin) terraformShow() (map[TResourceName]TResourceProperties, error) {
 	re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
 
-	result := map[string]interface{}{}
+	result := map[TResourceName]TResourceProperties{}
 
 	fs := &afero.Afero{Fs: p.fs}
 	// just scan the directory for the instance-*.tf.json files
@@ -232,84 +291,24 @@ func (p *plugin) terraformShow() (map[string]interface{}, error) {
 		matches := re.FindStringSubmatch(info.Name())
 
 		if len(matches) == 3 {
-			id := matches[1]
-			parse := map[string]interface{}{}
-
 			buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
-
 			if err != nil {
 				log.Warningln("Cannot parse:", err)
 				return err
 			}
-
-			err = json.Unmarshal(buff, &parse)
+			tf := TFormat{}
+			if err = types.AnyBytes(buff).Decode(&tf); err != nil {
+				return err
+			}
+			_, vmName, props, err := FindVM(&tf)
 			if err != nil {
 				return err
 			}
-
-			if res, has := parse["resource"].(map[string]interface{}); has {
-				var first map[string]interface{}
-			res:
-				for _, r := range res {
-					if f, ok := r.(map[string]interface{}); ok {
-						first = f
-						break res
-					}
-				}
-				if props, has := first[id]; has {
-					result[id] = props
-				}
-			}
+			result[vmName] = props
 		}
 		return nil
 	})
 	return result, err
-}
-
-func (p *plugin) parseTfStateFile() (map[string]interface{}, error) {
-	// open the terraform.tfstate file
-	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, "terraform.tfstate"))
-	if err != nil {
-
-		// The tfstate file is not present this means we have to apply it first.
-		if os.IsNotExist(err) {
-			if err = p.terraformApply(); err != nil {
-				return nil, err
-			}
-			return p.terraformShow()
-		}
-		return nil, err
-	}
-
-	// tfstate is a JSON so query it
-	parsed := map[string]interface{}{}
-	err = json.Unmarshal(buff, &parsed)
-	if err != nil {
-		return nil, err
-	}
-
-	if m1, has := parsed["modules"].([]interface{}); has && len(m1) > 0 {
-		module := m1[0]
-		if mm, ok := module.(map[string]interface{}); ok {
-			if resources, ok := mm["resources"].(map[string]interface{}); ok {
-
-				// the attributes are wrapped under each resource objects'
-				// primary.attributes
-				result := map[string]interface{}{}
-				for k, rr := range resources {
-					if r, ok := rr.(map[string]interface{}); ok {
-						if primary, ok := r["primary"].(map[string]interface{}); ok {
-							if attributes, ok := primary["attributes"]; ok {
-								result[k] = attributes
-							}
-						}
-					}
-				}
-				return result, nil
-			}
-		}
-	}
-	return nil, nil
 }
 
 func (p *plugin) ensureUniqueFile() string {
@@ -336,43 +335,55 @@ func ensureUniqueFile(dir string) string {
 // Special processing of hostname on some platforms. Where supported, you can
 // add a special @hostname_prefix that will allow the setting of hostname in given format
 // TODO - expand this to formatting string
-func (p *plugin) optionalProcessHostname(properties *SpecPropertiesFormat, name string) {
-	switch properties.Type {
-	case "softlayer_virtual_guest": // # list the platforms here
+func (p *plugin) optionalProcessHostname(vmType TResourceType, name TResourceName, properties TResourceProperties) {
+
+	if properties == nil {
+		return
+	}
+
+	switch vmType {
+	case TResourceType("softlayer_virtual_guest"): // # list the platforms here
 	default:
 		return
 	}
 
 	// Use the given hostname value as a prefix if it is a non-empty string
-	if hostnamePrefix, is := properties.Value["@hostname_prefix"].(string); is {
+	if hostnamePrefix, is := properties["@hostname_prefix"].(string); is {
 		hostnamePrefix = strings.Trim(hostnamePrefix, " ")
 		// Use the default behavior if hostnamePrefix was either not a string, or an empty string
 		if hostnamePrefix == "" {
-			properties.Value["hostname"] = name
+			properties["hostname"] = string(name)
 		} else {
 			// Remove "instance-" from "instance-XXXX", then append that string to the hostnamePrefix to create the new hostname
-			properties.Value["hostname"] = fmt.Sprintf("%s-%s", hostnamePrefix, strings.Replace(name, "instance-", "", -1))
+			properties["hostname"] = fmt.Sprintf("%s-%s", hostnamePrefix, strings.Replace(string(name), "instance-", "", -1))
 		}
 	} else {
-		properties.Value["hostname"] = name
+		properties["hostname"] = name
 	}
 	// Delete hostnamePrefix so it will not be written in the *.tf.json file
-	delete(properties.Value, "@hostname_prefix")
-	log.Debugln("Adding hostname to properties: hostname=", properties.Value["hostname"])
+	delete(properties, "@hostname_prefix")
+	log.Debugln("Adding hostname to properties: hostname=", properties["hostname"])
 }
 
 // Provision creates a new instance based on the spec.
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
-	// Simply writes a file and call terraform apply
 
-	if spec.Properties == nil {
-		return nil, fmt.Errorf("no-properties")
-	}
+	// Because the format of the spec.Properties is simply the same tf.json
+	// we simply look for vm instance and merge in the tags, and user init, etc.
 
-	properties := SpecPropertiesFormat{}
-	err := spec.Properties.Decode(&properties)
+	tf := TFormat{}
+	err := spec.Properties.Decode(&tf)
 	if err != nil {
 		return nil, err
+	}
+
+	vmType, vmName, properties, err := FindVM(&tf)
+	if err != nil {
+		return nil, err
+	}
+
+	if properties == nil {
+		return nil, fmt.Errorf("no-vm-instance-in-spec")
 	}
 
 	// use timestamp as instance id
@@ -383,8 +394,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// set the tags.
 	// add a name
 	if spec.Tags != nil {
-		switch properties.Type {
-		case "softlayer_virtual_guest":
+		switch vmType {
+		case VMSoftLayer:
 			// Set the "name" tag to be lowercase to meet platform requirements
 			if _, has := spec.Tags["name"]; !has {
 				spec.Tags["name"] = string(id)
@@ -397,79 +408,75 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 	}
 
-	p.optionalProcessHostname(&properties, name)
+	p.optionalProcessHostname(vmType, TResourceName(name), properties)
 
-	switch properties.Type {
-	case "aws_instance", "azurerm_virtual_machine", "digitalocean_droplet", "google_compute_instance":
-		if t, exists := properties.Value["tags"]; !exists {
-			properties.Value["tags"] = spec.Tags
+	switch vmType {
+	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
+		if t, exists := properties["tags"]; !exists {
+			properties["tags"] = spec.Tags
 		} else if mm, ok := t.(map[string]interface{}); ok {
 			// merge tags
 			for tt, vv := range spec.Tags {
 				mm[tt] = vv
 			}
 		}
-	case "softlayer_virtual_guest":
-		if _, has := properties.Value["tags"]; !has {
-			properties.Value["tags"] = []interface{}{}
+	case VMSoftLayer:
+		if _, has := properties["tags"]; !has {
+			properties["tags"] = []interface{}{}
 		}
-		tags, ok := properties.Value["tags"].([]interface{})
+		tags, ok := properties["tags"].([]interface{})
 		if ok {
 			//softlayer uses a list of tags, instead of a map of tags
-			properties.Value["tags"] = mergeLabelsIntoTagSlice(tags, spec.Tags)
+			properties["tags"] = mergeLabelsIntoTagSlice(tags, spec.Tags)
 		}
 	}
 
 	// Use tag to store the logical id
 	if spec.LogicalID != nil {
-		if m, ok := properties.Value["tags"].(map[string]interface{}); ok {
+		if m, ok := properties["tags"].(map[string]interface{}); ok {
 			m["LogicalID"] = string(*spec.LogicalID)
 		}
 	}
-	switch properties.Type {
-	case "aws_instance":
-		if p, exists := properties.Value["private_ip"]; exists {
+	switch vmType {
+	case VMAmazon:
+		if p, exists := properties["private_ip"]; exists {
 			if p == "INSTANCE_LOGICAL_ID" {
 				if spec.LogicalID != nil {
 					// set private IP to logical ID
-					properties.Value["private_ip"] = string(*spec.LogicalID)
+					properties["private_ip"] = string(*spec.LogicalID)
 				} else {
 					// reset private IP (the tag is not relevant in this context)
-					delete(properties.Value, "private_ip")
+					delete(properties, "private_ip")
 				}
 			}
 		}
 	}
 
 	// merge the inits
-	switch properties.Type {
-	case "aws_instance", "digitalocean_droplet":
-		addUserData(properties.Value, "user_data", base64.StdEncoding.EncodeToString([]byte(spec.Init)))
-	case "softlayer_virtual_guest":
-		addUserData(properties.Value, "user_metadata", spec.Init)
-	case "azurerm_virtual_machine":
+	switch vmType {
+	case VMAmazon, VMDigitalOcean:
+		addUserData(properties, "user_data", base64.StdEncoding.EncodeToString([]byte(spec.Init)))
+	case VMSoftLayer:
+		addUserData(properties, "user_metadata", spec.Init)
+	case VMAzure:
 		// os_profile.custom_data
-		if m, has := properties.Value["os_profile"]; !has {
-			properties.Value["os_profile"] = map[string]interface{}{
+		if m, has := properties["os_profile"]; !has {
+			properties["os_profile"] = map[string]interface{}{
 				"custom_data": spec.Init,
 			}
 		} else if mm, ok := m.(map[string]interface{}); ok {
 			addUserData(mm, "custom_data", spec.Init)
 		}
-	case "google_compute_instance":
+	case VMGoogleCloud:
 		// metadata_startup_script
-		addUserData(properties.Value, "metadata_startup_script", spec.Init)
+		addUserData(properties, "metadata_startup_script", spec.Init)
 	}
 
-	tfFile := TFormat{
-		Resource: map[string]map[string]map[string]interface{}{
-			properties.Type: {
-				name: properties.Value,
-			},
-		},
-	}
+	// Write the whole thing back out, after decorations and replacing the hostname with the generated hostname
+	delete(tf.Resource[vmType], vmName)
+	tf.Resource[vmType][TResourceName(name)] = properties
 
-	buff, err := json.MarshalIndent(tfFile, "  ", "  ")
+	buff, err := json.MarshalIndent(tf, "  ", "  ")
 	log.Debugln("provision", id, "data=", string(buff), "err=", err)
 	if err != nil {
 		return nil, err
@@ -490,38 +497,23 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 		return err
 	}
 
-	tfFile := map[string]interface{}{}
-	err = json.Unmarshal(buff, &tfFile)
+	tf := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
 	if err != nil {
 		return err
 	}
 
-	resources, has := tfFile["resource"].(map[string]interface{})
-	if !has {
-		return fmt.Errorf("bad tfile:%v", instance)
+	vmType, vmName, props, err := FindVM(&tf)
+	if err != nil {
+		return err
 	}
 
-	var resourceType string
-	var first map[string]interface{} // there should be only one element keyed by the type (e.g. aws_instance)
-	for k, r := range resources {
-		if f, ok := r.(map[string]interface{}); ok {
-			first = f
-			resourceType = k
-			break
-		}
-	}
-
-	if len(first) == 0 {
-		return fmt.Errorf("no typed properties:%v", instance)
-	}
-
-	props, has := first[string(instance)].(map[string]interface{})
-	if !has {
+	if len(props) == 0 || vmName != TResourceName(string(instance)) {
 		return fmt.Errorf("not found:%v", instance)
 	}
 
-	switch resourceType {
-	case "aws_instance", "azurerm_virtual_machine", "digitalocean_droplet", "google_compute_instance":
+	switch vmType {
+	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
 		if _, has := props["tags"]; !has {
 			props["tags"] = map[string]interface{}{}
 		}
@@ -532,7 +524,7 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 			}
 		}
 
-	case "softlayer_virtual_guest":
+	case VMSoftLayer:
 		if _, has := props["tags"]; !has {
 			props["tags"] = []interface{}{}
 		}
@@ -543,7 +535,7 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 		props["tags"] = mergeLabelsIntoTagSlice(tags, labels)
 	}
 
-	buff, err = json.MarshalIndent(tfFile, "  ", "  ")
+	buff, err = json.MarshalIndent(tf, "  ", "  ")
 	if err != nil {
 		return err
 	}
@@ -579,7 +571,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	// now we scan for <instance_type.instance-<timestamp> as keys
 scan:
 	for k, v := range show {
-		matches := re.FindStringSubmatch(k)
+		matches := re.FindStringSubmatch(string(k))
 		if len(matches) == 3 {
 			id := matches[2]
 
@@ -606,13 +598,7 @@ scan:
 	return result, nil
 }
 
-func terraformTags(v interface{}, key string) map[string]string {
-	log.Debugln("terraformTags", v)
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		log.Debugln("terraformTags: return nil")
-		return nil
-	}
+func terraformTags(m TResourceProperties, key string) map[string]string {
 	tags := map[string]string{}
 	if mm, ok := m[key].(map[string]interface{}); ok {
 		for k, v := range mm {

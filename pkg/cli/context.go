@@ -145,8 +145,8 @@ func (c *Context) getFromFlag(name, ftype, desc string, def interface{}) (interf
 	return nil, nil
 }
 
-// returns true if the value v is missing of the type t
-func missing(t string, v interface{}) bool {
+// Missing returns true if the value v is missing of the type t
+func Missing(t string, v interface{}) bool {
 	if v == nil {
 		return true
 	}
@@ -177,7 +177,8 @@ func parseBool(text string) (bool, error) {
 	return v > 0, err
 }
 
-func (c *Context) prompt(prompt, ftype string, optional ...interface{}) (interface{}, error) {
+// Prompt handles prompting the user using the given prompt message, type string and optional values.
+func Prompt(in io.Reader, prompt, ftype string, optional ...interface{}) (interface{}, error) {
 	def, label := "", ""
 	if len(optional) > 0 {
 		def = fmt.Sprintf("%v", optional[0])
@@ -186,7 +187,7 @@ func (c *Context) prompt(prompt, ftype string, optional ...interface{}) (interfa
 		}
 	}
 
-	input := bufio.NewReader(c.input)
+	input := bufio.NewReader(in)
 	fmt.Fprintf(os.Stderr, "%s %s: ", prompt, label)
 	text, _ := input.ReadString('\n')
 	text = strings.Trim(text, " \t\n")
@@ -244,6 +245,42 @@ func (c *Context) Funcs() []template.Function {
 			},
 		},
 		{
+			Name: "cond",
+			Func: func(b interface{}, optional ...interface{}) func() (bool, interface{}) {
+
+				// Technique here is to capture the value in the pipeline from the last stage,
+				// store it, and return a function that will evaluate to the boolean value of
+				// the first argument.  By doing so we captured the output of the previous stage
+				// and allow the next stage to determine if it needs to continue.  If the next
+				// stage chooses to not continue, then it can access the value from the stage
+				// before the cond.
+				//
+				// Example  {{ $x := flag `foo` `string` `foo flag` | cond $y | prompt `foo?` `string` }}
+				// So if $y evaluates to false, then prompt will not execute.
+
+				var capture interface{}
+				if len(optional) > 0 {
+					capture = optional[0]
+				}
+
+				return func() (bool, interface{}) {
+
+					switch b := b.(type) {
+					case bool:
+						return b, capture
+					case string:
+						p, err := parseBool(b)
+						if err != nil {
+							return false, capture
+						}
+						return p, capture
+					default:
+						return b != nil, capture
+					}
+				}
+			},
+		},
+		{
 			Name: "prompt",
 			Func: func(prompt, ftype string, optional ...interface{}) (interface{}, error) {
 
@@ -253,13 +290,31 @@ func (c *Context) Funcs() []template.Function {
 				if !c.exec {
 					return "", nil
 				}
-				// The last value in the optional var args is the value from the previous
-				// pipeline.
-				if len(optional) > 0 && !missing(ftype, optional[len(optional)-1]) {
-					return optional[len(optional)-1], nil
-				}
 
-				return c.prompt(prompt, ftype, optional...)
+				if len(optional) > 0 {
+
+					end := optional[len(optional)-1]
+
+					if cond, is := end.(func() (bool, interface{})); is {
+						ok, last := cond()
+						if !ok {
+							return last, nil
+						}
+						// if the condition evaluates to true, then we'd continue
+						// so the trailing arg must look like the cond was not
+						// inserted before this -- hence using the value from
+						// stage before the cond as the end
+						end = last
+					}
+
+					// The last value in the optional var args is the value from the previous
+					// pipeline.
+					if !Missing(ftype, end) {
+						return end, nil
+					}
+
+				}
+				return Prompt(c.input, prompt, ftype, optional...)
 			},
 		},
 	}

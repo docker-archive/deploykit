@@ -11,12 +11,12 @@ import (
 )
 
 func TestMissing(t *testing.T) {
-	require.True(t, missing("string", ""))
-	require.True(t, missing("int", 0))
-	require.True(t, missing("float", 0.))
-	require.True(t, missing("bool", none))
-	require.False(t, missing("bool", false))
-	require.False(t, missing("bool", true))
+	require.True(t, Missing("string", ""))
+	require.True(t, Missing("int", 0))
+	require.True(t, Missing("float", 0.))
+	require.True(t, Missing("bool", none))
+	require.False(t, Missing("bool", false))
+	require.False(t, Missing("bool", true))
 }
 
 func TestContext(t *testing.T) {

@@ -1,0 +1,5 @@
+
+{{/* =% sh %= */}}
+
+
+infrakit -H http://localhost:4358 event ls -al

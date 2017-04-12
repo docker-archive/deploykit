@@ -1,0 +1,7 @@
+
+{{/* =% sh %= */}}
+
+
+{{ $topic := flag "topic" "string" "Topic to watch" | prompt "What topic?" "string" "event-time/timer/msec/100" }}
+
+infrakit -H http://localhost:4358 event tail {{ $topic }}
