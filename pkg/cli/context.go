@@ -277,8 +277,6 @@ func (c *Context) Funcs() []template.Function {
 					default:
 						return b != nil, capture
 					}
-
-					return false, capture
 				}
 			},
 		},
@@ -301,13 +299,12 @@ func (c *Context) Funcs() []template.Function {
 						ok, last := cond()
 						if !ok {
 							return last, nil
-						} else {
-							// if the condition evaluates to true, then we'd continue
-							// so the trailing arg must look like the cond was not
-							// inserted before this -- hence using the value from
-							// stage before the cond as the end
-							end = last
 						}
+						// if the condition evaluates to true, then we'd continue
+						// so the trailing arg must look like the cond was not
+						// inserted before this -- hence using the value from
+						// stage before the cond as the end
+						end = last
 					}
 
 					// The last value in the optional var args is the value from the previous
