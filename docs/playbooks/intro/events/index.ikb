@@ -1,0 +1,4 @@
+# Another index file that tells infrakit what other commands are here.
+
+timer  : tail.ikt  # TODO - maybe add ability to pass in args?
+ls     : ls.ikt
