@@ -145,7 +145,7 @@ func (c *Context) getFromFlag(name, ftype, desc string, def interface{}) (interf
 	return nil, nil
 }
 
-// returns true if the value v is missing of the type t
+// Missing returns true if the value v is missing of the type t
 func Missing(t string, v interface{}) bool {
 	if v == nil {
 		return true
@@ -177,6 +177,7 @@ func parseBool(text string) (bool, error) {
 	return v > 0, err
 }
 
+// Prompt handles prompting the user using the given prompt message, type string and optional values.
 func Prompt(in io.Reader, prompt, ftype string, optional ...interface{}) (interface{}, error) {
 	def, label := "", ""
 	if len(optional) > 0 {
