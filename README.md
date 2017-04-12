@@ -1,6 +1,13 @@
 # InfraKit.RackHD
 
+**Docker for Private Clouds**
+
+The first and only open source toolkit for creating and managing declarative, self-healing, and platform-agnostic infrastructure in your data center. 
+
+
 [InfraKit](https://github.com/docker/infrakit) plugins for creating and managing resources in [RackHD](https://github.com/RackHD/RackHD).
+
+![logo](img/rackhd-infrakit-logo.png "Logo")
 
 ## Instance plugin
 
