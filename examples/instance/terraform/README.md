@@ -70,21 +70,22 @@ resource type name (e.g. `aws_instance`).  This is the spec for the instance plu
 ```json
 {
     "Properties" : {
-        "type" : "aws_instance",
-        "value" : {
-            "ami" : "${lookup(var.aws_amis, var.aws_region)}",
-            "instance_type" : "m1.small",
-            "key_name": "PUBKEY",
-            "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
-            "subnet_id": "${aws_subnet.default.id}",
-            "tags" :  {
-                "Tier" : "web",
-                "InstancePlugin" : "terraform"
-            },
-            "connection" : {
-                "user" : "ubuntu"
-            }
+      "resource" : {
+        "aws_instance": {
+          "ami" : "${lookup(var.aws_amis, var.aws_region)}",
+          "instance_type" : "m1.small",
+          "key_name": "PUBKEY",
+          "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
+          "subnet_id": "${aws_subnet.default.id}",
+          "tags" :  {
+              "Tier" : "web",
+              "InstancePlugin" : "terraform"
+          },
+          "connection" : {
+              "user" : "ubuntu"
+          }
         }
+      }
     },
     "Tags" : {
         "other" : "values"
