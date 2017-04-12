@@ -346,7 +346,10 @@ func TestBrokerSubscriberExactMatchTopic(t *testing.T) {
 					require.NoError(t, m.Decode(&val))
 					received1 <- val
 				} else {
-					close(received1)
+					if received1 != nil {
+						close(received1)
+						received1 = nil
+					}
 				}
 			}
 		}
@@ -365,7 +368,10 @@ func TestBrokerSubscriberExactMatchTopic(t *testing.T) {
 					require.NoError(t, m.Decode(&val))
 					received2 <- val
 				} else {
-					close(received2)
+					if received2 != nil {
+						close(received2)
+						received2 = nil
+					}
 				}
 			}
 		}
@@ -384,7 +390,10 @@ func TestBrokerSubscriberExactMatchTopic(t *testing.T) {
 					require.NoError(t, m.Decode(&val))
 					received3 <- val
 				} else {
-					close(received3)
+					if received3 != nil {
+						close(received3)
+						received3 = nil
+					}
 				}
 			}
 		}
