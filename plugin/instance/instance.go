@@ -8,14 +8,13 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codedellemc/gorackhd/client/nodes"
-	"github.com/codedellemc/gorackhd/client/skus"
-	"github.com/codedellemc/gorackhd/client/tags"
-	"github.com/codedellemc/gorackhd/models"
-	"github.com/codedellemc/infrakit.rackhd/monorail"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/go-openapi/runtime"
+	"github.com/spiegela/gorackhd/client/nodes"
+	"github.com/spiegela/gorackhd/client/skus"
+	"github.com/spiegela/gorackhd/models"
+	"github.com/spiegela/gorackhd/monorail"
 )
 
 // rackHDInstancePlugin is the public plugin client struct
@@ -25,15 +24,9 @@ type rackHDInstancePlugin struct {
 	Password string
 }
 
-// RackHDWorkflow are the details of the Workflow to be applied
-type RackHDWorkflow struct {
-	Name    string
-	Options interface{}
-}
-
 // RackHDProperties are the details of the RackHD provision request to be processed by RackHD
 type RackHDProperties struct {
-	Workflow RackHDWorkflow
+	Workflow *models.PostNodeWorkflow
 	SKUName  string
 }
 
@@ -50,44 +43,52 @@ func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string, properti
 	}
 	log.Infof("Logged into RackHD service as %s", p.Username)
 
-	nodes, nil := p.Client.Nodes().GetNodes(nodes.NewGetNodesParams(), auth)
-	log.Infof("NODES L56: %s", nodes)
+	nodes, err := p.Client.Nodes().NodesGetAll(nodes.NewNodesGetAllParams(), auth)
+	if err != nil {
+		return nil, err
+	}
 
 	descriptions := []instance.Description{}
 	for _, node := range nodes.Payload {
-		nodeTags, err := getTagMapForNode(node)
-		if err != nil {
-			return descriptions, err
-		}
-		keep := true
-		for tagKey, tagVal := range tags {
-			if nodeTags[tagKey] != tagVal {
-				keep = false
+		if node.Type == "compute" {
+			nodeTags, err := p.getTagMapForNode(node, auth)
+			if err != nil {
+				return descriptions, err
+			}
+			keep := true
+			for tagKey, tagVal := range tags {
+				if nodeTags[tagKey] != tagVal {
+					keep = false
+				}
+			}
+			logID := instance.LogicalID(node.ID)
+			if keep {
+				descriptions = append(descriptions, instance.Description{
+					ID:        instance.ID(node.ID),
+					LogicalID: &logID,
+					Tags:      nodeTags,
+				})
 			}
 		}
-		logID := instance.LogicalID(node.ID)
-		if keep {
-			descriptions = append(descriptions, instance.Description{
-				ID:        instance.ID(node.ID),
-				LogicalID: &logID,
-				Tags:      nodeTags,
-			})
-		}
 	}
+	log.Infof("Instance descriptions retrieved as %s", descriptions)
 	return descriptions, nil
 }
 
-func getTagMapForNode(node *models.Node) (map[string]string, error) {
+func (p rackHDInstancePlugin) getTagMapForNode(node *models.Node20Node, auth runtime.ClientAuthInfoWriter) (map[string]string, error) {
+	getTagsParams := nodes.NewNodesGetTagsByIDParams().
+		WithIdentifier(node.ID)
+	getTagsResp, err := p.Client.Nodes().NodesGetTagsByID(getTagsParams, auth)
+	if err != nil {
+		return nil, err
+	}
+
 	tags := make(map[string]string)
-	for _, tag := range node.Tags {
-		if t, ok := tag.(string); ok {
-			tagSlice := strings.SplitN(t, "=", 2)
-			// Only worry about tags with a key/value format:w
-			if len(tagSlice) == 2 {
-				tags[tagSlice[0]] = tagSlice[1]
-			}
-		} else {
-			return nil, fmt.Errorf("Cannot convert tag to string: %s", tag)
+	for _, tag := range getTagsResp.Payload {
+		tagSlice := strings.SplitN(tag, "=", 2)
+		// Only worry about tags with a key/value format:w
+		if len(tagSlice) == 2 {
+			tags[tagSlice[0]] = tagSlice[1]
 		}
 	}
 	return tags, nil
@@ -103,12 +104,17 @@ func (p rackHDInstancePlugin) Destroy(id instance.ID) error {
 
 	options := make(map[string]interface{})
 	options["useSecureErase"] = true
-	workflow := RackHDWorkflow{Name: "Graph.Bootstrap.Decommission.Node", Options: options}
+	workflow := models.PostNodeWorkflow{Name: "Graph.Bootstrap.Decommission.Node", Options: &models.PostNodeWorkflowOptions{Defaults: options}}
+	log.Infof("Posted destruction workflow to instance %s", id)
 
-	err = p.applyWorkflowToNode(workflow, string(id), auth)
+	err = p.applyWorkflowToNode(&workflow, string(id), auth)
 	if err != nil {
 		return fmt.Errorf("Unable to apply decommision workflow: %s", err)
 	}
+	log.Infof("Removing node %s from RackHD", id)
+	nodeDelParams := nodes.NewNodesDelByIDParams().
+		WithIdentifier(string(id))
+	p.Client.Nodes().NodesDelByID(nodeDelParams, auth)
 
 	return nil
 }
@@ -129,11 +135,12 @@ func (p rackHDInstancePlugin) Label(id instance.ID, labels map[string]string) er
 		tag.WriteString(v)
 		tagList = append(tagList, tag.String())
 	}
-	tagParams := tags.NewPatchNodesIdentifierTagsParams().
+	log.Infof("Writing tags to node %s: %s", id, tagList)
+	tagParams := nodes.NewNodesPatchTagByIDParams().
 		WithIdentifier(string(id)).
-		WithBody(tagList)
+		WithTags(&models.NodesPatchTags{Tags: tagList})
 
-	_, err = p.Client.Tags().PatchNodesIdentifierTags(tagParams, auth)
+	_, err = p.Client.Nodes().NodesPatchTagByID(tagParams, auth)
 	if err != nil {
 		return err
 	}
@@ -167,18 +174,13 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 
 	nodeID, err := p.getAvailableNodeIDForSKU(skuID, auth)
 	if err != nil {
+		log.Infof("Unable to select node ID for SKU ID, %s. %s", skuID, err)
 		return &instanceID, fmt.Errorf("Unable to select node ID for SKU ID, %s. %s", skuID, err)
 	}
 	log.Infof("Found available node ID: %s", nodeID)
 
-	tagParams := tags.NewPatchNodesIdentifierTagsParams().
-		WithIdentifier(nodeID).
-		WithBody([]string{"infrakitLocked"})
-
-	_, err = p.Client.Tags().PatchNodesIdentifierTags(tagParams, auth)
-	if err != nil {
-		return nil, err
-	}
+	log.Infof("Writing tags to node ID %s: %s", nodeID, spec.Tags)
+	p.Label(instance.ID(nodeID), spec.Tags)
 
 	err = p.applyWorkflowToNode(props.Workflow, nodeID, auth)
 	if err != nil {
@@ -186,6 +188,8 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 	}
 
 	instanceID = instance.ID(nodeID)
+
+	log.Infof("Applying init to node ID %s: %s", nodeID, spec.Init)
 	return &instanceID, nil
 }
 
@@ -194,7 +198,7 @@ func (p rackHDInstancePlugin) Validate(req *types.Any) error {
 	parsed := RackHDProperties{}
 	req.Decode(&parsed)
 
-	if parsed.Workflow.Name == "" {
+	if parsed.Workflow == nil || parsed.Workflow.Name == "" {
 		return fmt.Errorf("no-workflow:%s", req.String())
 	}
 
@@ -209,7 +213,7 @@ func (p rackHDInstancePlugin) getSKUIDForName(skuName string, auth runtime.Clien
 		return "", fmt.Errorf("no SKU name provided")
 	}
 
-	skuList, nil := p.Client.Skus().GetSkus(skus.NewGetSkusParams(), auth)
+	skuList, nil := p.Client.Skus().SkusGet(skus.NewSkusGetParams(), auth)
 	var skuID string
 	for _, sku1 := range skuList.Payload {
 		if string(sku1.Name) == skuName {
@@ -225,8 +229,11 @@ func (p rackHDInstancePlugin) getSKUIDForName(skuName string, auth runtime.Clien
 }
 
 func (p rackHDInstancePlugin) getAvailableNodeIDForSKU(skuID string, auth runtime.ClientAuthInfoWriter) (string, error) {
-	getNodesParams := skus.NewGetSkusIdentifierNodesParams().WithIdentifier(skuID)
-	nodes, nil := p.Client.Skus().GetSkusIdentifierNodes(getNodesParams, auth)
+	getNodesParams := skus.NewSkusIDGetNodesParams().WithIdentifier(skuID)
+	nodes, err := p.Client.Skus().SkusIDGetNodes(getNodesParams, auth)
+	if err != nil {
+		return "", err
+	}
 	var nodeID string
 	for _, node1 := range nodes.Payload {
 		// Consumed nodes must be un-tagged to be provisioned
@@ -241,21 +248,16 @@ func (p rackHDInstancePlugin) getAvailableNodeIDForSKU(skuID string, auth runtim
 	return nodeID, nil
 }
 
-func (p rackHDInstancePlugin) applyWorkflowToNode(workflow RackHDWorkflow, nodeID string, auth runtime.ClientAuthInfoWriter) error {
+func (p rackHDInstancePlugin) applyWorkflowToNode(workflow *models.PostNodeWorkflow, nodeID string, auth runtime.ClientAuthInfoWriter) error {
 	if workflow.Name == "" {
 		return fmt.Errorf("No workflow name provided")
 	}
 
-	body := make(map[string]interface{})
-	body["name"] = workflow.Name
-	body["options"] = workflow.Options
-
-	params := nodes.NewPostNodesIdentifierWorkflowsParams().
+	params := nodes.NewNodesPostWorkflowByIDParams().
 		WithIdentifier(nodeID).
-		WithName(workflow.Name).
-		WithBody(body)
-	log.Infof("POST PARAMS: %s", params)
-	_, err := p.Client.Nodes().PostNodesIdentifierWorkflows(params, auth)
+		WithName(&workflow.Name).
+		WithBody(workflow)
+	_, err := p.Client.Nodes().NodesPostWorkflowByID(params, auth)
 	if err != nil {
 		return err
 	}

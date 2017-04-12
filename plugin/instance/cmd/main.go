@@ -33,7 +33,7 @@ func main() {
 	}
 
 	cmd.Flags().IntVar(&logLevel, "log", cli.DefaultLogLevel, "Logging Level. 0 is the least verbose. Max is 5.")
-	cmd.Flags().StringVar(&name, "name", "instance-rackhd", "Plugin name to advertise for discovery")
+	cmd.Flags().StringVar(&name, "name", "rackhd", "Plugin name to advertise for discovery")
 	cmd.Flags().AddFlagSet(builder.Flags())
 
 	cmd.AddCommand(plugin.VersionCommand())

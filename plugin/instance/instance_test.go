@@ -3,18 +3,17 @@ package instance
 import (
 	"strings"
 
-	"github.com/codedellemc/gorackhd/client/nodes"
-	"github.com/codedellemc/gorackhd/client/skus"
-	"github.com/codedellemc/gorackhd/client/tags"
-	"github.com/codedellemc/gorackhd/models"
-	"github.com/codedellemc/infrakit.rackhd/jwt"
-	"github.com/codedellemc/infrakit.rackhd/mock"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/go-openapi/runtime"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/spiegela/gorackhd/client/nodes"
+	"github.com/spiegela/gorackhd/client/skus"
+	"github.com/spiegela/gorackhd/jwt"
+	"github.com/spiegela/gorackhd/mock"
+	"github.com/spiegela/gorackhd/models"
 )
 
 var nodeMock *mock.MockNodeIface
@@ -60,29 +59,29 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 			Context("before provisioning", func() {
 				BeforeEach(func() {
 					nodeMock.EXPECT().
-						PostNodesIdentifierWorkflows(gomock.Any(), gomock.Any()).
+						NodesPostWorkflowByID(gomock.Any(), gomock.Any()).
 						Times(1).
 						Return(nil, nil)
 
+					nodeMock.EXPECT().
+						NodesPatchTagByID(gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(&nodes.NodesPatchTagByIDOK{}, nil)
+
 					skuMock := mock.NewMockSkuIface(mockCtrl)
 					skuMock.EXPECT().
-						GetSkus(gomock.Any(), gomock.Any()).
+						SkusGet(gomock.Any(), gomock.Any()).
 						Times(1).
-						Return(&skus.GetSkusOK{Payload: _Skus()}, nil)
+						Return(&skus.SkusGetOK{Payload: _Skus()}, nil)
 
 					skuMock.EXPECT().
-						GetSkusIdentifierNodes(gomock.Any(), gomock.Any()).
+						SkusIDGetNodes(gomock.Any(), gomock.Any()).
 						Times(1).
-						Return(&skus.GetSkusIdentifierNodesOK{Payload: _Nodes(false)}, nil)
-
-					tagsMock := mock.NewMockTagIface(mockCtrl)
-					tagsMock.EXPECT().
-						PatchNodesIdentifierTags(gomock.Any(), gomock.Any()).
-						Times(1).
-						Return(&tags.PatchNodesIdentifierTagsOK{}, nil)
+						Return(&skus.SkusIDGetNodesOK{Payload: _Nodes(false)}, nil)
 
 					mockClient.EXPECT().
-						Tags().Times(1).Return(tagsMock)
+						Nodes().Times(1).Return(nodeMock)
+
 					mockClient.EXPECT().
 						Skus().Times(2).Return(skuMock)
 				})
@@ -97,9 +96,9 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 			Context("after provisioning", func() {
 				BeforeEach(func() {
 					nodeMock.EXPECT().
-						GetNodes(gomock.Any(), gomock.Any()).
+						NodesGetAll(gomock.Any(), gomock.Any()).
 						Times(1).
-						Return(&nodes.GetNodesOK{Payload: _Nodes(true)}, nil)
+						Return(&nodes.NodesGetAllOK{Payload: _Nodes(true)}, nil)
 				})
 
 				It("should read tags back during a describe operation", func() {
@@ -121,7 +120,7 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 
 				BeforeEach(func() {
 					nodeMock.EXPECT().
-						PostNodesIdentifierWorkflows(gomock.Any(), gomock.Any()).
+						NodesPostWorkflowByID(gomock.Any(), gomock.Any()).
 						Times(1).
 						Return(nil, nil)
 				})
@@ -136,14 +135,14 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 
 		Context("when writing tags", func() {
 			BeforeEach(func() {
-				tagsMock := mock.NewMockTagIface(mockCtrl)
-				tagsMock.EXPECT().
-					PatchNodesIdentifierTags(gomock.Any(), gomock.Any()).
+				nodesMock := mock.NewMockNodeIface(mockCtrl)
+				nodesMock.EXPECT().
+					NodesPatchTagByID(gomock.Any(), gomock.Any()).
 					Times(1).
-					Return(&tags.PatchNodesIdentifierTagsOK{}, nil)
+					Return(&nodes.NodesPatchTagByIDOK{}, nil)
 
 				mockClient.EXPECT().
-					Tags().Times(1).Return(tagsMock)
+					Nodes().Times(1).Return(nodesMock)
 			})
 
 			It("should tag a node during a label operation", func() {
@@ -182,8 +181,8 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 	})
 })
 
-func _Skus() []*models.Sku {
-	skus := []*models.Sku{
+func _Skus() []*models.Skus20Sku {
+	skus := []*models.Skus20Sku{
 		{
 			Name:               "vQuanta D51 SKU",
 			DiscoveryGraphName: "Graph.vQuanta.Default",
@@ -193,14 +192,14 @@ func _Skus() []*models.Sku {
 	return skus
 }
 
-func _Nodes(provisioned bool) []*models.Node {
+func _Nodes(provisioned bool) []*models.Node20Node {
 	names := []string{
 		"Enclosure Node QTFCJ05160195",
 		"52:54:be:ef:81:6d",
 		"52:54:be:ef:81:6e",
 	}
-	var tags1 []interface{}
-	var tags2 []interface{}
+	var tags1 []string
+	var tags2 []string
 	if provisioned {
 		tags1 = append(tags1, "infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y")
 		tags1 = append(tags1, "infrakit.group=cattle")
@@ -211,24 +210,24 @@ func _Nodes(provisioned bool) []*models.Node {
 		tags2 = append(tags1, "project=infrakit")
 		tags2 = append(tags1, "tier=app")
 	}
-	nodes := []*models.Node{
+	nodes := []*models.Node20Node{
 		{
-			AutoDiscover: false,
+			AutoDiscover: "false",
 			ID:           "58b02931ca8c52d204e60388",
-			Name:         &names[0],
+			Name:         names[0],
 			Type:         "enclosure",
 		},
 		{
-			AutoDiscover: false,
+			AutoDiscover: "false",
 			ID:           "58b028330b0d3789044b2ba3",
-			Name:         &names[1],
+			Name:         names[1],
 			Type:         "compute",
 			Tags:         tags1,
 		},
 		{
-			AutoDiscover: false,
+			AutoDiscover: "false",
 			ID:           "58b028330b0d3789044b2ba4",
-			Name:         &names[2],
+			Name:         names[2],
 			Type:         "compute",
 			Tags:         tags2,
 		},

@@ -1,9 +1,9 @@
 package instance
 
 import (
-	"github.com/codedellemc/infrakit.rackhd/monorail"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/pflag"
+	"github.com/spiegela/gorackhd/monorail"
 )
 
 type options struct {
