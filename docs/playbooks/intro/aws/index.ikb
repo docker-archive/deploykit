@@ -1,0 +1,3 @@
+
+# Create a single instance
+provision-instance : provision-instance.ikt
