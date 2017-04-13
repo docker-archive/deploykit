@@ -45,12 +45,12 @@ test:
   post:
     # Report to codecov
     - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)
-      
+
 deployment:
   pr:
     branch: /pull\/.*/
     commands:
-      - DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+      - # DISABLED TO SPEED UP PR Process:  DOCKER_BUILD_FLAGS="--rm=false" make build-docker
 
   release:
     branch: /release-.*/
