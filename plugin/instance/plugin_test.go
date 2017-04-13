@@ -31,9 +31,11 @@ func TestProvision(t *testing.T) {
 		"Network":"NETWORK",
 		"Subnetwork":"SUB_EUROPE",
 		"Tags":["TAG1", "TAG2"],
-		"DiskSizeMb":100,
-		"DiskImage":"docker-image",
-		"DiskType":"ssd",
+		"Disks":[{
+			"SizeMb":100,
+			"Image":"docker-image",
+			"Type":"ssd"
+		}],
 		"Scopes":["SCOPE1", "SCOPE2"],
 		"TargetPools":["POOL1", "POOL2"],
 		"Preemptible":true,
@@ -47,19 +49,24 @@ func TestProvision(t *testing.T) {
 	api, ctrl := NewMockGCloud(t)
 	defer ctrl.Finish()
 	api.EXPECT().CreateInstance("worker-ssnk9q", &gcloud.InstanceSettings{
-		Description:       "vm",
-		MachineType:       "n1-standard-1",
-		PrivateIP:         "10.20.2.100",
-		Network:           "NETWORK",
-		Subnetwork:        "SUB_EUROPE",
-		Tags:              []string{"TAG1", "TAG2"},
-		DiskSizeMb:        100,
-		DiskImage:         "docker-image",
-		DiskType:          "ssd",
-		Scopes:            []string{"SCOPE1", "SCOPE2"},
-		AutoDeleteDisk:    true,
-		ReuseExistingDisk: false,
-		Preemptible:       true,
+		Description: "vm",
+		MachineType: "n1-standard-1",
+		PrivateIP:   "10.20.2.100",
+		Network:     "NETWORK",
+		Subnetwork:  "SUB_EUROPE",
+		Tags:        []string{"TAG1", "TAG2"},
+		Scopes:      []string{"SCOPE1", "SCOPE2"},
+		Preemptible: true,
+		Disks: []gcloud.DiskSettings{
+			{
+				Boot:          true,
+				SizeMb:        100,
+				Image:         "docker-image",
+				Type:          "ssd",
+				AutoDelete:    true,
+				ReuseExisting: false,
+			},
+		},
 		MetaData: gcloud.TagsToMetaData(map[string]string{
 			"key1":                 "value1",
 			"key2":                 "value2",
@@ -83,20 +90,29 @@ func TestProvision(t *testing.T) {
 }
 
 func TestProvisionLogicalID(t *testing.T) {
-	properties := types.AnyString(`{ "AutoDeleteDisk":false, "ReuseExistingDisk":true }`)
+	properties := types.AnyString(`{
+		"Disks":[{
+			"AutoDelete":false,
+			"ReuseExisting":true
+		}]}`)
 	tags := map[string]string{}
 
 	api, ctrl := NewMockGCloud(t)
 	defer ctrl.Finish()
 	api.EXPECT().CreateInstance("LOGICAL-ID", &gcloud.InstanceSettings{
-		MachineType:       "g1-small",
-		Network:           "default",
-		DiskSizeMb:        10,
-		DiskImage:         "docker",
-		DiskType:          "pd-standard",
-		AutoDeleteDisk:    false,
-		ReuseExistingDisk: true,
-		Preemptible:       false,
+		MachineType: "g1-small",
+		Network:     "default",
+		Preemptible: false,
+		Disks: []gcloud.DiskSettings{
+			{
+				Boot:          true,
+				SizeMb:        10,
+				Image:         "docker",
+				Type:          "pd-standard",
+				AutoDelete:    false,
+				ReuseExisting: true,
+			},
+		},
 		MetaData: gcloud.TagsToMetaData(map[string]string{
 			"infrakit-logical-id":  "LOGICAL-ID",
 			"infrakit-gcp-version": "1",
@@ -117,22 +133,32 @@ func TestProvisionLogicalID(t *testing.T) {
 }
 
 func TestProvisionLogicalIDIsIPAddress(t *testing.T) {
-	properties := types.AnyString(`{ "PrivateIP" : "10.20.1.0" }`) // to be overwritten by LogicalID
+	properties := types.AnyString(`{
+		"PrivateIP" : "10.20.1.0",
+		"Disks":[{
+			"AutoDelete":true,
+			"ReuseExisting":false
+		}]}`) // PrivateIP to be overwritten by LogicalID
 	tags := map[string]string{}
 
 	api, ctrl := NewMockGCloud(t)
 	defer ctrl.Finish()
 
 	api.EXPECT().CreateInstance(gomock.Any(), &gcloud.InstanceSettings{
-		MachineType:       "g1-small",
-		Network:           "default",
-		DiskSizeMb:        10,
-		DiskImage:         "docker",
-		DiskType:          "pd-standard",
-		AutoDeleteDisk:    true,
-		ReuseExistingDisk: false,
-		Preemptible:       false,
-		PrivateIP:         "10.20.1.100",
+		MachineType: "g1-small",
+		Network:     "default",
+		Disks: []gcloud.DiskSettings{
+			{
+				Boot:          true,
+				SizeMb:        10,
+				Image:         "docker",
+				Type:          "pd-standard",
+				AutoDelete:    true,
+				ReuseExisting: false,
+			},
+		},
+		Preemptible: false,
+		PrivateIP:   "10.20.1.100",
 		MetaData: gcloud.TagsToMetaData(map[string]string{
 			"infrakit-logical-id":  "10.20.1.100",
 			"infrakit-gcp-version": "1",
@@ -161,13 +187,18 @@ func TestProvisionFails(t *testing.T) {
 	rand.Seed(0)
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().CreateInstance("instance-ssnk9q", &gcloud.InstanceSettings{
-		MachineType:       "g1-small",
-		Network:           "default",
-		DiskSizeMb:        10,
-		DiskImage:         "docker",
-		DiskType:          "pd-standard",
-		AutoDeleteDisk:    true,
-		ReuseExistingDisk: false,
+		MachineType: "g1-small",
+		Network:     "default",
+		Disks: []gcloud.DiskSettings{
+			{
+				Boot:          true,
+				SizeMb:        10,
+				Image:         "docker",
+				Type:          "pd-standard",
+				AutoDelete:    true,
+				ReuseExisting: false,
+			},
+		},
 		MetaData: gcloud.TagsToMetaData(map[string]string{
 			"key1":                 "value1",
 			"infrakit-gcp-version": "1",
@@ -191,13 +222,18 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 	rand.Seed(0)
 	api, _ := NewMockGCloud(t)
 	api.EXPECT().CreateInstance("instance-ssnk9q", &gcloud.InstanceSettings{
-		MachineType:       "g1-small",
-		Network:           "default",
-		DiskSizeMb:        10,
-		DiskImage:         "docker",
-		DiskType:          "pd-standard",
-		AutoDeleteDisk:    true,
-		ReuseExistingDisk: false,
+		MachineType: "g1-small",
+		Network:     "default",
+		Disks: []gcloud.DiskSettings{
+			{
+				Boot:          true,
+				SizeMb:        10,
+				Image:         "docker",
+				Type:          "pd-standard",
+				AutoDelete:    true,
+				ReuseExisting: false,
+			},
+		},
 		MetaData: gcloud.TagsToMetaData(map[string]string{
 			"infrakit-gcp-version": "1",
 		}),

@@ -73,20 +73,27 @@ type API interface {
 
 // InstanceSettings lists the characteristics of a VM instance.
 type InstanceSettings struct {
-	Description       string
-	MachineType       string
-	Network           string
-	Subnetwork        string
-	PrivateIP         string
-	Tags              []string
-	Scopes            []string
-	DiskSizeMb        int64
-	DiskImage         string
-	DiskType          string
-	AutoDeleteDisk    bool
-	ReuseExistingDisk bool
-	Preemptible       bool
-	MetaData          []*compute.MetadataItems
+	Description string
+	MachineType string
+	Network     string
+	Subnetwork  string
+	PrivateIP   string
+	Tags        []string
+	Scopes      []string
+	Disks       []DiskSettings
+	Preemptible bool
+	MetaData    []*compute.MetadataItems
+}
+
+// DiskSettings lists the characteristics of an attached disk.
+type DiskSettings struct {
+	Boot          bool
+	Type          string
+	Mode          string
+	SizeMb        int64
+	Image         string
+	AutoDelete    bool
+	ReuseExisting bool
 }
 
 // InstanceManagerSettings the characteristics of a VM instance template manager.
@@ -241,8 +248,11 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 	machineType := g.addAPIUrlPrefix(settings.MachineType, g.project+"/zones/"+g.zone+"/machineTypes/")
 	network := g.addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
 	subnetwork := g.addAPIUrlPrefix(settings.Subnetwork, g.project+"/regions/"+g.region()+"/subnetworks/")
-	sourceImage := g.addAPIUrlPrefix(settings.DiskImage, "")
-	diskType := g.addAPIUrlPrefix(settings.DiskType, g.project+"/zones/"+g.zone+"/diskTypes/")
+
+	disks, err := g.attachedDisks(name, settings.Disks)
+	if err != nil {
+		return err
+	}
 
 	instance := &compute.Instance{
 		Name:        name,
@@ -251,14 +261,7 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		Tags: &compute.Tags{
 			Items: settings.Tags,
 		},
-		Disks: []*compute.AttachedDisk{
-			{
-				Boot:       true,
-				AutoDelete: settings.AutoDeleteDisk,
-				Type:       "PERSISTENT",
-				Mode:       "READ_WRITE",
-			},
-		},
+		Disks: disks,
 		NetworkInterfaces: []*compute.NetworkInterface{
 			{
 				Network:    network,
@@ -287,8 +290,37 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		},
 	}
 
+	return g.doCall(g.service.Instances.Insert(g.project, g.zone, instance))
+}
+
+func (g *computeServiceWrapper) attachedDisks(name string, disksSettings []DiskSettings) ([]*compute.AttachedDisk, error) {
+	disks := []*compute.AttachedDisk{}
+
+	for _, diskSettings := range disksSettings {
+		disk, err := g.attachedDisk(name, diskSettings)
+		if err != nil {
+			return nil, err
+		}
+
+		disks = append(disks, disk)
+	}
+
+	return disks, nil
+}
+
+func (g *computeServiceWrapper) attachedDisk(name string, settings DiskSettings) (*compute.AttachedDisk, error) {
+	sourceImage := g.addAPIUrlPrefix(settings.Image, "")
+	diskType := g.addAPIUrlPrefix(settings.Type, g.project+"/zones/"+g.zone+"/diskTypes/")
+
+	disk := &compute.AttachedDisk{
+		Boot:       settings.Boot,       // TODO default to true
+		Mode:       settings.Mode,       // TODO default to READ_WRITE
+		AutoDelete: settings.AutoDelete, // TODO?? default to true
+		Type:       "PERSISTENT",
+	}
+
 	var existingDisk *compute.Disk
-	if settings.ReuseExistingDisk {
+	if settings.ReuseExisting {
 		log.Debugln("Trying to reuse disk", name)
 
 		disk, err := g.service.Disks.Get(g.project, g.zone, name).Do()
@@ -297,7 +329,7 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		} else if disk.SourceImage != sourceImage {
 			log.Debugln("Found existing disk that uses a wrong image. Let's delete", name)
 			if err := g.doCall(g.service.Disks.Delete(g.project, g.zone, disk.Name)); err != nil {
-				return err
+				return nil, err
 			}
 		} else {
 			log.Debugln("Found existing disk", name)
@@ -306,17 +338,17 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 	}
 
 	if existingDisk != nil {
-		instance.Disks[0].Source = "projects/" + g.project + "/zones/" + g.zone + "/disks/" + name
+		disk.Source = "projects/" + g.project + "/zones/" + g.zone + "/disks/" + name
 	} else {
-		instance.Disks[0].InitializeParams = &compute.AttachedDiskInitializeParams{
+		disk.InitializeParams = &compute.AttachedDiskInitializeParams{
 			DiskName:    name,
 			SourceImage: sourceImage,
-			DiskSizeGb:  settings.DiskSizeMb,
+			DiskSizeGb:  settings.SizeMb,
 			DiskType:    diskType,
 		}
 	}
 
-	return g.doCall(g.service.Instances.Insert(g.project, g.zone, instance))
+	return disk, nil
 }
 
 func (g *computeServiceWrapper) AddInstanceToTargetPool(targetPool string, instances ...string) error {
@@ -399,7 +431,11 @@ func (g *computeServiceWrapper) ListInstanceGroupInstances(name string) ([]*comp
 func (g *computeServiceWrapper) CreateInstanceTemplate(name string, settings *InstanceSettings) error {
 	network := g.addAPIUrlPrefix(settings.Network, g.project+"/global/networks/")
 	subnetwork := g.addAPIUrlPrefix(settings.Subnetwork, g.project+"/regions/"+g.region()+"/subnetworks/")
-	sourceImage := g.addAPIUrlPrefix(settings.DiskImage, "")
+
+	disks, err := g.attachedDisks(name, settings.Disks)
+	if err != nil {
+		return err
+	}
 
 	template := &compute.InstanceTemplate{
 		Name:        name,
@@ -410,19 +446,7 @@ func (g *computeServiceWrapper) CreateInstanceTemplate(name string, settings *In
 			Tags: &compute.Tags{
 				Items: settings.Tags,
 			},
-			Disks: []*compute.AttachedDisk{
-				{
-					Boot:       true,
-					AutoDelete: settings.AutoDeleteDisk,
-					Type:       "PERSISTENT",
-					Mode:       "READ_WRITE",
-					InitializeParams: &compute.AttachedDiskInitializeParams{
-						SourceImage: sourceImage,
-						DiskSizeGb:  settings.DiskSizeMb,
-						DiskType:    settings.DiskType,
-					},
-				},
-			},
+			Disks: disks,
 			NetworkInterfaces: []*compute.NetworkInterface{
 				{
 					Network:    network,

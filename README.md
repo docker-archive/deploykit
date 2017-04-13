@@ -60,9 +60,12 @@ too.
         "Network": "default",
         "Tags": ["tag1", "tag2"],
         "MachineType": "n1-standard-1",
-        "DiskSizeMb": 60,
-        "DiskImage": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
-        "DiskType": "pd-standard",
+        "Disks":[{
+            "Boot": true,
+            "SizeMb": 60,
+            "Image": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
+            "Type": "pd-standard"
+        }],
         "Scopes": [
           "https://www.googleapis.com/auth/cloudruntimeconfig",
           "https://www.googleapis.com/auth/logging.write"
@@ -126,11 +129,14 @@ by GCP.
         "Network": "default",
         "Tags": ["tag1", "tag2"],
         "MachineType": "n1-standard-1",
-        "DiskSizeMb": 60,
-        "DiskImage": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
-        "DiskType": "pd-standard",
-        "AutoDeleteDisk": false,
-        "ReuseExistingDisk": true,
+        "Disks":[{
+            "Boot": true,
+            "SizeMb": 60,
+            "Image": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
+            "Type": "pd-standard",
+            "AutoDelete": false,
+            "ReuseExisting": true
+        }],
         "Scopes": [
           "https://www.googleapis.com/auth/cloudruntimeconfig",
           "https://www.googleapis.com/auth/logging.write"

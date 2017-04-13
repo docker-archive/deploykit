@@ -1,13 +1,14 @@
 package metadata
 
 import (
+	"strings"
+	"sync"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
-	"strings"
-	"sync"
 )
 
 type plugin struct {
