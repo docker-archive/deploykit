@@ -78,9 +78,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	pretend := cmd.PersistentFlags().Bool("pretend", false, "Don't actually make changes; explain where appropriate")
 
+	templateFlags, toJSON, fromJSON, processTemplate := base.TemplateProcessor(plugins)
+
 	///////////////////////////////////////////////////////////////////////////////////
 	// commit
-	tflags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
 	commit := &cobra.Command{
 		Use:   "commit <template_URL>",
 		Short: "Commit a multi-group configuration, as specified by the URL.  Read from stdin if url is '-'",
@@ -150,11 +151,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
-	commit.Flags().AddFlagSet(tflags)
+	commit.Flags().AddFlagSet(templateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// inspect
-	inspectFlags, _, fromJSON, _ := base.TemplateProcessor(plugins)
 	inspect := &cobra.Command{
 		Use:   "inspect",
 		Short: "Inspect returns the plugin configurations known by the manager",
@@ -200,7 +200,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
-	inspect.Flags().AddFlagSet(inspectFlags)
+	inspect.Flags().AddFlagSet(templateFlags)
 
 	cmd.AddCommand(commit, inspect)
 

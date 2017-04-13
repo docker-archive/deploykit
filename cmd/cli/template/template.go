@@ -22,9 +22,10 @@ func init() {
 // Command is the entrypoint
 func Command(plugins func() discovery.Plugins) *cobra.Command {
 
+	templateFlags, _, _, processTemplate := base.TemplateProcessor(plugins)
+
 	///////////////////////////////////////////////////////////////////////////////////
 	// template
-	tflags, _, _, processTemplate := base.TemplateProcessor(plugins)
 	cmd := &cobra.Command{
 		Use:   "template <url>",
 		Short: "Render an infrakit template at given url.  If url is '-', read from stdin",
@@ -53,7 +54,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().AddFlagSet(tflags)
+	cmd.Flags().AddFlagSet(templateFlags)
 
 	format := &cobra.Command{
 		Use:   "format json|yaml",
