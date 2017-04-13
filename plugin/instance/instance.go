@@ -37,11 +37,10 @@ func NewInstancePlugin(client monorail.Iface, username string, password string) 
 
 // DescribeInstances Lists the instances running in RackHD by tags
 func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-	auth, err := p.Client.Login(p.Username, p.Password)
+	auth, err := p.login()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+		return nil, err
 	}
-	log.Infof("Logged into RackHD service as %s", p.Username)
 
 	nodes, err := p.Client.Nodes().NodesGetAll(nodes.NewNodesGetAllParams(), auth)
 	if err != nil {
@@ -55,13 +54,19 @@ func (p rackHDInstancePlugin) DescribeInstances(tags map[string]string, properti
 			if err != nil {
 				return descriptions, err
 			}
+
+			// Filter tags based on input
 			keep := true
 			for tagKey, tagVal := range tags {
 				if nodeTags[tagKey] != tagVal {
 					keep = false
 				}
 			}
-			logID := instance.LogicalID(node.ID)
+			var logID instance.LogicalID
+			ip, err := p.getNodeIPAddress(node.ID, auth)
+			if err == nil {
+				logID = instance.LogicalID(ip)
+			}
 			if keep {
 				descriptions = append(descriptions, instance.Description{
 					ID:        instance.ID(node.ID),
@@ -96,24 +101,28 @@ func (p rackHDInstancePlugin) getTagMapForNode(node *models.Node20Node, auth run
 
 // Destroy reformats a RackHD instance and performs a secure erase of the system
 func (p rackHDInstancePlugin) Destroy(id instance.ID) error {
-	auth, err := p.Client.Login(p.Username, p.Password)
+	auth, err := p.login()
 	if err != nil {
-		return fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+		return err
 	}
-	log.Infof("Logged into RackHD service as %s", p.Username)
 
 	options := make(map[string]interface{})
 	options["useSecureErase"] = true
-	workflow := models.PostNodeWorkflow{Name: "Graph.Bootstrap.Decommission.Node", Options: &models.PostNodeWorkflowOptions{Defaults: options}}
+	workflow := models.PostNodeWorkflow{
+		Name:    "Graph.Bootstrap.Decommission.Node",
+		Options: &models.PostNodeWorkflowOptions{Defaults: options},
+	}
 	log.Infof("Posted destruction workflow to instance %s", id)
 
 	err = p.applyWorkflowToNode(&workflow, string(id), auth)
 	if err != nil {
-		return fmt.Errorf("Unable to apply decommision workflow: %s", err)
+		return err
 	}
+
 	log.Infof("Removing node %s from RackHD", id)
 	nodeDelParams := nodes.NewNodesDelByIDParams().
 		WithIdentifier(string(id))
+
 	p.Client.Nodes().NodesDelByID(nodeDelParams, auth)
 
 	return nil
@@ -121,11 +130,10 @@ func (p rackHDInstancePlugin) Destroy(id instance.ID) error {
 
 // Label writes tags with the infrakit metadata to the RackHD instance
 func (p rackHDInstancePlugin) Label(id instance.ID, labels map[string]string) error {
-	auth, err := p.Client.Login(p.Username, p.Password)
+	auth, err := p.login()
 	if err != nil {
-		return fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+		return err
 	}
-	log.Infof("Logged into RackHD service as %s", p.Username)
 
 	var tagList []string
 	for k, v := range labels {
@@ -160,35 +168,32 @@ func (p rackHDInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 	}
 
 	skuName := props.SKUName
-	auth, err := p.Client.Login(p.Username, p.Password)
+	auth, err := p.login()
 	if err != nil {
-		return &instanceID, fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+		return nil, err
 	}
-	log.Infof("Logged into RackHD service as %s", p.Username)
 
 	skuID, err := p.getSKUIDForName(skuName, auth)
 	if err != nil {
-		return &instanceID, fmt.Errorf("Unable to lookup SKU ID: %s", err)
+		return &instanceID, err
 	}
-	log.Infof("Found SKU ID, %s, for name \"%s\"", skuID, skuName)
 
 	nodeID, err := p.getAvailableNodeIDForSKU(skuID, auth)
 	if err != nil {
-		log.Infof("Unable to select node ID for SKU ID, %s. %s", skuID, err)
-		return &instanceID, fmt.Errorf("Unable to select node ID for SKU ID, %s. %s", skuID, err)
+		return &instanceID, err
 	}
-	log.Infof("Found available node ID: %s", nodeID)
 
-	log.Infof("Writing tags to node ID %s: %s", nodeID, spec.Tags)
-	p.Label(instance.ID(nodeID), spec.Tags)
+	err = p.Label(instance.ID(nodeID), spec.Tags)
+	if err != nil {
+		return &instanceID, err
+	}
 
 	err = p.applyWorkflowToNode(props.Workflow, nodeID, auth)
 	if err != nil {
-		return &instanceID, fmt.Errorf("Unable to apply workflow: %s", err)
+		return &instanceID, err
 	}
 
 	instanceID = instance.ID(nodeID)
-
 	log.Infof("Applying init to node ID %s: %s", nodeID, spec.Init)
 	return &instanceID, nil
 }
@@ -225,6 +230,7 @@ func (p rackHDInstancePlugin) getSKUIDForName(skuName string, auth runtime.Clien
 		return "", fmt.Errorf("required SKU not found. Wanted %s, but not found",
 			skuName)
 	}
+	log.Infof("Found SKU ID, %s, for name \"%s\"", skuID, skuName)
 	return skuID, nil
 }
 
@@ -237,14 +243,25 @@ func (p rackHDInstancePlugin) getAvailableNodeIDForSKU(skuID string, auth runtim
 	var nodeID string
 	for _, node1 := range nodes.Payload {
 		// Consumed nodes must be un-tagged to be provisioned
-		if string(node1.Type) == "compute" && len(node1.Tags) == 0 {
-			nodeID = string(node1.ID)
-			break
+		if string(node1.Type) != "compute" {
+			continue
 		}
+		if len(node1.Tags) > 0 {
+			continue
+		}
+
+		active, err := p.hasAnActiveWorkflow(string(node1.ID), auth)
+		if active || err != nil {
+			log.Infof("Unable to determine if node %s has active workflow: %s", node1.ID, err)
+			continue
+		}
+		nodeID = string(node1.ID)
+		break
 	}
 	if nodeID == "" {
-		return "", fmt.Errorf("no eligible nodes found matching SKU ID: %s", skuID)
+		return "", fmt.Errorf("No eligible nodes found matching SKU ID: %s", skuID)
 	}
+	log.Infof("Found available node ID: %s", nodeID)
 	return nodeID, nil
 }
 
@@ -253,13 +270,63 @@ func (p rackHDInstancePlugin) applyWorkflowToNode(workflow *models.PostNodeWorkf
 		return fmt.Errorf("No workflow name provided")
 	}
 
+	active, err := p.hasAnActiveWorkflow(nodeID, auth)
+	if err != nil {
+		return err
+	} else if active {
+		return fmt.Errorf("Node ID, %s, has an active workflow, so this action cannot be performed", nodeID)
+	}
+
 	params := nodes.NewNodesPostWorkflowByIDParams().
 		WithIdentifier(nodeID).
 		WithName(&workflow.Name).
 		WithBody(workflow)
-	_, err := p.Client.Nodes().NodesPostWorkflowByID(params, auth)
+	_, err = p.Client.Nodes().NodesPostWorkflowByID(params, auth)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (p rackHDInstancePlugin) hasAnActiveWorkflow(nodeID string, auth runtime.ClientAuthInfoWriter) (bool, error) {
+	active := true
+	params := nodes.NewNodesGetWorkflowByIDParams().
+		WithActive(&active)
+	activeWorkflows, err := p.Client.Nodes().NodesGetWorkflowByID(params, auth)
+	if err != nil {
+		return false, err
+	}
+	if len(activeWorkflows.Payload) > 0 {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func (p rackHDInstancePlugin) login() (runtime.ClientAuthInfoWriter, error) {
+	auth, err := p.Client.Login(p.Username, p.Password)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to log into RackHD as %s: %s", p.Username, err)
+	}
+	log.Infof("Logged into RackHD service as %s", p.Username)
+	return auth, nil
+}
+
+func (p rackHDInstancePlugin) getNodeIPAddress(nodeID string, auth runtime.ClientAuthInfoWriter) (string, error) {
+	params := nodes.NewNodesGetCatalogSourceByIDParams().
+		WithIdentifier(nodeID).
+		WithSource("ohai")
+	catalogSource, err := p.Client.Nodes().NodesGetCatalogSourceByID(params, auth)
+	if err != nil {
+		return "", err
+	}
+
+	if p, ok := catalogSource.Payload.(map[string]interface{}); ok {
+		if d, ok := p["data"].(map[string]interface{}); ok {
+			if i, ok := d["ipaddress"].(string); ok {
+				return i, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("Unable to read catalog source payload: %s", catalogSource.Payload)
 }
