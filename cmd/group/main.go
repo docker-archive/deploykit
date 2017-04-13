@@ -16,6 +16,7 @@ import (
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -76,7 +77,7 @@ func main() {
 					}
 
 					updateSnapshot <- func(view map[string]interface{}) {
-						metadata_plugin.Put([]string{"specs"}, snapshot, view)
+						types.Put([]string{"specs"}, snapshot, view)
 					}
 
 				case <-tick30:
@@ -95,7 +96,7 @@ func main() {
 					}
 
 					updateSnapshot <- func(view map[string]interface{}) {
-						metadata_plugin.Put([]string{"groups"}, snapshot, view)
+						types.Put([]string{"groups"}, snapshot, view)
 					}
 
 				case <-stopSnapshot:

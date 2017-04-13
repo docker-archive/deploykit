@@ -17,6 +17,7 @@ import (
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/store"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/spf13/cobra"
 )
@@ -106,7 +107,7 @@ func runMain(cfg config) error {
 				// update leadership
 				if isLeader, err := mgr.IsLeader(); err == nil {
 					updateSnapshot <- func(view map[string]interface{}) {
-						metadata_plugin.Put([]string{"leader"}, isLeader, view)
+						types.Put([]string{"leader"}, isLeader, view)
 					}
 				} else {
 					logrus.Warningln("Cannot check leader for metadata:", err)
@@ -115,7 +116,7 @@ func runMain(cfg config) error {
 				// update config
 				if err := cfg.snapshot.Load(&snapshot); err == nil {
 					updateSnapshot <- func(view map[string]interface{}) {
-						metadata_plugin.Put([]string{"configs"}, snapshot, view)
+						types.Put([]string{"configs"}, snapshot, view)
 					}
 				} else {
 					logrus.Warningln("Cannot load snapshot for metadata:", err)
