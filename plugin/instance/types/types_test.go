@@ -15,7 +15,7 @@ func TestParseProperties(t *testing.T) {
 		"Tags":["TAG1", "TAG2"],
 		"Disks":[{
 			"Image":"docker-image",
-			"SizeMb":2000,
+			"SizeGb":2000,
 			"Type":"pd-ssd",
 			"AutoDelete":false,
 			"ReuseExisting":true
@@ -41,7 +41,7 @@ func TestParseProperties(t *testing.T) {
 	// Disk settings
 	bootDisk := p.Disks[0]
 	require.Equal(t, "docker-image", bootDisk.Image)
-	require.Equal(t, 2000, int(bootDisk.SizeMb))
+	require.Equal(t, 2000, int(bootDisk.SizeGb))
 	require.Equal(t, "pd-ssd", bootDisk.Type)
 	require.Equal(t, false, bootDisk.AutoDelete)
 	require.Equal(t, true, bootDisk.ReuseExisting)
@@ -67,7 +67,7 @@ func TestParseEmptyProperties(t *testing.T) {
 	bootDisk := p.Disks[0]
 	require.Equal(t, defaultDiskImage, bootDisk.Image)
 	require.Equal(t, defaultDiskType, bootDisk.Type)
-	require.Equal(t, defaultDiskSizeMb, bootDisk.SizeMb)
+	require.Equal(t, defaultDiskSizeGb, bootDisk.SizeGb)
 	require.Equal(t, true, bootDisk.AutoDelete)
 	require.Equal(t, false, bootDisk.ReuseExisting)
 }
@@ -85,7 +85,7 @@ func TestParseDefaultDiskProperties(t *testing.T) {
 	bootDisk := p.Disks[0]
 	require.Equal(t, "docker-image", bootDisk.Image)
 	require.Equal(t, defaultDiskType, bootDisk.Type)
-	require.Equal(t, defaultDiskSizeMb, bootDisk.SizeMb)
+	require.Equal(t, defaultDiskSizeGb, bootDisk.SizeGb)
 	require.Equal(t, true, bootDisk.AutoDelete)
 	require.Equal(t, false, bootDisk.ReuseExisting)
 }

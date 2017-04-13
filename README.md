@@ -62,7 +62,7 @@ too.
         "MachineType": "n1-standard-1",
         "Disks":[{
             "Boot": true,
-            "SizeMb": 60,
+            "SizeGb": 60,
             "Image": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
             "Type": "pd-standard"
         }],
@@ -131,7 +131,7 @@ by GCP.
         "MachineType": "n1-standard-1",
         "Disks":[{
             "Boot": true,
-            "SizeMb": 60,
+            "SizeGb": 60,
             "Image": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205",
             "Type": "pd-standard",
             "AutoDelete": false,

@@ -15,7 +15,7 @@ const (
 	defaultNetwork           = "default"
 	defaultPreemptible       = false
 	defaultDiskBoot          = true
-	defaultDiskSizeMb        = int64(10)
+	defaultDiskSizeGb        = int64(10)
 	defaultDiskImage         = "docker"
 	defaultDiskType          = "pd-standard"
 	defaultDiskAutoDelete    = true
@@ -54,7 +54,7 @@ func ParseProperties(req *types.Any) (Properties, error) {
 			Disks: []gcloud.DiskSettings{
 				{
 					Boot:          defaultDiskBoot,
-					SizeMb:        defaultDiskSizeMb,
+					SizeGb:        defaultDiskSizeGb,
 					Image:         defaultDiskImage,
 					Type:          defaultDiskType,
 					AutoDelete:    defaultDiskAutoDelete,
