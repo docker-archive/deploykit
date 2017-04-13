@@ -152,12 +152,12 @@ func main() {
 
 		// For metadata -- queries for current time
 		timeQueries := map[string]interface{}{}
-		metadata_plugin.Put(metadata_plugin.Path("now/nano"),
+		types.Put(types.PathFromString("now/nano"),
 			func() interface{} {
 				return time.Now().UnixNano()
 			},
 			timeQueries)
-		metadata_plugin.Put(metadata_plugin.Path("now/sec"),
+		types.Put(types.PathFromString("now/sec"),
 			func() interface{} {
 				return time.Now().Unix()
 			},

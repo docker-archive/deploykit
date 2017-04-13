@@ -10,9 +10,9 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
@@ -78,7 +78,7 @@ func main() {
 							}
 						}
 						updateSnapshot <- func(view map[string]interface{}) {
-							metadata_plugin.Put([]string{"containers"}, snapshot, view)
+							types.Put([]string{"containers"}, snapshot, view)
 						}
 
 					case <-stopSnapshot:
