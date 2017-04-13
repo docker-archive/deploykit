@@ -13,7 +13,7 @@
         "Tags": ["{{TAG}}"],
         "MachineType": "f1-micro",
         "Disks":[{
-          "SizeMb": 100,
+          "SizeGb": 100,
           "Image": "https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/debian-8-jessie-v20161215"
         }]
       }

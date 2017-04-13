@@ -1,0 +1,28 @@
+{
+  "ID": "single",
+  "Properties": {
+    "Allocation": {
+      "LogicalIDs": ["pet-1", "pet-2"]
+    },
+    "Instance": {
+      "Plugin": "instance-gcp",
+      "Properties": {
+        "NamePrefix": "test",
+        "Disks":[{
+          "Image": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205"
+        },{
+          "SizeGb": 1000,
+          "AutoDelete": false,
+          "ReuseExisting": true,
+          "NameSuffix": "-data"
+        }]
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": []
+      }
+    }
+  }
+}

@@ -32,7 +32,7 @@ func TestProvision(t *testing.T) {
 		"Subnetwork":"SUB_EUROPE",
 		"Tags":["TAG1", "TAG2"],
 		"Disks":[{
-			"SizeMb":100,
+			"SizeGb":100,
 			"Image":"docker-image",
 			"Type":"ssd"
 		}],
@@ -60,7 +60,7 @@ func TestProvision(t *testing.T) {
 		Disks: []gcloud.DiskSettings{
 			{
 				Boot:          true,
-				SizeMb:        100,
+				SizeGb:        100,
 				Image:         "docker-image",
 				Type:          "ssd",
 				AutoDelete:    true,
@@ -106,7 +106,7 @@ func TestProvisionLogicalID(t *testing.T) {
 		Disks: []gcloud.DiskSettings{
 			{
 				Boot:          true,
-				SizeMb:        10,
+				SizeGb:        10,
 				Image:         "docker",
 				Type:          "pd-standard",
 				AutoDelete:    false,
@@ -150,7 +150,7 @@ func TestProvisionLogicalIDIsIPAddress(t *testing.T) {
 		Disks: []gcloud.DiskSettings{
 			{
 				Boot:          true,
-				SizeMb:        10,
+				SizeGb:        10,
 				Image:         "docker",
 				Type:          "pd-standard",
 				AutoDelete:    true,
@@ -192,7 +192,7 @@ func TestProvisionFails(t *testing.T) {
 		Disks: []gcloud.DiskSettings{
 			{
 				Boot:          true,
-				SizeMb:        10,
+				SizeGb:        10,
 				Image:         "docker",
 				Type:          "pd-standard",
 				AutoDelete:    true,
@@ -227,7 +227,7 @@ func TestProvisionFailsToAddToTargetPool(t *testing.T) {
 		Disks: []gcloud.DiskSettings{
 			{
 				Boot:          true,
-				SizeMb:        10,
+				SizeGb:        10,
 				Image:         "docker",
 				Type:          "pd-standard",
 				AutoDelete:    true,

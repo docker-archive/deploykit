@@ -90,10 +90,11 @@ type DiskSettings struct {
 	Boot          bool
 	Type          string
 	Mode          string
-	SizeMb        int64
+	SizeGb        int64
 	Image         string
 	AutoDelete    bool
 	ReuseExisting bool
+	NameSuffix    string
 }
 
 // InstanceManagerSettings the characteristics of a VM instance template manager.
@@ -293,11 +294,11 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 	return g.doCall(g.service.Instances.Insert(g.project, g.zone, instance))
 }
 
-func (g *computeServiceWrapper) attachedDisks(name string, disksSettings []DiskSettings) ([]*compute.AttachedDisk, error) {
+func (g *computeServiceWrapper) attachedDisks(instanceName string, disksSettings []DiskSettings) ([]*compute.AttachedDisk, error) {
 	disks := []*compute.AttachedDisk{}
 
 	for _, diskSettings := range disksSettings {
-		disk, err := g.attachedDisk(name, diskSettings)
+		disk, err := g.attachedDisk(instanceName, diskSettings)
 		if err != nil {
 			return nil, err
 		}
@@ -308,42 +309,58 @@ func (g *computeServiceWrapper) attachedDisks(name string, disksSettings []DiskS
 	return disks, nil
 }
 
-func (g *computeServiceWrapper) attachedDisk(name string, settings DiskSettings) (*compute.AttachedDisk, error) {
+func (g *computeServiceWrapper) attachedDisk(instanceName string, settings DiskSettings) (*compute.AttachedDisk, error) {
 	sourceImage := g.addAPIUrlPrefix(settings.Image, "")
 	diskType := g.addAPIUrlPrefix(settings.Type, g.project+"/zones/"+g.zone+"/diskTypes/")
 
 	disk := &compute.AttachedDisk{
-		Boot:       settings.Boot,       // TODO default to true
-		Mode:       settings.Mode,       // TODO default to READ_WRITE
-		AutoDelete: settings.AutoDelete, // TODO?? default to true
+		Boot:       settings.Boot,
+		Mode:       settings.Mode,
+		AutoDelete: settings.AutoDelete,
 		Type:       "PERSISTENT",
 	}
 
+	// Each disk is prefixed by the instance name and an optional suffix.
+	diskName := instanceName + settings.NameSuffix
+
 	var existingDisk *compute.Disk
 	if settings.ReuseExisting {
-		log.Debugln("Trying to reuse disk", name)
+		log.Debugln("Trying to reuse disk", diskName)
 
-		disk, err := g.service.Disks.Get(g.project, g.zone, name).Do()
+		disk, err := g.service.Disks.Get(g.project, g.zone, diskName).Do()
 		if err != nil || disk == nil {
-			log.Debugln("Couldn't find existing disk", name)
+			log.Debugln("Couldn't find existing disk", diskName)
 		} else if disk.SourceImage != sourceImage {
-			log.Debugln("Found existing disk that uses a wrong image. Let's delete", name)
+			log.Debugln("Found existing disk that uses a wrong image. Let's delete", diskName)
 			if err := g.doCall(g.service.Disks.Delete(g.project, g.zone, disk.Name)); err != nil {
 				return nil, err
 			}
 		} else {
-			log.Debugln("Found existing disk", name)
+			log.Debugln("Found existing disk", diskName)
 			existingDisk = disk
 		}
 	}
 
 	if existingDisk != nil {
-		disk.Source = "projects/" + g.project + "/zones/" + g.zone + "/disks/" + name
+		disk.Source = existingDisk.SelfLink
+	} else if settings.Image == "" {
+		log.Debugln("Creating standalone disk", diskName)
+
+		if err := g.doCall(g.service.Disks.Insert(g.project, g.zone, &compute.Disk{
+			Name:   diskName,
+			SizeGb: settings.SizeGb,
+			Type:   diskType,
+		})); err != nil {
+			return nil, err
+		}
+
+		disk.Source = "projects/" + g.project + "/zones/" + g.zone + "/disks/" + diskName
 	} else {
+		// Create the disk alongside the instance
 		disk.InitializeParams = &compute.AttachedDiskInitializeParams{
-			DiskName:    name,
+			DiskName:    diskName,
 			SourceImage: sourceImage,
-			DiskSizeGb:  settings.SizeMb,
+			DiskSizeGb:  settings.SizeGb,
 			DiskType:    diskType,
 		}
 	}
