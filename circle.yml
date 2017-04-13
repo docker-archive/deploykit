@@ -47,11 +47,6 @@ test:
     - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)
 
 deployment:
-  pr:
-    branch: /pull\/.*/
-    commands:
-      - # DISABLED TO SPEED UP PR Process:  DOCKER_BUILD_FLAGS="--rm=false" make build-docker
-
   release:
     branch: /release-.*/
     commands:
