@@ -8,10 +8,10 @@ import (
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -48,17 +48,17 @@ func forPlugin(plugins func() discovery.Plugins, do func(string, metadata.Plugin
 	return nil
 }
 
-func listAll(m metadata.Plugin, path metadata.Path) ([]metadata.Path, error) {
+func listAll(m metadata.Plugin, path types.Path) ([]types.Path, error) {
 	if m == nil {
 		return nil, fmt.Errorf("no plugin")
 	}
-	result := []metadata.Path{}
+	result := []types.Path{}
 	nodes, err := m.List(path)
 	if err != nil {
 		return nil, err
 	}
 	for _, n := range nodes {
-		c := path.Join(n)
+		c := path.JoinString(n)
 		more, err := listAll(m, c)
 		if err != nil {
 			return nil, err
@@ -110,7 +110,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return fmt.Errorf("No absolute path")
 			}
 
-			path := metadata_plugin.Path(p)
+			path := types.PathFromString(p)
 			first := path.Index(0)
 
 			targets := []string{} // target plugins to query
@@ -128,7 +128,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			for j, target := range targets {
 
-				nodes := []metadata.Path{} // the result set to print
+				nodes := []types.Path{} // the result set to print
 
 				match, err := getPlugin(plugins, target)
 				if err != nil {
@@ -142,11 +142,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 							log.Warn("Cannot metadata ls on plugin", "target", target, "err", err)
 						}
 						for _, c := range allPaths {
-							nodes = append(nodes, metadata_plugin.Path(target).Sub(c))
+							nodes = append(nodes, types.PathFromString(target).Join(c))
 						}
 					} else {
 						for _, t := range targets {
-							nodes = append(nodes, metadata_plugin.Path(t))
+							nodes = append(nodes, types.PathFromString(t))
 						}
 					}
 
@@ -157,7 +157,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 							log.Warn("Cannot metadata ls on plugin", "target", target, "err", err)
 						}
 						for _, c := range allPaths {
-							nodes = append(nodes, metadata_plugin.Path(target).Sub(c))
+							nodes = append(nodes, types.PathFromString(target).Join(c))
 						}
 					} else {
 						children, err := match.List(path.Shift(1))
@@ -165,7 +165,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 							log.Warn("Cannot metadata ls on plugin", "target", target, "err", err)
 						}
 						for _, c := range children {
-							nodes = append(nodes, path.Join(c))
+							nodes = append(nodes, path.JoinString(c))
 						}
 					}
 				}
@@ -177,9 +177,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					}
 					for _, l := range nodes {
 						if *long {
-							fmt.Println(metadata_plugin.String(l))
+							fmt.Println(l)
 						} else {
-							fmt.Println(metadata_plugin.String(l.Rel(path)))
+							fmt.Println(l.Rel(path))
 						}
 					}
 					break
@@ -196,9 +196,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				}
 				for _, l := range nodes {
 					if *long {
-						fmt.Println(metadata_plugin.String(l))
+						fmt.Println(l)
 					} else {
-						fmt.Println(metadata_plugin.String(l.Rel(path)))
+						fmt.Println(l.Rel(path))
 					}
 				}
 			}
@@ -215,7 +215,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			for _, p := range args {
 
-				path := metadata_plugin.Path(p)
+				path := types.PathFromString(p)
 				first := path.Index(0)
 				if first != nil {
 					match, err := getPlugin(plugins, *first)

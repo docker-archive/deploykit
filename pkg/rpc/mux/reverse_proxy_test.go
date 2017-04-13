@@ -11,7 +11,6 @@ import (
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
-	plugin_metadata "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	rpc_metadata "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -88,22 +87,22 @@ func startPlugin(t *testing.T, name string) (string, rpc_server.Stoppable) {
 	socketPath := tempSocket(name)
 
 	m := map[string]interface{}{}
-	plugin_metadata.Put(plugin_metadata.Path("region/count"), 3, m)
-	plugin_metadata.Put(plugin_metadata.Path("region/us-west-1/vpc/vpc1/network/network1/id"), "id-network1", m)
-	plugin_metadata.Put(plugin_metadata.Path("region/us-west-1/vpc/vpc2/network/network10/id"), "id-network10", m)
-	plugin_metadata.Put(plugin_metadata.Path("region/us-west-1/vpc/vpc2/network/network11/id"), "id-network11", m)
-	plugin_metadata.Put(plugin_metadata.Path("region/us-west-2/vpc/vpc21/network/network210/id"), "id-network210", m)
-	plugin_metadata.Put(plugin_metadata.Path("region/us-west-2/vpc/vpc21/network/network211/id"), "id-network211", m)
-	plugin_metadata.Put(plugin_metadata.Path("region/us-west-2/metrics/instances/count"), 100, m)
+	types.Put(types.PathFromString("region/count"), 3, m)
+	types.Put(types.PathFromString("region/us-west-1/vpc/vpc1/network/network1/id"), "id-network1", m)
+	types.Put(types.PathFromString("region/us-west-1/vpc/vpc2/network/network10/id"), "id-network10", m)
+	types.Put(types.PathFromString("region/us-west-1/vpc/vpc2/network/network11/id"), "id-network11", m)
+	types.Put(types.PathFromString("region/us-west-2/vpc/vpc21/network/network210/id"), "id-network210", m)
+	types.Put(types.PathFromString("region/us-west-2/vpc/vpc21/network/network211/id"), "id-network211", m)
+	types.Put(types.PathFromString("region/us-west-2/metrics/instances/count"), 100, m)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, rpc_metadata.PluginServerWithTypes(
 		map[string]metadata.Plugin{
 			"aws": &testing_metadata.Plugin{
-				DoList: func(path metadata.Path) ([]string, error) {
-					return plugin_metadata.List(path, m), nil
+				DoList: func(path types.Path) ([]string, error) {
+					return types.List(path, m), nil
 				},
-				DoGet: func(path metadata.Path) (*types.Any, error) {
-					return plugin_metadata.GetValue(path, m)
+				DoGet: func(path types.Path) (*types.Any, error) {
+					return types.GetValue(path, m)
 				},
 			},
 		}))
@@ -130,7 +129,7 @@ func TestMuxPlugins(t *testing.T) {
 
 	T(100).Infoln("Basic client")
 	require.Equal(t, []string{"region"},
-		first(must(rpc_metadata.NewClient(socketPath)).List(plugin_metadata.Path("aws"))))
+		first(must(rpc_metadata.NewClient(socketPath)).List(types.PathFromString("aws"))))
 
 	infoClient := client.NewPluginInfoClient(socketPath)
 	info, err := infoClient.GetInfo()
