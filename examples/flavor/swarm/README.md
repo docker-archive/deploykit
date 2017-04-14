@@ -13,6 +13,10 @@ This plugin has a schema that looks like this:
    "SwarmJoinIP": "192.168.2.200",
    "Docker" : {
      "Host" : "tcp://192.168.2.200:4243"
+   },
+   "EngineLabels": {
+     "storage": "ssd",
+     "data": ""
    }
  }
 ```

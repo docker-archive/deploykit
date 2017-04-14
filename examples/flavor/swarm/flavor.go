@@ -41,6 +41,9 @@ type Spec struct {
 	// SwarmJoinIP is the IP for managers and workers to join
 	SwarmJoinIP string
 
+	// Labels to apply on the Docker engine
+	EngineLabels map[string]string
+
 	// Docker holds the connection params to the Docker engine for join tokens, etc.
 	Docker ConnectInfo
 }
@@ -459,8 +462,18 @@ func (c *templateContext) Funcs() []template.Function {
 		},
 		{
 			Name:        "INFRAKIT_LABELS",
-			Description: []string{"The Docker engine labels to be applied for linking the Docker engine to this instance."},
+			Description: []string{"The Docker engine labels to be applied for linking the Docker engine to this instance, as well as those defined in the flavor spec."},
 			Func: func() []string {
+				if len(c.flavorSpec.EngineLabels) > 0 {
+					out := []string{}
+					for k, v := range c.flavorSpec.EngineLabels {
+						out = append(out, fmt.Sprintf("%s=%s", k, v))
+					}
+					for k, v := range c.link.Map() {
+						out = append(out, fmt.Sprintf("%s=%s", k, v))
+					}
+					return out
+				}
 				return c.link.KVPairs()
 			},
 		},
