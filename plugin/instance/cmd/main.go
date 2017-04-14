@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/digitalocean/godo"
 	"github.com/docker/infrakit.digitalocean/plugin/instance"
 	"github.com/docker/infrakit/pkg/cli"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/spf13/cobra"
+	"golang.org/x/oauth2"
 )
 
 func main() {
@@ -19,11 +22,17 @@ func main() {
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	region := cmd.Flags().String("region", "", "DigitalOcean region")
 	//config := cmd.Flags().String("config", "$HOME/.config/doctl/config.yaml", "configuration file where the api token are specified")
-	token := cmd.Flags().String("access-token", "", "DigitalOcean token")
+	accessToken := cmd.Flags().String("access-token", "", "DigitalOcean token")
 
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(instance.NewDOInstancePlugin(*token, *region)))
+
+		token := &oauth2.Token{AccessToken: *accessToken}
+		tokenSource := oauth2.StaticTokenSource(token)
+		oauthClient := oauth2.NewClient(context.TODO(), tokenSource)
+		client := godo.NewClient(oauthClient)
+
+		cli.RunPlugin(*name, instance_plugin.PluginServer(instance.NewDOInstancePlugin(client, *region)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())

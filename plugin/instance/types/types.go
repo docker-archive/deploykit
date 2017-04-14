@@ -28,7 +28,6 @@ type Properties struct {
 	IPv6              bool `json:"ipv6"`
 	PrivateNetworking bool `json:"private_networking"`
 	Tags              []string
-	// FIXME(vdemeester) ssh_keys, volumes, tags, private networking, tags
 }
 
 // ParseProperties parses instance Properties from a json description.

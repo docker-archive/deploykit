@@ -15,7 +15,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
-	"golang.org/x/oauth2"
 )
 
 // Spec is just whatever that can be unmarshalled into a generic JSON map
@@ -25,29 +24,35 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
+type dropletsService interface {
+	List(context.Context, *godo.ListOptions) ([]godo.Droplet, *godo.Response, error)
+	Get(context.Context, int) (*godo.Droplet, *godo.Response, error)
+	Create(context.Context, *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error)
+	Delete(context.Context, int) (*godo.Response, error)
+}
+
+type tagsService interface {
+	TagResources(context.Context, string, *godo.TagResourcesRequest) (*godo.Response, error)
+}
+
 type plugin struct {
-	accessToken string
-	region      string
+	droplets dropletsService
+	tags     tagsService
+	region   string
 }
 
 // NewDOInstancePlugin creates a new DigitalOcean instance plugin for a given region.
-func NewDOInstancePlugin(accessToken, region string) instance.Plugin {
+func NewDOInstancePlugin(client *godo.Client, region string) instance.Plugin {
 	return &plugin{
-		accessToken: accessToken,
-		region:      region,
+		droplets: client.Droplets,
+		tags:     client.Tags,
+		region:   region,
 	}
-}
-
-func (p *plugin) getClient() *godo.Client {
-	token := &oauth2.Token{AccessToken: p.accessToken}
-	tokenSource := oauth2.StaticTokenSource(token)
-	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-
-	return godo.NewClient(client)
 }
 
 // Info returns a vendor specific name and version
 func (p *plugin) VendorInfo() *spi.VendorInfo {
+	// FIXME(vdemeester) extract that in a version package
 	return &spi.VendorInfo{
 		InterfaceSpec: spi.InterfaceSpec{
 			Name:    "infrakit-instance-digitalocean",
@@ -72,9 +77,23 @@ func (p *plugin) Validate(req *types.Any) error {
 
 // Label labels the instance
 func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
-	client := p.getClient()
+	log.Debugf("label instance %s with %v", instance, labels)
 
-	client.Droplets.List(context.TODO(), &godo.ListOptions{})
+	for key, value := range labels {
+		tag := strings.Replace(fmt.Sprintf("%s:%s", key, value), ".", "::", -1)
+		_, err := p.tags.TagResources(context.TODO(), tag, &godo.TagResourcesRequest{
+			Resources: []godo.Resource{
+				{
+					ID:   string(instance),
+					Type: godo.DropletResourceType,
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -93,8 +112,6 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	_, tags = mergeTags(tags, sliceToMap(properties.Tags)) // scope this resource with namespace tags
 
-	client := p.getClient()
-
 	// Create the droplet
 	dropletCreateRequest := &godo.DropletCreateRequest{
 		Name:   name,
@@ -108,7 +125,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		PrivateNetworking: properties.PrivateNetworking,
 		Tags:              doTags(mapToStringSlice(tags)),
 	}
-	droplet, _, err := client.Droplets.Create(context.TODO(), dropletCreateRequest)
+	droplet, _, err := p.droplets.Create(context.TODO(), dropletCreateRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -118,14 +135,12 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // Destroy terminates an existing instance.
 func (p *plugin) Destroy(instance instance.ID) error {
-	client := p.getClient()
-
 	id, err := strconv.Atoi(string(instance))
 	if err != nil {
 		return err
 	}
 
-	_, err = client.Droplets.Delete(context.TODO(), id)
+	_, err = p.droplets.Delete(context.TODO(), id)
 	return err
 }
 
@@ -133,8 +148,7 @@ func (p *plugin) Destroy(instance instance.ID) error {
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 
-	client := p.getClient()
-	droplets, _, err := client.Droplets.List(context.TODO(), &godo.ListOptions{
+	droplets, _, err := p.droplets.List(context.TODO(), &godo.ListOptions{
 		// FIXME(vdemeester) handle pagination (using resp.Pages)
 		PerPage: 100,
 	})
