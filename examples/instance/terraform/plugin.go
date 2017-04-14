@@ -1,15 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -90,36 +87,37 @@ An example of this looks like:
     }
 }
 
-Note that the JSON above has a name (web4).  In general, we do not require names to
-be specified. So this means the raw JSON we support needs to omit the name. So the instance.Spec
-JSON looks like below, where the value of `value` is the instance body of the TF format JSON.
+The block above is essentially embedded inside the `Properties` field of the instance Spec:
 
 {
     "Properties" : {
-        "type" : "aws_instance",
-        "value" : {
-            "ami" : "${lookup(var.aws_amis, var.aws_region)}",
-            "instance_type" : "m1.small",
-            "key_name": "PUBKEY",
-            "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
-            "subnet_id": "${aws_subnet.default.id}",
-            "tags" :  {
-                "name" : "web4",
-                "InstancePlugin" : "terraform"
-            },
-            "connection" : {
-                "user" : "ubuntu"
-            },
-            "provisioner" : {
-                "remote_exec" : {
-                    "inline" : [
-                        "sudo apt-get -y update",
-                        "sudo apt-get -y install nginx",
-                        "sudo service nginx start"
-                    ]
-                }
-            }
-        }
+      "resource" : {
+    	 "aws_instance" : {
+	    "web4" : {
+		"ami" : "${lookup(var.aws_amis, var.aws_region)}",
+		"instance_type" : "m1.small",
+		"key_name": "PUBKEY",
+		"vpc_security_group_ids" : ["${aws_security_group.default.id}"],
+		"subnet_id": "${aws_subnet.default.id}",
+		"tags" :  {
+		    "Name" : "web4",
+		    "InstancePlugin" : "terraform"
+		}
+		"connection" : {
+		    "user" : "ubuntu"
+		},
+		"provisioner" : {
+		    "remote_exec" : {
+			"inline" : [
+			    "sudo apt-get -y update",
+			    "sudo apt-get -y install nginx",
+			    "sudo service nginx start"
+			]
+		    }
+		}
+	    }
+	 }
+      }
     },
     "Tags" : {
         "other" : "values",
@@ -228,87 +226,41 @@ func addUserData(m map[string]interface{}, key string, init string) {
 	}
 }
 
-func (p *plugin) terraformApply() error {
-	if p.pretend {
-		return nil
-	}
-
-	p.applyLock.Lock()
-	defer p.applyLock.Unlock()
-
-	if p.applying {
-		return nil
-	}
-
-	go func() {
-		for {
-			if err := p.lock.TryLock(); err == nil {
-				defer p.lock.Unlock()
-				doTerraformApply(p.Dir)
-			}
-			log.Debugln("Can't acquire lock, waiting")
-			time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
-		}
-	}()
-	p.applying = true
-	return nil
-}
-
-func doTerraformApply(dir string) error {
-	log.Infoln(time.Now().Format(time.RFC850) + " Applying plan")
-	cmd := exec.Command("terraform", "apply")
-	cmd.Dir = dir
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-	output := io.MultiReader(stdout, stderr)
-	go func() {
-		reader := bufio.NewReader(output)
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				break
-			}
-			log.WithField("terraform", "apply").Infoln(line)
-		}
-	}()
-	return cmd.Run() // blocks
-}
-
-func (p *plugin) terraformShow() (map[TResourceName]TResourceProperties, error) {
+func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 	re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
 
-	result := map[TResourceName]TResourceProperties{}
+	vms := map[TResourceType]map[TResourceName]TResourceProperties{}
 
 	fs := &afero.Afero{Fs: p.fs}
 	// just scan the directory for the instance-*.tf.json files
-	err := fs.Walk(p.Dir, func(path string, info os.FileInfo, err error) error {
-		matches := re.FindStringSubmatch(info.Name())
+	err := fs.Walk(p.Dir,
 
-		if len(matches) == 3 {
-			buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
-			if err != nil {
-				log.Warningln("Cannot parse:", err)
-				return err
+		func(path string, info os.FileInfo, err error) error {
+			matches := re.FindStringSubmatch(info.Name())
+
+			if len(matches) == 3 {
+				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
+				if err != nil {
+					log.Warningln("Cannot parse:", err)
+					return err
+				}
+				tf := TFormat{}
+				if err = types.AnyBytes(buff).Decode(&tf); err != nil {
+					return err
+				}
+				vmType, vmName, props, err := FindVM(&tf)
+				if err != nil {
+					return err
+				}
+
+				if _, has := vms[vmType]; !has {
+					vms[vmType] = map[TResourceName]TResourceProperties{}
+				}
+				vms[vmType][vmName] = props
 			}
-			tf := TFormat{}
-			if err = types.AnyBytes(buff).Decode(&tf); err != nil {
-				return err
-			}
-			_, vmName, props, err := FindVM(&tf)
-			if err != nil {
-				return err
-			}
-			result[vmName] = props
-		}
-		return nil
-	})
-	return result, err
+			return nil
+		})
+	return vms, err
 }
 
 func (p *plugin) ensureUniqueFile() string {
@@ -561,38 +513,72 @@ func (p *plugin) Destroy(instance instance.ID) error {
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 
-	show, err := p.terraformShow()
+	// localSpecs are what we told terraform to create - these are the generated files.
+	localSpecs, err := p.scanLocalFiles()
 	if err != nil {
 		return nil, err
+	}
+
+	terraformShowResult := map[TResourceType]map[TResourceName]TResourceProperties{}
+	if properties {
+		// TODO - not the most efficient, but here we assume we're usually just one vm type
+		for vmResourceType := range localSpecs {
+
+			if instances, err := doTerraformShow(p.Dir, vmResourceType); err == nil {
+
+				terraformShowResult[vmResourceType] = instances
+
+			} else {
+				// Don't blow up... just do best and show what we can find.
+				log.Warnln("cannot terraform show:", err)
+			}
+		}
 	}
 
 	re := regexp.MustCompile("(.*)(instance-[0-9]+)")
 	result := []instance.Description{}
 	// now we scan for <instance_type.instance-<timestamp> as keys
 scan:
-	for k, v := range show {
-		matches := re.FindStringSubmatch(string(k))
-		if len(matches) == 3 {
-			id := matches[2]
+	for t, vm := range localSpecs {
 
-			inst := instance.Description{
-				Tags:      terraformTags(v, "tags"),
-				ID:        instance.ID(id),
-				LogicalID: terraformLogicalID(v),
-			}
+		for k, v := range vm {
+			matches := re.FindStringSubmatch(string(k))
+			if len(matches) == 3 {
+				id := matches[2]
 
-			if len(tags) == 0 {
-				result = append(result, inst)
-			} else {
-				for k, v := range tags {
-					if inst.Tags[k] != v {
-						continue scan // we implement AND
+				inst := instance.Description{
+					Tags:      terraformTags(v, "tags"),
+					ID:        instance.ID(id),
+					LogicalID: terraformLogicalID(v),
+				}
+
+				if properties {
+					if vms, has := terraformShowResult[t]; has {
+						if details, has := vms[k]; has {
+
+							if encoded, err := types.AnyValue(details); err == nil {
+								inst.Properties = encoded
+							}
+
+						}
 					}
 				}
-				result = append(result, inst)
+
+				if len(tags) == 0 {
+					result = append(result, inst)
+				} else {
+					for k, v := range tags {
+						if inst.Tags[k] != v {
+							continue scan // we implement AND
+						}
+					}
+					result = append(result, inst)
+				}
 			}
 		}
+
 	}
+
 	log.Debugln("describe-instances result=", result)
 
 	return result, nil
