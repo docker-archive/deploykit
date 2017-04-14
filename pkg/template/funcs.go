@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/ghodss/yaml"
+	"github.com/hashicorp/hcl"
 	"github.com/jmespath/go-jmespath"
 	"github.com/vaughan0/go-ini"
 )
@@ -55,7 +56,7 @@ func SplitLines(o interface{}) ([]string, error) {
 	return ret, fmt.Errorf("not-supported-value-type")
 }
 
-// FromJSON decode the input JSON encoded as string or byte slice into a map.
+// FromJSON decode the input JSON encoded as string or byte slice into a Go value.
 func FromJSON(o interface{}) (interface{}, error) {
 	var ret interface{}
 	switch o := o.(type) {
@@ -84,7 +85,7 @@ func ToJSONFormat(prefix, indent string, o interface{}) (string, error) {
 	return string(buff), err
 }
 
-// FromYAML decode the input YAML encoded as string or byte slice into a map.
+// FromYAML decode the input YAML encoded as string or byte slice into a Go value.
 func FromYAML(o interface{}) (interface{}, error) {
 	var ret interface{}
 	switch o := o.(type) {
@@ -123,6 +124,23 @@ func FromINI(v string) (map[string]interface{}, error) {
 		out[n] = m
 	}
 	return out, nil
+}
+
+// FromHCL decode the input HCL encoded as string or byte slice into a Go value
+func FromHCL(o interface{}) (interface{}, error) {
+	var ret interface{}
+	switch o := o.(type) {
+	case string:
+		err := hcl.Unmarshal([]byte(o), &ret)
+		return ret, err
+	case []byte:
+		err := hcl.Unmarshal(o, &ret)
+		return ret, err
+	case *types.Any:
+		err := hcl.Unmarshal(o.Bytes(), &ret)
+		return ret, err
+	}
+	return ret, fmt.Errorf("not-supported-value-type")
 }
 
 // FromMap decodes map into raw struct
@@ -430,6 +448,14 @@ func (t *Template) DefaultFuncs() []Function {
 				"This is useful for parsing arbitrary resources in INI format as object.  The object is the queryable via 'q'",
 			},
 			Func: FromINI,
+		},
+		{
+			Name: "hclDecode",
+			Description: []string{
+				"Decodes the input HCL (Hashicorp Terraform) into a Go value.",
+				"This is useful for working with HCL formatted output.",
+			},
+			Func: FromHCL,
 		},
 		{
 			Name: "echo",
