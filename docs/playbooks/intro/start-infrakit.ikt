@@ -1,0 +1,38 @@
+# Starts all infrakit containers
+
+{{/* =% sh %= */}}
+
+{{ $image := flag "infrakit-image" "string" "Infrakit image" | prompt "Infrakit image?" "string" "infrakit/devbundle:dev" }}
+{{ $port := flag "infrakit-port" "int" "Infrakit mux port" | prompt "Infrakit port for remote access?" "int" 24864 }}
+
+{{/* optional plugins */}}
+
+
+echo "Starting up infrakit base...  You can connect to it at infrakit -H localhost:{{$port}}"
+
+docker run -d --name infrakit \
+       -v /var/run/docker.sock:/var/run/docker.sock \
+       -v `pwd`:/project \
+       -p {{$port}}:24864 \
+       {{ $image }} infrakit util mux --log 5
+
+# Start a development mode fileserver
+# Start a network for connecting to it
+docker network create --attachable infrakit
+docker run -d --volumes-from infrakit --name playbooks.com \
+       --network infrakit \
+       --expose 80 \
+       {{ $image }} infrakit util fileserver --listen :80 /project
+
+docker run -d --volumes-from infrakit --name time {{ $image }} infrakit-event-time
+docker run -d --volumes-from infrakit --name vanilla {{ $image }} infrakit-flavor-vanilla
+docker run -d --volumes-from infrakit --name group-stateless {{ $image }} infrakit-group-default --name group-stateless
+
+# The leader file -- only required for local store
+docker run --rm --volumes-from infrakit {{ $image }} /bin/sh -c "echo group > /infrakit/leader"
+docker run -d --volumes-from infrakit --name manager \
+       {{ $image }} infrakit-manager --proxy-for-group group-stateless os
+
+
+{{/* Here we just source a file in the same folder for more reuse and modularity */}}
+{{ source "aws/start-plugin.ikt" }}

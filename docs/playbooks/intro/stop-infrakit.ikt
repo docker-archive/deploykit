@@ -1,0 +1,25 @@
+# Stops all infrakit containers
+
+{{/* This is a directive that says run this template as a sh script */}}
+{{/* =% sh %= */}}
+
+{{/* We use a prompt to ask the user if we really want to stop. Note the nil at the end, it's required. */}}
+{{ $ok := prompt "Are you really sure you want to stop infrakit?" "bool" "no" nil }}
+
+{{ if $ok }}
+
+echo "Stopping Infrakit"
+
+docker ps -f ancestor=infrakit/devbundle:dev -qa | xargs docker stop
+docker ps -f ancestor=infrakit/devbundle:dev -qa | xargs docker rm
+
+docker ps -f ancestor=infrakit/aws:dev -qa | xargs docker stop
+docker ps -f ancestor=infrakit/aws:dev -qa | xargs docker rm
+
+docker network rm infrakit
+
+{{ else }}
+
+echo "Not stopping Infrakit"
+
+{{ end }}
