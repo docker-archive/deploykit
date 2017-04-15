@@ -106,10 +106,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	name := fmt.Sprintf("%s-%s", properties.NamePrefix, randomSuffix(6))
 
-	tags, err := instance_types.ParseTags(spec)
-	if err != nil {
-		return nil, err
-	}
+	tags := instance_types.ParseTags(spec)
 	_, tags = mergeTags(tags, sliceToMap(properties.Tags)) // scope this resource with namespace tags
 
 	// Create the droplet
