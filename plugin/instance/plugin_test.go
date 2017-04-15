@@ -139,7 +139,8 @@ func TestProvision(t *testing.T) {
 				assert.Equal(t, godo.DropletCreateImage{
 					Slug: "ubuntu-14-04-x64",
 				}, req.Image)
-				assert.Equal(t, []string{versiontag, "foo"}, req.Tags)
+				assert.Condition(t, isInSlice("foo", req.Tags))
+				assert.Condition(t, isInSlice(versiontag, req.Tags))
 				return &godo.Droplet{
 					ID: 12345,
 				}, nil, nil
@@ -151,3 +152,16 @@ func TestProvision(t *testing.T) {
 	expectedID := instance.ID("12345")
 	assert.Equal(t, &expectedID, id)
 }
+
+func isInSlice(s string, strings []string) assert.Comparison {
+	return func() bool {
+		isIn := false
+		for _, str := range strings {
+			if s == str {
+				isIn = true
+			}
+		}
+		return isIn
+	}
+}
+
