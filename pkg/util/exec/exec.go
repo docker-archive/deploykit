@@ -29,6 +29,7 @@ type Builder struct {
 	command     string
 	options     template.Options
 	inheritEnvs bool
+	dir         string
 	envs        []string
 	funcs       map[string]interface{}
 	args        map[interface{}]interface{}
@@ -56,6 +57,12 @@ func (b *Builder) WithStdout(w io.Writer) *Builder {
 // WithStderr sets the stderr writer
 func (b *Builder) WithStderr(w io.Writer) *Builder {
 	b.stdout = w
+	return b
+}
+
+// WithDir sets the working directory.
+func (b *Builder) WithDir(path string) *Builder {
+	b.dir = path
 	return b
 }
 
@@ -256,6 +263,9 @@ func (b *Builder) Prepare(args ...interface{}) error {
 	b.cmd = exec.Command(command[0], command[1:]...)
 	if b.inheritEnvs {
 		b.cmd.Env = append(os.Environ(), b.envs...)
+	}
+	if b.dir != "" {
+		b.cmd.Dir = b.dir
 	}
 	if b.stdin != nil {
 		b.cmd.Stdin = b.stdin

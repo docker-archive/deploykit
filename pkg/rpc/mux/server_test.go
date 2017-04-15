@@ -8,7 +8,6 @@ import (
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
-	plugin_metadata "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	rpc_metadata "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -35,7 +34,7 @@ func TestMuxServer(t *testing.T) {
 
 	T(100).Infoln("Basic client")
 	require.Equal(t, []string{"region"},
-		first(must(rpc_metadata.NewClient(socketPath)).List(plugin_metadata.Path("aws"))))
+		first(must(rpc_metadata.NewClient(socketPath)).List(types.PathFromString("aws"))))
 
 	infoClient := client.NewPluginInfoClient(socketPath)
 	info, err := infoClient.GetInfo()

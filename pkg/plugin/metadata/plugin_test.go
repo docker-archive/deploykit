@@ -18,14 +18,14 @@ func TestPluginUnserializedReadWrites(t *testing.T) {
 
 	m := map[string]interface{}{}
 
-	require.True(t, Put(Path("us-west-1/metrics/instances/count"), 2000, m))
-	require.True(t, Put(Path("us-west-2/metrics/instances/count"), 1000, m))
+	require.True(t, types.Put(types.PathFromString("us-west-1/metrics/instances/count"), 2000, m))
+	require.True(t, types.Put(types.PathFromString("us-west-2/metrics/instances/count"), 1000, m))
 
 	p := NewPluginFromData(m)
 
-	require.Equal(t, []string{"us-west-1", "us-west-2"}, first(p.List(Path("/"))))
-	require.Nil(t, first(p.Get(Path("us-west-1/metrics/instances/foo"))))
-	require.Equal(t, "2000", first(p.Get(Path("us-west-1/metrics/instances/count"))).(*types.Any).String())
+	require.Equal(t, []string{"us-west-1", "us-west-2"}, first(p.List(types.PathFromString("/"))))
+	require.Nil(t, first(p.Get(types.PathFromString("us-west-1/metrics/instances/foo"))))
+	require.Equal(t, "2000", first(p.Get(types.PathFromString("us-west-1/metrics/instances/count"))).(*types.Any).String())
 
 }
 
@@ -43,7 +43,7 @@ func TestPluginSerializedReadWrites(t *testing.T) {
 		go func() {
 			<-start
 			c <- func(m map[string]interface{}) {
-				Put(Path(k), v, m)
+				types.Put(types.PathFromString(k), v, m)
 				wait.Add(1)
 			}
 		}()
@@ -57,7 +57,7 @@ func TestPluginSerializedReadWrites(t *testing.T) {
 	for i := range []int{0, 1, 2, 3} {
 
 		k := fmt.Sprintf("namespace/%d/value", i)
-		val, err := p.Get(Path(k))
+		val, err := p.Get(types.PathFromString(k))
 		require.NoError(t, err)
 
 		if val != nil {

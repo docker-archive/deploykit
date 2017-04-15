@@ -104,9 +104,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return group_types.Index{Group: group.ID(groupID), Sequence: groupSequence}
 	}
 
+	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
+
 	///////////////////////////////////////////////////////////////////////////////////
 	// validate
-	validateTemplateFlags, toJSON, _, validateProcessTemplate := base.TemplateProcessor(plugins)
 	validate := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate a flavor configuration",
@@ -117,7 +118,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			view, err := validateProcessTemplate(*flavorPropertiesURL)
+			view, err := processTemplate(*flavorPropertiesURL)
 			if err != nil {
 				return err
 			}
@@ -130,12 +131,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return flavorPlugin.Validate(types.AnyBytes(buff), allocationMethodFromFlags())
 		},
 	}
-	validate.Flags().AddFlagSet(validateTemplateFlags)
+	validate.Flags().AddFlagSet(templateFlags)
 	addAllocationMethodFlags(validate)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// prepare
-	prepareTemplateFlags, toJSON, _, prepareProcessTemplate := base.TemplateProcessor(plugins)
 	prepare := &cobra.Command{
 		Use:   "prepare <instance Spec template url>",
 		Short: "Prepare provisioning inputs for an instance. Read from stdin if url is '-'",
@@ -146,14 +146,14 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			flavorProperties, err := prepareProcessTemplate(*flavorPropertiesURL)
+			flavorProperties, err := processTemplate(*flavorPropertiesURL)
 			if err != nil {
 				return err
 			}
 
 			view, err := base.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return prepareProcessTemplate(args[0]) },
+				func() (string, error) { return processTemplate(args[0]) },
 				toJSON,
 			)
 			if err != nil {
@@ -181,13 +181,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	prepare.Flags().AddFlagSet(prepareTemplateFlags)
+	prepare.Flags().AddFlagSet(templateFlags)
 	addAllocationMethodFlags(prepare)
 	indexFlags(prepare)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// healthy
-	healthyTemplateFlags, toJSON, _, healthyProcessTemplate := base.TemplateProcessor(plugins)
 	healthy := &cobra.Command{
 		Use:   "healthy",
 		Short: "checks if an instance is considered healthy",
@@ -195,7 +194,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	tags := healthy.Flags().StringSlice("tags", []string{}, "Tags to filter")
 	id := healthy.Flags().String("id", "", "ID of resource")
 	logicalID := healthy.Flags().String("logical-id", "", "Logical ID of resource")
-	healthy.Flags().AddFlagSet(healthyTemplateFlags)
+	healthy.Flags().AddFlagSet(templateFlags)
 	healthy.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 0 {
@@ -203,7 +202,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		flavorProperties, err := healthyProcessTemplate(*flavorPropertiesURL)
+		flavorProperties, err := processTemplate(*flavorPropertiesURL)
 		if err != nil {
 			return err
 		}
