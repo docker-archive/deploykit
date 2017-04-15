@@ -139,7 +139,8 @@ func TestProvision(t *testing.T) {
 				assert.Equal(t, godo.DropletCreateImage{
 					Slug: "ubuntu-14-04-x64",
 				}, req.Image)
-				assert.Equal(t, []string{versiontag, "foo"}, req.Tags)
+				assert.Condition(t, isInSlice("foo", req.Tags))
+				assert.Condition(t, isInSlice(versiontag, req.Tags))
 				return &godo.Droplet{
 					ID: 12345,
 				}, nil, nil
@@ -150,4 +151,92 @@ func TestProvision(t *testing.T) {
 	require.NoError(t, err)
 	expectedID := instance.ID("12345")
 	assert.Equal(t, &expectedID, id)
+}
+
+func isInSlice(s string, strings []string) assert.Comparison {
+	return func() bool {
+		isIn := false
+		for _, str := range strings {
+			if s == str {
+				isIn = true
+			}
+		}
+		return isIn
+	}
+}
+
+func TestDescribeInstancesFails(t *testing.T) {
+	region := "asm2"
+	plugin := &plugin{
+		region: region,
+		droplets: &fakeDropletsServices{
+			expectedErr: "something went wrong",
+		},
+	}
+	_, err := plugin.DescribeInstances(map[string]string{}, false)
+	require.EqualError(t, err, "something went wrong")
+}
+
+func TestDescribeInstancesNone(t *testing.T) {
+	region := "asm2"
+	plugin := &plugin{
+		region: region,
+		droplets: &fakeDropletsServices{
+			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
+				return []godo.Droplet{
+					godoDroplet(),
+					godoDroplet(),
+					godoDroplet(),
+				}, godoResponse(), nil
+			},
+		},
+	}
+	descriptions, err := plugin.DescribeInstances(map[string]string{"infrakit.group": "foo"}, false)
+
+	require.NoError(t, err)
+	assert.Len(t, descriptions, 0)
+}
+
+func TestDescribeInstances(t *testing.T) {
+	region := "asm2"
+	plugin := &plugin{
+		region: region,
+		droplets: &fakeDropletsServices{
+			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
+				return []godo.Droplet{
+					godoDroplet(tags("infrakit.group:foo")),
+					godoDroplet(tags("infrakit.group:bar")),
+					godoDroplet(tags("infrakit.group:foo")),
+				}, godoResponse(), nil
+			},
+		},
+	}
+	descriptions, err := plugin.DescribeInstances(map[string]string{"infrakit.group": "foo"}, true)
+
+	require.NoError(t, err)
+	assert.Len(t, descriptions, 2)
+}
+
+func TestDescribeInstancesHandlesPages(t *testing.T) {
+	region := "asm2"
+	plugin := &plugin{
+		region: region,
+		droplets: &fakeDropletsServices{
+			listfunc: func(_ context.Context, opts *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
+				resp := godoResponse(hasNextPage)
+				if opts.Page > 0 {
+					resp = godoResponse()
+				}
+				return []godo.Droplet{
+					godoDroplet(tags("infrakit.group:foo")),
+					godoDroplet(tags("infrakit.group:bar")),
+					godoDroplet(tags("infrakit.group:foo")),
+				}, resp, nil
+			},
+		},
+	}
+	descriptions, err := plugin.DescribeInstances(map[string]string{"infrakit.group": "foo"}, true)
+
+	require.NoError(t, err)
+	assert.Len(t, descriptions, 4)
 }

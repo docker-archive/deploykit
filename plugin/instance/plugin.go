@@ -145,14 +145,10 @@ func (p *plugin) Destroy(instance instance.ID) error {
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 
-	droplets, _, err := p.droplets.List(context.TODO(), &godo.ListOptions{
-		// FIXME(vdemeester) handle pagination (using resp.Pages)
-		PerPage: 100,
-	})
+	droplets, err := p.listDroplets()
 	if err != nil {
 		return nil, err
 	}
-
 	result := []instance.Description{}
 
 	for _, droplet := range droplets {
@@ -179,6 +175,28 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	}
 
 	return result, nil
+}
+
+func (p *plugin) listDroplets() ([]godo.Droplet, error) {
+	droplets := []godo.Droplet{}
+	islast := false
+	page := 0
+	for !islast {
+		d, resp, err := p.droplets.List(context.TODO(), &godo.ListOptions{
+			Page: page,
+		})
+		if err != nil {
+			return droplets, err
+		}
+		islast = resp.Links.IsLastPage()
+		p, err := resp.Links.CurrentPage()
+		if err != nil {
+			return droplets, err
+		}
+		page = p + 1
+		droplets = append(droplets, d...)
+	}
+	return droplets, nil
 }
 
 func doTags(tags []string) []string {
@@ -244,8 +262,9 @@ func sliceToMap(s []string) map[string]string {
 }
 
 func hasDifferentTag(expected, actual map[string]string) bool {
-	log.Debugf("expected: %v", expected)
-	log.Debugf("actual: %v", actual)
+	if len(actual) == 0 {
+		return true
+	}
 	for k, v := range expected {
 		if actual[k] != v {
 			return true
