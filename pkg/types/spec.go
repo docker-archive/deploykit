@@ -28,7 +28,7 @@ type Spec struct {
 
 	// Depends is a list of dependencies that this spec needs to have resolved before instances can
 	// be instantiated.
-	Depends []Dependency `json:depends",omitempty" yaml:",omitempty"`
+	Depends []Dependency `json:"depends,omitempty" yaml:",omitempty"`
 }
 
 // Validate checks the spec for validity

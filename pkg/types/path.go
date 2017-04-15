@@ -14,8 +14,12 @@ var (
 
 // RFC6901 takes a path expression in the format of IETF RFC6901 (JSON pointer) and convert it to a Path
 func RFC6901ToPath(path string) Path {
+	return rfc6901ToPath(strings.Split(path, "/"))
+}
+
+func rfc6901ToPath(path []string) Path {
 	decoded := []string{}
-	for _, p := range strings.Split(path, "/") {
+	for _, p := range path {
 		p = strings.Replace(p, `~1`, `/`, -1)
 		p = strings.Replace(p, `~0`, `~`, -1)
 		if _, err := strconv.Atoi(p); err == nil {

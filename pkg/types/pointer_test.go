@@ -29,8 +29,8 @@ func TestPointer(t *testing.T) {
 	err := AnyString(input).Decode(&decoded)
 	require.NoError(t, err)
 
-	require.Equal(t, *PointerFromString("foo/bar/baz"), decoded.Pointer)
-	require.Equal(t, *PointerFromString("github.com/docker/infrakit/pkg/testing"), *decoded.PointerPtr)
+	require.Equal(t, PointerFromString("foo/bar/baz").String(), decoded.Pointer.String())
+	require.Equal(t, PointerFromString("github.com/docker/infrakit/pkg/testing").String(), decoded.PointerPtr.String())
 
 	any := AnyValueMust(decoded)
 	require.Equal(t, `{
