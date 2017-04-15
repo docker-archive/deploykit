@@ -80,8 +80,9 @@ options:
 depends:
     - class: instance-aws/ebs-volume
       name: /var/lib/docker
-      selector: Spec.Metadata.Identity.UID
-      var: volume/id
+      bind:
+         volume/id : Spec/Metadata/Identity/UID
+
 state:
     instanceType: c2xlarge
     ami:          ami-12345
@@ -116,10 +117,11 @@ state:
 			}),
 			Depends: []Dependency{
 				{
-					Class:    "instance-aws/ebs-volume",
-					Name:     "/var/lib/docker",
-					Selector: "Spec.Metadata.Identity.UID",
-					Var:      "volume/id",
+					Class: "instance-aws/ebs-volume",
+					Name:  "/var/lib/docker",
+					Bind: map[string]*Pointer{
+						"volume/id": PointerFromString("Spec/Metadata/Identity/UID"),
+					},
 				},
 			},
 		},

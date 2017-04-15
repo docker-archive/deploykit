@@ -7,28 +7,28 @@ type URL string
 type Spec struct {
 
 	// Class is the kind/type of the resource -- e.g. instance-aws/ec2-instance
-	Class string
+	Class string `json:"class"`
 
 	// SpiVersion is the name of the interface and version - instance/v0.1.0
-	SpiVersion string
+	SpiVersion string `json:"spiVersion"`
 
 	// Metadata is metadata / useful information about object
-	Metadata Metadata
+	Metadata Metadata `json:"metadata"`
 
 	// Template is a template of the resource's properties
-	Template URL `json:",omitempty" yaml:",omitempty"`
+	Template URL `json:"template,omitempty" yaml:",omitempty"`
 
 	// Properties is the desired properties of the resource, if template is specified,
 	// then the values of properties override the same fields in template.
-	Properties *Any
+	Properties *Any `json:"properties"`
 
 	// Options is additional data for handling the object that is not intrinsic to the object itself
 	// but is necessary for the controllers working with it.
-	Options *Any `json:",omitempty" yaml:",omitempty"`
+	Options *Any `json:"options,omitempty" yaml:",omitempty"`
 
 	// Depends is a list of dependencies that this spec needs to have resolved before instances can
 	// be instantiated.
-	Depends []Dependency `json:",omitempty" yaml:",omitempty"`
+	Depends []Dependency `json:depends",omitempty" yaml:",omitempty"`
 }
 
 // Validate checks the spec for validity
@@ -55,12 +55,9 @@ type Dependency struct {
 	// Name is the Name of the spec this spec dependes on
 	Name string
 
-	// Selector is a query expression in jmespath that can select some value to be bound to the alias
-	Selector string
-
-	// Var is the name givent to reference the selected value. This is then referenced in the {{ var }} expressions
-	// inside the Template or Properties fields of the spec.
-	Var string
+	// Bind is an associative array of pointer to the fields in the object to a variable name that will be referenced
+	// in the properties or template of the owning spec.
+	Bind map[string]*Pointer
 }
 
 // Identity uniquely identifies an instance
@@ -81,28 +78,4 @@ type Metadata struct {
 
 	// Tags are a collection of labels, in key-value form, about the object
 	Tags map[string]string
-}
-
-// Object is an instance or realization of the Spec.  It has Spec as the desired attributes, as well as,
-// the instance identifier (ID), and State, which represents the current snapshot of the object instance.
-type Object struct {
-
-	// Spec is the specification / desired state of the object instance.
-	Spec
-
-	// State is the current snapshot / status of the object instance.
-	State *Any `json:",omitempty" yaml:",omitempty"`
-}
-
-// Validate checks the object for validity
-func (o Object) Validate() error {
-	err := o.Spec.Validate()
-	if err != nil {
-		return err
-	}
-
-	if o.Metadata.Identity.UID == "" {
-		return errMissingAttribute("metadata.identity.uid")
-	}
-	return nil
 }
