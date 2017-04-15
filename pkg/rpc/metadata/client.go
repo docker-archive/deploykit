@@ -25,7 +25,7 @@ type client struct {
 }
 
 // List returns a list of nodes under path.
-func (c client) List(path metadata.Path) ([]string, error) {
+func (c client) List(path types.Path) ([]string, error) {
 	req := ListRequest{Path: path}
 	resp := ListResponse{}
 	err := c.client.Call("Metadata.List", req, &resp)
@@ -33,7 +33,7 @@ func (c client) List(path metadata.Path) ([]string, error) {
 }
 
 // Get retrieves the metadata at path.
-func (c client) Get(path metadata.Path) (*types.Any, error) {
+func (c client) Get(path types.Path) (*types.Any, error) {
 	req := GetRequest{Path: path}
 	resp := GetResponse{}
 	err := c.client.Call("Metadata.Get", req, &resp)

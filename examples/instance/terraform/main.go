@@ -18,6 +18,14 @@ func mustHaveTerraform() {
 	}
 }
 
+func getDir() string {
+	dir := os.Getenv("INFRAKIT_INSTANCE_TERRAFORM_DIR")
+	if dir != "" {
+		return dir
+	}
+	return os.TempDir()
+}
+
 func main() {
 
 	cmd := &cobra.Command{
@@ -26,7 +34,7 @@ func main() {
 	}
 	name := cmd.Flags().String("name", "instance-terraform", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
-	dir := cmd.Flags().String("dir", os.TempDir(), "Dir for storing plan files")
+	dir := cmd.Flags().String("dir", getDir(), "Dir for storing plan files")
 	cmd.Run = func(c *cobra.Command, args []string) {
 		mustHaveTerraform()
 

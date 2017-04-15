@@ -55,15 +55,15 @@ type plugin struct {
 
 // List returns a list of *child nodes* given a path, which is specified as a slice
 // where for i > j path[i] is the parent of path[j]
-func (p *plugin) List(path metadata.Path) ([]string, error) {
+func (p *plugin) List(path types.Path) ([]string, error) {
 	if p.reads == nil && p.data != nil {
-		return List(path, p.data), nil
+		return types.List(path, p.data), nil
 	}
 
 	children := make(chan []string)
 
 	p.reads <- func(data map[string]interface{}) {
-		children <- List(path, data)
+		children <- types.List(path, data)
 		return
 	}
 
@@ -71,16 +71,16 @@ func (p *plugin) List(path metadata.Path) ([]string, error) {
 }
 
 // Get retrieves the value at path given.
-func (p *plugin) Get(path metadata.Path) (*types.Any, error) {
+func (p *plugin) Get(path types.Path) (*types.Any, error) {
 	if p.reads == nil && p.data != nil {
-		return types.AnyValue(Get(path, p.data))
+		return types.AnyValue(types.Get(path, p.data))
 	}
 
 	value := make(chan *types.Any)
 	err := make(chan error)
 
 	p.reads <- func(data map[string]interface{}) {
-		v, e := types.AnyValue(Get(path, data))
+		v, e := types.AnyValue(types.Get(path, data))
 		value <- v
 		err <- e
 		return

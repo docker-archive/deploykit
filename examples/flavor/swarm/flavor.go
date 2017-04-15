@@ -11,7 +11,6 @@ import (
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -103,7 +102,7 @@ func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func
 				}
 
 				updateSnapshot <- func(view map[string]interface{}) {
-					metadata_plugin.Put([]string{"groups"}, snapshot, view)
+					types.Put([]string{"groups"}, snapshot, view)
 				}
 
 			case <-stopSnapshot:
@@ -116,7 +115,7 @@ func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func
 }
 
 // List implements the metadata.Plugin SPI's List method
-func (s *baseFlavor) List(path metadata.Path) ([]string, error) {
+func (s *baseFlavor) List(path types.Path) ([]string, error) {
 	if s.metadataPlugin != nil {
 		return s.metadataPlugin.List(path)
 	}
@@ -124,7 +123,7 @@ func (s *baseFlavor) List(path metadata.Path) ([]string, error) {
 }
 
 // Get implements the metadata.Plugin SPI's List method
-func (s *baseFlavor) Get(path metadata.Path) (*types.Any, error) {
+func (s *baseFlavor) Get(path types.Path) (*types.Any, error) {
 	if s.metadataPlugin != nil {
 		return s.metadataPlugin.Get(path)
 	}

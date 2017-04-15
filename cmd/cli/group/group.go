@@ -63,9 +63,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
+	templateFlags, toJSON, fromJSON, processTemplate := base.TemplateProcessor(plugins)
+
 	///////////////////////////////////////////////////////////////////////////////////
 	// commit
-	tflags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
 	commit := &cobra.Command{
 		Use:   "commit <group configuration url>",
 		Short: "Commit a group configuration. Read from stdin if url is '-'",
@@ -101,7 +102,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	commit.Flags().AddFlagSet(tflags)
+	commit.Flags().AddFlagSet(templateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// free
@@ -164,7 +165,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// inspect
-	inspectTemplateFlags, _, fromJSON, _ := base.TemplateProcessor(plugins)
 	inspect := &cobra.Command{
 		Use:   "inspect <group ID>",
 		Short: "Insepct a group. Returns the raw configuration associated with a group",
@@ -203,7 +203,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	inspect.Flags().AddFlagSet(inspectTemplateFlags)
+	inspect.Flags().AddFlagSet(templateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	//  destroy

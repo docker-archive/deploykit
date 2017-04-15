@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/discovery"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // MetadataFunc returns a template function to support metadata retrieval in templates.
@@ -21,7 +21,7 @@ func MetadataFunc(discovery func() discovery.Plugins) func(string) (interface{},
 			return nil, fmt.Errorf("no plugin discovery:%s", path)
 		}
 
-		mpath := metadata_plugin.Path(path)
+		mpath := types.PathFromString(path)
 		first := mpath.Index(0)
 		if first == nil {
 			return nil, fmt.Errorf("unknown plugin from path: %s", path)
