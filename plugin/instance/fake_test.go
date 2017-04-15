@@ -19,6 +19,7 @@ func (s *fakeTagsService) TagResources(context.Context, string, *godo.TagResourc
 }
 
 type fakeDropletsServices struct {
+	createfunc  func(context.Context, *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error)
 	expectedErr string
 }
 
@@ -36,9 +37,12 @@ func (s *fakeDropletsServices) Get(context.Context, int) (*godo.Droplet, *godo.R
 	return &godo.Droplet{}, nil, nil
 }
 
-func (s *fakeDropletsServices) Create(context.Context, *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error) {
+func (s *fakeDropletsServices) Create(ctx context.Context, req *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error) {
 	if s.expectedErr != "" {
 		return nil, nil, errors.New(s.expectedErr)
+	}
+	if s.createfunc != nil {
+		return s.createfunc(ctx, req)
 	}
 	return &godo.Droplet{}, nil, nil
 }

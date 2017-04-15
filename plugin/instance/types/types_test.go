@@ -55,8 +55,7 @@ func TestParseTags(t *testing.T) {
 		LogicalID: &id,
 	}
 
-	tags, err := ParseTags(spec)
-	assert.NoError(t, err)
+	tags := ParseTags(spec)
 	assert.Equal(t, map[string]string{
 		"foo":             "bar",
 		"banana":          "",

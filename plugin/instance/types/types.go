@@ -42,7 +42,7 @@ func ParseProperties(req *types.Any) (Properties, error) {
 }
 
 // ParseTags returns a key/value map from the instance specification.
-func ParseTags(spec instance.Spec) (map[string]string, error) {
+func ParseTags(spec instance.Spec) map[string]string {
 	tags := make(map[string]string)
 
 	for k, v := range spec.Tags {
@@ -57,5 +57,5 @@ func ParseTags(spec instance.Spec) (map[string]string, error) {
 
 	tags[InfrakitDOVersion] = InfrakitDOCurrentVersion
 
-	return tags, nil
+	return tags
 }
