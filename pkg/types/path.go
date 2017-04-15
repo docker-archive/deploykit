@@ -12,7 +12,7 @@ var (
 	NullPath = Path([]string{})
 )
 
-// RFC6901 takes a path expression in the format of IETF RFC6901 (JSON pointer) and convert it to a Path
+// RFC6901ToPath takes a path expression in the format of IETF RFC6901 (JSON pointer) and convert it to a Path
 func RFC6901ToPath(path string) Path {
 	return rfc6901ToPath(strings.Split(path, "/"))
 }

@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	. "github.com/docker/infrakit/pkg/testing"
 )
 
 func TestObject(t *testing.T) {
@@ -36,6 +34,7 @@ func TestObject(t *testing.T) {
 - class:        instance-aws/ec2-volume
   spiVersion:   instance/v0.1.0
   metadata:
+    uid: disk1-1234
     name: disk1
     tags:
       role:    worker
@@ -47,46 +46,21 @@ func TestObject(t *testing.T) {
   options:
     region: us-west-1
     stack:  test
+  state:
+    sizeGb : 100
+    type:    ssd
+    status: online
 `
 
-	specs := []*Spec{}
+	objects := []*Object{}
 	any, err := AnyYAML([]byte(text))
 	require.NoError(t, err)
-	err = any.Decode(&specs)
+	err = any.Decode(&objects)
 	require.NoError(t, err)
-	require.Equal(t, 2, len(specs))
+	require.Equal(t, 2, len(objects))
 
-	objects, err := Instantiate(specs,
-		func(spec *Spec) error {
-			return nil
-		}, func(spec *Spec) []interface{} {
-			return []interface{}{spec.Class, spec.Metadata.Name}
-		})
-
-	require.NoError(t, err)
-
-	T(100).Infoln("objects=", objects)
-	disk := objects.FindBy("instance-aws/ec2-volume", "disk1")
-	require.NotNil(t, disk)
-
-	disk.Metadata.Identity = &Identity{UID: "disk-11234"}
-
-	host := objects.FindBy("instance-aws/ec2-volume", "host1")
-	require.Nil(t, host) // wrong class
-
-	host = objects.FindBy("instance-aws/ec2-instance", "host1")
-	require.NotNil(t, host)
-
-	other, m, err := host.ResolveDepends(objects,
-		func(o *Object) []interface{} {
-			return []interface{}{o.Class, o.Metadata.Name}
-		})
-
-	require.NoError(t, err)
-
-	T(100).Infoln(m)
-
-	require.Equal(t, "disk-11234", m["volume/id"])
-	require.Equal(t, float64(100), m["volume/size"])
-	require.True(t, len(other) > 0)
+	require.NoError(t, objects[1].Validate())
+	require.Error(t, objects[0].Validate())
+	require.Nil(t, objects[0].State)
+	require.NotNil(t, objects[1].State)
 }

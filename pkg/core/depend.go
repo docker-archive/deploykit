@@ -1,21 +1,22 @@
-package types
+package core
 
 import (
 	"encoding/json"
 	"reflect"
 
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/twmb/algoimpl/go/graph"
 )
 
 // converts a map to a Spec, nil if it cannot be done
-func mapToSpec(m map[string]interface{}) *Spec {
+func mapToSpec(m map[string]interface{}) *types.Spec {
 	// This is hacky -- generate a string representation
 	// and try to parse it as struct
 	buff, err := json.Marshal(m)
 	if err != nil {
 		return nil
 	}
-	s := Spec{}
+	s := types.Spec{}
 	err = json.Unmarshal(buff, &s)
 	if err != nil {
 		return nil
@@ -29,19 +30,19 @@ func mapToSpec(m map[string]interface{}) *Spec {
 // findSpecs parses the bytes and returns a Spec, if the Spec can be parsed
 // from the buffer.  Some fields are verified and must be present for the
 // buffer to be considered a representation of a Spec.
-func findSpecs(v interface{}) []*Spec {
+func findSpecs(v interface{}) []*types.Spec {
 
-	result := []*Spec{}
+	result := []*types.Spec{}
 
 	switch v := v.(type) {
 
-	case []*Spec:
+	case []*types.Spec:
 		for _, x := range v {
 			c := *x
 			result = append(result, findSpecs(&c)...)
 		}
 
-	case []Spec:
+	case []types.Spec:
 		for _, x := range v {
 			c := x
 			result = append(result, findSpecs(&c)...)
@@ -57,13 +58,13 @@ func findSpecs(v interface{}) []*Spec {
 		// convert to Spec?
 		result = append(result, findSpecs(mapToSpec(v))...)
 
-	case *Any:
+	case *types.Any:
 
 		if v == nil {
 			return result
 		}
 
-		spec := Spec{}
+		spec := types.Spec{}
 		if err := v.Decode(&spec); err == nil {
 
 			if spec.Validate() == nil {
@@ -90,12 +91,12 @@ func findSpecs(v interface{}) []*Spec {
 			}
 		}
 
-	case Spec:
+	case types.Spec:
 		c := v
 		result = append(result, &c)
 		result = append(result, findSpecs(c.Properties)...)
 
-	case *Spec:
+	case *types.Spec:
 
 		if v == nil {
 			return result
@@ -120,7 +121,7 @@ func findSpecs(v interface{}) []*Spec {
 }
 
 // Nested recurses through the Properties of the spec and returns any nested specs.
-func (s Spec) Nested() []*Spec {
+func Nested(s *types.Spec) []*types.Spec {
 	if s.Properties == nil {
 		return nil
 	}
@@ -132,7 +133,7 @@ type key struct {
 	name  string
 }
 
-func indexSpecs(specs []*Spec, g *graph.Graph) map[key]*graph.Node {
+func indexSpecs(specs []*types.Spec, g *graph.Graph) map[key]*graph.Node {
 	index := map[key]*graph.Node{}
 	for _, spec := range specs {
 
@@ -152,7 +153,7 @@ func indexGet(index map[key]*graph.Node, class, name string) *graph.Node {
 }
 
 // OrderByDependency returns the given specs in dependency order.
-func OrderByDependency(specs []*Spec) ([]*Spec, error) {
+func OrderByDependency(specs []*types.Spec) ([]*types.Spec, error) {
 
 	g := graph.New(graph.Directed)
 	if g == nil {
@@ -177,9 +178,9 @@ func OrderByDependency(specs []*Spec) ([]*Spec, error) {
 
 			if from == to {
 
-				a := (*from.Value).(*Spec)
-				b := (*to.Value).(*Spec)
-				return nil, errCircularDependency([]*Spec{a, b})
+				a := (*from.Value).(*types.Spec)
+				b := (*to.Value).(*types.Spec)
+				return nil, errCircularDependency([]*types.Spec{a, b})
 			}
 
 			if err := g.MakeEdge(*to, *from); err != nil {
@@ -192,17 +193,17 @@ func OrderByDependency(specs []*Spec) ([]*Spec, error) {
 	for _, connected := range g.StronglyConnectedComponents() {
 		if len(connected) > 1 {
 
-			cycle := []*Spec{}
+			cycle := []*types.Spec{}
 			for _, n := range connected {
-				cycle = append(cycle, (*n.Value).(*Spec))
+				cycle = append(cycle, (*n.Value).(*types.Spec))
 			}
 			return nil, errCircularDependency(cycle)
 		}
 	}
 
-	ordered := []*Spec{}
+	ordered := []*types.Spec{}
 	for _, n := range g.TopologicalSort() {
-		ordered = append(ordered, (*n.Value).(*Spec))
+		ordered = append(ordered, (*n.Value).(*types.Spec))
 	}
 
 	return ordered, nil
