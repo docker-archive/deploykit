@@ -78,7 +78,7 @@ func TestObject(t *testing.T) {
 	host = objects.FindBy("instance-aws/ec2-instance", "host1")
 	require.NotNil(t, host)
 
-	other, m, err := ResolveDepends(host, objects,
+	m, err := ResolveDepends(host, objects,
 		func(o *types.Object) []interface{} {
 			return []interface{}{o.Class, o.Metadata.Name}
 		})
@@ -89,5 +89,4 @@ func TestObject(t *testing.T) {
 
 	require.Equal(t, "disk-11234", m["volume/id"])
 	require.Equal(t, float64(100), m["volume/size"])
-	require.True(t, len(other) > 0)
 }

@@ -52,8 +52,14 @@ func Instantiate(specs []*types.Spec,
 // ResolveDepends resolves the dependency declared in the Depends section of the Object by querying
 // the index of objects and applying the json pointer to get the values.  Then the result as a map
 // of key/value is returned.  The result can then be used as a template context.
-func ResolveDepends(o *types.Object, objects Objects,
-	find func(*types.Object) []interface{}) (other map[string]interface{}, depends map[string]interface{}, err error) {
+func ResolveDepends(
+	o *types.Object,
+	objects Objects,
+	find func(*types.Object) []interface{},
+) (
+	depends map[string]interface{},
+	err error,
+) {
 
 	depends = map[string]interface{}{}
 
@@ -61,20 +67,23 @@ func ResolveDepends(o *types.Object, objects Objects,
 
 		otherObject := objects.FindBy(dep.Class, dep.Name)
 		if otherObject == nil {
-			return nil, nil, fmt.Errorf("unresolved dependency: %v", dep)
+			err = fmt.Errorf("unresolved dependency: %v", dep)
+			return
 		}
 
 		// Here we encode the entire other object to a map. This is because the expressions
 		// used to reference values (json pointers) follow the structure of the document and not the
 		// golang structs which can be different due to embedding of fields and lower-case fields.
-		other = map[string]interface{}{}
+		other := map[string]interface{}{}
 
-		any, err := types.AnyValue(otherObject)
-		if err != nil {
-			return nil, nil, err
+		any, e := types.AnyValue(otherObject)
+		if e != nil {
+			err = e
+			return
 		}
-		if err := any.Decode(&other); err != nil {
-			return nil, nil, err
+		if e := any.Decode(&other); e != nil {
+			err = e
+			return
 		}
 
 		for key, pointer := range dep.Bind {

@@ -91,6 +91,8 @@ state:
 	o := Object{}
 	require.NoError(t, yaml.Unmarshal([]byte(object), &o))
 
+	templateURL, _ := NewURL("https://playbooks.test.com/aws-instance-template.ikt")
+
 	expected := Object{
 		Spec: Spec{
 			Class:      "instance-aws/ec2-instance",
@@ -105,7 +107,7 @@ state:
 					"project": "test",
 				},
 			},
-			Template: URL("https://playbooks.test.com/aws-instance-template.ikt"),
+			Template: templateURL,
 			Properties: AnyValueMust(map[string]interface{}{
 				"instanceType": "c2xlarge",
 				"ami":          "ami-12345",

@@ -1,0 +1,35 @@
+- class:        instance-aws/ec2-instance
+  spiVersion:   instance/v0.1.0
+  metadata:
+    name: host1
+    tags:
+      role:    worker
+      project: test
+  template: aws-instance-template.yml
+  properties:
+    instanceType: m2-xlarge
+    imageId:      ami-12345
+    key: mySSH
+  options:
+    region: us-west-1
+    stack:  test
+  depends:
+    - class: instance-aws/ec2-volume
+      name: disk1
+      bind:
+         volume/id : metadata/UID
+
+- class:        instance-aws/ec2-volume
+  spiVersion:   instance/v0.1.0
+  metadata:
+    name: disk1
+    tags:
+      role:    worker
+      project: test
+  template: aws-volume-template.yml
+  properties:
+    sizeGb : 100
+
+  options:
+    region: us-west-1
+    stack:  test

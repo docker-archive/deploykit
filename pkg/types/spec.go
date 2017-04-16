@@ -1,7 +1,10 @@
 package types
 
-// URL is a url string
-type URL string
+import (
+	"fmt"
+	"net/url"
+	"strings"
+)
 
 // Spec is the specification of the resource / object
 type Spec struct {
@@ -16,7 +19,7 @@ type Spec struct {
 	Metadata Metadata `json:"metadata"`
 
 	// Template is a template of the resource's properties
-	Template URL `json:"template,omitempty" yaml:",omitempty"`
+	Template *URL `json:"template,omitempty" yaml:",omitempty"`
 
 	// Properties is the desired properties of the resource, if template is specified,
 	// then the values of properties override the same fields in template.
@@ -78,4 +81,50 @@ type Metadata struct {
 
 	// Tags are a collection of labels, in key-value form, about the object
 	Tags map[string]string
+}
+
+// URL is an alias of url
+type URL url.URL
+
+// NewURL creates a new url from string
+func NewURL(s string) (*URL, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return nil, err
+	}
+	v := URL(*u)
+	return &v, nil
+}
+
+// Absolute returns true if the url is absolute (not relative)
+func (u URL) Absolute() bool {
+	return url.URL(u).Scheme != ""
+}
+
+// Value returns the aliased struct
+func (u URL) Value() *url.URL {
+	copy := url.URL(u)
+	return &copy
+}
+
+// String returns the string representation of the URL
+func (u URL) String() string {
+	return u.Value().String()
+}
+
+// MarshalJSON returns the json representation
+func (u URL) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, u.String())), nil
+}
+
+// UnmarshalJSON unmarshals the buffer to this struct
+func (u *URL) UnmarshalJSON(buff []byte) error {
+	str := strings.Trim(string(buff), " \"\\'\t\n")
+	uu, err := url.Parse(str)
+	if err != nil {
+		return err
+	}
+	copy := URL(*uu)
+	*u = copy
+	return nil
 }
