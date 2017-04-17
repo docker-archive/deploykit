@@ -1,0 +1,40 @@
+# Input to create instance using the GCP instance plugin
+{{/* =% sh %= */}}
+
+{{ $user := flag "user" "string" "owner" | prompt "Owner?" "string" (env "USER") nil }}
+{{ $prefix := flag "prefix" "string" "Prefix to use" | prompt "Prefix for hostname:" "string" (env "USER") }}
+{{ $diskSize := flag "disk-size" "int" "Disk size in mb" | prompt "Disk size in MB?" "int" 100 }}
+{{ $machineType := flag "machine-type" "string" "Machine type" | prompt "Machine type?" "string" "n1-standard-1"}}
+{{ $privateIP := flag "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" "10.128.0.10" nil }}
+{{ $image := flag "image" "string" "Image" | prompt "Image to boot?" "string" "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205" }}
+
+echo "===> Running with {{$user}}, {{$image}}, {{$privateIP}}:"
+
+infrakit --log 3 --log-stack --name instance-gcp instance provision -y - <<EOF
+
+LogicalID : {{ $privateIP }}
+Tags:
+  infrakit-user: {{ $user }}
+  infrakit-created: {{ now | htmlDate }}
+
+Init: |
+  #!/bin/bash
+  sudo apt-get update -y
+  sudo apt-get install wget curl
+  wget -q0- https://get.docker.com | sh
+
+Properties:
+  NamePrefix: {{ $prefix }}
+  PrivateIP: {{ $privateIP }}
+  Description: Some description
+  Network: default
+  MachineType: {{ $machineType }}
+  DiskSizeMb: {{ $diskSize }}
+  DiskImage: {{ $image }}
+  Scopes:
+    - https://www.googleapis.com/auth/cloudruntimeconfig
+    - https://www.googleapis.com/auth/logging.write
+  Tags:
+    - {{ $user }}
+
+EOF

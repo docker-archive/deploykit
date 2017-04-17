@@ -109,17 +109,17 @@ loop:
 			}
 		}
 
+		// Documentation -- look for a README.md at the given dir
+		readme := path.Join(path.Dir(string(url)), "README.md")
+		if t, err := template.NewTemplate(readme, template.Options{}); err == nil {
+			if view, err := t.Render(nil); err == nil {
+				cmd.SetHelpTemplate(fmt.Sprintf(helpTemplate, view))
+			}
+		}
+
 		// if we can parse it as a map, then we have a 'directory'
 		mods, err := dir(url)
 		if err == nil {
-
-			// Documentation -- look for a README.md at the given dir
-			readme := path.Join(path.Dir(string(url)), "README.md")
-			if t, err := template.NewTemplate(readme, template.Options{}); err == nil {
-				if view, err := t.Render(nil); err == nil {
-					cmd.SetHelpTemplate(fmt.Sprintf(helpTemplate, view))
-				}
-			}
 
 			copy := url
 			subs, err := list(plugins, mods, input, cmd, &copy)

@@ -163,7 +163,7 @@ func (p Path) Join(child Path) Path {
 	if this[len(this)-1] == "" {
 		pp = Path(this[:len(this)-1])
 	}
-	return Path(append(pp, []string(child)...))
+	return Path(append(pp, []string(child)...)).Clean()
 }
 
 // Rel returns a new path that is a child of the input from this path.
