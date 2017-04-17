@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/fsm"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -16,6 +17,7 @@ type Objects interface {
 	FindBy(...interface{}) *types.Object
 	Add(*types.Object)
 	Remove(*types.Object)
+	Len() int
 }
 
 type objectIndex struct {
@@ -59,6 +61,11 @@ func (index *objectIndex) Remove(o *types.Object) {
 
 	key := index.keyFunc(o)
 	delete(index.objects, key)
+}
+
+// Len returns the size
+func (index *objectIndex) Len() int {
+	return len(index.objects)
 }
 
 // resolveDepends resolves the dependency declared in the Depends section of the Object by querying
@@ -160,7 +167,7 @@ func templateEngine(url string,
 }
 
 // renderProperties applies the template and the properties to produce the final properties
-func renderProperties(object *types.Object,
+func renderProperties(object *types.Object, id fsm.ID,
 	depends map[string]interface{},
 	plugins func() discovery.Plugins) (*types.Any, error) {
 
@@ -176,7 +183,7 @@ func renderProperties(object *types.Object,
 			return nil, err
 		}
 
-		view, err := t.Render(nil)
+		view, err := t.Render(id)
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +214,7 @@ func renderProperties(object *types.Object,
 			return nil, err
 		}
 
-		view, err := t.Render(nil)
+		view, err := t.Render(id)
 		if err != nil {
 			return nil, err
 		}

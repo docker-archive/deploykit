@@ -1,8 +1,8 @@
 # AWS Instance plugin properties template
 AttachVolumeInputs:
   Device: /dev/sdf
-  InstanceId: {{ var "properties/metadata/uid" }}
-  VolumeId: {{ var "volumeId" }}
+  InstanceId: {{ var "properties/metadata/uid" | default . }}
+  VolumeId: {{ var "volumeId" | default "" }}
 RunInstancesInput:
     BlockDeviceMappings: null
     DisableApiTermination: null

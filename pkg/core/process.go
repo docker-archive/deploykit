@@ -32,13 +32,15 @@ type Process struct {
 
 	store   Objects
 	plugins func() discovery.Plugins
+
+	objects map[fsm.ID]*types.Object
 }
 
 // ModelDefinition defines the fsm model
 type ModelDefinition func(*Process) (*fsm.Spec, error)
 
 // Constructor constructs the instance using the rendered input
-type Constructor func(properties *types.Any) (identity *types.Identity, state *types.Any, err error)
+type Constructor func(spec types.Spec, properties *types.Any) (identity *types.Identity, state *types.Any, err error)
 
 // Destructor destroys the instance
 type Destructor func(*types.Object) error
@@ -69,6 +71,7 @@ func NewProcess(model ModelDefinition,
 		ProcessDefinition: check(input),
 		store:             store,
 		plugins:           plugins,
+		objects:           map[fsm.ID]*types.Object{},
 	}
 
 	proc.Constructor = func(instance fsm.Instance) error {
@@ -87,12 +90,14 @@ func NewProcess(model ModelDefinition,
 			return err
 		}
 
-		properties, err := renderProperties(obj, depends, proc.plugins)
+		properties, err := renderProperties(obj, instance.ID(), depends, proc.plugins)
 		if err != nil {
 			return err
 		}
 
-		identity, state, err := proc.ProcessDefinition.Constructor(properties)
+		log.Debug("about to call constructor", "properties", properties)
+
+		identity, state, err := proc.ProcessDefinition.Constructor(obj.Spec, properties)
 		if err != nil {
 			return proc.ProcessDefinition.ConstructorError(err, properties, instance)
 		}
@@ -104,14 +109,15 @@ func NewProcess(model ModelDefinition,
 		// index it
 		proc.store.Add(obj)
 
+		// associate instance ID with object
+		proc.objects[instance.ID()] = obj
+
 		// send signal
 		err = proc.ProcessDefinition.ConstructorSuccess(obj, instance)
-		if err == nil {
+		if err != nil {
+			log.Debug("err", "err", err)
 			return err
 		}
-
-		// associate instance ID with object
-		// TODO
 
 		return nil
 	}
@@ -128,9 +134,27 @@ func NewProcess(model ModelDefinition,
 
 // Start starts the management process of the instances
 func (p *Process) Start(clock *fsm.Clock) error {
-
 	p.instances = fsm.NewSet(p.workflow, clock, fsm.DefaultOptions(p.ProcessDefinition.Spec.Metadata.Name))
+	return nil
+}
 
+// Instances returns a collection of fsm instances
+func (p *Process) Instances() *fsm.Set {
+	return p.instances
+}
+
+// Object returns the Object reference given an instance
+func (p *Process) Object(instance fsm.Instance) *types.Object {
+	return p.objects[instance.ID()]
+}
+
+// Instance returns an fsm instance given the Object reference
+func (p *Process) Instance(object *types.Object) fsm.Instance {
+	for k, v := range p.objects {
+		if v == object {
+			return p.instances.Instance(k)
+		}
+	}
 	return nil
 }
 
@@ -186,7 +210,7 @@ func NormalizeSpecs(uri string, input []byte) ([]*types.Spec, error) {
 		}
 
 		specs = append(specs, member)
-		specs = append(specs, Nested(member)...)
+		specs = append(specs, nested(member)...)
 	}
 
 	// compute ordering

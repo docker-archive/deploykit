@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/fsm"
@@ -97,7 +98,7 @@ func testRenderProperties(t *testing.T, text string, depends map[string]interfac
 	ordered, err := NormalizeSpecs(url+"/fake.yml", []byte(text))
 	require.NoError(t, err)
 
-	any, err := renderProperties(&types.Object{Spec: *ordered[0]}, depends, plugins)
+	any, err := renderProperties(&types.Object{Spec: *ordered[0]}, fsm.ID(0), depends, plugins)
 	require.NoError(t, err)
 
 	assert(any)
@@ -231,10 +232,10 @@ func query(t *testing.T, exp string, v interface{}) interface{} {
 func TestProcess(t *testing.T) {
 
 	text := `
-  class:        instance-aws/ec2-instance
+- class:        instance-aws/ec2-instance
   spiVersion:   instance/v0.1.0
   metadata:
-    name: host1
+    name: workers
     tags:
       role:    worker
       project: test
@@ -248,28 +249,30 @@ func TestProcess(t *testing.T) {
     stack:  test
 `
 
-	spec := types.Spec{}
-	y, err := types.AnyYAML([]byte(text))
+	url := testGetRootURL(t)
+	ordered, err := NormalizeSpecs(url+"/fake.yml", []byte(text))
 	require.NoError(t, err)
-	require.NoError(t, y.Decode(&spec))
 
 	// states
 	const (
-		specified fsm.Index = iota
+		unavailable fsm.Index = iota
+		specified
 		available
-		unavailable
 	)
 
 	// signals
 	const (
-		create fsm.Signal = iota
+		exception fsm.Signal = iota
 		found
-		exception
+		create
 	)
 
 	store := NewObjects(func(o *types.Object) []interface{} {
 		return []interface{}{o.Metadata.Name, o.Metadata.Identity.UID}
 	})
+
+	createArgs := make(chan *types.Any)
+	createSpec := make(chan types.Spec)
 
 	proc, err := NewProcess(
 		func(p *Process) (*fsm.Spec, error) {
@@ -283,7 +286,6 @@ func TestProcess(t *testing.T) {
 					Actions: map[fsm.Signal]fsm.Action{
 						create: p.Constructor,
 					},
-					TTL: fsm.Expiry{3, create},
 				},
 				fsm.State{
 					Index: available,
@@ -298,9 +300,11 @@ func TestProcess(t *testing.T) {
 		},
 
 		ProcessDefinition{
-			Spec: &spec,
-			Constructor: func(properties *types.Any) (*types.Identity, *types.Any, error) {
-				return nil, nil, nil
+			Spec: ordered[0],
+			Constructor: func(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
+				createArgs <- properties
+				createSpec <- spec
+				return &types.Identity{UID: "new"}, nil, nil
 			},
 		},
 
@@ -311,4 +315,35 @@ func TestProcess(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proc)
 
+	err = proc.Start(fsm.Wall(time.Tick(100 * time.Millisecond)))
+	require.NoError(t, err)
+
+	// Add one
+	instance := proc.Instances().Add(specified)
+
+	err = instance.Signal(create)
+	require.NoError(t, err)
+
+	properties := <-createArgs
+	spec := <-createSpec
+
+	T(100).Infoln(properties.String())
+
+	// should be 0 for the id -- the type is bad
+	require.Equal(t, float64(0), types.Get(types.PathFromString("AttachVolumeInputs/InstanceId"), properties))
+	require.Equal(t, nil, types.Get(types.PathFromString("AttachVolumeInputs/VolumeId"), properties))
+	require.Equal(t, "mySSH", types.Get(types.PathFromString("RunInstancesInput/KeyName"), properties))
+	require.Equal(t, "ami-12345", types.Get(types.PathFromString("RunInstancesInput/ImageId"), properties))
+	require.Equal(t, "m2-xlarge", types.Get(types.PathFromString("RunInstancesInput/InstanceType"), properties))
+
+	T(100).Infoln(spec)
+	require.Equal(t, "instance-aws/ec2-instance", types.Get(types.PathFromString("Class"), spec))
+
+	// we should have 1 instance in the available state
+	require.Equal(t, 1, proc.Instances().CountByState(available))
+
+	// get the object
+	obj := proc.Object(instance)
+	require.NotNil(t, obj)
+	require.Equal(t, "new", obj.Metadata.Identity.UID)
 }

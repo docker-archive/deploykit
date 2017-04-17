@@ -120,8 +120,8 @@ func findSpecs(v interface{}) []*types.Spec {
 	return result
 }
 
-// Nested recurses through the Properties of the spec and returns any nested specs.
-func Nested(s *types.Spec) []*types.Spec {
+// nested recurses through the Properties of the spec and returns any nested specs.
+func nested(s *types.Spec) []*types.Spec {
 	if s.Properties == nil {
 		return nil
 	}
@@ -152,7 +152,18 @@ func indexGet(index map[key]*graph.Node, class, name string) *graph.Node {
 	return nil
 }
 
-// OrderByDependency returns the given specs in dependency order.
+// AllSpecs returns a list of all the specs given plus any nested specs
+func AllSpecs(specs []*types.Spec) []*types.Spec {
+	all := []*types.Spec{}
+	for _, s := range specs {
+		all = append(all, s)
+		all = append(all, nested(s)...)
+	}
+	return all
+}
+
+// OrderByDependency returns the given specs in dependency order.  The input is assume to be exhaustive in that
+// all nested specs are part of the list.
 func OrderByDependency(specs []*types.Spec) ([]*types.Spec, error) {
 
 	g := graph.New(graph.Directed)

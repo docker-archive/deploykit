@@ -421,9 +421,12 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 		instance.data = event.data
 	}
 
+	log.V(100).Infoln("About to run transition:", action)
 	// call action before transitiion
 	if action != nil {
 		if err := action(instance); err != nil {
+
+			log.V(100).Infoln("error at transition:", err)
 
 			if alternate, err := s.spec.error(current, event.signal); err != nil {
 
