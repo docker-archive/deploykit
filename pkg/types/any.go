@@ -23,6 +23,15 @@ func AnyYAML(y []byte) (*Any, error) {
 	return AnyBytes(buff), nil
 }
 
+// AnyYAMLMust constructs any Any from a yaml, panics on error
+func AnyYAMLMust(y []byte) *Any {
+	any, err := AnyYAML(y)
+	if err != nil {
+		panic(err)
+	}
+	return any
+}
+
 // AnyBytes returns an Any from the encoded message bytes
 func AnyBytes(data []byte) *Any {
 	any := &Any{}

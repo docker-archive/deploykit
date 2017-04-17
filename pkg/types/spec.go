@@ -53,21 +53,21 @@ func (s Spec) Validate() error {
 type Dependency struct {
 
 	// Class is the Class of the spec this spec depends on
-	Class string
+	Class string `json:"class"`
 
 	// Name is the Name of the spec this spec dependes on
-	Name string
+	Name string `json:"name"`
 
 	// Bind is an associative array of pointer to the fields in the object to a variable name that will be referenced
 	// in the properties or template of the owning spec.
-	Bind map[string]*Pointer
+	Bind map[string]*Pointer `json:"bind"`
 }
 
 // Identity uniquely identifies an instance
 type Identity struct {
 
 	// UID is a unique identifier for the object instance.
-	UID string
+	UID string `json:"uid"`
 }
 
 // Metadata captures label and descriptive information about the object
@@ -77,10 +77,10 @@ type Metadata struct {
 	*Identity `json:",omitempty" yaml:",omitempty"`
 
 	// Name is a user-friendly name.  It may or may not be unique.
-	Name string
+	Name string `json:"name"`
 
 	// Tags are a collection of labels, in key-value form, about the object
-	Tags map[string]string
+	Tags map[string]string `json:"tags"`
 }
 
 // URL is an alias of url

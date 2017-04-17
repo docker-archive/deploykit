@@ -17,7 +17,7 @@
     - class: instance-aws/ec2-volume
       name: disk1
       bind:
-         volume/id : metadata/UID
+         volumeId : metadata/UID
 
 - class:        instance-aws/ec2-volume
   spiVersion:   instance/v0.1.0

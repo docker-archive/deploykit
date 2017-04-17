@@ -31,7 +31,7 @@ func TestObject(t *testing.T) {
     - class: instance-aws/ec2-volume
       name: disk1
       bind:
-         volume/id : metadata/UID
+         volume/id : metadata/uid
          volume/size: properties/sizeGb
 
 - class:        instance-aws/ec2-volume
@@ -57,14 +57,16 @@ func TestObject(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(specs))
 
-	objects, err := Instantiate(specs,
-		func(spec *types.Spec) error {
-			return nil
-		}, func(spec *types.Spec) []interface{} {
-			return []interface{}{spec.Class, spec.Metadata.Name}
-		})
+	objects := NewObjects(func(o *types.Object) []interface{} {
+		return []interface{}{o.Spec.Class, o.Spec.Metadata.Name}
+	})
 
-	require.NoError(t, err)
+	objects.Add(&types.Object{
+		Spec: *specs[0],
+	})
+	objects.Add(&types.Object{
+		Spec: *specs[1],
+	})
 
 	T(100).Infoln("objects=", objects)
 	disk := objects.FindBy("instance-aws/ec2-volume", "disk1")
@@ -78,15 +80,16 @@ func TestObject(t *testing.T) {
 	host = objects.FindBy("instance-aws/ec2-instance", "host1")
 	require.NotNil(t, host)
 
-	m, err := ResolveDepends(host, objects,
-		func(o *types.Object) []interface{} {
-			return []interface{}{o.Class, o.Metadata.Name}
-		})
-
+	m, err := resolveDepends(host, objects)
 	require.NoError(t, err)
 
 	T(100).Infoln(m)
 
 	require.Equal(t, "disk-11234", m["volume/id"])
 	require.Equal(t, float64(100), m["volume/size"])
+
+	m, err = resolveDepends(disk, objects)
+	require.NoError(t, err)
+
+	T(100).Infoln(m)
 }

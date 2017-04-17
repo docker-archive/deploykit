@@ -1,6 +1,10 @@
 package core
 
 import (
+	"fmt"
+
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -8,8 +12,127 @@ import (
 
 var log = logutil.New("module", "core")
 
-// Constructor is a function that can construct an instance using the spec
-type Constructor func(*Spec, Objects) (*Object, error)
+// ProcessDefinition has the Spec and the actual behaviors like construct/ destruct
+type ProcessDefinition struct {
+	Spec               *types.Spec
+	Constructor        Constructor
+	ConstructorError   ConstructorError
+	ConstructorSuccess ConstructorSuccess
+	Destructor         Destructor
+}
+
+// Process manages the lifecycle of one class of objects
+type Process struct {
+	ProcessDefinition
+
+	workflow  *fsm.Spec
+	instances *fsm.Set
+
+	Constructor fsm.Action
+
+	store   Objects
+	plugins func() discovery.Plugins
+}
+
+// ModelDefinition defines the fsm model
+type ModelDefinition func(*Process) (*fsm.Spec, error)
+
+// Constructor constructs the instance using the rendered input
+type Constructor func(properties *types.Any) (identity *types.Identity, state *types.Any, err error)
+
+// Destructor destroys the instance
+type Destructor func(*types.Object) error
+
+// ConstructorSuccess is the callback when construction succeeds
+type ConstructorSuccess func(*types.Object, fsm.Instance) error
+
+// ConstructorError is the callback when the destruction succeeds
+type ConstructorError func(error, *types.Any, fsm.Instance) error
+
+func check(input ProcessDefinition) ProcessDefinition {
+	if input.ConstructorError == nil {
+		input.ConstructorError = func(err error, properties *types.Any, instance fsm.Instance) error { return err } // noop
+	}
+	if input.ConstructorSuccess == nil {
+		input.ConstructorSuccess = func(*types.Object, fsm.Instance) error { return nil } // noop
+	}
+	return input
+}
+
+// NewProcess creates a new process to manage a spec and the lifecycle of its instances.
+func NewProcess(model ModelDefinition,
+	input ProcessDefinition,
+	store Objects,
+	plugins func() discovery.Plugins) (*Process, error) {
+
+	proc := &Process{
+		ProcessDefinition: check(input),
+		store:             store,
+		plugins:           plugins,
+	}
+
+	proc.Constructor = func(instance fsm.Instance) error {
+		if proc.ProcessDefinition.Constructor == nil {
+			return fmt.Errorf("no constructor %s %s", input.Spec.Class, input.Spec.Metadata.Name)
+		}
+
+		// create an instace and resolve dependencies to compute a full spec
+		obj := &types.Object{
+			Spec: *proc.ProcessDefinition.Spec,
+		}
+
+		// here we resolve any dependencies in the spec
+		depends, err := resolveDepends(obj, proc.store)
+		if err != nil {
+			return err
+		}
+
+		properties, err := renderProperties(obj, depends, proc.plugins)
+		if err != nil {
+			return err
+		}
+
+		identity, state, err := proc.ProcessDefinition.Constructor(properties)
+		if err != nil {
+			return proc.ProcessDefinition.ConstructorError(err, properties, instance)
+		}
+
+		// create an Object from the spec
+		obj.Spec.Metadata.Identity = identity
+		obj.State = state
+
+		// index it
+		proc.store.Add(obj)
+
+		// send signal
+		err = proc.ProcessDefinition.ConstructorSuccess(obj, instance)
+		if err == nil {
+			return err
+		}
+
+		// associate instance ID with object
+		// TODO
+
+		return nil
+	}
+
+	workflow, err := model(proc)
+	if err != nil {
+		return nil, err
+	}
+
+	proc.workflow = workflow
+
+	return proc, nil
+}
+
+// Start starts the management process of the instances
+func (p *Process) Start(clock *fsm.Clock) error {
+
+	p.instances = fsm.NewSet(p.workflow, clock, fsm.DefaultOptions(p.ProcessDefinition.Spec.Metadata.Name))
+
+	return nil
+}
 
 // SpecsFromURL loads the raw specs from the URL and returns the root url and raw bytes
 func SpecsFromURL(uri string) (root string, config []byte, err error) {
@@ -17,28 +140,38 @@ func SpecsFromURL(uri string) (root string, config []byte, err error) {
 	if err != nil {
 		return uri, nil, err
 	}
+	buff, err = ensureJSON(buff)
+	return uri, buff, err
+}
 
+func ensureJSON(buff []byte) ([]byte, error) {
 	// try to decode it as json...
 	var v interface{}
-	err = types.AnyBytes(buff).Decode(&v)
+	err := types.AnyBytes(buff).Decode(&v)
 	if err == nil {
-		return uri, buff, nil
+		return buff, nil
 	}
 
 	y, err := types.AnyYAML(buff)
 	if err != nil {
-		return uri, buff, err
+		return buff, err
 	}
 	err = y.Decode(&v)
 	if err != nil {
-		return uri, nil, err
+		return nil, err
 	}
-	return uri, y.Bytes(), nil
+	return y.Bytes(), nil
 }
 
 // NormalizeSpecs given the input bytes and its source, returns the normalized specs where
 // template urls have been updated to be absolute and the specs are in dependency order.
 func NormalizeSpecs(uri string, input []byte) ([]*types.Spec, error) {
+
+	input, err := ensureJSON(input)
+	if err != nil {
+		return nil, err
+	}
+
 	parsed := []*types.Spec{}
 	if err := types.AnyBytes(input).Decode(&parsed); err != nil {
 		return nil, err
@@ -47,6 +180,11 @@ func NormalizeSpecs(uri string, input []byte) ([]*types.Spec, error) {
 	specs := []*types.Spec{}
 
 	for _, member := range parsed {
+
+		if err := member.Validate(); err != nil {
+			return nil, err
+		}
+
 		specs = append(specs, member)
 		specs = append(specs, Nested(member)...)
 	}
