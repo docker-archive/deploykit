@@ -23,6 +23,7 @@ func main() {
 	region := cmd.Flags().String("region", "", "DigitalOcean region")
 	//config := cmd.Flags().String("config", "$HOME/.config/doctl/config.yaml", "configuration file where the api token are specified")
 	accessToken := cmd.Flags().String("access-token", "", "DigitalOcean token")
+	sshKey := cmd.Flags().String("sshKey", "", "Default ssh key to use for droplets (it has to exists on digitalocean)")
 
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
@@ -32,7 +33,7 @@ func main() {
 		oauthClient := oauth2.NewClient(context.TODO(), tokenSource)
 		client := godo.NewClient(oauthClient)
 
-		cli.RunPlugin(*name, instance_plugin.PluginServer(instance.NewDOInstancePlugin(client, *region)))
+		cli.RunPlugin(*name, instance_plugin.PluginServer(instance.NewDOInstancePlugin(client, *region, *sshKey)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())

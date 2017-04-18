@@ -113,6 +113,31 @@ func TestProvisionFails(t *testing.T) {
 		droplets: &fakeDropletsServices{
 			expectedErr: "something went wrong",
 		},
+		keys: &fakeKeysService{},
+	}
+	_, err := plugin.Provision(spec)
+	require.EqualError(t, err, "something went wrong")
+}
+
+func TestProvisionFailsWithSshKey(t *testing.T) {
+	spec := instance.Spec{
+		Properties: types.AnyString(`{
+  "NamePrefix": "foo",
+  "Size": "512mb",
+  "Image": "ubuntu-14-04-x64",
+  "Tags": ["foo"]
+}`),
+	}
+	region := "asm2"
+	plugin := &plugin{
+		region: region,
+		sshkey: "foo",
+		droplets: &fakeDropletsServices{
+			expectedErr: "should not have error out here",
+		},
+		keys: &fakeKeysService{
+			expectedErr: "something went wrong",
+		},
 	}
 	_, err := plugin.Provision(spec)
 	require.EqualError(t, err, "something went wrong")
@@ -144,6 +169,79 @@ func TestProvision(t *testing.T) {
 				return &godo.Droplet{
 					ID: 12345,
 				}, nil, nil
+			},
+		},
+		keys: &fakeKeysService{},
+	}
+	id, err := plugin.Provision(spec)
+	require.NoError(t, err)
+	expectedID := instance.ID("12345")
+	assert.Equal(t, &expectedID, id)
+}
+
+func TestProvisionNonExistingSshkey(t *testing.T) {
+	spec := instance.Spec{
+		Properties: types.AnyString(`{
+  "NamePrefix": "foo",
+  "Size": "512mb",
+  "Image": "ubuntu-14-04-x64",
+  "Tags": ["foo"]
+}`),
+	}
+	region := "asm2"
+	plugin := &plugin{
+		region: region,
+		sshkey: "foo",
+		droplets: &fakeDropletsServices{
+			createfunc: func(ctx context.Context, req *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error) {
+				assert.Equal(t, 1, len(req.SSHKeys))
+				assert.Equal(t, 0, req.SSHKeys[0].ID)
+				return &godo.Droplet{
+					ID: 12345,
+				}, nil, nil
+			},
+		},
+		keys: &fakeKeysService{
+			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Key, *godo.Response, error) {
+				return []godo.Key{
+					godoKey(54321, "bar"),
+				}, godoResponse(), nil
+			},
+		},
+	}
+	id, err := plugin.Provision(spec)
+	require.NoError(t, err)
+	expectedID := instance.ID("12345")
+	assert.Equal(t, &expectedID, id)
+}
+
+func TestProvisionExistingSshkey(t *testing.T) {
+	spec := instance.Spec{
+		Properties: types.AnyString(`{
+  "NamePrefix": "foo",
+  "Size": "512mb",
+  "Image": "ubuntu-14-04-x64",
+  "Tags": ["foo"]
+}`),
+	}
+	region := "asm2"
+	plugin := &plugin{
+		region: region,
+		sshkey: "foo",
+		droplets: &fakeDropletsServices{
+			createfunc: func(ctx context.Context, req *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error) {
+				assert.Equal(t, 1, len(req.SSHKeys))
+				assert.Equal(t, 54321, req.SSHKeys[0].ID)
+				return &godo.Droplet{
+					ID: 12345,
+				}, nil, nil
+			},
+		},
+		keys: &fakeKeysService{
+			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Key, *godo.Response, error) {
+				return []godo.Key{
+					godoKey(54321, "foo"),
+				}, godoResponse(), nil
 			},
 		},
 	}
