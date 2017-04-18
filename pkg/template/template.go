@@ -196,6 +196,15 @@ func (t *Template) Global(name string, value interface{}) *Template {
 	return t
 }
 
+// Var implements the var function. It's a combination of global and ref
+func (t *Template) Var(name string, optional ...interface{}) interface{} {
+	if len(optional) == 0 {
+		return t.Ref(name)
+	}
+	t.Global(name, optional[len(optional)-1])
+	return voidValue
+}
+
 func (t *Template) updateGlobal(name string, value interface{}) {
 	t.lock.Lock()
 	defer t.lock.Unlock()

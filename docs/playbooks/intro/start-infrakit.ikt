@@ -36,3 +36,5 @@ docker run -d --volumes-from infrakit --name manager \
 
 {{/* Here we just source a file in the same folder for more reuse and modularity */}}
 {{ source "aws/start-plugin.ikt" }}
+
+{{ source "gcp/start-plugin.ikt" }}

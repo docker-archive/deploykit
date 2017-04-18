@@ -340,13 +340,7 @@ func (t *Template) DefaultFuncs() []Function {
 				"References or sets a variable.  If single argument, returns the value.",
 				"If second argument is provided, sets the variable. The scope is global.",
 			},
-			Func: func(n string, optional ...interface{}) interface{} {
-				if len(optional) == 0 {
-					return t.Ref(n)
-				}
-				t.Global(n, optional[len(optional)-1])
-				return voidValue
-			},
+			Func: t.Var,
 		},
 		{
 			Name: "k",

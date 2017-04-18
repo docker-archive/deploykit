@@ -1,0 +1,33 @@
+# AWS Instance plugin properties template
+AttachVolumeInputs:
+  Device: /dev/sdf
+  InstanceId: {{ var "properties/metadata/uid" | default . }}
+  VolumeId: {{ var "volumeId" | default "" }}
+RunInstancesInput:
+    BlockDeviceMappings: null
+    DisableApiTermination: null
+    EbsOptimized: null
+    IamInstanceProfile: null
+    ImageId: {{ var "properties/imageId" | default "default-image-id" }}
+    InstanceInitiatedShutdownBehavior: null
+    InstanceType: {{ var "properties/instanceType" | default "default-instance-type" }}
+    KeyName: {{ var "properties/key" | default "default-key" }}
+    MaxCount: 1
+    MinCount: 1
+    NetworkInterfaces:
+    - AssociatePublicIpAddress: true
+      DeleteOnTermination: true
+      DeviceIndex: 0
+      Groups:
+      - sg-1234
+      NetworkInterfaceId: null
+      SubnetId: subnet-1234
+    Placement:
+      Affinity: null
+      AvailabilityZone: {{ var "options/region" }}a
+      Tenancy: null
+    RamdiskId: null
+    SubnetId: null
+    UserData: null
+Tags:
+  infrakit.name: {{ var "metadata/name" }}

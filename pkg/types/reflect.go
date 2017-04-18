@@ -57,7 +57,7 @@ func List(path []string, object interface{}) []string {
 
 	switch val.Kind() {
 	case reflect.Slice:
-		// this is a slice, so return the name as '[%d]'
+		// this is a slice, so return the name as '%d'
 		for i := 0; i < val.Len(); i++ {
 			list = append(list, fmt.Sprintf("[%d]", i))
 		}
