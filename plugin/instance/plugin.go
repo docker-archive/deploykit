@@ -35,18 +35,26 @@ type tagsService interface {
 	TagResources(context.Context, string, *godo.TagResourcesRequest) (*godo.Response, error)
 }
 
+type keysService interface {
+	List(context.Context, *godo.ListOptions) ([]godo.Key, *godo.Response, error)
+}
+
 type plugin struct {
 	droplets dropletsService
 	tags     tagsService
+	keys     keysService
 	region   string
+	sshkey   string
 }
 
 // NewDOInstancePlugin creates a new DigitalOcean instance plugin for a given region.
-func NewDOInstancePlugin(client *godo.Client, region string) instance.Plugin {
+func NewDOInstancePlugin(client *godo.Client, region, sshkey string) instance.Plugin {
 	return &plugin{
 		droplets: client.Droplets,
 		tags:     client.Tags,
+		keys:     client.Keys,
 		region:   region,
+		sshkey:   sshkey,
 	}
 }
 
@@ -109,6 +117,17 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	tags := instance_types.ParseTags(spec)
 	_, tags = mergeTags(tags, sliceToMap(properties.Tags)) // scope this resource with namespace tags
 
+	key, err := p.getSshkey(p.sshkey)
+	if err != nil {
+		return nil, err
+	}
+
+	sshkeys := []godo.DropletCreateSSHKey{
+		{
+			ID: key.ID,
+		},
+	}
+
 	// Create the droplet
 	dropletCreateRequest := &godo.DropletCreateRequest{
 		Name:   name,
@@ -121,6 +140,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		IPv6:              properties.IPv6,
 		PrivateNetworking: properties.PrivateNetworking,
 		Tags:              doTags(mapToStringSlice(tags)),
+		SSHKeys:           sshkeys,
 	}
 	droplet, _, err := p.droplets.Create(context.TODO(), dropletCreateRequest)
 	if err != nil {
@@ -128,6 +148,35 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	id := instance.ID(fmt.Sprintf("%d", droplet.ID))
 	return &id, nil
+}
+
+func (p *plugin) getSshkey(expectedKey string) (godo.Key, error) {
+	keys := []godo.Key{}
+	islast := false
+	page := 0
+	for !islast {
+		d, resp, err := p.keys.List(context.TODO(), &godo.ListOptions{
+			Page: page,
+		})
+		if err != nil {
+			return godo.Key{}, err
+		}
+		islast = resp.Links.IsLastPage()
+		p, err := resp.Links.CurrentPage()
+		if err != nil {
+			return godo.Key{}, err
+		}
+		page = p + 1
+		keys = append(keys, d...)
+	}
+
+	for _, key := range keys {
+		if key.Name == expectedKey {
+			return key, nil
+		}
+	}
+	log.Warnf("key %s not found", expectedKey)
+	return godo.Key{}, nil
 }
 
 // Destroy terminates an existing instance.

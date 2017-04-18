@@ -8,6 +8,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+type fakeKeysService struct {
+	expectedErr string
+	listfunc    func(context.Context, *godo.ListOptions) ([]godo.Key, *godo.Response, error)
+}
+
+func (s *fakeKeysService) List(ctx context.Context, opts *godo.ListOptions) ([]godo.Key, *godo.Response, error) {
+	if s.expectedErr != "" {
+		return nil, nil, errors.New(s.expectedErr)
+	}
+	if s.listfunc != nil {
+		return s.listfunc(ctx, opts)
+	}
+	return []godo.Key{}, godoResponse(), nil
+}
+
 type fakeTagsService struct {
 	expectedErr string
 }
@@ -93,4 +108,17 @@ func tags(tags ...string) func(*godo.Droplet) {
 	return func(droplet *godo.Droplet) {
 		droplet.Tags = tags
 	}
+}
+
+func godoKey(id int, name string, ops ...func(*godo.Key)) godo.Key {
+	key := &godo.Key{
+		ID:   id,
+		Name: name,
+	}
+
+	for _, op := range ops {
+		op(key)
+	}
+
+	return *key
 }
