@@ -1,6 +1,7 @@
 package libvirt
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -15,12 +16,18 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/pkg/errors"
+	"github.com/rneugeba/iso9660wrap"
 )
 
 type infrakitMetadataTag struct {
 	XMLName xml.Name `xml:"tag"`
 	Key     string   `xml:"key"`
 	Value   string   `xml:"value"`
+}
+
+type infrakitMetadataDiskInfo struct {
+	Pool   string `xml:"pool"`
+	Volume string `xml:"volume"`
 }
 
 type infrakitMetadata struct {
@@ -31,9 +38,10 @@ type infrakitMetadata struct {
 	// <infrakit xmlns="https://github.com/docker/infrakit">...</infrakit>
 	// See https://github.com/golang/go/issues/13400,
 	// https://github.com/golang/go/issues/9519 and various linked issues.
-	XMLName   xml.Name              `xml:"https://github.com/docker/infrakit infrakit"`
-	LogicalID string                `xml:"logicalid"`
-	Tags      []infrakitMetadataTag `xml:"tag"`
+	XMLName          xml.Name                  `xml:"https://github.com/docker/infrakit infrakit"`
+	LogicalID        string                    `xml:"logicalid"`
+	Tags             []infrakitMetadataTag     `xml:"tag"`
+	MetadataDiskInfo *infrakitMetadataDiskInfo `xml:"metadata-disk,omitempty"`
 }
 
 func (d *infrakitMetadata) Unmarshal(doc string) error {
@@ -157,6 +165,66 @@ func (p libvirtPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		cmdline = string(b)
 	}
 
+	metadataPool := ""
+	metadataVol := ""
+
+	if spec.Init != "" {
+		metadataPool = "default"
+		if pn, ok := properties["MetadataStoragePool"].(string); ok {
+			metadataPool = pn
+		}
+		p, err := conn.LookupStoragePoolByName(metadataPool)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Looking up MetadataStoragePool: %s", metadataPool)
+		}
+
+		buf := &bytes.Buffer{}
+
+		if err := iso9660wrap.WriteBuffer(buf, []byte(spec.Init), "config"); err != nil {
+			return nil, errors.Wrap(err, "Writing user data ISO")
+		}
+
+		len := uint64(buf.Len())
+
+		metadataVol = string(id) + "-metadata"
+
+		volcfg := libvirtxml.StorageVolume{
+			Name: metadataVol,
+			Capacity: &libvirtxml.StorageVolumeSize{
+				Value: len,
+				Unit:  "bytes",
+			},
+		}
+
+		xmldoc, err := volcfg.Marshal()
+		if err != nil {
+			return nil, errors.Wrap(err, "Marshalling Instance Volume XML")
+		}
+
+		vol, err := p.StorageVolCreateXML(xmldoc, 0)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Creating metadata volume")
+		}
+		defer func() {
+			if metadataVol != "" {
+				_ = vol.Delete(0)
+			}
+		}()
+
+		stream, err := conn.NewStream(0)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Creating metadata stream")
+		}
+
+		if err := vol.Upload(stream, 0, len, 0); err != nil {
+			return nil, errors.Wrapf(err, "Starting metadata volume upload")
+		}
+
+		if _, err := stream.Send(buf.Bytes()); err != nil {
+			return nil, errors.Wrapf(err, "Writing to metadata stream")
+		}
+	}
+
 	domcfg := domainWithMetadata{
 		Domain: libvirtxml.Domain{
 			Type:   domtype,
@@ -204,6 +272,28 @@ func (p libvirtPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		LogicalID: logicalID,
 	}
 	metaSetTags(&meta, spec.Tags)
+
+	if metadataPool != "" && metadataVol != "" {
+		l.Printf("Adding %s %s as metadata", metadataPool, metadataVol)
+		domcfg.Domain.Devices.Disks = append(domcfg.Domain.Devices.Disks, libvirtxml.DomainDisk{
+			Type:   "volume",
+			Device: "cdrom",
+			Source: &libvirtxml.DomainDiskSource{
+				Pool:   metadataPool,
+				Volume: metadataVol,
+			},
+			Target: &libvirtxml.DomainDiskTarget{
+				Dev: "sdc",
+				Bus: "sata",
+			},
+		})
+
+		meta.MetadataDiskInfo = &infrakitMetadataDiskInfo{
+			Pool:   metadataPool,
+			Volume: metadataVol,
+		}
+	}
+
 	m, err := meta.Marshal()
 	if err != nil {
 		return nil, errors.Wrap(err, "Marshalling infrakitMetadata")
@@ -231,6 +321,8 @@ func (p libvirtPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	l.Infof("New instance started as dom%d", domid)
+
+	metadataVol = "" // Success, do not clean this up.
 
 	return &id, nil
 }
@@ -304,6 +396,45 @@ func (p libvirtPlugin) Label(instance instance.ID, labels map[string]string) err
 	return nil
 }
 
+func destroyMetadataDisk(conn *libvirt.Connect, d *libvirt.Domain) error {
+	xmldoc, err := d.GetXMLDesc(0)
+	if err != nil {
+		return errors.Wrap(err, "Getting domain XML")
+	}
+	var domcfg domainWithMetadata
+	if err := domcfg.Unmarshal(xmldoc); err != nil {
+		return errors.Wrap(err, "Unmarshalling domain XML")
+	}
+
+	if domcfg.Metadata == nil {
+		return errors.New("Domain is lacking metadata")
+	}
+
+	meta := infrakitMetadata{}
+	if err := meta.Unmarshal(domcfg.Metadata.Data); err != nil {
+		return errors.Wrap(err, "Unmarshalling metadata")
+	}
+
+	if meta.MetadataDiskInfo == nil {
+		return nil // No metadata disk for this VM
+	}
+
+	p, err := conn.LookupStoragePoolByName(meta.MetadataDiskInfo.Pool)
+	if err != nil {
+		return errors.Wrap(err, "Finding metadata disk's pool")
+	}
+
+	v, err := p.LookupStorageVolByName(meta.MetadataDiskInfo.Volume)
+	if err != nil {
+		return errors.Wrap(err, "Finding metadata disk's volume")
+	}
+	if err := v.Delete(0); err != nil {
+		return errors.Wrap(err, "Deleteing metadata disk's volume")
+	}
+
+	return nil
+}
+
 // Destroy terminates an existing instance.
 func (p libvirtPlugin) Destroy(id instance.ID) error {
 	l := log.WithField("instance", id)
@@ -318,6 +449,11 @@ func (p libvirtPlugin) Destroy(id instance.ID) error {
 	d, err := p.lookupInstanceByID(conn, id)
 	if err != nil {
 		return errors.Wrap(err, "Looking up domain")
+	}
+
+	if err := destroyMetadataDisk(conn, d); err != nil {
+		l.Errorf("Failed to destroy metadata disk: %s", err)
+		// Continue so we at least try and destroy the domain
 	}
 
 	if err := d.Destroy(); err != nil {
