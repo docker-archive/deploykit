@@ -60,6 +60,13 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
+build-docker-dev:
+	@echo "+ $@"
+	GOOS=linux GOARCH=amd64 make build-in-container
+	@docker build ${DOCKER_BUILD_FLAGS} \
+	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
+	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+
 get-tools:
 	@echo "+ $@"
 	@go get -u \
@@ -124,6 +131,7 @@ endif
 	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
 	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
 	$(call build_binary,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
+	$(call build_binary,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
 	$(call build_binary,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
 
 cli: build-cli
@@ -163,3 +171,7 @@ test-full:
 vendor-update:
 	@echo "+ $@"
 	@trash -u
+
+terraform-linux:
+	@echo "+ $@"
+	wget -O tf.zip https://releases.hashicorp.com/terraform/0.9.3/terraform_0.9.3_linux_amd64.zip && unzip tf.zip && mv terraform ./build

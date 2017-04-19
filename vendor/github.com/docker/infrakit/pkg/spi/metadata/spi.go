@@ -15,8 +15,8 @@ var InterfaceSpec = spi.InterfaceSpec{
 type Plugin interface {
 
 	// List returns a list of *child nodes* given a path, which is specified as a slice
-	List(path Path) (child []string, err error)
+	List(path types.Path) (child []string, err error)
 
 	// Get retrieves the value at path given.
-	Get(path Path) (value *types.Any, err error)
+	Get(path types.Path) (value *types.Any, err error)
 }

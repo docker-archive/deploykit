@@ -11,8 +11,10 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig"
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 )
+
+var log = logutil.New("module", "core/template")
 
 // Function contains the description of an exported template function
 type Function struct {
@@ -65,12 +67,6 @@ type Options struct {
 	Stderr func() io.Writer
 }
 
-type defaultValue struct {
-	Name  string
-	Value interface{}
-	Doc   string
-}
-
 // Template is the templating engine
 type Template struct {
 	options Options
@@ -81,8 +77,8 @@ type Template struct {
 	functions []func() []Function
 	funcs     map[string]interface{}
 	globals   map[string]interface{}
-	defaults  map[string]defaultValue
-	context   interface{}
+	//	defaults  map[string]defaultValue
+	context interface{}
 
 	registered []Function
 	lock       sync.Mutex
@@ -119,7 +115,7 @@ func NewTemplate(s string, opt Options) (*Template, error) {
 // path of any 'included' templates e.g. {{ include "./another.tpl" . }}
 func NewTemplateFromBytes(buff []byte, contextURL string, opt Options) (*Template, error) {
 	if contextURL == "" {
-		log.Warningln("Context is not known.  Included templates may not work properly.")
+		log.Warn("Context is not known; include/source may not work properly")
 	}
 
 	return &Template{
@@ -128,7 +124,6 @@ func NewTemplateFromBytes(buff []byte, contextURL string, opt Options) (*Templat
 		body:      buff,
 		funcs:     map[string]interface{}{},
 		globals:   map[string]interface{}{},
-		defaults:  map[string]defaultValue{},
 		functions: []func() []Function{},
 	}, nil
 }
@@ -161,8 +156,6 @@ func (t *Template) AddFunc(name string, f interface{}) *Template {
 func (t *Template) Ref(name string) interface{} {
 	if found, has := t.globals[name]; has {
 		return found
-	} else if v, has := t.defaults[name]; has {
-		return v.Value
 	}
 	return nil
 }
@@ -179,10 +172,6 @@ func (t *Template) forkFrom(parent *Template) (dotCopy interface{}, err error) {
 	// copy the globals in the parent scope into the child
 	for k, v := range parent.globals {
 		t.globals[k] = v
-	}
-	// copy the defaults in the parent scope into the child
-	for k, v := range parent.defaults {
-		t.defaults[k] = v
 	}
 	// inherit the functions defined for this template
 	for k, v := range parent.funcs {
@@ -207,30 +196,19 @@ func (t *Template) Global(name string, value interface{}) *Template {
 	return t
 }
 
+// Var implements the var function. It's a combination of global and ref
+func (t *Template) Var(name string, optional ...interface{}) interface{} {
+	if len(optional) == 0 {
+		return t.Ref(name)
+	}
+	t.Global(name, optional[len(optional)-1])
+	return voidValue
+}
+
 func (t *Template) updateGlobal(name string, value interface{}) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.globals[name] = value
-}
-
-// Def is equivalent to a {{ def "key" value "description" }} in defining a variable with a default value.
-// The value is accessible via a {{ ref "key" }} in the template.
-func (t *Template) Def(name string, value interface{}, doc string) *Template {
-	for here := t; here != nil; here = here.parent {
-		here.updateDef(name, value, doc)
-	}
-	return t
-}
-
-func (t *Template) updateDef(name string, val interface{}, doc ...string) *Template {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.defaults[name] = defaultValue{
-		Name:  name,
-		Value: val,
-		Doc:   strings.Join(doc, " "),
-	}
-	return t
 }
 
 // Validate parses the template and checks for validity.

@@ -91,7 +91,7 @@ func (c *Context) start() {
 
 // List returns a list of *child nodes* given a path, which is specified as a slice
 // where for i > j path[i] is the parent of path[j]
-func (c *Context) List(path metadata.Path) (child []string, err error) {
+func (c *Context) List(path types.Path) (child []string, err error) {
 	if path.Len() == 0 {
 		return []string{"export", "local"}, nil
 	}
@@ -103,7 +103,7 @@ func (c *Context) List(path metadata.Path) (child []string, err error) {
 		// is this a json?
 		decoded := map[string]interface{}{}
 		if err := json.Unmarshal([]byte(str), &decoded); err == nil {
-			return metadata_plugin.List([]string(path.Shift(1)), decoded), nil
+			return types.List([]string(path.Shift(1)), decoded), nil
 		}
 		trimmed := []string{}
 		for _, s := range strings.Split(str, "\n") {
@@ -115,7 +115,7 @@ func (c *Context) List(path metadata.Path) (child []string, err error) {
 }
 
 // Get retrieves the value at path given.
-func (c *Context) Get(path metadata.Path) (value *types.Any, err error) {
+func (c *Context) Get(path types.Path) (value *types.Any, err error) {
 	if path.Len() == 0 {
 		return nil, nil
 	}
@@ -149,7 +149,7 @@ func (c *Context) Funcs() []template.Function {
 				}
 
 				c.update <- func(view map[string]interface{}) {
-					metadata_plugin.Put([]string(metadata_plugin.Path(p)), value, view)
+					types.Put(types.PathFromString(p), value, view)
 				}
 
 				return "", nil

@@ -11,7 +11,7 @@ machine:
     GOPATH: "$HOME/.go_workspace"
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     E2E_CLEANUP: "false"
-    SKIP_TESTS: "docker,etcd"
+    SKIP_TESTS: "docker,etcd,terraform"
     S3_MINIO: "s3bucket"
     S3_BUCKET: "s3bucket/infrakit/build/linux-amd64"
     S3_BUILD_RELEASE: "infrakit-$CIRCLE_BRANCH.tar.gz"
@@ -45,13 +45,8 @@ test:
   post:
     # Report to codecov
     - cd $WORKDIR && bash <(curl -s https://codecov.io/bash)
-      
-deployment:
-  pr:
-    branch: /pull\/.*/
-    commands:
-      - DOCKER_BUILD_FLAGS="--rm=false" make build-docker
 
+deployment:
   release:
     branch: /release-.*/
     commands:

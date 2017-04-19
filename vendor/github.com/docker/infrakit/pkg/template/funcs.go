@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/ghodss/yaml"
+	"github.com/hashicorp/hcl"
 	"github.com/jmespath/go-jmespath"
 	"github.com/vaughan0/go-ini"
 )
@@ -55,7 +56,7 @@ func SplitLines(o interface{}) ([]string, error) {
 	return ret, fmt.Errorf("not-supported-value-type")
 }
 
-// FromJSON decode the input JSON encoded as string or byte slice into a map.
+// FromJSON decode the input JSON encoded as string or byte slice into a Go value.
 func FromJSON(o interface{}) (interface{}, error) {
 	var ret interface{}
 	switch o := o.(type) {
@@ -84,7 +85,7 @@ func ToJSONFormat(prefix, indent string, o interface{}) (string, error) {
 	return string(buff), err
 }
 
-// FromYAML decode the input YAML encoded as string or byte slice into a map.
+// FromYAML decode the input YAML encoded as string or byte slice into a Go value.
 func FromYAML(o interface{}) (interface{}, error) {
 	var ret interface{}
 	switch o := o.(type) {
@@ -123,6 +124,23 @@ func FromINI(v string) (map[string]interface{}, error) {
 		out[n] = m
 	}
 	return out, nil
+}
+
+// FromHCL decode the input HCL encoded as string or byte slice into a Go value
+func FromHCL(o interface{}) (interface{}, error) {
+	var ret interface{}
+	switch o := o.(type) {
+	case string:
+		err := hcl.Unmarshal([]byte(o), &ret)
+		return ret, err
+	case []byte:
+		err := hcl.Unmarshal(o, &ret)
+		return ret, err
+	case *types.Any:
+		err := hcl.Unmarshal(o.Bytes(), &ret)
+		return ret, err
+	}
+	return ret, fmt.Errorf("not-supported-value-type")
 }
 
 // FromMap decodes map into raw struct
@@ -232,7 +250,7 @@ func (t *Template) DefaultFuncs() []Function {
 				headers, context := headersAndContext(opt...)
 				loc := p
 				if strings.Index(loc, "str://") == -1 {
-					buff, err := getURL(t.url, p)
+					buff, err := GetURL(t.url, p)
 					if err != nil {
 						return "", err
 					}
@@ -275,7 +293,7 @@ func (t *Template) DefaultFuncs() []Function {
 				headers, context := headersAndContext(opt...)
 				loc := p
 				if strings.Index(loc, "str://") == -1 {
-					buff, err := getURL(t.url, p)
+					buff, err := GetURL(t.url, p)
 					if err != nil {
 						return "", err
 					}
@@ -317,57 +335,31 @@ func (t *Template) DefaultFuncs() []Function {
 			},
 		},
 		{
-			Name: "global",
+			Name: "var",
 			Description: []string{
-				"Sets a global variable named after the first argument, with the value as the second argument.",
-				"This is similar to def (which sets the default value).",
-				"Global variables are propagated to all templates that are rendered via the 'include' function.",
+				"References or sets a variable.  If single argument, returns the value.",
+				"If second argument is provided, sets the variable. The scope is global.",
 			},
-			Func: func(n string, v interface{}) Void {
-				t.Global(n, v)
-				return voidValue
-			},
+			Func: t.Var,
 		},
 		{
-			Name: "def",
+			Name: "k",
 			Description: []string{
-				"Defines a variable with the first argument as name and last argument value as the default.",
-				"It's also ok to pass a third optional parameter, in the middle, as the documentation string.",
+				"Get value from dictionary by key.",
+				"First arg is the key, second must be a map[string]interface{}",
 			},
-			Func: func(name string, args ...interface{}) (Void, error) {
-				if _, has := t.defaults[name]; has {
-					// not sure if this is good, but should complain loudly
-					return voidValue, fmt.Errorf("already defined: %v", name)
-				}
-				var doc string
-				var value interface{}
-				switch len(args) {
-				case 1:
-					// just value, no docs
-					value = args[0]
-				case 2:
-					// docs and value
-					doc = fmt.Sprintf("%v", args[0])
-					value = args[1]
-				}
-				t.Def(name, value, doc)
-				return voidValue, nil
+			Func: // MapIndex gets the value of key from map
+			func(k interface{}, m map[string]interface{}) interface{} {
+				return m[fmt.Sprintf("%v", k)]
 			},
-		},
-		{
-			Name: "ref",
-			Description: []string{
-				"References / gets the variable named after the first argument.",
-				"The values must be set first by either def or global.",
-			},
-			Func: t.Ref,
 		},
 		{
 			Name: "q",
 			Description: []string{
 				"Runs a JMESPath (http://jmespath.org/) query (first arg) on the object (second arg).",
 				"The return value is an object which needs to be rendered properly for the format of the document.",
-				"Example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of http request.",
+				"Example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }}",
+				"returns the origin of http request.",
 			},
 			Func: QueryObject,
 		},
@@ -452,14 +444,12 @@ func (t *Template) DefaultFuncs() []Function {
 			Func: FromINI,
 		},
 		{
-			Name: "k",
+			Name: "hclDecode",
 			Description: []string{
-				"Get value from dictionary by key. First arg is the key, second must be a map[string]interface{}",
+				"Decodes the input HCL (Hashicorp Terraform) into a Go value.",
+				"This is useful for working with HCL formatted output.",
 			},
-			Func: // MapIndex gets the value of key from map
-			func(k interface{}, m map[string]interface{}) interface{} {
-				return m[fmt.Sprintf("%v", k)]
-			},
+			Func: FromHCL,
 		},
 		{
 			Name: "echo",
@@ -477,33 +467,6 @@ func (t *Template) DefaultFuncs() []Function {
 				}
 				return ""
 			},
-		},
-
-		// Deprecated
-		{
-			Name: "to_json",
-			Description: []string{
-				"Encodes the input as a JSON string",
-				"This is useful for taking an object (interface{}) and render it inline as proper JSON.",
-				"Example: {{ include \"https://httpbin.org/get\" | from_json | to_json }}",
-			},
-			Func: ToJSON,
-		},
-		{
-			Name: "to_json_format",
-			Description: []string{
-				"Encodes the input as a JSON string with first arg as prefix, second arg the indentation, then the object",
-			},
-			Func: ToJSONFormat,
-		},
-		{
-			Name: "from_json",
-			Description: []string{
-				"Decodes the input (first arg) into a structure (a map[string]interface{} or []interface{}).",
-				"This is useful for parsing arbitrary resources in JSON format as object.  The object is the queryable via 'q'",
-				"For example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }} returns the origin of request.",
-			},
-			Func: FromJSON,
 		},
 	}
 }

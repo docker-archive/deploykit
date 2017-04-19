@@ -2,6 +2,8 @@ package types
 
 import (
 	"encoding/json"
+
+	"github.com/ghodss/yaml"
 )
 
 // Any is the raw configuration for the plugin
@@ -10,6 +12,24 @@ type Any json.RawMessage
 // AnyString returns an Any from a string that represents the marshaled/encoded data
 func AnyString(s string) *Any {
 	return AnyBytes([]byte(s))
+}
+
+// AnyYAML constructs any Any from a yaml
+func AnyYAML(y []byte) (*Any, error) {
+	buff, err := yaml.YAMLToJSON(y)
+	if err != nil {
+		return nil, err
+	}
+	return AnyBytes(buff), nil
+}
+
+// AnyYAMLMust constructs any Any from a yaml, panics on error
+func AnyYAMLMust(y []byte) *Any {
+	any, err := AnyYAML(y)
+	if err != nil {
+		panic(err)
+	}
+	return any
 }
 
 // AnyBytes returns an Any from the encoded message bytes
@@ -89,4 +109,22 @@ func (c *Any) MarshalJSON() ([]byte, error) {
 func (c *Any) UnmarshalJSON(data []byte) error {
 	*c = Any(json.RawMessage(data))
 	return nil
+}
+
+// MarshalYAML marshals to yaml
+func (c *Any) MarshalYAML() ([]byte, error) {
+	data, err := c.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return yaml.JSONToYAML(data)
+}
+
+// UnmarshalYAML decodes from yaml and populates the any
+func (c *Any) UnmarshalYAML(data []byte) error {
+	j, err := yaml.YAMLToJSON(data)
+	if err != nil {
+		return err
+	}
+	return c.UnmarshalJSON(j)
 }
