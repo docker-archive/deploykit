@@ -57,6 +57,8 @@ type DomainDiskSource struct {
 	Device        string                 `xml:"dev,attr,omitempty"`
 	Protocol      string                 `xml:"protocol,attr,omitempty"`
 	Name          string                 `xml:"name,attr,omitempty"`
+	Pool          string                 `xml:"pool,attr,omitempty"`
+	Volume        string                 `xml:"volume,attr,omitempty"`
 	Hosts         []DomainDiskSourceHost `xml:"host"`
 	StartupPolicy string                 `xml:"startupPolicy,attr,omitempty"`
 }
@@ -79,6 +81,45 @@ type DomainDisk struct {
 	Auth     *DomainDiskAuth   `xml:"auth"`
 	Source   *DomainDiskSource `xml:"source"`
 	Target   *DomainDiskTarget `xml:"target"`
+}
+
+type DomainFilesystemDriver struct {
+	Type     string `xml:"type,attr"`
+	Name     string `xml:"name,attr,omitempty"`
+	WRPolicy string `xml:"wrpolicy,attr,omitempty"`
+}
+
+type DomainFilesystemSource struct {
+	Dir  string `xml:"dir,attr,omitempty"`
+	File string `xml:"file,attr,omitempty"`
+}
+
+type DomainFilesystemTarget struct {
+	Dir string `xml:"dir,attr"`
+}
+
+type DomainFilesystemReadOnly struct {
+}
+
+type DomainFilesystemSpaceHardLimit struct {
+	Value int    `xml:",chardata"`
+	Unit  string `xml:"unit,attr,omitempty"`
+}
+
+type DomainFilesystemSpaceSoftLimit struct {
+	Value int    `xml:",chardata"`
+	Unit  string `xml:"unit,attr,omitempty"`
+}
+
+type DomainFilesystem struct {
+	Type           string                          `xml:"type,attr"`
+	AccessMode     string                          `xml:"accessmode,attr"`
+	Driver         *DomainFilesystemDriver         `xml:"driver"`
+	Source         *DomainFilesystemSource         `xml:"source"`
+	Target         *DomainFilesystemTarget         `xml:"target"`
+	ReadOnly       *DomainFilesystemReadOnly       `xml:"readonly"`
+	SpaceHardLimit *DomainFilesystemSpaceHardLimit `xml:"space_hard_limit"`
+	SpaceSoftLimit *DomainFilesystemSpaceSoftLimit `xml:"space_soft_limit"`
 }
 
 type DomainInterfaceMAC struct {
@@ -212,6 +253,7 @@ type DomainVideo struct {
 type DomainDeviceList struct {
 	Controllers []DomainController `xml:"controller"`
 	Disks       []DomainDisk       `xml:"disk"`
+	Filesystems []DomainFilesystem `xml:"filesystem"`
 	Interfaces  []DomainInterface  `xml:"interface"`
 	Serials     []DomainChardev    `xml:"serial"`
 	Consoles    []DomainChardev    `xml:"console"`
