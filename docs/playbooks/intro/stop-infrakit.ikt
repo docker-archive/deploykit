@@ -16,6 +16,9 @@ docker ps -f ancestor=infrakit/devbundle:dev -qa | xargs docker rm
 docker ps -f ancestor=infrakit/aws:dev -qa | xargs docker stop
 docker ps -f ancestor=infrakit/aws:dev -qa | xargs docker rm
 
+docker ps -f ancestor=infrakit/gcp:dev -qa | xargs docker stop
+docker ps -f ancestor=infrakit/gcp:dev -qa | xargs docker rm
+
 docker network rm infrakit
 
 {{ else }}

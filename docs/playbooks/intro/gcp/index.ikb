@@ -1,3 +1,6 @@
 
 # Create a single instance
 provision-instance : provision-instance.ikt
+
+# Starts the plugin as a daemon (not container)
+start-daemon : start-plugin-daemon.ikt

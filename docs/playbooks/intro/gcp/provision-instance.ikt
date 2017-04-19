@@ -1,21 +1,18 @@
-# Input to create instance using the GCP instance plugin
-{{/* =% sh %= */}}
+{{/* Input to create instance using the GCP instance plugin */}}
+{{/* =% instanceProvision "instance-gcp" true  %= */}}
 
 {{ $user := flag "user" "string" "owner" | prompt "Owner?" "string" (env "USER") nil }}
-{{ $prefix := flag "prefix" "string" "Prefix to use" | prompt "Prefix for hostname:" "string" (env "USER") }}
-{{ $diskSize := flag "disk-size" "int" "Disk size in mb" | prompt "Disk size in MB?" "int" 100 }}
-{{ $machineType := flag "machine-type" "string" "Machine type" | prompt "Machine type?" "string" "n1-standard-1"}}
+{{ $image := flag "image-id" "string" "Image  ID" | prompt "Image to boot?" "string" "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205" }}
+{{ $instanceType := flag "instance-type" "string" "Machine type" | prompt "Machine type?" "string" "n1-standard-1"}}
 {{ $privateIP := flag "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" "10.128.0.10" nil }}
-{{ $image := flag "image" "string" "Image" | prompt "Image to boot?" "string" "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205" }}
 
-echo "===> Running with {{$user}}, {{$image}}, {{$privateIP}}:"
+{{ $diskSize := flag "disk-size" "int" "Disk size in mb" | prompt "Disk size in MB?" "int" 100 }}
 
-infrakit --log 3 --log-stack --name instance-gcp instance provision -y - <<EOF
 
 LogicalID : {{ $privateIP }}
 Tags:
-  infrakit-user: {{ $user }}
-  infrakit-created: {{ now | htmlDate }}
+  infrakit.created: {{ now | htmlDate }}
+  infrakit.user: {{ $user }}
 
 Init: |
   #!/bin/bash
@@ -24,11 +21,11 @@ Init: |
   wget -q0- https://get.docker.com | sh
 
 Properties:
-  NamePrefix: {{ $prefix }}
+  NamePrefix: {{ $user }}
   PrivateIP: {{ $privateIP }}
   Description: Some description
   Network: default
-  MachineType: {{ $machineType }}
+  MachineType: {{ $instanceType }}
   DiskSizeMb: {{ $diskSize }}
   DiskImage: {{ $image }}
   Scopes:
@@ -36,5 +33,3 @@ Properties:
     - https://www.googleapis.com/auth/logging.write
   Tags:
     - {{ $user }}
-
-EOF

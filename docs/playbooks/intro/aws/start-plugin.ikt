@@ -3,11 +3,11 @@
 {{ $aws := flag "start-aws" "bool" "Start AWS plugin" | prompt "Start AWS plugin?" "bool" "no" }}
 
 {{ $profile := flag "aws-cred-profile" "string" "Profile name for credentials" | cond $aws |  prompt "What's the profile for your .aws/credentials?" "string" "default" }}
-{{ $project := flag "project" "string" "Project name" | cond $aws | prompt "What's the name of the project?" "string" "testproject"}}
 {{ $region := flag "region" "string" "aws region" | cond $aws | prompt "What's the region?" "string" "us-west-1"}}
 
 {{ $awsImage := flag "aws-plugin" "string" "Image of the plugin" |  cond $aws | prompt "What's the AWS plugin image?" "string" "infrakit/aws:dev" }}
 
+{{ $project := var "/project" }}
 
 {{ if $aws }}
 
@@ -15,10 +15,6 @@ echo "Starting AWS plugin"
 
 {{/* Pick a credential from the local user's ~/.aws folder.  You should have this if you use awscli. */}}
 {{ $creds := (source (cat "file://" (env "HOME") "/.aws/credentials" | nospace) | iniDecode | k $profile ) }}
-
-
-{{ $infrakit := (cat (env "HOME") "/.infrakit/" | nospace) }}
-{{ $dockerEnvs := "-e INFRAKIT_HOME=/infrakit -e INFRAKIT_PLUGINS_DIR=/infrakit/plugins" }}
 
 
 {{/* Show helpful message to user if we can find the credentials */}}
