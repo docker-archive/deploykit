@@ -5,6 +5,9 @@
 {{ $image := flag "infrakit-image" "string" "Infrakit image" | prompt "Infrakit image?" "string" "infrakit/devbundle:dev" }}
 {{ $port := flag "infrakit-port" "int" "Infrakit mux port" | prompt "Infrakit port for remote access?" "int" 24864 }}
 
+{{ $project := flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" "testproject"}}
+
+
 {{/* optional plugins */}}
 
 
@@ -33,6 +36,8 @@ docker run --rm --volumes-from infrakit {{ $image }} /bin/sh -c "echo group > /i
 docker run -d --volumes-from infrakit --name manager \
        {{ $image }} infrakit-manager --proxy-for-group group-stateless os
 
+
+{{ var "/project" $project }}
 
 {{/* Here we just source a file in the same folder for more reuse and modularity */}}
 {{ source "aws/start-plugin.ikt" }}

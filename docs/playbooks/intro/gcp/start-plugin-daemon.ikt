@@ -1,0 +1,19 @@
+#!/bin/bash
+
+{{/* =% sh %= */}}
+
+{{ $defaultCred := cat (env "HOME") "/.config/gcloud/application_default_credentials.json" | nospace }}
+{{ $credentials := flag "credential-path" "string" "Path to credentials.json" | prompt "Credentials JSON path?" "string" $defaultCred }}
+{{ $zone := flag "zone" "string" "GCP zone" | prompt "What's the zone?" "string" }}
+{{ $project := flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" }}
+{{ $instanceImage := "infrakit/gcp:dev" }}
+{{ $gcpCredentials :=  (cat $credentials ":/infrakit/platforms/gcp/credentials.json" | nospace) }}
+
+echo "Starting daemon"
+infrakit-instance-gcp \
+       --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
+       --zone {{ $zone }} --log 5 --project {{ $project }} \
+       > {{env "INFRAKIT_HOME"}}/logs/instance-gcp.log 2>&1  &
+
+echo "Tailing log"
+tail -f {{env "INFRAKIT_HOME"}}/logs/*.log
