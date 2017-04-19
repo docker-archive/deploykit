@@ -16,7 +16,9 @@ import (
 	"github.com/docker/infrakit.aws/plugin"
 	"github.com/docker/infrakit.aws/plugin/instance"
 	"github.com/docker/infrakit/pkg/cli"
-	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
+	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/spi/event"
 	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
@@ -59,23 +61,33 @@ func main() {
 			sqsClient := sqs.New(builder.Config)
 
 			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name, instance_plugin.PluginServerWithTypes(map[string]instance_spi.Plugin{
-				"autoscaling-autoscalinggroup":    instance.NewAutoScalingGroupPlugin(autoscalingClient, namespace),
-				"autoscaling-launchconfiguration": instance.NewLaunchConfigurationPlugin(autoscalingClient, namespace),
-				"cloudwatchlogs-loggroup":         instance.NewLogGroupPlugin(cloudWatchLogsClient, namespace),
-				"dynamodb-table":                  instance.NewTablePlugin(dynamodbClient, namespace),
-				"ec2-instance":                    instancePlugin,
-				"ec2-internetgateway":             instance.NewInternetGatewayPlugin(ec2Client, namespace),
-				"ec2-routetable":                  instance.NewRouteTablePlugin(ec2Client, namespace),
-				"ec2-securitygroup":               instance.NewSecurityGroupPlugin(ec2Client, namespace),
-				"ec2-subnet":                      instance.NewSubnetPlugin(ec2Client, namespace),
-				"ec2-volume":                      instance.NewVolumePlugin(ec2Client, namespace),
-				"ec2-vpc":                         instance.NewVpcPlugin(ec2Client, namespace),
-				"elb-loadbalancer":                instance.NewLoadBalancerPlugin(elbClient, namespace),
-				"iam-instanceprofile":             instance.NewInstanceProfilePlugin(iamClient, namespace),
-				"iam-role":                        instance.NewRolePlugin(iamClient, namespace),
-				"sqs-queue":                       instance.NewQueuePlugin(sqsClient, namespace),
-			}))
+			cli.RunPlugin(name,
+				// As event plugin
+				event_rpc.PluginServerWithTypes(
+					map[string]event.Plugin{
+						"ec2-instance": (&instance.Monitor{
+							Plugin: instancePlugin,
+						}).Init(),
+					}),
+
+				// instance plugins
+				instance_rpc.PluginServerWithTypes(map[string]instance_spi.Plugin{
+					"autoscaling-autoscalinggroup":    instance.NewAutoScalingGroupPlugin(autoscalingClient, namespace),
+					"autoscaling-launchconfiguration": instance.NewLaunchConfigurationPlugin(autoscalingClient, namespace),
+					"cloudwatchlogs-loggroup":         instance.NewLogGroupPlugin(cloudWatchLogsClient, namespace),
+					"dynamodb-table":                  instance.NewTablePlugin(dynamodbClient, namespace),
+					"ec2-instance":                    instancePlugin,
+					"ec2-internetgateway":             instance.NewInternetGatewayPlugin(ec2Client, namespace),
+					"ec2-routetable":                  instance.NewRouteTablePlugin(ec2Client, namespace),
+					"ec2-securitygroup":               instance.NewSecurityGroupPlugin(ec2Client, namespace),
+					"ec2-subnet":                      instance.NewSubnetPlugin(ec2Client, namespace),
+					"ec2-volume":                      instance.NewVolumePlugin(ec2Client, namespace),
+					"ec2-vpc":                         instance.NewVpcPlugin(ec2Client, namespace),
+					"elb-loadbalancer":                instance.NewLoadBalancerPlugin(elbClient, namespace),
+					"iam-instanceprofile":             instance.NewInstanceProfilePlugin(iamClient, namespace),
+					"iam-role":                        instance.NewRolePlugin(iamClient, namespace),
+					"sqs-queue":                       instance.NewQueuePlugin(sqsClient, namespace),
+				}))
 		},
 	}
 
