@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -165,24 +166,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			specs, err := groupPlugin.InspectGroups()
+			out, err := getGlobalConfig(groupPlugin, groupPluginName)
 			if err != nil {
 				return err
-			}
-
-			// the format is plugin.Spec
-			out := []plugin.Spec{}
-			for _, spec := range specs {
-
-				any, err := types.AnyValue(spec)
-				if err != nil {
-					return err
-				}
-
-				out = append(out, plugin.Spec{
-					Plugin:     plugin.Name(groupPluginName),
-					Properties: any,
-				})
 			}
 
 			view, err := types.AnyValue(out)
@@ -202,7 +188,117 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	inspect.Flags().AddFlagSet(templateFlags)
 
-	cmd.AddCommand(commit, inspect)
+	///////////////////////////////////////////////////////////////////////////////////
+	// change
+	change := &cobra.Command{
+		Use:   "change",
+		Short: "Change returns the plugin configurations known by the manager",
+	}
+	vars := change.Flags().StringSliceP("var", "v", []string{}, "key=value pairs")
+	commitChange := change.Flags().BoolP("commit", "c", false, "Commit changes")
+
+	change.RunE = func(cmd *cobra.Command, args []string) error {
+
+		if len(args) != 0 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		// Load the default
+		current, err := getGlobalConfig(groupPlugin, groupPluginName)
+		if err != nil {
+			return err
+		}
+
+		// make a copy by marshaling and unmarshaling -- deep copy
+		copy, err := types.AnyValue(current)
+		if err != nil {
+			return err
+		}
+
+		var applied interface{}
+		if err := copy.Decode(&applied); err != nil {
+			return err
+		}
+
+		// get the changes
+		changes, err := changeSet(*vars)
+		if err != nil {
+			return err
+		}
+
+		// applying the change means we encode the change set as json
+		// then decode /unmarshal the doc using the current state as
+		// the starting value
+
+		err = changes.Decode(&applied)
+		if err != nil {
+			return err
+		}
+
+		if !*commitChange {
+
+			proposed, err := types.AnyValue(applied)
+			if err != nil {
+				return err
+			}
+
+			buff, err := fromJSON(proposed.Bytes())
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(string(buff))
+
+			return nil
+		}
+
+		return nil
+	}
+
+	cmd.AddCommand(commit, inspect, change)
 
 	return cmd
+}
+
+func getGlobalConfig(groupPlugin group.Plugin, groupPluginName string) ([]plugin.Spec, error) {
+	specs, err := groupPlugin.InspectGroups()
+	if err != nil {
+		return nil, err
+	}
+
+	// the format is plugin.Spec
+	out := []plugin.Spec{}
+	for _, spec := range specs {
+
+		any, err := types.AnyValue(spec)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, plugin.Spec{
+			Plugin:     plugin.Name(groupPluginName),
+			Properties: any,
+		})
+	}
+	return out, nil
+}
+
+// changeSet returns a sparse map where the kv pairs of path / value have been
+// apply to a nested map structure.
+func changeSet(kvPairs []string) (*types.Any, error) {
+	changes := map[string]interface{}{}
+
+	for _, kv := range kvPairs {
+
+		parts := strings.SplitN(kv, "=", 2)
+		key := strings.Trim(parts[0], " \t\n")
+		value := strings.Trim(parts[1], " \t\n")
+
+		if !types.Put(types.PathFromString(key), value, changes) {
+			return nil, fmt.Errorf("can't apply change %s %s", key, value)
+		}
+	}
+
+	return types.AnyValue(changes)
 }

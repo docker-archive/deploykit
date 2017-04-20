@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -22,4 +23,25 @@ type GetRequest struct {
 // GetResponse is the rpc wrapper of the result of Get
 type GetResponse struct {
 	Value *types.Any
+}
+
+// ChangesRequest is the rpc wrapper of the params to Changes
+type ChangesRequest struct {
+	Changes []metadata.Change
+}
+
+// ChangesResponse is the rpc wrapper of the params to Changes
+type ChangesResponse struct {
+	Proposed *types.Any
+	Cas      string
+}
+
+// CommitRequest is the rpc wrapper of the params to Commit
+type CommitRequest struct {
+	Proposed *types.Any
+	Cas      string
+}
+
+// CommitResponse is the rpc wrapper of the params to Commit
+type CommitResponse struct {
 }
