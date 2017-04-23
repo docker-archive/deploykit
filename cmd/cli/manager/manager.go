@@ -56,13 +56,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 						return err
 					}
 
-					log.Info("Found manager", "name", name, "leader", isLeader)
+					log.Debug("Found manager", "name", name, "leader", isLeader)
 					if isLeader {
 
 						groupPlugin = group_plugin.Adapt(rpcClient)
 						groupPluginName = name
 
-						log.Info("Found manager", "name", name, "addr", endpoint.Address)
+						log.Debug("Found manager", "name", name, "addr", endpoint.Address)
 
 						break
 					}
