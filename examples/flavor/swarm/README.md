@@ -13,6 +13,10 @@ This plugin has a schema that looks like this:
    "SwarmJoinIP": "192.168.2.200",
    "Docker" : {
      "Host" : "tcp://192.168.2.200:4243"
+   },
+   "EngineLabels": {
+     "storage": "ssd",
+     "data": ""
    }
  }
 ```
@@ -41,7 +45,7 @@ set -o xtrace
 mkdir -p /etc/docker
 cat << EOF > /etc/docker/daemon.json
 {
-  "labels": {{ INFRAKIT_LABELS | to_json }}
+  "labels": {{ INFRAKIT_LABELS | jsonEncode }}
 }
 EOF
 
