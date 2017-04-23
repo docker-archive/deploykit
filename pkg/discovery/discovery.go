@@ -18,16 +18,16 @@ const (
 	PluginDirEnvVar = "INFRAKIT_PLUGINS_DIR"
 )
 
-// ErrNotUnixSocket is the error raised when the file is not a unix socket
-type ErrNotUnixSocket string
+// ErrNotUnixSocketOrListener is the error raised when the file is not a unix socket
+type ErrNotUnixSocketOrListener string
 
-func (e ErrNotUnixSocket) Error() string {
-	return fmt.Sprintf("not a unix socket:%s", string(e))
+func (e ErrNotUnixSocketOrListener) Error() string {
+	return fmt.Sprintf("not a unix socket or listener:%s", string(e))
 }
 
-// IsErrNotUnixSocket returns true if the error is due to the file not being a valid unix socket.
-func IsErrNotUnixSocket(e error) bool {
-	_, is := e.(ErrNotUnixSocket)
+// IsErrNotUnixSocketOrListener returns true if the error is due to the file not being a valid unix socket.
+func IsErrNotUnixSocketOrListener(e error) bool {
+	_, is := e.(ErrNotUnixSocketOrListener)
 	return is
 }
 
