@@ -43,3 +43,5 @@ docker run -d --volumes-from infrakit --name manager \
 {{ source "aws/start-plugin.ikt" }}
 
 {{ source "gcp/start-plugin.ikt" }}
+
+{{ source "macosx/start-plugin.ikt" }}

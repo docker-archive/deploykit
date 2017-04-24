@@ -12,3 +12,4 @@ events         : events/index.ikb
 
 aws : aws/index.ikb
 gcp : gcp/index.ikb
+mac : macosx/index.ikb
