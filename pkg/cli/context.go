@@ -378,7 +378,7 @@ func (c *Context) loadBackends() error {
 				if err != nil {
 					return err
 				}
-				fmt.Println(id)
+				fmt.Println(*id)
 				return nil
 			}
 			return ""
