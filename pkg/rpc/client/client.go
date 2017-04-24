@@ -3,10 +3,12 @@ package client
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"path"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -22,10 +24,6 @@ type client struct {
 
 // New creates a new Client that communicates with a unix socket and validates the remote API.
 func New(address string, api spi.InterfaceSpec) (Client, error) {
-	u, err := url.Parse(address)
-	if err != nil {
-		return nil, err
-	}
 
 	u, httpC, err := parseAddress(address)
 	if err != nil {
@@ -45,6 +43,15 @@ func New(address string, api spi.InterfaceSpec) (Client, error) {
 }
 
 func parseAddress(address string) (*url.URL, *http.Client, error) {
+
+	if path.Ext(address) == ".listen" {
+		buff, err := ioutil.ReadFile(address)
+		if err != nil {
+			return nil, nil, err
+		}
+		address = string(buff)
+	}
+
 	u, err := url.Parse(address)
 	if err != nil {
 		return nil, nil, err
@@ -60,7 +67,10 @@ func parseAddress(address string) (*url.URL, *http.Client, error) {
 				return net.Dial("unix", address)
 			},
 		}}, nil
-	case "http", "https", "tcp":
+	case "tcp":
+		u.Scheme = "http"
+		return u, &http.Client{}, nil
+	case "http", "https":
 		return u, &http.Client{}, nil
 
 	default:
