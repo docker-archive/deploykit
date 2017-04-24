@@ -3,9 +3,11 @@ package local
 import (
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/docker/infrakit/pkg/discovery"
@@ -81,16 +83,32 @@ func newDirPluginDiscovery(dir string) (*dirPluginDiscovery, error) {
 }
 
 func (r *dirPluginDiscovery) dirLookup(entry os.FileInfo) (*plugin.Endpoint, error) {
-	socketPath := filepath.Join(r.dir, entry.Name())
-	if entry.Mode()&os.ModeSocket != 0 {
+	path := filepath.Join(r.dir, entry.Name())
+
+	switch {
+
+	case entry.Mode()&os.ModeSocket != 0:
 		return &plugin.Endpoint{
 			Protocol: "unix",
-			Address:  socketPath,
+			Address:  path,
 			Name:     entry.Name(),
 		}, nil
+
+	case entry.Mode()&os.ModeType == 0 && filepath.Ext(path) == ".listen":
+		if buff, err := ioutil.ReadFile(path); err == nil {
+			// content should be a url
+			i := strings.Index(entry.Name(), ".listen")
+			if u, err := url.Parse(string(buff)); err == nil {
+				return &plugin.Endpoint{
+					Protocol: u.Scheme,
+					Address:  u.String(),
+					Name:     entry.Name()[0:i],
+				}, nil
+			}
+		}
 	}
 
-	return nil, discovery.ErrNotUnixSocket(socketPath)
+	return nil, discovery.ErrNotUnixSocketOrListener(path)
 }
 
 // List returns a list of plugins known, keyed by the name
@@ -112,7 +130,7 @@ func (r *dirPluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 			instance, err := r.dirLookup(entry)
 
 			if err != nil {
-				if !discovery.IsErrNotUnixSocket(err) {
+				if !discovery.IsErrNotUnixSocketOrListener(err) {
 					log.Warn("Err loading plugin", "err", err)
 				}
 				continue

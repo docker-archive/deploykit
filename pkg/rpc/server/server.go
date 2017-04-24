@@ -2,10 +2,12 @@ package server
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"os"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -76,9 +78,22 @@ type VersionedInterface interface {
 	ImplementedInterface() spi.InterfaceSpec
 }
 
+// StartListenerAtPath starts an HTTP server listening on tcp port with discovery entry at specified path.
+// Returns a Stoppable that can be used to stop or block on the server.
+func StartListenerAtPath(listen, discoverPath string,
+	receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
+	return startAtPath(listen, discoverPath, receiver, more...)
+}
+
 // StartPluginAtPath starts an HTTP server listening on a unix socket at the specified path.
 // Returns a Stoppable that can be used to stop or block on the server.
 func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
+	return startAtPath("", socketPath, receiver, more...)
+}
+
+func startAtPath(listen, discoverPath string,
+	receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
+
 	server := rpc.NewServer()
 	server.RegisterCodec(json2.NewCodec(), "application/json")
 
@@ -160,15 +175,40 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 
 	gracefulServer := graceful.Server{
 		Timeout: 10 * time.Second,
-		Server:  &http.Server{Addr: fmt.Sprintf("unix://%s", socketPath), Handler: router},
 	}
 
-	listener, err := net.Listen("unix", socketPath)
-	if err != nil {
-		return nil, err
-	}
+	var listener net.Listener
 
-	log.Infof("Listening at: %s", socketPath)
+	if listen != "" {
+		gracefulServer.Server = &http.Server{
+			Addr:    listen,
+			Handler: router,
+		}
+		l, err := net.Listen("tcp", listen)
+		if err != nil {
+			return nil, err
+		}
+		listener = l
+
+		if err := ioutil.WriteFile(discoverPath, []byte(fmt.Sprintf("tcp://%s", listen)), 0644); err != nil {
+			return nil, err
+		}
+
+		log.Infof("Listening at: %s, discoverable at %s", listen, discoverPath)
+
+	} else {
+		gracefulServer.Server = &http.Server{
+			Addr:    fmt.Sprintf("unix://%s", discoverPath),
+			Handler: router,
+		}
+		l, err := net.Listen("unix", discoverPath)
+		if err != nil {
+			return nil, err
+		}
+		listener = l
+		log.Infof("Listening at: %s", discoverPath)
+
+	}
 
 	go func() {
 		err := gracefulServer.Serve(listener)
@@ -176,6 +216,9 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 			log.Warn(err)
 		}
 		events.Stop()
+		if listen != "" {
+			os.Remove(discoverPath)
+		}
 	}()
 
 	return &stoppableServer{server: &gracefulServer}, nil
