@@ -35,7 +35,7 @@ func main() {
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 
 	vmDir := cmd.Flags().String("vm-dir", defaultVMDir, "Directory where to store VM state")
-	hyperkitCmd := cmd.Flags().String("hyperkit", "/usr/local/bin/hyperkit", "Path to HyperKit executable")
+	hyperkitCmd := cmd.Flags().String("hyperkit", "", "Path to HyperKit executable")
 	vpnkitSock := cmd.Flags().String("vpnkit-sock", "auto", "Path to VPNKit UNIX domain socket")
 	listen := cmd.Flags().String("listen", "localhost:24865", "Listens on port")
 

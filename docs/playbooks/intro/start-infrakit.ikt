@@ -44,4 +44,4 @@ docker run -d --volumes-from infrakit --name manager \
 
 {{ source "gcp/start-plugin.ikt" }}
 
-{{ source "macosx/start-plugin.ikt" }}
+{{ source "darwin/start-plugin.ikt" }}

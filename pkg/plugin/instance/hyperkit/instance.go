@@ -7,11 +7,12 @@ import (
 	"net"
 	"os"
 	"path"
+	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
-	hyperkit_go "github.com/moby/hyperkit/go"
+	"github.com/moby/hyperkit/go"
 	"github.com/rneugeba/iso9660wrap"
 )
 
@@ -43,7 +44,7 @@ type hyperkitPlugin struct {
 // Validate performs local validation on a provision request.
 func (p hyperkitPlugin) Validate(req *types.Any) error {
 	// The guest is just the same data structure used by hyperkit for full fidelity config
-	guest := hyperkit_go.HyperKit{}
+	guest := hyperkit.HyperKit{}
 
 	if err := req.Decode(&guest); err != nil {
 		return fmt.Errorf("error decoding guest configuration: %s", req.String())
@@ -80,7 +81,7 @@ func (p hyperkitPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	// The guest is just the same data structure used by hyperkit for full fidelity config
-	guest := &hyperkit_go.HyperKit{
+	guest := &hyperkit.HyperKit{
 		HyperKit:   p.HyperKit,
 		VPNKitSock: p.VPNKitSock,
 		CmdLine:    "console=ttyS0",
@@ -150,7 +151,7 @@ func (p hyperkitPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		guest.ISOImage = isoImage
 	}
 
-	guest.Console = hyperkit_go.ConsoleFile
+	guest.Console = hyperkit.ConsoleFile
 
 	log.Info("Starting guest", "id", id, "guest", guest,
 		"kernel", guest.Kernel, "initrd", guest.Initrd,
@@ -219,7 +220,7 @@ func (p hyperkitPlugin) Destroy(id instance.ID) error {
 		}
 	}
 
-	h, err := hyperkit_go.FromState(instanceDir)
+	h, err := hyperkit.FromState(instanceDir)
 	if err != nil {
 		return err
 	}
@@ -227,11 +228,39 @@ func (p hyperkitPlugin) Destroy(id instance.ID) error {
 	if err != nil {
 		return err
 	}
-	err = h.Remove(false)
-	if err != nil {
-		return err
+
+	if h.IsRunning() {
+
+		timeout := time.After(30 * time.Second)
+		tick := time.Tick(1 * time.Second)
+
+		go func() {
+		check:
+			for {
+				select {
+				case <-timeout:
+					log.Warn("timeout trying to stop instance", "id", id)
+					return
+				case <-tick:
+					if !h.IsRunning() {
+						log.Debug("hyperkit stopped", "id", id)
+						break check
+					}
+				}
+			}
+
+			log.Debug("removing on-disk state", "id", id)
+			err := h.Remove(false)
+			if err != nil {
+				log.Warn("cannot remove state", "id", id, "err", err)
+			}
+			log.Info("removed on-disk state", "id", id)
+		}()
+
 	}
-	return nil
+
+	log.Debug("removing on-disk state", "id", id)
+	return h.Remove(false)
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
@@ -277,7 +306,7 @@ func (p hyperkitPlugin) DescribeInstances(tags map[string]string, properties boo
 			var logicalID *instance.LogicalID
 			id := instance.ID(file.Name())
 
-			h, err := hyperkit_go.FromState(instanceDir)
+			h, err := hyperkit.FromState(instanceDir)
 			if err != nil {
 				log.Warn("Could not get instance data", "id", id)
 				p.Destroy(id)
