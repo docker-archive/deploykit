@@ -126,22 +126,26 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	///////////////////////////////////////////////////////////////////////////////////
 	// destroy
 	destroy := &cobra.Command{
-		Use:   "destroy <instance ID>",
+		Use:   "destroy <instance ID>...",
 		Short: "Destroy the instance",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if len(args) != 1 {
+			if len(args) < 1 {
 				cmd.Usage()
 				os.Exit(1)
 			}
 
-			instanceID := instance.ID(args[0])
-			err := instancePlugin.Destroy(instanceID)
+			for _, a := range args {
 
-			if err == nil {
+				instanceID := instance.ID(a)
+				err := instancePlugin.Destroy(instanceID)
+
+				if err != nil {
+					return err
+				}
 				fmt.Println("destroyed", instanceID)
 			}
-			return err
+			return nil
 		},
 	}
 

@@ -1,0 +1,23 @@
+{{/* Input to create instance using the HyperKit instance plugin */}}
+{{/* =% instanceProvision "instance-hyperkit" true  %= */}}
+
+{{ $user := flag "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
+{{ $linuxkitPath := flag "linuxkit-dir" "string" "Linuxkit directory" | prompt "Linuxkit directory?" "string" (cat (env "HOME") "/projects/src/github.com/linuxkit/linuxkit" | nospace) }}
+{{ $bundle := flag "bundle" "string" "Bundle prefix" | prompt "Bundle prefix?" "string"}}
+{{ $privateIP := flag "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" "192.168.65.101" nil }}
+LogicalID: {{ $privateIP }}
+Tags:
+  infrakit.created: {{ now | htmlDate }}
+  infrakit.user: {{ $user }}
+
+Init: |
+  #!/bin/bash
+  echo Hello world!
+
+Properties:
+  kernel: {{ cat $linuxkitPath "/" $bundle "-bzImage" | nospace }}
+  initrd: {{ cat $linuxkitPath "/" $bundle "-initrd.img" | nospace }}
+  cpus: 1
+  memory: 1024
+  disk_size: 100
+  cmdline: {{ include (cat "file://" $linuxkitPath "/" $bundle "-cmdline" | nospace) }}
