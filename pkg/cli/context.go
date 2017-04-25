@@ -28,13 +28,14 @@ const (
 
 // Context is the context for the running module
 type Context struct {
-	cmd     *cobra.Command
-	src     string
-	input   io.Reader
-	exec    bool
-	run     func(string) error
-	script  string
-	plugins func() discovery.Plugins
+	cmd      *cobra.Command
+	src      string
+	input    io.Reader
+	exec     bool
+	template *template.Template
+	run      func(string) error
+	script   string
+	plugins  func() discovery.Plugins
 }
 
 // NewContext creates a context
@@ -251,6 +252,24 @@ func (c *Context) Funcs() []template.Function {
 			},
 		},
 		{
+			Name: "include",
+			Func: func(p string, opt ...interface{}) (string, error) {
+				if c.exec {
+					return c.template.Include(p, opt...)
+				}
+				return "", nil
+			},
+		},
+		{
+			Name: "source",
+			Func: func(p string, opt ...interface{}) (string, error) {
+				if c.exec {
+					return c.template.Source(p, opt...)
+				}
+				return "", nil
+			},
+		},
+		{
 			Name: "cond",
 			Func: func(b interface{}, optional ...interface{}) func() (bool, interface{}) {
 
@@ -378,7 +397,7 @@ func (c *Context) loadBackends() error {
 				if err != nil {
 					return err
 				}
-				fmt.Println(id)
+				fmt.Println(*id)
 				return nil
 			}
 			return ""
@@ -497,6 +516,7 @@ func (c *Context) Execute() error {
 	}
 
 	c.exec = true
+	c.template = t
 	script, err := ConfigureTemplate(t, c.plugins).Render(c)
 	if err != nil {
 		return err

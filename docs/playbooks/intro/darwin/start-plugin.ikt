@@ -1,0 +1,13 @@
+#!/bin/bash
+
+{{/* =% sh %= */}}
+
+{{ $hyperkit := flag "start-hyperkit" "bool" "Start HYPERKIT plugin" | prompt "Start HYPERKIT plugin?" "bool" "no" }}
+
+{{ if $hyperkit }}
+
+echo "Starting HYPERKIT plugin.  This must be running on the Mac as a daemon and not as a container"
+
+infrakit-instance-hyperkit --log 5
+
+{{ end }}
