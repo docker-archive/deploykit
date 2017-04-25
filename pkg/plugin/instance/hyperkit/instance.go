@@ -6,7 +6,9 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
 	"path"
+	"path/filepath"
 	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -14,6 +16,7 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/moby/hyperkit/go"
 	"github.com/rneugeba/iso9660wrap"
+	"github.com/satori/go.uuid"
 )
 
 var log = logutil.New("module", "instance/hyperkit")
@@ -84,7 +87,6 @@ func (p hyperkitPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	guest := &hyperkit.HyperKit{
 		HyperKit:   p.HyperKit,
 		VPNKitSock: p.VPNKitSock,
-		CmdLine:    "console=ttyS0",
 	}
 
 	if err := spec.Properties.Decode(guest); err != nil {
@@ -105,7 +107,6 @@ func (p hyperkitPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	logicalID := string(id)
 
 	if spec.LogicalID != nil {
-
 		// Assume IP address is the format of the LogicalID
 		logicalID = string(*spec.LogicalID)
 
@@ -136,7 +137,6 @@ func (p hyperkitPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	// if there's init then build an iso image of that
 	if spec.Init != "" {
-
 		isoImage := path.Join(instanceDir, "data.iso")
 		outfh, err := os.OpenFile(isoImage, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -151,23 +151,26 @@ func (p hyperkitPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		guest.ISOImage = isoImage
 	}
 
-	guest.Console = hyperkit.ConsoleFile
+	// Generate new UUID, otherwise /sys/class/dmi/id/product_uuid is identical on all VMs
+	guest.UUID = uuid.NewV4().String()
+	guest.VPNKitSock, err = checkVPNKitSock(p.VPNKitSock)
+	if err != nil {
+		return nil, err
+	}
 
-	log.Info("Starting guest", "id", id, "guest", guest,
+	log.Info("Starting guest", "id", id, "guest", guest, "uuid", guest.UUID,
 		"kernel", guest.Kernel, "initrd", guest.Initrd,
 		"cpus", guest.CPUs, "memory", guest.Memory, "disksize", guest.DiskSize,
 		"image", guest.DiskImage, "isoimage", guest.ISOImage,
 		"cmdline", guest.CmdLine)
 
-	err = guest.Start(guest.CmdLine)
-	if err != nil {
-		return nil, err
-	}
-	log.Info("Started", "id", id)
-
 	if err := ioutil.WriteFile(path.Join(instanceDir, "logical.id"), []byte(logicalID), 0644); err != nil {
 		return nil, err
 	}
+
+	// inject additional tags
+	spec.Tags["infrakit.id"] = string(id)
+	spec.Tags["infrakit.logicalID"] = logicalID
 
 	tagData, err := types.AnyValue(spec.Tags)
 	if err != nil {
@@ -178,6 +181,13 @@ func (p hyperkitPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err := ioutil.WriteFile(path.Join(instanceDir, "tags"), tagData.Bytes(), 0644); err != nil {
 		return nil, err
 	}
+
+	guest.Console = hyperkit.ConsoleFile
+	err = guest.Start(guest.CmdLine)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("Started", "id", id)
 
 	return &id, nil
 }
@@ -354,4 +364,29 @@ func (p hyperkitPlugin) DescribeInstances(tags map[string]string, properties boo
 	}
 
 	return descriptions, nil
+}
+
+const (
+	defaultVPNKitSock = "Library/Containers/com.docker.docker/Data/s50"
+)
+
+// checkVPNKitSock tries to find and/or validate the path of the VPNKit socket
+func checkVPNKitSock(vpnkitsock string) (string, error) {
+	if vpnkitsock == "auto" {
+		vpnkitsock = filepath.Join(getHome(), defaultVPNKitSock)
+	}
+
+	vpnkitsock = filepath.Clean(vpnkitsock)
+	_, err := os.Stat(vpnkitsock)
+	if err != nil {
+		return "", err
+	}
+	return vpnkitsock, nil
+}
+
+func getHome() string {
+	if usr, err := user.Current(); err == nil {
+		return usr.HomeDir
+	}
+	return os.Getenv("HOME")
 }
