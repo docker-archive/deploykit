@@ -178,10 +178,22 @@ func runMain(cfg config) error {
 	}
 	updatableModel, stopUpdatable := updatable.pluginModel()
 	loadFunc := func() (original *types.Any, err error) {
-		return nil, nil
+		var state interface{}
+
+		if err := updatable.snapshot.Load(&state); err != nil {
+			return nil, err
+		}
+		return types.AnyValue(state)
 	}
+
 	commitFunc := func(proposed *types.Any) error {
-		return nil
+		var newState interface{}
+
+		if err := proposed.Decode(&newState); err != nil {
+			return err
+		}
+
+		return updatable.snapshot.Save(newState)
 	}
 	cli.RunPlugin(cfg.id,
 		metadata_rpc.UpdatablePluginServer(metadata_plugin.NewUpdatablePlugin(

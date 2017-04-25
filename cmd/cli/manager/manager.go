@@ -12,9 +12,11 @@ import (
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
-	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
+	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
+	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -30,6 +32,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	var groupPlugin group.Plugin
 	var groupPluginName string
+
+	var updatablePlugin metadata.Updatable
+	var updatablePluginName string
 
 	cmd := &cobra.Command{
 		Use:   "manager",
@@ -60,11 +65,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					log.Debug("Found manager", "name", name, "leader", isLeader)
 					if isLeader {
 
-						groupPlugin = group_plugin.Adapt(rpcClient)
+						groupPlugin = group_rpc.Adapt(rpcClient)
 						groupPluginName = name
 
 						log.Debug("Found manager", "name", name, "addr", endpoint.Address)
 
+						updatablePlugin = metadata_rpc.AdaptUpdatable(rpcClient)
+						updatablePluginName = name
+
+						log.Debug("Found updatable", "name", name, "addr", endpoint.Address)
 						break
 					}
 				}
@@ -133,7 +142,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 				// TODO(chungers) -- we need to enforce and confirm the type of this.
 				// Right now we assume the RPC endpoint is indeed a group.
-				target, err := group_plugin.NewClient(endpoint.Address)
+				target, err := group_rpc.NewClient(endpoint.Address)
 
 				log.Debug("commit", "plugin", gp.Plugin, "address", endpoint.Address, "err", err, "spec", spec)
 
@@ -196,6 +205,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	vars := change.Flags().StringSliceP("var", "v", []string{}, "key=value pairs")
 	commitChange := change.Flags().BoolP("commit", "c", false, "Commit changes")
+	casFlag := change.Flags().StringP("version", "h", "", "CAS for commit")
 
 	change.RunE = func(cmd *cobra.Command, args []string) error {
 
@@ -204,53 +214,26 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		// Load the default
-		current, err := getGlobalConfig(groupPlugin, groupPluginName)
-		if err != nil {
-			return err
-		}
-
-		// make a copy by marshaling and unmarshaling -- deep copy
-		copy, err := types.AnyValue(current)
-		if err != nil {
-			return err
-		}
-
-		var applied interface{}
-		if err := copy.Decode(&applied); err != nil {
-			return err
-		}
-
 		// get the changes
 		changes, err := changeSet(*vars)
 		if err != nil {
 			return err
 		}
 
-		// applying the change means we encode the change set as json
-		// then decode /unmarshal the doc using the current state as
-		// the starting value
-
-		err = changes.Decode(&applied)
+		proposed, cas, err := updatablePlugin.Changes(changes)
 		if err != nil {
 			return err
 		}
 
-		if !*commitChange {
+		if *commitChange {
 
-			proposed, err := types.AnyValue(applied)
-			if err != nil {
-				return err
+			if *casFlag != "" && *casFlag != cas {
+				// this case here the user provided a wrong cas that's not
+				// matched to the input changes
+				return fmt.Errorf("The cas / version value does not match.")
 			}
 
-			buff, err := fromJSON(proposed.Bytes())
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(string(buff))
-
-			return nil
+			return updatablePlugin.Commit(proposed, cas)
 		}
 
 		return nil
@@ -284,10 +267,9 @@ func getGlobalConfig(groupPlugin group.Plugin, groupPluginName string) ([]plugin
 	return out, nil
 }
 
-// changeSet returns a sparse map where the kv pairs of path / value have been
-// apply to a nested map structure.
-func changeSet(kvPairs []string) (*types.Any, error) {
-	changes := map[string]interface{}{}
+// changeSet returns a set of changes from the input pairs of path / value
+func changeSet(kvPairs []string) ([]metadata.Change, error) {
+	changes := []metadata.Change{}
 
 	for _, kv := range kvPairs {
 
@@ -295,10 +277,12 @@ func changeSet(kvPairs []string) (*types.Any, error) {
 		key := strings.Trim(parts[0], " \t\n")
 		value := strings.Trim(parts[1], " \t\n")
 
-		if !types.Put(types.PathFromString(key), value, changes) {
-			return nil, fmt.Errorf("can't apply change %s %s", key, value)
+		change := metadata.Change{
+			Path:  types.PathFromString(key),
+			Value: types.AnyString(value),
 		}
-	}
 
-	return types.AnyValue(changes)
+		changes = append(changes, change)
+	}
+	return changes, nil
 }
