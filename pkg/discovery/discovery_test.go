@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestErrNotUnixSocket(t *testing.T) {
-	err := ErrNotUnixSocket("no socket!")
+func TestErrNotUnixSocketOrListener(t *testing.T) {
+	err := ErrNotUnixSocketOrListener("no socket!")
 	require.Error(t, err)
-	require.True(t, IsErrNotUnixSocket(err))
+	require.True(t, IsErrNotUnixSocketOrListener(err))
 }

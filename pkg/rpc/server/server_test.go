@@ -59,3 +59,46 @@ func TestUnixSocketServer(t *testing.T) {
 
 	server.Stop()
 }
+
+func TestTCPServer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mock := plugin_mock.NewMockPlugin(ctrl)
+
+	instanceID := instance.ID("id")
+	spec := instance.Spec{
+		Tags: map[string]string{
+			"tag1": "value1",
+		},
+		Init: "init",
+	}
+
+	properties := types.AnyString(`{"foo":"bar"}`)
+	validateErr := errors.New("validate-error")
+
+	gomock.InOrder(
+		mock.EXPECT().Validate(properties).Return(validateErr),
+		mock.EXPECT().Provision(spec).Return(&instanceID, nil),
+	)
+
+	service := plugin_rpc.PluginServer(mock)
+
+	discover := filepath.Join(os.TempDir(), fmt.Sprintf("%d.listen", time.Now().Unix()))
+	name := plugin.Name(filepath.Base(discover))
+	server, err := StartListenerAtPath("localhost:7777", discover, service)
+	require.NoError(t, err)
+
+	c, err := plugin_rpc.NewClient(name, discover)
+	require.NoError(t, err)
+
+	err = c.Validate(properties)
+	require.Error(t, err)
+	require.Equal(t, validateErr.Error(), err.Error())
+
+	id, err := c.Provision(spec)
+	require.NoError(t, err)
+	require.Equal(t, instanceID, *id)
+
+	server.Stop()
+}

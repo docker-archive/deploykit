@@ -6,7 +6,7 @@ set -o xtrace
 mkdir -p /etc/docker
 cat << EOF > /etc/docker/daemon.json
 {
-  "labels": {{ INFRAKIT_LABELS | to_json }}
+  "labels": {{ INFRAKIT_LABELS | jsonEncode }}
 }
 EOF
 

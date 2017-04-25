@@ -1,0 +1,6 @@
+
+# Start the plugin as local daemon
+start-daemon : start-plugin.ikt
+
+# Create a single instance
+provision-instance : provision-instance.ikt
