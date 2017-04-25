@@ -37,6 +37,7 @@ dependencies:
 
     # Install dependencies
     - cd $WORKDIR && go get github.com/golang/lint/golint github.com/wfarner/blockcheck
+    - sudo apt-get update && sudo apt-get install -y libvirt-dev
 
 test:
   override:

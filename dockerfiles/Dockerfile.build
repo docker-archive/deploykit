@@ -1,6 +1,6 @@
 FROM golang:1.8-alpine
 
-RUN apk add --update git make gcc musl-dev wget ca-certificates openssl
+RUN apk add --update git make gcc musl-dev wget ca-certificates openssl libvirt-dev
 RUN go get github.com/rancher/trash
 
 WORKDIR /go/src/github.com/docker/infrakit
