@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,10 +13,12 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	"github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
+	"github.com/docker/infrakit/pkg/plugin"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
@@ -187,13 +190,41 @@ func runMain(cfg config) error {
 	}
 
 	commitFunc := func(proposed *types.Any) error {
-		var newState interface{}
+		newState := struct {
+			Groups map[group.ID]plugin.Spec
+		}{}
 
 		if err := proposed.Decode(&newState); err != nil {
 			return err
 		}
+		// Hacky --- there's a mismatch with how the Commit's schema and the internal
+		// store's schema --> we made the map based internal representation updatable
+		// so that it's possbile to use paths that contain object names (e.g. Groups/cattle/Properties as
+		// opposed to Groups/0/Properties).  So here we'd have to transform the object to
+		// make it the right shape.
+		// leaving this code here because we will have a new schema and this will be replaced soon.
+		groups := []group.Spec{}
+		for _, plugin := range newState.Groups {
 
-		return updatable.snapshot.Save(newState)
+			spec := group.Spec{}
+			if err := plugin.Properties.Decode(&spec); err != nil {
+				return err
+			}
+
+			groups = append(groups, spec)
+		}
+
+		groupImpl, ok := updatable.manager.(group.Plugin)
+		if !ok {
+			return fmt.Errorf("manager does not implement group.Plugin interface")
+		}
+
+		for _, spec := range groups {
+			if _, err := groupImpl.CommitGroup(spec, false); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	cli.RunPlugin(cfg.id,
 		metadata_rpc.UpdatablePluginServer(metadata_plugin.NewUpdatablePlugin(

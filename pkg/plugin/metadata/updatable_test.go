@@ -37,9 +37,14 @@ func TestUpdatableOverlayChanges(t *testing.T) {
    }
 }
 `
+	commitChan := make(chan *types.Any, 1)
 	u := &updatable{
 		load: func() (*types.Any, error) {
 			return types.AnyString(original), nil
+		},
+		commit: func(proposed *types.Any) error {
+			commitChan <- proposed
+			return nil
 		},
 	}
 
@@ -55,6 +60,7 @@ func TestUpdatableOverlayChanges(t *testing.T) {
 
 	T(100).Infoln("cas=", cas)
 	require.NotEqual(t, "", cas)
+	require.Equal(t, types.Fingerprint(current, proposed), cas)
 
 	T(100).Infoln("current", current.String())
 	T(100).Infoln("proposed", proposed.String())
@@ -66,5 +72,8 @@ func TestUpdatableOverlayChanges(t *testing.T) {
 
 	require.Equal(t, 10., types.Get(types.PathFromString("Groups/cattle/Properties/Properties/Allocations/Size"), v1))
 	require.Equal(t, 20., types.Get(types.PathFromString("Groups/cattle/Properties/Properties/Allocations/Size"), v2))
+
+	require.NoError(t, u.Commit(proposed, cas))
+	require.Equal(t, proposed, <-commitChan)
 
 }

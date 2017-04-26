@@ -248,7 +248,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		if *commitChange {
 			// ask for final approval
 			input := bufio.NewReader(os.Stdin)
-			fmt.Fprintf(os.Stderr, "\n\nCommit? [yes/no] ")
+			fmt.Fprintf(os.Stderr, "\n\nCommit? [y/n] ")
 			text, _ := input.ReadString('\n')
 			text = strings.Trim(text, " \t\n")
 
@@ -257,7 +257,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return fmt.Errorf("not boolean %v", text)
 			}
 			if !agree {
-				return fmt.Errorf("aborted.")
+				fmt.Fprintln(os.Stderr, "Not committing. Bye.")
+				os.Exit(0)
 			}
 
 			return updatablePlugin.Commit(proposed, cas)
@@ -266,6 +267,55 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 	change.Flags().AddFlagSet(templateFlags)
+
+	///////////////////////////////////////////////////////////////////////////////////
+	// change-list
+	changeList := &cobra.Command{
+		Use:   "ls",
+		Short: "Lists all the changeable paths",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if len(args) != 0 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			all, err := types.ListAll(updatablePlugin, types.PathFromString("."))
+			if err != nil {
+				return err
+			}
+
+			types.Sort(all)
+			for _, p := range all {
+				fmt.Println(p.String())
+			}
+			return nil
+		},
+	}
+	///////////////////////////////////////////////////////////////////////////////////
+	// change-cat
+	changeGet := &cobra.Command{
+		Use:   "cat",
+		Short: "Cat returns the current value at given path",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			path := types.PathFromString(args[0])
+			any, err := updatablePlugin.Get(path)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(any.String())
+
+			return nil
+		},
+	}
+	change.AddCommand(changeList, changeGet)
 
 	cmd.AddCommand(commit, inspect, change)
 

@@ -1,7 +1,6 @@
 package metadata
 
 import (
-	"crypto/md5"
 	"fmt"
 
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -31,14 +30,6 @@ type updatable struct {
 	metadata.Plugin
 	load   LoadFunc
 	commit CommitFunc
-}
-
-func hash(m ...*types.Any) string {
-	h := md5.New()
-	for _, mm := range m {
-		h.Write(mm.Bytes())
-	}
-	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 // changeSet returns a sparse map where the kv pairs of path / value have been
@@ -94,7 +85,7 @@ func (p updatable) Changes(changes []metadata.Change) (original, proposed *types
 
 	log.Info("proposed", "proposed", proposed.String())
 
-	cas = hash(original, proposed)
+	cas = types.Fingerprint(original, proposed)
 	return
 }
 
@@ -108,7 +99,7 @@ func (p updatable) Commit(proposed *types.Any, cas string) error {
 		return err
 	}
 
-	hash := hash(buff, proposed)
+	hash := types.Fingerprint(buff, proposed)
 	if hash != cas {
 		return fmt.Errorf("cas mismatch")
 	}
