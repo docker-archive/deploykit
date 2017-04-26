@@ -7,7 +7,6 @@ import (
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	"github.com/docker/infrakit/pkg/spi/application"
 	"github.com/docker/infrakit/pkg/spi/event"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"sync"
@@ -143,11 +142,6 @@ func (e eventRepeater) Stop() {
 }
 
 func (e eventRepeater) publishToSink(rr *RepeatRule) error {
-	templateURL := "str://{{.}}"
-	engine, err := template.NewTemplate(templateURL, template.Options{})
-	if err != nil {
-		return err
-	}
 	for {
 		select {
 		case <-rr.SinkStopCh:
@@ -157,15 +151,23 @@ func (e eventRepeater) publishToSink(rr *RepeatRule) error {
 				log.Info("Server disconnected", "topic", rr.SourceTopic)
 				return nil
 			}
-			buff, err := engine.Render(s)
+			buff, err := s.Bytes()
 			if err != nil {
 				return err
 			}
 			switch e.Protocol {
 			case "mqtt":
-				e.sinkEClient.(MQTT.Client).Publish(rr.SinkTopic, 0, false, buff)
+				if rr.SinkTopic == "." {
+					e.sinkEClient.(MQTT.Client).Publish(s.Topic.String(), 0, false, buff)
+				} else {
+					e.sinkEClient.(MQTT.Client).Publish(rr.SinkTopic, 0, false, buff)
+				}
 			case "stderr":
-				log.Infof("Publish subtopic %s gettopic %v pubtopic %v message %s\n", rr.SourceTopic, s.Topic, rr.SinkTopic, buff)
+				if rr.SinkTopic == "." {
+					log.Infof("Publish subtopic %s gettopic %v pubtopic %v message %s\n", rr.SourceTopic, s.Topic, s.Topic, buff)
+				} else {
+					log.Infof("Publish subtopic %s gettopic %v pubtopic %v message %s\n", rr.SourceTopic, s.Topic, rr.SinkTopic, buff)
+				}
 			}
 		}
 	}
