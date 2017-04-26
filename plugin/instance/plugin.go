@@ -315,7 +315,7 @@ func hasDifferentTag(expected, actual map[string]string) bool {
 		return true
 	}
 	for k, v := range expected {
-		if actual[k] != v {
+		if a, ok := actual[k]; ok && a != v {
 			return true
 		}
 	}
