@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"fmt"
 	"net/http"
 
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
@@ -37,7 +38,9 @@ func (u *Updatable) Get(q *http.Request, req *GetRequest, resp *GetResponse) err
 
 // Changes sends a batch of changes to get a proposed view and cas
 func (u *Updatable) Changes(_ *http.Request, req *ChangesRequest, resp *ChangesResponse) error {
-	proposed, cas, err := u.updatable.Changes(req.Changes)
+	fmt.Println(">>>> changes", req, u.updatable)
+	original, proposed, cas, err := u.updatable.Changes(req.Changes)
+	resp.Original = original
 	resp.Proposed = proposed
 	resp.Cas = cas
 	return err
@@ -78,11 +81,11 @@ func (u updatable) Get(path types.Path) (*types.Any, error) {
 }
 
 // Changes sends a batch of changes and gets in return a proposed view of configuration and a cas hash.
-func (u updatable) Changes(changes []metadata.Change) (proposed *types.Any, cas string, err error) {
+func (u updatable) Changes(changes []metadata.Change) (original, proposed *types.Any, cas string, err error) {
 	req := ChangesRequest{Changes: changes}
 	resp := ChangesResponse{}
 	err = u.client.client.Call("Updatable.Changes", req, &resp)
-	return resp.Proposed, resp.Cas, err
+	return resp.Original, resp.Proposed, resp.Cas, err
 }
 
 // Commit asks the plugin to commit the proposed view with the cas.  The cas is used for

@@ -30,7 +30,7 @@ type Updatable struct {
 	Plugin
 
 	// DoChanges sends a batch of changes and gets in return a proposed view of configuration and a cas hash.
-	DoChanges func(changes []metadata.Change) (proposed *types.Any, cas string, err error)
+	DoChanges func(changes []metadata.Change) (original, proposed *types.Any, cas string, err error)
 
 	// DoCommit asks the plugin to commit the proposed view with the cas.  The cas is used for
 	// optimistic concurrency control.
@@ -38,7 +38,7 @@ type Updatable struct {
 }
 
 // Changes sends a batch of changes and gets in return a proposed view of configuration and a cas hash.
-func (u *Updatable) Changes(changes []metadata.Change) (proposed *types.Any, cas string, err error) {
+func (u *Updatable) Changes(changes []metadata.Change) (original, proposed *types.Any, cas string, err error) {
 	return u.DoChanges(changes)
 }
 

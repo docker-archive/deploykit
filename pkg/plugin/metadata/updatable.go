@@ -4,9 +4,13 @@ import (
 	"crypto/md5"
 	"fmt"
 
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/imdario/mergo"
 )
+
+var log = logutil.New("module", "plugin/metadata/updatable")
 
 // LoadFunc is the function for returning the original to modify
 type LoadFunc func() (original *types.Any, err error)
@@ -50,37 +54,48 @@ func changeSet(changes []metadata.Change) (*types.Any, error) {
 }
 
 // Changes sends a batch of changes and gets in return a proposed view of configuration and a cas hash.
-func (p updatable) Changes(changes []metadata.Change) (proposed *types.Any, cas string, err error) {
-
+func (p updatable) Changes(changes []metadata.Change) (original, proposed *types.Any, cas string, err error) {
 	// first read the data to be modified
-	buff, err := p.load()
+	original, err = p.load()
 	if err != nil {
-		return nil, "", err
+		return
+	}
+	log.Info("original", "original", original.String())
+
+	var current map[string]interface{}
+	if err = original.Decode(&current); err != nil {
+		return
+	}
+	log.Info("decoded", "current", current)
+
+	changeSet, e := changeSet(changes)
+	if e != nil {
+		err = e
+		return
+	}
+	log.Info("changeset", "changeset", changeSet)
+
+	var applied map[string]interface{}
+	if err = changeSet.Decode(&applied); err != nil {
+		return
 	}
 
-	var original interface{}
-	if err := buff.Decode(&original); err != nil {
-		return nil, "", err
+	if err = mergo.Merge(&applied, &current); err != nil {
+		return
 	}
 
-	changeSet, err := changeSet(changes)
-	if err != nil {
-		return nil, "", err
-	}
-
-	// apply the changes using the originalVal as default
-	if err := changeSet.Decode(&original); err != nil {
-		return nil, "", err
-	}
+	log.Info("decoded2", "applied", applied)
 
 	// encoded it back to bytes
-	applied, err := types.AnyValue(original)
+	proposed, err = types.AnyValue(applied)
 	if err != nil {
-		return nil, "", err
+		return
 	}
 
-	hash := hash(buff, applied)
-	return applied, hash, nil
+	log.Info("proposed", "proposed", proposed.String())
+
+	cas = hash(original, proposed)
+	return
 }
 
 // Commit asks the plugin to commit the proposed view with the cas.  The cas is used for

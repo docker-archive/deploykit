@@ -42,7 +42,7 @@ type Updatable interface {
 	Plugin
 
 	// Changes sends a batch of changes and gets in return a proposed view of configuration and a cas hash.
-	Changes(changes []Change) (proposed *types.Any, cas string, err error)
+	Changes(changes []Change) (original, proposed *types.Any, cas string, err error)
 
 	// Commit asks the plugin to commit the proposed view with the cas.  The cas is used for
 	// optimistic concurrency control.

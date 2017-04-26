@@ -32,6 +32,7 @@ type ChangesRequest struct {
 
 // ChangesResponse is the rpc wrapper of the params to Changes
 type ChangesResponse struct {
+	Original *types.Any
 	Proposed *types.Any
 	Cas      string
 }

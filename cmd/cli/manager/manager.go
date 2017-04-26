@@ -1,8 +1,10 @@
 package manager
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/docker/infrakit/cmd/cli/base"
@@ -18,6 +20,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 )
 
@@ -205,8 +208,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	vars := change.Flags().StringSliceP("var", "v", []string{}, "key=value pairs")
 	commitChange := change.Flags().BoolP("commit", "c", false, "Commit changes")
-	casFlag := change.Flags().StringP("version", "h", "", "CAS for commit")
 
+	// This is the only interactive command.  We want to show the user the proposal, with the diff
+	// and when the user accepts the change, call a commit.
 	change.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 0 {
@@ -214,23 +218,46 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
+		log.Info("applying changes")
+
 		// get the changes
 		changes, err := changeSet(*vars)
 		if err != nil {
 			return err
 		}
-
-		proposed, cas, err := updatablePlugin.Changes(changes)
+		current, proposed, cas, err := updatablePlugin.Changes(changes)
+		if err != nil {
+			return err
+		}
+		currentBuff, err := current.MarshalYAML()
 		if err != nil {
 			return err
 		}
 
-		if *commitChange {
+		proposedBuff, err := proposed.MarshalYAML()
+		if err != nil {
+			return err
+		}
 
-			if *casFlag != "" && *casFlag != cas {
-				// this case here the user provided a wrong cas that's not
-				// matched to the input changes
-				return fmt.Errorf("The cas / version value does not match.")
+		// render the proposal
+		fmt.Printf("Proposed changes, hash=%s\n", cas)
+		dmp := diffmatchpatch.New()
+		diffs := dmp.DiffMain(string(currentBuff), string(proposedBuff), false)
+		fmt.Println(dmp.DiffPrettyText(diffs))
+
+		if *commitChange {
+			// ask for final approval
+			input := bufio.NewReader(os.Stdin)
+			fmt.Fprintf(os.Stderr, "\n\nCommit? [yes/no] ")
+			text, _ := input.ReadString('\n')
+			text = strings.Trim(text, " \t\n")
+
+			agree, err := parseBool(text)
+			if err != nil {
+				return fmt.Errorf("not boolean %v", text)
+			}
+			if !agree {
+				return fmt.Errorf("aborted.")
 			}
 
 			return updatablePlugin.Commit(proposed, cas)
@@ -238,10 +265,25 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		return nil
 	}
+	change.Flags().AddFlagSet(templateFlags)
 
 	cmd.AddCommand(commit, inspect, change)
 
 	return cmd
+}
+
+func parseBool(text string) (bool, error) {
+	agree, err := strconv.ParseBool(text)
+	if err == nil {
+		return agree, nil
+	}
+	switch strings.ToLower(text) {
+	case "yes", "ok", "y":
+		return true, nil
+	case "no", "nope", "n":
+		return false, nil
+	}
+	return false, err
 }
 
 func getGlobalConfig(groupPlugin group.Plugin, groupPluginName string) ([]plugin.Spec, error) {
@@ -279,7 +321,7 @@ func changeSet(kvPairs []string) ([]metadata.Change, error) {
 
 		change := metadata.Change{
 			Path:  types.PathFromString(key),
-			Value: types.AnyString(value),
+			Value: types.AnyYAMLMust([]byte(value)),
 		}
 
 		changes = append(changes, change)
