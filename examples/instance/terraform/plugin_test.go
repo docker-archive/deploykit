@@ -167,7 +167,24 @@ func run(t *testing.T, resourceType, properties string) {
 	err = terraform.Validate(config)
 	require.NoError(t, err)
 
-	instanceSpec := instance.Spec{
+	// Instance with tags that will not be updated
+	instanceSpec1 := instance.Spec{
+		Properties: config,
+		Tags: map[string]string{
+			"label1": "value1",
+			"label2": "value2",
+		},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+	}
+	id1, err := terraform.Provision(instanceSpec1)
+	require.NoError(t, err)
+	tfPath := filepath.Join(dir, string(*id1)+".tf.json")
+	_, err = ioutil.ReadFile(tfPath)
+	require.NoError(t, err)
+
+	// Instance with tags that will be updated
+	instanceSpec2 := instance.Spec{
 		Properties: config,
 		Tags: map[string]string{
 			"label1": "value1",
@@ -181,11 +198,11 @@ func run(t *testing.T, resourceType, properties string) {
 			},
 		},
 	}
-
-	id, err := terraform.Provision(instanceSpec)
+	id2, err := terraform.Provision(instanceSpec2)
 	require.NoError(t, err)
+	require.NotEqual(t, id1, id2)
 
-	tfPath := filepath.Join(dir, string(*id)+".tf.json")
+	tfPath = filepath.Join(dir, string(*id2)+".tf.json")
 	buff, err := ioutil.ReadFile(tfPath)
 	require.NoError(t, err)
 
@@ -213,18 +230,18 @@ func run(t *testing.T, resourceType, properties string) {
 			"terraform_demo_swarm_mgr_sl",
 			"label1:value1",
 			"label2:value2",
-			"name:" + string(*id),
+			"name:" + string(*id2),
 		}), conv(props["tags"].([]interface{})))
-		require.Equal(t, instanceSpec.Init, props["user_metadata"])
+		require.Equal(t, instanceSpec2.Init, props["user_metadata"])
 
 		// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
 		if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
-			newID := strings.Replace(string(*id), "instance-", "", -1)
+			newID := strings.Replace(string(*id2), "instance-", "", -1)
 			expectedHostname := "softlayer-hostname-" + newID
 			require.Equal(t, expectedHostname, props["hostname"])
 		} else {
 			// If no hostname was specified, the hostname should equal the ID
-			require.Equal(t, string(*id), props["hostname"])
+			require.Equal(t, string(*id2), props["hostname"])
 		}
 		// Verify the hostname prefix key/value is no longer in the props
 		require.Nil(t, props["@hostname_prefix"])
@@ -234,16 +251,67 @@ func run(t *testing.T, resourceType, properties string) {
 			"InstancePlugin": "terraform",
 			"label1":         "value1",
 			"label2":         "value2",
-			"Name":           string(*id),
+			"Name":           string(*id2),
 		}, props["tags"])
-		require.Equal(t, base64.StdEncoding.EncodeToString([]byte(instanceSpec.Init)), props["user_data"])
+		require.Equal(t, base64.StdEncoding.EncodeToString([]byte(instanceSpec2.Init)), props["user_data"])
 	}
 
-	// label resources
-	err = terraform.Label(*id, map[string]string{
+	// Expected instances returned from Describe
+	var inst1 instance.Description
+	var inst2 instance.Description
+	switch vmType {
+	case VMSoftLayer:
+		inst1 = instance.Description{
+			ID: *id1,
+			Tags: map[string]string{
+				"terraform_demo_swarm_mgr_sl": "",
+				"label1":                      "value1",
+				"label2":                      "value2",
+				"name":                        string(*id1),
+			},
+		}
+		inst2 = instance.Description{
+			ID: *id2,
+			Tags: map[string]string{
+				"terraform_demo_swarm_mgr_sl": "",
+				"label1":                      "value1",
+				"label2":                      "value2",
+				"name":                        string(*id2),
+			},
+		}
+	case VMAmazon:
+		inst1 = instance.Description{
+			ID: *id1,
+			Tags: map[string]string{
+				"InstancePlugin": "terraform",
+				"label1":         "value1",
+				"label2":         "value2",
+				"Name":           string(*id1),
+			},
+		}
+		inst2 = instance.Description{
+			ID: *id2,
+			Tags: map[string]string{
+				"InstancePlugin": "terraform",
+				"label1":         "value1",
+				"label2":         "value2",
+				"Name":           string(*id2),
+			},
+		}
+	}
+
+	// Both instances match: label=value1
+	list, err := terraform.DescribeInstances(map[string]string{"label1": "value1"}, false)
+	require.NoError(t, err)
+	require.Contains(t, list, inst1)
+	require.Contains(t, list, inst2)
+
+	// re-label instance2
+	err = terraform.Label(*id2, map[string]string{
 		"label1": "changed1",
 		"label3": "value3",
 	})
+	require.NoError(t, err)
 
 	buff, err = ioutil.ReadFile(tfPath)
 	require.NoError(t, err)
@@ -255,6 +323,7 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NoError(t, err)
 
 	vmType, _, props, err = FindVM(&parsed)
+	require.NoError(t, err)
 	switch vmType {
 	case VMSoftLayer:
 		require.Equal(t, conv([]interface{}{
@@ -262,7 +331,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label1:changed1",
 			"label2:value2",
 			"label3:value3",
-			"name:" + string(*id),
+			"name:" + string(*id2),
 		}), conv(props["tags"].([]interface{})))
 	case VMAmazon:
 		require.Equal(t, map[string]interface{}{
@@ -270,43 +339,31 @@ func run(t *testing.T, resourceType, properties string) {
 			"label1":         "changed1",
 			"label2":         "value2",
 			"label3":         "value3",
-			"Name":           string(*id),
+			"Name":           string(*id2),
 		}, props["tags"])
 	}
 
-	list, err := terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
+	// Update expected tags on inst2
+	inst2.Tags["label1"] = "changed1"
+	inst2.Tags["label3"] = "value3"
+
+	// Only a single match: label1=changed1
+	list, err = terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
+	require.Equal(t, []instance.Description{inst2}, list)
 
-	switch vmType {
-	case VMSoftLayer:
-		require.Equal(t, []instance.Description{
-			{
-				ID: *id,
-				Tags: map[string]string{
-					"terraform_demo_swarm_mgr_sl": "",
-					"label1":                      "changed1",
-					"label2":                      "value2",
-					"label3":                      "value3",
-					"name":                        string(*id),
-				},
-			},
-		}, list)
-	case VMAmazon:
-		require.Equal(t, []instance.Description{
-			{
-				ID: *id,
-				Tags: map[string]string{
-					"InstancePlugin": "terraform",
-					"label1":         "changed1",
-					"label2":         "value2",
-					"label3":         "value3",
-					"Name":           string(*id),
-				},
-			},
-		}, list)
-	}
+	// Only a single match: label1=value1
+	list, err = terraform.DescribeInstances(map[string]string{"label1": "value1"}, false)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{inst1}, list)
 
-	err = terraform.Destroy(*id)
+	// No matches: label1=foo
+	list, err = terraform.DescribeInstances(map[string]string{"label1": "foo"}, false)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, list)
+
+	// Destroy, then none should match
+	err = terraform.Destroy(*id2)
 	require.NoError(t, err)
 
 	list, err = terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
