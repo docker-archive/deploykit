@@ -1,7 +1,10 @@
 package types
 
 import (
+	"bytes"
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 
 	"github.com/ghodss/yaml"
 )
@@ -127,4 +130,19 @@ func (c *Any) UnmarshalYAML(data []byte) error {
 		return err
 	}
 	return c.UnmarshalJSON(j)
+}
+
+// Fingerprint returns a MD5 hash of the opague blob.  It also removes newlines and tab characters that
+// are common in JSON but don't contribute to the actual content.
+func Fingerprint(m ...*Any) string {
+	h := md5.New()
+	for _, mm := range m {
+		buff := mm.Bytes()
+		buff = bytes.Replace(buff, []byte(": "), []byte(":"), -1) // not really proud of this.
+		buff = bytes.Replace(buff, []byte(":"), []byte(":"), -1)  // not really proud of this.
+		buff = bytes.Replace(buff, []byte("\n"), nil, -1)
+		buff = bytes.Replace(buff, []byte("\t"), nil, -1)
+		h.Write(buff)
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
 }

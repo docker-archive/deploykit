@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,10 +13,12 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	"github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
+	"github.com/docker/infrakit/pkg/plugin"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
@@ -80,6 +83,49 @@ func main() {
 	}
 }
 
+type metadataModel struct {
+	snapshot store.Snapshot
+	manager  manager.Manager
+}
+
+func (m *metadataModel) pluginModel() (chan func(map[string]interface{}), chan struct{}) {
+	// Start a poller to load the snapshot and make that available as metadata
+	model := make(chan func(map[string]interface{}))
+	stop := make(chan struct{})
+	go func() {
+		tick := time.Tick(1 * time.Second)
+		for {
+			select {
+			case <-tick:
+				snapshot := map[string]interface{}{}
+
+				// update leadership
+				if isLeader, err := m.manager.IsLeader(); err == nil {
+					model <- func(view map[string]interface{}) {
+						types.Put([]string{"leader"}, isLeader, view)
+					}
+				} else {
+					logrus.Warningln("Cannot check leader for metadata:", err)
+				}
+
+				// update config
+				if err := m.snapshot.Load(&snapshot); err == nil {
+					model <- func(view map[string]interface{}) {
+						types.Put([]string{"configs"}, snapshot, view)
+					}
+				} else {
+					logrus.Warningln("Cannot load snapshot for metadata:", err)
+				}
+
+			case <-stop:
+				logrus.Infoln("Snapshot updater stopped")
+				return
+			}
+		}
+	}()
+	return model, stop
+}
+
 func runMain(cfg config) error {
 
 	logrus.Infoln("Starting up manager:", cfg)
@@ -129,12 +175,68 @@ func runMain(cfg config) error {
 		}
 	}()
 
+	updatable := &metadataModel{
+		snapshot: cfg.snapshot,
+		manager:  mgr,
+	}
+	updatableModel, stopUpdatable := updatable.pluginModel()
+	loadFunc := func() (original *types.Any, err error) {
+		var state interface{}
+
+		if err := updatable.snapshot.Load(&state); err != nil {
+			return nil, err
+		}
+		return types.AnyValue(state)
+	}
+
+	commitFunc := func(proposed *types.Any) error {
+		newState := struct {
+			Groups map[group.ID]plugin.Spec
+		}{}
+
+		if err := proposed.Decode(&newState); err != nil {
+			return err
+		}
+		// Hacky --- there's a mismatch with how the Commit's schema and the internal
+		// store's schema --> we made the map based internal representation updatable
+		// so that it's possbile to use paths that contain object names (e.g. Groups/cattle/Properties as
+		// opposed to Groups/0/Properties).  So here we'd have to transform the object to
+		// make it the right shape.
+		// leaving this code here because we will have a new schema and this will be replaced soon.
+		groups := []group.Spec{}
+		for _, plugin := range newState.Groups {
+
+			spec := group.Spec{}
+			if err := plugin.Properties.Decode(&spec); err != nil {
+				return err
+			}
+
+			groups = append(groups, spec)
+		}
+
+		groupImpl, ok := updatable.manager.(group.Plugin)
+		if !ok {
+			return fmt.Errorf("manager does not implement group.Plugin interface")
+		}
+
+		for _, spec := range groups {
+			if _, err := groupImpl.CommitGroup(spec, false); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	cli.RunPlugin(cfg.id,
+		metadata_rpc.UpdatablePluginServer(metadata_plugin.NewUpdatablePlugin(
+			metadata_plugin.NewPluginFromChannel(updatableModel),
+			loadFunc,
+			commitFunc)),
 		metadata_rpc.PluginServer(metadata_plugin.NewPluginFromChannel(updateSnapshot)),
 		group_rpc.PluginServer(mgr), manager_rpc.PluginServer(mgr))
 
 	mgr.Stop()
 	close(stopSnapshot)
+	close(stopUpdatable)
 	logrus.Infoln("Manager stopped")
 
 	return err

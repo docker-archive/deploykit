@@ -119,7 +119,7 @@ ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
 endif
 
-	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli/main)
+	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
 	$(call build_binary,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
 	$(call build_binary,infrakit-resource,github.com/docker/infrakit/cmd/resource)
@@ -142,7 +142,7 @@ build-cli:
 ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
 endif
-	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli/main)
+	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
 
 install:
 	@echo "+ $@"

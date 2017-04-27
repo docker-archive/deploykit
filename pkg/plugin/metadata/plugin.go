@@ -1,7 +1,6 @@
 package metadata
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -24,7 +23,7 @@ func NewPluginFromChannel(writes <-chan func(map[string]interface{})) metadata.P
 
 		defer func() {
 			if r := recover(); r != nil {
-				log.Warningln("Plugin stopped:", r)
+				log.Warn("Plugin stopped:", "recover", r)
 			}
 		}()
 

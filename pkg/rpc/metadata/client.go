@@ -24,21 +24,29 @@ type client struct {
 	client rpc_client.Client
 }
 
-// List returns a list of nodes under path.
-func (c client) List(path types.Path) ([]string, error) {
+func (c client) list(method string, path types.Path) ([]string, error) {
 	req := ListRequest{Path: path}
 	resp := ListResponse{}
-	err := c.client.Call("Metadata.List", req, &resp)
+	err := c.client.Call(method, req, &resp)
 	return resp.Nodes, err
 }
 
-// Get retrieves the metadata at path.
-func (c client) Get(path types.Path) (*types.Any, error) {
+// List returns a list of nodes under path.
+func (c client) List(path types.Path) ([]string, error) {
+	return c.list("Metadata.List", path)
+}
+
+func (c client) get(method string, path types.Path) (*types.Any, error) {
 	req := GetRequest{Path: path}
 	resp := GetResponse{}
-	err := c.client.Call("Metadata.Get", req, &resp)
+	err := c.client.Call(method, req, &resp)
 	if err != nil {
 		return nil, err
 	}
 	return resp.Value, err
+}
+
+// Get retrieves the metadata at path.
+func (c client) Get(path types.Path) (*types.Any, error) {
+	return c.get("Metadata.Get", path)
 }
