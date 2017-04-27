@@ -8,3 +8,6 @@ coverage.txt
 
 # Build binaries
 build/
+
+# Vim temporary files.
+.*.swp
