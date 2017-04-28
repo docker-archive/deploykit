@@ -16,7 +16,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
 
-	_ "github.com/docker/infrakit/cmd/cli/application"
 	_ "github.com/docker/infrakit/cmd/cli/event"
 	_ "github.com/docker/infrakit/cmd/cli/flavor"
 	_ "github.com/docker/infrakit/cmd/cli/group"

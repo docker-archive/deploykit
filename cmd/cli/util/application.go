@@ -1,30 +1,21 @@
-package application
+package util
 
 import (
 	"fmt"
-	"github.com/docker/infrakit/cmd/cli/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
-	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	application_rpc "github.com/docker/infrakit/pkg/rpc/application"
-	//	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/application"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
-var log = logutil.New("module", "cli/event")
-
 //OPERATIONS code of update command
 var OPERATIONS = map[int]string{1: "Add", 2: "Delete", 3: "Update", 4: "Read"}
 
-func init() {
-	base.Register(Command)
-}
-
 // Command is the entry point of the module
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func applicationCommand(plugins func() discovery.Plugins) *cobra.Command {
 	var applicationPlugin application.Plugin
 
 	cmd := &cobra.Command{

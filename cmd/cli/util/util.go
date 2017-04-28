@@ -21,7 +21,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Utilties",
 	}
 
-	util.AddCommand(muxCommand(plugins), fileServerCommand(plugins), trackCommand(plugins))
+	util.AddCommand(muxCommand(plugins), fileServerCommand(plugins), trackCommand(plugins), applicationCommand(plugins), eventrepeaterCommand(plugins))
 
 	return util
 }
