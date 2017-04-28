@@ -53,6 +53,15 @@ func TestTracker(t *testing.T) {
 
 	// Send different responses each step
 
+	// initial state - found = 1
+	steps <- 0
+	describes <- []instance.Description{
+		{
+			ID: instance.ID("a"),
+		},
+	}
+	tick <- time.Now()
+
 	// initial state - found = 2
 	steps <- 0
 	describes <- []instance.Description{
