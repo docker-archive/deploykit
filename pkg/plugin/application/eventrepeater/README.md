@@ -14,11 +14,22 @@ $ docker run -it --rm -p 1883:1883 eclipse-mosquitto
 ## Run event repeater
 
 ```
-$ ./build/infrakit-application-repeater -h
-Event Repeater Application plugin
+$ infrakit util event-repeater -h
+
+
+___  ________   ________ ________  ________  ___  __    ___  _________
+|\  \|\   ___  \|\  _____\\   __  \|\   __  \|\  \|\  \ |\  \|\___   ___\
+\ \  \ \  \\ \  \ \  \__/\ \  \|\  \ \  \|\  \ \  \/  /|\ \  \|___ \  \_|
+ \ \  \ \  \\ \  \ \   __\\ \   _  _\ \   __  \ \   ___  \ \  \   \ \  \
+  \ \  \ \  \\ \  \ \  \_| \ \  \\  \\ \  \ \  \ \  \\ \  \ \  \   \ \  \
+   \ \__\ \__\\ \__\ \__\   \ \__\\ _\\ \__\ \__\ \__\\ \__\ \__\   \ \__\
+    \|__|\|__| \|__|\|__|    \|__|\|__|\|__|\|__|\|__| \|__|\|__|    \|__|
+
+
+Event Repeater service
 
 Usage:
-  ./build/infrakit-application-repeater [flags]
+  infrakit util event-repeater [flags]
 
 Flags:
       --allowall              Allow all event from source and repeat the event to sink as same topic name. default: false
@@ -28,7 +39,16 @@ Flags:
       --sinkprotocol string   Event sink protocol. Now only mqtt and stderr is implemented. (default "mqtt")
       --source string         Event sourve address. (default "event-plugin")
 
-$ ./build/infrakit-application-repeater --source ~/.infrakit/plugins/event-time --sink tcp://localhost:1883
+Global Flags:
+  -H, --host stringSlice        host list. Default is local sockets
+      --httptest.serve string   if non-empty, httptest.NewServer serves on this address and blocks
+      --log-caller              include caller function (default true)
+      --log-format string       log format: logfmt|term|json (default "term")
+      --log-stack               include caller stack
+      --log-stdout              log to stdout
+
+
+$ infrakit util event-repeater --source ~/.infrakit/plugins/event-time --sink tcp://localhost:1883
 ```
 
 Now your app connected to event plugin and mqtt broker.
@@ -36,7 +56,7 @@ If you set `—-allowall`, your app subscribe ‘.’ Topic from event and publi
 You can specify repeat topics with infrakit command like below.
 
 ```
-$ ./build/infrakit application update -h
+$ infrakit util application update -h
 
 
 ___  ________   ________ ________  ________  ___  __    ___  _________
@@ -51,7 +71,7 @@ ___  ________   ________ ________  ________  ___  __    ___  _________
 Update application's resouce
 
 Usage:
-  ./build/infrakit application update [flags]
+  infrakit util application update [flags]
 
 Flags:
       --op int            update operation 1: Add, 2: Delete, 3: Update, 4: Read(default) (default 3)
@@ -67,14 +87,16 @@ Global Flags:
       --log-stack               include caller stack
       --log-stdout              log to stdout
       --name string             Name of plugin
-$ ./build/infrakit application update --name app-event-repeater --op 1 --resource event --value '[{"sourcetopic":"timer/sec/1","sinktopic":"/time/1s"},{"sourcetopic":"timer/msec/500","sinktopic":"/time/500m"}]'
+
+
+$ infrakit util application update --name app-event-repeater --op 1 --resource event --value '[{"sourcetopic":"timer/sec/1","sinktopic":"/time/1s"},{"sourcetopic":"timer/msec/500","sinktopic":"/time/500m"}]'
 ```
 
 Target events are described json style.
 Then you can delete registerd event.
 
 ```
-./build/infrakit application update --name app-event-repeater --op 2 --resource event --value '[{"sourcetopic":"timer/sec/1”}]’
+$ infrakit application update --name app-event-repeater --op 2 --resource event --value '[{"sourcetopic":"timer/sec/1”}]’
 ```
 Repeated events are encoded with byte.
 You can decode it like below.
