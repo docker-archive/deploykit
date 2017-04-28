@@ -538,9 +538,8 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	re := regexp.MustCompile("(.*)(instance-[0-9]+)")
 	result := []instance.Description{}
 	// now we scan for <instance_type.instance-<timestamp> as keys
-scan:
 	for t, vm := range localSpecs {
-
+	scan:
 		for k, v := range vm {
 			matches := re.FindStringSubmatch(string(k))
 			if len(matches) == 3 {
