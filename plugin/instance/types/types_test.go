@@ -3,6 +3,7 @@ package types
 import (
 	"testing"
 
+	"github.com/digitalocean/godo"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,7 @@ func TestParseProperties(t *testing.T) {
   "NamePrefix": "foo",
   "Region": "nyc3",
   "Size": "512mb",
-  "Image": "ubuntu-14-04-x64",
+  "Image": { "Slug" : "ubuntu-14-04-x64"},
   "Backups": false,
   "Ipv6": true,
   "Private_networking": null,
@@ -23,13 +24,18 @@ func TestParseProperties(t *testing.T) {
 	p, err := ParseProperties(properties)
 	assert.NoError(t, err)
 	assert.Equal(t, p, Properties{
-		NamePrefix:        "foo",
-		Size:              "512mb",
-		Image:             "ubuntu-14-04-x64",
-		Backups:           false,
-		IPv6:              true,
-		PrivateNetworking: false,
-		Tags:              []string{"foo"},
+		DropletCreateRequest: godo.DropletCreateRequest{
+			Region: "nyc3",
+			Size:   "512mb",
+			Image: godo.DropletCreateImage{
+				Slug: "ubuntu-14-04-x64",
+			},
+			Backups:           false,
+			IPv6:              true,
+			PrivateNetworking: false,
+			Tags:              []string{"foo"},
+		},
+		NamePrefix: "foo",
 	})
 }
 

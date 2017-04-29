@@ -119,14 +119,13 @@ func TestProvisionFails(t *testing.T) {
 	spec := instance.Spec{
 		Properties: types.AnyString(`{
   "NamePrefix": "foo",
+  "Region" : "asm2",
   "Size": "512mb",
-  "Image": "ubuntu-14-04-x64",
+  "Image": { "Slug" : "ubuntu-14-04-x64" },
   "Tags": ["foo"]
 }`),
 	}
-	region := "asm2"
 	plugin := &plugin{
-		region: region,
 		droplets: &fakeDropletsServices{
 			expectedErr: "something went wrong",
 		},
@@ -140,15 +139,14 @@ func TestProvisionFailsWithSshKey(t *testing.T) {
 	spec := instance.Spec{
 		Properties: types.AnyString(`{
   "NamePrefix": "foo",
+  "Region" : "asm2",
   "Size": "512mb",
-  "Image": "ubuntu-14-04-x64",
-  "Tags": ["foo"]
+  "Image": { "Slug" : "ubuntu-14-04-x64" },
+  "Tags": ["foo"],
+  "SSHKeyNames" : [ "foo" ]
 }`),
 	}
-	region := "asm2"
 	plugin := &plugin{
-		region: region,
-		sshkey: "foo",
 		droplets: &fakeDropletsServices{
 			expectedErr: "should not have error out here",
 		},
@@ -164,19 +162,18 @@ func TestProvision(t *testing.T) {
 	spec := instance.Spec{
 		Properties: types.AnyString(`{
   "NamePrefix": "foo",
+  "Region" : "asm2",
   "Size": "512mb",
-  "Image": "ubuntu-14-04-x64",
+  "Image": { "Slug" : "ubuntu-14-04-x64" },
   "Tags": ["foo"]
 }`),
 	}
-	region := "asm2"
 	versiontag := fmt.Sprintf("%s:%s", itypes.InfrakitDOVersion, itypes.InfrakitDOCurrentVersion)
 	plugin := &plugin{
-		region: region,
 		droplets: &fakeDropletsServices{
 			createfunc: func(ctx context.Context, req *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error) {
 				assert.Contains(t, req.Name, "foo")
-				assert.Equal(t, region, req.Region)
+				assert.Equal(t, req.Region, "asm2")
 				assert.Equal(t, "512mb", req.Size)
 				assert.Equal(t, godo.DropletCreateImage{
 					Slug: "ubuntu-14-04-x64",
@@ -200,15 +197,14 @@ func TestProvisionNonExistingSshkey(t *testing.T) {
 	spec := instance.Spec{
 		Properties: types.AnyString(`{
   "NamePrefix": "foo",
+  "Region" : "asm2",
   "Size": "512mb",
-  "Image": "ubuntu-14-04-x64",
-  "Tags": ["foo"]
+  "Image": { "Slug" : "ubuntu-14-04-x64" },
+  "Tags": ["foo"],
+  "SSHKeyNames" : [ "foo" ]
 }`),
 	}
-	region := "asm2"
 	plugin := &plugin{
-		region: region,
-		sshkey: "foo",
 		droplets: &fakeDropletsServices{
 			createfunc: func(ctx context.Context, req *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error) {
 				assert.Equal(t, 1, len(req.SSHKeys))
@@ -236,15 +232,14 @@ func TestProvisionExistingSshkey(t *testing.T) {
 	spec := instance.Spec{
 		Properties: types.AnyString(`{
   "NamePrefix": "foo",
+  "Region" : "asm2",
   "Size": "512mb",
-  "Image": "ubuntu-14-04-x64",
-  "Tags": ["foo"]
+  "Image": { "Slug" : "ubuntu-14-04-x64" },
+  "Tags": ["foo"],
+  "SSHKeyNames" : [ "foo" ]
 }`),
 	}
-	region := "asm2"
 	plugin := &plugin{
-		region: region,
-		sshkey: "foo",
 		droplets: &fakeDropletsServices{
 			createfunc: func(ctx context.Context, req *godo.DropletCreateRequest) (*godo.Droplet, *godo.Response, error) {
 				assert.Equal(t, 1, len(req.SSHKeys))
@@ -281,9 +276,7 @@ func isInSlice(s string, strings []string) assert.Comparison {
 }
 
 func TestDescribeInstancesFails(t *testing.T) {
-	region := "asm2"
 	plugin := &plugin{
-		region: region,
 		droplets: &fakeDropletsServices{
 			expectedErr: "something went wrong",
 		},
@@ -293,9 +286,7 @@ func TestDescribeInstancesFails(t *testing.T) {
 }
 
 func TestDescribeInstancesNone(t *testing.T) {
-	region := "asm2"
 	plugin := &plugin{
-		region: region,
 		droplets: &fakeDropletsServices{
 			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
 				return []godo.Droplet{
@@ -313,9 +304,7 @@ func TestDescribeInstancesNone(t *testing.T) {
 }
 
 func TestDescribeInstances(t *testing.T) {
-	region := "asm2"
 	plugin := &plugin{
-		region: region,
 		droplets: &fakeDropletsServices{
 			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
 				return []godo.Droplet{
@@ -333,9 +322,7 @@ func TestDescribeInstances(t *testing.T) {
 }
 
 func TestDescribeInstancesHandlesPages(t *testing.T) {
-	region := "asm2"
 	plugin := &plugin{
-		region: region,
 		droplets: &fakeDropletsServices{
 			listfunc: func(_ context.Context, opts *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
 				resp := godoResponse(hasNextPage)
