@@ -3,6 +3,7 @@ package instance
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/digitalocean/godo"
@@ -79,8 +80,9 @@ func TestDestroyFails(t *testing.T) {
 	}
 	id := instance.ID("foo")
 	err := plugin.Destroy(id)
-
-	require.EqualError(t, err, "strconv.ParseInt: parsing \"foo\": invalid syntax")
+	require.Error(t, err)
+	_, is := err.(*strconv.NumError)
+	require.True(t, is)
 
 	id = instance.ID("12345")
 	err = plugin.Destroy(id)
