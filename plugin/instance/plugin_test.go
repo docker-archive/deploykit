@@ -40,6 +40,23 @@ func TestLabelFails(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestBuildCloudInit(t *testing.T) {
+	cloudInit, err := buildCloudInit(
+		"#!/bin/bash",
+		"apt-get update -y; apt-get install -y curl",
+		"wget -qO- https://get.docker.com | sh")
+	require.NoError(t, err)
+	require.Equal(t, `
+#cloud-config
+
+runcmd:
+- apt-get update -y
+- apt-get install -y curl
+- wget -qO- https://get.docker.com | sh
+
+`, cloudInit)
+}
+
 func TestValidate(t *testing.T) {
 	plugin := &plugin{}
 	err := plugin.Validate(types.AnyString(`{"Size":"1gb", "Image": "debian-8-x64"}`))
@@ -63,7 +80,7 @@ func TestDestroyFails(t *testing.T) {
 	id := instance.ID("foo")
 	err := plugin.Destroy(id)
 
-	require.EqualError(t, err, "strconv.Atoi: parsing \"foo\": invalid syntax")
+	require.EqualError(t, err, "strconv.ParseInt: parsing \"foo\": invalid syntax")
 
 	id = instance.ID("12345")
 	err = plugin.Destroy(id)

@@ -14,6 +14,7 @@ import (
 	instance_types "github.com/docker/infrakit.digitalocean/plugin/instance/types"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -40,21 +41,23 @@ type keysService interface {
 }
 
 type plugin struct {
-	droplets dropletsService
-	tags     tagsService
-	keys     keysService
-	region   string
-	sshkey   string
+	droplets      dropletsService
+	tags          tagsService
+	keys          keysService
+	region        string
+	sshkey        string
+	namespaceTags map[string]string
 }
 
 // NewDOInstancePlugin creates a new DigitalOcean instance plugin for a given region.
-func NewDOInstancePlugin(client *godo.Client, region, sshkey string) instance.Plugin {
+func NewDOInstancePlugin(client *godo.Client, region, sshkey string, namespace map[string]string) instance.Plugin {
 	return &plugin{
-		droplets: client.Droplets,
-		tags:     client.Tags,
-		keys:     client.Keys,
-		region:   region,
-		sshkey:   sshkey,
+		droplets:      client.Droplets,
+		tags:          client.Tags,
+		keys:          client.Keys,
+		region:        region,
+		sshkey:        sshkey,
+		namespaceTags: namespace,
 	}
 }
 
@@ -115,7 +118,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	name := fmt.Sprintf("%s-%s", properties.NamePrefix, randomSuffix(6))
 
 	tags := instance_types.ParseTags(spec)
-	_, tags = mergeTags(tags, sliceToMap(properties.Tags)) // scope this resource with namespace tags
+	_, tags = mergeTags(tags, sliceToMap(properties.Tags), p.namespaceTags) // scope this resource with namespace tags
 
 	key, err := p.getSshkey(p.sshkey)
 	if err != nil {
@@ -142,6 +145,16 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		Tags:              doTags(mapToStringSlice(tags)),
 		SSHKeys:           sshkeys,
 	}
+
+	cloudInit, err := buildCloudInit(dropletCreateRequest.UserData, spec.Init)
+	if err != nil {
+		return nil, err
+	}
+
+	if cloudInit != "" {
+		dropletCreateRequest.UserData = cloudInit
+	}
+
 	droplet, _, err := p.droplets.Create(context.TODO(), dropletCreateRequest)
 	if err != nil {
 		return nil, err
@@ -193,6 +206,8 @@ func (p *plugin) Destroy(instance instance.ID) error {
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
+
+	_, tags = mergeTags(tags, p.namespaceTags)
 
 	droplets, err := p.listDroplets()
 	if err != nil {
@@ -246,6 +261,31 @@ func (p *plugin) listDroplets() ([]godo.Droplet, error) {
 		droplets = append(droplets, d...)
 	}
 	return droplets, nil
+}
+
+const cloudInitTemplate = `
+#cloud-config
+{{ $config := dict "runcmd" .lines }}
+{{ $config | yamlEncode }}
+`
+
+func buildCloudInit(args ...string) (string, error) {
+	t, err := template.NewTemplate("str://"+cloudInitTemplate, template.Options{})
+	if err != nil {
+		return "", err
+	}
+	lines := []string{}
+	for _, l := range args {
+		// split the line
+		for _, ll := range strings.Split(l, ";") {
+			t := strings.Trim(ll, " \t\n")
+			if strings.Index(t, "#!") != 0 {
+				// exclude shebangs like #!/bin/bash
+				lines = append(lines, t)
+			}
+		}
+	}
+	return t.Render(map[string]interface{}{"lines": lines})
 }
 
 func doTags(tags []string) []string {
