@@ -1,0 +1,28 @@
+#!/bin/bash
+
+{{/* =% sh %= */}}
+
+{{ $do := flag "start-do" "bool" "Start Digital Ocean plugin" | prompt "Start Digital Ocean plugin?" "bool" "no" }}
+
+{{ $defaultConfig := cat "file://" (env "HOME") "/.config/doctl/config.yaml" | nospace }}
+{{ $defaultAccessToken := source $defaultConfig | yamlDecode | k "access-token" }}
+
+{{ $accessToken := flag "access-token" "string" "Access token" | prompt "Access token?" "string" $defaultAccessToken }}
+{{ $project := flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" "mytest" }}
+
+{{ $doImage := flag "do-plugin" "string" "Image of the plugin" |  cond $do | prompt "What's the DO plugin image?" "string" "infrakit/digitalocean:dev" }}
+
+{{ $project := var "/project" }}
+
+{{ if $do }}
+
+echo "Starting DO plugin"
+
+# Starting docker container for instance plugin
+docker run -d --volumes-from infrakit --log 5 \
+       {{$doImage}} infrakit-instance-digitalocean  \
+       --name instance-digitalocean \
+       --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
+       --access-token {{ $accessToken }} \
+
+{{ end }}
