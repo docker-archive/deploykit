@@ -5,15 +5,23 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
-	"github.com/docker/infrakit/pkg/spi/application"
+	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/types"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	"github.com/gorilla/mux"
+	"gopkg.in/tylerb/graceful.v1"
+	"io"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"os"
 	"sync"
+	"time"
 )
 
 // NewEventRepeater creates an event repeater application.
-func NewEventRepeater(eSource string, eSink string, protocol string, allowall bool) application.Plugin {
+func NewEventRepeater(eSource string, eSink string, protocol string, allowall bool) *EventRepeater {
 	sub, err := event_rpc.NewClient(eSource)
 	if err != nil {
 		log.Errorf("Cannot Create Event Client :%v", err)
@@ -24,7 +32,7 @@ func NewEventRepeater(eSource string, eSink string, protocol string, allowall bo
 		log.Errorf("Cannot Create Sink Client protocol :%v Server :%v :%v", protocol, eSink, err)
 		return nil
 	}
-	e := &eventRepeater{
+	e := &EventRepeater{
 		EventSource:   eSource,
 		EventSink:     eSink,
 		Events:        make(map[string]*RepeatRule),
@@ -35,7 +43,6 @@ func NewEventRepeater(eSource string, eSink string, protocol string, allowall bo
 		allowAll:      allowall,
 		eventListMt:   new(sync.Mutex),
 	}
-	go e.serve()
 	return e
 }
 
@@ -57,7 +64,8 @@ func newSinkClient(protocol string, broker string) (interface{}, error) {
 	}
 }
 
-type eventRepeater struct {
+// EventRepeater struct
+type EventRepeater struct {
 	EventSource   string
 	EventSink     string
 	Events        map[string]*RepeatRule
@@ -85,15 +93,7 @@ type messageData struct {
 	SinkTopic   string `json:"sinktopic, omitempty"`
 }
 
-func (e eventRepeater) Validate(applicationProperties *types.Any) error {
-	return nil
-}
-
-func (e eventRepeater) Healthy(applicationProperties *types.Any) (application.Health, error) {
-	return application.Healthy, nil
-}
-
-func (e eventRepeater) addEvent(sourcesTopic string, sinkTopic string) error {
+func (e EventRepeater) addEvent(sourcesTopic string, sinkTopic string) error {
 	if sourcesTopic == "" {
 		return fmt.Errorf("Error: %s", "You must have a topic of source for add repeat event.")
 	}
@@ -121,7 +121,7 @@ func (e eventRepeater) addEvent(sourcesTopic string, sinkTopic string) error {
 	return nil
 }
 
-func (e eventRepeater) delEvent(sourcesTopic string) error {
+func (e EventRepeater) delEvent(sourcesTopic string) error {
 	if sourcesTopic == "" {
 		return fmt.Errorf("Error: %s", "You must have a topic of source for delete repeat event.")
 	}
@@ -137,11 +137,12 @@ func (e eventRepeater) delEvent(sourcesTopic string) error {
 	return nil
 }
 
-func (e eventRepeater) Stop() {
+// Stop EventRepeater server
+func (e EventRepeater) Stop() {
 	e.stop <- true
 }
 
-func (e eventRepeater) publishToSink(rr *RepeatRule) error {
+func (e EventRepeater) publishToSink(rr *RepeatRule) error {
 	for {
 		select {
 		case <-rr.SinkStopCh:
@@ -173,60 +174,134 @@ func (e eventRepeater) publishToSink(rr *RepeatRule) error {
 	}
 }
 
-func (e eventRepeater) Update(message *application.Message) error {
+func (e EventRepeater) eventsReqHandler(w http.ResponseWriter, r *http.Request) {
+	var body []byte
+	var err error
+	if r.Method != "GET" {
+		body, err = ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+			return
+		}
+		if err := r.Body.Close(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	err = e.eventUpdate(r.Method, body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	return
+}
+
+func (e EventRepeater) eventUpdate(method string, body []byte) error {
 	var dataStruct []messageData
-	err := json.Unmarshal([]byte(*message.Data), &dataStruct)
+	err := json.Unmarshal(body, &dataStruct)
 	if err != nil {
 		return err
 	}
-	switch message.Resource {
-	case "event":
-		log.Debugf("Update message op %v Resource %v Data %v \n", message.Op, message.Resource, dataStruct)
-		switch message.Op {
-		case application.ADD:
-			for _, d := range dataStruct {
-				log.Debugf("Add message %v \n", d)
-				err := e.addEvent(d.SourceTopic, d.SinkTopic)
-				if err != nil {
-					return err
-				}
+	log.Debugf("Update message op %v Data %v \n", method, dataStruct)
+	switch method {
+	case "POST":
+		for _, d := range dataStruct {
+			log.Debugf("Add message %v \n", d)
+			err := e.addEvent(d.SourceTopic, d.SinkTopic)
+			if err != nil {
+				return err
 			}
-		case application.DELETE:
-			for _, d := range dataStruct {
-				err := e.delEvent(d.SourceTopic)
-				if err != nil {
-					return err
-				}
-			}
-		case application.UPDATE:
-			for _, d := range dataStruct {
-				err := e.delEvent(d.SourceTopic)
-				if err != nil {
-					return err
-				}
-				err = e.addEvent(d.SourceTopic, d.SinkTopic)
-				if err != nil {
-					return err
-				}
-			}
-		case application.GET:
-		default:
-			log.Warnf("Unknown operation\n")
 		}
+	case "DELETE":
+		for _, d := range dataStruct {
+			err := e.delEvent(d.SourceTopic)
+			if err != nil {
+				return err
+			}
+		}
+	case "PUT":
+		for _, d := range dataStruct {
+			err := e.delEvent(d.SourceTopic)
+			if err != nil {
+				return err
+			}
+			err = e.addEvent(d.SourceTopic, d.SinkTopic)
+			if err != nil {
+				return err
+			}
+		}
+	case "GET":
 	default:
-		log.Warnf("Unknown resouces\n")
+		log.Warnf("Unknown operation\n")
 	}
 	return nil
 }
 
-func (e eventRepeater) serve() error {
+type stoppableServer struct {
+	server *graceful.Server
+}
+
+func (s *stoppableServer) Stop() {
+	s.server.Stop(10 * time.Second)
+}
+
+func (s *stoppableServer) Wait() <-chan struct{} {
+	return s.server.StopChan()
+}
+
+func (s *stoppableServer) AwaitStopped() {
+	<-s.server.StopChan()
+}
+
+type loggingHandler struct {
+	handler http.Handler
+}
+
+//Serve : Make listener or unix socket, listening and serve REST server
+func (e EventRepeater) Serve(discoverPath string, listen string) (server.Stoppable, error) {
 	if e.allowAll {
 		e.addEvent(".", "")
 	}
-	for {
-		select {
-		case <-e.stop:
-			return nil
-		}
+	r := mux.NewRouter().StrictSlash(true)
+	r.Path("/events").HandlerFunc(e.eventsReqHandler)
+	gracefulServer := graceful.Server{
+		Timeout: 10 * time.Second,
 	}
+	var listener net.Listener
+	if listen != "" {
+		gracefulServer.Server = &http.Server{
+			Addr:    listen,
+			Handler: r,
+		}
+		l, err := net.Listen("tcp", listen)
+		if err != nil {
+			return nil, err
+		}
+		listener = l
+		if err := ioutil.WriteFile(discoverPath, []byte(fmt.Sprintf("tcp://%s", listen)), 0644); err != nil {
+			return nil, err
+		}
+		log.Infof("Listening at: %s, discoverable at %s", listen, discoverPath)
+	} else {
+		gracefulServer.Server = &http.Server{
+			Addr:    fmt.Sprintf("unix://%s", discoverPath),
+			Handler: r,
+		}
+		l, err := net.Listen("unix", discoverPath)
+		if err != nil {
+			fmt.Printf("%s\n", err)
+			return nil, err
+		}
+		listener = l
+		log.Infof("Listening at: %s", discoverPath)
+	}
+	go func() {
+		err := gracefulServer.Serve(listener)
+		if err != nil {
+			log.Warn(err)
+		}
+		if listen != "" {
+			os.Remove(discoverPath)
+		}
+	}()
+	return &stoppableServer{server: &gracefulServer}, nil
 }

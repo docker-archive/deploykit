@@ -1,18 +1,21 @@
 package eventrepeater
 
 import (
+	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
-	"github.com/docker/infrakit/pkg/spi/application"
 	"github.com/docker/infrakit/pkg/spi/event"
 	testing_event "github.com/docker/infrakit/pkg/testing/event"
 	"github.com/docker/infrakit/pkg/types"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
+	"net"
+	"net/http"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -42,40 +45,28 @@ func TestUnitUpdate(t *testing.T) {
 	require.NoError(t, err)
 	defer server.Stop()
 
-	//Test ADD operation
+	//Test POST operation
 	require.NoError(t, err)
-	e := NewEventRepeater(socketPath, "", "stderr", false).(*eventRepeater)
-	mes := &application.Message{
-		Op:       application.ADD,
-		Resource: "event",
-		Data:     types.AnyString("[{\"sourcetopic\":\"test/instance1\",\"sinktopic\":\"test/sink/instance1\"},{\"sourcetopic\":\"test/instance2\",\"sinktopic\":\"test/sink/instance2\"}]"),
-	}
-	err = e.Update(mes)
+	e := NewEventRepeater(socketPath, "", "stderr", false)
+	reqbody := "[{\"sourcetopic\":\"test/instance1\",\"sinktopic\":\"test/sink/instance1\"},{\"sourcetopic\":\"test/instance2\",\"sinktopic\":\"test/sink/instance2\"}]"
+	err = e.eventUpdate("POST", []byte(reqbody))
 	require.NoError(t, err)
 	require.Equal(t, 2, len(e.Events))
 	require.Equal(t, "test/sink/instance1", e.Events["test/instance1"].SinkTopic)
 	require.Equal(t, "test/sink/instance2", e.Events["test/instance2"].SinkTopic)
 
-	//Test DELETE operation
-	mes = &application.Message{
-		Op:       application.DELETE,
-		Resource: "event",
-		Data:     types.AnyString("[{\"sourcetopic\":\"test/instance2\",\"sinktopic\":\"\"}]"),
-	}
-	err = e.Update(mes)
+	//Test ADD operation
+	reqbody = "[{\"sourcetopic\":\"test/instance2\",\"sinktopic\":\"\"}]"
+	err = e.eventUpdate("DELETE", []byte(reqbody))
 	require.NoError(t, err)
 	require.Equal(t, 1, len(e.Events))
 	require.Equal(t, "test/sink/instance1", e.Events["test/instance1"].SinkTopic)
 	_, ok := e.Events["test/instance2"]
 	require.Equal(t, false, ok)
 
-	//Test UPDATE operation
-	mes = &application.Message{
-		Op:       application.UPDATE,
-		Resource: "event",
-		Data:     types.AnyString("[{\"sourcetopic\":\"test/instance1\",\"sinktopic\":\"test/event/instance1\"}]"),
-	}
-	err = e.Update(mes)
+	//Test PUT operation
+	reqbody = "[{\"sourcetopic\":\"test/instance1\",\"sinktopic\":\"test/event/instance1\"}]"
+	err = e.eventUpdate("PUT", []byte(reqbody))
 	require.NoError(t, err)
 	require.Equal(t, "test/event/instance1", e.Events["test/instance1"].SinkTopic)
 }
@@ -189,8 +180,10 @@ func TestIntegrationAllowAll(t *testing.T) {
 	require.NoError(t, err)
 	defer mqttClient0.Disconnect(250)
 	defer mqttClient1.Disconnect(250)
-	app := NewEventRepeater(socketPath, MQTTTESTSERVER, "mqtt", true)
-	defer app.(*eventRepeater).Stop()
+	e := NewEventRepeater(socketPath, MQTTTESTSERVER, "mqtt", true)
+	discoverPath := tempSocket()
+	_, err = e.Serve(discoverPath, "")
+	require.NoError(t, err)
 	close(startPub)
 	var subEvent0 int
 	var subEvent1 int
@@ -237,15 +230,29 @@ func TestIntegrationDenyAll(t *testing.T) {
 	require.NoError(t, err)
 	defer mqttClient0.Disconnect(250)
 	defer mqttClient1.Disconnect(250)
-	app := NewEventRepeater(socketPath, MQTTTESTSERVER, "mqtt", false)
-	defer app.(*eventRepeater).Stop()
-	m := &application.Message{
-		Op:       application.ADD,
-		Resource: "event",
-		Data:     types.AnyString("[{\"sourcetopic\":\"" + topicPrefix + "-compute/instance/create\",\"sinktopic\":\"\"}]"),
-	}
-	err = app.Update(m)
+	e := NewEventRepeater(socketPath, MQTTTESTSERVER, "mqtt", false)
+	discoverPath := tempSocket()
+	_, err = e.Serve(discoverPath, "")
 	require.NoError(t, err)
+	req, err := http.NewRequest(
+		"POST",
+		"http://unix/events",
+		bytes.NewBuffer([]byte("[{\"sourcetopic\":\""+topicPrefix+"-compute/instance/create\",\"sinktopic\":\"\"}]")),
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	client := http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", discoverPath)
+			},
+		},
+		Timeout: time.Duration(10) * time.Second,
+	}
+	resp, err := client.Do(req)
+	defer resp.Body.Close()
+	require.NoError(t, err)
+	require.Equal(t, "200 OK", resp.Status)
 	close(startPub)
 	var subEvent0 int
 	var subEvent1 int

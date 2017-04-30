@@ -1,63 +1,117 @@
 package util
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
-	application_rpc "github.com/docker/infrakit/pkg/rpc/application"
-	"github.com/docker/infrakit/pkg/spi/application"
-	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"strings"
+	"time"
 )
-
-//OPERATIONS code of update command
-var OPERATIONS = map[int]string{1: "Add", 2: "Delete", 3: "Update", 4: "Read"}
 
 // Command is the entry point of the module
 func applicationCommand(plugins func() discovery.Plugins) *cobra.Command {
-	var applicationPlugin application.Plugin
 
 	cmd := &cobra.Command{
 		Use:   "application",
 		Short: "Access application plugins",
 	}
 	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
+	path := cmd.PersistentFlags().String("path", "/", "URL path of resource e.g. /resources/resourceID/")
+	if !strings.HasPrefix(*path, "/") {
+		fmt.Printf("Path must start from \"/\" : %s ", *path)
+		return nil
+	}
+	var addr string
+	var protocol string
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		if err := cli.EnsurePersistentPreRunE(c); err != nil {
 			return err
 		}
-
 		endpoint, err := plugins().Find(plugin.Name(*name))
 		if err != nil {
 			return err
 		}
-
-		p, err := application_rpc.NewClient(plugin.Name(*name), endpoint.Address)
-		if err != nil {
-			return err
-		}
-		applicationPlugin = p
-
-		cli.MustNotNil(applicationPlugin, "application plugin not found", "name", *name)
+		addr = endpoint.Address
+		protocol = endpoint.Protocol
 		return nil
 	}
 
-	operation := 3
-	resource := ""
 	value := ""
-	update := &cobra.Command{
-		Use:   "update",
-		Short: "Update application's resouce",
-		RunE: func(c *cobra.Command, args []string) error {
-			fmt.Printf("send update message plugin=%v, op=%v, resource=%v, value=%v.\n", args, OPERATIONS[operation], resource, value)
-			err := applicationPlugin.Update(
-				&application.Message{
-					Op:       application.Operation(operation),
-					Resource: resource,
-					Data:     types.AnyString(value),
-				},
+
+	send := func(method string, body string) error {
+		switch protocol {
+		case "tcp":
+			url := strings.Replace(addr, "tcp:", "http:", 1)
+			req, err := http.NewRequest(
+				method,
+				url+*path,
+				bytes.NewBuffer([]byte(body)),
 			)
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Content-Type", "application/json")
+			client := &http.Client{Timeout: time.Duration(10) * time.Second}
+			resp, err := client.Do(req)
+			if err != nil {
+				return err
+			}
+			respbody, _ := ioutil.ReadAll(resp.Body)
+			logger.Info("Send Request", "URL", url+*path, "Request Body", body, "Respence Status", resp.Status, "Respence Body", string(respbody))
+			defer resp.Body.Close()
+		case "unix":
+			req, err := http.NewRequest(
+				method,
+				"http://unix"+*path,
+				bytes.NewBuffer([]byte(body)),
+			)
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Content-Type", "application/json")
+			client := http.Client{
+				Transport: &http.Transport{
+					DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+						return net.Dial("unix", addr)
+					},
+				},
+				Timeout: time.Duration(10) * time.Second,
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				return err
+			}
+			respbody, _ := ioutil.ReadAll(resp.Body)
+			logger.Info("Send Request", "URL", addr+*path, "Request Body", body, "Respence Status", resp.Status, "Respence Body", string(respbody))
+			defer resp.Body.Close()
+		}
+		return nil
+	}
+	post := &cobra.Command{
+		Use:   "post",
+		Short: "Post request to application.",
+		RunE: func(c *cobra.Command, args []string) error {
+			err := send("POST", value)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	post.Flags().StringVar(&value, "value", value, "update value")
+
+	delete := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete request to application.",
+		RunE: func(c *cobra.Command, args []string) error {
+			err := send("DELETE", value)
 			if err != nil {
 				return err
 			}
@@ -65,11 +119,38 @@ func applicationCommand(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
-	update.Flags().IntVar(&operation, "op", operation, "update operation 1: Add, 2: Delete, 3: Update, 4: Read(default)")
-	update.Flags().StringVar(&resource, "resource", resource, "target resource")
-	update.Flags().StringVar(&value, "value", value, "update value")
+	delete.Flags().StringVar(&value, "value", value, "update value")
 
-	cmd.AddCommand(update)
+	put := &cobra.Command{
+		Use:   "put",
+		Short: "Put request to application.",
+		RunE: func(c *cobra.Command, args []string) error {
+			err := send("PUT", value)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+	put.Flags().StringVar(&value, "value", value, "update value")
+
+	get := &cobra.Command{
+		Use:   "get",
+		Short: "Get request to application.",
+		RunE: func(c *cobra.Command, args []string) error {
+			err := send("GET", value)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	cmd.AddCommand(post)
+	cmd.AddCommand(delete)
+	cmd.AddCommand(get)
+	cmd.AddCommand(put)
 
 	return cmd
 }
