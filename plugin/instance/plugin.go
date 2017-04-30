@@ -14,6 +14,7 @@ import (
 	instance_types "github.com/docker/infrakit.digitalocean/plugin/instance/types"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -40,21 +41,19 @@ type keysService interface {
 }
 
 type plugin struct {
-	droplets dropletsService
-	tags     tagsService
-	keys     keysService
-	region   string
-	sshkey   string
+	droplets      dropletsService
+	tags          tagsService
+	keys          keysService
+	namespaceTags map[string]string
 }
 
 // NewDOInstancePlugin creates a new DigitalOcean instance plugin for a given region.
-func NewDOInstancePlugin(client *godo.Client, region, sshkey string) instance.Plugin {
+func NewDOInstancePlugin(client *godo.Client, namespace map[string]string) instance.Plugin {
 	return &plugin{
-		droplets: client.Droplets,
-		tags:     client.Tags,
-		keys:     client.Keys,
-		region:   region,
-		sshkey:   sshkey,
+		droplets:      client.Droplets,
+		tags:          client.Tags,
+		keys:          client.Keys,
+		namespaceTags: namespace,
 	}
 }
 
@@ -112,37 +111,40 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	name := fmt.Sprintf("%s-%s", properties.NamePrefix, randomSuffix(6))
+	// the basic request is already part of the input
+	dropletCreateRequest := properties.DropletCreateRequest
 
+	// Some computed overrides:
+
+	// the name must be given suffix
+	dropletCreateRequest.Name = fmt.Sprintf("%s-%s", properties.NamePrefix, randomSuffix(6))
+
+	// tags to include namespace tags and injected tags
 	tags := instance_types.ParseTags(spec)
-	_, tags = mergeTags(tags, sliceToMap(properties.Tags)) // scope this resource with namespace tags
+	_, tags = mergeTags(tags, sliceToMap(properties.Tags), p.namespaceTags) // scope this resource with namespace tags
+	dropletCreateRequest.Tags = doTags(mapToStringSlice(tags))
 
-	key, err := p.getSshkey(p.sshkey)
+	// SSH key -- the api requires ID but we make it easier so users can use names
+	keys := []godo.DropletCreateSSHKey{}
+	for _, n := range properties.SSHKeyNames {
+		key, err := p.getSshkey(n)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, godo.DropletCreateSSHKey{ID: key.ID})
+	}
+	dropletCreateRequest.SSHKeys = keys
+
+	// CloudInit / UserData
+	cloudInit, err := buildCloudInit(dropletCreateRequest.UserData, spec.Init)
 	if err != nil {
 		return nil, err
 	}
-
-	sshkeys := []godo.DropletCreateSSHKey{
-		{
-			ID: key.ID,
-		},
+	if cloudInit != "" {
+		dropletCreateRequest.UserData = cloudInit
 	}
 
-	// Create the droplet
-	dropletCreateRequest := &godo.DropletCreateRequest{
-		Name:   name,
-		Region: p.region,
-		Size:   properties.Size,
-		Image: godo.DropletCreateImage{
-			Slug: properties.Image,
-		},
-		Backups:           properties.Backups,
-		IPv6:              properties.IPv6,
-		PrivateNetworking: properties.PrivateNetworking,
-		Tags:              doTags(mapToStringSlice(tags)),
-		SSHKeys:           sshkeys,
-	}
-	droplet, _, err := p.droplets.Create(context.TODO(), dropletCreateRequest)
+	droplet, _, err := p.droplets.Create(context.TODO(), &dropletCreateRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +195,8 @@ func (p *plugin) Destroy(instance instance.ID) error {
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
+
+	_, tags = mergeTags(tags, p.namespaceTags)
 
 	droplets, err := p.listDroplets()
 	if err != nil {
@@ -246,6 +250,31 @@ func (p *plugin) listDroplets() ([]godo.Droplet, error) {
 		droplets = append(droplets, d...)
 	}
 	return droplets, nil
+}
+
+const cloudInitTemplate = `
+#cloud-config
+{{ $config := dict "runcmd" .lines }}
+{{ $config | yamlEncode }}
+`
+
+func buildCloudInit(args ...string) (string, error) {
+	t, err := template.NewTemplate("str://"+cloudInitTemplate, template.Options{})
+	if err != nil {
+		return "", err
+	}
+	lines := []string{}
+	for _, l := range args {
+		// split the line
+		for _, ll := range strings.Split(l, ";") {
+			t := strings.Trim(ll, " \t\n")
+			if strings.Index(t, "#!") != 0 {
+				// exclude shebangs like #!/bin/bash
+				lines = append(lines, t)
+			}
+		}
+	}
+	return t.Render(map[string]interface{}{"lines": lines})
 }
 
 func doTags(tags []string) []string {

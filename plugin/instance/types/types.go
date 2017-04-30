@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/digitalocean/godo"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/pkg/errors"
@@ -21,13 +22,16 @@ const (
 
 // Properties is the configuration schema for the plugin, provided in instance.Spec.Properties
 type Properties struct {
-	NamePrefix        string
-	Image             string
-	Size              string
-	Backups           bool
-	IPv6              bool `json:"ipv6"`
-	PrivateNetworking bool `json:"private_networking"`
-	Tags              []string
+	godo.DropletCreateRequest
+
+	NamePrefix  string
+	SSHKeyNames []string
+	// Image             string
+	// Size              string
+	// Backups           bool
+	// IPv6              bool `json:"ipv6"`
+	// PrivateNetworking bool `json:"private_networking"`
+	// Tags              []string
 }
 
 // ParseProperties parses instance Properties from a json description.
