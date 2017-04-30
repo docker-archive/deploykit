@@ -257,7 +257,7 @@ func (c *Context) Funcs() []template.Function {
 				if c.exec {
 					return c.template.Include(p, opt...)
 				}
-				return "", nil
+				return "{}", nil
 			},
 		},
 		{
@@ -266,7 +266,7 @@ func (c *Context) Funcs() []template.Function {
 				if c.exec {
 					return c.template.Source(p, opt...)
 				}
-				return "", nil
+				return "{}", nil
 			},
 		},
 		{

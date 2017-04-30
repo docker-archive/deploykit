@@ -18,7 +18,7 @@ Init: |
   #!/bin/bash
   sudo apt-get update -y
   sudo apt-get install wget curl
-  wget -q0- https://get.docker.com | sh
+  wget -qO- https://get.docker.com | sh
 
 Properties:
   NamePrefix: {{ $user }}

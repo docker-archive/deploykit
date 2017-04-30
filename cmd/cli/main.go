@@ -23,6 +23,7 @@ import (
 	_ "github.com/docker/infrakit/cmd/cli/instance"
 	_ "github.com/docker/infrakit/cmd/cli/manager"
 	_ "github.com/docker/infrakit/cmd/cli/metadata"
+	_ "github.com/docker/infrakit/cmd/cli/playbook"
 	_ "github.com/docker/infrakit/cmd/cli/plugin"
 	_ "github.com/docker/infrakit/cmd/cli/resource"
 	_ "github.com/docker/infrakit/cmd/cli/template"
