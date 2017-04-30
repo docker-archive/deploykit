@@ -1,0 +1,9 @@
+
+# Starts the plugin as a container
+start-plugin : start-plugin.ikt
+
+# Starts the plugin as a daemon (not container)
+start-daemon : start-plugin-daemon.ikt
+
+# Create a single instance
+provision-instance : provision-instance.ikt
