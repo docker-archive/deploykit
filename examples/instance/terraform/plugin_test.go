@@ -40,7 +40,8 @@ func TestUsage(t *testing.T) {
 				"domain": "softlayer.com",
 				"ssh_key_ids": [
 					"${data.softlayer_ssh_key.public_key.id}"
-				]
+				],
+				"user_metadata": "ls"
 			}
 		}
 	}
@@ -74,7 +75,8 @@ func TestUsage(t *testing.T) {
 				"datacenter": "dal10",
 				"os_reference_code": "UBUNTU_14_64",
 				"domain": "softlayer.com",
-				"ssh_key_ids": [ "${data.softlayer_ssh_key.public_key.id}" ]
+				"ssh_key_ids": [ "${data.softlayer_ssh_key.public_key.id}" ],
+				"user_metadata": "ls"
 			}
 		}
 	}
@@ -105,7 +107,8 @@ func TestUsage(t *testing.T) {
 				"domain": "softlayer.com",
 				"ssh_key_ids": [
 					"${data.softlayer_ssh_key.public_key.id}"
-				]
+				],
+				"user_metadata": "ls"
 			}
 		}
 	}
@@ -130,6 +133,7 @@ func TestUsage(t *testing.T) {
 				"connection" : {
 					"user" : "ubuntu"
 				},
+				"user_data": "ls",
 				"provisioner" : {
 					"remote_exec" : {
 						"inline" : [
@@ -224,6 +228,10 @@ func run(t *testing.T, resourceType, properties string) {
 	_, v := firstInMap(vms.(map[string]interface{}))
 	value, _ := v.(map[string]interface{})
 
+	// Userdata should have the resource defined data (ie, "ls") with
+	// the spec init data appended
+	expectedUserData2 := "ls\n" + instanceSpec2.Init
+
 	switch vmType {
 	case VMSoftLayer:
 		require.Equal(t, conv([]interface{}{
@@ -232,7 +240,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label2:value2",
 			"name:" + string(*id2),
 		}), conv(props["tags"].([]interface{})))
-		require.Equal(t, instanceSpec2.Init, props["user_metadata"])
+		require.Equal(t, expectedUserData2, props["user_metadata"])
 
 		// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
 		if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
@@ -253,7 +261,8 @@ func run(t *testing.T, resourceType, properties string) {
 			"label2":         "value2",
 			"Name":           string(*id2),
 		}, props["tags"])
-		require.Equal(t, base64.StdEncoding.EncodeToString([]byte(instanceSpec2.Init)), props["user_data"])
+		// user_data is base64 encoded
+		require.Equal(t, base64.StdEncoding.EncodeToString([]byte(expectedUserData2)), props["user_data"])
 	}
 
 	// Expected instances returned from Describe
