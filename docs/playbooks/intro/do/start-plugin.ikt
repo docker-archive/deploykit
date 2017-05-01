@@ -8,7 +8,7 @@
 {{ $defaultAccessToken := source $defaultConfig | yamlDecode | k "access-token" }}
 
 {{ $accessToken := flag "access-token" "string" "Access token" | prompt "Access token?" "string" $defaultAccessToken }}
-{{ $project := flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" "mytest" }}
+{{ $project := var "/project" }} {{/*flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" "mytest" */}}
 
 {{ $doImage := flag "do-plugin" "string" "Image of the plugin" |  cond $do | prompt "What's the DO plugin image?" "string" "infrakit/digitalocean:dev" }}
 
@@ -16,13 +16,12 @@
 
 {{ if $do }}
 
-echo "Starting DO plugin"
+echo "Starting DO plugin with image {{$doImage}}, project {{$project}}"
 
 # Starting docker container for instance plugin
-docker run -d --volumes-from infrakit --log 5 \
-       {{$doImage}} infrakit-instance-digitalocean  \
-       --name instance-digitalocean \
+docker run -d --volumes-from infrakit --name instance-digitalocean {{$doImage}} \
+       infrakit-instance-digitalocean --name instance-digitalocean \
        --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
-       --access-token {{ $accessToken }} \
+       --access-token {{ $accessToken }} --log 5
 
 {{ end }}

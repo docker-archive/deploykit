@@ -1,0 +1,41 @@
+{{/* Input to create a group using the DO instance plugin and manager */}}
+{{/* =% managerCommit true false  %= */}}
+
+{{ $size := flag "size" "int" "Size of the group" | prompt "How many nodes?" "int" 2 }}
+{{ $groupName := flag "group-name" "string" "Name of group" | prompt "Name of the group?" "string" "mygroup" }}
+{{ $region := flag "region" "string" "DO region" | prompt "Region?" "string" "sfo1" }}
+{{ $image := flag "image-id" "string" "Image  ID" | prompt "Image to boot?" "string" "ubuntu-16-10-x64" }}
+{{ $instanceSize := flag "instance-size" "string" "Instance size" | prompt "Instance size?" "string" "1gb"}}
+{{ $sshKey := flag "ssh-key" "string" "SSH key to use" | prompt "SSH key to use?" "string" "" }}
+
+{{ $project := var "/project" | flag "project" "string" "Project name" | prompt "Project?" "string" "myproject" }}
+
+- Plugin: group
+  Properties:
+    ID: {{ $groupName }}
+    Properties:
+      Allocation:
+        Size: {{ $size }}
+      Flavor:
+        Plugin: flavor-vanilla
+        Properties:
+          Init:
+            - apt-get update -y
+            - apt-get install wget curl
+            - wget -qO- https://get.docker.com | sh
+          Tags:
+            project: {{ $project }}
+
+      Instance:
+        Plugin: instance-digitalocean
+        Properties:
+          NamePrefix: {{ $groupName }}
+          Region: {{ $region }}
+          Image:
+            Slug: {{ $image }}
+          Size: {{ $instanceSize }}
+          PrivateNetworking: false
+          SSHKeyNames:
+            - {{ $sshKey }}
+          Tags:
+            - {{ $groupName }}
