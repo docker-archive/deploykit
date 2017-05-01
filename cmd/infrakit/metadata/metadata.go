@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/docker/infrakit/cmd/cli/base"
+	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/rpc/client"
