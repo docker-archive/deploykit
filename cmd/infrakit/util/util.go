@@ -1,7 +1,7 @@
 package util
 
 import (
-	"github.com/docker/infrakit/cmd/cli/base"
+	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"

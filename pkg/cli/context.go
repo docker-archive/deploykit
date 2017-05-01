@@ -257,16 +257,7 @@ func (c *Context) Funcs() []template.Function {
 				if c.exec {
 					return c.template.Include(p, opt...)
 				}
-				return "", nil
-			},
-		},
-		{
-			Name: "source",
-			Func: func(p string, opt ...interface{}) (string, error) {
-				if c.exec {
-					return c.template.Source(p, opt...)
-				}
-				return "", nil
+				return "{}", nil
 			},
 		},
 		{

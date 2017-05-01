@@ -7,7 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/docker/infrakit/cmd/cli/base"
+	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/cli/local"
 	"github.com/docker/infrakit/pkg/cli/remote"
@@ -28,18 +28,22 @@ func init() {
 	base.Register(Command)
 }
 
-func getHome() string {
-	if usr, err := user.Current(); err == nil {
-		return usr.HomeDir
-	}
-	return os.Getenv("HOME")
-}
-
 func defaultPlaybooksFile() string {
 	if playbooksFile := os.Getenv(PlaybooksFileEnvVar); playbooksFile != "" {
 		return playbooksFile
 	}
-	return filepath.Join(getHome(), ".infrakit/playbooks")
+
+	// if there's INFRAKIT_HOME defined
+	home := os.Getenv("INFRAKIT_HOME")
+	if home != "" {
+		return filepath.Join(home, "playbooks")
+	}
+
+	home = os.Getenv("HOME")
+	if usr, err := user.Current(); err == nil {
+		home = usr.HomeDir
+	}
+	return filepath.Join(home, ".infrakit/playbooks")
 }
 
 // Load loads the playbook
