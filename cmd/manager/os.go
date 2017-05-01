@@ -31,6 +31,13 @@ func defaultLeaderFile() string {
 	if leaderFile := os.Getenv(LeaderFileEnvVar); leaderFile != "" {
 		return leaderFile
 	}
+
+	// if there's INFRAKIT_HOME defined
+	home := os.Getenv("INFRAKIT_HOME")
+	if home != "" {
+		return filepath.Join(home, "leader")
+	}
+
 	return filepath.Join(getHome(), ".infrakit/leader")
 }
 
@@ -38,6 +45,13 @@ func defaultStoreDir() string {
 	if storeDir := os.Getenv(StoreDirEnvVar); storeDir != "" {
 		return storeDir
 	}
+
+	// if there's INFRAKIT_HOME defined
+	home := os.Getenv("INFRAKIT_HOME")
+	if home != "" {
+		return filepath.Join(home, "configs")
+	}
+
 	return filepath.Join(getHome(), ".infrakit/configs")
 }
 
