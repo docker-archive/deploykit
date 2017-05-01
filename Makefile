@@ -116,7 +116,7 @@ define define_binary_target
 	$(eval $(call binary_target_template,$(1),$(2)))
 endef
 
-$(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/cli)
+$(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 $(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cmd/group)
 $(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/resource)

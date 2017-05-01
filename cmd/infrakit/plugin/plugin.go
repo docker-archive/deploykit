@@ -9,13 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/infrakit/cmd/cli/base"
+	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/os"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -64,19 +63,22 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	executor := start.Flags().String("exec", "os", "Executor to use for starting up plugins: [os | docker-run]")
 	doWait := start.Flags().BoolP("wait", "w", false, "True to wait in the foreground; Ctrl-C to exit")
 
+	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
+	start.Flags().AddFlagSet(templateFlags)
+
 	start.RunE = func(c *cobra.Command, args []string) error {
 
-		configTemplate, err := template.NewTemplate(*configURL, template.Options{})
+		buff, err := processTemplate(*configURL)
 		if err != nil {
 			return err
 		}
 
-		view, err := configTemplate.Render(nil)
+		view, err := toJSON([]byte(buff))
 		if err != nil {
 			return err
 		}
 
-		configs := types.AnyString(view)
+		configs := types.AnyBytes(view)
 
 		parsedRules := []launch.Rule{}
 		err = configs.Decode(&parsedRules)
