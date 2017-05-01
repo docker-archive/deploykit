@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -323,9 +324,17 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 			keepLooping = execInspect.Running
 		}
 		if exitCode != 0 {
-			log.Warningf("failed to exec, cmd was: %s", execConfig.Cmd)
+			log.Warningf("failed to exec init script for container %d", r.ID[0:12])
+			rc, err := cli.ContainerLogs(ctx, r.ID, apitypes.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
+			if err != nil {
+				log.Warning(err)
+			} else {
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(rc)
+				log.Warning(buf.String())
+			}
 			_ = p.Destroy(id)
-			return nil, fmt.Errorf("init script failed with code %d", exitCode)
+			return nil, fmt.Errorf("init script failed with code %d for container %s", exitCode, r.ID[0:12])
 		}
 		log.Debug("Init script succesfully executed")
 	}
