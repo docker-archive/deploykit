@@ -255,7 +255,9 @@ func (c *Context) Funcs() []template.Function {
 			Name: "include",
 			Func: func(p string, opt ...interface{}) (string, error) {
 				if c.exec {
-					return c.template.Include(p, opt...)
+					if content, err := c.template.Include(p, opt...); err == nil {
+						return content, nil
+					}
 				}
 				return "{}", nil
 			},
