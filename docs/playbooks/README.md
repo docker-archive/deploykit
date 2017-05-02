@@ -5,7 +5,7 @@ If you don't have infrakit or go compiler installed locally, just
 
 ```shell
 
-docker run --rm -e GOARCH=amd64 -e GOOS=darwin -v `pwd`:/build infrakit/devbundle:dev build-infrakit
+docker run --rm -e GOARCH=amd64 -e GOOS=darwin -v `pwd`:/build infrakit/installer build-infrakit
 ```
 
 This will cross-compile the `infrakit` cli for Mac OSX.  For Linux, there's no need to set the `GOOS` and `GOARCH`
