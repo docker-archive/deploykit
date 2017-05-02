@@ -60,6 +60,21 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
+# Trivial installer that packages source code (via go get) and has script for building the CLI
+INSTALLER_IMAGE?=infrakit/installer
+INSTALLER_TAG?=$(REVISION)
+build-installer:
+	@echo "+ $@"
+	@docker build -t ${INSTALLER_IMAGE}:${INSTALLER_TAG} -t ${INSTALLER_IMAGE}:latest \
+	-f ${CURDIR}/dockerfiles/Dockerfile.installer .
+ifeq (${DOCKER_PUSH},true)
+	@docker push ${INSTALLER_IMAGE}:${INSTALLER_TAG}
+ifeq (${DOCKER_TAG_LATEST},true)
+	@docker tag ${INSTALLER_IMAGE}:${INSTALLER_TAG} ${INSTALLER_IMAGE}:latest
+	@docker push ${INSTALLER_IMAGE}:latest
+endif
+endif
+
 build-docker-dev:
 	@echo "+ $@"
 	GOOS=linux GOARCH=amd64 make build-in-container

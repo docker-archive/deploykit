@@ -3,5 +3,8 @@
 export GOPATH=/go
 export PATH=/go/bin:$PATH
 
-go get github.com/docker/infrakit/cmd/infrakit
+if [[ "$1" == "update" ]]; then
+    go get -u -v github.com/docker/infrakit/cmd/infrakit
+fi
+
 go build -o /build/infrakit github.com/docker/infrakit/cmd/infrakit
