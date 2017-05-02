@@ -1,0 +1,7 @@
+#!/bin/sh
+
+export GOPATH=/go
+export PATH=/go/bin:$PATH
+
+go get github.com/docker/infrakit/cmd/infrakit
+go build -o /build/infrakit github.com/docker/infrakit/cmd/infrakit
