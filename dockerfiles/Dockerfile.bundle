@@ -1,5 +1,6 @@
 FROM docker:latest
 
+RUN apk update && apk add --no-cache file build-base git go
 
 RUN mkdir -p /infrakit/plugins /infrakit/configs /infrakit/logs /infrakit/cli /infrakit/instance/terraform
 
@@ -25,3 +26,4 @@ ENV INFRAKIT_INSTANCE_TERRAFORM_DIR /infrakit/instance/terraform
 
 
 ADD build/* /usr/local/bin/
+ADD dockerfiles/build-infrakit /usr/local/bin
