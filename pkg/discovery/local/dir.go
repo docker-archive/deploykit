@@ -20,7 +20,13 @@ func Dir() string {
 		return pluginDir
 	}
 
-	home := os.Getenv("HOME")
+	// if there's INFRAKIT_HOME defined
+	home := os.Getenv("INFRAKIT_HOME")
+	if home != "" {
+		return filepath.Join(home, "plugins")
+	}
+
+	home = os.Getenv("HOME")
 	if usr, err := user.Current(); err == nil {
 		home = usr.HomeDir
 	}

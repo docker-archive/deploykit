@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/infrakit/cmd/cli/base"
+	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/cli"
 	cli_local "github.com/docker/infrakit/pkg/cli/local"
 	"github.com/docker/infrakit/pkg/discovery"
@@ -16,17 +16,18 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
 
-	_ "github.com/docker/infrakit/cmd/cli/event"
-	_ "github.com/docker/infrakit/cmd/cli/flavor"
-	_ "github.com/docker/infrakit/cmd/cli/group"
-	_ "github.com/docker/infrakit/cmd/cli/info"
-	_ "github.com/docker/infrakit/cmd/cli/instance"
-	_ "github.com/docker/infrakit/cmd/cli/manager"
-	_ "github.com/docker/infrakit/cmd/cli/metadata"
-	_ "github.com/docker/infrakit/cmd/cli/plugin"
-	_ "github.com/docker/infrakit/cmd/cli/resource"
-	_ "github.com/docker/infrakit/cmd/cli/template"
-	_ "github.com/docker/infrakit/cmd/cli/util"
+	_ "github.com/docker/infrakit/cmd/infrakit/event"
+	_ "github.com/docker/infrakit/cmd/infrakit/flavor"
+	_ "github.com/docker/infrakit/cmd/infrakit/group"
+	_ "github.com/docker/infrakit/cmd/infrakit/info"
+	_ "github.com/docker/infrakit/cmd/infrakit/instance"
+	_ "github.com/docker/infrakit/cmd/infrakit/manager"
+	_ "github.com/docker/infrakit/cmd/infrakit/metadata"
+	_ "github.com/docker/infrakit/cmd/infrakit/playbook"
+	_ "github.com/docker/infrakit/cmd/infrakit/plugin"
+	_ "github.com/docker/infrakit/cmd/infrakit/resource"
+	_ "github.com/docker/infrakit/cmd/infrakit/template"
+	_ "github.com/docker/infrakit/cmd/infrakit/util"
 )
 
 func init() {

@@ -107,42 +107,60 @@ clean:
 	rm -rf build
 	mkdir -p build
 
-define build_binary
+define binary_target_template
+build/$(1):
 	go build -o build/$(1) \
 		-ldflags "-X github.com/docker/infrakit/pkg/cli.Version=$(VERSION) -X github.com/docker/infrakit/pkg/cli.Revision=$(REVISION) -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=$(DOCKER_CLIENT_VERSION)" $(2)
 endef
+define define_binary_target
+	$(eval $(call binary_target_template,$(1),$(2)))
+endef
+
+$(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
+$(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
+$(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cmd/group)
+$(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/resource)
+$(call define_binary_target,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
+$(call define_binary_target,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
+$(call define_binary_target,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
+$(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
+$(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
+$(call define_binary_target,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
+$(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
+$(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
+$(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
+$(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
+$(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
+$(call define_binary_target,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
 
 binaries: clean build-binaries
-build-binaries:
+build-binaries:	build/infrakit \
+		build/infrakit-manager \
+		build/infrakit-group-default \
+		build/infrakit-resource \
+		build/infrakit-flavor-combo \
+		build/infrakit-flavor-swarm \
+		build/infrakit-flavor-vanilla \
+		build/infrakit-flavor-zookeeper \
+		build/infrakit-instance-libvirt \
+		build/infrakit-instance-file \
+		build/infrakit-instance-terraform \
+		build/infrakit-instance-vagrant \
+		build/infrakit-instance-maas \
+		build/infrakit-instance-docker \
+		build/infrakit-instance-hyperkit \
+		build/infrakit-event-time
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
-	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
+	@echo "\nWARNING - repository contains uncommitted changes, tagged binaries as dirty\n"
 endif
-
-	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
-	$(call build_binary,infrakit-manager,github.com/docker/infrakit/cmd/manager)
-	$(call build_binary,infrakit-group-default,github.com/docker/infrakit/cmd/group)
-	$(call build_binary,infrakit-resource,github.com/docker/infrakit/cmd/resource)
-	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
-	$(call build_binary,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
-	$(call build_binary,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
-	$(call build_binary,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
-	$(call build_binary,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
-	$(call build_binary,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
-	$(call build_binary,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
-	$(call build_binary,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
-	$(call build_binary,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
-	$(call build_binary,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
-	$(call build_binary,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
-	$(call build_binary,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
 
 cli: build-cli
-build-cli:
+build-cli: build/infrakit
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
-	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
+	@echo "\nWARNING - repository contains uncommitted changes, tagged binaries as dirty\n"
 endif
-	$(call build_binary,infrakit,github.com/docker/infrakit/cmd/cli)
 
 install:
 	@echo "+ $@"

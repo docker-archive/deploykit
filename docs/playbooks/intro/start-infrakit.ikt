@@ -29,7 +29,8 @@ docker run -d --volumes-from infrakit --name playbooks.com \
 
 docker run -d --volumes-from infrakit --name time {{ $image }} infrakit-event-time
 docker run -d --volumes-from infrakit --name vanilla {{ $image }} infrakit-flavor-vanilla
-docker run -d --volumes-from infrakit --name group-stateless {{ $image }} infrakit-group-default --name group-stateless
+docker run -d --volumes-from infrakit --name group-stateless {{ $image }} infrakit-group-default \
+       --name group-stateless --poll-interval 30s
 
 # The leader file -- only required for local store
 docker run --rm --volumes-from infrakit {{ $image }} /bin/sh -c "echo group > /infrakit/leader"
@@ -45,3 +46,5 @@ docker run -d --volumes-from infrakit --name manager \
 {{ source "gcp/start-plugin.ikt" }}
 
 {{ source "darwin/start-plugin.ikt" }}
+
+{{ source "do/start-plugin.ikt" }}

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+{{/* =% sh %= */}}
+
+{{/* default location if you have doctl installed */}}
+{{ $defaultConfig := cat "file://" (env "HOME") "/.config/doctl/config.yaml" | nospace }}
+{{ $defaultAccessToken := include $defaultConfig | yamlDecode | k "access-token" }}
+
+{{ $accessToken := flag "access-token" "string" "Access token" | prompt "Access token?" "string" $defaultAccessToken }}
+{{ $project := var "/project" }} {{/*flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" "mytest" */}}
+
+echo "Starting daemon"
+infrakit-instance-digitalocean --log 5 \
+       --name instance-digitalocean \
+       --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
+       --access-token {{ $accessToken }} \
+       > {{env "INFRAKIT_HOME"}}/logs/instance-digitalocean.log 2>&1  &
+
+echo "Tailing log"
+tail -f {{env "INFRAKIT_HOME"}}/logs/instance-digitalocean.log
