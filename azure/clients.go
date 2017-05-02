@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-const version = "0.0"
+const version = "0.1"
 
-func subscriptionsClient(baseURI, subscriptionID string) subscriptions.Client {
+func subscriptionsClient(baseURI string) subscriptions.Client {
 	// used only for unauthenticated requests for generic subs IDs
-	c := subscriptions.NewClientWithBaseURI(baseURI, subscriptionID)
+	c := subscriptions.NewClientWithBaseURI(baseURI)
 	c.Client.UserAgent += fmt.Sprintf(";libmachete/%s", version)
 	c.RequestInspector = func(p autorest.Preparer) autorest.Preparer {
 		return autorest.PreparerFunc(func(r *http.Request) (*http.Request, error) {

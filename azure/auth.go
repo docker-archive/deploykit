@@ -43,7 +43,7 @@ func (a Credential) loadSPT(opt Options) (*azure.ServicePrincipalToken, error) {
 		return nil, err
 	}
 
-	oauthCfg, err := env.OAuthConfigForTenant(tenantID)
+	oauthCfg, err := azure.OAuthConfigForTenant(env.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (a *Credential) Refresh(opt Options) error {
 // automatically refresh the token using refresh_token (which might have
 // expired). This check is essentially to make sure refresh_token is good.
 func validateToken(env azure.Environment, token *azure.ServicePrincipalToken, subscriptionID string) error {
-	c := subscriptionsClient(env.ResourceManagerEndpoint, subscriptionID)
+	c := subscriptionsClient(env.ResourceManagerEndpoint)
 	c.Authorizer = token
 	_, err := c.List()
 	if err != nil {
@@ -147,7 +147,7 @@ func validateToken(env azure.Environment, token *azure.ServicePrincipalToken, su
 // the value from WWW-Authenticate header.
 func getTenantID(env azure.Environment, subscriptionID string) (string, error) {
 	const hdrKey = "WWW-Authenticate"
-	c := subscriptionsClient(env.ResourceManagerEndpoint, subscriptionID)
+	c := subscriptionsClient(env.ResourceManagerEndpoint)
 
 	// we expect this request to fail (err != nil), but we are only interested
 	// in headers, so surface the error if the Response is not present (i.e.
