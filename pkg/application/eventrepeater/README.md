@@ -48,7 +48,7 @@ Global Flags:
       --log-stdout              log to stdout
 
 
-$ infrakit util event-repeater --source ~/.infrakit/plugins/event-time --sink tcp://localhost:1883
+$ infrakit util event-repeater run --source ~/.infrakit/plugins/event-time --sink tcp://localhost:1883
 ```
 
 Now your app connected to event plugin and mqtt broker.
@@ -59,14 +59,14 @@ At default, it listen with unix socket.
 If you want to use tcp socket instead of unix socket, set option like below.
 
 ```
-infrakit util event-repeater --listen localhost:8080 --source ~/.infrakit/plugins/event-time --sink tcp://localhost:1883
+infrakit util event-repeater run --listen localhost:8080 --source ~/.infrakit/plugins/event-time --sink tcp://localhost:1883
 ```
 ## Manage event repeater
 
 You can manipurate Infrakit application with `infrakit util application` command.
 
 ```
-$ infrakit util application update -h
+$ infrakit util event-repeater manage -h
 
 ___  ________   ________ ________  ________  ___  __    ___  _________
 |\  \|\   ___  \|\  _____\\   __  \|\   __  \|\  \|\  \ |\  \|\___   ___\
@@ -80,7 +80,7 @@ ___  ________   ________ ________  ________  ___  __    ___  _________
 Access application plugins
 
 Usage:
-  infrakit util application [command]
+  infrakit util event-repeater manage [command]
 
 Available Commands:
   delete      Delete request to application.
@@ -101,7 +101,7 @@ Global Flags:
       --log-stack               include caller stack
       --log-stdout              log to stdout
 
-Use "infrakit util application [command] --help" for more information about a command.
+Use "infrakit util event-repeater manage [command] --help" for more information about a command.
 
 ```
 As you see, you can send REST request with `get, post, put, delete` commands.
@@ -113,7 +113,7 @@ Except for `get` command, you can set json quary by `--value` option.
 In the example below, you specify the event that is the target of repeate and the topic when publishing the event as mqtt.
 
 ```
-infrakit util application --name app-event-repeater --path /events post --value '[{"sourcetopic":"timer/sec/1","sinktopic":"/time/1s"},{"sourcetopic":"timer/msec/500","sinktopic":"/time/500m"}]'
+infrakit util event-repeater manaeg --name app-event-repeater --path /events post --value '[{"sourcetopic":"timer/sec/1","sinktopic":"/time/1s"},{"sourcetopic":"timer/msec/500","sinktopic":"/time/500m"}]'
 ```
 
 Ofcource, you can same operation with other tool e.g. `curl`.
@@ -126,7 +126,7 @@ Target events are described json style.
 Then you can delete registerd event.
 
 ```
-$ infrakit application update --name app-event-repeater --op 2 --resource event --value '[{"sourcetopic":"timer/sec/1”}]’
+$ infrakit util event-repeater manage --name app-event-repeater delete --value '[{"sourcetopic":"timer/sec/1”}]’
 ```
 Repeated events are encoded with byte.
 You can decode it like below.
