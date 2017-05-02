@@ -26,4 +26,4 @@ ENV INFRAKIT_INSTANCE_TERRAFORM_DIR /infrakit/instance/terraform
 
 
 ADD build/* /usr/local/bin/
-ADD dockerfiles/build-infrakit /usr/local/bin
+ADD dockerfiles/build-infrakit /usr/local/bin/
