@@ -56,7 +56,7 @@ func (b *Builder) WithStdout(w io.Writer) *Builder {
 
 // WithStderr sets the stderr writer
 func (b *Builder) WithStderr(w io.Writer) *Builder {
-	b.stdout = w
+	b.stderr = w
 	return b
 }
 
