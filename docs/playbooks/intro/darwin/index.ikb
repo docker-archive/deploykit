@@ -1,4 +1,7 @@
 
+# Build and install the MacOSX hyperkit plugin
+install-plugin: install-plugin.sh
+
 # Start the plugin as local daemon
 start-daemon : start-plugin.ikt
 

@@ -8,3 +8,4 @@ ENV PATH /go/bin:$PATH
 RUN go get github.com/docker/infrakit/cmd/infrakit
 
 COPY dockerfiles/build-infrakit /usr/local/bin/
+COPY dockerfiles/build-hyperkit /usr/local/bin/
