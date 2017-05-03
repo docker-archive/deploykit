@@ -353,7 +353,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	vmType, vmName, properties, err := FindVM(&tf)
+	vmType, _, properties, err := FindVM(&tf)
 	if err != nil {
 		return nil, err
 	}
@@ -444,9 +444,23 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		addUserData(properties, "metadata_startup_script", spec.Init)
 	}
 
-	// Write the whole thing back out, after decorations and replacing the hostname with the generated hostname
-	delete(tf.Resource[vmType], vmName)
-	tf.Resource[vmType][TResourceName(name)] = properties
+	// Write out each resource again with the instance name
+	for resourceType, resourceObj := range tf.Resource {
+		vmList := mapset.NewSetFromSlice(VMTypes)
+		for resourceName, resourceProps := range resourceObj {
+			var newResourceName string
+			if vmList.Contains(resourceType) {
+				// Overwrite with the changes to the VM properties
+				resourceProps = properties
+				newResourceName = name
+			} else {
+				newResourceName = fmt.Sprintf("%s-%s", name, resourceName)
+			}
+			// Write the whole thing back out, after decorations and replacing the hostname with the generated hostname
+			delete(tf.Resource[resourceType], resourceName)
+			tf.Resource[resourceType][TResourceName(newResourceName)] = resourceProps
+		}
+	}
 
 	buff, err := json.MarshalIndent(tf, "  ", "  ")
 	log.Debugln("provision", id, "data=", string(buff), "err=", err)
