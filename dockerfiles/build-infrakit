@@ -5,13 +5,14 @@ export PATH=/go/bin:$PATH
 
 case "$1" in
     darwin)
-	GOOS=darwin
-	GOARCH=amd64
+	export GOOS=darwin
+	export GOARCH=amd64
 	echo "Building for mac ${GOOS} / ${GOARCH}"
 	;;
     linux)
-	GOOS=linux
-	GOARCH=amd64
+	export GOOS=linux
+	export GOARCH=amd64
+	export BUILD_FLAGS="-buildmode pie"
 	echo "Building for linux ${GOOS} / ${GOARCH}"
 	;;
     *)
@@ -36,7 +37,9 @@ DOCKER_CLIENT_VERSION=1.24
 BINARY=infrakit
 PACKAGE=github.com/docker/infrakit/cmd/infrakit
 
-go build -o /build/${BINARY} -buildmode pie \
+echo "Building for ${BINARY} GOOS=${GOOS} GOARCH=${GOARCH}, version=${VERSION}, revision=${REVISION}"
+
+go build -o /build/${BINARY} ${BUILD_FLAGS} \
    -ldflags "-s -w -X github.com/docker/infrakit/pkg/cli.Version=${VERSION} -X github.com/docker/infrakit/pkg/cli.Revision=${REVISION} -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=${DOCKER_CLIENT_VERSION} -extldflags \"-static\"" \
    ${PACKAGE}
 
