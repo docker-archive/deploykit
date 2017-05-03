@@ -21,6 +21,8 @@ DOCKER_CLIENT_VERSION=1.24
 BINARY=infrakit-instance-hyperkit
 PACKAGE=github.com/docker/infrakit/cmd/instance/hyperkit
 
-go build -o /build/${BINARY} \
-   -ldflags "-X github.com/docker/infrakit/pkg/cli.Version=${VERSION} -X github.com/docker/infrakit/pkg/cli.Revision=${REVISION} -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=${DOCKER_CLIENT_VERSION}" \
+go build -o /build/${BINARY} -buildmode pie \
+   -ldflags "-s -w -X github.com/docker/infrakit/pkg/cli.Version=${VERSION} -X github.com/docker/infrakit/pkg/cli.Revision=${REVISION} -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=${DOCKER_CLIENT_VERSION} -extldflags \"-static\"" \
    ${PACKAGE}
+
+echo "Done.  You may want to copy the file to your path, like:  'sudo cp ./infrakit-instance-hyperkit /usr/local/bin/'"
