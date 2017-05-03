@@ -84,6 +84,62 @@ func TestVarAndGlobal(t *testing.T) {
 
 }
 
+func TestVarAndGlobalMultiPass(t *testing.T) {
+	str := `{{ q "locations[?state == 'WA'].name | sort(@) | {WashingtonCities: join(', ', @)}" . | var "washington-cities"}}
+
+{{/* The query above is exported and referenced somewhere else */}}
+{{ jsonDecode "[\"SF\",\"LA\"]" | var "california-cities" "Default value for California cities" }}
+{{ jsonDecode "{\"SF\":\"94109\",\"LA\":\"90210\"}" | var "zip-codes" "Default value for zip codes" }}
+
+{
+  "test" : "hello",
+  "val"  : true,
+  "result" : {{ var "washington-cities" | jsonEncode}},
+  "california" : {{ var "california-cities" | jsonEncode}},
+  "sf_zip" : {{ var "zip-codes" | q "SF" | jsonEncode }},
+  "second_stage" : {{ var "second-stage" }}
+}
+`
+
+	tpl, err := NewTemplate("str://"+str, Options{MultiPass: true})
+	require.NoError(t, err)
+
+	view, err := tpl.Render(map[string]interface{}{
+		"locations": []map[string]interface{}{
+			{"name": "Seattle", "state": "WA"},
+			{"name": "New York", "state": "NY"},
+			{"name": "Bellevue", "state": "WA"},
+			{"name": "Olympia", "state": "WA"},
+		},
+	})
+
+	require.NoError(t, err)
+
+	// Note the extra newlines because of comments, etc.
+	expected := `
+
+
+
+
+
+{
+  "test" : "hello",
+  "val"  : true,
+  "result" : {
+  "WashingtonCities": "Bellevue, Olympia, Seattle"
+},
+  "california" : [
+  "SF",
+  "LA"
+],
+  "sf_zip" : "94109",
+  "second_stage" : {{ var "second-stage" }}
+}
+`
+	require.Equal(t, expected, view)
+
+}
+
 type context struct {
 	Count  int
 	Bool   bool
