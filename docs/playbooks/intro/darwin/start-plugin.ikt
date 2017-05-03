@@ -7,6 +7,7 @@
 {{ if $hyperkit }}
 
 echo "Starting HYPERKIT plugin.  This must be running on the Mac as a daemon and not as a container"
+echo "This plugin is listening at localhost:24865"
 
 infrakit-instance-hyperkit --log 5
 

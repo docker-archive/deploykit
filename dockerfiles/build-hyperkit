@@ -3,9 +3,14 @@
 export GOPATH=/go
 export PATH=/go/bin:$PATH
 
+# The arch and os are for Mac OSX only.
+export GOOS=darwin
+export GOARCH=amd64
+
 if [[ "$1" == "update" ]]; then
     go get -u -v github.com/docker/infrakit/cmd/infrakit
 fi
+
 
 cd /go/src/github.com/docker/infrakit/cmd/infrakit
 
@@ -13,8 +18,8 @@ cd /go/src/github.com/docker/infrakit/cmd/infrakit
 VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION=$(git rev-list -1 HEAD)
 DOCKER_CLIENT_VERSION=1.24
-BINARY=infrakit
-PACKAGE=github.com/docker/infrakit/cmd/infrakit
+BINARY=infrakit-instance-hyperkit
+PACKAGE=github.com/docker/infrakit/cmd/instance/hyperkit
 
 go build -o /build/${BINARY} \
    -ldflags "-X github.com/docker/infrakit/pkg/cli.Version=${VERSION} -X github.com/docker/infrakit/pkg/cli.Revision=${REVISION} -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=${DOCKER_CLIENT_VERSION}" \
