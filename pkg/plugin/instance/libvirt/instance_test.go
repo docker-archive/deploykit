@@ -128,7 +128,10 @@ func TestLabel(t *testing.T) {
 
 	require.False(t, instanceExists(t, plugin, instance.ID(domname)), "domain was found in plugin instances before label")
 
-	labels := map[string]string{}
+	labels := map[string]string{
+		"foo":  "bar",
+		"foo2": "bar",
+	}
 	err = plugin.Label(instance.ID(domname), labels)
 	require.NoError(t, err)
 
