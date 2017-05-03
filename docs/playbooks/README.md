@@ -1,17 +1,25 @@
 Quick Start
 ===========
 
+## Install InfraKit
+
+### Mac
 If you don't have infrakit or go compiler installed locally, just
 
 ```shell
 
-docker run --rm -e GOARCH=amd64 -e GOOS=darwin -v `pwd`:/build infrakit/installer build-infrakit
-cp ./infrakit /usr/local/bin
+docker run --rm -v `pwd`:/build infrakit/installer build-infrakit darwin
+sudo cp ./infrakit /usr/local/bin
 ```
-
 This will cross-compile the `infrakit` cli for Mac OSX.  For Linux, there's no need to set the `GOOS` and `GOARCH`
 environment variables.
 
+### Linux
+
+```shell
+$ docker run --rm -v `pwd`:/build infrakit/installer build-infrakit linux
+$ sudo cp ./infrakit /usr/local/bin/
+```
 
 ## Add a Playbook
 
@@ -59,6 +67,9 @@ Available Commands:
 This tutorial uses Digitial Ocean.  Be sure you have the API token; you will be prompted to provide it
 if you don't provide it in the command line flag.  You can also authenticate via the `doctl` tool and thus
 have a `~/.config/doctl/config.yaml` file which has the access token.
+
+Also, be sure to have upload a SSH key with Digital Ocean.  Creating instances requires specifying the SSH
+key by name.
 
 
 ## Start up Infrakit controller daemons and plugins
