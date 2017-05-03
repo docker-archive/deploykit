@@ -5,7 +5,7 @@
 {{ $do := flag "start-do" "bool" "Start Digital Ocean plugin" | prompt "Start Digital Ocean plugin?" "bool" "no" }}
 
 {{ $defaultConfig := cat "file://" (env "HOME") "/.config/doctl/config.yaml" | nospace }}
-{{ $defaultAccessToken := source $defaultConfig | yamlDecode | k "access-token" }}
+{{ $defaultAccessToken := include $defaultConfig | yamlDecode | k "access-token" }}
 
 {{ $accessToken := flag "access-token" "string" "Access token" | prompt "Access token?" "string" $defaultAccessToken }}
 {{ $project := var "/project" }} {{/*flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" "mytest" */}}
