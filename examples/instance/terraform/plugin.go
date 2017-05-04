@@ -407,7 +407,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// merge the inits
 	switch vmType {
 	case VMAmazon, VMDigitalOcean:
-		addUserData(properties, "user_data", base64.StdEncoding.EncodeToString([]byte(spec.Init)))
+		addUserData(properties, "user_data", spec.Init)
+		properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(properties["user_data"].(string)))
 	case VMSoftLayer:
 		addUserData(properties, "user_metadata", spec.Init)
 	case VMAzure:
