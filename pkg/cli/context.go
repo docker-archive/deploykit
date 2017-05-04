@@ -254,8 +254,14 @@ func (c *Context) Funcs() []template.Function {
 		{
 			Name: "include",
 			Func: func(p string, opt ...interface{}) (string, error) {
+				// Overrides the base 'include' to account for the fact that
+				// some variables in the flag building phase are not set and would
+				// cause errors.  In general, use include for loading files whose
+				// paths are computed from some flags.  Use 'source' for including
+				// sibling templates that also include other flag definitions.
 				if c.exec {
-					if content, err := c.template.Include(p, opt...); err == nil {
+					content, err := c.template.Include(p, opt...)
+					if err == nil {
 						return content, nil
 					}
 				}

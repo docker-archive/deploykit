@@ -50,7 +50,7 @@ func (p hyperkitPlugin) Validate(req *types.Any) error {
 	guest := hyperkit.HyperKit{}
 
 	if err := req.Decode(&guest); err != nil {
-		return fmt.Errorf("error decoding guest configuration: %s", req.String())
+		return fmt.Errorf("error decoding guest configuration: %s, err=%v", req.String(), err)
 	}
 
 	for key, check := range map[string]int{
