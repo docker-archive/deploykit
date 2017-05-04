@@ -116,7 +116,7 @@ func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 			}
 
 			log.Debug("reading template", "url", url)
-			engine, err := template.NewTemplate(url, template.Options{})
+			engine, err := template.NewTemplate(url, template.Options{MultiPass: true})
 			if err != nil {
 				return
 			}

@@ -133,7 +133,7 @@ func TestVarAndGlobalMultiPass(t *testing.T) {
   "LA"
 ],
   "sf_zip" : "94109",
-  "second_stage" : {{ var "second-stage" }}
+  "second_stage" : {{ var ` + "`second-stage`" + ` }}
 }
 `
 	require.Equal(t, expected, view)

@@ -227,10 +227,10 @@ func (t *Template) Var(name string, optional ...interface{}) interface{} {
 	}
 	// Handling of optional parameter isn't possible here because by now the
 	// template engine has already done the variable expansions and we have full values.
-	// Cases like {{ var "my-var" $defaultValue }} will render to {{ var "my-var" }}.
+	// Cases like {{ var "my-var" $defaultValue }} will render to {{ var `my-var` }}.
 	// Also this will not work in the case of pipeline - like {{ $x | var "my-var" }} --
-	// which will just render to {{ var "my-var }}
-	return fmt.Sprintf("%s var \"%s\" %s", dl, name, dr)
+	// which will just render to {{ var `my-var` }}
+	return fmt.Sprintf("%s var `%s` %s", dl, name, dr)
 }
 
 // var implements the var function. It's a combination of global and ref
