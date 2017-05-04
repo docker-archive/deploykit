@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	sys_os "os"
+	"path"
 	"strconv"
 	"sync"
 	"syscall"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/os"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -247,13 +249,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				continue
 			}
 
-			if p.Protocol != "unix" {
-				log.Warn("Plugin is not a local process", "name", n)
-				continue
+			pidFile := n + ".pid"
+			if p.Protocol == "unix" {
+				pidFile = p.Address + ".pid"
+			} else {
+				pidFile = path.Join(local.Dir(), pidFile)
 			}
-
-			// TODO(chungers) -- here we
-			pidFile := p.Address + ".pid"
 
 			buff, err := ioutil.ReadFile(pidFile)
 			if err != nil {

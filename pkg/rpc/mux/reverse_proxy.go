@@ -193,14 +193,36 @@ func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, pre
 	reversep := httputil.NewSingleHostReverseProxy(u)
 	socketPath, prefix = rp.socketPath(u)
 	if socketPath != "" {
-		reversep.Transport = &http.Transport{
-			Dial: func(proto, addr string) (conn net.Conn, err error) {
-				log.Debug("connecting", "proto", proto, "socket", socketPath)
-				return net.Dial("unix", socketPath)
-			},
+
+		uu, err := url.Parse(socketPath)
+		if err != nil {
+			panic(err) // this should not happen. complain loudly.
 		}
-		u.Scheme = "http"
-		u.Host = "d"
+		log.Debug("checking socketPath", "socketPath", socketPath, "parsed", uu)
+
+		switch uu.Scheme {
+		case "", "unix", "file":
+			reversep.Transport = &http.Transport{
+				Dial: func(proto, addr string) (conn net.Conn, err error) {
+					log.Debug("connecting", "proto", proto, "socket", uu.Path)
+					return net.Dial("unix", uu.Path)
+				},
+			}
+			u.Scheme = "http"
+			u.Host = "d"
+
+		case "tcp":
+			reversep.Transport = &http.Transport{}
+			u.Scheme = "http"
+			u.Host = uu.Host
+
+		case "http", "https":
+			reversep.Transport = &http.Transport{}
+			u.Host = uu.Host
+
+		default:
+		}
+
 	}
 
 	// We need to rewrite the request to change the host. This is so that
