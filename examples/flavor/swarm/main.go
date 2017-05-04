@@ -24,7 +24,7 @@ func init() {
 		})
 }
 
-var defaultTemplateOptions = template.Options{}
+var defaultTemplateOptions = template.Options{MultiPass: true}
 
 func main() {
 
