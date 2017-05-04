@@ -108,6 +108,7 @@ parse, it returns the time unaltered. See `time.ParseDuration` for info on durat
   "one anchovy" "many anchovies"`
 - uuidv4: Generate a UUID v4 string
 - sha256sum: Generate a hex encoded sha256 hash of the input
+- toString: Convert something to a string
 
 ### String Slice Functions:
 
@@ -115,6 +116,10 @@ parse, it returns the time unaltered. See `time.ParseDuration` for info on durat
 - split: strings.Split, but as `split SEP STRING`. The results are returned
   as a map with the indexes set to _N, where N is an integer starting from 0.
   Use it like this: `{{$v := "foo/bar/baz" | split "/"}}{{$v._0}}` (Prints `foo`)
+- splitList: strings.Split, but as `split SEP STRING`. The results are returned
+  as an array.
+- toStrings: convert a list to a list of strings. 'list 1 2 3 | toStrings' produces '["1" "2" "3"]'
+- sortAlpha: sort a list lexicographically.
 
 ### Integer Slice Functions:
 
@@ -141,11 +146,25 @@ parse, it returns the time unaltered. See `time.ParseDuration` for info on durat
   no clear empty condition). For everything else, nil value triggers a default.
 - empty: Returns true if the given value is the zero value for that
   type. Structs are always non-empty.
+- coalesce: Given a list of items, return the first non-empty one.
+  This follows the same rules as 'empty'. `{{ coalesce .someVal 0 "hello" }}`
+  will return `.someVal` if set, or else return "hello". The 0 is skipped
+  because it is an empty value.
+- compact: Return a copy of a list with all of the empty values removed.
+  `list 0 1 2 "" | compact` will return `[1 2]`
 
 ### OS:
 
 - env: Read an environment variable.
 - expandenv: Expand all environment variables in a string.
+
+### File Paths:
+- base: Return the last element of a path. https://golang.org/pkg/path#Base
+- dir: Remove the last element of a path. https://golang.org/pkg/path#Dir
+- clean: Clean a path to the shortest equivalent name.  (e.g. remove "foo/.."
+  from "foo/../bar.html") https://golang.org/pkg/path#Clean
+- ext: Get the extension for a file path: https://golang.org/pkg/path#Ext
+- isAbs: Returns true if a path is absolute: https://golang.org/pkg/path#IsAbs
 
 ### Encoding:
 
@@ -156,8 +175,11 @@ parse, it returns the time unaltered. See `time.ParseDuration` for info on durat
 
 ### Data Structures:
 
-- tuple: A sequence of related objects. It is implemented as a
-  `[]interface{}`, where each item can be accessed using `index`.
+- tuple: Takes an arbitrary list of items and returns a slice of items. Its
+  tuple-ish properties are mainly gained through the template idiom, and not
+  through an API provided here. WARNING: The implementation of tuple will
+  change in the future.
+- list: An arbitrary ordered list of items. (This is prefered over tuple.)
 - dict: Takes a list of name/values and returns a map[string]interface{}.
   The first parameter is converted to a string and stored as a key, the
   second parameter is treated as the value. And so on, with odds as keys and
@@ -165,7 +187,43 @@ parse, it returns the time unaltered. See `time.ParseDuration` for info on durat
   be assigned the empty string. Non-string keys are converted to strings as
   follows: []byte are converted, fmt.Stringers will have String() called.
   errors will have Error() called. All others will be passed through
-  fmt.Sprtinf("%v").
+  fmt.Sprtinf("%v"). _dicts are unordered_.
+
+List:
+
+```
+{{$t := list 1 "a" "foo"}}
+{{index $t 2}}{{index $t 0 }}{{index $t 1}}
+{{/* Prints foo1a *}}
+```
+
+Dict:
+```
+{{ $t := map "key1" "value1" "key2" "value2" }}
+{{ $t.key2 }}
+{{ /* Prints value2 *}}
+```
+
+
+### Lists Functions:
+
+These are used to manipulate lists: `{{ list 1 2 3 | reverse | first }}`
+
+- first: Get the first item in a 'list'. 'list 1 2 3 | first' prints '1'
+- last: Get the last item in a 'list': 'list 1 2 3 | last ' prints '3'
+- rest: Get all but the first item in a list: 'list 1 2 3 | rest' returns '[2 3]'
+- initial: Get all but the last item in a list: 'list 1 2 3 | initial' returns '[1 2]'
+- append: Add an item to the end of a list: 'append $list 4' adds '4' to the end of '$list'
+- prepend: Add an item to the beginning of a list: 'prepend $list 4' puts 4 at the beginning of the list.
+- reverse: Reverse the items in a list.
+- uniq: Remove duplicates from a list.
+- without: Return a list with the given values removed: 'without (list 1 2 3) 1' would return '[2 3]'
+- has: Return 'tru' if the item is found in the list: 'has "foo" $list' will return 'true' if the list contains "foo"
+
+### Dict Functions:
+
+These are used to manipulate dicts.
+
 - set: Takes a dict, a key, and a value, and sets that key/value pair in
   the dict. `set $dict $key $value`. For convenience, it returns the dict,
   even though the dict was modified in place.
@@ -173,12 +231,10 @@ parse, it returns the time unaltered. See `time.ParseDuration` for info on durat
   dict. `unset $dict $key`. This returns the dict for convenience.
 - hasKey: Takes a dict and a key, and returns boolean true if the key is in
   the dict.
-
-```
-{{$t := tuple 1 "a" "foo"}}
-{{index $t 2}}{{index $t 0 }}{{index $t 1}}
-{{/* Prints foo1a *}}
-```
+- pluck: Given a key and one or more maps, get all of the values for that key.
+- keys: Get an array of all of the keys in a dict. Order is not guaranteed.
+- pick: Select just the given keys out of the dict, and return a new dict.
+- omit: Return a dict without the given keys.
 
 ### Reflection:
 
@@ -215,6 +271,23 @@ string is passed in, functions will attempt to conver with
 - min: Return the smallest of a series of integers. `min 1 2 3` returns
   `1`.
 
+### Cryptographic Functions:
+
+- derivePassword: Derive a password from the given parameters according to the "Master Password" algorithm (http://masterpasswordapp.com/algorithm.html)
+  Given parameters (in order) are:
+      `counter` (starting with 1), `password_type` (maximum, long, medium, short, basic, or pin), `password`,
+       `user`, and `site`. The following line generates a long password for the user "user" and with a master-password "password"  on the site "example.com":
+       ```
+       {{ derivePassword 1 "long" "password" "user" "example.com" }}
+       ```
+
+## SemVer Functions:
+
+These functions provide version parsing and comparisons for SemVer 2 version
+strings.
+
+- semver: Parse a semantic version and return a Version object.
+- semverCompare: Compare a SemVer range to a particular version.
 
 ## Principles:
 
