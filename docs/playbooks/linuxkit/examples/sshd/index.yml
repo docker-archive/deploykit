@@ -1,0 +1,9 @@
+# An index file.
+
+build-image : build-image.sh
+
+# Provision a single instance
+run-instance : provision-instance.ikt
+
+# Manage a group of nodes
+scale-group : scale-group.ikt
