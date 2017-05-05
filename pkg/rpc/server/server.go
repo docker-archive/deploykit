@@ -80,7 +80,7 @@ type VersionedInterface interface {
 
 // StartListenerAtPath starts an HTTP server listening on tcp port with discovery entry at specified path.
 // Returns a Stoppable that can be used to stop or block on the server.
-func StartListenerAtPath(listen, discoverPath string,
+func StartListenerAtPath(listen []string, discoverPath string,
 	receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
 	return startAtPath(listen, discoverPath, receiver, more...)
 }
@@ -88,10 +88,10 @@ func StartListenerAtPath(listen, discoverPath string,
 // StartPluginAtPath starts an HTTP server listening on a unix socket at the specified path.
 // Returns a Stoppable that can be used to stop or block on the server.
 func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
-	return startAtPath("", socketPath, receiver, more...)
+	return startAtPath(nil, socketPath, receiver, more...)
 }
 
-func startAtPath(listen, discoverPath string,
+func startAtPath(listen []string, discoverPath string,
 	receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
 
 	server := rpc.NewServer()
@@ -179,18 +179,22 @@ func startAtPath(listen, discoverPath string,
 
 	var listener net.Listener
 
-	if listen != "" {
+	if len(listen) > 0 {
 		gracefulServer.Server = &http.Server{
-			Addr:    listen,
+			Addr:    listen[0],
 			Handler: router,
 		}
-		l, err := net.Listen("tcp", listen)
+		l, err := net.Listen("tcp", listen[0])
 		if err != nil {
 			return nil, err
 		}
 		listener = l
 
-		if err := ioutil.WriteFile(discoverPath, []byte(fmt.Sprintf("tcp://%s", listen)), 0644); err != nil {
+		advertise := listen[0]
+		if len(listen) > 1 {
+			advertise = listen[1]
+		}
+		if err := ioutil.WriteFile(discoverPath, []byte(fmt.Sprintf("tcp://%s", advertise)), 0644); err != nil {
 			return nil, err
 		}
 
@@ -216,7 +220,7 @@ func startAtPath(listen, discoverPath string,
 			log.Warn(err)
 		}
 		events.Stop()
-		if listen != "" {
+		if len(listen) > 0 {
 			os.Remove(discoverPath)
 		}
 	}()

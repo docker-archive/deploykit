@@ -37,13 +37,15 @@ func main() {
 	hyperkitCmd := cmd.Flags().String("hyperkit-cmd", "hyperkit", "Path to HyperKit executable")
 	vpnkitSock := cmd.Flags().String("vpnkit-sock", "auto", "Path to VPNKit UNIX domain socket")
 	listen := cmd.Flags().String("listen", "localhost:24865", "Listens on port")
+	advertise := cmd.Flags().StringP("advertise", "a", "192.168.65.1:24865",
+		"Hostname for discovery (e.g. to containers). Use 192.168.65.1:24865 if running infrakit in containers on D4M")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
 		os.MkdirAll(*vmDir, os.ModePerm)
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunListener(*listen, *name,
+		cli.RunListener([]string{*listen, *advertise}, *name,
 			instance_plugin.PluginServer(hyperkit.NewPlugin(*vmDir, *hyperkitCmd, *vpnkitSock)),
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(
 				map[string]interface{}{
