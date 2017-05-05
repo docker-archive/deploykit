@@ -13,7 +13,8 @@ go:
 sudo: false
 
 script:
-  - make setup test
+  - GO15VENDOREXPERIMENT=1 make setup
+  - GO15VENDOREXPERIMENT=1 make test
 
 notifications:
   webhooks:
