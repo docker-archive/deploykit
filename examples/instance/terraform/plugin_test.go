@@ -41,7 +41,7 @@ func TestUsage(t *testing.T) {
 				"ssh_key_ids": [
 					"${data.softlayer_ssh_key.public_key.id}"
 				],
-				"user_metadata": "ls"
+				"user_metadata": "echo {{ var `+"`/self/instId`"+` }}"
 			}
 		}
 	}
@@ -76,7 +76,7 @@ func TestUsage(t *testing.T) {
 				"os_reference_code": "UBUNTU_14_64",
 				"domain": "softlayer.com",
 				"ssh_key_ids": [ "${data.softlayer_ssh_key.public_key.id}" ],
-				"user_metadata": "ls"
+				"user_metadata": "echo {{ var `+"`/self/instId`"+` }}"
 			}
 		}
 	}
@@ -108,7 +108,7 @@ func TestUsage(t *testing.T) {
 				"ssh_key_ids": [
 					"${data.softlayer_ssh_key.public_key.id}"
 				],
-				"user_metadata": "ls"
+				"user_metadata": "echo {{ var `+"`/self/instId`"+` }}"
 			}
 		}
 	}
@@ -133,7 +133,7 @@ func TestUsage(t *testing.T) {
 				"connection" : {
 					"user" : "ubuntu"
 				},
-				"user_data": "ls",
+				"user_data": "echo {{ var `+"`/self/instId`"+` }}",
 				"provisioner" : {
 					"remote_exec" : {
 						"inline" : [
@@ -228,9 +228,9 @@ func run(t *testing.T, resourceType, properties string) {
 	_, v := firstInMap(vms.(map[string]interface{}))
 	value, _ := v.(map[string]interface{})
 
-	// Userdata should have the resource defined data (ie, "ls") with
+	// Userdata should have the resource defined data (ie, echo <instId>) with
 	// the spec init data appended
-	expectedUserData2 := "ls\n" + instanceSpec2.Init
+	expectedUserData2 := "echo " + string(*id2) + "\n" + instanceSpec2.Init
 
 	switch vmType {
 	case VMSoftLayer:
