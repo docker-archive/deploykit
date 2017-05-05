@@ -24,13 +24,13 @@ func RunPlugin(name string, plugin server.VersionedInterface, more ...server.Ver
 
 	socketPath := path.Join(dir, name)
 	pidPath := path.Join(dir, name+".pid")
-	run("", socketPath, pidPath, plugin, more...)
+	run(nil, socketPath, pidPath, plugin, more...)
 }
 
 // RunListener runs a plugin server, listening at listen address, and
 // advertising with the provided name for discovery.
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
-func RunListener(listen, name string, plugin server.VersionedInterface, more ...server.VersionedInterface) {
+func RunListener(listen []string, name string, plugin server.VersionedInterface, more ...server.VersionedInterface) {
 	dir := local.Dir()
 	EnsureDirExists(dir)
 
@@ -39,12 +39,12 @@ func RunListener(listen, name string, plugin server.VersionedInterface, more ...
 	run(listen, discoverPath, pidPath, plugin, more...)
 }
 
-func run(listen, discoverPath, pidPath string,
+func run(listen []string, discoverPath, pidPath string,
 	plugin server.VersionedInterface, more ...server.VersionedInterface) {
 
 	var stoppable server.Stoppable
 
-	if listen != "" {
+	if len(listen) > 0 {
 		s, err := server.StartListenerAtPath(listen, discoverPath, plugin, more...)
 		if err != nil {
 			logrus.Error(err)
