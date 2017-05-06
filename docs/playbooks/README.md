@@ -21,6 +21,14 @@ $ docker run --rm -v `pwd`:/build infrakit/installer build-infrakit linux
 $ sudo cp ./infrakit /usr/local/bin/
 ```
 
+## Set the `INFRAKIT_HOME` environment variable
+
+In your terminal, or add this to your `.bash_profile`:
+
+```shell
+export INFRAKIT_HOME=~/.infrakit
+```
+
 ## Add a Playbook
 
 The `infrakit` cli is a dynamic command line tool.  You can add 'playbooks' which contain pre-built features.

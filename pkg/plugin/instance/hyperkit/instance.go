@@ -64,9 +64,8 @@ func (p hyperkitPlugin) Validate(req *types.Any) error {
 	}
 
 	for key, check := range map[string]string{
-		"Kernel":    guest.Kernel,
-		"Initrd":    guest.Initrd,
-		"DiskImage": guest.DiskImage,
+		"Kernel": guest.Kernel,
+		"Initrd": guest.Initrd,
 	} {
 		if check == "" {
 			return fmt.Errorf("no %s specified", key)
