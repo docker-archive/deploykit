@@ -61,7 +61,6 @@ func main() {
 
 	cmd.PersistentFlags().AddFlagSet(cli.Flags(logOptions))
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
-
 	cmd.PersistentFlags().StringSliceVarP(&remotes, "host", "H", remotes, "host list. Default is local sockets")
 
 	// parse the list of hosts
@@ -79,29 +78,31 @@ func main() {
 
 			// If not -- see if INFRAKIT_HOST is set to point to a host list in the $INFRAKIT_HOME/hosts file.
 			host := os.Getenv("INFRAKIT_HOST")
-			switch host {
-			case "":
-				host = "default"
-			case "local":
+			if host == "" {
 				return nil // do nothing -- local mode
 			}
 
-			fmt.Println(">>>>>> host", host)
-
 			// Now look up the host lists in the file
-			buff, err := ioutil.ReadFile(filepath.Join(os.Getenv("INFRAKIT_HOME"), "hosts"))
+			hostsFile := filepath.Join(os.Getenv("INFRAKIT_HOME"), "hosts")
+			buff, err := ioutil.ReadFile(hostsFile)
+			if err != nil {
+				return fmt.Errorf("cannot read hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
+			}
+			m := map[string]string{}
+			yaml, err := types.AnyYAML(buff)
+			if err != nil {
+				return fmt.Errorf("bad format for hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
 
-			fmt.Println(">>>>> buff", string(buff), "err", err)
+			}
+			err = yaml.Decode(&m)
+			if err != nil {
+				return fmt.Errorf("cannot decode hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
+			}
 
-			if err == nil {
-				m := map[string]string{}
-				if yaml, err := types.AnyYAML(buff); err == nil {
-					if err := yaml.Decode(&m); err == nil {
-						if list, has := m[host]; has {
-							hosts = strings.Split(list, ",")
-						}
-					}
-				}
+			if list, has := m[host]; has {
+				hosts = strings.Split(list, ",")
+			} else {
+				return fmt.Errorf("no entry in hosts file at %s for INFRAKIT_HOST=%s", hostsFile, host)
 			}
 		}
 
