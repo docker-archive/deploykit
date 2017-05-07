@@ -40,3 +40,9 @@ docker run  -d --volumes-from infrakit --name manager \
 {{ source "start-instance-hyperkit.sh" }}
 
 {{ source "start-instance-gcp.sh" }}
+
+echo "Updating hosts file"
+{{ $hostsFile := list (env `INFRAKIT_HOME`) `/hosts` | join `` }} 
+{{ $hosts :=  include (list `file://` $hostsFile | join ``) | yamlDecode }} 
+{{ $_ := set $hosts `localhost` (list `localhost` $port | join `:`) }}
+echo "{{ $hosts | yamlEncode }}" > {{ $hostsFile }}
