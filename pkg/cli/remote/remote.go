@@ -3,6 +3,7 @@ package remote
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"path"
 	"strings"
 
@@ -92,55 +93,68 @@ func list(plugins func() discovery.Plugins, modules Modules, input io.Reader,
 	found := []*cobra.Command{}
 
 loop:
-	for op, url := range modules {
+	for op, moduleURL := range modules {
 
 		cmd := &cobra.Command{
 			Use:   string(op),
 			Short: string(op),
 		}
 
-		// try to resolve to absolute url if it's relative
+		var parent *url.URL
+
 		if parentURL != nil {
-			if u, err := template.GetURL(string(*parentURL), string(url)); err == nil {
-				url = SourceURL(u)
+
+			// try to resolve to absolute url if it's relative
+			if u, err := template.GetURL(string(*parentURL), string(moduleURL)); err == nil {
+
+				parent = u
+				moduleURL = SourceURL(u.String())
+
 			} else {
-				log.Warn("cannot resolve", "op", op, "url", url, "parent", parentURL)
+				log.Warn("cannot resolve", "op", op, "url", moduleURL, "parent", parentURL)
 				continue loop
 			}
 		}
 
-		// Documentation -- look for a README.md at the given dir
-		readme := path.Join(path.Dir(string(url)), "README.md")
-		if t, err := template.NewTemplate(readme, template.Options{}); err == nil {
-			if view, err := t.Render(nil); err == nil {
-				cmd.SetHelpTemplate(fmt.Sprintf(helpTemplate, view))
+		if parent != nil {
+
+			// Documentation -- look for a README.md at the given dir
+			readmeURL := *parent
+			readmeURL.Path = path.Join(path.Dir(parent.Path), "README.md")
+			if t, err := template.NewTemplate(readmeURL.String(), template.Options{}); err == nil {
+				if view, err := t.Render(nil); err == nil {
+					cmd.SetHelpTemplate(fmt.Sprintf(helpTemplate, view))
+				}
 			}
 		}
 
 		// if we can parse it as a map, then we have a 'directory'
-		mods, err := dir(url)
+		mods, err := dir(moduleURL)
 		if err == nil {
 
-			copy := url
+			copy := moduleURL
 			subs, err := list(plugins, mods, input, cmd, &copy)
 			if err != nil {
-				log.Warn("cannot list", "op", op, "url", url, "err", err)
+				log.Warn("cannot list", "op", op, "url", moduleURL, "err", err)
 				continue loop
 			}
 			for _, sub := range subs {
 				cmd.AddCommand(sub)
 			}
+
 		} else {
-			ctx := cli.NewContext(plugins, cmd, string(url), input)
+
+			ctx := cli.NewContext(plugins, cmd, string(moduleURL), input)
 			cmd.RunE = func(c *cobra.Command, args []string) error {
-				log.Debug("Running", "command", op, "url", url, "args", args)
+				log.Debug("Running", "command", op, "url", moduleURL, "args", args)
 				return ctx.Execute()
 			}
 			err := ctx.BuildFlags()
 			if err != nil {
-				log.Warn("cannot build flags", "op", op, "url", url, "err", err)
+				log.Warn("cannot build flags", "op", op, "url", moduleURL, "err", err)
 				continue loop
 			}
+
 		}
 		found = append(found, cmd)
 	}

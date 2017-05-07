@@ -112,7 +112,7 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "6 plugins should be discoverable" "run infrakit plugin ls -q" "6"
+expect_output_lines "16 plugins should be discoverable" "run infrakit plugin ls -q" "16"
 
 expect_output_lines "0 instances should exist" "run infrakit instance describe -q --name instance-file" "0"
 

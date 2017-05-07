@@ -76,6 +76,8 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 type VersionedInterface interface {
 	// ImplementedInterface returns the interface being provided.
 	ImplementedInterface() spi.InterfaceSpec
+	// Types returns the types in this category/ kind
+	Types() []string
 }
 
 // StartListenerAtPath starts an HTTP server listening on tcp port with discovery entry at specified path.
@@ -99,9 +101,10 @@ func startAtPath(listen []string, discoverPath string,
 
 	targets := append([]VersionedInterface{receiver}, more...)
 
-	interfaces := []spi.InterfaceSpec{}
+	interfaces := map[spi.InterfaceSpec][]string{}
 	for _, t := range targets {
-		interfaces = append(interfaces, t.ImplementedInterface())
+
+		interfaces[t.ImplementedInterface()] = t.Types()
 
 		if err := server.RegisterService(t, ""); err != nil {
 			return nil, err

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	sys_os "os"
 	"path"
+	"sort"
 	"strconv"
 	"sync"
 	"syscall"
@@ -17,6 +18,8 @@ import (
 	"github.com/docker/infrakit/pkg/launch/os"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
+	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -46,11 +49,65 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		if !*quiet {
-			fmt.Printf("%-20s\t%-s\n", "NAME", "LISTEN")
+		type ep struct {
+			name   string
+			listen string
+			spi    rpc.InterfaceSpec
 		}
-		for k, v := range entries {
-			fmt.Printf("%-20s\t%-s\n", k, v.Address)
+
+		view := map[string]ep{} // table of name, listen, and spi
+		keys := []string{}      // slice of names to sort later, keys into view
+
+		// Show the interfaces implemented by each plugin
+		for major, entry := range entries {
+			hs, err := client.NewHandshaker(entry.Address)
+			if err != nil {
+				log.Warn("handshaker error", "err", err, "addr", entry.Address)
+				continue
+			}
+
+			typeMap, err := hs.Types()
+			if err != nil {
+				log.Warn("cannot get types for this kind", "err", err, "addr", entry.Address)
+				continue
+			}
+
+			for spi, names := range typeMap {
+
+				interfaceSpec := spi
+
+				for _, minor := range names {
+
+					n := major
+
+					if minor != "." {
+						n = n + "/" + minor
+					}
+
+					ep := ep{
+						name:   n,
+						listen: entry.Address,
+						spi:    interfaceSpec,
+					}
+
+					key := fmt.Sprintf("%s:%s", ep.name, ep.spi)
+					view[key] = ep
+					keys = append(keys, key)
+				}
+			}
+		}
+
+		if !*quiet {
+			fmt.Printf("%-20s\t%-50s\t%-s\n", "NAME", "LISTEN", "INTERFACES")
+		}
+
+		sort.Strings(keys)
+
+		for _, k := range keys {
+
+			ep := view[k]
+			fmt.Printf("%-20s\t%-50s\t%-s\n", ep.name, ep.listen, ep.spi)
+
 		}
 
 		return nil

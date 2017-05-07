@@ -229,7 +229,7 @@ func NormalizeSpecs(uri string, input []byte) ([]*types.Spec, error) {
 			if err != nil {
 				return nil, err
 			}
-			if u, err := types.NewURL(absolute); err == nil {
+			if u, err := types.NewURL(absolute.String()); err == nil {
 				spec.Template = u
 			}
 		}

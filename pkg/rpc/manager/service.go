@@ -22,6 +22,11 @@ func (p *Manager) ImplementedInterface() spi.InterfaceSpec {
 	return manager.InterfaceSpec
 }
 
+// Types returns the types exposed by this kind of RPC service
+func (p *Manager) Types() []string {
+	return []string{"."} // no types
+}
+
 // IsLeaderRequest is the rpc request
 type IsLeaderRequest struct {
 }
