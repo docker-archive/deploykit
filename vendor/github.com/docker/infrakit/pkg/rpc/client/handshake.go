@@ -3,13 +3,12 @@ package client
 import (
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"sync"
 )
 
 type handshakingClient struct {
-	client Client
+	client *client
 	iface  spi.InterfaceSpec
 
 	// handshakeResult handles the tri-state outcome of handshake state:
@@ -44,27 +43,24 @@ func (c *handshakingClient) handshake() error {
 	defer c.lock.Unlock()
 
 	if c.handshakeResult == nil {
-		req := rpc.ImplementsRequest{}
-		resp := rpc.ImplementsResponse{}
 
-		if err := c.client.Call("Handshake.Implements", req, &resp); err != nil {
+		apis, err := c.client.Implements()
+		if err != nil {
 			return err
 		}
 
-		err := fmt.Errorf("Plugin does not support interface %v", c.iface)
-		if resp.APIs != nil {
-			for _, iface := range resp.APIs {
-				if iface.Name == c.iface.Name {
-					if iface.Version == c.iface.Version {
-						err = nil
-						break
-					} else {
-						err = errVersionMismatch(fmt.Sprintf(
-							"Plugin supports %s interface version %s, client requires %s",
-							iface.Name,
-							iface.Version,
-							c.iface.Version))
-					}
+		err = fmt.Errorf("Plugin does not support interface %v", c.iface)
+		for _, iface := range apis {
+			if iface.Name == c.iface.Name {
+				if iface.Version == c.iface.Version {
+					err = nil
+					break
+				} else {
+					err = errVersionMismatch(fmt.Sprintf(
+						"Plugin supports %s interface version %s, client requires %s",
+						iface.Name,
+						iface.Version,
+						c.iface.Version))
 				}
 			}
 		}

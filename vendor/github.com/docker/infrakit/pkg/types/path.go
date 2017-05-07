@@ -1,7 +1,9 @@
 package types
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -10,11 +12,32 @@ var (
 	NullPath = Path([]string{})
 )
 
+// RFC6901ToPath takes a path expression in the format of IETF RFC6901 (JSON pointer) and convert it to a Path
+func RFC6901ToPath(path string) Path {
+	return rfc6901ToPath(strings.Split(path, "/"))
+}
+
+func rfc6901ToPath(path []string) Path {
+	decoded := []string{}
+	for _, p := range path {
+		p = strings.Replace(p, `~1`, `/`, -1)
+		p = strings.Replace(p, `~0`, `~`, -1)
+		if _, err := strconv.Atoi(p); err == nil {
+			p = fmt.Sprintf(`[%s]`, p)
+		}
+		decoded = append(decoded, p)
+	}
+	return Path(decoded)
+}
+
 // Path is used to identify a particle of metadata.  The path can be strings separated by / as in a URL.
 type Path []string
 
 // PathFromString returns the path components of a / separated path
 func PathFromString(path string) Path {
+	if path == "" {
+		return Path([]string{}).Clean() // ==> .
+	}
 	return Path(strings.Split(path, "/")).Clean()
 }
 
@@ -57,9 +80,13 @@ func (p Path) Dot() bool {
 func (p Path) Clean() Path {
 	this := []string(p)
 	copy := []string{}
-	for _, v := range this {
+	for i, v := range this {
 		switch v {
-		case "", ".":
+		case ".":
+		case "":
+			if i == 0 {
+				copy = append(copy, "")
+			}
 		case "..":
 			if len(copy) == 0 {
 				copy = append(copy, "..")
@@ -76,7 +103,9 @@ func (p Path) Clean() Path {
 	if len(copy) == 0 {
 		copy = []string{"."}
 	} else if this[len(this)-1] == "" || this[len(this)-1] == "." {
-		copy = append(copy, "")
+		if len(this)-2 > -1 {
+			copy = append(copy, "")
+		}
 	}
 
 	return Path(copy)
@@ -134,7 +163,7 @@ func (p Path) Join(child Path) Path {
 	if this[len(this)-1] == "" {
 		pp = Path(this[:len(this)-1])
 	}
-	return Path(append(pp, []string(child)...))
+	return Path(append(pp, []string(child)...)).Clean()
 }
 
 // Rel returns a new path that is a child of the input from this path.
@@ -197,4 +226,16 @@ func (p pathSorter) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 // Sort sorts the paths
 func Sort(p []Path) {
 	sort.Sort(pathSorter(p))
+}
+
+// MarshalJSON returns the json representation
+func (p Path) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, p.String())), nil
+}
+
+// UnmarshalJSON unmarshals the buffer to this struct
+func (p *Path) UnmarshalJSON(buff []byte) error {
+	str := strings.Trim(string(buff), " \"\\'\t\n")
+	*p = PathFromString(str)
+	return nil
 }
