@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
@@ -14,6 +16,7 @@ import (
 	discovery_local "github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 
 	_ "github.com/docker/infrakit/cmd/infrakit/event"
@@ -65,23 +68,58 @@ func main() {
 	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
 		logutil.Configure(logOptions)
 
-		if len(remotes) > 0 {
-			for _, h := range remotes {
-				addProtocol := false
-				if !strings.Contains(h, "://") {
-					h = "http://" + h
-					addProtocol = true
-				}
-				u, err := url.Parse(h)
-				if err != nil {
-					return err
-				}
-				if addProtocol {
-					u.Scheme = "http"
-				}
+		hosts := []string{}
 
-				ulist = append(ulist, u)
+		if len(remotes) > 0 {
+
+			// The command line flag wins.
+			hosts = remotes
+
+		} else {
+
+			// If not -- see if INFRAKIT_HOST is set to point to a host list in the $INFRAKIT_HOME/hosts file.
+			host := os.Getenv("INFRAKIT_HOST")
+			switch host {
+			case "":
+				host = "default"
+			case "local":
+				return nil // do nothing -- local mode
 			}
+
+			fmt.Println(">>>>>> host", host)
+
+			// Now look up the host lists in the file
+			buff, err := ioutil.ReadFile(filepath.Join(os.Getenv("INFRAKIT_HOME"), "hosts"))
+
+			fmt.Println(">>>>> buff", string(buff), "err", err)
+
+			if err == nil {
+				m := map[string]string{}
+				if yaml, err := types.AnyYAML(buff); err == nil {
+					if err := yaml.Decode(&m); err == nil {
+						if list, has := m[host]; has {
+							hosts = strings.Split(list, ",")
+						}
+					}
+				}
+			}
+		}
+
+		for _, h := range hosts {
+			addProtocol := false
+			if !strings.Contains(h, "://") {
+				h = "http://" + h
+				addProtocol = true
+			}
+			u, err := url.Parse(h)
+			if err != nil {
+				return err
+			}
+			if addProtocol {
+				u.Scheme = "http"
+			}
+
+			ulist = append(ulist, u)
 		}
 		return nil
 	}
@@ -94,6 +132,9 @@ func main() {
 	// They are returned from cmd.Execute() below and we print it ourselves.
 	cmd.SilenceErrors = true
 	f := func() discovery.Plugins {
+
+		fmt.Println("????", ulist)
+
 		if len(ulist) == 0 {
 			d, err := discovery_local.NewPluginDiscovery()
 			if err != nil {
