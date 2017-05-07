@@ -57,6 +57,19 @@ func (p *Event) ImplementedInterface() spi.InterfaceSpec {
 	return event.InterfaceSpec
 }
 
+// Types returns the types exposed by this service (or kind/ category)
+func (p *Event) Types() []string {
+	types := []string{}
+	for k := range p.typedPlugins {
+		types = append(types, k)
+	}
+	if p.plugin != nil {
+		types = append(types, ".")
+	}
+	sort.Strings(types)
+	return types
+}
+
 func (p *Event) getPlugin(eventType string) event.Plugin {
 	if eventType == "" {
 		return p.plugin

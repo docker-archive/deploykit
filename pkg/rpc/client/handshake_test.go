@@ -95,6 +95,11 @@ func (p *TestPlugin) ImplementedInterface() spi.InterfaceSpec {
 	return p.spec
 }
 
+// Types returns the types
+func (p *TestPlugin) Types() []string {
+	return []string{"."}
+}
+
 // EmptyMessage is an empty test message.
 type EmptyMessage struct {
 }

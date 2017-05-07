@@ -238,11 +238,11 @@ func (t *Template) Source(p string, opt ...interface{}) (string, error) {
 	headers, context := headersAndContext(opt...)
 	loc := p
 	if strings.Index(loc, "str://") == -1 {
-		buff, err := GetURL(t.url, p)
+		u, err := GetURL(t.url, p)
 		if err != nil {
 			return "", err
 		}
-		loc = buff
+		loc = u.String()
 	}
 
 	prev := t.options.CustomizeFetch
@@ -273,11 +273,11 @@ func (t *Template) Include(p string, opt ...interface{}) (string, error) {
 	headers, context := headersAndContext(opt...)
 	loc := p
 	if strings.Index(loc, "str://") == -1 {
-		buff, err := GetURL(t.url, p)
+		u, err := GetURL(t.url, p)
 		if err != nil {
 			return "", err
 		}
-		loc = buff
+		loc = u.String()
 	}
 
 	prev := t.options.CustomizeFetch
