@@ -129,8 +129,8 @@ func nested(s *types.Spec) []*types.Spec {
 }
 
 type key struct {
-	class string
-	name  string
+	kind string
+	name string
 }
 
 func indexSpecs(specs []*types.Spec, g *graph.Graph) map[key]*graph.Node {
@@ -140,13 +140,13 @@ func indexSpecs(specs []*types.Spec, g *graph.Graph) map[key]*graph.Node {
 		node := g.MakeNode()
 		*(node.Value) = spec
 
-		index[key{class: spec.Class, name: spec.Metadata.Name}] = &node
+		index[key{kind: spec.Kind, name: spec.Metadata.Name}] = &node
 	}
 	return index
 }
 
-func indexGet(index map[key]*graph.Node, class, name string) *graph.Node {
-	if v, has := index[key{class: class, name: name}]; has {
+func indexGet(index map[key]*graph.Node, kind, name string) *graph.Node {
+	if v, has := index[key{kind: kind, name: name}]; has {
 		return v
 	}
 	return nil
@@ -175,14 +175,14 @@ func OrderByDependency(specs []*types.Spec) ([]*types.Spec, error) {
 
 	for _, spec := range specs {
 
-		from := indexGet(index, spec.Class, spec.Metadata.Name)
+		from := indexGet(index, spec.Kind, spec.Metadata.Name)
 		if from == nil {
-			return nil, errNotFound{class: spec.Class, name: spec.Metadata.Name}
+			return nil, errNotFound{kind: spec.Kind, name: spec.Metadata.Name}
 		}
 
 		for _, depend := range spec.Depends {
 
-			to := indexGet(index, depend.Class, depend.Name)
+			to := indexGet(index, depend.Kind, depend.Name)
 			if to == nil {
 				return nil, errBadDependency(depend)
 			}

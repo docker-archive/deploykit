@@ -9,7 +9,7 @@ import (
 func TestObject(t *testing.T) {
 
 	text := `
-- class:        instance-aws/ec2-instance
+- kind:        instance-aws/ec2-instance
   spiVersion:   instance/v0.1.0
   metadata:
     name: host1
@@ -25,13 +25,13 @@ func TestObject(t *testing.T) {
     region: us-west-1
     stack:  test
   depends:
-    - class: instance-aws/ec2-volume
+    - kind: instance-aws/ec2-volume
       name: disk1
       bind:
          volume/id : metadata/UID
          volume/size: properties/sizeGb
 
-- class:        instance-aws/ec2-volume
+- kind:        instance-aws/ec2-volume
   spiVersion:   instance/v0.1.0
   metadata:
     uid: disk1-1234

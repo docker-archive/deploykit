@@ -14,7 +14,7 @@ import (
 func TestObject(t *testing.T) {
 
 	text := `
-- class:        instance-aws/ec2-instance
+- kind:        instance-aws/ec2-instance
   spiVersion:   instance/v0.1.0
   metadata:
     name: host1
@@ -30,13 +30,13 @@ func TestObject(t *testing.T) {
     region: us-west-1
     stack:  test
   depends:
-    - class: instance-aws/ec2-volume
+    - kind: instance-aws/ec2-volume
       name: disk1
       bind:
          volume/id : metadata/uid
          volume/size: properties/sizeGb
 
-- class:        instance-aws/ec2-volume
+- kind:        instance-aws/ec2-volume
   spiVersion:   instance/v0.1.0
   metadata:
     name: disk1
@@ -60,7 +60,7 @@ func TestObject(t *testing.T) {
 	require.Equal(t, 2, len(specs))
 
 	objects := NewObjects(func(o *types.Object) []interface{} {
-		return []interface{}{o.Spec.Class, o.Spec.Metadata.Name}
+		return []interface{}{o.Spec.Kind, o.Spec.Metadata.Name}
 	})
 
 	objects.Add(&types.Object{
@@ -77,7 +77,7 @@ func TestObject(t *testing.T) {
 	disk.Metadata.Identity = &types.Identity{UID: "disk-11234"}
 
 	host := objects.FindBy("instance-aws/ec2-volume", "host1")
-	require.Nil(t, host) // wrong class
+	require.Nil(t, host) // wrong kind
 
 	host = objects.FindBy("instance-aws/ec2-instance", "host1")
 	require.NotNil(t, host)
@@ -99,7 +99,7 @@ func TestObject(t *testing.T) {
 func TestObjectNested(t *testing.T) {
 
 	text := `
-- class:        group
+- kind:        group
   spiVersion:   group/v0.1.0
   metadata:
     name: managers
@@ -108,7 +108,7 @@ func TestObjectNested(t *testing.T) {
       project: test
   properties:
     instance:
-      class:        instance-aws/ec2-instance
+      kind:        instance-aws/ec2-instance
       spiVersion:   instance/v0.1.0
       metadata:
         name: manager-node
@@ -124,21 +124,21 @@ func TestObjectNested(t *testing.T) {
         region: us-west-1
         stack:  test
       depends:
-        - class: instance-aws/ec2-volume
+        - kind: instance-aws/ec2-volume
           name: disk1
           bind:
             disk1VolumeId : metadata/uid
-        - class: instance-aws/ec2-volume
+        - kind: instance-aws/ec2-volume
           name: disk2
           bind:
             disk2VolumeId : metadata/uid
-        - class: instance-aws/ec2-volume
+        - kind: instance-aws/ec2-volume
           name: disk3
           bind:
             disk3VolumeId : metadata/uid
 
     flavor:
-      class:        flavor-swarm/manager
+      kind:        flavor-swarm/manager
       spiVersion:   flavor/v0.1.0
       metadata:
         name: swarm-manager
@@ -149,7 +149,7 @@ func TestObjectNested(t *testing.T) {
       options:
           region: us-west-1
           stack:  test
-- class:        instance-aws/ec2-volume
+- kind:        instance-aws/ec2-volume
   spiVersion:   instance/v0.1.0
   metadata:
     name: disk1
@@ -163,7 +163,7 @@ func TestObjectNested(t *testing.T) {
   options:
     region: us-west-1
     stack:  test
-- class:        instance-aws/ec2-volume
+- kind:        instance-aws/ec2-volume
   spiVersion:   instance/v0.1.0
   metadata:
     name: disk2
@@ -177,7 +177,7 @@ func TestObjectNested(t *testing.T) {
   options:
     region: us-west-1
     stack:  test
-- class:        instance-aws/ec2-volume
+- kind:        instance-aws/ec2-volume
   spiVersion:   instance/v0.1.0
   metadata:
     name: disk3
@@ -201,7 +201,7 @@ func TestObjectNested(t *testing.T) {
 	require.Equal(t, 4, len(specs)) // nested
 
 	objects := NewObjects(func(o *types.Object) []interface{} {
-		return []interface{}{o.Spec.Class, o.Spec.Metadata.Name}
+		return []interface{}{o.Spec.Kind, o.Spec.Metadata.Name}
 	})
 
 	all := AllSpecs(specs) // all including nested
