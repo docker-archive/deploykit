@@ -1,5 +1,9 @@
 {{/* Input to create a group using the hyperkit instance plugin and manager */}}
+<<<<<<< HEAD
 {{/* =% managerCommit true false %= */}}
+=======
+{{/* =% managerCommit true false  %= */}}
+>>>>>>> a8e9cb894b8d878d79ab036cda9bb1af9a8cf86f
 
 {{ $groupName := flag "group-name" "string" "Name of group" | prompt "Name of the group?" "string" "mygroup" }}
 {{ $size := flag "size" "int" "Size of the group" | prompt "How many nodes?" "int" 2 }}
