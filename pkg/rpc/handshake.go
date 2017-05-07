@@ -23,7 +23,7 @@ type TypesRequest struct {
 // InterfaceSpec is the string version of the InterfaceSpec
 type InterfaceSpec string
 
-// TypeResponse is the response for returning the types exposed by the rpc object
+// TypesResponse is the response for returning the types exposed by the rpc object
 type TypesResponse struct {
 	Types map[InterfaceSpec][]string
 }
