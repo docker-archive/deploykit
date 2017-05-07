@@ -8,6 +8,9 @@ REVISION?=$(shell git rev-list -1 HEAD)
 # Docker client API version.  Change this to be consistent with the version of the vendored sources you use.
 DOCKER_CLIENT_VERSION?=1.24
 
+# True to run e2e test
+E2E_TESTS?=true
+
 # Allow turning off function inlining and variable registerization
 ifeq (${DISABLE_OPTIMIZATION},true)
 	GO_GCFLAGS=-gcflags "-N -l"
@@ -50,8 +53,10 @@ build-docker:
 	@docker build ${DOCKER_BUILD_FLAGS} \
 	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
 	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+ifeq (${E2E_TESTS},true)
 	@echo "Running tests -- scripts/e2e-test-docker-containers.sh to verify the binaries"
 	@scripts/e2e-test-docker-containers.sh
+endif
 ifeq (${DOCKER_PUSH},true)
 	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
 ifeq (${DOCKER_TAG_LATEST},true)
@@ -197,7 +202,11 @@ coverage:
 
 e2e-test: binaries
 	@echo "+ $@"
-	./scripts/e2e-test.sh
+ifeq (${E2E_TESTS},true)
+	@echo "Running tests -- scripts/e2e-test.sh to verify the binaries"
+	@./scripts/e2e-test.sh
+endif
+
 
 test-full:
 	@echo "+ $@"

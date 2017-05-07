@@ -69,6 +69,30 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			typeMap, err := hs.Types()
 			if err != nil {
 				log.Warn("cannot get types for this kind", "err", err, "addr", entry.Address)
+
+				// plugins that haven't been updated to the new types() call
+
+				// try the implements
+				if spis, err := hs.Implements(); err == nil {
+					for _, spi := range spis {
+						ep := ep{
+							name:   major,
+							listen: entry.Address,
+							spi:    rpc.InterfaceSpec(fmt.Sprintf("%s/%s", spi.Name, spi.Version)),
+						}
+
+						key := fmt.Sprintf("%s:%s", ep.name, ep.spi)
+						view[key] = ep
+						keys = append(keys, key)
+					}
+				} else {
+					ep := ep{
+						name:   major,
+						listen: entry.Address,
+					}
+					view[ep.name] = ep
+					keys = append(keys, ep.name)
+				}
 				continue
 			}
 
@@ -98,7 +122,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		if !*quiet {
-			fmt.Printf("%-20s\t%-50s\t%-s\n", "NAME", "LISTEN", "INTERFACES")
+			fmt.Printf("%-20s\t%-50s\t%-s\n", "NAME", "LISTEN", "INTERFACE")
 		}
 
 		sort.Strings(keys)
