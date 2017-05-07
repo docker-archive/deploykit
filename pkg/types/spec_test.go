@@ -10,7 +10,7 @@ import (
 func TestEncodeDecodeSpec(t *testing.T) {
 
 	spec := `
-class:        instance-aws/ec2-instance
+kind:        instance-aws/ec2-instance
 spiVersion:   instance/v0.1.0
 metadata:
   name: host1
@@ -29,7 +29,7 @@ options:
 	require.NoError(t, yaml.Unmarshal([]byte(spec), &s))
 
 	expected := Spec{
-		Class:      "instance-aws/ec2-instance",
+		Kind:       "instance-aws/ec2-instance",
 		SpiVersion: "instance/v0.1.0",
 		Metadata: Metadata{
 			Name: "host1",
@@ -51,7 +51,7 @@ options:
 	require.Equal(t, AnyValueMust(expected), AnyValueMust(s))
 	require.NoError(t, s.Validate())
 
-	s.Class = ""
+	s.Kind = ""
 	require.Error(t, s.Validate())
 
 	s.SpiVersion = ""
@@ -61,7 +61,7 @@ options:
 func TestEncodeDecodeObject(t *testing.T) {
 
 	object := `
-class:        instance-aws/ec2-instance
+kind:        instance-aws/ec2-instance
 spiVersion:   instance/v0.1.0
 metadata:
   uid : u-12134
@@ -78,7 +78,7 @@ options:
     region: us-west-1
     stack:  test
 depends:
-    - class: instance-aws/ebs-volume
+    - kind: instance-aws/ebs-volume
       name: /var/lib/docker
       bind:
          volume/id : Spec/Metadata/Identity/UID
@@ -95,7 +95,7 @@ state:
 
 	expected := Object{
 		Spec: Spec{
-			Class:      "instance-aws/ec2-instance",
+			Kind:       "instance-aws/ec2-instance",
 			SpiVersion: "instance/v0.1.0",
 			Metadata: Metadata{
 				Identity: &Identity{
@@ -119,8 +119,8 @@ state:
 			}),
 			Depends: []Dependency{
 				{
-					Class: "instance-aws/ebs-volume",
-					Name:  "/var/lib/docker",
+					Kind: "instance-aws/ebs-volume",
+					Name: "/var/lib/docker",
 					Bind: map[string]*Pointer{
 						"volume/id": PointerFromString("Spec/Metadata/Identity/UID"),
 					},
