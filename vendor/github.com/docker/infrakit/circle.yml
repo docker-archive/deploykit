@@ -7,7 +7,7 @@ machine:
   environment:
     OS: "linux"
     ARCH: "amd64"
-    GOVERSION: "1.7.5"
+    GOVERSION: "1.8.1"
     GOPATH: "$HOME/.go_workspace"
     WORKDIR: "$GOPATH/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     E2E_CLEANUP: "false"
@@ -37,6 +37,7 @@ dependencies:
 
     # Install dependencies
     - cd $WORKDIR && go get github.com/golang/lint/golint github.com/wfarner/blockcheck
+    - sudo apt-get update && sudo apt-get install -y libvirt-dev
 
 test:
   override:
@@ -51,7 +52,7 @@ deployment:
     branch: /release-.*/
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
-      - DOCKER_PUSH=true DOCKER_TAG_LATEST=false DOCKER_TAG=$(echo $CIRCLE_BRANCH | awk -F - '{print $2}') DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+      - DOCKER_PUSH=true DOCKER_TAG_LATEST=false DOCKER_TAG=$(echo $CIRCLE_BRANCH | awk -F - '{print $2}') DOCKER_BUILD_FLAGS="--rm=false" make build-docker build-installer
       # Install minio.io for S3 bucket uploads
       - wget https://dl.minio.io/client/mc/release/linux-amd64/mc && chmod a+x ./mc && sudo cp ./mc /usr/local/bin
       - mc config host add $S3_MINIO https://s3.amazonaws.com $S3_KEY_ID $S3_SECRET_KEY S3v4
@@ -63,7 +64,7 @@ deployment:
     branch: master
     commands:
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
-      - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
+      - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker build-installer
       # Install minio.io for S3 bucket uploads
       - wget https://dl.minio.io/client/mc/release/linux-amd64/mc && chmod a+x ./mc && sudo cp ./mc /usr/local/bin
       - mc config host add $S3_MINIO https://s3.amazonaws.com $S3_KEY_ID $S3_SECRET_KEY S3v4

@@ -60,25 +60,33 @@ func (p *Metadata) Funcs() []template.Function {
 	return f.Funcs()
 }
 
-// Types implements server.TypedFunctionExporter
+// Types returns the types exposed by this service (or kind/ category)
 func (p *Metadata) Types() []string {
-	if p.typedPlugins == nil {
-		return nil
-	}
-	list := []string{}
+	types := []string{}
 	for k := range p.typedPlugins {
-		list = append(list, k)
+		types = append(types, k)
 	}
-	return list
+	if p.plugin != nil {
+		types = append(types, ".")
+	}
+	sort.Strings(types)
+	return types
 }
 
 // FuncsByType implements server.TypedFunctionExporter
 func (p *Metadata) FuncsByType(t string) []template.Function {
-	if p.typedPlugins == nil {
-		return nil
+	var fp metadata.Plugin
+	switch t {
+	case ".":
+		fp = p.plugin
+	default:
+		found, has := p.typedPlugins[t]
+		if !has {
+			return nil
+		}
+		fp = found
 	}
-	fp, has := p.typedPlugins[t]
-	if !has {
+	if fp == nil {
 		return nil
 	}
 	exp, is := fp.(template.FunctionExporter)

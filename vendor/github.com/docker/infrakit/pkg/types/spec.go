@@ -9,8 +9,8 @@ import (
 // Spec is the specification of the resource / object
 type Spec struct {
 
-	// Class is the kind/type of the resource -- e.g. instance-aws/ec2-instance
-	Class string `json:"class"`
+	// Kind is the category of the resources and kind can have types  -- e.g. instance-aws/ec2-instance
+	Kind string `json:"kind"`
 
 	// SpiVersion is the name of the interface and version - instance/v0.1.0
 	SpiVersion string `json:"spiVersion"`
@@ -36,7 +36,7 @@ type Spec struct {
 
 // Validate checks the spec for validity
 func (s Spec) Validate() error {
-	if s.Class == "" {
+	if s.Kind == "" {
 		return errMissingAttribute("class")
 	}
 	if s.SpiVersion == "" {
@@ -48,12 +48,12 @@ func (s Spec) Validate() error {
 	return nil
 }
 
-// Dependency models the reference and usage of another spec, by spec's Class and Name, and a way
+// Dependency models the reference and usage of another spec, by spec's Kind and Name, and a way
 // to extract its properties, and how it's referenced via the alias in the Properties section of the dependent Spec.
 type Dependency struct {
 
-	// Class is the Class of the spec this spec depends on
-	Class string `json:"class"`
+	// Kind is the Kind of the spec this spec depends on
+	Kind string `json:"kind"`
 
 	// Name is the Name of the spec this spec dependes on
 	Name string `json:"name"`

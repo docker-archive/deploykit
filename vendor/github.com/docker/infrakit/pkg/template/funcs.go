@@ -233,6 +233,78 @@ func setHeaders(req *http.Request, headers map[string][]string) {
 	}
 }
 
+// Source 'sources' the input file at url, also inherits all the variables.
+func (t *Template) Source(p string, opt ...interface{}) (string, error) {
+	headers, context := headersAndContext(opt...)
+	loc := p
+	if strings.Index(loc, "str://") == -1 {
+		u, err := GetURL(t.url, p)
+		if err != nil {
+			return "", err
+		}
+		loc = u.String()
+	}
+
+	prev := t.options.CustomizeFetch
+	t.options.CustomizeFetch = func(req *http.Request) {
+		setHeaders(req, headers)
+		if prev != nil {
+			prev(req)
+		}
+	}
+	sourced, err := NewTemplate(loc, t.options)
+	if err != nil {
+		return "", err
+	}
+	// set this as the parent of the sourced template so its global can mutate the globals in this
+	sourced.parent = t
+	sourced.forkFrom(t)
+	sourced.context = t.context
+
+	if context == nil {
+		context = sourced.context
+	}
+	// TODO(chungers) -- let the sourced template define new functions that can be called in the parent.
+	return sourced.Render(context)
+}
+
+// Include includes the template at the url inline.
+func (t *Template) Include(p string, opt ...interface{}) (string, error) {
+	headers, context := headersAndContext(opt...)
+	loc := p
+	if strings.Index(loc, "str://") == -1 {
+		u, err := GetURL(t.url, p)
+		if err != nil {
+			return "", err
+		}
+		loc = u.String()
+	}
+
+	prev := t.options.CustomizeFetch
+	t.options.CustomizeFetch = func(req *http.Request) {
+		setHeaders(req, headers)
+		if prev != nil {
+			prev(req)
+		}
+	}
+
+	included, err := NewTemplate(loc, t.options)
+	if err != nil {
+		return "", err
+	}
+	dotCopy, err := included.forkFrom(t)
+	if err != nil {
+		return "", err
+	}
+	included.context = dotCopy
+
+	if context == nil {
+		context = included.context
+	}
+
+	return included.Render(context)
+}
+
 // DefaultFuncs returns a list of default functions for binding in the template
 func (t *Template) DefaultFuncs() []Function {
 
@@ -246,39 +318,7 @@ func (t *Template) DefaultFuncs() []Function {
 				"as the calling template.  The context (e.g. variables) of the calling template as a result can",
 				"be mutated.",
 			},
-			Func: func(p string, opt ...interface{}) (string, error) {
-				headers, context := headersAndContext(opt...)
-				loc := p
-				if strings.Index(loc, "str://") == -1 {
-					buff, err := GetURL(t.url, p)
-					if err != nil {
-						return "", err
-					}
-					loc = buff
-				}
-
-				prev := t.options.CustomizeFetch
-				t.options.CustomizeFetch = func(req *http.Request) {
-					setHeaders(req, headers)
-					if prev != nil {
-						prev(req)
-					}
-				}
-				sourced, err := NewTemplate(loc, t.options)
-				if err != nil {
-					return "", err
-				}
-				// set this as the parent of the sourced template so its global can mutate the globals in this
-				sourced.parent = t
-				sourced.forkFrom(t)
-				sourced.context = t.context
-
-				if context == nil {
-					context = sourced.context
-				}
-				// TODO(chungers) -- let the sourced template define new functions that can be called in the parent.
-				return sourced.Render(context)
-			},
+			Func: t.Source,
 		},
 		{
 			Name: "include",
@@ -289,41 +329,7 @@ func (t *Template) DefaultFuncs() []Function {
 				"of current context in the calling template.  Any mutations to the context via 'global' will not ",
 				"be visible in the calling template's context.",
 			},
-			Func: func(p string, opt ...interface{}) (string, error) {
-				headers, context := headersAndContext(opt...)
-				loc := p
-				if strings.Index(loc, "str://") == -1 {
-					buff, err := GetURL(t.url, p)
-					if err != nil {
-						return "", err
-					}
-					loc = buff
-				}
-
-				prev := t.options.CustomizeFetch
-				t.options.CustomizeFetch = func(req *http.Request) {
-					setHeaders(req, headers)
-					if prev != nil {
-						prev(req)
-					}
-				}
-
-				included, err := NewTemplate(loc, t.options)
-				if err != nil {
-					return "", err
-				}
-				dotCopy, err := included.forkFrom(t)
-				if err != nil {
-					return "", err
-				}
-				included.context = dotCopy
-
-				if context == nil {
-					context = included.context
-				}
-
-				return included.Render(context)
-			},
+			Func: t.Include,
 		},
 		{
 			Name: "loop",

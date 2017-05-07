@@ -5,6 +5,13 @@
 .idea/
 *.iml
 coverage.txt
+.tags
 
 # Build binaries
 build/
+
+# Vim temporary files.
+.*.swp
+
+# Test binary, build with `go test -c`
+*.test

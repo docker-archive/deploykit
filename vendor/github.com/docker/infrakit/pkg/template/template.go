@@ -64,7 +64,13 @@ type Options struct {
 	// CustomizeFetch allows setting of http request header, etc. during fetch
 	CustomizeFetch func(*http.Request)
 
+	// Stderr is a function that returns stream to use for stderr
 	Stderr func() io.Writer
+
+	// MultiPass can affect the behavior of some functions like `var` where
+	// evaluation of the function return different results based on whether the
+	// template is meant to be evaluated in multiple passes.
+	MultiPass bool
 }
 
 // Template is the templating engine
@@ -77,8 +83,7 @@ type Template struct {
 	functions []func() []Function
 	funcs     map[string]interface{}
 	globals   map[string]interface{}
-	//	defaults  map[string]defaultValue
-	context interface{}
+	context   interface{}
 
 	registered []Function
 	lock       sync.Mutex
@@ -197,7 +202,39 @@ func (t *Template) Global(name string, value interface{}) *Template {
 }
 
 // Var implements the var function. It's a combination of global and ref
+// Note that the behavior of the var function depends on whether the template is used
+// in multiple passes where some var cannot be resolved to values in the first pass.
+// In this case, if the MultiplePass flag is set, the var function will just echo back
+// the same template expression in case of no value.
 func (t *Template) Var(name string, optional ...interface{}) interface{} {
+	base := t.doVar(name, optional...)
+
+	if !t.options.MultiPass {
+		return base
+	}
+
+	if base != nil {
+		return base
+	}
+
+	dl := t.options.DelimLeft
+	dr := t.options.DelimRight
+	if dl == "" {
+		dl = "{{"
+	}
+	if dr == "" {
+		dr = "}}"
+	}
+	// Handling of optional parameter isn't possible here because by now the
+	// template engine has already done the variable expansions and we have full values.
+	// Cases like {{ var "my-var" $defaultValue }} will render to {{ var `my-var` }}.
+	// Also this will not work in the case of pipeline - like {{ $x | var "my-var" }} --
+	// which will just render to {{ var `my-var` }}
+	return fmt.Sprintf("%s var `%s` %s", dl, name, dr)
+}
+
+// var implements the var function. It's a combination of global and ref
+func (t *Template) doVar(name string, optional ...interface{}) interface{} {
 	if len(optional) == 0 {
 		return t.Ref(name)
 	}

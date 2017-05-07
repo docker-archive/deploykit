@@ -9,7 +9,13 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
+	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
+	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/cobra"
 )
@@ -22,13 +28,14 @@ const (
 
 // Context is the context for the running module
 type Context struct {
-	cmd     *cobra.Command
-	src     string
-	input   io.Reader
-	exec    bool
-	run     func(string) error
-	script  string
-	plugins func() discovery.Plugins
+	cmd      *cobra.Command
+	src      string
+	input    io.Reader
+	exec     bool
+	template *template.Template
+	run      func(string) error
+	script   string
+	plugins  func() discovery.Plugins
 }
 
 // NewContext creates a context
@@ -245,6 +252,23 @@ func (c *Context) Funcs() []template.Function {
 			},
 		},
 		{
+			Name: "include",
+			Func: func(p string, opt ...interface{}) (string, error) {
+				// Overrides the base 'include' to account for the fact that
+				// some variables in the flag building phase are not set and would
+				// cause errors.  In general, use include for loading files whose
+				// paths are computed from some flags.  Use 'source' for including
+				// sibling templates that also include other flag definitions.
+				if c.exec {
+					content, err := c.template.Include(p, opt...)
+					if err == nil {
+						return content, nil
+					}
+				}
+				return "{}", nil
+			},
+		},
+		{
 			Name: "cond",
 			Func: func(b interface{}, optional ...interface{}) func() (bool, interface{}) {
 
@@ -338,6 +362,102 @@ func (c *Context) loadBackends() error {
 			}
 			return ""
 		})
+	t.AddFunc("instanceProvision",
+		func(name string, isYAML bool) string {
+			c.run = func(script string) error {
+
+				// locate the plugin
+				endpoint, err := c.plugins().Find(plugin.Name(name))
+				if err != nil {
+					return err
+				}
+
+				plugin, err := instance_plugin.NewClient(plugin.Name(name), endpoint.Address)
+				if err != nil {
+					return err
+				}
+
+				spec := instance.Spec{}
+				if isYAML {
+					y, err := types.AnyYAML([]byte(script))
+					if err != nil {
+						return err
+					}
+					if err := y.Decode(&spec); err != nil {
+						return err
+					}
+				} else {
+					if err := types.AnyString(script).Decode(&spec); err != nil {
+						return err
+					}
+				}
+
+				id, err := plugin.Provision(spec)
+				if err != nil {
+					return err
+				}
+				fmt.Println(*id)
+				return nil
+			}
+			return ""
+		})
+
+	t.AddFunc("managerCommit",
+		func(isYAML, pretend bool) string {
+			c.run = func(script string) error {
+
+				groups := []plugin.Spec{}
+				if isYAML {
+					y, err := types.AnyYAML([]byte(script))
+					if err != nil {
+						return err
+					}
+					if err := y.Decode(&groups); err != nil {
+						return err
+					}
+				} else {
+					if err := types.AnyString(script).Decode(&groups); err != nil {
+						return err
+					}
+				}
+
+				// Check the list of plugins
+				for _, gp := range groups {
+
+					endpoint, err := c.plugins().Find(gp.Plugin)
+					if err != nil {
+						return err
+					}
+
+					// unmarshal the group spec
+					spec := group.Spec{}
+					if gp.Properties != nil {
+						err = gp.Properties.Decode(&spec)
+						if err != nil {
+							return err
+						}
+					}
+
+					target, err := group_plugin.NewClient(endpoint.Address)
+
+					log.Debug("commit", "plugin", gp.Plugin, "address", endpoint.Address, "err", err, "spec", spec)
+
+					if err != nil {
+						return err
+					}
+
+					plan, err := target.CommitGroup(spec, pretend)
+					if err != nil {
+						return err
+					}
+
+					fmt.Println("Group", spec.ID, "with plugin", gp.Plugin, "plan:", plan)
+				}
+				return nil
+			}
+			return ""
+		})
+
 	t.AddFunc("sh",
 		func(opts ...string) string {
 			c.run = func(script string) error {
@@ -395,6 +515,7 @@ func (c *Context) Execute() error {
 	}
 
 	c.exec = true
+	c.template = t
 	script, err := ConfigureTemplate(t, c.plugins).Render(c)
 	if err != nil {
 		return err
