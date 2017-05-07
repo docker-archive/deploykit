@@ -134,8 +134,6 @@ func main() {
 	cmd.SilenceErrors = true
 	f := func() discovery.Plugins {
 
-		fmt.Println("????", ulist)
-
 		if len(ulist) == 0 {
 			d, err := discovery_local.NewPluginDiscovery()
 			if err != nil {

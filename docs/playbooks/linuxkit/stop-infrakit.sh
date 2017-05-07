@@ -21,8 +21,6 @@ echo "Stopping local hyperkit plugin"
 export INFRAKIT_HOME={{ env `INFRAKIT_HOME` }}
 infrakit plugin stop --all
 
-rm -f $INFRAKIT_HOME/plugins/instance-hyperkit-local.listen
-
 {{ else }}
 
 echo "Not stopping Infrakit"
