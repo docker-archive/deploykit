@@ -3,13 +3,16 @@ package client
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"path"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/gorilla/rpc/v2/json2"
 )
@@ -20,18 +23,21 @@ type client struct {
 	url  *url.URL
 }
 
-// New creates a new Client that communicates with a unix socket and validates the remote API.
-func New(address string, api spi.InterfaceSpec) (Client, error) {
-	u, err := url.Parse(address)
-	if err != nil {
-		return nil, err
-	}
-
+// NewHandshaker returns a handshaker object, or a generic, untyped rpc object
+func NewHandshaker(address string) (rpc.Handshaker, error) {
 	u, httpC, err := parseAddress(address)
 	if err != nil {
 		return nil, err
 	}
+	return &client{addr: address, http: httpC, url: u}, nil
+}
 
+// New creates a new Client that communicates with a unix socket and validates the remote API.
+func New(address string, api spi.InterfaceSpec) (Client, error) {
+	u, httpC, err := parseAddress(address)
+	if err != nil {
+		return nil, err
+	}
 	unvalidatedClient := &client{addr: address, http: httpC, url: u}
 	cl := &handshakingClient{client: unvalidatedClient, iface: api, lock: &sync.Mutex{}}
 	// check handshake
@@ -45,6 +51,14 @@ func New(address string, api spi.InterfaceSpec) (Client, error) {
 }
 
 func parseAddress(address string) (*url.URL, *http.Client, error) {
+	if path.Ext(address) == ".listen" {
+		buff, err := ioutil.ReadFile(address)
+		if err != nil {
+			return nil, nil, err
+		}
+		address = string(buff)
+	}
+
 	u, err := url.Parse(address)
 	if err != nil {
 		return nil, nil, err
@@ -60,12 +74,35 @@ func parseAddress(address string) (*url.URL, *http.Client, error) {
 				return net.Dial("unix", address)
 			},
 		}}, nil
-	case "http", "https", "tcp":
+	case "tcp":
+		u.Scheme = "http"
+		return u, &http.Client{}, nil
+	case "http", "https":
 		return u, &http.Client{}, nil
 
 	default:
 	}
 	return nil, nil, fmt.Errorf("invalid address %v", address)
+}
+
+// Implements is the method from the Handshaker interface
+func (c client) Implements() ([]spi.InterfaceSpec, error) {
+	req := rpc.ImplementsRequest{}
+	resp := rpc.ImplementsResponse{}
+	if err := c.Call("Handshake.Implements", req, &resp); err != nil {
+		return nil, err
+	}
+	return resp.APIs, nil
+}
+
+// Types returns a list of types exposed by this object
+func (c client) Types() (map[rpc.InterfaceSpec][]string, error) {
+	req := rpc.TypesRequest{}
+	resp := rpc.TypesResponse{}
+	if err := c.Call("Handshake.Types", req, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Types, nil
 }
 
 func (c client) Addr() string {

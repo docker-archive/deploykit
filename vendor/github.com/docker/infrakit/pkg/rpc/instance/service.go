@@ -3,6 +3,7 @@ package instance
 import (
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -66,6 +67,19 @@ func (p *Instance) SetExampleProperties(request interface{}) {
 // ImplementedInterface returns the interface implemented by this RPC service.
 func (p *Instance) ImplementedInterface() spi.InterfaceSpec {
 	return instance.InterfaceSpec
+}
+
+// Types returns the types exposed by this service (or kind/ category)
+func (p *Instance) Types() []string {
+	types := []string{}
+	for k := range p.typedPlugins {
+		types = append(types, k)
+	}
+	if p.plugin != nil {
+		types = append(types, ".")
+	}
+	sort.Strings(types)
+	return types
 }
 
 func (p *Instance) getPlugin(instanceType string) instance.Plugin {

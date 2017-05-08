@@ -17,17 +17,19 @@ func Setup() error {
 	}
 	fs := afero.NewOsFs()
 	exists, err := afero.Exists(fs, dir)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		log.Warn("Creating directory", "dir", dir)
-		err = fs.MkdirAll(dir, 0600)
+	if err != nil || !exists {
+		log.Debug("Creating directory", "dir", dir)
+		err = fs.MkdirAll(dir, 0755)
 		if err != nil {
 			return err
 		}
 	}
-	return nil
+	// try again
+	exists, err = afero.Exists(fs, dir)
+	if !exists {
+		return fmt.Errorf("Cannot set up directory %s: err=%v", dir, err)
+	}
+	return err
 }
 
 var log = logutil.New("module", "discovery/local")
