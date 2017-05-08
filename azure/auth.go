@@ -11,14 +11,10 @@ import (
 )
 
 var (
-	environments = map[string]azure.Environment{
-		azure.PublicCloud.Name:       azure.PublicCloud,
-		azure.USGovernmentCloud.Name: azure.USGovernmentCloud,
-		azure.ChinaCloud.Name:        azure.ChinaCloud,
-	}
-
-	// DefaultEnvironment assumed environment - for use by CLI or other clients to avoid import azure packages
-	DefaultEnvironment = azure.PublicCloud.Name
+	// Default Endpoints assumes Public Azure - for use by CLI or other clients to avoid import azure packages
+	DefaultResourceManagerEndpoint = azure.PublicCloud.ResourceManagerEndpoint
+	DefaultActiveDirectoryEndpoint = azure.PublicCloud.ActiveDirectoryEndpoint
+	DefaultServiceManagementEndpoint = azure.PublicCloud.ServiceManagementEndpoint
 )
 
 // NewCredential allocates a credential
@@ -33,23 +29,18 @@ type Credential struct {
 }
 
 func (a Credential) loadSPT(opt Options) (*azure.ServicePrincipalToken, error) {
-	env, ok := environments[opt.Environment]
-	if !ok {
-		return nil, fmt.Errorf("No valid environment")
-	}
-
-	tenantID, err := getTenantID(env, opt.SubscriptionID)
+	tenantID, err := getTenantID(opt.ResourceManagerEndpoint, opt.SubscriptionID)
 	if err != nil {
 		return nil, err
 	}
 
-	oauthCfg, err := azure.OAuthConfigForTenant(env.ActiveDirectoryEndpoint, tenantID)
+	oauthCfg, err := azure.OAuthConfigForTenant(opt.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
 		return nil, err
 	}
 
 	return azure.NewServicePrincipalTokenFromManualToken(*oauthCfg,
-		opt.OAuthClientID, env.ServiceManagementEndpoint, a.Token)
+		opt.OAuthClientID, opt.ServiceManagementEndpoint, a.Token)
 }
 
 // Validate performs validation on the credential
@@ -58,31 +49,21 @@ func (a Credential) Validate(opt Options) error {
 		return fmt.Errorf("no token")
 	}
 
-	env, ok := environments[opt.Environment]
-	if !ok {
-		return fmt.Errorf("No valid environment")
-	}
-
 	spt, err := a.loadSPT(opt)
 	if err != nil {
 		return err
 	}
-	return validateToken(env, spt, opt.SubscriptionID)
+	return validateToken(opt.ResourceManagerEndpoint, spt, opt.SubscriptionID)
 }
 
 // Authenticate performs authentication
 func (a *Credential) Authenticate(opt Options) error {
-	env, ok := environments[opt.Environment]
-	if !ok {
-		return fmt.Errorf("No valid environment")
-	}
-
-	tenantID, err := getTenantID(env, opt.SubscriptionID)
+	tenantID, err := getTenantID(opt.ResourceManagerEndpoint, opt.SubscriptionID)
 	if err != nil {
 		return err
 	}
 
-	oauthCfg, err := env.OAuthConfigForTenant(tenantID)
+	oauthCfg, err := azure.OAuthConfigForTenant(opt.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
 		return err
 	}
@@ -94,7 +75,7 @@ func (a *Credential) Authenticate(opt Options) error {
 			*oauthCfg,
 			opt.ADClientID,
 			opt.ADClientSecret,
-			env.ServiceManagementEndpoint)
+			opt.ServiceManagementEndpoint)
 		if err != nil {
 			return err
 		}
@@ -102,7 +83,7 @@ func (a *Credential) Authenticate(opt Options) error {
 		return nil
 	}
 
-	spt, err = tokenFromDeviceFlow(*oauthCfg, opt.OAuthClientID, env.ServiceManagementEndpoint)
+	spt, err = tokenFromDeviceFlow(*oauthCfg, opt.OAuthClientID, opt.ServiceManagementEndpoint)
 	if err != nil {
 		return err
 	}
@@ -132,8 +113,8 @@ func (a *Credential) Refresh(opt Options) error {
 // sure if the access_token valid, if not it uses SDK’s functionality to
 // automatically refresh the token using refresh_token (which might have
 // expired). This check is essentially to make sure refresh_token is good.
-func validateToken(env azure.Environment, token *azure.ServicePrincipalToken, subscriptionID string) error {
-	c := subscriptionsClient(env.ResourceManagerEndpoint)
+func validateToken(endpoint string, token *azure.ServicePrincipalToken, subscriptionID string) error {
+	c := subscriptionsClient(endpoint)
 	c.Authorizer = token
 	_, err := c.List()
 	if err != nil {
@@ -145,9 +126,9 @@ func validateToken(env azure.Environment, token *azure.ServicePrincipalToken, su
 // getTenantID figures out the AAD tenant ID of the subscription by making an
 // unauthenticated request to the Get Subscription Details endpoint and parses
 // the value from WWW-Authenticate header.
-func getTenantID(env azure.Environment, subscriptionID string) (string, error) {
+func getTenantID(endpoint string, subscriptionID string) (string, error) {
 	const hdrKey = "WWW-Authenticate"
-	c := subscriptionsClient(env.ResourceManagerEndpoint)
+	c := subscriptionsClient(endpoint)
 
 	// we expect this request to fail (err != nil), but we are only interested
 	// in headers, so surface the error if the Response is not present (i.e.

@@ -23,10 +23,14 @@ func TestADAppIDSecretFlow(t *testing.T) {
 	appSecret := requireEnvVar(t, "AD_APP_SECRET")
 
 	subscriptionID := requireEnvVar(t, "AZURE_SUBSCRIPTION_ID")
-	environment := requireEnvVar(t, "AZURE_ENVIRONMENT")
+	resourceManagerEndpoint := requireEnvVar(t, "AZURE_RESOURCE_MANAGER_ENDPOINT")
+	activeDirectoryEndpoint := requireEnvVar(t, "AZURE_ACTIVE_DIRECTORY_ENDPOINT")
+	serviceManagementEndpoint := requireEnvVar(t, "AZURE_SERVICE_MANAGEMENT_ENDPOINT")
 
 	opt := Options{
-		Environment:    environment,
+		ResourceManagerEndpoint:    resourceManagerEndpoint,
+		ActiveDirectoryEndpoint:    activeDirectoryEndpoint,
+		ServiceManagementEndpoint:  serviceManagementEndpoint,
 		SubscriptionID: subscriptionID,
 		ADClientID:     appID,
 		ADClientSecret: appSecret,
@@ -66,17 +70,23 @@ func TestOAuthDeviceFlow(t *testing.T) {
 
 	/*
 		From Docker Machine, for example:
-		environment := "AzurePublicCloud"
+		resourceManagerEndpoint := "https://management.azure.com/"
+		activeDirectoryEndpoint := "https://login.microsoftonline.com/"
+		serviceManagementEndpoint := "https://management.core.windows.net/"
 		subscriptionID := "71be52f3-def6-4c7c-85b4-c1053ba503b2"
 		clientID := "637ddaba-219b-43b8-bf19-8cea500cf273"
 	*/
 
 	clientID := requireEnvVar(t, "AZURE_CLIENT_ID")
 	subscriptionID := requireEnvVar(t, "AZURE_SUBSCRIPTION_ID")
-	environment := requireEnvVar(t, "AZURE_ENVIRONMENT")
+	resourceManagerEndpoint := requireEnvVar(t, "AZURE_RESOURCE_MANAGER_ENDPOINT")
+	activeDirectoryEndpoint := requireEnvVar(t, "AZURE_ACTIVE_DIRECTORY_ENDPOINT")
+	serviceManagementEndpoint := requireEnvVar(t, "AZURE_SERVICE_MANAGEMENT_ENDPOINT")
 
 	opt := Options{
-		Environment:    environment,
+		ResourceManagerEndpoint:    resourceManagerEndpoint,
+		ActiveDirectoryEndpoint:    activeDirectoryEndpoint,
+		ServiceManagementEndpoint:  serviceManagementEndpoint,
 		SubscriptionID: subscriptionID,
 		OAuthClientID:  clientID,
 	}

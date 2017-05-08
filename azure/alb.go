@@ -17,7 +17,9 @@ var (
 
 // Options - options for Azure
 type Options struct {
-	Environment            string
+	ResourceManagerEndpoint   string // Azure Resource Manager endpoint url for APIs
+	ActiveDirectoryEndpoint   string // Azure AD endpoint url for authentication
+	ServiceManagementEndpoint string // Azure Service Management endpoint url 
 	SubscriptionID         string
 	OAuthClientID          string // The app client id
 	PollingDelaySeconds    int    // The number of seconds to delay between polls
@@ -392,12 +394,7 @@ func (p *albDriver) Routes() ([]loadbalancer.Route, error) {
 
 // CreateALBClient creates a client of the SDK
 func CreateALBClient(cred *Credential, opt Options) (*network.LoadBalancersClient, error) {
-	env, ok := environments[opt.Environment]
-	if !ok {
-		return nil, fmt.Errorf("No valid environment")
-	}
-
-	c := network.NewLoadBalancersClientWithBaseURI(env.ResourceManagerEndpoint, opt.SubscriptionID)
+	c := network.NewLoadBalancersClientWithBaseURI(opt.ResourceManagerEndpoint, opt.SubscriptionID)
 	if cred.authorizer != nil {
 		c.Authorizer = cred.authorizer
 	} else {
