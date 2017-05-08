@@ -82,11 +82,12 @@ func main() {
 				return nil // do nothing -- local mode
 			}
 
+			// If the env is set but we don't have any hosts file locally, don't exit.  Print a warning and proceed.
 			// Now look up the host lists in the file
 			hostsFile := filepath.Join(os.Getenv("INFRAKIT_HOME"), "hosts")
 			buff, err := ioutil.ReadFile(hostsFile)
 			if err != nil {
-				return fmt.Errorf("cannot read hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
+				return nil // do nothing -- local mode
 			}
 			m := map[string]string{}
 			yaml, err := types.AnyYAML(buff)
