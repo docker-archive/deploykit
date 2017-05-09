@@ -10,11 +10,13 @@
 {{ $memory := flag "memory" "int" "Memory in MB" | prompt "How many mb for memory?" "int" 1024 }}
 {{ $disk := flag "disk" "int" "Disk in MB" | prompt "How many mb for disk?" "int" 100 }}
 
+{{ $checksum := file (cat $linuxkitPath "/" $bundle "-initrd.img" | nospace) | sha256sum }}
+
 LogicalID: {{ $privateIP }}
 Tags:
   infrakit.created: {{ now | htmlDate }}
   infrakit.project: {{ $project }}
-  infrakit.checksum: {{ include (cat $linuxkitPath "/" $bundle "-initrd.img" | nospace) | sha256sum }}
+  infrakit.checksum: {{ $checksum }}
 
 Properties:
   kernel: {{ cat $linuxkitPath "/" $bundle "-kernel" | nospace }}
@@ -23,3 +25,4 @@ Properties:
   memory: {{ $memory }}
   disk_size: {{ $disk }}
   cmdline: {{ include (cat "file://" $linuxkitPath "/" $bundle "-cmdline" | nospace) }}
+  checksum: {{ $checksum }}

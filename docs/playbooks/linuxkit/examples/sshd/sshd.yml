@@ -50,6 +50,7 @@ files:
 
 outputs:
   - format: kernel+initrd
-  - format: iso-bios
-  - format: iso-efi
-  - format: gcp-img
+
+#  - format: iso-bios
+#  - format: iso-efi
+#  - format: gcp-img

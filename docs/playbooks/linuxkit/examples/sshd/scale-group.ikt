@@ -1,9 +1,6 @@
 {{/* Input to create a group using the hyperkit instance plugin and manager */}}
-<<<<<<< HEAD
 {{/* =% managerCommit true false %= */}}
-=======
-{{/* =% managerCommit true false  %= */}}
->>>>>>> a8e9cb894b8d878d79ab036cda9bb1af9a8cf86f
+
 
 {{ $groupName := flag "group-name" "string" "Name of group" | prompt "Name of the group?" "string" "mygroup" }}
 {{ $size := flag "size" "int" "Size of the group" | prompt "How many nodes?" "int" 2 }}
@@ -15,6 +12,8 @@
 {{ $cpus := flag "cpus" "int" "CPUs" | prompt "How many CPUs?" "int" 1 }}
 {{ $memory := flag "memory" "int" "Memory in MB" | prompt "How many mb for memory?" "int" 1024 }}
 {{ $disk := flag "disk" "int" "Disk in MB" | prompt "How many mb for disk?" "int" 100 }}
+
+{{ $checksum := file (cat $linuxkitPath "/" $bundle "-initrd.img" | nospace) | sha256sum }}
 
 - Plugin: group
   Properties:
@@ -28,7 +27,7 @@
           Tags:
             infrakit.created: {{ now | htmlDate }}
             infrakit.project: {{ $project }}
-            infrakit.checksum: {{ include (cat $linuxkitPath "/" $bundle "-initrd.img" | nospace) | sha256sum }}
+            infrakit.checksum: {{ $checksum }}
 
       Instance:
         Plugin: instance-hyperkit
@@ -39,3 +38,4 @@
           memory: {{ $memory }}
           disk_size: {{ $disk }}
           cmdline: {{ include (cat "file://" $linuxkitPath "/" $bundle "-cmdline" | nospace) }}
+          checksum: {{ $checksum }}

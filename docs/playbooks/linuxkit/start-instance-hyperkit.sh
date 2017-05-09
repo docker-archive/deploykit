@@ -13,4 +13,6 @@ echo "This plugin is listening at localhost:24865"
 
 infrakit-instance-hyperkit --log 5 > {{env `INFRAKIT_HOME`}}/logs/instance-hyperkit.log 2>&1 &
 
+{{ var `started-hyperkit` true }}
+
 {{ end }}

@@ -3,7 +3,7 @@
 {{ $defaultKeyDir := cat (env `HOME`) `/.ssh` | nospace }}
 
 {{ $keyDir := flag "ssh-dir" "string" "Directory of ssh keys" | prompt "SSH key dir?" "string" $defaultKeyDir }}
-{{ $keyFile := flag "key-name" "string" "Key name" | prompt "Which public key to include?" "string" "id_rsa" }}
+{{ $keyFile := flag "key-name" "string" "Key name" | prompt "Which public key to include?" "string" "id_rsa.pub" }}
 
 {{ $output := `sshd.yml` }}
 
@@ -23,3 +23,6 @@ EOF
 echo "Generated config file. Running moby."
 
 moby build {{$output}}
+
+{{ $bundle := `sshd` }}
+echo "Checksum:"{{ file (cat $bundle "-initrd.img" | nospace) | sha256sum }}

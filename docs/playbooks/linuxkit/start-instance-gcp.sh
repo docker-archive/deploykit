@@ -25,4 +25,6 @@ docker run -d --volumes-from infrakit --name instance-gcp \
        --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
        --zone {{ $zone }} --log 5 --project {{ $project }}
 
+{{ var `started-gcp` true }}
+
 {{ end }}
