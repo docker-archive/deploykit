@@ -13,3 +13,6 @@ list-instances : list-instances.sh
 
 # Inspect global state
 inspect : inspect.sh
+
+# Destroy all
+destroy-all : destroy-instances.sh

@@ -25,4 +25,4 @@ echo "Generated config file. Running moby."
 moby build {{$output}}
 
 {{ $bundle := `sshd` }}
-echo "Checksum:"{{ file (cat $bundle "-initrd.img" | nospace) | sha256sum }}
+echo "Checksum:"{{ fetch (cat `file://` (env `PWD`) $bundle "-initrd.img" | nospace) | sha256sum }}
