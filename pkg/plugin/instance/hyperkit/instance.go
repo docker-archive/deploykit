@@ -44,14 +44,23 @@ type hyperkitPlugin struct {
 	DiskDir string
 }
 
+// Properties is the struct that holds the input
+type Properties struct {
+	hyperkit.HyperKit
+
+	// Checksum is a checksum for the image
+	Checksum string
+}
+
 // Validate performs local validation on a provision request.
 func (p hyperkitPlugin) Validate(req *types.Any) error {
-	// The guest is just the same data structure used by hyperkit for full fidelity config
-	guest := hyperkit.HyperKit{}
-
-	if err := req.Decode(&guest); err != nil {
+	properties := Properties{}
+	if err := req.Decode(&properties); err != nil {
 		return fmt.Errorf("error decoding guest configuration: %s, err=%v", req.String(), err)
 	}
+
+	// The guest is just the same data structure used by hyperkit for full fidelity config
+	guest := properties.HyperKit
 
 	for key, check := range map[string]int{
 		"CPUs":     guest.CPUs,
@@ -82,15 +91,18 @@ func (p hyperkitPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, fmt.Errorf("missing properties in spec")
 	}
 
-	// The guest is just the same data structure used by hyperkit for full fidelity config
-	guest := &hyperkit.HyperKit{
-		HyperKit:   p.HyperKit,
-		VPNKitSock: p.VPNKitSock,
+	properties := Properties{
+		HyperKit: hyperkit.HyperKit{
+			HyperKit:   p.HyperKit,
+			VPNKitSock: p.VPNKitSock,
+		},
+	}
+	if err := spec.Properties.Decode(&properties); err != nil {
+		return nil, fmt.Errorf("error decoding guest configuration: err=%v", err)
 	}
 
-	if err := spec.Properties.Decode(guest); err != nil {
-		return nil, fmt.Errorf("error decoding guest configuration: %s", spec.Properties.String())
-	}
+	// The guest is just the same data structure used by hyperkit for full fidelity config
+	guest := properties.HyperKit
 
 	// directory for instance state
 	instanceDir, err := ioutil.TempDir(p.VMDir, "infrakit-")

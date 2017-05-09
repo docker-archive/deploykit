@@ -7,10 +7,10 @@ install-moby: install-moby.sh
 install-hyperkit : install-hyperkit.sh
 
 # Starts the infrakit daemons using a common data volume for sockets and files
-start-infrakit : start-infrakit.sh
+start : start-infrakit.sh
 
 # Stops all the infrakit daemons
-stop-infrakit  : stop-infrakit.sh
+stop  : stop-infrakit.sh
 
 # Examples
 examples : examples/index.yml

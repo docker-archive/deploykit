@@ -7,3 +7,12 @@ run-instance : provision-instance.ikt
 
 # Manage a group of nodes
 scale-group : scale-group.ikt
+
+# List instances
+list-instances : list-instances.sh
+
+# Inspect global state
+inspect : inspect.sh
+
+# Destroy all
+destroy-all : destroy-instances.sh

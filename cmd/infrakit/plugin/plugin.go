@@ -122,7 +122,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		if !*quiet {
-			fmt.Printf("%-20s\t%-50s\t%-s\n", "NAME", "LISTEN", "INTERFACE")
+			fmt.Printf("%-30s\t%-50s\t%-s\n", "NAME", "LISTEN", "INTERFACE")
 		}
 
 		sort.Strings(keys)
@@ -130,7 +130,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		for _, k := range keys {
 
 			ep := view[k]
-			fmt.Printf("%-20s\t%-50s\t%-s\n", ep.name, ep.listen, ep.spi)
+			fmt.Printf("%-30s\t%-50s\t%-s\n", ep.name, ep.listen, ep.spi)
 
 		}
 
