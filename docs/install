@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Installs infrakit by cross compiling locally inside a docker container.
+
+if [[ "$(which docker)" == "" ]]; then
+    echo "You must have Docker locally."
+    exit -1
+fi
+
+dir=$(pwd)
+case "$(uname)" in
+    Darwin)
+	export target="darwin"
+	;;
+    Linux)
+	export target="linux"
+	;;
+    *)
+	echo "not supported: $(uname)"
+	exit -1
+	;;
+esac
+
+
+docker run --rm -v $dir:/build infrakit/installer build-infrakit $target
+sudo cp ./infrakit /usr/local/bin
