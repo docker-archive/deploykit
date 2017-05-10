@@ -40,6 +40,11 @@ func (p *Group) ImplementedInterface() spi.InterfaceSpec {
 
 }
 
+// Types returns the types exposed by this kind of RPC service
+func (p *Group) Types() []string {
+	return []string{"."} // no types
+}
+
 // CommitGroup is the rpc method to commit a group
 func (p *Group) CommitGroup(_ *http.Request, req *CommitGroupRequest, resp *CommitGroupResponse) error {
 	details, err := p.plugin.CommitGroup(req.Spec, req.Pretend)

@@ -19,129 +19,133 @@ func TestUsage(t *testing.T) {
 	// Test a softlayer_virtual_guest with an @hostname_prefix
 	run(t, "softlayer_virtual_guest", `
 {
-  "resource" : {
-    "softlayer_virtual_guest": {
-      "host" : {
-          "@hostname_prefix": "softlayer-hostname",
-          "cores": 2,
-          "memory": 2048,
-          "tags": [
-            "terraform_demo_swarm_mgr_sl"
-          ],
-          "connection": {
-            "user": "root",
-            "private_key": "${file(\"~/.ssh/id_rsa_de\")}"
-          },
-          "hourly_billing": true,
-          "local_disk": true,
-          "network_speed": 100,
-          "datacenter": "dal10",
-          "os_reference_code": "UBUNTU_14_64",
-          "domain": "softlayer.com",
-          "ssh_key_ids": [
-            "${data.softlayer_ssh_key.public_key.id}"
-          ]
-        }
-    }
-  }
+	"resource" : {
+		"softlayer_virtual_guest": {
+			"host" : {
+				"@hostname_prefix": "softlayer-hostname",
+				"cores": 2,
+				"memory": 2048,
+				"tags": [
+					"terraform_demo_swarm_mgr_sl"
+				],
+				"connection": {
+					"user": "root",
+					"private_key": "${file(\"~/.ssh/id_rsa_de\")}"
+				},
+				"hourly_billing": true,
+				"local_disk": true,
+				"network_speed": 100,
+				"datacenter": "dal10",
+				"os_reference_code": "UBUNTU_14_64",
+				"domain": "softlayer.com",
+				"ssh_key_ids": [
+					"${data.softlayer_ssh_key.public_key.id}"
+				],
+				"user_metadata": "echo {{ var `+"`/self/instId`"+` }}"
+			}
+		}
+	}
 }
 `)
 
 	// Test a softlayer_virtual_guest without an @hostname_prefix
 	run(t, "softlayer_virtual_guest", `
 {
-  "resource" : {
-    "ibmcloud_infra_file_storage": {
-      "csy_test_file_storage1": {
-        "iops" : 0.25,
-        "type" : "Endurance",
-        "datacenter" : "dal10",
-        "capacity" : 20
-      }
-    },
-    "softlayer_virtual_guest" : {
-       "host" : {
-	  "cores": 2,
-	  "memory": 2048,
-	  "tags": [ "terraform_demo_swarm_mgr_sl" ],
-	  "connection": {
-	     "user": "root",
-	     "private_key": "${file(\"~/.ssh/id_rsa_de\")}"
-	     },
-	  "hourly_billing": true,
-	  "local_disk": true,
-	  "network_speed": 100,
-	  "datacenter": "dal10",
-	  "os_reference_code": "UBUNTU_14_64",
-	  "domain": "softlayer.com",
-	  "ssh_key_ids": [ "${data.softlayer_ssh_key.public_key.id}" ]
-       }
-    }
-  }
+	"resource" : {
+		"ibmcloud_infra_file_storage": {
+			"csy_test_file_storage1": {
+				"iops" : 0.25,
+				"type" : "Endurance",
+				"datacenter" : "dal10",
+				"capacity" : 20
+			}
+		},
+		"softlayer_virtual_guest" : {
+			"host": {
+				"cores": 2,
+				"memory": 2048,
+				"tags": [ "terraform_demo_swarm_mgr_sl" ],
+				"connection": {
+					"user": "root",
+					"private_key": "${file(\"~/.ssh/id_rsa_de\")}"
+				},
+				"hourly_billing": true,
+				"local_disk": true,
+				"network_speed": 100,
+				"datacenter": "dal10",
+				"os_reference_code": "UBUNTU_14_64",
+				"domain": "softlayer.com",
+				"ssh_key_ids": [ "${data.softlayer_ssh_key.public_key.id}" ],
+				"user_metadata": "echo {{ var `+"`/self/instId`"+` }}"
+			}
+		}
+	}
 }
 `)
 
 	// Test a softlayer_virtual_guest with an empty @hostname_prefix
 	run(t, "softlayer_virtual_guest", `
 {
-  "resource" : {
-    "softlayer_virtual_guest" : {
-      "host" : {
-			"@hostname_prefix": "   ",
-			"cores": 2,
-			"memory": 2048,
-			"tags": [
-				"terraform_demo_swarm_mgr_sl"
-			],
-			"connection": {
-				"user": "root",
-				"private_key": "${file(\"~/.ssh/id_rsa_de\")}"
-			},
-			"hourly_billing": true,
-			"local_disk": true,
-			"network_speed": 100,
-			"datacenter": "dal10",
-			"os_reference_code": "UBUNTU_14_64",
-			"domain": "softlayer.com",
-			"ssh_key_ids": [
-				"${data.softlayer_ssh_key.public_key.id}"
-			]
+	"resource" : {
+		"softlayer_virtual_guest" : {
+			"host" : {
+				"@hostname_prefix": "   ",
+				"cores": 2,
+				"memory": 2048,
+				"tags": [
+					"terraform_demo_swarm_mgr_sl"
+				],
+				"connection": {
+					"user": "root",
+					"private_key": "${file(\"~/.ssh/id_rsa_de\")}"
+				},
+				"hourly_billing": true,
+				"local_disk": true,
+				"network_speed": 100,
+				"datacenter": "dal10",
+				"os_reference_code": "UBUNTU_14_64",
+				"domain": "softlayer.com",
+				"ssh_key_ids": [
+					"${data.softlayer_ssh_key.public_key.id}"
+				],
+				"user_metadata": "echo {{ var `+"`/self/instId`"+` }}"
+			}
 		}
-    }
-  }
+	}
 }
 `)
 
 	run(t, "aws_instance", `
 {
-  "resource" : {
-    "aws_instance" : {
-      "host" : {
-         "ami" : "${lookup(var.aws_amis, var.aws_region)}",
-         "instance_type" : "m1.small",
-         "key_name": "PUBKEY",
-         "vpc_security_group_ids" : ["${aws_security_group.default.id}"],
-         "subnet_id": "${aws_subnet.default.id}",
-         "private_ip": "INSTANCE_LOGICAL_ID",
-         "tags" :  {
-             "Name" : "web4",
-             "InstancePlugin" : "terraform"
-         },
-         "connection" : {
-             "user" : "ubuntu"
-         },
-         "provisioner" : {
-             "remote_exec" : {
-                 "inline" : [
-                     "sudo apt-get -y update",
-                     "sudo apt-get -y install nginx",
-                     "sudo service nginx start"
-                 ]
-             }
-         }
-      }
-    }
-  }
+	"resource" : {
+		"aws_instance" : {
+			"host" : {
+				"ami" : "${lookup(var.aws_amis, var.aws_region)}",
+				"instance_type" : "m1.small",
+				"key_name": "PUBKEY",
+				"vpc_security_group_ids" : ["${aws_security_group.default.id}"],
+				"subnet_id": "${aws_subnet.default.id}",
+				"private_ip": "INSTANCE_LOGICAL_ID",
+				"tags" :  {
+					"Name" : "web4",
+					"InstancePlugin" : "terraform"
+				},
+				"connection" : {
+					"user" : "ubuntu"
+				},
+				"user_data": "echo {{ var `+"`/self/instId`"+` }}",
+				"provisioner" : {
+					"remote_exec" : {
+						"inline" : [
+							"sudo apt-get -y update",
+							"sudo apt-get -y install nginx",
+							"sudo service nginx start"
+						]
+					}
+				}
+			}
+		}
+	}
 }
 `)
 }
@@ -224,6 +228,10 @@ func run(t *testing.T, resourceType, properties string) {
 	_, v := firstInMap(vms.(map[string]interface{}))
 	value, _ := v.(map[string]interface{})
 
+	// Userdata should have the resource defined data (ie, echo <instId>) with
+	// the spec init data appended
+	expectedUserData2 := "echo " + string(*id2) + "\n" + instanceSpec2.Init
+
 	switch vmType {
 	case VMSoftLayer:
 		require.Equal(t, conv([]interface{}{
@@ -232,7 +240,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label2:value2",
 			"name:" + string(*id2),
 		}), conv(props["tags"].([]interface{})))
-		require.Equal(t, instanceSpec2.Init, props["user_metadata"])
+		require.Equal(t, expectedUserData2, props["user_metadata"])
 
 		// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
 		if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
@@ -253,7 +261,8 @@ func run(t *testing.T, resourceType, properties string) {
 			"label2":         "value2",
 			"Name":           string(*id2),
 		}, props["tags"])
-		require.Equal(t, base64.StdEncoding.EncodeToString([]byte(instanceSpec2.Init)), props["user_data"])
+		// user_data is base64 encoded
+		require.Equal(t, base64.StdEncoding.EncodeToString([]byte(expectedUserData2)), props["user_data"])
 	}
 
 	// Expected instances returned from Describe

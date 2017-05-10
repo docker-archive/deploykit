@@ -1,0 +1,16 @@
+# An index file.
+
+# Install Moby tool
+install-moby: install-moby.sh
+
+# Install hyperkit plugin
+install-hyperkit : install-hyperkit.sh
+
+# Starts the infrakit daemons using a common data volume for sockets and files
+start : start-infrakit.sh
+
+# Stops all the infrakit daemons
+stop  : stop-infrakit.sh
+
+# Examples
+examples : examples/index.yml

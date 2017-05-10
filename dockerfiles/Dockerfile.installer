@@ -1,0 +1,12 @@
+FROM golang:1.8-alpine
+
+RUN apk add --update git make gcc musl-dev wget ca-certificates openssl libvirt-dev git openssh
+
+ENV GOPATH /go
+ENV PATH /go/bin:$PATH
+
+COPY dockerfiles/build-infrakit /usr/local/bin/
+COPY dockerfiles/build-hyperkit /usr/local/bin/
+
+# Add source code
+Add . /go/src/github.com/docker/infrakit/

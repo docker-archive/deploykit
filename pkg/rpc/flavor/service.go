@@ -3,6 +3,7 @@ package flavor
 import (
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -49,25 +50,20 @@ func (p *Flavor) Funcs() []template.Function {
 	return f.Funcs()
 }
 
-// Types implements server.TypedFunctionExporter
-func (p *Flavor) Types() []string {
-	if p.typedPlugins == nil {
-		return nil
-	}
-	list := []string{}
-	for k := range p.typedPlugins {
-		list = append(list, k)
-	}
-	return list
-}
-
 // FuncsByType implements server.TypedFunctionExporter
 func (p *Flavor) FuncsByType(t string) []template.Function {
-	if p.typedPlugins == nil {
-		return nil
+	var fp flavor.Plugin
+	switch t {
+	case ".":
+		fp = p.plugin
+	default:
+		found, has := p.typedPlugins[t]
+		if !has {
+			return nil
+		}
+		fp = found
 	}
-	fp, has := p.typedPlugins[t]
-	if !has {
+	if fp == nil {
 		return nil
 	}
 	exp, is := fp.(template.FunctionExporter)
@@ -114,6 +110,19 @@ func (p *Flavor) exampleProperties() *types.Any {
 // ImplementedInterface returns the interface implemented by this RPC service.
 func (p *Flavor) ImplementedInterface() spi.InterfaceSpec {
 	return flavor.InterfaceSpec
+}
+
+// Types returns the types exposed by this service (or kind/ category)
+func (p *Flavor) Types() []string {
+	types := []string{}
+	for k := range p.typedPlugins {
+		types = append(types, k)
+	}
+	if p.plugin != nil {
+		types = append(types, ".")
+	}
+	sort.Strings(types)
+	return types
 }
 
 func (p *Flavor) getPlugin(flavorType string) flavor.Plugin {

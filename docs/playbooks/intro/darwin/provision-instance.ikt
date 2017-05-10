@@ -15,7 +15,7 @@ Init: |
   echo Hello world!
 
 Properties:
-  kernel: {{ cat $linuxkitPath "/" $bundle "-bzImage" | nospace }}
+  kernel: {{ cat $linuxkitPath "/" $bundle "-kernel" | nospace }}
   initrd: {{ cat $linuxkitPath "/" $bundle "-initrd.img" | nospace }}
   cpus: 1
   memory: 1024

@@ -29,32 +29,39 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "template <url>",
 		Short: "Render an infrakit template at given url.  If url is '-', read from stdin",
-		RunE: func(cmd *cobra.Command, args []string) error {
+	}
 
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
+	outputFile := cmd.PersistentFlags().StringP("output", "o", "", "Output filename")
+	cmd.Flags().AddFlagSet(templateFlags)
 
-			url := args[0]
-			if url == "-" {
-				buff, err := ioutil.ReadAll(os.Stdin)
-				if err != nil {
-					return err
-				}
-				url = fmt.Sprintf("str://%s", string(buff))
-			}
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 
-			view, err := processTemplate(url)
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		url := args[0]
+		if url == "-" {
+			buff, err := ioutil.ReadAll(os.Stdin)
 			if err != nil {
 				return err
 			}
+			url = fmt.Sprintf("str://%s", string(buff))
+		}
 
-			fmt.Print(view)
-			return nil
-		},
+		view, err := processTemplate(url)
+		if err != nil {
+			return err
+		}
+
+		if *outputFile != "" {
+			return ioutil.WriteFile(*outputFile, []byte(view), 0644)
+		}
+
+		fmt.Print(view)
+		return nil
 	}
-	cmd.Flags().AddFlagSet(templateFlags)
 
 	format := &cobra.Command{
 		Use:   "format json|yaml",
@@ -84,6 +91,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			if err != nil {
 				return err
+			}
+
+			if *outputFile != "" {
+				return ioutil.WriteFile(*outputFile, buff, 0644)
 			}
 
 			fmt.Print(string(buff))

@@ -107,7 +107,7 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "6 plugins should be discoverable" "infrakit plugin ls -q" "6"
+expect_output_lines "16 plugins should be discoverable" "infrakit plugin ls -q" "16"
 expect_output_lines "0 instances should exist" "infrakit instance describe -q --name instance-file" "0"
 
 echo "Commiting"

@@ -58,6 +58,7 @@ func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 	globals := fs.StringSliceP("var", "v", []string{}, "key=value pairs of globally scoped variagbles")
 	yamlDoc := fs.BoolP("yaml", "y", false, "True if input is in yaml format; json is the default")
 	dump := fs.BoolP("dump", "x", false, "True to dump to output instead of executing")
+	singlePass := fs.BoolP("final", "f", false, "True to render template as the final pass")
 
 	return fs,
 		// ToJSONFunc
@@ -116,7 +117,7 @@ func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 			}
 
 			log.Debug("reading template", "url", url)
-			engine, err := template.NewTemplate(url, template.Options{})
+			engine, err := template.NewTemplate(url, template.Options{MultiPass: !*singlePass})
 			if err != nil {
 				return
 			}

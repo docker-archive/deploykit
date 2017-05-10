@@ -77,7 +77,7 @@ func resolveDepends(o *types.Object, objects Objects) (depends map[string]interf
 
 	for _, dep := range o.Depends {
 
-		otherObject := objects.FindBy(dep.Class, dep.Name)
+		otherObject := objects.FindBy(dep.Kind, dep.Name)
 		if otherObject == nil {
 			err = fmt.Errorf("unresolved dependency: %v", dep)
 			return

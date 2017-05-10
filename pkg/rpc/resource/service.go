@@ -37,7 +37,11 @@ func (p *Resource) ExampleProperties() *types.Any {
 // ImplementedInterface returns the interface implemented by this RPC service.
 func (p *Resource) ImplementedInterface() spi.InterfaceSpec {
 	return resource.InterfaceSpec
+}
 
+// Types returns the types exposed by this service (or kind/ category)
+func (p *Resource) Types() []string {
+	return []string{"."}
 }
 
 // Commit is the rpc method to commit resources.

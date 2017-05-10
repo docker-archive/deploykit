@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	sys_os "os"
+	"path"
+	"sort"
 	"strconv"
 	"sync"
 	"syscall"
@@ -11,10 +13,13 @@ import (
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/os"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
+	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -44,11 +49,89 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		if !*quiet {
-			fmt.Printf("%-20s\t%-s\n", "NAME", "LISTEN")
+		type ep struct {
+			name   string
+			listen string
+			spi    rpc.InterfaceSpec
 		}
-		for k, v := range entries {
-			fmt.Printf("%-20s\t%-s\n", k, v.Address)
+
+		view := map[string]ep{} // table of name, listen, and spi
+		keys := []string{}      // slice of names to sort later, keys into view
+
+		// Show the interfaces implemented by each plugin
+		for major, entry := range entries {
+			hs, err := client.NewHandshaker(entry.Address)
+			if err != nil {
+				log.Warn("handshaker error", "err", err, "addr", entry.Address)
+				continue
+			}
+
+			typeMap, err := hs.Types()
+			if err != nil {
+				log.Warn("cannot get types for this kind", "err", err, "addr", entry.Address)
+
+				// plugins that haven't been updated to the new types() call
+
+				// try the implements
+				if spis, err := hs.Implements(); err == nil {
+					for _, spi := range spis {
+						ep := ep{
+							name:   major,
+							listen: entry.Address,
+							spi:    rpc.InterfaceSpec(fmt.Sprintf("%s/%s", spi.Name, spi.Version)),
+						}
+
+						key := fmt.Sprintf("%s:%s", ep.name, ep.spi)
+						view[key] = ep
+						keys = append(keys, key)
+					}
+				} else {
+					ep := ep{
+						name:   major,
+						listen: entry.Address,
+					}
+					view[ep.name] = ep
+					keys = append(keys, ep.name)
+				}
+				continue
+			}
+
+			for spi, names := range typeMap {
+
+				interfaceSpec := spi
+
+				for _, minor := range names {
+
+					n := major
+
+					if minor != "." {
+						n = n + "/" + minor
+					}
+
+					ep := ep{
+						name:   n,
+						listen: entry.Address,
+						spi:    interfaceSpec,
+					}
+
+					key := fmt.Sprintf("%s:%s", ep.name, ep.spi)
+					view[key] = ep
+					keys = append(keys, key)
+				}
+			}
+		}
+
+		if !*quiet {
+			fmt.Printf("%-30s\t%-50s\t%-s\n", "NAME", "LISTEN", "INTERFACE")
+		}
+
+		sort.Strings(keys)
+
+		for _, k := range keys {
+
+			ep := view[k]
+			fmt.Printf("%-30s\t%-50s\t%-s\n", ep.name, ep.listen, ep.spi)
+
 		}
 
 		return nil
@@ -247,13 +330,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				continue
 			}
 
-			if p.Protocol != "unix" {
-				log.Warn("Plugin is not a local process", "name", n)
-				continue
+			pidFile := n + ".pid"
+			if p.Protocol == "unix" {
+				pidFile = p.Address + ".pid"
+			} else {
+				pidFile = path.Join(local.Dir(), pidFile)
 			}
-
-			// TODO(chungers) -- here we
-			pidFile := p.Address + ".pid"
 
 			buff, err := ioutil.ReadFile(pidFile)
 			if err != nil {

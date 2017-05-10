@@ -142,14 +142,15 @@ func TestMuxPlugins(t *testing.T) {
 	})
 	require.NotNil(t, rp)
 
-	proxy, err := startProxy(t, ":24864", rp)
+	proxy, err := startProxy(t, ":24863", rp)
 	require.NoError(t, err)
 	defer proxy.Stop(10 * time.Second)
 
-	get := "http://localhost:24864/" + pluginName + rpc.URLAPI
+	get := "http://localhost:24863/" + pluginName + rpc.URLAPI
 
 	T(100).Infoln("Basic info client:", get)
 	resp, err := http.Get(get)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 	T(100).Infoln("resp=", resp, "err=", err)
 

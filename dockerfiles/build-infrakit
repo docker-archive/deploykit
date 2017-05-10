@@ -3,5 +3,44 @@
 export GOPATH=/go
 export PATH=/go/bin:$PATH
 
-go get github.com/docker/infrakit/cmd/infrakit
-go build -o /build/infrakit github.com/docker/infrakit/cmd/infrakit
+case "$1" in
+    darwin)
+	export GOOS=darwin
+	export GOARCH=amd64
+	echo "Building for mac ${GOOS} / ${GOARCH}"
+	;;
+    linux)
+	export GOOS=linux
+	export GOARCH=amd64
+	export BUILD_FLAGS="-buildmode pie"
+	echo "Building for linux ${GOOS} / ${GOARCH}"
+	;;
+    *)
+	if [[ "${GOOS}" == "" ]]; then
+	    echo "Must set GOOS and GOOARCH environment variables"
+	    exit -1
+	fi
+	echo "Building for linux ${GOOS} / ${GOARCH}"
+	;;
+esac
+
+if [[ "$2" == "update" ]]; then
+    go get -u -v github.com/docker/infrakit/cmd/infrakit
+fi
+
+cd /go/src/github.com/docker/infrakit/cmd/infrakit
+
+# See Makefile
+VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always)
+REVISION=$(git rev-list -1 HEAD)
+DOCKER_CLIENT_VERSION=1.24
+BINARY=infrakit
+PACKAGE=github.com/docker/infrakit/cmd/infrakit
+
+echo "Building for ${BINARY} GOOS=${GOOS} GOARCH=${GOARCH}, version=${VERSION}, revision=${REVISION}"
+
+go build -o /build/${BINARY} ${BUILD_FLAGS} \
+   -ldflags "-s -w -X github.com/docker/infrakit/pkg/cli.Version=${VERSION} -X github.com/docker/infrakit/pkg/cli.Revision=${REVISION} -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=${DOCKER_CLIENT_VERSION} -extldflags \"-static\"" \
+   ${PACKAGE}
+
+echo "Done.  You may want to copy the file to your path, like:  'sudo cp ./infrakit /usr/local/bin/'"

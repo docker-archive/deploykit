@@ -16,6 +16,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/deckarep/golang-set"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/nightlyone/lockfile"
 	"github.com/spf13/afero"
@@ -317,14 +318,37 @@ func (p *plugin) optionalProcessHostname(vmType TResourceType, name TResourceNam
 	log.Debugln("Adding hostname to properties: hostname=", properties["hostname"])
 }
 
+// renderInstIdVar applies the "/self/instId" as a global option and renders
+// the given string
+func renderInstIDVar(data string, id instance.ID) (string, error) {
+	t, _ := template.NewTemplate("str://"+data, template.Options{})
+	return t.Global("/self/instId", id).Render(nil)
+}
+
 // Provision creates a new instance based on the spec.
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	// Because the format of the spec.Properties is simply the same tf.json
 	// we simply look for vm instance and merge in the tags, and user init, etc.
 
+	// use timestamp as instance id
+	name := p.ensureUniqueFile()
+	id := instance.ID(name)
+
+	// Template the {{ var "/self/instId" }} var in both the Properties and the Init
+	rendered, err := renderInstIDVar(spec.Properties.String(), id)
+	if err != nil {
+		return nil, err
+	}
+	spec.Properties = types.AnyBytes([]byte(rendered))
+	rendered, err = renderInstIDVar(spec.Init, id)
+	if err != nil {
+		return nil, err
+	}
+	spec.Init = rendered
+
 	tf := TFormat{}
-	err := spec.Properties.Decode(&tf)
+	err = spec.Properties.Decode(&tf)
 	if err != nil {
 		return nil, err
 	}
@@ -337,11 +361,6 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if properties == nil {
 		return nil, fmt.Errorf("no-vm-instance-in-spec")
 	}
-
-	// use timestamp as instance id
-	name := p.ensureUniqueFile()
-
-	id := instance.ID(name)
 
 	// set the tags.
 	// add a name
@@ -407,7 +426,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// merge the inits
 	switch vmType {
 	case VMAmazon, VMDigitalOcean:
-		addUserData(properties, "user_data", base64.StdEncoding.EncodeToString([]byte(spec.Init)))
+		addUserData(properties, "user_data", spec.Init)
+		properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(properties["user_data"].(string)))
 	case VMSoftLayer:
 		addUserData(properties, "user_metadata", spec.Init)
 	case VMAzure:

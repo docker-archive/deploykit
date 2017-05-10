@@ -108,7 +108,7 @@ func TestRenderProperties(t *testing.T) {
 
 	// Case - no template, just properties. Note the escapes here.
 	testRenderProperties(t, `
-- class:        instance-aws/ec2-instance
+- kind:        instance-aws/ec2-instance
   spiVersion:   instance/v0.1.0
   metadata:
     name: host1
@@ -158,7 +158,7 @@ func TestRenderProperties(t *testing.T) {
 		})
 	// Case - has template.  No properties
 	testRenderProperties(t, `
-- class:        instance-aws/ec2-instance
+- kind:        instance-aws/ec2-instance
   spiVersion:   instance/v0.1.0
   metadata:
     name: host1
@@ -189,7 +189,7 @@ func TestRenderProperties(t *testing.T) {
 
 	// Case - has template, with properties override
 	testRenderProperties(t, `
-- class:        instance-aws/ec2-instance
+- kind:        instance-aws/ec2-instance
   spiVersion:   instance/v0.1.0
   metadata:
     name: host1
@@ -232,7 +232,7 @@ func query(t *testing.T, exp string, v interface{}) interface{} {
 func TestProcess(t *testing.T) {
 
 	text := `
-- class:        instance-aws/ec2-instance
+- kind:        instance-aws/ec2-instance
   spiVersion:   instance/v0.1.0
   metadata:
     name: workers
@@ -337,7 +337,7 @@ func TestProcess(t *testing.T) {
 	require.Equal(t, "m2-xlarge", types.Get(types.PathFromString("RunInstancesInput/InstanceType"), properties))
 
 	T(100).Infoln(spec)
-	require.Equal(t, "instance-aws/ec2-instance", types.Get(types.PathFromString("Class"), spec))
+	require.Equal(t, "instance-aws/ec2-instance", types.Get(types.PathFromString("Kind"), spec))
 
 	// we should have 1 instance in the available state
 	require.Equal(t, 1, proc.Instances().CountByState(available))

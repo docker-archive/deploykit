@@ -76,7 +76,7 @@ func NewProcess(model ModelDefinition,
 
 	proc.Constructor = func(instance fsm.Instance) error {
 		if proc.ProcessDefinition.Constructor == nil {
-			return fmt.Errorf("no constructor %s %s", input.Spec.Class, input.Spec.Metadata.Name)
+			return fmt.Errorf("no constructor %s %s", input.Spec.Kind, input.Spec.Metadata.Name)
 		}
 
 		// create an instace and resolve dependencies to compute a full spec
@@ -229,7 +229,7 @@ func NormalizeSpecs(uri string, input []byte) ([]*types.Spec, error) {
 			if err != nil {
 				return nil, err
 			}
-			if u, err := types.NewURL(absolute); err == nil {
+			if u, err := types.NewURL(absolute.String()); err == nil {
 				spec.Template = u
 			}
 		}

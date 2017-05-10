@@ -41,7 +41,7 @@ func TestDirDiscovery(t *testing.T) {
 	T(100).Infoln("Starting server2")
 	name2 := "server2"
 	path2 := filepath.Join(dir, name2+".listen")
-	server2, err := server.StartListenerAtPath("localhost:7777", path2, rpc.PluginServer(nil))
+	server2, err := server.StartListenerAtPath([]string{"localhost:7777"}, path2, rpc.PluginServer(nil))
 	require.NoError(t, err)
 	require.NotNil(t, server2)
 

@@ -233,16 +233,38 @@ func setHeaders(req *http.Request, headers map[string][]string) {
 	}
 }
 
+// Fetch opens and reads a url and returns its content
+func (t *Template) Fetch(p string, opt ...interface{}) (string, error) {
+	headers, _ := headersAndContext(opt...)
+	loc := p
+	if strings.Index(loc, "str://") == -1 {
+		u, err := GetURL(t.url, p)
+		if err != nil {
+			return "", err
+		}
+		loc = u.String()
+	}
+	prev := t.options.CustomizeFetch
+	t.options.CustomizeFetch = func(req *http.Request) {
+		setHeaders(req, headers)
+		if prev != nil {
+			prev(req)
+		}
+	}
+	buff, err := Fetch(loc, t.options)
+	return string(buff), err
+}
+
 // Source 'sources' the input file at url, also inherits all the variables.
 func (t *Template) Source(p string, opt ...interface{}) (string, error) {
 	headers, context := headersAndContext(opt...)
 	loc := p
 	if strings.Index(loc, "str://") == -1 {
-		buff, err := GetURL(t.url, p)
+		u, err := GetURL(t.url, p)
 		if err != nil {
 			return "", err
 		}
-		loc = buff
+		loc = u.String()
 	}
 
 	prev := t.options.CustomizeFetch
@@ -273,11 +295,11 @@ func (t *Template) Include(p string, opt ...interface{}) (string, error) {
 	headers, context := headersAndContext(opt...)
 	loc := p
 	if strings.Index(loc, "str://") == -1 {
-		buff, err := GetURL(t.url, p)
+		u, err := GetURL(t.url, p)
 		if err != nil {
 			return "", err
 		}
-		loc = buff
+		loc = u.String()
 	}
 
 	prev := t.options.CustomizeFetch
@@ -309,6 +331,13 @@ func (t *Template) Include(p string, opt ...interface{}) (string, error) {
 func (t *Template) DefaultFuncs() []Function {
 
 	return []Function{
+		{
+			Name: "fetch",
+			Description: []string{
+				"Fetches a resource without evaluation as template",
+			},
+			Func: t.Fetch,
+		},
 		{
 			Name: "source",
 			Description: []string{

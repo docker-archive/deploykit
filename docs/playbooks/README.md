@@ -1,16 +1,38 @@
 Quick Start
 ===========
 
+## Install InfraKit
+
+### Mac
 If you don't have infrakit or go compiler installed locally, just
 
 ```shell
 
-docker run --rm -e GOARCH=amd64 -e GOOS=darwin -v `pwd`:/build infrakit/devbundle:dev build-infrakit
+docker run --rm -v `pwd`:/build infrakit/installer build-infrakit darwin
+sudo cp ./infrakit /usr/local/bin
 ```
-
 This will cross-compile the `infrakit` cli for Mac OSX.  For Linux, there's no need to set the `GOOS` and `GOARCH`
 environment variables.
 
+### Linux
+
+```shell
+$ docker run --rm -v `pwd`:/build infrakit/installer build-infrakit linux
+$ sudo cp ./infrakit /usr/local/bin/
+```
+
+## Set the `INFRAKIT_HOME` environment variable
+
+In your terminal, or add this to your `.bash_profile`:
+
+```shell
+export INFRAKIT_HOME=~/.infrakit
+```
+If you're on the Mac, also
+
+```shell
+export INFRAKIT_HOST=localhost
+```
 
 ## Add a Playbook
 
@@ -46,12 +68,22 @@ Usage:
 Available Commands:
   aws            aws
   darwin         darwin
-  do             do
+  digitalocean   do
   events         events
   gcp            gcp
   start-infrakit start-infrakit
   stop-infrakit  stop-infrakit
 ```
+
+## Prerequisites:
+
+This tutorial uses Digitial Ocean.  Be sure you have the API token; you will be prompted to provide it
+if you don't provide it in the command line flag.  You can also authenticate via the `doctl` tool and thus
+have a `~/.config/doctl/config.yaml` file which has the access token.
+
+Also, be sure to have upload a SSH key with Digital Ocean.  Creating instances requires specifying the SSH
+key by name.
+
 
 ## Start up Infrakit controller daemons and plugins
 
@@ -87,10 +119,10 @@ Now you can connect to Infrakit at localhost:24864 via the `-H` option:
 
 ## Provision an Instance
 
-There's a `do` sub-command, for Digital Ocean.  It has the following command available:
+There's a `digitalocean` sub-command, for Digital Ocean.  It has the following command available:
 
 ```shell
-$ infrakit -H localhost:24864 playbook intro do -h
+$ infrakit -H localhost:24864 playbook intro digitialocean -h
 
 
 ___  ________   ________ ________  ________  ___  __    ___  _________
@@ -105,7 +137,7 @@ ___  ________   ________ ________  ________  ___  __    ___  _________
 do
 
 Usage:
-  infrakit playbook intro do [command]
+  infrakit playbook intro digitalocean [command]
 
 Available Commands:
   provision-instance provision-instance
@@ -118,7 +150,7 @@ Now provision.  Use flags or follow the prompts:
 
 ```shell
 
-$ infrakit -H localhost:24864 playbook intro do provision-instance
+$ infrakit -H localhost:24864 playbook intro digitialocean provision-instance
 Owner? [davidchung]:
 Region? [sfo1]:
 Image to boot? [ubuntu-16-10-x64]:
@@ -243,16 +275,16 @@ destroyed 47604302
 
 ## Manage a Scale Group
 
-The Digital Ocean playbook `do` also has a function to create a scale group of nodes:
+The Digital Ocean playbook `digitalocean` also has a function to create a scale group of nodes:
 
 ```shell
 
-$ infrakit -H localhost:24864 playbook intro do scale-group -h
+$ infrakit -H localhost:24864 playbook intro digitialocean scale-group -h
 
 scale-group
 
 Usage:
-  infrakit playbook intro do scale-group [flags]
+  infrakit playbook intro digitialocean scale-group [flags]
 
 Flags:
       --group-name string      Name of group
@@ -269,7 +301,7 @@ You can use flags or follow along:
 
 ```shell
 
-$ infrakit -H localhost:24864 playbook intro do scale-group
+$ infrakit -H localhost:24864 playbook intro digitialocean scale-group
 How many nodes? [2]: 3
 Name of the group? [mygroup]:
 Region? [sfo1]:

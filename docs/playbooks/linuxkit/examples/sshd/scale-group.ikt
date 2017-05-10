@@ -1,0 +1,41 @@
+{{/* Input to create a group using the hyperkit instance plugin and manager */}}
+{{/* =% managerCommit true false %= */}}
+
+
+{{ $groupName := flag "group-name" "string" "Name of group" | prompt "Name of the group?" "string" "mygroup" }}
+{{ $size := flag "size" "int" "Size of the group" | prompt "How many nodes?" "int" 2 }}
+
+{{ $project := var "/project" | flag "project" "string" "Project name" | prompt "Project?" "string" "myproject" }}
+
+{{ $linuxkitPath := flag "bundle-path" "string" "Bundle directory" | prompt "Bundle directory?" "string" (env "PWD") }}
+{{ $bundle := flag "bundle" "string" "Bundle prefix" | prompt "Bundle prefix?" "string" "sshd"}}
+{{ $cpus := flag "cpus" "int" "CPUs" | prompt "How many CPUs?" "int" 1 }}
+{{ $memory := flag "memory" "int" "Memory in MB" | prompt "How many mb for memory?" "int" 1024 }}
+{{ $disk := flag "disk" "int" "Disk in MB" | prompt "How many mb for disk?" "int" 100 }}
+
+{{ $checksum := fetch (cat "file://" $linuxkitPath "/" $bundle "-initrd.img" | nospace) | sha256sum }}
+
+- Plugin: group
+  Properties:
+    ID: {{ $groupName }}
+    Properties:
+      Allocation:
+        Size : {{ $size }}
+      Flavor:
+        Plugin: flavor-vanilla
+        Properties:
+          Tags:
+            infrakit.created: {{ now | htmlDate }}
+            infrakit.project: {{ $project }}
+            infrakit.checksum: {{ $checksum }}
+
+      Instance:
+        Plugin: instance-hyperkit
+        Properties:
+          kernel: {{ cat $linuxkitPath "/" $bundle "-kernel" | nospace }}
+          initrd: {{ cat $linuxkitPath "/" $bundle "-initrd.img" | nospace }}
+          cpus: {{ $cpus }}
+          memory: {{ $memory }}
+          disk_size: {{ $disk }}
+          cmdline: {{ include (cat "file://" $linuxkitPath "/" $bundle "-cmdline" | nospace) }}
+          checksum: {{ $checksum }}

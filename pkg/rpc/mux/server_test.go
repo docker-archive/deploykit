@@ -53,6 +53,7 @@ func TestMuxServer(t *testing.T) {
 
 	T(100).Infoln("Basic info client:", get)
 	resp, err := http.Get(get)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 	T(100).Infoln("resp=", resp, "err=", err)
 
