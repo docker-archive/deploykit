@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -52,12 +53,21 @@ func TestUsage(t *testing.T) {
 	run(t, "softlayer_virtual_guest", `
 {
 	"resource" : {
-		"ibmcloud_infra_file_storage": {
-			"csy_test_file_storage1": {
+		"softlayer_file_storage": {
+			"worker_file_storage": {
 				"iops" : 0.25,
 				"type" : "Endurance",
 				"datacenter" : "dal10",
 				"capacity" : 20
+			}
+		},
+		"softlayer_block_storage": {
+			"worker_block_storage": {
+				"iops" : 0.25,
+				"type" : "Endurance",
+				"datacenter" : "dal10",
+				"capacity" : 20,
+				"os_format_type" : "Linux"
 			}
 		},
 		"softlayer_virtual_guest" : {
@@ -224,45 +234,64 @@ func run(t *testing.T, resourceType, properties string) {
 	json.Unmarshal([]byte(properties), &testingData)
 	m := testingData.(map[string]interface{})
 
-	_, vms := firstInMap(m["resource"].(map[string]interface{}))
-	_, v := firstInMap(vms.(map[string]interface{}))
-	value, _ := v.(map[string]interface{})
+	// More than one resource may be defined.  Loop through them.
+	for key, resources := range m["resource"].(map[string]interface{}) {
+		resourceName, resource := firstInMap(resources.(map[string]interface{}))
+		value, _ := resource.(map[string]interface{})
 
-	// Userdata should have the resource defined data (ie, echo <instId>) with
-	// the spec init data appended
-	expectedUserData2 := "echo " + string(*id2) + "\n" + instanceSpec2.Init
+		// Userdata should have the resource defined data (ie, echo <instId>) with
+		// the spec init data appended
+		expectedUserData2 := "echo " + string(*id2) + "\n" + instanceSpec2.Init
 
-	switch vmType {
-	case VMSoftLayer:
-		require.Equal(t, conv([]interface{}{
-			"terraform_demo_swarm_mgr_sl",
-			"label1:value1",
-			"label2:value2",
-			"name:" + string(*id2),
-		}), conv(props["tags"].([]interface{})))
-		require.Equal(t, expectedUserData2, props["user_metadata"])
+		switch TResourceType(key) {
+		case VMSoftLayer:
+			require.Equal(t, conv([]interface{}{
+				"terraform_demo_swarm_mgr_sl",
+				"label1:value1",
+				"label2:value2",
+				"name:" + string(*id2),
+			}), conv(props["tags"].([]interface{})))
+			require.Equal(t, expectedUserData2, props["user_metadata"])
 
-		// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
-		if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
-			newID := strings.Replace(string(*id2), "instance-", "", -1)
-			expectedHostname := "softlayer-hostname-" + newID
-			require.Equal(t, expectedHostname, props["hostname"])
-		} else {
-			// If no hostname was specified, the hostname should equal the ID
-			require.Equal(t, string(*id2), props["hostname"])
+			// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
+			if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
+				newID := strings.Replace(string(*id2), "instance-", "", -1)
+				expectedHostname := "softlayer-hostname-" + newID
+				require.Equal(t, expectedHostname, props["hostname"])
+			} else {
+				// If no hostname was specified, the hostname should equal the ID
+				require.Equal(t, string(*id2), props["hostname"])
+			}
+			// Verify the hostname prefix key/value is no longer in the props
+			require.Nil(t, props["@hostname_prefix"])
+
+		case VMAmazon:
+			require.Equal(t, map[string]interface{}{
+				"InstancePlugin": "terraform",
+				"label1":         "value1",
+				"label2":         "value2",
+				"Name":           string(*id2),
+			}, props["tags"])
+			require.Equal(t, base64.StdEncoding.EncodeToString([]byte(expectedUserData2)), props["user_data"])
+
+		default:
+			// Find the resource and make sure the name was updated
+			var resourceFound bool
+			var name string
+			for resourceType, objs := range tformat.Resource {
+				if resourceType == TResourceType(key) {
+					resourceFound = true
+					for k := range objs {
+						name = string(k)
+						break
+					}
+				}
+			}
+			require.True(t, resourceFound)
+			// Other resources should be renamed to include the id
+			require.Equal(t, name, fmt.Sprintf("%s-%s", string(*id2), resourceName))
+
 		}
-		// Verify the hostname prefix key/value is no longer in the props
-		require.Nil(t, props["@hostname_prefix"])
-
-	case VMAmazon:
-		require.Equal(t, map[string]interface{}{
-			"InstancePlugin": "terraform",
-			"label1":         "value1",
-			"label2":         "value2",
-			"Name":           string(*id2),
-		}, props["tags"])
-		// user_data is base64 encoded
-		require.Equal(t, base64.StdEncoding.EncodeToString([]byte(expectedUserData2)), props["user_data"])
 	}
 
 	// Expected instances returned from Describe
