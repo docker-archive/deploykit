@@ -1,3 +1,6 @@
 
 # Create a single instance
 provision-instance : provision-instance.ikt
+
+# Manage a scale group
+scale-group : provision-group.yml
