@@ -1,0 +1,41 @@
+{{/* Input to create a group using the AWS instance plugin and manager */}}
+{{/* =% managerCommit true false  %= */}}
+
+{{ $size := flag "size" "int" "Size of the group" | prompt "How many nodes?" "int" 2 }}
+{{ $groupName := flag "group-name" "string" "Name of group" | prompt "Name of the group?" "string" "mygroup" }}
+{{ $az := flag "availability-zone" "string" "Availability zone" | prompt "AvailabilityZone?" "string" "us-west-1a" }}
+{{ $image := flag "image-id" "string" "Image ID" | prompt "Image to boot?" "string" "ami-4926fd29" }}
+{{ $instanceType := flag "instance-type" "string" "Instance type" | prompt "Instance type?" "string" "t2.micro"}}
+{{ $sshKey := flag "ssh-key" "string" "SSH key name" | prompt "SSH key?" "string" "" }}
+{{ $SecurityGroupId := flag "security-group-id" "string" "Security group ID" | prompt "Names of security group ID?" "string" "" }}
+{{ $project := var "/project" | flag "project" "string" "Project name" | prompt "Project?" "string" "myproject" }}
+
+- Plugin: group
+  Properties:
+    ID: {{ $groupName }}
+    Properties:
+      Allocation:
+        Size: {{ $size }}
+      Flavor:
+        Plugin: flavor-vanilla
+        Properties:
+          Init:
+            - apt-get update -y
+            - apt-get install wget curl
+            - wget -qO- https://get.docker.com | sh
+          Tags:
+            project: {{ $project }}
+
+      Instance:
+        Plugin: instance-aws/ec2-instance
+        Properties:
+          RunInstancesInput:
+            Placement:
+              AvailabilityZone: {{ $az }}
+            ImageId: {{ $image }}
+            InstanceType: {{ $instanceType }}
+            KeyName: {{ $sshKey }}
+            SecurityGroupIds:
+              - {{ $SecurityGroupId }}
+          Tags:
+              Name: {{ $groupName }}
