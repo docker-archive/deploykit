@@ -84,6 +84,10 @@ func dir(url SourceURL) (Modules, error) {
 
 	m := Modules{}
 	err = Decode([]byte(view), &m)
+	if err == nil {
+		return m, nil
+	}
+	m[Op(".")] = url
 	return m, err
 }
 
