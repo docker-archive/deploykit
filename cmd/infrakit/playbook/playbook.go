@@ -95,14 +95,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
-			// try fetch
-			test, err := template.NewTemplate(url, template.Options{})
-			if err != nil {
-				return err
+			if modules == nil {
+				modules = map[remote.Op]remote.SourceURL{}
 			}
 
-			_, err = test.Render(nil)
+			// try fetch
+			_, err = template.Fetch(url, template.Options{})
 			if err != nil {
 				return err
 			}
