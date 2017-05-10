@@ -1,0 +1,7 @@
+
+
+upload-gcp : provision-gcp.ikt
+
+upload-local : provision-local.ikt
+
+upload-s3: provision-s3.ikt

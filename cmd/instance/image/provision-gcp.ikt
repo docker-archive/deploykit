@@ -1,0 +1,25 @@
+{{/* Input to create instance using the image instance plugin */}}
+{{/* =% instanceProvision `instance-image` true  %= */}}
+
+{{ $dir := flag `linuxkit-dir` `string` `LinuxKit dir` | prompt `LinuxKit dir?` `string` (env `PWD`) }}
+{{ $bundle := flag `bundle-name` `string` `Bundle name` | prompt `Bundle name?` `string` `ssh` }}
+{{ $user := flag `user` `string` `owner` | prompt `Owner?` `string` (env `USER`) nil }}
+
+{{ $defaultPath := (list `file://` (env `HOME`) `/.config/gcloud/DevServiceAccountKey.json` | join ``) }}
+{{ $serviceAccountKey := flag `service-account-key-json` `string` `ServiceAccountKey path` | prompt `ServiceAccountKey path?` `string` $defaultPath }}
+
+Tags:
+  infrakit.created: {{ now | htmlDate }}
+  infrakit.user: {{ $user }}
+
+Properties:
+  sources:
+    {{$bundle}}-kernel: {{ list `file://` $dir `/` $bundle `-kernel` | join `` }}
+    {{$bundle}}-initrd: {{ list `file://` $dir `/` $bundle `-initrd.img` | join `` }}
+    {{$bundle}}.img.tar.gz: {{ list `file://` $dir `/` $bundle `.img.tar.gz` | join `` }}
+  options:
+    store: google
+    container: infrakit
+    config:
+      project_id: docker4x
+      json: {{ include $serviceAccountKey }}

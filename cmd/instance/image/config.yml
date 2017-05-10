@@ -1,0 +1,21 @@
+gcp:
+  store: google
+  container: infrakit
+  config:
+    project_id: docker4x
+    json: {{ include (list `file://` (env `HOME`) `/.config/gcloud/DevServiceAccountKey.json` | join ``) }}
+
+local:
+  store: local
+  container: {{ list (env `INFRAKIT_HOME`) `instance-image` | join `/` }}
+  config:
+    path: {{ list (env `INFRAKIT_HOME`) `instance-image` | join `/` }}
+
+{{ $creds := (source (cat `file://` (env `HOME`) `/.aws/credentials` | nospace) | iniDecode | k `default` ) }}
+aws:
+  store: s3
+  container: infrakit
+  config:
+    region: us-west-1
+    access_key_id: {{ $creds.aws_access_key_id }}
+    secret_key: {{ $creds.aws_secret_access_key }}

@@ -145,6 +145,8 @@ $(call define_binary_target,infrakit-flavor-swarm,github.com/docker/infrakit/exa
 $(call define_binary_target,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
 $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
 $(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
+$(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
+$(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
 $(call define_binary_target,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
 $(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
 $(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
@@ -163,6 +165,8 @@ build-binaries:	build/infrakit \
 		build/infrakit-flavor-vanilla \
 		build/infrakit-flavor-zookeeper \
 		build/infrakit-instance-libvirt \
+		build/infrakit-instance-packet \
+		build/infrakit-instance-image \
 		build/infrakit-instance-file \
 		build/infrakit-instance-terraform \
 		build/infrakit-instance-vagrant \
