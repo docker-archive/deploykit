@@ -1,4 +1,4 @@
-package packetnet
+package packet
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/packethost/packngo"
 )
@@ -23,10 +22,13 @@ func init() {
 
 // Properties is the input in the `Properties` field of the config yml
 type Properties struct {
-	packngo.DeviceCreateRequest
+	*packngo.DeviceCreateRequest `yaml:",inline"`
 
 	// HostnamePrefix
-	HostnamePrefix string
+	HostnamePrefix string `json:"hostname_prefix,omitempty"`
+
+	// Checksum
+	Checksum string `json:"checksum,omitempty"`
 }
 
 type plugin struct {
@@ -79,7 +81,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, err
 	}
 
-	deviceCreateRequest := properties.DeviceCreateRequest
+	deviceCreateRequest := *properties.DeviceCreateRequest
 
 	// Some computed overrides:
 	if deviceCreateRequest.ProjectID == "" {
@@ -95,19 +97,20 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	deviceCreateRequest.Tags = doTags(mapToStringSlice(tags))
 
 	// CloudInit / UserData
-	cloudInit, err := buildCloudInit(deviceCreateRequest.UserData, spec.Init)
-	if err != nil {
-		return nil, err
+	if spec.Init != "" {
+		deviceCreateRequest.UserData = strings.Join([]string{
+			deviceCreateRequest.UserData,
+			spec.Init,
+		}, "\n")
 	}
-	if cloudInit != "" {
-		deviceCreateRequest.UserData = cloudInit
-	}
+
+	log.Debug("creating", "request", deviceCreateRequest)
 
 	device, _, err := p.client.Devices.Create(&deviceCreateRequest)
 	if err != nil {
 		return nil, err
 	}
-	id := instance.ID(fmt.Sprintf("%d", device.ID))
+	id := instance.ID(fmt.Sprintf("%s", device.ID))
 	return &id, nil
 }
 
@@ -137,7 +140,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		}
 
 		description := instance.Description{
-			ID:   instance.ID(fmt.Sprintf("%d", device.ID)),
+			ID:   instance.ID(fmt.Sprintf("%s", device.ID)),
 			Tags: instTags,
 		}
 
@@ -153,31 +156,6 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	}
 
 	return result, nil
-}
-
-const cloudInitTemplate = `
-#cloud-config
-{{ $config := dict "runcmd" .lines }}
-{{ $config | yamlEncode }}
-`
-
-func buildCloudInit(args ...string) (string, error) {
-	t, err := template.NewTemplate("str://"+cloudInitTemplate, template.Options{})
-	if err != nil {
-		return "", err
-	}
-	lines := []string{}
-	for _, l := range args {
-		// split the line
-		for _, ll := range strings.Split(l, ";") {
-			t := strings.Trim(ll, " \t\n")
-			if strings.Index(t, "#!") != 0 {
-				// exclude shebangs like #!/bin/bash
-				lines = append(lines, t)
-			}
-		}
-	}
-	return t.Render(map[string]interface{}{"lines": lines})
 }
 
 func doTags(tags []string) []string {

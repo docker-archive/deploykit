@@ -6,7 +6,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/plugin/instance/packetnet"
+	"github.com/docker/infrakit/pkg/plugin/instance/packet"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +21,7 @@ func main() {
 		Use:   os.Args[0],
 		Short: "Packetnet instance plugin",
 	}
-	name := cmd.Flags().String("name", "instance-packnet", "Plugin name to advertise for discovery")
+	name := cmd.Flags().String("name", "instance-packet", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	apiToken := cmd.Flags().String("access-token", "", "API token")
 	projectID := cmd.Flags().String("project-id", "", "Project ID")
@@ -46,7 +46,7 @@ func main() {
 			namespace[keyAndValue[0]] = keyAndValue[1]
 		}
 
-		cli.RunPlugin(*name, instance_plugin.PluginServer(packetnet.NewPlugin(*projectID, *apiToken, namespace)))
+		cli.RunPlugin(*name, instance_plugin.PluginServer(packet.NewPlugin(*projectID, *apiToken, namespace)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
