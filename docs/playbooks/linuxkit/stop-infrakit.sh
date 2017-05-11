@@ -10,11 +10,11 @@
 
 echo "Stopping Infrakit"
 
-docker ps -f ancestor=infrakit/devbundle:dev -qa | xargs docker stop
-docker ps -f ancestor=infrakit/devbundle:dev -qa | xargs docker rm
+docker ps -f ancestor=infrakit/devbundle -qa | xargs docker stop
+docker ps -f ancestor=infrakit/devbundle -qa | xargs docker rm
 
-docker ps -f ancestor=infrakit/gcp:dev -qa | xargs docker stop
-docker ps -f ancestor=infrakit/gcp:dev -qa | xargs docker rm
+docker ps -f ancestor=infrakit/gcp -qa | xargs docker stop
+docker ps -f ancestor=infrakit/gcp -qa | xargs docker rm
 
 echo "Stopping local hyperkit plugin"
 
