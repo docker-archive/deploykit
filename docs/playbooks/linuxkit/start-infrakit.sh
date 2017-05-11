@@ -2,16 +2,19 @@
 
 {{/* =% sh %= */}}
 
-{{ $image := flag "infrakit-image" "string" "Infrakit image" | prompt "Infrakit image?" "string" "infrakit/devbundle:dev" }}
+{{ $image := flag "infrakit-image" "string" "Infrakit image" | prompt "Infrakit image?" "string" "infrakit/devbundle" }}
 {{ $port := flag "infrakit-port" "int" "Infrakit mux port" | prompt "Infrakit port for remote access?" "int" 24864 }}
 
 {{ $project := flag "project" "string" "Project name" | prompt "What's the name of the project?" "string" "testproject"}}
 
 
+{{/* global variable used by other sourced templates */}}
+{{ var "infrakit-image" $image }}
+
 {{/* optional plugins */}}
 
 
-echo "Starting up infrakit base...  You can connect to it at infrakit -H localhost:{{$port}}"
+echo "Starting up infrakit containers."
 
 export INFRAKIT_HOME={{env `INFRAKIT_HOME` }}
 mkdir -p $INFRAKIT_HOME/configs
@@ -37,18 +40,22 @@ docker run  -d --volumes-from infrakit --name manager \
 
 {{ var "/project" $project }}
 
+{{ source "start-instance-gcp.sh" }}
+
 {{ source "start-instance-hyperkit.sh" }}
 
-{{ source "start-instance-gcp.sh" }}
+{{ source "start-instance-packet.sh" }}
 
 echo "Updating hosts file"
 {{ $hostsFile := list (env `INFRAKIT_HOME`) `/hosts` | join `` }}
 {{ $hosts :=  include (list `file://` $hostsFile | join ``) | yamlDecode }}
 {{ $_ := set $hosts `localhost` (list `localhost` $port | join `:`) }}
 echo "{{ $hosts | yamlEncode }}" > {{ $hostsFile }}
+echo "Updated hosts file.  You are using the host `localhost` as defined in your hosts file in INFRAKIT_HOME/hosts"
 
 echo "Started hyperkit: {{ var `started-hyperkit` }}"
 echo "Started gcp:      {{ var `started-gcp` }}"
+echo "Started packet:      {{ var `started-packet` }}"
 
 tracked=``
 # Start any tracker of resources
@@ -58,8 +65,24 @@ tracked="$tracked --instance instance-hyperkit"
 {{ if var `started-gcp`}}
 tracked="$tracked --instance instance-gcp"
 {{ end }}
+{{ if var `started-packet`}}
+tracked="$tracked --instance instance-packet"
+{{ end }}
 
 if [[ "$tracked" != "" ]]; then
-docker run -d --volumes-from infrakit --name tracker \
-       {{ $image }} infrakit util track --name tracker $tracked
+    echo "Tracking instances:  $tracked"
+    docker run -d --volumes-from infrakit --name tracker \
+	   {{ $image }} infrakit util track --name tracker $tracked
 fi
+
+# Fileserver for ixpe boot from your host
+{{ $path := flag `fileserver-path` `string` `Path to serve from` | prompt "Directory to serve from?" `string` (env `PWD`) }}
+{{ $port := flag `fileserver-port` `int` `Listen port` | prompt "Listening port?" `int` 8080 }}
+
+echo "Starting up file server from {{$path}}"
+
+docker run  -d --rm --name infrakit-fileserver \
+       -v {{ $path }}:/files -p {{ $port }}:8080 \
+       {{ $image }} infrakit util fileserver /files
+
+echo "Don't forget to start up ngrok!!!"

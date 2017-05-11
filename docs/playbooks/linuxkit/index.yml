@@ -12,5 +12,13 @@ start : start-infrakit.sh
 # Stops all the infrakit daemons
 stop  : stop-infrakit.sh
 
+# sshd example
+demo-sshd : examples/sshd/index.yml
+
 # Examples
-examples : examples/index.yml
+#examples : examples/index.yml
+
+
+run-gcp: start-instance-gcp.sh
+run-packet: start-instance-packet.sh
+run-hyperkit: start-instance-hyperkit.sh

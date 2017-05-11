@@ -8,7 +8,7 @@
 {{ $credentials := flag "credential-path" "string" "Path to credentials.json" | cond $gcp | prompt "Credentials JSON path?" "string" $defaultCred }}
 {{ $zone := flag "zone" "string" "GCP zone" | cond $gcp | prompt "What's the zone?" "string" "us-central1-f"}}
 
-{{ $gcpImage := flag "gcp-plugin" "string" "Image of the plugin" |  cond $gcp | prompt "What's the GCP plugin image?" "string" "infrakit/gcp:dev" }}
+{{ $gcpImage := flag "gcp-plugin" "string" "Image of the plugin" |  cond $gcp | prompt "What's the GCP plugin image?" "string" "infrakit/gcp" }}
 
 {{ $project := var "/project" }}
 
