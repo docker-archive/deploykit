@@ -28,11 +28,7 @@ package libvirt
 
 /*
 #cgo pkg-config: libvirt
-// Can't rely on pkg-config for libvirt-qemu since it was not
-// installed until 2.6.0 onwards
-#cgo LDFLAGS: -lvirt-qemu
 #include <libvirt/libvirt.h>
-#include <libvirt/libvirt-qemu.h>
 #include <libvirt/virterror.h>
 #include <stdlib.h>
 #include "domain_compat.h"
@@ -437,24 +433,6 @@ const (
 	DOMAIN_EVENT_TRAY_CHANGE_CLOSE = ConnectDomainEventTrayChangeReason(C.VIR_DOMAIN_EVENT_TRAY_CHANGE_CLOSE)
 )
 
-/*
- * QMP has two different kinds of ways to talk to QEMU. One is legacy (HMP,
- * or 'human' monitor protocol. The default is QMP, which is all-JSON.
- *
- * QMP json commands are of the format:
- * 	{"execute" : "query-cpus"}
- *
- * whereas the same command in 'HMP' would be:
- *	'info cpus'
- */
-
-type DomainQemuMonitorCommandFlags int
-
-const (
-	DOMAIN_QEMU_MONITOR_COMMAND_DEFAULT = DomainQemuMonitorCommandFlags(C.VIR_DOMAIN_QEMU_MONITOR_COMMAND_DEFAULT)
-	DOMAIN_QEMU_MONITOR_COMMAND_HMP     = DomainQemuMonitorCommandFlags(C.VIR_DOMAIN_QEMU_MONITOR_COMMAND_HMP)
-)
-
 type DomainProcessSignal int
 
 const (
@@ -832,6 +810,20 @@ const (
 	VCPU_OFFLINE = VcpuState(C.VIR_VCPU_OFFLINE)
 	VCPU_RUNNING = VcpuState(C.VIR_VCPU_RUNNING)
 	VCPU_BLOCKED = VcpuState(C.VIR_VCPU_BLOCKED)
+)
+
+type DomainJobOperationType int
+
+const (
+	DOMAIN_JOB_OPERATION_UNKNOWN         = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_UNKNOWN)
+	DOMAIN_JOB_OPERATION_START           = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_START)
+	DOMAIN_JOB_OPERATION_SAVE            = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_SAVE)
+	DOMAIN_JOB_OPERATION_RESTORE         = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_RESTORE)
+	DOMAIN_JOB_OPERATION_MIGRATION_IN    = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_MIGRATION_IN)
+	DOMAIN_JOB_OPERATION_MIGRATION_OUT   = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_MIGRATION_OUT)
+	DOMAIN_JOB_OPERATION_SNAPSHOT        = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_SNAPSHOT)
+	DOMAIN_JOB_OPERATION_SNAPSHOT_REVERT = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_SNAPSHOT_REVERT)
+	DOMAIN_JOB_OPERATION_DUMP            = DomainJobOperationType(C.VIR_DOMAIN_JOB_OPERATION_DUMP)
 )
 
 type DomainBlockInfo struct {
@@ -1729,21 +1721,6 @@ func (d *Domain) GetVcpusFlags(flags DomainVcpuFlags) (int32, error) {
 	return int32(result), nil
 }
 
-func (d *Domain) QemuMonitorCommand(command string, flags DomainQemuMonitorCommandFlags) (string, error) {
-	var cResult *C.char
-	cCommand := C.CString(command)
-	defer C.free(unsafe.Pointer(cCommand))
-	result := C.virDomainQemuMonitorCommand(d.ptr, cCommand, &cResult, C.uint(flags))
-
-	if result != 0 {
-		return "", GetLastError()
-	}
-
-	rstring := C.GoString(cResult)
-	C.free(unsafe.Pointer(cResult))
-	return rstring, nil
-}
-
 func (d *Domain) PinVcpu(vcpu uint, cpuMap []bool) error {
 	maplen := (len(cpuMap) + 7) / 8
 	ccpumap := make([]C.uchar, maplen)
@@ -1796,7 +1773,7 @@ type DomainInterface struct {
 	Addrs  []DomainIPAddress
 }
 
-func (d *Domain) ListAllInterfaceAddresses(src uint) ([]DomainInterface, error) {
+func (d *Domain) ListAllInterfaceAddresses(src DomainInterfaceAddressesSource) ([]DomainInterface, error) {
 	if C.LIBVIR_VERSION_NUMBER < 1002014 {
 		return []DomainInterface{}, GetNotImplementedError("virDomainInterfaceAddresses")
 	}
@@ -1807,37 +1784,29 @@ func (d *Domain) ListAllInterfaceAddresses(src uint) ([]DomainInterface, error) 
 		return nil, GetLastError()
 	}
 
-	hdr := reflect.SliceHeader{
-		Data: uintptr(unsafe.Pointer(cList)),
-		Len:  int(numIfaces),
-		Cap:  int(numIfaces),
-	}
-
 	ifaces := make([]DomainInterface, numIfaces)
-	ifaceSlice := *(*[]C.virDomainInterfacePtr)(unsafe.Pointer(&hdr))
 
 	for i := 0; i < numIfaces; i++ {
-		ifaces[i].Name = C.GoString(ifaceSlice[i].name)
-		ifaces[i].Hwaddr = C.GoString(ifaceSlice[i].hwaddr)
+		var ciface *C.virDomainInterface
+		ciface = *(**C.virDomainInterface)(unsafe.Pointer(uintptr(unsafe.Pointer(cList)) + (unsafe.Sizeof(ciface) * uintptr(i))))
 
-		numAddr := int(ifaceSlice[i].naddrs)
-		addrHdr := reflect.SliceHeader{
-			Data: uintptr(unsafe.Pointer(&ifaceSlice[i].addrs)),
-			Len:  int(numAddr),
-			Cap:  int(numAddr),
-		}
+		ifaces[i].Name = C.GoString(ciface.name)
+		ifaces[i].Hwaddr = C.GoString(ciface.hwaddr)
+
+		numAddr := int(ciface.naddrs)
 
 		ifaces[i].Addrs = make([]DomainIPAddress, numAddr)
-		addrSlice := *(*[]C.virDomainIPAddressPtr)(unsafe.Pointer(&addrHdr))
 
 		for k := 0; k < numAddr; k++ {
+			var caddr *C.virDomainIPAddress
+			caddr = (*C.virDomainIPAddress)(unsafe.Pointer(uintptr(unsafe.Pointer(ciface.addrs)) + (unsafe.Sizeof(*caddr) * uintptr(k))))
 			ifaces[i].Addrs[k] = DomainIPAddress{}
-			ifaces[i].Addrs[k].Type = int(addrSlice[k]._type)
-			ifaces[i].Addrs[k].Addr = C.GoString(addrSlice[k].addr)
-			ifaces[i].Addrs[k].Prefix = uint(addrSlice[k].prefix)
+			ifaces[i].Addrs[k].Type = int(caddr._type)
+			ifaces[i].Addrs[k].Addr = C.GoString(caddr.addr)
+			ifaces[i].Addrs[k].Prefix = uint(caddr.prefix)
 
 		}
-		C.virDomainInterfaceFreeCompat(ifaceSlice[i])
+		C.virDomainInterfaceFreeCompat(ciface)
 	}
 	C.free(unsafe.Pointer(cList))
 	return ifaces, nil
@@ -2805,6 +2774,8 @@ type DomainJobInfo struct {
 	CompressionOverflow       uint64
 	AutoConvergeThrottleSet   bool
 	AutoConvergeThrottle      int
+	OperationSet              bool
+	Operation                 DomainJobOperationType
 }
 
 func (d *Domain) GetJobInfo() (*DomainJobInfo, error) {
@@ -2955,6 +2926,10 @@ func getDomainJobInfoFieldInfo(params *DomainJobInfo) map[string]typedParamsFiel
 		C.VIR_DOMAIN_JOB_AUTO_CONVERGE_THROTTLE: typedParamsFieldInfo{
 			set: &params.AutoConvergeThrottleSet,
 			i:   &params.AutoConvergeThrottle,
+		},
+		C.VIR_DOMAIN_JOB_OPERATION: typedParamsFieldInfo{
+			set: &params.OperationSet,
+			i:   (*int)(&params.Operation),
 		},
 	}
 }
