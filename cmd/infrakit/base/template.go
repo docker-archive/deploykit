@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
@@ -131,7 +132,15 @@ func TemplateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 				key := strings.TrimSpace(kv[0])
 				val := strings.TrimSpace(kv[1])
 				if key != "" && val != "" {
-					engine.Global(key, val)
+					// Attempt to convert to int and bool types so that template operations
+					// are not only against strings.
+					if intVal, err := strconv.Atoi(val); err == nil {
+						engine.Global(key, intVal)
+					} else if boolVar, err := strconv.ParseBool(val); err == nil {
+						engine.Global(key, boolVar)
+					} else {
+						engine.Global(key, val)
+					}
 				}
 			}
 
