@@ -1,0 +1,32 @@
+{{/* Input to create instance using the Packet instance plugin */}}
+{{/* =% instanceProvision "instance-packet" true  %= */}}
+
+{{ $project := var "/project" | flag "project" "string" "Project name" | prompt "Project?" "string" "myproject" }}
+
+{{ $linuxkitPath := flag "bundle-path" "string" "Bundle directory" | prompt "Bundle directory?" "string" (env "PWD") }}
+{{ $bundle := flag "bundle" "string" "Bundle prefix" | prompt "Bundle prefix?" "string" "sshd"}}
+{{ $baseURL := flag "base-url" "string" "Base URL" | prompt "Base URL (from upload or ngrok)?" "string" "https://76c08e79.ngrok.io" }}
+{{ $facility := flag "facility" "string" "Facility" | prompt "Facility?" "string" "sjc1" }}
+{{ $checksum := fetch (cat "file://" $linuxkitPath "/" $bundle "-initrd.img" | nospace) | sha256sum }}
+
+Tags:
+  infrakit.created: {{ now | htmlDate }}
+  infrakit.project: {{ $project }}
+  infrakit.checksum: {{ $checksum }}
+
+Properties:
+  plan: baremetal_0
+  facility: {{ $facility }}
+  operating_system: custom_ipxe
+  billing_cycle: hourly
+  userdata: |
+    #!ipxe
+
+    dhcp
+    set base-url {{ $baseURL }}
+    set kernel-params ip=dhcp nomodeset ro serial console=ttyS1,115200
+    kernel ${base-url}/{{$bundle}}-kernel ${kernel-params}
+    initrd ${base-url}/{{$bundle}}-initrd.img
+    boot
+  hostname_prefix: infrakit-test
+  checksum: {{ $checksum }}

@@ -286,8 +286,35 @@ func TestSourceWithHeaders(t *testing.T) {
 	any := types.AnyString(view)
 	headers := map[string]interface{}{}
 	require.NoError(t, any.Decode(&headers))
+
+	// Looks like httpbin.org's handling of repeating headers has changed:
+	//
+	// $ curl -i -H "A:B" -H "Foo:Bar" -H "Foo:Bar" https://httpbin.org/headers
+	// HTTP/1.1 200 OK
+	// Connection: keep-alive
+	// Server: meinheld/0.6.1
+	// Date: Thu, 11 May 2017 18:50:08 GMT
+	// Content-Type: application/json
+	// Access-Control-Allow-Origin: *
+	// Access-Control-Allow-Credentials: true
+	// X-Powered-By: Flask
+	// X-Processed-Time: 0.000694990158081
+	// Content-Length: 167
+	// Via: 1.1 vegur
+
+	// {
+	//   "headers": {
+	//     "A": "B",
+	//     "Accept": "*/*",
+	//     "Connection": "close",
+	//     "Foo": "Bar",
+	//     "Host": "httpbin.org",
+	//     "User-Agent": "curl/7.43.0"
+	//   }
+	// }
+
 	require.Equal(t, map[string]interface{}{
-		"Foo":             "Bar,Bar",
+		"Foo":             "Bar",
 		"Host":            "httpbin.org",
 		"User-Agent":      "Go-http-client/1.1",
 		"A":               "B",
