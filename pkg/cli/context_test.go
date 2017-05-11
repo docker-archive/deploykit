@@ -33,6 +33,7 @@ func TestContext(t *testing.T) {
 {{ $clusterName := flag "cluster-name" "string" "the name of the cluster" "swarm" }}
 {{ $clusterSize := flag "size" "int" "the size of the cluster" 20 }}
 {{ $floatValue := flag "param" "float" "some float param" 25.5 }}
+{{ $listValue := listflag "tags" "string" "some string tags (Comma-separated)" "test" }}
 
 {{ $user := prompt "Please enter your user name" "string" }}
 
@@ -46,7 +47,8 @@ func TestContext(t *testing.T) {
   "username" : "{{$user}}",
   "doCommit" : {{$doCommit}},
   "instanceType" : "{{$instanceType}}",
-  "param" : {{$floatValue}}
+  "param" : {{$floatValue}},
+  "tags" : "{{$listValue}}"
 }
 `
 
@@ -67,7 +69,7 @@ func TestContext(t *testing.T) {
 		require.NotNil(t, c.cmd.Flag(n))
 	}
 
-	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --commit true --size 20 --instance-type large", " "))
+	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --tags dev,infrakit --commit true --size 20 --instance-type large", " "))
 	require.NoError(t, err)
 
 	err = c.Execute()
@@ -85,6 +87,7 @@ func TestContext(t *testing.T) {
 		"username":     "username",
 		"doCommit":     true,
 		"instanceType": "large",
+		"tags":         "[dev infrakit]",
 	}).String(), types.AnyValueMust(m).String())
 }
 

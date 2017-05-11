@@ -252,6 +252,30 @@ func (c *Context) Funcs() []template.Function {
 			},
 		},
 		{
+			Name: "listflag",
+			Func: func(n, ftype, desc string, optional ...interface{}) ([]string, error) {
+				if ftype == "" {
+					return nil, fmt.Errorf("missing type for variable %v", n)
+				}
+				if ftype != "string" {
+					return nil, fmt.Errorf("list flag only support string %v", n)
+				}
+				var defaultValue interface{}
+				if len(optional) > 0 {
+					defaultValue = optional[0]
+				}
+				if c.exec {
+					d, err := c.cmd.Flags().GetString(n)
+					return strings.Split(d, ","), err
+				}
+
+				// Defining a flag never returns a printable value that can mess up the template rendering
+				d, err := c.defineFlag(n, ftype, desc, defaultValue)
+				dl := strings.Split(d.(string), ",")
+				return dl, err
+			},
+		},
+		{
 			Name: "fetch",
 			Func: func(p string, opt ...interface{}) (string, error) {
 				// Overrides the base 'file' to account for the fact that
@@ -356,6 +380,47 @@ func (c *Context) Funcs() []template.Function {
 
 				}
 				return Prompt(c.input, prompt, ftype, optional...)
+			},
+		},
+		{
+			Name: "listprompt",
+			Func: func(prompt, ftype string, optional ...interface{}) ([]string, error) {
+
+				if ftype == "" {
+					return nil, fmt.Errorf("missing type for variable prompted")
+				}
+				if ftype == "" {
+					return nil, fmt.Errorf("listprompt only support string")
+				}
+				var pl []string
+				if !c.exec {
+					return pl, nil
+				}
+
+				if len(optional) > 0 {
+					end := optional[len(optional)-1]
+					if cond, is := end.(func() (bool, interface{})); is {
+						ok, last := cond()
+						if !ok {
+							return pl, nil
+						}
+						// if the condition evaluates to true, then we'd continue
+						// so the trailing arg must look like the cond was not
+						// inserted before this -- hence using the value from
+						// stage before the cond as the end
+						end = last
+					}
+
+					// The last value in the optional var args is the value from the previous
+					// pipeline.
+					if len(end.([]string)) > 1 {
+						return end.([]string), nil
+					}
+
+				}
+				p, err := Prompt(c.input, prompt, ftype, optional...)
+				pl = strings.Split(p.(string), ",")
+				return pl, err
 			},
 		},
 	}
