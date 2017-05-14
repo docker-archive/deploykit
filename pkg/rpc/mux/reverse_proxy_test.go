@@ -131,7 +131,8 @@ func TestMuxPlugins(t *testing.T) {
 	require.Equal(t, []string{"region"},
 		first(must(rpc_metadata.NewClient(socketPath)).List(types.PathFromString("aws"))))
 
-	infoClient := client.NewPluginInfoClient(socketPath)
+	infoClient, err := client.NewPluginInfoClient(socketPath)
+	require.NoError(t, err)
 	info, err := infoClient.GetInfo()
 	require.NoError(t, err)
 	T(100).Infoln("info=", info)
