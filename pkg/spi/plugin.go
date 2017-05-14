@@ -21,7 +21,7 @@ func (i InterfaceSpec) Encode() string {
 	return fmt.Sprintf("%s/%s", i.Name, i.Version)
 }
 
-// Decode takes a string and returns the struct
+// DecodeInterfaceSpec takes a string and returns the struct
 func DecodeInterfaceSpec(s string) InterfaceSpec {
 	p := strings.SplitN(s, "/", 2)
 	return InterfaceSpec{
