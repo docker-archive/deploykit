@@ -3,6 +3,7 @@ package instance
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -160,7 +161,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	tagsTemplate := describe.Flags().StringP("tags-view", "t", "*", "Template to render tags")
 	propertiesTemplate := describe.Flags().StringP("properties-view", "v", "{{.}}", "Template to render properties")
 
-	rawOutputFlags, rawOutput := base.RawOutput()
+	rawOutputFlags, rawOutput := cli.Output()
 	describe.Flags().AddFlagSet(rawOutputFlags)
 
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
@@ -185,55 +186,50 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		desc, err := instancePlugin.DescribeInstances(filter, *properties)
-		if err == nil {
-
-			rendered, err := rawOutput(os.Stdout, desc)
-			if err != nil {
-				return err
-			}
-
-			if rendered {
-				return nil
-			}
-
-			if !*quiet {
-				if *properties {
-					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS", "PROPERTIES")
-
-				} else {
-					fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
-				}
-			}
-			for _, d := range desc {
-
-				logical := "  -   "
-				if d.LogicalID != nil {
-					logical = string(*d.LogicalID)
-				}
-
-				tagViewBuff := ""
-				if *tagsTemplate == "*" {
-					// default -- this is a hack
-					printTags := []string{}
-					for k, v := range d.Tags {
-						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
-					}
-					sort.Strings(printTags)
-					tagViewBuff = strings.Join(printTags, ",")
-				} else {
-					tagViewBuff = renderTags(d.Tags, tagsView)
-				}
-
-				if *properties {
-					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff,
-						renderProperties(d.Properties, propertiesView))
-				} else {
-					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff)
-				}
-			}
+		if err != nil {
+			return err
 		}
+		return rawOutput(os.Stdout, desc,
+			func(io.Writer, interface{}) error {
 
-		return err
+				if !*quiet {
+					if *properties {
+						fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS", "PROPERTIES")
+
+					} else {
+						fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
+					}
+				}
+				for _, d := range desc {
+
+					logical := "  -   "
+					if d.LogicalID != nil {
+						logical = string(*d.LogicalID)
+					}
+
+					tagViewBuff := ""
+					if *tagsTemplate == "*" {
+						// default -- this is a hack
+						printTags := []string{}
+						for k, v := range d.Tags {
+							printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
+						}
+						sort.Strings(printTags)
+						tagViewBuff = strings.Join(printTags, ",")
+					} else {
+						tagViewBuff = renderTags(d.Tags, tagsView)
+					}
+
+					if *properties {
+						fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff,
+							renderProperties(d.Properties, propertiesView))
+					} else {
+						fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff)
+					}
+				}
+
+				return nil
+			})
 	}
 
 	cmd.AddCommand(

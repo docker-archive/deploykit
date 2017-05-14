@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/spi"
@@ -45,7 +44,7 @@ func (h Handshake) Implements(_ *http.Request, req *ImplementsRequest, resp *Imp
 func (h Handshake) Types(_ *http.Request, req *TypesRequest, resp *TypesResponse) error {
 	m := map[InterfaceSpec][]string{}
 	for k, v := range h {
-		m[InterfaceSpec(fmt.Sprintf("%s/%s", k.Name, k.Version))] = v
+		m[InterfaceSpec(k.Encode())] = v
 	}
 	resp.Types = m
 	return nil

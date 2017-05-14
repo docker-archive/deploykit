@@ -19,16 +19,21 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 
+	_ "github.com/docker/infrakit/pkg/cli/v1"
+
+	// TODO - deprecate these in favor of the dynamic commands (see above)
+	//_ "github.com/docker/infrakit/cmd/infrakit/flavor"
+	//_ "github.com/docker/infrakit/cmd/infrakit/instance"
+	//_ "github.com/docker/infrakit/cmd/infrakit/group"
+	//_ "github.com/docker/infrakit/cmd/infrakit/info"
+
 	_ "github.com/docker/infrakit/cmd/infrakit/event"
-	_ "github.com/docker/infrakit/cmd/infrakit/flavor"
-	_ "github.com/docker/infrakit/cmd/infrakit/group"
-	_ "github.com/docker/infrakit/cmd/infrakit/info"
-	_ "github.com/docker/infrakit/cmd/infrakit/instance"
 	_ "github.com/docker/infrakit/cmd/infrakit/manager"
 	_ "github.com/docker/infrakit/cmd/infrakit/metadata"
+	_ "github.com/docker/infrakit/cmd/infrakit/resource"
+
 	_ "github.com/docker/infrakit/cmd/infrakit/playbook"
 	_ "github.com/docker/infrakit/cmd/infrakit/plugin"
-	_ "github.com/docker/infrakit/cmd/infrakit/resource"
 	_ "github.com/docker/infrakit/cmd/infrakit/template"
 	_ "github.com/docker/infrakit/cmd/infrakit/util"
 )
@@ -49,82 +54,19 @@ func main() {
 
 	log := logutil.New("module", "main")
 
+	// Log setup
+	logOptions := &logutil.ProdDefaults
+
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "infrakit cli",
+		PersistentPreRunE: func(c *cobra.Command, args []string) error {
+			logutil.Configure(logOptions)
+			return nil
+		},
 	}
-
-	// Log setup
-	logOptions := &logutil.ProdDefaults
-	ulist := []*url.URL{}
-	remotes := []string{}
-
 	cmd.PersistentFlags().AddFlagSet(cli.Flags(logOptions))
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
-	cmd.PersistentFlags().StringSliceVarP(&remotes, "host", "H", remotes, "host list. Default is local sockets")
-
-	// parse the list of hosts
-	cmd.PersistentPreRunE = func(c *cobra.Command, args []string) error {
-		logutil.Configure(logOptions)
-
-		hosts := []string{}
-
-		if len(remotes) > 0 {
-
-			// The command line flag wins.
-			hosts = remotes
-
-		} else {
-
-			// If not -- see if INFRAKIT_HOST is set to point to a host list in the $INFRAKIT_HOME/hosts file.
-			host := os.Getenv("INFRAKIT_HOST")
-			if host == "" {
-				return nil // do nothing -- local mode
-			}
-
-			// If the env is set but we don't have any hosts file locally, don't exit.  Print a warning and proceed.
-			// Now look up the host lists in the file
-			hostsFile := filepath.Join(os.Getenv("INFRAKIT_HOME"), "hosts")
-			buff, err := ioutil.ReadFile(hostsFile)
-			if err != nil {
-				return nil // do nothing -- local mode
-			}
-			m := map[string]string{}
-			yaml, err := types.AnyYAML(buff)
-			if err != nil {
-				return fmt.Errorf("bad format for hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
-
-			}
-			err = yaml.Decode(&m)
-			if err != nil {
-				return fmt.Errorf("cannot decode hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
-			}
-
-			if list, has := m[host]; has {
-				hosts = strings.Split(list, ",")
-			} else {
-				return fmt.Errorf("no entry in hosts file at %s for INFRAKIT_HOST=%s", hostsFile, host)
-			}
-		}
-
-		for _, h := range hosts {
-			addProtocol := false
-			if !strings.Contains(h, "://") {
-				h = "http://" + h
-				addProtocol = true
-			}
-			u, err := url.Parse(h)
-			if err != nil {
-				return err
-			}
-			if addProtocol {
-				u.Scheme = "http"
-			}
-
-			ulist = append(ulist, u)
-		}
-		return nil
-	}
 
 	// Don't print usage text for any error returned from a RunE function.
 	// Only print it when explicitly requested.
@@ -134,6 +76,12 @@ func main() {
 	// They are returned from cmd.Execute() below and we print it ourselves.
 	cmd.SilenceErrors = true
 	f := func() discovery.Plugins {
+
+		ulist, err := remotes()
+		if err != nil {
+			log.Crit("Cannot lookup plugins", "err", err)
+			os.Exit(1)
+		}
 
 		if len(ulist) == 0 {
 			d, err := discovery_local.NewPluginDiscovery()
@@ -158,6 +106,20 @@ func main() {
 		cmd.AddCommand(c)
 	})
 
+	// Set environment variable to disable this feature.
+	if os.Getenv("INFRAKIT_DYNAMIC_CLI") != "false" {
+		// Load dynamic plugin commands based on discovery
+		pluginCommands, err := cli.LoadAll(cli.NewServices(f))
+		if err != nil {
+			log.Crit("error loading", "cmd", cmd.Use, "err", err)
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+		for _, c := range pluginCommands {
+			cmd.AddCommand(c)
+		}
+	}
+
 	// Help template includes the usage string, which is configure below
 	cmd.SetHelpTemplate(helpTemplate)
 	cmd.SetUsageTemplate(usageTemplate)
@@ -168,6 +130,66 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
+
+	// write the file for bash completion if environment variable is set
+	bashCompletionScript := os.Getenv("INFRAKIT_BASH_COMPLETION")
+	if bashCompletionScript != "" {
+		cmd.GenBashCompletionFile(bashCompletionScript)
+	}
+}
+
+func remotes() ([]*url.URL, error) {
+	ulist := []*url.URL{}
+
+	hosts := []string{}
+	// See if INFRAKIT_HOST is set to point to a host list in the $INFRAKIT_HOME/hosts file.
+	host := os.Getenv("INFRAKIT_HOST")
+	if host == "" {
+		return ulist, nil // do nothing -- local mode
+	}
+
+	// If the env is set but we don't have any hosts file locally, don't exit.
+	// Print a warning and proceed.
+	// Now look up the host lists in the file
+	hostsFile := filepath.Join(os.Getenv("INFRAKIT_HOME"), "hosts")
+	buff, err := ioutil.ReadFile(hostsFile)
+	if err != nil {
+		return ulist, nil // do nothing -- local mode
+	}
+
+	m := map[string]string{}
+	yaml, err := types.AnyYAML(buff)
+	if err != nil {
+		return nil, fmt.Errorf("bad format for hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
+	}
+	err = yaml.Decode(&m)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
+	}
+
+	if list, has := m[host]; has {
+		hosts = strings.Split(list, ",")
+	} else {
+		return nil, fmt.Errorf("no entry in hosts file at %s for INFRAKIT_HOST=%s", hostsFile, host)
+	}
+
+	for _, h := range hosts {
+		addProtocol := false
+		if !strings.Contains(h, "://") {
+			h = "http://" + h
+			addProtocol = true
+		}
+		u, err := url.Parse(h)
+		if err != nil {
+			panic(err)
+		}
+		if addProtocol {
+			u.Scheme = "http"
+		}
+		ulist = append(ulist, u)
+	}
+
+	return ulist, nil
 }
 
 const (

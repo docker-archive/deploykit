@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/rpc/client"
@@ -207,7 +208,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
-	catFlags, catOutput := base.Output()
+	catFlags, catOutput := cli.Output()
 	cat := &cobra.Command{
 		Use:   "cat",
 		Short: "Get metadata entry by path",
@@ -231,18 +232,21 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 						fmt.Printf("%v\n", match != nil)
 					} else {
 						value, err := match.Get(path.Shift(1))
-						if err == nil {
-							if value != nil {
-								str := value.String()
-								if s, err := strconv.Unquote(value.String()); err == nil {
-									str = s
-								}
-
-								catOutput(os.Stdout, str)
-							}
-						} else {
+						if err != nil {
 							log.Warn("Cannot metadata cat on plugin", "target", *first, "err", err)
+							continue
 						}
+						if value == nil {
+							log.Warn("value is nil")
+							continue
+						}
+
+						str := value.String()
+						if s, err := strconv.Unquote(value.String()); err == nil {
+							str = s
+						}
+
+						catOutput(os.Stdout, str, nil)
 					}
 				}
 			}

@@ -2,6 +2,7 @@ package playbook
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -151,7 +152,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		},
 	}
 
-	rawOutputFlags, rawOutput := base.RawOutput()
+	rawOutputFlags, rawOutput := cli.Output()
 	list := &cobra.Command{
 		Use:   "ls",
 		Short: "List playbooks",
@@ -164,25 +165,20 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			modules, err := loadPlaybooks()
 			if err != nil {
-				fmt.Println("***")
 				return err
 			}
-			rendered, err := rawOutput(os.Stdout, modules)
-			if err != nil {
-				return err
-			}
-			if rendered {
-				return nil
-			}
 
-			if !*quiet {
-				fmt.Printf("%-30s\t%-30s\n", "PLAYBOOK", "URL")
-			}
+			return rawOutput(os.Stdout, modules,
+				func(io.Writer, interface{}) error {
+					if !*quiet {
+						fmt.Printf("%-30s\t%-30s\n", "PLAYBOOK", "URL")
+					}
 
-			for op, url := range modules {
-				fmt.Printf("%-30v\t%-30v\n", op, url)
-			}
-			return nil
+					for op, url := range modules {
+						fmt.Printf("%-30v\t%-30v\n", op, url)
+					}
+					return nil
+				})
 		},
 	}
 	list.Flags().AddFlagSet(rawOutputFlags)

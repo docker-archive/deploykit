@@ -97,6 +97,16 @@ type Void string
 
 const voidValue Void = ""
 
+// ValidURL makes sure the input is of the URL form.  If the input does not
+// container :// then a str:// is prepended so that the input string is interpreted
+// literally as the template itself.
+func ValidURL(s string) string {
+	if strings.Index(s, "://") == -1 {
+		return "str://" + s
+	}
+	return s
+}
+
 // NewTemplate fetches the content at the url and returns a template.  If the string begins
 // with str:// as scheme, then the rest of the string is interpreted as the body of the template.
 func NewTemplate(s string, opt Options) (*Template, error) {
