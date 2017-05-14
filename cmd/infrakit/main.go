@@ -20,12 +20,11 @@ import (
 	//_ "github.com/docker/infrakit/cmd/infrakit/flavor"
 	//_ "github.com/docker/infrakit/cmd/infrakit/instance"
 	//_ "github.com/docker/infrakit/cmd/infrakit/group"
-	//_ "github.com/docker/infrakit/cmd/infrakit/info"
+	//_ "github.com/docker/infrakit/cmd/infrakit/resource"
 
 	_ "github.com/docker/infrakit/cmd/infrakit/event"
 	_ "github.com/docker/infrakit/cmd/infrakit/manager"
 	_ "github.com/docker/infrakit/cmd/infrakit/metadata"
-	_ "github.com/docker/infrakit/cmd/infrakit/resource"
 
 	_ "github.com/docker/infrakit/cmd/infrakit/playbook"
 	_ "github.com/docker/infrakit/cmd/infrakit/plugin"

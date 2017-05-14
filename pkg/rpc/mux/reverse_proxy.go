@@ -218,6 +218,7 @@ func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, pre
 
 		case "http", "https":
 			reversep.Transport = &http.Transport{}
+			u.Scheme = uu.Scheme
 			u.Host = uu.Host
 
 		default:

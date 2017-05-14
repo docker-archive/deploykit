@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/resource"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 
@@ -17,6 +18,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/cli/v1/flavor"
 	_ "github.com/docker/infrakit/pkg/cli/v1/group"
 	_ "github.com/docker/infrakit/pkg/cli/v1/instance"
+	_ "github.com/docker/infrakit/pkg/cli/v1/resource"
 )
 
 func init() {
@@ -29,6 +31,10 @@ func init() {
 			Info,
 		})
 	cli.Register(group.InterfaceSpec,
+		[]cli.CmdBuilder{
+			Info,
+		})
+	cli.Register(resource.InterfaceSpec,
 		[]cli.CmdBuilder{
 			Info,
 		})

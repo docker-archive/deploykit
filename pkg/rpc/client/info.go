@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"path"
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
@@ -29,7 +30,11 @@ type InfoClient struct {
 // GetInfo implements the Info interface and returns the metadata about the plugin
 func (i *InfoClient) GetInfo() (plugin.Info, error) {
 	meta := plugin.Info{}
-	resp, err := i.client.Get(i.url.Scheme + "://" + i.url.Host + rpc.URLAPI)
+
+	dest := *i.url
+	dest.Path = path.Clean(path.Join(i.url.Path, rpc.URLAPI))
+
+	resp, err := i.client.Get(dest.String())
 	if err != nil {
 		return meta, err
 	}
@@ -41,7 +46,11 @@ func (i *InfoClient) GetInfo() (plugin.Info, error) {
 // GetFunctions returns metadata about the plugin's template functions, if the plugin supports templating.
 func (i *InfoClient) GetFunctions() (map[string][]template.Function, error) {
 	meta := map[string][]template.Function{}
-	resp, err := i.client.Get(i.url.Scheme + "://" + i.url.Host + rpc.URLFunctions)
+
+	dest := *i.url
+	dest.Path = path.Clean(path.Join(i.url.Path, rpc.URLFunctions))
+
+	resp, err := i.client.Get(dest.String())
 	if err != nil {
 		return meta, err
 	}
