@@ -115,7 +115,7 @@ expect_output_lines() {
 ls $TEST_DIR/plugins
 expect_output_lines "16 plugins should be discoverable" "run infrakit plugin ls -q" "16"
 
-expect_output_lines "0 instances should exist" "run infrakit instance describe -q --name instance-file" "0"
+expect_output_lines "0 instances should exist" "run infrakit instance-file describe -q " "0"
 
 echo "Commiting"
 run infrakit group commit /root/docs/cattle.json
@@ -124,7 +124,7 @@ echo 'Waiting for group to be provisioned'
 sleep 2
 
 expect_output_lines "5 instances should exist in group" "run infrakit group describe cattle -q" "5"
-expect_output_lines "5 instances should exist" "run infrakit instance describe -q --name instance-file" "5"
+expect_output_lines "5 instances should exist" "run infrakit instance-file describe -q " "5"
 
 echo "Free the cattle"
 run infrakit group free cattle
@@ -155,6 +155,6 @@ sleep 5
 expect_output_lines "10 instances should exist in group" "run infrakit group describe cattle -q" "10"
 
 run infrakit group destroy cattle
-expect_output_lines "0 instances should exist" "run infrakit instance describe -q --name instance-file" "0"
+expect_output_lines "0 instances should exist" "run infrakit instance-file describe -q " "0"
 
 echo 'ALL TESTS PASSED'
