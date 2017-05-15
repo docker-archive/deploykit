@@ -1,0 +1,28 @@
+{
+    "Plugin": "group",
+    "Properties": {
+       "ID": "kubernetes-managers",
+       "Properties": {
+           "Allocation": {
+             "LogicalIDs": [
+                "192.168.2.200"
+             ]
+           },
+           "Flavor": {
+               "Plugin": "flavor-kubernetes/manager",
+               "Properties": {
+                   "InitScriptTemplateURL": "file:///home/ubuntu/go/src/github.com/docker/infrakit/examples/flavor/kubernetes/manager-init.sh",
+                   "KubeJoinIP": "192.168.2.200",
+                   "KubeBindPort": 6443,
+                   "KubeNWAddOn": "calico"
+               }
+           },
+           "Instance": {
+               "Plugin": "instance-vagrant",
+               "Properties": {
+                   "Box": "ubuntu/xenial64"
+               }
+           }
+       }
+    }
+}
