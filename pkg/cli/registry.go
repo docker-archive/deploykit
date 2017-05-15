@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/docker/infrakit/pkg/rpc"
@@ -117,17 +118,21 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 		for name, spis := range objects {
 
 			command := &cobra.Command{
-				Use:   name,
-				Short: fmt.Sprintf("Access the %s instance plugin", name),
+				Use: name,
 			}
 
+			list := []string{}
 			for _, spi := range spis {
+				list = append(list, spi.Encode())
 				visitCommands(spi, func(buildCmd CmdBuilder) {
 
 					subcommand := buildCmd(name, services)
 					command.AddCommand(subcommand)
 				})
 			}
+
+			command.Short = fmt.Sprintf("Access plugin %s which implements %s",
+				name, strings.Join(list, ","))
 
 			commands = append(commands, command)
 		}
