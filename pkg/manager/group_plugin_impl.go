@@ -58,6 +58,31 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	return m.snapshot.Save(stored)
 }
 
+func (m *manager) removeConfig(id group.ID) error {
+	log.Debugln("Removing config", id)
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	// Always read and then update with the current value.  Assumes the user's input
+	// is always authoritative.
+	stored := globalSpec{}
+
+	err := m.snapshot.Load(&stored)
+	if err != nil {
+		return err
+	}
+
+	// if not-found just return without error.
+	if stored.Groups == nil {
+		return nil
+	}
+
+	delete(stored.Groups, id)
+	log.Debugln("Saving updated config", stored)
+
+	return m.snapshot.Save(stored)
+}
+
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err error) {
 
@@ -67,16 +92,27 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 		name: "commit",
 		operation: func() error {
 			log.Infoln("Proxy CommitGroup:", grp)
+
+			var txnResp string
+			var txnErr error
+
+			// Always send a response so we don't block forever
+			defer func() {
+				resultChan <- []interface{}{txnResp, txnErr}
+			}()
+
+			// We first update the user's desired state first
 			if !pretend {
-				if err := m.updateConfig(grp); err != nil {
-					log.Warningln("Error updating", err)
-					return err
+				if updateErr := m.updateConfig(grp); updateErr != nil {
+					log.Warningln("Error updating", updateErr)
+					txnErr = updateErr
+					txnResp = "Cannot update spec. Abort"
+					return txnErr
 				}
 			}
-			resp, cerr := m.Plugin.CommitGroup(grp, pretend)
-			log.Infoln("Responses from CommitGroup:", resp, cerr)
-			resultChan <- []interface{}{resp, cerr}
-			return err
+
+			txnResp, txnErr = m.Plugin.CommitGroup(grp, pretend)
+			return txnErr
 		},
 	}
 
@@ -86,6 +122,80 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 		resp = v
 	}
 	if v, has := r[1].(error); has && v != nil {
+		err = v
+	}
+	return
+}
+
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) DestroyGroup(id group.ID) (err error) {
+
+	resultChan := make(chan []interface{})
+
+	m.backendOps <- backendOp{
+		name: "destroy",
+		operation: func() error {
+
+			log.Infoln("Proxy DestroyGroup", id)
+
+			var txnErr error
+
+			// Always send a response so we don't block forever
+			defer func() {
+				resultChan <- []interface{}{txnErr}
+			}()
+
+			// We first update the user's desired state first
+			if removeErr := m.removeConfig(id); removeErr != nil {
+				log.Warningln("Error updating", removeErr)
+				txnErr = removeErr
+				return txnErr
+			}
+
+			txnErr = m.Plugin.DestroyGroup(id)
+			return txnErr
+		},
+	}
+
+	r := <-resultChan
+	if v, has := r[0].(error); has && v != nil {
+		err = v
+	}
+	return
+}
+
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) FreeGroup(id group.ID) (err error) {
+
+	resultChan := make(chan []interface{})
+
+	m.backendOps <- backendOp{
+		name: "free",
+		operation: func() error {
+
+			log.Infoln("Proxy FreeGroup", id)
+
+			var txnErr error
+
+			// Always send a response so we don't block forever
+			defer func() {
+				resultChan <- []interface{}{txnErr}
+			}()
+
+			// We first update the user's desired state first
+			if removeErr := m.removeConfig(id); removeErr != nil {
+				log.Warningln("Error updating", removeErr)
+				txnErr = removeErr
+				return txnErr
+			}
+
+			txnErr = m.Plugin.FreeGroup(id)
+			return txnErr
+		},
+	}
+
+	r := <-resultChan
+	if v, has := r[0].(error); has && v != nil {
 		err = v
 	}
 	return
