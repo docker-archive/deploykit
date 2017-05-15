@@ -53,15 +53,15 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 			nodes := []types.Path{} // the result set to print
 
 			if *all {
-				allPaths, err := listAll(eventPlugin, path.Shift(1))
+				allPaths, err := listAll(eventPlugin, path)
 				if err != nil {
 					log.Warn("Cannot event ls on plugin", "name", name, "err", err)
 				}
 				for _, c := range allPaths {
-					nodes = append(nodes, types.PathFromString(name).Join(c))
+					nodes = append(nodes, c)
 				}
 			} else {
-				children, err := eventPlugin.List(path.Shift(1))
+				children, err := eventPlugin.List(path)
 				if err != nil {
 					log.Warn("Cannot event ls on plugin", "name", name, "err", err)
 				}

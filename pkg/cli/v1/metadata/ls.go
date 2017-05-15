@@ -53,15 +53,15 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 			nodes := []types.Path{} // the result set to print
 
 			if *all {
-				allPaths, err := listAll(metadataPlugin, path.Shift(1))
+				allPaths, err := listAll(metadataPlugin, path)
 				if err != nil {
 					log.Warn("Cannot metadata ls on plugin", "name", name, "err", err)
 				}
 				for _, c := range allPaths {
-					nodes = append(nodes, types.PathFromString(name).Join(c))
+					nodes = append(nodes, c)
 				}
 			} else {
-				children, err := metadataPlugin.List(path.Shift(1))
+				children, err := metadataPlugin.List(path)
 				if err != nil {
 					log.Warn("Cannot metadata ls on plugin", "name", name, "err", err)
 				}
@@ -77,7 +77,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 				}
 				for _, l := range nodes {
 					if *long {
-						fmt.Println(l)
+						fmt.Println(l.Rel(path))
 					} else {
 						fmt.Println(l.Rel(path))
 					}
@@ -89,11 +89,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 				fmt.Printf("total %d:\n", len(nodes))
 			}
 			for _, l := range nodes {
-				if *long {
-					fmt.Println(l)
-				} else {
-					fmt.Println(l.Rel(path))
-				}
+				fmt.Println(l.Rel(path))
 			}
 
 		}

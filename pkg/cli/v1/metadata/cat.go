@@ -35,7 +35,7 @@ func Cat(name string, services *cli.Services) *cobra.Command {
 				if path.Len() == 1 {
 					fmt.Printf("%v\n", metadataPlugin != nil)
 				} else {
-					value, err := metadataPlugin.Get(path.Shift(1))
+					value, err := metadataPlugin.Get(path)
 					if err != nil {
 						log.Warn("Cannot metadata cat on plugin", "target", *first, "err", err)
 						continue

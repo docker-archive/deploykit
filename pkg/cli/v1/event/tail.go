@@ -85,7 +85,7 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 		for _, topic := range topics {
 
 			target := *topic.Index(0)
-			eventTopic := topic.Shift(1)
+			eventTopic := topic
 
 			client, is := eventPlugin.(event.Subscriber)
 			if !is {
