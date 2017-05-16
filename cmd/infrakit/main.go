@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -28,6 +29,7 @@ import (
 
 	_ "github.com/docker/infrakit/cmd/infrakit/playbook"
 	_ "github.com/docker/infrakit/cmd/infrakit/plugin"
+	_ "github.com/docker/infrakit/cmd/infrakit/remote"
 	_ "github.com/docker/infrakit/cmd/infrakit/template"
 	_ "github.com/docker/infrakit/cmd/infrakit/util"
 )
@@ -51,9 +53,10 @@ func main() {
 	// Log setup
 	logOptions := &logutil.ProdDefaults
 
+	program := path.Base(os.Args[0])
 	cmd := &cobra.Command{
-		Use:   os.Args[0],
-		Short: "infrakit cli",
+		Use:   program,
+		Short: program + " command line interface",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 			logutil.Configure(logOptions)
 			return nil
@@ -134,15 +137,6 @@ func main() {
 
 const (
 	helpTemplate = `
-
-___  ________   ________ ________  ________  ___  __    ___  _________   
-|\  \|\   ___  \|\  _____\\   __  \|\   __  \|\  \|\  \ |\  \|\___   ___\ 
-\ \  \ \  \\ \  \ \  \__/\ \  \|\  \ \  \|\  \ \  \/  /|\ \  \|___ \  \_| 
- \ \  \ \  \\ \  \ \   __\\ \   _  _\ \   __  \ \   ___  \ \  \   \ \  \  
-  \ \  \ \  \\ \  \ \  \_| \ \  \\  \\ \  \ \  \ \  \\ \  \ \  \   \ \  \ 
-   \ \__\ \__\\ \__\ \__\   \ \__\\ _\\ \__\ \__\ \__\\ \__\ \__\   \ \__\
-    \|__|\|__| \|__|\|__|    \|__|\|__|\|__|\|__|\|__| \|__|\|__|    \|__|
-
 
 {{with or .Long .Short }}{{. | trim}}{{end}}
 {{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}

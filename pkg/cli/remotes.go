@@ -5,11 +5,75 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 
 	"github.com/docker/infrakit/pkg/types"
 )
+
+const (
+	// HostsFileEnvVar is the location of the hosts file
+	HostsFileEnvVar = "INFRAKIT_HOSTS_FILE"
+)
+
+// DefaultHostsFile returns the hsots file used for looking up hosts
+func HostsFile() string {
+	if hostsFile := os.Getenv(HostsFileEnvVar); hostsFile != "" {
+		return hostsFile
+	}
+
+	// if there's INFRAKIT_HOME defined
+	home := os.Getenv("INFRAKIT_HOME")
+	if home != "" {
+		return filepath.Join(home, "hosts")
+	}
+
+	home = os.Getenv("HOME")
+	if usr, err := user.Current(); err == nil {
+		home = usr.HomeDir
+	}
+	return filepath.Join(home, ".infrakit/hosts")
+}
+
+// HostList is a comma-delimited list of protocol://host:port
+type HostList string
+
+// Hosts is the schema of the hosts file
+type Hosts map[string]HostList
+
+// Save saves the hosts
+func (h Hosts) Save() error {
+	any, err := types.AnyValue(h)
+	if err != nil {
+		return err
+	}
+	buff, err := any.MarshalYAML()
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(HostsFile(), buff, 0755)
+}
+
+// LoadHosts loads the hosts file
+func LoadHosts() (Hosts, error) {
+	hosts := Hosts{}
+
+	buff, err := ioutil.ReadFile(HostsFile())
+	if err != nil {
+		if !os.IsExist(err) {
+			return hosts, nil
+		}
+		return nil, err
+	}
+
+	any, err := types.AnyYAML(buff)
+	if err != nil {
+		any = types.AnyBytes(buff)
+	}
+
+	return hosts, any.Decode(&hosts)
+}
 
 // Remotes returns a list of remote URLs to connect to
 func Remotes() ([]*url.URL, error) {
@@ -25,7 +89,7 @@ func Remotes() ([]*url.URL, error) {
 	// If the env is set but we don't have any hosts file locally, don't exit.
 	// Print a warning and proceed.
 	// Now look up the host lists in the file
-	hostsFile := filepath.Join(os.Getenv("INFRAKIT_HOME"), "hosts")
+	hostsFile := HostsFile()
 	buff, err := ioutil.ReadFile(hostsFile)
 	if err != nil {
 		return ulist, nil // do nothing -- local mode

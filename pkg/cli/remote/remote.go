@@ -120,15 +120,18 @@ loop:
 			}
 		}
 
+		// Documentation -- look for a README.md at the given dir
+		readmeURLStr := path.Join(path.Dir(string(moduleURL)), "README.md")
 		if parent != nil {
 
 			// Documentation -- look for a README.md at the given dir
 			readmeURL := *parent
 			readmeURL.Path = path.Join(path.Dir(parent.Path), "README.md")
-			if t, err := template.NewTemplate(readmeURL.String(), template.Options{}); err == nil {
-				if view, err := t.Render(nil); err == nil {
-					cmd.SetHelpTemplate(fmt.Sprintf(helpTemplate, view))
-				}
+			readmeURLStr = readmeURL.String()
+		}
+		if t, err := template.NewTemplate(readmeURLStr, template.Options{}); err == nil {
+			if view, err := t.Render(nil); err == nil {
+				cmd.SetHelpTemplate(fmt.Sprintf(helpTemplate, view))
 			}
 		}
 
