@@ -17,7 +17,7 @@ const (
 	HostsFileEnvVar = "INFRAKIT_HOSTS_FILE"
 )
 
-// DefaultHostsFile returns the hsots file used for looking up hosts
+// HostsFile returns the hsots file used for looking up hosts
 func HostsFile() string {
 	if hostsFile := os.Getenv(HostsFileEnvVar); hostsFile != "" {
 		return hostsFile
