@@ -1,3 +1,3 @@
 {{/* =% sh %= */}}
 
-infrakit instance --name instance-packet describe
+infrakit instance-packet describe

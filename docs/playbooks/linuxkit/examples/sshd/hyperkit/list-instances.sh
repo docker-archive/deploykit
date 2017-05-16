@@ -1,3 +1,3 @@
 {{/* =% sh %= */}}
 
-infrakit instance --name instance-hyperkit describe
+infrakit instance-hyperkit describe

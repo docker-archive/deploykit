@@ -33,6 +33,8 @@
           facility: {{ $facility }}
           operating_system: custom_ipxe
           billing_cycle: hourly
+          hostname_prefix: infrakit-{{ $groupName }}
+          checksum: {{ $checksum }}
           userdata: |
             #!ipxe
 
@@ -42,5 +44,3 @@
             kernel ${base-url}/{{$bundle}}-kernel ${kernel-params}
             initrd ${base-url}/{{$bundle}}-initrd.img
             boot
-            hostname_prefix: infrakit-demo
-            checksum: {{ $checksum }}

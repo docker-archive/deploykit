@@ -14,7 +14,7 @@ import (
 	"github.com/packethost/packngo"
 )
 
-var log = logutil.New("module", "plugin/instance/packetnet")
+var log = logutil.New("module", "plugin/instance/packet")
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
