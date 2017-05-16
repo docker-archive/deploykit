@@ -1,24 +1,54 @@
-package info
+package v1
 
 import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
+	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/spi/resource"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
+
+	// v1 loads these packages
+	_ "github.com/docker/infrakit/pkg/cli/v1/event"
+	_ "github.com/docker/infrakit/pkg/cli/v1/flavor"
+	_ "github.com/docker/infrakit/pkg/cli/v1/group"
+	_ "github.com/docker/infrakit/pkg/cli/v1/instance"
+	_ "github.com/docker/infrakit/pkg/cli/v1/metadata"
+	_ "github.com/docker/infrakit/pkg/cli/v1/resource"
 )
 
 func init() {
-	base.Register(Command)
+	cli.Register(instance.InterfaceSpec,
+		[]cli.CmdBuilder{
+			Info,
+		})
+	cli.Register(flavor.InterfaceSpec,
+		[]cli.CmdBuilder{
+			Info,
+		})
+	cli.Register(group.InterfaceSpec,
+		[]cli.CmdBuilder{
+			Info,
+		})
+	cli.Register(resource.InterfaceSpec,
+		[]cli.CmdBuilder{
+			Info,
+		})
+	cli.Register(metadata.InterfaceSpec,
+		[]cli.CmdBuilder{
+			Info,
+		})
 }
 
-// Command creates a cobra Command that prints build version information.
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+// Info returns the info command which works for multiple interfaces (e.g. instance, flavor, etc.)
+func Info(name string, services *cli.Services) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "print plugin info",
@@ -26,8 +56,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return cli.EnsurePersistentPreRunE(c)
 		},
 	}
-	name := cmd.PersistentFlags().String("name", "", "Name of plugin")
-	raw := cmd.PersistentFlags().Bool("raw", false, "True to show raw data")
+
+	raw := cmd.Flags().Bool("raw", false, "True to show raw data")
 
 	api := &cobra.Command{
 		Use:   "api",
@@ -41,12 +71,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	cmd.AddCommand(api, templateFuncs)
 
 	api.RunE = func(cmd *cobra.Command, args []string) error {
-		endpoint, err := plugins().Find(plugin.Name(*name))
+		endpoint, err := services.Plugins().Find(plugin.Name(name))
 		if err != nil {
 			return err
 		}
 
-		infoClient := client.NewPluginInfoClient(endpoint.Address)
+		infoClient, err := client.NewPluginInfoClient(endpoint.Address)
+		if err != nil {
+			return err
+		}
+
 		info, err := infoClient.GetInfo()
 		if err != nil {
 			return err
@@ -67,7 +101,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		view, err := renderer.Global("plugin", *name).Render(info)
+		view, err := renderer.Global("plugin", name).Render(info)
 		if err != nil {
 			return err
 		}
@@ -77,12 +111,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	templateFuncs.RunE = func(cmd *cobra.Command, args []string) error {
-		endpoint, err := plugins().Find(plugin.Name(*name))
+		endpoint, err := services.Plugins().Find(plugin.Name(name))
 		if err != nil {
 			return err
 		}
 
-		infoClient := client.NewPluginInfoClient(endpoint.Address)
+		infoClient, err := client.NewPluginInfoClient(endpoint.Address)
+		if err != nil {
+			return err
+		}
 		info, err := infoClient.GetFunctions()
 		if err != nil {
 			return err
@@ -103,7 +140,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		view, err := renderer.Global("plugin", *name).Render(info)
+		view, err := renderer.Global("plugin", name).Render(info)
 		if err != nil {
 			return err
 		}
@@ -124,10 +161,10 @@ Interfaces: {{range $iface := .Interfaces}}
   RPC:      {{range $method := $iface.Methods}}
     Method: {{$method.Request | q "method" }}
     Request:
-    {{$method.Request | to_json_format "    " "  "}}
+    {{$method.Request | jsonEncode | yamlEncode }}
 
     Response:
-    {{$method.Response | to_json_format "    " "  "}}
+    {{$method.Response | jsonEncode | yamlEncode }}
 
     -------------------------
   {{end}}

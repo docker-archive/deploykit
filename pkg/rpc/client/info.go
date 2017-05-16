@@ -2,8 +2,9 @@ package client
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
+	"net/url"
+	"path"
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
@@ -11,22 +12,29 @@ import (
 )
 
 // NewPluginInfoClient returns a plugin informer that can give metadata about a plugin
-func NewPluginInfoClient(socketPath string) *InfoClient {
-	dialUnix := func(proto, addr string) (conn net.Conn, err error) {
-		return net.Dial("unix", socketPath)
+func NewPluginInfoClient(address string) (*InfoClient, error) {
+	u, httpC, err := parseAddress(address)
+	if err != nil {
+		return nil, err
 	}
-	return &InfoClient{client: &http.Client{Transport: &http.Transport{Dial: dialUnix}}}
+	return &InfoClient{addr: address, client: httpC, url: u}, nil
 }
 
 // InfoClient is the client for retrieving plugin info
 type InfoClient struct {
 	client *http.Client
+	addr   string
+	url    *url.URL
 }
 
 // GetInfo implements the Info interface and returns the metadata about the plugin
 func (i *InfoClient) GetInfo() (plugin.Info, error) {
 	meta := plugin.Info{}
-	resp, err := i.client.Get("http://d" + rpc.URLAPI)
+
+	dest := *i.url
+	dest.Path = path.Clean(path.Join(i.url.Path, rpc.URLAPI))
+
+	resp, err := i.client.Get(dest.String())
 	if err != nil {
 		return meta, err
 	}
@@ -38,7 +46,11 @@ func (i *InfoClient) GetInfo() (plugin.Info, error) {
 // GetFunctions returns metadata about the plugin's template functions, if the plugin supports templating.
 func (i *InfoClient) GetFunctions() (map[string][]template.Function, error) {
 	meta := map[string][]template.Function{}
-	resp, err := i.client.Get("http://d" + rpc.URLFunctions)
+
+	dest := *i.url
+	dest.Path = path.Clean(path.Join(i.url.Path, rpc.URLFunctions))
+
+	resp, err := i.client.Get(dest.String())
 	if err != nil {
 		return meta, err
 	}

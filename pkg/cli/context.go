@@ -578,7 +578,7 @@ func (c *Context) BuildFlags() error {
 		return err
 	}
 
-	_, err = ConfigureTemplate(t, c.plugins).Render(c)
+	_, err = configureTemplate(t, c.plugins).Render(c)
 	return err
 }
 
@@ -598,7 +598,7 @@ func (c *Context) Execute() error {
 
 	c.exec = true
 	c.template = t
-	script, err := ConfigureTemplate(t, c.plugins).Render(c)
+	script, err := configureTemplate(t, c.plugins).Render(c)
 	if err != nil {
 		return err
 	}

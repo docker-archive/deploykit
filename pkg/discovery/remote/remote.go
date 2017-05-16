@@ -85,7 +85,7 @@ func (r *remotePluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 		// one of the remotes which responded would be a leader.  In that case, we
 		// don't care about the other ones that failed to respond.
 		if err != nil {
-			log.Warn("error getting remote plugin info", "err", err)
+			log.Debug("error getting remote plugin info", "err", err)
 			continue
 		}
 

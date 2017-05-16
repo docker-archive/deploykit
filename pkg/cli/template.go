@@ -8,8 +8,7 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 )
 
-// ConfigureTemplate is a utility that helps setup template engines in a standardized way across all uses.
-func ConfigureTemplate(engine *template.Template, plugins func() discovery.Plugins) *template.Template {
+func configureTemplate(engine *template.Template, plugins func() discovery.Plugins) *template.Template {
 	engine.WithFunctions(func() []template.Function {
 		return []template.Function{
 			{
