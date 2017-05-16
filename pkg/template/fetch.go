@@ -50,6 +50,10 @@ func doHTTPGet(u *url.URL, customize func(*http.Request), client *http.Client) (
 	if err != nil {
 		return nil, err
 	}
+
+	if resp.StatusCode != http.StatusOK {
+		return []byte{}, fmt.Errorf("error %s", resp.Status)
+	}
 	defer resp.Body.Close()
 	return ioutil.ReadAll(resp.Body)
 }

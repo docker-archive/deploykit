@@ -49,9 +49,9 @@ docker run  -d --volumes-from infrakit --name manager \
 echo "Updating hosts file"
 {{ $hostsFile := list (env `INFRAKIT_HOME`) `/hosts` | join `` }}
 {{ $hosts :=  include (list `file://` $hostsFile | join ``) | yamlDecode }}
-{{ $_ := set $hosts `localhost` (list `localhost` $port | join `:`) }}
+{{ $_ := set $hosts `docker4mac` (list `localhost` $port | join `:`) }}
 echo "{{ $hosts | yamlEncode }}" > {{ $hostsFile }}
-echo "Updated hosts file.  You are using the host `localhost` as defined in your hosts file in INFRAKIT_HOME/hosts"
+echo "Updated hosts file.  You are using the remote `docker4mac` as defined in your hosts file in INFRAKIT_HOME/hosts"
 
 echo "Started hyperkit: {{ var `started-hyperkit` }}"
 echo "Started gcp:      {{ var `started-gcp` }}"

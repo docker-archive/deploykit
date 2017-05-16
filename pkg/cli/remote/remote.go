@@ -115,7 +115,7 @@ loop:
 				moduleURL = SourceURL(u.String())
 
 			} else {
-				log.Warn("cannot resolve", "op", op, "url", moduleURL, "parent", parentURL)
+				log.Debug("cannot resolve", "op", op, "url", moduleURL, "parent", parentURL)
 				continue loop
 			}
 		}
@@ -142,7 +142,7 @@ loop:
 			copy := moduleURL
 			subs, err := list(plugins, mods, input, cmd, &copy)
 			if err != nil {
-				log.Warn("cannot list", "op", op, "url", moduleURL, "err", err)
+				log.Debug("cannot list", "op", op, "url", moduleURL, "err", err)
 				continue loop
 			}
 			for _, sub := range subs {
@@ -158,7 +158,7 @@ loop:
 			}
 			err := ctx.BuildFlags()
 			if err != nil {
-				log.Warn("cannot build flags", "op", op, "url", moduleURL, "err", err)
+				log.Debug("cannot build flags", "op", op, "url", moduleURL, "err", err)
 				continue loop
 			}
 

@@ -50,14 +50,14 @@ func getPluginObjects(hs rpc.Handshaker, major string) map[string][]spi.Interfac
 	// The spi this object implements (e.g. Instance/0.5.0)
 	spis, err := hs.Implements()
 	if err != nil {
-		log.Warn("error getting interface", "name", major, "err", err)
+		log.Debug("error getting interface", "name", major, "err", err)
 		return objects
 	}
 
 	// For each spi, eg. Instance/0.5.0 a list of object names
 	typesBySpi, err := hs.Types()
 	if err != nil {
-		log.Warn("error getting typed objects in this plugin", "name", major, "err", err)
+		log.Debug("error getting typed objects in this plugin", "name", major, "err", err)
 
 		// Here we assume there are no lower level objects
 		objects[major] = spis
@@ -108,7 +108,7 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 	for major, entry := range running {
 		hs, err := client.NewHandshaker(entry.Address)
 		if err != nil {
-			log.Warn("handshaker error", "err", err, "addr", entry.Address)
+			log.Debug("handshaker error", "err", err, "addr", entry.Address)
 			continue
 		}
 
