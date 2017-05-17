@@ -182,14 +182,17 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NoError(t, err)
 
 	// Instance with tags that will not be updated
+	logicalID1 := instance.LogicalID("logical.id-1")
 	instanceSpec1 := instance.Spec{
 		Properties: config,
 		Tags: map[string]string{
 			"label1": "value1",
 			"label2": "value2",
+			"LABEL3": "VALUE3",
 		},
 		Init:        "",
 		Attachments: []instance.Attachment{},
+		LogicalID:   &logicalID1,
 	}
 	id1, err := terraform.Provision(instanceSpec1)
 	require.NoError(t, err)
@@ -198,6 +201,7 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NoError(t, err)
 
 	// Instance with tags that will be updated
+	logicalID2 := instance.LogicalID("logical:id-2")
 	instanceSpec2 := instance.Spec{
 		Properties: config,
 		Tags: map[string]string{
@@ -211,6 +215,7 @@ func run(t *testing.T, resourceType, properties string) {
 				Type: "ebs",
 			},
 		},
+		LogicalID: &logicalID2,
 	}
 	id2, err := terraform.Provision(instanceSpec2)
 	require.NoError(t, err)
@@ -250,6 +255,7 @@ func run(t *testing.T, resourceType, properties string) {
 				"label1:value1",
 				"label2:value2",
 				"name:" + string(*id2),
+				"logicalid:logical:id-2",
 			}), conv(props["tags"].([]interface{})))
 			require.Equal(t, expectedUserData2, props["user_metadata"])
 
@@ -271,6 +277,7 @@ func run(t *testing.T, resourceType, properties string) {
 				"label1":         "value1",
 				"label2":         "value2",
 				"Name":           string(*id2),
+				"LogicalID":      "logical:id-2",
 			}, props["tags"])
 			require.Equal(t, base64.StdEncoding.EncodeToString([]byte(expectedUserData2)), props["user_data"])
 
@@ -305,8 +312,11 @@ func run(t *testing.T, resourceType, properties string) {
 				"terraform_demo_swarm_mgr_sl": "",
 				"label1":                      "value1",
 				"label2":                      "value2",
+				"label3":                      "value3",
 				"name":                        string(*id1),
+				"logicalid":                   "logical.id-1",
 			},
+			LogicalID: &logicalID1,
 		}
 		inst2 = instance.Description{
 			ID: *id2,
@@ -315,7 +325,9 @@ func run(t *testing.T, resourceType, properties string) {
 				"label1":                      "value1",
 				"label2":                      "value2",
 				"name":                        string(*id2),
+				"logicalid":                   "logical:id-2",
 			},
+			LogicalID: &logicalID2,
 		}
 	case VMAmazon:
 		inst1 = instance.Description{
@@ -324,8 +336,11 @@ func run(t *testing.T, resourceType, properties string) {
 				"InstancePlugin": "terraform",
 				"label1":         "value1",
 				"label2":         "value2",
+				"LABEL3":         "VALUE3",
 				"Name":           string(*id1),
+				"LogicalID":      "logical.id-1",
 			},
+			LogicalID: &logicalID1,
 		}
 		inst2 = instance.Description{
 			ID: *id2,
@@ -334,7 +349,9 @@ func run(t *testing.T, resourceType, properties string) {
 				"label1":         "value1",
 				"label2":         "value2",
 				"Name":           string(*id2),
+				"LogicalID":      "logical:id-2",
 			},
+			LogicalID: &logicalID2,
 		}
 	}
 
@@ -370,6 +387,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label2:value2",
 			"label3:value3",
 			"name:" + string(*id2),
+			"logicalid:logical:id-2",
 		}), conv(props["tags"].([]interface{})))
 	case VMAmazon:
 		require.Equal(t, map[string]interface{}{
@@ -378,6 +396,7 @@ func run(t *testing.T, resourceType, properties string) {
 			"label2":         "value2",
 			"label3":         "value3",
 			"Name":           string(*id2),
+			"LogicalID":      "logical:id-2",
 		}, props["tags"])
 	}
 
