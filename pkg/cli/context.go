@@ -567,37 +567,50 @@ func (c *Context) loadBackends(t *template.Template) error {
 	return err
 }
 
-// BuildFlags from parsing the body which is a template
-func (c *Context) BuildFlags() error {
-	t, err := template.NewTemplate(c.src, template.Options{})
-	if err != nil {
-		return err
+func (c *Context) getTemplate() (*template.Template, error) {
+	if c.template == nil {
+		t, err := template.NewTemplate(c.src, template.Options{})
+		if err != nil {
+			return nil, err
+		}
+		c.template = t
 	}
+	return c.template, nil
+}
 
+// BuildFlags from parsing the body which is a template
+func (c *Context) BuildFlags() (err error) {
+	var t *template.Template
+
+	t, err = c.getTemplate()
+	if err != nil {
+		return
+	}
+	t.SetOptions(template.Options{})
 	_, err = configureTemplate(t, c.plugins).Render(c)
-	return err
+	return
 }
 
 // Execute runs the command
-func (c *Context) Execute() error {
+func (c *Context) Execute() (err error) {
+	var t *template.Template
 
-	t, err := template.NewTemplate(c.src, template.Options{
+	t, err = c.getTemplate()
+	if err != nil {
+		return
+	}
+
+	// First pass to get the backends
+	t.SetOptions(template.Options{
 		DelimLeft:  "=%",
 		DelimRight: "%=",
 	})
-	if err != nil {
-		return err
-	}
 
 	if err := c.loadBackends(t); err != nil {
 		return err
 	}
 
-	// // create a new one without any fetch using the already fetched content
-	// t = template.NewFromTemplate(t, template.Options{
-	// 	Stderr: func() io.Writer { return os.Stderr },
-	// })
-
+	// Now regular processing
 	t.SetOptions(template.Options{
 		Stderr: func() io.Writer { return os.Stderr },
 	})
