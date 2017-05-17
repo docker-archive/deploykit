@@ -428,14 +428,7 @@ func (c *Context) Funcs() []template.Function {
 
 // loadBackend determines the backend to use for executing the rendered template text (e.g. run in shell).
 // During this phase, the template delimiters are changed to =% %= so put this in the comment {{/* */}}
-func (c *Context) loadBackends() error {
-	t, err := template.NewTemplate(c.src, template.Options{
-		DelimLeft:  "=%",
-		DelimRight: "%=",
-	})
-	if err != nil {
-		return err
-	}
+func (c *Context) loadBackends(t *template.Template) error {
 	t.AddFunc("print",
 		func() string {
 			c.run = func(script string) error {
@@ -567,7 +560,10 @@ func (c *Context) loadBackends() error {
 			return ""
 		})
 
-	_, err = t.Render(c)
+	_, err := t.Render(c)
+
+	// clean up after we rendered...  remove the functions
+	t.RemoveFunc("sh", "print", "instanceProvision", "managerCommit")
 	return err
 }
 
@@ -585,16 +581,26 @@ func (c *Context) BuildFlags() error {
 // Execute runs the command
 func (c *Context) Execute() error {
 
-	if err := c.loadBackends(); err != nil {
-		return err
-	}
-
 	t, err := template.NewTemplate(c.src, template.Options{
-		Stderr: func() io.Writer { return os.Stderr },
+		DelimLeft:  "=%",
+		DelimRight: "%=",
 	})
 	if err != nil {
 		return err
 	}
+
+	if err := c.loadBackends(t); err != nil {
+		return err
+	}
+
+	// // create a new one without any fetch using the already fetched content
+	// t = template.NewFromTemplate(t, template.Options{
+	// 	Stderr: func() io.Writer { return os.Stderr },
+	// })
+
+	t.SetOptions(template.Options{
+		Stderr: func() io.Writer { return os.Stderr },
+	})
 
 	c.exec = true
 	c.template = t
