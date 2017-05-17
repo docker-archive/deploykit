@@ -40,6 +40,7 @@ func (c *Controller) Stop() {
 	close(c.stop)
 }
 
+// Start starts the controller running.  This call does not block.
 func (c *Controller) Start() {
 	go c.run()
 }
