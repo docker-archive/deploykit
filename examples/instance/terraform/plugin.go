@@ -362,25 +362,28 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, fmt.Errorf("no-vm-instance-in-spec")
 	}
 
-	// set the tags.
-	// add a name
+	// Add the name to the tags if it does not exist, issue case-insensitive
+	// check for the "name" key
 	if spec.Tags != nil {
-		switch vmType {
-		case VMSoftLayer:
-			// Set the "name" tag to be lowercase to meet platform requirements
-			if _, has := spec.Tags["name"]; !has {
-				spec.Tags["name"] = string(id)
-			}
-		default:
-			// Set the first character of the "Name" tag to be uppercase to meet platform requirements
-			if _, has := spec.Tags["Name"]; !has {
-				spec.Tags["Name"] = string(id)
+		match := false
+		for key := range spec.Tags {
+			if strings.ToLower(key) == "name" {
+				match = true
+				break
 			}
 		}
+		if !match {
+			spec.Tags["Name"] = string(id)
+		}
+	}
+	// Use tag to store the logical id
+	if spec.LogicalID != nil {
+		spec.Tags["LogicalID"] = string(*spec.LogicalID)
 	}
 
 	p.optionalProcessHostname(vmType, TResourceName(name), properties)
 
+	// Merge any user-defined tags and convert to platform specific tag type
 	switch vmType {
 	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
 		if t, exists := properties["tags"]; !exists {
@@ -402,12 +405,6 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 	}
 
-	// Use tag to store the logical id
-	if spec.LogicalID != nil {
-		if m, ok := properties["tags"].(map[string]interface{}); ok {
-			m["LogicalID"] = string(*spec.LogicalID)
-		}
-	}
 	switch vmType {
 	case VMAmazon:
 		if p, exists := properties["private_ip"]; exists {
@@ -442,6 +439,16 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	case VMGoogleCloud:
 		// metadata_startup_script
 		addUserData(properties, "metadata_startup_script", spec.Init)
+	}
+
+	// On Softlayer the tags must be lowercase
+	switch vmType {
+	case VMSoftLayer:
+		tagsLower := []string{}
+		for _, val := range properties["tags"].([]string) {
+			tagsLower = append(tagsLower, strings.ToLower(val))
+		}
+		properties["tags"] = tagsLower
 	}
 
 	// Write out each resource again with the instance name
@@ -656,19 +663,29 @@ func terraformTags(m TResourceProperties, key string) map[string]string {
 	}
 	return tags
 }
-func terraformLogicalID(v interface{}) *instance.LogicalID {
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	tags, ok := m["tags"].(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	v, exists := tags["LogicalID"]
-	if exists {
-		id := instance.LogicalID(fmt.Sprintf("%v", v))
-		return &id
+
+// terraformLogicalID parses the LogicalID (case insensitive key check) from
+// either the map of tags or the list of tags
+func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
+	if propsTag, ok := props["tags"]; ok {
+		if tagsMap, ok := propsTag.(map[string]interface{}); ok {
+			for key, val := range tagsMap {
+				if strings.ToLower(key) == "logicalid" {
+					id := instance.LogicalID(fmt.Sprintf("%v", val))
+					return &id
+				}
+			}
+		} else if tagsList, ok := propsTag.([]interface{}); ok {
+			for _, tag := range tagsList {
+				if tagString, ok := tag.(string); ok {
+					if strings.HasPrefix(strings.ToLower(tagString), "logicalid:") {
+						logicalID := strings.SplitN(strings.ToLower(tagString), ":", 2)[1]
+						id := instance.LogicalID(fmt.Sprintf("%v", logicalID))
+						return &id
+					}
+				}
+			}
+		}
 	}
 	return nil
 }
