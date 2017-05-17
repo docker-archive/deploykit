@@ -143,6 +143,15 @@ func NewTemplateFromBytes(buff []byte, contextURL string, opt Options) (*Templat
 	}, nil
 }
 
+// NewFromTemplate creates a new template from existing, without any fetches (hence network calls)
+func NewFromTemplate(from *Template, opt Options) *Template {
+	return &Template{
+		options: opt,
+		url:     from.url,
+		body:    from.body,
+	}
+}
+
 // SetOptions sets the runtime flags for the engine
 func (t *Template) SetOptions(opt Options) *Template {
 	t.lock.Lock()
@@ -164,6 +173,16 @@ func (t *Template) AddFunc(name string, f interface{}) *Template {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.funcs[name] = f
+	return t
+}
+
+// RemoveFunc remove the functions
+func (t *Template) RemoveFunc(name ...string) *Template {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	for _, n := range name {
+		delete(t.funcs, n)
+	}
 	return t
 }
 
@@ -274,10 +293,6 @@ func (t *Template) Funcs() []Function {
 func (t *Template) build(context Context) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-
-	if t.parsed != nil {
-		return nil
-	}
 
 	registered := []Function{}
 	fm := map[string]interface{}{}

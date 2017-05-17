@@ -428,14 +428,7 @@ func (c *Context) Funcs() []template.Function {
 
 // loadBackend determines the backend to use for executing the rendered template text (e.g. run in shell).
 // During this phase, the template delimiters are changed to =% %= so put this in the comment {{/* */}}
-func (c *Context) loadBackends() error {
-	t, err := template.NewTemplate(c.src, template.Options{
-		DelimLeft:  "=%",
-		DelimRight: "%=",
-	})
-	if err != nil {
-		return err
-	}
+func (c *Context) loadBackends(t *template.Template) error {
 	t.AddFunc("print",
 		func() string {
 			c.run = func(script string) error {
@@ -567,34 +560,60 @@ func (c *Context) loadBackends() error {
 			return ""
 		})
 
-	_, err = t.Render(c)
+	_, err := t.Render(c)
+
+	// clean up after we rendered...  remove the functions
+	t.RemoveFunc("sh", "print", "instanceProvision", "managerCommit")
 	return err
+}
+
+func (c *Context) getTemplate() (*template.Template, error) {
+	if c.template == nil {
+		t, err := template.NewTemplate(c.src, template.Options{})
+		if err != nil {
+			return nil, err
+		}
+		c.template = t
+	}
+	return c.template, nil
 }
 
 // BuildFlags from parsing the body which is a template
-func (c *Context) BuildFlags() error {
-	t, err := template.NewTemplate(c.src, template.Options{})
-	if err != nil {
-		return err
-	}
+func (c *Context) BuildFlags() (err error) {
+	var t *template.Template
 
+	t, err = c.getTemplate()
+	if err != nil {
+		return
+	}
+	t.SetOptions(template.Options{})
 	_, err = configureTemplate(t, c.plugins).Render(c)
-	return err
+	return
 }
 
 // Execute runs the command
-func (c *Context) Execute() error {
+func (c *Context) Execute() (err error) {
+	var t *template.Template
 
-	if err := c.loadBackends(); err != nil {
+	t, err = c.getTemplate()
+	if err != nil {
+		return
+	}
+
+	// First pass to get the backends
+	t.SetOptions(template.Options{
+		DelimLeft:  "=%",
+		DelimRight: "%=",
+	})
+
+	if err := c.loadBackends(t); err != nil {
 		return err
 	}
 
-	t, err := template.NewTemplate(c.src, template.Options{
+	// Now regular processing
+	t.SetOptions(template.Options{
 		Stderr: func() io.Writer { return os.Stderr },
 	})
-	if err != nil {
-		return err
-	}
 
 	c.exec = true
 	c.template = t
