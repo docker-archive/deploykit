@@ -27,6 +27,12 @@ Properties:
           Boot:
             Dev: hd
         Devices:
+          Interfaces:
+          - Type: bridge
+            Source:
+              Bridge: virbr0
+            Model:
+              Type: virtio
           Serials:
           - Type: pty
           Consoles:
@@ -34,6 +40,11 @@ Properties:
             Target:
               Type: serial
               Name: "0"
+          Channels:
+          - Type: unix
+            Target:
+              Type: virtio
+              Name: org.qemu.guest_agent.0
         OnCrash: destroy
         OnPoweroff: destroy
         OnReboot: restart

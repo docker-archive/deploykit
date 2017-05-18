@@ -462,11 +462,42 @@ func (p libvirtPlugin) DescribeInstances(tags map[string]string, properties bool
 		}
 		lid := instance.LogicalID(meta.LogicalID)
 		if allMatched {
-			descriptions = append(descriptions, instance.Description{
+			description := instance.Description{
 				ID:        instance.ID(domcfg.Name),
 				LogicalID: &lid,
 				Tags:      instanceTags,
-			})
+			}
+
+			if properties {
+				extra := map[string]interface{}{}
+
+				srcs := []libvirt.DomainInterfaceAddressesSource{
+					libvirt.DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT,
+					libvirt.DOMAIN_INTERFACE_ADDRESSES_SRC_LEASE,
+				}
+
+				for _, src := range srcs {
+					if allifaces, err := d.ListAllInterfaceAddresses(src); err == nil {
+						ifaces := []libvirt.DomainInterface{}
+
+						for _, iface := range allifaces {
+							// Filter out uninteresting interfaces with no addresses
+							if iface.Hwaddr == "" || len(iface.Addrs) == 0 {
+								continue
+							}
+							ifaces = append(ifaces, iface)
+						}
+
+						if len(ifaces) > 0 {
+							extra["interfaces"] = ifaces
+							break
+						}
+					}
+				}
+				description.Properties = types.AnyValueMust(extra)
+			}
+
+			descriptions = append(descriptions, description)
 		}
 
 	}
