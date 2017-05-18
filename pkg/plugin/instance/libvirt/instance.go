@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -106,24 +104,25 @@ func metaSetTags(meta *infrakitMetadata, tags map[string]string) {
 	}
 }
 
+// Properties is the struct which defines spec.Properties for this instance plugin
+type Properties struct {
+	// Domains is the libvirt domain description
+	Domain libvirtxml.Domain
+
+	// MetadataStoragePool is the libvirt storage pool where metadata ISO images should be placed
+	MetadataStoragePool string
+}
+
 // Provision creates a new instance.
 func (p libvirtPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
-	var properties map[string]interface{}
+	properties := Properties{
+		MetadataStoragePool: "default",
+	}
 
 	if spec.Properties != nil {
 		if err := spec.Properties.Decode(&properties); err != nil {
 			return nil, errors.Errorf("Invalid instance properties: %s", err)
 		}
-	}
-
-	if properties["Kernel"] == nil {
-		return nil, errors.New("Property 'Kernel' must be set")
-	}
-	if properties["CPUs"] == nil {
-		properties["CPUs"] = 1
-	}
-	if properties["Memory"] == nil {
-		properties["Memory"] = 512
 	}
 
 	// The name needs to be unique on the host. In the unlikely
@@ -138,41 +137,10 @@ func (p libvirtPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	defer conn.Close()
 
-	domtype, ok := properties["DomainType"].(string)
-	if !ok {
-		domtype = "kvm"
-	}
-	kernel, err := filepath.Abs(properties["Kernel"].(string))
-	if err != nil {
-		return nil, errors.Wrap(err, "Constructing path to kernel")
-	}
-	initrd := ""
-	if initrdprop, ok := properties["Ramdisk"].(string); ok {
-		initrd, err = filepath.Abs(initrdprop)
-		if err != nil {
-			return nil, errors.Wrap(err, "Constructing path to initrd")
-		}
-	}
-	cmdline := ""
-	if properties["Cmdline"] != nil {
-		cmdline = properties["Cmdline"].(string)
-	} else if properties["CmdlineFile"] != nil {
-		f := properties["CmdlineFile"].(string)
-		b, err := ioutil.ReadFile(f)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Reading CmdlineFile: %s", f)
-		}
-		cmdline = string(b)
-	}
-
-	metadataPool := ""
+	metadataPool := properties.MetadataStoragePool
 	metadataVol := ""
 
 	if spec.Init != "" {
-		metadataPool = "default"
-		if pn, ok := properties["MetadataStoragePool"].(string); ok {
-			metadataPool = pn
-		}
 		p, err := conn.LookupStoragePoolByName(metadataPool)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Looking up MetadataStoragePool: %s", metadataPool)
@@ -225,43 +193,16 @@ func (p libvirtPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 	}
 
+	// XXX Check properties.DomainChannels for a Type==unix and Target.Name == "org.qemu.guest_agent.0"
+
 	domcfg := domainWithMetadata{
-		Domain: libvirtxml.Domain{
-			Type:   domtype,
-			VCPU:   &libvirtxml.DomainVCPU{Value: int(properties["CPUs"].(float64))},
-			Memory: &libvirtxml.DomainMemory{Value: int(properties["Memory"].(float64)), Unit: "MiB"},
-			Name:   string(id),
-			OS: &libvirtxml.DomainOS{
-				Type: &libvirtxml.DomainOSType{
-					Type: "hvm",
-				},
-				Kernel:     kernel,
-				Initrd:     initrd,
-				KernelArgs: string(cmdline),
-				BIOS: &libvirtxml.DomainBIOS{
-					UseSerial: "yes",
-				},
-			},
-			Devices: &libvirtxml.DomainDeviceList{
-				Serials: []libvirtxml.DomainChardev{
-					{
-						Type: "pty",
-					},
-				},
-				Consoles: []libvirtxml.DomainChardev{
-					{
-						Type: "pty",
-						Target: &libvirtxml.DomainChardevTarget{
-							Type: "serial",
-							Name: "0",
-						},
-					},
-				},
-			},
-			OnCrash:    "destroy",
-			OnPoweroff: "destroy",
-		},
+		Domain: properties.Domain,
 	}
+
+	if properties.Domain.Name != "" {
+		l.Warnf("Overriding 'Name' property")
+	}
+	domcfg.Domain.Name = string(id)
 
 	logicalID := string(id)
 	if spec.LogicalID != nil {
