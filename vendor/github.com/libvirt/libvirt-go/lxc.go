@@ -60,7 +60,7 @@ func (d *Domain) LxcOpenNamespace(flags uint32) ([]os.File, error) {
 		cfd = *(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cfdlist)) + (unsafe.Sizeof(cfd) * uintptr(i))))
 		fdlist[i] = *os.NewFile(uintptr(cfd), "namespace")
 	}
-	defer C.free(cfdlist)
+	defer C.free(unsafe.Pointer(cfdlist))
 	return fdlist, nil
 }
 
@@ -82,7 +82,7 @@ func (d *Domain) LxcEnterNamespace(fdlist []os.File, flags uint32) ([]os.File, e
 		cfd = *(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(coldfdlist)) + (unsafe.Sizeof(cfd) * uintptr(i))))
 		oldfdlist[i] = *os.NewFile(uintptr(cfd), "namespace")
 	}
-	defer C.free(coldfdlist)
+	defer C.free(unsafe.Pointer(coldfdlist))
 	return oldfdlist, nil
 }
 
