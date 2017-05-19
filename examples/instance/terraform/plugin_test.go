@@ -259,14 +259,13 @@ func run(t *testing.T, resourceType, properties string) {
 			}), conv(props["tags"].([]interface{})))
 			require.Equal(t, expectedUserData2, props["user_metadata"])
 
-			// If a hostname was specified, the expectation is that the hostname is appended with the timestamp from the ID
+			// If a hostname was specified, the expectation is that the hostname is appended with the logical ID
 			if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
-				newID := strings.Replace(string(*id2), "instance-", "", -1)
-				expectedHostname := "softlayer-hostname-" + newID
+				expectedHostname := "softlayer-hostname-logical:id-2"
 				require.Equal(t, expectedHostname, props["hostname"])
 			} else {
-				// If no hostname was specified, the hostname should equal the ID
-				require.Equal(t, string(*id2), props["hostname"])
+				// If no hostname was specified, the hostname should equal the logical ID
+				require.Equal(t, "logical:id-2", props["hostname"])
 			}
 			// Verify the hostname prefix key/value is no longer in the props
 			require.Nil(t, props["@hostname_prefix"])
