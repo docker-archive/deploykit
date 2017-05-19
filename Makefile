@@ -11,6 +11,9 @@ DOCKER_CLIENT_VERSION?=1.24
 # True to run e2e test
 E2E_TESTS?=true
 
+#Source file target
+SRCS  := $(shell find . -type f -name '*.go')
+
 # Allow turning off function inlining and variable registerization
 ifeq (${DISABLE_OPTIMIZATION},true)
 	GO_GCFLAGS=-gcflags "-N -l"
@@ -128,7 +131,7 @@ clean:
 	mkdir -p build
 
 define binary_target_template
-build/$(1):
+build/$(1): $(SRCS)
 	go build -o build/$(1) \
 		-ldflags "-X github.com/docker/infrakit/pkg/cli.Version=$(VERSION) -X github.com/docker/infrakit/pkg/cli.Revision=$(REVISION) -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=$(DOCKER_CLIENT_VERSION)" $(2)
 endef
