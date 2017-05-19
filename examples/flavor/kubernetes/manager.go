@@ -48,6 +48,18 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 			log.Warnf("LogicalID %s has no attachments, which is needed for durability", id)
 		}
 	}
+	ads := map[string]string{}
+	for _, a := range spec.KubeAddOns {
+		if a.Type == "network" || a.Type == "visualise" {
+			ads[a.Type] = a.Name
+		}
+	}
+	if _, ok := ads["network"]; !ok {
+		log.Warnf("No Network addon configured. Your cluster will not be Ready status until apply network addon.")
+	}
+	for k, v := range ads {
+		log.Infof("Type : %v, Name : %v addon will be apply", k, v)
+	}
 	return nil
 }
 

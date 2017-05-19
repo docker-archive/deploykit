@@ -15,3 +15,7 @@ export KUBECONFIG=/etc/kubernetes/admin.conf
     kubectl apply -f {{ NETWORK_ADDON }}
 {{ else }}
 {{ end }}
+{{ if VISUALISE_ADDON }}
+    kubectl apply -f {{ VISUALISE_ADDON }}
+{{ else }}
+{{ end }}

@@ -1,4 +1,4 @@
-InfraKit Flavor Plugin - Swarm
+InfraKit Flavor Plugin - Kubernetes
 ==============================
 
 A [reference](/README.md#reference-implementations) implementation of a Flavor Plugin that creates a [Kubernetes](https://kubernetes.io/) cluster.
@@ -6,16 +6,39 @@ A [reference](/README.md#reference-implementations) implementation of a Flavor P
 ## Schema & Templates
 
 This plugin has a schema that looks like this:
+
+For manager
 ```json
 {
     "InitScriptTemplateURL": "file:///home/ubuntu/go/src/github.com/docker/infrakit/examples/flavor/kubernetes/manager-init.sh",
     "KubeJoinIP": "192.168.2.200",
     "KubeBindPort": 6443,
-    "KubeNWAddOn": "flannel"
+    "KubeAddOns": [
+        {
+            "Name" : "flannel",
+            "Type" : "network",
+            "Path" : ""
+        }
+    ]
+
 }
 ```
-Note that the Kubernetes connection information, as well as what IP in the Kubernetes managers and workers should use
+For workers
+```json
+{
+    "InitScriptTemplateURL": "file:///home/ubuntu/go/src/github.com/docker/infrakit/examples/flavor/kubernetes/worker-init.sh",
+    "KubeJoinIP": "192.168.2.200",
+    "KubeBindPort": 6443,
+}
+ 
+```
+
+Note `KubeJoinIP`, `KubeBindPort` that the Kubernetes connection information, as well as what IP in the Kubernetes managers and workers should use
 to advertise and join.
+
+`KubeAddOns` is list of (kubernetes addons)[https://kubernetes.io/docs/concepts/cluster-administration/addons/]. 
+You can set Type as network or visualise.
+`network` Type addon should be set as your cluster will not be Ready status until network addon is applyed.
 
 This plugin makes heavy use of Golang template to enable customization of instance behavior on startup.  For example,
 the `InitScriptTemplateURL` field above is a URL where a init script template is served.  The plugin will fetch this
@@ -72,8 +95,7 @@ For installation, we use [kubeadm](https://kubernetes.io/docs/admin/kubeadm/) an
 
 ### Building & Running -- An Example
 
-There are scripts in this directory to illustrate how to start up the InfraKit plugin ensemble and examples for creating
-a Docker swarm via vagrant.
+There are scripts in this directory to illustrate how to start up the InfraKit plugin ensemble and examples for creating a kubernetes via vagrant.
 
 Building the binaries - do this from the top level project directory:
 ```shell

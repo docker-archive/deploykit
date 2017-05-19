@@ -11,8 +11,7 @@
                "Properties": {
                    "InitScriptTemplateURL": "file:///home/ubuntu/go/src/github.com/docker/infrakit/examples/flavor/kubernetes/worker-init.sh",
                    "KubeJoinIP": "192.168.2.200",
-                   "KubeBindPort": 6443,
-                   "KubeNWAddOn": "calico"
+                   "KubeBindPort": 6443
                }
            },
            "Instance": {

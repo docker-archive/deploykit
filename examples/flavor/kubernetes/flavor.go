@@ -42,14 +42,21 @@ type Spec struct {
 	// KubeBindPort is the IP for managers and workers to join
 	KubeBindPort int
 
-	// KubeNWAddOn is the networking and network policy provider
-	KubeNWAddOn string
+	// KubeAddOns is the networking and network policy provider
+	KubeAddOns []AddOnInfo
 
 	// KubeClusterID is the ID of Kubernetes Cluster you will deploy.
 	KubeClusterID string
 
 	// SkipManagerValidation is skip to check manager for worker
 	SkipManagerValidation bool
+}
+
+// AddOnInfo is info mation of kubernetes add on information. Type is add on type network and visualise. See https://kubernetes.io/docs/concepts/cluster-administration/addons/
+type AddOnInfo struct {
+	Name string
+	Type string
+	Path string
 }
 
 type baseFlavor struct {
@@ -326,22 +333,27 @@ func (c *templateContext) Funcs() []template.Function {
 			Name:        "NETWORK_ADDON",
 			Description: []string{"Returns the kube network addon"},
 			Func: func() (interface{}, error) {
-				var pfPath string
-				switch c.flavorSpec.KubeNWAddOn {
-				case "flannel":
-					pfPath = "https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"
-
-				case "calico":
-					pfPath = "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"
-
-				case "weave":
-					pfPath = "https://git.io/weave-kube-1.6"
-
-				case "contiv":
-					pfPath = "https://raw.githubusercontent.com/contiv/install/master/install/k8s/k8s1.6/contiv.yaml"
-
+				aPath := ""
+				for _, a := range c.flavorSpec.KubeAddOns {
+					if a.Type == "network" {
+						aPath = a.Path
+					}
 				}
-				return pfPath, nil
+
+				return aPath, nil
+			},
+		},
+		{
+			Name:        "VISUALISE_ADDON",
+			Description: []string{"Returns the kube visualise addon"},
+			Func: func() (interface{}, error) {
+				aPath := ""
+				for _, a := range c.flavorSpec.KubeAddOns {
+					if a.Type == "visualise" {
+						aPath = a.Path
+					}
+				}
+				return aPath, nil
 			},
 		},
 	}
