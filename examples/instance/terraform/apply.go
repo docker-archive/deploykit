@@ -26,8 +26,9 @@ func (p *plugin) terraformApply() error {
 			if err := p.lock.TryLock(); err == nil {
 				defer p.lock.Unlock()
 				doTerraformApply(p.Dir)
+			} else {
+				log.Debugln("Can't acquire lock, waiting")
 			}
-			log.Debugln("Can't acquire lock, waiting")
 			time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
 		}
 	}()
