@@ -288,30 +288,36 @@ func ensureUniqueFile(dir string) string {
 // Special processing of hostname on some platforms. Where supported, you can
 // add a special @hostname_prefix that will allow the setting of hostname in given format
 // TODO - expand this to formatting string
-func (p *plugin) optionalProcessHostname(vmType TResourceType, name TResourceName, properties TResourceProperties) {
+func (p *plugin) optionalProcessHostname(vmType TResourceType, name TResourceName, logicalID *instance.LogicalID, properties TResourceProperties) {
 
 	if properties == nil {
 		return
 	}
 
 	switch vmType {
-	case TResourceType("softlayer_virtual_guest"): // # list the platforms here
+	case VMSoftLayer: // # List the supported platforms here
 	default:
 		return
 	}
-
+	// Use the LogicalID (if set), else the name
+	var hostname string
+	if logicalID == nil {
+		hostname = string(name)
+	} else {
+		hostname = string(*logicalID)
+	}
 	// Use the given hostname value as a prefix if it is a non-empty string
 	if hostnamePrefix, is := properties["@hostname_prefix"].(string); is {
 		hostnamePrefix = strings.Trim(hostnamePrefix, " ")
 		// Use the default behavior if hostnamePrefix was either not a string, or an empty string
 		if hostnamePrefix == "" {
-			properties["hostname"] = string(name)
+			properties["hostname"] = hostname
 		} else {
 			// Remove "instance-" from "instance-XXXX", then append that string to the hostnamePrefix to create the new hostname
-			properties["hostname"] = fmt.Sprintf("%s-%s", hostnamePrefix, strings.Replace(string(name), "instance-", "", -1))
+			properties["hostname"] = fmt.Sprintf("%s-%s", hostnamePrefix, strings.Replace(hostname, "instance-", "", -1))
 		}
 	} else {
-		properties["hostname"] = name
+		properties["hostname"] = hostname
 	}
 	// Delete hostnamePrefix so it will not be written in the *.tf.json file
 	delete(properties, "@hostname_prefix")
@@ -381,7 +387,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		spec.Tags["LogicalID"] = string(*spec.LogicalID)
 	}
 
-	p.optionalProcessHostname(vmType, TResourceName(name), properties)
+	// Optionally append either part of the name or the logical ID to the given hostname
+	p.optionalProcessHostname(vmType, TResourceName(name), spec.LogicalID, properties)
 
 	// Merge any user-defined tags and convert to platform specific tag type
 	switch vmType {
