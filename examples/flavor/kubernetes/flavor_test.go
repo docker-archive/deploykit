@@ -44,7 +44,11 @@ func TestValidate(t *testing.T) {
 	require.NoError(t, workerFlavor.Validate(
 		types.AnyString(`{"KubeJoinIP" : "127.0.0.1", 
 		"KubeBindPort" : 6443, 
-		"KubeNWAddOn" : "flannel", 
+		"KubeAddOns" : [
+			{
+				"Name" : "flannel", 
+				"Type" : "network",
+				"Path" : "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"}],
 		"KubeClusterID" : "test",
 		"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`),
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
@@ -57,7 +61,11 @@ func TestValidate(t *testing.T) {
 	err = managerFlavor.Validate(
 		types.AnyString(`{"KubeJoinIP" : "127.0.0.1", 
 		"KubeBindPort" : 6443, 
-		"KubeNWAddOn" : "flannel", 
+		"KubeAddOns" : [ 
+		    {
+				"Name" : "flannel", 
+				"Type" : "network",
+				"Path" : "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"}],
 		"KubeClusterID" : "test"}`),
 		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2"}})
 	require.Error(t, err)
@@ -81,7 +89,11 @@ func TestManager(t *testing.T) {
 	id := instance.LogicalID("10.20.100.1")
 	flavorSpec := types.AnyString(`{"KubeJoinIP" : "10.20.100.1", 
 		"KubeBindPort" : 6443, 
-		"KubeNWAddOn" : "flannel", 
+		"KubeAddOns" : [ 
+			{
+				"Name" : "flannel", 
+				"Type" : "network",
+				"Path" : "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"}],
 		"KubeClusterID" : "test",
 		"Attachments": {"10.20.100.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`)
 	details, err := managerFlavor.Prepare(flavorSpec,
