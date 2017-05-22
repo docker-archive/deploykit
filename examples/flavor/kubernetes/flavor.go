@@ -211,6 +211,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	})
 	initScript, err = initTemplate.Render(context)
 	instanceSpec.Init = initScript
+	log.Debugf("Init script \n %v\n", initScript)
 	return instanceSpec, nil
 }
 
@@ -330,29 +331,16 @@ func (c *templateContext) Funcs() []template.Function {
 			},
 		},
 		{
-			Name:        "NETWORK_ADDON",
-			Description: []string{"Returns the kube network addon"},
-			Func: func() (interface{}, error) {
+			Name:        "ADDON",
+			Description: []string{"Returns the kubernetes addon"},
+			Func: func(addonType string) (interface{}, error) {
 				aPath := ""
 				for _, a := range c.flavorSpec.KubeAddOns {
-					if a.Type == "network" {
+					if a.Type == addonType {
 						aPath = a.Path
 					}
 				}
 
-				return aPath, nil
-			},
-		},
-		{
-			Name:        "VISUALISE_ADDON",
-			Description: []string{"Returns the kube visualise addon"},
-			Func: func() (interface{}, error) {
-				aPath := ""
-				for _, a := range c.flavorSpec.KubeAddOns {
-					if a.Type == "visualise" {
-						aPath = a.Path
-					}
-				}
 				return aPath, nil
 			},
 		},

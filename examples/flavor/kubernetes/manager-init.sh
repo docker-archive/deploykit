@@ -11,11 +11,11 @@ set -o xtrace
 
 kubeadm init --token {{ KUBEADM_JOIN_TOKEN }}
 export KUBECONFIG=/etc/kubernetes/admin.conf
-{{ if NETWORK_ADDON }}
-    kubectl apply -f {{ NETWORK_ADDON }}
+{{ if ADDON "network" }}
+    kubectl apply -f {{ ADDON "network" }}
 {{ else }}
 {{ end }}
-{{ if VISUALISE_ADDON }}
-    kubectl apply -f {{ VISUALISE_ADDON }}
+{{ if ADDON "visualise" }}
+    kubectl apply -f {{ ADDON "visualise" }}
 {{ else }}
 {{ end }}
