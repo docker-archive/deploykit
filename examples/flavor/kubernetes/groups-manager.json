@@ -1,0 +1,39 @@
+{
+    "Plugin": "group",
+    "Properties": {
+       "ID": "kubernetes-managers",
+       "Properties": {
+           "Allocation": {
+             "LogicalIDs": [
+                "192.168.2.200"
+             ]
+           },
+           "Flavor": {
+               "Plugin": "flavor-kubernetes/manager",
+               "Properties": {
+                   "InitScriptTemplateURL": "file:///home/ubuntu/go/src/github.com/docker/infrakit/examples/flavor/kubernetes/manager-init.sh",
+                   "KubeJoinIP": "192.168.2.200",
+                   "KubeBindPort": 6443,
+                   "KubeAddOns": [
+                       {
+                           "Name" : "calico",
+                           "Type" : "network",
+                           "Path" : "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"
+                       },
+                       {
+                           "Name" : "kubedash",
+                           "Type" : "visualise",
+                           "Path" : "https://git.io/kube-dashboard"
+                       }
+                   ]
+               }
+           },
+           "Instance": {
+               "Plugin": "instance-vagrant",
+               "Properties": {
+                   "Box": "ubuntu/xenial64"
+               }
+           }
+       }
+    }
+}

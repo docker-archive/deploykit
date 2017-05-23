@@ -145,6 +145,7 @@ $(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cm
 $(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/resource)
 $(call define_binary_target,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
 $(call define_binary_target,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
+$(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infrakit/examples/flavor/kubernetes)
 $(call define_binary_target,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
 $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
 $(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
@@ -165,6 +166,7 @@ build-binaries:	build/infrakit \
 		build/infrakit-resource \
 		build/infrakit-flavor-combo \
 		build/infrakit-flavor-swarm \
+		build/infrakit-flavor-kubernetes \
 		build/infrakit-flavor-vanilla \
 		build/infrakit-flavor-zookeeper \
 		build/infrakit-instance-libvirt \

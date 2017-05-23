@@ -1,0 +1,25 @@
+{
+    "Plugin": "group",
+    "Properties": {
+       "ID": "kubernetes-workers",
+       "Properties": {
+           "Allocation": {
+                "Size": 3
+           },
+           "Flavor": {
+               "Plugin": "flavor-kubernetes/manager",
+               "Properties": {
+                   "InitScriptTemplateURL": "file:///home/ubuntu/go/src/github.com/docker/infrakit/examples/flavor/kubernetes/worker-init.sh",
+                   "KubeJoinIP": "192.168.2.200",
+                   "KubeBindPort": 6443
+               }
+           },
+           "Instance": {
+               "Plugin": "instance-vagrant",
+               "Properties": {
+                   "Box": "ubuntu/xenial64"
+               }
+           }
+       }
+    }
+}
