@@ -192,6 +192,61 @@ func TestNoDevices(t *testing.T) {
 	require.False(t, instanceExists(t, plugin, *id), "domain was found in plugin instances after destroy")
 }
 
+// TestLogicalIDNotMAC checks that we do not fail if LogicalID happens to not be a MAC address
+func TestLogicalIDNotMAC(t *testing.T) {
+	conn, err := libvirt.NewConnect(libvirtDrvTest)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	plugin := NewLibvirtPlugin(libvirtDrvTest)
+	require.NotNil(t, plugin)
+
+	props := types.Any(`{
+    "Domain": {
+        "Type": "test",
+        "VCPU": {
+            "Value": 1
+        },
+        "Memory" : {
+            "Unit": "MiB",
+            "Value": 1024
+        },
+        "OS": {
+            "Type": {
+                "Type": "hvm"
+            },
+            "Kernel": "/foo/bar/Image"
+         }
+    }
+}`)
+
+	logicalID := instance.LogicalID("da:37:60:0c:e2:fe")
+
+	id, err := plugin.Provision(instance.Spec{
+		Properties:  &props,
+		Tags:        map[string]string{},
+		Init:        "",
+		LogicalID:   &logicalID,
+		Attachments: []instance.Attachment{},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, id)
+
+	require.True(t, domainExists(t, conn, string(*id)), "domain was not found in libvirt domains")
+	require.True(t, instanceExists(t, plugin, *id), "domain was not found in plugin instances")
+
+	inst := findInstance(t, plugin, *id)
+	require.NotNil(t, inst)
+
+	require.Equal(t, logicalID, *inst.LogicalID)
+
+	err = plugin.Destroy(*id)
+	require.NoError(t, err)
+
+	require.False(t, domainExists(t, conn, string(*id)), "domain was found in libvirt domains after destroy")
+	require.False(t, instanceExists(t, plugin, *id), "domain was found in plugin instances after destroy")
+}
+
 func TestLabel(t *testing.T) {
 	conn, err := libvirt.NewConnect(libvirtDrvTest)
 	require.NoError(t, err)

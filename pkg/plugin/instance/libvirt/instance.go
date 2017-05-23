@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"math/rand"
+	"net"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -207,6 +208,18 @@ func (p libvirtPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	logicalID := string(id)
 	if spec.LogicalID != nil {
 		logicalID = string(*spec.LogicalID)
+		_, err := net.ParseMAC(logicalID)
+		if err == nil && domcfg.Domain.Devices != nil && len(domcfg.Domain.Devices.Interfaces) > 0 {
+			if domcfg.Domain.Devices.Interfaces[0].MAC != nil {
+				l.Warnf("Overriding MAC address of first interface (%q) with logical ID (%q)",
+					domcfg.Domain.Devices.Interfaces[0].MAC.Address, logicalID)
+			}
+			domcfg.Domain.Devices.Interfaces[0].MAC = &libvirtxml.DomainInterfaceMAC{
+				Address: logicalID,
+			}
+		} else {
+			l.Warnf("No Network device to apply logical ID %q to", logicalID)
+		}
 	}
 
 	meta := infrakitMetadata{
