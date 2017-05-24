@@ -1,6 +1,7 @@
 package maxlife
 
 import (
+	"math"
 	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -19,8 +20,7 @@ type Controller struct {
 	poll    time.Duration
 	maxlife time.Duration
 	tags    map[string]string
-
-	stop chan struct{}
+	stop    chan struct{}
 }
 
 // NewController creates a controller based on the given plugin and configurations.
@@ -67,22 +67,16 @@ loop:
 
 func (c *Controller) ensureMaxlife(initialCount int) {
 
-	// Count is used to track the steady state...  we don't want to keep killing instances
-	// if the counts are steadily decreasing.  The idea here is that once we terminate a resource
-	// another one will be resurrected so we will be back to steady state.
-	// Of course it's possible that the size of the cluster actually is decreased.  So we'd
-	// wait for a few samples to get to steady state before we terminate another instance.
-	// Currently we assume damping == 1 or 1 successive samples of delta >= 0 is sufficient to terminate
-	// another instance.
-
-	last := initialCount
 	tick := time.Tick(c.poll)
+
 loop:
 	for {
 
 		select {
 
 		case now := <-tick:
+
+			log.Info("TICK")
 
 			described, err := c.plugin.DescribeInstances(c.tags, false)
 			if err != nil {
@@ -91,22 +85,10 @@ loop:
 				continue
 			}
 
-			// TODO -- we should compute the 2nd derivative wrt time to make sure we
-			// are truly in a steady state...
-
-			current := len(described)
-			delta := current - last
-			last = current
-
-			if current < 2 {
-				log.Info("there are less than 2 instances.  No actions.", "name", c.name)
-				continue
-			}
-
-			if delta < 0 {
-				// Don't do anything if there are fewer instances at this iteration
-				// than the last.  We want to wait until steady state
-				log.Info("fewer instances in this round.  No actions taken", "name", c.name)
+			// If we are not in a steady state, don't destroy the instances.  This is
+			// important so that we don't take down the whole cluster without restraint.
+			if len(described) != initialCount {
+				log.Info("Not steady state yet. No action")
 				continue
 			}
 
@@ -117,6 +99,9 @@ loop:
 
 			// check to make sure the age is over the maxlife
 			if age(oldest, now) > c.maxlife {
+
+				log.Info("Destroying", "oldest", oldest, "age", age(oldest, now), "maxlife", c.maxlife)
+
 				// terminate it and hope the group controller restores with a new intance
 				err = c.plugin.Destroy(oldest.ID)
 				if err != nil {
@@ -135,15 +120,21 @@ loop:
 	return
 }
 
+// age returns the age to the nearest second
 func age(instance instance.Description, now time.Time) (age time.Duration) {
 	link := types.NewLinkFromMap(instance.Tags)
 	if link.Valid() {
 		age = now.Sub(link.Created())
+		age = time.Duration(math.Floor(age.Seconds())) * time.Second
 	}
 	return
 }
 
-func maxAge(instances []instance.Description, now time.Time) instance.Description {
+func maxAge(instances []instance.Description, now time.Time) (result instance.Description) {
+	if len(instances) == 0 || instances == nil {
+		return
+	}
+
 	// check to see if the tags of the instances have links.  Links have a creation date and
 	// we can use it to compute the age
 	var max time.Duration
@@ -155,5 +146,6 @@ func maxAge(instances []instance.Description, now time.Time) instance.Descriptio
 			found = i
 		}
 	}
-	return instances[found]
+	result = instances[found]
+	return
 }
