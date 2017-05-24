@@ -1,12 +1,16 @@
 package group
 
 import (
+	"testing"
+	"time"
+
 	mock_group "github.com/docker/infrakit/pkg/mock/plugin/group"
+	mock_instance "github.com/docker/infrakit/pkg/mock/spi/instance"
+	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
-	"testing"
-	"time"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -94,4 +98,97 @@ func TestRemoveUnknown(t *testing.T) {
 	scaled.EXPECT().Destroy(d)
 
 	quorum.Run()
+}
+
+func TestQuorumPlanUpdateNoChanges(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("quorum")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	settings := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				LogicalIDs: []instance.LogicalID{
+					*a.LogicalID,
+				},
+			},
+		},
+	}
+	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
+	plan, err := quorum.PlanUpdate(scaled, settings, settings)
+	require.NoError(t, err)
+	require.IsType(t, &noopUpdate{}, plan)
+}
+
+func TestQuorumPlanUpdateLogicalIDChange(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("quorum")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	settingsOld := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				LogicalIDs: []instance.LogicalID{
+					*a.LogicalID,
+				},
+			},
+		},
+	}
+	settingsNew := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				LogicalIDs: []instance.LogicalID{
+					*b.LogicalID,
+				},
+			},
+		},
+	}
+	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
+	_, err := quorum.PlanUpdate(scaled, settingsOld, settingsNew)
+	require.Error(t, err)
+}
+
+func TestQuorumPlanUpdateRollingUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("quorum")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	instanceOld := types.InstancePlugin{
+		Plugin: "name-old",
+	}
+	instanceNew := types.InstancePlugin{
+		Plugin: "name-new",
+	}
+	allocation := types.AllocationMethod{
+		LogicalIDs: []instance.LogicalID{
+			*b.LogicalID,
+		},
+	}
+	settingsOld := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: allocation,
+			Instance:   instanceOld,
+		},
+	}
+	settingsNew := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: allocation,
+			Instance:   instanceNew,
+		},
+	}
+	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
+	plan, err := quorum.PlanUpdate(scaled, settingsOld, settingsNew)
+	require.NoError(t, err)
+	require.IsType(t, &rollingupdate{}, plan)
 }

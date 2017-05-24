@@ -3,12 +3,13 @@ package group
 import (
 	"errors"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/spi/group"
-	"github.com/docker/infrakit/pkg/spi/instance"
 	"reflect"
 	"sync"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 // TODO(wfarner): Converge this implementation with scaler.go, they share a lot of behavior.
@@ -36,6 +37,11 @@ func (q *quorum) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 
 	if !reflect.DeepEqual(settings.config.Allocation.LogicalIDs, newSettings.config.Allocation.LogicalIDs) {
 		return nil, errors.New("Logical ID changes to a quorum is not currently supported")
+	}
+
+	if settings.config.InstanceHash() == newSettings.config.InstanceHash() {
+		// This is a no-op update because the instance configuration is unchanged
+		return &noopUpdate{}, nil
 	}
 
 	return &rollingupdate{

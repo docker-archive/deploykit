@@ -6,9 +6,12 @@ import (
 	"time"
 
 	mock_group "github.com/docker/infrakit/pkg/mock/plugin/group"
+	mock_instance "github.com/docker/infrakit/pkg/mock/spi/instance"
+	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -178,4 +181,236 @@ func TestFailToList(t *testing.T) {
 	)
 
 	scaler.Run()
+}
+
+func TestScalerPlanUpdateNoChanges(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("scaler")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	settings := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 1,
+			},
+		},
+	}
+	scaler := NewScalingGroup(groupID, scaled, 1, 1*time.Millisecond, 1)
+	existingInst := instance.Description{
+		ID: instance.ID("id1"),
+		Tags: map[string]string{
+			"infrakit.config_sha": settings.config.InstanceHash(),
+		},
+	}
+	gomock.InOrder(
+		scaled.EXPECT().List().Return([]instance.Description{existingInst}, nil),
+	)
+	plan, err := scaler.PlanUpdate(scaled, settings, settings)
+	require.NoError(t, err)
+	require.IsType(t, &noopUpdate{}, plan)
+}
+
+func TestScalerPlanUpdateRollingUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("scaler")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	settings := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 1,
+			},
+		},
+	}
+	scaler := NewScalingGroup(groupID, scaled, 1, 1*time.Millisecond, 1)
+	existingInst := instance.Description{
+		ID: instance.ID("id1"),
+		Tags: map[string]string{
+			"infrakit.config_sha": "different-hash",
+		},
+	}
+	gomock.InOrder(
+		scaled.EXPECT().List().Return([]instance.Description{existingInst}, nil),
+	)
+	plan, err := scaler.PlanUpdate(scaled, settings, settings)
+	require.NoError(t, err)
+	require.IsType(t, scalerUpdatePlan{}, plan)
+	require.Equal(t,
+		"Performing a rolling update on 1 instances",
+		plan.(scalerUpdatePlan).desc,
+	)
+}
+
+func TestScalerPlanUpdateScaleDown(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("scaler")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	settingsOld := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 2,
+			},
+		},
+	}
+	settingsNew := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 1,
+			},
+		},
+	}
+	scaler := NewScalingGroup(groupID, scaled, 1, 1*time.Millisecond, 1)
+	existingInst := instance.Description{
+		ID: instance.ID("id1"),
+		Tags: map[string]string{
+			"infrakit.config_sha": settingsOld.config.InstanceHash(),
+		},
+	}
+	gomock.InOrder(
+		scaled.EXPECT().List().Return([]instance.Description{existingInst, existingInst}, nil),
+	)
+	plan, err := scaler.PlanUpdate(scaled, settingsOld, settingsNew)
+	require.NoError(t, err)
+	require.IsType(t, scalerUpdatePlan{}, plan)
+	require.Equal(t,
+		"Terminating 1 instances to reduce the group size to 1",
+		plan.(scalerUpdatePlan).desc,
+	)
+}
+
+func TestScalerPlanUpdateScaleDownRollingUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("scaler")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	settingsOld := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 2,
+			},
+		},
+	}
+	settingsNew := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 1,
+			},
+		},
+	}
+	scaler := NewScalingGroup(groupID, scaled, 1, 1*time.Millisecond, 1)
+	existingInst := instance.Description{
+		ID: instance.ID("id1"),
+		Tags: map[string]string{
+			"infrakit.config_sha": "different-hash",
+		},
+	}
+	gomock.InOrder(
+		scaled.EXPECT().List().Return([]instance.Description{existingInst, existingInst}, nil),
+	)
+	plan, err := scaler.PlanUpdate(scaled, settingsOld, settingsNew)
+	require.NoError(t, err)
+	require.IsType(t, scalerUpdatePlan{}, plan)
+	require.Equal(t,
+		"Terminating 1 instances to reduce the group size to 1, then performing a rolling update on 1 instances",
+		plan.(scalerUpdatePlan).desc,
+	)
+}
+
+func TestScalerPlanUpdateScaleUp(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("scaler")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	settingsOld := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 1,
+			},
+		},
+	}
+	settingsNew := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 2,
+			},
+		},
+	}
+	scaler := NewScalingGroup(groupID, scaled, 1, 1*time.Millisecond, 1)
+	existingInst := instance.Description{
+		ID: instance.ID("id1"),
+		Tags: map[string]string{
+			"infrakit.config_sha": settingsOld.config.InstanceHash(),
+		},
+	}
+	gomock.InOrder(
+		scaled.EXPECT().List().Return([]instance.Description{existingInst}, nil),
+	)
+	plan, err := scaler.PlanUpdate(scaled, settingsOld, settingsNew)
+	require.NoError(t, err)
+	require.IsType(t, scalerUpdatePlan{}, plan)
+	require.Equal(t,
+		"Adding 1 instances to increase the group size to 2",
+		plan.(scalerUpdatePlan).desc,
+	)
+}
+
+func TestScalerPlanUpdateScaleUpRollingUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	groupID := group.ID("scaler")
+	scaled := mock_group.NewMockScaled(ctrl)
+	instancePlugin := mock_instance.NewMockPlugin(ctrl)
+	settingsOld := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 1,
+			},
+		},
+	}
+	settingsNew := groupSettings{
+		instancePlugin: instancePlugin,
+		config: types.Spec{
+			Allocation: types.AllocationMethod{
+				Size: 2,
+			},
+		},
+	}
+	scaler := NewScalingGroup(groupID, scaled, 1, 1*time.Millisecond, 1)
+	existingInst := instance.Description{
+		ID: instance.ID("id1"),
+		Tags: map[string]string{
+			"infrakit.config_sha": "different-hash",
+		},
+	}
+	gomock.InOrder(
+		scaled.EXPECT().List().Return([]instance.Description{existingInst}, nil),
+	)
+	plan, err := scaler.PlanUpdate(scaled, settingsOld, settingsNew)
+	require.NoError(t, err)
+	require.IsType(t, scalerUpdatePlan{}, plan)
+	require.Equal(t,
+		"Performing a rolling update on 1 instances, then adding 1 instances to increase the group size to 2",
+		plan.(scalerUpdatePlan).desc,
+	)
 }
