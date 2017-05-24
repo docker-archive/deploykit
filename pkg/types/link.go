@@ -20,24 +20,41 @@ func init() {
 type Link struct {
 	value   string
 	context string
+	created time.Time
 }
 
 // NewLink creates a link
 func NewLink() *Link {
 	return &Link{
-		value: randomAlphaNumericString(16),
+		value:   randomAlphaNumericString(16),
+		created: time.Now(),
 	}
 }
 
-// NewLinkFromMap constructs a link from data in the map
+// Link related labels
+const (
+	LinkLabel        = "infrakit-link"
+	LinkContextLabel = "infrakit-link-context"
+	LinkCreatedLabel = "infrakit-link-created"
+)
+
+// NewLinkFromMap constructs a link from data in the map. The link will have missing data
+// if the input does not contain the attribute labels.
 func NewLinkFromMap(m map[string]string) *Link {
 	l := &Link{}
-	if v, has := m["infrakit-link"]; has {
+	if v, has := m[LinkLabel]; has {
 		l.value = v
 	}
 
-	if v, has := m["infrakit-link-context"]; has {
+	if v, has := m[LinkContextLabel]; has {
 		l.context = v
+	}
+
+	if v, has := m[LinkCreatedLabel]; has {
+		t, err := time.Parse(time.RFC3339, v)
+		if err == nil {
+			l.created = t
+		}
 	}
 	return l
 }
@@ -52,9 +69,14 @@ func (l Link) Value() string {
 	return l.value
 }
 
+// Created returns the creation time of the link
+func (l Link) Created() time.Time {
+	return l.created
+}
+
 // Label returns the label to look for the link
 func (l Link) Label() string {
-	return "infrakit-link"
+	return LinkLabel
 }
 
 // Context returns the context of the link
@@ -80,8 +102,9 @@ func (l *Link) KVPairs() []string {
 // Map returns a representation that is easily converted to JSON or YAML
 func (l *Link) Map() map[string]string {
 	return map[string]string{
-		"infrakit-link":         l.value,
-		"infrakit-link-context": l.context,
+		LinkLabel:        l.value,
+		LinkContextLabel: l.context,
+		LinkCreatedLabel: l.created.Format(time.RFC3339),
 	}
 }
 
@@ -94,7 +117,7 @@ func (l *Link) WriteMap(target map[string]string) {
 
 // InMap returns true if the link is contained in the map
 func (l *Link) InMap(m map[string]string) bool {
-	c, has := m["infrakit-link-context"]
+	c, has := m[LinkContextLabel]
 	if !has {
 		return false
 	}
@@ -102,7 +125,7 @@ func (l *Link) InMap(m map[string]string) bool {
 		return false
 	}
 
-	v, has := m["infrakit-link"]
+	v, has := m[LinkLabel]
 	if !has {
 		return false
 	}

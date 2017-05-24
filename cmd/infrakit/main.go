@@ -19,8 +19,8 @@ import (
 
 	// TODO - deprecate these in favor of the dynamic commands (see above)
 	//_ "github.com/docker/infrakit/cmd/infrakit/flavor"
-	//_ "github.com/docker/infrakit/cmd/infrakit/instance"
 	//_ "github.com/docker/infrakit/cmd/infrakit/group"
+	//_ "github.com/docker/infrakit/cmd/infrakit/instance"
 	//_ "github.com/docker/infrakit/cmd/infrakit/resource"
 
 	_ "github.com/docker/infrakit/cmd/infrakit/event"
@@ -32,6 +32,7 @@ import (
 	_ "github.com/docker/infrakit/cmd/infrakit/remote"
 	_ "github.com/docker/infrakit/cmd/infrakit/template"
 	_ "github.com/docker/infrakit/cmd/infrakit/util"
+	_ "github.com/docker/infrakit/cmd/infrakit/x"
 )
 
 func init() {
