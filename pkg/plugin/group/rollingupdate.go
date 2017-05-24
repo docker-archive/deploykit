@@ -159,5 +159,5 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 }
 
 func (r *rollingupdate) Stop() {
-	r.stop <- true
+	close(r.stop)
 }
