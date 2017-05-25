@@ -57,8 +57,8 @@ deployment:
       - wget https://dl.minio.io/client/mc/release/linux-amd64/mc && chmod a+x ./mc && sudo cp ./mc /usr/local/bin
       - mc config host add $S3_MINIO https://s3.amazonaws.com $S3_KEY_ID $S3_SECRET_KEY S3v4
       - mc policy download $S3_BUCKET
-      - tar cvfz ./$S3_BUILD_PR -C build .
-      - mc cp ./$S3_BUILD_PR $S3_BUCKET/
+      - tar cvfz ./$S3_BUILD_RELEASE -C build .
+      - mc cp ./$S3_BUILD_RELEASE $S3_BUCKET/
 
   docker:
     branch: master
