@@ -5,9 +5,10 @@ InfraKit
 [![Go Report Card](https://goreportcard.com/badge/github.com/docker/infrakit)](https://goreportcard.com/report/github.com/docker/infrakit)
 [![codecov.io](https://codecov.io/github/docker/infrakit/coverage.svg?branch=master&token=z08ZKeIJfA)](https://codecov.io/github/docker/infrakit?branch=master)
 
-_InfraKit_ is a toolkit for creating and managing declarative, self-healing infrastructure.
-It breaks infrastructure automation down into simple, pluggable components.
+_InfraKit_ is a toolkit for infrastructure orchestration.
+With an emphasis on immutable infrastructure, it breaks down infrastructure automation and management processes into small, pluggable components.
 These components work together to actively ensure the infrastructure state matches the user's specifications.
+InfraKit therefore provides infrastructure support for higher-level container orchestration systems and can make your infrastructure self-managing and self-healing.
 
 To get started, try the [tutorial](docs/tutorial.md), or check out the video below:
 
@@ -15,9 +16,10 @@ To get started, try the [tutorial](docs/tutorial.md), or check out the video bel
 
 [![infrakit+linuxkit](./docs/images/infrakit_linuxkit_screencap.png)](https://www.youtube.com/watch?v=j50ovfRWpZM "InfraKit + LinuxKit")
 
-In this video, InfraKit is used to build a custom linux operating system (based on [linuxkit](https://github.com/linuxkit/linuxkit)).
-We then deploy a cluster of virtual machine instances on a local Mac laptop using the Mac Xhyve hypervisor (HyperKit). A cluster
-of 3 servers boot up in seconds and InfraKit orchestrates rolling updates when the custom OS image is updated with a different public key.
+In this video, InfraKit was used to build a custom linux operating system (based on [linuxkit](https://github.com/linuxkit/linuxkit)).
+We then deployed a cluster of virtual machine instances on a local Mac laptop using the Mac Xhyve hypervisor (HyperKit). A cluster
+of 3 servers booted up in seconds.  Later, after the custom OS image has been updated with a new public key, InfraKit detects the
+change and orchestrates a rolling update of the nodes.
 We then deploy the same OS image to a bare-metal ARM server running on [Packet.net](https://packet.net), where the server uses
 custom ipxe boot directly from the localhost.  It demonstrates some of the key concepts and components in InfraKit and shows how
 InfraKit can be used to implement an integrated workflow from custom OS image creation to cluster deployment and Day N management.
@@ -43,7 +45,7 @@ Here is a list of plugins:
 |:--------------------------------------------------------|:---------|:----------------------------------------|
 | [infrakit/group](./cmd/group)                       | group    | core group controller for rolling updates, scale group, etc. |
 | [swarm](./examples/flavor/swarm)                    | flavor   | runs Docker in Swarm mode               |
-| [kubernetes](./examples/flavor/kubernetes)          | flavor   | bootstraps single master k8s cluster    |
+| [kubernetes](./examples/flavor/kubernetes)          | flavor   | bootstraps a single master kubernetes cluster    |
 | [vanilla](./examples/flavor/vanilla)                | flavor   | manual specification of instance fields |
 | [zookeeper](./examples/flavor/zookeeper)            | flavor   | run an Apache ZooKeeper ensemble        |
 | [infrakit/file](./examples/instance/file)           | instance | useful for development and testing      |
