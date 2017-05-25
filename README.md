@@ -62,9 +62,9 @@ Here is a list of plugins:
 | [infrakit/terraform](./examples/instance/terraform) | instance | creates resources using Terraform       |
 | [infrakit/maas](./examples/instance/maas)           | instance | bare-metal provisioning using Ubuntu MAAS  |
 | [infrakit/vagrant](./examples/instance/vagrant)     | instance | creates Vagrant VMs                     |
-| [infrakit/hyperkit](./examples/instance/hyperkit)   | instance | creates Xhyve VMs on Mac OSX            |
-| [infrakit/packet](./examples/instance/packet)       | instance | provisions bare metal hosts on Packet   |
-| [infrakit/libvirt](./examples/instance/libvirt)     | instance | provisions KVM vms via libvirt          |
+| [infrakit/hyperkit](./pkg/plugin/instance/hyperkit)   | instance | creates Xhyve VMs on Mac OSX            |
+| [infrakit/packet](./pkg/plugin/instance/packet)       | instance | provisions bare metal hosts on Packet   |
+| [infrakit/libvirt](./pkg/plugin/instance/libvirt)     | instance | provisions KVM vms via libvirt          |
 | [docker/infrakit.aws](https://github.com/docker/infrakit.aws)       | instance | creates Amazon EC2 instances and other resource types |
 | [docker/infrakit.gcp](https://github.com/docker/infrakit.gcp)       | instance | creates Google Cloud Platform compute instances       |
 | [docker/infrakit.digitalocean](https://github.com/docker/infrakit.digitalocean) | instance | creates DigitalOcean droplets             |
