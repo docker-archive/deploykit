@@ -89,7 +89,7 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 				newSettings.config.Allocation.Size)
 		} else {
 			plan.desc = fmt.Sprintf(
-				"Terminating %d instances to reduce the group size to %d, "+
+				"Terminating %d instances to reduce the group size to %d,"+
 					" then performing a rolling update on %d instances",
 				int(sizeChange)*-1,
 				newSettings.config.Allocation.Size,
