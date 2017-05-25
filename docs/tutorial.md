@@ -5,8 +5,7 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
   + The `file` instance plugin - to provision instances by writing files to disk
   + The `vanilla` flavor plugin - to provide context/ flavor to the configuration of the instances
 
-It may be helpful to familiarize yourself with [plugin discovery](../README.md#plugin-discovery) if you have not already
-done so.
+For more information on plugins and how they work, please see the [docs](./plugins/README.md).
 
 ## Building the binaries
 

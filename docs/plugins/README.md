@@ -8,8 +8,11 @@ API, listening on a unix socket.
 Multiple _InfraKit_ plugins are typically used together to support a declared configuration.  These plugins discover
 each other by looking for socket files in a common plugin directory, and communicate via HTTP.
 
-The default plugin directory is `~/.infrakit/plugins`, and can be overridden with the environment variable
-`INFRAKIT_PLUGINS_DIR`.
+InfraKit stores a number of files (for configurations, plugin socket files, etc.) in a directory tree.  Typically
+the environment variable `INFRAKIT_HOME` designates where the directory is.  It is typically `~/.infrakit`.
+For plugin discovery, the default directory is `~/.infrakit/plugins`, and can be overridden with the environment variable
+`INFRAKIT_PLUGINS_DIR`.  This is the directory where the unix sockets are found.  The name of a socket file corresponds
+to the name the plugin is referenced throughout the system.  For example, a
 
 Note that multiple instances of a plugin may run, provided they have different names for discovery.  This may be useful,
 for example, if a plugin can be configured to behave differently. For example:
@@ -69,42 +72,10 @@ Flavors allow a group of instances to have different characteristics.  In a grou
 all members are treated identically and individual members do not have strong identity.  In a group of pets,
 however, the members may require special handling and demand stronger notions of identity and state.
 
-
-### Reference implementations
-This repository contains several Plugins which should be considered reference implementations for demonstration purposes
-and development aides.  With the exception of those listed as
-[supported](#supported-implementations), Plugins in this repository should be considered **not** to be under active
-development and for use at your own risk.
-
-Over time, we would prefer to phase out reference Plugins that appear to provide real value for implementations that
-are developed independently.  For this reason, please [file an issue](https://github.com/docker/infrakit/issues/new)
-to start a discussion before contributing to these plugins with non-trivial code.
-
-| plugin                                                  | type     | description                             |
-|:--------------------------------------------------------|:---------|:----------------------------------------|
-| [swarm](../../examples/flavor/swarm)                    | flavor   | runs Docker in Swarm mode               |
-| [vanilla](../../examples/flavor/vanilla)                | flavor   | manual specification of instance fields |
-| [zookeeper](../../examples/flavor/zookeeper)            | flavor   | run an Apache ZooKeeper ensemble        |
-| [infrakit/file](../../examples/instance/file)           | instance | useful for development and testing      |
-| [infrakit/terraform](../../examples/instance/terraform) | instance | creates instances using Terraform       |
-| [infrakit/vagrant](../../examples/instance/vagrant)     | instance | creates Vagrant VMs                     |
-
-
-### Supported implementations
-The following Plugins are supported for active development.  Note that these Plugins may not be part of the InfraKit
-project, so please double-check where the code lives before filing InfraKit issues.
-
-| plugin                                                              | type     | description                                           |
-|:--------------------------------------------------------------------|:---------|:------------------------------------------------------|
-| [infrakit/group](../../cmd/group)                                   | group    | supports Instance and Flavor plugins, rolling updates |
-| [docker/infrakit.aws](https://github.com/docker/infrakit.aws)       | instance | creates Amazon EC2 instances                          |
-
-Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
-
 ### Creating a plugin
 A plugin must be an HTTP server that implements one of the plugin [APIs](#apis), listening on a Unix socket.  While
 a plugin can be written in any programming language, [utilities](../../pkg/rpc) are available as libraries to simplify Plugin
-development in Go.  Our [reference implementations](#reference-implementations) should provide a good starting point
+development in Go.  Our [reference implementations](../../examples/instance) should provide a good starting point
 for building a new plugin using these utilities.
 
 #### APIs

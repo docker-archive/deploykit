@@ -5,9 +5,10 @@ InfraKit
 [![Go Report Card](https://goreportcard.com/badge/github.com/docker/infrakit)](https://goreportcard.com/report/github.com/docker/infrakit)
 [![codecov.io](https://codecov.io/github/docker/infrakit/coverage.svg?branch=master&token=z08ZKeIJfA)](https://codecov.io/github/docker/infrakit?branch=master)
 
-_InfraKit_ is a toolkit for creating and managing declarative, self-healing infrastructure.
-It breaks infrastructure automation down into simple, pluggable components.
+_InfraKit_ is a toolkit for infrastructure orchestration.
+With an emphasis on immutable infrastructure, it breaks down infrastructure automation and management processes into small, pluggable components.
 These components work together to actively ensure the infrastructure state matches the user's specifications.
+InfraKit therefore provides infrastructure support for higher-level container orchestration systems and can make your infrastructure self-managing and self-healing.
 
 To get started, try the [tutorial](docs/tutorial.md), or check out the video below:
 
@@ -15,24 +16,71 @@ To get started, try the [tutorial](docs/tutorial.md), or check out the video bel
 
 [![infrakit+linuxkit](./docs/images/infrakit_linuxkit_screencap.png)](https://www.youtube.com/watch?v=j50ovfRWpZM "InfraKit + LinuxKit")
 
-In this video, InfraKit is used to build a custom linux operating system (based on [linuxkit](https://github.com/linuxkit/linuxkit))
-and deploy a cluster of virtual machine instances from a local Mac laptop to a bare-metal ARM server running on [Packet.net](https://packet.net).
-It demonstrates some of the key concepts and components in InfraKit and shows how InfraKit can be used to implement an integrated
-workflow from custom OS image creation to cluster deployment and Day N management.
+In this video, InfraKit was used to build a custom linux operating system (based on [linuxkit](https://github.com/linuxkit/linuxkit)).
+We then deployed a cluster of virtual machine instances on a local Mac laptop using the Mac Xhyve hypervisor (HyperKit). A cluster
+of 3 servers booted up in seconds.  Later, after the custom OS image has been updated with a new public key, InfraKit detects the
+change and orchestrates a rolling update of the nodes.
+We then deploy the same OS image to a bare-metal ARM server running on [Packet.net](https://packet.net), where the server uses
+custom ipxe boot directly from the localhost.  It demonstrates some of the key concepts and components in InfraKit and shows how
+InfraKit can be used to implement an integrated workflow from custom OS image creation to cluster deployment and Day N management.
+The entire demo is published as a [playbook](docs/playbooks/README.md), and you can create your own playbooks too.
 
-### Who InfraKit is for
+### Use Cases
 
-_InfraKit_ is designed to support setup and management of base infrastructure.  For example, it can help you manage a
-system like a cluster or container orchestrator, ideally relieving you of building custom release and maintenance tools.
-As a result, it is a low-level tool intended to be used by infrastructure operators directly or indirectly
-(as a toolkit) through a higher-level tool.  Since _InfraKit_ is pluggable, it allows you to manage resources in diverse
-environments while using shared components and consistent interfaces.
+_InfraKit_ is designed to automate setup and management of infrastructure in support of distributed systems and higher-level
+container orchestration systems.  Some of the use cases we are working on include:
+
+  + Bootstrap / installation of container orchestration systems like Docker Swarm and Kubernetes
+  + Cluster autoscaler that can work across a variety of platforms from public clouds (like AWS autoscaling groups) to
+  bare-metal hosts.
+  + GPU cluster provisioning
+  + Integration with LinuxKit for building and deploying immutable infrastructure from declarative specifications of the entire stack:
+  from infrastructure resources to os / kernel and applications.
+  + Day-N management and automation of infrastructure - from provisioning to rolling updates and capacity scaling.
+
+InfraKit has a modular architecture with a set of interfaces which define the interactions of these 'plugin objects'.
+Plugins are active daemons that cooperate with one another to ensure the infrastructure state matches your specifications.
+
 
 ## Plugins
 _InfraKit_ makes extensive use of _Plugins_ to manage arbitrary systems in diverse environments, which can be composed
-to meet different needs.
+to meet different needs. See the [plugins](docs/plugins) documentation for more technical details.
 
-See the [plugins](docs/plugins) documentation for more details.
+Here is a list of plugins:
+
+### Core Implementations
+
+| plugin                                                  | type     | description                             |
+|:--------------------------------------------------------|:---------|:----------------------------------------|
+| [infrakit/group](./cmd/group)                       | group    | core group controller for rolling updates, scale group, etc. |
+| [swarm](./examples/flavor/swarm)                    | flavor   | runs Docker in Swarm mode               |
+| [kubernetes](./examples/flavor/kubernetes)          | flavor   | bootstraps a single master kubernetes cluster    |
+| [vanilla](./examples/flavor/vanilla)                | flavor   | manual specification of instance fields |
+| [zookeeper](./examples/flavor/zookeeper)            | flavor   | run an Apache ZooKeeper ensemble        |
+| [infrakit/file](./examples/instance/file)           | instance | useful for development and testing      |
+| [infrakit/docker](./examples/instance/docker)       | instance | provisions container via Docker         |
+| [infrakit/terraform](./examples/instance/terraform) | instance | creates resources using Terraform       |
+| [infrakit/maas](./examples/instance/maas)           | instance | bare-metal provisioning using Ubuntu MAAS  |
+| [infrakit/vagrant](./examples/instance/vagrant)     | instance | creates Vagrant VMs                     |
+| [infrakit/hyperkit](./examples/instance/hyperkit)   | instance | creates Xhyve VMs on Mac OSX            |
+| [infrakit/packet](./examples/instance/packet)       | instance | provisions bare metal hosts on Packet   |
+| [infrakit/libvirt](./examples/instance/libvirt)     | instance | provisions KVM vms via libvirt          |
+| [docker/infrakit.aws](https://github.com/docker/infrakit.aws)       | instance | creates Amazon EC2 instances and other resource types |
+| [docker/infrakit.gcp](https://github.com/docker/infrakit.gcp)       | instance | creates Google Cloud Platform compute instances       |
+| [docker/infrakit.digitalocean](https://github.com/docker/infrakit.digitalocean) | instance | creates DigitalOcean droplets             |
+
+### Community Implementations
+
+| plugin                                                  | type     | description                             |
+|:--------------------------------------------------------|:---------|:----------------------------------------|
+| [HewlettPackard/infrakit-instance-oneview](https://github.com/HewlettPackard/infrakit-instance-oneview)      | instance    | bare-metal server provisioning via HP-OneView |
+| [codedellemc/infrakit.rackhd](https://github.com/codedellemc/infrakit.rackhd)      | instance    | bare-metal server provisioning via RackHD |
+| [IBM Bluemix / SoftLayer](./examples/instance/terraform) | instance    | SoftLayer via terraform             |
+| [AliyunContainerService/infrakit.aliyun](https://github.com/AliyunContainerService/infrakit.aliyun) | instance    | Provisions instances on Alibaba Cloud |
+| [1and1/infrakit-instance-oneandone](https://github.com/1and1/infrakit-instance-oneandone) | instance    | Provisions instances on 1&1 Cloud Server |
+
+
+Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
 
 
 ## Building
@@ -82,8 +130,16 @@ This will produce binaries for tools and several reference Plugin implementation
     an Instance plugin integrating [Terraform](https://www.terraform.io)
   + [`infrakit-instance-vagrant`](examples/instance/vagrant):
     an Instance plugin using [Vagrant](https://www.vagrantup.com/)
+  + [`infrakit-instance-docker`](examples/instance/docker):
+    an Instance plugin for provisioning Docker containers via the Docker API
   + [`infrakit-instance-maas`](examples/instance/maas):
-    an Instance plugin using [MaaS](https://maas.io)
+    an Instance plugin using [MaaS](https://maas.io) to provision bare metal servers
+  + [`infrakit-instance-hyperkit`](pkg/plugin/instance/hyperkit):
+    an Instance plugin using [HyperKit](https://github.com/docker/hyperkit) to provision Xhyve-based guest vm's on Mac OSX
+  + [`infrakit-instance-libvirt`](pkg/plugin/instance/libvirt):
+    an Instance plugin using libvirt to provision KVM / QEMU vm instances
+  + [`infrakit-instance-packet`](pkg/plugin/instance/packet):
+    an Instance plugin for provisioning bare-metal servers from [Packet.net](https://packet.net)
   + [`infrakit-flavor-vanilla`](examples/flavor/vanilla):
     a Flavor plugin for plain vanilla set up with user data and labels
   + [`infrakit-flavor-zookeeper`](examples/flavor/zookeeper):
