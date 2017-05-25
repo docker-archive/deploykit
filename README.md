@@ -11,12 +11,14 @@ These components work together to actively ensure the infrastructure state match
 
 To get started, try the [tutorial](docs/tutorial.md), or check out the video below:
 
-### InfraKit + LinuxKit POC
+### InfraKit + [LinuxKit](https://github.com/linuxkit/linuxkit) POC
 
 [![infrakit+linuxkit](./docs/images/infrakit_linuxkit_screencap.png)](https://www.youtube.com/watch?v=j50ovfRWpZM "InfraKit + LinuxKit")
 
-In this video, InfraKit is used to build and deploy a cluster of virtual machine instances from a local Mac laptop to
-a bare-metal ARM server running on Packet.net.  It demonstrates some of the key concepts and components in InfraKit.
+In this video, InfraKit is used to build a custom linux operating system (based on [linuxkit](https://github.com/linuxkit/linuxkit))
+and deploy a cluster of virtual machine instances from a local Mac laptop to a bare-metal ARM server running on [Packet.net](https://packet.net).
+It demonstrates some of the key concepts and components in InfraKit and shows how InfraKit can be used to implement an integrated
+workflow from custom OS image creation to cluster deployment and Day N management.
 
 ### Who InfraKit is for
 
