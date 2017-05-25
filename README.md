@@ -25,13 +25,22 @@ custom ipxe boot directly from the localhost.  It demonstrates some of the key c
 InfraKit can be used to implement an integrated workflow from custom OS image creation to cluster deployment and Day N management.
 The entire demo is published as a [playbook](docs/playbooks/README.md), and you can create your own playbooks too.
 
-### Who InfraKit is for
+### Use Cases
 
-_InfraKit_ is designed to support setup and management of base infrastructure.  For example, it can help you manage a
-system like a cluster or container orchestrator, ideally relieving you of building custom release and maintenance tools.
-As a result, it is a low-level tool intended to be used by infrastructure operators directly or indirectly
-(as a toolkit) through a higher-level tool.  Since _InfraKit_ is pluggable, it allows you to manage resources in diverse
-environments while using shared components and consistent interfaces.
+_InfraKit_ is designed to automate setup and management of infrastructure in support of distributed systems and higher-level
+container orchestration systems.  Some of the use cases we are working on include:
+
+  + Bootstrap / installation of container orchestration systems like Docker Swarm and Kubernetes
+  + Cluster autoscaler that can work across a variety of platforms from public clouds (like AWS autoscaling groups) to
+  bare-metal hosts.
+  + GPU cluster provisioning
+  + Integration with LinuxKit for building and deploying immutable infrastructure from declarative specifications of the entire stack:
+  from infrastructure resources to os / kernel and applications.
+  + Day-N management and automation of infrastructure - from provisioning to rolling updates and capacity scaling.
+
+InfraKit has a modular architecture with a set of interfaces which define the interactions of these 'plugin objects'.
+Plugins are active daemons that cooperate with one another to ensure the infrastructure state matches your specifications.
+
 
 ## Plugins
 _InfraKit_ makes extensive use of _Plugins_ to manage arbitrary systems in diverse environments, which can be composed
@@ -128,7 +137,7 @@ This will produce binaries for tools and several reference Plugin implementation
   + [`infrakit-instance-hyperkit`](pkg/plugin/instance/hyperkit):
     an Instance plugin using [HyperKit](https://github.com/docker/hyperkit) to provision Xhyve-based guest vm's on Mac OSX
   + [`infrakit-instance-libvirt`](pkg/plugin/instance/libvirt):
-    an Instance plugin using [HyperKit](https://github.com/docker/hyperkit) to provision Xhyve-based guest vm's on Mac OSX
+    an Instance plugin using libvirt to provision KVM / QEMU vm instances
   + [`infrakit-instance-packet`](pkg/plugin/instance/packet):
     an Instance plugin for provisioning bare-metal servers from [Packet.net](https://packet.net)
   + [`infrakit-flavor-vanilla`](examples/flavor/vanilla):
