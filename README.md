@@ -6,12 +6,17 @@ InfraKit
 [![codecov.io](https://codecov.io/github/docker/infrakit/coverage.svg?branch=master&token=z08ZKeIJfA)](https://codecov.io/github/docker/infrakit?branch=master)
 
 _InfraKit_ is a toolkit for creating and managing declarative, self-healing infrastructure.
-It breaks infrastructure automation down into simple, pluggable components. These components work together to actively
-ensure the infrastructure state matches the user's specifications.
-Although _InfraKit_ emphasizes primitives for building self-healing infrastructure, it also can be used passively like
-conventional tools.
+It breaks infrastructure automation down into simple, pluggable components.
+These components work together to actively ensure the infrastructure state matches the user's specifications.
 
-To get started, try the [tutorial](docs/tutorial.md).
+To get started, try the [tutorial](docs/tutorial.md), or check out the video below:
+
+### InfraKit + LinuxKit POC
+
+[![infrakit+linuxkit](./docs/images/infrakit_linuxkit_screencap.png)](https://www.youtube.com/watch?v=j50ovfRWpZM "InfraKit + LinuxKit")
+
+In this video, InfraKit is used to build and deploy a cluster of virtual machine instances from a local Mac laptop to
+a bare-metal ARM server running on Packet.net.  It demonstrates some of the key concepts and components in InfraKit.
 
 ### Who InfraKit is for
 

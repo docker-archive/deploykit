@@ -1,4 +1,4 @@
-# A Quick Tutorial
+# A Quick Tour of InfraKit
 
 To illustrate the concept of working with Group, Flavor, and Instance plugins, we use a simple setup composed of
   + The default `group` plugin - to manage a collection of instances
@@ -8,10 +8,32 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
 It may be helpful to familiarize yourself with [plugin discovery](../README.md#plugin-discovery) if you have not already
 done so.
 
+## Building the binaries
+
 First, build the plugins:
 ```shell
 $ make binaries
 ```
+
+## Starting up InfraKit
+
+InfraKit is made up of a collection of small microservice controllers that are commonly referred to as 'plugins'.
+'Plugins' implement different Service Provider Interfaces in InfraKit:
+
+   + The 'Instance' SPI is concerned with provisioning a resource
+   + The 'Metadata' SPI provides a cluster-wide 'sysfs' where readable properties about the cluster are exposed
+   and accessible as paths like a filesystem.
+   + The 'Event' SPI allows the client to subscribe to topics (discoverable as paths) for events that are generated
+   by the resources and controllers in the cluster.  For example, you could have a topic called `aws/ec2-instance/lost`
+   that you can subscribe to receive notification when ec2 instances are lost in the cluster due to crashes or
+   terminations.
+
+InfraKit can be run in different ways such as in Docker containers or as simple daemons.  Here we are
+going with the simple daemons that are built from source.  For a quick start with pre-built Docker containers,
+you can take a look at the [Playbook](./playbooks/README.md).
+
+There are many different plugins that InfraKit can use to provision resources.
+In this tutorial we use the very basic file plugin, which simply creates files on disk.
 
 Start the default Group plugin
 
@@ -37,18 +59,117 @@ $ build/infrakit-flavor-vanilla
 INFO[0000] Listening at: ~/.infrakit/plugins/flavor-vanilla
 ```
 
+## The CLI
+
+As a user, you typically interact with the cluster and resources you provisioned via the `infrakit` CLI.
+The CLI can connect to local system as well as remote clusters (called 'remotes').
+
+Which remote or local target to connect to is controlled by the `INFRAKIT_HOST` environment variable.
+When this variable is unset or not defined, `infrakit` CLI will look at local plugins which are
+discoverable on your localhost at `$INFRAKIT_HOME/plugins`.
+
+To see, add or remove remotes, you would use the `infrakit remote` subcommand. For example:
+
+```shell
+$ build/infrakit remote ls
+HOST                          	URL LIST
+docker4mac                    	localhost:24864
+if1                           	54.219.137.138:24864
+swarm1                        	52.53.247.176:24864,54.215.167.235:24864,54.193.100.40:24864
+test1                         	54.215.224.155:24864
+```
+
+Once a 'remote' has been added, you can change the target of the CLI by setting the `INFRAKIT_HOST`
+environment variable.
+
+The `infrakit` CLI dynamically configures itself based on the set of plugins it has access to.
+
 Show the plugins:
 
 ```shell
 $ build/infrakit plugin ls
-Plugins:
-NAME                    LISTEN
-flavor-vanilla          ~/.infrakit/plugins/flavor-vanilla
-group                   ~/.infrakit/plugins/group
-instance-file           ~/.infrakit/plugins/instance-file
+INTERFACE           LISTEN                                            NAME
+Flavor/0.1.0        /Users/davidchung/.infrakit/plugins/flavor-vanillaflavor-vanilla
+Group/0.1.0         /Users/davidchung/.infrakit/plugins/group         group
+Metadata/0.1.0      /Users/davidchung/.infrakit/plugins/group         group
+Instance/0.5.0      /Users/davidchung/.infrakit/plugins/instance-file instance-file
 ```
 
-Note the names of the plugin.  We will use the names in the `--name` flag of the plugin CLI to refer to them.
+Doing a simple `infrakit -h` will show all the possible commands and options:
+
+```shell
+$ build/infrakit -h
+
+
+infrakit command line interface
+
+Usage:
+  infrakit [command]
+
+Available Commands:
+  event          Access event exposed by infrakit plugins
+  flavor-vanilla Access plugin flavor-vanilla which implements Flavor/0.1.0
+  group          Access plugin group which implements Group/0.1.0,Metadata/0.1.0
+  instance-file  Access plugin instance-file which implements Instance/0.5.0
+  manager        Access the manager
+  metadata       Access metadata exposed by infrakit plugins
+  playbook       Manage playbooks
+  plugin         Manage plugins
+  remote         Manage remotes
+  template       Render an infrakit template at given url.  If url is '-', read from stdin
+  util           Utilties
+  version        Print build version information
+  x              Experimental features
+
+Flags:
+      --httptest.serve string   if non-empty, httptest.NewServer serves on this address and blocks
+      --log int                 log level (default 4)
+      --log-caller              include caller function (default true)
+      --log-format string       log format: logfmt|term|json (default "term")
+      --log-stack               include caller stack
+      --log-stdout              log to stdout
+```
+
+Note that in this case, we have three commands that are dynamically created for accessing
+the running `flavor-vanilla`, `group`, `instance-file` plugins:
+
+```
+  flavor-vanilla Access plugin flavor-vanilla which implements Flavor/0.1.0
+  group          Access plugin group which implements Group/0.1.0,Metadata/0.1.0
+  instance-file  Access plugin instance-file which implements Instance/0.5.0
+```
+
+For example:
+
+```shell
+$ build/infrakit instance-file -h
+
+
+Access plugin instance-file which implements Instance/0.5.0
+
+Usage:
+  infrakit instance-file [command]
+
+Available Commands:
+  describe    Describe all managed instances across all groups, subject to filter
+  destroy     Destroy the instance
+  info        print plugin info
+  provision   Provisions an instance.  Read from stdin if url is '-'
+  validate    Validates an flavor config.  Read from stdin if url is '-'
+```
+
+The verbs as available commands are available based on the interface the plugin object implements.
+
+To list all the 'file' instances we have managed by the `instance-file` plugin, we simply do this:
+
+```shell
+infrakit@ Wed May 24-16:24:09 demo % infrakit instance-file describe
+ID                            	LOGICAL                       	TAGS
+```
+
+At this point, we have no instances under management.  So let's provision some.
+
+## Provision a Group of Instances
 
 Now we must create the JSON for a group.  You will find that the JSON structures follow a pattern:
 
@@ -111,39 +232,47 @@ some criteria.
 Checking for the instances via the CLI:
 
 ```shell
-$ build/infrakit instance --name instance-file describe
+$ build/infrakit instance-file describe
 ID                              LOGICAL                         TAGS
 ```
 
 Let's tell the group plugin to `commit` our group by providing the group plugin with the configuration:
 
 ```shell
-$ build/infrakit group commit cattle.json
+$ build/infrakit group commit ./cattle.json
 Committed cattle: Managing 5 instances
+```
+
+Checking with the group plugin, we should see a group called `cattle`:
+
+```shell
+$ build/infrakit group ls
+ID
+cattle
 ```
 
 The group plugin is responsible for ensuring that the infrastructure state matches with your specifications.  Since we
 started out with nothing, it will create 5 instances and maintain that state by monitoring the instances:
 ```shell
 $ build/infrakit group describe cattle
-ID                             	LOGICAL                        	TAGS
-instance-5993795900014843850   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
-instance-6529053068646043018   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
-instance-7203714904652099824   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
-instance-8430289623921829870   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
-instance-9014687032220994836   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+ID                            	LOGICAL                       	TAGS
+instance-4582464082013813178  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
+instance-4657666275748037214  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
+instance-5419344861148823408  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
+instance-6391471917728203585  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
+instance-7797144284686029457  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
 The Instance Plugin can also report instances, it will report all instances across all groups (not just `cattle`).
 
 ```shell
-$ build/infrakit instance --name instance-file describe
-ID                             	LOGICAL                        	TAGS
-instance-5993795900014843850   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
-instance-6529053068646043018   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
-instance-7203714904652099824   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
-instance-8430289623921829870   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
-instance-9014687032220994836   	  -                            	infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y=,infrakit.group=cattle,project=infrakit,tier=web
+$ build/infrakit instance-file describe
+ID                            	LOGICAL                       	TAGS
+instance-4582464082013813178  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
+instance-4657666275748037214  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
+instance-5419344861148823408  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
+instance-6391471917728203585  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
+instance-7797144284686029457  	  -                           	infrakit.config_sha=x4nrsdaibscmj7awpkxzx5vvpt6pilw2,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
 At any point you can safely `free` a group.  This is a non-destructive action, which instructs _InfraKit_ to cease
@@ -159,12 +288,6 @@ $ build/infrakit group commit cattle.json
 Committed cattle: Managing 5 instances
 ```
 
-Check which groups are being managed:
-```shell
-$ build/infrakit group ls
-ID
-cattle
-```
 
 Now let's update the configuration by changing the size of the group and a property of the instance.  Save this file as
 `cattle2.json`:
@@ -233,45 +356,67 @@ Committed cattle: Performing a rolling update on 5 instances, then adding 5 inst
 If we poll the group, we can see state will converging until all instances have been updated:
 ```shell
 $ build/infrakit group describe cattle
-ID                             	LOGICAL                        	TAGS
-instance-1422140834255860063   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1478871890164117825   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1507972539885141336   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1665488406863611296   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-2340140454359833670   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-2796731287627125229   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-285480170677988698    	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-4084455402433225349   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-5591036640758692177   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-6810420924276316298   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+ID                            	LOGICAL                       	TAGS
+instance-4857202356361893780  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-5331231286773283071  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-5527424552965675861  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-6711510839918342232  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-6870580757786415410  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-7164654173522392740  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-7416472420378252869  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-7470730388550100679  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-7585119672637883592  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-8916238683700118734  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
-Note the instances now have a new SHA `eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=` (vs `006438mMXW8gXeYtUxgf9Zbg94Y_M60vIq7CufFmQWk=` previously)
+Note the instances now have a new SHA `jpfedp4sefvncwye5b6yre5qoz2odtnd` while perviously we had `x4nrsdaibscmj7awpkxzx5vvpt6pilw2`.
 
 To see that the Group plugin can enforce the size of the group, let's simulate an instance disappearing.
 
+For comparison, we capture the listing before we destroy instances
 ```shell
-$ rm tutorial/instance-1422140834255860063 tutorial/instance-1478871890164117825 tutorial/instance-1507972539885141336
+$ build/nfrakit group describe cattle > before
 ```
 
-After a few moments, the missing instances will be replaced (we've highlighted new instances with `-->`):
+```shell
+$ rm ./tutorial/instance-4857202356361893780 ./tutorial/instance-8916238683700118734
+```
+
+After a few moments, let's capture the listing
+```shell
+$ build/nfrakit group describe cattle > after
+```
+
+A quick diff shows that 2 instances have been replaced:
+
+```shell
+$ diff before after
+2c2,3
+< instance-4857202356361893780  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+---
+> instance-2554519562373330601  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+> instance-3947516675797073281  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+11d11
+< instance-8916238683700118734  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+```
+
+Let's look at the instances:
 ```shell
 $ build/infrakit group describe cattle
-ID                             	LOGICAL                        	TAGS
---> instance-1265288729718091217   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-1665488406863611296   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
---> instance-1952247477026188949   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-2340140454359833670   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-2796731287627125229   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-285480170677988698    	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-4084455402433225349   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
---> instance-4161733946225446641   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-5591036640758692177   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
-instance-6810420924276316298   	  -                            	infrakit.config_sha=eB2JuP0c5Sf41X5e2vc2gJ4ZTVg=,infrakit.group=cattle,project=infrakit,tier=web
+ID                            	LOGICAL                       	TAGS
+instance-2554519562373330601  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-3947516675797073281  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-5331231286773283071  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-5527424552965675861  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-6711510839918342232  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-6870580757786415410  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-7164654173522392740  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-7416472420378252869  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-7470730388550100679  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
+instance-7585119672637883592  	  -                           	infrakit.config_sha=jpfedp4sefvncwye5b6yre5qoz2odtnd,infrakit.group=cattle,project=infrakit,tier=web
 ```
 
-We see that 3 new instance have been created to replace the three removed, to match our
-original specification of 10 instances.
+We are back to 10 instances.
 
 Finally, let's clean up:
 
@@ -288,3 +433,11 @@ This concludes our quick tutorial.  In this tutorial we:
   + Applied the update across the group
   + Removed some instances and observed that the group self-healed
   + Destroyed the group
+
+
+## Next Step
+
+Now that you have completed the tutorial, it's time to explore the Playbooks.  Playbooks are 'scripts' that can
+be shared and reused.  Playbooks can drive the `infrakit` CLI by defining new commands and flags.  A good one to
+start is the [LinuxKit playbook](./docs/playbooks/linuxkit),
+where we explore integration with [LinuxKit](https://github.com/linuxkit/linuxkit).
