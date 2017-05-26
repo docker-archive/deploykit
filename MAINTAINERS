@@ -11,8 +11,10 @@
 [Org]
 	[Org."Core maintainers"]
 		people = [
-			"chungers",
-			"wfarner"
+		       "chungers",
+		       "kaufers",
+		       "ndegory",
+		       "YujiOshima"
 		]
 
 [people]
@@ -28,7 +30,18 @@
 	Email = "david.chung@docker.com"
 	GitHub = "chungers"
 
-	[people.wfarner]
-	Name = "Bill Farner"
-	Email = "bill.farner@docker.com"
-	GitHub = "wfarner"
+	[people.kaufers]
+	Name = "Steven Kaufer"
+	Email = "kaufer@us.ibm.com"
+	GitHub = "kaufer"
+
+	[people.ndegory]
+	Name = "Nicolas Degory"
+	Email = "nicolas.degory@gmail.com"
+	GitHub = "ndegory"
+
+	[people.YujiOshima]
+	Name = "Yuji Oshima"
+	Email = "yuji.oshima0x3fd@gmail.com"
+	GitHub = "YujiOshima"
+
