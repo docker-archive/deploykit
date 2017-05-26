@@ -33,7 +33,7 @@
 	[people.kaufers]
 	Name = "Steven Kaufer"
 	Email = "kaufer@us.ibm.com"
-	GitHub = "kaufer"
+	GitHub = "kaufers"
 
 	[people.ndegory]
 	Name = "Nicolas Degory"
@@ -44,4 +44,3 @@
 	Name = "Yuji Oshima"
 	Email = "yuji.oshima0x3fd@gmail.com"
 	GitHub = "YujiOshima"
-
