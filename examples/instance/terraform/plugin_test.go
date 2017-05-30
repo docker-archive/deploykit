@@ -478,3 +478,70 @@ func TestFirst(t *testing.T) {
 	require.Equal(t, TResourceName("first-name"), name)
 	require.Equal(t, TResourceProperties{"k1": "v1", "k2": "v2"}, props)
 }
+
+// getPlugin returns the terraform instance plugin to use for testing and the
+// directory where the .tf.json files should be stored
+func getPlugin(t *testing.T) (instance.Plugin, string) {
+	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
+	require.NoError(t, err)
+	terraform := NewTerraformInstancePlugin(dir)
+	terraform.(*plugin).pretend = true
+	return terraform, dir
+}
+
+func TestValidateInvalidJSON(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	config := types.AnyString("not-going-to-decode")
+	err := terraform.Validate(config)
+	require.Error(t, err)
+}
+
+func TestValidate(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	// Should fail with 2 VMs
+	props := map[string]map[TResourceType]TResourceProperties{
+		"resource": {
+			VMSoftLayer: TResourceProperties{},
+			VMAmazon:    TResourceProperties{},
+		},
+	}
+	config, err := json.Marshal(props)
+	require.NoError(t, err)
+	err = terraform.Validate(types.AnyBytes(config))
+	require.Error(t, err)
+	require.True(t, strings.HasPrefix(
+		err.Error(),
+		"zero or 1 vm instance per request:"),
+		fmt.Sprintf("Error does not have correct prefix: %v", err.Error()),
+	)
+	// And pass with 1
+	delete(props["resource"], VMAmazon)
+	require.Equal(t, 1, len(props["resource"]))
+	config, err = json.Marshal(props)
+	require.NoError(t, err)
+	err = terraform.Validate(types.AnyBytes(config))
+	require.NoError(t, err)
+	// And pass with 0
+	delete(props["resource"], VMSoftLayer)
+	require.Empty(t, props["resource"])
+	config, err = json.Marshal(props)
+	require.NoError(t, err)
+	err = terraform.Validate(types.AnyBytes(config))
+	require.NoError(t, err)
+}
+
+func TestAddUserDataNoMerge(t *testing.T) {
+	m := map[string]interface{}{}
+	addUserData(m, "key", "init")
+	require.Equal(t, 1, len(m))
+	require.Equal(t, "init", m["key"])
+}
+
+func TestAddUserDataMerge(t *testing.T) {
+	m := map[string]interface{}{"key": "before"}
+	addUserData(m, "key", "init")
+	require.Equal(t, 1, len(m))
+	require.Equal(t, "before\ninit", m["key"])
+}
