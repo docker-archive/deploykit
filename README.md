@@ -78,7 +78,7 @@ Here is a list of plugins:
 | [IBM Bluemix / SoftLayer](./examples/instance/terraform) | instance    | SoftLayer via terraform             |
 | [AliyunContainerService/infrakit.aliyun](https://github.com/AliyunContainerService/infrakit.aliyun) | instance    | Provisions instances on Alibaba Cloud |
 | [1and1/infrakit-instance-oneandone](https://github.com/1and1/infrakit-instance-oneandone) | instance    | Provisions instances on 1&1 Cloud Server |
-
+| [sacloud/infrakit-instance-sakuracloud](https://github.com/sacloud/infrakit.sakuracloud) | instance    | Provisions instances on Sakura Cloud |
 
 Have a Plugin you'd like to share?  Submit a Pull Request to add yourself to the list!
 
