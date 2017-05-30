@@ -435,3 +435,46 @@ func conv(a []interface{}) []string {
 	sort.Strings(sa)
 	return sa
 }
+
+func TestFindVMNoResource(t *testing.T) {
+	tformat := TFormat{}
+	_, _, _, err := FindVM(&tformat)
+	require.Error(t, err)
+	require.Equal(t, "no resource section", err.Error())
+}
+
+func TestFindVMEmptyResource(t *testing.T) {
+	m := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	tformat := TFormat{Resource: m}
+	_, _, _, err := FindVM(&tformat)
+	require.Error(t, err)
+	require.Equal(t, "not found", err.Error())
+}
+
+func TestFindVM(t *testing.T) {
+	typeMap := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	nameMap := make(map[TResourceName]TResourceProperties)
+	nameMap["some-name"] = TResourceProperties{"foo": "bar"}
+	typeMap[VMSoftLayer] = nameMap
+	tformat := TFormat{Resource: typeMap}
+	vmType, vmName, props, err := FindVM(&tformat)
+	require.NoError(t, err)
+	require.Equal(t, VMSoftLayer, vmType)
+	require.Equal(t, TResourceName("some-name"), vmName)
+	require.Equal(t, TResourceProperties{"foo": "bar"}, props)
+}
+
+func TestFirstEmpty(t *testing.T) {
+	vms := make(map[TResourceName]TResourceProperties)
+	name, props := first(vms)
+	require.Equal(t, TResourceName(""), name)
+	require.Nil(t, props)
+}
+
+func TestFirst(t *testing.T) {
+	vms := make(map[TResourceName]TResourceProperties)
+	vms["first-name"] = TResourceProperties{"k1": "v1", "k2": "v2"}
+	name, props := first(vms)
+	require.Equal(t, TResourceName("first-name"), name)
+	require.Equal(t, TResourceProperties{"k1": "v1", "k2": "v2"}, props)
+}
