@@ -724,3 +724,294 @@ func TestOptionalProcessHostnameWithEmptyStringPrefix(t *testing.T) {
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "instance-1234", props["hostname"])
 }
+
+func TestRenderInstIDVarNoReplace(t *testing.T) {
+	result, err := renderInstIDVar("{}", instance.ID("id"))
+	require.NoError(t, err)
+	require.Equal(t, "{}", result)
+}
+
+func TestRenderInstIDVar(t *testing.T) {
+	input := `{
+ "id": "{{ var "/self/instId" }}",
+ "key": "val"
+}`
+	expected := `{
+ "id": "id",
+ "key": "val"
+}`
+	result, err := renderInstIDVar(input, instance.ID("id"))
+	require.NoError(t, err)
+	require.JSONEq(t, expected, result)
+}
+
+func TestLabelNoFiles(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	err := p.Label(instance.ID("ID"), nil)
+	require.Error(t, err)
+}
+
+func TestLabelInvalidFile(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	id := "instance-1234"
+	err := afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), []byte("not-json"), 0644)
+	require.NoError(t, err)
+	err = p.Label(instance.ID(id), nil)
+	require.Error(t, err)
+}
+
+func TestLabelNoVM(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	id := "instance-1234"
+	// No VM data in instance definition
+	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	tformat := TFormat{Resource: inst}
+	buff, err := json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	require.NoError(t, err)
+	err = p.Label(instance.ID(id), nil)
+	require.Error(t, err)
+	require.True(t, strings.HasPrefix("not found:", err.Error()))
+}
+
+func TestLabelCreateNewTags(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+
+	// Create a file without any tags for each VMType
+	for index, vmType := range VMTypes {
+		inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
+		id := fmt.Sprintf("instance-%v", index)
+		key := vmType.(TResourceType)
+		inst[key] = map[TResourceName]TResourceProperties{
+			TResourceName(id): {
+				fmt.Sprintf("key-%v", index): fmt.Sprintf("val-%v", index),
+			},
+		}
+		tformat := TFormat{Resource: inst}
+		buff, err := json.MarshalIndent(tformat, " ", " ")
+		require.NoError(t, err)
+		err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+		require.NoError(t, err)
+	}
+
+	// Add some labels
+	labels := map[string]string{
+		"label1": "value1",
+		"label2": "value2",
+	}
+	for index := range VMTypes {
+		id := fmt.Sprintf("instance-%v", index)
+		err := p.Label(instance.ID(id), labels)
+		require.NoError(t, err)
+	}
+
+	// Verify that the labels were added
+	for index, vmType := range VMTypes {
+		id := fmt.Sprintf("instance-%v", index)
+		buff, err := ioutil.ReadFile(filepath.Join(p.Dir, id+".tf.json"))
+		require.NoError(t, err)
+		tf := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tf)
+		require.NoError(t, err)
+		actualVMType, vmName, props, err := FindVM(&tf)
+		require.NoError(t, err)
+		require.Equal(t, vmType, actualVMType)
+		require.Equal(t, TResourceName(id), vmName)
+		_, contains := props["tags"]
+		require.True(t, contains)
+		if vmType == VMSoftLayer {
+			// Tags as list
+			expectedTags := []string{"label1:value1", "label2:value2"}
+			actualTags := []string{}
+			for _, tag := range props["tags"].([]interface{}) {
+				actualTags = append(actualTags, tag.(string))
+			}
+			sort.Strings(actualTags)
+			require.Equal(t, expectedTags, actualTags)
+		} else {
+			// Tags are map
+			require.Equal(t,
+				map[string]interface{}{
+					"label1": "value1",
+					"label2": "value2",
+				},
+				props["tags"],
+			)
+		}
+	}
+}
+
+func TestLabelMergeTags(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+
+	// Create a file with existing tags for each VMType
+	for index, vmType := range VMTypes {
+		inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
+		id := fmt.Sprintf("instance-%v", index)
+		key := vmType.(TResourceType)
+		var tags interface{}
+		if vmType == VMSoftLayer {
+			tags = []string{"tag1:val1", "tag2:val2"}
+		} else {
+			tags = map[string]string{"tag1": "val1", "tag2": "val2"}
+		}
+		inst[key] = map[TResourceName]TResourceProperties{
+			TResourceName(id): {
+				fmt.Sprintf("key-%v", index): fmt.Sprintf("val-%v", index),
+				"tags": tags,
+			},
+		}
+		tformat := TFormat{Resource: inst}
+		buff, err := json.MarshalIndent(tformat, " ", " ")
+		require.NoError(t, err)
+		err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+		require.NoError(t, err)
+	}
+
+	// Add some labels
+	labels := map[string]string{
+		"label1": "value1",
+		"label2": "value2",
+	}
+	for index := range VMTypes {
+		id := fmt.Sprintf("instance-%v", index)
+		err := p.Label(instance.ID(id), labels)
+		require.NoError(t, err)
+	}
+
+	// Verify that the labels were added
+	for index, vmType := range VMTypes {
+		id := fmt.Sprintf("instance-%v", index)
+		buff, err := ioutil.ReadFile(filepath.Join(p.Dir, id+".tf.json"))
+		require.NoError(t, err)
+		tf := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tf)
+		require.NoError(t, err)
+		actualVMType, vmName, props, err := FindVM(&tf)
+		require.NoError(t, err)
+		require.Equal(t, vmType, actualVMType)
+		require.Equal(t, TResourceName(id), vmName)
+		_, contains := props["tags"]
+		require.True(t, contains)
+		if vmType == VMSoftLayer {
+			// Tags as list
+			expectedTags := []string{"label1:value1", "label2:value2", "tag1:val1", "tag2:val2"}
+			actualTags := []string{}
+			for _, tag := range props["tags"].([]interface{}) {
+				actualTags = append(actualTags, tag.(string))
+			}
+			sort.Strings(actualTags)
+			require.Equal(t, expectedTags, actualTags)
+		} else {
+			// Tags are map
+			require.Equal(t,
+				map[string]interface{}{
+					"tag1":   "val1",
+					"tag2":   "val2",
+					"label1": "value1",
+					"label2": "value2",
+				},
+				props["tags"],
+			)
+		}
+	}
+}
+
+func TestTerraformTagsEmpty(t *testing.T) {
+	// No tags
+	props := TResourceProperties{"foo": "bar"}
+	result := terraformTags(props, "tags")
+	require.Equal(t, map[string]string{}, result)
+	// Invalid type
+	props = TResourceProperties{
+		"foo":  "bar",
+		"tags": true,
+	}
+	result = terraformTags(props, "tags")
+	require.Equal(t, map[string]string{}, result)
+}
+
+func TestTerraformTagsMap(t *testing.T) {
+	props := TResourceProperties{
+		"foo": "bar",
+		"tags": map[string]interface{}{
+			"t1": "v1",
+			"t2": "v2",
+			"t3": "v3:extra",
+		},
+	}
+	result := terraformTags(props, "tags")
+	require.Equal(t,
+		map[string]string{"t1": "v1", "t2": "v2", "t3": "v3:extra"},
+		result,
+	)
+}
+
+func TestTerraformTagsList(t *testing.T) {
+	props := TResourceProperties{
+		"foo": "bar",
+		"tags": []interface{}{
+			"t1:v1",
+			"t2:v2",
+			"t3:v3:extra",
+		},
+	}
+	result := terraformTags(props, "tags")
+	require.Equal(t,
+		map[string]string{"t1": "v1", "t2": "v2", "t3": "v3:extra"},
+		result,
+	)
+}
+
+func TestTerraformLogicalIDNoID(t *testing.T) {
+	// As map
+	props := TResourceProperties{"tags": map[string]string{}}
+	id := terraformLogicalID(props)
+	require.Nil(t, id)
+	// As list
+	props = TResourceProperties{"tags": []interface{}{}}
+	id = terraformLogicalID(props)
+	require.Nil(t, id)
+	// Invalid type
+	props = TResourceProperties{"tags": true}
+	id = terraformLogicalID(props)
+	require.Nil(t, id)
+}
+
+func TestTerraformLogicalIDFromMap(t *testing.T) {
+	props := TResourceProperties{
+		"tags": map[string]interface{}{
+			"foo":       "bar",
+			"lOGiCALid": "logical-id",
+		},
+	}
+	id := terraformLogicalID(props)
+	require.Equal(t, instance.LogicalID("logical-id"), *id)
+}
+
+func TestTerraformLogicalIDFromList(t *testing.T) {
+	props := TResourceProperties{
+		"tags": []interface{}{
+			"foo:bar",
+			"lOGiCALid:logical-id:val",
+		},
+	}
+	id := terraformLogicalID(props)
+	require.Equal(t, instance.LogicalID("logical-id:val"), *id)
+}
