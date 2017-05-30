@@ -13,6 +13,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
 
@@ -544,4 +545,182 @@ func TestAddUserDataMerge(t *testing.T) {
 	addUserData(m, "key", "init")
 	require.Equal(t, 1, len(m))
 	require.Equal(t, "before\ninit", m["key"])
+}
+
+func TestScanLocalFilesNoFiles(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	vms, err := p.scanLocalFiles()
+	require.NoError(t, err)
+	require.Empty(t, vms)
+}
+
+func TestScanLocalFilesNoVms(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	// Create a valid file without a VM type
+	m := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	tformat := TFormat{Resource: m}
+	buff, err := json.Marshal(tformat)
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-12345.tf.json"), buff, 0644)
+	require.NoError(t, err)
+	_, err = p.scanLocalFiles()
+	require.Error(t, err)
+	require.Equal(t, "not found", err.Error())
+}
+
+func TestScanLocalFiles(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+
+	// Create a few valid files, same type
+	inst1 := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	inst1[VMSoftLayer] = map[TResourceName]TResourceProperties{
+		"instance-12": {"key1": "val1"},
+	}
+	tformat := TFormat{Resource: inst1}
+	buff, err := json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-12.tf.json"), buff, 0644)
+	require.NoError(t, err)
+
+	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	inst2[VMSoftLayer] = map[TResourceName]TResourceProperties{
+		"instance-34": {"key2": "val2"},
+	}
+	tformat = TFormat{Resource: inst2}
+	buff, err = json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-34.tf.json"), buff, 0644)
+	require.NoError(t, err)
+
+	// And another type
+	inst3 := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	inst3[VMAmazon] = map[TResourceName]TResourceProperties{
+		"instance-56": {"key3": "val3"},
+	}
+	tformat = TFormat{Resource: inst3}
+	buff, err = json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-56.tf.json"), buff, 0644)
+	require.NoError(t, err)
+
+	// Should get 2 different resource types, 2 VMs for softlayer and 1 for AWS
+	vms, err := p.scanLocalFiles()
+	require.NoError(t, err)
+	require.Equal(t, 2, len(vms))
+	softlayerVMs, contains := vms[VMSoftLayer]
+	require.True(t, contains)
+	require.Equal(t, 2, len(softlayerVMs))
+	require.Equal(t,
+		softlayerVMs[TResourceName("instance-12")],
+		TResourceProperties{"key1": "val1"},
+	)
+	require.Equal(t,
+		softlayerVMs[TResourceName("instance-34")],
+		TResourceProperties{"key2": "val2"},
+	)
+	awsVMs, contains := vms[VMAmazon]
+	require.True(t, contains)
+	require.Equal(t, 1, len(awsVMs))
+	require.Equal(t,
+		awsVMs[TResourceName("instance-56")],
+		TResourceProperties{"key3": "val3"},
+	)
+}
+
+func TestOptionalProcessHostnameNoProperties(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	p.optionalProcessHostname(VMSoftLayer, "instance-1234", nil, nil)
+}
+
+func TestOptionalProcessHostnameWrongVMType(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	props := TResourceProperties{"@hostname_prefix": "hostname"}
+	// AWS does not honor the property
+	p.optionalProcessHostname(VMAmazon, "instance-1234", nil, props)
+	require.Equal(t, 1, len(props))
+	require.Equal(t, "hostname", props["@hostname_prefix"])
+}
+
+func TestOptionalProcessHostnameNoPrefixNoLogicalID(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	props := TResourceProperties{}
+	p.optionalProcessHostname(VMSoftLayer, "instance-1234", nil, props)
+	require.Equal(t, 1, len(props))
+	require.Equal(t, "instance-1234", props["hostname"])
+}
+
+func TestOptionalProcessHostnameNoPrefixWithLogicalID(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	logicalID := instance.LogicalID("logical-id")
+	props := TResourceProperties{}
+	p.optionalProcessHostname(VMSoftLayer, "instance-1234", &logicalID, props)
+	require.Equal(t, 1, len(props))
+	require.Equal(t, "logical-id", props["hostname"])
+}
+
+func TestOptionalProcessHostnameWithPrefixNoLogicalID(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	props := TResourceProperties{"@hostname_prefix": "prefix"}
+	p.optionalProcessHostname(VMSoftLayer, "instance-1234", nil, props)
+	require.Equal(t, 1, len(props))
+	require.Equal(t, "prefix-1234", props["hostname"])
+}
+
+func TestOptionalProcessHostnameWithPrefixWithLogicalID(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	logicalID := instance.LogicalID("logical-id")
+	props := TResourceProperties{"@hostname_prefix": "prefix"}
+	p.optionalProcessHostname(VMSoftLayer, "instance-1234", &logicalID, props)
+	require.Equal(t, 1, len(props))
+	require.Equal(t, "prefix-logical-id", props["hostname"])
+}
+
+func TestOptionalProcessHostnameWithNonStringPrefix(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	logicalID := instance.LogicalID("logical-id")
+	props := TResourceProperties{"@hostname_prefix": 1, "hostname": "hostname"}
+	p.optionalProcessHostname(VMSoftLayer, "instance-1234", &logicalID, props)
+	require.Equal(t, 1, len(props))
+	require.Equal(t, "logical-id", props["hostname"])
+}
+
+func TestOptionalProcessHostnameWithEmptyStringPrefix(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	props := TResourceProperties{"@hostname_prefix": "", "hostname": "hostname"}
+	p.optionalProcessHostname(VMSoftLayer, "instance-1234", nil, props)
+	require.Equal(t, 1, len(props))
+	require.Equal(t, "instance-1234", props["hostname"])
 }
