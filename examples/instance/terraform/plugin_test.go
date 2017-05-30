@@ -1015,3 +1015,138 @@ func TestTerraformLogicalIDFromList(t *testing.T) {
 	id := terraformLogicalID(props)
 	require.Equal(t, instance.LogicalID("logical-id:val"), *id)
 }
+
+func TestDestroyInstanceNotExists(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	err := terraform.Destroy(instance.ID("id"))
+	require.Error(t, err)
+}
+
+func TestDestroy(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	id := "instance-1234"
+	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	tformat := TFormat{Resource: inst}
+	buff, err := json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	require.NoError(t, err)
+	result := terraform.Destroy(instance.ID(id))
+	require.Nil(t, result)
+	// The file has been removed
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 0)
+}
+
+func TestDescribeNoFiles(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	results, err := terraform.DescribeInstances(map[string]string{}, false)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, results)
+}
+
+func TestDescribe(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+
+	// Instance1, unique tag and shared tag
+	inst1 := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	id1 := "instance-1"
+	tags1 := []string{"tag1:val1", "tagShared:valShared"}
+	inst1[VMSoftLayer] = map[TResourceName]TResourceProperties{
+		TResourceName(id1): {"tags": tags1},
+	}
+	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id1)), buff, 0644)
+	require.NoError(t, err)
+	// Instance1, unique tag and shared tag
+	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	id2 := "instance-2"
+	tags2 := map[string]string{"tag2": "val2", "tagShared": "valShared"}
+	inst2[VMAzure] = map[TResourceName]TResourceProperties{
+		TResourceName(id2): {"tags": tags2},
+	}
+	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id2)), buff, 0644)
+	require.NoError(t, err)
+	// Instance1, unique tag only
+	inst3 := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	id3 := "instance-3"
+	tags3 := map[string]string{"tag3": "val3"}
+	inst3[VMAmazon] = map[TResourceName]TResourceProperties{
+		TResourceName(id3): {"tags": tags3},
+	}
+	buff, err = json.MarshalIndent(TFormat{Resource: inst3}, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id3)), buff, 0644)
+	require.NoError(t, err)
+
+	// First instance matches
+	results, err := terraform.DescribeInstances(
+		map[string]string{"tag1": "val1"},
+		false)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(results))
+	require.Equal(t, instance.ID(id1), results[0].ID)
+	results, err = terraform.DescribeInstances(
+		map[string]string{"tag1": "val1", "tagShared": "valShared"},
+		false)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(results))
+	require.Equal(t, instance.ID(id1), results[0].ID)
+
+	// Second instance matches
+	results, err = terraform.DescribeInstances(
+		map[string]string{"tag2": "val2"},
+		false)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(results))
+	require.Equal(t, instance.ID(id2), results[0].ID)
+
+	// Both instances matches
+	results, err = terraform.DescribeInstances(
+		map[string]string{"tagShared": "valShared"},
+		false)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(results))
+	var ids []instance.ID
+	for _, result := range results {
+		ids = append(ids, result.ID)
+	}
+	require.Contains(t, ids, instance.ID(id1))
+	require.Contains(t, ids, instance.ID(id2))
+
+	// No instances match
+	results, err = terraform.DescribeInstances(
+		map[string]string{"tag1": "val1", "tagShared": "valShared", "foo": "bar"},
+		false)
+	require.NoError(t, err)
+	require.Empty(t, results)
+	results, err = terraform.DescribeInstances(
+		map[string]string{"TAG2": "val2"},
+		false)
+	require.NoError(t, err)
+	require.Empty(t, results)
+
+	// All instances match (no tags passed)
+	results, err = terraform.DescribeInstances(map[string]string{}, false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(results))
+	ids = []instance.ID{}
+	for _, result := range results {
+		ids = append(ids, result.ID)
+	}
+	require.Contains(t, ids, instance.ID(id1))
+	require.Contains(t, ids, instance.ID(id2))
+	require.Contains(t, ids, instance.ID(id3))
+}
