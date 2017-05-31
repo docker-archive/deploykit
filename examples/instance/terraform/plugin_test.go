@@ -17,9 +17,265 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUsage(t *testing.T) {
+// getPlugin returns the terraform instance plugin to use for testing and the
+// directory where the .tf.json files should be stored
+func getPlugin(t *testing.T) (instance.Plugin, string) {
+	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
+	require.NoError(t, err)
+	terraform := NewTerraformInstancePlugin(dir)
+	terraform.(*plugin).pretend = true
+	return terraform, dir
+}
+
+func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
+	logicalID := instance.LogicalID("logical-id-1")
+	// Spec with logical ID
+	spec := instance.Spec{
+		Properties:  nil,
+		Tags:        map[string]string{},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   &logicalID,
+	}
+	for _, vmType := range VMTypes {
+		props := TResourceProperties{}
+		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
+		tags := props["tags"]
+		var expectedTags interface{}
+		if vmType == VMSoftLayer {
+			sort.Strings(props["tags"].([]string))
+			// Note that tags are all lowercase
+			expectedTags = []string{
+				"logicalid:logical-id-1",
+				"name:instance-1234"}
+		} else {
+			expectedTags = map[string]string{
+				"LogicalID": "logical-id-1",
+				"Name":      "instance-1234"}
+		}
+		require.Equal(t, expectedTags, tags)
+	}
+}
+
+func TestHandleProvisionTagsEmptyTagsNoLogicalID(t *testing.T) {
+	// Spec without logical ID
+	spec := instance.Spec{
+		Properties:  nil,
+		Tags:        map[string]string{},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   nil,
+	}
+	for _, vmType := range VMTypes {
+		props := TResourceProperties{}
+		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
+		tags := props["tags"]
+		var expectedTags interface{}
+		if vmType == VMSoftLayer {
+			expectedTags = []string{"name:instance-1234"}
+		} else {
+			expectedTags = map[string]string{"Name": "instance-1234"}
+		}
+		require.Equal(t, expectedTags, tags)
+	}
+}
+
+func TestHandleProvisionTagsWithTagsLogicalID(t *testing.T) {
+	logicalID := instance.LogicalID("logical-id-1")
+	// Spec with logical ID
+	spec := instance.Spec{
+		Properties: nil,
+		Tags: map[string]string{
+			"name": "existing-name",
+			"foo":  "bar"},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   &logicalID,
+	}
+	for _, vmType := range VMTypes {
+		props := TResourceProperties{}
+		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
+		tags := props["tags"]
+		var expectedTags interface{}
+		if vmType == VMSoftLayer {
+			sort.Strings(props["tags"].([]string))
+			// Note that tags are all lowercase
+			expectedTags = []string{
+				"foo:bar",
+				"logicalid:logical-id-1",
+				"name:existing-name"}
+		} else {
+			expectedTags = map[string]string{
+				"LogicalID": "logical-id-1",
+				"name":      "existing-name",
+				"foo":       "bar"}
+		}
+		require.Equal(t, expectedTags, tags)
+	}
+}
+
+func TestHandleProvisionTagsWithTagsNoLogicalID(t *testing.T) {
+	// Spec without logical ID
+	spec := instance.Spec{
+		Properties: nil,
+		Tags: map[string]string{
+			"Name": "existing-name",
+			"foo":  "bar"},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   nil,
+	}
+	for _, vmType := range VMTypes {
+		props := TResourceProperties{}
+		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
+		tags := props["tags"]
+		var expectedTags interface{}
+		if vmType == VMSoftLayer {
+			sort.Strings(props["tags"].([]string))
+			expectedTags = []string{"foo:bar", "name:existing-name"}
+		} else {
+			expectedTags = map[string]string{"Name": "existing-name", "foo": "bar"}
+		}
+		require.Equal(t, expectedTags, tags)
+	}
+}
+
+func TestMergeInitScriptNoUserDefined(t *testing.T) {
+	for _, vmType := range VMTypes {
+		initData := "pwd\nls"
+		spec := instance.Spec{
+			Properties:  nil,
+			Tags:        map[string]string{},
+			Init:        initData,
+			Attachments: []instance.Attachment{},
+			LogicalID:   nil,
+		}
+		// Input properites do not have init data
+		props := TResourceProperties{}
+		mergeInitScript(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
+		switch vmType {
+		case VMAmazon, VMDigitalOcean:
+			require.Equal(t,
+				TResourceProperties{"user_data": base64.StdEncoding.EncodeToString([]byte(initData))},
+				props)
+		case VMSoftLayer:
+			require.Equal(t,
+				TResourceProperties{"user_metadata": initData},
+				props)
+		case VMAzure:
+			require.Equal(t,
+				TResourceProperties{"os_profile": map[string]interface{}{"custom_data": initData}},
+				props)
+		case VMGoogleCloud:
+			require.Equal(t,
+				TResourceProperties{"metadata_startup_script": initData},
+				props)
+		default:
+			require.Fail(t, fmt.Sprintf("Init script not handled for type: %v", initData))
+		}
+	}
+}
+
+func TestMergeInitScriptWithUserDefined(t *testing.T) {
+	for _, vmType := range VMTypes {
+		initData := "pwd\nls"
+		spec := instance.Spec{
+			Properties:  nil,
+			Tags:        map[string]string{},
+			Init:        initData,
+			Attachments: []instance.Attachment{},
+			LogicalID:   nil,
+		}
+		instanceUserData := "set\nifconfig"
+		expectedInit := fmt.Sprintf("%s\n%s", instanceUserData, initData)
+
+		// Configure the input properties with init data
+		props := TResourceProperties{}
+		switch vmType {
+		case VMAmazon, VMDigitalOcean:
+			props["user_data"] = instanceUserData
+		case VMSoftLayer:
+			props["user_metadata"] = instanceUserData
+		case VMAzure:
+			props["os_profile"] = map[string]interface{}{"custom_data": instanceUserData}
+		case VMGoogleCloud:
+			props["metadata_startup_script"] = instanceUserData
+		default:
+			require.Fail(t, fmt.Sprintf("Init script not handled for type: %v", vmType))
+		}
+		// Merge the spec init data with the input properties
+		mergeInitScript(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
+		switch vmType {
+		case VMAmazon, VMDigitalOcean:
+			require.Equal(t,
+				TResourceProperties{"user_data": base64.StdEncoding.EncodeToString([]byte(expectedInit))},
+				props)
+		case VMSoftLayer:
+			require.Equal(t,
+				TResourceProperties{"user_metadata": expectedInit},
+				props)
+		case VMAzure:
+			require.Equal(t,
+				TResourceProperties{"os_profile": map[string]interface{}{"custom_data": expectedInit}},
+				props)
+		case VMGoogleCloud:
+			require.Equal(t,
+				TResourceProperties{"metadata_startup_script": expectedInit},
+				props)
+		default:
+			require.Fail(t, fmt.Sprintf("Init script not handled for type: %v", vmType))
+		}
+	}
+}
+
+func TestProvisionNoResources(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	spec := instance.Spec{
+		Properties:  types.AnyString("{}"),
+		Tags:        map[string]string{},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   nil,
+	}
+	_, err := terraform.Provision(spec)
+	require.Error(t, err)
+	require.Equal(t, "no resource section", err.Error())
+}
+
+func TestProvisionNoVM(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	spec := instance.Spec{
+		Properties:  types.AnyString("{\"resource\": {}}"),
+		Tags:        map[string]string{},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   nil,
+	}
+	_, err := terraform.Provision(spec)
+	require.Error(t, err)
+	require.Equal(t, "not found", err.Error())
+}
+
+func TestProvisionNoVMProperties(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	spec := instance.Spec{
+		Properties:  types.AnyString("{\"resource\": {\"aws_instance\": {}}}"),
+		Tags:        map[string]string{},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   nil,
+	}
+	_, err := terraform.Provision(spec)
+	require.Error(t, err)
+	require.Equal(t, "no-vm-instance-in-spec", err.Error())
+}
+
+func TestRunValidateProvisionDescribe(t *testing.T) {
 	// Test a softlayer_virtual_guest with an @hostname_prefix
-	run(t, "softlayer_virtual_guest", `
+	runValidateProvisionDescribe(t, "softlayer_virtual_guest", `
 {
 	"resource" : {
 		"softlayer_virtual_guest": {
@@ -51,7 +307,7 @@ func TestUsage(t *testing.T) {
 `)
 
 	// Test a softlayer_virtual_guest without an @hostname_prefix
-	run(t, "softlayer_virtual_guest", `
+	runValidateProvisionDescribe(t, "softlayer_virtual_guest", `
 {
 	"resource" : {
 		"softlayer_file_storage": {
@@ -95,7 +351,7 @@ func TestUsage(t *testing.T) {
 `)
 
 	// Test a softlayer_virtual_guest with an empty @hostname_prefix
-	run(t, "softlayer_virtual_guest", `
+	runValidateProvisionDescribe(t, "softlayer_virtual_guest", `
 {
 	"resource" : {
 		"softlayer_virtual_guest" : {
@@ -126,7 +382,7 @@ func TestUsage(t *testing.T) {
 }
 `)
 
-	run(t, "aws_instance", `
+	runValidateProvisionDescribe(t, "aws_instance", `
 {
 	"resource" : {
 		"aws_instance" : {
@@ -161,6 +417,7 @@ func TestUsage(t *testing.T) {
 `)
 }
 
+// firstInMap returns the first key/value pair in the given map
 func firstInMap(m map[string]interface{}) (string, interface{}) {
 	for k, v := range m {
 		return k, v
@@ -168,18 +425,14 @@ func firstInMap(m map[string]interface{}) (string, interface{}) {
 	return "", nil
 }
 
-func run(t *testing.T, resourceType, properties string) {
-	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
-	require.NoError(t, err)
-
+// runValidateProvisionDescribe validates, provisions, and describes instances
+// based on the given resource type and properties
+func runValidateProvisionDescribe(t *testing.T, resourceType, properties string) {
+	terraform, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
-	terraform := NewTerraformInstancePlugin(dir)
-	terraform.(*plugin).pretend = true // turn off actually calling terraform
-
 	config := types.AnyString(properties)
-
-	err = terraform.Validate(config)
+	err := terraform.Validate(config)
 	require.NoError(t, err)
 
 	// Instance with tags that will not be updated
@@ -197,8 +450,8 @@ func run(t *testing.T, resourceType, properties string) {
 	}
 	id1, err := terraform.Provision(instanceSpec1)
 	require.NoError(t, err)
-	tfPath := filepath.Join(dir, string(*id1)+".tf.json")
-	_, err = ioutil.ReadFile(tfPath)
+	tfPath1 := filepath.Join(dir, string(*id1)+".tf.json")
+	_, err = ioutil.ReadFile(tfPath1)
 	require.NoError(t, err)
 
 	// Instance with tags that will be updated
@@ -222,8 +475,8 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NoError(t, err)
 	require.NotEqual(t, id1, id2)
 
-	tfPath = filepath.Join(dir, string(*id2)+".tf.json")
-	buff, err := ioutil.ReadFile(tfPath)
+	tfPath2 := filepath.Join(dir, string(*id2)+".tf.json")
+	buff, err := ioutil.ReadFile(tfPath2)
 	require.NoError(t, err)
 
 	any := types.AnyBytes(buff)
@@ -368,7 +621,7 @@ func run(t *testing.T, resourceType, properties string) {
 	})
 	require.NoError(t, err)
 
-	buff, err = ioutil.ReadFile(tfPath)
+	buff, err = ioutil.ReadFile(tfPath2)
 	require.NoError(t, err)
 
 	any = types.AnyBytes(buff)
@@ -419,13 +672,23 @@ func run(t *testing.T, resourceType, properties string) {
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
 
-	// Destroy, then none should match
+	// Destroy, then none should match and 1 file should be removed
 	err = terraform.Destroy(*id2)
 	require.NoError(t, err)
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	require.Equal(t, filepath.Base(tfPath1), files[0].Name())
 
 	list, err = terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
+
+	err = terraform.Destroy(*id1)
+	require.NoError(t, err)
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 0)
 }
 
 func conv(a []interface{}) []string {
@@ -478,16 +741,6 @@ func TestFirst(t *testing.T) {
 	name, props := first(vms)
 	require.Equal(t, TResourceName("first-name"), name)
 	require.Equal(t, TResourceProperties{"k1": "v1", "k2": "v2"}, props)
-}
-
-// getPlugin returns the terraform instance plugin to use for testing and the
-// directory where the .tf.json files should be stored
-func getPlugin(t *testing.T) (instance.Plugin, string) {
-	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
-	require.NoError(t, err)
-	terraform := NewTerraformInstancePlugin(dir)
-	terraform.(*plugin).pretend = true
-	return terraform, dir
 }
 
 func TestValidateInvalidJSON(t *testing.T) {
@@ -636,91 +889,75 @@ func TestScanLocalFiles(t *testing.T) {
 	)
 }
 
-func TestOptionalProcessHostnameNoProperties(t *testing.T) {
-	terraform, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
-	p.optionalProcessHostname(VMSoftLayer, "instance-1234", nil, nil)
+func TestPlatformSpecificUpdatesNoProperties(t *testing.T) {
+	platformSpecificUpdates(VMSoftLayer, "instance-1234", nil, nil)
 }
 
-func TestOptionalProcessHostnameWrongVMType(t *testing.T) {
-	terraform, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
-	props := TResourceProperties{"@hostname_prefix": "hostname"}
-	// AWS does not honor the property
-	p.optionalProcessHostname(VMAmazon, "instance-1234", nil, props)
+func TestPlatformSpecificUpdatesWrongVMType(t *testing.T) {
+	props := TResourceProperties{"key": "val"}
+	// Azure does not have platform specific processing
+	platformSpecificUpdates(VMAzure, "instance-1234", nil, props)
 	require.Equal(t, 1, len(props))
-	require.Equal(t, "hostname", props["@hostname_prefix"])
+	require.Equal(t, "val", props["key"])
 }
 
-func TestOptionalProcessHostnameNoPrefixNoLogicalID(t *testing.T) {
-	terraform, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
+func TestPlatformSpecificUpdatesAWSPrivateIPLogicalID(t *testing.T) {
+	logicalID := instance.LogicalID("10.0.0.1")
+	// private_ip set to logical ID address on AWS
+	props := TResourceProperties{"private_ip": "INSTANCE_LOGICAL_ID"}
+	platformSpecificUpdates(VMAmazon, "instance-1234", &logicalID, props)
+	require.Equal(t,
+		TResourceProperties{"private_ip": "10.0.0.1"},
+		props)
+	// but not on other platforms
+	props = TResourceProperties{"private_ip": "INSTANCE_LOGICAL_ID"}
+	platformSpecificUpdates(VMAzure, "instance-1234", &logicalID, props)
+	require.Equal(t,
+		TResourceProperties{"private_ip": "INSTANCE_LOGICAL_ID"},
+		props)
+}
+
+func TestPlatformSpecificUpdatesNoHostnamePrefixNoLogicalID(t *testing.T) {
 	props := TResourceProperties{}
-	p.optionalProcessHostname(VMSoftLayer, "instance-1234", nil, props)
+	platformSpecificUpdates(VMSoftLayer, "instance-1234", nil, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "instance-1234", props["hostname"])
 }
 
-func TestOptionalProcessHostnameNoPrefixWithLogicalID(t *testing.T) {
-	terraform, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
+func TestPlatformSpecificUpdatesNoHostanmePrefixWithLogicalID(t *testing.T) {
 	logicalID := instance.LogicalID("logical-id")
 	props := TResourceProperties{}
-	p.optionalProcessHostname(VMSoftLayer, "instance-1234", &logicalID, props)
+	platformSpecificUpdates(VMSoftLayer, "instance-1234", &logicalID, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "logical-id", props["hostname"])
 }
 
-func TestOptionalProcessHostnameWithPrefixNoLogicalID(t *testing.T) {
-	terraform, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
+func TestPlatformSpecificUpdatesWithHostnamePrefixNoLogicalID(t *testing.T) {
 	props := TResourceProperties{"@hostname_prefix": "prefix"}
-	p.optionalProcessHostname(VMSoftLayer, "instance-1234", nil, props)
+	platformSpecificUpdates(VMSoftLayer, "instance-1234", nil, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "prefix-1234", props["hostname"])
 }
 
-func TestOptionalProcessHostnameWithPrefixWithLogicalID(t *testing.T) {
-	terraform, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
+func TestPlatformSpecificUpdatesWithHostnamePrefixWithLogicalID(t *testing.T) {
 	logicalID := instance.LogicalID("logical-id")
 	props := TResourceProperties{"@hostname_prefix": "prefix"}
-	p.optionalProcessHostname(VMSoftLayer, "instance-1234", &logicalID, props)
+	platformSpecificUpdates(VMSoftLayer, "instance-1234", &logicalID, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "prefix-logical-id", props["hostname"])
 }
 
-func TestOptionalProcessHostnameWithNonStringPrefix(t *testing.T) {
-	terraform, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
+func TestPlatformSpecificUpdatesWithNonStringHostnamePrefix(t *testing.T) {
 	logicalID := instance.LogicalID("logical-id")
 	props := TResourceProperties{"@hostname_prefix": 1, "hostname": "hostname"}
-	p.optionalProcessHostname(VMSoftLayer, "instance-1234", &logicalID, props)
+	platformSpecificUpdates(VMSoftLayer, "instance-1234", &logicalID, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "logical-id", props["hostname"])
 }
 
-func TestOptionalProcessHostnameWithEmptyStringPrefix(t *testing.T) {
-	terraform, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
+func TestPlatformSpecificUpdatesWithEmptyHostanmePrefix(t *testing.T) {
 	props := TResourceProperties{"@hostname_prefix": "", "hostname": "hostname"}
-	p.optionalProcessHostname(VMSoftLayer, "instance-1234", nil, props)
+	platformSpecificUpdates(VMSoftLayer, "instance-1234", nil, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "instance-1234", props["hostname"])
 }
