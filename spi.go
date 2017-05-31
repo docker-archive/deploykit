@@ -15,6 +15,8 @@ type Route struct {
 
 	// LoadBalancerPort is the TCP port that the load balancer is listening on.
 	LoadBalancerPort uint32
+
+	Certificate *string
 }
 
 // Result is the result of an operation

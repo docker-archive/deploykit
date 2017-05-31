@@ -15,28 +15,92 @@ type listener struct {
 	URL           *url.URL
 	SwarmPort     uint32
 	SwarmProtocol Protocol
+	Certificate   *string
 }
 
-func newListener(service string, swarmPort uint32, urlStr string) (*listener, error) {
+func newListener(service string, swarmPort uint32, urlStr string, cert *string) (*listener, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
 	return &listener{
-		Service:   service,
-		URL:       u,
-		SwarmPort: swarmPort,
+		Service:     service,
+		URL:         u,
+		SwarmPort:   swarmPort,
+		Certificate: cert,
 	}, nil
 }
 
 func (l *listener) asRoute() Route {
+	protocol := l.protocol()
+	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
+		log.Infoln("port ", l.extPort(), " Is in ", l.CertPorts())
+		protocol = SSL
+	} else {
+		log.Infoln("cert is nil, or port ", l.extPort(), " Is NOT in ", l.CertPorts())
+	}
 	return Route{
 		Port:             l.SwarmPort,
-		Protocol:         l.protocol(),
+		Protocol:         protocol,
 		LoadBalancerPort: l.extPort(),
+		Certificate:      l.CertASN(),
 	}
 }
 
+// Get the ASN value from the service label
+// Normal format would be label=asn@port,port it will just return the asn part
+// or nil if no certificate.
+func (l *listener) CertASN() *string {
+	if l.Certificate == nil {
+		return nil
+	}
+	asn := strings.Split(*l.Certificate, "@")[0]
+	if asn != "" {
+		return &asn
+	}
+	return nil
+}
+
+// Get the ports that are associated with the certificate from the service label
+func (l *listener) CertPorts() []uint32 {
+	if l.Certificate == nil {
+		// if we have not Certificate then return 443
+		return []uint32{443}
+	}
+	parts := strings.Split(*l.Certificate, "@")
+	if len(parts) > 1 {
+		var finalPorts = []uint32{}
+		ports := strings.Split(parts[1], ",")
+		log.Infoln("ports ", ports)
+		if len(ports) > 0 {
+			log.Infoln("# of ports ", len(ports))
+			for _, port := range ports {
+				log.Infoln("port: ", port)
+				if port != "" {
+					j, err := strconv.ParseUint(port, 10, 32)
+					if err != nil {
+						log.Infoln("Can't convert to int: ", port, "; error=", err)
+					}
+					finalPorts = append(finalPorts, uint32(j))
+				}
+			}
+		}
+		log.Infoln("finalPorts ", finalPorts)
+		if len(finalPorts) == 0 {
+			// this would happen if there was an ASN like this
+			// asn:blah@
+			// an at symbol but no ports after, if that is the case
+			// default to 443.
+			finalPorts = append(finalPorts, uint32(443))
+		}
+		return finalPorts
+	} else {
+		// if there is no port, default to 443
+		return []uint32{443}
+	}
+}
+
+// String value of the listener, good for log statements.
 func (l *listener) String() string {
 	return fmt.Sprintf("service(%s):%d ==> %s", l.Service, l.SwarmPort, l.URL)
 }
@@ -97,6 +161,10 @@ func explicitSwarmPortToURL(service, spec string) (*listener, error) {
 	}
 
 	listener, err := impliedSwarmPortToURL(service, parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("bad spec: %s for service %s", parts[1], service)
+	}
+	log.Infoln("swarmPort: ", swarmPort)
 	listener.SwarmPort = uint32(swarmPort)
 	return listener, nil
 }
@@ -110,7 +178,24 @@ func impliedSwarmPortToURL(service, spec string) (*listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newListener(service, uint32(0), serviceURL.String())
+	var cert *string
+	return newListener(service, uint32(0), serviceURL.String(), cert)
+}
+
+func serviceCert(service swarm.Service, certLabel string) *string {
+	// given a service and a certLabel, look for the service Label
+	// to see if there is a value for the ACM ARN for an SSL cert
+	// for this listener.
+	var cert *string
+	if certLabel == "" {
+		return cert
+	}
+	labelCert, hasCert := service.Spec.Labels[certLabel]
+	if hasCert {
+		cert = &labelCert
+	}
+	return cert
+
 }
 
 func addListenerToHostMap(m map[string][]*listener, l *listener) {
@@ -121,33 +206,46 @@ func addListenerToHostMap(m map[string][]*listener, l *listener) {
 	m[host] = append(m[host], l)
 }
 
+func intInSlice(a uint32, list []uint32) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
 // listenersFromExposedPorts generates a list of listeners, where the URL is defaulted to the swarm port and default ELB
-func listenersFromExposedPorts(service swarm.Service) []*listener {
+func listenersFromExposedPorts(service swarm.Service, certLabel string) []*listener {
 
 	// Rule on publishing ports
 	// If the user specified -p X:Y, then we publish the port to the ELB.  If the port
 	// was assigned by Swarm, then we leave it alone.
 
 	// Given -p X:Y option when starting up services, we look at what's requested and what's actually published:
-	requestedPublishPorts := map[uint32]uint32{} // key - target port Y (app/container port), value = publish port X
+	requestedPublishPorts := map[uint32][]uint32{} // key - target port Y (app/container port), value = publish port X
 	if service.Spec.EndpointSpec != nil {
 		for _, p := range service.Spec.EndpointSpec.Ports {
 			if p.PublishedPort > 0 && strings.EqualFold(string(p.PublishMode), "ingress") {
 				// Only if the user has specify the desired publish port
-				requestedPublishPorts[p.TargetPort] = p.PublishedPort
+				requestedPublishPorts[p.TargetPort] = append(requestedPublishPorts[p.TargetPort], p.PublishedPort)
 			}
 		}
 	}
 
+	log.Infoln("requestedPublishPorts: ", requestedPublishPorts)
 	// Now look at the ports that are actually published:
 	listeners := []*listener{}
 	for _, exposed := range service.Endpoint.Ports {
 
-		requestedPublishPort, has := requestedPublishPorts[exposed.TargetPort]
-		if has && requestedPublishPort == exposed.PublishedPort {
+		log.Infoln("exposed: ", exposed)
+		if intInSlice(exposed.PublishedPort, requestedPublishPorts[exposed.TargetPort]) {
+			cert := serviceCert(service, certLabel)
 
+			log.Infoln("Cert: ", cert)
 			urlString := fmt.Sprintf("%v://:%d", strings.ToLower(string(exposed.Protocol)), exposed.PublishedPort)
-			if listener, err := newListener(service.Spec.Name, exposed.PublishedPort, urlString); err == nil {
+			log.Infoln("urlString: ", urlString)
+			if listener, err := newListener(service.Spec.Name, exposed.TargetPort, urlString, cert); err == nil {
 				listeners = append(listeners, listener)
 			} else {
 				log.Warningln("Error creating listener for exposed port:", exposed, "err=", err)
@@ -162,7 +260,7 @@ func listenersFromExposedPorts(service swarm.Service) []*listener {
 
 // listenersFromLabel generates a list of listeners based on what's specified in the label.  The listeners
 // are then matched against the exposed ports in the service.
-func listenersFromLabel(service swarm.Service, label string) []*listener {
+func listenersFromLabel(service swarm.Service, label string, certLabel string) []*listener {
 	// get all the specs -- the label determines what elb listeners are to be created.
 	labelValue, has := service.Spec.Labels[label]
 	if !has || labelValue == "" {
@@ -188,6 +286,10 @@ func listenersFromLabel(service swarm.Service, label string) []*listener {
 			log.Warningln("Error=", err)
 			continue
 		}
+		// need to add the certificate after it is parsed since service isn't available
+		// inside of specParser.
+		listener.Certificate = serviceCert(service, certLabel)
+
 		listenersToPublish = append(listenersToPublish, listener)
 	}
 	return listenersToPublish

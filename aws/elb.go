@@ -2,6 +2,8 @@ package aws
 
 import (
 	"fmt"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -11,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elb/elbiface"
 	"github.com/docker/editions/pkg/loadbalancer"
-	"time"
 )
 
 // ELBOptions are the configuration parameters for the ELB provisioner.
@@ -86,6 +87,7 @@ func (p *elbDriver) Routes() ([]loadbalancer.Route, error) {
 				Port:             uint32(*listener.Listener.InstancePort),
 				Protocol:         loadbalancer.ProtocolFromString(*listener.Listener.Protocol),
 				LoadBalancerPort: uint32(*listener.Listener.LoadBalancerPort),
+				Certificate:      listener.Listener.SSLCertificateId,
 			})
 		}
 	}
@@ -124,15 +126,18 @@ func (p *elbDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, erro
 	if route.Protocol == loadbalancer.Invalid {
 		return nil, fmt.Errorf("Bad protocol")
 	}
+	instanceProtocol := aws.String(string(route.Protocol))
+	if route.Protocol == loadbalancer.SSL {
+		instanceProtocol = aws.String(string(loadbalancer.TCP))
+	}
 
 	listener := &elb.Listener{
 		InstancePort:     aws.Int64(int64(route.Port)),
 		LoadBalancerPort: aws.Int64(int64(route.LoadBalancerPort)),
 		Protocol:         aws.String(string(route.Protocol)),
-		InstanceProtocol: aws.String(string(route.Protocol)),
+		InstanceProtocol: instanceProtocol,
+		SSLCertificateId: *route.Certificate,
 	}
-
-	// TODO(chungers) - Support SSL id
 
 	return p.client.CreateLoadBalancerListeners(&elb.CreateLoadBalancerListenersInput{
 		Listeners:        []*elb.Listener{listener},

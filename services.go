@@ -44,7 +44,7 @@ type Options struct {
 }
 
 func externalLoadBalancerListenersFromServices(services []swarm.Service, label string,
-	options Options) map[string][]*listener {
+	options Options, certLabel string) map[string][]*listener {
 
 	// group the listeners by hostname.  hostname maps to a ELB somewhere else.
 	listeners := map[string][]*listener{}
@@ -55,9 +55,10 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 		for _, exposed := range s.Endpoint.Ports {
 			exposedPorts[exposed.PublishedPort] = exposed
 		}
+		log.Infoln("exposedPorts: ", exposedPorts)
 
 		// Now go through the list that we need to publish and match up the exposed ports
-		for _, publish := range listenersFromLabel(s, label) {
+		for _, publish := range listenersFromLabel(s, label, certLabel) {
 
 			if sp, has := exposedPorts[publish.SwarmPort]; has {
 
@@ -74,6 +75,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 				for _, exposed := range exposedPorts {
 					publish.SwarmProtocol = ProtocolFromString(string(exposed.Protocol))
 					publish.SwarmPort = exposed.PublishedPort
+					log.Debugln("only one exposed port")
 					break // Just grab the first one
 				}
 				addListenerToHostMap(listeners, publish)
@@ -87,7 +89,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 		}
 
 		if options.PublishAllExposed {
-			for _, l := range listenersFromExposedPorts(s) {
+			for _, l := range listenersFromExposedPorts(s, certLabel) {
 				addListenerToHostMap(listeners, l)
 			}
 		}
@@ -146,10 +148,11 @@ func configureL4(elb Driver, listeners []*listener, options Options) error {
 		protocol := route.Protocol
 		lbPort := route.LoadBalancerPort
 		instancePort := route.Port
+		cert := route.Certificate
 
 		if _, has := listenerIndex[listenerIndexKey(protocol, lbPort, instancePort)]; !has {
 
-			l, err := newListener("delete", instancePort, fmt.Sprintf("%v://:%d", protocol, lbPort))
+			l, err := newListener("delete", instancePort, fmt.Sprintf("%v://:%d", protocol, lbPort), cert)
 			if err == nil {
 				toRemove = append(toRemove, l)
 			} else {
@@ -171,7 +174,7 @@ func configureL4(elb Driver, listeners []*listener, options Options) error {
 
 		_, err := elb.Publish(l.asRoute()) // No SSL cert yet..
 		if err != nil {
-			log.Warningln("err unpublishing", l, "err=", err)
+			log.Warningln("err publishing", l, "err=", err)
 			return err
 		}
 		log.Infoln("CREATED on", elb.Name(), "listener", l)
@@ -236,7 +239,7 @@ func configureL4(elb Driver, listeners []*listener, options Options) error {
 }
 
 // ExposeServicePortInExternalLoadBalancer creates a ServiceAction to expose a service in an ELB.
-func ExposeServicePortInExternalLoadBalancer(elbMap VhostLoadBalancerMap, options Options) ServiceAction {
+func ExposeServicePortInExternalLoadBalancer(elbMap VhostLoadBalancerMap, options Options, certLabel string) ServiceAction {
 
 	return func(services []swarm.Service) {
 
@@ -244,7 +247,7 @@ func ExposeServicePortInExternalLoadBalancer(elbMap VhostLoadBalancerMap, option
 		// since different hostnames can point to the same ELB.
 		targets := map[Driver][]*listener{}
 
-		listenersByHost := externalLoadBalancerListenersFromServices(services, LabelExternalLoadBalancerSpec, options)
+		listenersByHost := externalLoadBalancerListenersFromServices(services, LabelExternalLoadBalancerSpec, options, certLabel)
 
 		// Need to process for each ELB known because it's possible that we'd have to remove all listeners in an ELB.
 		// when there are no listeners to be created from all the services.
