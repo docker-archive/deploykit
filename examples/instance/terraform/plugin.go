@@ -219,14 +219,6 @@ func (p *plugin) Validate(req *types.Any) error {
 	return nil
 }
 
-func addUserData(m map[string]interface{}, key string, init string) {
-	if v, has := m[key]; has {
-		m[key] = fmt.Sprintf("%s\n%s", v, init)
-	} else {
-		m[key] = init
-	}
-}
-
 func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 	re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
 
@@ -285,43 +277,83 @@ func ensureUniqueFile(dir string) string {
 	return n
 }
 
-// Special processing of hostname on some platforms. Where supported, you can
-// add a special @hostname_prefix that will allow the setting of hostname in given format
-// TODO - expand this to formatting string
-func (p *plugin) optionalProcessHostname(vmType TResourceType, name TResourceName, logicalID *instance.LogicalID, properties TResourceProperties) {
-
+// platformSpecificUpdates handles unique platform specific logic
+func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID *instance.LogicalID, properties TResourceProperties) {
 	if properties == nil {
 		return
 	}
-
 	switch vmType {
-	case VMSoftLayer: // # List the supported platforms here
-	default:
-		return
-	}
-	// Use the LogicalID (if set), else the name
-	var hostname string
-	if logicalID == nil {
-		hostname = string(name)
-	} else {
-		hostname = string(*logicalID)
-	}
-	// Use the given hostname value as a prefix if it is a non-empty string
-	if hostnamePrefix, is := properties["@hostname_prefix"].(string); is {
-		hostnamePrefix = strings.Trim(hostnamePrefix, " ")
-		// Use the default behavior if hostnamePrefix was either not a string, or an empty string
-		if hostnamePrefix == "" {
-			properties["hostname"] = hostname
+	case VMSoftLayer:
+		// Process a special @hostname_prefix that will allow the setting of hostname in a
+		// specific format; use the LogicalID (if set), else the name
+		var hostname string
+		if logicalID == nil {
+			hostname = string(name)
 		} else {
-			// Remove "instance-" from "instance-XXXX", then append that string to the hostnamePrefix to create the new hostname
-			properties["hostname"] = fmt.Sprintf("%s-%s", hostnamePrefix, strings.Replace(hostname, "instance-", "", -1))
+			hostname = string(*logicalID)
 		}
-	} else {
-		properties["hostname"] = hostname
+		// Use the given hostname value as a prefix if it is a non-empty string
+		if hostnamePrefix, is := properties["@hostname_prefix"].(string); is {
+			hostnamePrefix = strings.Trim(hostnamePrefix, " ")
+			// Use the default behavior if hostnamePrefix was either not a string, or an empty string
+			if hostnamePrefix == "" {
+				properties["hostname"] = hostname
+			} else {
+				// Remove "instance-" from "instance-XXXX", then append that string to the hostnamePrefix to create the new hostname
+				properties["hostname"] = fmt.Sprintf("%s-%s", hostnamePrefix, strings.Replace(hostname, "instance-", "", -1))
+			}
+		} else {
+			properties["hostname"] = hostname
+		}
+		// Delete hostnamePrefix so it will not be written in the *.tf.json file
+		delete(properties, "@hostname_prefix")
+		log.Debugln("Adding hostname to properties: hostname=", properties["hostname"])
+	case VMAmazon:
+		if p, exists := properties["private_ip"]; exists {
+			if p == "INSTANCE_LOGICAL_ID" {
+				if logicalID != nil {
+					// set private IP to logical ID
+					properties["private_ip"] = string(*logicalID)
+				} else {
+					// reset private IP (the tag is not relevant in this context)
+					delete(properties, "private_ip")
+				}
+			}
+		}
 	}
-	// Delete hostnamePrefix so it will not be written in the *.tf.json file
-	delete(properties, "@hostname_prefix")
-	log.Debugln("Adding hostname to properties: hostname=", properties["hostname"])
+}
+
+// addUserData adds the given init data to the given map at the given key
+func addUserData(m map[string]interface{}, key string, init string) {
+	if v, has := m[key]; has {
+		m[key] = fmt.Sprintf("%s\n%s", v, init)
+	} else {
+		m[key] = init
+	}
+}
+
+// mergeInitScript merges the user defined user data with the spec init data
+func mergeInitScript(spec instance.Spec, id instance.ID, vmType TResourceType, properties TResourceProperties) {
+	// Merge the init scripts
+	switch vmType {
+	case VMAmazon, VMDigitalOcean:
+		addUserData(properties, "user_data", spec.Init)
+		properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(properties["user_data"].(string)))
+	case VMSoftLayer:
+		addUserData(properties, "user_metadata", spec.Init)
+	case VMAzure:
+		// os_profile.custom_data
+		if m, has := properties["os_profile"]; !has {
+			properties["os_profile"] = map[string]interface{}{
+				"custom_data": spec.Init,
+			}
+		} else if mm, ok := m.(map[string]interface{}); ok {
+			addUserData(mm, "custom_data", spec.Init)
+		}
+	case VMGoogleCloud:
+		// metadata_startup_script
+		addUserData(properties, "metadata_startup_script", spec.Init)
+	}
 }
 
 // renderInstIdVar applies the "/self/instId" as a global option and renders
@@ -329,6 +361,55 @@ func (p *plugin) optionalProcessHostname(vmType TResourceType, name TResourceNam
 func renderInstIDVar(data string, id instance.ID) (string, error) {
 	t, _ := template.NewTemplate("str://"+data, template.Options{})
 	return t.Global("/self/instId", id).Render(nil)
+}
+
+// handleProvisionTags sets the Infrakit-specific tags and merges with the user-defined in the instance spec
+func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceType, properties TResourceProperties) {
+	// Add the name to the tags if it does not exist, issue case-insensitive
+	// check for the "name" key
+	if spec.Tags != nil {
+		match := false
+		for key := range spec.Tags {
+			if strings.ToLower(key) == "name" {
+				match = true
+				break
+			}
+		}
+		if !match {
+			spec.Tags["Name"] = string(id)
+		}
+	}
+	// Use tag to store the logical id
+	if spec.LogicalID != nil {
+		spec.Tags["LogicalID"] = string(*spec.LogicalID)
+	}
+
+	// Merge any user-defined tags and convert to platform specific tag type
+	switch vmType {
+	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
+		if t, exists := properties["tags"]; !exists {
+			properties["tags"] = spec.Tags
+		} else if mm, ok := t.(map[string]interface{}); ok {
+			// merge tags
+			for tt, vv := range spec.Tags {
+				mm[tt] = vv
+			}
+		}
+	case VMSoftLayer:
+		if _, has := properties["tags"]; !has {
+			properties["tags"] = []interface{}{}
+		}
+		if tags, ok := properties["tags"].([]interface{}); ok {
+			// softlayer uses a list of tags, instead of a map of tags
+			properties["tags"] = mergeLabelsIntoTagSlice(tags, spec.Tags)
+		}
+		// On Softlayer the tags must be lowercase
+		tagsLower := []string{}
+		for _, val := range properties["tags"].([]string) {
+			tagsLower = append(tagsLower, strings.ToLower(val))
+		}
+		properties["tags"] = tagsLower
+	}
 }
 
 // Provision creates a new instance based on the spec.
@@ -353,110 +434,26 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	spec.Init = rendered
 
+	// Decode the given spec and find the VM resource
 	tf := TFormat{}
 	err = spec.Properties.Decode(&tf)
 	if err != nil {
 		return nil, err
 	}
-
 	vmType, _, properties, err := FindVM(&tf)
 	if err != nil {
 		return nil, err
 	}
-
 	if properties == nil {
 		return nil, fmt.Errorf("no-vm-instance-in-spec")
 	}
 
-	// Add the name to the tags if it does not exist, issue case-insensitive
-	// check for the "name" key
-	if spec.Tags != nil {
-		match := false
-		for key := range spec.Tags {
-			if strings.ToLower(key) == "name" {
-				match = true
-				break
-			}
-		}
-		if !match {
-			spec.Tags["Name"] = string(id)
-		}
-	}
-	// Use tag to store the logical id
-	if spec.LogicalID != nil {
-		spec.Tags["LogicalID"] = string(*spec.LogicalID)
-	}
-
-	// Optionally append either part of the name or the logical ID to the given hostname
-	p.optionalProcessHostname(vmType, TResourceName(name), spec.LogicalID, properties)
-
-	// Merge any user-defined tags and convert to platform specific tag type
-	switch vmType {
-	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
-		if t, exists := properties["tags"]; !exists {
-			properties["tags"] = spec.Tags
-		} else if mm, ok := t.(map[string]interface{}); ok {
-			// merge tags
-			for tt, vv := range spec.Tags {
-				mm[tt] = vv
-			}
-		}
-	case VMSoftLayer:
-		if _, has := properties["tags"]; !has {
-			properties["tags"] = []interface{}{}
-		}
-		tags, ok := properties["tags"].([]interface{})
-		if ok {
-			//softlayer uses a list of tags, instead of a map of tags
-			properties["tags"] = mergeLabelsIntoTagSlice(tags, spec.Tags)
-		}
-	}
-
-	switch vmType {
-	case VMAmazon:
-		if p, exists := properties["private_ip"]; exists {
-			if p == "INSTANCE_LOGICAL_ID" {
-				if spec.LogicalID != nil {
-					// set private IP to logical ID
-					properties["private_ip"] = string(*spec.LogicalID)
-				} else {
-					// reset private IP (the tag is not relevant in this context)
-					delete(properties, "private_ip")
-				}
-			}
-		}
-	}
-
-	// merge the inits
-	switch vmType {
-	case VMAmazon, VMDigitalOcean:
-		addUserData(properties, "user_data", spec.Init)
-		properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(properties["user_data"].(string)))
-	case VMSoftLayer:
-		addUserData(properties, "user_metadata", spec.Init)
-	case VMAzure:
-		// os_profile.custom_data
-		if m, has := properties["os_profile"]; !has {
-			properties["os_profile"] = map[string]interface{}{
-				"custom_data": spec.Init,
-			}
-		} else if mm, ok := m.(map[string]interface{}); ok {
-			addUserData(mm, "custom_data", spec.Init)
-		}
-	case VMGoogleCloud:
-		// metadata_startup_script
-		addUserData(properties, "metadata_startup_script", spec.Init)
-	}
-
-	// On Softlayer the tags must be lowercase
-	switch vmType {
-	case VMSoftLayer:
-		tagsLower := []string{}
-		for _, val := range properties["tags"].([]string) {
-			tagsLower = append(tagsLower, strings.ToLower(val))
-		}
-		properties["tags"] = tagsLower
-	}
+	// Add Infrakit-specific tags
+	handleProvisionTags(spec, id, vmType, properties)
+	// Merge the init scripts
+	mergeInitScript(spec, id, vmType, properties)
+	// Platform specific processing
+	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, properties)
 
 	// Write out each resource again with the instance name
 	for resourceType, resourceObj := range tf.Resource {
