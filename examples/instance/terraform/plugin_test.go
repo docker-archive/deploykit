@@ -273,6 +273,36 @@ func TestProvisionNoVMProperties(t *testing.T) {
 	require.Equal(t, "no-vm-instance-in-spec", err.Error())
 }
 
+func TestProvisionInvalidTemplateProperties(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	spec := instance.Spec{
+		Properties:  types.AnyString("{{}"),
+		Tags:        map[string]string{},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   nil,
+	}
+	_, err := terraform.Provision(spec)
+	require.Error(t, err)
+	require.True(t, strings.HasPrefix(err.Error(), "template:"))
+}
+
+func TestProvisionInvalidTemplateInit(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	spec := instance.Spec{
+		Properties:  types.AnyString("{}"),
+		Tags:        map[string]string{},
+		Init:        "{{}",
+		Attachments: []instance.Attachment{},
+		LogicalID:   nil,
+	}
+	_, err := terraform.Provision(spec)
+	require.Error(t, err)
+	require.True(t, strings.HasPrefix(err.Error(), "template:"))
+}
+
 func TestRunValidateProvisionDescribe(t *testing.T) {
 	// Test a softlayer_virtual_guest with an @hostname_prefix
 	runValidateProvisionDescribe(t, "softlayer_virtual_guest", `
@@ -810,6 +840,17 @@ func TestScanLocalFilesNoFiles(t *testing.T) {
 	require.Empty(t, vms)
 }
 
+func TestScanLocalFilesInvalidFile(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	err := afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-12345.tf.json"), []byte("not-json"), 0644)
+	require.NoError(t, err)
+	_, err = p.scanLocalFiles()
+	require.Error(t, err)
+}
+
 func TestScanLocalFilesNoVms(t *testing.T) {
 	terraform, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
@@ -917,6 +958,13 @@ func TestPlatformSpecificUpdatesAWSPrivateIPLogicalID(t *testing.T) {
 		props)
 }
 
+func TestPlatformSpecificUpdatesAWSPrivateIPNoLogicalID(t *testing.T) {
+	// private_ip removed if there is no logical ID
+	props := TResourceProperties{"private_ip": "INSTANCE_LOGICAL_ID"}
+	platformSpecificUpdates(VMAmazon, "instance-1234", nil, props)
+	require.Equal(t, TResourceProperties{}, props)
+}
+
 func TestPlatformSpecificUpdatesNoHostnamePrefixNoLogicalID(t *testing.T) {
 	props := TResourceProperties{}
 	platformSpecificUpdates(VMSoftLayer, "instance-1234", nil, props)
@@ -1018,7 +1066,26 @@ func TestLabelNoVM(t *testing.T) {
 	require.NoError(t, err)
 	err = p.Label(instance.ID(id), nil)
 	require.Error(t, err)
-	require.True(t, strings.HasPrefix("not found:", err.Error()))
+	require.Equal(t, "not found", err.Error())
+}
+
+func TestLabelNoProperties(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	id := "instance-1234"
+	// Resource does not have any properties
+	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	inst[VMSoftLayer] = map[TResourceName]TResourceProperties{"instance-1234": {}}
+	tformat := TFormat{Resource: inst}
+	buff, err := json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	require.NoError(t, err)
+	err = p.Label(instance.ID(id), nil)
+	require.Error(t, err)
+	require.Equal(t, "not found:instance-1234", err.Error())
 }
 
 func TestLabelCreateNewTags(t *testing.T) {
@@ -1212,6 +1279,20 @@ func TestTerraformTagsList(t *testing.T) {
 	result := terraformTags(props, "tags")
 	require.Equal(t,
 		map[string]string{"t1": "v1", "t2": "v2", "t3": "v3:extra"},
+		result,
+	)
+}
+
+func TestTerraformTagRawProperties(t *testing.T) {
+	props := TResourceProperties{
+		"foo":     "bar",
+		"tags.%":  2,
+		"tags.t1": "v1",
+		"tags.t2": "v2",
+	}
+	result := terraformTags(props, "tags")
+	require.Equal(t,
+		map[string]string{"t1": "v1", "t2": "v2"},
 		result,
 	)
 }
