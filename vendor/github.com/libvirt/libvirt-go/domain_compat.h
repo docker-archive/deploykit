@@ -483,7 +483,6 @@ int virDomainPinIOThreadCompat(virDomainPtr domain,
 #define VIR_DOMAIN_EVENT_ID_DEVICE_ADDED 19
 #endif
 
-
 int virDomainAddIOThreadCompat(virDomainPtr domain,
 			       unsigned int iothread_id,
 			       unsigned int flags);
@@ -898,5 +897,47 @@ int virDomainSetBlockThresholdCompat(virDomainPtr domain,
                                      const char *dev,
                                      unsigned long long threshold,
                                      unsigned int flags);
+
+/* 3.3.0 */
+
+#ifndef VIR_DOMAIN_JOB_OPERATION
+#define VIR_DOMAIN_JOB_OPERATION "operation"
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_UNKNOWN
+#define VIR_DOMAIN_JOB_OPERATION_UNKNOWN 0
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_START
+#define VIR_DOMAIN_JOB_OPERATION_START 1
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_SAVE
+#define VIR_DOMAIN_JOB_OPERATION_SAVE 2
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_RESTORE
+#define VIR_DOMAIN_JOB_OPERATION_RESTORE 3
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_MIGRATION_IN
+#define VIR_DOMAIN_JOB_OPERATION_MIGRATION_IN 4
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_MIGRATION_OUT
+#define VIR_DOMAIN_JOB_OPERATION_MIGRATION_OUT 5
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_SNAPSHOT
+#define VIR_DOMAIN_JOB_OPERATION_SNAPSHOT 6
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_SNAPSHOT_REVERT
+#define VIR_DOMAIN_JOB_OPERATION_SNAPSHOT_REVERT 7
+#endif
+
+#ifndef VIR_DOMAIN_JOB_OPERATION_DUMP
+#define VIR_DOMAIN_JOB_OPERATION_DUMP 8
+#endif
 
 #endif /* LIBVIRT_GO_DOMAIN_COMPAT_H__ */
