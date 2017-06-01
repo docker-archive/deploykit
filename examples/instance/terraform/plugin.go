@@ -644,11 +644,7 @@ func terraformTags(m TResourceProperties, key string) map[string]string {
 				// This assumes that the first colon is separating the key and the value of the tag.
 				// This is done so that colons are valid characters in the value.
 				vv := strings.SplitN(value, ":", 2)
-				if len(vv) == 2 {
-					tags[vv[0]] = vv[1]
-				} else {
-					log.Errorln("terraformTags: ignore invalid tag detected", value)
-				}
+				tags[vv[0]] = vv[1]
 			} else {
 				tags[value] = "" // for list but no ':"
 			}
