@@ -163,6 +163,22 @@ const (
 	VMSoftLayer = TResourceType("softlayer_virtual_guest")
 )
 
+const (
+	// PropHostnamePrefix is the optional terraform property that contains the hostname prefix
+	PropHostnamePrefix = "@hostname_prefix"
+
+	// PropScope is the optional terraform property that defines how a resource should be persisted
+	PropScope = "@scope"
+
+	// ValScopeDedicated defines dedicated scope: the resource lifecycle is loosely couple with the
+	// VM; it is written in a file named "instance-xxxx-dedicated.tf.json"
+	ValScopeDedicated = "@dedicated"
+
+	// ValScopeDefault defines the default scope: the resource lifecycle is tightly coupled
+	// with the VM; it is written in the same "instance.xxxx.tf.json" file
+	ValScopeDefault = "@default"
+)
+
 var (
 	// VMTypes is a list of supported vm types.
 	VMTypes = []interface{}{VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud, VMSoftLayer}
@@ -216,7 +232,6 @@ func (p *plugin) Validate(req *types.Any) error {
 	if vms > 1 {
 		return fmt.Errorf("zero or 1 vm instance per request: %d", vms)
 	}
-
 	return nil
 }
 
@@ -294,7 +309,7 @@ func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID
 			hostname = string(*logicalID)
 		}
 		// Use the given hostname value as a prefix if it is a non-empty string
-		if hostnamePrefix, is := properties["@hostname_prefix"].(string); is {
+		if hostnamePrefix, is := properties[PropHostnamePrefix].(string); is {
 			hostnamePrefix = strings.Trim(hostnamePrefix, " ")
 			// Use the default behavior if hostnamePrefix was either not a string, or an empty string
 			if hostnamePrefix == "" {
@@ -307,7 +322,7 @@ func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID
 			properties["hostname"] = hostname
 		}
 		// Delete hostnamePrefix so it will not be written in the *.tf.json file
-		delete(properties, "@hostname_prefix")
+		delete(properties, PropHostnamePrefix)
 		log.Debugln("Adding hostname to properties: hostname=", properties["hostname"])
 	case VMAmazon:
 		if p, exists := properties["private_ip"]; exists {
@@ -429,9 +444,15 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 	}
 }
 
-// writeTerraformFiles uses the data in the TFormat to create a .tf.json file with the
+// writeTerraformFiles uses the data in the TFormat to create one or more .tf.json files with the
 // generated name. The properties of the VM resource are overriden by vmProperties.
 func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) error {
+	// Map file names to the data in each file based on the "@scope" property:
+	// - @default: resources in same "instance-xxxx.tf.json" file as VM
+	// - @dedicated: resources in different file as VM with the same ID (instance-xxxx-dedicated.tf.json)
+	// - <other>: resource defined in different file with a scope identifier (scope-<other>.tf.json)
+	fileMap := make(map[string]*TFormat)
+
 	for resourceType, resourceObj := range tf.Resource {
 		vmList := mapset.NewSetFromSlice(VMTypes)
 		for resourceName, resourceProps := range resourceObj {
@@ -443,21 +464,51 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 			} else {
 				newResourceName = fmt.Sprintf("%s-%s", generatedName, resourceName)
 			}
-			delete(tf.Resource[resourceType], resourceName)
-			tf.Resource[resourceType][TResourceName(newResourceName)] = resourceProps
+			// Determine the scope value (default to 'default')
+			scope, has := resourceProps[PropScope]
+			if has {
+				delete(resourceProps, PropScope)
+			} else {
+				scope = ValScopeDefault
+			}
+			// Determine the filename based off of the scope value
+			var filename string
+			switch scope {
+			case ValScopeDefault:
+				filename = generatedName
+			case ValScopeDedicated:
+				filename = fmt.Sprintf("%s-dedicated", generatedName)
+			default:
+				filename = fmt.Sprintf("scope-%s", scope)
+			}
+			// Get the associated value in the file map
+			tfPersistence, has := fileMap[filename]
+			if !has {
+				resourceMap := make(map[TResourceType]map[TResourceName]TResourceProperties)
+				tfPersistence = &TFormat{Resource: resourceMap}
+				fileMap[filename] = tfPersistence
+			}
+			resourceNameMap, has := tfPersistence.Resource[resourceType]
+			if !has {
+				resourceNameMap = make(map[TResourceName]TResourceProperties)
+				tfPersistence.Resource[resourceType] = resourceNameMap
+			}
+			resourceNameMap[TResourceName(newResourceName)] = resourceProps
 		}
 	}
 	// Handle any platform specific updates to the VM properties prior to writing out
 	platformSpecificUpdates(vmType, TResourceName(generatedName), logicalID, vmProperties)
 
-	buff, err := json.MarshalIndent(tf, "  ", "  ")
-	log.Debugln("writeTerraformFiles", generatedName, "data=", string(buff), "err=", err)
-	if err != nil {
-		return err
-	}
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, generatedName+".tf.json"), buff, 0644)
-	if err != nil {
-		return err
+	for filename, tfVal := range fileMap {
+		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
+		log.Debugln("writeTerraformFiles", filename, "data=", string(buff), "err=", err)
+		if err != nil {
+			return err
+		}
+		err = afero.WriteFile(p.fs, filepath.Join(p.Dir, filename+".tf.json"), buff, 0644)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

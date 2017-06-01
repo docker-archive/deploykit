@@ -545,7 +545,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 			require.Equal(t, expectedUserData2, props["user_metadata"])
 
 			// If a hostname was specified, the expectation is that the hostname is appended with the logical ID
-			if value["@hostname_prefix"] != nil && strings.Trim(value["@hostname_prefix"].(string), " ") != "" {
+			if value[PropHostnamePrefix] != nil && strings.Trim(value[PropHostnamePrefix].(string), " ") != "" {
 				expectedHostname := "softlayer-hostname-logical:id-2"
 				require.Equal(t, expectedHostname, props["hostname"])
 			} else {
@@ -553,7 +553,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				require.Equal(t, "logical:id-2", props["hostname"])
 			}
 			// Verify the hostname prefix key/value is no longer in the props
-			require.Nil(t, props["@hostname_prefix"])
+			require.Nil(t, props[PropHostnamePrefix])
 
 		case VMAmazon:
 			require.Equal(t, map[string]interface{}{
@@ -836,7 +836,9 @@ func TestWriteTerraformFilesError(t *testing.T) {
 	defer os.RemoveAll(dir)
 	p, is := terraform.(*plugin)
 	require.True(t, is)
-	tformat := TFormat{Resource: make(map[TResourceType]map[TResourceName]TResourceProperties)}
+	tformat := TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {"host": {}}},
+	}
 	// Before writing the file delete the directory to create an error
 	os.RemoveAll(dir)
 	err := p.writeTerraformFiles(nil, "instance-1234", &tformat, VMSoftLayer, TResourceProperties{})
@@ -910,7 +912,7 @@ func TestWriteTerraformFilesVMOnlyLogicalId(t *testing.T) {
 	)
 }
 
-func TestWriteTerraformFilesMultipleResources(t *testing.T) {
+func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 	terraform, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	p, is := terraform.(*plugin)
@@ -970,6 +972,183 @@ func TestWriteTerraformFilesMultipleResources(t *testing.T) {
 			TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
 		},
 		bsType,
+	)
+}
+
+func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	name := "instance-1234"
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMAmazon: {
+			TResourceName("host"): {
+				"vmp1": "vmv1", "vmp2": "vmv2",
+				PropScope: ValScopeDefault,
+			},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {
+				"fsp1": "fsv1", "fsp2": "fsv2",
+				PropScope: ValScopeDedicated,
+			},
+		},
+		TResourceType("softlayer_block_storage"): {
+			TResourceName("worker_bs"): {
+				"bsp1": "bsv1", "bsp2": "bsv2",
+				PropScope: "managers",
+			},
+		},
+		TResourceType("another-dedicated"): {
+			TResourceName("another-dedicated-name"): {
+				"kded-1":  "vded-1",
+				PropScope: ValScopeDedicated,
+			},
+		},
+		TResourceType("another-default"): {
+			TResourceName("another-default-name"): {"kdef-1": "vdef-1"},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	err := p.writeTerraformFiles(nil,
+		name,
+		&tformat,
+		VMAmazon,
+		TResourceProperties{"vmp3": "vmv3"})
+	require.NoError(t, err)
+	// Should be 3 files on disk
+	files, err := ioutil.ReadDir(p.Dir)
+	require.NoError(t, err)
+	require.Len(t, files, 3)
+	filenames := []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json", name))
+	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json", name))
+	require.Contains(t, filenames, "scope-managers.tf.json")
+	// Default
+	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, fmt.Sprintf("%s.tf.json", name)))
+	require.NoError(t, err)
+	tf := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName(name): {"vmp3": "vmv3"},
+			},
+			TResourceType("another-default"): {
+				TResourceName(name + "-another-default-name"): {"kdef-1": "vdef-1"},
+			},
+		},
+		tf.Resource,
+	)
+	// Dedicated
+	buff, err = ioutil.ReadFile(filepath.Join(p.Dir, fmt.Sprintf("%s-dedicated.tf.json", name)))
+	require.NoError(t, err)
+	tf = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName(name + "-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+			},
+			TResourceType("another-dedicated"): {
+				TResourceName(name + "-another-dedicated-name"): {"kded-1": "vded-1"},
+			},
+		},
+		tf.Resource,
+	)
+	// Global
+	buff, err = ioutil.ReadFile(filepath.Join(p.Dir, "scope-managers.tf.json"))
+	require.NoError(t, err)
+	tf = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_block_storage"): {
+				TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+			},
+		},
+		tf.Resource,
+	)
+}
+
+func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	logicalID := instance.LogicalID("mgr1")
+	name := "instance-1234"
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {
+			TResourceName("host"): {"vmp1": "vmv1", "vmp2": "vmv2"},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {
+				"fsp1": "fsv1", "fsp2": "fsv2",
+				PropScope: ValScopeDedicated,
+			},
+		},
+		TResourceType("softlayer_block_storage"): {
+			TResourceName("worker_bs"): {
+				"bsp1": "bsv1", "bsp2": "bsv2",
+				PropScope: ValScopeDedicated,
+			},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	err := p.writeTerraformFiles(&logicalID,
+		name,
+		&tformat,
+		VMSoftLayer,
+		TResourceProperties{"vmp3": "vmv3"})
+	require.NoError(t, err)
+	// Should be 2 files on disk
+	files, err := ioutil.ReadDir(p.Dir)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+	filenames := []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json", name))
+	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json", name))
+	// VM file
+	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, name+".tf.json"))
+	require.NoError(t, err)
+	tf := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
+	require.NoError(t, err)
+	require.Len(t, tf.Resource, 1)
+	vmType := tf.Resource[VMSoftLayer]
+	require.Equal(t,
+		map[TResourceName]TResourceProperties{
+			TResourceName(name): {"hostname": "mgr1", "vmp3": "vmv3"},
+		},
+		vmType,
+	)
+	// File storage and block storage
+	buff, err = ioutil.ReadFile(filepath.Join(p.Dir, fmt.Sprintf("%s-dedicated.tf.json", name)))
+	require.NoError(t, err)
+	tf = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName(name + "-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+			},
+			TResourceType("softlayer_block_storage"): {
+				TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+			},
+		},
+		tf.Resource,
 	)
 }
 
@@ -1124,7 +1303,7 @@ func TestPlatformSpecificUpdatesNoHostanmePrefixWithLogicalID(t *testing.T) {
 }
 
 func TestPlatformSpecificUpdatesWithHostnamePrefixNoLogicalID(t *testing.T) {
-	props := TResourceProperties{"@hostname_prefix": "prefix"}
+	props := TResourceProperties{PropHostnamePrefix: "prefix"}
 	platformSpecificUpdates(VMSoftLayer, "instance-1234", nil, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "prefix-1234", props["hostname"])
@@ -1132,7 +1311,7 @@ func TestPlatformSpecificUpdatesWithHostnamePrefixNoLogicalID(t *testing.T) {
 
 func TestPlatformSpecificUpdatesWithHostnamePrefixWithLogicalID(t *testing.T) {
 	logicalID := instance.LogicalID("logical-id")
-	props := TResourceProperties{"@hostname_prefix": "prefix"}
+	props := TResourceProperties{PropHostnamePrefix: "prefix"}
 	platformSpecificUpdates(VMSoftLayer, "instance-1234", &logicalID, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "prefix-logical-id", props["hostname"])
@@ -1140,14 +1319,14 @@ func TestPlatformSpecificUpdatesWithHostnamePrefixWithLogicalID(t *testing.T) {
 
 func TestPlatformSpecificUpdatesWithNonStringHostnamePrefix(t *testing.T) {
 	logicalID := instance.LogicalID("logical-id")
-	props := TResourceProperties{"@hostname_prefix": 1, "hostname": "hostname"}
+	props := TResourceProperties{PropHostnamePrefix: 1, "hostname": "hostname"}
 	platformSpecificUpdates(VMSoftLayer, "instance-1234", &logicalID, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "logical-id", props["hostname"])
 }
 
 func TestPlatformSpecificUpdatesWithEmptyHostanmePrefix(t *testing.T) {
-	props := TResourceProperties{"@hostname_prefix": "", "hostname": "hostname"}
+	props := TResourceProperties{PropHostnamePrefix: "", "hostname": "hostname"}
 	platformSpecificUpdates(VMSoftLayer, "instance-1234", nil, props)
 	require.Equal(t, 1, len(props))
 	require.Equal(t, "instance-1234", props["hostname"])
