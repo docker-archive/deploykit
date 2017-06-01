@@ -412,6 +412,39 @@ func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceTyp
 	}
 }
 
+// writeTerraformFiles uses the data in the TFormat to create a .tf.json file with the
+// generated name. The properties of the VM resource are overriden by vmProperties.
+func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) error {
+	for resourceType, resourceObj := range tf.Resource {
+		vmList := mapset.NewSetFromSlice(VMTypes)
+		for resourceName, resourceProps := range resourceObj {
+			var newResourceName string
+			if vmList.Contains(resourceType) {
+				// Overwrite with the changes to the VM properties
+				resourceProps = vmProperties
+				newResourceName = generatedName
+			} else {
+				newResourceName = fmt.Sprintf("%s-%s", generatedName, resourceName)
+			}
+			delete(tf.Resource[resourceType], resourceName)
+			tf.Resource[resourceType][TResourceName(newResourceName)] = resourceProps
+		}
+	}
+	// Handle any platform specific updates to the VM properties prior to writing out
+	platformSpecificUpdates(vmType, TResourceName(generatedName), logicalID, vmProperties)
+
+	buff, err := json.MarshalIndent(tf, "  ", "  ")
+	log.Debugln("writeTerraformFiles", generatedName, "data=", string(buff), "err=", err)
+	if err != nil {
+		return err
+	}
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, generatedName+".tf.json"), buff, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Provision creates a new instance based on the spec.
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
@@ -440,50 +473,23 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	vmType, _, properties, err := FindVM(&tf)
+	vmType, _, vmProps, err := FindVM(&tf)
 	if err != nil {
 		return nil, err
 	}
-	if properties == nil {
+	if vmProps == nil {
 		return nil, fmt.Errorf("no-vm-instance-in-spec")
 	}
 
-	// Add Infrakit-specific tags
-	handleProvisionTags(spec, id, vmType, properties)
-	// Merge the init scripts
-	mergeInitScript(spec, id, vmType, properties)
-	// Platform specific processing
-	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, properties)
-
-	// Write out each resource again with the instance name
-	for resourceType, resourceObj := range tf.Resource {
-		vmList := mapset.NewSetFromSlice(VMTypes)
-		for resourceName, resourceProps := range resourceObj {
-			var newResourceName string
-			if vmList.Contains(resourceType) {
-				// Overwrite with the changes to the VM properties
-				resourceProps = properties
-				newResourceName = name
-			} else {
-				newResourceName = fmt.Sprintf("%s-%s", name, resourceName)
-			}
-			// Write the whole thing back out, after decorations and replacing the hostname with the generated hostname
-			delete(tf.Resource[resourceType], resourceName)
-			tf.Resource[resourceType][TResourceName(newResourceName)] = resourceProps
-		}
-	}
-
-	buff, err := json.MarshalIndent(tf, "  ", "  ")
-	log.Debugln("provision", id, "data=", string(buff), "err=", err)
-	if err != nil {
+	// Add Infrakit-specific tags to the user-defined VM properties
+	handleProvisionTags(spec, id, vmType, vmProps)
+	// Merge the init scripts into the VM properties
+	mergeInitScript(spec, id, vmType, vmProps)
+	// Write out the tf.json file
+	if err = p.writeTerraformFiles(spec.LogicalID, name, &tf, vmType, vmProps); err != nil {
 		return nil, err
 	}
-
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, string(id)+".tf.json"), buff, 0644)
-	if err != nil {
-		return nil, err
-	}
-
+	// And apply the updates
 	return &id, p.terraformApply()
 }
 

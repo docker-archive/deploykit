@@ -830,6 +830,148 @@ func TestAddUserDataMerge(t *testing.T) {
 	require.Equal(t, "before\ninit", m["key"])
 }
 
+func TestWriteTerraformFilesError(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	tformat := TFormat{Resource: make(map[TResourceType]map[TResourceName]TResourceProperties)}
+	// Before writing the file delete the directory to create an error
+	os.RemoveAll(dir)
+	err := p.writeTerraformFiles(nil, "instance-1234", &tformat, VMSoftLayer, TResourceProperties{})
+	require.Error(t, err)
+}
+
+func TestWriteTerraformFilesVMOnly(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	name := "instance-1234"
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {
+			TResourceName("host"): {"p1": "v1", "p2": "v2"},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	err := p.writeTerraformFiles(nil, name, &tformat, VMSoftLayer, TResourceProperties{"p3": "v3"})
+	require.NoError(t, err)
+	// Read single file from disk
+	files, err := ioutil.ReadDir(p.Dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, name+".tf.json"))
+	require.NoError(t, err)
+	tf := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
+	require.NoError(t, err)
+	// 1 resource type
+	require.Len(t, tf.Resource, 1)
+	require.Equal(t,
+		map[TResourceName]TResourceProperties{TResourceName(name): {
+			"hostname": "instance-1234",
+			"p3":       "v3"}},
+		tf.Resource[VMSoftLayer],
+	)
+}
+
+func TestWriteTerraformFilesVMOnlyLogicalId(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	logicalID := instance.LogicalID("mgr1")
+	name := "instance-1234"
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {
+			TResourceName("host"): {"p1": "v1", "p2": "v2"},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	err := p.writeTerraformFiles(&logicalID, name, &tformat, VMSoftLayer, TResourceProperties{"p3": "v3"})
+	require.NoError(t, err)
+	// Read single file from disk
+	files, err := ioutil.ReadDir(p.Dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, name+".tf.json"))
+	require.NoError(t, err)
+	tf := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
+	require.NoError(t, err)
+	// 1 resource type
+	require.Len(t, tf.Resource, 1)
+	require.Equal(t,
+		map[TResourceName]TResourceProperties{TResourceName(name): {
+			"hostname": "mgr1",
+			"p3":       "v3"}},
+		tf.Resource[VMSoftLayer],
+	)
+}
+
+func TestWriteTerraformFilesMultipleResources(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	name := "instance-1234"
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {
+			TResourceName("host"): {"vmp1": "vmv1", "vmp2": "vmv2"},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+		},
+		TResourceType("softlayer_block_storage"): {
+			TResourceName("worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	err := p.writeTerraformFiles(nil, name, &tformat, VMSoftLayer, TResourceProperties{"vmp3": "vmv3"})
+	require.NoError(t, err)
+	// Read single file from disk
+	files, err := ioutil.ReadDir(p.Dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, name+".tf.json"))
+	require.NoError(t, err)
+	tf := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tf)
+	require.NoError(t, err)
+	// 3 resource type
+	require.Len(t, tf.Resource, 3)
+	// VM resource
+	vmType := tf.Resource[VMSoftLayer]
+	require.NotNil(t, vmType)
+	require.Equal(t,
+		map[TResourceName]TResourceProperties{
+			TResourceName(name): {
+				"hostname": name,
+				"vmp3":     "vmv3",
+			},
+		},
+		vmType,
+	)
+	// File storage
+	fsType := tf.Resource[TResourceType("softlayer_file_storage")]
+	require.NotNil(t, fsType)
+	require.Equal(t,
+		map[TResourceName]TResourceProperties{
+			TResourceName(name + "-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+		},
+		fsType,
+	)
+	// Block storage
+	bsType := tf.Resource[TResourceType("softlayer_block_storage")]
+	require.NotNil(t, bsType)
+	require.Equal(t,
+		map[TResourceName]TResourceProperties{
+			TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+		},
+		bsType,
+	)
+}
+
 func TestScanLocalFilesNoFiles(t *testing.T) {
 	terraform, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
