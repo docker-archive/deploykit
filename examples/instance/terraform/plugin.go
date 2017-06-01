@@ -59,73 +59,73 @@ TFormat models the on disk representation of a terraform resource JSON.
 An example of this looks like:
 
 {
-    "resource" : {
-	"aws_instance" : {
-	    "web4" : {
-		"ami" : "${lookup(var.aws_amis, var.aws_region)}",
-		"instance_type" : "m1.small",
-		"key_name": "PUBKEY",
-		"vpc_security_group_ids" : ["${aws_security_group.default.id}"],
-		"subnet_id": "${aws_subnet.default.id}",
-		"tags" :  {
-		    "Name" : "web4",
-		    "InstancePlugin" : "terraform"
+	"resource": {
+		"aws_instance": {
+			"web4": {
+				"ami": "${lookup(var.aws_amis, var.aws_region)}",
+				"instance_type": "m1.small",
+				"key_name": "PUBKEY",
+				"vpc_security_group_ids": ["${aws_security_group.default.id}"],
+				"subnet_id": "${aws_subnet.default.id}",
+				"tags":  {
+					"Name": "web4",
+					"InstancePlugin": "terraform"
+				},
+				"connection": {
+					"user": "ubuntu"
+				},
+				"provisioner": {
+					"remote_exec": {
+						"inline": [
+							"sudo apt-get -y update",
+							"sudo apt-get -y install nginx",
+							"sudo service nginx start"
+						]
+					}
+				}
+			}
 		}
-		"connection" : {
-		    "user" : "ubuntu"
-		},
-		"provisioner" : {
-		    "remote_exec" : {
-			"inline" : [
-			    "sudo apt-get -y update",
-			    "sudo apt-get -y install nginx",
-			    "sudo service nginx start"
-			]
-		    }
-		}
-	    }
 	}
-    }
 }
 
 The block above is essentially embedded inside the `Properties` field of the instance Spec:
 
 {
-    "Properties" : {
-      "resource" : {
-    	 "aws_instance" : {
-	    "web4" : {
-		"ami" : "${lookup(var.aws_amis, var.aws_region)}",
-		"instance_type" : "m1.small",
-		"key_name": "PUBKEY",
-		"vpc_security_group_ids" : ["${aws_security_group.default.id}"],
-		"subnet_id": "${aws_subnet.default.id}",
-		"tags" :  {
-		    "Name" : "web4",
-		    "InstancePlugin" : "terraform"
+	"Properties": {
+		"resource": {
+			"aws_instance": {
+				"web4": {
+					"ami": "${lookup(var.aws_amis, var.aws_region)}",
+					"instance_type": "m1.small",
+					"key_name": "PUBKEY",
+					"vpc_security_group_ids": ["${aws_security_group.default.id}"],
+					"subnet_id": "${aws_subnet.default.id}",
+					"tags":  {
+						"Name": "web4",
+						"InstancePlugin": "terraform"
+					},
+					"connection": {
+						"user": "ubuntu"
+					},
+					"provisioner": {
+						"remote_exec": {
+							"inline": [
+								"sudo apt-get -y update",
+								"sudo apt-get -y install nginx",
+								"sudo service nginx start"
+							]
+						}
+					}
+				}
+			}
 		}
-		"connection" : {
-		    "user" : "ubuntu"
-		},
-		"provisioner" : {
-		    "remote_exec" : {
-			"inline" : [
-			    "sudo apt-get -y update",
-			    "sudo apt-get -y install nginx",
-			    "sudo service nginx start"
-			]
-		    }
-		}
-	    }
-	 }
-      }
-    },
-    "Tags" : {
-        "other" : "values",
-        "to" : "merge",
-        "with" : "tags"
-    },
-    "Init" : "init string"
+	},
+	"Tags": {
+		"other": "values",
+		"to": "merge",
+		"with": "tags"
+	},
+	"Init": "init string"
 }
 
 */
