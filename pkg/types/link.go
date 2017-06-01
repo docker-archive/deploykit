@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -49,9 +50,9 @@ func NewLinkFromMap(m map[string]string) *Link {
 	if v, has := m[LinkContextLabel]; has {
 		l.context = v
 	}
-
 	if v, has := m[LinkCreatedLabel]; has {
-		t, err := time.Parse(time.RFC3339, v)
+		// The RFC3339 format requires upper case values
+		t, err := time.Parse(time.RFC3339, strings.ToUpper(v))
 		if err == nil {
 			l.created = t
 		}
@@ -133,7 +134,7 @@ func (l *Link) InMap(m map[string]string) bool {
 }
 
 // Equal returns true if the links are the same - same value and context
-func (l *Link) Equal(other Link) bool {
+func (l *Link) Equal(other *Link) bool {
 	return l.value == other.value && l.context == other.context
 }
 
