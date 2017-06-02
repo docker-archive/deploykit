@@ -136,7 +136,7 @@ func (p *elbDriver) Publish(route loadbalancer.Route) (loadbalancer.Result, erro
 		LoadBalancerPort: aws.Int64(int64(route.LoadBalancerPort)),
 		Protocol:         aws.String(string(route.Protocol)),
 		InstanceProtocol: instanceProtocol,
-		SSLCertificateId: *route.Certificate,
+		SSLCertificateId: route.Certificate,
 	}
 
 	return p.client.CreateLoadBalancerListeners(&elb.CreateLoadBalancerListenersInput{
