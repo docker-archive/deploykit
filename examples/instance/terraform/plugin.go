@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -364,7 +365,7 @@ func renderInstIDVar(data string, id instance.ID) (string, error) {
 }
 
 // handleProvisionTags sets the Infrakit-specific tags and merges with the user-defined in the instance spec
-func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceType, properties TResourceProperties) {
+func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceType, vmProperties TResourceProperties) {
 	// Add the name to the tags if it does not exist, issue case-insensitive
 	// check for the "name" key
 	if spec.Tags != nil {
@@ -384,31 +385,47 @@ func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceTyp
 		spec.Tags["LogicalID"] = string(*spec.LogicalID)
 	}
 
-	// Merge any user-defined tags and convert to platform specific tag type
+	// Merge any spec tags into the VM properties
+	mergeTagsIntoVMProps(vmType, vmProperties, spec.Tags)
+}
+
+// mergeTagsIntoVMProps merges the given tags into vmProperties in the appropriate
+// platform-specific tag format
+func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties, tags map[string]string) {
 	switch vmType {
 	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
-		if t, exists := properties["tags"]; !exists {
-			properties["tags"] = spec.Tags
-		} else if mm, ok := t.(map[string]interface{}); ok {
-			// merge tags
-			for tt, vv := range spec.Tags {
-				mm[tt] = vv
+		if vmTags, exists := vmProperties["tags"]; !exists {
+			// Need to be careful with type here; the tags saved in the VM properties need to be generic
+			// since that it how they are parsed from json
+			tagsInterface := make(map[string]interface{}, len(tags))
+			for k, v := range tags {
+				tagsInterface[k] = v
 			}
+			vmProperties["tags"] = tagsInterface
+		} else if tagsMap, ok := vmTags.(map[string]interface{}); ok {
+			// merge tags
+			for k, v := range tags {
+				tagsMap[k] = v
+			}
+		} else {
+			log.Errorf("mergeTagsIntoVMProps: invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"]))
 		}
 	case VMSoftLayer:
-		if _, has := properties["tags"]; !has {
-			properties["tags"] = []interface{}{}
+		if _, has := vmProperties["tags"]; !has {
+			vmProperties["tags"] = []interface{}{}
 		}
-		if tags, ok := properties["tags"].([]interface{}); ok {
+		if tagsArray, ok := vmProperties["tags"].([]interface{}); ok {
 			// softlayer uses a list of tags, instead of a map of tags
-			properties["tags"] = mergeLabelsIntoTagSlice(tags, spec.Tags)
+			vmProperties["tags"] = mergeLabelsIntoTagSlice(tagsArray, tags)
+		} else {
+			log.Errorf("mergeTagsIntoVMProps: invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"]))
 		}
-		// On Softlayer the tags must be lowercase
-		tagsLower := []string{}
-		for _, val := range properties["tags"].([]string) {
+		// All tags on Softlayer must be lower-case
+		tagsLower := []interface{}{}
+		for _, val := range vmProperties["tags"].([]string) {
 			tagsLower = append(tagsLower, strings.ToLower(val))
 		}
-		properties["tags"] = tagsLower
+		vmProperties["tags"] = tagsLower
 	}
 }
 
@@ -506,37 +523,16 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 		return err
 	}
 
-	vmType, vmName, props, err := FindVM(&tf)
+	vmType, vmName, vmProps, err := FindVM(&tf)
 	if err != nil {
 		return err
 	}
 
-	if len(props) == 0 || vmName != TResourceName(string(instance)) {
+	if len(vmProps) == 0 || vmName != TResourceName(string(instance)) {
 		return fmt.Errorf("not found:%v", instance)
 	}
 
-	switch vmType {
-	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
-		if _, has := props["tags"]; !has {
-			props["tags"] = map[string]interface{}{}
-		}
-
-		if tags, ok := props["tags"].(map[string]interface{}); ok {
-			for k, v := range labels {
-				tags[k] = v
-			}
-		}
-
-	case VMSoftLayer:
-		if _, has := props["tags"]; !has {
-			props["tags"] = []interface{}{}
-		}
-		tags, ok := props["tags"].([]interface{})
-		if !ok {
-			return fmt.Errorf("bad format:%v", instance)
-		}
-		props["tags"] = mergeLabelsIntoTagSlice(tags, labels)
-	}
+	mergeTagsIntoVMProps(vmType, vmProps, labels)
 
 	buff, err = json.MarshalIndent(tf, "  ", "  ")
 	if err != nil {

@@ -40,20 +40,19 @@ func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
 	for _, vmType := range VMTypes {
 		props := TResourceProperties{}
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
-		tags := props["tags"]
-		var expectedTags interface{}
 		if vmType == VMSoftLayer {
-			sort.Strings(props["tags"].([]string))
+			tags := props["tags"]
+			require.Len(t, tags, 2)
 			// Note that tags are all lowercase
-			expectedTags = []string{
-				"logicalid:logical-id-1",
-				"name:instance-1234"}
+			require.Contains(t, tags, "logicalid:logical-id-1")
+			require.Contains(t, tags, "name:instance-1234")
 		} else {
-			expectedTags = map[string]string{
+			expectedTags := map[string]interface{}{
 				"LogicalID": "logical-id-1",
-				"Name":      "instance-1234"}
+				"Name":      "instance-1234",
+			}
+			require.Equal(t, expectedTags, props["tags"])
 		}
-		require.Equal(t, expectedTags, tags)
 	}
 }
 
@@ -72,9 +71,9 @@ func TestHandleProvisionTagsEmptyTagsNoLogicalID(t *testing.T) {
 		tags := props["tags"]
 		var expectedTags interface{}
 		if vmType == VMSoftLayer {
-			expectedTags = []string{"name:instance-1234"}
+			expectedTags = []interface{}{"name:instance-1234"}
 		} else {
-			expectedTags = map[string]string{"Name": "instance-1234"}
+			expectedTags = map[string]interface{}{"Name": "instance-1234"}
 		}
 		require.Equal(t, expectedTags, tags)
 	}
@@ -95,22 +94,21 @@ func TestHandleProvisionTagsWithTagsLogicalID(t *testing.T) {
 	for _, vmType := range VMTypes {
 		props := TResourceProperties{}
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
-		tags := props["tags"]
-		var expectedTags interface{}
 		if vmType == VMSoftLayer {
-			sort.Strings(props["tags"].([]string))
+			tags := props["tags"]
+			require.Len(t, tags, 3)
 			// Note that tags are all lowercase
-			expectedTags = []string{
-				"foo:bar",
-				"logicalid:logical-id-1",
-				"name:existing-name"}
+			require.Contains(t, tags, "foo:bar")
+			require.Contains(t, tags, "logicalid:logical-id-1")
+			require.Contains(t, tags, "name:existing-name")
 		} else {
-			expectedTags = map[string]string{
+			expectedTags := map[string]interface{}{
 				"LogicalID": "logical-id-1",
 				"name":      "existing-name",
-				"foo":       "bar"}
+				"foo":       "bar",
+			}
+			require.Equal(t, expectedTags, props["tags"])
 		}
-		require.Equal(t, expectedTags, tags)
 	}
 }
 
@@ -128,15 +126,18 @@ func TestHandleProvisionTagsWithTagsNoLogicalID(t *testing.T) {
 	for _, vmType := range VMTypes {
 		props := TResourceProperties{}
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
-		tags := props["tags"]
-		var expectedTags interface{}
 		if vmType == VMSoftLayer {
-			sort.Strings(props["tags"].([]string))
-			expectedTags = []string{"foo:bar", "name:existing-name"}
+			tags := props["tags"]
+			require.Len(t, tags, 2)
+			require.Contains(t, tags, "foo:bar")
+			require.Contains(t, tags, "name:existing-name")
 		} else {
-			expectedTags = map[string]string{"Name": "existing-name", "foo": "bar"}
+			expectedTags := map[string]interface{}{
+				"Name": "existing-name",
+				"foo":  "bar",
+			}
+			require.Equal(t, expectedTags, props["tags"])
 		}
-		require.Equal(t, expectedTags, tags)
 	}
 }
 
@@ -1152,6 +1153,118 @@ func TestPlatformSpecificUpdatesWithEmptyHostanmePrefix(t *testing.T) {
 	require.Equal(t, "instance-1234", props["hostname"])
 }
 
+func TestMergeTagsIntoVMPropsEmpty(t *testing.T) {
+	for _, vmType := range VMTypes {
+		props := TResourceProperties{}
+		mergeTagsIntoVMProps(vmType.(TResourceType), props, map[string]string{})
+		var expectedTags interface{}
+		if vmType == VMSoftLayer {
+			expectedTags = []interface{}{}
+		} else {
+			expectedTags = map[string]interface{}{}
+		}
+		require.Equal(t, expectedTags, props["tags"])
+	}
+}
+
+func TestMergeTagsIntoVMPropsNoExtraTags(t *testing.T) {
+	for _, vmType := range VMTypes {
+		var props TResourceProperties
+		if vmType == VMSoftLayer {
+			props = TResourceProperties{
+				"tags": []interface{}{
+					"Name:instance-1234",
+					"foo:BaR",
+				},
+			}
+		} else {
+			props = TResourceProperties{
+				"tags": map[string]interface{}{
+					"Name": "instance-1234",
+					"foo":  "BaR",
+				},
+			}
+		}
+		mergeTagsIntoVMProps(vmType.(TResourceType), props, map[string]string{})
+		if vmType == VMSoftLayer {
+			tags := props["tags"]
+			require.Len(t, tags, 2)
+			// Note that tags are all lowercase
+			require.Contains(t, tags, "foo:bar")
+			require.Contains(t, tags, "name:instance-1234")
+		} else {
+			expectedTags := map[string]interface{}{
+				"Name": "instance-1234",
+				"foo":  "BaR",
+			}
+			require.Equal(t, expectedTags, props["tags"])
+		}
+
+	}
+}
+
+func TestMergeTagsIntoVMPropsNoVMTags(t *testing.T) {
+	for _, vmType := range VMTypes {
+		tags := map[string]string{
+			"Name": "instance-1234",
+			"foo":  "BaR",
+		}
+		props := TResourceProperties{}
+		mergeTagsIntoVMProps(vmType.(TResourceType), props, tags)
+		if vmType == VMSoftLayer {
+			tags := props["tags"]
+			require.Len(t, tags, 2)
+			// Note that tags are all lowercase
+			require.Contains(t, tags, "foo:bar")
+			require.Contains(t, tags, "name:instance-1234")
+		} else {
+			expectedTags := map[string]interface{}{
+				"Name": "instance-1234",
+				"foo":  "BaR",
+			}
+			require.Equal(t, expectedTags, props["tags"])
+		}
+	}
+}
+
+func TestMergeTagsIntoVMProps(t *testing.T) {
+	for _, vmType := range VMTypes {
+		var props TResourceProperties
+		if vmType == VMSoftLayer {
+			props = TResourceProperties{
+				"tags": []interface{}{
+					"Name:instance-1234",
+					"key:original",
+				},
+			}
+		} else {
+			props = TResourceProperties{
+				"tags": map[string]interface{}{
+					"Name": "instance-1234",
+					"key":  "original",
+				},
+			}
+		}
+		tags := map[string]string{
+			"Name": "instance-1234",
+			"key":  "override::val",
+		}
+		mergeTagsIntoVMProps(vmType.(TResourceType), props, tags)
+		if vmType == VMSoftLayer {
+			tags := props["tags"]
+			require.Len(t, tags, 2)
+			require.Contains(t, tags, "key:override::val")
+			require.Contains(t, tags, "name:instance-1234")
+		} else {
+			expectedTags := map[string]interface{}{
+				"Name": "instance-1234",
+				"key":  "override::val",
+			}
+			require.Equal(t, expectedTags, props["tags"])
+		}
+	}
+}
+
 func TestRenderInstIDVarNoReplace(t *testing.T) {
 	result, err := renderInstIDVar("{}", instance.ID("id"))
 	require.NoError(t, err)
@@ -1280,13 +1393,10 @@ func TestLabelCreateNewTags(t *testing.T) {
 		require.True(t, contains)
 		if vmType == VMSoftLayer {
 			// Tags as list
-			expectedTags := []string{"label1:value1", "label2:value2"}
-			actualTags := []string{}
-			for _, tag := range props["tags"].([]interface{}) {
-				actualTags = append(actualTags, tag.(string))
-			}
-			sort.Strings(actualTags)
-			require.Equal(t, expectedTags, actualTags)
+			tags := props["tags"]
+			require.Len(t, tags, 2)
+			require.Contains(t, tags, "label1:value1")
+			require.Contains(t, tags, "label2:value2")
 		} else {
 			// Tags are map
 			require.Equal(t,
@@ -1357,13 +1467,12 @@ func TestLabelMergeTags(t *testing.T) {
 		require.True(t, contains)
 		if vmType == VMSoftLayer {
 			// Tags as list
-			expectedTags := []string{"label1:value1", "label2:value2", "tag1:val1", "tag2:val2"}
-			actualTags := []string{}
-			for _, tag := range props["tags"].([]interface{}) {
-				actualTags = append(actualTags, tag.(string))
-			}
-			sort.Strings(actualTags)
-			require.Equal(t, expectedTags, actualTags)
+			tags := props["tags"]
+			require.Len(t, tags, 4)
+			require.Contains(t, tags, "tag1:val1")
+			require.Contains(t, tags, "tag2:val2")
+			require.Contains(t, tags, "label1:value1")
+			require.Contains(t, tags, "label2:value2")
 		} else {
 			// Tags are map
 			require.Equal(t,
