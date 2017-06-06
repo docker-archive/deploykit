@@ -1037,7 +1037,12 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
 			VMAmazon: {
-				TResourceName(name): {"vmp3": "vmv3"},
+				TResourceName(name): {
+					"vmp3": "vmv3",
+					"tags": map[string]interface{}{
+						attachTag: fmt.Sprintf("%s-dedicated,%s", name, "scope-managers"),
+					},
+				},
 			},
 			TResourceType("another-default"): {
 				TResourceName(name + "-another-default-name"): {"kdef-1": "vdef-1"},
@@ -1129,7 +1134,13 @@ func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
 	vmType := tf.Resource[VMSoftLayer]
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{
-			TResourceName(name): {"hostname": "mgr1", "vmp3": "vmv3"},
+			TResourceName(name): {
+				"hostname": "mgr1",
+				"vmp3":     "vmv3",
+				"tags": []interface{}{
+					fmt.Sprintf("%s:%s-dedicated", attachTag, name),
+				},
+			},
 		},
 		vmType,
 	)
@@ -1427,17 +1438,25 @@ func TestMergeTagsIntoVMProps(t *testing.T) {
 		tags := map[string]string{
 			"Name": "instance-1234",
 			"key":  "override::val",
+			// Input tag is comma separated
+			attachTag: fmt.Sprintf("%s,%s", "attach1", "attach2"),
 		}
 		mergeTagsIntoVMProps(vmType.(TResourceType), props, tags)
 		if vmType == VMSoftLayer {
 			tags := props["tags"]
-			require.Len(t, tags, 2)
+			require.Len(t, tags, 3)
 			require.Contains(t, tags, "key:override::val")
 			require.Contains(t, tags, "name:instance-1234")
+			// Changed to space separated
+			require.Contains(t,
+				tags,
+				fmt.Sprintf("%s:%s %s", attachTag, "attach1", "attach2"),
+			)
 		} else {
 			expectedTags := map[string]interface{}{
-				"Name": "instance-1234",
-				"key":  "override::val",
+				"Name":    "instance-1234",
+				"key":     "override::val",
+				attachTag: fmt.Sprintf("%s,%s", "attach1", "attach2"),
 			}
 			require.Equal(t, expectedTags, props["tags"])
 		}

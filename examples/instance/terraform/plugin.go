@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +30,11 @@ import (
 // and call terraform apply.  For describing instances, we parse the
 // result of terraform show.  Destroying an instance is simply removing a
 // tf.json file and call terraform apply again.
+
+const (
+	// AttachTag contains a space separated list of IDs that are to the instance
+	attachTag = "infrakit.attach"
+)
 
 type plugin struct {
 	Dir       string
@@ -438,6 +444,11 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 		// All tags on Softlayer must be lower-case
 		tagsLower := []interface{}{}
 		for _, val := range vmProperties["tags"].([]string) {
+			// Commas are not valid tag characters, change to a space for tag values that
+			// are a list
+			if strings.HasPrefix(val, attachTag+":") {
+				val = strings.Replace(val, ",", " ", -1)
+			}
 			tagsLower = append(tagsLower, strings.ToLower(val))
 		}
 		vmProperties["tags"] = tagsLower
@@ -495,6 +506,21 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 			}
 			resourceNameMap[TResourceName(newResourceName)] = resourceProps
 		}
+	}
+	// Update the vmProperties with the infrakit.attach tag
+	attach := []string{}
+	for filename := range fileMap {
+		if filename == generatedName {
+			continue
+		}
+		attach = append(attach, filename)
+	}
+	if len(attach) > 0 {
+		sort.Strings(attach)
+		tags := map[string]string{
+			attachTag: strings.Join(attach, ","),
+		}
+		mergeTagsIntoVMProps(vmType, vmProperties, tags)
 	}
 	// Handle any platform specific updates to the VM properties prior to writing out
 	platformSpecificUpdates(vmType, TResourceName(generatedName), logicalID, vmProperties)
