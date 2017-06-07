@@ -661,28 +661,27 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 
 	re := regexp.MustCompile("(.*)(instance-[0-9]+)")
 	result := []instance.Description{}
-	// now we scan for <instance_type.instance-<timestamp> as keys
-	for t, vm := range localSpecs {
+	// now we scan for <instance_type.instance-<timestamp>> as keys
+	for vmType, vm := range localSpecs {
 	scan:
-		for k, v := range vm {
-			matches := re.FindStringSubmatch(string(k))
+		for vmName, vmProps := range vm {
+			// Only process valid instance-xxxx resources
+			matches := re.FindStringSubmatch(string(vmName))
 			if len(matches) == 3 {
 				id := matches[2]
 
 				inst := instance.Description{
-					Tags:      terraformTags(v, "tags"),
+					Tags:      parseTerraformTags(vmType, vmProps),
 					ID:        instance.ID(id),
-					LogicalID: terraformLogicalID(v),
+					LogicalID: terraformLogicalID(vmProps),
 				}
 
 				if properties {
-					if vms, has := terraformShowResult[t]; has {
-						if details, has := vms[k]; has {
-
+					if vms, has := terraformShowResult[vmType]; has {
+						if details, has := vms[vmName]; has {
 							if encoded, err := types.AnyValue(details); err == nil {
 								inst.Properties = encoded
 							}
-
 						}
 					}
 				}
@@ -707,39 +706,42 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	return result, nil
 }
 
-func terraformTags(m TResourceProperties, key string) map[string]string {
+// parseTerraformTags parses the platform-specific tags into a generic map
+func parseTerraformTags(vmType TResourceType, m TResourceProperties) map[string]string {
 	tags := map[string]string{}
-	if mm, ok := m[key].(map[string]interface{}); ok {
-		for k, v := range mm {
-			tags[k] = fmt.Sprintf("%v", v)
-		}
-		return tags
-	} else if mm, ok := m[key].([]interface{}); ok {
-		// add each tag in the list to the tags map
-		for _, v := range mm {
-			value := fmt.Sprintf("%v", v)
-			if strings.Contains(value, ":") {
-				log.Debugln("terraformTags system tags detected v=", v)
-				// This assumes that the first colon is separating the key and the value of the tag.
-				// This is done so that colons are valid characters in the value.
-				vv := strings.SplitN(value, ":", 2)
-				tags[vv[0]] = vv[1]
-			} else {
-				tags[value] = "" // for list but no ':"
+	switch vmType {
+	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
+		if tagsMap, ok := m["tags"].(map[string]interface{}); ok {
+			for k, v := range tagsMap {
+				tags[k] = fmt.Sprintf("%v", v)
 			}
+		} else {
+			log.Errorf("parseTerraformTags: invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"]))
 		}
-		log.Debugln("terraformTags return tags", tags)
-		return tags
-	} else {
-		log.Errorln("terraformTags: invalid terraformTags tags value", m[key])
-	}
-
-	for k, v := range m {
-		if k != "tags.%" && strings.Index(k, "tags.") == 0 {
-			n := k[len("tags."):]
-			tags[n] = fmt.Sprintf("%v", v)
+	case VMSoftLayer:
+		if tagsSlice, ok := m["tags"].([]interface{}); ok {
+			for _, v := range tagsSlice {
+				value := fmt.Sprintf("%v", v)
+				if strings.Contains(value, ":") {
+					log.Debugln("parseTerraformTags system tags detected v=", v)
+					// This assumes that the first colon is separating the key and the value of the tag.
+					// This is done so that colons are valid characters in the value.
+					vv := strings.SplitN(value, ":", 2)
+					// Commas are not valid tag characters so a space was used, change back to a common
+					// for tag values that are a slice
+					if vv[0] == attachTag {
+						vv[1] = strings.Replace(vv[1], " ", ",", -1)
+					}
+					tags[vv[0]] = vv[1]
+				} else {
+					tags[value] = "" // for list but no ':"
+				}
+			}
+		} else {
+			log.Errorln("parseTerraformTags: invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"]))
 		}
 	}
+	log.Debugln("parseTerraformTags return tags", tags)
 	return tags
 }
 

@@ -304,6 +304,97 @@ func TestProvisionInvalidTemplateInit(t *testing.T) {
 	require.True(t, strings.HasPrefix(err.Error(), "template:"))
 }
 
+func TestProvisionDescribeDestroyScope(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMAmazon: {
+			TResourceName("host"): {
+				"vmp1": "vmv1", "vmp2": "vmv2",
+				PropScope: ValScopeDefault,
+			},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {
+				"fsp1": "fsv1", "fsp2": "fsv2",
+				PropScope: ValScopeDedicated,
+			},
+		},
+		TResourceType("softlayer_block_storage"): {
+			TResourceName("worker_bs"): {
+				"bsp1": "bsv1", "bsp2": "bsv2",
+				PropScope: "managers",
+			},
+		},
+		TResourceType("another-dedicated"): {
+			TResourceName("another-dedicated-name"): {
+				"kded-1":  "vded-1",
+				PropScope: ValScopeDedicated,
+			},
+		},
+		TResourceType("another-default"): {
+			TResourceName("another-default-name"): {"kdef-1": "vdef-1"},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	spec := instance.Spec{
+		Properties:  types.AnyBytes(buff),
+		Tags:        map[string]string{"tag1": "val1"},
+		Init:        "",
+		Attachments: []instance.Attachment{},
+		LogicalID:   nil,
+	}
+	id, err := terraform.Provision(spec)
+	require.NoError(t, err)
+	results, err := terraform.DescribeInstances(
+		map[string]string{"tag1": "val1"},
+		false,
+	)
+	require.NoError(t, err)
+	expectedAttach := []string{string(*id) + "-dedicated", "scope-managers"}
+	require.Equal(t,
+		[]instance.Description{
+			{
+				ID: *id,
+				Tags: map[string]string{
+					attachTag: strings.Join(expectedAttach, ","),
+					"Name":    string(*id),
+					"tag1":    "val1",
+				},
+			},
+		},
+		results)
+	// Should be files for the 2 attachments and the 1 VM
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 3)
+	for _, path := range expectedAttach {
+		tfPath1 := filepath.Join(dir, path+".tf.json")
+		_, err = ioutil.ReadFile(tfPath1)
+		require.NoError(t, err)
+	}
+	// Should be able to Destroy each
+	err = terraform.Destroy(*id)
+	require.NoError(t, err)
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+
+	err = terraform.Destroy(instance.ID(expectedAttach[0]))
+	require.NoError(t, err)
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	err = terraform.Destroy(instance.ID(expectedAttach[1]))
+	require.NoError(t, err)
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 0)
+}
+
 func TestRunValidateProvisionDescribe(t *testing.T) {
 	// Test a softlayer_virtual_guest with an @hostname_prefix
 	runValidateProvisionDescribe(t, "softlayer_virtual_guest", `
@@ -1686,64 +1777,85 @@ func TestLabelMergeTags(t *testing.T) {
 	}
 }
 
-func TestTerraformTagsEmpty(t *testing.T) {
+func TestParseTerraformTagsEmpty(t *testing.T) {
 	// No tags
 	props := TResourceProperties{"foo": "bar"}
-	result := terraformTags(props, "tags")
-	require.Equal(t, map[string]string{}, result)
+	for _, vmType := range VMTypes {
+		result := parseTerraformTags(vmType.(TResourceType), props)
+		require.Equal(t, map[string]string{}, result)
+	}
 	// Invalid type
 	props = TResourceProperties{
 		"foo":  "bar",
 		"tags": true,
 	}
-	result = terraformTags(props, "tags")
-	require.Equal(t, map[string]string{}, result)
+	for _, vmType := range VMTypes {
+		result := parseTerraformTags(vmType.(TResourceType), props)
+		require.Equal(t, map[string]string{}, result)
+	}
 }
 
-func TestTerraformTagsMap(t *testing.T) {
-	props := TResourceProperties{
-		"foo": "bar",
-		"tags": map[string]interface{}{
-			"t1": "v1",
-			"t2": "v2",
-			"t3": "v3:extra",
-		},
+func TestParseTerraformTags(t *testing.T) {
+	for _, vmType := range VMTypes {
+		var props TResourceProperties
+		switch vmType {
+		case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
+			props = TResourceProperties{
+				"foo": "bar",
+				"tags": map[string]interface{}{
+					"t1": "v1",
+					"t2": "v2",
+					"t3": "v3:extra",
+				},
+			}
+		case VMSoftLayer:
+			props = TResourceProperties{
+				"foo": "bar",
+				"tags": []interface{}{
+					"t1:v1",
+					"t2:v2",
+					"t3:v3:extra",
+				},
+			}
+		default:
+			require.Fail(t, fmt.Sprintf("parseTerraformTags not handled for type: %v", vmType))
+		}
+		result := parseTerraformTags(vmType.(TResourceType), props)
+		require.Equal(t,
+			map[string]string{"t1": "v1", "t2": "v2", "t3": "v3:extra"},
+			result,
+		)
 	}
-	result := terraformTags(props, "tags")
-	require.Equal(t,
-		map[string]string{"t1": "v1", "t2": "v2", "t3": "v3:extra"},
-		result,
-	)
 }
 
-func TestTerraformTagsList(t *testing.T) {
-	props := TResourceProperties{
-		"foo": "bar",
-		"tags": []interface{}{
-			"t1:v1",
-			"t2:v2",
-			"t3:v3:extra",
-		},
+func TestParseTerraformTagsInfrakitAttach(t *testing.T) {
+	for _, vmType := range VMTypes {
+		var props TResourceProperties
+		switch vmType {
+		case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
+			props = TResourceProperties{
+				"foo": "bar",
+				"tags": map[string]interface{}{
+					"infrakit.attach": "attach1,attach2",
+				},
+			}
+		case VMSoftLayer:
+			props = TResourceProperties{
+				"foo": "bar",
+				"tags": []interface{}{
+					// Space should be parsed to a comma
+					"infrakit.attach:attach1 attach2",
+				},
+			}
+		default:
+			require.Fail(t, fmt.Sprintf("parseTerraformTags not handled for type: %v", vmType))
+		}
+		result := parseTerraformTags(vmType.(TResourceType), props)
+		require.Equal(t,
+			map[string]string{"infrakit.attach": "attach1,attach2"},
+			result,
+		)
 	}
-	result := terraformTags(props, "tags")
-	require.Equal(t,
-		map[string]string{"t1": "v1", "t2": "v2", "t3": "v3:extra"},
-		result,
-	)
-}
-
-func TestTerraformTagRawProperties(t *testing.T) {
-	props := TResourceProperties{
-		"foo":     "bar",
-		"tags.%":  2,
-		"tags.t1": "v1",
-		"tags.t2": "v2",
-	}
-	result := terraformTags(props, "tags")
-	require.Equal(t,
-		map[string]string{"t1": "v1", "t2": "v2"},
-		result,
-	)
 }
 
 func TestTerraformLogicalIDNoID(t *testing.T) {
@@ -1916,4 +2028,70 @@ func TestDescribe(t *testing.T) {
 	require.Contains(t, ids, instance.ID(id1))
 	require.Contains(t, ids, instance.ID(id2))
 	require.Contains(t, ids, instance.ID(id3))
+}
+
+func TestDescribeAttachTag(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+
+	inst1 := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	id1 := "instance-1"
+	inst1[VMSoftLayer] = map[TResourceName]TResourceProperties{
+		TResourceName(id1): {
+			"tags": []string{
+				"key:val",
+				// Tag value has space delimiter
+				fmt.Sprintf("%s:attach1-1 attach1-2", attachTag),
+			},
+		},
+	}
+	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id1)), buff, 0644)
+	require.NoError(t, err)
+
+	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	id2 := "instance-2"
+	inst2[VMAzure] = map[TResourceName]TResourceProperties{
+		TResourceName(id2): {
+			"tags": map[string]string{
+				"key": "val",
+				// Tag value has comma delimiter
+				attachTag: "attach2-1,attach2-2",
+			},
+		},
+	}
+	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id2)), buff, 0644)
+	require.NoError(t, err)
+
+	// Get both instances
+	results, err := terraform.DescribeInstances(
+		map[string]string{"key": "val"},
+		false)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	require.Contains(t,
+		results,
+		instance.Description{
+			ID: instance.ID(id1),
+			Tags: map[string]string{
+				"key":     "val",
+				attachTag: "attach1-1,attach1-2",
+			},
+		},
+	)
+	require.Contains(t,
+		results,
+		instance.Description{
+			ID: instance.ID(id2),
+			Tags: map[string]string{
+				"key":     "val",
+				attachTag: "attach2-1,attach2-2",
+			},
+		},
+	)
 }
