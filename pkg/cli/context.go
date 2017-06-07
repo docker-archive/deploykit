@@ -4,19 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/plugin"
-	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
-	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
-	"github.com/docker/infrakit/pkg/spi/group"
-	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
-	"github.com/docker/infrakit/pkg/types"
-	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/cobra"
 )
 
@@ -293,6 +287,24 @@ func (c *Context) Funcs() []template.Function {
 			},
 		},
 		{
+			Name: "file",
+			Func: func(p string, content interface{}) (string, error) {
+				if c.exec {
+					var buff []byte
+					switch content := content.(type) {
+					case []byte:
+						buff = content
+					case string:
+						buff = []byte(content)
+					default:
+						buff = []byte(fmt.Sprintf("%v", content))
+					}
+					return "", ioutil.WriteFile(p, buff, 0644)
+				}
+				return "", nil
+			},
+		},
+		{
 			Name: "include",
 			Func: func(p string, opt ...interface{}) (string, error) {
 				// Overrides the base 'include' to account for the fact that
@@ -426,147 +438,6 @@ func (c *Context) Funcs() []template.Function {
 	}
 }
 
-// loadBackend determines the backend to use for executing the rendered template text (e.g. run in shell).
-// During this phase, the template delimiters are changed to =% %= so put this in the comment {{/* */}}
-func (c *Context) loadBackends(t *template.Template) error {
-	t.AddFunc("print",
-		func() string {
-			c.run = func(script string) error {
-				fmt.Println(script)
-				return nil
-			}
-			return ""
-		})
-	t.AddFunc("instanceProvision",
-		func(name string, isYAML bool) string {
-			c.run = func(script string) error {
-
-				// locate the plugin
-				endpoint, err := c.plugins().Find(plugin.Name(name))
-				if err != nil {
-					return err
-				}
-
-				plugin, err := instance_plugin.NewClient(plugin.Name(name), endpoint.Address)
-				if err != nil {
-					return err
-				}
-
-				spec := instance.Spec{}
-				if isYAML {
-					y, err := types.AnyYAML([]byte(script))
-					if err != nil {
-						return err
-					}
-					if err := y.Decode(&spec); err != nil {
-						return err
-					}
-				} else {
-					if err := types.AnyString(script).Decode(&spec); err != nil {
-						return err
-					}
-				}
-
-				id, err := plugin.Provision(spec)
-				if err != nil {
-					return err
-				}
-				fmt.Println(*id)
-				return nil
-			}
-			return ""
-		})
-
-	t.AddFunc("managerCommit",
-		func(isYAML, pretend bool) string {
-			c.run = func(script string) error {
-
-				groups := []plugin.Spec{}
-				if isYAML {
-					y, err := types.AnyYAML([]byte(script))
-					if err != nil {
-						return err
-					}
-					if err := y.Decode(&groups); err != nil {
-						return err
-					}
-				} else {
-					if err := types.AnyString(script).Decode(&groups); err != nil {
-						return err
-					}
-				}
-
-				// Check the list of plugins
-				for _, gp := range groups {
-
-					endpoint, err := c.plugins().Find(gp.Plugin)
-					if err != nil {
-						return err
-					}
-
-					// unmarshal the group spec
-					spec := group.Spec{}
-					if gp.Properties != nil {
-						err = gp.Properties.Decode(&spec)
-						if err != nil {
-							return err
-						}
-					}
-
-					target, err := group_plugin.NewClient(endpoint.Address)
-
-					log.Debug("commit", "plugin", gp.Plugin, "address", endpoint.Address, "err", err, "spec", spec)
-
-					if err != nil {
-						return err
-					}
-
-					plan, err := target.CommitGroup(spec, pretend)
-					if err != nil {
-						return err
-					}
-
-					fmt.Println("Group", spec.ID, "with plugin", gp.Plugin, "plan:", plan)
-				}
-				return nil
-			}
-			return ""
-		})
-
-	t.AddFunc("sh",
-		func(opts ...string) string {
-			c.run = func(script string) error {
-
-				cmd := strings.Join(append([]string{"/bin/sh"}, opts...), " ")
-				log.Debug("sh", "cmd", cmd)
-
-				run := exec.Command(cmd)
-				run.InheritEnvs(true).StartWithHandlers(
-					func(stdin io.Writer) error {
-						_, err := stdin.Write([]byte(script))
-						return err
-					},
-					func(stdout io.Reader) error {
-						_, err := io.Copy(os.Stdout, stdout)
-						return err
-					},
-					func(stderr io.Reader) error {
-						_, err := io.Copy(os.Stderr, stderr)
-						return err
-					},
-				)
-				return run.Wait()
-			}
-			return ""
-		})
-
-	_, err := t.Render(c)
-
-	// clean up after we rendered...  remove the functions
-	t.RemoveFunc("sh", "print", "instanceProvision", "managerCommit")
-	return err
-}
-
 func (c *Context) getTemplate() (*template.Template, error) {
 	if c.template == nil {
 		t, err := template.NewTemplate(c.src, template.Options{})
@@ -593,6 +464,9 @@ func (c *Context) BuildFlags() (err error) {
 
 // Execute runs the command
 func (c *Context) Execute() (err error) {
+
+	c.exec = true
+
 	var t *template.Template
 
 	t, err = c.getTemplate()
@@ -600,7 +474,21 @@ func (c *Context) Execute() (err error) {
 		return
 	}
 
-	// First pass to get the backends
+	c.template = t
+
+	// Process the input, render the template
+	t.SetOptions(template.Options{
+		Stderr: func() io.Writer { return os.Stderr },
+	})
+
+	script, err := configureTemplate(t, c.plugins).Render(c)
+	if err != nil {
+		return err
+	}
+	c.script = script
+	log.Debug("running", "script", script)
+
+	// Determine the backends
 	t.SetOptions(template.Options{
 		DelimLeft:  "=%",
 		DelimRight: "%=",
@@ -610,19 +498,6 @@ func (c *Context) Execute() (err error) {
 		return err
 	}
 
-	// Now regular processing
-	t.SetOptions(template.Options{
-		Stderr: func() io.Writer { return os.Stderr },
-	})
-
-	c.exec = true
-	c.template = t
-	script, err := configureTemplate(t, c.plugins).Render(c)
-	if err != nil {
-		return err
-	}
-	c.script = script
-	log.Debug("running", "script", script)
 	if c.run != nil {
 		return c.run(script)
 	}
