@@ -28,6 +28,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/cli/v1"
 
 	// CLI backends
+	_ "github.com/docker/infrakit/pkg/cli/backend/http"
 	_ "github.com/docker/infrakit/pkg/cli/backend/instance"
 	_ "github.com/docker/infrakit/pkg/cli/backend/manager"
 	_ "github.com/docker/infrakit/pkg/cli/backend/print"
