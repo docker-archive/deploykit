@@ -15,24 +15,24 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
 
-	_ "github.com/docker/infrakit/pkg/cli/v1"
-
-	// TODO - deprecate these in favor of the dynamic commands (see above)
-	//_ "github.com/docker/infrakit/cmd/infrakit/flavor"
-	//_ "github.com/docker/infrakit/cmd/infrakit/group"
-	//_ "github.com/docker/infrakit/cmd/infrakit/instance"
-	//_ "github.com/docker/infrakit/cmd/infrakit/resource"
-
+	// CLI commands
 	_ "github.com/docker/infrakit/cmd/infrakit/event"
 	_ "github.com/docker/infrakit/cmd/infrakit/manager"
 	_ "github.com/docker/infrakit/cmd/infrakit/metadata"
-
 	_ "github.com/docker/infrakit/cmd/infrakit/playbook"
 	_ "github.com/docker/infrakit/cmd/infrakit/plugin"
 	_ "github.com/docker/infrakit/cmd/infrakit/remote"
 	_ "github.com/docker/infrakit/cmd/infrakit/template"
 	_ "github.com/docker/infrakit/cmd/infrakit/util"
 	_ "github.com/docker/infrakit/cmd/infrakit/x"
+	_ "github.com/docker/infrakit/pkg/cli/v1"
+
+	// CLI backends
+	_ "github.com/docker/infrakit/pkg/cli/backend/http"
+	_ "github.com/docker/infrakit/pkg/cli/backend/instance"
+	_ "github.com/docker/infrakit/pkg/cli/backend/manager"
+	_ "github.com/docker/infrakit/pkg/cli/backend/print"
+	_ "github.com/docker/infrakit/pkg/cli/backend/sh"
 )
 
 func init() {

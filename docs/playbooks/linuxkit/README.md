@@ -22,6 +22,7 @@ The URL `https://docker.github.io/infrakit/playbooks/linuxkit/index.yml` is for 
 that is being served by github pages.  If you cloned the repo, you can speed up things by referencing
 a local file via the `file://` scheme in the URL.
 
+
 Now verify:
 ```shell
 $ infrakit playbook linuxkit -h
