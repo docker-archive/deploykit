@@ -46,16 +46,20 @@ docker run  -d --volumes-from infrakit --name manager \
 
 {{ source "start-instance-packet.sh" }}
 
-echo "Updating hosts file"
 {{ $hostsFile := list (env `INFRAKIT_HOME`) `/hosts` | join `` }}
 {{ $hosts :=  include (list `file://` $hostsFile | join ``) | yamlDecode }}
 {{ $_ := set $hosts `docker4mac` (list `localhost` $port | join `:`) }}
-echo "{{ $hosts | yamlEncode }}" > {{ $hostsFile }}
+echo "Updating hosts file"
+{{ $hosts | yamlEncode | file $hostsFile }}
+echo "Updated hosts file"
+
+
+
 echo "Updated hosts file.  You are using the remote `docker4mac` as defined in your hosts file in INFRAKIT_HOME/hosts"
 
 echo "Started hyperkit: {{ var `started-hyperkit` }}"
 echo "Started gcp:      {{ var `started-gcp` }}"
-echo "Started packet:      {{ var `started-packet` }}"
+echo "Started packet:   {{ var `started-packet` }}"
 
 tracked=``
 # Start any tracker of resources
@@ -75,7 +79,7 @@ if [[ "$tracked" != "" ]]; then
 	   {{ $image }} infrakit util track --name tracker $tracked
 fi
 
-# Fileserver for ixpe boot from your host
+# Fileserver for ipxe boot from your host
 {{ $path := flag `fileserver-path` `string` `Path to serve from` | prompt "Directory to serve from?" `string` (env `PWD`) }}
 {{ $port := flag `fileserver-port` `int` `Listen port` | prompt "Listening port?" `int` 8080 }}
 
@@ -86,3 +90,4 @@ docker run  -d --rm --name infrakit-fileserver \
        {{ $image }} infrakit util fileserver /files
 
 echo "Don't forget to start up ngrok!!!"
+
