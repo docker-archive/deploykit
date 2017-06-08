@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -41,7 +40,7 @@ const (
 type plugin struct {
 	Dir          string
 	fs           afero.Fs
-	lock         lockfile.Lockfile
+	fsLock       lockfile.Lockfile
 	applying     bool
 	applyLock    sync.Mutex
 	pretend      bool // true to actually do terraform apply
@@ -53,7 +52,7 @@ type plugin struct {
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
 func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
-	lock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
+	fsLock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +74,7 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 	return &plugin{
 		Dir:          dir,
 		fs:           afero.NewOsFs(),
-		lock:         lock,
+		fsLock:       fsLock,
 		pollInterval: pollInterval,
 		pluginLookup: pluginLookup,
 	}
@@ -262,6 +261,7 @@ func (p *plugin) Validate(req *types.Any) error {
 	return nil
 }
 
+// scanLocalFiles reads the filesystem and loads as tf.json files
 func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 	re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
 
@@ -297,27 +297,6 @@ func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResource
 			return nil
 		})
 	return vms, err
-}
-
-func (p *plugin) ensureUniqueFile() string {
-	for {
-		if err := p.lock.TryLock(); err == nil {
-			defer p.lock.Unlock()
-			return ensureUniqueFile(p.Dir)
-		}
-		log.Infoln("Can't acquire lock, waiting")
-		time.Sleep(time.Duration(int64(rand.NormFloat64())%1000) * time.Millisecond)
-	}
-}
-
-func ensureUniqueFile(dir string) string {
-	n := fmt.Sprintf("instance-%d", time.Now().Unix())
-	// if we can open then we have to try again... the file cannot exist currently
-	if f, err := os.Open(filepath.Join(dir, n) + ".tf.json"); err == nil {
-		f.Close()
-		return ensureUniqueFile(dir)
-	}
-	return n
 }
 
 // platformSpecificUpdates handles unique platform specific logic
@@ -560,14 +539,35 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 	return nil
 }
 
+// ensureUniqueFile returns a filename that is not in use
+func ensureUniqueFile(dir string) string {
+	// use timestamp as instance id
+	n := fmt.Sprintf("instance-%d", time.Now().Unix())
+	// if we can open then we have to try again... the file cannot exist currently
+	if f, err := os.Open(filepath.Join(dir, n) + ".tf.json"); err == nil {
+		f.Close()
+		return ensureUniqueFile(dir)
+	}
+	return n
+}
+
 // Provision creates a new instance based on the spec.
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	// Because the format of the spec.Properties is simply the same tf.json
 	// we simply look for vm instance and merge in the tags, and user init, etc.
 
-	// use timestamp as instance id
-	name := p.ensureUniqueFile()
+	// Hold the fs lock for the duration since the file is written at the end
+	var name string
+	for {
+		if err := p.fsLock.TryLock(); err == nil {
+			defer p.fsLock.Unlock()
+			name = ensureUniqueFile(p.Dir)
+			break
+		}
+		log.Infoln("Can't acquire fsLock on Provision, waiting")
+		time.Sleep(time.Second)
+	}
 	id := instance.ID(name)
 
 	// Template the {{ var "/self/instId" }} var in both the Properties and the Init
@@ -610,6 +610,15 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // Label labels the instance
 func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
+	// Acquire lock
+	for {
+		if err := p.fsLock.TryLock(); err == nil {
+			defer p.fsLock.Unlock()
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
 	buff, err := afero.ReadFile(p.fs, filepath.Join(p.Dir, string(instance)+".tf.json"))
 	if err != nil {
 		return err
@@ -654,6 +663,15 @@ func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
 // doDestroy terminates an existing instance and optionally terminates any related
 // resources
 func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
+	// Acquire lock
+	for {
+		if err := p.fsLock.TryLock(); err == nil {
+			defer p.fsLock.Unlock()
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
 	filename := string(inst) + ".tf.json"
 	fp := filepath.Join(p.Dir, filename)
 
@@ -740,6 +758,14 @@ func parseAttachTagFromFile(fp string) ([]string, error) {
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
+	// Acquire lock since we are reading all files and potentially running "terraform show"
+	for {
+		if err := p.fsLock.TryLock(); err == nil {
+			defer p.fsLock.Unlock()
+			break
+		}
+		time.Sleep(time.Second)
+	}
 
 	// localSpecs are what we told terraform to create - these are the generated files.
 	localSpecs, err := p.scanLocalFiles()
