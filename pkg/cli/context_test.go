@@ -8,6 +8,12 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/docker/infrakit/pkg/cli/backend/http"
+	_ "github.com/docker/infrakit/pkg/cli/backend/instance"
+	_ "github.com/docker/infrakit/pkg/cli/backend/manager"
+	_ "github.com/docker/infrakit/pkg/cli/backend/print"
+	_ "github.com/docker/infrakit/pkg/cli/backend/sh"
 )
 
 func TestMissing(t *testing.T) {
