@@ -62,7 +62,7 @@ Here is a list of plugins:
 | [infrakit/terraform](./examples/instance/terraform) | instance | creates resources using Terraform       |
 | [infrakit/maas](./examples/instance/maas)           | instance | bare-metal provisioning using Ubuntu MAAS  |
 | [infrakit/vagrant](./examples/instance/vagrant)     | instance | creates Vagrant VMs                     |
-| [infrakit/hyperkit](./pkg/plugin/instance/hyperkit)   | instance | creates Xhyve VMs on Mac OSX            |
+| [infrakit/hyperkit](./pkg/plugin/instance/hyperkit)   | instance | creates [HyperKit](https://github.com/moby/hyperkit) VMs on Mac OSX |
 | [infrakit/packet](./pkg/plugin/instance/packet)       | instance | provisions bare metal hosts on Packet   |
 | [infrakit/libvirt](./pkg/plugin/instance/libvirt)     | instance | provisions KVM vms via libvirt          |
 | [docker/infrakit.aws](https://github.com/docker/infrakit.aws)       | instance | creates Amazon EC2 instances and other resource types |
