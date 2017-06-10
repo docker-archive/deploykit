@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
-	"github.com/docker/infrakit.gcp/plugin/group"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/group"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/flavor"

@@ -5,8 +5,7 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit.gcp/plugin/gcloud"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -55,7 +54,7 @@ func (p *plugin) buildTopics() map[string]interface{} {
 }
 
 func (p *plugin) addTopic(topics map[string]interface{}, path string, getter func() (string, error)) {
-	metadata_plugin.Put(metadata_plugin.Path(path), func() interface{} {
+	types.Put(types.PathFromString(path), func() interface{} {
 		value, err := getter()
 		if err != nil {
 			return nil // TODO
@@ -66,14 +65,14 @@ func (p *plugin) addTopic(topics map[string]interface{}, path string, getter fun
 
 // List returns a list of *child nodes* given a path, which is specified as a slice
 // where for i > j path[i] is the parent of path[j]
-func (p *plugin) List(topic metadata.Path) ([]string, error) {
+func (p *plugin) List(topic types.Path) ([]string, error) {
 	p.loadTopics()
 
 	return types.List(topic, p.topics), nil
 }
 
 // Get retrieves the value at path given.
-func (p *plugin) Get(topic metadata.Path) (*types.Any, error) {
+func (p *plugin) Get(topic types.Path) (*types.Any, error) {
 	p.loadTopics()
 
 	return types.GetValue(topic, p.topics)

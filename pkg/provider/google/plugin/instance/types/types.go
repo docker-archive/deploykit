@@ -3,7 +3,7 @@ package types
 import (
 	"fmt"
 
-	"github.com/docker/infrakit.gcp/plugin/gcloud"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )

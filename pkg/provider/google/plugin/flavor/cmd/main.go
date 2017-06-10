@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
-	"github.com/docker/infrakit.gcp/plugin/flavor"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/flavor"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
 	flavor_plugin "github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/spf13/cobra"

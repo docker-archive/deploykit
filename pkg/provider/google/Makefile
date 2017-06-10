@@ -1,5 +1,5 @@
 # REPO
-REPO?=github.com/docker/infrakit.gcp
+REPO?=github.com/docker/infrakit/pkg/provider/google
 
 # Set an output prefix, which is the local directory if not specified
 PREFIX?=$(shell pwd -L)
@@ -57,7 +57,7 @@ clean:
 
 define build_binary
 	go build -o build/$(1) \
-		-ldflags "-X github.com/docker/infrakit.gcp/plugin.Version=$(VERSION) -X github.com/docker/infrakit.gcp/plugin.Revision=$(REVISION)" $(2)
+		-ldflags "-X github.com/docker/infrakit/pkg/provider/google/plugin.Version=$(VERSION) -X github.com/docker/infrakit/pkg/provider/google/plugin.Revision=$(REVISION)" $(2)
 endef
 binaries: clean build-binaries
 build-binaries:
@@ -66,9 +66,9 @@ ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
 endif
 
-	$(call build_binary,infrakit-instance-gcp,github.com/docker/infrakit.gcp/plugin/instance/cmd)
-	$(call build_binary,infrakit-group-gcp,github.com/docker/infrakit.gcp/plugin/group/cmd)
-	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit.gcp/plugin/flavor/cmd)
+	$(call build_binary,infrakit-instance-gcp,github.com/docker/infrakit/pkg/provider/google/plugin/instance/cmd)
+	$(call build_binary,infrakit-group-gcp,github.com/docker/infrakit/pkg/provider/google/plugin/group/cmd)
+	$(call build_binary,infrakit-flavor-combo,github.com/docker/infrakit/pkg/provider/google/plugin/flavor/cmd)
 
 install:
 	@echo "+ $@"

@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit.gcp/plugin/gcloud"
-	instance_types "github.com/docker/infrakit.gcp/plugin/instance/types"
-	"github.com/docker/infrakit.gcp/plugin/instance/util"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
+	instance_types "github.com/docker/infrakit/pkg/provider/google/plugin/instance/types"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/instance/util"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -41,7 +41,7 @@ func (p *plugin) VendorInfo() *spi.VendorInfo {
 			Name:    "infrakit-instance-gcp",
 			Version: "0.5.0",
 		},
-		URL: "https://github.com/docker/infrakit.gcp",
+		URL: "https://github.com/docker/infrakit/pkg/provider/google",
 	}
 }
 

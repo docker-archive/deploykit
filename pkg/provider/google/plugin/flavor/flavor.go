@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit.gcp/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/plugin/group"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"

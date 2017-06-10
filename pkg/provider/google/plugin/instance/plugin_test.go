@@ -5,8 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
-	mock_gcloud "github.com/docker/infrakit.gcp/mock/gcloud"
-	"github.com/docker/infrakit.gcp/plugin/gcloud"
+	mock_gcloud "github.com/docker/infrakit/pkg/provider/google/mock/gcloud"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"

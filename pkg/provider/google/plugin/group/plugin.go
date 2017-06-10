@@ -8,10 +8,10 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit.gcp/plugin/gcloud"
-	instance_types "github.com/docker/infrakit.gcp/plugin/instance/types"
 	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
+	instance_types "github.com/docker/infrakit/pkg/provider/google/plugin/instance/types"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -54,7 +54,7 @@ func (p *plugin) VendorInfo() *spi.VendorInfo {
 			Name:    "infrakit-group-gcp",
 			Version: "0.3.0",
 		},
-		URL: "https://github.com/docker/infrakit.gcp",
+		URL: "https://github.com/docker/infrakit/pkg/provider/google",
 	}
 }
 

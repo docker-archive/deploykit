@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit.gcp/plugin"
-	instance_plugin "github.com/docker/infrakit.gcp/plugin/instance"
-	metadata_plugin "github.com/docker/infrakit.gcp/plugin/metadata"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/provider/google/plugin"
+	instance_plugin "github.com/docker/infrakit/pkg/provider/google/plugin/instance"
+	metadata_plugin "github.com/docker/infrakit/pkg/provider/google/plugin/metadata"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/spf13/cobra"

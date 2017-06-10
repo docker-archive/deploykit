@@ -3,8 +3,8 @@ package metadata
 import (
 	"testing"
 
-	mock_gcloud "github.com/docker/infrakit.gcp/mock/gcloud"
-	"github.com/docker/infrakit.gcp/plugin/gcloud"
+	mock_gcloud "github.com/docker/infrakit/pkg/provider/google/mock/gcloud"
+	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
