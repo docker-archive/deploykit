@@ -18,7 +18,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	util := &cobra.Command{
 		Use:   "util",
-		Short: "Utilties",
+		Short: "Utilities",
 	}
 
 	util.AddCommand(
