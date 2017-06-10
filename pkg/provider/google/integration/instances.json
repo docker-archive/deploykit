@@ -1,0 +1,30 @@
+{
+  "ID": "instances",
+  "Properties": {
+    "Allocation": {
+      "Size": 2
+    },
+    "Instance": {
+      "Plugin": "instance-gcp",
+      "Properties": {
+        "NamePrefix": "test",
+        "Description": "Test of GCP infrakit",
+        "Network": "default",
+        "Tags": ["{{TAG}}"],
+        "MachineType": "f1-micro",
+        "Disks":[{
+          "SizeGb": 100,
+          "Image": "https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/debian-8-jessie-v20161215"
+        }]
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": [
+          "echo Hello, World"
+        ]
+      }
+    }
+  }
+}
