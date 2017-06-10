@@ -30,6 +30,11 @@
 	Email = "david.chung@docker.com"
 	GitHub = "chungers"
 
+	[people.dgageot]
+	Name = "David Gageot"
+	Email = "david.gageot@docker.com"
+	GitHub = "dgageot"
+
 	[people.kaufers]
 	Name = "Steven Kaufer"
 	Email = "kaufer@us.ibm.com"
