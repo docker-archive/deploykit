@@ -65,7 +65,7 @@ Here is a list of plugins:
 | [infrakit/hyperkit](./pkg/plugin/instance/hyperkit)   | instance | creates [HyperKit](https://github.com/moby/hyperkit) VMs on Mac OSX |
 | [infrakit/packet](./pkg/plugin/instance/packet)       | instance | provisions bare metal hosts on Packet   |
 | [infrakit/libvirt](./pkg/plugin/instance/libvirt)     | instance | provisions KVM vms via libvirt          |
-| [docker/infrakit.aws](https://github.com/docker/infrakit.aws)       | instance | creates Amazon EC2 instances and other resource types |
+| [infrakit/aws](./pkg/provider/aws)                    | instance | creates Amazon EC2 instances and other resource types |
 | [docker/infrakit.gcp](https://github.com/docker/infrakit.gcp)       | instance | creates Google Cloud Platform compute instances       |
 | [docker/infrakit.digitalocean](https://github.com/docker/infrakit.digitalocean) | instance | creates DigitalOcean droplets             |
 
