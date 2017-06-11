@@ -6,7 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/docker/infrakit.aws/plugin/instance"
+	"github.com/docker/infrakit/pkg/provider/aws/plugin/instance"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

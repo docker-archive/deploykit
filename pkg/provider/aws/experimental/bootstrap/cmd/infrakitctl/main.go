@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit.aws/experimental/bootstrap"
+	"github.com/docker/infrakit/pkg/provider/aws/experimental/bootstrap"
 	"github.com/spf13/cobra"
 	"os"
 )

@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o xtrace
 
-go get github.com/docker/infrakit github.com/docker/infrakit.aws || true
+go get github.com/docker/infrakit github.com/docker/infrakit/pkg/provider/aws || true
 
 cd /go/src/github.com/docker/infrakit
 make binaries
@@ -15,6 +15,6 @@ mv infrakit-flavor-swarm /build/
 mv infrakit-flavor-vanilla /build/
 mv infrakit-group-default /build/
 
-cd /go/src/github.com/docker/infrakit.aws
+cd /go/src/github.com/docker/infrakit/pkg/provider/aws
 make binaries
 mv build/infrakit-instance-aws /build/

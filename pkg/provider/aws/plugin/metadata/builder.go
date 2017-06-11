@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/docker/infrakit.aws/plugin/instance"
+	"github.com/docker/infrakit/pkg/provider/aws/plugin/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/pflag"
 )

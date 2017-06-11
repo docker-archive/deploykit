@@ -7,7 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	mock_ec2 "github.com/docker/infrakit.aws/mock/ec2"
+	mock_ec2 "github.com/docker/infrakit/pkg/provider/aws/mock/ec2"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"

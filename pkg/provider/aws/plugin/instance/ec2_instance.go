@@ -75,7 +75,7 @@ func (p awsInstancePlugin) VendorInfo() *spi.VendorInfo {
 			Name:    "infrakit-instance-aws",
 			Version: "0.3.0",
 		},
-		URL: "https://github.com/docker/infrakit.aws",
+		URL: "https://github.com/docker/infrakit/pkg/provider/aws",
 	}
 }
 

@@ -1,5 +1,5 @@
 # REPO
-REPO?=github.com/docker/infrakit.aws
+REPO?=github.com/docker/infrakit/pkg/provider/aws
 
 # Set an output prefix, which is the local directory if not specified
 PREFIX?=$(shell pwd -L)
@@ -57,7 +57,7 @@ clean:
 
 define build_binary
 	go build -o build/$(1) \
-		-ldflags "-X github.com/docker/infrakit.aws/plugin.Version=$(VERSION) -X github.com/docker/infrakit.aws/plugin.Revision=$(REVISION)" $(2)
+		-ldflags "-X github.com/docker/infrakit/pkg/provider/aws/plugin.Version=$(VERSION) -X github.com/docker/infrakit/pkg/provider/aws/plugin.Revision=$(REVISION)" $(2)
 endef
 binaries: clean build-binaries
 build-binaries:
@@ -66,8 +66,8 @@ ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagging binaries as dirty\n"
 endif
 
-	$(call build_binary,infrakit-instance-aws,github.com/docker/infrakit.aws/plugin/instance/cmd)
-	$(call build_binary,infrakit-metadata-aws,github.com/docker/infrakit.aws/plugin/metadata/cmd)
+	$(call build_binary,infrakit-instance-aws,github.com/docker/infrakit/pkg/provider/aws/plugin/instance/cmd)
+	$(call build_binary,infrakit-metadata-aws,github.com/docker/infrakit/pkg/provider/aws/plugin/metadata/cmd)
 
 
 install:
