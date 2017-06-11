@@ -265,8 +265,9 @@ build-docker: build-installer \
 	build-provider-aws \
 
 # Provider: AWS
-build-provider-aws: build/infrakit-instance-aws
+build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
 	@mkdir -p pkg/provider/aws/build
 	@cp build/infrakit-instance-aws pkg/provider/aws/build
+	@cp build/infrakit-metadata-aws pkg/provider/aws/build
 	$(MAKE) -C pkg/provider/aws build-docker
 >>>>>>> 8b27c2f905dc4470aff9d062c75775832d30f4ee
