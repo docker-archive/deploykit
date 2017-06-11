@@ -33,63 +33,6 @@ AUTHORS: .mailmap .git/HEAD
 PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor)
 PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
 
-# Current working environment.  Set these explicitly if you want to cross-compile
-# in the build container (see the build-in-container target):
-GOOS?=$(shell go env GOOS)
-GOARCH?=$(shell go env GOARCH)
-DOCKER_BUILD_FLAGS?=--no-cache --pull
-build-in-container:
-	@echo "+ $@"
-	@docker build ${DOCKER_BUILD_FLAGS} -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
-	@docker run --rm \
-		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} -e DOCKER_CLIENT_VERSION=${DOCKER_CLIENT_VERSION} \
-		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
-		infrakit-build
-
-# For packaging as Docker container images.  Set the environment variables DOCKER_PUSH, DOCKER_TAG_LATEST
-# if also push to remote repo.  You must have access to the remote repo.
-DOCKER_IMAGE?=infrakit/devbundle
-DOCKER_TAG?=dev
-build-docker:
-	@echo "+ $@"
-	GOOS=linux GOARCH=amd64 make build-in-container
-	@docker build ${DOCKER_BUILD_FLAGS} \
-	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
-	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
-ifeq (${E2E_TESTS},true)
-	@echo "Running tests -- scripts/e2e-test-docker-containers.sh to verify the binaries"
-	@scripts/e2e-test-docker-containers.sh
-endif
-ifeq (${DOCKER_PUSH},true)
-	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-ifeq (${DOCKER_TAG_LATEST},true)
-	@docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
-	@docker push ${DOCKER_IMAGE}:latest
-endif
-endif
-
-# Trivial installer that packages source code (via go get) and has script for building the CLI
-INSTALLER_IMAGE?=infrakit/installer
-INSTALLER_TAG?=$(REVISION)
-build-installer:
-	@echo "+ $@"
-	@docker build -t ${INSTALLER_IMAGE}:${INSTALLER_TAG} -t ${INSTALLER_IMAGE}:latest \
-	-f ${CURDIR}/dockerfiles/Dockerfile.installer .
-ifeq (${DOCKER_PUSH},true)
-	@docker push ${INSTALLER_IMAGE}:${INSTALLER_TAG}
-ifeq (${DOCKER_TAG_LATEST},true)
-	@docker tag ${INSTALLER_IMAGE}:${INSTALLER_TAG} ${INSTALLER_IMAGE}:latest
-	@docker push ${INSTALLER_IMAGE}:latest
-endif
-endif
-
-build-docker-dev:
-	@echo "+ $@"
-	GOOS=linux GOARCH=amd64 make build-in-container
-	@docker build ${DOCKER_BUILD_FLAGS} \
-	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
-	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
-
 get-tools:
 	@echo "+ $@"
 	@go get -u \
@@ -149,7 +92,7 @@ $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit
 $(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cmd/group)
 $(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
 $(call define_binary_target,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
-$(call define_binary_target,infrakit-instance-google,github.com/docker/infrakit/cmd/instance/google)
+$(call define_binary_target,infrakit-instance-gcp,github.com/docker/infrakit/cmd/instance/google)
 $(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
 $(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
 $(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
@@ -171,7 +114,7 @@ build-binaries:	build/infrakit \
 		build/infrakit-group-default \
 		build/infrakit-instance-docker \
 		build/infrakit-instance-file \
-		build/infrakit-instance-google \
+		build/infrakit-instance-gcp \
 		build/infrakit-instance-hyperkit \
 		build/infrakit-instance-image \
 		build/infrakit-instance-libvirt \
@@ -231,3 +174,63 @@ vendor-update:
 terraform-linux:
 	@echo "+ $@"
 	wget -O tf.zip https://releases.hashicorp.com/terraform/0.9.3/terraform_0.9.3_linux_amd64.zip && unzip tf.zip && mv terraform ./build
+
+# Current working environment.  Set these explicitly if you want to cross-compile
+# in the build container (see the build-in-container target):
+GOOS?=$(shell go env GOOS)
+GOARCH?=$(shell go env GOARCH)
+DOCKER_BUILD_FLAGS?=--no-cache --pull
+build-in-container:
+	@echo "+ $@"
+	@docker build ${DOCKER_BUILD_FLAGS} -t infrakit-build -f ${CURDIR}/dockerfiles/Dockerfile.build .
+	@docker run --rm \
+		-e GOOS=${GOOS} -e GOARCCH=${GOARCH} -e DOCKER_CLIENT_VERSION=${DOCKER_CLIENT_VERSION} \
+		-v ${CURDIR}/build:/go/src/github.com/docker/infrakit/build \
+		infrakit-build
+
+# For packaging as Docker container images.  Set the environment variables DOCKER_PUSH, DOCKER_TAG_LATEST
+# if also push to remote repo.  You must have access to the remote repo.
+DOCKER_IMAGE?=infrakit/devbundle
+DOCKER_TAG?=dev
+build-devbundle:
+	@echo "+ $@"
+	GOOS=linux GOARCH=amd64 make build-in-container
+	@docker build ${DOCKER_BUILD_FLAGS} \
+	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
+	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+ifeq (${E2E_TESTS},true)
+	@echo "Running tests -- scripts/e2e-test-docker-containers.sh to verify the binaries"
+	@scripts/e2e-test-docker-containers.sh
+endif
+ifeq (${DOCKER_PUSH},true)
+	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+ifeq (${DOCKER_TAG_LATEST},true)
+	@docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+	@docker push ${DOCKER_IMAGE}:latest
+endif
+endif
+
+# Trivial installer that packages source code (via go get) and has script for building the CLI
+INSTALLER_IMAGE?=infrakit/installer
+INSTALLER_TAG?=$(REVISION)
+build-installer:
+	@echo "+ $@"
+	@docker build -t ${INSTALLER_IMAGE}:${INSTALLER_TAG} -t ${INSTALLER_IMAGE}:latest \
+	-f ${CURDIR}/dockerfiles/Dockerfile.installer .
+ifeq (${DOCKER_PUSH},true)
+	@docker push ${INSTALLER_IMAGE}:${INSTALLER_TAG}
+ifeq (${DOCKER_TAG_LATEST},true)
+	@docker tag ${INSTALLER_IMAGE}:${INSTALLER_TAG} ${INSTALLER_IMAGE}:latest
+	@docker push ${INSTALLER_IMAGE}:latest
+endif
+endif
+
+# Provider: Google
+build-provider-google: build/infrakit-instance-google
+	@mkdir -p pkg/provider/google/build
+	@cp build/infrakit-instance-google pkg/provider/google/build
+	$(MAKE) -C pkg/provider/google build-docker
+
+build-docker: build-installer \
+	build-devbundle \
+	build-provider-google \
