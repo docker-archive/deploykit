@@ -3,7 +3,9 @@ InfraKit
 
 [![Circle CI](https://circleci.com/gh/docker/infrakit.png?style=shield&circle-token=50d2063f283f98b7d94746416c979af3102275b5)](https://circleci.com/gh/docker/infrakit)
 [![Go Report Card](https://goreportcard.com/badge/github.com/docker/infrakit)](https://goreportcard.com/report/github.com/docker/infrakit)
+<!--
 [![codecov.io](https://codecov.io/github/docker/infrakit/coverage.svg?branch=master&token=z08ZKeIJfA)](https://codecov.io/github/docker/infrakit?branch=master)
+-->
 
 _InfraKit_ is a toolkit for infrastructure orchestration.
 With an emphasis on immutable infrastructure, it breaks down infrastructure automation and management processes into small, pluggable components.
@@ -65,8 +67,8 @@ Here is a list of plugins:
 | [infrakit/hyperkit](./pkg/plugin/instance/hyperkit)   | instance | creates [HyperKit](https://github.com/moby/hyperkit) VMs on Mac OSX |
 | [infrakit/packet](./pkg/plugin/instance/packet)       | instance | provisions bare metal hosts on Packet   |
 | [infrakit/libvirt](./pkg/plugin/instance/libvirt)     | instance | provisions KVM vms via libvirt          |
+| [infrakit/aws](./pkg/provider/aws)                    | instance | creates Amazon EC2 instances and other resource types |
 | [infrakit/google](./pkg/provider/google/plugin/instance)     | instance | Google Cloud Platform compute instances |
-| [docker/infrakit.aws](https://github.com/docker/infrakit.aws)       | instance | creates Amazon EC2 instances and other resource types |
 | [docker/infrakit.digitalocean](https://github.com/docker/infrakit.digitalocean) | instance | creates DigitalOcean droplets             |
 
 ### Community Implementations

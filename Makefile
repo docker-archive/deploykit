@@ -90,6 +90,7 @@ $(call define_binary_target,infrakit-flavor-swarm,github.com/docker/infrakit/exa
 $(call define_binary_target,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
 $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
 $(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cmd/group)
+$(call define_binary_target,infrakit-instance-aws,github.com/docker/infrakit/cmd/instance/aws)
 $(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
 $(call define_binary_target,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
 $(call define_binary_target,infrakit-instance-gcp,github.com/docker/infrakit/cmd/instance/google)
@@ -101,6 +102,7 @@ $(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/
 $(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
 $(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
+$(call define_binary_target,infrakit-metadata-aws,github.com/docker/infrakit/cmd/metadata/aws)
 $(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/resource)
 
 binaries: clean build-binaries
@@ -112,6 +114,7 @@ build-binaries:	build/infrakit \
 		build/infrakit-flavor-vanilla \
 		build/infrakit-flavor-zookeeper \
 		build/infrakit-group-default \
+		build/infrakit-instance-aws \
 		build/infrakit-instance-docker \
 		build/infrakit-instance-file \
 		build/infrakit-instance-gcp \
@@ -123,6 +126,7 @@ build-binaries:	build/infrakit \
 		build/infrakit-instance-terraform \
 		build/infrakit-instance-vagrant \
 		build/infrakit-manager \
+		build/infrakit-metadata-aws \
 		build/infrakit-resource \
 
 	@echo "+ $@"
@@ -175,6 +179,15 @@ terraform-linux:
 	@echo "+ $@"
 	wget -O tf.zip https://releases.hashicorp.com/terraform/0.9.3/terraform_0.9.3_linux_amd64.zip && unzip tf.zip && mv terraform ./build
 
+<<<<<<< HEAD
+=======
+################################
+#
+# Docker Images
+#
+################################
+
+>>>>>>> 8b27c2f905dc4470aff9d062c75775832d30f4ee
 # Current working environment.  Set these explicitly if you want to cross-compile
 # in the build container (see the build-in-container target):
 GOOS?=$(shell go env GOOS)
@@ -210,7 +223,11 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
+<<<<<<< HEAD
 # Trivial installer that packages source code (via go get) and has script for building the CLI
+=======
+# Installer that packages source code (via go get) and has script for cross-compiling the CLI
+>>>>>>> 8b27c2f905dc4470aff9d062c75775832d30f4ee
 INSTALLER_IMAGE?=infrakit/installer
 INSTALLER_TAG?=$(REVISION)
 build-installer:
@@ -225,6 +242,7 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
+<<<<<<< HEAD
 # Provider: Google
 build-provider-google: build/infrakit-instance-google
 	@mkdir -p pkg/provider/google/build
@@ -234,3 +252,21 @@ build-provider-google: build/infrakit-instance-google
 build-docker: build-installer \
 	build-devbundle \
 	build-provider-google \
+=======
+build-docker-dev:
+	@echo "+ $@"
+	GOOS=linux GOARCH=amd64 make build-in-container
+	@docker build ${DOCKER_BUILD_FLAGS} \
+	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
+	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
+
+build-docker: build-installer \
+	build-devbundle \
+	build-provider-aws \
+
+# Provider: AWS
+build-provider-aws: build/infrakit-instance-aws
+	@mkdir -p pkg/provider/aws/build
+	@cp build/infrakit-instance-aws pkg/provider/aws/build
+	$(MAKE) -C pkg/provider/aws build-docker
+>>>>>>> 8b27c2f905dc4470aff9d062c75775832d30f4ee
