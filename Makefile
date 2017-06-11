@@ -181,6 +181,7 @@ build-binaries:	build/infrakit \
 		build/infrakit-instance-vagrant \
 		build/infrakit-manager \
 		build/infrakit-resource \
+
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagged binaries as dirty\n"
