@@ -223,11 +223,7 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
-<<<<<<< HEAD
-# Trivial installer that packages source code (via go get) and has script for building the CLI
-=======
 # Installer that packages source code (via go get) and has script for cross-compiling the CLI
->>>>>>> 8b27c2f905dc4470aff9d062c75775832d30f4ee
 INSTALLER_IMAGE?=infrakit/installer
 INSTALLER_TAG?=$(REVISION)
 build-installer:
@@ -242,27 +238,10 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
-<<<<<<< HEAD
-# Provider: Google
-build-provider-google: build/infrakit-instance-google
-	@mkdir -p pkg/provider/google/build
-	@cp build/infrakit-instance-google pkg/provider/google/build
-	$(MAKE) -C pkg/provider/google build-docker
-
-build-docker: build-installer \
-	build-devbundle \
-	build-provider-google \
-=======
-build-docker-dev:
-	@echo "+ $@"
-	GOOS=linux GOARCH=amd64 make build-in-container
-	@docker build ${DOCKER_BUILD_FLAGS} \
-	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
-	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
-
 build-docker: build-installer \
 	build-devbundle \
 	build-provider-aws \
+	build-provider-google \
 
 # Provider: AWS
 build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
@@ -270,4 +249,10 @@ build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
 	@cp build/infrakit-instance-aws pkg/provider/aws/build
 	@cp build/infrakit-metadata-aws pkg/provider/aws/build
 	$(MAKE) -C pkg/provider/aws build-docker
->>>>>>> 8b27c2f905dc4470aff9d062c75775832d30f4ee
+
+# Provider: Google
+build-provider-google: build/infrakit-instance-google
+	@mkdir -p pkg/provider/google/build
+	@cp build/infrakit-instance-google pkg/provider/google/build
+	$(MAKE) -C pkg/provider/google build-docker
+
