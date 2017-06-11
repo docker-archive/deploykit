@@ -2,8 +2,10 @@ package instance
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
@@ -36,24 +38,47 @@ func (p awsAutoScalingGroupPlugin) Provision(spec instance.Spec) (*instance.ID, 
 		return nil, fmt.Errorf("Invalid input formatting: %s", err)
 	}
 
-	name := newUnrestrictedName(spec.Tags, p.namespaceTags)
+	if spec.LogicalID == nil {
+		return nil, errors.New("No AutoScalingGroup name found: missing LogicalID")
+	}
 
-	request.CreateAutoScalingGroupInput.AutoScalingGroupName = aws.String(name)
+	request.CreateAutoScalingGroupInput.AutoScalingGroupName = (*string)(spec.LogicalID)
+
 	_, err := p.client.CreateAutoScalingGroup(&request.CreateAutoScalingGroupInput)
 	if err != nil {
 		return nil, fmt.Errorf("CreateAutoScalingGroup failed: %s", err)
 	}
-	id := instance.ID(name)
-
 	for i, input := range request.PutLifecycleHookInputs {
-		input.AutoScalingGroupName = aws.String(name)
 		input.LifecycleHookName = aws.String(fmt.Sprintf("%s_hook_%d", newQueueName(spec.Tags, p.namespaceTags), i))
 		if _, err := p.client.PutLifecycleHook(&input); err != nil {
 			return nil, fmt.Errorf("PutLifecycleHook failed: %s", err)
 		}
 	}
 
-	return &id, nil
+	// set the tags
+	// TODO: user tag support
+	keys, allTags := mergeTags(spec.Tags, p.namespaceTags)
+	autoscalingTags := []*autoscaling.Tag{}
+	for _, key := range keys {
+		autoscalingTags = append(
+			autoscalingTags,
+			&autoscaling.Tag{
+				ResourceId:        request.CreateAutoScalingGroupInput.AutoScalingGroupName,
+				ResourceType:      aws.String("auto-scaling-group"),
+				Key:               aws.String(key),
+				Value:             aws.String(allTags[key]),
+				PropagateAtLaunch: aws.Bool(true),
+			},
+		)
+	}
+	_, err = p.client.CreateOrUpdateTags(&autoscaling.CreateOrUpdateTagsInput{Tags: autoscalingTags})
+	if err != nil {
+		return nil, err
+	}
+
+	// return the id
+	id := (*instance.ID)(request.CreateAutoScalingGroupInput.AutoScalingGroupName)
+	return id, nil
 }
 
 func (p awsAutoScalingGroupPlugin) Label(id instance.ID, labels map[string]string) error {
@@ -71,19 +96,65 @@ func (p awsAutoScalingGroupPlugin) Destroy(id instance.ID) error {
 	return nil
 }
 
-func (p awsAutoScalingGroupPlugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-	name := newUnrestrictedName(tags, p.namespaceTags)
-
-	output, err := p.client.DescribeAutoScalingGroups(&autoscaling.DescribeAutoScalingGroupsInput{
-		AutoScalingGroupNames: []*string{&name},
-	})
-	if err != nil {
-		return []instance.Description{}, fmt.Errorf("DescribeAutoScalingGroups failed: %s", err)
+/**
+Return true iff searchTags is a subset of tags
+*/
+func matchAll(searchTags map[string]string, tags map[string]string) bool {
+	for k, v := range searchTags {
+		if v != tags[k] {
+			return false
+		}
 	}
 
+	return true
+}
+
+/*
+Example labels map passed to this function is pretty simple, just 1 key:value. eg infrakit.group:my-group-name
+*/
+func (p awsAutoScalingGroupPlugin) DescribeInstances(labels map[string]string, properties bool) ([]instance.Description, error) {
 	descriptions := []instance.Description{}
-	for _, autoScalingGroup := range output.AutoScalingGroups {
-		descriptions = append(descriptions, instance.Description{ID: instance.ID(*autoScalingGroup.AutoScalingGroupName)})
+
+	output, err := p.client.DescribeAutoScalingGroups(nil)
+	for {
+		if err != nil {
+			return descriptions, fmt.Errorf("DescribeAutoScalingGroups failed: %s", err)
+		}
+		for _, group := range output.AutoScalingGroups {
+			tags := map[string]string{}
+			for _, tag := range group.Tags {
+				tags[*tag.Key] = *tag.Value
+			}
+			if matchAll(labels, tags) {
+				var status *types.Any
+				if properties {
+					if v, err := types.AnyValue(group); err == nil {
+						status = v
+					} else {
+						log.Warningln("cannot encode AutoScalingGroup:", err)
+					}
+				}
+				descriptions = append(
+					descriptions,
+					instance.Description{
+						ID:         instance.ID(*group.AutoScalingGroupName),
+						LogicalID:  (*instance.LogicalID)(group.AutoScalingGroupName),
+						Tags:       tags,
+						Properties: status,
+					},
+				)
+			}
+		}
+		if output.NextToken == nil {
+			break
+		} else {
+			output, err = p.client.DescribeAutoScalingGroups(
+				&autoscaling.DescribeAutoScalingGroupsInput{
+					AutoScalingGroupNames: []*string{},
+					NextToken:             output.NextToken,
+				},
+			)
+		}
 	}
 	return descriptions, nil
 }
