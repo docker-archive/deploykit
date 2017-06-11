@@ -139,46 +139,48 @@ define define_binary_target
 	$(eval $(call binary_target_template,$(1),$(2)))
 endef
 
+
 $(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
-$(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
-$(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cmd/group)
-$(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/resource)
+$(call define_binary_target,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
 $(call define_binary_target,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
-$(call define_binary_target,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
 $(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infrakit/examples/flavor/kubernetes)
+$(call define_binary_target,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
 $(call define_binary_target,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
 $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
-$(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
-$(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
-$(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
+$(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cmd/group)
+$(call define_binary_target,infrakit-instance-digitalocean,github.com/docker/infrakit/cmd/instance/digitalocean)
+$(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
 $(call define_binary_target,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
+$(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
+$(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
+$(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
+$(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
+$(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
 $(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
 $(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
-$(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
-$(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
-$(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
-$(call define_binary_target,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
-
+$(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
+$(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/resource)
 binaries: clean build-binaries
 build-binaries:	build/infrakit \
-		build/infrakit-manager \
-		build/infrakit-group-default \
-		build/infrakit-resource \
+		build/infrakit-event-time \
 		build/infrakit-flavor-combo \
-		build/infrakit-flavor-swarm \
 		build/infrakit-flavor-kubernetes \
+		build/infrakit-flavor-swarm \
 		build/infrakit-flavor-vanilla \
 		build/infrakit-flavor-zookeeper \
-		build/infrakit-instance-libvirt \
-		build/infrakit-instance-packet \
-		build/infrakit-instance-image \
+		build/infrakit-group-default \
+		build/infrakit-instance-digitalocean \
+		build/infrakit-instance-docker \
 		build/infrakit-instance-file \
+		build/infrakit-instance-hyperkit \
+		build/infrakit-instance-image \
+		build/infrakit-instance-libvirt \
+		build/infrakit-instance-maas \
+		build/infrakit-instance-packet \
 		build/infrakit-instance-terraform \
 		build/infrakit-instance-vagrant \
-		build/infrakit-instance-maas \
-		build/infrakit-instance-docker \
-		build/infrakit-instance-hyperkit \
-		build/infrakit-event-time
+		build/infrakit-manager \
+		build/infrakit-resource \
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
 	@echo "\nWARNING - repository contains uncommitted changes, tagged binaries as dirty\n"

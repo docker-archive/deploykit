@@ -7,8 +7,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/digitalocean/godo"
-	"github.com/docker/infrakit.digitalocean/plugin/instance"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/provider/digitalocean/plugin/instance"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"

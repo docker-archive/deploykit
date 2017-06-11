@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/digitalocean/godo"
-	itypes "github.com/docker/infrakit.digitalocean/plugin/instance/types"
+	itypes "github.com/docker/infrakit/pkg/provider/digitalocean/plugin/instance/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/assert"

@@ -11,7 +11,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/digitalocean/godo"
-	instance_types "github.com/docker/infrakit.digitalocean/plugin/instance/types"
+	instance_types "github.com/docker/infrakit/pkg/provider/digitalocean/plugin/instance/types"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
@@ -65,7 +65,7 @@ func (p *plugin) VendorInfo() *spi.VendorInfo {
 			Name:    "infrakit-instance-digitalocean",
 			Version: "0.1.0",
 		},
-		URL: "https://github.com/docker/infrakit.digitalocean",
+		URL: "https://github.com/docker/infrakit/pkg/provider/digitalocean",
 	}
 }
 
