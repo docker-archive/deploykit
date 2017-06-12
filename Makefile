@@ -95,6 +95,7 @@ $(call define_binary_target,infrakit-instance-aws,github.com/docker/infrakit/cmd
 $(call define_binary_target,infrakit-instance-digitalocean,github.com/docker/infrakit/cmd/instance/digitalocean)
 $(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
 $(call define_binary_target,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
+$(call define_binary_target,infrakit-instance-gcp,github.com/docker/infrakit/cmd/instance/google)
 $(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
 $(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
 $(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
@@ -119,6 +120,7 @@ build-binaries:	build/infrakit \
 		build/infrakit-instance-digitalocean \
 		build/infrakit-instance-docker \
 		build/infrakit-instance-file \
+		build/infrakit-instance-gcp \
 		build/infrakit-instance-hyperkit \
 		build/infrakit-instance-image \
 		build/infrakit-instance-libvirt \
@@ -236,16 +238,10 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
-build-docker-dev:
-	@echo "+ $@"
-	GOOS=linux GOARCH=amd64 make build-in-container
-	@docker build ${DOCKER_BUILD_FLAGS} \
-	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
-	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
-
 build-docker: build-installer \
 	build-devbundle \
 	build-provider-aws \
+	build-provider-google \
 
 # Provider: AWS
 build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
@@ -253,3 +249,10 @@ build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
 	@cp build/infrakit-instance-aws pkg/provider/aws/build
 	@cp build/infrakit-metadata-aws pkg/provider/aws/build
 	$(MAKE) -C pkg/provider/aws build-docker
+
+# Provider: Google
+build-provider-google: build/infrakit-instance-google
+	@mkdir -p pkg/provider/google/build
+	@cp build/infrakit-instance-google pkg/provider/google/build
+	$(MAKE) -C pkg/provider/google build-docker
+
