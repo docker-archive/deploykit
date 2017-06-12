@@ -179,15 +179,12 @@ terraform-linux:
 	@echo "+ $@"
 	wget -O tf.zip https://releases.hashicorp.com/terraform/0.9.3/terraform_0.9.3_linux_amd64.zip && unzip tf.zip && mv terraform ./build
 
-<<<<<<< HEAD
-=======
 ################################
 #
 # Docker Images
 #
 ################################
 
->>>>>>> 8b27c2f905dc4470aff9d062c75775832d30f4ee
 # Current working environment.  Set these explicitly if you want to cross-compile
 # in the build container (see the build-in-container target):
 GOOS?=$(shell go env GOOS)
