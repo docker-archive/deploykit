@@ -45,6 +45,11 @@
 	Email = "nicolas.degory@gmail.com"
 	GitHub = "ndegory"
 
+	[people.vdemeester]
+	Name = "Vincent Demeester"
+	Email = "vincent@sbr.pm"
+	GitHub = "vdemeester"
+
 	[people.YujiOshima]
 	Name = "Yuji Oshima"
 	Email = "yuji.oshima0x3fd@gmail.com"
