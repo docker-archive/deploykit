@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -15,6 +16,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +31,55 @@ func init() {
 	base.Register(Command)
 }
 
+type playbook struct {
+	// Source is the original location
+	Source string
+
+	// Cache is the cached location, as a url of file:// format
+	Cache string
+}
+
+type playbooks map[remote.Op]*playbook
+
+func (pb *playbooks) module() map[remote.Op]remote.SourceURL {
+	module := map[remote.Op]remote.SourceURL{}
+	for k, p := range *pb {
+		if p.Cache != "" {
+			module[k] = remote.SourceURL(p.Cache)
+		} else {
+			module[k] = remote.SourceURL(p.Source)
+		}
+	}
+	return module
+}
+
+func (pb *playbooks) writeTo(path string) error {
+	any, err := types.AnyValue(*pb)
+	if err != nil {
+		return err
+	}
+	buff, err := any.MarshalYAML()
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(path, buff, 0755)
+}
+
+func (pb *playbooks) loadFrom(path string) error {
+	buff, err := ioutil.ReadFile(defaultPlaybooksFile())
+	if err != nil {
+		if !os.IsExist(err) {
+			return nil
+		}
+		return err
+	}
+	yaml, err := types.AnyYAML(buff)
+	if err != nil {
+		return err
+	}
+	return yaml.Decode(pb)
+}
+
 func defaultPlaybooksFile() string {
 	if playbooksFile := os.Getenv(PlaybooksFileEnvVar); playbooksFile != "" {
 		return playbooksFile
@@ -37,14 +88,14 @@ func defaultPlaybooksFile() string {
 	// if there's INFRAKIT_HOME defined
 	home := os.Getenv("INFRAKIT_HOME")
 	if home != "" {
-		return filepath.Join(home, "playbooks")
+		return filepath.Join(home, "playbooks.yml")
 	}
 
 	home = os.Getenv("HOME")
 	if usr, err := user.Current(); err == nil {
 		home = usr.HomeDir
 	}
-	return filepath.Join(home, ".infrakit/playbooks")
+	return filepath.Join(home, ".infrakit/playbooks.yml")
 }
 
 // Load loads the playbook
@@ -53,19 +104,12 @@ func Load() (remote.Modules, error) {
 }
 
 func loadPlaybooks() (remote.Modules, error) {
-	modules := remote.Modules{}
-	buff, err := ioutil.ReadFile(defaultPlaybooksFile())
+	pb := &playbooks{}
+	err := pb.loadFrom(defaultPlaybooksFile())
 	if err != nil {
-		if !os.IsExist(err) {
-			return modules, nil
-		}
 		return nil, err
 	}
-
-	if len(buff) > 0 {
-		err = remote.Decode(buff, &modules)
-	}
-	return modules, err
+	return pb.module(), nil
 }
 
 // Command is the entrypoint
@@ -78,6 +122,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Short: "Manage playbooks",
 	}
 	quiet := cmd.PersistentFlags().BoolP("quiet", "q", false, "Print rows without column headers")
+
+	cache := false
 
 	add := &cobra.Command{
 		Use:   "add <name> <url>",
@@ -92,12 +138,14 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			name := args[0]
 			url := args[1]
 
-			modules, err := loadPlaybooks()
+			pb := playbooks{}
+			err := pb.loadFrom(defaultPlaybooksFile())
 			if err != nil {
 				return err
 			}
-			if modules == nil {
-				modules = map[remote.Op]remote.SourceURL{}
+
+			if _, has := pb[remote.Op(name)]; has {
+				return fmt.Errorf("%s already exists", name)
 			}
 
 			// try fetch
@@ -106,20 +154,38 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			if _, has := modules[remote.Op(name)]; has {
-				return fmt.Errorf("%s already exists", name)
+			// if caching then fetch the whole bundle
+			if cache && !strings.Contains(url, "file://") {
+				// basically build the commands here... while we turn on caching so that
+				// templates are written to local cache
+
+				test, err := remote.NewModules(plugins,
+					map[remote.Op]remote.SourceURL{
+						remote.Op(name): remote.SourceURL(url),
+					},
+					os.Stdin, template.Options{
+						CacheDir: "cacheDir",
+					})
+				if err != nil {
+					return err
+				}
+				cmds, err := test.List()
+				if err != nil {
+					return err
+				}
+				fmt.Println("found", len(cmds), "commands")
 			}
 
-			modules[remote.Op(name)] = remote.SourceURL(url)
-
-			encoded, err := remote.Encode(modules)
-			if err != nil {
-				return err
+			pb[remote.Op(name)] = &playbook{
+				Source: url,
+				Cache:  url,
 			}
 
-			return ioutil.WriteFile(defaultPlaybooksFile(), encoded, 0755)
+			return pb.writeTo(defaultPlaybooksFile())
 		},
 	}
+	add.Flags().BoolVarP(&cache, "cache", "c", cache, "Cache the playbook")
+
 	remove := &cobra.Command{
 		Use:   "rm <name>",
 		Short: "Remove a playbook",
@@ -132,23 +198,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			name := args[0]
 
-			modules, err := loadPlaybooks()
+			pb := playbooks{}
+			err := pb.loadFrom(defaultPlaybooksFile())
 			if err != nil {
 				return err
 			}
-
-			if _, has := modules[remote.Op(name)]; !has {
-				return fmt.Errorf("%s does not exists", name)
-			}
-
-			delete(modules, remote.Op(name))
-
-			encoded, err := remote.Encode(modules)
-			if err != nil {
-				return err
-			}
-
-			return ioutil.WriteFile(defaultPlaybooksFile(), encoded, 0755)
+			delete(pb, remote.Op(name))
+			return pb.writeTo(defaultPlaybooksFile())
 		},
 	}
 
@@ -163,19 +219,20 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			modules, err := loadPlaybooks()
+			pb := playbooks{}
+			err := pb.loadFrom(defaultPlaybooksFile())
 			if err != nil {
 				return err
 			}
 
-			return rawOutput(os.Stdout, modules,
+			return rawOutput(os.Stdout, pb,
 				func(io.Writer, interface{}) error {
 					if !*quiet {
-						fmt.Printf("%-30s\t%-30s\n", "PLAYBOOK", "URL")
+						fmt.Printf("%-20s\t%-50s\t%-50s\n", "PLAYBOOK", "URL", "CACHE")
 					}
 
-					for op, url := range modules {
-						fmt.Printf("%-30v\t%-30v\n", op, url)
+					for op, pb := range pb {
+						fmt.Printf("%-20v\t%-50v\t%-50s\n", op, pb.Source, pb.Cache)
 					}
 					return nil
 				})
@@ -210,7 +267,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	if err != nil {
 		log.Warn("playbooks failed to load", "err", err)
 	} else {
-		if playbooks, err := remote.NewModules(plugins, pmod, os.Stdin); err != nil {
+		if playbooks, err := remote.NewModules(plugins, pmod, os.Stdin, template.Options{}); err != nil {
 			log.Warn("error loading playbooks", "err", err)
 		} else {
 			if more, err := playbooks.List(); err != nil {

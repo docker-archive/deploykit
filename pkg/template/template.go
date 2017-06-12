@@ -71,6 +71,9 @@ type Options struct {
 	// evaluation of the function return different results based on whether the
 	// template is meant to be evaluated in multiple passes.
 	MultiPass bool
+
+	// CacheDir is the location of the cache
+	CacheDir string
 }
 
 // Template is the templating engine
@@ -110,6 +113,11 @@ func ValidURL(s string) string {
 // NewTemplate fetches the content at the url and returns a template.  If the string begins
 // with str:// as scheme, then the rest of the string is interpreted as the body of the template.
 func NewTemplate(s string, opt Options) (*Template, error) {
+
+	if opt.CacheDir != "" {
+		fmt.Println("looking for", s, "in", opt.CacheDir, "original=", s)
+	}
+
 	var buff []byte
 	contextURL := s
 	// Special case of specifying the entire template as a string; otherwise treat as url

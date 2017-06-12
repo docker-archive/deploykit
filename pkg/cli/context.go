@@ -27,18 +27,21 @@ type Context struct {
 	input    io.Reader
 	exec     bool
 	template *template.Template
+	options  template.Options
 	run      func(string) error
 	script   string
 	plugins  func() discovery.Plugins
 }
 
 // NewContext creates a context
-func NewContext(plugins func() discovery.Plugins, cmd *cobra.Command, src string, input io.Reader) *Context {
+func NewContext(plugins func() discovery.Plugins, cmd *cobra.Command, src string, input io.Reader,
+	options template.Options) *Context {
 	return &Context{
 		plugins: plugins,
 		cmd:     cmd,
 		src:     src,
 		input:   input,
+		options: options,
 	}
 }
 
@@ -440,7 +443,7 @@ func (c *Context) Funcs() []template.Function {
 
 func (c *Context) getTemplate() (*template.Template, error) {
 	if c.template == nil {
-		t, err := template.NewTemplate(c.src, template.Options{})
+		t, err := template.NewTemplate(c.src, c.options)
 		if err != nil {
 			return nil, err
 		}
@@ -457,7 +460,7 @@ func (c *Context) BuildFlags() (err error) {
 	if err != nil {
 		return
 	}
-	t.SetOptions(template.Options{})
+	t.SetOptions(c.options)
 	_, err = configureTemplate(t, c.plugins).Render(c)
 	return
 }
@@ -476,10 +479,10 @@ func (c *Context) Execute() (err error) {
 
 	c.template = t
 
+	opt := c.options
+	opt.Stderr = func() io.Writer { return os.Stderr }
 	// Process the input, render the template
-	t.SetOptions(template.Options{
-		Stderr: func() io.Writer { return os.Stderr },
-	})
+	t.SetOptions(opt)
 
 	script, err := configureTemplate(t, c.plugins).Render(c)
 	if err != nil {
@@ -488,11 +491,11 @@ func (c *Context) Execute() (err error) {
 	c.script = script
 	log.Debug("running", "script", script)
 
+	opt = c.options
+	opt.DelimLeft = "=%"
+	opt.DelimRight = "%="
 	// Determine the backends
-	t.SetOptions(template.Options{
-		DelimLeft:  "=%",
-		DelimRight: "%=",
-	})
+	t.SetOptions(opt)
 
 	if err := c.loadBackends(t); err != nil {
 		return err

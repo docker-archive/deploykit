@@ -121,13 +121,22 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 				Use: name,
 			}
 
+			// Prevents duplicate sub-commands. This can happen when multiple
+			// 'info' subcommands map to the each interface the plugin implements
+			seen := map[string]*cobra.Command{}
+
 			list := []string{}
 			for _, spi := range spis {
 				list = append(list, spi.Encode())
+
 				visitCommands(spi, func(buildCmd CmdBuilder) {
 
 					subcommand := buildCmd(name, services)
-					command.AddCommand(subcommand)
+
+					if _, has := seen[subcommand.Use]; !has {
+						command.AddCommand(subcommand)
+						seen[subcommand.Use] = subcommand
+					}
 				})
 			}
 
