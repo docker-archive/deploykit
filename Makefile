@@ -251,7 +251,7 @@ build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
 	$(MAKE) -C pkg/provider/aws build-docker
 
 # Provider: Google
-build-provider-google: build/infrakit-instance-google
+build-provider-google: build/infrakit-instance-gcp
 	@mkdir -p pkg/provider/google/build
 	@cp build/infrakit-instance-google pkg/provider/google/build
 	$(MAKE) -C pkg/provider/google build-docker
