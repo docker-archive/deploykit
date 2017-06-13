@@ -339,56 +339,82 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 	tformat := TFormat{Resource: m}
 	buff, err := json.MarshalIndent(tformat, "  ", "  ")
 	require.NoError(t, err)
-	spec := instance.Spec{
-		Properties:  types.AnyBytes(buff),
-		Tags:        map[string]string{"tag1": "val1"},
-		Init:        "",
-		Attachments: []instance.Attachment{},
-		LogicalID:   nil,
-	}
-	id, err := terraform.Provision(spec)
+	// Issue 2 provisions; should get dedicated for both and a single global
+	id1, err := terraform.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		Tags:       map[string]string{"tag1": "val1"},
+	})
+	require.NoError(t, err)
+	id2, err := terraform.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		Tags:       map[string]string{"tag1": "val1"},
+	})
 	require.NoError(t, err)
 	results, err := terraform.DescribeInstances(
 		map[string]string{"tag1": "val1"},
 		false,
 	)
 	require.NoError(t, err)
-	expectedAttach := []string{string(*id) + "-dedicated", "scope-managers"}
-	require.Equal(t,
-		[]instance.Description{
-			{
-				ID: *id,
-				Tags: map[string]string{
-					attachTag: strings.Join(expectedAttach, ","),
-					"Name":    string(*id),
-					"tag1":    "val1",
-				},
+	require.Len(t, results, 2)
+	expectedAttach1 := []string{string(*id1) + "-dedicated", "scope-managers"}
+	require.Contains(t,
+		results,
+		instance.Description{
+			ID: *id1,
+			Tags: map[string]string{
+				attachTag: strings.Join(expectedAttach1, ","),
+				"Name":    string(*id1),
+				"tag1":    "val1",
 			},
-		},
-		results)
-	// Should be files for the 2 attachments and the 1 VM
+		})
+	expectedAttach2 := []string{string(*id2) + "-dedicated", "scope-managers"}
+	require.Contains(t,
+		results,
+		instance.Description{
+			ID: *id2,
+			Tags: map[string]string{
+				attachTag: strings.Join(expectedAttach2, ","),
+				"Name":    string(*id2),
+				"tag1":    "val1",
+			},
+		})
+	// Should be files for:
+	// 2 VMs
+	// 2 dedicated
+	// 1 global ("managers" scope)
 	files, err := ioutil.ReadDir(dir)
 	require.NoError(t, err)
-	require.Len(t, files, 3)
-	for _, path := range expectedAttach {
+	require.Len(t, files, 5)
+	expectedPaths := []string{
+		expectedAttach1[0],
+		expectedAttach2[0],
+		string(*id1),
+		string(*id2),
+		"scope-managers",
+	}
+	for _, path := range expectedPaths {
 		tfPath1 := filepath.Join(dir, path+".tf.json")
 		_, err = ioutil.ReadFile(tfPath1)
-		require.NoError(t, err)
+		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
 	}
-	// Should be able to Destroy each
-	err = terraform.Destroy(*id)
+	// Should be able to Destroy the first VM and the dedicated file should be removed
+	err = terraform.Destroy(*id1)
 	require.NoError(t, err)
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
-	require.Len(t, files, 2)
-
-	err = terraform.Destroy(instance.ID(expectedAttach[0]))
-	require.NoError(t, err)
-	files, err = ioutil.ReadDir(dir)
-	require.NoError(t, err)
-	require.Len(t, files, 1)
-
-	err = terraform.Destroy(instance.ID(expectedAttach[1]))
+	require.Len(t, files, 3)
+	expectedPaths = []string{
+		expectedAttach2[0],
+		string(*id2),
+		"scope-managers",
+	}
+	for _, path := range expectedPaths {
+		tfPath1 := filepath.Join(dir, path+".tf.json")
+		_, err = ioutil.ReadFile(tfPath1)
+		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
+	}
+	// Destroying the second VM should remove everything
+	err = terraform.Destroy(*id2)
 	require.NoError(t, err)
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
@@ -1908,18 +1934,174 @@ func TestDestroy(t *testing.T) {
 	p, is := terraform.(*plugin)
 	require.True(t, is)
 	id := "instance-1234"
-	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
-	tformat := TFormat{Resource: inst}
+	tformat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("host"): {},
+			},
+		},
+	}
 	buff, err := json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
 	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
 	require.NoError(t, err)
-	result := terraform.Destroy(instance.ID(id))
-	require.Nil(t, result)
+	err = terraform.Destroy(instance.ID(id))
+	require.Nil(t, err)
 	// The file has been removed
 	files, err := ioutil.ReadDir(dir)
 	require.NoError(t, err)
 	require.Len(t, files, 0)
+}
+
+func TestDestroyScaleDown(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {
+			TResourceName("host"): {},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {
+				PropScope: ValScopeDedicated,
+			},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	id, err := terraform.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		Tags:       map[string]string{"tag1": "val1"},
+	})
+	require.NoError(t, err)
+	// 2 files created
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+	// Destroy the instance and the related files
+	err = terraform.Destroy(instance.ID(*id))
+	require.NoError(t, err)
+	// All files has been removed
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 0)
+}
+
+func TestDestroyRollingUpdate(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {
+			TResourceName("host"): {},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {
+				PropScope: ValScopeDedicated,
+			},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	id, err := terraform.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		Tags:       map[string]string{"tag1": "val1"},
+	})
+	require.NoError(t, err)
+	// 2 files created
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+	// Destroy the instance and the related files
+	// TODO(kaufers): Update to SPI call once rolling update context is supported
+	err = p.doDestroy(instance.ID(*id), false)
+	require.NoError(t, err)
+	// Instance file has been removed; dedicated file still exists
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	path := filepath.Join(dir, fmt.Sprintf("%s-dedicated.tf.json", string(*id)))
+	_, err = ioutil.ReadFile(path)
+	require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
+}
+
+func TestParseAttachTagFromFileNoFile(t *testing.T) {
+	_, err := parseAttachTagFromFile("")
+	require.Error(t, err)
+}
+
+func TestParseAttachTagFromFileNoVM(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	tformat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{},
+	}
+	buff, err := json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	fp := filepath.Join(p.Dir, "instance-1234.tf.json")
+	err = afero.WriteFile(p.fs, fp, buff, 0644)
+	require.NoError(t, err)
+	_, err = parseAttachTagFromFile(fp)
+	require.Error(t, err)
+	require.Equal(t, "not found", err.Error())
+}
+
+func TestParseAttachTagFromFileMap(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	tformat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName("host1"): {
+					"tags": map[string]interface{}{
+						"foo":     "bar",
+						attachTag: "attach1,attach2",
+					},
+				},
+			},
+		},
+	}
+	buff, err := json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	fp := filepath.Join(p.Dir, "instance-1234.tf.json")
+	err = afero.WriteFile(p.fs, fp, buff, 0644)
+	require.NoError(t, err)
+	results, err := parseAttachTagFromFile(fp)
+	require.NoError(t, err)
+	require.Equal(t, []string{"attach1", "attach2"}, results)
+}
+
+func TestParseAttachTagFromFileSlice(t *testing.T) {
+	terraform, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	p, is := terraform.(*plugin)
+	require.True(t, is)
+	tformat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("host1"): {
+					"tags": []interface{}{
+						"foo:bar",
+						fmt.Sprintf("%s:attach1 attach2", attachTag),
+					},
+				},
+			},
+		},
+	}
+	buff, err := json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	fp := filepath.Join(p.Dir, "instance-1234.tf.json")
+	err = afero.WriteFile(p.fs, fp, buff, 0644)
+	require.NoError(t, err)
+	results, err := parseAttachTagFromFile(fp)
+	require.NoError(t, err)
+	require.Equal(t, []string{"attach1", "attach2"}, results)
 }
 
 func TestDescribeNoFiles(t *testing.T) {

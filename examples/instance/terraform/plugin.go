@@ -624,13 +624,95 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 
 // Destroy terminates an existing instance.
 func (p *plugin) Destroy(instance instance.ID) error {
-	fp := filepath.Join(p.Dir, string(instance)+".tf.json")
+	// TODO(kaufers): When SPI is updated with context, updated 2nd arg to false
+	// for rolling updated so that attached resources are not destroyed
+	err := p.doDestroy(instance, true)
+	return err
+}
+
+// doDestroy terminates an existing instance and optionally terminates any related
+// resources
+func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
+	filename := string(inst) + ".tf.json"
+	fp := filepath.Join(p.Dir, filename)
 	log.Debugln("destroy instance", fp)
+	// Optionally destroy the related resources
+	if processAttach {
+		// Get an referenced resources in the "infrakit.attach" tag
+		attachIDs, err := parseAttachTagFromFile(fp)
+		if err != nil {
+			return err
+		}
+		if len(attachIDs) > 0 {
+			idsToDestroy := make(map[string]string)
+			for _, attachID := range attachIDs {
+				idsToDestroy[attachID] = ""
+			}
+			// Load all other instance files and determine other references exist
+			re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
+			fs := &afero.Afero{Fs: p.fs}
+			err := fs.Walk(p.Dir,
+				func(path string, info os.FileInfo, err error) error {
+					matches := re.FindStringSubmatch(info.Name())
+					// Note that the current instance (being destroyed) still exists; filter
+					// this file out.
+					if len(matches) == 3 && filename != info.Name() {
+						ids, err := parseAttachTagFromFile(filepath.Join(p.Dir, info.Name()))
+						if err != nil {
+							return err
+						}
+						for _, id := range ids {
+							if _, has := idsToDestroy[id]; has {
+								log.Infof(
+									"Not destroying related resource %s, %s references it",
+									id,
+									info.Name())
+								delete(idsToDestroy, id)
+							}
+						}
+					}
+					return nil
+				})
+			if err != nil {
+				return err
+			}
+			// Delete any resources that are no longer referenced
+			for id := range idsToDestroy {
+				err = p.doDestroy(instance.ID(id), false)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
 	err := p.fs.Remove(fp)
 	if err != nil {
 		return err
 	}
 	return p.terraformApply()
+}
+
+// parseAttachTagFromFile parses the file at the given path and returns value of
+// the "infrakit.attach" tag
+func parseAttachTagFromFile(fp string) ([]string, error) {
+	buff, err := ioutil.ReadFile(fp)
+	if err != nil {
+		log.Warningln("Cannot load file to destroy:", err)
+		return nil, err
+	}
+	tf := TFormat{}
+	if err = types.AnyBytes(buff).Decode(&tf); err != nil {
+		return nil, err
+	}
+	vmType, _, vmProps, err := FindVM(&tf)
+	if err != nil {
+		return nil, err
+	}
+	tags := parseTerraformTags(vmType, vmProps)
+	if attachTag, has := tags[attachTag]; has {
+		return strings.Split(attachTag, ","), nil
+	}
+	return []string{}, nil
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
