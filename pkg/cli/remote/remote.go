@@ -29,6 +29,7 @@ type remote struct {
 	modules Modules
 	input   io.Reader
 	plugins func() discovery.Plugins
+	options template.Options
 }
 
 // Op is the name of the operation / sub-command
@@ -41,11 +42,14 @@ type SourceURL string
 type Modules map[Op]SourceURL
 
 // NewModules returns an implementation of Modules using a file at given URL. The file is in YAML format
-func NewModules(plugins func() discovery.Plugins, modules Modules, input io.Reader) (cli.Modules, error) {
+func NewModules(plugins func() discovery.Plugins, modules Modules, input io.Reader,
+	options template.Options) (cli.Modules, error) {
+
 	return &remote{
 		modules: modules,
 		input:   input,
 		plugins: plugins,
+		options: options,
 	}, nil
 }
 
@@ -71,8 +75,8 @@ func Encode(m Modules) ([]byte, error) {
 	return yaml.JSONToYAML(any.Bytes())
 }
 
-func dir(url SourceURL) (Modules, error) {
-	t, err := template.NewTemplate(string(url), template.Options{})
+func dir(url SourceURL, options template.Options) (Modules, error) {
+	t, err := template.NewTemplate(string(url), options)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +96,7 @@ func dir(url SourceURL) (Modules, error) {
 }
 
 func list(plugins func() discovery.Plugins, modules Modules, input io.Reader,
-	parent *cobra.Command, parentURL *SourceURL) ([]*cobra.Command, error) {
+	parent *cobra.Command, parentURL *SourceURL, options template.Options) ([]*cobra.Command, error) {
 
 	found := []*cobra.Command{}
 
@@ -129,18 +133,18 @@ loop:
 			readmeURL.Path = path.Join(path.Dir(parent.Path), "README.md")
 			readmeURLStr = readmeURL.String()
 		}
-		if t, err := template.NewTemplate(readmeURLStr, template.Options{}); err == nil {
+		if t, err := template.NewTemplate(readmeURLStr, options); err == nil {
 			if view, err := t.Render(nil); err == nil {
 				cmd.SetHelpTemplate(fmt.Sprintf(helpTemplate, view))
 			}
 		}
 
 		// if we can parse it as a map, then we have a 'directory'
-		mods, err := dir(moduleURL)
+		mods, err := dir(moduleURL, options)
 		if err == nil {
 
 			copy := moduleURL
-			subs, err := list(plugins, mods, input, cmd, &copy)
+			subs, err := list(plugins, mods, input, cmd, &copy, options)
 			if err != nil {
 				log.Debug("cannot list", "op", op, "url", moduleURL, "err", err)
 				continue loop
@@ -151,7 +155,7 @@ loop:
 
 		} else {
 
-			ctx := cli.NewContext(plugins, cmd, string(moduleURL), input)
+			ctx := cli.NewContext(plugins, cmd, string(moduleURL), input, options)
 			cmd.RunE = func(c *cobra.Command, args []string) error {
 				log.Debug("Running", "command", op, "url", moduleURL, "args", args)
 				return ctx.Execute()
@@ -174,7 +178,7 @@ func (r *remote) List() ([]*cobra.Command, error) {
 	if err := resolved(r.modules); err != nil {
 		return nil, err
 	}
-	return list(r.plugins, r.modules, r.input, nil, nil)
+	return list(r.plugins, r.modules, r.input, nil, nil, r.options)
 }
 
 func resolved(m Modules) error {

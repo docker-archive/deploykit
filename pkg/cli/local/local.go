@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -172,7 +173,7 @@ entries:
 		} else {
 
 			url := "file://" + filepath.Join(dir, entry.Name())
-			context := cli.NewContext(plugins, cmd, url, os.Stdin)
+			context := cli.NewContext(plugins, cmd, url, os.Stdin, template.Options{})
 
 			cmd.RunE = func(c *cobra.Command, args []string) error {
 				log.Debug("Running", "command", entry.Name(), "url", url, "args", args)

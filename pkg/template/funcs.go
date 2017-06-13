@@ -244,6 +244,7 @@ func (t *Template) Fetch(p string, opt ...interface{}) (string, error) {
 		}
 		loc = u.String()
 	}
+
 	prev := t.options.CustomizeFetch
 	t.options.CustomizeFetch = func(req *http.Request) {
 		setHeaders(req, headers)
@@ -251,7 +252,10 @@ func (t *Template) Fetch(p string, opt ...interface{}) (string, error) {
 			prev(req)
 		}
 	}
-	buff, err := Fetch(loc, t.options)
+
+	buff, err := checkCache(loc, t.options, func() ([]byte, error) {
+		return Fetch(loc, t.options)
+	})
 	return string(buff), err
 }
 

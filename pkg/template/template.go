@@ -71,6 +71,9 @@ type Options struct {
 	// evaluation of the function return different results based on whether the
 	// template is meant to be evaluated in multiple passes.
 	MultiPass bool
+
+	// CacheDir is the location of the cache
+	CacheDir string
 }
 
 // Template is the templating engine
@@ -109,21 +112,22 @@ func ValidURL(s string) string {
 
 // NewTemplate fetches the content at the url and returns a template.  If the string begins
 // with str:// as scheme, then the rest of the string is interpreted as the body of the template.
-func NewTemplate(s string, opt Options) (*Template, error) {
-	var buff []byte
+func NewTemplate(s string, opt Options) (t *Template, err error) {
+	var templateBuff []byte
 	contextURL := s
 	// Special case of specifying the entire template as a string; otherwise treat as url
 	if strings.Index(s, "str://") == 0 {
-		buff = []byte(strings.Replace(s, "str://", "", 1))
+		templateBuff = []byte(strings.Replace(s, "str://", "", 1))
 		contextURL = defaultContextURL()
 	} else {
-		b, err := Fetch(s, opt)
+		templateBuff, err = checkCache(s, opt, func() ([]byte, error) {
+			return Fetch(s, opt)
+		})
 		if err != nil {
 			return nil, err
 		}
-		buff = b
 	}
-	return NewTemplateFromBytes(buff, contextURL, opt)
+	return NewTemplateFromBytes(templateBuff, contextURL, opt)
 }
 
 // NewTemplateFromBytes builds the template from buffer with a contextURL which is used to deduce absolute
