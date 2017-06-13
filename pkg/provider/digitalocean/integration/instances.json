@@ -1,0 +1,26 @@
+{
+  "ID": "instances",
+  "Properties": {
+    "Allocation": {
+      "Size": 2
+    },
+    "Instance": {
+      "Plugin": "instance-digitalocean",
+      "Properties": {
+        "NamePrefix": "test",
+        "Description": "Test of DigitalOcean infrakit",
+        "Tags": ["{{TAG}}"],
+        "Size": "1gb",
+        "Image": "debian-8-x64"
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": [
+          "echo Hello, World"
+        ]
+      }
+    }
+  }
+}

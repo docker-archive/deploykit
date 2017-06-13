@@ -30,6 +30,11 @@
 	Email = "david.chung@docker.com"
 	GitHub = "chungers"
 
+	[people.dgageot]
+	Name = "David Gageot"
+	Email = "david.gageot@docker.com"
+	GitHub = "dgageot"
+
 	[people.kaufers]
 	Name = "Steven Kaufer"
 	Email = "kaufer@us.ibm.com"
@@ -39,6 +44,11 @@
 	Name = "Nicolas Degory"
 	Email = "nicolas.degory@gmail.com"
 	GitHub = "ndegory"
+
+	[people.vdemeester]
+	Name = "Vincent Demeester"
+	Email = "vincent@sbr.pm"
+	GitHub = "vdemeester"
 
 	[people.YujiOshima]
 	Name = "Yuji Oshima"

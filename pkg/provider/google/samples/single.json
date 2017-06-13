@@ -1,0 +1,23 @@
+{
+  "ID": "single",
+  "Properties": {
+    "Allocation": {
+      "Size": 1
+    },
+    "Instance": {
+      "Plugin": "instance-gcp",
+      "Properties": {
+        "NamePrefix": "test",
+        "Disks":[{
+          "Image": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205"
+        }]
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-vanilla",
+      "Properties": {
+        "Init": []
+      }
+    }
+  }
+}
