@@ -245,10 +245,6 @@ func (t *Template) Fetch(p string, opt ...interface{}) (string, error) {
 		loc = u.String()
 	}
 
-	if t.options.CacheDir != "" {
-		fmt.Println("looking for", loc, "in", t.options.CacheDir, "original=", p)
-	}
-
 	prev := t.options.CustomizeFetch
 	t.options.CustomizeFetch = func(req *http.Request) {
 		setHeaders(req, headers)
@@ -256,7 +252,10 @@ func (t *Template) Fetch(p string, opt ...interface{}) (string, error) {
 			prev(req)
 		}
 	}
-	buff, err := Fetch(loc, t.options)
+
+	buff, err := checkCache(loc, t.options, func() ([]byte, error) {
+		return Fetch(loc, t.options)
+	})
 	return string(buff), err
 }
 
@@ -270,10 +269,6 @@ func (t *Template) Source(p string, opt ...interface{}) (string, error) {
 			return "", err
 		}
 		loc = u.String()
-	}
-
-	if t.options.CacheDir != "" {
-		fmt.Println("looking for", loc, "in", t.options.CacheDir, "original=", p)
 	}
 
 	prev := t.options.CustomizeFetch
@@ -309,10 +304,6 @@ func (t *Template) Include(p string, opt ...interface{}) (string, error) {
 			return "", err
 		}
 		loc = u.String()
-	}
-
-	if t.options.CacheDir != "" {
-		fmt.Println("looking for", loc, "in", t.options.CacheDir, "original=", p)
 	}
 
 	prev := t.options.CustomizeFetch

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -123,7 +124,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	quiet := cmd.PersistentFlags().BoolP("quiet", "q", false, "Print rows without column headers")
 
-	cache := false
+	cache := true
 
 	add := &cobra.Command{
 		Use:   "add <name> <url>",
@@ -136,7 +137,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			name := args[0]
-			url := args[1]
+			source := args[1]
 
 			pb := playbooks{}
 			err := pb.loadFrom(defaultPlaybooksFile())
@@ -149,22 +150,31 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			// try fetch
-			_, err = template.Fetch(url, template.Options{})
+			_, err = template.Fetch(source, template.Options{})
 			if err != nil {
 				return err
 			}
 
+			cacheDir := ""
+
 			// if caching then fetch the whole bundle
-			if cache && !strings.Contains(url, "file://") {
-				// basically build the commands here... while we turn on caching so that
+			if cache && !(strings.Contains(source, "file://") || strings.Contains(source, "str://")) {
+
+				u, err := url.Parse(source)
+				if err != nil {
+					return err
+				}
+
+				// Build the commands here... while we turn on caching so that
 				// templates are written to local cache
 
+				cacheDir = filepath.Join(template.Dir(), name)
 				test, err := remote.NewModules(plugins,
 					map[remote.Op]remote.SourceURL{
-						remote.Op(name): remote.SourceURL(url),
+						remote.Op(name): remote.SourceURL(source),
 					},
 					os.Stdin, template.Options{
-						CacheDir: "cacheDir",
+						CacheDir: cacheDir,
 					})
 				if err != nil {
 					return err
@@ -173,12 +183,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Println("found", len(cmds), "commands")
+
+				// update the cacheDir to be the url form
+				cacheDir = "file://" + filepath.Join(cacheDir, u.Path)
+
+				fmt.Println("found", len(cmds), "commands", "cached", cacheDir)
 			}
 
 			pb[remote.Op(name)] = &playbook{
-				Source: url,
-				Cache:  url,
+				Source: source,
+				Cache:  cacheDir,
 			}
 
 			return pb.writeTo(defaultPlaybooksFile())
@@ -205,6 +219,39 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			delete(pb, remote.Op(name))
 			return pb.writeTo(defaultPlaybooksFile())
+		},
+	}
+
+	update := &cobra.Command{
+		Use:   "update <name>",
+		Short: "Update a cached playbook",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
+			name := args[0]
+
+			pb := playbooks{}
+			err := pb.loadFrom(defaultPlaybooksFile())
+			if err != nil {
+				return err
+			}
+
+			p, has := pb[remote.Op(name)]
+			if has && p.Cache != "" {
+
+				// remove then add
+				err := remove.RunE(nil, []string{name})
+				if err != nil {
+					return err
+				}
+				fmt.Println("Cleared cache. Updating")
+				return add.RunE(nil, []string{name, string(p.Source)})
+			}
+			return nil
 		},
 	}
 
@@ -240,7 +287,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	list.Flags().AddFlagSet(rawOutputFlags)
 
-	cmd.AddCommand(add, remove, list)
+	cmd.AddCommand(add, remove, update, list)
 
 	reserved := map[*cobra.Command]int{add: 1, remove: 1, list: 1}
 

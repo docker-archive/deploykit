@@ -13,6 +13,7 @@ import (
 	discovery_local "github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 
 	// CLI commands
@@ -46,6 +47,9 @@ func main() {
 		panic(err)
 	}
 	if err := cli_local.Setup(); err != nil {
+		panic(err)
+	}
+	if err := template.Setup(); err != nil {
 		panic(err)
 	}
 
