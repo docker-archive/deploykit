@@ -241,6 +241,7 @@ endif
 build-docker: build-installer \
 	build-devbundle \
 	build-provider-aws \
+	build-provider-digitalocean \
 	build-provider-google \
 
 # Provider: AWS
@@ -253,6 +254,12 @@ build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
 # Provider: Google
 build-provider-google: build/infrakit-instance-gcp
 	@mkdir -p pkg/provider/google/build
-	@cp build/infrakit-instance-google pkg/provider/google/build
+	@cp build/infrakit-instance-gcp pkg/provider/google/build
 	$(MAKE) -C pkg/provider/google build-docker
+
+# Provider: DigitalOcean
+build-provider-digitalocean: build/infrakit-instance-digitalocean
+	@mkdir -p pkg/provider/digitalocean/build
+	@cp build/infrakit-instance-digitalocean pkg/provider/digitalocean/build
+	$(MAKE) -C pkg/provider/digitalocean build-docker
 
