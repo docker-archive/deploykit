@@ -8,7 +8,9 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +30,11 @@ import (
 // and call terraform apply.  For describing instances, we parse the
 // result of terraform show.  Destroying an instance is simply removing a
 // tf.json file and call terraform apply again.
+
+const (
+	// AttachTag contains a space separated list of IDs that are to the instance
+	attachTag = "infrakit.attach"
+)
 
 type plugin struct {
 	Dir       string
@@ -59,73 +66,73 @@ TFormat models the on disk representation of a terraform resource JSON.
 An example of this looks like:
 
 {
-    "resource" : {
-	"aws_instance" : {
-	    "web4" : {
-		"ami" : "${lookup(var.aws_amis, var.aws_region)}",
-		"instance_type" : "m1.small",
-		"key_name": "PUBKEY",
-		"vpc_security_group_ids" : ["${aws_security_group.default.id}"],
-		"subnet_id": "${aws_subnet.default.id}",
-		"tags" :  {
-		    "Name" : "web4",
-		    "InstancePlugin" : "terraform"
+	"resource": {
+		"aws_instance": {
+			"web4": {
+				"ami": "${lookup(var.aws_amis, var.aws_region)}",
+				"instance_type": "m1.small",
+				"key_name": "PUBKEY",
+				"vpc_security_group_ids": ["${aws_security_group.default.id}"],
+				"subnet_id": "${aws_subnet.default.id}",
+				"tags":  {
+					"Name": "web4",
+					"InstancePlugin": "terraform"
+				},
+				"connection": {
+					"user": "ubuntu"
+				},
+				"provisioner": {
+					"remote_exec": {
+						"inline": [
+							"sudo apt-get -y update",
+							"sudo apt-get -y install nginx",
+							"sudo service nginx start"
+						]
+					}
+				}
+			}
 		}
-		"connection" : {
-		    "user" : "ubuntu"
-		},
-		"provisioner" : {
-		    "remote_exec" : {
-			"inline" : [
-			    "sudo apt-get -y update",
-			    "sudo apt-get -y install nginx",
-			    "sudo service nginx start"
-			]
-		    }
-		}
-	    }
 	}
-    }
 }
 
 The block above is essentially embedded inside the `Properties` field of the instance Spec:
 
 {
-    "Properties" : {
-      "resource" : {
-    	 "aws_instance" : {
-	    "web4" : {
-		"ami" : "${lookup(var.aws_amis, var.aws_region)}",
-		"instance_type" : "m1.small",
-		"key_name": "PUBKEY",
-		"vpc_security_group_ids" : ["${aws_security_group.default.id}"],
-		"subnet_id": "${aws_subnet.default.id}",
-		"tags" :  {
-		    "Name" : "web4",
-		    "InstancePlugin" : "terraform"
+	"Properties": {
+		"resource": {
+			"aws_instance": {
+				"web4": {
+					"ami": "${lookup(var.aws_amis, var.aws_region)}",
+					"instance_type": "m1.small",
+					"key_name": "PUBKEY",
+					"vpc_security_group_ids": ["${aws_security_group.default.id}"],
+					"subnet_id": "${aws_subnet.default.id}",
+					"tags":  {
+						"Name": "web4",
+						"InstancePlugin": "terraform"
+					},
+					"connection": {
+						"user": "ubuntu"
+					},
+					"provisioner": {
+						"remote_exec": {
+							"inline": [
+								"sudo apt-get -y update",
+								"sudo apt-get -y install nginx",
+								"sudo service nginx start"
+							]
+						}
+					}
+				}
+			}
 		}
-		"connection" : {
-		    "user" : "ubuntu"
-		},
-		"provisioner" : {
-		    "remote_exec" : {
-			"inline" : [
-			    "sudo apt-get -y update",
-			    "sudo apt-get -y install nginx",
-			    "sudo service nginx start"
-			]
-		    }
-		}
-	    }
-	 }
-      }
-    },
-    "Tags" : {
-        "other" : "values",
-        "to" : "merge",
-        "with" : "tags"
-    },
-    "Init" : "init string"
+	},
+	"Tags": {
+		"other": "values",
+		"to": "merge",
+		"with": "tags"
+	},
+	"Init": "init string"
 }
 
 */
@@ -160,6 +167,22 @@ const (
 
 	// VMSoftLayer is the resource type for softlayer
 	VMSoftLayer = TResourceType("softlayer_virtual_guest")
+)
+
+const (
+	// PropHostnamePrefix is the optional terraform property that contains the hostname prefix
+	PropHostnamePrefix = "@hostname_prefix"
+
+	// PropScope is the optional terraform property that defines how a resource should be persisted
+	PropScope = "@scope"
+
+	// ValScopeDedicated defines dedicated scope: the resource lifecycle is loosely couple with the
+	// VM; it is written in a file named "instance-xxxx-dedicated.tf.json"
+	ValScopeDedicated = "@dedicated"
+
+	// ValScopeDefault defines the default scope: the resource lifecycle is tightly coupled
+	// with the VM; it is written in the same "instance.xxxx.tf.json" file
+	ValScopeDefault = "@default"
 )
 
 var (
@@ -215,7 +238,6 @@ func (p *plugin) Validate(req *types.Any) error {
 	if vms > 1 {
 		return fmt.Errorf("zero or 1 vm instance per request: %d", vms)
 	}
-
 	return nil
 }
 
@@ -293,7 +315,7 @@ func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID
 			hostname = string(*logicalID)
 		}
 		// Use the given hostname value as a prefix if it is a non-empty string
-		if hostnamePrefix, is := properties["@hostname_prefix"].(string); is {
+		if hostnamePrefix, is := properties[PropHostnamePrefix].(string); is {
 			hostnamePrefix = strings.Trim(hostnamePrefix, " ")
 			// Use the default behavior if hostnamePrefix was either not a string, or an empty string
 			if hostnamePrefix == "" {
@@ -306,7 +328,7 @@ func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID
 			properties["hostname"] = hostname
 		}
 		// Delete hostnamePrefix so it will not be written in the *.tf.json file
-		delete(properties, "@hostname_prefix")
+		delete(properties, PropHostnamePrefix)
 		log.Debugln("Adding hostname to properties: hostname=", properties["hostname"])
 	case VMAmazon:
 		if p, exists := properties["private_ip"]; exists {
@@ -364,7 +386,7 @@ func renderInstIDVar(data string, id instance.ID) (string, error) {
 }
 
 // handleProvisionTags sets the Infrakit-specific tags and merges with the user-defined in the instance spec
-func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceType, properties TResourceProperties) {
+func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceType, vmProperties TResourceProperties) {
 	// Add the name to the tags if it does not exist, issue case-insensitive
 	// check for the "name" key
 	if spec.Tags != nil {
@@ -384,32 +406,137 @@ func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceTyp
 		spec.Tags["LogicalID"] = string(*spec.LogicalID)
 	}
 
-	// Merge any user-defined tags and convert to platform specific tag type
+	// Merge any spec tags into the VM properties
+	mergeTagsIntoVMProps(vmType, vmProperties, spec.Tags)
+}
+
+// mergeTagsIntoVMProps merges the given tags into vmProperties in the appropriate
+// platform-specific tag format
+func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties, tags map[string]string) {
 	switch vmType {
 	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
-		if t, exists := properties["tags"]; !exists {
-			properties["tags"] = spec.Tags
-		} else if mm, ok := t.(map[string]interface{}); ok {
-			// merge tags
-			for tt, vv := range spec.Tags {
-				mm[tt] = vv
+		if vmTags, exists := vmProperties["tags"]; !exists {
+			// Need to be careful with type here; the tags saved in the VM properties need to be generic
+			// since that it how they are parsed from json
+			tagsInterface := make(map[string]interface{}, len(tags))
+			for k, v := range tags {
+				tagsInterface[k] = v
 			}
+			vmProperties["tags"] = tagsInterface
+		} else if tagsMap, ok := vmTags.(map[string]interface{}); ok {
+			// merge tags
+			for k, v := range tags {
+				tagsMap[k] = v
+			}
+		} else {
+			log.Errorf("mergeTagsIntoVMProps: invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"]))
 		}
 	case VMSoftLayer:
-		if _, has := properties["tags"]; !has {
-			properties["tags"] = []interface{}{}
+		if _, has := vmProperties["tags"]; !has {
+			vmProperties["tags"] = []interface{}{}
 		}
-		if tags, ok := properties["tags"].([]interface{}); ok {
+		if tagsArray, ok := vmProperties["tags"].([]interface{}); ok {
 			// softlayer uses a list of tags, instead of a map of tags
-			properties["tags"] = mergeLabelsIntoTagSlice(tags, spec.Tags)
+			vmProperties["tags"] = mergeLabelsIntoTagSlice(tagsArray, tags)
+		} else {
+			log.Errorf("mergeTagsIntoVMProps: invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"]))
 		}
-		// On Softlayer the tags must be lowercase
-		tagsLower := []string{}
-		for _, val := range properties["tags"].([]string) {
+		// All tags on Softlayer must be lower-case
+		tagsLower := []interface{}{}
+		for _, val := range vmProperties["tags"].([]string) {
+			// Commas are not valid tag characters, change to a space for tag values that
+			// are a list
+			if strings.HasPrefix(val, attachTag+":") {
+				val = strings.Replace(val, ",", " ", -1)
+			}
 			tagsLower = append(tagsLower, strings.ToLower(val))
 		}
-		properties["tags"] = tagsLower
+		vmProperties["tags"] = tagsLower
 	}
+}
+
+// writeTerraformFiles uses the data in the TFormat to create one or more .tf.json files with the
+// generated name. The properties of the VM resource are overriden by vmProperties.
+func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) error {
+	// Map file names to the data in each file based on the "@scope" property:
+	// - @default: resources in same "instance-xxxx.tf.json" file as VM
+	// - @dedicated: resources in different file as VM with the same ID (instance-xxxx-dedicated.tf.json)
+	// - <other>: resource defined in different file with a scope identifier (scope-<other>.tf.json)
+	fileMap := make(map[string]*TFormat)
+
+	for resourceType, resourceObj := range tf.Resource {
+		vmList := mapset.NewSetFromSlice(VMTypes)
+		for resourceName, resourceProps := range resourceObj {
+			var newResourceName string
+			if vmList.Contains(resourceType) {
+				// Overwrite with the changes to the VM properties
+				resourceProps = vmProperties
+				newResourceName = generatedName
+			} else {
+				newResourceName = fmt.Sprintf("%s-%s", generatedName, resourceName)
+			}
+			// Determine the scope value (default to 'default')
+			scope, has := resourceProps[PropScope]
+			if has {
+				delete(resourceProps, PropScope)
+			} else {
+				scope = ValScopeDefault
+			}
+			// Determine the filename based off of the scope value
+			var filename string
+			switch scope {
+			case ValScopeDefault:
+				filename = generatedName
+			case ValScopeDedicated:
+				filename = fmt.Sprintf("%s-dedicated", generatedName)
+			default:
+				filename = fmt.Sprintf("scope-%s", scope)
+			}
+			// Get the associated value in the file map
+			tfPersistence, has := fileMap[filename]
+			if !has {
+				resourceMap := make(map[TResourceType]map[TResourceName]TResourceProperties)
+				tfPersistence = &TFormat{Resource: resourceMap}
+				fileMap[filename] = tfPersistence
+			}
+			resourceNameMap, has := tfPersistence.Resource[resourceType]
+			if !has {
+				resourceNameMap = make(map[TResourceName]TResourceProperties)
+				tfPersistence.Resource[resourceType] = resourceNameMap
+			}
+			resourceNameMap[TResourceName(newResourceName)] = resourceProps
+		}
+	}
+	// Update the vmProperties with the infrakit.attach tag
+	attach := []string{}
+	for filename := range fileMap {
+		if filename == generatedName {
+			continue
+		}
+		attach = append(attach, filename)
+	}
+	if len(attach) > 0 {
+		sort.Strings(attach)
+		tags := map[string]string{
+			attachTag: strings.Join(attach, ","),
+		}
+		mergeTagsIntoVMProps(vmType, vmProperties, tags)
+	}
+	// Handle any platform specific updates to the VM properties prior to writing out
+	platformSpecificUpdates(vmType, TResourceName(generatedName), logicalID, vmProperties)
+
+	for filename, tfVal := range fileMap {
+		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
+		log.Debugln("writeTerraformFiles", filename, "data=", string(buff), "err=", err)
+		if err != nil {
+			return err
+		}
+		err = afero.WriteFile(p.fs, filepath.Join(p.Dir, filename+".tf.json"), buff, 0644)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Provision creates a new instance based on the spec.
@@ -440,50 +567,23 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	vmType, _, properties, err := FindVM(&tf)
+	vmType, _, vmProps, err := FindVM(&tf)
 	if err != nil {
 		return nil, err
 	}
-	if properties == nil {
+	if vmProps == nil {
 		return nil, fmt.Errorf("no-vm-instance-in-spec")
 	}
 
-	// Add Infrakit-specific tags
-	handleProvisionTags(spec, id, vmType, properties)
-	// Merge the init scripts
-	mergeInitScript(spec, id, vmType, properties)
-	// Platform specific processing
-	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, properties)
-
-	// Write out each resource again with the instance name
-	for resourceType, resourceObj := range tf.Resource {
-		vmList := mapset.NewSetFromSlice(VMTypes)
-		for resourceName, resourceProps := range resourceObj {
-			var newResourceName string
-			if vmList.Contains(resourceType) {
-				// Overwrite with the changes to the VM properties
-				resourceProps = properties
-				newResourceName = name
-			} else {
-				newResourceName = fmt.Sprintf("%s-%s", name, resourceName)
-			}
-			// Write the whole thing back out, after decorations and replacing the hostname with the generated hostname
-			delete(tf.Resource[resourceType], resourceName)
-			tf.Resource[resourceType][TResourceName(newResourceName)] = resourceProps
-		}
-	}
-
-	buff, err := json.MarshalIndent(tf, "  ", "  ")
-	log.Debugln("provision", id, "data=", string(buff), "err=", err)
-	if err != nil {
+	// Add Infrakit-specific tags to the user-defined VM properties
+	handleProvisionTags(spec, id, vmType, vmProps)
+	// Merge the init scripts into the VM properties
+	mergeInitScript(spec, id, vmType, vmProps)
+	// Write out the tf.json file
+	if err = p.writeTerraformFiles(spec.LogicalID, name, &tf, vmType, vmProps); err != nil {
 		return nil, err
 	}
-
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, string(id)+".tf.json"), buff, 0644)
-	if err != nil {
-		return nil, err
-	}
-
+	// And apply the updates
 	return &id, p.terraformApply()
 }
 
@@ -500,37 +600,16 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 		return err
 	}
 
-	vmType, vmName, props, err := FindVM(&tf)
+	vmType, vmName, vmProps, err := FindVM(&tf)
 	if err != nil {
 		return err
 	}
 
-	if len(props) == 0 || vmName != TResourceName(string(instance)) {
+	if len(vmProps) == 0 || vmName != TResourceName(string(instance)) {
 		return fmt.Errorf("not found:%v", instance)
 	}
 
-	switch vmType {
-	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
-		if _, has := props["tags"]; !has {
-			props["tags"] = map[string]interface{}{}
-		}
-
-		if tags, ok := props["tags"].(map[string]interface{}); ok {
-			for k, v := range labels {
-				tags[k] = v
-			}
-		}
-
-	case VMSoftLayer:
-		if _, has := props["tags"]; !has {
-			props["tags"] = []interface{}{}
-		}
-		tags, ok := props["tags"].([]interface{})
-		if !ok {
-			return fmt.Errorf("bad format:%v", instance)
-		}
-		props["tags"] = mergeLabelsIntoTagSlice(tags, labels)
-	}
+	mergeTagsIntoVMProps(vmType, vmProps, labels)
 
 	buff, err = json.MarshalIndent(tf, "  ", "  ")
 	if err != nil {
@@ -545,13 +624,96 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 
 // Destroy terminates an existing instance.
 func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
-	fp := filepath.Join(p.Dir, string(instance)+".tf.json")
+	// TODO(kaufers): When SPI is updated with context, updated 2nd arg to false
+	// for rolling updated so that attached resources are not destroyed
+	err := p.doDestroy(instance, true)
+	return err
+}
+
+// doDestroy terminates an existing instance and optionally terminates any related
+// resources
+func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
+	filename := string(inst) + ".tf.json"
+	fp := filepath.Join(p.Dir, filename)
+
 	log.Debugln("destroy instance", fp)
+	// Optionally destroy the related resources
+	if processAttach {
+		// Get an referenced resources in the "infrakit.attach" tag
+		attachIDs, err := parseAttachTagFromFile(fp)
+		if err != nil {
+			return err
+		}
+		if len(attachIDs) > 0 {
+			idsToDestroy := make(map[string]string)
+			for _, attachID := range attachIDs {
+				idsToDestroy[attachID] = ""
+			}
+			// Load all other instance files and determine other references exist
+			re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
+			fs := &afero.Afero{Fs: p.fs}
+			err := fs.Walk(p.Dir,
+				func(path string, info os.FileInfo, err error) error {
+					matches := re.FindStringSubmatch(info.Name())
+					// Note that the current instance (being destroyed) still exists; filter
+					// this file out.
+					if len(matches) == 3 && filename != info.Name() {
+						ids, err := parseAttachTagFromFile(filepath.Join(p.Dir, info.Name()))
+						if err != nil {
+							return err
+						}
+						for _, id := range ids {
+							if _, has := idsToDestroy[id]; has {
+								log.Infof(
+									"Not destroying related resource %s, %s references it",
+									id,
+									info.Name())
+								delete(idsToDestroy, id)
+							}
+						}
+					}
+					return nil
+				})
+			if err != nil {
+				return err
+			}
+			// Delete any resources that are no longer referenced
+			for id := range idsToDestroy {
+				err = p.doDestroy(instance.ID(id), false)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
 	err := p.fs.Remove(fp)
 	if err != nil {
 		return err
 	}
 	return p.terraformApply()
+}
+
+// parseAttachTagFromFile parses the file at the given path and returns value of
+// the "infrakit.attach" tag
+func parseAttachTagFromFile(fp string) ([]string, error) {
+	buff, err := ioutil.ReadFile(fp)
+	if err != nil {
+		log.Warningln("Cannot load file to destroy:", err)
+		return nil, err
+	}
+	tf := TFormat{}
+	if err = types.AnyBytes(buff).Decode(&tf); err != nil {
+		return nil, err
+	}
+	vmType, _, vmProps, err := FindVM(&tf)
+	if err != nil {
+		return nil, err
+	}
+	tags := parseTerraformTags(vmType, vmProps)
+	if attachTag, has := tags[attachTag]; has {
+		return strings.Split(attachTag, ","), nil
+	}
+	return []string{}, nil
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
@@ -582,28 +744,27 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 
 	re := regexp.MustCompile("(.*)(instance-[0-9]+)")
 	result := []instance.Description{}
-	// now we scan for <instance_type.instance-<timestamp> as keys
-	for t, vm := range localSpecs {
+	// now we scan for <instance_type.instance-<timestamp>> as keys
+	for vmType, vm := range localSpecs {
 	scan:
-		for k, v := range vm {
-			matches := re.FindStringSubmatch(string(k))
+		for vmName, vmProps := range vm {
+			// Only process valid instance-xxxx resources
+			matches := re.FindStringSubmatch(string(vmName))
 			if len(matches) == 3 {
 				id := matches[2]
 
 				inst := instance.Description{
-					Tags:      terraformTags(v, "tags"),
+					Tags:      parseTerraformTags(vmType, vmProps),
 					ID:        instance.ID(id),
-					LogicalID: terraformLogicalID(v),
+					LogicalID: terraformLogicalID(vmProps),
 				}
 
 				if properties {
-					if vms, has := terraformShowResult[t]; has {
-						if details, has := vms[k]; has {
-
+					if vms, has := terraformShowResult[vmType]; has {
+						if details, has := vms[vmName]; has {
 							if encoded, err := types.AnyValue(details); err == nil {
 								inst.Properties = encoded
 							}
-
 						}
 					}
 				}
@@ -628,39 +789,42 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	return result, nil
 }
 
-func terraformTags(m TResourceProperties, key string) map[string]string {
+// parseTerraformTags parses the platform-specific tags into a generic map
+func parseTerraformTags(vmType TResourceType, m TResourceProperties) map[string]string {
 	tags := map[string]string{}
-	if mm, ok := m[key].(map[string]interface{}); ok {
-		for k, v := range mm {
-			tags[k] = fmt.Sprintf("%v", v)
-		}
-		return tags
-	} else if mm, ok := m[key].([]interface{}); ok {
-		// add each tag in the list to the tags map
-		for _, v := range mm {
-			value := fmt.Sprintf("%v", v)
-			if strings.Contains(value, ":") {
-				log.Debugln("terraformTags system tags detected v=", v)
-				// This assumes that the first colon is separating the key and the value of the tag.
-				// This is done so that colons are valid characters in the value.
-				vv := strings.SplitN(value, ":", 2)
-				tags[vv[0]] = vv[1]
-			} else {
-				tags[value] = "" // for list but no ':"
+	switch vmType {
+	case VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud:
+		if tagsMap, ok := m["tags"].(map[string]interface{}); ok {
+			for k, v := range tagsMap {
+				tags[k] = fmt.Sprintf("%v", v)
 			}
+		} else {
+			log.Errorf("parseTerraformTags: invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"]))
 		}
-		log.Debugln("terraformTags return tags", tags)
-		return tags
-	} else {
-		log.Errorln("terraformTags: invalid terraformTags tags value", m[key])
-	}
-
-	for k, v := range m {
-		if k != "tags.%" && strings.Index(k, "tags.") == 0 {
-			n := k[len("tags."):]
-			tags[n] = fmt.Sprintf("%v", v)
+	case VMSoftLayer:
+		if tagsSlice, ok := m["tags"].([]interface{}); ok {
+			for _, v := range tagsSlice {
+				value := fmt.Sprintf("%v", v)
+				if strings.Contains(value, ":") {
+					log.Debugln("parseTerraformTags system tags detected v=", v)
+					// This assumes that the first colon is separating the key and the value of the tag.
+					// This is done so that colons are valid characters in the value.
+					vv := strings.SplitN(value, ":", 2)
+					// Commas are not valid tag characters so a space was used, change back to a common
+					// for tag values that are a slice
+					if vv[0] == attachTag {
+						vv[1] = strings.Replace(vv[1], " ", ",", -1)
+					}
+					tags[vv[0]] = vv[1]
+				} else {
+					tags[value] = "" // for list but no ':"
+				}
+			}
+		} else {
+			log.Errorln("parseTerraformTags: invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"]))
 		}
 	}
+	log.Debugln("parseTerraformTags return tags", tags)
 	return tags
 }
 
