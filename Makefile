@@ -101,7 +101,7 @@ $(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/c
 $(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
 $(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
 $(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
-$(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/examples/instance/terraform)
+$(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/pkg/provider/terraform/instance)
 $(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 $(call define_binary_target,infrakit-metadata-aws,github.com/docker/infrakit/cmd/metadata/aws)
@@ -243,6 +243,7 @@ build-docker: build-installer \
 	build-provider-aws \
 	build-provider-digitalocean \
 	build-provider-google \
+	build-provider-terraform \
 
 # Provider: AWS
 build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
@@ -263,3 +264,9 @@ build-provider-digitalocean: build/infrakit-instance-digitalocean
 	@cp build/infrakit-instance-digitalocean pkg/provider/digitalocean/build
 	$(MAKE) -C pkg/provider/digitalocean build-docker
 
+# Provider: Terraform
+build-provider-terraform: build/infrakit-instance-terraform
+	@mkdir -p pkg/provider/terraform/instance/build
+	@cp build/infrakit-instance-terraform pkg/provider/terraform/instance/build
+	@cp build/terraform pkg/provider/terraform/instance/build
+	$(MAKE) -C pkg/provider/terraform/instance build-docker
