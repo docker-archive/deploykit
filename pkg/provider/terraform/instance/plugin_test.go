@@ -19,12 +19,14 @@ import (
 
 // getPlugin returns the terraform instance plugin to use for testing and the
 // directory where the .tf.json files should be stored
-func getPlugin(t *testing.T) (instance.Plugin, string) {
+func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	terraform := NewTerraformInstancePlugin(dir)
-	terraform.(*plugin).pretend = true
-	return terraform, dir
+	tf := NewTerraformInstancePlugin(dir)
+	tf.(*plugin).pretend = true
+	p, is := tf.(*plugin)
+	require.True(t, is)
+	return p, dir
 }
 
 func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
@@ -230,7 +232,7 @@ func TestMergeInitScriptWithUserDefined(t *testing.T) {
 }
 
 func TestProvisionNoResources(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	spec := instance.Spec{
 		Properties:  types.AnyString("{}"),
@@ -239,13 +241,13 @@ func TestProvisionNoResources(t *testing.T) {
 		Attachments: []instance.Attachment{},
 		LogicalID:   nil,
 	}
-	_, err := terraform.Provision(spec)
+	_, err := tf.Provision(spec)
 	require.Error(t, err)
 	require.Equal(t, "no resource section", err.Error())
 }
 
 func TestProvisionNoVM(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	spec := instance.Spec{
 		Properties:  types.AnyString("{\"resource\": {}}"),
@@ -254,13 +256,13 @@ func TestProvisionNoVM(t *testing.T) {
 		Attachments: []instance.Attachment{},
 		LogicalID:   nil,
 	}
-	_, err := terraform.Provision(spec)
+	_, err := tf.Provision(spec)
 	require.Error(t, err)
 	require.Equal(t, "not found", err.Error())
 }
 
 func TestProvisionNoVMProperties(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	spec := instance.Spec{
 		Properties:  types.AnyString("{\"resource\": {\"aws_instance\": {}}}"),
@@ -269,13 +271,13 @@ func TestProvisionNoVMProperties(t *testing.T) {
 		Attachments: []instance.Attachment{},
 		LogicalID:   nil,
 	}
-	_, err := terraform.Provision(spec)
+	_, err := tf.Provision(spec)
 	require.Error(t, err)
 	require.Equal(t, "no-vm-instance-in-spec", err.Error())
 }
 
 func TestProvisionInvalidTemplateProperties(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	spec := instance.Spec{
 		Properties:  types.AnyString("{{}"),
@@ -284,13 +286,13 @@ func TestProvisionInvalidTemplateProperties(t *testing.T) {
 		Attachments: []instance.Attachment{},
 		LogicalID:   nil,
 	}
-	_, err := terraform.Provision(spec)
+	_, err := tf.Provision(spec)
 	require.Error(t, err)
 	require.True(t, strings.HasPrefix(err.Error(), "template:"))
 }
 
 func TestProvisionInvalidTemplateInit(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	spec := instance.Spec{
 		Properties:  types.AnyString("{}"),
@@ -299,13 +301,13 @@ func TestProvisionInvalidTemplateInit(t *testing.T) {
 		Attachments: []instance.Attachment{},
 		LogicalID:   nil,
 	}
-	_, err := terraform.Provision(spec)
+	_, err := tf.Provision(spec)
 	require.Error(t, err)
 	require.True(t, strings.HasPrefix(err.Error(), "template:"))
 }
 
 func TestProvisionDescribeDestroyScope(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMAmazon: {
@@ -340,17 +342,17 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 	buff, err := json.MarshalIndent(tformat, "  ", "  ")
 	require.NoError(t, err)
 	// Issue 2 provisions; should get dedicated for both and a single global
-	id1, err := terraform.Provision(instance.Spec{
+	id1, err := tf.Provision(instance.Spec{
 		Properties: types.AnyBytes(buff),
 		Tags:       map[string]string{"tag1": "val1"},
 	})
 	require.NoError(t, err)
-	id2, err := terraform.Provision(instance.Spec{
+	id2, err := tf.Provision(instance.Spec{
 		Properties: types.AnyBytes(buff),
 		Tags:       map[string]string{"tag1": "val1"},
 	})
 	require.NoError(t, err)
-	results, err := terraform.DescribeInstances(
+	results, err := tf.DescribeInstances(
 		map[string]string{"tag1": "val1"},
 		false,
 	)
@@ -398,7 +400,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
 	}
 	// Should be able to Destroy the first VM and the dedicated file should be removed
-	err = terraform.Destroy(*id1, instance.Termination)
+	err = tf.Destroy(*id1, instance.Termination)
 	require.NoError(t, err)
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
@@ -414,7 +416,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
 	}
 	// Destroying the second VM should remove everything
-	err = terraform.Destroy(*id2, instance.Termination)
+	err = tf.Destroy(*id2, instance.Termination)
 	require.NoError(t, err)
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
@@ -576,11 +578,11 @@ func firstInMap(m map[string]interface{}) (string, interface{}) {
 // runValidateProvisionDescribe validates, provisions, and describes instances
 // based on the given resource type and properties
 func runValidateProvisionDescribe(t *testing.T, resourceType, properties string) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
 	config := types.AnyString(properties)
-	err := terraform.Validate(config)
+	err := tf.Validate(config)
 	require.NoError(t, err)
 
 	// Instance with tags that will not be updated
@@ -596,7 +598,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 		Attachments: []instance.Attachment{},
 		LogicalID:   &logicalID1,
 	}
-	id1, err := terraform.Provision(instanceSpec1)
+	id1, err := tf.Provision(instanceSpec1)
 	require.NoError(t, err)
 	tfPath1 := filepath.Join(dir, string(*id1)+".tf.json")
 	_, err = ioutil.ReadFile(tfPath1)
@@ -619,7 +621,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 		},
 		LogicalID: &logicalID2,
 	}
-	id2, err := terraform.Provision(instanceSpec2)
+	id2, err := tf.Provision(instanceSpec2)
 	require.NoError(t, err)
 	require.NotEqual(t, id1, id2)
 
@@ -757,13 +759,13 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	}
 
 	// Both instances match: label=value1
-	list, err := terraform.DescribeInstances(map[string]string{"label1": "value1"}, false)
+	list, err := tf.DescribeInstances(map[string]string{"label1": "value1"}, false)
 	require.NoError(t, err)
 	require.Contains(t, list, inst1)
 	require.Contains(t, list, inst2)
 
 	// re-label instance2
-	err = terraform.Label(*id2, map[string]string{
+	err = tf.Label(*id2, map[string]string{
 		"label1": "changed1",
 		"label3": "value3",
 	})
@@ -806,33 +808,33 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	inst2.Tags["label3"] = "value3"
 
 	// Only a single match: label1=changed1
-	list, err = terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
+	list, err = tf.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{inst2}, list)
 
 	// Only a single match: label1=value1
-	list, err = terraform.DescribeInstances(map[string]string{"label1": "value1"}, false)
+	list, err = tf.DescribeInstances(map[string]string{"label1": "value1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{inst1}, list)
 
 	// No matches: label1=foo
-	list, err = terraform.DescribeInstances(map[string]string{"label1": "foo"}, false)
+	list, err = tf.DescribeInstances(map[string]string{"label1": "foo"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
 
 	// Destroy, then none should match and 1 file should be removed
-	err = terraform.Destroy(*id2, instance.Termination)
+	err = tf.Destroy(*id2, instance.Termination)
 	require.NoError(t, err)
 	files, err := ioutil.ReadDir(dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 	require.Equal(t, filepath.Base(tfPath1), files[0].Name())
 
-	list, err = terraform.DescribeInstances(map[string]string{"label1": "changed1"}, false)
+	list, err = tf.DescribeInstances(map[string]string{"label1": "changed1"}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
 
-	err = terraform.Destroy(*id1, instance.Termination)
+	err = tf.Destroy(*id1, instance.Termination)
 	require.NoError(t, err)
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
@@ -892,15 +894,15 @@ func TestFirst(t *testing.T) {
 }
 
 func TestValidateInvalidJSON(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	config := types.AnyString("not-going-to-decode")
-	err := terraform.Validate(config)
+	err := tf.Validate(config)
 	require.Error(t, err)
 }
 
 func TestValidate(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	// Should fail with 2 VMs
 	props := map[string]map[TResourceType]TResourceProperties{
@@ -911,7 +913,7 @@ func TestValidate(t *testing.T) {
 	}
 	config, err := json.Marshal(props)
 	require.NoError(t, err)
-	err = terraform.Validate(types.AnyBytes(config))
+	err = tf.Validate(types.AnyBytes(config))
 	require.Error(t, err)
 	require.True(t, strings.HasPrefix(
 		err.Error(),
@@ -923,14 +925,14 @@ func TestValidate(t *testing.T) {
 	require.Equal(t, 1, len(props["resource"]))
 	config, err = json.Marshal(props)
 	require.NoError(t, err)
-	err = terraform.Validate(types.AnyBytes(config))
+	err = tf.Validate(types.AnyBytes(config))
 	require.NoError(t, err)
 	// And pass with 0
 	delete(props["resource"], VMSoftLayer)
 	require.Empty(t, props["resource"])
 	config, err = json.Marshal(props)
 	require.NoError(t, err)
-	err = terraform.Validate(types.AnyBytes(config))
+	err = tf.Validate(types.AnyBytes(config))
 	require.NoError(t, err)
 }
 
@@ -949,24 +951,20 @@ func TestAddUserDataMerge(t *testing.T) {
 }
 
 func TestWriteTerraformFilesError(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	tformat := TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
 		VMSoftLayer: {"host": {}}},
 	}
 	// Before writing the file delete the directory to create an error
 	os.RemoveAll(dir)
-	err := p.writeTerraformFiles(nil, "instance-1234", &tformat, VMSoftLayer, TResourceProperties{})
+	err := tf.writeTerraformFiles(nil, "instance-1234", &tformat, VMSoftLayer, TResourceProperties{})
 	require.Error(t, err)
 }
 
 func TestWriteTerraformFilesVMOnly(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	name := "instance-1234"
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMSoftLayer: {
@@ -974,32 +972,30 @@ func TestWriteTerraformFilesVMOnly(t *testing.T) {
 		},
 	}
 	tformat := TFormat{Resource: m}
-	err := p.writeTerraformFiles(nil, name, &tformat, VMSoftLayer, TResourceProperties{"p3": "v3"})
+	err := tf.writeTerraformFiles(nil, name, &tformat, VMSoftLayer, TResourceProperties{"p3": "v3"})
 	require.NoError(t, err)
 	// Read single file from disk
-	files, err := ioutil.ReadDir(p.Dir)
+	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, name+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json"))
 	require.NoError(t, err)
-	tf := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
 	// 1 resource type
-	require.Len(t, tf.Resource, 1)
+	require.Len(t, tFormat.Resource, 1)
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{TResourceName(name): {
 			"hostname": "instance-1234",
 			"p3":       "v3"}},
-		tf.Resource[VMSoftLayer],
+		tFormat.Resource[VMSoftLayer],
 	)
 }
 
 func TestWriteTerraformFilesVMOnlyLogicalId(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	logicalID := instance.LogicalID("mgr1")
 	name := "instance-1234"
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
@@ -1008,32 +1004,30 @@ func TestWriteTerraformFilesVMOnlyLogicalId(t *testing.T) {
 		},
 	}
 	tformat := TFormat{Resource: m}
-	err := p.writeTerraformFiles(&logicalID, name, &tformat, VMSoftLayer, TResourceProperties{"p3": "v3"})
+	err := tf.writeTerraformFiles(&logicalID, name, &tformat, VMSoftLayer, TResourceProperties{"p3": "v3"})
 	require.NoError(t, err)
 	// Read single file from disk
-	files, err := ioutil.ReadDir(p.Dir)
+	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, name+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json"))
 	require.NoError(t, err)
-	tf := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
 	// 1 resource type
-	require.Len(t, tf.Resource, 1)
+	require.Len(t, tFormat.Resource, 1)
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{TResourceName(name): {
 			"hostname": "mgr1",
 			"p3":       "v3"}},
-		tf.Resource[VMSoftLayer],
+		tFormat.Resource[VMSoftLayer],
 	)
 }
 
 func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	name := "instance-1234"
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMSoftLayer: {
@@ -1047,21 +1041,21 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 		},
 	}
 	tformat := TFormat{Resource: m}
-	err := p.writeTerraformFiles(nil, name, &tformat, VMSoftLayer, TResourceProperties{"vmp3": "vmv3"})
+	err := tf.writeTerraformFiles(nil, name, &tformat, VMSoftLayer, TResourceProperties{"vmp3": "vmv3"})
 	require.NoError(t, err)
 	// Read single file from disk
-	files, err := ioutil.ReadDir(p.Dir)
+	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, name+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json"))
 	require.NoError(t, err)
-	tf := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
 	// 3 resource type
-	require.Len(t, tf.Resource, 3)
+	require.Len(t, tFormat.Resource, 3)
 	// VM resource
-	vmType := tf.Resource[VMSoftLayer]
+	vmType := tFormat.Resource[VMSoftLayer]
 	require.NotNil(t, vmType)
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{
@@ -1073,7 +1067,7 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 		vmType,
 	)
 	// File storage
-	fsType := tf.Resource[TResourceType("softlayer_file_storage")]
+	fsType := tFormat.Resource[TResourceType("softlayer_file_storage")]
 	require.NotNil(t, fsType)
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{
@@ -1082,7 +1076,7 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 		fsType,
 	)
 	// Block storage
-	bsType := tf.Resource[TResourceType("softlayer_block_storage")]
+	bsType := tFormat.Resource[TResourceType("softlayer_block_storage")]
 	require.NotNil(t, bsType)
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{
@@ -1093,10 +1087,8 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 }
 
 func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	name := "instance-1234"
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMAmazon: {
@@ -1128,14 +1120,14 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 		},
 	}
 	tformat := TFormat{Resource: m}
-	err := p.writeTerraformFiles(nil,
+	err := tf.writeTerraformFiles(nil,
 		name,
 		&tformat,
 		VMAmazon,
 		TResourceProperties{"vmp3": "vmv3"})
 	require.NoError(t, err)
 	// Should be 3 files on disk
-	files, err := ioutil.ReadDir(p.Dir)
+	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 3)
 	filenames := []string{}
@@ -1146,10 +1138,10 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json", name))
 	require.Contains(t, filenames, "scope-managers.tf.json")
 	// Default
-	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, fmt.Sprintf("%s.tf.json", name)))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json", name)))
 	require.NoError(t, err)
-	tf := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
@@ -1165,13 +1157,13 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 				TResourceName(name + "-another-default-name"): {"kdef-1": "vdef-1"},
 			},
 		},
-		tf.Resource,
+		tFormat.Resource,
 	)
 	// Dedicated
-	buff, err = ioutil.ReadFile(filepath.Join(p.Dir, fmt.Sprintf("%s-dedicated.tf.json", name)))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s-dedicated.tf.json", name)))
 	require.NoError(t, err)
-	tf = TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
@@ -1182,13 +1174,13 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 				TResourceName(name + "-another-dedicated-name"): {"kded-1": "vded-1"},
 			},
 		},
-		tf.Resource,
+		tFormat.Resource,
 	)
 	// Global
-	buff, err = ioutil.ReadFile(filepath.Join(p.Dir, "scope-managers.tf.json"))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "scope-managers.tf.json"))
 	require.NoError(t, err)
-	tf = TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
@@ -1196,15 +1188,13 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 				TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
 			},
 		},
-		tf.Resource,
+		tFormat.Resource,
 	)
 }
 
 func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	logicalID := instance.LogicalID("mgr1")
 	name := "instance-1234"
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
@@ -1225,14 +1215,14 @@ func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
 		},
 	}
 	tformat := TFormat{Resource: m}
-	err := p.writeTerraformFiles(&logicalID,
+	err := tf.writeTerraformFiles(&logicalID,
 		name,
 		&tformat,
 		VMSoftLayer,
 		TResourceProperties{"vmp3": "vmv3"})
 	require.NoError(t, err)
 	// Should be 2 files on disk
-	files, err := ioutil.ReadDir(p.Dir)
+	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 2)
 	filenames := []string{}
@@ -1242,13 +1232,13 @@ func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
 	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json", name))
 	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json", name))
 	// VM file
-	buff, err := ioutil.ReadFile(filepath.Join(p.Dir, name+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json"))
 	require.NoError(t, err)
-	tf := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
-	require.Len(t, tf.Resource, 1)
-	vmType := tf.Resource[VMSoftLayer]
+	require.Len(t, tFormat.Resource, 1)
+	vmType := tFormat.Resource[VMSoftLayer]
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{
 			TResourceName(name): {
@@ -1262,10 +1252,10 @@ func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
 		vmType,
 	)
 	// File storage and block storage
-	buff, err = ioutil.ReadFile(filepath.Join(p.Dir, fmt.Sprintf("%s-dedicated.tf.json", name)))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s-dedicated.tf.json", name)))
 	require.NoError(t, err)
-	tf = TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
@@ -1276,53 +1266,45 @@ func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
 				TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
 			},
 		},
-		tf.Resource,
+		tFormat.Resource,
 	)
 }
 
 func TestScanLocalFilesNoFiles(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
-	vms, err := p.scanLocalFiles()
+	vms, err := tf.scanLocalFiles()
 	require.NoError(t, err)
 	require.Empty(t, vms)
 }
 
 func TestScanLocalFilesInvalidFile(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
-	err := afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-12345.tf.json"), []byte("not-json"), 0644)
+	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12345.tf.json"), []byte("not-json"), 0644)
 	require.NoError(t, err)
-	_, err = p.scanLocalFiles()
+	_, err = tf.scanLocalFiles()
 	require.Error(t, err)
 }
 
 func TestScanLocalFilesNoVms(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	// Create a valid file without a VM type
 	m := make(map[TResourceType]map[TResourceName]TResourceProperties)
 	tformat := TFormat{Resource: m}
 	buff, err := json.Marshal(tformat)
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-12345.tf.json"), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12345.tf.json"), buff, 0644)
 	require.NoError(t, err)
-	_, err = p.scanLocalFiles()
+	_, err = tf.scanLocalFiles()
 	require.Error(t, err)
 	require.Equal(t, "not found", err.Error())
 }
 
 func TestScanLocalFiles(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 
 	// Create a few valid files, same type
 	inst1 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -1332,7 +1314,7 @@ func TestScanLocalFiles(t *testing.T) {
 	tformat := TFormat{Resource: inst1}
 	buff, err := json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-12.tf.json"), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12.tf.json"), buff, 0644)
 	require.NoError(t, err)
 
 	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -1342,7 +1324,7 @@ func TestScanLocalFiles(t *testing.T) {
 	tformat = TFormat{Resource: inst2}
 	buff, err = json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-34.tf.json"), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-34.tf.json"), buff, 0644)
 	require.NoError(t, err)
 
 	// And another type
@@ -1353,11 +1335,11 @@ func TestScanLocalFiles(t *testing.T) {
 	tformat = TFormat{Resource: inst3}
 	buff, err = json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, "instance-56.tf.json"), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-56.tf.json"), buff, 0644)
 	require.NoError(t, err)
 
 	// Should get 2 different resource types, 2 VMs for softlayer and 1 for AWS
-	vms, err := p.scanLocalFiles()
+	vms, err := tf.scanLocalFiles()
 	require.NoError(t, err)
 	require.Equal(t, 2, len(vms))
 	softlayerVMs, contains := vms[VMSoftLayer]
@@ -1601,49 +1583,41 @@ func TestRenderInstIDVar(t *testing.T) {
 }
 
 func TestLabelNoFiles(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
-	err := p.Label(instance.ID("ID"), nil)
+	err := tf.Label(instance.ID("ID"), nil)
 	require.Error(t, err)
 }
 
 func TestLabelInvalidFile(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	id := "instance-1234"
-	err := afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), []byte("not-json"), 0644)
+	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), []byte("not-json"), 0644)
 	require.NoError(t, err)
-	err = p.Label(instance.ID(id), nil)
+	err = tf.Label(instance.ID(id), nil)
 	require.Error(t, err)
 }
 
 func TestLabelNoVM(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	id := "instance-1234"
 	// No VM data in instance definition
 	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
 	tformat := TFormat{Resource: inst}
 	buff, err := json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
 	require.NoError(t, err)
-	err = p.Label(instance.ID(id), nil)
+	err = tf.Label(instance.ID(id), nil)
 	require.Error(t, err)
 	require.Equal(t, "not found", err.Error())
 }
 
 func TestLabelNoProperties(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	id := "instance-1234"
 	// Resource does not have any properties
 	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -1651,18 +1625,16 @@ func TestLabelNoProperties(t *testing.T) {
 	tformat := TFormat{Resource: inst}
 	buff, err := json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
 	require.NoError(t, err)
-	err = p.Label(instance.ID(id), nil)
+	err = tf.Label(instance.ID(id), nil)
 	require.Error(t, err)
 	require.Equal(t, "not found:instance-1234", err.Error())
 }
 
 func TestLabelCreateNewTags(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 
 	// Create a file without any tags for each VMType
 	for index, vmType := range VMTypes {
@@ -1677,7 +1649,7 @@ func TestLabelCreateNewTags(t *testing.T) {
 		tformat := TFormat{Resource: inst}
 		buff, err := json.MarshalIndent(tformat, " ", " ")
 		require.NoError(t, err)
-		err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
 		require.NoError(t, err)
 	}
 
@@ -1688,19 +1660,19 @@ func TestLabelCreateNewTags(t *testing.T) {
 	}
 	for index := range VMTypes {
 		id := fmt.Sprintf("instance-%v", index)
-		err := p.Label(instance.ID(id), labels)
+		err := tf.Label(instance.ID(id), labels)
 		require.NoError(t, err)
 	}
 
 	// Verify that the labels were added
 	for index, vmType := range VMTypes {
 		id := fmt.Sprintf("instance-%v", index)
-		buff, err := ioutil.ReadFile(filepath.Join(p.Dir, id+".tf.json"))
+		buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, id+".tf.json"))
 		require.NoError(t, err)
-		tf := TFormat{}
-		err = types.AnyBytes(buff).Decode(&tf)
+		tFormat := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tFormat)
 		require.NoError(t, err)
-		actualVMType, vmName, props, err := FindVM(&tf)
+		actualVMType, vmName, props, err := FindVM(&tFormat)
 		require.NoError(t, err)
 		require.Equal(t, vmType, actualVMType)
 		require.Equal(t, TResourceName(id), vmName)
@@ -1726,10 +1698,8 @@ func TestLabelCreateNewTags(t *testing.T) {
 }
 
 func TestLabelMergeTags(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 
 	// Create a file with existing tags for each VMType
 	for index, vmType := range VMTypes {
@@ -1751,7 +1721,7 @@ func TestLabelMergeTags(t *testing.T) {
 		tformat := TFormat{Resource: inst}
 		buff, err := json.MarshalIndent(tformat, " ", " ")
 		require.NoError(t, err)
-		err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
 		require.NoError(t, err)
 	}
 
@@ -1762,19 +1732,19 @@ func TestLabelMergeTags(t *testing.T) {
 	}
 	for index := range VMTypes {
 		id := fmt.Sprintf("instance-%v", index)
-		err := p.Label(instance.ID(id), labels)
+		err := tf.Label(instance.ID(id), labels)
 		require.NoError(t, err)
 	}
 
 	// Verify that the labels were added
 	for index, vmType := range VMTypes {
 		id := fmt.Sprintf("instance-%v", index)
-		buff, err := ioutil.ReadFile(filepath.Join(p.Dir, id+".tf.json"))
+		buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, id+".tf.json"))
 		require.NoError(t, err)
-		tf := TFormat{}
-		err = types.AnyBytes(buff).Decode(&tf)
+		tFormat := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tFormat)
 		require.NoError(t, err)
-		actualVMType, vmName, props, err := FindVM(&tf)
+		actualVMType, vmName, props, err := FindVM(&tFormat)
 		require.NoError(t, err)
 		require.Equal(t, vmType, actualVMType)
 		require.Equal(t, TResourceName(id), vmName)
@@ -1922,17 +1892,15 @@ func TestTerraformLogicalIDFromList(t *testing.T) {
 }
 
 func TestDestroyInstanceNotExists(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	err := terraform.Destroy(instance.ID("id"), instance.Termination)
+	err := tf.Destroy(instance.ID("id"), instance.Termination)
 	require.Error(t, err)
 }
 
 func TestDestroy(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	id := "instance-1234"
 	tformat := TFormat{
 		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
@@ -1943,9 +1911,9 @@ func TestDestroy(t *testing.T) {
 	}
 	buff, err := json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
 	require.NoError(t, err)
-	err = terraform.Destroy(instance.ID(id), instance.Termination)
+	err = tf.Destroy(instance.ID(id), instance.Termination)
 	require.Nil(t, err)
 
 	// The file has been removed
@@ -1955,7 +1923,7 @@ func TestDestroy(t *testing.T) {
 }
 
 func TestDestroyScaleDown(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMSoftLayer: {
@@ -1970,7 +1938,7 @@ func TestDestroyScaleDown(t *testing.T) {
 	tformat := TFormat{Resource: m}
 	buff, err := json.MarshalIndent(tformat, "  ", "  ")
 	require.NoError(t, err)
-	id, err := terraform.Provision(instance.Spec{
+	id, err := tf.Provision(instance.Spec{
 		Properties: types.AnyBytes(buff),
 		Tags:       map[string]string{"tag1": "val1"},
 	})
@@ -1980,7 +1948,7 @@ func TestDestroyScaleDown(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 2)
 	// Destroy the instance and the related files
-	err = terraform.Destroy(instance.ID(*id), instance.Termination)
+	err = tf.Destroy(instance.ID(*id), instance.Termination)
 	require.NoError(t, err)
 	// All files has been removed
 	files, err = ioutil.ReadDir(dir)
@@ -1989,10 +1957,8 @@ func TestDestroyScaleDown(t *testing.T) {
 }
 
 func TestDestroyRollingUpdate(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMSoftLayer: {
 			TResourceName("host"): {},
@@ -2006,7 +1972,7 @@ func TestDestroyRollingUpdate(t *testing.T) {
 	tformat := TFormat{Resource: m}
 	buff, err := json.MarshalIndent(tformat, "  ", "  ")
 	require.NoError(t, err)
-	id, err := terraform.Provision(instance.Spec{
+	id, err := tf.Provision(instance.Spec{
 		Properties: types.AnyBytes(buff),
 		Tags:       map[string]string{"tag1": "val1"},
 	})
@@ -2017,7 +1983,7 @@ func TestDestroyRollingUpdate(t *testing.T) {
 	require.Len(t, files, 2)
 	// Destroy the instance and the related files
 	// TODO(kaufers): Update to SPI call once rolling update context is supported
-	err = p.doDestroy(instance.ID(*id), false)
+	err = tf.doDestroy(instance.ID(*id), false)
 	require.NoError(t, err)
 	// Instance file has been removed; dedicated file still exists
 	files, err = ioutil.ReadDir(dir)
@@ -2034,17 +2000,15 @@ func TestParseAttachTagFromFileNoFile(t *testing.T) {
 }
 
 func TestParseAttachTagFromFileNoVM(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	tformat := TFormat{
 		Resource: map[TResourceType]map[TResourceName]TResourceProperties{},
 	}
 	buff, err := json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	fp := filepath.Join(p.Dir, "instance-1234.tf.json")
-	err = afero.WriteFile(p.fs, fp, buff, 0644)
+	fp := filepath.Join(tf.Dir, "instance-1234.tf.json")
+	err = afero.WriteFile(tf.fs, fp, buff, 0644)
 	require.NoError(t, err)
 	_, err = parseAttachTagFromFile(fp)
 	require.Error(t, err)
@@ -2052,10 +2016,8 @@ func TestParseAttachTagFromFileNoVM(t *testing.T) {
 }
 
 func TestParseAttachTagFromFileMap(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	tformat := TFormat{
 		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
 			VMAmazon: {
@@ -2070,8 +2032,8 @@ func TestParseAttachTagFromFileMap(t *testing.T) {
 	}
 	buff, err := json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	fp := filepath.Join(p.Dir, "instance-1234.tf.json")
-	err = afero.WriteFile(p.fs, fp, buff, 0644)
+	fp := filepath.Join(tf.Dir, "instance-1234.tf.json")
+	err = afero.WriteFile(tf.fs, fp, buff, 0644)
 	require.NoError(t, err)
 	results, err := parseAttachTagFromFile(fp)
 	require.NoError(t, err)
@@ -2079,10 +2041,8 @@ func TestParseAttachTagFromFileMap(t *testing.T) {
 }
 
 func TestParseAttachTagFromFileSlice(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 	tformat := TFormat{
 		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
 			VMSoftLayer: {
@@ -2097,8 +2057,8 @@ func TestParseAttachTagFromFileSlice(t *testing.T) {
 	}
 	buff, err := json.MarshalIndent(tformat, " ", " ")
 	require.NoError(t, err)
-	fp := filepath.Join(p.Dir, "instance-1234.tf.json")
-	err = afero.WriteFile(p.fs, fp, buff, 0644)
+	fp := filepath.Join(tf.Dir, "instance-1234.tf.json")
+	err = afero.WriteFile(tf.fs, fp, buff, 0644)
 	require.NoError(t, err)
 	results, err := parseAttachTagFromFile(fp)
 	require.NoError(t, err)
@@ -2106,18 +2066,16 @@ func TestParseAttachTagFromFileSlice(t *testing.T) {
 }
 
 func TestDescribeNoFiles(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	results, err := terraform.DescribeInstances(map[string]string{}, false)
+	results, err := tf.DescribeInstances(map[string]string{}, false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, results)
 }
 
 func TestDescribe(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 
 	// Instance1, unique tag and shared tag
 	inst1 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -2128,7 +2086,7 @@ func TestDescribe(t *testing.T) {
 	}
 	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id1)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id1)), buff, 0644)
 	require.NoError(t, err)
 	// Instance1, unique tag and shared tag
 	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -2139,7 +2097,7 @@ func TestDescribe(t *testing.T) {
 	}
 	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id2)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id2)), buff, 0644)
 	require.NoError(t, err)
 	// Instance1, unique tag only
 	inst3 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -2150,17 +2108,17 @@ func TestDescribe(t *testing.T) {
 	}
 	buff, err = json.MarshalIndent(TFormat{Resource: inst3}, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id3)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id3)), buff, 0644)
 	require.NoError(t, err)
 
 	// First instance matches
-	results, err := terraform.DescribeInstances(
+	results, err := tf.DescribeInstances(
 		map[string]string{"tag1": "val1"},
 		false)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(results))
 	require.Equal(t, instance.ID(id1), results[0].ID)
-	results, err = terraform.DescribeInstances(
+	results, err = tf.DescribeInstances(
 		map[string]string{"tag1": "val1", "tagShared": "valShared"},
 		false)
 	require.NoError(t, err)
@@ -2168,7 +2126,7 @@ func TestDescribe(t *testing.T) {
 	require.Equal(t, instance.ID(id1), results[0].ID)
 
 	// Second instance matches
-	results, err = terraform.DescribeInstances(
+	results, err = tf.DescribeInstances(
 		map[string]string{"tag2": "val2"},
 		false)
 	require.NoError(t, err)
@@ -2176,7 +2134,7 @@ func TestDescribe(t *testing.T) {
 	require.Equal(t, instance.ID(id2), results[0].ID)
 
 	// Both instances matches
-	results, err = terraform.DescribeInstances(
+	results, err = tf.DescribeInstances(
 		map[string]string{"tagShared": "valShared"},
 		false)
 	require.NoError(t, err)
@@ -2189,19 +2147,19 @@ func TestDescribe(t *testing.T) {
 	require.Contains(t, ids, instance.ID(id2))
 
 	// No instances match
-	results, err = terraform.DescribeInstances(
+	results, err = tf.DescribeInstances(
 		map[string]string{"tag1": "val1", "tagShared": "valShared", "foo": "bar"},
 		false)
 	require.NoError(t, err)
 	require.Empty(t, results)
-	results, err = terraform.DescribeInstances(
+	results, err = tf.DescribeInstances(
 		map[string]string{"TAG2": "val2"},
 		false)
 	require.NoError(t, err)
 	require.Empty(t, results)
 
 	// All instances match (no tags passed)
-	results, err = terraform.DescribeInstances(map[string]string{}, false)
+	results, err = tf.DescribeInstances(map[string]string{}, false)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(results))
 	ids = []instance.ID{}
@@ -2214,10 +2172,8 @@ func TestDescribe(t *testing.T) {
 }
 
 func TestDescribeAttachTag(t *testing.T) {
-	terraform, dir := getPlugin(t)
+	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	p, is := terraform.(*plugin)
-	require.True(t, is)
 
 	inst1 := make(map[TResourceType]map[TResourceName]TResourceProperties)
 	id1 := "instance-1"
@@ -2232,7 +2188,7 @@ func TestDescribeAttachTag(t *testing.T) {
 	}
 	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id1)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id1)), buff, 0644)
 	require.NoError(t, err)
 
 	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -2248,11 +2204,11 @@ func TestDescribeAttachTag(t *testing.T) {
 	}
 	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id2)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id2)), buff, 0644)
 	require.NoError(t, err)
 
 	// Get both instances
-	results, err := terraform.DescribeInstances(
+	results, err := tf.DescribeInstances(
 		map[string]string{"key": "val"},
 		false)
 	require.NoError(t, err)
