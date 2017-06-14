@@ -142,7 +142,7 @@ func (p *plugin) Destroy(config resource.Spec, pretend bool) (string, error) {
 		if pretend {
 			detail = fmt.Sprintf("Would destroy %s (%s)", name, id)
 		} else {
-			if err = resourceConfigs[name].plugin.Destroy(id); err != nil {
+			if err = resourceConfigs[name].plugin.Destroy(id, instance.Termination); err != nil {
 				return "", fmt.Errorf("Failed to destroy resource '%s' (%s): %s", name, id, err)
 			}
 

@@ -118,7 +118,7 @@ func (q *quorum) converge() {
 		grp.Add(1)
 		go func() {
 			defer grp.Done()
-			q.scaled.Destroy(unknownInstance)
+			q.scaled.Destroy(unknownInstance, instance.Termination)
 		}()
 	}
 

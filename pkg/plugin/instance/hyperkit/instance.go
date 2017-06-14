@@ -230,7 +230,7 @@ func (p hyperkitPlugin) Label(instance instance.ID, labels map[string]string) er
 }
 
 // Destroy terminates an existing instance.
-func (p hyperkitPlugin) Destroy(id instance.ID) error {
+func (p hyperkitPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	log.Info("Destroying VM", "id", id)
 
 	instanceDir := path.Join(p.VMDir, string(id))
@@ -330,7 +330,7 @@ func (p hyperkitPlugin) DescribeInstances(tags map[string]string, properties boo
 			h, err := hyperkit.FromState(instanceDir)
 			if err != nil {
 				log.Warn("Could not get instance data", "id", id)
-				p.Destroy(id)
+				p.Destroy(id, instance.Termination)
 				continue
 			}
 

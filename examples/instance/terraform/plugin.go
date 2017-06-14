@@ -544,7 +544,7 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 }
 
 // Destroy terminates an existing instance.
-func (p *plugin) Destroy(instance instance.ID) error {
+func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
 	fp := filepath.Join(p.Dir, string(instance)+".tf.json")
 	log.Debugln("destroy instance", fp)
 	err := p.fs.Remove(fp)

@@ -703,7 +703,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	require.Equal(t, []instance.Description{}, list)
 
 	// Destroy, then none should match and 1 file should be removed
-	err = terraform.Destroy(*id2)
+	err = terraform.Destroy(*id2, instance.Termination)
 	require.NoError(t, err)
 	files, err := ioutil.ReadDir(dir)
 	require.NoError(t, err)
@@ -714,7 +714,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
 
-	err = terraform.Destroy(*id1)
+	err = terraform.Destroy(*id1, instance.Termination)
 	require.NoError(t, err)
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
@@ -1337,7 +1337,7 @@ func TestTerraformLogicalIDFromList(t *testing.T) {
 func TestDestroyInstanceNotExists(t *testing.T) {
 	terraform, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	err := terraform.Destroy(instance.ID("id"))
+	err := terraform.Destroy(instance.ID("id"), instance.Termination)
 	require.Error(t, err)
 }
 
@@ -1353,7 +1353,7 @@ func TestDestroy(t *testing.T) {
 	require.NoError(t, err)
 	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
 	require.NoError(t, err)
-	result := terraform.Destroy(instance.ID(id))
+	result := terraform.Destroy(instance.ID(id), instance.Termination)
 	require.Nil(t, result)
 	// The file has been removed
 	files, err := ioutil.ReadDir(dir)

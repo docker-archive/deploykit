@@ -41,14 +41,14 @@ func (_mr *_MockPluginRecorder) DescribeInstances(arg0, arg1 interface{}) *gomoc
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeInstances", arg0, arg1)
 }
 
-func (_m *MockPlugin) Destroy(_param0 instance.ID) error {
-	ret := _m.ctrl.Call(_m, "Destroy", _param0)
+func (_m *MockPlugin) Destroy(_param0 instance.ID, _param1 instance.Context) error {
+	ret := _m.ctrl.Call(_m, "Destroy", _param0, _param1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockPluginRecorder) Destroy(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
+func (_mr *_MockPluginRecorder) Destroy(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0, arg1)
 }
 
 func (_m *MockPlugin) Label(_param0 instance.ID, _param1 map[string]string) error {

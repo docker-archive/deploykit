@@ -65,7 +65,7 @@ func (p awsRouteTablePlugin) Label(id instance.ID, labels map[string]string) err
 	return ec2CreateTags(p.client, id, labels)
 }
 
-func (p awsRouteTablePlugin) Destroy(id instance.ID) error {
+func (p awsRouteTablePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	output, err := p.client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{RouteTableIds: []*string{(*string)(&id)}})
 	if err != nil {
 		return fmt.Errorf("DescribeRouteTables failed: %s", err)

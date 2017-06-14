@@ -31,7 +31,7 @@ func Destroy(name string, services *cli.Services) *cobra.Command {
 			for _, a := range args {
 
 				instanceID := instance.ID(a)
-				err := instancePlugin.Destroy(instanceID)
+				err := instancePlugin.Destroy(instanceID, instance.Termination)
 
 				if err != nil {
 					return err

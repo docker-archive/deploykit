@@ -275,7 +275,7 @@ func (p imagePlugin) Label(instance instance.ID, labels map[string]string) error
 }
 
 // Destroy terminates an existing instance. This is a No-op. Images are immutable and never go away.
-func (p imagePlugin) Destroy(id instance.ID) error {
+func (p imagePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	return nil
 }
 

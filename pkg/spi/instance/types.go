@@ -48,3 +48,12 @@ type Spec struct {
 	// Attachments are instructions for external entities that should be attached to the instance.
 	Attachments []Attachment
 }
+
+// Context provides additional information to certain operations.
+// For example, context is used for Destroy to denote whether the
+// destroy is for rolling update or termination
+type Context struct {
+	// Reason is a string that provides some information about the operation
+	// The string pointer denotes the field is optional
+	Reason string
+}

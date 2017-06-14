@@ -260,7 +260,7 @@ func (s *scaler) converge() {
 			destroy := toDestroy
 			go func() {
 				defer grp.Done()
-				s.scaled.Destroy(destroy)
+				s.scaled.Destroy(destroy, instance.Termination)
 			}()
 			s.waitIfReachParallelLimit(i, &grp)
 		}

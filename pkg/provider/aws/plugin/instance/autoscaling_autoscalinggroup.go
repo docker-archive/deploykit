@@ -85,7 +85,7 @@ func (p awsAutoScalingGroupPlugin) Label(id instance.ID, labels map[string]strin
 	return nil
 }
 
-func (p awsAutoScalingGroupPlugin) Destroy(id instance.ID) error {
+func (p awsAutoScalingGroupPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	_, err := p.client.DeleteAutoScalingGroup(&autoscaling.DeleteAutoScalingGroupInput{
 		AutoScalingGroupName: (*string)(&id),
 		ForceDelete:          aws.Bool(true),

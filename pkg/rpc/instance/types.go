@@ -46,6 +46,7 @@ type LabelResponse struct {
 type DestroyRequest struct {
 	Type     string
 	Instance instance.ID
+	Context  instance.Context
 }
 
 // DestroyResponse is the rpc wrapper for Destroy response

@@ -32,7 +32,7 @@ func newTestInstancePlugin() *testing_instance.Plugin {
 			instances[id] = spec
 			return &id, nil
 		},
-		DoDestroy: func(id instance.ID) error {
+		DoDestroy: func(id instance.ID, ctx instance.Context) error {
 			if _, ok := instances[id]; !ok {
 				return errors.New("Instance does not exist")
 			}

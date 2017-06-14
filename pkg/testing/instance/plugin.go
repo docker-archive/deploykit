@@ -17,7 +17,7 @@ type Plugin struct {
 	DoLabel func(instance instance.ID, labels map[string]string) error
 
 	// DoDestroy terminates an existing instance.
-	DoDestroy func(instance instance.ID) error
+	DoDestroy func(instance instance.ID, context instance.Context) error
 
 	// DoDescribeInstances returns descriptions of all instances matching all of the provided tags.
 	DoDescribeInstances func(tags map[string]string, details bool) ([]instance.Description, error)
@@ -39,8 +39,8 @@ func (t *Plugin) Label(instance instance.ID, labels map[string]string) error {
 }
 
 // Destroy terminates an existing instance.
-func (t *Plugin) Destroy(instance instance.ID) error {
-	return t.DoDestroy(instance)
+func (t *Plugin) Destroy(instance instance.ID, context instance.Context) error {
+	return t.DoDestroy(instance, context)
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.

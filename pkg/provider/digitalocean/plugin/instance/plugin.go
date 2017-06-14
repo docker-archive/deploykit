@@ -182,7 +182,7 @@ func (p *plugin) getSshkey(expectedKey string) (godo.Key, error) {
 }
 
 // Destroy terminates an existing instance.
-func (p *plugin) Destroy(instance instance.ID) error {
+func (p *plugin) Destroy(instance instance.ID, ctx instance.Context) error {
 	id, err := strconv.Atoi(string(instance))
 	if err != nil {
 		return err

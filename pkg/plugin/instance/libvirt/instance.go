@@ -390,7 +390,7 @@ func destroyMetadataDisk(conn *libvirt.Connect, d *libvirt.Domain) error {
 }
 
 // Destroy terminates an existing instance.
-func (p libvirtPlugin) Destroy(id instance.ID) error {
+func (p libvirtPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	l := log.WithField("instance", id)
 	l.Info("Destroying VM")
 

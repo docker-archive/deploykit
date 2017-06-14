@@ -62,6 +62,11 @@ Fields:
 ### Instance ID
 A globally-unique string identifier for an Instance.
 
+### Context
+An operation context. Contains a reason code that can be either
+  + rolling_update
+  + termination
+It is currently used to provide context for proper handling of instance.Destroy
 
 ### Instance Spec
 The declared specification of an Instance.

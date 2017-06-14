@@ -267,7 +267,7 @@ func TestDestroy(t *testing.T) {
 	api.EXPECT().DeleteInstance("instance-id").Return(nil)
 
 	plugin := NewPlugin(api, nil)
-	err := plugin.Destroy("instance-id")
+	err := plugin.Destroy("instance-id", instance.Termination)
 
 	require.NoError(t, err)
 }
@@ -277,7 +277,7 @@ func TestDestroyFails(t *testing.T) {
 	api.EXPECT().DeleteInstance("instance-wrong-id").Return(errors.New("BUG"))
 
 	plugin := NewPlugin(api, nil)
-	err := plugin.Destroy("instance-wrong-id")
+	err := plugin.Destroy("instance-wrong-id", instance.Termination)
 
 	require.EqualError(t, err, "BUG")
 }

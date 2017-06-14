@@ -53,9 +53,9 @@ func (c client) Label(instance instance.ID, labels map[string]string) error {
 }
 
 // Destroy terminates an existing instance.
-func (c client) Destroy(instance instance.ID) error {
+func (c client) Destroy(instance instance.ID, context instance.Context) error {
 	_, instanceType := c.name.GetLookupAndType()
-	req := DestroyRequest{Instance: instance, Type: instanceType}
+	req := DestroyRequest{Instance: instance, Type: instanceType, Context: context}
 	resp := DestroyResponse{}
 
 	return c.client.Call("Instance.Destroy", req, &resp)

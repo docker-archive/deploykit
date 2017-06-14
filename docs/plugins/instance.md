@@ -1,6 +1,6 @@
 # Instance plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/instance/* af33b7b157a24a90e4ecef4b99c997a4039edf7832ae259bfe527c06caec5455f3c083481586eda2 -->
+<!-- SOURCE-CHECKSUM pkg/spi/instance/* 9117db2da2ea1073a6f94b241e6c6a9a0a9048d452c44631323150dfeffdfde2b8c5ba85e274fabe -->
 
 ## API
 
@@ -63,12 +63,16 @@ Permanently destroys an instance.
 #### Request
 ```json
 {
-  "Instance": "instance_id"
+  "Instance": "instance_id",
+  "Context" : {
+    "Reason" : "rolling_update"
+  }
 }
 ```
 
 Parameters:
 - `Instance`: An [instance ID](types.md#instance-id).
+- `Context` : An [instance Context](types.md#context).
 
 #### Response
 ```json

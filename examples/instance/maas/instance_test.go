@@ -149,6 +149,6 @@ func TestProvision_and_Destroy(t *testing.T) {
 		},
 	}, list)
 
-	err = maasPlugin.Destroy(*id)
+	err = maasPlugin.Destroy(*id, instance.Termination)
 	require.NoError(t, err)
 }

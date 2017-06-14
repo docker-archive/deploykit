@@ -96,7 +96,7 @@ func run(t *testing.T, properties string) {
 		},
 	}, list)
 
-	err = fileinst.Destroy(*id)
+	err = fileinst.Destroy(*id, instance.Termination)
 	require.NoError(t, err)
 
 	list, err = fileinst.DescribeInstances(map[string]string{"label1": "changed1"}, false)

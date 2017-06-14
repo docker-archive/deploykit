@@ -64,7 +64,7 @@ func (d *testplugin) Label(id instance.ID, labels map[string]string) error {
 	return nil
 }
 
-func (d *testplugin) Destroy(id instance.ID) error {
+func (d *testplugin) Destroy(id instance.ID, ctx instance.Context) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

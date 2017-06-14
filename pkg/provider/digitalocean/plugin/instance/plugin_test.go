@@ -79,13 +79,13 @@ func TestDestroyFails(t *testing.T) {
 		},
 	}
 	id := instance.ID("foo")
-	err := plugin.Destroy(id)
+	err := plugin.Destroy(id, instance.Termination)
 	require.Error(t, err)
 	_, is := err.(*strconv.NumError)
 	require.True(t, is)
 
 	id = instance.ID("12345")
-	err = plugin.Destroy(id)
+	err = plugin.Destroy(id, instance.Termination)
 
 	require.EqualError(t, err, "something went wrong")
 }
@@ -96,7 +96,7 @@ func TestDestroy(t *testing.T) {
 		droplets: &fakeDropletsServices{},
 	}
 	id := instance.ID("12345")
-	err := plugin.Destroy(id)
+	err := plugin.Destroy(id, instance.Termination)
 
 	require.NoError(t, err)
 }
