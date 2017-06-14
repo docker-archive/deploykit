@@ -398,7 +398,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
 	}
 	// Should be able to Destroy the first VM and the dedicated file should be removed
-	err = terraform.Destroy(*id1)
+	err = terraform.Destroy(*id1, instance.Termination)
 	require.NoError(t, err)
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
@@ -414,7 +414,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
 	}
 	// Destroying the second VM should remove everything
-	err = terraform.Destroy(*id2)
+	err = terraform.Destroy(*id2, instance.Termination)
 	require.NoError(t, err)
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
@@ -1980,7 +1980,7 @@ func TestDestroyScaleDown(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 2)
 	// Destroy the instance and the related files
-	err = terraform.Destroy(instance.ID(*id))
+	err = terraform.Destroy(instance.ID(*id), instance.Termination)
 	require.NoError(t, err)
 	// All files has been removed
 	files, err = ioutil.ReadDir(dir)
