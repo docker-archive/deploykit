@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/exec"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
@@ -35,11 +36,12 @@ func main() {
 	name := cmd.Flags().String("name", "instance-terraform", "Plugin name to advertise for discovery")
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	dir := cmd.Flags().String("dir", getDir(), "Dir for storing plan files")
+	pollInterval := cmd.Flags().Duration("poll-interval", 30*time.Second, "Terraform polling interval")
 	cmd.Run = func(c *cobra.Command, args []string) {
 		mustHaveTerraform()
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(NewTerraformInstancePlugin(*dir)))
+		cli.RunPlugin(*name, instance_plugin.PluginServer(NewTerraformInstancePlugin(*dir, *pollInterval)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())

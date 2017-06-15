@@ -37,16 +37,18 @@ const (
 )
 
 type plugin struct {
-	Dir       string
-	fs        afero.Fs
-	lock      lockfile.Lockfile
-	applying  bool
-	applyLock sync.Mutex
-	pretend   bool // true to actually do terraform apply
+	Dir          string
+	fs           afero.Fs
+	lock         lockfile.Lockfile
+	applying     bool
+	applyLock    sync.Mutex
+	pretend      bool // true to actually do terraform apply
+	pollInterval time.Duration
+	pollChannel  chan bool
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(dir string) instance.Plugin {
+func NewTerraformInstancePlugin(dir string, pollInterval time.Duration) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
 	lock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
 	if err != nil {
@@ -54,9 +56,10 @@ func NewTerraformInstancePlugin(dir string) instance.Plugin {
 	}
 
 	return &plugin{
-		Dir:  dir,
-		fs:   afero.NewOsFs(),
-		lock: lock,
+		Dir:          dir,
+		fs:           afero.NewOsFs(),
+		lock:         lock,
+		pollInterval: pollInterval,
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -20,7 +21,9 @@ func TestRunTerraformApply(t *testing.T) {
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	dir = path.Join(dir, "aws-two-tier")
-
-	err = doTerraformApply(dir)
+	terraform := NewTerraformInstancePlugin(dir, 1*time.Second)
+	p, _ := terraform.(*plugin)
+	attempted, err := p.doTerraformApply(false)
 	require.NoError(t, err)
+	require.True(t, attempted)
 }
