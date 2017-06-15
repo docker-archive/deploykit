@@ -200,7 +200,7 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 	// if the network do not exist, first create it
 	for _, networkAttachment := range request.NetworkAttachments {
 		if networkAttachment.Name == "" {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, errors.New("NetworkAttachment should have a name")
 		}
 		filter := filters.NewArgs()
@@ -212,7 +212,7 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 		networkListOptions := apitypes.NetworkListOptions{Filters: filter}
 		networkResources, err := cli.NetworkList(ctx, networkListOptions)
 		if err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		networkID := ""
@@ -222,21 +222,21 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 			networkCreateOptions := apitypes.NetworkCreate{Driver: networkAttachment.Driver, Attachable: true, CheckDuplicate: true}
 			networkResponse, err := cli.NetworkCreate(ctx, networkAttachment.Name, networkCreateOptions)
 			if err != nil {
-				_ = p.Destroy(id)
+				_ = p.Destroy(id, instance.Context{})
 				return nil, err
 			}
 			networkID = networkResponse.ID
 		} else if len(networkResources) == 1 {
 			networkID = networkResources[0].ID
 		} else {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, fmt.Errorf("too many (%d) networks found with name %s", len(networkResources), networkAttachment.Name)
 		}
 
 		endpointSettings := network.EndpointSettings{}
 		err = cli.NetworkConnect(ctx, networkID, r.ID, &endpointSettings)
 		if err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 	}
@@ -246,56 +246,56 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 		tmpfile, err := ioutil.TempFile("/tmp", "infrakit")
 		userdataBasename = path.Base(tmpfile.Name())
 		if err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 
 		defer os.Remove(tmpfile.Name()) // clean up
 
 		if _, err := tmpfile.Write([]byte(spec.Init)); err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		if err := tmpfile.Close(); err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		srcInfo, err := archive.CopyInfoSourcePath(tmpfile.Name(), false)
 		if err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 
 		srcArchive, err := archive.TarResource(srcInfo)
 		if err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		defer srcArchive.Close()
 		dstDir, preparedArchive, err := archive.PrepareArchiveCopy(srcArchive, srcInfo, archive.CopyInfo{Path: fmt.Sprintf("%s/%s", userdataDirname, userdataBasename)})
 		if err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		defer preparedArchive.Close()
 
 		if err := cli.CopyToContainer(ctx, r.ID, dstDir, preparedArchive, apitypes.CopyToContainerOptions{}); err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		containerPathStat, err := cli.ContainerStatPath(ctx, r.ID, fmt.Sprintf("%s/%s", userdataDirname, userdataBasename))
 		if err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		if containerPathStat.Size != int64(len(spec.Init)) {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, fmt.Errorf("userdata has not been properly copied in the container, filename = %s, file size = %d", containerPathStat.Name, containerPathStat.Size)
 		}
 	}
 
 	if err = cli.ContainerStart(ctx, r.ID, apitypes.ContainerStartOptions{}); err != nil {
-		_ = p.Destroy(id)
+		_ = p.Destroy(id, instance.Context{})
 		return nil, err
 	}
 
@@ -304,11 +304,11 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 		execConfig := apitypes.ExecConfig{Cmd: []string{"/bin/sh", fmt.Sprintf("%s/%s", userdataDirname, userdataBasename)}}
 		idResponse, err := cli.ContainerExecCreate(ctx, r.ID, execConfig)
 		if err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		if err = cli.ContainerExecStart(ctx, idResponse.ID, apitypes.ExecStartCheck{}); err != nil {
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, err
 		}
 		exitCode := 0
@@ -317,7 +317,7 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 			execInspect, err := cli.ContainerExecInspect(ctx, idResponse.ID)
 			if err != nil {
 				log.Warningf("failed to inspect the execution, cmd was: %s", execConfig.Cmd)
-				_ = p.Destroy(id)
+				_ = p.Destroy(id, instance.Context{})
 				return nil, err
 			}
 			exitCode = execInspect.ExitCode
@@ -333,7 +333,7 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 				buf.ReadFrom(rc)
 				log.Warning(buf.String())
 			}
-			_ = p.Destroy(id)
+			_ = p.Destroy(id, instance.Context{})
 			return nil, fmt.Errorf("init script failed with code %d for container %s", exitCode, r.ID[0:12])
 		}
 		log.Debug("Init script succesfully executed")
@@ -342,7 +342,7 @@ func (p dockerInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error
 }
 
 // Destroy terminates an existing instance
-func (p dockerInstancePlugin) Destroy(id instance.ID) error {
+func (p dockerInstancePlugin) Destroy(id instance.ID, dc instance.Context) error {
 	options := apitypes.ContainerRemoveOptions{Force: true, RemoveVolumes: true, RemoveLinks: false}
 	cli := p.client
 	ctx := context.Background()

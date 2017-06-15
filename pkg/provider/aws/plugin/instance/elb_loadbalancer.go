@@ -76,7 +76,7 @@ func (p awsLoadBalancerPlugin) Label(id instance.ID, labels map[string]string) e
 	return nil
 }
 
-func (p awsLoadBalancerPlugin) Destroy(id instance.ID) error {
+func (p awsLoadBalancerPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	if _, err := p.client.DeleteLoadBalancer(&elb.DeleteLoadBalancerInput{LoadBalancerName: (*string)(&id)}); err != nil {
 		return fmt.Errorf("DeleteLoadBalancer failed: %s", err)
 	}

@@ -8,8 +8,16 @@ import (
 // InterfaceSpec is the current name and version of the Instance API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Instance",
-	Version: "0.5.0",
+	Version: "0.6.0",
 }
+
+var (
+	// RollingUpdate is context indicating rolling update
+	RollingUpdate = Context{Reason: "rolling_update"}
+
+	// Termination is context indicating termination
+	Termination = Context{Reason: "terminate"}
+)
 
 // Plugin is a vendor-agnostic API used to create and manage resources with an infrastructure provider.
 type Plugin interface {
@@ -23,7 +31,7 @@ type Plugin interface {
 	Label(instance ID, labels map[string]string) error
 
 	// Destroy terminates an existing instance.
-	Destroy(instance ID) error
+	Destroy(instance ID, context Context) error
 
 	// DescribeInstances returns descriptions of all instances matching all of the provided tags.
 	// The properties flag indicates the client is interested in receiving details about each instance.

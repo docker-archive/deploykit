@@ -57,7 +57,7 @@ func (p awsVpcPlugin) Label(id instance.ID, labels map[string]string) error {
 	return ec2CreateTags(p.client, id, labels)
 }
 
-func (p awsVpcPlugin) Destroy(id instance.ID) error {
+func (p awsVpcPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	if _, err := p.client.DeleteVpc(&ec2.DeleteVpcInput{VpcId: (*string)(&id)}); err != nil {
 		return fmt.Errorf("DeleteVpc failed: %s", err)
 	}

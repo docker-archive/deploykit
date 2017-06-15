@@ -168,7 +168,7 @@ func (p *plugin) DestroyGroup(gid group.ID) error {
 		}
 
 		for _, desc := range descriptions {
-			context.scaled.Destroy(desc)
+			context.scaled.Destroy(desc, instance.Termination)
 		}
 	}
 

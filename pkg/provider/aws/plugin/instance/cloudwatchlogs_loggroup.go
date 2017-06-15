@@ -58,7 +58,7 @@ func (p awsLogGroupPlugin) Label(id instance.ID, labels map[string]string) error
 	return nil
 }
 
-func (p awsLogGroupPlugin) Destroy(id instance.ID) error {
+func (p awsLogGroupPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	if _, err := p.client.DeleteLogGroup(&cloudwatchlogs.DeleteLogGroupInput{LogGroupName: (*string)(&id)}); err != nil {
 		return fmt.Errorf("DeleteLogGroup failed: %s", err)
 	}

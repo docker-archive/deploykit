@@ -623,7 +623,7 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 }
 
 // Destroy terminates an existing instance.
-func (p *plugin) Destroy(instance instance.ID) error {
+func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
 	// TODO(kaufers): When SPI is updated with context, updated 2nd arg to false
 	// for rolling updated so that attached resources are not destroyed
 	err := p.doDestroy(instance, true)
@@ -635,6 +635,7 @@ func (p *plugin) Destroy(instance instance.ID) error {
 func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 	filename := string(inst) + ".tf.json"
 	fp := filepath.Join(p.Dir, filename)
+
 	log.Debugln("destroy instance", fp)
 	// Optionally destroy the related resources
 	if processAttach {

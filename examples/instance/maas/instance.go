@@ -244,7 +244,7 @@ func (m maasPlugin) Label(id instance.ID, labels map[string]string) error {
 }
 
 // Destroy terminates an existing instance.
-func (m maasPlugin) Destroy(id instance.ID) error {
+func (m maasPlugin) Destroy(id instance.ID, context instance.Context) error {
 	node, err := m.MaasObj.GetSubObject("nodes").GetSubObject(string(id)).Get()
 	if err != nil {
 		return err

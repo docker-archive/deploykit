@@ -335,7 +335,7 @@ func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 }
 
 // Destroy terminates an existing instance.
-func (p awsInstancePlugin) Destroy(id instance.ID) error {
+func (p awsInstancePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	result, err := p.client.TerminateInstances(&ec2.TerminateInstancesInput{
 		InstanceIds: []*string{aws.String(string(id))}})
 

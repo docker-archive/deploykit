@@ -38,12 +38,12 @@ func (_mr *_MockScaledRecorder) CreateOne(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateOne", arg0)
 }
 
-func (_m *MockScaled) Destroy(_param0 instance.Description) {
-	_m.ctrl.Call(_m, "Destroy", _param0)
+func (_m *MockScaled) Destroy(_param0 instance.Description, _param1 instance.Context) {
+	_m.ctrl.Call(_m, "Destroy", _param0, _param1)
 }
 
-func (_mr *_MockScaledRecorder) Destroy(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0)
+func (_mr *_MockScaledRecorder) Destroy(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Destroy", arg0, arg1)
 }
 
 func (_m *MockScaled) Health(_param0 instance.Description) flavor.Health {

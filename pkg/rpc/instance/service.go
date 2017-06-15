@@ -144,7 +144,7 @@ func (p *Instance) Destroy(_ *http.Request, req *DestroyRequest, resp *DestroyRe
 	if c == nil {
 		return fmt.Errorf("no-plugin:%s", req.Type)
 	}
-	err := c.Destroy(req.Instance)
+	err := c.Destroy(req.Instance, req.Context)
 	if err != nil {
 		return err
 	}

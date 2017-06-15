@@ -70,7 +70,7 @@ func (p awsQueuePlugin) Label(id instance.ID, labels map[string]string) error {
 	return nil
 }
 
-func (p awsQueuePlugin) Destroy(id instance.ID) error {
+func (p awsQueuePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	output, err := p.client.GetQueueUrl(&sqs.GetQueueUrlInput{QueueName: aws.String(arnOrNameToName(string(id)))})
 	if err != nil {
 		return fmt.Errorf("GetQueueUrl failed: %s", err)

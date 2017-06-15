@@ -141,7 +141,7 @@ func (v vagrantPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	_, err = inheritedEnvCommand([]string{"vagrant", "up"}, fmt.Sprintf("VAGRANT_CWD=%s", machineDir))
 	if err != nil {
-		v.Destroy(id)
+		v.Destroy(id, instance.Termination)
 		return nil, err
 	}
 
@@ -190,7 +190,7 @@ func (v vagrantPlugin) Label(instance instance.ID, labels map[string]string) err
 }
 
 // Destroy terminates an existing instance.
-func (v vagrantPlugin) Destroy(id instance.ID) error {
+func (v vagrantPlugin) Destroy(id instance.ID, context instance.Context) error {
 	fmt.Println("Destroying ", id)
 
 	machineDir := path.Join(v.VagrantfilesDir, string(id))

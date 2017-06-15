@@ -95,7 +95,7 @@ func TestRemoveUnknown(t *testing.T) {
 		scaled.EXPECT().List().Return([]instance.Description{a, b, c}, nil).AnyTimes(),
 	)
 
-	scaled.EXPECT().Destroy(d)
+	scaled.EXPECT().Destroy(d, instance.Termination)
 
 	quorum.Run()
 }

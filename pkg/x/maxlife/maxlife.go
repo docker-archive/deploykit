@@ -103,7 +103,7 @@ loop:
 				log.Info("Destroying", "oldest", oldest, "age", age(oldest, now), "maxlife", c.maxlife)
 
 				// terminate it and hope the group controller restores with a new intance
-				err = c.plugin.Destroy(oldest.ID)
+				err = c.plugin.Destroy(oldest.ID, instance.Termination)
 				if err != nil {
 					log.Warn("cannot destroy instance", "name", c.name, "id", oldest.ID, "err", err)
 					continue

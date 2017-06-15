@@ -62,7 +62,7 @@ func (p awsRolePlugin) Label(id instance.ID, labels map[string]string) error {
 	return nil
 }
 
-func (p awsRolePlugin) Destroy(id instance.ID) error {
+func (p awsRolePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	roleName := arnOrNameToName(string(id))
 
 	output, err := p.client.ListRolePolicies(&iam.ListRolePoliciesInput{RoleName: &roleName})

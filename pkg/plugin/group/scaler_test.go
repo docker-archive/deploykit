@@ -94,8 +94,8 @@ func TestScaleDown(t *testing.T) {
 		scaled.EXPECT().List().Return([]instance.Description{c, d}, nil).AnyTimes(),
 	)
 
-	scaled.EXPECT().Destroy(a)
-	scaled.EXPECT().Destroy(b)
+	scaled.EXPECT().Destroy(a, instance.Termination)
+	scaled.EXPECT().Destroy(b, instance.Termination)
 
 	scaler.Run()
 }
@@ -119,8 +119,8 @@ func TestBufferScaleDown(t *testing.T) {
 		scaled.EXPECT().List().Return([]instance.Description{c, d}, nil).AnyTimes(),
 	)
 
-	scaled.EXPECT().Destroy(a)
-	scaled.EXPECT().Destroy(b)
+	scaled.EXPECT().Destroy(a, instance.Termination)
+	scaled.EXPECT().Destroy(b, instance.Termination)
 
 	scaler.Run()
 }

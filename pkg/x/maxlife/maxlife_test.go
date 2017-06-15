@@ -54,7 +54,7 @@ func TestStartStop(t *testing.T) {
 		DoDescribeInstances: func(tags map[string]string, details bool) ([]instance.Description, error) {
 			return nil, nil
 		},
-		DoDestroy: func(instance instance.ID) error {
+		DoDestroy: func(instance instance.ID, ctx instance.Context) error {
 			return nil
 		},
 	}
@@ -93,7 +93,7 @@ func TestEnsureMaxlife(t *testing.T) {
 			}
 			return list, nil
 		},
-		DoDestroy: func(instance instance.ID) error {
+		DoDestroy: func(instance instance.ID, ctx instance.Context) error {
 			delete(all, instance)
 			destroy <- instance
 			return nil

@@ -62,7 +62,7 @@ func (p awsLaunchConfigurationPlugin) Label(id instance.ID, labels map[string]st
 	return nil
 }
 
-func (p awsLaunchConfigurationPlugin) Destroy(id instance.ID) error {
+func (p awsLaunchConfigurationPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	_, err := p.client.DeleteLaunchConfiguration(&autoscaling.DeleteLaunchConfigurationInput{
 		LaunchConfigurationName: (*string)(&id),
 	})

@@ -49,7 +49,7 @@ func (p awsVolumePlugin) Label(id instance.ID, labels map[string]string) error {
 	return ec2CreateTags(p.client, id, labels)
 }
 
-func (p awsVolumePlugin) Destroy(id instance.ID) error {
+func (p awsVolumePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	if _, err := p.client.DeleteVolume(&ec2.DeleteVolumeInput{VolumeId: (*string)(&id)}); err != nil {
 		return fmt.Errorf("DeleteVolume failed: %s", err)
 	}
