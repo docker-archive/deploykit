@@ -32,16 +32,9 @@ func newListener(service string, swarmPort uint32, urlStr string, cert *string) 
 }
 
 func (l *listener) asRoute() Route {
-	protocol := l.protocol()
-	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
-		log.Infoln("port ", l.extPort(), " Is in ", l.CertPorts())
-		protocol = SSL
-	} else {
-		log.Infoln("cert is nil, or port ", l.extPort(), " Is NOT in ", l.CertPorts())
-	}
 	return Route{
 		Port:             l.SwarmPort,
-		Protocol:         protocol,
+		Protocol:         l.protocol(),
 		LoadBalancerPort: l.extPort(),
 		Certificate:      l.CertASN(),
 	}
@@ -146,6 +139,15 @@ func (l *listener) protocol() Protocol {
 	if l.URL != nil {
 		scheme = l.URL.Scheme
 	}
+
+	// check if this should be SSL because it has a certificate.
+	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
+		log.Infoln("port ", l.extPort(), " Is in ", l.CertPorts())
+		scheme = string(SSL)
+	} else {
+		log.Infoln("cert is nil, or port ", l.extPort(), " Is NOT in ", l.CertPorts())
+	}
+
 	return ProtocolFromString(scheme)
 }
 
