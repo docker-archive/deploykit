@@ -29,7 +29,7 @@ func TestInstanceLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, id)
 
-	require.NoError(t, pluginImpl.Destroy(instance.ID(*id)))
+	require.NoError(t, pluginImpl.Destroy(instance.ID(*id), instance.Termination))
 }
 
 func TestCreateInstanceError(t *testing.T) {
@@ -59,7 +59,7 @@ func TestDestroyInstanceError(t *testing.T) {
 	instanceID := "test-id"
 
 	pluginImpl := NewInstancePlugin(cli, testNamespace)
-	require.Error(t, pluginImpl.Destroy(instance.ID(instanceID)))
+	require.Error(t, pluginImpl.Destroy(instance.ID(instanceID), instance.Termination))
 }
 
 func TestDescribeInstancesRequest(t *testing.T) {

@@ -234,13 +234,13 @@ func TestInstanceTypedPluginDestroy(t *testing.T) {
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]instance.Plugin{
 			"type1": &testing_instance.Plugin{
-				DoDestroy: func(req instance.ID) error {
+				DoDestroy: func(req instance.ID, ctx instance.Context) error {
 					instActual1 <- req
 					return nil
 				},
 			},
 			"type2": &testing_instance.Plugin{
-				DoDestroy: func(req instance.ID) error {
+				DoDestroy: func(req instance.ID, ctx instance.Context) error {
 					instActual2 <- req
 					return errors.New("can't do")
 				},
@@ -248,10 +248,10 @@ func TestInstanceTypedPluginDestroy(t *testing.T) {
 		}))
 	require.NoError(t, err)
 
-	err = must(NewClient(plugin.Name(name+"/type1"), socketPath)).Destroy(inst1)
+	err = must(NewClient(plugin.Name(name+"/type1"), socketPath)).Destroy(inst1, instance.Termination)
 	require.NoError(t, err)
 
-	err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Destroy(inst2)
+	err = must(NewClient(plugin.Name(name+"/type2"), socketPath)).Destroy(inst2, instance.Termination)
 	require.Error(t, err)
 	require.Equal(t, "can't do", err.Error())
 

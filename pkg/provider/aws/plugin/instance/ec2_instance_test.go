@@ -57,7 +57,7 @@ func TestInstanceLifecycle(t *testing.T) {
 			TerminatingInstances: []*ec2.InstanceStateChange{{InstanceId: &instanceID}}},
 			nil)
 
-	require.NoError(t, pluginImpl.Destroy(instance.ID(instanceID)))
+	require.NoError(t, pluginImpl.Destroy(instance.ID(instanceID), instance.Termination))
 }
 
 func TestCreateInstanceError(t *testing.T) {
@@ -88,7 +88,7 @@ func TestDestroyInstanceError(t *testing.T) {
 		Return(nil, runError)
 
 	pluginImpl := NewInstancePlugin(clientMock, testNamespace)
-	require.Error(t, pluginImpl.Destroy(instance.ID(instanceID)))
+	require.Error(t, pluginImpl.Destroy(instance.ID(instanceID), instance.Termination))
 }
 
 func describeInstancesResponse(

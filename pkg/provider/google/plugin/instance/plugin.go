@@ -108,7 +108,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	return &id, nil
 }
 
-func (p *plugin) Destroy(id instance.ID) error {
+func (p *plugin) Destroy(id instance.ID, ctx instance.Context) error {
 	err := p.API.DeleteInstance(string(id))
 
 	log.Debugln("destroy", id, "err=", err)

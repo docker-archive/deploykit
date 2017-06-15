@@ -58,7 +58,7 @@ func (p awsSubnetPlugin) Label(id instance.ID, labels map[string]string) error {
 	return nil
 }
 
-func (p awsSubnetPlugin) Destroy(id instance.ID) error {
+func (p awsSubnetPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	err := retry(30*time.Second, 500*time.Millisecond, func() error {
 		_, err := p.client.DeleteSubnet(&ec2.DeleteSubnetInput{SubnetId: (*string)(&id)})
 		return err

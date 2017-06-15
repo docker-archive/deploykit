@@ -57,7 +57,7 @@ func (p awsInternetGatewayPlugin) Label(id instance.ID, labels map[string]string
 	return ec2CreateTags(p.client, id, labels)
 }
 
-func (p awsInternetGatewayPlugin) Destroy(id instance.ID) error {
+func (p awsInternetGatewayPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	output, err := p.client.DescribeInternetGateways(&ec2.DescribeInternetGatewaysInput{InternetGatewayIds: []*string{(*string)(&id)}})
 	if err != nil {
 		return fmt.Errorf("DescribeInternetGateways failed: %s", err)

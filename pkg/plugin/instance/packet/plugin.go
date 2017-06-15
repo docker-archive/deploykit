@@ -115,7 +115,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 }
 
 // Destroy terminates an existing instance.
-func (p *plugin) Destroy(instance instance.ID) error {
+func (p *plugin) Destroy(instance instance.ID, ctx instance.Context) error {
 	_, err := p.client.Devices.Delete(string(instance))
 	return err
 }

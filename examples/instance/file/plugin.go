@@ -134,7 +134,7 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 }
 
 // Destroy terminates an existing instance.
-func (p *plugin) Destroy(instance instance.ID) error {
+func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
 	fp := filepath.Join(p.Dir, string(instance))
 	log.Debugln("destroy", fp)
 	return p.fs.Remove(fp)

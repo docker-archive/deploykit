@@ -52,7 +52,7 @@ func (p awsTablePlugin) Label(id instance.ID, labels map[string]string) error {
 	return nil
 }
 
-func (p awsTablePlugin) Destroy(id instance.ID) error {
+func (p awsTablePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	if _, err := p.client.DeleteTable(&dynamodb.DeleteTableInput{TableName: (*string)(&id)}); err != nil {
 		return fmt.Errorf("DeleteTable failed: %s", err)
 	}

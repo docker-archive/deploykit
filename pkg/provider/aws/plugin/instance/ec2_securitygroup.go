@@ -70,7 +70,7 @@ func (p awsSecurityGroupPlugin) Label(id instance.ID, labels map[string]string) 
 	return ec2CreateTags(p.client, id, labels)
 }
 
-func (p awsSecurityGroupPlugin) Destroy(id instance.ID) error {
+func (p awsSecurityGroupPlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	err := retry(30*time.Second, 500*time.Millisecond, func() error {
 		_, err := p.client.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{GroupId: (*string)(&id)})
 		return err

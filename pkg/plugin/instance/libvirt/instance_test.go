@@ -130,7 +130,7 @@ func TestBasicLifecycle(t *testing.T) {
 
 	require.Equal(t, logicalID, *inst.LogicalID)
 
-	err = plugin.Destroy(*id)
+	err = plugin.Destroy(*id, instance.Termination)
 	require.NoError(t, err)
 
 	require.False(t, domainExists(t, conn, string(*id)), "domain was found in libvirt domains after destroy")
@@ -185,7 +185,7 @@ func TestNoDevices(t *testing.T) {
 
 	require.Equal(t, logicalID, *inst.LogicalID)
 
-	err = plugin.Destroy(*id)
+	err = plugin.Destroy(*id, instance.Termination)
 	require.NoError(t, err)
 
 	require.False(t, domainExists(t, conn, string(*id)), "domain was found in libvirt domains after destroy")
@@ -240,7 +240,7 @@ func TestLogicalIDNotMAC(t *testing.T) {
 
 	require.Equal(t, logicalID, *inst.LogicalID)
 
-	err = plugin.Destroy(*id)
+	err = plugin.Destroy(*id, instance.Termination)
 	require.NoError(t, err)
 
 	require.False(t, domainExists(t, conn, string(*id)), "domain was found in libvirt domains after destroy")

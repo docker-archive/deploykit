@@ -69,7 +69,7 @@ func (p awsInstanceProfilePlugin) Label(id instance.ID, labels map[string]string
 	return nil
 }
 
-func (p awsInstanceProfilePlugin) Destroy(id instance.ID) error {
+func (p awsInstanceProfilePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	output, err := p.client.GetInstanceProfile(&iam.GetInstanceProfileInput{InstanceProfileName: (*string)(&id)})
 	if err != nil {
 		return fmt.Errorf("GetInstanceProfile failed: %s", err)
