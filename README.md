@@ -61,7 +61,7 @@ Here is a list of plugins:
 | [zookeeper](./examples/flavor/zookeeper)            | flavor   | run an Apache ZooKeeper ensemble        |
 | [infrakit/file](./examples/instance/file)           | instance | useful for development and testing      |
 | [infrakit/docker](./examples/instance/docker)       | instance | provisions container via Docker         |
-| [infrakit/terraform](./examples/instance/terraform) | instance | creates resources using Terraform       |
+| [infrakit/terraform](./pkg/provider/terraform/instance) | instance | creates resources using Terraform       |
 | [infrakit/maas](./examples/instance/maas)           | instance | bare-metal provisioning using Ubuntu MAAS  |
 | [infrakit/vagrant](./examples/instance/vagrant)     | instance | creates Vagrant VMs                     |
 | [infrakit/hyperkit](./pkg/plugin/instance/hyperkit)   | instance | creates [HyperKit](https://github.com/moby/hyperkit) VMs on Mac OSX |
@@ -77,7 +77,7 @@ Here is a list of plugins:
 |:--------------------------------------------------------|:---------|:----------------------------------------|
 | [HewlettPackard/infrakit-instance-oneview](https://github.com/HewlettPackard/infrakit-instance-oneview)      | instance    | bare-metal server provisioning via HP-OneView |
 | [codedellemc/infrakit.rackhd](https://github.com/codedellemc/infrakit.rackhd)      | instance    | bare-metal server provisioning via RackHD |
-| [IBM Bluemix / SoftLayer](./examples/instance/terraform) | instance    | SoftLayer via terraform             |
+| [IBM Bluemix / SoftLayer](./pkg/provider/terraform/instance) | instance    | SoftLayer via terraform             |
 | [AliyunContainerService/infrakit.aliyun](https://github.com/AliyunContainerService/infrakit.aliyun) | instance    | Provisions instances on Alibaba Cloud |
 | [1and1/infrakit-instance-oneandone](https://github.com/1and1/infrakit-instance-oneandone) | instance    | Provisions instances on 1&1 Cloud Server |
 | [sacloud/infrakit-instance-sakuracloud](https://github.com/sacloud/infrakit.sakuracloud) | instance    | Provisions instances on Sakura Cloud |
@@ -128,7 +128,7 @@ This will produce binaries for tools and several reference Plugin implementation
   + [`infrakit`](cmd/cli/README.md): a command line interface to interact with plugins
   + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./pkg/spi/group)
   + [`infrakit-instance-file`](examples/instance/file): an Instance plugin using dummy files to represent instances
-  + [`infrakit-instance-terraform`](examples/instance/terraform):
+  + [`infrakit-instance-terraform`](pkg/provider/terraform/instance):
     an Instance plugin integrating [Terraform](https://www.terraform.io)
   + [`infrakit-instance-vagrant`](examples/instance/vagrant):
     an Instance plugin using [Vagrant](https://www.vagrantup.com/)
