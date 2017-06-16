@@ -247,7 +247,7 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 			log.Infoln("Cert: ", cert)
 			urlString := fmt.Sprintf("%v://:%d", strings.ToLower(string(exposed.Protocol)), exposed.PublishedPort)
 			log.Infoln("urlString: ", urlString)
-			if listener, err := newListener(service.Spec.Name, exposed.TargetPort, urlString, cert); err == nil {
+			if listener, err := newListener(service.Spec.Name, exposed.PublishedPort, urlString, cert); err == nil {
 				listeners = append(listeners, listener)
 			} else {
 				log.Warningln("Error creating listener for exposed port:", exposed, "err=", err)
