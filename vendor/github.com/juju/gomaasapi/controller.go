@@ -44,47 +44,82 @@ type ControllerArgs struct {
 	APIKey  string
 }
 
-// NewController creates an authenticated client to the MAAS API, and checks
-// the capabilities of the server.
+// NewController creates an authenticated client to the MAAS API, and
+// checks the capabilities of the server. If the BaseURL specified
+// includes the API version, that version of the API will be used,
+// otherwise the controller will use the highest supported version
+// available.
 //
 // If the APIKey is not valid, a NotValid error is returned.
 // If the credentials are incorrect, a PermissionError is returned.
 func NewController(args ControllerArgs) (Controller, error) {
+	base, apiVersion, includesVersion := SplitVersionedURL(args.BaseURL)
+	if includesVersion {
+		if !supportedVersion(apiVersion) {
+			return nil, NewUnsupportedVersionError("version %s", apiVersion)
+		}
+		return newControllerWithVersion(base, apiVersion, args.APIKey)
+	}
+	return newControllerUnknownVersion(args)
+}
+
+func supportedVersion(value string) bool {
+	for _, version := range supportedAPIVersions {
+		if value == version {
+			return true
+		}
+	}
+	return false
+}
+
+func newControllerWithVersion(baseURL, apiVersion, apiKey string) (Controller, error) {
+	major, minor, err := version.ParseMajorMinor(apiVersion)
+	// We should not get an error here. See the test.
+	if err != nil {
+		return nil, errors.Errorf("bad version defined in supported versions: %q", apiVersion)
+	}
+	client, err := NewAuthenticatedClient(AddAPIVersionToURL(baseURL, apiVersion), apiKey)
+	if err != nil {
+		// If the credentials aren't valid, return now.
+		if errors.IsNotValid(err) {
+			return nil, errors.Trace(err)
+		}
+		// Any other error attempting to create the authenticated client
+		// is an unexpected error and return now.
+		return nil, NewUnexpectedError(err)
+	}
+	controllerVersion := version.Number{
+		Major: major,
+		Minor: minor,
+	}
+	controller := &controller{client: client, apiVersion: controllerVersion}
+	controller.capabilities, err = controller.readAPIVersionInfo()
+	if err != nil {
+		logger.Debugf("read version failed: %#v", err)
+		return nil, errors.Trace(err)
+	}
+
+	if err := controller.checkCreds(); err != nil {
+		return nil, errors.Trace(err)
+	}
+	return controller, nil
+}
+
+func newControllerUnknownVersion(args ControllerArgs) (Controller, error) {
 	// For now we don't need to test multiple versions. It is expected that at
 	// some time in the future, we will try the most up to date version and then
 	// work our way backwards.
 	for _, apiVersion := range supportedAPIVersions {
-		major, minor, err := version.ParseMajorMinor(apiVersion)
-		// We should not get an error here. See the test.
-		if err != nil {
-			return nil, errors.Errorf("bad version defined in supported versions: %q", apiVersion)
-		}
-		client, err := NewAuthenticatedClient(args.BaseURL, args.APIKey, apiVersion)
-		if err != nil {
-			// If the credentials aren't valid, return now.
-			if errors.IsNotValid(err) {
-				return nil, errors.Trace(err)
-			}
-			// Any other error attempting to create the authenticated client
-			// is an unexpected error and return now.
-			return nil, NewUnexpectedError(err)
-		}
-		controllerVersion := version.Number{
-			Major: major,
-			Minor: minor,
-		}
-		controller := &controller{client: client}
-		// The controllerVersion returned from the function will include any patch version.
-		controller.capabilities, controller.apiVersion, err = controller.readAPIVersion(controllerVersion)
-		if err != nil {
-			logger.Debugf("read version failed: %#v", err)
+		controller, err := newControllerWithVersion(args.BaseURL, apiVersion, args.APIKey)
+		switch {
+		case err == nil:
+			return controller, nil
+		case IsUnsupportedVersionError(err):
+			// This will only come back from readAPIVersionInfo for 410/404.
 			continue
-		}
-
-		if err := controller.checkCreds(); err != nil {
+		default:
 			return nil, errors.Trace(err)
 		}
-		return controller, nil
 	}
 
 	return nil, NewUnsupportedVersionError("controller at %s does not support any of %s", args.BaseURL, supportedAPIVersions)
@@ -805,10 +840,30 @@ func nextRequestID() int64 {
 	return atomic.AddInt64(&requestNumber, 1)
 }
 
-func (c *controller) readAPIVersion(apiVersion version.Number) (set.Strings, version.Number, error) {
+func indicatesUnsupportedVersion(err error) bool {
+	if err == nil {
+		return false
+	}
+	if serverErr, ok := errors.Cause(err).(ServerError); ok {
+		code := serverErr.StatusCode
+		return code == http.StatusNotFound || code == http.StatusGone
+	}
+	// Workaround for bug in MAAS 1.9.4 - instead of a 404 we get a
+	// redirect to the HTML login page, which doesn't parse as JSON.
+	// https://bugs.launchpad.net/maas/+bug/1583715
+	if syntaxErr, ok := errors.Cause(err).(*json.SyntaxError); ok {
+		message := "invalid character '<' looking for beginning of value"
+		return syntaxErr.Offset == 1 && syntaxErr.Error() == message
+	}
+	return false
+}
+
+func (c *controller) readAPIVersionInfo() (set.Strings, error) {
 	parsed, err := c.get("version")
-	if err != nil {
-		return nil, apiVersion, errors.Trace(err)
+	if indicatesUnsupportedVersion(err) {
+		return nil, WrapWithUnsupportedVersionError(err)
+	} else if err != nil {
+		return nil, errors.Trace(err)
 	}
 
 	// As we care about other fields, add them.
@@ -818,7 +873,7 @@ func (c *controller) readAPIVersion(apiVersion version.Number) (set.Strings, ver
 	checker := schema.FieldMap(fields, nil) // no defaults
 	coerced, err := checker.Coerce(parsed, nil)
 	if err != nil {
-		return nil, apiVersion, WrapWithDeserializationError(err, "version response")
+		return nil, WrapWithDeserializationError(err, "version response")
 	}
 	// For now, we don't append any subversion, but as it becomes used, we
 	// should parse and check.
@@ -832,7 +887,7 @@ func (c *controller) readAPIVersion(apiVersion version.Number) (set.Strings, ver
 		capabilities.Add(value.(string))
 	}
 
-	return capabilities, apiVersion, nil
+	return capabilities, nil
 }
 
 func parseAllocateConstraintsResponse(source interface{}, machine *machine) (ConstraintMatches, error) {

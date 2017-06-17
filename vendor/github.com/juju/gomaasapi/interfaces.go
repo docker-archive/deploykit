@@ -353,6 +353,7 @@ type BlockDevice interface {
 	ID() int
 	Name() string
 	Model() string
+	IDPath() string
 	Path() string
 	UsedFor() string
 	Tags() []string

@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -265,10 +266,28 @@ func (signer anonSigner) OAuthSign(request *http.Request) error {
 // *anonSigner implements the OAuthSigner interface.
 var _ OAuthSigner = anonSigner{}
 
-func composeAPIURL(BaseURL string, apiVersion string) (*url.URL, error) {
+// AddAPIVersionToURL will add the version/<version>/ suffix to the
+// given URL, handling trailing slashes. It shouldn't be called with a
+// URL that already includes a version.
+func AddAPIVersionToURL(BaseURL, apiVersion string) string {
 	baseurl := EnsureTrailingSlash(BaseURL)
-	apiurl := fmt.Sprintf("%sapi/%s/", baseurl, apiVersion)
-	return url.Parse(apiurl)
+	return fmt.Sprintf("%sapi/%s/", baseurl, apiVersion)
+}
+
+var apiVersionPattern = regexp.MustCompile(`^(?P<base>.*/)api/(?P<version>\d+\.\d+)/?$`)
+
+// SplitVersionedURL splits a versioned API URL (like
+// http://maas.server/MAAS/api/2.0/) into a base URL
+// (http://maas.server/MAAS/) and API version (2.0). If the URL
+// doesn't include a version component the bool return value will be
+// false.
+func SplitVersionedURL(url string) (string, string, bool) {
+	if !apiVersionPattern.MatchString(url) {
+		return url, "", false
+	}
+	version := apiVersionPattern.ReplaceAllString(url, "$version")
+	baseURL := apiVersionPattern.ReplaceAllString(url, "$base")
+	return baseURL, version, true
 }
 
 // NewAnonymousClient creates a client that issues anonymous requests.
@@ -276,20 +295,21 @@ func composeAPIURL(BaseURL string, apiVersion string) (*url.URL, error) {
 // http://my.maas.server.example.com/MAAS/
 // apiVersion should contain the version of the MAAS API that you want to use.
 func NewAnonymousClient(BaseURL string, apiVersion string) (*Client, error) {
-	parsedBaseURL, err := composeAPIURL(BaseURL, apiVersion)
+	versionedURL := AddAPIVersionToURL(BaseURL, apiVersion)
+	parsedURL, err := url.Parse(versionedURL)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{Signer: &anonSigner{}, APIURL: parsedBaseURL}, nil
+	return &Client{Signer: &anonSigner{}, APIURL: parsedURL}, nil
 }
 
-// NewAuthenticatedClient parses the given MAAS API key into the individual
-// OAuth tokens and creates an Client that will use these tokens to sign the
-// requests it issues.
-// BaseURL should refer to the root of the MAAS server path, e.g.
-// http://my.maas.server.example.com/MAAS/
-// apiVersion should contain the version of the MAAS API that you want to use.
-func NewAuthenticatedClient(BaseURL string, apiKey string, apiVersion string) (*Client, error) {
+// NewAuthenticatedClient parses the given MAAS API key into the
+// individual OAuth tokens and creates an Client that will use these
+// tokens to sign the requests it issues.
+// versionedURL should be the location of the versioned API root of
+// the MAAS server, e.g.:
+// http://my.maas.server.example.com/MAAS/api/2.0/
+func NewAuthenticatedClient(versionedURL, apiKey string) (*Client, error) {
 	elements := strings.Split(apiKey, ":")
 	if len(elements) != 3 {
 		errString := fmt.Sprintf("invalid API key %q; expected \"<consumer secret>:<token key>:<token secret>\"", apiKey)
@@ -306,9 +326,9 @@ func NewAuthenticatedClient(BaseURL string, apiKey string, apiVersion string) (*
 	if err != nil {
 		return nil, err
 	}
-	parsedBaseURL, err := composeAPIURL(BaseURL, apiVersion)
+	parsedURL, err := url.Parse(EnsureTrailingSlash(versionedURL))
 	if err != nil {
 		return nil, err
 	}
-	return &Client{Signer: signer, APIURL: parsedBaseURL}, nil
+	return &Client{Signer: signer, APIURL: parsedURL}, nil
 }

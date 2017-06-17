@@ -15,6 +15,7 @@ type blockdevice struct {
 	id      int
 	name    string
 	model   string
+	idPath  string
 	path    string
 	usedFor string
 	tags    []string
@@ -39,6 +40,11 @@ func (b *blockdevice) Name() string {
 // Model implements BlockDevice.
 func (b *blockdevice) Model() string {
 	return b.model
+}
+
+// IDPath implements BlockDevice.
+func (b *blockdevice) IDPath() string {
+	return b.idPath
 }
 
 // Path implements BlockDevice.
@@ -131,6 +137,7 @@ func blockdevice_2_0(source map[string]interface{}) (*blockdevice, error) {
 		"id":       schema.ForceInt(),
 		"name":     schema.String(),
 		"model":    schema.OneOf(schema.Nil(""), schema.String()),
+		"id_path":  schema.OneOf(schema.Nil(""), schema.String()),
 		"path":     schema.String(),
 		"used_for": schema.String(),
 		"tags":     schema.List(schema.String()),
@@ -156,12 +163,14 @@ func blockdevice_2_0(source map[string]interface{}) (*blockdevice, error) {
 	}
 
 	model, _ := valid["model"].(string)
+	idPath, _ := valid["id_path"].(string)
 	result := &blockdevice{
 		resourceURI: valid["resource_uri"].(string),
 
 		id:      valid["id"].(int),
 		name:    valid["name"].(string),
 		model:   model,
+		idPath:  idPath,
 		path:    valid["path"].(string),
 		usedFor: valid["used_for"].(string),
 		tags:    convertToStringSlice(valid["tags"]),
