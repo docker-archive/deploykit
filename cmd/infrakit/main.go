@@ -53,8 +53,8 @@ func (e emptyPlugins) List() (map[string]*plugin.Endpoint, error) {
 }
 
 var (
-	empty      = emptyPlugins{}
-	emptyError = errors.New("no plugins")
+	empty    = emptyPlugins{}
+	errEmpty = errors.New("no plugins")
 )
 
 // A generic client for infrakit
@@ -129,7 +129,7 @@ func main() {
 	if os.Getenv("INFRAKIT_DYNAMIC_CLI") != "false" {
 		// Load dynamic plugin commands based on discovery
 		pluginCommands, err := cli.LoadAll(cli.NewServices(f))
-		if err != nil && err != emptyError {
+		if err != nil && err != errEmpty {
 			log.Debug("error loading", "cmd", cmd.Use, "err", err)
 			fmt.Println(err.Error())
 			os.Exit(1)
