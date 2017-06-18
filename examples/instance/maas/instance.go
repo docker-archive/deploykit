@@ -11,8 +11,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	maas "github.com/juju/gomaasapi"
-	//"github.com/juju/juju/cloudconfig/cloudinit"
-	//"github.com/juju/utils"
 	"net/url"
 )
 
