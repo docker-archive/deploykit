@@ -45,11 +45,11 @@ func init() {
 type emptyPlugins struct{}
 
 func (e emptyPlugins) Find(name plugin.Name) (*plugin.Endpoint, error) {
-	return nil, emptyError
+	return nil, errEmpty
 }
 
 func (e emptyPlugins) List() (map[string]*plugin.Endpoint, error) {
-	return nil, emptyError
+	return nil, errEmpty
 }
 
 var (
