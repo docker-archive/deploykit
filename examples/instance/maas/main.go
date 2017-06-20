@@ -19,7 +19,11 @@ func main() {
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	apiKey := cmd.Flags().String("apikey", "aaaa:bbbb:ccccc", "MAAS API KEY. <consumer_key>:<key>:<secret>")
 	maasURL := cmd.Flags().String("url", "127.0.0.1:80", "MAAS Server URL. <url>:<port>")
-	apiVersion := cmd.Flags().String("apiversion", "1.0", "MAAS api Version. 1.0")
+	apiVersion := cmd.Flags().String("apiversion", "2.0", "MAAS api Version. 2.0")
+	if *apiVersion == "1.0" {
+		log.Error("MAAS API version 1.0 is no longer supported. You should use 2.0.")
+		os.Exit(1)
+	}
 	defaultDir, err := os.Getwd()
 	if err != nil {
 		log.Error(err)
@@ -27,7 +31,6 @@ func main() {
 	}
 	dir := cmd.Flags().String("dir", defaultDir, "MaaS directory")
 	cmd.RunE = func(c *cobra.Command, args []string) error {
-
 		cli.SetLogLevel(*logLevel)
 		cli.RunPlugin(*name, instance_plugin.PluginServer(NewMaasPlugin(*dir, *apiKey, *maasURL, *apiVersion)))
 		return nil
