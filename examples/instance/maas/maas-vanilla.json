@@ -13,6 +13,8 @@
       "Plugin": "flavor-vanilla",
       "Properties": {
         "Init": [
+            "#!/bin/bash",
+            "echo ======== Hi World ======================| tee /my.log"
         ],
         "Tags": {
             "tier": "web",

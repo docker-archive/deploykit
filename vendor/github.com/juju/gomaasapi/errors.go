@@ -65,6 +65,14 @@ func IsUnsupportedVersionError(err error) bool {
 	return ok
 }
 
+// WrapWithUnsupportedVersionError constructs a new
+// UnsupportedVersionError wrapping the passed error.
+func WrapWithUnsupportedVersionError(err error) error {
+	uerr := &UnsupportedVersionError{Err: errors.NewErr("unsupported version: %v", err)}
+	uerr.SetLocation(1)
+	return errors.Wrap(err, uerr)
+}
+
 // DeserializationError types are returned when the returned JSON data from
 // the controller doesn't match the code's expectations.
 type DeserializationError struct {
