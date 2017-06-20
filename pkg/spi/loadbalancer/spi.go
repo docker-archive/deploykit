@@ -26,8 +26,8 @@ type Result interface {
 
 // TODO(chungers) -- Update the interface to support Vhosts for L7 routing.
 
-// Driver is the generic driver for a single L4 load balancer instance
-type Driver interface {
+// L4 is the generic driver for a single L4 load balancer instance
+type L4 interface {
 
 	// Name is the name of the load balancer
 	Name() string

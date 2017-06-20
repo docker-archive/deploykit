@@ -1,4 +1,4 @@
-package loadbalancer
+package swarm
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
 const (
@@ -31,7 +32,7 @@ type HealthCheck struct {
 }
 
 // VhostLoadBalancerMap is a function which returns a map of L4 load balancers by vhost
-type VhostLoadBalancerMap func() map[string]Driver
+type VhostLoadBalancerMap func() map[string]loadbalancer.L4
 
 // ServiceAction defines the action to apply to a list of services
 type ServiceAction func([]swarm.Service)
@@ -63,7 +64,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 			if sp, has := exposedPorts[publish.SwarmPort]; has {
 
 				// This is the case where we have a clear mapping of swarm port to url
-				publish.SwarmProtocol = ProtocolFromString(string(sp.Protocol))
+				publish.SwarmProtocol = loadbalancer.ProtocolFromString(string(sp.Protocol))
 				addListenerToHostMap(listeners, publish)
 
 			} else if publish.SwarmPort == 0 && len(exposedPorts) == 1 {
@@ -73,7 +74,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 				// We can't handle the case where there are more than one exposed port and we don't have explicit
 				// swarm port to url mappings.
 				for _, exposed := range exposedPorts {
-					publish.SwarmProtocol = ProtocolFromString(string(exposed.Protocol))
+					publish.SwarmProtocol = loadbalancer.ProtocolFromString(string(exposed.Protocol))
 					publish.SwarmPort = exposed.PublishedPort
 					log.Debugln("only one exposed port")
 					break // Just grab the first one
@@ -99,9 +100,9 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 }
 
 func findRoutePort(
-	routes []Route,
+	routes []loadbalancer.Route,
 	loadbalancerPort uint32,
-	protocol Protocol) (uint32, bool) {
+	protocol loadbalancer.Protocol) (uint32, bool) {
 
 	for _, route := range routes {
 		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol {
@@ -111,7 +112,7 @@ func findRoutePort(
 	return 0, false
 }
 
-func configureL4(elb Driver, listeners []*listener, options Options) error {
+func configureL4(elb loadbalancer.L4, listeners []*listener, options Options) error {
 	// Process the listeners
 	routes, err := elb.Routes()
 	if err != nil {
@@ -127,7 +128,7 @@ func configureL4(elb Driver, listeners []*listener, options Options) error {
 
 	// Index the listener set up
 	listenerIndex := map[string]*listener{}
-	listenerIndexKey := func(p Protocol, extPort, instancePort uint32) string {
+	listenerIndexKey := func(p loadbalancer.Protocol, extPort, instancePort uint32) string {
 		return fmt.Sprintf("%v/%5d/%5d", p, extPort, instancePort)
 	}
 
@@ -245,7 +246,7 @@ func ExposeServicePortInExternalLoadBalancer(elbMap VhostLoadBalancerMap, option
 
 		// to avoid multiple dates when ELBs have aliases need to agregate all of them by elb than just hostname
 		// since different hostnames can point to the same ELB.
-		targets := map[Driver][]*listener{}
+		targets := map[loadbalancer.L4][]*listener{}
 
 		listenersByHost := externalLoadBalancerListenersFromServices(services, LabelExternalLoadBalancerSpec, options, certLabel)
 

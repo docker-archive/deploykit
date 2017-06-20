@@ -1,4 +1,4 @@
-package loadbalancer
+package swarm
 
 import (
 	log "github.com/Sirupsen/logrus"

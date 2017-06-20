@@ -1,4 +1,4 @@
-package loadbalancer
+package swarm
 
 import (
 	"fmt"
@@ -8,13 +8,14 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
 type listener struct {
 	Service       string
 	URL           *url.URL
 	SwarmPort     uint32
-	SwarmProtocol Protocol
+	SwarmProtocol loadbalancer.Protocol
 	Certificate   *string
 }
 
@@ -31,8 +32,8 @@ func newListener(service string, swarmPort uint32, urlStr string, cert *string) 
 	}, nil
 }
 
-func (l *listener) asRoute() Route {
-	return Route{
+func (l *listener) asRoute() loadbalancer.Route {
+	return loadbalancer.Route{
 		Port:             l.SwarmPort,
 		Protocol:         l.protocol(),
 		LoadBalancerPort: l.extPort(),
@@ -134,7 +135,7 @@ func (l *listener) host() string {
 }
 
 // Protocol gets the network protocol used by the service.
-func (l *listener) protocol() Protocol {
+func (l *listener) protocol() loadbalancer.Protocol {
 	scheme := ""
 	if l.URL != nil {
 		scheme = l.URL.Scheme
@@ -143,12 +144,12 @@ func (l *listener) protocol() Protocol {
 	// check if this should be SSL because it has a certificate.
 	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
 		log.Infoln("port ", l.extPort(), " Is in ", l.CertPorts())
-		scheme = string(SSL)
+		scheme = string(loadbalancer.SSL)
 	} else {
 		log.Infoln("cert is nil, or port ", l.extPort(), " Is NOT in ", l.CertPorts())
 	}
 
-	return ProtocolFromString(scheme)
+	return loadbalancer.ProtocolFromString(scheme)
 }
 
 // explicitSwarmPortToURL is explicit mapping in the format of {swarm_port}={url}

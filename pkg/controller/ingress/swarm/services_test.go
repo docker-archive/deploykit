@@ -1,9 +1,10 @@
-package loadbalancer
+package swarm
 
 import (
 	"testing"
 
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,9 +45,9 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
 	require.Equal(t, uint32(8080), listener.SwarmPort)
-	require.Equal(t, TCP, listener.SwarmProtocol)
+	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "default", listener.host())
-	require.Equal(t, HTTP, listener.protocol())
+	require.Equal(t, loadbalancer.HTTP, listener.protocol())
 	require.Equal(t, uint32(8080), listener.extPort())
 }
 
@@ -80,9 +81,9 @@ func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
 	require.Equal(t, uint32(30000), listener.SwarmPort)
-	require.Equal(t, TCP, listener.SwarmProtocol)
+	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "default", listener.host())
-	require.Equal(t, HTTP, listener.protocol())
+	require.Equal(t, loadbalancer.HTTP, listener.protocol())
 	require.Equal(t, uint32(80), listener.extPort())
 }
 
@@ -116,9 +117,9 @@ func TestExternalLoadBalancerListenersFromService3(t *testing.T) {
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
 	require.Equal(t, uint32(5000), listener.SwarmPort)
-	require.Equal(t, TCP, listener.SwarmProtocol)
+	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "foo.bar.com", listener.host())
-	require.Equal(t, HTTP, listener.protocol())
+	require.Equal(t, loadbalancer.HTTP, listener.protocol())
 	require.Equal(t, uint32(80), listener.extPort())
 }
 
@@ -157,13 +158,13 @@ func TestExternalLoadBalancerListenersFromService4(t *testing.T) {
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
 	require.Equal(t, uint32(4556), listener.SwarmPort)
-	require.Equal(t, TCP, listener.SwarmProtocol)
+	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "foo.bar.com", listener.host())
-	require.Equal(t, TCP, listener.protocol())
+	require.Equal(t, loadbalancer.TCP, listener.protocol())
 	require.Equal(t, uint32(4556), listener.extPort())
 }
 
-func findListener(listeners []*listener, protocol Protocol, host string, extPort, swarmPort uint32) bool {
+func findListener(listeners []*listener, protocol loadbalancer.Protocol, host string, extPort, swarmPort uint32) bool {
 	for _, l := range listeners {
 		if l.extPort() == extPort && l.host() == host && l.protocol() == protocol && l.SwarmPort == swarmPort {
 			return true
@@ -222,8 +223,8 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 	listeners, has := listenersByHost[hostname]
 	require.True(t, has)
 	require.Equal(t, 2, len(listeners))
-	require.True(t, findListener(listeners, TCP, "default", 8080, 8080))
-	require.True(t, findListener(listeners, TCP, "default", 4343, 4343))
+	require.True(t, findListener(listeners, loadbalancer.TCP, "default", 8080, 8080))
+	require.True(t, findListener(listeners, loadbalancer.TCP, "default", 4343, 4343))
 
 	hostname = "foo.bar.com"
 	listeners, has = listenersByHost[hostname]
@@ -232,9 +233,9 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
 	require.Equal(t, uint32(8080), listener.SwarmPort)
-	require.Equal(t, TCP, listener.SwarmProtocol)
+	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "foo.bar.com", listener.host())
-	require.Equal(t, HTTP, listener.protocol())
+	require.Equal(t, loadbalancer.HTTP, listener.protocol())
 	require.Equal(t, uint32(8080), listener.extPort())
 
 	hostname = "secret.com"
@@ -244,9 +245,9 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 	listener = listeners[0]
 	require.Equal(t, "web1", listener.Service)
 	require.Equal(t, uint32(4343), listener.SwarmPort)
-	require.Equal(t, TCP, listener.SwarmProtocol)
+	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "secret.com", listener.host())
-	require.Equal(t, HTTPS, listener.protocol())
+	require.Equal(t, loadbalancer.HTTPS, listener.protocol())
 	require.Equal(t, uint32(443), listener.extPort())
 }
 
@@ -297,6 +298,6 @@ func TestExternalLoadBalancerListenersFromServiceWithNoLabels(t *testing.T) {
 	listeners, has := listenersByHost[hostname]
 	require.True(t, has)
 	require.Equal(t, 2, len(listeners))
-	require.True(t, findListener(listeners, TCP, "default", 8080, 8080))
-	require.True(t, findListener(listeners, TCP, "default", 4343, 4343))
+	require.True(t, findListener(listeners, loadbalancer.TCP, "default", 8080, 8080))
+	require.True(t, findListener(listeners, loadbalancer.TCP, "default", 4343, 4343))
 }

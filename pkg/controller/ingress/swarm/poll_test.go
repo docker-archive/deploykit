@@ -1,20 +1,21 @@
-package loadbalancer
+package swarm
 
 import (
+	"testing"
+	"time"
+
 	"github.com/docker/docker/api/types/swarm"
-	mock_client "github.com/docker/editions/mock/docker/docker/client"
+	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
-	"testing"
-	"time"
 )
 
 func TestBuildPoller(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := mock_client.NewMockAPIClient(ctrl)
+	client := mock_client.NewMockAPIClientCloser(ctrl)
 
 	poller, err := NewServicePoller(client, 1*time.Second).Build()
 
@@ -154,7 +155,7 @@ func TestRunPoller(t *testing.T) {
 		},
 	}
 
-	client := mock_client.NewMockAPIClient(ctrl)
+	client := mock_client.NewMockAPIClientCloser(ctrl)
 	client.EXPECT().ServiceList(gomock.Any(), gomock.Any()).AnyTimes().Return(services, nil)
 
 	found := []swarm.Service{}

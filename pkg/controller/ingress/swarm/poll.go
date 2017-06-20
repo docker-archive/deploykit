@@ -1,14 +1,15 @@
-package loadbalancer
+package swarm
 
 import (
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
-	"golang.org/x/net/context"
 	"reflect"
 	"sync"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/infrakit/pkg/util/docker"
+	"golang.org/x/net/context"
 )
 
 // ServiceMatcher is a swarm.Service predicate.
@@ -58,7 +59,7 @@ type matcher struct {
 
 // PollerBuilder simplifies creation of a poller.
 type PollerBuilder struct {
-	client   client.APIClient
+	client   docker.APIClientCloser
 	err      error
 	matchers []*matcher
 	interval time.Duration
@@ -75,14 +76,14 @@ type RunWithContext interface {
 
 type poller struct {
 	hardSync bool
-	client   client.APIClient
+	client   docker.APIClientCloser
 	interval time.Duration
 	matchers []*matcher
 	stop     chan interface{}
 }
 
 // NewServicePoller creates a poller.
-func NewServicePoller(client client.APIClient, interval time.Duration) *PollerBuilder {
+func NewServicePoller(client docker.APIClientCloser, interval time.Duration) *PollerBuilder {
 	return &PollerBuilder{client: client, interval: interval}
 }
 
