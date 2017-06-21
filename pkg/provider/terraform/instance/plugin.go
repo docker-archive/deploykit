@@ -45,10 +45,11 @@ type plugin struct {
 	pretend      bool // true to actually do terraform apply
 	pollInterval time.Duration
 	pollChannel  chan bool
+	standalone   bool
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(dir string, pollInterval time.Duration) instance.Plugin {
+func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
 	lock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
 	if err != nil {
@@ -60,6 +61,7 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration) instance
 		fs:           afero.NewOsFs(),
 		lock:         lock,
 		pollInterval: pollInterval,
+		standalone:   standalone,
 	}
 }
 

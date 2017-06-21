@@ -23,7 +23,7 @@ import (
 func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 1*time.Second)
+	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)

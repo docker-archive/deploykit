@@ -5,6 +5,9 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
+	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	"github.com/docker/infrakit/pkg/util/exec"
 )
 
@@ -33,6 +36,13 @@ func (p *plugin) terraformApply() error {
 	go func() {
 		initial := true
 		for {
+			if !p.continuePolling() {
+				p.applyLock.Lock()
+				p.applying = false
+				p.applyLock.Unlock()
+				return
+			}
+
 			attempted, err := p.doTerraformApply(initial)
 			initial = false
 			if err != nil {
@@ -41,6 +51,7 @@ func (p *plugin) terraformApply() error {
 			if !attempted {
 				log.Infof("Can't acquire apply lock, waiting %v seconds", p.pollInterval)
 			}
+
 			select {
 			case <-p.pollChannel:
 				// Interrupted, use same initial delay so that more than a single delta
@@ -76,4 +87,41 @@ func (p *plugin) doTerraformApply(initial bool) (bool, error) {
 		return true, command.Wait()
 	}
 	return false, nil
+}
+
+// continuePolling returns true if polling should continue; this happens if either
+// the plugin is configured to be standalone or if the associated manager plugin
+// is the current leader
+func (p *plugin) continuePolling() bool {
+	// Always continue if standalone
+	if p.standalone {
+		return true
+	}
+	if err := local.Setup(); err != nil {
+		log.Errorf("Failed to setup local discovery: %v", err)
+		return false
+	}
+	plugins, err := local.NewPluginDiscovery()
+	if err != nil {
+		log.Errorf("Failed to discover local plugins: %v", err)
+		return false
+	}
+	manager, err := manager_discovery.Locate(
+		func() discovery.Plugins { return plugins },
+	)
+	if err != nil {
+		log.Errorf("Failed to find manager plugin: %v", err)
+		return false
+	}
+	isLeader, err := manager.IsLeader()
+	if err != nil {
+		log.Errorf("Failed to find determine manager plugin leadership: %v", err)
+		return false
+	}
+	if isLeader {
+		log.Debugf("Manager leadership has not changed, continuing apply polling loop")
+	} else {
+		log.Infof("No longer running on leader, NOT continuing apply polling loop")
+	}
+	return isLeader
 }

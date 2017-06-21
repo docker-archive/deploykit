@@ -37,11 +37,12 @@ func main() {
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	dir := cmd.Flags().String("dir", getDir(), "Dir for storing plan files")
 	pollInterval := cmd.Flags().Duration("poll-interval", 30*time.Second, "Terraform polling interval")
+	standalone := cmd.Flags().Bool("standalone", false, "Set if running standalone, disables manager leadership verification")
 	cmd.Run = func(c *cobra.Command, args []string) {
 		mustHaveTerraform()
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(NewTerraformInstancePlugin(*dir, *pollInterval)))
+		cli.RunPlugin(*name, instance_plugin.PluginServer(NewTerraformInstancePlugin(*dir, *pollInterval, *standalone)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
