@@ -88,10 +88,9 @@ func (l *listener) CertPorts() []uint32 {
 			finalPorts = append(finalPorts, uint32(443))
 		}
 		return finalPorts
-	} else {
-		// if there is no port, default to 443
-		return []uint32{443}
 	}
+	// if there is no port, default to 443
+	return []uint32{443}
 }
 
 // String value of the listener, good for log statements.

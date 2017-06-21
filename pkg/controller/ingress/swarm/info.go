@@ -7,7 +7,7 @@ import (
 )
 
 // AmISwarmLeader determines if the current node is the swarm manager leader
-func AmISwarmLeader(client client.APIClient, ctx context.Context) (bool, error) {
+func AmISwarmLeader(ctx context.Context, client client.APIClient) (bool, error) {
 	info, err := client.Info(ctx)
 
 	log.Debugln("info=", info, "err=", err)
