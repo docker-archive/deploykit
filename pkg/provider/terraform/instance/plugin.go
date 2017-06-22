@@ -17,6 +17,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/deckarep/golang-set"
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -45,7 +47,7 @@ type plugin struct {
 	pretend      bool // true to actually do terraform apply
 	pollInterval time.Duration
 	pollChannel  chan bool
-	standalone   bool
+	pluginLookup func() discovery.Plugins
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
@@ -56,12 +58,26 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 		panic(err)
 	}
 
+	var pluginLookup func() discovery.Plugins
+	if !standalone {
+		if err = local.Setup(); err != nil {
+			panic(err)
+		}
+		plugins, err := local.NewPluginDiscovery()
+		if err != nil {
+			panic(err)
+		}
+		pluginLookup = func() discovery.Plugins {
+			return plugins
+		}
+	}
+
 	return &plugin{
 		Dir:          dir,
 		fs:           afero.NewOsFs(),
 		lock:         lock,
 		pollInterval: pollInterval,
-		standalone:   standalone,
+		pluginLookup: pluginLookup,
 	}
 }
 

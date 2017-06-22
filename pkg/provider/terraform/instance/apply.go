@@ -5,8 +5,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/discovery/local"
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	"github.com/docker/infrakit/pkg/util/exec"
 )
@@ -36,20 +34,27 @@ func (p *plugin) terraformApply() error {
 	go func() {
 		initial := true
 		for {
-			if !p.continuePolling() {
-				p.applyLock.Lock()
-				p.applying = false
-				p.applyLock.Unlock()
-				return
-			}
-
-			attempted, err := p.doTerraformApply(initial)
-			initial = false
+			execute, err := p.continuePolling()
+			// Only poll is there was no error; if there was an error re-try next cycle
 			if err != nil {
-				log.Errorf("Executing 'terraform apply' failed: %v", err)
-			}
-			if !attempted {
-				log.Infof("Can't acquire apply lock, waiting %v seconds", p.pollInterval)
+				log.Errorf("Failed to determine if polling should continue: %v", err)
+			} else {
+				if !execute {
+					p.applyLock.Lock()
+					p.applying = false
+					p.applyLock.Unlock()
+					log.Infof("Exiting terraform apply gorouting")
+					return
+				}
+
+				attempted, err := p.doTerraformApply(initial)
+				initial = false
+				if err != nil {
+					log.Errorf("Executing 'terraform apply' failed: %v", err)
+				}
+				if !attempted {
+					log.Infof("Can't acquire apply lock, waiting %v seconds", p.pollInterval)
+				}
 			}
 
 			select {
@@ -91,37 +96,24 @@ func (p *plugin) doTerraformApply(initial bool) (bool, error) {
 
 // continuePolling returns true if polling should continue; this happens if either
 // the plugin is configured to be standalone or if the associated manager plugin
-// is the current leader
-func (p *plugin) continuePolling() bool {
-	// Always continue if standalone
-	if p.standalone {
-		return true
+// is the current leader.
+func (p *plugin) continuePolling() (bool, error) {
+	// If there is no lookup func then the plugin is running standalone
+	if p.pluginLookup == nil {
+		return true, nil
 	}
-	if err := local.Setup(); err != nil {
-		log.Errorf("Failed to setup local discovery: %v", err)
-		return false
-	}
-	plugins, err := local.NewPluginDiscovery()
+	manager, err := manager_discovery.Locate(p.pluginLookup)
 	if err != nil {
-		log.Errorf("Failed to discover local plugins: %v", err)
-		return false
-	}
-	manager, err := manager_discovery.Locate(
-		func() discovery.Plugins { return plugins },
-	)
-	if err != nil {
-		log.Errorf("Failed to find manager plugin: %v", err)
-		return false
+		return true, err
 	}
 	isLeader, err := manager.IsLeader()
 	if err != nil {
-		log.Errorf("Failed to find determine manager plugin leadership: %v", err)
-		return false
+		return true, err
 	}
 	if isLeader {
 		log.Debugf("Manager leadership has not changed, continuing apply polling loop")
 	} else {
 		log.Infof("No longer running on leader, NOT continuing apply polling loop")
 	}
-	return isLeader
+	return isLeader, nil
 }

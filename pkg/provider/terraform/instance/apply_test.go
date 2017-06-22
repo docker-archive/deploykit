@@ -33,14 +33,7 @@ func TestContinuePollingStandalone(t *testing.T) {
 	defer os.RemoveAll(dir)
 	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, true)
 	p, _ := terraform.(*plugin)
-	require.True(t, p.continuePolling())
-}
-
-func TestContinuePollingNotStandaloneNoManager(t *testing.T) {
-	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
+	execute, err := p.continuePolling()
 	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, false)
-	p, _ := terraform.(*plugin)
-	require.False(t, p.continuePolling())
+	require.True(t, execute)
 }
