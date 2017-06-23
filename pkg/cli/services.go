@@ -154,6 +154,9 @@ func templateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 				if dir, err := os.Getwd(); err == nil {
 					p = path.Join(dir, url)
 				}
+				if _, err := os.Stat(p); os.IsNotExist(err) {
+					p = url
+				}
 				url = "file://" + p
 			}
 
