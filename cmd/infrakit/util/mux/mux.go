@@ -1,7 +1,6 @@
 package mux
 
 import (
-	"net"
 	"net/url"
 	"time"
 
@@ -115,39 +114,4 @@ func runMux(config *config) error {
 	<-block
 
 	return nil
-}
-
-func localURL() string {
-	if ip, err := getLocalIP(); err == nil {
-		return "http://" + ip + ":24864"
-	}
-	return ""
-}
-
-func getLocalIP() (string, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return "", err
-	}
-
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err == nil {
-			for _, addr := range addrs {
-				var ip net.IP
-				switch v := addr.(type) {
-				case *net.IPNet:
-					ip = v.IP
-				case *net.IPAddr:
-					ip = v.IP
-				}
-
-				if !ip.IsLoopback() {
-					return ip.To4().String(), nil
-				}
-			}
-		}
-	}
-
-	return "", nil
 }

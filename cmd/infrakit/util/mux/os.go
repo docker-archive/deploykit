@@ -57,7 +57,7 @@ func osEnvironment(cfg *config) *cobra.Command {
 		Short: "os",
 	}
 
-	locateURL := cmd.Flags().StringP("locate-url", "u", localURL(), "Locate URL of this node")
+	locateURL := cmd.Flags().StringP("locate-url", "u", "", "Locate URL of this node, eg. http://public_ip:24864")
 	id := cmd.Flags().String("id", defaultLeaderFile(), "Id of this node")
 	leaderFile := cmd.Flags().String("leader-file", defaultLeaderFile(), "File used for leader election/detection")
 	leaderLocation := cmd.Flags().String("leader-location-file", defaultLeaderLocationFile(), "File used for storing location")

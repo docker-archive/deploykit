@@ -20,7 +20,7 @@ func etcdEnvironment(cfg *config) *cobra.Command {
 		Short: "etcd v3 for leader detection and storage",
 	}
 
-	locateURL := cmd.Flags().StringP("locate-url", "u", localURL(), "Locate URL of this node")
+	locateURL := cmd.Flags().StringP("locate-url", "u", "", "Locate URL of this node, eg. http://public_ip:24864")
 	requestTimeout := cmd.Flags().Duration("request-timeout", 1*time.Second, "Request timeout")
 	endpoint := cmd.Flags().String("endpoint", defaultEndpoint, "Etcd endpoint (v3 grpc)")
 	caFile := cmd.Flags().String("tlscacert", "", "TLS CA cert file path")

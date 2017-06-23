@@ -16,7 +16,7 @@ func swarmEnvironment(cfg *config) *cobra.Command {
 		Short: "swarm mode for leader detection and storage",
 	}
 
-	locateURL := cmd.Flags().StringP("locate-url", "u", localURL(), "Locate URL of this node")
+	locateURL := cmd.Flags().StringP("locate-url", "u", "", "Locate URL of this node, eg. http://public_ip:24864")
 	host := cmd.Flags().String("host", "unix:///var/run/docker.sock", "Docker host")
 	caFile := cmd.Flags().String("tlscacert", "", "TLS CA cert file path")
 	certFile := cmd.Flags().String("tlscert", "", "TLS cert file path")
