@@ -71,9 +71,8 @@ func runMux(config *config) error {
 
 		if l, err := config.poller.Start(); err != nil {
 			return err
-		} else {
-			leadership = l
 		}
+		leadership = l
 	}
 
 	logger.Info("Starting mux server", "listen", *config.listen)
