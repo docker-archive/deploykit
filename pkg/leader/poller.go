@@ -8,6 +8,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+// Poller is the entity that polls for different backend / control planes to determine leadership
 type Poller struct {
 	leaderChan   chan Leadership
 	pollInterval time.Duration
