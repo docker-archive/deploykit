@@ -69,7 +69,8 @@ func runMux(config *config) error {
 
 		defer config.poller.Stop()
 
-		if l, err := config.poller.Start(); err != nil {
+		l, err := config.poller.Start()
+		if err != nil {
 			return err
 		}
 		leadership = l
