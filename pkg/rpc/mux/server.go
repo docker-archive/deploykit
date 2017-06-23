@@ -8,13 +8,20 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/leader"
 	"github.com/docker/infrakit/pkg/rpc"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"gopkg.in/tylerb/graceful.v1"
 )
 
+// Options capture additional configurations and objects that the mux will use
+type Options struct {
+	Leadership <-chan leader.Leadership
+	Registry   leader.Store
+}
+
 // NewServer returns a tcp server listening at the listen address (e.g. ':8080'), or error
-func NewServer(listen string, plugins func() discovery.Plugins) (rpc_server.Stoppable, error) {
+func NewServer(listen string, plugins func() discovery.Plugins, options Options) (rpc_server.Stoppable, error) {
 
 	proxy := NewReverseProxy(plugins)
 	server := &graceful.Server{

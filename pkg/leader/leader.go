@@ -1,5 +1,9 @@
 package leader
 
+import (
+	"net/url"
+)
+
 // Status indicates leadership status
 type Status int
 
@@ -19,6 +23,17 @@ const (
 // This function returns true or false for leadership when there are no errors.  Returned error is reported and
 // the status of the event will be set to `Unknown`.
 type CheckLeaderFunc func() (bool, error)
+
+// Store is an interface implemented by the environment that supports storing and retrieving the current leader location
+type Store interface {
+
+	// UpdateLocation sets the leader to the given URL
+	UpdateLocation(*url.URL) error
+
+	// GetLocation returns the location of the current leader.  It's possible that the leader location isn't
+	// known despite no errors in querying.  So the url can be nil
+	GetLocation() (*url.URL, error)
+}
 
 // Leadership is a struct that captures the leadership state, possibly error if exception occurs
 type Leadership struct {

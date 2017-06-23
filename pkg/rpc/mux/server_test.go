@@ -45,7 +45,7 @@ func TestMuxServer(t *testing.T) {
 	T(100).Infoln("Starting mux server")
 	server, err = NewServer(":9090", func() discovery.Plugins {
 		return lookup
-	})
+	}, Options{})
 	require.NoError(t, err)
 
 	defer server.Stop()
