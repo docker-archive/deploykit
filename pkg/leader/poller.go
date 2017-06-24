@@ -1,30 +1,54 @@
 package leader
 
 import (
+	"net/url"
+	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 )
 
-type poller struct {
+var log = logutil.New("module", "leader/poll")
+
+// Poller is the entity that polls for different backend / control planes to determine leadership
+type Poller struct {
 	leaderChan   chan Leadership
 	pollInterval time.Duration
 	tick         <-chan time.Time
 	stop         chan struct{}
 	pollFunc     CheckLeaderFunc
+	location     *url.URL
+	store        Store
+	lock         sync.Mutex
 }
 
 // NewPoller returns a detector implementation given the poll interval and function that polls
-func NewPoller(pollInterval time.Duration, f CheckLeaderFunc) Detector {
-	return &poller{
+func NewPoller(pollInterval time.Duration, f CheckLeaderFunc) *Poller {
+	return &Poller{
 		pollInterval: pollInterval,
 		tick:         time.Tick(pollInterval),
 		pollFunc:     f,
 	}
 }
 
+// ReportLocation tells the poller to report its location when it becomes the leader.
+func (l *Poller) ReportLocation(url *url.URL, store Store) {
+	if url == nil {
+		panic("leader poller url cannot be nil")
+	}
+	if store == nil {
+		panic("leader poller store cannot be nil")
+	}
+
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	l.location = url
+	l.store = store
+}
+
 // Start implements Detect.Start
-func (l *poller) Start() (<-chan Leadership, error) {
+func (l *Poller) Start() (<-chan Leadership, error) {
 	if l.leaderChan != nil {
 		return l.leaderChan, nil
 	}
@@ -37,13 +61,13 @@ func (l *poller) Start() (<-chan Leadership, error) {
 }
 
 // Stop implements Detect.Stop
-func (l *poller) Stop() {
+func (l *Poller) Stop() {
 	if l.stop != nil {
 		close(l.stop)
 	}
 }
 
-func (l *poller) poll() {
+func (l *Poller) poll() {
 	for {
 		select {
 
@@ -57,6 +81,12 @@ func (l *poller) poll() {
 			} else {
 				if isLeader {
 					event.Status = Leader
+
+					if l.location != nil {
+						err = l.store.UpdateLocation(l.location)
+						log.Debug("update-location", "location", l.location.String(), "err", err)
+					}
+
 				} else {
 					event.Status = NotLeader
 				}
@@ -65,7 +95,7 @@ func (l *poller) poll() {
 			l.leaderChan <- event
 
 		case <-l.stop:
-			log.Infoln("Stopping leadership check")
+			log.Info("Stopping leadership check")
 			close(l.leaderChan)
 			l.leaderChan = nil
 			l.stop = nil
