@@ -5,8 +5,10 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 )
+
+var log = logutil.New("module", "leader/poll")
 
 // Poller is the entity that polls for different backend / control planes to determine leadership
 type Poller struct {
@@ -81,7 +83,8 @@ func (l *Poller) poll() {
 					event.Status = Leader
 
 					if l.location != nil {
-						l.store.UpdateLocation(l.location)
+						err = l.store.UpdateLocation(l.location)
+						log.Debug("update-location", "location", l.location.String(), "err", err)
 					}
 
 				} else {
@@ -92,7 +95,7 @@ func (l *Poller) poll() {
 			l.leaderChan <- event
 
 		case <-l.stop:
-			log.Infoln("Stopping leadership check")
+			log.Info("Stopping leadership check")
 			close(l.leaderChan)
 			l.leaderChan = nil
 			l.stop = nil
