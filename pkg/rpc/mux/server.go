@@ -3,7 +3,6 @@ package mux
 import (
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/http/httputil"
 	"strings"
 	"time"
@@ -77,7 +76,7 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		log.Error("err", "err", err)
 	}
 
-	recorder := httptest.NewRecorder()
+	recorder := rpc.NewRecorder()
 
 	h.handler.ServeHTTP(recorder, req)
 
