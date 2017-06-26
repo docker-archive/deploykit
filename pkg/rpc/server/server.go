@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/http/httputil"
 	"os"
 	"time"
@@ -57,7 +56,7 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		log.Error(err)
 	}
 
-	recorder := httptest.NewRecorder()
+	recorder := rpc_server.NewRecorder()
 
 	h.handler.ServeHTTP(recorder, req)
 

@@ -17,6 +17,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/deckarep/golang-set"
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -37,26 +39,45 @@ const (
 )
 
 type plugin struct {
-	Dir       string
-	fs        afero.Fs
-	lock      lockfile.Lockfile
-	applying  bool
-	applyLock sync.Mutex
-	pretend   bool // true to actually do terraform apply
+	Dir          string
+	fs           afero.Fs
+	lock         lockfile.Lockfile
+	applying     bool
+	applyLock    sync.Mutex
+	pretend      bool // true to actually do terraform apply
+	pollInterval time.Duration
+	pollChannel  chan bool
+	pluginLookup func() discovery.Plugins
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(dir string) instance.Plugin {
+func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
 	lock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
 	if err != nil {
 		panic(err)
 	}
 
+	var pluginLookup func() discovery.Plugins
+	if !standalone {
+		if err = local.Setup(); err != nil {
+			panic(err)
+		}
+		plugins, err := local.NewPluginDiscovery()
+		if err != nil {
+			panic(err)
+		}
+		pluginLookup = func() discovery.Plugins {
+			return plugins
+		}
+	}
+
 	return &plugin{
-		Dir:  dir,
-		fs:   afero.NewOsFs(),
-		lock: lock,
+		Dir:          dir,
+		fs:           afero.NewOsFs(),
+		lock:         lock,
+		pollInterval: pollInterval,
+		pluginLookup: pluginLookup,
 	}
 }
 

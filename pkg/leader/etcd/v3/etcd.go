@@ -2,9 +2,11 @@ package etcd
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/util/etcd/v3"
@@ -14,7 +16,7 @@ import (
 var log = logutil.New("module", "etcd/leader")
 
 // NewDetector return an implementation of leader detector
-func NewDetector(pollInterval time.Duration, client *etcd.Client) leader.Detector {
+func NewDetector(pollInterval time.Duration, client *etcd.Client) *leader.Poller {
 	return leader.NewPoller(pollInterval, func() (bool, error) {
 		return AmILeader(context.Background(), client)
 	})
@@ -52,4 +54,77 @@ func AmILeader(ctx context.Context, client *etcd.Client) (isLeader bool, err err
 	isLeader = statusResp.Leader == statusResp.Header.MemberId
 
 	return
+}
+
+// Store uses ectd as the backend for registration of leader location
+type Store struct {
+	client *etcd.Client
+}
+
+// NewStore returns a store for registration of leader location
+func NewStore(c *etcd.Client) Store {
+	return Store{client: c}
+}
+
+const (
+
+	// DefaultKey is the key used to persist the location
+	DefaultKey = "infrakit/leader/location"
+)
+
+// UpdateLocation writes the location to etcd.
+func (s Store) UpdateLocation(location *url.URL) error {
+	ctx, cancel := context.WithTimeout(context.Background(), s.client.Options.RequestTimeout)
+	_, err := s.client.Client.Put(ctx, DefaultKey, location.String())
+	cancel()
+	if err != nil {
+		switch err {
+		case context.Canceled:
+			log.Warn("ctx is canceled by another routine", "err", err)
+		case context.DeadlineExceeded:
+			log.Warn("ctx is attached with a deadline is exceeded", "err", err)
+		case rpctypes.ErrEmptyKey:
+			log.Warn("client-side error", "err", err)
+		default:
+			log.Warn("bad cluster endpoints, which are not etcd servers", "err", err)
+		}
+	}
+	return err
+}
+
+// GetLocation returns the location of the leader
+func (s Store) GetLocation() (*url.URL, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), s.client.Options.RequestTimeout)
+	resp, err := s.client.Client.Get(ctx, DefaultKey)
+	cancel()
+	if err != nil {
+		switch err {
+		case context.Canceled:
+			log.Warn("ctx is canceled by another routine", "err", err)
+		case context.DeadlineExceeded:
+			log.Warn("ctx is attached with a deadline is exceeded", "err", err)
+		case rpctypes.ErrEmptyKey:
+			log.Warn("client-side error", "err", err)
+		default:
+			log.Warn("bad cluster endpoints, which are not etcd servers", "err", err)
+		}
+	}
+
+	if resp == nil {
+		log.Warn("response is nil. server down?")
+		return nil, nil
+	}
+
+	if resp.Count > 1 {
+		log.Warn("more than 1 location", "resp", resp)
+		return nil, nil
+	}
+
+	if resp.Count == 0 {
+		// no data. therefore no effect on the input
+		return nil, nil
+	}
+
+	pair := resp.Kvs[0]
+	return url.Parse(string(pair.Value))
 }

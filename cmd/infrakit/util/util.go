@@ -2,6 +2,7 @@ package util
 
 import (
 	"github.com/docker/infrakit/cmd/infrakit/base"
+	"github.com/docker/infrakit/cmd/infrakit/util/mux"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/log"
 	"github.com/spf13/cobra"
@@ -22,7 +23,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	util.AddCommand(
-		muxCommand(plugins),
+		mux.Command(plugins),
 		fileServerCommand(plugins),
 		trackCommand(plugins),
 	)

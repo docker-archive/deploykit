@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
@@ -36,6 +37,43 @@ func TestWithRealEtcd(t *testing.T) {
 	defer etcd.StopContainer.Start(containerName)
 
 	t.Run("AmILeader", testAmILeader)
+
+	t.Run("StoreTest", testStore)
+
+}
+
+func testStore(t *testing.T) {
+
+	if testutil.SkipTests("etcd") {
+		t.SkipNow()
+	}
+
+	ip := etcd.LocalIP()
+	options := etcd.Options{
+		Config: clientv3.Config{
+			Endpoints: []string{ip + ":2379"},
+		},
+		RequestTimeout: 1 * time.Second,
+	}
+
+	client, err := etcd.NewClient(options)
+	require.NoError(t, err)
+
+	defer client.Close()
+
+	store := Store{client}
+
+	loc := "tcp://10.10.1.100:24864"
+	u, err := url.Parse(loc)
+	require.NoError(t, err)
+
+	err = store.UpdateLocation(u)
+	require.NoError(t, err)
+
+	uu, err := store.GetLocation()
+	require.NoError(t, err)
+
+	require.Equal(t, u, uu)
 }
 
 func testAmILeader(t *testing.T) {

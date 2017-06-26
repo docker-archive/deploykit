@@ -1,12 +1,13 @@
 package swarm
 
 import (
+	"testing"
+
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var input = map[string]interface{}{
