@@ -17,7 +17,7 @@ to the name the plugin is referenced throughout the system.  For example, a
 Note that multiple instances of a plugin may run, provided they have different names for discovery.  This may be useful,
 for example, if a plugin can be configured to behave differently. For example:
 
-The CLI shows which plugins are [discoverable](../../cmd/cli/README.md#list-plugins).
+The CLI shows which plugins are [discoverable](../../cmd/infrakit/README.md#list-plugins).
 
 ## Plugin types
 ### Group
