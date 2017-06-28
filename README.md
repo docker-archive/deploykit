@@ -125,7 +125,7 @@ $ make binaries
 ```
 Executables will be placed in the `./build` directory.
 This will produce binaries for tools and several reference Plugin implementations:
-  + [`infrakit`](cmd/cli/README.md): a command line interface to interact with plugins
+  + [`infrakit`](cmd/infrakit/README.md): a command line interface to interact with plugins
   + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./pkg/spi/group)
   + [`infrakit-instance-file`](examples/instance/file): an Instance plugin using dummy files to represent instances
   + [`infrakit-instance-terraform`](pkg/provider/terraform/instance):
@@ -171,7 +171,7 @@ A common pattern for a JSON object looks like this:
 
 There is only one `Properties` field in this JSON and its value is a JSON object. The opaque
 JSON value for `Properties` is decoded via the Go `Spec` struct defined within the package of the plugin --
-for example -- [`vanilla.Spec`](pkg/plugin/flavor/vanilla/flavor.go).
+for example -- [`vanilla.Spec`](examples/flavor/vanilla/flavor.go).
 
 The JSON above is a _value_, but the type of the value belongs outside the structure.  For example, the
 default Group [Spec](pkg/plugin/group/types/types.go) is composed of an Instance plugin, a Flavor plugin, and an

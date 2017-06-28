@@ -113,7 +113,7 @@ The plugin requires a directory (`--dir`) that will be used to contain the `tfst
 files.  It also checks to make sure it can call `terraform`.
 Install Terraform [here](https://www.terraform.io/downloads.html) if you haven't done so.
 
-See the [CLI Doc](/cmd/cli/README.md) for details on accessing the instance plugin via CLI.
+See the [CLI Doc](/cmd/infrakit/README.md) for details on accessing the instance plugin via CLI.
 
 Start the plugin:
 
@@ -122,7 +122,7 @@ $ build/infrakit-instance-terraform --dir=./pkg/provider/terraform/instance/aws-
 INFO[0000] Listening at: ~/.infrakit/plugins/instance-terraform
 ```
 
-Be sure to verify that the plugin is [discoverable](/cmd/cli/README.md#list-plugins).
+Be sure to verify that the plugin is [discoverable](/cmd/infrakit/README.md#list-plugins).
 
 Now lets try to validate something.  Instead of reading from stdin we are loading from a file
 to avoid problems with bad bash substitution beacuse Terrafrom configs use `$` to indicate variables.
