@@ -2,6 +2,7 @@ package maxlife
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -86,10 +87,17 @@ func TestEnsureMaxlife(t *testing.T) {
 	destroy := make(chan instance.ID, 2)
 	plugin := &fake.Plugin{
 		DoDescribeInstances: func(tags map[string]string, details bool) ([]instance.Description, error) {
-
 			list := []instance.Description{}
-			for _, inst := range all {
-				list = append(list, inst)
+			// Return instances in sorted order by instance ID
+			keys := make([]string, len(all))
+			i := 0
+			for key := range all {
+				keys[i] = string(key)
+				i++
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				list = append(list, all[instance.ID(key)])
 			}
 			return list, nil
 		},

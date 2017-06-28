@@ -31,7 +31,7 @@ $ build/infrakit-flavor-zookeeper
 INFO[0000] Listening at: ~/.infrakit/plugins/flavor-zookeeper
 ```
 
-Be sure to verify that the plugin is [discoverable](/cmd/cli/README.md#list-plugins).
+Be sure to verify that the plugin is [discoverable](/cmd/infrakit/README.md#list-plugins).
 
 Here's a JSON for the group we'd like to see [vagrant-zk.json](./vagrant-zk.json):
 

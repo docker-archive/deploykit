@@ -26,9 +26,9 @@ $ build/infrakit-instance-file --name=another-file --dir=./test
 INFO[0000] Listening at: ~/.infrakit/plugins/another-file
 ```
 
-Be sure to verify that the plugin is [discoverable](/cmd/cli/README.md#list-plugins).
+Be sure to verify that the plugin is [discoverable](/cmd/infrakit/README.md#list-plugins).
 
 Note that there should be two file instance plugins running now with different names
 (`instance-file`, and `another-file`).
 
-See the [CLI Doc](/cmd/cli/README.md) for details on accessing the instance plugin via CLI.
+See the [CLI Doc](/cmd/infrakit/README.md) for details on accessing the instance plugin via CLI.
