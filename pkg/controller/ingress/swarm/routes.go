@@ -72,7 +72,8 @@ type RoutesBuilder struct {
 	lock          sync.Mutex
 }
 
-type routes struct {
+// Routes can derive a list of routes based on Docker services
+type Routes struct {
 	options            ingress.Options
 	hardSync           bool
 	client             docker.APIClientCloser
@@ -102,7 +103,7 @@ func (b *RoutesBuilder) SetOptions(options ingress.Options) *RoutesBuilder {
 	return b
 }
 
-// SetSpecLabel sets the label to look for for loadbalancer spec and certifcate spec
+// SetSpecLabels sets the label to look for for loadbalancer spec and certifcate spec
 func (b *RoutesBuilder) SetSpecLabels(lbSpec, certSpec string) *RoutesBuilder {
 	b.lbSpecLabel = lbSpec
 	b.certSpecLabel = certSpec
@@ -124,12 +125,12 @@ func (b *RoutesBuilder) AddRule(n string, m ServiceMatcher,
 }
 
 // Build creates the routes.
-func (b *RoutesBuilder) Build() (ingress.Routes, error) {
+func (b *RoutesBuilder) Build() (*Routes, error) {
 	if b.err != nil {
 		return nil, b.err
 	}
 
-	routes := &routes{
+	routes := &Routes{
 		options:            b.options,
 		client:             b.client,
 		matchers:           b.matchers,
@@ -151,7 +152,7 @@ func (b *RoutesBuilder) Build() (ingress.Routes, error) {
 }
 
 // RoutesFromServices analyzes the given set of services and option and produces a routes by vhost.
-func (p *routes) RoutesFromServices(services []swarm.Service) (map[ingress.Vhost][]loadbalancer.Route, error) {
+func (p *Routes) RoutesFromServices(services []swarm.Service) (map[ingress.Vhost][]loadbalancer.Route, error) {
 	return toVhostRoutes(externalLoadBalancerListenersFromServices(
 		services,
 		p.options.PublishAllExposed,
@@ -160,8 +161,8 @@ func (p *routes) RoutesFromServices(services []swarm.Service) (map[ingress.Vhost
 	)), nil
 }
 
-// Run will start all the matchers and query the services at defined polling interval.  It blocks until stop is called.
-func (p *routes) List() (map[ingress.Vhost][]loadbalancer.Route, error) {
+// List will return all the known routes for this Docker swarm of matching services.
+func (p *Routes) List() (map[ingress.Vhost][]loadbalancer.Route, error) {
 
 	ctx := context.Background()
 	services, err := p.client.ServiceList(ctx, types.ServiceListOptions{})
