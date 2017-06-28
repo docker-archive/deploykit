@@ -3,7 +3,15 @@ package loadbalancer
 import (
 	"fmt"
 	"time"
+
+	"github.com/docker/infrakit/pkg/spi"
 )
+
+// InterfaceSpec is the current name and version of the L4 API.
+var InterfaceSpec = spi.InterfaceSpec{
+	Name:    "L4",
+	Version: "0.6.0",
+}
 
 // Route is a description of a network target for a load balancer.
 type Route struct {
@@ -38,7 +46,7 @@ type L4 interface {
 	// Publish publishes a route in the LB by adding a load balancing rule
 	Publish(route Route) (Result, error)
 
-	// UnpublishService dissociates the load balancer from the backend service at the given port.
+	// Unpublish dissociates the load balancer from the backend service at the given port.
 	Unpublish(extPort uint32) (Result, error)
 
 	// ConfigureHealthCheck configures the health checks for instance removal and reconfiguration
