@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/infrakit/pkg/controller/ingress"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 )
 
 func TestBuildPoller(t *testing.T) {
@@ -17,10 +18,10 @@ func TestBuildPoller(t *testing.T) {
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
-	poller, err := NewServicePoller(client, 1*time.Second).Build()
+	routes, err := NewServiceRoutes(client, 1*time.Second).Build()
 
 	require.NoError(t, err)
-	require.NotNil(t, poller)
+	require.NotNil(t, routes)
 }
 
 func TestMatchMaps(t *testing.T) {
@@ -128,7 +129,7 @@ func TestDifferent(t *testing.T) {
 	require.True(t, different(services, updated))
 }
 
-func TestRunPoller(t *testing.T) {
+func TestRunRoutes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -160,34 +161,30 @@ func TestRunPoller(t *testing.T) {
 
 	found := []swarm.Service{}
 
-	stopPoller := make(chan interface{})
+	stopRoutes := make(chan interface{})
 
-	poller, err := NewServicePoller(client, 200*time.Millisecond).
-		AddService("proxy",
+	routes, err := NewServiceRoutes(client, 200*time.Millisecond).
+		AddRule("proxy",
 
 			MatchSpecLabels(map[string]string{
 				"docker.editions.proxy.port": "",
 			}),
 
-			func(s []swarm.Service) {
+			func(s []swarm.Service) (map[ingress.Vhost][]loadbalancer.Route, error) {
 				require.Equal(t, 1, len(s))
 				require.Equal(t, "80/http", s[0].Spec.Labels["docker.editions.proxy.port"])
 				found = append(found, s[0])
 
-				close(stopPoller)
+				close(stopRoutes)
+
+				return nil, nil
 			}).
 		Build()
 
 	require.NoError(t, err)
-	require.NotNil(t, poller)
+	require.NotNil(t, routes)
 
-	go func() {
-		<-stopPoller
-		poller.Stop()
-	}()
-
-	ctx := context.Background()
-	poller.Run(ctx) // Blocks until stop() is called
+	routes.List()
 
 	require.Equal(t, 1, len(found))
 	require.Equal(t, services[0], found[0])

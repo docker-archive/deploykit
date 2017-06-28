@@ -1,11 +1,9 @@
 package swarm
 
 import (
-	"fmt"
-	"time"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/infrakit/pkg/controller/ingress"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
@@ -22,30 +20,20 @@ const (
 	LabelExternalLoadBalancerSpec = "docker.swarm.lb"
 )
 
-// HealthCheck is the configuration for an operation to determine if a service is healthy.
-type HealthCheck struct {
-	Port            uint32
-	Healthy         int
-	Unhealthy       int
-	IntervalSeconds int
-	TimeoutSeconds  int
+func toVhostRoutes(listeners map[string][]*listener) map[ingress.Vhost][]loadbalancer.Route {
+	result := map[ingress.Vhost][]loadbalancer.Route{}
+	for vhost, list := range listeners {
+		routes := []loadbalancer.Route{}
+		for _, l := range list {
+			routes = append(routes, l.asRoute())
+		}
+		result[ingress.Vhost(vhost)] = routes
+	}
+	return result
 }
 
-// VhostLoadBalancerMap is a function which returns a map of L4 load balancers by vhost
-type VhostLoadBalancerMap func() map[string]loadbalancer.L4
-
-// ServiceAction defines the action to apply to a list of services
-type ServiceAction func([]swarm.Service)
-
-// Options contains options to control behavior of the ELB sync process.
-type Options struct {
-	RemoveListeners   bool
-	HealthCheck       *HealthCheck
-	PublishAllExposed bool
-}
-
-func externalLoadBalancerListenersFromServices(services []swarm.Service, label string,
-	options Options, certLabel string) map[string][]*listener {
+func externalLoadBalancerListenersFromServices(services []swarm.Service,
+	publishAllExposed bool, lbSpecLabel, certLabel string) map[string][]*listener {
 
 	// group the listeners by hostname.  hostname maps to a ELB somewhere else.
 	listeners := map[string][]*listener{}
@@ -59,7 +47,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 		log.Infoln("exposedPorts: ", exposedPorts)
 
 		// Now go through the list that we need to publish and match up the exposed ports
-		for _, publish := range listenersFromLabel(s, label, certLabel) {
+		for _, publish := range listenersFromLabel(s, lbSpecLabel, certLabel) {
 
 			if sp, has := exposedPorts[publish.SwarmPort]; has {
 
@@ -89,7 +77,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service, label s
 			}
 		}
 
-		if options.PublishAllExposed {
+		if publishAllExposed {
 			for _, l := range listenersFromExposedPorts(s, certLabel) {
 				addListenerToHostMap(listeners, l)
 			}
@@ -110,190 +98,4 @@ func findRoutePort(
 		}
 	}
 	return 0, false
-}
-
-func configureL4(elb loadbalancer.L4, listeners []*listener, options Options) error {
-	// Process the listeners
-	routes, err := elb.Routes()
-	if err != nil {
-		log.Warningln("Error describing ELB err=", err)
-		return err
-	}
-	log.Debugln("describe elb=", routes)
-
-	log.Infoln("Listeners to sync with ELB:", listeners)
-	toCreate := []*listener{}
-	toChange := []*listener{}
-	toRemove := []*listener{}
-
-	// Index the listener set up
-	listenerIndex := map[string]*listener{}
-	listenerIndexKey := func(p loadbalancer.Protocol, extPort, instancePort uint32) string {
-		return fmt.Sprintf("%v/%5d/%5d", p, extPort, instancePort)
-	}
-
-	for _, l := range listeners {
-		instancePort, hasListener := findRoutePort(routes, l.extPort(), l.protocol())
-
-		if !hasListener {
-			toCreate = append(toCreate, l)
-		} else if instancePort != l.SwarmPort {
-			toChange = append(toChange, l)
-		}
-
-		listenerIndex[listenerIndexKey(l.protocol(), l.extPort(), instancePort)] = l
-	}
-	log.Debugln("ListenerIndex=", listenerIndex)
-
-	for _, route := range routes {
-		protocol := route.Protocol
-		lbPort := route.LoadBalancerPort
-		instancePort := route.Port
-		cert := route.Certificate
-
-		if _, has := listenerIndex[listenerIndexKey(protocol, lbPort, instancePort)]; !has {
-
-			l, err := newListener("delete", instancePort, fmt.Sprintf("%v://:%d", protocol, lbPort), cert)
-			if err == nil {
-				toRemove = append(toRemove, l)
-			} else {
-				log.Warningln("error deleting listener protocol=", protocol,
-					"lbPort=", lbPort, "instancePort=", instancePort)
-			}
-		} else {
-			log.Infoln("keeping protocol=", protocol, "port=", lbPort, "instancePort=", instancePort)
-		}
-	}
-
-	log.Infoln("listeners to create:", toCreate)
-	log.Infoln("listeners to change:", toChange)
-	log.Infoln("listeners to remove:", toRemove)
-
-	// Now we have a list of targets to create
-	for _, l := range toCreate {
-		log.Infoln("CREATE on", elb.Name(), "listener", l)
-
-		_, err := elb.Publish(l.asRoute()) // No SSL cert yet..
-		if err != nil {
-			log.Warningln("err publishing", l, "err=", err)
-			return err
-		}
-		log.Infoln("CREATED on", elb.Name(), "listener", l)
-	}
-	for _, l := range toChange {
-		log.Infoln("CHANGE on", elb.Name(), "listener", l)
-
-		_, err := elb.Unpublish(l.extPort())
-		if err != nil {
-			log.Warningln("err unpublishing", l, "err=", err)
-			return err
-		}
-		_, err = elb.Publish(l.asRoute()) // No SSL cert yet..
-		if err != nil {
-			log.Warningln("err publishing", l, "err=", err)
-			return err
-		}
-		log.Infoln("CHANGED on", elb.Name(), "listener", l)
-	}
-	for _, l := range toRemove {
-		log.Infoln("REMOVE on", elb.Name(), "listener", l)
-
-		if options.RemoveListeners {
-			_, err := elb.Unpublish(l.extPort())
-			if err != nil {
-				log.Warningln("err unpublishing", l, "err=", err)
-				return err
-			}
-			log.Infoln("REMOVED on", elb.Name(), "listener", l)
-		}
-	}
-
-	// Configure health check.
-	// ELB only has one health check port and that determines if the backend is out of service or not.
-	// This presents a problem where if we have more than one service, the ELB may think a service is down
-	// when only one of our services is out.  We probably need to have a way to do health checks on the services
-	// ourselves and then update the health check when we detect that one of the services is down so that ELB doesn't
-	// shut everything down.
-
-	if options.HealthCheck != nil {
-		options.HealthCheck.Port = 0
-		if len(toCreate) > 0 {
-			options.HealthCheck.Port = toCreate[0].SwarmPort
-		} else if len(toChange) > 0 {
-			options.HealthCheck.Port = toChange[0].SwarmPort
-		}
-
-		if options.HealthCheck.Port > 0 {
-			log.Infoln("HEALTH CHECK - Configuring the health check to ping port:", options.HealthCheck.Port)
-			_, err := elb.ConfigureHealthCheck(options.HealthCheck.Port,
-				options.HealthCheck.Healthy, options.HealthCheck.Unhealthy,
-				time.Duration(options.HealthCheck.IntervalSeconds)*time.Second,
-				time.Duration(options.HealthCheck.TimeoutSeconds)*time.Second)
-			if err != nil {
-				log.Warningln("err config health check, err=", err)
-				return err
-			}
-			log.Infoln("HEALTH CHECK CONFIGURED on port:", options.HealthCheck.Port, "config=", options.HealthCheck)
-		}
-	}
-	return nil
-}
-
-// ExposeServicePortInExternalLoadBalancer creates a ServiceAction to expose a service in an ELB.
-func ExposeServicePortInExternalLoadBalancer(elbMap VhostLoadBalancerMap, options Options, certLabel string) ServiceAction {
-
-	return func(services []swarm.Service) {
-
-		// to avoid multiple dates when ELBs have aliases need to agregate all of them by elb than just hostname
-		// since different hostnames can point to the same ELB.
-		targets := map[loadbalancer.L4][]*listener{}
-
-		listenersByHost := externalLoadBalancerListenersFromServices(services, LabelExternalLoadBalancerSpec, options, certLabel)
-
-		// Need to process for each ELB known because it's possible that we'd have to remove all listeners in an ELB.
-		// when there are no listeners to be created from all the services.
-		elbs := elbMap()
-		for hostname, elb := range elbs {
-			if _, has := targets[elb]; !has {
-				add := []*listener{}
-				if list, exists := listenersByHost[hostname]; exists {
-					add = list
-				}
-				targets[elb] = add
-			} else {
-				if list, exists := listenersByHost[hostname]; exists {
-					for _, l := range list {
-						targets[elb] = append(targets[elb], l)
-					}
-				}
-			}
-		}
-
-		log.Debugln("Targets=", len(targets), "targets=", targets)
-		if len(targets) == 0 {
-			// This is the case when there are absolutely no services in the swarm... we need
-			// synchronize and clean up any unmanaged listeners.
-			cleaned := map[string]interface{}{}
-			for _, elb := range elbs {
-				if _, has := cleaned[elb.Name()]; !has {
-					err := configureL4(elb, []*listener{}, options)
-					if err != nil {
-						log.Warning("Cannot clean up ELB %s:", elb.Name())
-						continue
-					}
-					cleaned[elb.Name()] = nil
-				}
-			}
-
-		} else {
-			for elb, listeners := range targets {
-				log.Infoln("Configuring", elb.Name())
-				err := configureL4(elb, listeners, options)
-				if err != nil {
-					log.Warning("Cannot configure ELB %s with listeners:", elb.Name(), listeners)
-					continue
-				}
-			}
-		}
-	}
 }
