@@ -25,7 +25,7 @@ to join the swarm, are now part of the plugin configuration.
 
 This plugin makes heavy use of Golang template to enable customization of instance behavior on startup.  For example,
 the `InitScriptTemplateURL` field above is a URL where a init script template is served.  The plugin will fetch this
-template from the URL and processe the template to render the final init script for the instance.
+template from the URL and processes the template to render the final init script for the instance.
 
 The plugin exposes a set of template functions that can be used, along with primitives already in [Golang template]
 (https://golang.org/pkg/text/template/) and functions from [Sprig](https://github.com/Masterminds/sprig#functions).

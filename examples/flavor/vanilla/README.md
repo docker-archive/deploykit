@@ -19,13 +19,16 @@ Here's a skeleton of this Plugin's schema:
 ```json
 {
   "Init": [],
-  "Tags": {}
+  "Tags": {},
+  "InitScriptTemplateURL": "http://your.github.io/your/project/script.sh"
 }
 ```
 
 The supported fields are:
 * `Init`: an array of shell code lines to use for the Instance's Init script
 * `Tags`: a string-string mapping of keys and values to add as Instance Tags
+* `InitScriptTemplateURL`: string URL where a init script template is served.  The plugin will fetch this
+template from the URL and process the template to render the final init script for the instance.
 
 Here's an example Group configuration using the default [infrakit/group](/cmd/group) Plugin and the Vanilla Plugin:
 ```json
@@ -107,7 +110,7 @@ in your config JSON.  For instance, you may start up this plugin as `french-vani
 
 ```shell
 $ build/infrakit-flavor-vanilla --name french-vanilla
-INFO[0000] Listening at: ~/.infrakit/plugins/french-vanilla 
+INFO[0000] Listening at: ~/.infrakit/plugins/french-vanilla
 ```
 
 Then in your JSON config for the default group plugin, you would reference it by name:
