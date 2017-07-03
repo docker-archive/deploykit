@@ -73,7 +73,7 @@ func vCenterConnect(vc *vCenter) (vcInternal, error) {
 	// Connect and log in to ESX or vCenter
 	internals.client, err = govmomi.NewClient(ctx, u, true)
 	if err != nil {
-		return internals, fmt.Errorf("Error logging into vCenter, check address and credentials %v", err)
+		return internals, fmt.Errorf("Error logging into vCenter, check address and credentials\nClient Error: %v", err)
 	}
 	return internals, nil
 }
@@ -253,19 +253,35 @@ func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, 
 	return foundVMs, err
 }
 
-func returnDataFromAnnotation(ctx context.Context, vmInstance *object.VirtualMachine, dataType string) string {
-	var machine mo.VirtualMachine
-	err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"config.annotation"}, &machine)
-	if err != nil {
-		log.Errorf("%v", vmInstance)
-	}
-	annotationData := strings.Split(machine.Config.Annotation, "\n")
-	if len(annotationData) > 1 {
-		switch dataType {
-		case "group":
-			return annotationData[0]
-		case "sha":
-			return annotationData[1]
+func returnDataFromVM(ctx context.Context, vmInstance *object.VirtualMachine, dataType string) string {
+	var machineConfig mo.VirtualMachine
+	if dataType == "guestIP" {
+		err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"guest.ipAddress"}, &machineConfig)
+		if err != nil {
+			log.Errorf("%v", vmInstance)
+		} else {
+			// Ensure that we're pointing to a Guest Config struct
+			if machineConfig.Guest != nil {
+				//log.Printf("%v\n%s", vmInstance, machineConfig.Guest.IpAddress)
+				return machineConfig.Guest.IpAddress
+			}
+		}
+	} else {
+		err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"config.annotation"}, &machineConfig)
+		if err != nil {
+			log.Errorf("%v", vmInstance)
+		}
+		// Ensure that we're pointing to a Configuration struct
+		if machineConfig.Config != nil {
+			annotationData := strings.Split(machineConfig.Config.Annotation, "\n")
+			if len(annotationData) > 1 {
+				switch dataType {
+				case "group":
+					return annotationData[0]
+				case "sha":
+					return annotationData[1]
+				}
+			}
 		}
 	}
 	return ""
@@ -281,7 +297,7 @@ func findInstancesFromAnnotation(ctx context.Context, f *find.Finder, groupName 
 	}
 	// Create new array of Virtual Machines that will hold all VMs that have the groupName
 	for _, vmInstance := range vmList {
-		instanceGroup := returnDataFromAnnotation(ctx, vmInstance, "group")
+		instanceGroup := returnDataFromVM(ctx, vmInstance, "group")
 		if instanceGroup == groupName {
 			log.Debugf("%s matches groupName %s\n", vmInstance.Name(), groupName)
 			foundVMS = append(foundVMS, vmInstance)
@@ -360,14 +376,15 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 		log.Warnf("%v", err)
 	}
 
-	if p.vCenterInternals.network != nil {
+	if *p.vC.networkName != "" {
 		err = findNetwork(p.vC, p.vCenterInternals)
 		if err != nil {
 			log.Warnf("%v", err)
-		}
-		err = addNIC(newVM, p.vCenterInternals.network)
-		if err != nil {
-			log.Warnf("%v", err)
+		} else {
+			err = addNIC(newVM, p.vCenterInternals.network)
+			if err != nil {
+				log.Warnf("%v", err)
+			}
 		}
 	}
 
@@ -380,15 +397,15 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 
 	if vm.poweron == true {
 		log.Infoln("Powering on provisioned Virtual Machine")
-		return powerOnVM(newVM)
+		return setVMPowerOn(true, newVM)
 	}
 	return nil
 }
 
 func deleteVM(p *plugin, vm string) error {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	// Create a new finder that will discover the defaults and are looked for Networks/Datastores
 	f := find.NewFinder(p.vCenterInternals.client.Client, true)
 
@@ -400,8 +417,17 @@ func deleteVM(p *plugin, vm string) error {
 
 	// Make future calls local to this datacenter
 	f.SetDatacenter(dc)
-	foundVM, err := f.VirtualMachine(ctx, vm)
 
+	// Try and find the virtual machine
+	foundVM, err := f.VirtualMachine(ctx, vm)
+	if err != nil {
+		return fmt.Errorf("Error finding Virtual Machine\nClient Error => %v", err)
+	}
+
+	// Attempt to power off the VM regardless of power state
+	_ = setVMPowerOn(false, foundVM)
+
+	// If the Virtual Machine is found then we call Destroy against it.
 	task, err := foundVM.Destroy(ctx)
 	if err != nil {
 		return errors.New("Delete operation has failed, more detail can be found in vCenter tasks")
@@ -414,15 +440,24 @@ func deleteVM(p *plugin, vm string) error {
 	return nil
 }
 
-func powerOnVM(vm *object.VirtualMachine) error {
+func setVMPowerOn(state bool, vm *object.VirtualMachine) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	task, err := vm.PowerOn(ctx)
-	if err != nil {
-		return errors.New("Power On operation has failed, more detail can be found in vCenter tasks")
-	}
+	var task *object.Task
+	var err error
 
+	if state == true {
+		task, err = vm.PowerOn(ctx)
+		if err != nil {
+			return errors.New("Power On operation has failed, more detail can be found in vCenter tasks")
+		}
+	} else {
+		task, err = vm.PowerOff(ctx)
+		if err != nil {
+			return errors.New("Power Off operation has failed, more detail can be found in vCenter tasks")
+		}
+	}
 	_, err = task.WaitForResult(ctx, nil)
 	if err != nil {
 		return errors.New("Power On Task has failed, more detail can be found in vCenter tasks")

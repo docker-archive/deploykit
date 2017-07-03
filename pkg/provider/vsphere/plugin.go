@@ -34,7 +34,8 @@ func NewVSphereInstancePlugin(vc *vCenter) instance.Plugin {
 	// Attempt to log in to VMware vCenter and return the internal variables required
 	internals, err := vCenterConnect(vc)
 	if err != nil {
-		fmt.Printf("%v", err)
+		// Exit with an error if we can't connect to vCenter (no point continuing)
+		log.Fatalf("%v\n", err)
 	}
 	return &plugin{
 		ctx:              ctx,
@@ -116,57 +117,38 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	newInstance.vmName = string(vmName)
-	err = createNewVMInstance(p, &newInstance, spec)
-	if err != nil {
-		return &vmName, err
-	}
+
+	//  Spawn a goroutine to provision in the background
+	go func() {
+		newInstance.vmName = string(vmName)
+		err = createNewVMInstance(p, &newInstance, spec)
+		if err != nil {
+			log.Printf("Error adding %s\n%v", newInstance.vmName, err)
+		}
+	}()
+
 	return &vmName, nil
 }
 
 // Label labels the instance
 func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
-
-	// fp := filepath.Join(p.Dir, string(instance))
-	// buff, err := afero.ReadFile(p.fs, fp)
-	// if err != nil {
-	// 	return err
-	// }
-	// instanceData := fileInstance{}
-	// err = json.Unmarshal(buff, &instanceData)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if instanceData.Description.Tags == nil {
-	// 	instanceData.Description.Tags = map[string]string{}
-	// }
-	// for k, v := range labels {
-	// 	instanceData.Description.Tags[k] = v
-	// }
-
-	// buff, err = json.MarshalIndent(instanceData, "", "")
-	// log.Debugln("label:", instance, "data=", string(buff), "err=", err)
-	// if err != nil {
-	// 	return err
-	// }
-	return nil
+	return fmt.Errorf("VMware vSphere VM label updates are not implemented yet")
 }
 
 // Destroy terminates an existing instance.
 func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
 	log.Infof("Currently running %s on instance: %v", context, instance)
-	deleteVM(p, string(instance))
+	// Spawn a goroutine to delete in the background
+	go func() {
+		// TODO: Checks need adding to examine the instance that are quick enough not to trip timeout
+		deleteVM(p, string(instance))
+	}()
 	return nil
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 // TODO - need to define the fitlering of tags => AND or OR of matches?
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	log.Debugln("describe-instances", tags)
 	results := []instance.Description{}
 
@@ -179,16 +161,27 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		log.Warnln("No Instances found")
 	}
 
+	// Iterate through group instances and find the sha from their annotation field
 	for _, vmInstance := range instances {
-		configSHA := returnDataFromAnnotation(ctx, vmInstance, "sha")
-		tags["infrakit.config_sha"] = configSHA
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
+		configSHA := returnDataFromVM(ctx, vmInstance, "sha")
+		guestIP := returnDataFromVM(ctx, vmInstance, "guestIP")
+
+		// Duplicate original tags
+		vmTags := make(map[string]string)
+		for k, v := range tags {
+			vmTags[k] = v
+		}
+
+		vmTags["infrakit.config_sha"] = configSHA
+		vmTags["guestIP"] = guestIP
 		results = append(results, instance.Description{
 			ID:        instance.ID(vmInstance.Name()),
 			LogicalID: nil,
-			Tags:      tags,
+			Tags:      vmTags,
 		})
 	}
-
 	return results, nil
 }
