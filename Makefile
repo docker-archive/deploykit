@@ -103,6 +103,7 @@ $(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/ex
 $(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
 $(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/pkg/provider/terraform/instance)
 $(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
+$(call define_binary_target,infrakit-instance-vsphere,github.com/docker/infrakit/pkg/provider/vsphere)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 $(call define_binary_target,infrakit-metadata-aws,github.com/docker/infrakit/cmd/metadata/aws)
 $(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/resource)
@@ -128,6 +129,7 @@ build-binaries:	build/infrakit \
 		build/infrakit-instance-packet \
 		build/infrakit-instance-terraform \
 		build/infrakit-instance-vagrant \
+		build/infrakit-instance-vsphere \
 		build/infrakit-manager \
 		build/infrakit-metadata-aws \
 		build/infrakit-resource \

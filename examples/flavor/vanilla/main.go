@@ -6,8 +6,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
+
+var defaultTemplateOptions = template.Options{MultiPass: true}
 
 func main() {
 

@@ -12,7 +12,7 @@ ENV INFRAKIT_PLUGINS_DIR /infrakit/plugins
 # Defined in pkg/cli
 ENV INFRAKIT_CLI_DIR /infrakit/cli
 
-# Defined in cmd/cli/playbook
+# Defined in cmd/infrakit/playbook
 ENV INFRAKIT_PLAYBOOKS_FILE /infrakit/playbooks
 
 # When using the manager 'os' option
