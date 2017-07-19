@@ -3,29 +3,26 @@ package ingress
 import (
 	"time"
 
-	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"golang.org/x/net/context"
 )
 
-// Poller is the entity that polls for desired routes
+// Poller is the entity that executes a unit of work at a predefined interval
 type Poller struct {
-	name          string
-	hardSync      bool
-	routes        func() (map[Vhost][]loadbalancer.Route, error)
-	options       Options
-	loadbalancers func() (map[Vhost]loadbalancer.L4, error)
-	stop          chan interface{}
+	interval  time.Duration
+	stop      chan interface{}
+	shouldRun func() bool
+	work      func() error
 }
 
 // Stop stops the Poller
-func (p *Poller) Stop() {
+func (p Poller) Stop() {
 	if p.stop != nil {
 		close(p.stop)
 	}
 }
 
 // Run will start all the matchers and query the services at defined polling interval.  It blocks until stop is called.
-func (p *Poller) Run(ctx context.Context) error {
+func (p Poller) Run(ctx context.Context) error {
 
 	if p.stop != nil {
 		return nil // already running
@@ -33,7 +30,7 @@ func (p *Poller) Run(ctx context.Context) error {
 
 	p.stop = make(chan interface{})
 
-	ticker := time.Tick(p.options.Interval)
+	ticker := time.Tick(p.interval)
 
 	for {
 		select {
@@ -49,10 +46,11 @@ func (p *Poller) Run(ctx context.Context) error {
 
 		}
 
-		log.Debug("running expose L4")
-		err := ExposeL4(p.loadbalancers, p.routes, p.options)
-		if err != nil {
-			log.Warn("error exposing L4 routes", "err", err)
+		if p.shouldRun() {
+			err := p.work()
+			if err != nil {
+				log.Warn("Poller error", "err", err)
+			}
 		}
 	}
 }

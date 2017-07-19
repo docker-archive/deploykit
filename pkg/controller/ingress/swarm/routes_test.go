@@ -2,7 +2,6 @@ package swarm
 
 import (
 	"testing"
-	"time"
 
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/infrakit/pkg/controller/ingress"
@@ -18,7 +17,7 @@ func TestBuildPoller(t *testing.T) {
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
-	routes, err := NewServiceRoutes(client, 1*time.Second).Build()
+	routes, err := NewServiceRoutes(client).Build()
 
 	require.NoError(t, err)
 	require.NotNil(t, routes)
@@ -163,7 +162,7 @@ func TestRunRoutes(t *testing.T) {
 
 	stopRoutes := make(chan interface{})
 
-	routes, err := NewServiceRoutes(client, 200*time.Millisecond).
+	routes, err := NewServiceRoutes(client).
 		AddRule("proxy",
 
 			MatchSpecLabels(map[string]string{

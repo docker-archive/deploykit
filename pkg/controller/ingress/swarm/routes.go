@@ -65,7 +65,6 @@ type RoutesBuilder struct {
 	client        docker.APIClientCloser
 	err           error
 	matchers      []*matcher
-	interval      time.Duration
 	hardSync      bool
 	lbSpecLabel   string
 	certSpecLabel string
@@ -75,7 +74,6 @@ type RoutesBuilder struct {
 // Routes can derive a list of routes based on Docker services
 type Routes struct {
 	options            ingress.Options
-	hardSync           bool
 	client             docker.APIClientCloser
 	interval           time.Duration
 	matchers           []*matcher
@@ -86,8 +84,8 @@ type Routes struct {
 }
 
 // NewServiceRoutes creates a routes.
-func NewServiceRoutes(client docker.APIClientCloser, interval time.Duration) *RoutesBuilder {
-	return &RoutesBuilder{client: client, interval: interval}
+func NewServiceRoutes(client docker.APIClientCloser) *RoutesBuilder {
+	return &RoutesBuilder{client: client}
 }
 
 // SetHardSyncWithLB forces the routes to do a hard sync for every service.  This is not very
@@ -134,8 +132,6 @@ func (b *RoutesBuilder) Build() (*Routes, error) {
 		options:            b.options,
 		client:             b.client,
 		matchers:           b.matchers,
-		interval:           b.interval,
-		hardSync:           b.hardSync,
 		lbSpecLabel:        b.lbSpecLabel,
 		certSpecLabel:      b.certSpecLabel,
 		lastKnownByMatcher: map[string][]swarm.Service{},
@@ -196,7 +192,7 @@ func (p *Routes) List() (map[ingress.Vhost][]loadbalancer.Route, error) {
 		// This has happened with Azure where initial update was 200 and followed by a 429.
 		// This is not very efficient when there are lots of swarm services and we are basically calling the
 		// backend api each run.
-		if p.hardSync || different(lastKnown, found) || p.iteration == 0 {
+		if p.options.HardSync || different(lastKnown, found) || p.iteration == 0 {
 			log.Infoln(len(found), "matches found. Processing.")
 			return matcher.toRoutes(found)
 		}

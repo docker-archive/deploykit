@@ -1,36 +1,14 @@
 package ingress
 
 import (
-	"time"
-
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
 var log = logutil.New("module", "controller/ingress")
-
-// Vhost is the virtual host / domain
-type Vhost string
-
-// Options is the controller options
-type Options struct {
-	HardSync          bool
-	RemoveListeners   bool
-	HealthCheck       *HealthCheck
-	PublishAllExposed bool
-	Interval          time.Duration
-}
-
-// HealthCheck is the configuration for an operation to determine if a service is healthy.
-type HealthCheck struct {
-	Port            uint32
-	Healthy         int
-	Unhealthy       int
-	IntervalSeconds int
-	TimeoutSeconds  int
-}
 
 // Controller is the entity that reconciles desired routes with loadbalancers
 type Controller struct {
@@ -39,11 +17,17 @@ type Controller struct {
 	leader manager.Leadership
 
 	// l4s is a function that get retrieve a map of L4 loadbalancers by name
-	l4s func() map[string]loadbalancer.L4
+	l4s func() map[Vhost]loadbalancer.L4
 
-	// routes is a function returning the desired state of routes
-	routes func(string) ([]loadbalancer.Route, error)
+	// routes is a function returning the desired state of routes by vhosts
+	routes func() (map[Vhost]loadbalancer.Route, error)
 
-	// backends is a function that returns a list of backends for a given named loadbalancer
-	backends func(string) ([]instance.ID, error)
+	// groups is a function that looks up an association of vhost to lists of group ids
+	groups func() (map[Vhost][]group.ID, error)
+
+	// configureL4 is the handler for actually configuring a L4 loadbalancer
+	configureL4 func(loadbalancer.L4, []loadbalancer.Route, []HealthCheck, Options) error
+
+	// configureBackends associates the list of instances to a loadbalancer
+	configureBackends func(loadbalancer.L4, []instance.ID, Options) error
 }
