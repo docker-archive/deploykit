@@ -64,7 +64,7 @@ func (l4 *L4) RegisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
 	return l4.DoRegisterBackends(ids)
 }
 
-// DeregisterBackend removes the specified instances from the backend pool
+// DeregisterBackends removes the specified instances from the backend pool
 func (l4 *L4) DeregisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
 	return l4.DoDeregisterBackends(ids)
 }

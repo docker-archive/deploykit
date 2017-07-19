@@ -76,7 +76,7 @@ func (l4 *L4) ConfigureHealthCheck(_ *http.Request, req *ConfigureHealthCheckReq
 	return err
 }
 
-// RegisterBackend registers instances identified by the IDs to the LB's backend pool
+// RegisterBackends registers instances identified by the IDs to the LB's backend pool
 func (l4 *L4) RegisterBackends(_ *http.Request, req *RegisterBackendsRequest, resp *RegisterBackendsResponse) error {
 	result, err := l4.l4.RegisterBackends(req.IDs)
 	if err == nil {
@@ -85,7 +85,7 @@ func (l4 *L4) RegisterBackends(_ *http.Request, req *RegisterBackendsRequest, re
 	return err
 }
 
-// DeregisterBackend removes the specified instances from the backend pool
+// DeregisterBackends removes the specified instances from the backend pool
 func (l4 *L4) DeregisterBackends(_ *http.Request, req *DeregisterBackendsRequest, resp *DeregisterBackendsResponse) error {
 	result, err := l4.l4.DeregisterBackends(req.IDs)
 	if err == nil {
