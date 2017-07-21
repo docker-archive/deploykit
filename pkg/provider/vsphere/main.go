@@ -24,6 +24,7 @@ func main() {
 
 	// Attributes of the VMware vCenter Server to connect to
 	newVCenter.vCenterURL = cmd.Flags().String("url", os.Getenv("VCURL"), "URL of VMware vCenter in the format of https://username:password@VCaddress/sdk")
+	newVCenter.dcName = cmd.Flags().String("datacenter", os.Getenv("VCDATACENTER"), "The name of a Datacenter within vCenter")
 	newVCenter.dsName = cmd.Flags().String("datastore", os.Getenv("VCDATASTORE"), "The name of the DataStore to host the VM")
 	newVCenter.networkName = cmd.Flags().String("network", os.Getenv("VCNETWORK"), "The network label the VM will use")
 	newVCenter.vSphereHost = cmd.Flags().String("hostname", os.Getenv("VCHOST"), "The server that will run the VM")
