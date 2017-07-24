@@ -23,7 +23,7 @@ import (
 func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false)
+	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false, "", "")
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)
@@ -2236,4 +2236,225 @@ func TestDescribeAttachTag(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestMergePropNotInSource(t *testing.T) {
+	source := TResourceProperties{}
+	dest := TResourceProperties{"key": "val"}
+	mergeProp(source, dest, "foo")
+	require.Equal(t, TResourceProperties{"key": "val"}, dest)
+}
+
+func TestMergePropNotInDest(t *testing.T) {
+	source := TResourceProperties{"key": "val"}
+	dest := TResourceProperties{}
+	mergeProp(source, dest, "key")
+	require.Equal(t, TResourceProperties{"key": "val"}, dest)
+}
+
+func TestMergeNonComplex(t *testing.T) {
+	source := TResourceProperties{"key": "new-val", "other": "z"}
+	dest := TResourceProperties{"key": "old-val", "foo": "bar"}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{"key": "new-val", "foo": "bar"},
+		dest)
+}
+
+func TestMergePropSliceIntoEmptySlice(t *testing.T) {
+	source := TResourceProperties{"key": []interface{}{1, 2, true}}
+	dest := TResourceProperties{
+		"key": []interface{}{},
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{
+			"key": []interface{}{1, 2, true},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestMergePropSliceIntoSlice(t *testing.T) {
+	source := TResourceProperties{"key": []interface{}{1, 2, true}}
+	dest := TResourceProperties{
+		"key": []interface{}{1},
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{
+			"key": []interface{}{1, 2, true},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestMergeTagsSliceIntoEmptySlice(t *testing.T) {
+	source := TResourceProperties{"tags": []interface{}{"tag1:val1", "tag2:val2"}}
+	dest := TResourceProperties{
+		"tags": []interface{}{},
+		"foo":  "bar",
+	}
+	mergeProp(source, dest, "tags")
+	require.Equal(t,
+		TResourceProperties{
+			"tags": []interface{}{"tag1:val1", "tag2:val2"},
+			"foo":  "bar",
+		},
+		dest)
+}
+
+func TestMergeTagsSliceIntoSlice(t *testing.T) {
+	source := TResourceProperties{"tags": []interface{}{"tag1:val1", "tag2:override"}}
+	dest := TResourceProperties{
+		"tags": []interface{}{"tag2:val2", "tag3:val3"},
+		"foo":  "bar",
+	}
+	mergeProp(source, dest, "tags")
+	require.Equal(t,
+		TResourceProperties{
+			"tags": []interface{}{"tag2:override", "tag3:val3", "tag1:val1"},
+			"foo":  "bar",
+		},
+		dest)
+}
+
+func TestMergeSliceIntoWrongType(t *testing.T) {
+	source := TResourceProperties{"slice": []interface{}{1, 2, 3}}
+	dest := TResourceProperties{
+		"slice": true,
+		"foo":   "bar",
+	}
+	mergeProp(source, dest, "slice")
+	require.Equal(t,
+		TResourceProperties{
+			"slice": []interface{}{1, 2, 3},
+			"foo":   "bar",
+		},
+		dest)
+}
+
+func TestMergePropMapIntoEmptyMap(t *testing.T) {
+	source := TResourceProperties{
+		"key": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v2",
+		},
+	}
+	dest := TResourceProperties{
+		"key": map[string]interface{}{},
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{
+			"key": map[string]interface{}{
+				"k1": "v1",
+				"k2": "v2",
+			},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestMergePropMapIntoMap(t *testing.T) {
+	source := TResourceProperties{
+		"key": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v-override",
+		},
+	}
+	dest := TResourceProperties{
+		"key": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v2",
+			"k3": "v3",
+		},
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{
+			"key": map[string]interface{}{
+				"k1": "v1",
+				"k2": "v-override",
+				"k3": "v3",
+			},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestMergeMapIntoWrongType(t *testing.T) {
+	source := TResourceProperties{
+		"map": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v2",
+		},
+	}
+	dest := TResourceProperties{
+		"map": true,
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "map")
+	require.Equal(t,
+		TResourceProperties{
+			"map": map[string]interface{}{
+				"k1": "v1",
+				"k2": "v2",
+			},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestWriteTfJSONForImport(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	specProps := TResourceProperties{
+		PropHostnamePrefix: "some-prefix",
+		PropScope:          "some-scope",
+		"ssh-key-ids":      []interface{}{789},
+		"datacenter":       "some-datacenter",
+		"tags":             []interface{}{"spec-tag1:spec-val1"},
+		"z-other":          "not-imported",
+	}
+	importedProps := TResourceProperties{
+		"hostname":    "actual-hostname",
+		"ssh-key-ids": []interface{}{123},
+		"datacenter":  "actual-datacenter",
+		"tags": []interface{}{
+			"actual-tag1:actual-val1",
+			"actual-tag2:actual-val2",
+		},
+		"ip":         "10.0.0.1",
+		"z-imported": "imported-but-not-in-spec",
+	}
+
+	id := "instance-12345"
+	err := tf.writeTfJSONForImport(specProps, importedProps, VMIBMCloud, id)
+	require.NoError(t, err)
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, id+".tf.json"))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	actualVMType, vmName, props, err := FindVM(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t, VMIBMCloud, actualVMType)
+	require.Equal(t, TResourceName("instance-12345"), vmName)
+	expectedProps := TResourceProperties{
+		"hostname":    "actual-hostname",
+		"ssh-key-ids": []interface{}{float64(123)},
+		"datacenter":  "actual-datacenter",
+		"tags": []interface{}{
+			"spec-tag1:spec-val1",
+			"actual-tag1:actual-val1",
+			"actual-tag2:actual-val2",
+		},
+	}
+	require.Equal(t, expectedProps, props)
 }

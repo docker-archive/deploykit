@@ -38,11 +38,18 @@ func main() {
 	dir := cmd.Flags().String("dir", getDir(), "Dir for storing plan files")
 	pollInterval := cmd.Flags().Duration("poll-interval", 30*time.Second, "Terraform polling interval")
 	standalone := cmd.Flags().Bool("standalone", false, "Set if running standalone, disables manager leadership verification")
+	bootstrapGrpSpec := cmd.Flags().String("bootstrap-group-spec", "", "Group spec to import the current into into, must be used with 'bootstrap-instance-id'")
+	bootstrapInstID := cmd.Flags().String("bootstrap-instance-id", "", "Current instance ID, must be used with 'bootstrap-group-spec'")
 	cmd.Run = func(c *cobra.Command, args []string) {
 		mustHaveTerraform()
-
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(NewTerraformInstancePlugin(*dir, *pollInterval, *standalone)))
+		cli.RunPlugin(*name, instance_plugin.PluginServer(
+			NewTerraformInstancePlugin(
+				*dir,
+				*pollInterval,
+				*standalone,
+				*bootstrapGrpSpec,
+				*bootstrapInstID)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
