@@ -18,6 +18,9 @@ var title = regexp.MustCompile("^(.*)\\.(.*):$")
 // properties matches a line like: "  id = igw-c5fcffac"
 var properties = regexp.MustCompile("^[ ]+(.*)[ ]+=[ ]+(.*)$")
 
+// propertiesForInstance matches a line like: "id = igw-c5fcffac"
+var propertiesForInstance = regexp.MustCompile("^(.*)[ ]+=[ ]+(.*)$")
+
 // listRegx matches a kye in a line like: "  egress.# = 1"
 var sliceRegex = regexp.MustCompile("^([^.]+)\\.#")
 
@@ -117,6 +120,40 @@ func parseTerraformShowOutput(byType TResourceType, input io.Reader) (map[TResou
 		expandProps(props)
 	}
 	return found, nil
+}
+
+// parseTerraformShowForInstanceOutput calls terraform show for a specific resource
+//
+// Example of terraform state show <resource>
+// id = subnet-32feb75a
+// availability_zone = eu-central-1a
+// cidr_block = 10.0.1.0/24
+// map_public_ip_on_launch = true
+// tags.% = 1
+// tags.provisioner = infrakit-terraform-demo
+// vpc_id = vpc-f8d45a90
+func parseTerraformShowForInstanceOutput(input io.Reader) (TResourceProperties, error) {
+	reader := bufio.NewReader(input)
+	var propKey string
+	props := TResourceProperties{}
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			break
+		}
+		p := propertiesForInstance.FindAllStringSubmatch(string(line), -1)
+		if p != nil && len(p[0][1]) > 0 {
+			propKey = strings.TrimSpace(p[0][1])
+			value := strings.TrimSpace(p[0][2])
+			props[propKey] = value
+		} else {
+			// Append to previous key
+			props[propKey] = fmt.Sprintf("%s\n%s", props[propKey], line)
+		}
+	}
+	// Process the properties to convert from string to native types
+	expandProps(props)
+	return props, nil
 }
 
 // expandProps converts the flattened resource definition into native JSON types
@@ -222,6 +259,24 @@ func doTerraformShow(dir string,
 		func(r io.Reader) error {
 			found, err := parseTerraformShowOutput(resourceType, r)
 			result = found
+			return err
+		},
+		nil)
+
+	command.Wait()
+	return
+}
+
+// doTerraformShowForInstance shells out to run `terraform state show <instance>` and parses the result
+func doTerraformShowForInstance(dir string,
+	instance string) (result TResourceProperties, err error) {
+
+	command := exec.Command(fmt.Sprintf("terraform state show %v", instance)).InheritEnvs(true).WithDir(dir)
+	command.StartWithHandlers(
+		nil,
+		func(r io.Reader) error {
+			props, err := parseTerraformShowForInstanceOutput(r)
+			result = props
 			return err
 		},
 		nil)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 	"path"
@@ -46,6 +47,37 @@ res-type3.host1:
 	require.Equal(t, TResourceProperties{"id": "type3-host1"}, found[TResourceName("host1")])
 }
 
+func convertToSingleInstanceOutput(data []byte, resTypeName string) []byte {
+	resType := strings.Split(resTypeName, ".")[0]
+	resName := strings.Split(resTypeName, ".")[1]
+	match := false
+	lines := []string{}
+	reader := bufio.NewReader(bytes.NewBuffer(data))
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			break
+		}
+		m := title.FindAllStringSubmatch(string(line), -1)
+		if m != nil && len(m[0][1]) > 0 && len(m[0][2]) > 0 {
+			if m[0][1] == resType && m[0][2] == resName {
+				match = true
+			} else if len(lines) > 0 {
+				// No longer match, break if we have data
+				break
+			}
+		} else if match {
+			// Remove leading spaces
+			lineStr := string(line)
+			for lineStr[0:1] == " " {
+				lineStr = lineStr[1:]
+			}
+			lines = append(lines, lineStr)
+		}
+	}
+	return []byte(strings.Join(lines, "\n"))
+}
+
 func TestTerraformShowParseResultEmptyValues(t *testing.T) {
 	// {
 	//   "id": 123,
@@ -70,17 +102,22 @@ type.host:
 `, "=\n", "= \n", -1)
 	found, err := parseTerraformShowOutput(TResourceType("type"), bytes.NewBuffer([]byte(input)))
 	require.NoError(t, err)
-	require.Equal(t,
-		TResourceProperties{
-			"id": 123,
-			"destination_cidr_block":     "0.0.0.0/0",
-			"destination_prefix_list_id": "",
-			"gateway_id":                 "igw-c5fcffac",
-			"instance_id":                "",
-			"instance_owner_id":          "",
-			"pie":                        3.14,
-		},
-		found[TResourceName("host")])
+	expected := TResourceProperties{
+		"id": 123,
+		"destination_cidr_block":     "0.0.0.0/0",
+		"destination_prefix_list_id": "",
+		"gateway_id":                 "igw-c5fcffac",
+		"instance_id":                "",
+		"instance_owner_id":          "",
+		"pie":                        3.14,
+	}
+	require.Equal(t, expected, found[TResourceName("host")])
+
+	// Also verify single instance output
+	data := convertToSingleInstanceOutput([]byte(input), "type.host")
+	props, err := parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, expected, props)
 }
 
 func TestTerraformShowParseResultLists(t *testing.T) {
@@ -104,14 +141,19 @@ type.host:
 `)
 	found, err := parseTerraformShowOutput(TResourceType("type"), bytes.NewBuffer(data))
 	require.NoError(t, err)
-	require.Equal(t,
-		TResourceProperties{
-			"id":    1,
-			"tags":  []interface{}{"tag1", "tag2"},
-			"keys":  []interface{}{1, "k2", false},
-			"z-foo": "z-bar",
-		},
-		found[TResourceName("host")])
+	expected := TResourceProperties{
+		"id":    1,
+		"tags":  []interface{}{"tag1", "tag2"},
+		"keys":  []interface{}{1, "k2", false},
+		"z-foo": "z-bar",
+	}
+	require.Equal(t, expected, found[TResourceName("host")])
+
+	// Also verify single instance output
+	data = convertToSingleInstanceOutput(data, "type.host")
+	props, err := parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, expected, props)
 }
 
 func TestTerraformShowParseResultMaps(t *testing.T) {
@@ -141,14 +183,19 @@ type.host:
 `)
 	found, err := parseTerraformShowOutput(TResourceType("type"), bytes.NewBuffer(data))
 	require.NoError(t, err)
-	require.Equal(t,
-		TResourceProperties{
-			"id":    1,
-			"tags":  map[string]interface{}{"tag1": "v1", "tag2": "v2"},
-			"keys":  map[string]interface{}{"key1": 1, "key2": "k2", "key3": false},
-			"z-foo": "z-bar",
-		},
-		found[TResourceName("host")])
+	expected := TResourceProperties{
+		"id":    1,
+		"tags":  map[string]interface{}{"tag1": "v1", "tag2": "v2"},
+		"keys":  map[string]interface{}{"key1": 1, "key2": "k2", "key3": false},
+		"z-foo": "z-bar",
+	}
+	require.Equal(t, expected, found[TResourceName("host")])
+
+	// Also verify single instance output
+	data = convertToSingleInstanceOutput(data, "type.host")
+	props, err := parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, expected, props)
 }
 
 func TestTerraformShowParseResultNested(t *testing.T) {
@@ -183,6 +230,18 @@ type.host:
 	require.Equal(t, 1, props["id"])
 	// Tag list sort order not guaranteed
 	tags := props["tags"].([]interface{})
+	require.Equal(t, 3, len(tags))
+	require.Contains(t, tags, 5)
+	require.Contains(t, tags, map[string]interface{}{"list1": []interface{}{1, 2}})
+	require.Contains(t, tags, map[string]interface{}{"list2": []interface{}{3, 4}})
+
+	// Also verify single instance output
+	data = convertToSingleInstanceOutput(data, "type.host")
+	props, err = parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, 2, len(props))
+	require.Equal(t, 1, props["id"])
+	tags = props["tags"].([]interface{})
 	require.Equal(t, 3, len(tags))
 	require.Contains(t, tags, 5)
 	require.Contains(t, tags, map[string]interface{}{"list1": []interface{}{1, 2}})
@@ -289,7 +348,7 @@ func TestTerraformShowParseResultTagsList(t *testing.T) {
 
 	found, err := parseTerraformShowOutput(TResourceType("ibm_compute_vm_instance"), bytes.NewBuffer(terraformShowOutput))
 	require.NoError(t, err)
-	require.Equal(t, TResourceProperties{
+	expected := TResourceProperties{
 		"id":               36147555,
 		"cores":            1,
 		"datacenter":       "dal10",
@@ -306,13 +365,20 @@ func TestTerraformShowParseResultTagsList(t *testing.T) {
 		},
 		"user_metadata": "set -o errexit\nset -o nounset\nset -o xtrace\napt-get -y update\nFOO=BAR\necho $FOO",
 		"z_prop":        "z_val",
-	}, found[TResourceName("instance-1499827079")])
+	}
+	require.Equal(t, expected, found[TResourceName("instance-1499827079")])
+
+	// Also verify single instance output
+	data := convertToSingleInstanceOutput(terraformShowOutput, "ibm_compute_vm_instance.instance-1499827079")
+	props, err := parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, expected, props)
 }
 
 func TestTerraformShowParseResultAwsVpc(t *testing.T) {
 	found, err := parseTerraformShowOutput(TResourceType("aws_vpc"), bytes.NewBuffer(terraformShowOutput))
 	require.NoError(t, err)
-	require.Equal(t, TResourceProperties{
+	expected := TResourceProperties{
 		"id":                        "vpc-f8d45a90",
 		"cidr_block":                "10.0.0.0/16",
 		"default_network_acl_id":    "acl-9d88fef5",
@@ -324,20 +390,34 @@ func TestTerraformShowParseResultAwsVpc(t *testing.T) {
 		"instance_tenancy":          "default",
 		"main_route_table_id":       "rtb-7bf68e13",
 		"tags":                      map[string]interface{}{"provisioner": "infrakit-terraform-demo"},
-	}, found[TResourceName("default")])
+	}
+	require.Equal(t, expected, found[TResourceName("default")])
+
+	// Also verify single instance output
+	data := convertToSingleInstanceOutput(terraformShowOutput, "aws_vpc.default")
+	props, err := parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, expected, props)
 }
 
 func TestTerraformShowParseResultAwsSubnet(t *testing.T) {
 	found, err := parseTerraformShowOutput(TResourceType("aws_subnet"), bytes.NewBuffer(terraformShowOutput))
 	require.NoError(t, err)
-	require.Equal(t, TResourceProperties{
+	expected := TResourceProperties{
 		"id":                      "subnet-32feb75a",
 		"availability_zone":       "eu-central-1a",
 		"cidr_block":              "10.0.1.0/24",
 		"map_public_ip_on_launch": true,
 		"tags":   map[string]interface{}{"provisioner": "infrakit-terraform-demo"},
 		"vpc_id": "vpc-f8d45a90",
-	}, found[TResourceName("default")])
+	}
+	require.Equal(t, expected, found[TResourceName("default")])
+
+	// Also verify single instance output
+	data := convertToSingleInstanceOutput(terraformShowOutput, "aws_subnet.default")
+	props, err := parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, expected, props)
 }
 
 func TestTerraformShowParseResultAwsSecurityGroup(t *testing.T) {
@@ -349,30 +429,26 @@ func TestTerraformShowParseResultAwsSecurityGroup(t *testing.T) {
 	ingress := props["ingress"].([]interface{})
 	delete(props, "ingress")
 	require.Equal(t, 2, len(ingress))
-	require.Contains(t,
-		ingress,
-		map[string]interface{}{
-			"cidr_blocks":     []interface{}{"10.0.0.0/16"},
-			"from_port":       80,
-			"protocol":        "tcp",
-			"security_groups": []interface{}{},
-			"self":            false,
-			"to_port":         80,
-		},
-	)
-	require.Contains(t,
-		ingress,
-		map[string]interface{}{
-			"cidr_blocks":     []interface{}{"0.0.0.0/0"},
-			"from_port":       22,
-			"protocol":        "tcp",
-			"security_groups": []interface{}{},
-			"self":            false,
-			"to_port":         22,
-		},
-	)
+	expectedIngress1 := map[string]interface{}{
+		"cidr_blocks":     []interface{}{"10.0.0.0/16"},
+		"from_port":       80,
+		"protocol":        "tcp",
+		"security_groups": []interface{}{},
+		"self":            false,
+		"to_port":         80,
+	}
+	expectedIngress2 := map[string]interface{}{
+		"cidr_blocks":     []interface{}{"0.0.0.0/0"},
+		"from_port":       22,
+		"protocol":        "tcp",
+		"security_groups": []interface{}{},
+		"self":            false,
+		"to_port":         22,
+	}
+	require.Contains(t, ingress, expectedIngress1)
+	require.Contains(t, ingress, expectedIngress2)
 	// Verify everything else
-	require.Equal(t, TResourceProperties{
+	expected := TResourceProperties{
 		"id":          "sg-b903abd2",
 		"description": "Used in the terraform",
 		"egress": []interface{}{
@@ -392,7 +468,19 @@ func TestTerraformShowParseResultAwsSecurityGroup(t *testing.T) {
 			"provisioner": "infrakit-terraform-demo",
 		},
 		"vpc_id": "vpc-f8d45a90",
-	}, props)
+	}
+	require.Equal(t, expected, props)
+
+	// Also verify single instance output
+	data := convertToSingleInstanceOutput(terraformShowOutput, "aws_security_group.default")
+	props, err = parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
+	require.NoError(t, err)
+	ingress = props["ingress"].([]interface{})
+	delete(props, "ingress")
+	require.Equal(t, 2, len(ingress))
+	require.Contains(t, ingress, expectedIngress1)
+	require.Contains(t, ingress, expectedIngress2)
+	require.Equal(t, expected, props)
 }
 
 func TestRunTerraformShow(t *testing.T) {
