@@ -103,7 +103,20 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 		if err = types.AnyString(template).Decode(&bootstrapGrpSpec); err != nil {
 			panic(err)
 		}
-		if id, err := p.importResource(bootstrapInstID, bootstrapGrpSpec, true); err == nil {
+		// Define the functions for import and import the VM
+		fns := importFns{
+			tfShow: doTerraformShow,
+			tfImport: func(vmType TResourceType, filename, vmID string) error {
+				command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", vmType, filename, vmID)).InheritEnvs(true).WithDir(p.Dir)
+				if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
+					return err
+				}
+				return command.Wait()
+			},
+			tfShowInst: doTerraformShowForInstance,
+			tfClean:    p.cleanupFailedImport,
+		}
+		if id, err := p.importResource(fns, bootstrapInstID, bootstrapGrpSpec, true); err == nil {
 			log.Infof("Successfull imported bootstrap instance %v with id %v", *id, bootstrapInstID)
 		} else {
 			log.Errorf("Failed to import bootstrap instance %v, error: %v", bootstrapInstID, err)
@@ -939,9 +952,17 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 	return nil
 }
 
+// External functions using during import; broken out for testing
+type importFns struct {
+	tfShow     func(dir string, vmType TResourceType) (map[TResourceName]TResourceProperties, error)
+	tfImport   func(vmType TResourceType, filename, vmID string) error
+	tfShowInst func(dir, id string) (TResourceProperties, error)
+	tfClean    func(vmType TResourceType, vmName string)
+}
+
 // importResource imports the resource with the given ID into terraform and creates a
 // .tf.json file based on the given spec
-func (p *plugin) importResource(resourceID string, spec group.Spec, markBootstrap bool) (*instance.ID, error) {
+func (p *plugin) importResource(fns importFns, resourceID string, spec group.Spec, markBootstrap bool) (*instance.ID, error) {
 	// Acquire lock since we are creating a tf.json file and updating terraform state
 	var filename string
 	for {
@@ -974,7 +995,7 @@ func (p *plugin) importResource(resourceID string, spec group.Spec, markBootstra
 
 	// Only import if terraform is not already managing
 	// TODO(kaufers): Could instead check tag value via metadata plugin
-	existingVMs, err := doTerraformShow(p.Dir, specVMType)
+	existingVMs, err := fns.tfShow(p.Dir, specVMType)
 	if err != nil {
 		return nil, err
 	}
@@ -993,20 +1014,15 @@ func (p *plugin) importResource(resourceID string, spec group.Spec, markBootstra
 
 	// Import into terraform
 	log.Infof("Importing %v %v into terraform ...", specVMType, resourceID)
-	command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", specVMType, filename, resourceID)).InheritEnvs(true).WithDir(p.Dir)
-	if err = command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
-		p.cleanupFailedImport(specVMType, filename)
-		return nil, err
-	}
-	if err = command.Wait(); err != nil {
-		p.cleanupFailedImport(specVMType, filename)
+	if err = fns.tfImport(specVMType, filename, resourceID); err != nil {
+		fns.tfClean(specVMType, filename)
 		return nil, err
 	}
 
 	// Parse the terraform show output
-	importedProps, err := doTerraformShowForInstance(p.Dir, fmt.Sprintf("%v.%v", specVMType, filename))
+	importedProps, err := fns.tfShowInst(p.Dir, fmt.Sprintf("%v.%v", specVMType, filename))
 	if err != nil {
-		p.cleanupFailedImport(specVMType, filename)
+		fns.tfClean(specVMType, filename)
 		return nil, err
 	}
 
@@ -1021,7 +1037,7 @@ func (p *plugin) importResource(resourceID string, spec group.Spec, markBootstra
 	// Write out tf.json file
 	log.Infoln("Using spec for import", specVMProps)
 	if err = p.writeTfJSONForImport(specVMProps, importedProps, specVMType, filename); err != nil {
-		p.cleanupFailedImport(specVMType, filename)
+		fns.tfClean(specVMType, filename)
 		return nil, err
 	}
 	id := instance.ID(filename)

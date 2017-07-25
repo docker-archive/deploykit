@@ -12,11 +12,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewInstanceBootstrapPanics(t *testing.T) {
+	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
+	require.NoError(t, err)
+	require.Panics(t, func() {
+		NewTerraformInstancePlugin(dir, 1*time.Second, false, "str://foo", "")
+	})
+	require.Panics(t, func() {
+		NewTerraformInstancePlugin(dir, 1*time.Second, false, "", "1234")
+	})
+	require.Panics(t, func() {
+		NewTerraformInstancePlugin(dir, 1*time.Second, false, "str://{{ nosuchfn }}", "1234")
+	})
+}
 
 // getPlugin returns the terraform instance plugin to use for testing and the
 // directory where the .tf.json files should be stored
@@ -2457,4 +2472,364 @@ func TestWriteTfJSONForImport(t *testing.T) {
 		},
 	}
 	require.Equal(t, expectedProps, props)
+}
+
+func TestImportInvalidGrpSpecProps(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	spec := group.Spec{
+		ID:         "managers",
+		Properties: types.AnyString("no-json"),
+	}
+	_, err := tf.importResource(importFns{}, "123", spec, true)
+	require.Error(t, err)
+}
+
+func TestImportNoVm(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	spec := group.Spec{
+		ID:         "managers",
+		Properties: types.AnyString("{}"),
+	}
+	_, err := tf.importResource(importFns{}, "123", spec, true)
+	require.Error(t, err)
+	require.Equal(t, "no resource section", err.Error())
+}
+
+func TestImportNoVmProps(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	spec := group.Spec{
+		ID: "managers",
+		Properties: types.AnyString(`
+{
+  "instance": {
+    "Properties": {
+      "resource": {
+        "aws_instance": {}
+      }
+    }
+  }
+}`)}
+	_, err := tf.importResource(importFns{}, "123", spec, true)
+	require.Error(t, err)
+	require.Equal(t, "Missing resource properties", err.Error())
+}
+
+func TestImportTfShowError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return nil, fmt.Errorf("Custom show error")
+		},
+	}
+	spec := group.Spec{
+		ID: "managers",
+		Properties: types.AnyString(`
+{
+  "instance": {
+    "Properties": {
+      "resource": {
+        "aws_instance": {
+          "host": {
+            "hostnane": "host1"
+          }
+        }
+      }
+    }
+  }
+}`)}
+	_, err := tf.importResource(fns, "123", spec, true)
+	require.Error(t, err)
+	require.Equal(t, "Custom show error", err.Error())
+}
+
+func TestImportAlreadyExists(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return map[TResourceName]TResourceProperties{
+				TResourceName("instance-foo"): {},
+				TResourceName("instance-123"): {
+					"id": 123,
+				},
+			}, nil
+		},
+	}
+	spec := group.Spec{
+		ID: "managers",
+		Properties: types.AnyString(`
+{
+  "instance": {
+    "Properties": {
+      "resource": {
+        "aws_instance": {
+          "host": {
+            "hostnane": "host1"
+          }
+        }
+      }
+    }
+  }
+}`)}
+	id, err := tf.importResource(fns, "123", spec, true)
+	require.NoError(t, err)
+	require.Equal(t, "instance-123", string(*id))
+}
+
+func TestImportTfImportError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	cleanInvoked := false
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return map[TResourceName]TResourceProperties{}, nil
+		},
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(filename, "instance-"))
+			require.Equal(t, "123", vmID)
+			return fmt.Errorf("Custom import error")
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(vmName, "instance-"))
+			cleanInvoked = true
+		},
+	}
+	spec := group.Spec{
+		ID: "managers",
+		Properties: types.AnyString(`
+{
+  "instance": {
+    "Properties": {
+      "resource": {
+        "aws_instance": {
+          "host": {
+            "hostnane": "host1"
+          }
+        }
+      }
+    }
+  }
+}`)}
+	_, err := tf.importResource(fns, "123", spec, true)
+	require.Error(t, err)
+	require.Equal(t, "Custom import error", err.Error())
+	require.True(t, cleanInvoked)
+}
+
+func TestImportTfShowInstError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	cleanInvoked := false
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return map[TResourceName]TResourceProperties{}, nil
+		},
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(filename, "instance-"))
+			require.Equal(t, "123", vmID)
+			return nil
+		},
+		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			return nil, fmt.Errorf("Custom show inst error")
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(vmName, "instance-"))
+			cleanInvoked = true
+		},
+	}
+	spec := group.Spec{
+		ID: "managers",
+		Properties: types.AnyString(`
+{
+  "instance": {
+    "Properties": {
+      "resource": {
+        "aws_instance": {
+          "host": {
+            "hostnane": "host1"
+          }
+        }
+      }
+    }
+  }
+}`)}
+	_, err := tf.importResource(fns, "123", spec, true)
+	require.Error(t, err)
+	require.Equal(t, "Custom show inst error", err.Error())
+	require.True(t, cleanInvoked)
+}
+
+func TestImportResourceTagMap(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	cleanInvoked := false
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return map[TResourceName]TResourceProperties{}, nil
+		},
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(filename, "instance-"))
+			require.Equal(t, "123", vmID)
+			return nil
+		},
+		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.True(t, strings.HasPrefix(id, "aws_instance.instance-"))
+			props := TResourceProperties{
+				"hostname": "actual-hostname",
+				"spec-key": "actual-val",
+				"other":    "foo",
+			}
+			return props, nil
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			cleanInvoked = true
+		},
+	}
+	spec := group.Spec{
+		ID: "managers",
+		Properties: types.AnyString(`
+{
+  "instance": {
+    "Properties": {
+      "resource": {
+        "aws_instance": {
+          "host": {
+            "@hostname_prefix": "host1",
+            "spec-key": "spec-val",
+            "tags": {"t1": "v1"}
+          }
+        }
+      }
+    }
+  }
+}`)}
+	id, err := tf.importResource(fns, "123", spec, true)
+	require.NoError(t, err)
+	require.False(t, cleanInvoked)
+
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", *id)))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	actualVMType, vmName, props, err := FindVM(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t, VMAmazon, actualVMType)
+	require.Equal(t, string(*id), string(vmName))
+	require.Equal(t,
+		TResourceProperties{
+			"hostname": "actual-hostname",
+			"spec-key": "actual-val",
+			"tags": map[string]interface{}{
+				"t1":                  "v1",
+				"infrakit.group":      "managers",
+				"infrakit.config_sha": "bootstrap",
+			},
+		},
+		props)
+}
+
+func TestImportResourceTagSlice(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	cleanInvoked := false
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMIBMCloud, vmType)
+			return map[TResourceName]TResourceProperties{}, nil
+		},
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			require.Equal(t, VMIBMCloud, vmType)
+			require.True(t, strings.HasPrefix(filename, "instance-"))
+			require.Equal(t, "123", vmID)
+			return nil
+		},
+		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.True(t, strings.HasPrefix(id, "ibm_compute_vm_instance.instance-"))
+			props := TResourceProperties{
+				"hostname": "actual-hostname",
+				"spec-key": "actual-val",
+				"other":    "foo",
+			}
+			return props, nil
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			cleanInvoked = true
+		},
+	}
+	spec := group.Spec{
+		ID: "managers",
+		Properties: types.AnyString(`
+{
+  "instance": {
+    "Properties": {
+      "resource": {
+        "ibm_compute_vm_instance": {
+          "host": {
+            "@hostname_prefix": "host1",
+            "spec-key": "spec-val"
+          }
+        }
+      }
+    }
+  }
+}`)}
+	id, err := tf.importResource(fns, "123", spec, true)
+	require.NoError(t, err)
+	require.False(t, cleanInvoked)
+
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", *id)))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	actualVMType, vmName, props, err := FindVM(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t, VMIBMCloud, actualVMType)
+	require.Equal(t, string(*id), string(vmName))
+	// Tag slice order not guaranteed since it is created by iterating over a map
+	tags := props["tags"]
+	delete(props, "tags")
+	require.Len(t, tags, 2)
+	require.Contains(t, tags, "infrakit.group:managers")
+	require.Contains(t, tags, "infrakit.config_sha:bootstrap")
+	// Compare everythine else
+	require.Equal(t,
+		TResourceProperties{
+			"hostname": "actual-hostname",
+			"spec-key": "actual-val",
+		},
+		props)
 }
