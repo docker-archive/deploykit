@@ -58,7 +58,7 @@ type Options struct {
 	HardSync          bool
 	RemoveListeners   bool
 	PublishAllExposed bool
-	Interval          time.Duration
+	SyncInterval      time.Duration
 }
 
 // HealthCheck is the configuration for an operation to determine if a service is healthy.

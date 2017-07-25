@@ -2,14 +2,12 @@ package ingress
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
-// ConfigureL4 configures a L4 loadbalancer with the desired routes and given options
-func ConfigureL4(elb loadbalancer.L4, desired []loadbalancer.Route, healthchecks []HealthCheck,
-	options Options) error {
+// configureL4 configures a L4 loadbalancer with the desired routes and given options
+func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options Options) error {
 
 	// Process the listeners
 	routes, err := elb.Routes()
@@ -103,24 +101,6 @@ func ConfigureL4(elb loadbalancer.L4, desired []loadbalancer.Route, healthchecks
 			log.Info("REMOVED", "name", elb.Name(), "listener", l)
 		}
 	}
-
-	// Configure health check.  Note that on some platforms, only one healthcheck port
-	// is supported, so it's up to the configuration spec to properly set this up.
-	for _, healthCheck := range healthchecks {
-		if healthCheck.Port > 0 {
-			log.Info("HEALTH CHECK - Configuring the health check to ping", "port", healthCheck.Port)
-			_, err := elb.ConfigureHealthCheck(healthCheck.Port,
-				healthCheck.Healthy, healthCheck.Unhealthy,
-				time.Duration(healthCheck.IntervalSeconds)*time.Second,
-				time.Duration(healthCheck.TimeoutSeconds)*time.Second)
-			if err != nil {
-				log.Warn("err config health check", "err", err)
-				return err
-			}
-			log.Info("HEALTH CHECK CONFIGURED", "port", healthCheck.Port, "config", healthCheck)
-		}
-	}
-
 	return nil
 }
 
