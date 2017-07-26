@@ -76,8 +76,8 @@ func (p *plugin) terraformApply() error {
 // doTerraformApply executes "terraform apply" if it can aquire the lock. Returns
 // true/false if the command was executed and an error
 func (p *plugin) doTerraformApply(initial bool) (bool, error) {
-	if err := p.lock.TryLock(); err == nil {
-		defer p.lock.Unlock()
+	if err := p.fsLock.TryLock(); err == nil {
+		defer p.fsLock.Unlock()
 		// The trigger for the initial apply is typically from a group commit, sleep
 		// for a few seconds so that multiple .tf.json files have time to be created
 		if initial {
