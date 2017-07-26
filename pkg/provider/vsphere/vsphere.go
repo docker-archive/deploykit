@@ -34,10 +34,13 @@ type vmInstance struct {
 
 	// Used with LinuxKit ISOs
 	isoPath string
+
 	// Used with a VMware VM template
 	vmTemplate string
+	// TODO - Add in reading template from one DS and deploy to another
+	vmTemplateDatastore string
 
-	// Used by InfraKit to tack group
+	// Used by InfraKit to track group
 	groupTag string
 
 	// Folder that will store all InfraKit instances
@@ -162,9 +165,13 @@ func parseParameters(properties map[string]interface{}, p *plugin) (vmInstance, 
 	}
 
 	if properties["isoPath"] == nil {
-		log.Debugf("The property 'isoPath' hasn't been set, no networks will be attached to VM")
+		log.Debugf("The property 'isoPath' hasn't been set, bootable ISO will not be added to the VM")
 	} else {
 		newInstance.isoPath = properties["isoPath"].(string)
+	}
+
+	if properties["Template"] != nil {
+		newInstance.vmTemplate = properties["Template"].(string)
 	}
 
 	if properties["CPUs"] == nil {
@@ -186,10 +193,10 @@ func parseParameters(properties map[string]interface{}, p *plugin) (vmInstance, 
 		newInstance.persistentSz = int(properties["persistantSZ"].(float64))
 	}
 
-	if properties["powerOn"] == nil {
+	if properties["PowerOn"] == nil {
 		newInstance.poweron = false
 	} else {
-		newInstance.poweron = bool(properties["powerOn"].(bool))
+		newInstance.poweron = bool(properties["PowerOn"].(bool))
 	}
 
 	return newInstance, nil

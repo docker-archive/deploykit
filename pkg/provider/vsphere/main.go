@@ -29,9 +29,12 @@ func main() {
 	newVCenter.networkName = cmd.Flags().String("network", os.Getenv("VCNETWORK"), "The network label the VM will use")
 	newVCenter.vSphereHost = cmd.Flags().String("hostname", os.Getenv("VCHOST"), "The server that will run the VM")
 
+	// Testing flag to ensure VMs are never deleted
+	ignoreOnDestroy := cmd.Flags().Bool("ignoreOnDestroy", false, "When set to true, InfraKit will only Mark VMs as deleted")
+
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(NewVSphereInstancePlugin(&newVCenter)))
+		cli.RunPlugin(*name, instance_plugin.PluginServer(NewVSphereInstancePlugin(&newVCenter, *ignoreOnDestroy)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
