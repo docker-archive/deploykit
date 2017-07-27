@@ -1,10 +1,12 @@
 package ingress
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/fsm"
 	"github.com/docker/infrakit/pkg/types"
-	"golang.org/x/net/context"
 )
 
 // states
@@ -25,11 +27,6 @@ const (
 	lead
 	follow
 )
-
-func optionsFromSpec(spec types.Spec) (Options, error) {
-	options := Options{}
-	return options, spec.Options.Decode(&options)
-}
 
 var stateMachineSpec, _ = fsm.Define(
 
@@ -64,7 +61,11 @@ var stateMachineSpec, _ = fsm.Define(
 	},
 )
 
-func (c *Controller) start(in types.Spec) (err error) {
+func (c *Controller) init(in types.Spec) (err error) {
+	if c.process != nil {
+		return nil // no op
+	}
+
 	spec := in
 	err = spec.Options.Decode(&c.options)
 	if err != nil {
@@ -75,6 +76,7 @@ func (c *Controller) start(in types.Spec) (err error) {
 	// work along with the work signal.
 	stateMachineSpec.SetAction(syncing, sync,
 		func(instance fsm.Instance) error {
+			fmt.Println(">>>>>>")
 			err = c.syncRoutesL4()
 			if err != nil {
 				log.Warn("error syncing routes", "err", err)
@@ -117,16 +119,20 @@ func (c *Controller) start(in types.Spec) (err error) {
 		return
 	}
 
+	// start the process with a manual clock which advances only when tick() is called.
+	// A clock is required but in this case, we are driving the fsm from the poller,
+	// so the manual clock will not be driving any state transitions based on deadlines, etc.
+	c.process.Start(fsm.NewClock())
+
 	// create the singleton in the follower state
 	c.stateMachine = c.process.Instances().Add(follower)
 
-	stopper := make(chan interface{})
-
 	// add the poller
 	c.poller = &Poller{
-		interval: c.options.SyncInterval,
-		stop:     stopper,
+		ticker: c.ticker(),
+		stop:   c.pollerStopChan,
 		shouldRun: func() bool {
+			fmt.Println(">>>> here")
 			if mustTrue(c.leader.IsLeader()) {
 				c.stateMachine.Signal(lead)
 				return true
@@ -139,8 +145,12 @@ func (c *Controller) start(in types.Spec) (err error) {
 			return c.stateMachine.Signal(sync)
 		},
 	}
+	return nil
+}
 
-	return c.poller.Run(context.Background())
+// ticker for polling
+func (c *Controller) ticker() <-chan time.Time {
+	return time.Tick(c.options.SyncInterval)
 }
 
 func mustTrue(v bool, e error) bool {
@@ -161,6 +171,6 @@ func (c *Controller) construct(spec types.Spec, properties *types.Any) (*types.I
 	return &types.Identity{UID: "ingress-singleton"}, properties, nil
 }
 
-func (c *Controller) CurrentState() *types.Object {
+func (c *Controller) object() *types.Object {
 	return c.process.Object(c.stateMachine)
 }

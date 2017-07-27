@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"golang.org/x/net/context"
 )
 
 var log = logutil.New("module", "controller/ingress")
@@ -52,6 +53,8 @@ type Controller struct {
 
 	// polling
 	poller *Poller
+
+	pollerStopChan chan interface{}
 }
 
 func (c *Controller) groupPlugin(name plugin.Name) (group.Plugin, error) {
@@ -60,4 +63,10 @@ func (c *Controller) groupPlugin(name plugin.Name) (group.Plugin, error) {
 		return nil, err
 	}
 	return group_rpc.NewClient(endpoint.Address)
+}
+
+func (c *Controller) start() {
+	if c.process != nil && c.poller != nil {
+		c.poller.Run(context.Background())
+	}
 }
