@@ -13,24 +13,26 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+var ignoreVMs bool
+
 // Spec is just whatever that can be unmarshalled into a generic JSON map
 type Spec map[string]interface{}
+
+// This contains the two main structs used to
+type plugin struct {
+	vC               *vCenter
+	vCenterInternals *vcInternal
+}
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-type plugin struct {
-	ctx              context.Context
-	vC               *vCenter
-	vCenterInternals *vcInternal
-}
-
 // NewVSphereInstancePlugin will take the cmdline/env configuration
-func NewVSphereInstancePlugin(vc *vCenter) instance.Plugin {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+func NewVSphereInstancePlugin(vc *vCenter, ignoreOnDestroy bool) instance.Plugin {
+	// Set this as a global operation when working with vCenter, the plugin will need
+	// restarting to modify this setting.
+	ignoreVMs = ignoreOnDestroy
 	// Attempt to log in to VMware vCenter and return the internal variables required
 	internals, err := vCenterConnect(vc)
 	if err != nil {
@@ -38,7 +40,6 @@ func NewVSphereInstancePlugin(vc *vCenter) instance.Plugin {
 		log.Fatalf("%v\n", err)
 	}
 	return &plugin{
-		ctx:              ctx,
 		vC:               vc,
 		vCenterInternals: &internals,
 	}
@@ -121,9 +122,16 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	//  Spawn a goroutine to provision in the background
 	go func() {
 		newInstance.vmName = string(vmName)
-		err = createNewVMInstance(p, &newInstance, spec)
-		if err != nil {
-			log.Printf("Error adding %s\n%v", newInstance.vmName, err)
+		var newInstanceError error
+		if newInstance.vmTemplate != "" {
+			log.Infof("Cloning new instance from template: %s", newInstance.vmTemplate)
+			newInstanceError = cloneNewInstance(p, &newInstance, spec)
+		} else {
+			newInstanceError = createNewVMInstance(p, &newInstance, spec)
+		}
+		if newInstanceError != nil {
+			log.Warnf("Error adding %s", newInstance.vmName)
+			log.Errorf("vSphere Error: %v", newInstanceError)
 		}
 	}()
 
@@ -141,7 +149,15 @@ func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
 	// Spawn a goroutine to delete in the background
 	go func() {
 		// TODO: Checks need adding to examine the instance that are quick enough not to trip timeout
-		deleteVM(p, string(instance))
+		var err error
+		if ignoreVMs == true {
+			err = ignoreVM(p, string(instance))
+		} else {
+			err = deleteVM(p, string(instance))
+		}
+		if err != nil {
+			log.Errorf("%v", err)
+		}
 	}()
 	return nil
 }
