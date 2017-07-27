@@ -16,12 +16,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, error) {
-	// Without a groupName we have nothing to search for
-	if groupName == "" {
-		return nil, errors.New("The tag infrakit.group was blank")
-	}
-
+func cloneNewInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -31,82 +26,89 @@ func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, 
 	// Find one and only datacenter, not sure how VMware linked mode will work
 	dc, err := f.DatacenterOrDefault(ctx, *p.vC.dcName)
 	if err != nil {
-		return nil, fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
+		return fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
 	}
 
 	// Make future calls local to this datacenter
 	f.SetDatacenter(dc)
 
-	// Try to find virtual machines in the groupName folder (doesn't exist on ESXi)
-	vmList, err := f.VirtualMachineList(ctx, groupName+"/*")
-
-	if err == nil {
-		if len(vmList) == 0 {
-			log.Errorf("No Virtual Machines found in Folder")
-		}
-		return vmList, nil
-	}
-	// Restort to inspecting ALL VM Instances for group tags
-	foundVMs, err := findInstancesFromAnnotation(ctx, f, groupName)
-	return foundVMs, err
-}
-
-func returnDataFromVM(ctx context.Context, vmInstance *object.VirtualMachine, dataType string) string {
-	var machineConfig mo.VirtualMachine
-	if dataType == "guestIP" {
-		err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"guest.ipAddress"}, &machineConfig)
-		if err != nil {
-			log.Errorf("%v", vmInstance)
-		} else {
-			// Ensure that we're pointing to a Guest Config struct
-			if machineConfig.Guest != nil {
-				//log.Printf("%v\n%s", vmInstance, machineConfig.Guest.IpAddress)
-				return machineConfig.Guest.IpAddress
-			}
-		}
-	} else {
-		err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"config.annotation"}, &machineConfig)
-		if err != nil {
-			log.Errorf("%v", vmInstance)
-		}
-		// Ensure that we're pointing to a Configuration struct
-		if machineConfig.Config != nil {
-			annotationData := strings.Split(machineConfig.Config.Annotation, "\n")
-			if len(annotationData) > 1 {
-				switch dataType {
-				case "group":
-					return annotationData[0]
-				case "sha":
-					return annotationData[1]
-				}
-			}
-		}
-	}
-	return ""
-}
-
-func findInstancesFromAnnotation(ctx context.Context, f *find.Finder, groupName string) ([]*object.VirtualMachine, error) {
-	var foundVMS []*object.VirtualMachine
-
-	// Find ALL Virtual Machines
-	vmList, err := f.VirtualMachineList(ctx, "*")
+	// Use finder for VM template
+	vmTemplate, err := f.VirtualMachine(ctx, vm.vmTemplate)
 	if err != nil {
-		return foundVMS, err
+		return err
 	}
-	// Create new array of Virtual Machines that will hold all VMs that have the groupName
-	for _, vmInstance := range vmList {
-		instanceGroup := returnDataFromVM(ctx, vmInstance, "group")
-		if instanceGroup == groupName {
-			log.Debugf("%s matches groupName %s\n", vmInstance.Name(), groupName)
-			foundVMS = append(foundVMS, vmInstance)
+	pool := p.vCenterInternals.resourcePool.Reference()
+	host := p.vCenterInternals.hostSystem.Reference()
+	ds := p.vCenterInternals.datastore.Reference()
+
+	// TODO - Allow modifiable relocateSpec for other DataStores
+	relocateSpec := types.VirtualMachineRelocateSpec{
+		Pool:      &pool,
+		Host:      &host,
+		Datastore: &ds,
+	}
+
+	// The only change we make to the Template Spec, is the config sha and group name
+	spec := types.VirtualMachineConfigSpec{
+		Annotation: vmSpec.Tags["infrakit.group"] + "\n" + vmSpec.Tags["infrakit.config_sha"] + "\n" + vm.annotation,
+	}
+
+	// Changes can be to spec or relocateSpec
+	cisp := types.VirtualMachineCloneSpec{
+		Config:   &spec,
+		Location: relocateSpec,
+		Template: false,
+		PowerOn:  vm.poweron,
+	}
+
+	vmObj := object.NewVirtualMachine(p.vCenterInternals.client.Client, vmTemplate.Reference())
+	groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
+	if err != nil {
+		log.Debugf("%v", err)
+		groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags["infrakit.group"])
+		if err != nil {
+			if err.Error() == "ServerFaultCode: The operation is not supported on the object." {
+				baseFolder, _ := dc.Folders(ctx)
+				groupFolder = baseFolder.VmFolder
+			} else {
+				if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags["infrakit.group"]+"' already exists." {
+					return errors.New("A Virtual Machine exists with the same name as the InfraKit group")
+				}
+				log.Warnf("%v", err)
+			}
 		}
 	}
-	return foundVMS, nil
+
+	task, err := vmObj.Clone(ctx, groupFolder, vm.vmName, cisp)
+	if err != nil {
+		return errors.New("Creating new VM failed, more detail can be found in vCenter tasks")
+	}
+
+	info, err := task.WaitForResult(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("Creating new VM failed\n%v", err)
+	}
+	if info.Error != nil {
+		return fmt.Errorf("Clone task finished with error: %s", info.Error)
+	}
+	return nil
 }
 
 func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Create a new finder that will discover the defaults and are looked for Networks/Datastores
+	f := find.NewFinder(p.vCenterInternals.client.Client, true)
+
+	// Find one and only datacenter, not sure how VMware linked mode will work
+	dc, err := f.DatacenterOrDefault(ctx, *p.vC.dcName)
+	if err != nil {
+		return fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
+	}
+
+	// Make future calls local to this datacenter
+	f.SetDatacenter(dc)
 
 	spec := types.VirtualMachineConfigSpec{
 		Name:       vm.vmName,
@@ -126,18 +128,6 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 		Operation: types.VirtualDeviceConfigSpecOperationAdd,
 		Device:    scsi,
 	})
-
-	// Create a new finder that will discover the defaults and are looked for Networks/Datastores
-	f := find.NewFinder(p.vCenterInternals.client.Client, true)
-
-	// Find one and only datacenter, not sure how VMware linked mode will work
-	dc, err := f.DefaultDatacenter(ctx)
-	if err != nil {
-		return fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
-	}
-
-	// Make future calls local to this datacenter
-	f.SetDatacenter(dc)
 
 	groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
 	if err != nil {
@@ -197,6 +187,7 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 		log.Infoln("Powering on provisioned Virtual Machine")
 		return setVMPowerOn(true, newVM)
 	}
+
 	return nil
 }
 
@@ -208,7 +199,7 @@ func deleteVM(p *plugin, vm string) error {
 	f := find.NewFinder(p.vCenterInternals.client.Client, true)
 
 	// Find one and only datacenter, not sure how VMware linked mode will work
-	dc, err := f.DefaultDatacenter(ctx)
+	dc, err := f.DatacenterOrDefault(ctx, *p.vC.dcName)
 	if err != nil {
 		return fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
 	}
@@ -227,6 +218,44 @@ func deleteVM(p *plugin, vm string) error {
 
 	// If the Virtual Machine is found then we call Destroy against it.
 	task, err := foundVM.Destroy(ctx)
+	if err != nil {
+		return errors.New("Delete operation has failed, more detail can be found in vCenter tasks")
+	}
+
+	_, err = task.WaitForResult(ctx, nil)
+	if err != nil {
+		return errors.New("Delete Task has failed, more detail can be found in vCenter tasks")
+	}
+	return nil
+}
+
+func ignoreVM(p *plugin, vm string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create a new finder that will discover the defaults and are looked for Networks/Datastores
+	f := find.NewFinder(p.vCenterInternals.client.Client, true)
+
+	// Find one and only datacenter, not sure how VMware linked mode will work
+	dc, err := f.DatacenterOrDefault(ctx, *p.vC.dcName)
+	if err != nil {
+		return fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
+	}
+
+	// Make future calls local to this datacenter
+	f.SetDatacenter(dc)
+
+	// Try and find the virtual machine
+	foundVM, err := f.VirtualMachine(ctx, vm)
+	if err != nil {
+		return fmt.Errorf("Error finding Virtual Machine\nClient Error => %v", err)
+	}
+
+	configSpec := types.VirtualMachineConfigSpec{
+		Annotation: "Deleted by InfraKit",
+	}
+
+	task, err := foundVM.Reconfigure(ctx, configSpec)
 	if err != nil {
 		return errors.New("Delete operation has failed, more detail can be found in vCenter tasks")
 	}
@@ -344,4 +373,96 @@ func addISO(p *plugin, newInstance vmInstance, vm *object.VirtualMachine) error 
 		return fmt.Errorf("Unable to add new CD-ROM device to VM configuration\n%v", err)
 	}
 	return nil
+}
+
+func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, error) {
+	// Without a groupName we have nothing to search for
+	if groupName == "" {
+		return nil, errors.New("The tag infrakit.group was blank")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create a new finder that will discover the defaults and are looked for Networks/Datastores
+	f := find.NewFinder(p.vCenterInternals.client.Client, true)
+
+	// Find one and only datacenter, not sure how VMware linked mode will work
+	dc, err := f.DatacenterOrDefault(ctx, *p.vC.dcName)
+	if err != nil {
+		return nil, fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
+	}
+
+	// Make future calls local to this datacenter
+	f.SetDatacenter(dc)
+
+	// This will either hold all of the virtual machines in a folder, or ALL VMs
+	var vmList []*object.VirtualMachine
+
+	// Try to find virtual machines in the groupName folder (doesn't exist on ESXi)
+	vmList, err = f.VirtualMachineList(ctx, groupName+"/*")
+
+	// If there is an error, it should indicate that there is no folder
+	if err != nil {
+		// Resort to inspecting ALL VM Instances for group tags
+		vmList, err = f.VirtualMachineList(ctx, "*")
+		if err != nil {
+			return vmList, err
+		}
+	} else {
+		log.Debugf("%v", err)
+	}
+	// Go through the VMs and find the correct ones from the groupname
+	foundVMs, err := findInstancesFromAnnotation(ctx, vmList, groupName)
+	return foundVMs, err
+}
+
+func findInstancesFromAnnotation(ctx context.Context, vmList []*object.VirtualMachine, groupName string) ([]*object.VirtualMachine, error) {
+	var foundVMS []*object.VirtualMachine
+
+	// Find ALL Virtual Machines
+
+	// Create new array of Virtual Machines that will hold all VMs that have the groupName
+	for _, vmInstance := range vmList {
+		instanceGroup := returnDataFromVM(ctx, vmInstance, "group")
+		if instanceGroup == groupName {
+			log.Debugf("%s matches groupName %s\n", vmInstance.Name(), groupName)
+			foundVMS = append(foundVMS, vmInstance)
+		}
+	}
+	return foundVMS, nil
+}
+
+func returnDataFromVM(ctx context.Context, vmInstance *object.VirtualMachine, dataType string) string {
+	var machineConfig mo.VirtualMachine
+	if dataType == "guestIP" {
+		err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"guest.ipAddress"}, &machineConfig)
+		if err != nil {
+			log.Errorf("%v", vmInstance)
+		} else {
+			// Ensure that we're pointing to a Guest Config struct
+			if machineConfig.Guest != nil {
+				//log.Printf("%v\n%s", vmInstance, machineConfig.Guest.IpAddress)
+				return machineConfig.Guest.IpAddress
+			}
+		}
+	} else {
+		err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"config.annotation"}, &machineConfig)
+		if err != nil {
+			log.Errorf("%v", vmInstance)
+		}
+		// Ensure that we're pointing to a Configuration struct
+		if machineConfig.Config != nil {
+			annotationData := strings.Split(machineConfig.Config.Annotation, "\n")
+			if len(annotationData) > 1 {
+				switch dataType {
+				case "group":
+					return annotationData[0]
+				case "sha":
+					return annotationData[1]
+				}
+			}
+		}
+	}
+	return ""
 }
