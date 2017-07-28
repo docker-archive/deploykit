@@ -1,7 +1,6 @@
 package ingress
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/docker/infrakit/pkg/core"
@@ -76,7 +75,8 @@ func (c *Controller) init(in types.Spec) (err error) {
 	// work along with the work signal.
 	stateMachineSpec.SetAction(syncing, sync,
 		func(instance fsm.Instance) error {
-			fmt.Println(">>>>>>")
+			log.Debug("syncing routes and backends")
+
 			err = c.syncRoutesL4()
 			if err != nil {
 				log.Warn("error syncing routes", "err", err)
@@ -125,14 +125,22 @@ func (c *Controller) init(in types.Spec) (err error) {
 	c.process.Start(fsm.NewClock())
 
 	// create the singleton in the follower state
-	c.stateMachine = c.process.Instances().Add(follower)
+	c.stateMachine, err = c.process.NewInstance(follower)
+	if err != nil {
+		return
+	}
+
+	//c.stateMachine = c.process.Instances().Add(follower)
+
+	if c.ticker == nil && c.options.SyncInterval > 0 {
+		c.ticker = time.Tick(c.options.SyncInterval)
+	}
 
 	// add the poller
 	c.poller = &Poller{
-		ticker: c.ticker(),
-		stop:   c.pollerStopChan,
+		ticker: c.ticker,
+		stop:   make(chan interface{}),
 		shouldRun: func() bool {
-			fmt.Println(">>>> here")
 			if mustTrue(c.leader.IsLeader()) {
 				c.stateMachine.Signal(lead)
 				return true
@@ -148,11 +156,6 @@ func (c *Controller) init(in types.Spec) (err error) {
 	return nil
 }
 
-// ticker for polling
-func (c *Controller) ticker() <-chan time.Time {
-	return time.Tick(c.options.SyncInterval)
-}
-
 func mustTrue(v bool, e error) bool {
 	if e != nil {
 		return false
@@ -162,13 +165,14 @@ func mustTrue(v bool, e error) bool {
 
 func (c *Controller) construct(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
 	// parse for the spec
-	ingressSpec := Spec{}
+	ingressSpec := Properties{}
 	err := properties.Decode(&ingressSpec)
 	if err != nil {
 		return nil, nil, err
 	}
 	c.spec = ingressSpec
-	return &types.Identity{UID: "ingress-singleton"}, properties, nil
+	state, err := types.AnyValue(c.state())
+	return &types.Identity{UID: "ingress-singleton"}, state, err
 }
 
 func (c *Controller) object() *types.Object {

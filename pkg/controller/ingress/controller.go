@@ -1,6 +1,8 @@
 package ingress
 
 import (
+	"time"
+
 	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/fsm"
@@ -43,7 +45,7 @@ type Controller struct {
 	// Options are properties controlling behavior of the controller
 	options Options
 
-	spec Spec
+	spec Properties
 
 	plugins func() discovery.Plugins
 
@@ -52,9 +54,13 @@ type Controller struct {
 	stateMachine fsm.Instance
 
 	// polling
+	ticker <-chan time.Time
 	poller *Poller
+}
 
-	pollerStopChan chan interface{}
+func (c *Controller) state() Properties {
+	// TODO - compute this from results of polling
+	return Properties{}
 }
 
 func (c *Controller) groupPlugin(name plugin.Name) (group.Plugin, error) {
@@ -67,6 +73,12 @@ func (c *Controller) groupPlugin(name plugin.Name) (group.Plugin, error) {
 
 func (c *Controller) start() {
 	if c.process != nil && c.poller != nil {
-		c.poller.Run(context.Background())
+		go c.poller.Run(context.Background())
+	}
+}
+
+func (c *Controller) stop() {
+	if c.process != nil && c.poller != nil {
+		c.poller.Stop()
 	}
 }

@@ -6,95 +6,110 @@ import (
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
-// This is an unexported interface for testing. The interface
-// contains the methods we want to override / mock.  If there's
-// a new method on the Controller to be tested and overridden,
-// simply add it to this interface and provide an implementation
-// below.  This uses composition / embedding in Go to avoid having
-// to declare and complicated public interface and use code generations
-// like gomock, which has been seen to generate unsafe concurrent code
-// (as detected by go vet).
-type testControllerInterface interface {
-	groupPlugin(plugin.Name) (group.Plugin, error)
-	ticker() <-chan time.Time
-	init(types.Spec) error
+type fakeLeadership <-chan bool
+
+func (l fakeLeadership) IsLeader() (bool, error) {
+	return <-l, nil
 }
 
-type testControllerHarness struct {
-	testControllerInterface
-	leader       <-chan bool
-	_groupPlugin func(plugin.Name) (group.Plugin, error)
-	_ticker      func() <-chan time.Time
-}
+func TestControllerStartStop(t *testing.T) {
 
-func (tc *testControllerHarness) IsLeader() (bool, error) {
-	return <-tc.leader, nil
-}
+	ticker := make(chan time.Time, 1)
+	leader := make(chan bool, 1)
 
-func (tc *testControllerHarness) groupPlugin(name plugin.Name) (group.Plugin, error) {
-	return tc._groupPlugin(name)
-}
+	doneWork := make(chan interface{})
 
-func (tc *testControllerHarness) ticker() <-chan time.Time {
-	return tc._ticker()
-}
+	controller := &Controller{
+		leader:           fakeLeadership(leader),
+		ticker:           ticker,
+		healthChecks:     func() (map[Vhost][]HealthCheck, error) { return nil, nil },
+		groups:           func() (map[Vhost][]group.ID, error) { return nil, nil },
+		groupPluginNames: func() map[Vhost][]plugin.Name { return nil },
+		l4s:              func() (map[Vhost]loadbalancer.L4, error) { return nil, nil },
 
-func TestControllerInitSpec(t *testing.T) {
-
-	ticker := make(chan time.Time, 5)
-	leader := make(chan bool, 5)
-	stopPoller := make(chan interface{})
-	close(stopPoller)
-
-	harness := &testControllerHarness{
-		leader: leader,
-		_groupPlugin: func(n plugin.Name) (group.Plugin, error) {
-			t.Log("groupPlugin:", n)
+		routes: func() (map[Vhost][]loadbalancer.Route, error) {
+			// if this function is called then we know we've done work in the state transition
+			// from syncing to waiting
+			close(doneWork)
 			return nil, nil
 		},
-		_ticker: func() <-chan time.Time {
-			return ticker
-		},
 	}
 
-	expectedInterval := 10 * time.Second
-
-	realController := &Controller{
-		leader:         harness,
-		pollerStopChan: stopPoller,
-		options: Options{
-			SyncInterval: expectedInterval,
+	spec := types.Spec{
+		Kind:       "ingress-controller",
+		SpiVersion: "0.1",
+		Metadata: types.Metadata{
+			Name: "ingress-controller",
 		},
+		Properties: types.AnyValueMust(Properties{
+			{
+				Vhost:      Vhost("default"),
+				ResourceID: "elb-1",
+			},
+		}),
 	}
-	harness.testControllerInterface = realController
-
-	err := harness.init(types.Spec{})
+	err := controller.init(spec)
 	require.NoError(t, err)
 
-	t.Log("verify that the default value remains despite no Options in the spec")
-	require.Equal(t, expectedInterval, realController.options.SyncInterval)
-
-	t.Log("verify that spec's option value makes into the Options")
-	realController = &Controller{
-		leader: harness,
-	}
-	harness.testControllerInterface = realController
-
-	expectedOptions := Options{
-		HardSync:     true,
-		SyncInterval: expectedInterval,
-	}
-
-	err = harness.init(types.Spec{
-		Options: types.AnyValueMust(expectedOptions),
-	})
-	require.NoError(t, err)
-	require.Equal(t, expectedOptions, realController.options)
+	controller.start()
 
 	t.Log("verify initial state machine is in the follower state")
-	require.Equal(t, follower, realController.stateMachine.State())
+	require.Equal(t, follower, controller.stateMachine.State())
+
+	stateObject := controller.object()
+	require.NotNil(t, stateObject)
+	require.NoError(t, stateObject.Validate())
+	require.Equal(t, "ingress-singleton", stateObject.Metadata.Identity.UID)
+	require.Equal(t, "ingress-controller", stateObject.Metadata.Name)
+
+	// initial state
+	found := Properties{}
+	err = stateObject.State.Decode(&found)
+	require.NoError(t, err)
+	require.Equal(t, Properties{}, found) // initially the state is empty
+
+	// send a tick to the poller
+	ticker <- time.Now()
+	leader <- true
+
+	<-doneWork
+
+	t.Log("verify state machine moved to the waiting state")
+	require.Equal(t, waiting, controller.stateMachine.State())
+
+	// leadership changed
+	leader <- false
+
+	ticker <- time.Now()
+
+	t.Log("verify state machine moved to the follower state")
+
+	time.Sleep(500 * time.Millisecond)
+	require.Equal(t, follower, controller.stateMachine.State())
+
+	// leadership changed
+	leader <- true
+
+	// here we change the routes function to test for another close
+	doneWork2 := make(chan interface{})
+	controller.routes = func() (map[Vhost][]loadbalancer.Route, error) {
+		// if this function is called then we know we've done work in the state transition
+		// from syncing to waiting
+		close(doneWork2)
+		return nil, nil
+	}
+
+	ticker <- time.Now()
+
+	t.Log("verify state machine moved to the waiting state")
+
+	<-doneWork2 // if not called, the test will hang here
+	require.Equal(t, waiting, controller.stateMachine.State())
+
+	controller.stop()
 }

@@ -3,8 +3,10 @@ package ingress
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/docker/infrakit/pkg/fsm"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,4 +78,37 @@ func TestMustTrue(t *testing.T) {
 	require.True(t, mustTrue(func() (bool, error) { return true, nil }()))
 	require.False(t, mustTrue(func() (bool, error) { return true, fmt.Errorf("error") }()))
 	require.False(t, mustTrue(func() (bool, error) { return false, nil }()))
+}
+
+func TestControllerInitSpec(t *testing.T) {
+	expectedInterval := 10 * time.Second
+
+	controller := &Controller{
+		options: Options{
+			SyncInterval: expectedInterval,
+		},
+	}
+
+	err := controller.init(types.Spec{})
+	require.NoError(t, err)
+
+	t.Log("verify that the default value remains despite no Options in the spec")
+	require.Equal(t, expectedInterval, controller.options.SyncInterval)
+
+	t.Log("verify that spec's option value makes into the Options")
+	controller = &Controller{}
+
+	expectedOptions := Options{
+		HardSync:     true,
+		SyncInterval: expectedInterval,
+	}
+
+	err = controller.init(types.Spec{
+		Options: types.AnyValueMust(expectedOptions),
+	})
+	require.NoError(t, err)
+	require.Equal(t, expectedOptions, controller.options)
+
+	t.Log("verify initial state machine is in the follower state")
+	require.Equal(t, follower, controller.stateMachine.State())
 }

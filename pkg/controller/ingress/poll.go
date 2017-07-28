@@ -16,6 +16,17 @@ type Poller struct {
 	running   bool
 }
 
+// NewPoller creates a poller
+func NewPoller(shouldRun func() bool, work func() error, interval time.Duration) *Poller {
+	return &Poller{
+		err:       make(chan error),
+		ticker:    time.Tick(interval),
+		stop:      make(chan interface{}),
+		shouldRun: shouldRun,
+		work:      work,
+	}
+}
+
 // Err returns the errors encountered by the poller
 func (p *Poller) Err() <-chan error {
 	return p.err
