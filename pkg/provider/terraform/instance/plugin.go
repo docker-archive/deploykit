@@ -187,6 +187,9 @@ const (
 
 	// VMSoftLayer is the resource type for softlayer
 	VMSoftLayer = TResourceType("softlayer_virtual_guest")
+
+	// VMIBMCloud is the resource type for IBM Cloud
+	VMIBMCloud = TResourceType("ibm_compute_vm_instance")
 )
 
 const (
@@ -207,7 +210,7 @@ const (
 
 var (
 	// VMTypes is a list of supported vm types.
-	VMTypes = []interface{}{VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud, VMSoftLayer}
+	VMTypes = []interface{}{VMAmazon, VMAzure, VMDigitalOcean, VMGoogleCloud, VMSoftLayer, VMIBMCloud}
 )
 
 // first returns the first entry.  This is based on our assumption that exactly one vm resource per file.
@@ -305,7 +308,7 @@ func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID
 		return
 	}
 	switch vmType {
-	case VMSoftLayer:
+	case VMSoftLayer, VMIBMCloud:
 		// Process a special @hostname_prefix that will allow the setting of hostname in a
 		// specific format; use the LogicalID (if set), else the name
 		var hostname string
@@ -361,7 +364,7 @@ func mergeInitScript(spec instance.Spec, id instance.ID, vmType TResourceType, p
 	case VMAmazon, VMDigitalOcean:
 		addUserData(properties, "user_data", spec.Init)
 		properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(properties["user_data"].(string)))
-	case VMSoftLayer:
+	case VMSoftLayer, VMIBMCloud:
 		addUserData(properties, "user_metadata", spec.Init)
 	case VMAzure:
 		// os_profile.custom_data
@@ -431,7 +434,7 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 		} else {
 			log.Errorf("mergeTagsIntoVMProps: invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"]))
 		}
-	case VMSoftLayer:
+	case VMSoftLayer, VMIBMCloud:
 		if _, has := vmProperties["tags"]; !has {
 			vmProperties["tags"] = []interface{}{}
 		}
@@ -848,7 +851,7 @@ func parseTerraformTags(vmType TResourceType, m TResourceProperties) map[string]
 		} else {
 			log.Errorf("parseTerraformTags: invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"]))
 		}
-	case VMSoftLayer:
+	case VMSoftLayer, VMIBMCloud:
 		if tagsSlice, ok := m["tags"].([]interface{}); ok {
 			for _, v := range tagsSlice {
 				value := fmt.Sprintf("%v", v)
