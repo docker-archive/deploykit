@@ -49,7 +49,6 @@ func TestPollerShouldRun(t *testing.T) {
 func TestPollerShouldNotRun(t *testing.T) {
 
 	shouldRun := make(chan bool, 1)
-	work := make(chan error, 1)
 
 	calledShouldRun := make(chan struct{})
 
@@ -60,7 +59,6 @@ func TestPollerShouldNotRun(t *testing.T) {
 		},
 		func() error {
 			panic("shouldn't call")
-			return <-work
 		},
 		1*time.Second,
 	)
