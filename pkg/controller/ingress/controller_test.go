@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -25,14 +26,13 @@ func TestControllerStartStop(t *testing.T) {
 	doneWork := make(chan interface{})
 
 	controller := &Controller{
-		leader:           fakeLeadership(leader),
-		ticker:           ticker,
-		healthChecks:     func() (map[Vhost][]HealthCheck, error) { return nil, nil },
-		groups:           func() (map[Vhost][]group.ID, error) { return nil, nil },
-		groupPluginNames: func() map[Vhost][]plugin.Name { return nil },
-		l4s:              func() (map[Vhost]loadbalancer.L4, error) { return nil, nil },
+		leader:       fakeLeadership(leader),
+		ticker:       ticker,
+		healthChecks: func() (map[ingress.Vhost][]ingress.HealthCheck, error) { return nil, nil },
+		groups:       func() (map[ingress.Vhost][]group.ID, error) { return nil, nil },
+		l4s:          func() (map[ingress.Vhost]loadbalancer.L4, error) { return nil, nil },
 
-		routes: func() (map[Vhost][]loadbalancer.Route, error) {
+		routes: func() (map[ingress.Vhost][]loadbalancer.Route, error) {
 			// if this function is called then we know we've done work in the state transition
 			// from syncing to waiting
 			close(doneWork)
@@ -46,10 +46,10 @@ func TestControllerStartStop(t *testing.T) {
 		Metadata: types.Metadata{
 			Name: "ingress-controller",
 		},
-		Properties: types.AnyValueMust(Properties{
+		Properties: types.AnyValueMust(ingress.Properties{
 			{
-				Vhost:      Vhost("default"),
-				ResourceID: "elb-1",
+				Vhost:    ingress.Vhost("default"),
+				L4Plugin: plugin.Name("elb-1"),
 			},
 		}),
 	}
@@ -68,10 +68,10 @@ func TestControllerStartStop(t *testing.T) {
 	require.Equal(t, "ingress-controller", stateObject.Metadata.Name)
 
 	// initial state
-	found := Properties{}
+	found := ingress.Properties{}
 	err = stateObject.State.Decode(&found)
 	require.NoError(t, err)
-	require.Equal(t, Properties{}, found) // initially the state is empty
+	require.Equal(t, ingress.Properties{}, found) // initially the state is empty
 
 	// send a tick to the poller
 	ticker <- time.Now()
@@ -97,7 +97,7 @@ func TestControllerStartStop(t *testing.T) {
 
 	// here we change the routes function to test for another close
 	doneWork2 := make(chan interface{})
-	controller.routes = func() (map[Vhost][]loadbalancer.Route, error) {
+	controller.routes = func() (map[ingress.Vhost][]loadbalancer.Route, error) {
 		// if this function is called then we know we've done work in the state transition
 		// from syncing to waiting
 		close(doneWork2)

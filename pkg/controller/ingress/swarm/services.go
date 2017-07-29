@@ -3,7 +3,7 @@ package swarm
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/infrakit/pkg/controller/ingress"
+	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 

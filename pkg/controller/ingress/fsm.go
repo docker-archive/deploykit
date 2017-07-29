@@ -3,6 +3,7 @@ package ingress
 import (
 	"time"
 
+	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/fsm"
 	"github.com/docker/infrakit/pkg/types"
@@ -165,7 +166,7 @@ func mustTrue(v bool, e error) bool {
 
 func (c *Controller) construct(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
 	// parse for the spec
-	ingressSpec := Properties{}
+	ingressSpec := ingress.Properties{}
 	err := properties.Decode(&ingressSpec)
 	if err != nil {
 		return nil, nil, err

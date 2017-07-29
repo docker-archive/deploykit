@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/fsm"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -84,7 +85,7 @@ func TestControllerInitSpec(t *testing.T) {
 	expectedInterval := 10 * time.Second
 
 	controller := &Controller{
-		options: Options{
+		options: ingress.Options{
 			SyncInterval: expectedInterval,
 		},
 	}
@@ -95,10 +96,10 @@ func TestControllerInitSpec(t *testing.T) {
 	t.Log("verify that the default value remains despite no Options in the spec")
 	require.Equal(t, expectedInterval, controller.options.SyncInterval)
 
-	t.Log("verify that spec's option value makes into the Options")
+	t.Log("verify that spec's option value makes into the ingress.Options")
 	controller = &Controller{}
 
-	expectedOptions := Options{
+	expectedOptions := ingress.Options{
 		HardSync:     true,
 		SyncInterval: expectedInterval,
 	}

@@ -3,11 +3,12 @@ package ingress
 import (
 	"fmt"
 
+	"github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
 // configureL4 configures a L4 loadbalancer with the desired routes and given options
-func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options Options) error {
+func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options types.Options) error {
 
 	// Process the listeners
 	routes, err := elb.Routes()

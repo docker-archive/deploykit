@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/infrakit/pkg/controller/ingress"
+	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/golang/mock/gomock"

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/deckarep/golang-set"
+	"github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
@@ -57,7 +58,7 @@ func (c *Controller) syncBackends() error {
 	// process by vhost and loadbalancer and keep a list of unresolved vhosts
 	// for which we do not have any backends
 
-	unresolved := []Vhost{}
+	unresolved := []types.Vhost{}
 	for vhost, l4 := range loadbalancersByVhost {
 
 		groupIDs, has := groupsByVhost[vhost]
@@ -84,22 +85,20 @@ func (c *Controller) syncBackends() error {
 			nodes.Add(id)
 		}
 
-		for _, pluginName := range c.groupPluginNames()[vhost] {
-			groupPlugin, err := c.groupPlugin(pluginName)
+		groupPlugin, err := c.groupPlugin()
+		if err != nil {
+			return err
+		}
+		for _, gid := range groupIDs {
+
+			desc, err := groupPlugin.DescribeGroup(gid)
 			if err != nil {
-				return err
+				log.Warn("error describing group", "id", gid, "err", err)
+				continue
 			}
-			for _, gid := range groupIDs {
 
-				desc, err := groupPlugin.DescribeGroup(gid)
-				if err != nil {
-					log.Warn("error describing group", "id", gid, "err", err)
-					continue
-				}
-
-				for _, inst := range desc.Instances {
-					nodes.Add(inst.ID)
-				}
+			for _, inst := range desc.Instances {
+				nodes.Add(inst.ID)
 			}
 		}
 
@@ -131,7 +130,7 @@ func (c *Controller) syncBackends() error {
 }
 
 func (c *Controller) syncHealthChecks() error {
-	targets := map[loadbalancer.L4][]HealthCheck{}
+	targets := map[loadbalancer.L4][]types.HealthCheck{}
 	healthChecksByVhost, err := c.healthChecks()
 	if err != nil {
 		return err
