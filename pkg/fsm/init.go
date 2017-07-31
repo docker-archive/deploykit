@@ -1,9 +1,7 @@
 package fsm
 
 import (
-	"flag"
+	logutil "github.com/docker/infrakit/pkg/log"
 )
 
-func init() {
-	flag.Parse()
-}
+var log = logutil.New("module", "core/fsm")

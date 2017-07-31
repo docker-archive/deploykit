@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/golang/glog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -146,7 +145,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 
 	clock.Tick() // t = 5
 
-	time.Sleep(2 * time.Second) // give a little time for the set to settle
+	time.Sleep(3 * time.Second) // give a little time for the set to settle
 
 	require.Equal(t, 100, set.CountByState(running))
 	require.Equal(t, 0, set.CountByState(wait))
@@ -233,7 +232,7 @@ func TestSetFlapping(t *testing.T) {
 	require.Equal(t, 1, set.CountByState(running))
 	require.Equal(t, running, instance.State())
 
-	log.Infoln("************************* running -> down")
+	t.Log("************************* running -> down")
 
 	set.Signal(timeout, id) // flap 1 - a
 
@@ -246,40 +245,40 @@ func TestSetFlapping(t *testing.T) {
 
 	clock.Tick()
 
-	log.Infoln("************************* down -> running")
+	t.Log("************************* down -> running")
 
 	set.Signal(ping, id) // flap 1 - b
 
 	require.Equal(t, 1, set.CountByState(running))
 	require.Equal(t, running, instance.State())
 
-	log.Infoln("************************* running -> down")
+	t.Log("************************* running -> down")
 
 	set.Signal(timeout, id) // flap 2
 
 	require.Equal(t, 1, set.CountByState(down))
 	require.Equal(t, down, instance.State())
 
-	log.Infoln("************************* running -> down")
+	t.Log("************************* running -> down")
 
 	require.False(t, instance.CanReceive(timeout))
 
 	err = instance.Signal(timeout)
 	require.NoError(t, err) // This does no checking
 
-	log.Infoln("************************* down -> running")
+	t.Log("************************* down -> running")
 
 	set.Signal(ping, id) // flap 2
 
-	log.Infoln("************************* running -> down")
+	t.Log("************************* running -> down")
 
 	set.Signal(timeout, id) // flap 2
 
-	log.Infoln("************************* down -> running")
+	t.Log("************************* down -> running")
 
 	set.Signal(ping, id) // flap 3
 
-	log.Infoln("************************* running -> down")
+	t.Log("************************* running -> down")
 
 	set.Signal(timeout, id) // flap 3
 
@@ -449,5 +448,5 @@ func TestActionErrors(t *testing.T) {
 	// then automatically triggered to the unavailable state
 	require.Equal(t, unavailable, instance.State())
 
-	log.Infoln("stopping")
+	t.Log("stopping")
 }
