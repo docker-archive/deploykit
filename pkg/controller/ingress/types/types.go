@@ -6,6 +6,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -22,9 +23,14 @@ type Spec struct {
 	// L4Plugin is the name of the L4Plugin to lookup
 	L4Plugin plugin.Name
 
-	// Routes is a specification of the actual routes (port, protocol).  It's an Any
-	// bacause different implmeentations (e.g. swarm) can have different configurations.
-	Routes *types.Any
+	// RouteSources allows the specification of routes based on some specialized handlers.
+	// The routes are keyed by the 'handler' name and the configuration blob are specific to the keyed
+	// handler.  For example, a 'swarm' handler will dynamically generate the required routes based
+	// on Docker swarm services.  These routes are added to the static routes.
+	RouteSources map[string]*types.Any
+
+	// Routes are those that are always synchronized routes that are specified in the configuration.
+	Routes []loadbalancer.Route
 
 	// Backends specify where to get the nodes of the backend pool.
 	Backends BackendSpec
