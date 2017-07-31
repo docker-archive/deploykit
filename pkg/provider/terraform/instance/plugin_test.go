@@ -19,18 +19,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewInstanceBootstrapPanics(t *testing.T) {
-	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
-	require.NoError(t, err)
-	require.Panics(t, func() {
-		NewTerraformInstancePlugin(dir, 1*time.Second, false, "str://foo", "")
-	})
-	require.Panics(t, func() {
-		NewTerraformInstancePlugin(dir, 1*time.Second, false, "", "1234")
-	})
-	require.Panics(t, func() {
-		NewTerraformInstancePlugin(dir, 1*time.Second, false, "str://{{ nosuchfn }}", "1234")
-	})
+func TestProcessBootstrapErrors(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	// Group spec but no instance ID
+	groupSpecURL := "str://foo"
+	instID := ""
+	b := bootstrapOptions{GroupSpecURL: &groupSpecURL, InstanceID: &instID}
+	err := tf.processBootstrap(&b)
+	require.Error(t, err)
+	require.Equal(t,
+		"Bootstrap instance ID required with bootstrap group spec",
+		err.Error())
+	// No group spec but instance ID
+	groupSpecURL = ""
+	instID = "1234"
+	b = bootstrapOptions{GroupSpecURL: &groupSpecURL, InstanceID: &instID}
+	err = tf.processBootstrap(&b)
+	require.Error(t, err)
+	require.Equal(t,
+		"Bootstrap group spec required with bootstrap instance ID",
+		err.Error())
+	// Invalid group spec template with instance ID
+	groupSpecURL = "str://{{ nosuchfn }}"
+	instID = "1234"
+	b = bootstrapOptions{GroupSpecURL: &groupSpecURL, InstanceID: &instID}
+	err = tf.processBootstrap(&b)
+	require.Error(t, err)
 }
 
 // getPlugin returns the terraform instance plugin to use for testing and the
@@ -38,7 +53,7 @@ func TestNewInstanceBootstrapPanics(t *testing.T) {
 func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false, "", "")
+	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false, nil)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)

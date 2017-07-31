@@ -53,7 +53,7 @@ type plugin struct {
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool, bootstrapGrpSpecStr, bootstrapInstID string) instance.Plugin {
+func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool, bootstrap *bootstrapOptions) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
 	fsLock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
 	if err != nil {
@@ -73,7 +73,6 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 			return plugins
 		}
 	}
-
 	p := plugin{
 		Dir:          dir,
 		fs:           afero.NewOsFs(),
@@ -81,49 +80,65 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 		pollInterval: pollInterval,
 		pluginLookup: pluginLookup,
 	}
-
-	// Handle bootstrap data
-	var bootstrapGrpSpec group.Spec
-	if bootstrapGrpSpecStr == "" {
-		if bootstrapInstID != "" {
-			panic(fmt.Errorf("Bootstrap group spec required with bootstrap instance ID"))
-		}
-	} else {
-		if bootstrapInstID == "" {
-			panic(fmt.Errorf("Bootstrap instance ID required with bootstrap group spec"))
-		}
-		t, err := template.NewTemplate(bootstrapGrpSpecStr, template.Options{MultiPass: false})
-		if err != nil {
-			panic(err)
-		}
-		template, err := t.Render(nil)
-		if err != nil {
-			panic(err)
-		}
-		if err = types.AnyString(template).Decode(&bootstrapGrpSpec); err != nil {
-			panic(err)
-		}
-		// Define the functions for import and import the VM
-		fns := importFns{
-			tfShow: doTerraformShow,
-			tfImport: func(vmType TResourceType, filename, vmID string) error {
-				command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", vmType, filename, vmID)).InheritEnvs(true).WithDir(p.Dir)
-				if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
-					return err
-				}
-				return command.Wait()
-			},
-			tfShowInst: doTerraformShowForInstance,
-			tfClean:    p.cleanupFailedImport,
-		}
-		if id, err := p.importResource(fns, bootstrapInstID, bootstrapGrpSpec, true); err == nil {
-			log.Infof("Successfull imported bootstrap instance %v with id %v", *id, bootstrapInstID)
-		} else {
-			log.Errorf("Failed to import bootstrap instance %v, error: %v", bootstrapInstID, err)
-			panic(err)
-		}
+	if err := p.processBootstrap(bootstrap); err != nil {
+		panic(err)
 	}
 	return &p
+}
+
+// processBootstrap coverts the GroupSpecURL into a group.Spec and attempts to import
+// the instance with the given ID into terraform, associating it with the group
+func (p *plugin) processBootstrap(b *bootstrapOptions) error {
+	if b == nil {
+		return nil
+	}
+	groupSpecURL := string(*b.GroupSpecURL)
+	instanceID := string(*b.InstanceID)
+	log.Infof("Processing bootstrap group spec URL: %v", groupSpecURL)
+	log.Infof("Processing bootstrap instance ID: %v", instanceID)
+	if groupSpecURL == "" {
+		if instanceID != "" {
+			return fmt.Errorf("Bootstrap group spec required with bootstrap instance ID")
+		}
+		// Values are empty, nothing to import
+		return nil
+	}
+	if instanceID == "" {
+		return fmt.Errorf("Bootstrap instance ID required with bootstrap group spec")
+	}
+	// Have both a group spec URL and an instance ID
+	var bootstrapGrpSpec group.Spec
+	t, err := template.NewTemplate(groupSpecURL, template.Options{MultiPass: false})
+	if err != nil {
+		return err
+	}
+	template, err := t.Render(nil)
+	if err != nil {
+		return err
+	}
+	if err = types.AnyString(template).Decode(&bootstrapGrpSpec); err != nil {
+		return err
+	}
+	// Define the functions for import and import the VM
+	fns := importFns{
+		tfShow: doTerraformShow,
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", vmType, filename, vmID)).InheritEnvs(true).WithDir(p.Dir)
+			if err = command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
+				return err
+			}
+			return command.Wait()
+		},
+		tfShowInst: doTerraformShowForInstance,
+		tfClean:    p.cleanupFailedImport,
+	}
+	var instID *instance.ID
+	if instID, err = p.importResource(fns, instanceID, bootstrapGrpSpec, true); err == nil {
+		log.Infof("Successfull imported bootstrap instance %v with id %v", *instID, instanceID)
+		return nil
+	}
+	log.Errorf("Failed to import bootstrap instance %v, error: %v", instanceID, err)
+	return err
 }
 
 /*
