@@ -494,6 +494,8 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 				filename = fmt.Sprintf("%s-dedicated", generatedName)
 			default:
 				filename = fmt.Sprintf("scope-%s", scope)
+				// If the scope is global use it as the prefix for the resource name
+				newResourceName = fmt.Sprintf("%s-%s", scope, resourceName)
 			}
 			// Get the associated value in the file map
 			tfPersistence, has := fileMap[filename]

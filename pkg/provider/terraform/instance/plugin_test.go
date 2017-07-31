@@ -1091,6 +1091,7 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	name := "instance-1234"
+	globalName := "managers"
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMAmazon: {
 			TResourceName("host"): {
@@ -1107,7 +1108,7 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 		TResourceType("softlayer_block_storage"): {
 			TResourceName("worker_bs"): {
 				"bsp1": "bsv1", "bsp2": "bsv2",
-				PropScope: "managers",
+				PropScope: globalName,
 			},
 		},
 		TResourceType("another-dedicated"): {
@@ -1137,7 +1138,8 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	}
 	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json", name))
 	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json", name))
-	require.Contains(t, filenames, "scope-managers.tf.json")
+	expectedGlobalFilename := fmt.Sprintf("scope-%s.tf.json", globalName)
+	require.Contains(t, filenames, expectedGlobalFilename)
 	// Default
 	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json", name)))
 	require.NoError(t, err)
@@ -1178,7 +1180,7 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 		tFormat.Resource,
 	)
 	// Global
-	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "scope-managers.tf.json"))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, expectedGlobalFilename))
 	require.NoError(t, err)
 	tFormat = TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1186,7 +1188,7 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
 			TResourceType("softlayer_block_storage"): {
-				TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+				TResourceName(globalName + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
 			},
 		},
 		tFormat.Resource,
