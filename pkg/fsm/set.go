@@ -2,8 +2,6 @@ package fsm
 
 import (
 	"time"
-
-	log "github.com/golang/glog"
 )
 
 const (
@@ -99,7 +97,7 @@ func (s *Set) Signal(signal Signal, instance ID, optionalData ...interface{}) er
 		data = optionalData[0]
 	}
 
-	log.V(100).Infoln(s.options.Name, "signal", signal, "to instance=", instance)
+	log.Info("Signal", "set", s.options.Name, "signal", signal, "instance", instance)
 	s.events <- &event{instance: instance, signal: signal, data: data}
 	return nil
 }
@@ -198,7 +196,7 @@ type event struct {
 }
 
 func (s *Set) handleError(tid int64, err error, ctx interface{}) {
-	log.Warningln(tid, "error occurred:", err, "context=", ctx)
+	log.Warn("error", "tid", tid, "err", err, "context", ctx)
 	select {
 	case s.errors <- err:
 	default:
@@ -221,7 +219,7 @@ func (s *Set) handleAdd(tid int64, initial Index) error {
 		},
 	}
 
-	log.V(100).Infoln(s.options.Name, tid, "add:", "id=", id, "initial=", initial, "set deadline.")
+	log.Debug("add: set deadline", "name", s.options.Name, tid, "id", id, "initial", initial)
 	if err := s.processDeadline(tid, new, initial); err != nil {
 		return err
 	}
@@ -268,7 +266,7 @@ func (s *Set) handleClockTick(tid int64) error {
 	s.tick()
 	now := s.ct()
 
-	log.V(100).Infoln(s.options.Name, tid, "CLOCK [", now, "] ========================================================")
+	log.Debug("Clock tick", "name", s.options.Name, "tid", tid, "now", now)
 
 	for s.deadlines.Len() > 0 {
 
@@ -293,7 +291,7 @@ func (s *Set) handleClockTick(tid int64) error {
 
 			} else if ttl != nil {
 
-				log.V(100).Infoln(s.options.Name, tid, "deadline exceeded:", "@id=", instance.id, "raise=", ttl.Raise)
+				log.Warn("deadline exceeded", "name", s.options.Name, "tid", tid, "id", instance.id, "raise", ttl.Raise)
 
 				s.raise(tid, instance.id, ttl.Raise, instance.state)
 			}
@@ -322,18 +320,20 @@ func (s *Set) processDeadline(tid int64, instance *instance, state Index) error 
 		// case where this instance is in the deadlines queue (since it has a > -1 index)
 		if instance.deadline > 0 {
 			// in the queue and deadline is different now
-			log.V(100).Infoln(s.options.Name, tid,
-				"deadline: updating @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
+			log.Debug("deadline updating", "name", s.options.Name, "tid", tid,
+				"instance", instance.id, "deadline", instance.deadline,
+				"state", instance.index)
 			s.deadlines.update(instance)
 		} else {
-			log.V(100).Infoln(s.options.Name, tid,
-				"deadline: removing @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
+			log.Debug("deadline removing", "name", s.options.Name, "tid", tid,
+				"instance", instance.id, "deadline", instance.deadline,
+				"state", instance.index)
 			s.deadlines.remove(instance)
 		}
 	} else if instance.deadline > 0 {
 		// index == -1 means it's not in the queue yet and we have a deadline
-		log.V(100).Infoln(s.options.Name, tid,
-			"deadline: enqueuing @id=", instance.id, "deadline=", instance.deadline, "at", instance.index)
+		log.Debug("deadline enqueuing", "name", s.options.Name, "tid", tid,
+			"instance", instance.id, "deadline", instance.deadline, "state", instance.index)
 		s.deadlines.enqueue(instance)
 	}
 
@@ -350,8 +350,8 @@ func (s *Set) processVisitLimit(tid int64, instance *instance, state Index) erro
 
 		if limit.Value > 0 && instance.visits[state] == limit.Value {
 
-			log.V(100).Infoln(s.options.Name, tid,
-				"max visits hit.", "@id=", instance.id, "[", instance.state, "]--(", limit.Raise, ")-->")
+			log.Debug("Max visit limit hit", "name", s.options.Name, "tid", tid,
+				"instance", instance.id, "state", instance.state, "raise", limit.Raise)
 
 			s.raise(tid, instance.id, limit.Raise, instance.state)
 
@@ -364,7 +364,8 @@ func (s *Set) processVisitLimit(tid int64, instance *instance, state Index) erro
 // raises a signal by placing directly on the txn queue
 func (s *Set) raise(tid int64, id ID, signal Signal, current Index) (err error) {
 	defer func() {
-		log.V(100).Infoln(s.options.Name, "instance.signal: @id=", id, "signal=", signal, "current=", current, "err=", err)
+		log.Debug("instance.signal", "name", s.options.Name, "instance", id,
+			"signal", signal, "state", current, "err", err)
 	}()
 
 	if _, has := s.spec.signals[signal]; !has {
@@ -396,9 +397,9 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 		return err
 	}
 
-	log.V(100).Infoln(s.options.Name, tid,
-		"transition: @id=", instance.id, "::::", "[", current, "]--(", event.signal, ")-->", "[", next, "]",
-		"deadline=", instance.deadline, "index=", instance.index)
+	log.Debug("Transition", "name", s.options.Name, "tid", tid,
+		"instance", instance.id, "state", current, "signal", event.signal, "next", next,
+		"deadline", instance.deadline, "index", instance.index)
 
 	// any flap detection?
 	limit := s.spec.flap(current, next)
@@ -409,7 +410,8 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 
 		if flaps >= limit.Count {
 
-			log.Warningln(tid, "flapping:", flaps, "@id=", instance.id, "[", instance.state, "]--(", limit.Raise, ")-->")
+			log.Warn("Flapping", "tid", tid, "flaps", flaps,
+				"instance", instance.id, "state", instance.state, "raise", limit.Raise)
 			s.raise(tid, instance.id, limit.Raise, instance.state)
 
 			return nil // done -- another transition
@@ -421,12 +423,12 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 		instance.data = event.data
 	}
 
-	log.V(100).Infoln("About to run transition:", action)
+	log.Debug("Transtion", "action", action)
 	// call action before transitiion
 	if action != nil {
 		if err := action(instance); err != nil {
 
-			log.V(100).Infoln("error at transition:", err)
+			log.Warn("Error transition", "err", err)
 
 			if alternate, err := s.spec.error(current, event.signal); err != nil {
 
@@ -434,8 +436,8 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 
 			} else {
 
-				log.Warningln(tid, "error executing action:", "@id=", instance.id,
-					"[", current, "]--(", event.signal, ")-->[", alternate, "] (was[", next, "])")
+				log.Warn("Err executing action", "tid", tid, "instance", instance.id,
+					"state", current, "signal", event.signal, "alternate", alternate, "next", next)
 
 				next = alternate
 			}
@@ -473,7 +475,7 @@ func (s *Set) run() {
 	// Core processing
 	go func() {
 		defer func() {
-			log.Infoln(s.options.Name, "set shutting down.")
+			log.Info("Shutting down", "name", s.options.Name)
 			close(s.transactions)
 		}()
 

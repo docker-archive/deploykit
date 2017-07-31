@@ -2,8 +2,6 @@ package fsm
 
 import (
 	"fmt"
-
-	log "github.com/golang/glog"
 )
 
 // Index is the index of the state in a FSM
@@ -89,8 +87,6 @@ func Define(s State, more ...State) (spec *Spec, err error) {
 
 	spec.states = states
 	spec.signals = signals
-
-	log.V(100).Infoln("signals=", signals)
 	return
 }
 
@@ -118,7 +114,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		// Check all the signal references in Actions must be in transitions
 		for signal, action := range s.Actions {
 			if _, has := s.Transitions[signal]; !has {
-				log.Warningln("actions has signal that's not in state's transitions:", s.Index, signal)
+				log.Warn("actions has signal that's not in state's transitions", "state", s.Index, "signal", signal)
 				return nil, unknownTransition(signal)
 			}
 
@@ -137,7 +133,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 	for _, s := range m {
 		if s.TTL.TTL > 0 {
 			if _, has := s.Transitions[s.TTL.Raise]; !has {
-				log.Warningln("expiry raises signal that's not in state's transitions:", s.Index, s.TTL)
+				log.Warn("expiry raises signal that's not in state's transitions", "state", s.Index, "TTL", s.TTL)
 				return nil, unknownSignal(s.TTL.Raise)
 			}
 
@@ -147,7 +143,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		}
 		if s.Visit.Value > 0 {
 			if _, has := s.Transitions[s.Visit.Raise]; !has {
-				log.Warningln("visit limit raises signal that's not in state's transitions:", s.Index, s.Visit)
+				log.Warn("visit limit raises signal that's not in state's transitions", "state", s.Index, "visit", s.Visit)
 				return nil, unknownSignal(s.Visit.Raise)
 			}
 
@@ -242,7 +238,7 @@ func (s *Spec) error(current Index, signal Signal) (next Index, err error) {
 // returns error if the transition is not possible.
 func (s *Spec) transition(current Index, signal Signal) (next Index, action Action, err error) {
 	defer func() {
-		log.V(200).Infoln("transition:", "[", current, "]--(", signal, ")-->[", next, "]", "action=", action, "err=", err)
+		log.Debug("transition:", "current", current, "signal", signal, "next", next, "action", action, "err", err)
 	}()
 
 	state, has := s.states[current]

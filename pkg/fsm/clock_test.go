@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/golang/glog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,19 +24,19 @@ func TestClock(t *testing.T) {
 		}
 	}()
 
-	log.Infoln("Start")
+	t.Log("Start")
 	close(start)
 	clock.Start()
 	clock.Tick()
 	clock.Tick()
 	clock.Tick()
 
-	log.Infoln("Stopping")
+	t.Log("Stopping")
 	clock.Stop()
 
-	log.Infoln("waiting for done")
+	t.Log("waiting for done")
 	<-done
-	log.Infoln("done")
+	t.Log("done")
 }
 
 func TestWallClock(t *testing.T) {
@@ -78,25 +77,25 @@ func TestWallClock2(t *testing.T) {
 			if !open {
 				return
 			}
-			log.Infoln("tick")
+			t.Log("tick")
 			ticks <- 1
 		}
 	}()
 
 	close(start)
 	clock.Start()
-	log.Infoln("starting")
+	t.Log("starting")
 
 	time.Sleep(1 * time.Second)
 
-	log.Infoln("Stopping")
+	t.Log("Stopping")
 	clock.Stop()
-	log.Infoln("Stopped")
+	t.Log("Stopped")
 
 	total := 0
 	for i := range ticks {
 		total += i
 	}
-	log.Infoln("count=", total)
+	t.Log("count=", total)
 	require.Equal(t, 10, total)
 }
