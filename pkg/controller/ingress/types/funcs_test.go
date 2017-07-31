@@ -195,8 +195,8 @@ func TestRegisterRouteHandler(t *testing.T) {
 	require.Equal(t, 0, len(routeHandlers))
 
 	calledChan := make(chan *types.Any, 1)
-	routesChan := make(chan []loadbalancer.Route, 1)
-	f := func(customConfig *types.Any) ([]loadbalancer.Route, error) {
+	routesChan := make(chan map[Vhost][]loadbalancer.Route, 1)
+	f := func(customConfig *types.Any, options Options) (map[Vhost][]loadbalancer.Route, error) {
 		calledChan <- customConfig
 		return <-routesChan, nil
 	}
@@ -226,9 +226,11 @@ func TestRegisterRouteHandler(t *testing.T) {
 			LoadBalancerPort: 8080,
 		},
 	}
-	routesChan <- routes
+	routesChan <- map[Vhost][]loadbalancer.Route{
+		vhost: routes,
+	}
 
-	m, err := properties.Routes()
+	m, err := properties.Routes(Options{})
 	require.NoError(t, err)
 	require.Equal(t, map[Vhost][]loadbalancer.Route{
 		vhost: routes,

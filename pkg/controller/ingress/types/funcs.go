@@ -15,12 +15,13 @@ import (
 
 var (
 	log               = logutil.New("module", "ingress/types")
-	routeHandlers     = map[string]func(*types.Any) ([]loadbalancer.Route, error){}
+	routeHandlers     = map[string]func(*types.Any, Options) (map[Vhost][]loadbalancer.Route, error){}
 	routeHandlersLock = sync.Mutex{}
 )
 
 // RegisterRouteHandler registers a package specific handler for determining the L4 routes (e.g. static or swarm)
-func RegisterRouteHandler(key string, f func(*types.Any) ([]loadbalancer.Route, error)) {
+func RegisterRouteHandler(key string, f func(*types.Any, Options) (map[Vhost][]loadbalancer.Route, error)) {
+
 	routeHandlersLock.Lock()
 	defer routeHandlersLock.Unlock()
 
@@ -96,26 +97,27 @@ func (p Properties) InstanceIDs() (result map[Vhost][]instance.ID, err error) {
 // Routes returns a map of routes by vhost.  This will try to parse the Routes field of each Spec
 // as loadbalancer.Route.  If parsing fails, the provided function callback is used to provide
 // alternative parsing of the types.Any to give the data.
-func (p Properties) Routes() (result map[Vhost][]loadbalancer.Route, err error) {
+func (p Properties) Routes(options Options) (result map[Vhost][]loadbalancer.Route, err error) {
 	result = map[Vhost][]loadbalancer.Route{}
 	for _, spec := range p {
 
-		routes := spec.Routes
+		result[spec.Vhost] = spec.Routes
 
 		for key, config := range spec.RouteSources {
 			handler, has := routeHandlers[key]
 			if !has {
 				continue
 			}
-			more, err := handler(config)
+
+			vhostRoutes, err := handler(config, options)
 			if err != nil {
 				continue
 			}
 
-			routes = append(routes, more...)
+			for h, r := range vhostRoutes {
+				result[h] = append(result[h], r...)
+			}
 		}
-
-		result[spec.Vhost] = routes
 	}
 	return
 }
