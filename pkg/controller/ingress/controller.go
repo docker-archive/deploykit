@@ -91,6 +91,7 @@ func (c *Controller) l4Client(spec ingress.Spec) (loadbalancer.L4, error) {
 	return loadbalancer_rpc.NewClient(spec.L4Plugin, endpoint.Address)
 }
 
+// Run starts the controller given the spec it needs to maintain
 func (c *Controller) Run(spec types.Spec) error {
 	err := c.init(spec)
 	if err != nil {
