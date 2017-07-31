@@ -26,7 +26,7 @@ func TestControllerStartStop(t *testing.T) {
 	doneWork := make(chan interface{})
 
 	controller := &Controller{
-		leader:       fakeLeadership(leader),
+		Leadership:   fakeLeadership(leader),
 		ticker:       ticker,
 		healthChecks: func() (map[ingress.Vhost][]ingress.HealthCheck, error) { return nil, nil },
 		groups:       func() (map[ingress.Vhost][]group.ID, error) { return nil, nil },
@@ -36,6 +36,7 @@ func TestControllerStartStop(t *testing.T) {
 			// if this function is called then we know we've done work in the state transition
 			// from syncing to waiting
 			close(doneWork)
+
 			return nil, nil
 		},
 	}

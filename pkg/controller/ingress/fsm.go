@@ -7,6 +7,7 @@ import (
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/fsm"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -62,16 +63,52 @@ var stateMachineSpec, _ = fsm.Define(
 	},
 )
 
+func (c *Controller) defaultBehaviors(spec types.Spec) {
+
+	properties := ingress.Properties{}
+	if spec.Properties != nil {
+		spec.Properties.Decode(&properties)
+	}
+
+	c.properties = properties
+
+	// Set up the functions that actually do the work of fetching routes, backends, etc.
+	// get the functions from the properties
+	if c.l4s == nil {
+		c.l4s = properties.L4Func(c.l4Client)
+	}
+
+	if c.routes == nil {
+		c.routes = func() (map[ingress.Vhost][]loadbalancer.Route, error) {
+			return properties.Routes(c.options)
+		}
+	}
+
+	if c.groups == nil {
+		c.groups = properties.Groups
+	}
+
+	if c.instanceIDs == nil {
+		c.instanceIDs = properties.InstanceIDs
+	}
+
+	if c.healthChecks == nil {
+		c.healthChecks = properties.HealthChecks
+	}
+}
+
 func (c *Controller) init(in types.Spec) (err error) {
 	if c.process != nil {
 		return nil // no op
 	}
 
-	spec := in
-	err = spec.Options.Decode(&c.options)
+	c.spec = in
+	err = c.spec.Options.Decode(&c.options)
 	if err != nil {
 		return err
 	}
+
+	c.defaultBehaviors(in)
 
 	// Once the state is in the syncing state, we advance the fsm from syncing to waiting by executing
 	// work along with the work signal.
@@ -106,7 +143,7 @@ func (c *Controller) init(in types.Spec) (err error) {
 		// the controller has simple states: start, syncing and waiting.  These states correspond
 		// to when the controller is polling and updating or waiting.
 		core.ProcessDefinition{
-			Spec:        &spec,
+			Spec:        &c.spec,
 			Constructor: c.construct,
 		},
 
@@ -132,8 +169,6 @@ func (c *Controller) init(in types.Spec) (err error) {
 		return
 	}
 
-	//c.stateMachine = c.process.Instances().Add(follower)
-
 	if c.ticker == nil && c.options.SyncInterval > 0 {
 		c.ticker = time.Tick(c.options.SyncInterval)
 	}
@@ -141,7 +176,7 @@ func (c *Controller) init(in types.Spec) (err error) {
 	// add the poller
 	c.poller = controller.Poll(
 		func() bool {
-			if mustTrue(c.leader.IsLeader()) {
+			if mustTrue(c.IsLeader()) {
 				c.stateMachine.Signal(lead)
 				return true
 			}
@@ -154,23 +189,6 @@ func (c *Controller) init(in types.Spec) (err error) {
 		},
 		c.ticker,
 	)
-
-	// c.poller = &Poller{
-	// 	ticker: c.ticker,
-	// 	stop:   make(chan interface{}),
-	// 	shouldRun: func() bool {
-	// 		if mustTrue(c.leader.IsLeader()) {
-	// 			c.stateMachine.Signal(lead)
-	// 			return true
-	// 		}
-	// 		c.stateMachine.Signal(follow)
-	// 		return false
-	// 	},
-	// 	work: func() (err error) {
-	// 		c.stateMachine.Signal(start)
-	// 		return c.stateMachine.Signal(sync)
-	// 	},
-	// }
 	return nil
 }
 
@@ -182,13 +200,6 @@ func mustTrue(v bool, e error) bool {
 }
 
 func (c *Controller) construct(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
-	// parse for the spec
-	ingressSpec := ingress.Properties{}
-	err := properties.Decode(&ingressSpec)
-	if err != nil {
-		return nil, nil, err
-	}
-	c.spec = ingressSpec
 	state, err := types.AnyValue(c.state())
 	return &types.Identity{UID: "ingress-singleton"}, state, err
 }

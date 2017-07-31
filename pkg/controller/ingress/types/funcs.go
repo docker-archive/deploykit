@@ -3,10 +3,7 @@ package types
 import (
 	"sync"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/plugin"
-	rpc "github.com/docker/infrakit/pkg/rpc/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -31,15 +28,7 @@ func RegisterRouteHandler(key string, f func(*types.Any, Options) (map[Vhost][]l
 }
 
 // L4Func returns a function that can return a map of vhost and L4 objects, with the help of plugin lookup.
-func (p Properties) L4Func(plugins func() discovery.Plugins,
-	findL4 func(spec Spec, ep *plugin.Endpoint) (loadbalancer.L4, error)) func() (map[Vhost]loadbalancer.L4, error) {
-	return p.l4Func(plugins, func(spec Spec, ep *plugin.Endpoint) (loadbalancer.L4, error) {
-		return rpc.NewClient(spec.L4Plugin, ep.Address)
-	})
-}
-
-func (p Properties) l4Func(plugins func() discovery.Plugins,
-	findL4 func(spec Spec, ep *plugin.Endpoint) (loadbalancer.L4, error)) func() (map[Vhost]loadbalancer.L4, error) {
+func (p Properties) L4Func(findL4 func(spec Spec) (loadbalancer.L4, error)) func() (map[Vhost]loadbalancer.L4, error) {
 
 	return func() (result map[Vhost]loadbalancer.L4, err error) {
 		result = map[Vhost]loadbalancer.L4{}
@@ -47,16 +36,8 @@ func (p Properties) l4Func(plugins func() discovery.Plugins,
 
 			vhost := spec.Vhost
 
-			ep, err := plugins().Find(spec.L4Plugin)
-			if err != nil {
-				return nil, err
-			}
-			if ep == nil {
-				continue
-			}
-
-			l4, err := findL4(spec, ep)
-			if err != nil {
+			l4, err := findL4(spec)
+			if err != nil || l4 == nil {
 				log.Warn("cannot locate L4 plugin", "vhost", vhost, "spec", spec)
 				continue
 			}

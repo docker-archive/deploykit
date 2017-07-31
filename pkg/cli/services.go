@@ -65,6 +65,16 @@ type ToJSONFunc func(in []byte) (json []byte, err error)
 // FromJSONFunc converts json formatted input to output buffer
 type FromJSONFunc func(json []byte) (out []byte, err error)
 
+// ReadFromStdinOrURL reads input given from the argument.  If this arg is URL then the content
+// is fetched and rendered as a template.  If the arg is '-', it reads from stdin.
+func (s *Services) ReadFromStdinOrURL(arg string) (rendered string, err error) {
+	return s.ReadFromStdinIfElse(
+		func() bool { return arg == "-" },
+		func() (string, error) { return s.ProcessTemplate(arg) },
+		s.ToJSON,
+	)
+}
+
 // ReadFromStdinIfElse checks condition and reads from stdin if true; otherwise it executes other.
 func (s *Services) ReadFromStdinIfElse(condition func() bool,
 	otherwise func() (string, error),
@@ -96,7 +106,7 @@ func templateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 
 	fs := pflag.NewFlagSet("template", pflag.ExitOnError)
 
-	globals := fs.StringSliceP("var", "v", []string{}, "key=value pairs of globally scoped variagbles")
+	globals := fs.StringSliceP("var", "p", []string{}, "key=value pairs of globally scoped variagbles")
 	yamlDoc := fs.BoolP("yaml", "y", false, "True if input is in yaml format; json is the default")
 	dump := fs.BoolP("dump", "x", false, "True to dump to output instead of executing")
 	singlePass := fs.BoolP("final", "f", false, "True to render template as the final pass")

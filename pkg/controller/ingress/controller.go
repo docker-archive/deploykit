@@ -1,6 +1,7 @@
 package ingress
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/docker/infrakit/pkg/controller"
@@ -12,9 +13,11 @@ import (
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
+	loadbalancer_rpc "github.com/docker/infrakit/pkg/rpc/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
 
@@ -22,11 +25,10 @@ var log = logutil.New("module", "controller/ingress")
 
 // Controller is the entity that reconciles desired routes with loadbalancers
 type Controller struct {
-	// Name of the group plugin / controller to lookup
-	groupPluginName plugin.Name
+	manager.Leadership
 
-	// leader is a manager interface that can return whether this is running as leader
-	leader manager.Leadership
+	// Name of the group plugin / controller to lookup
+	GroupPluginName plugin.Name
 
 	// l4s is a function that get retrieve a map of L4 loadbalancers by name
 	l4s func() (map[ingress.Vhost]loadbalancer.L4, error)
@@ -41,12 +43,13 @@ type Controller struct {
 	groups func() (map[ingress.Vhost][]group.ID, error)
 
 	// list of instance ids by vhost
-	instanceIDs func() map[ingress.Vhost][]instance.ID
+	instanceIDs func() (map[ingress.Vhost][]instance.ID, error)
 
 	// Options are properties controlling behavior of the controller
 	options ingress.Options
 
-	spec ingress.Properties
+	spec       types.Spec
+	properties ingress.Properties
 
 	plugins func() discovery.Plugins
 
@@ -65,11 +68,36 @@ func (c *Controller) state() ingress.Properties {
 }
 
 func (c *Controller) groupPlugin() (group.Plugin, error) {
-	endpoint, err := c.plugins().Find(c.groupPluginName)
+	if c.plugins == nil {
+		return nil, fmt.Errorf("no group plugin %v", c.GroupPluginName)
+	}
+
+	endpoint, err := c.plugins().Find(c.GroupPluginName)
 	if err != nil {
 		return nil, err
 	}
 	return group_rpc.NewClient(endpoint.Address)
+}
+
+func (c *Controller) l4Client(spec ingress.Spec) (loadbalancer.L4, error) {
+	if c.plugins == nil {
+		return nil, fmt.Errorf("no L4 plugin %v", spec.L4Plugin)
+	}
+
+	endpoint, err := c.plugins().Find(spec.L4Plugin)
+	if err != nil {
+		return nil, err
+	}
+	return loadbalancer_rpc.NewClient(spec.L4Plugin, endpoint.Address)
+}
+
+func (c *Controller) Run(spec types.Spec) error {
+	err := c.init(spec)
+	if err != nil {
+		return err
+	}
+	c.start()
+	return nil
 }
 
 func (c *Controller) start() {

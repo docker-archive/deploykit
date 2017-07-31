@@ -3,7 +3,6 @@ package types
 import (
 	"testing"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -34,22 +33,15 @@ func TestL4(t *testing.T) {
 	}
 
 	fakeL4 := &fake.L4{}
-	fakeEndpoint := &plugin.Endpoint{}
 
 	expect := map[Vhost]loadbalancer.L4{
 		vhost: fakeL4,
 	}
 
 	calledFind := make(chan struct{})
-	l4 := properties.l4Func(
-		func() discovery.Plugins {
-			return fakePlugins{
-				"ingress/elb1": fakeEndpoint,
-			}
-		},
-		func(spec Spec, ep *plugin.Endpoint) (loadbalancer.L4, error) {
+	l4 := properties.L4Func(
+		func(spec Spec) (loadbalancer.L4, error) {
 			close(calledFind)
-			require.Equal(t, *fakeEndpoint, *ep)
 			require.Equal(t, vhost, spec.Vhost)
 			require.Equal(t, "ingress/elb1", string(spec.L4Plugin))
 			return fakeL4, nil

@@ -81,7 +81,8 @@ func (c *Controller) syncBackends() error {
 		// all the nodes from all the groups and nodes
 		nodes := mapset.NewSet()
 
-		for _, id := range c.instanceIDs()[vhost] {
+		instanceIDs, _ := c.instanceIDs()
+		for _, id := range instanceIDs[vhost] {
 			nodes.Add(id)
 		}
 
