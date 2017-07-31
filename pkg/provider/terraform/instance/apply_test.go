@@ -33,7 +33,6 @@ func TestContinuePollingStandalone(t *testing.T) {
 	defer os.RemoveAll(dir)
 	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, true)
 	p, _ := terraform.(*plugin)
-	execute, err := p.continuePolling()
-	require.NoError(t, err)
-	require.True(t, execute)
+	shoudApply := p.shouldApply()
+	require.True(t, shoudApply)
 }
