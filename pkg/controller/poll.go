@@ -1,10 +1,13 @@
-package ingress
+package controller
 
 import (
 	"time"
 
+	logutil "github.com/docker/infrakit/pkg/log"
 	"golang.org/x/net/context"
 )
+
+var log = logutil.New("module", "controller")
 
 // Poller is the entity that executes a unit of work at a predefined interval
 type Poller struct {
@@ -16,11 +19,11 @@ type Poller struct {
 	running   bool
 }
 
-// NewPoller creates a poller
-func NewPoller(shouldRun func() bool, work func() error, interval time.Duration) *Poller {
+// Poll creates a poller
+func Poll(shouldRun func() bool, work func() error, ticker <-chan time.Time) *Poller {
 	return &Poller{
 		err:       make(chan error),
-		ticker:    time.Tick(interval),
+		ticker:    ticker,
 		stop:      make(chan interface{}),
 		shouldRun: shouldRun,
 		work:      work,

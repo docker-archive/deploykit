@@ -3,6 +3,7 @@ package ingress
 import (
 	"time"
 
+	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/discovery"
@@ -55,7 +56,7 @@ type Controller struct {
 
 	// polling
 	ticker <-chan time.Time
-	poller *Poller
+	poller *controller.Poller
 }
 
 func (c *Controller) state() ingress.Properties {

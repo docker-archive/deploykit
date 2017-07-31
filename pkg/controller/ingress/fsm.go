@@ -3,6 +3,7 @@ package ingress
 import (
 	"time"
 
+	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/fsm"
@@ -138,10 +139,8 @@ func (c *Controller) init(in types.Spec) (err error) {
 	}
 
 	// add the poller
-	c.poller = &Poller{
-		ticker: c.ticker,
-		stop:   make(chan interface{}),
-		shouldRun: func() bool {
+	c.poller = controller.Poll(
+		func() bool {
 			if mustTrue(c.leader.IsLeader()) {
 				c.stateMachine.Signal(lead)
 				return true
@@ -149,11 +148,29 @@ func (c *Controller) init(in types.Spec) (err error) {
 			c.stateMachine.Signal(follow)
 			return false
 		},
-		work: func() (err error) {
+		func() (err error) {
 			c.stateMachine.Signal(start)
 			return c.stateMachine.Signal(sync)
 		},
-	}
+		c.ticker,
+	)
+
+	// c.poller = &Poller{
+	// 	ticker: c.ticker,
+	// 	stop:   make(chan interface{}),
+	// 	shouldRun: func() bool {
+	// 		if mustTrue(c.leader.IsLeader()) {
+	// 			c.stateMachine.Signal(lead)
+	// 			return true
+	// 		}
+	// 		c.stateMachine.Signal(follow)
+	// 		return false
+	// 	},
+	// 	work: func() (err error) {
+	// 		c.stateMachine.Signal(start)
+	// 		return c.stateMachine.Signal(sync)
+	// 	},
+	// }
 	return nil
 }
 

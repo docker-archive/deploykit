@@ -1,4 +1,4 @@
-package ingress
+package controller
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ func TestPollerShouldRun(t *testing.T) {
 	calledShouldRun := make(chan struct{})
 	calledWork := make(chan struct{})
 
-	poller := NewPoller(
+	poller := Poll(
 		func() bool {
 			close(calledShouldRun)
 			return <-shouldRun
@@ -26,7 +26,7 @@ func TestPollerShouldRun(t *testing.T) {
 			close(calledWork)
 			return <-work
 		},
-		1*time.Second,
+		time.Tick(1*time.Second),
 	)
 
 	// replace the tick so we can control it
@@ -52,7 +52,7 @@ func TestPollerShouldNotRun(t *testing.T) {
 
 	calledShouldRun := make(chan struct{})
 
-	poller := NewPoller(
+	poller := Poll(
 		func() bool {
 			close(calledShouldRun)
 			return <-shouldRun
@@ -60,7 +60,7 @@ func TestPollerShouldNotRun(t *testing.T) {
 		func() error {
 			panic("shouldn't call")
 		},
-		1*time.Second,
+		time.Tick(1*time.Second),
 	)
 
 	// replace the tick so we can control it
@@ -85,7 +85,7 @@ func TestPollerShouldRunError(t *testing.T) {
 
 	calledWork := make(chan struct{})
 
-	poller := NewPoller(
+	poller := Poll(
 		func() bool {
 			return <-shouldRun
 		},
@@ -93,7 +93,7 @@ func TestPollerShouldRunError(t *testing.T) {
 			close(calledWork)
 			return <-work
 		},
-		1*time.Second,
+		time.Tick(1*time.Second),
 	)
 
 	// replace the tick so we can control it
