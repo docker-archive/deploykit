@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/golang/glog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -168,7 +167,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 	require.NotNil(t, spec)
 
 	clock := Wall(time.Tick(100 * time.Millisecond)) // per tick
-	log.Infoln("Start the clock")
+	t.Log("Start the clock")
 	clock.Start()
 
 	for i := range myCluster.zones {
@@ -181,13 +180,13 @@ func TestSimpleProvisionFlow(t *testing.T) {
 		}
 	}()
 
-	log.Infoln("Creating", myCluster.size, "instances across", len(myCluster.zones), "zones.")
+	t.Log("Creating", myCluster.size, "instances across", len(myCluster.zones), "zones.")
 
 	for i := 0; i < myCluster.size; i++ {
 		myCluster.zones[i%zones].Add(specified)
 	}
 
-	log.Infoln("Specified all instances based on spec:")
+	t.Log("Specified all instances based on spec:")
 	require.Equal(t, myCluster.size, func() int {
 		total := 0
 		for i := range myCluster.zones {
@@ -207,7 +206,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 		world = append(world, id)
 	}
 
-	log.Infoln("Discover a few instances over 3 zones", described)
+	t.Log("Discover a few instances over 3 zones", described)
 	// label / associate with the fsm instances
 	associated := 0
 	for i := range make([]int, zones) {
@@ -278,7 +277,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 
 					az.Signal(found, id, instanceID)
 
-					log.Infoln("associated", id, "to", instanceID)
+					t.Log("associated", id, "to", instanceID)
 
 				}
 
@@ -293,7 +292,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 
 	require.Equal(t, 30, myCluster.countByState(allocated))
 
-	log.Infoln("make sure everyone is associated with an instance id from the infrastructure")
+	t.Log("make sure everyone is associated with an instance id from the infrastructure")
 
 	for i := range myCluster.zones {
 		az := myCluster.zones[i]

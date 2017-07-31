@@ -1,9 +1,5 @@
 package fsm
 
-import (
-	log "github.com/golang/glog"
-)
-
 func newFlaps() *flaps {
 	return &flaps{
 		history: []Index{},
@@ -32,7 +28,7 @@ func equals(i, j []Index) bool {
 
 func (f *flaps) record(a, b Index) {
 	old := append([]Index{}, f.history...)
-	defer func() { log.V(100).Infoln("record: before=", old, "|", a, b, "after=", f.history) }()
+	defer func() { log.Debug("record", "before", old, "a", a, "b", b, "after", f.history) }()
 
 	if len(f.history) == 0 {
 		f.history = []Index{a, b}
@@ -56,7 +52,7 @@ func (f *flaps) count(a, b Index) int {
 	}
 
 	count := 0
-	defer func() { log.Infoln("search: search=", search, "history=", f.history, "count=", count) }()
+	defer func() { log.Debug("search", "search", search, "history", f.history, "count", count) }()
 
 	for i := len(f.history); i > 2; i = i - 2 {
 		check := f.history[i-3 : i]
