@@ -138,6 +138,12 @@ func (p *Process) Start(clock *fsm.Clock) error {
 	return nil
 }
 
+// NewInstance creates an instance of the object in the initial state, calling the process constructor
+func (p *Process) NewInstance(initialState fsm.Index) (fsm.Instance, error) {
+	newObject := p.instances.Add(initialState)
+	return newObject, p.Constructor(newObject)
+}
+
 // Instances returns a collection of fsm instances
 func (p *Process) Instances() *fsm.Set {
 	return p.instances

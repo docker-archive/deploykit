@@ -23,6 +23,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	experimental.AddCommand(
 		maxlifeCommand(plugins),
+		ingressCommand(plugins),
 	)
 
 	return experimental

@@ -5,6 +5,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
@@ -94,34 +95,45 @@ func (c client) ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int,
 	return clientResult(resp.Result), nil
 }
 
-// RegisterBackend registers instances identified by the IDs to the LB's backend pool
-func (c client) RegisterBackend(id string, more ...string) (loadbalancer.Result, error) {
+// RegisterBackends registers instances identified by the IDs to the LB's backend pool
+func (c client) RegisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
 	_, l4Type := c.name.GetLookupAndType()
-	req := RegisterBackendCheckRequest{
+	req := RegisterBackendsRequest{
 		Type: l4Type,
-		ID:   id,
-		More: more,
+		IDs:  ids,
 	}
-	resp := RegisterBackendCheckResponse{}
+	resp := RegisterBackendsResponse{}
 
-	if err := c.client.Call("L4.RegisterBackend", req, &resp); err != nil {
+	if err := c.client.Call("L4.RegisterBackends", req, &resp); err != nil {
 		return nil, err
 	}
 	return clientResult(resp.Result), nil
 }
 
-// DeregisterBackend removes the specified instances from the backend pool
-func (c client) DeregisterBackend(id string, more ...string) (loadbalancer.Result, error) {
+// DeregisterBackends removes the specified instances from the backend pool
+func (c client) DeregisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
 	_, l4Type := c.name.GetLookupAndType()
-	req := DeregisterBackendCheckRequest{
+	req := DeregisterBackendsRequest{
 		Type: l4Type,
-		ID:   id,
-		More: more,
+		IDs:  ids,
 	}
-	resp := DeregisterBackendCheckResponse{}
+	resp := DeregisterBackendsResponse{}
 
-	if err := c.client.Call("L4.DeregisterBackend", req, &resp); err != nil {
+	if err := c.client.Call("L4.DeregisterBackends", req, &resp); err != nil {
 		return nil, err
 	}
 	return clientResult(resp.Result), nil
+}
+
+// Backends returns the backends as list of instance ids
+func (c client) Backends() ([]instance.ID, error) {
+	_, l4Type := c.name.GetLookupAndType()
+	req := BackendsRequest{
+		Type: l4Type,
+	}
+	resp := BackendsResponse{}
+	if err := c.client.Call("L4.Backends", req, &resp); err != nil {
+		return nil, err
+	}
+	return resp.IDs, nil
 }
