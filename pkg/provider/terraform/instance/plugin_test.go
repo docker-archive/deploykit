@@ -43,7 +43,7 @@ func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
 	for _, vmType := range VMTypes {
 		props := TResourceProperties{}
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags := props["tags"]
 			require.Len(t, tags, 2)
 			// Note that tags are all lowercase
@@ -73,7 +73,7 @@ func TestHandleProvisionTagsEmptyTagsNoLogicalID(t *testing.T) {
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
 		tags := props["tags"]
 		var expectedTags interface{}
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			expectedTags = []interface{}{"name:instance-1234"}
 		} else {
 			expectedTags = map[string]interface{}{"Name": "instance-1234"}
@@ -97,7 +97,7 @@ func TestHandleProvisionTagsWithTagsLogicalID(t *testing.T) {
 	for _, vmType := range VMTypes {
 		props := TResourceProperties{}
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags := props["tags"]
 			require.Len(t, tags, 3)
 			// Note that tags are all lowercase
@@ -129,7 +129,7 @@ func TestHandleProvisionTagsWithTagsNoLogicalID(t *testing.T) {
 	for _, vmType := range VMTypes {
 		props := TResourceProperties{}
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags := props["tags"]
 			require.Len(t, tags, 2)
 			require.Contains(t, tags, "foo:bar")
@@ -162,7 +162,7 @@ func TestMergeInitScriptNoUserDefined(t *testing.T) {
 			require.Equal(t,
 				TResourceProperties{"user_data": base64.StdEncoding.EncodeToString([]byte(initData))},
 				props)
-		case VMSoftLayer:
+		case VMSoftLayer, VMIBMCloud:
 			require.Equal(t,
 				TResourceProperties{"user_metadata": initData},
 				props)
@@ -198,7 +198,7 @@ func TestMergeInitScriptWithUserDefined(t *testing.T) {
 		switch vmType {
 		case VMAmazon, VMDigitalOcean:
 			props["user_data"] = instanceUserData
-		case VMSoftLayer:
+		case VMSoftLayer, VMIBMCloud:
 			props["user_metadata"] = instanceUserData
 		case VMAzure:
 			props["os_profile"] = map[string]interface{}{"custom_data": instanceUserData}
@@ -214,7 +214,7 @@ func TestMergeInitScriptWithUserDefined(t *testing.T) {
 			require.Equal(t,
 				TResourceProperties{"user_data": base64.StdEncoding.EncodeToString([]byte(expectedInit))},
 				props)
-		case VMSoftLayer:
+		case VMSoftLayer, VMIBMCloud:
 			require.Equal(t,
 				TResourceProperties{"user_metadata": expectedInit},
 				props)
@@ -654,7 +654,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 		expectedUserData2 := "echo " + string(*id2) + "\n" + instanceSpec2.Init
 
 		switch TResourceType(key) {
-		case VMSoftLayer:
+		case VMSoftLayer, VMIBMCloud:
 			require.Equal(t, conv([]interface{}{
 				"terraform_demo_swarm_mgr_sl",
 				"label1:value1",
@@ -709,7 +709,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	var inst1 instance.Description
 	var inst2 instance.Description
 	switch vmType {
-	case VMSoftLayer:
+	case VMSoftLayer, VMIBMCloud:
 		inst1 = instance.Description{
 			ID: *id1,
 			Tags: map[string]string{
@@ -784,7 +784,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	vmType, _, props, err = FindVM(&parsed)
 	require.NoError(t, err)
 	switch vmType {
-	case VMSoftLayer:
+	case VMSoftLayer, VMIBMCloud:
 		require.Equal(t, conv([]interface{}{
 			"terraform_demo_swarm_mgr_sl",
 			"label1:changed1",
@@ -1450,7 +1450,7 @@ func TestMergeTagsIntoVMPropsEmpty(t *testing.T) {
 		props := TResourceProperties{}
 		mergeTagsIntoVMProps(vmType.(TResourceType), props, map[string]string{})
 		var expectedTags interface{}
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			expectedTags = []interface{}{}
 		} else {
 			expectedTags = map[string]interface{}{}
@@ -1462,7 +1462,7 @@ func TestMergeTagsIntoVMPropsEmpty(t *testing.T) {
 func TestMergeTagsIntoVMPropsNoExtraTags(t *testing.T) {
 	for _, vmType := range VMTypes {
 		var props TResourceProperties
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			props = TResourceProperties{
 				"tags": []interface{}{
 					"Name:instance-1234",
@@ -1478,7 +1478,7 @@ func TestMergeTagsIntoVMPropsNoExtraTags(t *testing.T) {
 			}
 		}
 		mergeTagsIntoVMProps(vmType.(TResourceType), props, map[string]string{})
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags := props["tags"]
 			require.Len(t, tags, 2)
 			// Note that tags are all lowercase
@@ -1503,7 +1503,7 @@ func TestMergeTagsIntoVMPropsNoVMTags(t *testing.T) {
 		}
 		props := TResourceProperties{}
 		mergeTagsIntoVMProps(vmType.(TResourceType), props, tags)
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags := props["tags"]
 			require.Len(t, tags, 2)
 			// Note that tags are all lowercase
@@ -1522,7 +1522,7 @@ func TestMergeTagsIntoVMPropsNoVMTags(t *testing.T) {
 func TestMergeTagsIntoVMProps(t *testing.T) {
 	for _, vmType := range VMTypes {
 		var props TResourceProperties
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			props = TResourceProperties{
 				"tags": []interface{}{
 					"Name:instance-1234",
@@ -1544,7 +1544,7 @@ func TestMergeTagsIntoVMProps(t *testing.T) {
 			attachTag: fmt.Sprintf("%s,%s", "attach1", "attach2"),
 		}
 		mergeTagsIntoVMProps(vmType.(TResourceType), props, tags)
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags := props["tags"]
 			require.Len(t, tags, 3)
 			require.Contains(t, tags, "key:override::val")
@@ -1681,7 +1681,7 @@ func TestLabelCreateNewTags(t *testing.T) {
 		require.Equal(t, TResourceName(id), vmName)
 		_, contains := props["tags"]
 		require.True(t, contains)
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			// Tags as list
 			tags := props["tags"]
 			require.Len(t, tags, 2)
@@ -1710,7 +1710,7 @@ func TestLabelMergeTags(t *testing.T) {
 		id := fmt.Sprintf("instance-%v", index)
 		key := vmType.(TResourceType)
 		var tags interface{}
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags = []string{"tag1:val1", "tag2:val2"}
 		} else {
 			tags = map[string]string{"tag1": "val1", "tag2": "val2"}
@@ -1753,7 +1753,7 @@ func TestLabelMergeTags(t *testing.T) {
 		require.Equal(t, TResourceName(id), vmName)
 		_, contains := props["tags"]
 		require.True(t, contains)
-		if vmType == VMSoftLayer {
+		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			// Tags as list
 			tags := props["tags"]
 			require.Len(t, tags, 4)
@@ -1807,7 +1807,7 @@ func TestParseTerraformTags(t *testing.T) {
 					"t3": "v3:extra",
 				},
 			}
-		case VMSoftLayer:
+		case VMSoftLayer, VMIBMCloud:
 			props = TResourceProperties{
 				"foo": "bar",
 				"tags": []interface{}{
@@ -1838,7 +1838,7 @@ func TestParseTerraformTagsInfrakitAttach(t *testing.T) {
 					"infrakit.attach": "attach1,attach2",
 				},
 			}
-		case VMSoftLayer:
+		case VMSoftLayer, VMIBMCloud:
 			props = TResourceProperties{
 				"foo": "bar",
 				"tags": []interface{}{

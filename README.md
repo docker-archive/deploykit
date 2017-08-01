@@ -77,7 +77,7 @@ Here is a list of plugins:
 |:--------------------------------------------------------|:---------|:----------------------------------------|
 | [HewlettPackard/infrakit-instance-oneview](https://github.com/HewlettPackard/infrakit-instance-oneview)      | instance    | bare-metal server provisioning via HP-OneView |
 | [codedellemc/infrakit.rackhd](https://github.com/codedellemc/infrakit.rackhd)      | instance    | bare-metal server provisioning via RackHD |
-| [IBM Bluemix / SoftLayer](./pkg/provider/terraform/instance) | instance    | SoftLayer via terraform             |
+| [IBM Cloud](./pkg/provider/terraform/instance) | instance    | Provisions instances on IBM Cloud via terraform             |
 | [AliyunContainerService/infrakit.aliyun](https://github.com/AliyunContainerService/infrakit.aliyun) | instance    | Provisions instances on Alibaba Cloud |
 | [1and1/infrakit-instance-oneandone](https://github.com/1and1/infrakit-instance-oneandone) | instance    | Provisions instances on 1&1 Cloud Server |
 | [sacloud/infrakit-instance-sakuracloud](https://github.com/sacloud/infrakit.sakuracloud) | instance    | Provisions instances on Sakura Cloud |
