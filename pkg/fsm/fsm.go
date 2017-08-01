@@ -1,5 +1,9 @@
 package fsm
 
+import (
+	"fmt"
+)
+
 // Index is the index of the state in a FSM
 type Index int
 
@@ -83,8 +87,6 @@ func Define(s State, more ...State) (spec *Spec, err error) {
 
 	spec.states = states
 	spec.signals = signals
-
-	log.Debug("signals", "signals", signals)
 	return
 }
 
@@ -166,6 +168,20 @@ func newSpec() *Spec {
 		signals: map[Signal]Signal{},
 		flaps:   map[[2]Index]*Flap{},
 	}
+}
+
+// SetAction sets the action associated with a signal in a given state
+func (s *Spec) SetAction(state Index, signal Signal, action Action) error {
+	st, has := s.states[state]
+	if !has {
+		return fmt.Errorf("no such state %v", state)
+	}
+	if st.Actions == nil {
+		st.Actions = map[Signal]Action{}
+	}
+	st.Actions[signal] = action
+	s.states[state] = st // Update the map because the map returned a copy of the state.
+	return nil
 }
 
 // returns an expiry for the state.  if the TTL is 0 then there's no expiry for the state.

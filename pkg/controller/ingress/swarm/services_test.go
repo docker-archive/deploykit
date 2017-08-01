@@ -10,9 +10,6 @@ import (
 
 func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 	certLabel := "emptylabel"
-	opt := Options{
-		PublishAllExposed: false,
-	}
 
 	s := swarm.Service{}
 	s.Spec.Labels = map[string]string{
@@ -20,7 +17,8 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 	}
 	s.Endpoint.Ports = []swarm.PortConfig{} // no exposed ports
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, LabelExternalLoadBalancerSpec, opt, certLabel)
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 0, len(listenersByHost))
 
@@ -34,7 +32,8 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 		},
 	}
 
-	listenersByHost = externalLoadBalancerListenersFromServices([]swarm.Service{s}, LabelExternalLoadBalancerSpec, opt, certLabel)
+	listenersByHost = externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
 
@@ -53,9 +52,6 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 
 func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 	certLabel := "emptylabel"
-	opt := Options{
-		PublishAllExposed: false,
-	}
 
 	s := swarm.Service{}
 	s.Spec.Labels = map[string]string{
@@ -70,7 +66,8 @@ func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 		},
 	}
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, LabelExternalLoadBalancerSpec, opt, certLabel)
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
 
@@ -89,9 +86,6 @@ func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 
 func TestExternalLoadBalancerListenersFromService3(t *testing.T) {
 	certLabel := "emptylabel"
-	opt := Options{
-		PublishAllExposed: false,
-	}
 
 	s := swarm.Service{}
 	s.Spec.Labels = map[string]string{
@@ -106,7 +100,8 @@ func TestExternalLoadBalancerListenersFromService3(t *testing.T) {
 		},
 	}
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, LabelExternalLoadBalancerSpec, opt, certLabel)
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
 
@@ -125,9 +120,6 @@ func TestExternalLoadBalancerListenersFromService3(t *testing.T) {
 
 func TestExternalLoadBalancerListenersFromService4(t *testing.T) {
 	certLabel := "emptylabel"
-	opt := Options{
-		PublishAllExposed: false,
-	}
 
 	s := swarm.Service{}
 	s.Spec.Labels = map[string]string{
@@ -147,7 +139,8 @@ func TestExternalLoadBalancerListenersFromService4(t *testing.T) {
 		},
 	}
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, LabelExternalLoadBalancerSpec, opt, certLabel)
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
 
@@ -175,9 +168,6 @@ func findListener(listeners []*listener, protocol loadbalancer.Protocol, host st
 
 func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 	certLabel := "emptylabel"
-	opt := Options{
-		PublishAllExposed: true,
-	}
 
 	s := swarm.Service{}
 	s.Spec.Labels = map[string]string{
@@ -215,7 +205,7 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 		},
 	}
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, LabelExternalLoadBalancerSpec, opt, certLabel)
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, true, LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 3, len(listenersByHost))
 
@@ -253,9 +243,6 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 
 func TestExternalLoadBalancerListenersFromServiceWithNoLabels(t *testing.T) {
 	certLabel := "emptylabel"
-	opt := Options{
-		PublishAllExposed: true,
-	}
 
 	s := swarm.Service{}
 	s.Spec.Name = "web1"
@@ -290,7 +277,7 @@ func TestExternalLoadBalancerListenersFromServiceWithNoLabels(t *testing.T) {
 		},
 	}
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, LabelExternalLoadBalancerSpec, opt, certLabel)
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, true, LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
 

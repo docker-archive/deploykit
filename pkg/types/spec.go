@@ -37,7 +37,7 @@ type Spec struct {
 // Validate checks the spec for validity
 func (s Spec) Validate() error {
 	if s.Kind == "" {
-		return errMissingAttribute("class")
+		return errMissingAttribute("kind")
 	}
 	if s.SpiVersion == "" {
 		return errMissingAttribute("spiVersion")

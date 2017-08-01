@@ -22,10 +22,15 @@ var InterfaceSpec = spi.InterfaceSpec{
 	Version: "0.1.0",
 }
 
-// Manager is the interface for interacting locally or remotely with the manager
-type Manager interface {
+// Leadership is the interface for getting information about the current leader node
+type Leadership interface {
 	// IsLeader returns true only if for certain this is a leader. False if not or unknown.
 	IsLeader() (bool, error)
+}
+
+// Manager is the interface for interacting locally or remotely with the manager
+type Manager interface {
+	Leadership
 }
 
 // Backend is the admin / server interface

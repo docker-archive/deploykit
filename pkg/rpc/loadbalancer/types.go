@@ -3,6 +3,7 @@ package loadbalancer
 import (
 	"time"
 
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
@@ -68,28 +69,37 @@ type ConfigureHealthCheckResponse struct {
 	Result string
 }
 
-// RegisterBackendCheckRequest is the rpc wrapper for RegisterBackend request
-type RegisterBackendCheckRequest struct {
+// RegisterBackendsRequest is the rpc wrapper for RegisterBackend request
+type RegisterBackendsRequest struct {
 	Type string
-	ID   string
-	More []string
+	IDs  []instance.ID
 }
 
-// RegisterBackendCheckResponse is the rpc wrapper for RegisterBackend response
-type RegisterBackendCheckResponse struct {
+// RegisterBackendsResponse is the rpc wrapper for RegisterBackend response
+type RegisterBackendsResponse struct {
 	Type   string
 	Result string
 }
 
-// DeregisterBackendCheckRequest is the rpc wrapper for DeregisterBackend request
-type DeregisterBackendCheckRequest struct {
+// DeregisterBackendsRequest is the rpc wrapper for DeregisterBackend request
+type DeregisterBackendsRequest struct {
 	Type string
-	ID   string
-	More []string
+	IDs  []instance.ID
 }
 
-// DeregisterBackendCheckResponse is the rpc wrapper for DeregisterBackend response
-type DeregisterBackendCheckResponse struct {
+// DeregisterBackendsResponse is the rpc wrapper for DeregisterBackend response
+type DeregisterBackendsResponse struct {
 	Type   string
 	Result string
+}
+
+// BackendsRequest is the rpc wrapper for Backends request
+type BackendsRequest struct {
+	Type string
+}
+
+// BackendsResponse is the rpc response for Backends call
+type BackendsResponse struct {
+	Type string
+	IDs  []instance.ID
 }
