@@ -19,7 +19,7 @@ func Commit(name string, services *cli.Services) *cobra.Command {
 	}
 
 	pretend := false
-	commit.Flags().BoolVarP(&pretend, "pretend", "p", pretend, "Don't actually commit, only explain where appropriate")
+	commit.Flags().BoolVar(&pretend, "pretend", pretend, "Don't actually commit, only explain where appropriate")
 
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
 

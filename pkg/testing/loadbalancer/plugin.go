@@ -3,6 +3,7 @@ package loadbalancer
 import (
 	"time"
 
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
@@ -23,11 +24,14 @@ type L4 struct {
 	// DoConfigureHealthCheck configures the health checks for instance removal and reconfiguration
 	DoConfigureHealthCheck func(backendPort uint32, healthy, unhealthy int, interval, timeout time.Duration) (loadbalancer.Result, error)
 
-	// RegisterBackend registers instances identified by the IDs to the LB's backend pool
-	DoRegisterBackend func(id string, more ...string) (loadbalancer.Result, error)
+	// RegisterBackends registers instances identified by the IDs to the LB's backend pool
+	DoRegisterBackends func(ids []instance.ID) (loadbalancer.Result, error)
 
 	// DoDeregisterBackend removes the specified instances from the backend pool
-	DoDeregisterBackend func(id string, more ...string) (loadbalancer.Result, error)
+	DoDeregisterBackends func(ids []instance.ID) (loadbalancer.Result, error)
+
+	// DoBackends returns the list of instance ids in the backend
+	DoBackends func() ([]instance.ID, error)
 }
 
 // Name is the name of the load balancer
@@ -55,12 +59,17 @@ func (l4 *L4) ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int, i
 	return l4.DoConfigureHealthCheck(backendPort, healthy, unhealthy, interval, timeout)
 }
 
-// RegisterBackend registers instances identified by the IDs to the LB's backend pool
-func (l4 *L4) RegisterBackend(id string, more ...string) (loadbalancer.Result, error) {
-	return l4.DoRegisterBackend(id, more...)
+// RegisterBackends registers instances identified by the IDs to the LB's backend pool
+func (l4 *L4) RegisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
+	return l4.DoRegisterBackends(ids)
 }
 
-// DeregisterBackend removes the specified instances from the backend pool
-func (l4 *L4) DeregisterBackend(id string, more ...string) (loadbalancer.Result, error) {
-	return l4.DoDeregisterBackend(id, more...)
+// DeregisterBackends removes the specified instances from the backend pool
+func (l4 *L4) DeregisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
+	return l4.DoDeregisterBackends(ids)
+}
+
+// Backends returns the list of instance ids as the backend
+func (l4 *L4) Backends() ([]instance.ID, error) {
+	return l4.DoBackends()
 }

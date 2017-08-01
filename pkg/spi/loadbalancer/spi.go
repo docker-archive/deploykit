@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 // InterfaceSpec is the current name and version of the L4 API.
@@ -56,8 +57,11 @@ type L4 interface {
 	ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int, interval, timeout time.Duration) (Result, error)
 
 	// RegisterBackend registers instances identified by the IDs to the LB's backend pool
-	RegisterBackend(id string, more ...string) (Result, error)
+	RegisterBackends(ids []instance.ID) (Result, error)
 
 	// DeregisterBackend removes the specified instances from the backend pool
-	DeregisterBackend(id string, more ...string) (Result, error)
+	DeregisterBackends(id []instance.ID) (Result, error)
+
+	// Backends returns a list of backends
+	Backends() ([]instance.ID, error)
 }

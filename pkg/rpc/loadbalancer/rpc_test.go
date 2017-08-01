@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	testing_lb "github.com/docker/infrakit/pkg/testing/loadbalancer"
 	"github.com/stretchr/testify/require"
@@ -291,106 +292,124 @@ func TestLoadbalancerRegisterBackend(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	idActual := make(chan string, 1)
-	id := "some-id"
-	moreActual := make(chan []string, 1)
-	more := []string{"some", "more", "data"}
-
+	actual := make(chan []instance.ID, 1)
+	expected := []instance.ID{instance.ID("some-id"), instance.ID("some"), instance.ID("more"), instance.ID("data")}
 	result := fakeResult("result")
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
-		DoRegisterBackend: func(id string, more ...string) (loadbalancer.Result, error) {
-			idActual <- id
-			moreActual <- more
+		DoRegisterBackends: func(ids []instance.ID) (loadbalancer.Result, error) {
+			actual <- ids
 			return result, nil
 		},
 	}))
 	require.NoError(t, err)
 
-	actualResult, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).RegisterBackend(id, more...)
+	actualResult, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).RegisterBackends(expected)
 	server.Stop()
 	require.NoError(t, err)
 	require.Equal(t, result.String(), actualResult.String())
-	require.Equal(t, id, <-idActual)
-	require.Equal(t, more, <-moreActual)
+	require.Equal(t, expected, <-actual)
 }
 
 func TestLoadbalancerRegisterBackendError(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	idActual := make(chan string, 1)
-	id := "some-id"
-	moreActual := make(chan []string, 1)
-	more := []string{"some", "more", "data"}
+	actual := make(chan []instance.ID, 1)
+	expected := []instance.ID{instance.ID("some-id"), instance.ID("some"), instance.ID("more"), instance.ID("data")}
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
-		DoRegisterBackend: func(id string, more ...string) (loadbalancer.Result, error) {
-			idActual <- id
-			moreActual <- more
+		DoRegisterBackends: func(ids []instance.ID) (loadbalancer.Result, error) {
+			actual <- ids
 			return nil, errors.New("backend-error")
 		},
 	}))
 	require.NoError(t, err)
 
-	result, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).RegisterBackend(id, more...)
+	result, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).RegisterBackends(expected)
 	server.Stop()
 	require.Error(t, err)
 	require.Nil(t, result)
-	require.Equal(t, id, <-idActual)
-	require.Equal(t, more, <-moreActual)
+	require.Equal(t, expected, <-actual)
 }
 
 func TestLoadbalancerDeregisterBackend(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	idActual := make(chan string, 1)
-	id := "some-id"
-	moreActual := make(chan []string, 1)
-	more := []string{"some", "more", "data"}
-
+	actual := make(chan []instance.ID, 1)
+	expected := []instance.ID{instance.ID("some-id"), instance.ID("some"), instance.ID("more"), instance.ID("data")}
 	result := fakeResult("result")
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
-		DoDeregisterBackend: func(id string, more ...string) (loadbalancer.Result, error) {
-			idActual <- id
-			moreActual <- more
+		DoDeregisterBackends: func(ids []instance.ID) (loadbalancer.Result, error) {
+			actual <- ids
 			return result, nil
 		},
 	}))
 	require.NoError(t, err)
 
-	actualResult, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).DeregisterBackend(id, more...)
+	actualResult, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).DeregisterBackends(expected)
 	server.Stop()
 	require.NoError(t, err)
 	require.Equal(t, result.String(), actualResult.String())
-	require.Equal(t, id, <-idActual)
-	require.Equal(t, more, <-moreActual)
+	require.Equal(t, expected, <-actual)
 }
 
 func TestLoadbalancerDeregisterBackendError(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	idActual := make(chan string, 1)
-	id := "some-id"
-	moreActual := make(chan []string, 1)
-	more := []string{"some", "more", "data"}
+	actual := make(chan []instance.ID, 1)
+	expected := []instance.ID{instance.ID("some-id"), instance.ID("some"), instance.ID("more"), instance.ID("data")}
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
-		DoDeregisterBackend: func(id string, more ...string) (loadbalancer.Result, error) {
-			idActual <- id
-			moreActual <- more
+		DoDeregisterBackends: func(ids []instance.ID) (loadbalancer.Result, error) {
+			actual <- expected
 			return nil, errors.New("backend-error")
 		},
 	}))
 	require.NoError(t, err)
 
-	result, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).DeregisterBackend(id, more...)
+	result, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).DeregisterBackends(expected)
 	server.Stop()
 	require.Error(t, err)
 	require.Nil(t, result)
-	require.Equal(t, id, <-idActual)
-	require.Equal(t, more, <-moreActual)
+	require.Equal(t, expected, <-actual)
+}
+
+func TestLoadbalancerBackends(t *testing.T) {
+	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
+
+	expected := []instance.ID{instance.ID("some-id"), instance.ID("some"), instance.ID("more"), instance.ID("data")}
+
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
+		DoBackends: func() ([]instance.ID, error) {
+			return expected, nil
+		},
+	}))
+	require.NoError(t, err)
+
+	actualResult, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).Backends()
+	server.Stop()
+	require.NoError(t, err)
+	require.Equal(t, expected, actualResult)
+}
+
+func TestLoadbalancerBackendsError(t *testing.T) {
+	socketPath := tempSocket()
+	name := plugin.Name(filepath.Base(socketPath))
+
+	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
+		DoBackends: func() ([]instance.ID, error) {
+			return nil, errors.New("backend-error")
+		},
+	}))
+	require.NoError(t, err)
+
+	result, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).Backends()
+	server.Stop()
+	require.Error(t, err)
+	require.Nil(t, result)
 }
