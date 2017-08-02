@@ -12,40 +12,48 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
 
-func TestProcessBootstrapErrors(t *testing.T) {
+func TestProcessImportOptions(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	// Group spec but no instance ID
-	groupSpecURL := "str://foo"
+	// Instance spec but no instance ID
+	instSpec := instance.Spec{}
 	instID := ""
-	b := bootstrapOptions{GroupSpecURL: &groupSpecURL, InstanceID: &instID}
-	err := tf.processBootstrap(&b)
+	importOpts := ImportOptions{InstanceSpec: &instSpec, InstanceID: &instID}
+	err := tf.processImport(&importOpts)
 	require.Error(t, err)
 	require.Equal(t,
-		"Bootstrap instance ID required with bootstrap group spec",
+		"Import instance ID required with import instance spec",
 		err.Error())
-	// No group spec but instance ID
-	groupSpecURL = ""
-	instID = "1234"
-	b = bootstrapOptions{GroupSpecURL: &groupSpecURL, InstanceID: &instID}
-	err = tf.processBootstrap(&b)
+	importOpts = ImportOptions{InstanceSpec: &instSpec, InstanceID: nil}
+	err = tf.processImport(&importOpts)
 	require.Error(t, err)
 	require.Equal(t,
-		"Bootstrap group spec required with bootstrap instance ID",
+		"Import instance ID required with import instance spec",
 		err.Error())
-	// Invalid group spec template with instance ID
-	groupSpecURL = "str://{{ nosuchfn }}"
+
+	// No instance spec but instance ID
 	instID = "1234"
-	b = bootstrapOptions{GroupSpecURL: &groupSpecURL, InstanceID: &instID}
-	err = tf.processBootstrap(&b)
+	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: &instID}
+	err = tf.processImport(&importOpts)
 	require.Error(t, err)
+	require.Equal(t,
+		"Import instance spec required with import instance ID",
+		err.Error())
+
+	// Neither specified
+	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: nil}
+	err = tf.processImport(&importOpts)
+	require.NoError(t, err)
+	instID = ""
+	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: &instID}
+	err = tf.processImport(&importOpts)
+	require.NoError(t, err)
 }
 
 // getPlugin returns the terraform instance plugin to use for testing and the
@@ -2489,27 +2497,14 @@ func TestWriteTfJSONForImport(t *testing.T) {
 	require.Equal(t, expectedProps, props)
 }
 
-func TestImportInvalidGrpSpecProps(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
-	spec := group.Spec{
-		ID:         "managers",
-		Properties: types.AnyString("no-json"),
-	}
-	_, err := tf.importResource(importFns{}, "123", spec, true)
-	require.Error(t, err)
-}
-
 func TestImportNoVm(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
-	spec := group.Spec{
-		ID:         "managers",
+	spec := instance.Spec{
 		Properties: types.AnyString("{}"),
 	}
-	_, err := tf.importResource(importFns{}, "123", spec, true)
+	_, err := tf.importResource(importFns{}, "123", &spec)
 	require.Error(t, err)
 	require.Equal(t, "no resource section", err.Error())
 }
@@ -2518,19 +2513,14 @@ func TestImportNoVmProps(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
-	spec := group.Spec{
-		ID: "managers",
+	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
-  "instance": {
-    "Properties": {
-      "resource": {
-        "aws_instance": {}
-      }
-    }
+  "resource": {
+    "aws_instance": {}
   }
 }`)}
-	_, err := tf.importResource(importFns{}, "123", spec, true)
+	_, err := tf.importResource(importFns{}, "123", &spec)
 	require.Error(t, err)
 	require.Equal(t, "Missing resource properties", err.Error())
 }
@@ -2546,23 +2536,18 @@ func TestImportTfShowError(t *testing.T) {
 			return nil, fmt.Errorf("Custom show error")
 		},
 	}
-	spec := group.Spec{
-		ID: "managers",
+	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
-  "instance": {
-    "Properties": {
-      "resource": {
-        "aws_instance": {
-          "host": {
-            "hostnane": "host1"
-          }
-        }
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
       }
     }
   }
 }`)}
-	_, err := tf.importResource(fns, "123", spec, true)
+	_, err := tf.importResource(fns, "123", &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom show error", err.Error())
 }
@@ -2583,23 +2568,18 @@ func TestImportAlreadyExists(t *testing.T) {
 			}, nil
 		},
 	}
-	spec := group.Spec{
-		ID: "managers",
+	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
-  "instance": {
-    "Properties": {
-      "resource": {
-        "aws_instance": {
-          "host": {
-            "hostnane": "host1"
-          }
-        }
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
       }
     }
   }
 }`)}
-	id, err := tf.importResource(fns, "123", spec, true)
+	id, err := tf.importResource(fns, "123", &spec)
 	require.NoError(t, err)
 	require.Equal(t, "instance-123", string(*id))
 }
@@ -2627,23 +2607,18 @@ func TestImportTfImportError(t *testing.T) {
 			cleanInvoked = true
 		},
 	}
-	spec := group.Spec{
-		ID: "managers",
+	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
-  "instance": {
-    "Properties": {
-      "resource": {
-        "aws_instance": {
-          "host": {
-            "hostnane": "host1"
-          }
-        }
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
       }
     }
   }
 }`)}
-	_, err := tf.importResource(fns, "123", spec, true)
+	_, err := tf.importResource(fns, "123", &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom import error", err.Error())
 	require.True(t, cleanInvoked)
@@ -2676,23 +2651,18 @@ func TestImportTfShowInstError(t *testing.T) {
 			cleanInvoked = true
 		},
 	}
-	spec := group.Spec{
-		ID: "managers",
+	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
-  "instance": {
-    "Properties": {
-      "resource": {
-        "aws_instance": {
-          "host": {
-            "hostnane": "host1"
-          }
-        }
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
       }
     }
   }
 }`)}
-	_, err := tf.importResource(fns, "123", spec, true)
+	_, err := tf.importResource(fns, "123", &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom show inst error", err.Error())
 	require.True(t, cleanInvoked)
@@ -2729,25 +2699,24 @@ func TestImportResourceTagMap(t *testing.T) {
 			cleanInvoked = true
 		},
 	}
-	spec := group.Spec{
-		ID: "managers",
+	spec := instance.Spec{
+		Tags: map[string]string{
+			"infrakit.group":      "managers",
+			"infrakit.config_sha": "bootstrap",
+		},
 		Properties: types.AnyString(`
 {
-  "instance": {
-    "Properties": {
-      "resource": {
-        "aws_instance": {
-          "host": {
-            "@hostname_prefix": "host1",
-            "spec-key": "spec-val",
-            "tags": {"t1": "v1"}
-          }
-        }
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "@hostname_prefix": "host1",
+        "spec-key": "spec-val",
+        "tags": {"t1": "v1"}
       }
     }
   }
 }`)}
-	id, err := tf.importResource(fns, "123", spec, true)
+	id, err := tf.importResource(fns, "123", &spec)
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
 
@@ -2804,24 +2773,24 @@ func TestImportResourceTagSlice(t *testing.T) {
 			cleanInvoked = true
 		},
 	}
-	spec := group.Spec{
-		ID: "managers",
+	spec := instance.Spec{
+		Tags: map[string]string{
+			"infrakit.group":      "managers",
+			"infrakit.config_sha": "bootstrap",
+		},
 		Properties: types.AnyString(`
 {
-  "instance": {
-    "Properties": {
-      "resource": {
-        "ibm_compute_vm_instance": {
-          "host": {
-            "@hostname_prefix": "host1",
-            "spec-key": "spec-val"
-          }
-        }
+  "resource": {
+    "ibm_compute_vm_instance": {
+      "host": {
+        "@hostname_prefix": "host1",
+        "spec-key": "spec-val",
+				"tags": ["t1:v1"]
       }
     }
   }
 }`)}
-	id, err := tf.importResource(fns, "123", spec, true)
+	id, err := tf.importResource(fns, "123", &spec)
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
 
@@ -2837,7 +2806,8 @@ func TestImportResourceTagSlice(t *testing.T) {
 	// Tag slice order not guaranteed since it is created by iterating over a map
 	tags := props["tags"]
 	delete(props, "tags")
-	require.Len(t, tags, 2)
+	require.Len(t, tags, 3)
+	require.Contains(t, tags, "t1:v1")
 	require.Contains(t, tags, "infrakit.group:managers")
 	require.Contains(t, tags, "infrakit.config_sha:bootstrap")
 	// Compare everythine else
