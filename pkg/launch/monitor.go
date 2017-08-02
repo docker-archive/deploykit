@@ -2,6 +2,7 @@ package launch
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -28,8 +29,8 @@ type Rule struct {
 // Monitor runs continuously receiving requests to start a plugin.
 // Monitor uses a launcher to actually start the process of the plugin.
 type Monitor struct {
-	exec      Exec
-	rules     map[plugin.Name]*types.Any
+	execs     map[ExecName]Exec
+	rules     map[plugin.Name]map[ExecName]*types.Any
 	startChan <-chan StartPlugin
 	inputChan chan<- StartPlugin
 	stop      chan interface{}
@@ -39,16 +40,27 @@ type Monitor struct {
 // NewMonitor returns a monitor that continuously watches for input
 // requests and launches the process for the plugin, if not already running.
 // The configuration to use in the config is matched to the Name() of the executor (the field Exec).
-func NewMonitor(l Exec, rules []Rule) *Monitor {
-	m := map[plugin.Name]*types.Any{}
-	// index by name of plugin
+func NewMonitor(execs []Exec, rules []Rule) *Monitor {
+	m := map[plugin.Name]map[ExecName]*types.Any{}
+	mm := map[ExecName]Exec{}
+
 	for _, r := range rules {
-		if cfg, has := r.Launch[ExecName(l.Name())]; has {
-			m[r.Plugin] = cfg
+		m[r.Plugin] = map[ExecName]*types.Any{}
+	}
+
+	// index by name of plugin
+	for _, exec := range execs {
+
+		n := ExecName(exec.Name())
+		mm[n] = exec
+		for _, r := range rules {
+			if cfg, has := r.Launch[n]; has {
+				m[r.Plugin][n] = cfg
+			}
 		}
 	}
 	return &Monitor{
-		exec:  l,
+		execs: mm,
 		rules: m,
 	}
 }
@@ -56,6 +68,8 @@ func NewMonitor(l Exec, rules []Rule) *Monitor {
 // StartPlugin is the command to start a plugin
 type StartPlugin struct {
 	Plugin  plugin.Name
+	Exec    ExecName
+	Options *types.Any // options that can override the defaults in the rules
 	Started func(*types.Any)
 	Error   func(*types.Any, error)
 }
@@ -96,25 +110,37 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 				return
 			}
 
-			// match first by full name of the form lookup/type -- 'specialization'
-			properties, has := m.rules[req.Plugin]
-			if !has {
-				// match now by lookup only -- 'base class'
-				alternate, _ := req.Plugin.GetLookupAndType()
-				properties, has = m.rules[plugin.Name(alternate)]
+			configCopy := types.AnyBytes(nil)
+
+			if req.Options == nil {
+				// match first by full name of the form lookup/type -- 'specialization'
+				properties, has := m.rules[req.Plugin][req.Exec]
+				if !has {
+					// match now by lookup only -- 'base class'
+					alternate, _ := req.Plugin.GetLookupAndType()
+					properties, has = m.rules[plugin.Name(alternate)][req.Exec]
+				}
+				if !has {
+					log.Warningln("no plugin:", req)
+					req.reportError(nil, errNoConfig)
+					continue loop
+				}
+				if properties != nil {
+					*configCopy = *properties
+				}
+			} else {
+				*configCopy = *req.Options
 			}
+
+			exec, has := m.execs[req.Exec]
 			if !has {
-				log.Warningln("no plugin:", req)
-				req.reportError(nil, errNoConfig)
+				req.reportError(configCopy, fmt.Errorf("no exec:%v", req.Exec))
 				continue loop
 			}
 
-			configCopy := types.AnyBytes(nil)
-			if properties != nil {
-				*configCopy = *properties
-			}
+			log.Infoln("Using executor", exec.Name(), "Plugin=", req.Plugin, "Exec=", req.Exec)
 
-			block, err := m.exec.Exec(req.Plugin.String(), configCopy)
+			block, err := exec.Exec(req.Plugin.String(), configCopy)
 			if err != nil {
 				req.reportError(configCopy, err)
 				continue loop

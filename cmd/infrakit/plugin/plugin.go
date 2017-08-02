@@ -169,31 +169,24 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		monitors := []*launch.Monitor{}
-
-		switch *executor {
-		case "os":
-			exec, err := os.NewLauncher("os")
-			if err != nil {
-				return err
-			}
-			monitors = append(monitors, launch.NewMonitor(exec, parsedRules))
-		case "docker-run":
-			// docker-run is also implemented by the same os executor. We just search for a different key (docker-run)
-			exec, err := os.NewLauncher("docker-run")
-			if err != nil {
-				return err
-			}
-			monitors = append(monitors, launch.NewMonitor(exec, parsedRules))
+		osExec, err := os.NewLauncher("os")
+		if err != nil {
+			return err
+		}
+		// docker-run is also implemented by the same os executor. We just search for a different key (docker-run)
+		dockerExec, err := os.NewLauncher("docker-run")
+		if err != nil {
+			return err
 		}
 
-		input := []chan<- launch.StartPlugin{}
-		for _, m := range monitors {
-			ch, err := m.Start()
-			if err != nil {
-				return err
-			}
-			input = append(input, ch)
+		monitor := launch.NewMonitor([]launch.Exec{
+			osExec,
+			dockerExec,
+		}, parsedRules)
+
+		startPlugin, err := monitor.Start()
+		if err != nil {
+			return err
 		}
 
 		// This is the channel to send signal that plugins are stopped out of band so stop waiting.
@@ -229,22 +222,20 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			wait.Add(1)
 
-			for _, ch := range input {
+			name := pluginToStart
+			startPlugin <- launch.StartPlugin{
+				Plugin: plugin.Name(name),
+				Exec:   launch.ExecName(*executor),
+				Started: func(config *types.Any) {
+					fmt.Println(name, "started.")
 
-				name := pluginToStart
-				ch <- launch.StartPlugin{
-					Plugin: plugin.Name(name),
-					Started: func(config *types.Any) {
-						fmt.Println(name, "started.")
-
-						started = append(started, name)
-						wait.Done()
-					},
-					Error: func(config *types.Any, err error) {
-						fmt.Println("Error starting", name, "err=", err)
-						wait.Done()
-					},
-				}
+					started = append(started, name)
+					wait.Done()
+				},
+				Error: func(config *types.Any, err error) {
+					fmt.Println("Error starting", name, "err=", err)
+					wait.Done()
+				},
 			}
 		}
 
@@ -292,9 +283,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			log.Info("Plugins aren't running anymore.  Exiting.")
 		}
 
-		for _, monitor := range monitors {
-			monitor.Stop()
-		}
+		monitor.Stop()
 
 		close(pluginScanDone)
 		return nil

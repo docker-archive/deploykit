@@ -4,11 +4,11 @@
         "Plugin" : "group-stateless",
         "Launch" : {
             "os": {
-                "Cmd" : "infrakit-group-default --poll-interval 500ms --name group-stateless --log 5 > {{env "INFRAKIT_HOME"}}/logs/group-stateless.log 2>&1",
+                "Cmd" : "infrakit-group-default --poll-interval 500ms --name group-stateless --log 5 > {{env `INFRAKIT_HOME`}}/logs/group-stateless.log 2>&1",
                 "SamePgID" : true
             },
 	    "docker-run" : {
-		"Cmd" : "{{template "rundocker" "group-stateless"}} infrakit-group-default --poll-interval 500ms --name group-stateless --log 5"
+		"Cmd" : "{{template `rundocker` `group-stateless`}} infrakit-group-default --poll-interval 500ms --name group-stateless --log 5"
 	    }
         }
     }
@@ -17,11 +17,11 @@
         "Plugin" : "instance-file",
         "Launch" : {
             "os" : {
-                "Cmd" : "infrakit-instance-file --dir {{env "INFRAKIT_HOME"}}/instance-file --log 5 > {{env "INFRAKIT_HOME"}}/logs/instance-file.log 2>&1",
+                "Cmd" : "infrakit-instance-file --dir {{env `INFRAKIT_HOME`}}/instance-file --log 5 > {{env `INFRAKIT_HOME`}}/logs/instance-file.log 2>&1",
                 "SamePgID" : true
             },
             "docker-run" : {
-                "Cmd" : "{{template "rundocker" "instance-file"}} infrakit-instance-file --dir {{env "INFRAKIT_HOME"}}/instance-file --log 5"
+                "Cmd" : "{{template `rundocker` `instance-file`}} infrakit-instance-file --dir {{env `INFRAKIT_HOME`}}/instance-file --log 5"
             }
         }
     }
@@ -30,11 +30,11 @@
         "Plugin" : "instance-vagrant",
         "Launch" : {
             "os" : {
-                "Cmd" : "infrakit-instance-vagrant --log 5 > {{env "INFRAKIT_HOME"}}/logs/instance-vagrant.log 2>&1",
+                "Cmd" : "infrakit-instance-vagrant --log 5 > {{env `INFRAKIT_HOME`}}/logs/instance-vagrant.log 2>&1",
                 "SamePgID" : true
             },
             "docker-run" : {
-                "Cmd" : "{{template "rundocker" "instance-vagrant"}} infrakit-instance-vagrant --log 5"
+                "Cmd" : "{{template `rundocker` `instance-vagrant`}} infrakit-instance-vagrant --log 5"
             }
         }
     }
@@ -43,11 +43,11 @@
         "Plugin" : "flavor-vanilla",
         "Launch" : {
             "os" : {
-                "Cmd" : "infrakit-flavor-vanilla --log 5 > {{env "INFRAKIT_HOME"}}/logs/flavor-vanilla.log 2>&1",
+                "Cmd" : "infrakit-flavor-vanilla --log 5 > {{env `INFRAKIT_HOME`}}/logs/flavor-vanilla.log 2>&1",
                 "SamePgID" : true
             },
             "docker-run" : {
-                "Cmd" : "{{template "rundocker" "flavor-vanilla"}} infrakit-flavor-vanilla --log 5"
+                "Cmd" : "{{template `rundocker` `flavor-vanilla`}} infrakit-flavor-vanilla --log 5"
             }
         }
     }
@@ -56,11 +56,11 @@
         "Plugin" : "flavor-swarm",
         "Launch" : {
             "os" : {
-                "Cmd" : "infrakit-flavor-swarm --host {{env "SWARM_MANAGER"}} --log 5 > {{env "INFRAKIT_HOME"}}/logs/flavor-swarm.log 2>&1",
+                "Cmd" : "infrakit-flavor-swarm --host {{env `SWARM_MANAGER`}} --log 5 > {{env `INFRAKIT_HOME`}}/logs/flavor-swarm.log 2>&1",
                 "SamePgID" : true
             },
             "docker-run" : {
-                "Cmd" : "{{template "rundocker" "flavor-swarm"}} infrakit-flavor-swarm --host {{env "SWARM_MANAGER"}} --log 5"
+                "Cmd" : "{{template `rundocker` `flavor-swarm`}} infrakit-flavor-swarm --host {{env `SWARM_MANAGER`}} --log 5"
             }
         }
     }

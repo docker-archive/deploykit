@@ -63,7 +63,7 @@ func (l *Launcher) Exec(name string, config *types.Any) (<-chan error, error) {
 
 	s := state{}
 	l.plugins[name] = s
-	s.wait = start(name, launchConfig.Cmd, !launchConfig.SamePgID)
+	s.wait = start(l, name, launchConfig.Cmd, !launchConfig.SamePgID)
 
 	return s.wait, nil
 }
