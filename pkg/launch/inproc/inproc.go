@@ -8,12 +8,14 @@ import (
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // PluginRunFunc is a function that takes the plugin lookup, a configuration blob and starts the plugin
 // and returns a stoppable, running channel (for optionally blocking), and error.
-type PluginRunFunc func(func() discovery.Plugins, *types.Any) (server.Stoppable, <-chan struct{}, error)
+type PluginRunFunc func(func() discovery.Plugins,
+	*types.Any) (name plugin.Name, plugins []interface{}, onStop func(), err error)
 
 type builder struct {
 	lookup  string
@@ -41,8 +43,8 @@ func Register(lookup string, prf PluginRunFunc, defaultOptions interface{}) {
 	}
 }
 
-// LaunchRules returns a list of default launch rules.  This is a set of rules required by the monitor
-func LaunchRules() []launch.Rule {
+// Rules returns a list of default launch rules.  This is a set of rules required by the monitor
+func Rules() []launch.Rule {
 	rules := []launch.Rule{}
 
 	for lookup, builder := range builders {
@@ -109,11 +111,16 @@ func (l *Launcher) Exec(name string, config *types.Any) (starting <-chan error, 
 	l.running[name] = s
 
 	sc := make(chan error)
+	defer close(sc)
+
 	s.wait = sc
 
-	s.stoppable, s.running, err = builder.run(l.plugins, config)
+	pluginName, impls, onStop, err := builder.run(l.plugins, config)
+	if err != nil {
+		sc <- err
+	}
 
-	close(sc) // done starting up
+	s.stoppable, s.running, err = run.ServeRPC(pluginName, onStop, impls)
 
 	return s.wait, nil
 }

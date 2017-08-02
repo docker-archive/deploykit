@@ -3,7 +3,6 @@ package group
 import (
 	"time"
 
-	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -11,10 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/group"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
-	group_server "github.com/docker/infrakit/pkg/rpc/group"
 	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
-	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
-	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -57,7 +53,7 @@ var DefaultOptions = Options{
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins,
-	config *types.Any) (stoppable server.Stoppable, running <-chan struct{}, err error) {
+	config *types.Any) (name plugin.Name, impls []interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -133,13 +129,13 @@ func Run(plugins func() discovery.Plugins,
 		}
 	}()
 
-	lookup, _ := options.Name.GetLookupAndType() // for names like 'aws/ec2' or just 'group'.
-	stoppable, running = cli.BackgroundPlugin(lookup,
-		func() {
-			close(stopSnapshot)
-		},
-		metadata_rpc.PluginServer(metadata_plugin.NewPluginFromChannel(updateSnapshot)),
-		group_server.PluginServer(groupPlugin))
-
+	name = options.Name
+	impls = []interface{}{
+		metadata_plugin.NewPluginFromChannel(updateSnapshot),
+		groupPlugin,
+	}
+	onStop = func() {
+		close(stopSnapshot)
+	}
 	return
 }

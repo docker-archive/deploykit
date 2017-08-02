@@ -7,6 +7,7 @@ import (
 	"path"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/launch"
+	"github.com/docker/infrakit/pkg/launch/inproc"
 	"github.com/docker/infrakit/pkg/launch/os"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -22,6 +24,9 @@ import (
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
+
+	// Load the inprocess plugins supported
+	_ "github.com/docker/infrakit/pkg/run/group"
 )
 
 var log = logutil.New("module", "cli/plugin")
@@ -143,7 +148,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
-	executor := start.Flags().String("exec", "os", "Executor to use for starting up plugins: [os | docker-run]")
 	doWait := start.Flags().BoolP("wait", "w", false, "True to wait in the foreground; Ctrl-C to exit")
 
 	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
@@ -169,12 +173,18 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
+		// launch plugin via os process
 		osExec, err := os.NewLauncher("os")
 		if err != nil {
 			return err
 		}
-		// docker-run is also implemented by the same os executor. We just search for a different key (docker-run)
+		// launch docker run, implemented by the same os executor. We just search for a different key (docker-run)
 		dockerExec, err := os.NewLauncher("docker-run")
+		if err != nil {
+			return err
+		}
+		// launch inprocess plugins
+		inprocExec, err := inproc.NewLauncher("inproc", plugins)
 		if err != nil {
 			return err
 		}
@@ -182,7 +192,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		monitor := launch.NewMonitor([]launch.Exec{
 			osExec,
 			dockerExec,
-		}, parsedRules)
+			inprocExec,
+		}, launch.MergeRules(parsedRules, inproc.Rules()))
 
 		startPlugin, err := monitor.Start()
 		if err != nil {
@@ -217,23 +228,29 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			before = len(m)
 		}
 
-		for _, pluginToStart := range args {
-			fmt.Println("Starting up", pluginToStart)
+		for _, pluginToStartSpec := range args {
+			fmt.Println("Starting up", pluginToStartSpec)
 
 			wait.Add(1)
 
-			name := pluginToStart
-			startPlugin <- launch.StartPlugin{
-				Plugin: plugin.Name(name),
-				Exec:   launch.ExecName(*executor),
-				Started: func(config *types.Any) {
-					fmt.Println(name, "started.")
+			p := strings.SplitN(pluginToStartSpec, "=", 2)
+			execName := "inproc" // default is to use inprocess goroutine for running plugins
+			if len(p) > 1 {
+				execName = p[1]
+			}
+			pluginToStart := p[0]
 
-					started = append(started, name)
+			startPlugin <- launch.StartPlugin{
+				Plugin: plugin.Name(pluginToStart),
+				Exec:   launch.ExecName(execName),
+				Started: func(config *types.Any) {
+					fmt.Println(pluginToStart, "started.")
+
+					started = append(started, pluginToStart)
 					wait.Done()
 				},
 				Error: func(config *types.Any, err error) {
-					fmt.Println("Error starting", name, "err=", err)
+					fmt.Println("Error starting", pluginToStart, "err=", err)
 					wait.Done()
 				},
 			}

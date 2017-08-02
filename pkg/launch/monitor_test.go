@@ -3,6 +3,7 @@ package launch
 import (
 	"testing"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -201,4 +202,85 @@ func TestMonitorLoopRuleOverrideOptions(t *testing.T) {
 	require.Equal(t, *expected, *receivedArgs)
 
 	monitor.Stop()
+}
+
+func TestMergeRule(t *testing.T) {
+
+	m1 := map[ExecName]*types.Any{
+		ExecName("exec1"): types.AnyValueMust("test"),
+	}
+	m2 := map[ExecName]*types.Any{
+		ExecName("exec2"): types.AnyValueMust("test2"),
+	}
+
+	r1 := Rule{
+		Plugin: plugin.Name("foo"),
+		Launch: m1,
+	}
+
+	r2 := r1.Merge(Rule{Plugin: plugin.Name("no")})
+	require.Equal(t, r1, r2) // expects no effect
+	require.Equal(t, m1, r1.Launch)
+
+	r3 := r1.Merge(Rule{Plugin: plugin.Name("foo"), Launch: m2})
+	require.Equal(t, map[ExecName]*types.Any{
+		ExecName("exec1"): types.AnyValueMust("test"),
+		ExecName("exec2"): types.AnyValueMust("test2"),
+	}, r3.Launch)
+
+	expect, err := types.AnyValueMust([]Rule{
+		{
+			Plugin: plugin.Name("bar"),
+			Launch: map[ExecName]*types.Any{
+				ExecName("exec2"): types.AnyValueMust("test2"),
+			},
+		},
+		{
+			Plugin: plugin.Name("baz"),
+			Launch: map[ExecName]*types.Any{
+				ExecName("exec1"): types.AnyValueMust("test1"),
+				ExecName("exec2"): types.AnyValueMust("test2"),
+			},
+		},
+		{
+			Plugin: plugin.Name("foo"),
+			Launch: map[ExecName]*types.Any{
+				ExecName("exec"): types.AnyValueMust("test"),
+			},
+		},
+	}).MarshalYAML()
+	require.NoError(t, err)
+
+	actual, err := types.AnyValueMust(MergeRules(
+		[]Rule{
+			{
+				Plugin: plugin.Name("foo"),
+				Launch: map[ExecName]*types.Any{
+					ExecName("exec"): types.AnyValueMust("test"),
+				},
+			},
+			{
+				Plugin: plugin.Name("baz"),
+				Launch: map[ExecName]*types.Any{
+					ExecName("exec1"): types.AnyValueMust("test1"),
+				},
+			},
+		},
+		[]Rule{
+			{
+				Plugin: plugin.Name("bar"),
+				Launch: map[ExecName]*types.Any{
+					ExecName("exec2"): types.AnyValueMust("test2"),
+				},
+			},
+			{
+				Plugin: plugin.Name("baz"),
+				Launch: map[ExecName]*types.Any{
+					ExecName("exec2"): types.AnyValueMust("test2"),
+				},
+			},
+		})).MarshalYAML()
+	require.NoError(t, err)
+
+	require.Equal(t, string(expect), string(actual))
 }

@@ -3,6 +3,7 @@ package launch
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -24,6 +25,61 @@ type Rule struct {
 	// Launch is the rule for starting / launching the plugin. It's a dictionary with the key being
 	// the name of the executor and the value being the properties used by that executor.
 	Launch map[ExecName]*types.Any
+}
+
+// Merge input rule into receiver.  If the input rule's plugin doesn't match the receiver's, the receiver value
+// sees no changes.
+func (r Rule) Merge(o Rule) Rule {
+	copy := r
+	copy.Launch = map[ExecName]*types.Any{}
+	for k, v := range r.Launch {
+		var c types.Any
+		if v != nil {
+			c = *v
+		}
+		copy.Launch[k] = &c
+	}
+
+	if r.Plugin != o.Plugin {
+		return copy
+	}
+	for k, v := range o.Launch {
+		var c types.Any
+		if v != nil {
+			c = *v
+		}
+		copy.Launch[k] = &c
+	}
+	return copy
+}
+
+// Rules is a slice of rules
+type Rules []Rule
+
+func (r Rules) Len() int           { return len(r) }
+func (r Rules) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
+func (r Rules) Less(i, j int) bool { return r[i].Plugin < r[j].Plugin }
+
+// MergeRules input rules into another slice
+func MergeRules(a, b []Rule) []Rule {
+	out := Rules{}
+	q := map[plugin.Name]Rule{}
+	for _, v := range a {
+		q[v.Plugin] = v
+	}
+	for _, r := range b {
+		if found, has := q[r.Plugin]; !has {
+			out = append(out, r)
+		} else {
+			q[r.Plugin] = found.Merge(r)
+		}
+	}
+	for _, r := range q {
+		out = append(out, r)
+	}
+
+	sort.Sort(out)
+	return out
 }
 
 // Monitor runs continuously receiving requests to start a plugin.
