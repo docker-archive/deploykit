@@ -1,4 +1,4 @@
-package main
+package vanilla
 
 import (
 	"testing"

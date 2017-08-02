@@ -27,6 +27,7 @@ import (
 
 	// Load the inprocess plugins supported
 	_ "github.com/docker/infrakit/pkg/run/group"
+	_ "github.com/docker/infrakit/pkg/run/vanilla"
 )
 
 var log = logutil.New("module", "cli/plugin")
@@ -155,22 +156,24 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	start.RunE = func(c *cobra.Command, args []string) error {
 
-		buff, err := processTemplate(*configURL)
-		if err != nil {
-			return err
-		}
-
-		view, err := toJSON([]byte(buff))
-		if err != nil {
-			return err
-		}
-
-		configs := types.AnyBytes(view)
-
 		parsedRules := []launch.Rule{}
-		err = configs.Decode(&parsedRules)
-		if err != nil {
-			return err
+
+		if *configURL != "" {
+			buff, err := processTemplate(*configURL)
+			if err != nil {
+				return err
+			}
+
+			view, err := toJSON([]byte(buff))
+			if err != nil {
+				return err
+			}
+
+			configs := types.AnyBytes(view)
+			err = configs.Decode(&parsedRules)
+			if err != nil {
+				return err
+			}
 		}
 
 		// launch plugin via os process
@@ -193,7 +196,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			osExec,
 			dockerExec,
 			inprocExec,
-		}, launch.MergeRules(parsedRules, inproc.Rules()))
+		}, launch.MergeRules(inproc.Rules(), parsedRules))
 
 		startPlugin, err := monitor.Start()
 		if err != nil {
@@ -229,16 +232,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		for _, pluginToStartSpec := range args {
-			fmt.Println("Starting up", pluginToStartSpec)
-
 			wait.Add(1)
 
-			p := strings.SplitN(pluginToStartSpec, "=", 2)
+			p := strings.Split(pluginToStartSpec, "=")
 			execName := "inproc" // default is to use inprocess goroutine for running plugins
 			if len(p) > 1 {
 				execName = p[1]
 			}
 			pluginToStart := p[0]
+
+			log.Info("Starting up", "rule", pluginToStartSpec, "executor", execName, "plugin", pluginToStart)
 
 			startPlugin <- launch.StartPlugin{
 				Plugin: plugin.Name(pluginToStart),

@@ -6,12 +6,15 @@ import (
 	"sort"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 )
 
-var errNoConfig = errors.New("no-config")
+var (
+	log         = logutil.New("module", "core/launch")
+	errNoConfig = errors.New("no-config")
+)
 
 // ExecName is the name of the executor to use (e.g. 'os', 'docker-run', etc.). It's found in the config.
 type ExecName string
@@ -161,7 +164,7 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 		for {
 			req, open := <-m.startChan
 			if !open {
-				log.Infoln("Plugin activation input closed. Stopping.")
+				log.Info("Plugin activation input closed. Stopping.")
 				m.inputChan = nil
 				return
 			}
@@ -177,7 +180,7 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 					properties, has = m.rules[plugin.Name(alternate)][req.Exec]
 				}
 				if !has {
-					log.Warningln("no plugin:", req)
+					log.Warn("no plugin", "plugin", req.Plugin)
 					req.reportError(nil, errNoConfig)
 					continue loop
 				}
@@ -194,7 +197,7 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 				continue loop
 			}
 
-			log.Infoln("Using executor", exec.Name(), "Plugin=", req.Plugin, "Exec=", req.Exec)
+			log.Info("Starting plugin", "executor", exec.Name(), "plugin", req.Plugin, "exec=", req.Exec)
 
 			block, err := exec.Exec(req.Plugin.String(), configCopy)
 			if err != nil {
@@ -202,7 +205,7 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 				continue loop
 			}
 
-			log.Infoln("Waiting for", req.Plugin, "to start:", configCopy.String())
+			log.Info("Waiting for startup", "plugin", req.Plugin, "config", configCopy.String())
 			err = <-block
 			if err != nil {
 				req.reportError(configCopy, err)

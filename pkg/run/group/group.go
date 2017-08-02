@@ -19,7 +19,7 @@ import (
 var log = logutil.New("module", "run/group")
 
 func init() {
-	inproc.Register("group", Run, DefaultOptions)
+	inproc.Register("group-stateless", Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the group controller.
@@ -43,7 +43,7 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Name:                    plugin.Name("group"),
+	Name:                    plugin.Name("group-stateless"),
 	PollInterval:            10 * time.Second,
 	MaxParallelNum:          0,
 	PollIntervalGroupSpec:   1 * time.Second,
