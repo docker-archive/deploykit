@@ -294,8 +294,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				}
 			}
 		}
-
-		return nil
 	}
 
 	stop := &cobra.Command{
