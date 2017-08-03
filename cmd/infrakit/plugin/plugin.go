@@ -26,8 +26,8 @@ import (
 	"github.com/spf13/cobra"
 
 	// Load the inprocess plugins supported
-	_ "github.com/docker/infrakit/pkg/run/group"
-	_ "github.com/docker/infrakit/pkg/run/vanilla"
+	_ "github.com/docker/infrakit/pkg/run/controller/group"
+	_ "github.com/docker/infrakit/pkg/run/flavor/vanilla"
 )
 
 var log = logutil.New("module", "cli/plugin")
