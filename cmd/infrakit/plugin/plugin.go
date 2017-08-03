@@ -149,7 +149,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
-	doWait := start.Flags().BoolP("wait", "w", false, "True to wait in the foreground; Ctrl-C to exit")
 
 	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
 	start.Flags().AddFlagSet(templateFlags)
@@ -198,114 +197,104 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			inprocExec,
 		}, launch.MergeRules(inproc.Rules(), parsedRules))
 
+		defer func() {
+			monitor.Stop()
+			log.Info("Stopped")
+		}()
+
+		// Get what's currently running
+		running, err := plugins().List()
+		if err != nil {
+			return err
+		}
+
+		// start the monitor
 		startPlugin, err := monitor.Start()
 		if err != nil {
 			return err
 		}
 
-		// This is the channel to send signal that plugins are stopped out of band so stop waiting.
-		noRunningPlugins := make(chan struct{})
-		// This is the channel for completion of waiting.
-		waitDone := make(chan struct{})
-		// This is the channel to stop scanning for running plugins.
-		pluginScanDone := make(chan struct{})
+		// Generate a list of StartPlugin instructions for each arg that isn't seen in discovery
+		toStart := []launch.StartPlugin{}
+		for _, arg := range args {
 
-		var wait sync.WaitGroup
-		if *doWait {
-			wait.Add(1)
-			go func() {
-				wait.Wait() // wait for everyone to complete
-				close(waitDone)
-			}()
-		}
-
-		// Now start all the plugins
-		started := []string{}
-
-		// We do a count of the plugins running before we start.
-		var before, after = 0, 0
-
-		if m, err := plugins().List(); err != nil {
-			log.Warn("Problem listing current plugins, continue", "err", err)
-		} else {
-			before = len(m)
-		}
-
-		for _, pluginToStartSpec := range args {
-			wait.Add(1)
-
-			p := strings.Split(pluginToStartSpec, "=")
+			p := strings.Split(arg, "=")
 			execName := "inproc" // default is to use inprocess goroutine for running plugins
 			if len(p) > 1 {
 				execName = p[1]
 			}
 			pluginToStart := p[0]
 
-			log.Info("Starting up", "rule", pluginToStartSpec, "executor", execName, "plugin", pluginToStart)
+			if _, has := running[pluginToStart]; has {
+				log.Warn("plugin running. skipped", "plugin", pluginToStart)
+				continue
+			}
 
-			startPlugin <- launch.StartPlugin{
+			toStart = append(toStart, launch.StartPlugin{
 				Plugin: plugin.Name(pluginToStart),
 				Exec:   launch.ExecName(execName),
-				Started: func(config *types.Any) {
-					fmt.Println(pluginToStart, "started.")
+			})
+		}
 
-					started = append(started, pluginToStart)
-					wait.Done()
-				},
-				Error: func(config *types.Any, err error) {
-					fmt.Println("Error starting", pluginToStart, "err=", err)
-					wait.Done()
-				},
+		// starting wait
+		var wgStartAll sync.WaitGroup
+		var waitDoneStartAll = make(chan struct{})
+
+		// wait for everyone to complete starting up
+		go func() {
+			wgStartAll.Wait()
+			close(waitDoneStartAll)
+		}()
+
+		started := make(chan string, 10)
+		for _, inst := range toStart {
+
+			lookup, _ := inst.Plugin.GetLookupAndType()
+
+			// Assign callbacks to help with signaling
+
+			inst.Started = func(config *types.Any) {
+				fmt.Println(lookup, "started.")
+				started <- lookup
+				wgStartAll.Done()
+			}
+			inst.Error = func(config *types.Any, err error) {
+				fmt.Println("Error starting", lookup, "err=", err)
+				wgStartAll.Done()
+			}
+
+			wgStartAll.Add(1)
+			startPlugin <- inst
+			log.Info("Starting up", "executor", inst.Exec, "plugin", inst.Plugin)
+		}
+
+		// wait for all the plugins to come up
+		<-waitDoneStartAll
+
+		log.Info("Plugins have started.")
+
+		// Block by polling for the plugin socket files.  We keep this process blocking
+		// until all the plugins specified have exited and removed their socket files.
+
+		targets := []string{}
+		checkNow := time.Tick(5 * time.Second)
+
+		for {
+			select {
+			case target := <-started:
+				targets = append(targets, target)
+
+			case <-checkNow:
+				log.Debug("Checking on targets", "targets", targets)
+				if m, err := plugins().List(); err == nil {
+					if countMatches(targets, m) == 0 {
+						log.Info("Scan found plugins not running now", "plugins", targets)
+						return nil
+					}
+				}
 			}
 		}
 
-		if m, err := plugins().List(); err == nil {
-			after = len(m)
-		}
-
-		// Here we scan the plugins.  If we are starting up the plugins, wait a little bit
-		// for them to show up.  Then we start scanning to see if the sockets are gone.
-		// If the sockets are gone, then we can safely exit.
-		if *doWait {
-			go func() {
-				interval := 5 * time.Second
-
-				now := after
-				if now <= before {
-					// Here we have fewer plugins running then before. Wait a bit
-					time.Sleep(interval)
-				}
-				checkNow := time.Tick(interval)
-				for {
-					select {
-					case <-pluginScanDone:
-						log.Info("--wait mode: stop scanning.")
-						return
-
-					case <-checkNow:
-						if m, err := plugins().List(); err == nil {
-							now = len(m)
-						}
-						if now == 0 {
-							log.Info("--wait mode: scan found no plugins.")
-							close(noRunningPlugins)
-						}
-					}
-				}
-			}()
-		}
-
-		// Here we wait for either wait group to be done or if they are killed out of band.
-		select {
-		case <-waitDone:
-			log.Info("All plugins completed. Exiting.")
-		case <-noRunningPlugins:
-			log.Info("Plugins aren't running anymore.  Exiting.")
-		}
-
-		monitor.Stop()
-
-		close(pluginScanDone)
 		return nil
 	}
 
@@ -378,4 +367,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	cmd.AddCommand(ls, start, stop)
 
 	return cmd
+}
+
+// counts the number of matches by name
+func countMatches(list []string, found map[string]*plugin.Endpoint) int {
+	c := 0
+	for _, l := range list {
+		if _, has := found[l]; has {
+			c++
+		}
+	}
+	return c
 }
