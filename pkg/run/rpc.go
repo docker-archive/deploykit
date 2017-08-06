@@ -4,11 +4,13 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	resource_rpc "github.com/docker/infrakit/pkg/rpc/resource"
 	"github.com/docker/infrakit/pkg/rpc/server"
@@ -41,6 +43,8 @@ func ServeRPC(name plugin.Name, onStop func(),
 			plugins = append(plugins, group_rpc.PluginServer(p))
 		case instance.Plugin:
 			plugins = append(plugins, instance_rpc.PluginServer(p))
+		case manager.Backend:
+			plugins = append(plugins, manager_rpc.PluginServer(p))
 		case metadata.Plugin:
 			plugins = append(plugins, metadata_rpc.PluginServer(p))
 		case resource.Plugin:

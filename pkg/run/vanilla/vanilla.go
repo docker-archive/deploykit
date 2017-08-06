@@ -10,10 +10,17 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
-var log = logutil.New("module", "run/flavor/vanilla")
+const (
+	// CanonicalName is the canonical name of the plugin and also key used to locate the plugin in discovery
+	CanonicalName = "flavor-vanilla"
+)
+
+var (
+	log = logutil.New("module", "run/flavor/vanilla")
+)
 
 func init() {
-	inproc.Register("flavor-vanilla", Run, DefaultOptions)
+	inproc.Register(CanonicalName, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the group controller.
@@ -26,10 +33,10 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
+	Name: CanonicalName,
 	Options: template.Options{
 		MultiPass: true,
 	},
-	Name: "flavor-vanilla",
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately

@@ -28,6 +28,7 @@ import (
 	// Load the inprocess plugins supported
 	_ "github.com/docker/infrakit/pkg/run/controller/group"
 	_ "github.com/docker/infrakit/pkg/run/flavor/vanilla"
+	_ "github.com/docker/infrakit/pkg/run/instance/file"
 )
 
 var log = logutil.New("module", "cli/plugin")

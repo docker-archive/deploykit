@@ -1,4 +1,4 @@
-package main
+package file
 
 import (
 	"encoding/json"
@@ -39,8 +39,8 @@ type plugin struct {
 	fs  afero.Fs
 }
 
-// NewFileInstancePlugin returns an instance plugin backed by disk files.
-func NewFileInstancePlugin(dir string) instance.Plugin {
+// NewPlugin returns an instance plugin backed by disk files.
+func NewPlugin(dir string) instance.Plugin {
 	log.Debugln("file instance plugin. dir=", dir)
 	return &plugin{
 		Dir: dir,

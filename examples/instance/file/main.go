@@ -5,7 +5,9 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/instance/file"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -15,12 +17,26 @@ func main() {
 		Use:   os.Args[0],
 		Short: "File instance plugin",
 	}
-	name := cmd.Flags().String("name", "instance-file", "Plugin name to advertise for discovery")
+
+	options := file.DefaultOptions
+	cmd.Flags().StringVar(&options.Name, "name", options.Name, "Plugin name to advertise for discovery")
+	cmd.Flags().StringVar(&options.Dir, "dir", options.Dir, "Directory path to store the files")
+
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
-	dir := cmd.Flags().String("dir", os.TempDir(), "Dir for storing the files")
+
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(NewFileInstancePlugin(*dir)))
+
+		name, impl, onStop, err := file.Run(nil, types.AnyValueMust(options))
+		if err != nil {
+			return
+		}
+
+		_, running, err := run.ServeRPC(name, onStop, impl)
+		if err != nil {
+			return
+		}
+		<-running
 	}
 
 	cmd.AddCommand(cli.VersionCommand())

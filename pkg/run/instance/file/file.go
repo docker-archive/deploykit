@@ -1,35 +1,46 @@
-package vanilla
+package file
 
 import (
+	"os"
+
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/flavor/vanilla"
-	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/plugin/instance/file"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/types"
 )
 
-var log = logutil.New("module", "run/flavor/vanilla")
+const (
+	// CanonicalName is the canonical name of the plugin and also key used to locate the plugin in discovery
+	CanonicalName = "instance-file"
+
+	// EnvOptionsDir is the environment variable to use to set the default value of Options.Dir
+	EnvOptionsDir = "INFRAKIT_INSTANCE_FILE_OPTIONS_DIR"
+)
+
+var (
+	log = logutil.New("module", "run/instance/file")
+)
 
 func init() {
-	inproc.Register("flavor-vanilla", Run, DefaultOptions)
+	inproc.Register(CanonicalName, Run, DefaultOptions)
 }
 
-// Options capture the options for starting up the group controller.
+// Options capture the options for starting up the plugin.
 type Options struct {
-	template.Options `json:",inline" yaml:",inline"`
-
 	// Name of the plugin
 	Name string
+
+	// Dir is the path of the directory to store the files
+	Dir string
 }
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Options: template.Options{
-		MultiPass: true,
-	},
-	Name: "flavor-vanilla",
+	Name: CanonicalName,
+	Dir:  run.GetEnv(EnvOptionsDir, os.TempDir()),
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
@@ -45,7 +56,7 @@ func Run(plugins func() discovery.Plugins,
 
 	name = plugin.Name(options.Name)
 	impls = []interface{}{
-		vanilla.NewPlugin(options.Options),
+		file.NewPlugin(options.Dir),
 	}
 	return
 }
