@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strconv"
@@ -218,8 +217,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		log.Info("applying changes")
-
 		// get the changes
 		changes, err := changeSet(*vars)
 		if err != nil {
@@ -239,28 +236,18 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		// render the proposal
-		fmt.Printf("Proposed changes, hash=%s\n", cas)
+		if *commitChange {
+			fmt.Printf("Committing changes, hash=%s\n", cas)
+		} else {
+			fmt.Printf("Proposed changes, hash=%s\n", cas)
+		}
+
+		// Render the delta
 		dmp := diffmatchpatch.New()
 		diffs := dmp.DiffMain(string(currentBuff), string(proposedBuff), false)
 		fmt.Println(dmp.DiffPrettyText(diffs))
 
 		if *commitChange {
-			// ask for final approval
-			input := bufio.NewReader(os.Stdin)
-			fmt.Fprintf(os.Stderr, "\n\nCommit? [y/n] ")
-			text, _ := input.ReadString('\n')
-			text = strings.Trim(text, " \t\n")
-
-			agree, err := parseBool(text)
-			if err != nil {
-				return fmt.Errorf("not boolean %v", text)
-			}
-			if !agree {
-				fmt.Fprintln(os.Stderr, "Not committing. Bye.")
-				os.Exit(0)
-			}
-
 			return updatablePlugin.Commit(proposed, cas)
 		}
 

@@ -263,7 +263,7 @@ func doTerraformShow(dir string,
 		},
 		nil)
 
-	command.Wait()
+	err = command.Wait()
 	return
 }
 
@@ -281,6 +281,6 @@ func doTerraformShowForInstance(dir string,
 		},
 		nil)
 
-	command.Wait()
+	err = command.Wait()
 	return
 }

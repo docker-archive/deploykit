@@ -18,12 +18,50 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestProcessImportOptions(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	// Instance spec but no instance ID
+	instSpec := instance.Spec{}
+	instID := ""
+	importOpts := ImportOptions{InstanceSpec: &instSpec, InstanceID: &instID}
+	err := tf.processImport(&importOpts)
+	require.Error(t, err)
+	require.Equal(t,
+		"Import instance ID required with import instance spec",
+		err.Error())
+	importOpts = ImportOptions{InstanceSpec: &instSpec, InstanceID: nil}
+	err = tf.processImport(&importOpts)
+	require.Error(t, err)
+	require.Equal(t,
+		"Import instance ID required with import instance spec",
+		err.Error())
+
+	// No instance spec but instance ID
+	instID = "1234"
+	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: &instID}
+	err = tf.processImport(&importOpts)
+	require.Error(t, err)
+	require.Equal(t,
+		"Import instance spec required with import instance ID",
+		err.Error())
+
+	// Neither specified
+	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: nil}
+	err = tf.processImport(&importOpts)
+	require.NoError(t, err)
+	instID = ""
+	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: &instID}
+	err = tf.processImport(&importOpts)
+	require.NoError(t, err)
+}
+
 // getPlugin returns the terraform instance plugin to use for testing and the
 // directory where the .tf.json files should be stored
 func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false)
+	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false, nil)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)
@@ -2236,4 +2274,547 @@ func TestDescribeAttachTag(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestMergePropNotInSource(t *testing.T) {
+	source := TResourceProperties{}
+	dest := TResourceProperties{"key": "val"}
+	mergeProp(source, dest, "foo")
+	require.Equal(t, TResourceProperties{"key": "val"}, dest)
+}
+
+func TestMergePropNotInDest(t *testing.T) {
+	source := TResourceProperties{"key": "val"}
+	dest := TResourceProperties{}
+	mergeProp(source, dest, "key")
+	require.Equal(t, TResourceProperties{"key": "val"}, dest)
+}
+
+func TestMergeNonComplex(t *testing.T) {
+	source := TResourceProperties{"key": "new-val", "other": "z"}
+	dest := TResourceProperties{"key": "old-val", "foo": "bar"}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{"key": "new-val", "foo": "bar"},
+		dest)
+}
+
+func TestMergePropSliceIntoEmptySlice(t *testing.T) {
+	source := TResourceProperties{"key": []interface{}{1, 2, true}}
+	dest := TResourceProperties{
+		"key": []interface{}{},
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{
+			"key": []interface{}{1, 2, true},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestMergePropSliceIntoSlice(t *testing.T) {
+	source := TResourceProperties{"key": []interface{}{1, 2, true}}
+	dest := TResourceProperties{
+		"key": []interface{}{1},
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{
+			"key": []interface{}{1, 2, true},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestMergeTagsSliceIntoEmptySlice(t *testing.T) {
+	source := TResourceProperties{"tags": []interface{}{"tag1:val1", "tag2:val2"}}
+	dest := TResourceProperties{
+		"tags": []interface{}{},
+		"foo":  "bar",
+	}
+	mergeProp(source, dest, "tags")
+	require.Equal(t,
+		TResourceProperties{
+			"tags": []interface{}{"tag1:val1", "tag2:val2"},
+			"foo":  "bar",
+		},
+		dest)
+}
+
+func TestMergeTagsSliceIntoSlice(t *testing.T) {
+	source := TResourceProperties{"tags": []interface{}{"tag1:val1", "tag2:override"}}
+	dest := TResourceProperties{
+		"tags": []interface{}{"tag2:val2", "tag3:val3"},
+		"foo":  "bar",
+	}
+	mergeProp(source, dest, "tags")
+	require.Equal(t,
+		TResourceProperties{
+			"tags": []interface{}{"tag2:override", "tag3:val3", "tag1:val1"},
+			"foo":  "bar",
+		},
+		dest)
+}
+
+func TestMergeSliceIntoWrongType(t *testing.T) {
+	source := TResourceProperties{"slice": []interface{}{1, 2, 3}}
+	dest := TResourceProperties{
+		"slice": true,
+		"foo":   "bar",
+	}
+	mergeProp(source, dest, "slice")
+	require.Equal(t,
+		TResourceProperties{
+			"slice": []interface{}{1, 2, 3},
+			"foo":   "bar",
+		},
+		dest)
+}
+
+func TestMergePropMapIntoEmptyMap(t *testing.T) {
+	source := TResourceProperties{
+		"key": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v2",
+		},
+	}
+	dest := TResourceProperties{
+		"key": map[string]interface{}{},
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{
+			"key": map[string]interface{}{
+				"k1": "v1",
+				"k2": "v2",
+			},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestMergePropMapIntoMap(t *testing.T) {
+	source := TResourceProperties{
+		"key": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v-override",
+		},
+	}
+	dest := TResourceProperties{
+		"key": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v2",
+			"k3": "v3",
+		},
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "key")
+	require.Equal(t,
+		TResourceProperties{
+			"key": map[string]interface{}{
+				"k1": "v1",
+				"k2": "v-override",
+				"k3": "v3",
+			},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestMergeMapIntoWrongType(t *testing.T) {
+	source := TResourceProperties{
+		"map": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v2",
+		},
+	}
+	dest := TResourceProperties{
+		"map": true,
+		"foo": "bar",
+	}
+	mergeProp(source, dest, "map")
+	require.Equal(t,
+		TResourceProperties{
+			"map": map[string]interface{}{
+				"k1": "v1",
+				"k2": "v2",
+			},
+			"foo": "bar",
+		},
+		dest)
+}
+
+func TestWriteTfJSONForImport(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	specProps := TResourceProperties{
+		PropHostnamePrefix: "some-prefix",
+		PropScope:          "some-scope",
+		"ssh-key-ids":      []interface{}{789},
+		"datacenter":       "some-datacenter",
+		"tags":             []interface{}{"spec-tag1:spec-val1"},
+		"z-other":          "not-imported",
+	}
+	importedProps := TResourceProperties{
+		"hostname":    "actual-hostname",
+		"ssh-key-ids": []interface{}{123},
+		"datacenter":  "actual-datacenter",
+		"tags": []interface{}{
+			"actual-tag1:actual-val1",
+			"actual-tag2:actual-val2",
+		},
+		"ip":         "10.0.0.1",
+		"z-imported": "imported-but-not-in-spec",
+	}
+
+	id := "instance-12345"
+	err := tf.writeTfJSONForImport(specProps, importedProps, VMIBMCloud, id)
+	require.NoError(t, err)
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, id+".tf.json"))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	actualVMType, vmName, props, err := FindVM(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t, VMIBMCloud, actualVMType)
+	require.Equal(t, TResourceName("instance-12345"), vmName)
+	expectedProps := TResourceProperties{
+		"hostname":    "actual-hostname",
+		"ssh-key-ids": []interface{}{float64(123)},
+		"datacenter":  "actual-datacenter",
+		"tags": []interface{}{
+			"spec-tag1:spec-val1",
+			"actual-tag1:actual-val1",
+			"actual-tag2:actual-val2",
+		},
+	}
+	require.Equal(t, expectedProps, props)
+}
+
+func TestImportNoVm(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	spec := instance.Spec{
+		Properties: types.AnyString("{}"),
+	}
+	_, err := tf.importResource(importFns{}, "123", &spec)
+	require.Error(t, err)
+	require.Equal(t, "no resource section", err.Error())
+}
+
+func TestImportNoVmProps(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	spec := instance.Spec{
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "aws_instance": {}
+  }
+}`)}
+	_, err := tf.importResource(importFns{}, "123", &spec)
+	require.Error(t, err)
+	require.Equal(t, "Missing resource properties", err.Error())
+}
+
+func TestImportTfShowError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return nil, fmt.Errorf("Custom show error")
+		},
+	}
+	spec := instance.Spec{
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
+      }
+    }
+  }
+}`)}
+	_, err := tf.importResource(fns, "123", &spec)
+	require.Error(t, err)
+	require.Equal(t, "Custom show error", err.Error())
+}
+
+func TestImportAlreadyExists(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return map[TResourceName]TResourceProperties{
+				TResourceName("instance-foo"): {},
+				TResourceName("instance-123"): {
+					"id": 123,
+				},
+			}, nil
+		},
+	}
+	spec := instance.Spec{
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
+      }
+    }
+  }
+}`)}
+	id, err := tf.importResource(fns, "123", &spec)
+	require.NoError(t, err)
+	require.Equal(t, "instance-123", string(*id))
+}
+
+func TestImportTfImportError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	cleanInvoked := false
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return map[TResourceName]TResourceProperties{}, nil
+		},
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(filename, "instance-"))
+			require.Equal(t, "123", vmID)
+			return fmt.Errorf("Custom import error")
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(vmName, "instance-"))
+			cleanInvoked = true
+		},
+	}
+	spec := instance.Spec{
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
+      }
+    }
+  }
+}`)}
+	_, err := tf.importResource(fns, "123", &spec)
+	require.Error(t, err)
+	require.Equal(t, "Custom import error", err.Error())
+	require.True(t, cleanInvoked)
+}
+
+func TestImportTfShowInstError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	cleanInvoked := false
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return map[TResourceName]TResourceProperties{}, nil
+		},
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(filename, "instance-"))
+			require.Equal(t, "123", vmID)
+			return nil
+		},
+		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			return nil, fmt.Errorf("Custom show inst error")
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(vmName, "instance-"))
+			cleanInvoked = true
+		},
+	}
+	spec := instance.Spec{
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
+      }
+    }
+  }
+}`)}
+	_, err := tf.importResource(fns, "123", &spec)
+	require.Error(t, err)
+	require.Equal(t, "Custom show inst error", err.Error())
+	require.True(t, cleanInvoked)
+}
+
+func TestImportResourceTagMap(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	cleanInvoked := false
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMAmazon, vmType)
+			return map[TResourceName]TResourceProperties{}, nil
+		},
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			require.Equal(t, VMAmazon, vmType)
+			require.True(t, strings.HasPrefix(filename, "instance-"))
+			require.Equal(t, "123", vmID)
+			return nil
+		},
+		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.True(t, strings.HasPrefix(id, "aws_instance.instance-"))
+			props := TResourceProperties{
+				"hostname": "actual-hostname",
+				"spec-key": "actual-val",
+				"other":    "foo",
+			}
+			return props, nil
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			cleanInvoked = true
+		},
+	}
+	spec := instance.Spec{
+		Tags: map[string]string{
+			"infrakit.group":      "managers",
+			"infrakit.config_sha": "bootstrap",
+		},
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "@hostname_prefix": "host1",
+        "spec-key": "spec-val",
+        "tags": {"t1": "v1"}
+      }
+    }
+  }
+}`)}
+	id, err := tf.importResource(fns, "123", &spec)
+	require.NoError(t, err)
+	require.False(t, cleanInvoked)
+
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", *id)))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	actualVMType, vmName, props, err := FindVM(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t, VMAmazon, actualVMType)
+	require.Equal(t, string(*id), string(vmName))
+	require.Equal(t,
+		TResourceProperties{
+			"hostname": "actual-hostname",
+			"spec-key": "actual-val",
+			"tags": map[string]interface{}{
+				"t1":                  "v1",
+				"infrakit.group":      "managers",
+				"infrakit.config_sha": "bootstrap",
+			},
+		},
+		props)
+}
+
+func TestImportResourceTagSlice(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	cleanInvoked := false
+	fns := importFns{
+		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Equal(t, VMIBMCloud, vmType)
+			return map[TResourceName]TResourceProperties{}, nil
+		},
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			require.Equal(t, VMIBMCloud, vmType)
+			require.True(t, strings.HasPrefix(filename, "instance-"))
+			require.Equal(t, "123", vmID)
+			return nil
+		},
+		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.True(t, strings.HasPrefix(id, "ibm_compute_vm_instance.instance-"))
+			props := TResourceProperties{
+				"hostname": "actual-hostname",
+				"spec-key": "actual-val",
+				"other":    "foo",
+			}
+			return props, nil
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			cleanInvoked = true
+		},
+	}
+	spec := instance.Spec{
+		Tags: map[string]string{
+			"infrakit.group":      "managers",
+			"infrakit.config_sha": "bootstrap",
+		},
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "ibm_compute_vm_instance": {
+      "host": {
+        "@hostname_prefix": "host1",
+        "spec-key": "spec-val",
+				"tags": ["t1:v1"]
+      }
+    }
+  }
+}`)}
+	id, err := tf.importResource(fns, "123", &spec)
+	require.NoError(t, err)
+	require.False(t, cleanInvoked)
+
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", *id)))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	actualVMType, vmName, props, err := FindVM(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t, VMIBMCloud, actualVMType)
+	require.Equal(t, string(*id), string(vmName))
+	// Tag slice order not guaranteed since it is created by iterating over a map
+	tags := props["tags"]
+	delete(props, "tags")
+	require.Len(t, tags, 3)
+	require.Contains(t, tags, "t1:v1")
+	require.Contains(t, tags, "infrakit.group:managers")
+	require.Contains(t, tags, "infrakit.config_sha:bootstrap")
+	// Compare everythine else
+	require.Equal(t,
+		TResourceProperties{
+			"hostname": "actual-hostname",
+			"spec-key": "actual-val",
+		},
+		props)
 }
