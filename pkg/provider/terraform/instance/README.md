@@ -109,9 +109,17 @@ and update its state.
 
 Begin by building plugin [binaries](/README.md#binaries).
 
-The plugin requires a directory (`--dir`) that will be used to contain the `tfstate` and `tf.json`
-files.  It also checks to make sure it can call `terraform`.
-Install Terraform [here](https://www.terraform.io/downloads.html) if you haven't done so.
+The supported fields are:
+* `dir`: Directory that will be used to contain the `tfstate` and `tf.json` files
+* `poll-interval`: Frequency that `terraform apply` is invoked; note that it is only invoked on the leader manager (unless `standalone=true`, see below)
+* `standalone`: If `true` then manager leadership is not verified prior to invoking `terraform apply` (default is `false`)
+
+The plugin also supports importing an existing resource into terraform; this can be used to import the initial manager into terraform. Once the resource is imported into terraform, a corresponding `.tf.json` file is also created. The following optional fields are used for this purpose:
+* `import-group-spec-url`: The group specification URL that contains a nested instance specification; the `.tf.json` file for the imported resource contains the properties in the instance specification
+* `import-instance-id`: The ID of the instance to import
+* `import-group-id`: Optional group ID that the imported resource should be tagged with
+
+The plugin also checks to make sure it can call `terraform`. Install Terraform [here](https://www.terraform.io/downloads.html) if you haven't done so.
 
 See the [CLI Doc](/cmd/infrakit/README.md) for details on accessing the instance plugin via CLI.
 
