@@ -40,6 +40,11 @@ type BootController struct {
 	// TFTP Configuration
 	pxeFileName string // undionly.kpxe
 
+	// iPXE file settings - exported
+	Kernel  string
+	Initrd  string
+	Cmdline string
+
 	handler *DHCPSettings
 }
 
@@ -62,7 +67,15 @@ type DHCPSettings struct {
 }
 
 // NewRemoteBoot -
-func NewRemoteBoot(adapterName string, addressDHCP string, addressHTTP string, addressTFTP string, pxeFileName string, gateway string, dns string, leasecount int, startAddress string) (*BootController, error) {
+func NewRemoteBoot(adapterName string,
+	addressDHCP string,
+	addressHTTP string,
+	addressTFTP string,
+	pxeFileName string,
+	gateway string,
+	dns string,
+	leasecount int,
+	startAddress string) (*BootController, error) {
 
 	handler := &DHCPSettings{}
 	if addressDHCP == "" {
@@ -138,7 +151,7 @@ func (c *BootController) StartServices(dhcpService bool, tftpService bool, httpS
 	if tftpService == true {
 		go func() {
 			log.Println("RemoteBoot => Starting TFTP")
-			err := tftpServer(c.tftpAddress, c.pxeFileName)
+			err := c.serveTFTP()
 			log.Fatalf("%v", err)
 		}()
 	}
@@ -146,7 +159,7 @@ func (c *BootController) StartServices(dhcpService bool, tftpService bool, httpS
 	if httpService == true {
 		go func() {
 			log.Println("RemoteBoot => Starting HTTP")
-			err := httpServer(c.httpAddress)
+			err := c.serveHTTP()
 			log.Fatalf("%v", err)
 		}()
 	}
@@ -251,10 +264,10 @@ func HandleRead(filename string) (r io.Reader, err error) {
 }
 
 // tftp server
-func tftpServer(addr string, iPXEImage string) error {
+func (c *BootController) serveTFTP() error {
 
 	log.Printf("Opening and caching undionly.kpxe")
-	f, err := os.Open(iPXEImage)
+	f, err := os.Open(c.pxeFileName)
 	if err != nil {
 		log.Printf("Please download the bootloader with the pulliPXE command")
 		return err
@@ -268,7 +281,7 @@ func tftpServer(addr string, iPXEImage string) error {
 		return err
 	}
 	s := tftp.NewServer("", HandleRead, HandleWrite)
-	err = s.Serve(addr + ":69")
+	err = s.Serve(c.tftpAddress + ":69")
 	if err != nil {
 		return err
 	}
@@ -281,11 +294,10 @@ func tftpServer(addr string, iPXEImage string) error {
 //
 //////////////////////////////
 
-func httpServer(address string) error {
-
+func (c *BootController) serveHTTP() error {
 	if _, err := os.Stat("./infrakit.ipxe"); os.IsNotExist(err) {
 		log.Println("Auto generating ./infrakit.ipxe")
-		err = generateiPXEScript(address)
+		err = generateiPXEScript(c.httpAddress, c.Kernel, c.Initrd, c.Cmdline)
 		if err != nil {
 			return err
 		}
@@ -310,7 +322,7 @@ func httpServer(address string) error {
 //
 //////////////////////////////
 
-func generateiPXEScript(webserverAddress string) error {
+func generateiPXEScript(webserverAddress string, kernel string, initrd string, cmdline string) error {
 	script := `#!ipxe
 
 dhcp
@@ -321,11 +333,11 @@ echo | mac.....: ${net0/mac}
 echo | gateway.: ${net0/gateway} 
 echo +------------------------------------------------------------
 echo .
-kernel http://%s/linuxkit-kernel console=tty0 console=ttyS0 
-initrd http://%s/linuxkit-initrd.img
+kernel http://%s/%s %s 
+initrd http://%s/%s
 boot`
 	// Replace the addresses inline
-	buildScript := fmt.Sprintf(script, webserverAddress, webserverAddress)
+	buildScript := fmt.Sprintf(script, webserverAddress, kernel, cmdline, webserverAddress, initrd)
 
 	f, err := os.Create("./infrakit.ipxe")
 	if err != nil {
