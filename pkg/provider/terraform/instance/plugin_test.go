@@ -2023,8 +2023,7 @@ func TestDestroyRollingUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 2)
 	// Destroy the instance and the related files
-	// TODO(kaufers): Update to SPI call once rolling update context is supported
-	err = tf.doDestroy(instance.ID(*id), false)
+	err = tf.Destroy(instance.ID(*id), instance.RollingUpdate)
 	require.NoError(t, err)
 	// Instance file has been removed; dedicated file still exists
 	files, err = ioutil.ReadDir(dir)
