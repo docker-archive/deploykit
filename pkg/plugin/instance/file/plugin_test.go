@@ -28,7 +28,7 @@ func run(t *testing.T, properties string) {
 
 	defer os.RemoveAll(dir)
 
-	fileinst := NewFileInstancePlugin(dir)
+	fileinst := NewPlugin(dir)
 
 	config := types.AnyString(properties)
 
