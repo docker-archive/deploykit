@@ -35,6 +35,9 @@ func NewPlugin(opt template.Options) flavor.Plugin {
 	return vanillaFlavor{options: opt}
 }
 
+// DefaultOptions contains the default settings.
+var DefaultOptions = template.Options{}
+
 type vanillaFlavor struct {
 	options template.Options
 }
