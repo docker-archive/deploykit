@@ -711,10 +711,13 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 }
 
 // Destroy terminates an existing instance.
-func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
-	// TODO(kaufers): When SPI is updated with context, updated 2nd arg to false
-	// for rolling updated so that attached resources are not destroyed
-	err := p.doDestroy(instance, true)
+func (p *plugin) Destroy(instID instance.ID, context instance.Context) error {
+	processAttach := true
+	if context == instance.RollingUpdate {
+		// Do not destroy related resources since this instance will be re-provisioned
+		processAttach = false
+	}
+	err := p.doDestroy(instID, processAttach)
 	return err
 }
 
@@ -733,7 +736,7 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 	filename := string(inst) + ".tf.json"
 	fp := filepath.Join(p.Dir, filename)
 
-	log.Debugln("destroy instance", fp)
+	log.Debugf("Destroying instance %v, processAttach: %v", fp, processAttach)
 	// Optionally destroy the related resources
 	if processAttach {
 		// Get an referenced resources in the "infrakit.attach" tag
