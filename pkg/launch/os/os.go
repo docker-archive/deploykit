@@ -3,6 +3,7 @@ package os
 import (
 	"sync"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -47,23 +48,24 @@ func (l *Launcher) Name() string {
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes (which uses shell to run the real task in
 // background).
-func (l *Launcher) Exec(name string, config *types.Any) (<-chan error, error) {
+func (l *Launcher) Exec(name string, config *types.Any) (plugin.Name, <-chan error, error) {
 
+	pn := plugin.Name(name)
 	launchConfig := &LaunchConfig{}
 	if err := config.Decode(launchConfig); err != nil {
-		return nil, err
+		return pn, nil, err
 	}
 
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
 	if s, has := l.plugins[name]; has {
-		return s.wait, nil
+		return pn, s.wait, nil
 	}
 
 	s := state{}
 	l.plugins[name] = s
 	s.wait = start(l, name, launchConfig.Cmd, !launchConfig.SamePgID)
 
-	return s.wait, nil
+	return pn, s.wait, nil
 }

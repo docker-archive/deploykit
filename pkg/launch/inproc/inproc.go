@@ -6,16 +6,19 @@ import (
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/types"
 )
 
+var log = logutil.New("module", "launch/inproc")
+
 // PluginRunFunc is a function that takes the plugin lookup, a configuration blob and starts the plugin
 // and returns a stoppable, running channel (for optionally blocking), and error.
 type PluginRunFunc func(func() discovery.Plugins,
-	*types.Any) (name plugin.Name, plugins []interface{}, onStop func(), err error)
+	*types.Any) (name plugin.Name, plugins map[run.PluginCode]interface{}, onStop func(), err error)
 
 type builder struct {
 	lookup  string
@@ -71,6 +74,7 @@ func NewLauncher(n string, plugins func() discovery.Plugins) (*Launcher, error) 
 	return &Launcher{
 		name:    n,
 		running: map[string]state{},
+		plugins: plugins,
 	}, nil
 }
 
@@ -96,31 +100,33 @@ func (l *Launcher) Name() string {
 // The channel is closed as soon as an error (or nil for success completion) is written.
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes.  However, the plugin is running in process.
-func (l *Launcher) Exec(name string, config *types.Any) (starting <-chan error, err error) {
+func (l *Launcher) Exec(name string, config *types.Any) (pluginName plugin.Name, starting <-chan error, err error) {
 
 	if s, has := l.running[name]; has {
-		return s.wait, nil
+		return pluginName, s.wait, nil
 	}
 
 	builder, has := builders[name]
 	if !has {
-		return nil, fmt.Errorf("cannot start plugin %v", name)
+		return pluginName, nil, fmt.Errorf("cannot start plugin %v", name)
 	}
 
 	s := state{}
 	l.running[name] = s
 
-	sc := make(chan error)
+	sc := make(chan error, 1)
 	defer close(sc)
 
 	s.wait = sc
 
 	pluginName, impls, onStop, err := builder.run(l.plugins, config)
 	if err != nil {
+		log.Warn("error executing inproc", "plugin", name, "config", config, "err", err)
 		sc <- err
+		return pluginName, s.wait, err
 	}
 
 	s.stoppable, s.running, err = run.ServeRPC(pluginName, onStop, impls)
 
-	return s.wait, nil
+	return pluginName, s.wait, nil
 }

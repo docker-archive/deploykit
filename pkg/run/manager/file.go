@@ -40,6 +40,7 @@ var DefaultBackendFileOptions = Options{
 	Backend: "file",
 	Settings: types.AnyValueMust(
 		BackendFileOptions{
+			ID:           "manager1",
 			PollInterval: 5 * time.Second,
 			LeaderFile:   run.GetEnv(EnvLeaderFile, filepath.Join(run.InfrakitHome(), "leader")),
 			StoreDir:     run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "configs")),

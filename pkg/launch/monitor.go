@@ -129,19 +129,19 @@ type StartPlugin struct {
 	Plugin  plugin.Name
 	Exec    ExecName
 	Options *types.Any // options that can override the defaults in the rules
-	Started func(*types.Any)
-	Error   func(*types.Any, error)
+	Started func(plugin.Name, *types.Any)
+	Error   func(plugin.Name, *types.Any, error)
 }
 
-func (s StartPlugin) reportError(config *types.Any, e error) {
+func (s StartPlugin) reportError(n plugin.Name, config *types.Any, e error) {
 	if s.Error != nil {
-		go s.Error(config, e)
+		go s.Error(n, config, e)
 	}
 }
 
-func (s StartPlugin) reportSuccess(config *types.Any) {
+func (s StartPlugin) reportSuccess(n plugin.Name, config *types.Any) {
 	if s.Started != nil {
-		go s.Started(config)
+		go s.Started(n, config)
 	}
 }
 
@@ -181,7 +181,7 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 				}
 				if !has {
 					log.Warn("no plugin", "plugin", req.Plugin)
-					req.reportError(nil, errNoConfig)
+					req.reportError(plugin.Name(""), nil, errNoConfig)
 					continue loop
 				}
 				if properties != nil {
@@ -193,26 +193,28 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 
 			exec, has := m.execs[req.Exec]
 			if !has {
-				req.reportError(configCopy, fmt.Errorf("no exec:%v", req.Exec))
+				req.reportError(plugin.Name(""), configCopy, fmt.Errorf("no exec:%v", req.Exec))
 				continue loop
 			}
 
-			log.Info("Starting plugin", "executor", exec.Name(), "plugin", req.Plugin, "exec=", req.Exec)
+			log.Info("Starting plugin", "executor", exec.Name(), "plugin", req.Plugin, "exec", req.Exec)
 
-			block, err := exec.Exec(req.Plugin.String(), configCopy)
+			pluginName, block, err := exec.Exec(req.Plugin.String(), configCopy)
 			if err != nil {
-				req.reportError(configCopy, err)
+				log.Warn("error starting plugin", "err", err, "config", configCopy, "plugin", req.Plugin, "lookup", pluginName)
+				req.reportError(pluginName, configCopy, err)
 				continue loop
 			}
 
-			log.Info("Waiting for startup", "plugin", req.Plugin, "config", configCopy.String())
+			log.Info("Waiting for startup", "plugin", req.Plugin, "config", configCopy.String(), "lookup", pluginName)
 			err = <-block
 			if err != nil {
-				req.reportError(configCopy, err)
+				log.Warn("error startup", "err", err, "config", configCopy, "plugin", req.Plugin)
+				req.reportError(pluginName, configCopy, err)
 				continue loop
 			}
 
-			req.reportSuccess(configCopy)
+			req.reportSuccess(pluginName, configCopy)
 		}
 	}()
 

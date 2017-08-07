@@ -12,7 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
-	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -21,21 +21,20 @@ const (
 	// CanonicalName is the canonical name of the plugin and also key used to locate the plugin in discovery
 	CanonicalName = "manager"
 
+	// LookupName is the name used to look up the object via discovery
+	LookupName = "group"
+
 	// EnvOptionsBackend is the environment variable to use to set the default value of Options.Backend
 	EnvOptionsBackend = "INFRAKIT_MANAGER_OPTIONS_BACKEND"
 )
 
 var (
 	log                   = logutil.New("module", "run/manager")
-	defaultOptionsBackend = os.Getenv(EnvOptionsBackend)
+	defaultOptionsBackend = run.GetEnv(EnvOptionsBackend, "file")
 )
 
 func init() {
-	if defaultOptionsBackend == "" {
-		defaultOptionsBackend = "file"
-	}
-
-	inproc.Register("instance-manager", Run, DefaultOptions)
+	inproc.Register(CanonicalName, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the plugin.
@@ -74,7 +73,11 @@ func defaultOptions() (options Options) {
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins,
-	config *types.Any) (name plugin.Name, impls []interface{}, onStop func(), err error) {
+	config *types.Any) (name plugin.Name, impls map[run.PluginCode]interface{}, onStop func(), err error) {
+
+	if plugins == nil {
+		panic("no plugins()")
+	}
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -82,32 +85,50 @@ func Run(plugins func() discovery.Plugins,
 		return
 	}
 
+	log.Info("Decoded input", "config", options)
+	log.Info("Starting up", "backend", options.Backend)
+
 	var leader leader.Detector
 	var snapshot store.Snapshot
-	var cleanUp func()
+	var cleanUpFunc func()
 
 	switch strings.ToLower(options.Backend) {
 	case "etcd":
 		backendOptions := BackendEtcdOptions{}
-		err = config.Decode(&backendOptions)
+		err = options.Settings.Decode(&backendOptions)
 		if err != nil {
 			return
 		}
-		leader, snapshot, cleanUp, err = etcdBackends(backendOptions)
+		log.Info("starting up etcd backend", "options", backendOptions)
+		leader, snapshot, cleanUpFunc, err = etcdBackends(backendOptions)
+		if err != nil {
+			return
+		}
+		log.Info("etcd backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
 	case "file":
 		backendOptions := BackendFileOptions{}
-		err = config.Decode(&backendOptions)
+		err = options.Settings.Decode(&backendOptions)
 		if err != nil {
 			return
 		}
-		leader, snapshot, cleanUp, err = fileBackends(backendOptions)
+		log.Info("starting up file backend", "options", backendOptions)
+		leader, snapshot, cleanUpFunc, err = fileBackends(backendOptions)
+		if err != nil {
+			return
+		}
+		log.Info("file backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
 	case "swarm":
 		backendOptions := BackendSwarmOptions{}
-		err = config.Decode(&backendOptions)
+		err = options.Settings.Decode(&backendOptions)
 		if err != nil {
 			return
 		}
-		leader, snapshot, cleanUp, err = swarmBackends(backendOptions)
+		log.Info("starting up swarm backend", "options", backendOptions)
+		leader, snapshot, cleanUpFunc, err = swarmBackends(backendOptions)
+		if err != nil {
+			return
+		}
+		log.Info("swarm backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
 	default:
 		err = fmt.Errorf("unknown backend:%v", options.Backend)
 		return
@@ -120,16 +141,20 @@ func Run(plugins func() discovery.Plugins,
 		return
 	}
 
+	log.Info("start manager")
+
 	_, err = mgr.Start()
 	if err != nil {
 		return
 	}
 
+	log.Info("manager running")
+
 	updatable := &metadataModel{
 		snapshot: snapshot,
 		manager:  mgr,
 	}
-	updatableModel, stopUpdatable := updatable.pluginModel()
+	updatableModel, _ := updatable.pluginModel()
 	stopRelay := make(chan struct{})
 	copy1 := make(chan func(map[string]interface{}))
 	copy2 := make(chan func(map[string]interface{}))
@@ -141,23 +166,32 @@ func Run(plugins func() discovery.Plugins,
 				copy1 <- data
 				copy2 <- data
 			case <-stopRelay:
-				close(stopUpdatable)
+				return // finished
 			}
 		}
 	}()
-	name = plugin.Name(CanonicalName)
-	impls = []interface{}{
-		mgr,
-		mgr.(group.Plugin),
-		metadata_plugin.NewUpdatablePlugin(
-			metadata_plugin.NewPluginFromChannel(copy1),
-			updatable.load, updatable.commit),
-		metadata_plugin.NewPluginFromChannel(copy2),
+
+	name = plugin.Name(LookupName)
+
+	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
+		metadata_plugin.NewPluginFromChannel(updatableModel),
+		updatable.load, updatable.commit)
+
+	impls = map[run.PluginCode]interface{}{
+		run.Manager:           mgr,
+		run.Group:             mgr,
+		run.MetadataUpdatable: metadataUpdatable,
+		run.Metadata:          metadataUpdatable,
 	}
+
 	onStop = func() {
-		cleanUp()
+		if cleanUpFunc != nil {
+			cleanUpFunc()
+		}
 		close(stopRelay)
 	}
+
+	log.Info("exported objects")
 	return
 }
 

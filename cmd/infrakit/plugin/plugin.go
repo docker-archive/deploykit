@@ -29,6 +29,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/controller/group"
 	_ "github.com/docker/infrakit/pkg/run/flavor/vanilla"
 	_ "github.com/docker/infrakit/pkg/run/instance/file"
+	_ "github.com/docker/infrakit/pkg/run/manager"
 )
 
 var log = logutil.New("module", "cli/plugin")
@@ -150,11 +151,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
+	mustAll := start.Flags().Bool("all", true, "Panic if any plugin fails to start")
 
 	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
 	start.Flags().AddFlagSet(templateFlags)
 
 	start.RunE = func(c *cobra.Command, args []string) error {
+
+		if plugins == nil {
+			panic("no plugins()")
+		}
 
 		parsedRules := []launch.Rule{}
 
@@ -247,20 +253,20 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			close(waitDoneStartAll)
 		}()
 
-		started := make(chan string, 10)
+		started := make(chan plugin.Name, 10)
 		for _, inst := range toStart {
 
-			lookup, _ := inst.Plugin.GetLookupAndType()
-
 			// Assign callbacks to help with signaling
-
-			inst.Started = func(config *types.Any) {
-				fmt.Println(lookup, "started.")
-				started <- lookup
+			inst.Started = func(n plugin.Name, config *types.Any) {
+				fmt.Println(n, "started.")
+				started <- n
 				wgStartAll.Done()
 			}
-			inst.Error = func(config *types.Any, err error) {
-				fmt.Println("Error starting", lookup, "err=", err)
+			inst.Error = func(n plugin.Name, config *types.Any, err error) {
+				if *mustAll {
+					panic(err)
+				}
+				fmt.Println("Error starting", "lookup", inst.Plugin, "err", err)
 				wgStartAll.Done()
 			}
 
@@ -272,7 +278,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		// wait for all the plugins to come up
 		<-waitDoneStartAll
 
-		log.Info("Plugins have started.")
+		log.Info("Done waiting on plugin starts")
 
 		// Block by polling for the plugin socket files.  We keep this process blocking
 		// until all the plugins specified have exited and removed their socket files.
@@ -283,7 +289,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		for {
 			select {
 			case target := <-started:
-				targets = append(targets, target)
+				lookup, _ := target.GetLookupAndType()
+				log.Debug("Start watching", "lookup", lookup)
+				targets = append(targets, lookup)
 
 			case <-checkNow:
 				log.Debug("Checking on targets", "targets", targets)
@@ -373,6 +381,7 @@ func countMatches(list []string, found map[string]*plugin.Endpoint) int {
 	c := 0
 	for _, l := range list {
 		if _, has := found[l]; has {
+			log.Debug("Scan found", "lookup", l)
 			c++
 		}
 	}

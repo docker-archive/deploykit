@@ -6,6 +6,7 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/flavor/vanilla"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -35,7 +36,7 @@ var DefaultOptions = Options{
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins,
-	config *types.Any) (name plugin.Name, impls []interface{}, onStop func(), err error) {
+	config *types.Any) (name plugin.Name, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -44,8 +45,8 @@ func Run(plugins func() discovery.Plugins,
 	}
 
 	name = plugin.Name(options.Name)
-	impls = []interface{}{
-		vanilla.NewPlugin(options.Options),
+	impls = map[run.PluginCode]interface{}{
+		run.Flavor: vanilla.NewPlugin(options.Options),
 	}
 	return
 }

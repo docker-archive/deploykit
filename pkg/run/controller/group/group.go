@@ -11,15 +11,27 @@ import (
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
 	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
 
+const (
+	// CanonicalName is the canonical name of the plugin. Used for command line identification
+	CanonicalName = "group"
+
+	// LookupName is the name used to look up the object via discovery
+	LookupName = "group-stateless"
+
+	// EnvOptionsBackend is the environment variable to use to set the default value of Options.Backend
+	EnvOptionsBackend = "INFRAKIT_MANAGER_OPTIONS_BACKEND"
+)
+
 var log = logutil.New("module", "run/group")
 
 func init() {
-	inproc.Register("group-stateless", Run, DefaultOptions)
+	inproc.Register(CanonicalName, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the group controller.
@@ -43,7 +55,7 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Name:                    plugin.Name("group-stateless"),
+	Name:                    plugin.Name(LookupName),
 	PollInterval:            10 * time.Second,
 	MaxParallelNum:          0,
 	PollIntervalGroupSpec:   1 * time.Second,
@@ -53,7 +65,7 @@ var DefaultOptions = Options{
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins,
-	config *types.Any) (name plugin.Name, impls []interface{}, onStop func(), err error) {
+	config *types.Any) (name plugin.Name, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -130,9 +142,9 @@ func Run(plugins func() discovery.Plugins,
 	}()
 
 	name = options.Name
-	impls = []interface{}{
-		metadata_plugin.NewPluginFromChannel(updateSnapshot),
-		groupPlugin,
+	impls = map[run.PluginCode]interface{}{
+		run.Metadata: metadata_plugin.NewPluginFromChannel(updateSnapshot),
+		run.Group:    groupPlugin,
 	}
 	onStop = func() {
 		close(stopSnapshot)
