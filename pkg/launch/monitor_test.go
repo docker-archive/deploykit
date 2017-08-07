@@ -23,16 +23,17 @@ func (l *testLauncher) Name() string {
 	return l.name
 }
 
-func (l *testLauncher) Exec(name string, config *types.Any) (<-chan error, error) {
+func (l *testLauncher) Exec(name string, config *types.Any) (plugin.Name, <-chan error, error) {
+	pn := plugin.Name(name)
 	rule := testConfig{}
 	err := config.Decode(&rule)
 	if err != nil {
-		return nil, err
+		return pn, nil, err
 	}
 	c := make(chan error)
 	l.callback(config)
 	close(c)
-	return c, nil
+	return pn, c, nil
 }
 
 func TestMonitorLoopNoRules(t *testing.T) {
@@ -52,7 +53,7 @@ func TestMonitorLoopNoRules(t *testing.T) {
 	input <- StartPlugin{
 		Plugin: "test",
 		Exec:   ExecName("test"),
-		Error: func(config *types.Any, e error) {
+		Error: func(pn plugin.Name, config *types.Any, e error) {
 			errChan <- e
 		},
 	}
@@ -95,7 +96,7 @@ func TestMonitorLoopValidRule(t *testing.T) {
 	input <- StartPlugin{
 		Plugin: "hello",
 		Exec:   ExecName("test"),
-		Started: func(config *types.Any) {
+		Started: func(pn plugin.Name, config *types.Any) {
 			close(started)
 		},
 	}
@@ -140,7 +141,7 @@ func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
 	input <- StartPlugin{
 		Plugin: "hello",
 		Exec:   ExecName("test"),
-		Started: func(config *types.Any) {
+		Started: func(pn plugin.Name, config *types.Any) {
 			close(started)
 		},
 	}
@@ -191,7 +192,7 @@ func TestMonitorLoopRuleOverrideOptions(t *testing.T) {
 		Plugin:  "hello",
 		Exec:    ExecName("test"),
 		Options: types.AnyValueMust(options),
-		Started: func(config *types.Any) {
+		Started: func(pn plugin.Name, config *types.Any) {
 			close(started)
 		},
 	}
