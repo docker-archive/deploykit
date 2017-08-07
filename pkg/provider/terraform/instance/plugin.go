@@ -911,7 +911,6 @@ func parseTerraformTags(vmType TResourceType, m TResourceProperties) map[string]
 			for _, v := range tagsSlice {
 				value := fmt.Sprintf("%v", v)
 				if strings.Contains(value, ":") {
-					log.Debugln("parseTerraformTags system tags detected v=", v)
 					// This assumes that the first colon is separating the key and the value of the tag.
 					// This is done so that colons are valid characters in the value.
 					vv := strings.SplitN(value, ":", 2)
