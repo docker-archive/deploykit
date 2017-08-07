@@ -88,6 +88,10 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 	if err := p.processImport(importOpts); err != nil {
 		panic(err)
 	}
+	// Ensure that tha apply goroutine is always running; it will only run "terraform apply"
+	// if the current node is the leader. However, when leadership changes, a Provision is
+	// not guaranteed to be executed so we need to create the goroutine now.
+	p.terraformApply()
 	return &p
 }
 
