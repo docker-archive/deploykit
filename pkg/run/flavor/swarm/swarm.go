@@ -8,6 +8,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/flavor/swarm"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -76,6 +77,10 @@ func Run(plugins func() discovery.Plugins,
 	name = plugin.Name(options.Name)
 	impls = map[run.PluginCode]interface{}{
 		run.Flavor: map[string]flavor.Plugin{
+			"manager": managerFlavor,
+			"worker":  workerFlavor,
+		},
+		run.Metadata: map[string]metadata.Plugin{
 			"manager": managerFlavor,
 			"worker":  workerFlavor,
 		},
