@@ -15,28 +15,29 @@ import (
 	"os"
 )
 
-type options struct {
-	region          string
-	accessKeyID     string
-	secretAccessKey string
-	sessionToken    string
-	retries         int
+// Options contain the options for aws plugin
+type Options struct {
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+	SessionToken    string
+	Retries         int
 }
 
 // Builder is a ProvisionerBuilder that creates an AWS instance provisioner.
 type Builder struct {
 	Config  client.ConfigProvider
-	options options
+	Options Options
 }
 
 // Flags returns the flags required.
 func (b *Builder) Flags() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("aws", pflag.PanicOnError)
-	flags.StringVar(&b.options.region, "region", "", "AWS region")
-	flags.StringVar(&b.options.accessKeyID, "access-key-id", "", "IAM access key ID")
-	flags.StringVar(&b.options.secretAccessKey, "secret-access-key", "", "IAM access key secret")
-	flags.StringVar(&b.options.sessionToken, "session-token", "", "AWS STS token")
-	flags.IntVar(&b.options.retries, "retries", 5, "Number of retries for AWS API operations")
+	flags.StringVar(&b.Options.Region, "region", "", "AWS region")
+	flags.StringVar(&b.Options.AccessKeyID, "access-key-id", "", "IAM access key ID")
+	flags.StringVar(&b.Options.SecretAccessKey, "secret-access-key", "", "IAM access key secret")
+	flags.StringVar(&b.Options.SessionToken, "session-token", "", "AWS STS token")
+	flags.IntVar(&b.Options.Retries, "retries", 5, "Number of retries for AWS API operations")
 	return flags
 }
 
@@ -49,18 +50,18 @@ func (b *Builder) BuildInstancePlugin(namespaceTags map[string]string) (instance
 			&credentials.SharedCredentialsProvider{},
 		}
 
-		if (len(b.options.accessKeyID) > 0 && len(b.options.secretAccessKey) > 0) || len(b.options.sessionToken) > 0 {
+		if (len(b.Options.AccessKeyID) > 0 && len(b.Options.SecretAccessKey) > 0) || len(b.Options.SessionToken) > 0 {
 			staticCreds := credentials.StaticProvider{
 				Value: credentials.Value{
-					AccessKeyID:     b.options.accessKeyID,
-					SecretAccessKey: b.options.secretAccessKey,
-					SessionToken:    b.options.sessionToken,
+					AccessKeyID:     b.Options.AccessKeyID,
+					SecretAccessKey: b.Options.SecretAccessKey,
+					SessionToken:    b.Options.SessionToken,
 				},
 			}
 			providers = append(providers, &staticCreds)
 		}
 
-		if b.options.region == "" {
+		if b.Options.Region == "" {
 			log.Println("region not specified, attempting to discover from EC2 instance metadata")
 			region, err := GetRegion()
 			if err != nil {
@@ -68,15 +69,15 @@ func (b *Builder) BuildInstancePlugin(namespaceTags map[string]string) (instance
 			}
 
 			log.Printf("Defaulting to local region %s\n", region)
-			b.options.region = region
+			b.Options.Region = region
 		}
 
 		b.Config = session.New(aws.NewConfig().
-			WithRegion(b.options.region).
+			WithRegion(b.Options.Region).
 			WithCredentials(credentials.NewChainCredentials(providers)).
 			WithLogger(GetLogger()).
 			//WithLogLevel(aws.LogDebugWithRequestErrors).
-			WithMaxRetries(b.options.retries))
+			WithMaxRetries(b.Options.Retries))
 	}
 
 	return NewInstancePlugin(ec2.New(b.Config), namespaceTags), nil

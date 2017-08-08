@@ -70,8 +70,17 @@ func ServeRPC(name plugin.Name, onStop func(),
 			log.Debug("group_rpc.PluginServer", "p", p)
 			plugins = append(plugins, group_rpc.PluginServer(p.(group.Plugin)))
 		case Instance:
-			log.Debug("instance_rpc.PluginServer", "p", p)
-			plugins = append(plugins, instance_rpc.PluginServer(p.(instance.Plugin)))
+			switch pp := p.(type) {
+			case map[string]instance.Plugin:
+				log.Debug("instance_rpc.PluginServerWithTypes", "pp", pp)
+				plugins = append(plugins, instance_rpc.PluginServerWithTypes(pp))
+			case instance.Plugin:
+				log.Debug("instance_rpc.PluginServer", "pp", pp)
+				plugins = append(plugins, instance_rpc.PluginServer(pp))
+			default:
+				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				return
+			}
 		case Flavor:
 			switch pp := p.(type) {
 			case map[string]flavor.Plugin:
@@ -101,8 +110,17 @@ func ServeRPC(name plugin.Name, onStop func(),
 				return
 			}
 		case Event:
-			log.Debug("event_rpc.PluginServer", "p", p)
-			plugins = append(plugins, event_rpc.PluginServer(p.(event.Plugin)))
+			switch pp := p.(type) {
+			case map[string]event.Plugin:
+				log.Debug("event_rpc.PluginServerWithTypes", "pp", pp)
+				plugins = append(plugins, event_rpc.PluginServerWithTypes(pp))
+			case event.Plugin:
+				log.Debug("event_rpc.PluginServer", "pp", pp)
+				plugins = append(plugins, event_rpc.PluginServer(pp))
+			default:
+				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				return
+			}
 		case Resource:
 			log.Debug("resource_rpc.PluginServer", "p", p)
 			plugins = append(plugins, resource_rpc.PluginServer(p.(resource.Plugin)))

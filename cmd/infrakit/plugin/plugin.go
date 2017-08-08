@@ -27,6 +27,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v1/controller/group"
 	_ "github.com/docker/infrakit/pkg/run/v1/flavor/swarm"
 	_ "github.com/docker/infrakit/pkg/run/v1/flavor/vanilla"
+	_ "github.com/docker/infrakit/pkg/run/v1/instance/aws"
 	_ "github.com/docker/infrakit/pkg/run/v1/instance/file"
 	_ "github.com/docker/infrakit/pkg/run/v1/manager"
 )
@@ -296,16 +297,4 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	cmd.AddCommand(ls, start, stop)
 
 	return cmd
-}
-
-// counts the number of matches by name
-func countMatches(list []string, found map[string]*plugin.Endpoint) int {
-	c := 0
-	for _, l := range list {
-		if _, has := found[l]; has {
-			log.Debug("Scan found", "lookup", l)
-			c++
-		}
-	}
-	return c
 }
