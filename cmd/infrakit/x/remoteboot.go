@@ -16,7 +16,7 @@ const iPXEURL = "https://boot.ipxe.org/undionly.kpxe"
 func remoteBootCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:   "remoteboot",
+		Use:   "remoteboot [kernel] [initrd] [\"kernel string\"]",
 		Short: "Used to remotely boot OS instances",
 	}
 
@@ -35,6 +35,10 @@ func remoteBootCommand() *cobra.Command {
 	leasecount := cmd.Flags().Int("leasecount", 20, "Amount of leases to advertise")
 	startAddress := cmd.Flags().String("startAddress", "", "Start advertised address [REQUIRED]")
 
+	// kernelPath := cmd.Flags().String("kernel", "", "Path of the Kernel file [Needs to be within the current working directory]")
+	// initrdPath := cmd.Flags().String("initrd", "", "Path of the initrd file [Needs to be within the current working directory]")
+	// cmdLine := cmd.Flags().String("cmdline", "", "A string containing additional command line options to be passed to the kernel")
+
 	var pulliPXE = &cobra.Command{
 		Use:   "pulliPXE",
 		Short: "Attempts to download iPXE to the current working directory",
@@ -45,6 +49,15 @@ func remoteBootCommand() *cobra.Command {
 	cmd.AddCommand(pulliPXE)
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
+
+		if len(args) != 3 {
+			fmt.Printf("Argument count = %d\n", len(args))
+
+			if *enableHTTP == true {
+				log.Crit("The arguments for a kernel, initrd and cmdline string are needed")
+				return nil
+			}
+		}
 
 		if *adapter == "" {
 			cmd.Usage()
@@ -65,6 +78,11 @@ func remoteBootCommand() *cobra.Command {
 			*dns,
 			*leasecount,
 			*startAddress)
+		if *enableHTTP == true {
+			remote.Kernel = args[0]
+			remote.Initrd = args[1]
+			remote.Cmdline = args[2]
+		}
 
 		if err != nil {
 			log.Crit("%v", err)
