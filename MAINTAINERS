@@ -14,6 +14,7 @@
 		       "chungers",
 		       "kaufers",
 		       "ndegory",
+		       "thebsdbox",
 		       "YujiOshima"
 		]
 
@@ -44,6 +45,11 @@
 	Name = "Nicolas Degory"
 	Email = "nicolas.degory@gmail.com"
 	GitHub = "ndegory"
+
+	[people.thebsdbox]
+	Name = "Dan Finneran"
+	Email = "daniel.finneran@gmail.com"
+	GitHub = "thebsdbox"
 
 	[people.vdemeester]
 	Name = "Vincent Demeester"
