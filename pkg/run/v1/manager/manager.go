@@ -2,8 +2,10 @@ package manager
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
@@ -12,6 +14,8 @@ import (
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
+	"github.com/docker/infrakit/pkg/rpc/mux"
+	rpc "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
@@ -48,6 +52,26 @@ type Options struct {
 
 	// Settings is the configuration of the backend
 	Settings *types.Any
+
+	// Mux is the tcp frontend for remote connectivity
+	Mux *MuxConfig
+}
+
+// MuxConfig is the struct for the mux frontend
+type MuxConfig struct {
+	// Listen string e.g. :24864
+	Listen string
+
+	// URL is the url of this node -- e.g. http://public_ip:24864
+	URL string
+
+	// PollInterval is interval of polling leadership
+	PollInterval time.Duration
+
+	location *url.URL                 `json:"-" yaml:"-"`
+	plugins  func() discovery.Plugins `json:"-" yaml:"-"`
+	poller   *leader.Poller           `json:"-" yaml:"-"`
+	store    leader.Store             `json:"-" yaml:"-"`
 }
 
 // DefaultOptions return an Options with default values filled in.
@@ -88,9 +112,15 @@ func Run(plugins func() discovery.Plugins,
 	log.Info("Decoded input", "config", options)
 	log.Info("Starting up", "backend", options.Backend)
 
-	var leader leader.Detector
+	var leaderDetector leader.Detector
 	var snapshot store.Snapshot
 	var cleanUpFunc func()
+
+	// If mux config is set then build up the object with runtime components like discovery and then
+	// the backends will configure the Mux object.
+	if options.Mux != nil {
+		options.Mux.plugins = plugins
+	}
 
 	switch strings.ToLower(options.Backend) {
 	case "etcd":
@@ -100,11 +130,11 @@ func Run(plugins func() discovery.Plugins,
 			return
 		}
 		log.Info("starting up etcd backend", "options", backendOptions)
-		leader, snapshot, cleanUpFunc, err = etcdBackends(backendOptions)
+		leaderDetector, snapshot, cleanUpFunc, err = etcdBackends(backendOptions)
 		if err != nil {
 			return
 		}
-		log.Info("etcd backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
+		log.Info("etcd backend", "leader", leaderDetector, "store", snapshot, "cleanup", cleanUpFunc)
 	case "file":
 		backendOptions := BackendFileOptions{}
 		err = options.Settings.Decode(&backendOptions)
@@ -112,11 +142,11 @@ func Run(plugins func() discovery.Plugins,
 			return
 		}
 		log.Info("starting up file backend", "options", backendOptions)
-		leader, snapshot, cleanUpFunc, err = fileBackends(backendOptions)
+		leaderDetector, snapshot, cleanUpFunc, err = fileBackends(backendOptions, options.Mux)
 		if err != nil {
 			return
 		}
-		log.Info("file backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
+		log.Info("file backend", "leader", leaderDetector, "store", snapshot, "cleanup", cleanUpFunc)
 	case "swarm":
 		backendOptions := BackendSwarmOptions{}
 		err = options.Settings.Decode(&backendOptions)
@@ -124,11 +154,11 @@ func Run(plugins func() discovery.Plugins,
 			return
 		}
 		log.Info("starting up swarm backend", "options", backendOptions)
-		leader, snapshot, cleanUpFunc, err = swarmBackends(backendOptions)
+		leaderDetector, snapshot, cleanUpFunc, err = swarmBackends(backendOptions)
 		if err != nil {
 			return
 		}
-		log.Info("swarm backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
+		log.Info("swarm backend", "leader", leaderDetector, "store", snapshot, "cleanup", cleanUpFunc)
 	default:
 		err = fmt.Errorf("unknown backend:%v", options.Backend)
 		return
@@ -136,7 +166,7 @@ func Run(plugins func() discovery.Plugins,
 
 	var mgr manager.Backend
 	lookup, _ := options.BackendName.GetLookupAndType()
-	mgr, err = manager.NewManager(plugins(), leader, snapshot, lookup)
+	mgr, err = manager.NewManager(plugins(), leaderDetector, snapshot, lookup)
 	if err != nil {
 		return
 	}
@@ -155,21 +185,6 @@ func Run(plugins func() discovery.Plugins,
 		manager:  mgr,
 	}
 	updatableModel, _ := updatable.pluginModel()
-	stopRelay := make(chan struct{})
-	copy1 := make(chan func(map[string]interface{}))
-	copy2 := make(chan func(map[string]interface{}))
-	go func() {
-		// relay data
-		for {
-			select {
-			case data := <-updatableModel:
-				copy1 <- data
-				copy2 <- data
-			case <-stopRelay:
-				return // finished
-			}
-		}
-	}()
 
 	name = plugin.Name(LookupName)
 
@@ -184,11 +199,40 @@ func Run(plugins func() discovery.Plugins,
 		run.Metadata:          metadataUpdatable,
 	}
 
+	var muxServer rpc.Stoppable
+	if options.Mux != nil {
+		var leadership <-chan leader.Leadership
+
+		if options.Mux.store != nil && options.Mux.poller != nil {
+			log.Info("Starting leader poller")
+			options.Mux.poller.ReportLocation(options.Mux.location, options.Mux.store)
+
+			l, err := options.Mux.poller.Start()
+			if err != nil {
+				panic(err)
+			}
+			leadership = l
+		}
+
+		log.Info("Starting mux server", "listen", options.Mux.Listen)
+		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.plugins,
+			mux.Options{
+				Leadership: leadership,
+				Registry:   options.Mux.store,
+			})
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	onStop = func() {
 		if cleanUpFunc != nil {
 			cleanUpFunc()
 		}
-		close(stopRelay)
+		if muxServer != nil {
+			options.Mux.poller.Stop()
+			muxServer.Stop()
+		}
 	}
 
 	log.Info("exported objects")

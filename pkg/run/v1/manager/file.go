@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -18,6 +19,9 @@ const (
 
 	// EnvStoreDir is the directory where the configs are stored
 	EnvStoreDir = "INFRAKIT_STORE_DIR"
+
+	// EnvURL is the location of this node
+	EnvURL = "INFRAKIT_URL"
 )
 
 // BackendFileOptions contain the options for the file backend
@@ -33,6 +37,9 @@ type BackendFileOptions struct {
 
 	// ID is the id of the node
 	ID string
+
+	// LeaderLocationFile is the path to the file that stores the leader's location
+	LeaderLocationFile string
 }
 
 // DefaultBackendFileOptions is the default for the file backend
@@ -40,15 +47,22 @@ var DefaultBackendFileOptions = Options{
 	Backend: "file",
 	Settings: types.AnyValueMust(
 		BackendFileOptions{
-			ID:           "manager1",
-			PollInterval: 5 * time.Second,
-			LeaderFile:   run.GetEnv(EnvLeaderFile, filepath.Join(run.InfrakitHome(), "leader")),
-			StoreDir:     run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "configs")),
+			ID:                 "manager1",
+			PollInterval:       5 * time.Second,
+			LeaderFile:         run.GetEnv(EnvLeaderFile, filepath.Join(run.InfrakitHome(), "leader")),
+			StoreDir:           run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "configs")),
+			LeaderLocationFile: run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "leader.loc")),
 		},
 	),
+	Mux: &MuxConfig{
+		Listen:       ":24864",
+		URL:          run.GetEnv(EnvURL, "http://localhost:24864"),
+		PollInterval: 5 * time.Second,
+	},
 }
 
-func fileBackends(options BackendFileOptions) (leader.Detector, store.Snapshot, cleanup, error) {
+func fileBackends(options BackendFileOptions, muxConfig *MuxConfig) (leader.Detector, store.Snapshot, cleanup, error) {
+
 	leader, err := file_leader.NewDetector(options.PollInterval, options.LeaderFile, options.ID)
 	if err != nil {
 		return nil, nil, nil, err
@@ -57,6 +71,23 @@ func fileBackends(options BackendFileOptions) (leader.Detector, store.Snapshot, 
 	snapshot, err := file_store.NewSnapshot(options.StoreDir, "global.config")
 	if err != nil {
 		return nil, nil, nil, err
+	}
+
+	if muxConfig != nil {
+
+		u, err := url.Parse(muxConfig.URL)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		muxConfig.location = u
+
+		poller, err := file_leader.NewDetector(muxConfig.PollInterval, options.LeaderFile, options.ID)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		muxConfig.poller = poller
+		muxConfig.store = file_leader.NewStore(options.LeaderLocationFile)
 	}
 
 	return leader, snapshot, nil, nil

@@ -129,7 +129,7 @@ func (m *Manager) Launch(exec string, name plugin.Name, options *types.Any) erro
 	return nil
 }
 
-// Wait blocks until all the plugins stopped.
+// WaitForAllShutdown blocks until all the plugins stopped.
 func (m *Manager) WaitForAllShutdown() {
 	targets := []string{}
 	checkNow := time.Tick(m.scanInterval)
@@ -165,7 +165,7 @@ func countMatches(list []string, found map[string]*plugin.Endpoint) int {
 	return c
 }
 
-// WaitStaring blocks until a current batch of plugins completed starting up.
+// WaitStarting blocks until a current batch of plugins completed starting up.
 func (m *Manager) WaitStarting() {
 	m.wgStartAll.Wait()
 }
