@@ -96,7 +96,7 @@ func (m *Manager) Start(rules []launch.Rule) error {
 }
 
 // Launch launches the plugin
-func (m Manager) Launch(exec string, name plugin.Name, options *types.Any) error {
+func (m *Manager) Launch(exec string, name plugin.Name, options *types.Any) error {
 
 	// check that the plugin is not currently running
 	running, err := m.plugins().List()
@@ -130,7 +130,7 @@ func (m Manager) Launch(exec string, name plugin.Name, options *types.Any) error
 }
 
 // Wait blocks until all the plugins stopped.
-func (m Manager) WaitForAllShutdown() {
+func (m *Manager) WaitForAllShutdown() {
 	targets := []string{}
 	checkNow := time.Tick(m.scanInterval)
 
@@ -166,12 +166,12 @@ func countMatches(list []string, found map[string]*plugin.Endpoint) int {
 }
 
 // WaitStaring blocks until a current batch of plugins completed starting up.
-func (m Manager) WaitStarting() {
+func (m *Manager) WaitStarting() {
 	m.wgStartAll.Wait()
 }
 
 // Stop stops the manager
-func (m Manager) Stop() {
+func (m *Manager) Stop() {
 	m.monitor.Stop()
 	log.Debug("Stopped plugin manager")
 }
