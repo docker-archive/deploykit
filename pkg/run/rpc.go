@@ -73,14 +73,33 @@ func ServeRPC(name plugin.Name, onStop func(),
 			log.Debug("instance_rpc.PluginServer", "p", p)
 			plugins = append(plugins, instance_rpc.PluginServer(p.(instance.Plugin)))
 		case Flavor:
-			log.Debug("flavor_rpc.PluginServer", "p", p)
-			plugins = append(plugins, flavor_rpc.PluginServer(p.(flavor.Plugin)))
+			switch pp := p.(type) {
+			case map[string]flavor.Plugin:
+				log.Debug("flavor_rpc.PluginServerWithTypes", "pp", pp)
+				plugins = append(plugins, flavor_rpc.PluginServerWithTypes(pp))
+			case flavor.Plugin:
+				log.Debug("flavor_rpc.PluginServer", "pp", pp)
+				plugins = append(plugins, flavor_rpc.PluginServer(pp))
+			default:
+				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				return
+			}
+
 		case MetadataUpdatable:
 			log.Debug("metadata_rpc.UpdatablePluginServer", "p", p)
 			plugins = append(plugins, metadata_rpc.UpdatablePluginServer(p.(metadata.Updatable)))
 		case Metadata:
-			log.Debug("metadata_rpc.PluginServer", "p", p)
-			plugins = append(plugins, metadata_rpc.PluginServer(p.(metadata.Plugin)))
+			switch pp := p.(type) {
+			case map[string]metadata.Plugin:
+				log.Debug("metadata_rpc.PluginServerWithTypes", "pp", pp)
+				plugins = append(plugins, metadata_rpc.PluginServerWithTypes(pp))
+			case metadata.Plugin:
+				log.Debug("metadata_rpc.PluginServer", "p", pp)
+				plugins = append(plugins, metadata_rpc.PluginServer(pp))
+			default:
+				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				return
+			}
 		case Event:
 			log.Debug("event_rpc.PluginServer", "p", p)
 			plugins = append(plugins, event_rpc.PluginServer(p.(event.Plugin)))

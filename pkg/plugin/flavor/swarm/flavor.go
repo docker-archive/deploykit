@@ -1,4 +1,4 @@
-package main
+package swarm
 
 import (
 	"fmt"
@@ -28,6 +28,8 @@ const (
 	AllInstances = instance.LogicalID("*")
 )
 
+var defaultTemplateOptions = template.Options{MultiPass: true}
+
 // Spec is the value passed in the `Properties` field of configs
 type Spec struct {
 
@@ -45,13 +47,7 @@ type Spec struct {
 	EngineLabels map[string]string
 
 	// Docker holds the connection params to the Docker engine for join tokens, etc.
-	Docker ConnectInfo
-}
-
-// ConnectInfo holds the connection parameters for connecting to a Docker engine to get join tokens, etc.
-type ConnectInfo struct {
-	Host string
-	TLS  *tlsconfig.Options
+	Docker docker.ConnectInfo
 }
 
 // DockerClient checks the validity of input spec and connects to Docker engine
@@ -86,7 +82,7 @@ func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func
 			case <-tick:
 				snapshot := map[string]interface{}{}
 				docker, err := s.getDockerClient(Spec{
-					Docker: ConnectInfo{
+					Docker: docker.ConnectInfo{
 						Host: "unix:///var/run/docker.sock", // defaults to local socket
 					},
 				})
