@@ -253,7 +253,7 @@ func convertToType(val string) interface{} {
 func doTerraformShow(dir string,
 	resourceType TResourceType) (result map[TResourceName]TResourceProperties, err error) {
 
-	command := exec.Command(`terraform show`).InheritEnvs(true).WithDir(dir)
+	command := exec.Command("terraform show -no-color").InheritEnvs(true).WithDir(dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {
@@ -271,7 +271,7 @@ func doTerraformShow(dir string,
 func doTerraformShowForInstance(dir string,
 	instance string) (result TResourceProperties, err error) {
 
-	command := exec.Command(fmt.Sprintf("terraform state show %v", instance)).InheritEnvs(true).WithDir(dir)
+	command := exec.Command(fmt.Sprintf("terraform state show %v -no-color", instance)).InheritEnvs(true).WithDir(dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {
