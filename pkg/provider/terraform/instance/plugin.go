@@ -21,6 +21,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/nightlyone/lockfile"
 	"github.com/spf13/afero"
 )
@@ -49,8 +50,15 @@ type plugin struct {
 	pluginLookup func() discovery.Plugins
 }
 
+// ImportOptions defines the resource that should be imported into terraform before
+// the plugin is started
+type ImportOptions struct {
+	InstanceSpec *instance.Spec
+	InstanceID   *string
+}
+
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool) instance.Plugin {
+func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool, importOpts *ImportOptions) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
 	fsLock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
 	if err != nil {
@@ -70,14 +78,63 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 			return plugins
 		}
 	}
-
-	return &plugin{
+	p := plugin{
 		Dir:          dir,
 		fs:           afero.NewOsFs(),
 		fsLock:       fsLock,
 		pollInterval: pollInterval,
 		pluginLookup: pluginLookup,
 	}
+	if err := p.processImport(importOpts); err != nil {
+		panic(err)
+	}
+	// Ensure that tha apply goroutine is always running; it will only run "terraform apply"
+	// if the current node is the leader. However, when leadership changes, a Provision is
+	// not guaranteed to be executed so we need to create the goroutine now.
+	p.terraformApply()
+	return &p
+}
+
+// processImport imports the resource with the given ID based on the instance Spec;
+// after the resource is imported, a tf.json file is also generated so that the
+// resource is not orphaned in terraform.
+func (p *plugin) processImport(importOpts *ImportOptions) error {
+	if importOpts == nil {
+		return nil
+	}
+
+	if importOpts.InstanceSpec == nil {
+		if importOpts.InstanceID != nil && string(*importOpts.InstanceID) != "" {
+			return fmt.Errorf("Import instance spec required with import instance ID")
+		}
+		// Values are empty, nothing to import
+		return nil
+	}
+	if importOpts.InstanceID == nil || string(*importOpts.InstanceID) == "" {
+		return fmt.Errorf("Import instance ID required with import instance spec")
+	}
+	log.Infof("Processing import for instance ID: %v", string(*importOpts.InstanceID))
+
+	// Define the functions for import and import the VM
+	fns := importFns{
+		tfShow: doTerraformShow,
+		tfImport: func(vmType TResourceType, filename, vmID string) error {
+			command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", vmType, filename, vmID)).InheritEnvs(true).WithDir(p.Dir)
+			if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
+				return err
+			}
+			return command.Wait()
+		},
+		tfShowInst: doTerraformShowForInstance,
+		tfClean:    p.cleanupFailedImport,
+	}
+	instID, err := p.importResource(fns, string(*importOpts.InstanceID), importOpts.InstanceSpec)
+	if err == nil {
+		log.Infof("Successfull imported instance %v with id %v", *instID, string(*importOpts.InstanceID))
+		return nil
+	}
+	log.Errorf("Failed to import instance %v, error: %v", string(*importOpts.InstanceID), err)
+	return err
 }
 
 /*
@@ -658,10 +715,13 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 }
 
 // Destroy terminates an existing instance.
-func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
-	// TODO(kaufers): When SPI is updated with context, updated 2nd arg to false
-	// for rolling updated so that attached resources are not destroyed
-	err := p.doDestroy(instance, true)
+func (p *plugin) Destroy(instID instance.ID, context instance.Context) error {
+	processAttach := true
+	if context == instance.RollingUpdate {
+		// Do not destroy related resources since this instance will be re-provisioned
+		processAttach = false
+	}
+	err := p.doDestroy(instID, processAttach)
 	return err
 }
 
@@ -680,7 +740,7 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 	filename := string(inst) + ".tf.json"
 	fp := filepath.Join(p.Dir, filename)
 
-	log.Debugln("destroy instance", fp)
+	log.Debugf("Destroying instance %v, processAttach: %v", fp, processAttach)
 	// Optionally destroy the related resources
 	if processAttach {
 		// Get an referenced resources in the "infrakit.attach" tag
@@ -858,7 +918,6 @@ func parseTerraformTags(vmType TResourceType, m TResourceProperties) map[string]
 			for _, v := range tagsSlice {
 				value := fmt.Sprintf("%v", v)
 				if strings.Contains(value, ":") {
-					log.Debugln("parseTerraformTags system tags detected v=", v)
 					// This assumes that the first colon is separating the key and the value of the tag.
 					// This is done so that colons are valid characters in the value.
 					vv := strings.SplitN(value, ":", 2)
@@ -904,4 +963,217 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 		}
 	}
 	return nil
+}
+
+// External functions using during import; broken out for testing
+type importFns struct {
+	tfShow     func(dir string, vmType TResourceType) (map[TResourceName]TResourceProperties, error)
+	tfImport   func(vmType TResourceType, filename, vmID string) error
+	tfShowInst func(dir, id string) (TResourceProperties, error)
+	tfClean    func(vmType TResourceType, vmName string)
+}
+
+// importResource imports the resource with the given ID into terraform and creates a
+// .tf.json file based on the given spec
+func (p *plugin) importResource(fns importFns, resourceID string, spec *instance.Spec) (*instance.ID, error) {
+	// Acquire lock since we are creating a tf.json file and updating terraform state
+	var filename string
+	for {
+		if err := p.fsLock.TryLock(); err == nil {
+			defer p.fsLock.Unlock()
+			filename = ensureUniqueFile(p.Dir)
+			break
+		}
+		log.Infoln("Can't acquire fsLock on importResource, waiting")
+		time.Sleep(time.Second)
+	}
+
+	// Parse the instance spec
+	tf := TFormat{}
+	err := spec.Properties.Decode(&tf)
+	if err != nil {
+		return nil, err
+	}
+	specVMType, _, specVMProps, err := FindVM(&tf)
+	if err != nil {
+		return nil, err
+	}
+	if specVMProps == nil {
+		return nil, fmt.Errorf("Missing resource properties")
+	}
+
+	// Only import if terraform is not already managing
+	existingVMs, err := fns.tfShow(p.Dir, specVMType)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("Terraform is managing %v resources of type %v", len(existingVMs), specVMType)
+	for name, props := range existingVMs {
+		if idVal, has := props["id"]; has {
+			idStr := fmt.Sprintf("%v", idVal)
+			if idStr == resourceID {
+				log.Infof("Resource %v with ID %v is already managed by terraform", name, idStr)
+				id := instance.ID(name)
+				return &id, nil
+			}
+			log.Debugf("Resource with ID '%s' does not match '%s'", idStr, resourceID)
+		} else {
+			log.Warnf("Resource %v is missing 'id' prop", name)
+		}
+	}
+
+	// Import into terraform
+	log.Infof("Importing %v %v into terraform ...", specVMType, resourceID)
+	if err = fns.tfImport(specVMType, filename, resourceID); err != nil {
+		fns.tfClean(specVMType, filename)
+		return nil, err
+	}
+
+	// Parse the terraform show output
+	importedProps, err := fns.tfShowInst(p.Dir, fmt.Sprintf("%v.%v", specVMType, filename))
+	if err != nil {
+		fns.tfClean(specVMType, filename)
+		return nil, err
+	}
+
+	// Merge in the group tags
+	if spec.Tags != nil && len(spec.Tags) > 0 {
+		mergeTagsIntoVMProps(specVMType, specVMProps, spec.Tags)
+	}
+	// Write out tf.json file
+	log.Infoln("Using spec for import", specVMProps)
+	if err = p.writeTfJSONForImport(specVMProps, importedProps, specVMType, filename); err != nil {
+		fns.tfClean(specVMType, filename)
+		return nil, err
+	}
+	id := instance.ID(filename)
+	return &id, p.terraformApply()
+}
+
+// cleanupFailedImport removes the resource from the terraform state file
+func (p *plugin) cleanupFailedImport(vmType TResourceType, vmName string) {
+	command := exec.Command(fmt.Sprintf("terraform state rm %v.%v", vmType, vmName)).InheritEnvs(true).WithDir(p.Dir)
+	err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start()
+	if err == nil {
+		command.Wait()
+	}
+}
+
+// writeTfJSONForImport writes the .tf.json file for the imported resource
+func (p *plugin) writeTfJSONForImport(specProps, importedProps TResourceProperties, vmType TResourceType, filename string) error {
+	// Build the props for the tf.json file
+	finalProps := TResourceProperties{}
+	for k := range specProps {
+		// Ignore certain keys in spec
+		if k == PropScope {
+			continue
+		}
+		if k == PropHostnamePrefix {
+			k = "hostname"
+		}
+		v, has := importedProps[k]
+		if !has {
+			log.Warningf("Imported terraform resource missing '%s' property, not setting", k)
+			continue
+		}
+		finalProps[k] = v
+	}
+	// Also honor "tags" on imported resource, merge with any in the spec
+	mergeProp(importedProps, specProps, "tags")
+	if tags, has := specProps["tags"]; has {
+		finalProps["tags"] = tags
+	}
+
+	// Create the spec and write out the tf.json file
+	tf := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			vmType: {
+				TResourceName(filename): finalProps,
+			},
+		},
+	}
+	buff, err := json.MarshalIndent(tf, "  ", "  ")
+	log.Debugln("writeTfJSONForImport", filename, "data=", string(buff), "err=", err)
+	if err != nil {
+		return err
+	}
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, filename+".tf.json"), buff, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// mergeProps ensures that the peroperty at the given key in the "source" is set
+// on the "dest"; maps and slices are merged, other types are overriden
+func mergeProp(source, dest TResourceProperties, key string) {
+	sourceData, has := source[key]
+	if !has {
+		// The key is not on the source, no-op
+		return
+	}
+	destData, has := dest[key]
+	if !has {
+		// The key is not on the destination, just override with the source
+		dest[key] = sourceData
+		return
+	}
+
+	if sourceDataSlice, ok := sourceData.([]interface{}); ok {
+		// Merge slice elements
+		if destDataSlice, ok := destData.([]interface{}); ok {
+			for _, sourceElement := range sourceDataSlice {
+				// "tags" are unique, they are key/value pairs delimited by ":"
+				var prefix string
+				if key == "tags" {
+					if sourceElementStr, ok := sourceElement.(string); ok {
+						prefix = strings.Split(sourceElementStr, ":")[0] + ":"
+					}
+				}
+				match := false
+				for i, destElement := range destDataSlice {
+					if prefix != "" {
+						if strings.HasPrefix(destElement.(string), prefix) {
+							destDataSlice[i] = sourceElement
+							match = true
+							break
+						}
+					} else if sourceElement == destElement {
+						match = true
+						break
+					}
+				}
+				if !match {
+					destDataSlice = append(destDataSlice, sourceElement)
+				}
+			}
+			dest[key] = destDataSlice
+		} else {
+			log.Errorf(
+				"mergeProp: invalid '%v' prop value on spec, expected %v, actual %v",
+				key,
+				reflect.TypeOf(sourceData),
+				reflect.TypeOf(destDataSlice),
+			)
+			dest[key] = sourceData
+		}
+	} else if sourceDataMap, ok := sourceData.(map[string]interface{}); ok {
+		// Merge map elements
+		if destDataMap, ok := destData.(map[string]interface{}); ok {
+			for k, v := range sourceDataMap {
+				destDataMap[k] = v
+			}
+		} else {
+			log.Errorf(
+				"mergeProp: invalid '%v' prop value on spec, expected %v, actual %v",
+				key,
+				reflect.TypeOf(sourceData),
+				reflect.TypeOf(destDataMap),
+			)
+			dest[key] = sourceData
+		}
+	} else {
+		// Not a complex type, override
+		dest[key] = sourceData
+	}
 }
