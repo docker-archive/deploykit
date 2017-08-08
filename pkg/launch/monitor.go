@@ -164,8 +164,8 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 		for {
 			req, open := <-m.startChan
 			if !open {
-				log.Info("Plugin activation input closed. Stopping.")
 				m.inputChan = nil
+				log.Debug("Plugin activation input closed. Stopping.")
 				return
 			}
 

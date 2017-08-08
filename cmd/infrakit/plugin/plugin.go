@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -16,21 +15,20 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/launch"
-	"github.com/docker/infrakit/pkg/launch/inproc"
-	"github.com/docker/infrakit/pkg/launch/os"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
+	"github.com/docker/infrakit/pkg/run/manager"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 
 	// Load the inprocess plugins supported
-	_ "github.com/docker/infrakit/pkg/run/controller/group"
-	_ "github.com/docker/infrakit/pkg/run/flavor/swarm"
-	_ "github.com/docker/infrakit/pkg/run/flavor/vanilla"
-	_ "github.com/docker/infrakit/pkg/run/instance/file"
-	_ "github.com/docker/infrakit/pkg/run/manager"
+	_ "github.com/docker/infrakit/pkg/run/v1/controller/group"
+	_ "github.com/docker/infrakit/pkg/run/v1/flavor/swarm"
+	_ "github.com/docker/infrakit/pkg/run/v1/flavor/vanilla"
+	_ "github.com/docker/infrakit/pkg/run/v1/instance/file"
+	_ "github.com/docker/infrakit/pkg/run/v1/manager"
 )
 
 var log = logutil.New("module", "cli/plugin")
@@ -183,47 +181,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 		}
 
-		// launch plugin via os process
-		osExec, err := os.NewLauncher("os")
-		if err != nil {
-			return err
-		}
-		// launch docker run, implemented by the same os executor. We just search for a different key (docker-run)
-		dockerExec, err := os.NewLauncher("docker-run")
-		if err != nil {
-			return err
-		}
-		// launch inprocess plugins
-		inprocExec, err := inproc.NewLauncher("inproc", plugins)
-		if err != nil {
-			return err
-		}
-
-		monitor := launch.NewMonitor([]launch.Exec{
-			osExec,
-			dockerExec,
-			inprocExec,
-		}, launch.MergeRules(inproc.Rules(), parsedRules))
-
-		defer func() {
-			monitor.Stop()
-			log.Info("Stopped")
-		}()
-
-		// Get what's currently running
-		running, err := plugins().List()
-		if err != nil {
-			return err
-		}
-
-		// start the monitor
-		startPlugin, err := monitor.Start()
+		pluginManager, err := manager.ManagePlugins(parsedRules, plugins, *mustAll, 5*time.Second)
 		if err != nil {
 			return err
 		}
 
 		// Generate a list of StartPlugin instructions for each arg that isn't seen in discovery
-		toStart := []launch.StartPlugin{}
 		for _, arg := range args {
 
 			p := strings.Split(arg, "=")
@@ -233,77 +196,21 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 			pluginToStart := p[0]
 
-			if _, has := running[pluginToStart]; has {
-				log.Warn("plugin running. skipped", "plugin", pluginToStart)
-				continue
+			err = pluginManager.Launch(execName, plugin.Name(pluginToStart), nil)
+			if err != nil {
+				log.Warn("failed to launch", "exec", execName, "plugin", pluginToStart)
 			}
-
-			toStart = append(toStart, launch.StartPlugin{
-				Plugin: plugin.Name(pluginToStart),
-				Exec:   launch.ExecName(execName),
-			})
 		}
 
-		// starting wait
-		var wgStartAll sync.WaitGroup
-		var waitDoneStartAll = make(chan struct{})
-
-		// wait for everyone to complete starting up
-		go func() {
-			wgStartAll.Wait()
-			close(waitDoneStartAll)
-		}()
-
-		started := make(chan plugin.Name, 10)
-		for _, inst := range toStart {
-
-			// Assign callbacks to help with signaling
-			inst.Started = func(n plugin.Name, config *types.Any) {
-				fmt.Println(n, "started.")
-				started <- n
-				wgStartAll.Done()
-			}
-			inst.Error = func(n plugin.Name, config *types.Any, err error) {
-				if *mustAll {
-					panic(err)
-				}
-				fmt.Println("Error starting", "lookup", inst.Plugin, "err", err)
-				wgStartAll.Done()
-			}
-
-			wgStartAll.Add(1)
-			startPlugin <- inst
-			log.Info("Starting up", "executor", inst.Exec, "plugin", inst.Plugin)
-		}
-
-		// wait for all the plugins to come up
-		<-waitDoneStartAll
+		pluginManager.WaitStarting()
 
 		log.Info("Done waiting on plugin starts")
 
-		// Block by polling for the plugin socket files.  We keep this process blocking
-		// until all the plugins specified have exited and removed their socket files.
+		pluginManager.WaitForAllShutdown()
+		log.Info("All plugins shutdown")
 
-		targets := []string{}
-		checkNow := time.Tick(5 * time.Second)
-
-		for {
-			select {
-			case target := <-started:
-				lookup, _ := target.GetLookupAndType()
-				log.Debug("Start watching", "lookup", lookup)
-				targets = append(targets, lookup)
-
-			case <-checkNow:
-				log.Debug("Checking on targets", "targets", targets)
-				if m, err := plugins().List(); err == nil {
-					if countMatches(targets, m) == 0 {
-						log.Info("Scan found plugins not running now", "plugins", targets)
-						return nil
-					}
-				}
-			}
-		}
+		pluginManager.Stop()
+		return nil
 	}
 
 	stop := &cobra.Command{

@@ -1,198 +1,189 @@
 package manager
 
 import (
-	"fmt"
-	"os"
-	"strings"
+	"sync"
+	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/inproc"
-	"github.com/docker/infrakit/pkg/leader"
+	"github.com/docker/infrakit/pkg/launch/os"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
-	"github.com/docker/infrakit/pkg/run"
-	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 )
 
-const (
-	// CanonicalName is the canonical name of the plugin and also key used to locate the plugin in discovery
-	CanonicalName = "manager"
+var log = logutil.New("module", "run/manager")
 
-	// LookupName is the name used to look up the object via discovery
-	LookupName = "group"
+// ManagePlugins returns a manager that can manage the start up and stopping of plugins.
+func ManagePlugins(rules []launch.Rule,
+	plugins func() discovery.Plugins, mustAll bool, scanInterval time.Duration) (*Manager, error) {
 
-	// EnvOptionsBackend is the environment variable to use to set the default value of Options.Backend
-	EnvOptionsBackend = "INFRAKIT_MANAGER_OPTIONS_BACKEND"
-)
-
-var (
-	log                   = logutil.New("module", "run/manager")
-	defaultOptionsBackend = run.GetEnv(EnvOptionsBackend, "file")
-)
-
-func init() {
-	inproc.Register(CanonicalName, Run, DefaultOptions)
+	m := &Manager{
+		plugins:      plugins,
+		mustAll:      mustAll,
+		scanInterval: scanInterval,
+	}
+	return m, m.Start(rules)
 }
 
-// Options capture the options for starting up the plugin.
-type Options struct {
-	// Backend is the backend used for leadership, persistence, etc.
-	// Possible values are file, etcd, and swarm
-	Backend string
+// Manager manages the plugins startup, stop, etc.
+type Manager struct {
+	// mustAll panics if set to true and any plugins fails to start
+	mustAll bool
+	// scanInterval is the interval for checking the plugin discovery
+	scanInterval time.Duration
+	// Plugins is a function that returns the plugins discovered.
+	plugins func() discovery.Plugins
 
-	// Name of the backend
-	BackendName plugin.Name
-
-	// Settings is the configuration of the backend
-	Settings *types.Any
+	rules       []launch.Rule
+	monitor     *launch.Monitor
+	startPlugin chan<- launch.StartPlugin
+	wgStartAll  sync.WaitGroup
+	started     chan plugin.Name
+	startedAll  chan struct{}
+	lock        sync.Mutex
 }
 
-// DefaultOptions return an Options with default values filled in.
-var DefaultOptions = defaultOptions()
+// Start starts the manager
+func (m *Manager) Start(rules []launch.Rule) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-func defaultOptions() (options Options) {
-	b := os.Getenv(EnvOptionsBackend)
-	switch b {
-	case "swarm":
-		options = DefaultBackendSwarmOptions
-	case "etcd":
-		options = DefaultBackendEtcdOptions
-	case "file":
-		options = DefaultBackendFileOptions
-	default:
-		options = DefaultBackendFileOptions
+	if m.started != nil {
+		return nil
 	}
 
-	options.BackendName = plugin.Name("group-stateless")
-	return options
-}
-
-// Run runs the plugin, blocking the current thread.  Error is returned immediately
-// if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins,
-	config *types.Any) (name plugin.Name, impls map[run.PluginCode]interface{}, onStop func(), err error) {
-
-	if plugins == nil {
-		panic("no plugins()")
-	}
-
-	options := DefaultOptions
-	err = config.Decode(&options)
+	m.rules = rules
+	// launch plugin via os process
+	osExec, err := os.NewLauncher("os")
 	if err != nil {
-		return
+		return err
 	}
-
-	log.Info("Decoded input", "config", options)
-	log.Info("Starting up", "backend", options.Backend)
-
-	var leader leader.Detector
-	var snapshot store.Snapshot
-	var cleanUpFunc func()
-
-	switch strings.ToLower(options.Backend) {
-	case "etcd":
-		backendOptions := BackendEtcdOptions{}
-		err = options.Settings.Decode(&backendOptions)
-		if err != nil {
-			return
-		}
-		log.Info("starting up etcd backend", "options", backendOptions)
-		leader, snapshot, cleanUpFunc, err = etcdBackends(backendOptions)
-		if err != nil {
-			return
-		}
-		log.Info("etcd backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
-	case "file":
-		backendOptions := BackendFileOptions{}
-		err = options.Settings.Decode(&backendOptions)
-		if err != nil {
-			return
-		}
-		log.Info("starting up file backend", "options", backendOptions)
-		leader, snapshot, cleanUpFunc, err = fileBackends(backendOptions)
-		if err != nil {
-			return
-		}
-		log.Info("file backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
-	case "swarm":
-		backendOptions := BackendSwarmOptions{}
-		err = options.Settings.Decode(&backendOptions)
-		if err != nil {
-			return
-		}
-		log.Info("starting up swarm backend", "options", backendOptions)
-		leader, snapshot, cleanUpFunc, err = swarmBackends(backendOptions)
-		if err != nil {
-			return
-		}
-		log.Info("swarm backend", "leader", leader, "store", snapshot, "cleanup", cleanUpFunc)
-	default:
-		err = fmt.Errorf("unknown backend:%v", options.Backend)
-		return
-	}
-
-	var mgr manager.Backend
-	lookup, _ := options.BackendName.GetLookupAndType()
-	mgr, err = manager.NewManager(plugins(), leader, snapshot, lookup)
+	// launch docker run, implemented by the same os executor. We just search for a different key (docker-run)
+	dockerExec, err := os.NewLauncher("docker-run")
 	if err != nil {
-		return
+		return err
 	}
-
-	log.Info("start manager")
-
-	_, err = mgr.Start()
+	// launch inprocess plugins
+	inprocExec, err := inproc.NewLauncher("inproc", m.plugins)
 	if err != nil {
-		return
+		return err
 	}
 
-	log.Info("manager running")
+	m.monitor = launch.NewMonitor([]launch.Exec{
+		osExec,
+		dockerExec,
+		inprocExec,
+	}, launch.MergeRules(inproc.Rules(), rules))
 
-	updatable := &metadataModel{
-		snapshot: snapshot,
-		manager:  mgr,
+	// start the monitor
+	startPlugin, err := m.monitor.Start()
+	if err != nil {
+		return err
 	}
-	updatableModel, _ := updatable.pluginModel()
-	stopRelay := make(chan struct{})
-	copy1 := make(chan func(map[string]interface{}))
-	copy2 := make(chan func(map[string]interface{}))
+
+	m.startPlugin = startPlugin
+	m.started = make(chan plugin.Name, 100)
+	m.startedAll = make(chan struct{})
+	if m.scanInterval == 0 {
+		m.scanInterval = 5 * time.Second
+	}
 	go func() {
-		// relay data
 		for {
-			select {
-			case data := <-updatableModel:
-				copy1 <- data
-				copy2 <- data
-			case <-stopRelay:
-				return // finished
+			m.wgStartAll.Wait()
+			if m.startedAll != nil {
+				close(m.startedAll)
+				m.startedAll = nil
 			}
 		}
 	}()
-
-	name = plugin.Name(LookupName)
-
-	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
-		metadata_plugin.NewPluginFromChannel(updatableModel),
-		updatable.load, updatable.commit)
-
-	impls = map[run.PluginCode]interface{}{
-		run.Manager:           mgr,
-		run.Group:             mgr,
-		run.MetadataUpdatable: metadataUpdatable,
-		run.Metadata:          metadataUpdatable,
-	}
-
-	onStop = func() {
-		if cleanUpFunc != nil {
-			cleanUpFunc()
-		}
-		close(stopRelay)
-	}
-
-	log.Info("exported objects")
-	return
+	return nil
 }
 
-type cleanup func()
+// Launch launches the plugin
+func (m Manager) Launch(exec string, name plugin.Name, options *types.Any) error {
+
+	// check that the plugin is not currently running
+	running, err := m.plugins().List()
+	if err != nil {
+		return err
+	}
+
+	lookup, _ := name.GetLookupAndType()
+	if countMatches([]string{lookup}, running) > 0 {
+		m.started <- name
+		return nil
+	}
+
+	m.startPlugin <- launch.StartPlugin{
+		Plugin:  name,
+		Exec:    launch.ExecName(exec),
+		Options: options,
+		Started: func(n plugin.Name, config *types.Any) {
+			m.started <- n
+			m.wgStartAll.Done()
+		},
+		Error: func(n plugin.Name, config *types.Any, err error) {
+			if m.mustAll {
+				panic(err)
+			}
+			m.wgStartAll.Done()
+		},
+	}
+	m.wgStartAll.Add(1)
+	return nil
+}
+
+// Wait blocks until all the plugins stopped.
+func (m Manager) WaitForAllShutdown() {
+	targets := []string{}
+	checkNow := time.Tick(m.scanInterval)
+
+	for {
+		select {
+		case target := <-m.started:
+			lookup, _ := target.GetLookupAndType()
+			log.Debug("Start watching", "lookup", lookup)
+			targets = append(targets, lookup)
+
+		case <-checkNow:
+			log.Debug("Checking on targets", "targets", targets)
+			if m, err := m.plugins().List(); err == nil {
+				if countMatches(targets, m) == 0 {
+					log.Info("Scan found plugins not running now", "plugins", targets)
+					return
+				}
+			}
+		}
+	}
+}
+
+// counts the number of matches by name
+func countMatches(list []string, found map[string]*plugin.Endpoint) int {
+	c := 0
+	for _, l := range list {
+		if _, has := found[l]; has {
+			log.Debug("Scan found", "lookup", l)
+			c++
+		}
+	}
+	return c
+}
+
+// WaitStaring blocks until a current batch of plugins completed starting up.
+func (m Manager) WaitStarting() {
+	if m.startedAll != nil {
+		<-m.startedAll
+	}
+}
+
+// Stop stops the manager
+func (m Manager) Stop() {
+	m.monitor.Stop()
+	close(m.started)
+	if m.startedAll != nil {
+		close(m.startedAll)
+	}
+	log.Info("Stopped plugin manager")
+}
