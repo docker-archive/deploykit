@@ -41,8 +41,12 @@ type Manager struct {
 	startPlugin chan<- launch.StartPlugin
 	wgStartAll  sync.WaitGroup
 	started     chan plugin.Name
-	startedAll  chan struct{}
 	lock        sync.Mutex
+}
+
+// Rules returns a list of plugins that can be launched via this manager
+func (m *Manager) Rules() []launch.Rule {
+	return m.rules
 }
 
 // Start starts the manager
@@ -54,7 +58,6 @@ func (m *Manager) Start(rules []launch.Rule) error {
 		return nil
 	}
 
-	m.rules = rules
 	// launch plugin via os process
 	osExec, err := os.NewLauncher("os")
 	if err != nil {
@@ -71,11 +74,12 @@ func (m *Manager) Start(rules []launch.Rule) error {
 		return err
 	}
 
+	m.rules = launch.MergeRules(inproc.Rules(), rules)
 	m.monitor = launch.NewMonitor([]launch.Exec{
 		osExec,
 		dockerExec,
 		inprocExec,
-	}, launch.MergeRules(inproc.Rules(), rules))
+	}, m.rules)
 
 	// start the monitor
 	startPlugin, err := m.monitor.Start()
@@ -85,19 +89,9 @@ func (m *Manager) Start(rules []launch.Rule) error {
 
 	m.startPlugin = startPlugin
 	m.started = make(chan plugin.Name, 100)
-	m.startedAll = make(chan struct{})
 	if m.scanInterval == 0 {
 		m.scanInterval = 5 * time.Second
 	}
-	go func() {
-		for {
-			m.wgStartAll.Wait()
-			if m.startedAll != nil {
-				close(m.startedAll)
-				m.startedAll = nil
-			}
-		}
-	}()
 	return nil
 }
 
@@ -173,17 +167,11 @@ func countMatches(list []string, found map[string]*plugin.Endpoint) int {
 
 // WaitStaring blocks until a current batch of plugins completed starting up.
 func (m Manager) WaitStarting() {
-	if m.startedAll != nil {
-		<-m.startedAll
-	}
+	m.wgStartAll.Wait()
 }
 
 // Stop stops the manager
 func (m Manager) Stop() {
 	m.monitor.Stop()
-	close(m.started)
-	if m.startedAll != nil {
-		close(m.startedAll)
-	}
-	log.Info("Stopped plugin manager")
+	log.Debug("Stopped plugin manager")
 }

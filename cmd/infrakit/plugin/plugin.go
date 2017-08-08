@@ -185,6 +185,21 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		defer pluginManager.Stop()
+
+		if len(args) == 0 {
+
+			fmt.Println("Plugins available:")
+			fmt.Printf("%-20s\t%s\n", "PLUGIN", "EXEC")
+			for _, r := range pluginManager.Rules() {
+				execs := []string{}
+				for k := range r.Launch {
+					execs = append(execs, string(k))
+				}
+				fmt.Printf("%-20v\t%v\n", r.Plugin, strings.Join(execs, ","))
+			}
+			return nil
+		}
 
 		// Generate a list of StartPlugin instructions for each arg that isn't seen in discovery
 		for _, arg := range args {
@@ -209,7 +224,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		pluginManager.WaitForAllShutdown()
 		log.Info("All plugins shutdown")
 
-		pluginManager.Stop()
 		return nil
 	}
 
