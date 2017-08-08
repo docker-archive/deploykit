@@ -434,7 +434,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 		"scope-managers",
 	}
 	for _, path := range expectedPaths {
-		tfPath1 := filepath.Join(dir, path+".tf.json")
+		tfPath1 := filepath.Join(dir, path+".tf.json.new")
 		_, err = ioutil.ReadFile(tfPath1)
 		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
 	}
@@ -450,7 +450,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 		"scope-managers",
 	}
 	for _, path := range expectedPaths {
-		tfPath1 := filepath.Join(dir, path+".tf.json")
+		tfPath1 := filepath.Join(dir, path+".tf.json.new")
 		_, err = ioutil.ReadFile(tfPath1)
 		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
 	}
@@ -639,7 +639,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	}
 	id1, err := tf.Provision(instanceSpec1)
 	require.NoError(t, err)
-	tfPath1 := filepath.Join(dir, string(*id1)+".tf.json")
+	tfPath1 := filepath.Join(dir, string(*id1)+".tf.json.new")
 	_, err = ioutil.ReadFile(tfPath1)
 	require.NoError(t, err)
 
@@ -664,7 +664,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	require.NoError(t, err)
 	require.NotEqual(t, id1, id2)
 
-	tfPath2 := filepath.Join(dir, string(*id2)+".tf.json")
+	tfPath2 := filepath.Join(dir, string(*id2)+".tf.json.new")
 	buff, err := ioutil.ReadFile(tfPath2)
 	require.NoError(t, err)
 
@@ -1017,7 +1017,7 @@ func TestWriteTerraformFilesVMOnly(t *testing.T) {
 	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json.new"))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1049,7 +1049,7 @@ func TestWriteTerraformFilesVMOnlyLogicalId(t *testing.T) {
 	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json.new"))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1086,7 +1086,7 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json.new"))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1174,12 +1174,12 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	for _, file := range files {
 		filenames = append(filenames, file.Name())
 	}
-	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json", name))
-	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json", name))
-	expectedGlobalFilename := fmt.Sprintf("scope-%s.tf.json", globalName)
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", name))
+	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json.new", name))
+	expectedGlobalFilename := fmt.Sprintf("scope-%s.tf.json.new", globalName)
 	require.Contains(t, filenames, expectedGlobalFilename)
 	// Default
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json", name)))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", name)))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1201,7 +1201,7 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 		tFormat.Resource,
 	)
 	// Dedicated
-	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s-dedicated.tf.json", name)))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s-dedicated.tf.json.new", name)))
 	require.NoError(t, err)
 	tFormat = TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1270,10 +1270,10 @@ func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
 	for _, file := range files {
 		filenames = append(filenames, file.Name())
 	}
-	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json", name))
-	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json", name))
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", name))
+	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json.new", name))
 	// VM file
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json.new"))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1293,7 +1293,7 @@ func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
 		vmType,
 	)
 	// File storage and block storage
-	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s-dedicated.tf.json", name)))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s-dedicated.tf.json.new", name)))
 	require.NoError(t, err)
 	tFormat = TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -2029,36 +2029,22 @@ func TestDestroyRollingUpdate(t *testing.T) {
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	path := filepath.Join(dir, fmt.Sprintf("%s-dedicated.tf.json", string(*id)))
+	path := filepath.Join(dir, fmt.Sprintf("%s-dedicated.tf.json.new", string(*id)))
 	_, err = ioutil.ReadFile(path)
 	require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
 }
 
-func TestParseAttachTagFromFileNoFile(t *testing.T) {
-	_, err := parseAttachTagFromFile("")
-	require.Error(t, err)
-}
-
-func TestParseAttachTagFromFileNoVM(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	tformat := TFormat{
+func TestParseAttachTagNoVM(t *testing.T) {
+	tFormat := TFormat{
 		Resource: map[TResourceType]map[TResourceName]TResourceProperties{},
 	}
-	buff, err := json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	fp := filepath.Join(tf.Dir, "instance-1234.tf.json")
-	err = afero.WriteFile(tf.fs, fp, buff, 0644)
-	require.NoError(t, err)
-	_, err = parseAttachTagFromFile(fp)
+	_, err := parseAttachTag(&tFormat)
 	require.Error(t, err)
 	require.Equal(t, "not found", err.Error())
 }
 
-func TestParseAttachTagFromFileMap(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	tformat := TFormat{
+func TestParseAttachTagMap(t *testing.T) {
+	tFormat := TFormat{
 		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
 			VMAmazon: {
 				TResourceName("host1"): {
@@ -2070,20 +2056,13 @@ func TestParseAttachTagFromFileMap(t *testing.T) {
 			},
 		},
 	}
-	buff, err := json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	fp := filepath.Join(tf.Dir, "instance-1234.tf.json")
-	err = afero.WriteFile(tf.fs, fp, buff, 0644)
-	require.NoError(t, err)
-	results, err := parseAttachTagFromFile(fp)
+	results, err := parseAttachTag(&tFormat)
 	require.NoError(t, err)
 	require.Equal(t, []string{"attach1", "attach2"}, results)
 }
 
-func TestParseAttachTagFromFileSlice(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	tformat := TFormat{
+func TestParseAttachTagSlice(t *testing.T) {
+	tFormat := TFormat{
 		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
 			VMSoftLayer: {
 				TResourceName("host1"): {
@@ -2095,12 +2074,7 @@ func TestParseAttachTagFromFileSlice(t *testing.T) {
 			},
 		},
 	}
-	buff, err := json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	fp := filepath.Join(tf.Dir, "instance-1234.tf.json")
-	err = afero.WriteFile(tf.fs, fp, buff, 0644)
-	require.NoError(t, err)
-	results, err := parseAttachTagFromFile(fp)
+	results, err := parseAttachTag(&tFormat)
 	require.NoError(t, err)
 	require.Equal(t, []string{"attach1", "attach2"}, results)
 }
@@ -2113,11 +2087,11 @@ func TestDescribeNoFiles(t *testing.T) {
 	require.Equal(t, []instance.Description{}, results)
 }
 
-func TestDescribe(t *testing.T) {
+func TestDescribeWithNewFile(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
-	// Instance1, unique tag and shared tag
+	// Instance1, unique tag and shared tag (and give it the ".new" file suffix)
 	inst1 := make(map[TResourceType]map[TResourceName]TResourceProperties)
 	id1 := "instance-1"
 	tags1 := []string{"tag1:val1", "tagShared:valShared"}
@@ -2126,7 +2100,7 @@ func TestDescribe(t *testing.T) {
 	}
 	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id1)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id1)), buff, 0644)
 	require.NoError(t, err)
 	// Instance1, unique tag and shared tag
 	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -2228,7 +2202,7 @@ func TestDescribeAttachTag(t *testing.T) {
 	}
 	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
 	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id1)), buff, 0644)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id1)), buff, 0644)
 	require.NoError(t, err)
 
 	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -2474,7 +2448,7 @@ func TestWriteTfJSONForImport(t *testing.T) {
 	id := "instance-12345"
 	err := tf.writeTfJSONForImport(specProps, importedProps, VMIBMCloud, id)
 	require.NoError(t, err)
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, id+".tf.json"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, id+".tf.json.new"))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -2719,7 +2693,7 @@ func TestImportResourceTagMap(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
 
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", *id)))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", *id)))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -2793,7 +2767,7 @@ func TestImportResourceTagSlice(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
 
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", *id)))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", *id)))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -2816,4 +2790,71 @@ func TestImportResourceTagSlice(t *testing.T) {
 			"spec-key": "actual-val",
 		},
 		props)
+}
+
+func TestParseFileForInstanceIDNoMatch(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	_, _, err := tf.parseFileForInstanceID(instance.ID("instance-1234"))
+	require.Error(t, err)
+}
+
+func TestParseFileForInstanceID(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	tformat := TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+		VMIBMCloud: {"instance-1234": {}}},
+	}
+	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-1234.tf.json.new"), buff, 0644)
+	require.NoError(t, err)
+	tformat = TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {"instance-2345": {}}},
+	}
+	buff, err = json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-2345.tf.json.new"), buff, 0644)
+	require.NoError(t, err)
+	tformat = TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+		VMAmazon: {"instance-3456": {}}},
+	}
+	buff, err = json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-3456.tf.json"), buff, 0644)
+	require.NoError(t, err)
+
+	tFormat, filename, err := tf.parseFileForInstanceID(instance.ID("instance-1234"))
+	require.NoError(t, err)
+	require.Equal(t, "instance-1234.tf.json.new", filename)
+	require.Equal(t,
+		TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMIBMCloud: {"instance-1234": {}}},
+		},
+		*tFormat)
+
+	tFormat, filename, err = tf.parseFileForInstanceID(instance.ID("instance-2345"))
+	require.NoError(t, err)
+	require.Equal(t, "instance-2345.tf.json.new", filename)
+	require.Equal(t,
+		TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {"instance-2345": {}}},
+		},
+		*tFormat)
+
+	tFormat, filename, err = tf.parseFileForInstanceID(instance.ID("instance-3456"))
+	require.NoError(t, err)
+	require.Equal(t, "instance-3456.tf.json", filename)
+	require.Equal(t,
+		TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {"instance-3456": {}}},
+		},
+		*tFormat)
+
+	// Instance file does not exist
+	tFormat, filename, err = tf.parseFileForInstanceID(instance.ID("instance-4567"))
+	require.Error(t, err)
+	require.Nil(t, tFormat)
+	require.Equal(t, "", filename)
 }
