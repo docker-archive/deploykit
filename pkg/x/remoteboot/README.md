@@ -20,8 +20,17 @@ A PXE boot loader is needed to automate the booting process as the system comes 
 
 `./infrakit x remoteboot pulliPXE` 
 
-This will download the iPXE boot loader from the iPXE project site. 
+This will download the iPXE boot loader from the iPXE project site. On first run remoteboot will create a infrakit.ipxe file that contains the auto-built paths to the kernel and initrd. If you change the kernel you'd like to boot from then you'll need to rename or delete the ipxe script.
 
+#### Required Arguments:
+
+**First argument** - path to a kernel file
+
+**Second argument** - path to an initrd file
+
+**Third argument** - kernel command line options e.g. "console=tty0"
+
+e.g. `sudo ./infrakit x remoteboot ./linuxkit-kernel ./linuxkit-initrd.img "console=tty0"  ... flags`
 #### Required Flags:
 
 `--adapter=<X>` This flag is required in order to select the network adapter to bind to.
@@ -50,7 +59,10 @@ $ make build/infrakit
 $ sudo build/infrakit x remoteboot pulliPXE
 Beginning of iPXE download... Completed
 
-$ sudo build/infrakit x remoteboot --adapter=en0 \
+$ sudo build/infrakit x remoteboot ./linuxkit-kernel \
+./linuxkit-initrd.img \
+"console=tty0" \
+--adapter=en0 \
 --startAddress=192.168.0.2 \
 --leaseCount=50 \
 --enableDHCP \
@@ -67,7 +79,7 @@ $ sudo build/infrakit x remoteboot --adapter=en0 \
 ```
 
 ### DHCP
-**NOTE**:  As this advertising networking configuration it is advisable to only use on test networks. As a minimum speak to yur local friendly networking administrator before advertising networking details on their network. 
+**NOTE**:  As this advertising networking configuration it is advisable to only use on test networks. As a minimum speak to your local friendly networking administrator before advertising networking details on their network. 
 
 
 ## Reporting security issues
