@@ -1,10 +1,16 @@
 package manager
 
 import (
+	"io/ioutil"
+	sys_os "os"
+	"path"
+	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	"github.com/docker/infrakit/pkg/launch/os"
@@ -47,6 +53,70 @@ type Manager struct {
 // Rules returns a list of plugins that can be launched via this manager
 func (m *Manager) Rules() []launch.Rule {
 	return m.rules
+}
+
+// Terminate stops the plugins.  Note this is accomplished by sending a signal TERM to the
+// process found at the lookup.pid file.  For inproc plugins, this will effectively kill
+// all the plugins that run in that process.
+// TODO - selectively terminate inproc plugins without taking down the process.
+func (m *Manager) Terminate(lookup []string) error {
+	allPlugins, err := m.plugins().List()
+	if err != nil {
+		return err
+	}
+	for _, n := range lookup {
+
+		p, has := allPlugins[n]
+		if !has {
+			continue
+		}
+
+		pidFile := n + ".pid"
+		if p.Protocol == "unix" {
+			pidFile = p.Address + ".pid"
+		} else {
+			pidFile = path.Join(local.Dir(), pidFile)
+		}
+
+		buff, err := ioutil.ReadFile(pidFile)
+		if err != nil {
+			log.Warn("Cannot read PID file", "name", n, "pid", pidFile)
+			continue
+		}
+
+		pid, err := strconv.Atoi(string(buff))
+		if err != nil {
+			log.Warn("Cannot determine PID", "name", n, "pid", pidFile)
+			continue
+		}
+
+		process, err := sys_os.FindProcess(pid)
+		if err != nil {
+			log.Warn("Error finding process of plugin", "name", n)
+			continue
+		}
+
+		log.Info("Stopping", "name", n, "pid", pid)
+		if err := process.Signal(syscall.SIGTERM); err == nil {
+			process.Wait()
+			log.Info("Process exited", "name", n)
+		}
+
+	}
+	return nil
+}
+
+// TerminateAll terminates all the plugins.
+func (m *Manager) TerminateAll() error {
+	allPlugins, err := m.plugins().List()
+	if err != nil {
+		return err
+	}
+	names := []string{}
+	for n := range allPlugins {
+		names = append(names, n)
+	}
+	return m.Terminate(names)
 }
 
 // Start starts the manager

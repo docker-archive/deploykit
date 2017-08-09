@@ -2,18 +2,12 @@ package plugin
 
 import (
 	"fmt"
-	"io/ioutil"
-	sys_os "os"
-	"path"
 	"sort"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -236,62 +230,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	all := stop.Flags().Bool("all", false, "True to stop all running plugins")
 	stop.RunE = func(c *cobra.Command, args []string) error {
 
-		allPlugins, err := plugins().List()
+		pluginManager, err := manager.ManagePlugins([]launch.Rule{}, plugins, false, 5*time.Second)
 		if err != nil {
 			return err
 		}
 
-		targets := args
-
 		if *all {
-			names := []string{}
-			for n := range allPlugins {
-				names = append(names, n)
-			}
-			targets = names
+			return pluginManager.TerminateAll()
 		}
-
-		for _, n := range targets {
-
-			p, has := allPlugins[n]
-			if !has {
-				continue
-			}
-
-			pidFile := n + ".pid"
-			if p.Protocol == "unix" {
-				pidFile = p.Address + ".pid"
-			} else {
-				pidFile = path.Join(local.Dir(), pidFile)
-			}
-
-			buff, err := ioutil.ReadFile(pidFile)
-			if err != nil {
-				log.Warn("Cannot read PID file", "name", n, "pid", pidFile)
-				continue
-			}
-
-			pid, err := strconv.Atoi(string(buff))
-			if err != nil {
-				log.Warn("Cannot determine PID", "name", n, "pid", pidFile)
-				continue
-			}
-
-			process, err := sys_os.FindProcess(pid)
-			if err != nil {
-				log.Warn("Error finding process of plugin", "name", n)
-				continue
-			}
-
-			log.Info("Stopping", "name", n, "pid", pid)
-			if err := process.Signal(syscall.SIGTERM); err == nil {
-				process.Wait()
-				log.Info("Process exited", "name", n)
-			}
-
-		}
-
-		return nil
+		return pluginManager.Terminate(args)
 	}
 
 	cmd.AddCommand(ls, start, stop)
