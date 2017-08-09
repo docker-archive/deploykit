@@ -1,14 +1,11 @@
 package manager
 
 import (
-	"net/url"
 	"path/filepath"
 	"time"
 
-	"github.com/docker/infrakit/pkg/leader"
 	file_leader "github.com/docker/infrakit/pkg/leader/file"
 	"github.com/docker/infrakit/pkg/run"
-	"github.com/docker/infrakit/pkg/store"
 	file_store "github.com/docker/infrakit/pkg/store/file"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -61,34 +58,33 @@ var DefaultBackendFileOptions = Options{
 	},
 }
 
-func fileBackends(options BackendFileOptions, muxConfig *MuxConfig) (leader.Detector, store.Snapshot, cleanup, error) {
+func configFileBackends(options BackendFileOptions, managerConfig *Options, muxConfig *MuxConfig) error {
 
 	leader, err := file_leader.NewDetector(options.PollInterval, options.LeaderFile, options.ID)
 	if err != nil {
-		return nil, nil, nil, err
+		return err
 	}
 
 	snapshot, err := file_store.NewSnapshot(options.StoreDir, "global.config")
 	if err != nil {
-		return nil, nil, nil, err
+		return err
+	}
+
+	if managerConfig != nil {
+		managerConfig.leader = leader
+		managerConfig.store = snapshot
 	}
 
 	if muxConfig != nil {
 
-		u, err := url.Parse(muxConfig.URL)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		muxConfig.location = u
-
 		poller, err := file_leader.NewDetector(muxConfig.PollInterval, options.LeaderFile, options.ID)
 		if err != nil {
-			return nil, nil, nil, err
+			return err
 		}
 
 		muxConfig.poller = poller
 		muxConfig.store = file_leader.NewStore(options.LeaderLocationFile)
 	}
 
-	return leader, snapshot, nil, nil
+	return nil
 }

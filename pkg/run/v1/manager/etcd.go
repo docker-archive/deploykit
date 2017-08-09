@@ -5,9 +5,7 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/docker/go-connections/tlsconfig"
-	"github.com/docker/infrakit/pkg/leader"
 	etcd_leader "github.com/docker/infrakit/pkg/leader/etcd/v3"
-	"github.com/docker/infrakit/pkg/store"
 	etcd_store "github.com/docker/infrakit/pkg/store/etcd/v3"
 	"github.com/docker/infrakit/pkg/types"
 	etcd "github.com/docker/infrakit/pkg/util/etcd/v3"
@@ -40,11 +38,11 @@ var DefaultBackendEtcdOptions = Options{
 	),
 }
 
-func etcdBackends(options BackendEtcdOptions) (leader.Detector, store.Snapshot, cleanup, error) {
+func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options, muxConfig *MuxConfig) error {
 	if options.TLS != nil {
 		config, err := tlsconfig.Client(*options.TLS)
 		if err != nil {
-			return nil, nil, nil, err
+			return err
 		}
 		options.Options.Config.TLS = config
 	}
@@ -52,13 +50,25 @@ func etcdBackends(options BackendEtcdOptions) (leader.Detector, store.Snapshot, 
 	etcdClient, err := etcd.NewClient(options.Options)
 	log.Info("Connect to etcd3", "endpoint", options.Options.Config.Endpoints, "err", err)
 	if err != nil {
-		return nil, nil, nil, err
+		return err
 	}
 
 	leader := etcd_leader.NewDetector(options.PollInterval, etcdClient)
 	snapshot, err := etcd_store.NewSnapshot(etcdClient)
 	if err != nil {
-		return nil, nil, nil, err
+		return err
 	}
-	return leader, snapshot, func() { etcdClient.Close() }, nil
+
+	if managerConfig != nil {
+		managerConfig.leader = leader
+		managerConfig.store = snapshot
+		managerConfig.cleanUpFunc = func() { etcdClient.Close() }
+	}
+
+	if muxConfig != nil {
+		muxConfig.poller = etcd_leader.NewDetector(muxConfig.PollInterval, etcdClient)
+		muxConfig.store = etcd_leader.NewStore(etcdClient)
+	}
+
+	return nil
 }

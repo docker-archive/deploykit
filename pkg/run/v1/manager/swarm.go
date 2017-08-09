@@ -3,9 +3,7 @@ package manager
 import (
 	"time"
 
-	"github.com/docker/infrakit/pkg/leader"
 	swarm_leader "github.com/docker/infrakit/pkg/leader/swarm"
-	"github.com/docker/infrakit/pkg/store"
 	swarm_store "github.com/docker/infrakit/pkg/store/swarm"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
@@ -32,20 +30,31 @@ var DefaultBackendSwarmOptions = Options{
 	),
 }
 
-func swarmBackends(options BackendSwarmOptions) (leader.Detector, store.Snapshot, cleanup, error) {
+func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options, muxConfig *MuxConfig) error {
 	dockerClient, err := docker.NewClient(options.Docker.Host, options.Docker.TLS)
 	log.Info("Connect to docker", "host", options.Docker.Host, "err=", err)
 	if err != nil {
-		return nil, nil, nil, err
+		return err
 	}
 
 	snapshot, err := swarm_store.NewSnapshot(dockerClient)
 	if err != nil {
 		dockerClient.Close()
-		return nil, nil, nil, err
+		return err
 	}
 
 	leader := swarm_leader.NewDetector(options.PollInterval, dockerClient)
 
-	return leader, snapshot, func() { dockerClient.Close() }, nil
+	if managerConfig != nil {
+		managerConfig.leader = leader
+		managerConfig.store = snapshot
+		managerConfig.cleanUpFunc = func() { dockerClient.Close() }
+	}
+
+	if muxConfig != nil {
+		muxConfig.poller = swarm_leader.NewDetector(muxConfig.PollInterval, dockerClient)
+		muxConfig.store = swarm_leader.NewStore(dockerClient)
+	}
+
+	return nil
 }

@@ -55,6 +55,11 @@ type Options struct {
 
 	// Mux is the tcp frontend for remote connectivity
 	Mux *MuxConfig
+
+	plugins     func() discovery.Plugins
+	leader      leader.Detector
+	store       store.Snapshot
+	cleanUpFunc func()
 }
 
 // MuxConfig is the struct for the mux frontend
@@ -68,10 +73,10 @@ type MuxConfig struct {
 	// PollInterval is interval of polling leadership
 	PollInterval time.Duration
 
-	location *url.URL                 `json:"-" yaml:"-"`
-	plugins  func() discovery.Plugins `json:"-" yaml:"-"`
-	poller   *leader.Poller           `json:"-" yaml:"-"`
-	store    leader.Store             `json:"-" yaml:"-"`
+	location *url.URL
+	plugins  func() discovery.Plugins
+	poller   *leader.Poller
+	store    leader.Store
 }
 
 // DefaultOptions return an Options with default values filled in.
@@ -112,15 +117,13 @@ func Run(plugins func() discovery.Plugins,
 	log.Info("Decoded input", "config", options)
 	log.Info("Starting up", "backend", options.Backend)
 
-	var leaderDetector leader.Detector
-	var snapshot store.Snapshot
-	var cleanUpFunc func()
-
 	// If mux config is set then build up the object with runtime components like discovery and then
 	// the backends will configure the Mux object.
 	if options.Mux != nil {
 		options.Mux.plugins = plugins
 	}
+
+	options.plugins = plugins
 
 	switch strings.ToLower(options.Backend) {
 	case "etcd":
@@ -130,11 +133,11 @@ func Run(plugins func() discovery.Plugins,
 			return
 		}
 		log.Info("starting up etcd backend", "options", backendOptions)
-		leaderDetector, snapshot, cleanUpFunc, err = etcdBackends(backendOptions)
+		err = configEtcdBackends(backendOptions, &options, options.Mux)
 		if err != nil {
 			return
 		}
-		log.Info("etcd backend", "leader", leaderDetector, "store", snapshot, "cleanup", cleanUpFunc)
+		log.Info("etcd backend", "leader", options.leader, "store", options.store, "cleanup", options.cleanUpFunc)
 	case "file":
 		backendOptions := BackendFileOptions{}
 		err = options.Settings.Decode(&backendOptions)
@@ -142,11 +145,11 @@ func Run(plugins func() discovery.Plugins,
 			return
 		}
 		log.Info("starting up file backend", "options", backendOptions)
-		leaderDetector, snapshot, cleanUpFunc, err = fileBackends(backendOptions, options.Mux)
+		err = configFileBackends(backendOptions, &options, options.Mux)
 		if err != nil {
 			return
 		}
-		log.Info("file backend", "leader", leaderDetector, "store", snapshot, "cleanup", cleanUpFunc)
+		log.Info("file backend", "leader", options.leader, "store", options.store, "cleanup", options.cleanUpFunc)
 	case "swarm":
 		backendOptions := BackendSwarmOptions{}
 		err = options.Settings.Decode(&backendOptions)
@@ -154,11 +157,11 @@ func Run(plugins func() discovery.Plugins,
 			return
 		}
 		log.Info("starting up swarm backend", "options", backendOptions)
-		leaderDetector, snapshot, cleanUpFunc, err = swarmBackends(backendOptions)
+		err = configSwarmBackends(backendOptions, &options, options.Mux)
 		if err != nil {
 			return
 		}
-		log.Info("swarm backend", "leader", leaderDetector, "store", snapshot, "cleanup", cleanUpFunc)
+		log.Info("swarm backend", "leader", options.leader, "store", options.store, "cleanup", options.cleanUpFunc)
 	default:
 		err = fmt.Errorf("unknown backend:%v", options.Backend)
 		return
@@ -166,7 +169,7 @@ func Run(plugins func() discovery.Plugins,
 
 	var mgr manager.Backend
 	lookup, _ := options.BackendName.GetLookupAndType()
-	mgr, err = manager.NewManager(plugins(), leaderDetector, snapshot, lookup)
+	mgr, err = manager.NewManager(plugins(), options.leader, options.store, lookup)
 	if err != nil {
 		return
 	}
@@ -181,7 +184,7 @@ func Run(plugins func() discovery.Plugins,
 	log.Info("manager running")
 
 	updatable := &metadataModel{
-		snapshot: snapshot,
+		snapshot: options.store,
 		manager:  mgr,
 	}
 	updatableModel, _ := updatable.pluginModel()
@@ -200,7 +203,14 @@ func Run(plugins func() discovery.Plugins,
 	}
 
 	var muxServer rpc.Stoppable
+
 	if options.Mux != nil {
+
+		options.Mux.location, err = url.Parse(options.Mux.URL)
+		if err != nil {
+			return
+		}
+
 		var leadership <-chan leader.Leadership
 
 		if options.Mux.store != nil && options.Mux.poller != nil {
@@ -226,8 +236,8 @@ func Run(plugins func() discovery.Plugins,
 	}
 
 	onStop = func() {
-		if cleanUpFunc != nil {
-			cleanUpFunc()
+		if options.cleanUpFunc != nil {
+			options.cleanUpFunc()
 		}
 		if muxServer != nil {
 			options.Mux.poller.Stop()
