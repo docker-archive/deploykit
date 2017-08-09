@@ -28,7 +28,7 @@ import (
 	_ "github.com/docker/infrakit/cmd/infrakit/template"
 	_ "github.com/docker/infrakit/cmd/infrakit/util"
 	_ "github.com/docker/infrakit/cmd/infrakit/x"
-	_ "github.com/docker/infrakit/pkg/cli/v1"
+	_ "github.com/docker/infrakit/pkg/cli/v0"
 
 	// CLI backends
 	_ "github.com/docker/infrakit/pkg/cli/backend/http"
