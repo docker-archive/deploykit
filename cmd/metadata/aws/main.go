@@ -30,12 +30,12 @@ func main() {
 
 			stop := make(chan struct{})
 
-			plugin, err := metadata.NewPlugin(
-				templateURL,
-				template.Options{},
-				poll,
-				stack,
-				*options,
+			plugin, err := metadata.NewPlugin(metadata.Options{
+				Template:        templateURL,
+				TemplateOptions: template.Options{},
+				PollInterval:    poll,
+				StackName:       stack,
+			},
 				stop)
 			if err != nil {
 				return err

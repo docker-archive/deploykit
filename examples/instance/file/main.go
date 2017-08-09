@@ -6,7 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/run"
-	"github.com/docker/infrakit/pkg/run/instance/file"
+	"github.com/docker/infrakit/pkg/run/v0/file"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )

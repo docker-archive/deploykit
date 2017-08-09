@@ -18,12 +18,12 @@ import (
 	"github.com/spf13/cobra"
 
 	// Load the inprocess plugins supported
-	_ "github.com/docker/infrakit/pkg/run/v1/controller/group"
-	_ "github.com/docker/infrakit/pkg/run/v1/flavor/swarm"
-	_ "github.com/docker/infrakit/pkg/run/v1/flavor/vanilla"
-	_ "github.com/docker/infrakit/pkg/run/v1/instance/aws"
-	_ "github.com/docker/infrakit/pkg/run/v1/instance/file"
-	_ "github.com/docker/infrakit/pkg/run/v1/manager"
+	_ "github.com/docker/infrakit/pkg/run/v0/aws"
+	_ "github.com/docker/infrakit/pkg/run/v0/file"
+	_ "github.com/docker/infrakit/pkg/run/v0/group"
+	_ "github.com/docker/infrakit/pkg/run/v0/manager"
+	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
+	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
 )
 
 var log = logutil.New("module", "cli/plugin")
