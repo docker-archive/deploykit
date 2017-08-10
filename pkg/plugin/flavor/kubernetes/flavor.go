@@ -23,7 +23,9 @@ import (
 )
 
 var (
-	log                    = logutil.New("module", "flavor/kubernetes")
+	log = logutil.New("module", "flavor/kubernetes")
+
+	// DefaultTemplateOptions contains the default values to use for templates
 	DefaultTemplateOptions = template.Options{MultiPass: true}
 )
 
