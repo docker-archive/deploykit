@@ -23,8 +23,7 @@ func (l *testLauncher) Name() string {
 	return l.name
 }
 
-func (l *testLauncher) Exec(name string, config *types.Any) (plugin.Name, <-chan error, error) {
-	pn := plugin.Name(name)
+func (l *testLauncher) Exec(kind string, pn plugin.Name, config *types.Any) (plugin.Name, <-chan error, error) {
 	rule := testConfig{}
 	err := config.Decode(&rule)
 	if err != nil {
@@ -51,9 +50,10 @@ func TestMonitorLoopNoRules(t *testing.T) {
 	errChan := make(chan error)
 
 	input <- StartPlugin{
-		Plugin: "test",
-		Exec:   ExecName("test"),
-		Error: func(pn plugin.Name, config *types.Any, e error) {
+		Kind: "test",
+		Name: plugin.Name("test"),
+		Exec: ExecName("test"),
+		Error: func(kind string, pn plugin.Name, config *types.Any, e error) {
 			errChan <- e
 		},
 	}
@@ -73,7 +73,7 @@ func TestMonitorLoopValidRule(t *testing.T) {
 
 	var receivedArgs *types.Any
 	rule := Rule{
-		Plugin: "hello",
+		Kind: "hello",
 		Launch: map[ExecName]*types.Any{
 			"test": types.AnyValueMust(config),
 		},
@@ -94,9 +94,10 @@ func TestMonitorLoopValidRule(t *testing.T) {
 
 	started := make(chan interface{})
 	input <- StartPlugin{
-		Plugin: "hello",
-		Exec:   ExecName("test"),
-		Started: func(pn plugin.Name, config *types.Any) {
+		Kind: "hello",
+		Name: plugin.Name("hello"),
+		Exec: ExecName("test"),
+		Started: func(kind string, pn plugin.Name, config *types.Any) {
 			close(started)
 		},
 	}
@@ -118,7 +119,7 @@ func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
 
 	var receivedArgs *types.Any
 	rule := Rule{
-		Plugin: "hello",
+		Kind: "hello",
 		Launch: map[ExecName]*types.Any{
 			"test": types.AnyValueMust(config),
 		},
@@ -139,9 +140,10 @@ func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
 
 	started := make(chan interface{})
 	input <- StartPlugin{
-		Plugin: "hello",
-		Exec:   ExecName("test"),
-		Started: func(pn plugin.Name, config *types.Any) {
+		Kind: "hello",
+		Name: plugin.Name("hello"),
+		Exec: ExecName("test"),
+		Started: func(kind string, pn plugin.Name, config *types.Any) {
 			close(started)
 		},
 	}
@@ -163,7 +165,7 @@ func TestMonitorLoopRuleOverrideOptions(t *testing.T) {
 
 	var receivedArgs *types.Any
 	rule := Rule{
-		Plugin: "hello",
+		Kind: "hello",
 		Launch: map[ExecName]*types.Any{
 			"test": types.AnyValueMust(config),
 		},
@@ -189,10 +191,11 @@ func TestMonitorLoopRuleOverrideOptions(t *testing.T) {
 
 	started := make(chan interface{})
 	input <- StartPlugin{
-		Plugin:  "hello",
+		Kind:    "hello",
+		Name:    plugin.Name("hello"),
 		Exec:    ExecName("test"),
 		Options: types.AnyValueMust(options),
-		Started: func(pn plugin.Name, config *types.Any) {
+		Started: func(kind string, pn plugin.Name, config *types.Any) {
 			close(started)
 		},
 	}
@@ -215,15 +218,15 @@ func TestMergeRule(t *testing.T) {
 	}
 
 	r1 := Rule{
-		Plugin: plugin.Name("foo"),
+		Kind:   "foo",
 		Launch: m1,
 	}
 
-	r2 := r1.Merge(Rule{Plugin: plugin.Name("no")})
+	r2 := r1.Merge(Rule{Kind: "no"})
 	require.Equal(t, r1, r2) // expects no effect
 	require.Equal(t, m1, r1.Launch)
 
-	r3 := r1.Merge(Rule{Plugin: plugin.Name("foo"), Launch: m2})
+	r3 := r1.Merge(Rule{Kind: "foo", Launch: m2})
 	require.Equal(t, map[ExecName]*types.Any{
 		ExecName("exec1"): types.AnyValueMust("test"),
 		ExecName("exec2"): types.AnyValueMust("test2"),
@@ -231,20 +234,20 @@ func TestMergeRule(t *testing.T) {
 
 	expect, err := types.AnyValueMust([]Rule{
 		{
-			Plugin: plugin.Name("bar"),
+			Kind: "bar",
 			Launch: map[ExecName]*types.Any{
 				ExecName("exec2"): types.AnyValueMust("test2"),
 			},
 		},
 		{
-			Plugin: plugin.Name("baz"),
+			Kind: "baz",
 			Launch: map[ExecName]*types.Any{
 				ExecName("exec1"): types.AnyValueMust("test1"),
 				ExecName("exec2"): types.AnyValueMust("test2"),
 			},
 		},
 		{
-			Plugin: plugin.Name("foo"),
+			Kind: "foo",
 			Launch: map[ExecName]*types.Any{
 				ExecName("exec"): types.AnyValueMust("test"),
 			},
@@ -255,13 +258,13 @@ func TestMergeRule(t *testing.T) {
 	actual, err := types.AnyValueMust(MergeRules(
 		[]Rule{
 			{
-				Plugin: plugin.Name("foo"),
+				Kind: "foo",
 				Launch: map[ExecName]*types.Any{
 					ExecName("exec"): types.AnyValueMust("test"),
 				},
 			},
 			{
-				Plugin: plugin.Name("baz"),
+				Kind: "baz",
 				Launch: map[ExecName]*types.Any{
 					ExecName("exec1"): types.AnyValueMust("test1"),
 				},
@@ -269,13 +272,13 @@ func TestMergeRule(t *testing.T) {
 		},
 		[]Rule{
 			{
-				Plugin: plugin.Name("bar"),
+				Kind: "bar",
 				Launch: map[ExecName]*types.Any{
 					ExecName("exec2"): types.AnyValueMust("test2"),
 				},
 			},
 			{
-				Plugin: plugin.Name("baz"),
+				Kind: "baz",
 				Launch: map[ExecName]*types.Any{
 					ExecName("exec2"): types.AnyValueMust("test2"),
 				},

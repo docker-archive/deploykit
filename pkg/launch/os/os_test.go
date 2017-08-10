@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +18,7 @@ func TestLaunchOSCommand(t *testing.T) {
 	launcher, err := NewLauncher("os")
 	require.NoError(t, err)
 
-	_, starting, err := launcher.Exec("sleepPlugin", types.AnyValueMust(&LaunchConfig{
+	_, starting, err := launcher.Exec("sleepPlugin", plugin.Name("sleepPlugin"), types.AnyValueMust(&LaunchConfig{
 		Cmd: "sleep 100",
 	}))
 	require.NoError(t, err)
@@ -33,7 +34,7 @@ func TestLaunchWithLog(t *testing.T) {
 	launcher, err := NewLauncher("os")
 	require.NoError(t, err)
 
-	_, starting, err := launcher.Exec("echoPlugin", types.AnyValueMust(&LaunchConfig{
+	_, starting, err := launcher.Exec("echoPlugin", plugin.Name("echoPlugin"), types.AnyValueMust(&LaunchConfig{
 		Cmd:      fmt.Sprintf("echo hello > %s 2>&1", logfile),
 		SamePgID: true,
 	}))

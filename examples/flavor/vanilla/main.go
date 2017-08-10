@@ -5,6 +5,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/v0/vanilla"
 	"github.com/docker/infrakit/pkg/template"
@@ -25,11 +26,12 @@ func main() {
 
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 
-	cmd.Flags().StringVar(&options.Name, "name", options.Name, "Plugin name to advertise for discovery")
+	name := "flavor-vanilla"
+	cmd.Flags().StringVar(&name, "name", name, "Plugin name to advertise for discovery")
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
 
-		name, impl, onStop, err := vanilla.Run(nil, types.AnyValueMust(options))
+		name, impl, onStop, err := vanilla.Run(nil, plugin.Name(name), types.AnyValueMust(options))
 		if err != nil {
 			return
 		}

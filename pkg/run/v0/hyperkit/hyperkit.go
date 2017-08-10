@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	// CanonicalName is the canonical name of the plugin for starting up, etc.
-	CanonicalName = "hyperkit"
+	// Kind is the canonical name of the plugin for starting up, etc.
+	Kind = "hyperkit"
 
 	// EnvDir is the environment variable for where the instance states are stored.
 	EnvDir = "INFRAKIT_INSTANCE_HYPERKIT_DIR"
@@ -31,7 +31,7 @@ var (
 )
 
 func init() {
-	inproc.Register(CanonicalName, Run, DefaultOptions)
+	inproc.Register(Kind, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the plugin.

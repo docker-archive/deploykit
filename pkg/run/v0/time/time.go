@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	// CanonicalName is the canonical name of the plugin for starting up, etc.
-	CanonicalName = "time"
+	// Kind is the canonical name of the plugin for starting up, etc.
+	Kind = "time"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 )
 
 func init() {
-	inproc.Register(CanonicalName, Run, DefaultOptions)
+	inproc.Register(Kind, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the plugin.

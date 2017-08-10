@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	// CanonicalName is the canonical name of the plugin. Used for command line identification
-	CanonicalName = "group"
+	// Kind is the canonical name of the plugin. Used for command line identification
+	Kind = "group"
 
 	// LookupName is the name used to look up the object via discovery
 	LookupName = "group-stateless"
@@ -31,7 +31,7 @@ const (
 var log = logutil.New("module", "run/group")
 
 func init() {
-	inproc.Register(CanonicalName, Run, DefaultOptions)
+	inproc.Register(Kind, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the group controller.
@@ -61,6 +61,8 @@ var DefaultOptions = Options{
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
+
+	log.Debug("Starting group", "name", name, "configs", config)
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -136,7 +138,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		}
 	}()
 
-	transport.Name = plugin.Name(LookupName)
+	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Metadata: metadata_plugin.NewPluginFromChannel(updateSnapshot),
 		run.Group:    groupPlugin,

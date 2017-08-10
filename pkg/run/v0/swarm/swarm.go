@@ -14,14 +14,14 @@ import (
 )
 
 const (
-	// CanonicalName is the canonical name of the plugin and also key used to locate the plugin in discovery
-	CanonicalName = "swarm"
+	// Kind is the canonical name of the plugin and also key used to locate the plugin in discovery
+	Kind = "swarm"
 )
 
 var log = logutil.New("module", "run/v0/swarm")
 
 func init() {
-	inproc.Register(CanonicalName, Run, DefaultOptions)
+	inproc.Register(Kind, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the group controller.

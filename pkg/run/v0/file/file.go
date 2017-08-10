@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	// CanonicalName is the canonical name of the plugin for starting up, etc.
-	CanonicalName = "file"
+	// Kind is the canonical name of the plugin for starting up, etc.
+	Kind = "file"
 
 	// EnvOptionsDir is the environment variable to use to set the default value of Options.Dir
 	EnvOptionsDir = "INFRAKIT_INSTANCE_FILE_OPTIONS_DIR"
@@ -25,7 +25,7 @@ var (
 )
 
 func init() {
-	inproc.Register(CanonicalName, Run, DefaultOptions)
+	inproc.Register(Kind, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the plugin.

@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	// CanonicalName is the canonical name of the plugin and also key used to locate the plugin in discovery
-	CanonicalName = "manager"
+	// Kind is the canonical name of the plugin and also key used to locate the plugin in discovery
+	Kind = "manager"
 
 	// LookupName is the name used to look up the object via discovery
 	LookupName = "group"
@@ -38,7 +38,7 @@ var (
 )
 
 func init() {
-	inproc.Register(CanonicalName, Run, DefaultOptions)
+	inproc.Register(Kind, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the plugin.
@@ -189,7 +189,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	}
 	updatableModel, _ := updatable.pluginModel()
 
-	transport.Name = plugin.Name(LookupName)
+	transport.Name = name
 
 	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
 		metadata_plugin.NewPluginFromChannel(updatableModel),

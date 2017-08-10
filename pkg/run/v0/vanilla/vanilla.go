@@ -12,14 +12,14 @@ import (
 )
 
 const (
-	// CanonicalName is the canonical name of the plugin for starting up, etc.
-	CanonicalName = "vanilla"
+	// Kind is the canonical name of the plugin for starting up, etc.
+	Kind = "vanilla"
 )
 
 var log = logutil.New("module", "run/v0/vanilla")
 
 func init() {
-	inproc.Register("vanilla", Run, DefaultOptions)
+	inproc.Register(Kind, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the group controller.

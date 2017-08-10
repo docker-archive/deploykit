@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	// CanonicalName is the canonical name of the plugin for starting up, etc.
-	CanonicalName = "kubernetes"
+	// Kind is the canonical name of the plugin for starting up, etc.
+	Kind = "kubernetes"
 
 	// EnvConfigDir is the environment variable to set the config directory
 	EnvConfigDir = "INFRAKIT_FLAVOR_KUBERNETES_CONFIG_DIR"
@@ -28,7 +28,7 @@ var (
 )
 
 func init() {
-	inproc.Register(CanonicalName, Run, DefaultOptions)
+	inproc.Register(Kind, Run, DefaultOptions)
 }
 
 // Options capture the options for starting up the plugin.

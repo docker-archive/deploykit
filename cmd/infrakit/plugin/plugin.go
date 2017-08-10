@@ -20,10 +20,10 @@ import (
 	// Load the inprocess plugins supported
 	_ "github.com/docker/infrakit/pkg/run/v0/aws"
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
-	_ "github.com/docker/infrakit/pkg/run/v0/group"
+	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
 	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
-	_ "github.com/docker/infrakit/pkg/run/v0/manager"
+	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
 	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
@@ -187,13 +187,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		if len(args) == 0 {
 
 			fmt.Println("Plugins available:")
-			fmt.Printf("%-20s\t%s\n", "PLUGIN", "EXEC")
+			fmt.Printf("%-20s\t%s\n", "KIND", "EXEC")
 			for _, r := range pluginManager.Rules() {
 				execs := []string{}
 				for k := range r.Launch {
 					execs = append(execs, string(k))
 				}
-				fmt.Printf("%-20v\t%v\n", r.Plugin, strings.Join(execs, ","))
+				fmt.Printf("%-20v\t%v\n", r.Kind, strings.Join(execs, ","))
 			}
 			return nil
 		}
@@ -206,11 +206,28 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			if len(p) > 1 {
 				execName = p[1]
 			}
-			pluginToStart := p[0]
 
-			err = pluginManager.Launch(execName, plugin.Name(pluginToStart), nil)
+			// the format is kind[:{plugin_name}][={os|inproc}]
+			pp := strings.Split(p[0], ":")
+			kind := pp[0]
+			name := plugin.Name(kind)
+
+			// This is some special case for the legacy setup (pre v0.6)
+			switch kind {
+			case manager_kind.Kind:
+				name = plugin.Name(manager_kind.LookupName)
+			case group_kind.Kind:
+				name = plugin.Name(group_kind.LookupName)
+			}
+			// customized by user as override
+			if len(pp) > 1 {
+				name = plugin.Name(pp[1])
+			}
+
+			log.Info("Launching", "kind", kind, "name", name)
+			err = pluginManager.Launch(execName, kind, name, nil)
 			if err != nil {
-				log.Warn("failed to launch", "exec", execName, "plugin", pluginToStart)
+				log.Warn("failed to launch", "exec", execName, "kind", kind, "name", name)
 			}
 		}
 

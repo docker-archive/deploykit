@@ -58,7 +58,7 @@ func Rules() []launch.Rule {
 		}
 
 		rules = append(rules, launch.Rule{
-			Plugin: plugin.Name(lookup),
+			Kind: lookup,
 			Launch: map[launch.ExecName]*types.Any{
 				launch.ExecName("inproc"): defaultOptions,
 			},
@@ -100,15 +100,18 @@ func (l *Launcher) Name() string {
 // The channel is closed as soon as an error (or nil for success completion) is written.
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes.  However, the plugin is running in process.
-func (l *Launcher) Exec(name string, config *types.Any) (pluginName plugin.Name, starting <-chan error, err error) {
+func (l *Launcher) Exec(kind string, pn plugin.Name,
+	config *types.Any) (pluginName plugin.Name, starting <-chan error, err error) {
+
+	name, _ := pn.GetLookupAndType()
 
 	if s, has := l.running[name]; has {
 		return pluginName, s.wait, nil
 	}
 
-	builder, has := builders[name]
+	builder, has := builders[kind]
 	if !has {
-		return pluginName, nil, fmt.Errorf("cannot start plugin %v", name)
+		return pluginName, nil, fmt.Errorf("cannot start plugin of kind %v", kind)
 	}
 
 	s := state{}

@@ -48,9 +48,8 @@ func (l *Launcher) Name() string {
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes (which uses shell to run the real task in
 // background).
-func (l *Launcher) Exec(name string, config *types.Any) (plugin.Name, <-chan error, error) {
-
-	pn := plugin.Name(name)
+func (l *Launcher) Exec(kind string, pn plugin.Name, config *types.Any) (plugin.Name, <-chan error, error) {
+	name, _ := pn.GetLookupAndType()
 	launchConfig := &LaunchConfig{}
 	if err := config.Decode(launchConfig); err != nil {
 		return pn, nil, err
