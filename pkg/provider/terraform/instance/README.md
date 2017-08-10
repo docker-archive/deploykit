@@ -212,3 +212,27 @@ ID                            	LOGICAL                       	TAGS
 ```
 
 ![RSG Screenshot](terminated.png)
+
+## Technical Details
+
+Terraform tracks the state of resources (corresponding to `.tf.json` files) in the `.tfstate` file.
+
+In order to detect resources that have been removed outside of Infrakit (for example, if an instance is
+removed from the Cloud provider natively), the terraform instance plugin creates an intermediate
+`tf.json.new` file on `Provision`; these files are **not processed** during a `terraform apply`. However,
+the terraform instance plugin **does process**  both `tf.json` and `tf.json.new` files in the
+`DescribeInstances`, `Destroy`, and `Label` functions.
+
+The terraform instance plugin has a dedicated goroutine (running at a configurable frequency) that
+executes the following:
+
+1. Acquires a file lock (protects access to all `tf.json` and `tf.json.new` files)
+2. Executes `terraform refresh` to update the `.tfstate` file
+3. Executes `terraform state list` to list all resources in the state file
+4. Removes any `tf.json` file that corresponds to an instance that is **not** in the state file
+5. Renames all `tf.json.new` files to `tf.json` files so that a `terraform apply` will process them
+6. Releases file lock (from step 1)
+7. Executes `terraform apply -no-refresh`
+
+But naming new files with the `.tf.json.new` suffix in the `Provision` flow, the plugin can differentiate
+between orphaned resources and those queued up for creation.
