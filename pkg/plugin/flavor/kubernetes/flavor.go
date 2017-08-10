@@ -1,9 +1,15 @@
-package main
+package kubernetes
 
 import (
 	"fmt"
-	log "github.com/Sirupsen/logrus"
+	"io/ioutil"
+	"os"
+	"path"
+	"strconv"
+	"time"
+
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -13,12 +19,12 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	kubediscovery "github.com/kubernetes/kubernetes/cmd/kubeadm/app/discovery"
 	kubetoken "github.com/kubernetes/kubernetes/cmd/kubeadm/app/util/token"
-	"io/ioutil"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"os"
-	"path"
-	"strconv"
-	"time"
+)
+
+var (
+	log                    = logutil.New("module", "flavor/kubernetes")
+	DefaultTemplateOptions = template.Options{MultiPass: true}
 )
 
 const (
@@ -88,7 +94,7 @@ func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group_type
 	}
 
 	if spec.InitScriptTemplateURL != "" {
-		_, err := template.NewTemplate(spec.InitScriptTemplateURL, defaultTemplateOptions)
+		_, err := template.NewTemplate(spec.InitScriptTemplateURL, DefaultTemplateOptions)
 		if err != nil {
 			return err
 		}
@@ -159,9 +165,9 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			}
 			for i := 0; ; i++ {
 				_, err := kubediscovery.For(&cfg)
-				log.Debugln(role, ">>>", i, "Querying Kubernetes API server")
+				log.Debug("Querying Kubernetes API server", "role", role, "i", i)
 				if err != nil {
-					log.Warningln("Cannot connect to Kubernetes API server:", err)
+					log.Warn("Cannot connect to Kubernetes API server", "err", err)
 					if i > 10 {
 						return instanceSpec, err
 					}
@@ -178,13 +184,13 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 	if spec.InitScriptTemplateURL != "" {
 
-		t, err := template.NewTemplate(spec.InitScriptTemplateURL, defaultTemplateOptions)
+		t, err := template.NewTemplate(spec.InitScriptTemplateURL, DefaultTemplateOptions)
 		if err != nil {
 			return instanceSpec, err
 		}
 
 		initTemplate = t
-		log.Infoln("Using", spec.InitScriptTemplateURL, "for init script template")
+		log.Info("Init script template", "template", spec.InitScriptTemplateURL)
 	}
 	link = types.NewLink().WithContext("kubernetes::" + role)
 	context := &templateContext{
@@ -211,7 +217,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	})
 	initScript, err = initTemplate.Render(context)
 	instanceSpec.Init = initScript
-	log.Debugf("Init script \n %v\n", initScript)
+	log.Debug("Init script", "content", initScript)
 	return instanceSpec, nil
 }
 

@@ -1,8 +1,8 @@
-package main
+package kubernetes
 
 import (
 	"errors"
-	log "github.com/Sirupsen/logrus"
+
 	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -45,7 +45,7 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 
 	for _, id := range allocation.LogicalIDs {
 		if att, exists := spec.Attachments[id]; !exists || len(att) == 0 {
-			log.Warnf("LogicalID %s has no attachments, which is needed for durability", id)
+			log.Warn("Instance has no attachments, which is needed for durability", "logicalID", id)
 		}
 	}
 	ads := map[string]string{}
@@ -55,10 +55,10 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 		}
 	}
 	if _, ok := ads["network"]; !ok {
-		log.Warnf("No Network addon configured. Your cluster will not be Ready status until apply network addon.")
+		log.Warn("No Network addon configured. Your cluster will not be Ready status until apply network addon.")
 	}
 	for k, v := range ads {
-		log.Infof("Type : %v, Name : %v addon will be apply", k, v)
+		log.Info("Apply addon", "type", k, "name", v)
 	}
 	return nil
 }

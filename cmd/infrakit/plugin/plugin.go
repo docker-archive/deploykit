@@ -22,6 +22,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
 	_ "github.com/docker/infrakit/pkg/run/v0/group"
 	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
+	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
 	_ "github.com/docker/infrakit/pkg/run/v0/manager"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
@@ -148,7 +149,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
 	mustAll := start.Flags().Bool("all", true, "Panic if any plugin fails to start")
-
 	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
 	start.Flags().AddFlagSet(templateFlags)
 

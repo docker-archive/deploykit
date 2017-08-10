@@ -205,7 +205,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		Use:   "change",
 		Short: "Change returns the plugin configurations known by the manager",
 	}
-	vars := change.Flags().StringSliceP("var", "v", []string{}, "key=value pairs")
+	vars := change.Flags().StringSlice("var", []string{}, "key=value pairs")
 	commitChange := change.Flags().BoolP("commit", "c", false, "Commit changes")
 
 	// This is the only interactive command.  We want to show the user the proposal, with the diff

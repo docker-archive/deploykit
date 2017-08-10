@@ -24,7 +24,7 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
 	properties := describe.Flags().BoolP("properties", "p", false, "Also returns current status/ properties")
 	tagsTemplate := describe.Flags().StringP("tags-view", "t", "*", "Template to render tags")
-	propertiesTemplate := describe.Flags().StringP("properties-view", "v", "{{.}}", "Template to render properties")
+	propertiesTemplate := describe.Flags().StringP("properties-view", "r", "{{.}}", "Template to render properties")
 
 	quiet := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
 

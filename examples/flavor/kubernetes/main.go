@@ -7,6 +7,7 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
+	"github.com/docker/infrakit/pkg/plugin/flavor/kubernetes"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -23,8 +24,6 @@ func init() {
 			"DockerClientAPIVersion": docker.ClientVersion,
 		})
 }
-
-var defaultTemplateOptions = template.Options{MultiPass: true}
 
 func main() {
 
@@ -57,11 +56,15 @@ func main() {
 
 		cli.SetLogLevel(*logLevel)
 
-		mt, err := getTemplate(*managerInitScriptTemplURL, DefaultManagerInitScriptTemplate, defaultTemplateOptions)
+		mt, err := getTemplate(*managerInitScriptTemplURL,
+			kubernetes.DefaultManagerInitScriptTemplate,
+			kubernetes.DefaultTemplateOptions)
 		if err != nil {
 			return err
 		}
-		wt, err := getTemplate(*workerInitScriptTemplURL, DefaultWorkerInitScriptTemplate, defaultTemplateOptions)
+		wt, err := getTemplate(*workerInitScriptTemplURL,
+			kubernetes.DefaultWorkerInitScriptTemplate,
+			kubernetes.DefaultTemplateOptions)
 		if err != nil {
 			return err
 		}
@@ -69,8 +72,8 @@ func main() {
 		managerStop := make(chan struct{})
 		workerStop := make(chan struct{})
 
-		managerFlavor := NewManagerFlavor(plugins, mt, *dir, managerStop)
-		workerFlavor := NewWorkerFlavor(plugins, wt, *dir, workerStop)
+		managerFlavor := kubernetes.NewManagerFlavor(plugins, mt, *dir, managerStop)
+		workerFlavor := kubernetes.NewWorkerFlavor(plugins, wt, *dir, workerStop)
 
 		cli.RunPlugin(*name,
 

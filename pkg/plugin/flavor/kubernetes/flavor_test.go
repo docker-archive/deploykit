@@ -1,4 +1,4 @@
-package main
+package kubernetes
 
 import (
 	"github.com/docker/infrakit/pkg/discovery"
