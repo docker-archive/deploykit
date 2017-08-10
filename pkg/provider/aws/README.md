@@ -51,7 +51,7 @@ $ cat << EOF > aws-vanilla.json
       "Size": 1
     },
     "Instance": {
-      "Plugin": "instance-aws",
+      "Plugin": "instance-aws/ec2-instance",
       "Properties": {
         "RunInstancesInput": {
           "ImageId": "ami-4926fd29",
@@ -91,13 +91,13 @@ The instance type is set to `m1.small` by default. Note that you cannot use HVM 
 
 Finally, instruct the Group plugin to start watching the group:
 ```console
-$ build/infrakit group watch aws-vanilla.json
-watching aws-example
+$ build/infrakit group commit aws-vanilla.json
+Committed aws-example: Managing 1 instances
 ```
 
 In the console running the Group plugin, we will see input like the following:
 ```
-INFO[1208] Watching group 'aws-example'
+INFO[1219] Committing group aws-example (pretend=false) 
 INFO[1219] Adding 1 instances to group to reach desired 1
 INFO[1219] Created instance i-ba0412a2 with tags map[infrakit.config_sha:dUBtWGmkptbGg29ecBgv1VJYzys= infrakit.group:aws-example]
 ```
