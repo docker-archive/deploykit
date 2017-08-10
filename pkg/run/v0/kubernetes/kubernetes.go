@@ -33,9 +33,6 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
-	// Name of the plugin
-	Name string
-
 	// ConfigDir is the path of the directory to store the files
 	ConfigDir string
 
@@ -57,13 +54,12 @@ func getWd() string {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Name:      CanonicalName,
 	ConfigDir: run.GetEnv(EnvConfigDir, getWd()),
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins,
+func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
@@ -98,7 +94,7 @@ func Run(plugins func() discovery.Plugins,
 	managerFlavor := kubernetes.NewManagerFlavor(plugins, mt, options.ConfigDir, managerStop)
 	workerFlavor := kubernetes.NewWorkerFlavor(plugins, wt, options.ConfigDir, workerStop)
 
-	transport.Name = plugin.Name(options.Name)
+	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Flavor: map[string]flavor.Plugin{
 			"manager": managerFlavor,

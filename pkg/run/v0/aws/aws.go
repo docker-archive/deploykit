@@ -38,9 +38,6 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
-	// Name of the plugin
-	Name string
-
 	// Namespace is a set of kv pairs for tags that namespaces the resource instances
 	Namespace map[string]string
 
@@ -49,7 +46,6 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Name:      CanonicalName,
 	Namespace: map[string]string{},
 	Options: aws_metadata.Options{
 		Options: aws_instance.Options{
@@ -61,7 +57,7 @@ var DefaultOptions = Options{
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins,
+func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
@@ -93,7 +89,7 @@ func Run(plugins func() discovery.Plugins,
 	iamClient := iam.New(builder.Config)
 	sqsClient := sqs.New(builder.Config)
 
-	transport.Name = plugin.Name(options.Name)
+	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Event: map[string]event.Plugin{
 			"ec2-instance": (&aws_instance.Monitor{Plugin: instancePlugin}).Init(),

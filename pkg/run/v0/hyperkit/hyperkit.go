@@ -36,9 +36,6 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
-	// Name of the plugin
-	Name string
-
 	// Dir is the directory for storing the VM state
 	Dir string
 
@@ -58,7 +55,6 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Name:              CanonicalName,
 	Listen:            ":24865",
 	DiscoveryHostPort: run.GetEnv(EnvDiscoveryHostPort, "192.168.65.1:24865"),
 	Dir:               run.GetEnv(EnvDir, filepath.Join(run.InfrakitHome(), "hyperkit-vms")),
@@ -68,7 +64,7 @@ var DefaultOptions = Options{
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins,
+func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
@@ -77,7 +73,7 @@ func Run(plugins func() discovery.Plugins,
 		return
 	}
 
-	transport.Name = plugin.Name(options.Name)
+	transport.Name = name
 	transport.Listen = options.Listen
 	transport.Advertise = options.DiscoveryHostPort
 

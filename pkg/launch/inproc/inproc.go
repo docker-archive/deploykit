@@ -17,7 +17,7 @@ var log = logutil.New("module", "launch/inproc")
 
 // PluginRunFunc is a function that takes the plugin lookup, a configuration blob and starts the plugin
 // and returns a stoppable, running channel (for optionally blocking), and error.
-type PluginRunFunc func(func() discovery.Plugins,
+type PluginRunFunc func(func() discovery.Plugins, plugin.Name,
 	*types.Any) (transport plugin.Transport, plugins map[run.PluginCode]interface{}, onStop func(), err error)
 
 type builder struct {
@@ -119,7 +119,7 @@ func (l *Launcher) Exec(name string, config *types.Any) (pluginName plugin.Name,
 
 	s.wait = sc
 
-	transport, impls, onStop, err := builder.run(l.plugins, config)
+	transport, impls, onStop, err := builder.run(l.plugins, plugin.Name(name), config)
 	if err != nil {
 		log.Warn("error executing inproc", "plugin", name, "config", config, "err", err)
 		sc <- err

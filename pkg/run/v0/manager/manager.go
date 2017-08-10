@@ -101,7 +101,7 @@ func defaultOptions() (options Options) {
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins,
+func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	if plugins == nil {

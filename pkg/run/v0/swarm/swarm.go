@@ -28,9 +28,6 @@ func init() {
 type Options struct {
 	template.Options `json:",inline" yaml:",inline"`
 
-	// Name of the plugin
-	Name string
-
 	// ManaagerInitScriptTemplate is the URL of the template for manager init script
 	// This is overridden by the value provided in the spec.
 	ManagerInitScriptTemplate string
@@ -45,12 +42,11 @@ var DefaultOptions = Options{
 	Options: template.Options{
 		MultiPass: true,
 	},
-	Name: CanonicalName,
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins,
+func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
@@ -74,7 +70,7 @@ func Run(plugins func() discovery.Plugins,
 	managerFlavor := swarm.NewManagerFlavor(plugins, swarm.DockerClient, mt, managerStop)
 	workerFlavor := swarm.NewWorkerFlavor(plugins, swarm.DockerClient, wt, workerStop)
 
-	transport.Name = plugin.Name(options.Name)
+	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Flavor: map[string]flavor.Plugin{
 			"manager": managerFlavor,

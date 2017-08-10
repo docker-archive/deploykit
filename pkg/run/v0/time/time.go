@@ -29,18 +29,14 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
-	// Name of the plugin
-	Name string
 }
 
 // DefaultOptions return an Options with default values filled in.
-var DefaultOptions = Options{
-	Name: CanonicalName,
-}
+var DefaultOptions = Options{}
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins,
+func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
@@ -67,7 +63,7 @@ func Run(plugins func() discovery.Plugins,
 	// For events
 	timerEvents := (&timer{stop: stop}).init()
 
-	transport.Name = plugin.Name(options.Name)
+	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Metadata: map[string]metadata.Plugin{
 			"time": metadata_plugin.NewPluginFromData(timeQueries),

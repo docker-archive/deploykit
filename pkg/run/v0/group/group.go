@@ -36,10 +36,6 @@ func init() {
 
 // Options capture the options for starting up the group controller.
 type Options struct {
-
-	// Name is the name to advertise for discovery
-	Name plugin.Name
-
 	// PollInterval is the frequency for syncing the state
 	PollInterval time.Duration
 
@@ -55,7 +51,6 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Name:                    plugin.Name(LookupName),
 	PollInterval:            10 * time.Second,
 	MaxParallelNum:          0,
 	PollIntervalGroupSpec:   1 * time.Second,
@@ -64,7 +59,7 @@ var DefaultOptions = Options{
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins,
+func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
@@ -141,7 +136,7 @@ func Run(plugins func() discovery.Plugins,
 		}
 	}()
 
-	transport.Name = options.Name
+	transport.Name = plugin.Name(LookupName)
 	impls = map[run.PluginCode]interface{}{
 		run.Metadata: metadata_plugin.NewPluginFromChannel(updateSnapshot),
 		run.Group:    groupPlugin,
