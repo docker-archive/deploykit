@@ -52,7 +52,7 @@ const (
 
 // ServeRPC starts the RPC endpoint / server given a plugin name for lookup and a list of plugin objects
 // that implements the pkg/spi/ interfaces. onStop is a callback invoked when the the endpoint shuts down.
-func ServeRPC(name plugin.Name, onStop func(),
+func ServeRPC(transport plugin.Transport, onStop func(),
 	impls map[PluginCode]interface{}) (stoppable server.Stoppable, running <-chan struct{}, err error) {
 
 	// Get the server interfaces to be exported.  Do this by checking on the types of the implementations
@@ -132,8 +132,13 @@ func ServeRPC(name plugin.Name, onStop func(),
 
 	}
 
-	lookupName, _ := name.GetLookupAndType() // for aws/ec2, start with 'aws' for example.
-	stoppable, running = cli.BackgroundPlugin(lookupName, onStop, plugins[0], plugins[1:]...)
+	lookupName, _ := transport.Name.GetLookupAndType() // for aws/ec2, start with 'aws' for example.
+	if transport.Listen == "" {
+		stoppable, running = cli.BackgroundPlugin(lookupName, onStop, plugins[0], plugins[1:]...)
+		return
+	}
 
+	stoppable, running = cli.BackgroundListener([]string{transport.Listen, transport.Advertise},
+		lookupName, onStop, plugins[0], plugins[1:]...)
 	return
 }

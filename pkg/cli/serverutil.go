@@ -41,8 +41,10 @@ func BackgroundPlugin(name string, onStop func(), plugin server.VersionedInterfa
 // RunListener runs a plugin server, listening at listen address, and
 // advertising with the provided name for discovery.
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
-func RunListener(listen []string, name string, plugin server.VersionedInterface, more ...server.VersionedInterface) {
-	_, running := BackgroundListener(listen, name, plugin, more...)
+func RunListener(listen []string, name string, onStop func(), plugin server.VersionedInterface,
+	more ...server.VersionedInterface) {
+
+	_, running := BackgroundListener(listen, name, onStop, plugin, more...)
 	<-running
 }
 
@@ -50,7 +52,7 @@ func RunListener(listen []string, name string, plugin server.VersionedInterface,
 // advertising with the provided name for discovery.
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
 // This function does not block. Use the returned channel to optionally block while the server is running.
-func BackgroundListener(listen []string, name string, plugin server.VersionedInterface,
+func BackgroundListener(listen []string, name string, onStop func(), plugin server.VersionedInterface,
 	more ...server.VersionedInterface) (server.Stoppable, <-chan struct{}) {
 
 	dir := local.Dir()
@@ -58,7 +60,7 @@ func BackgroundListener(listen []string, name string, plugin server.VersionedInt
 
 	discoverPath := path.Join(dir, name+".listen")
 	pidPath := path.Join(dir, name+".pid")
-	return run(listen, discoverPath, pidPath, nil, plugin, more...)
+	return run(listen, discoverPath, pidPath, onStop, plugin, more...)
 }
 
 func run(listen []string, discoverPath, pidPath string, onStop func(),
@@ -90,6 +92,7 @@ func run(listen []string, discoverPath, pidPath string, onStop func(),
 		}
 		logrus.Infoln("PID file at", pidPath)
 		if stoppable != nil {
+			logrus.Infoln("Server waiting at", discoverPath)
 			stoppable.AwaitStopped()
 		}
 

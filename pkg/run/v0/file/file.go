@@ -14,14 +14,14 @@ import (
 
 const (
 	// CanonicalName is the canonical name of the plugin for starting up, etc.
-	CanonicalName = "instance-file"
+	CanonicalName = "file"
 
 	// EnvOptionsDir is the environment variable to use to set the default value of Options.Dir
 	EnvOptionsDir = "INFRAKIT_INSTANCE_FILE_OPTIONS_DIR"
 )
 
 var (
-	log = logutil.New("module", "run/instance/file")
+	log = logutil.New("module", "run/v0/file")
 )
 
 func init() {
@@ -46,7 +46,7 @@ var DefaultOptions = Options{
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins,
-	config *types.Any) (name plugin.Name, impls map[run.PluginCode]interface{}, onStop func(), err error) {
+	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -54,7 +54,7 @@ func Run(plugins func() discovery.Plugins,
 		return
 	}
 
-	name = plugin.Name(options.Name)
+	transport.Name = plugin.Name(options.Name)
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: file.NewPlugin(options.Dir),
 	}

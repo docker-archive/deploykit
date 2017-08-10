@@ -15,10 +15,10 @@ import (
 
 const (
 	// CanonicalName is the canonical name of the plugin and also key used to locate the plugin in discovery
-	CanonicalName = "flavor-swarm"
+	CanonicalName = "swarm"
 )
 
-var log = logutil.New("module", "run/flavor/swarm")
+var log = logutil.New("module", "run/v0/swarm")
 
 func init() {
 	inproc.Register(CanonicalName, Run, DefaultOptions)
@@ -51,7 +51,7 @@ var DefaultOptions = Options{
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins,
-	config *types.Any) (name plugin.Name, impls map[run.PluginCode]interface{}, onStop func(), err error) {
+	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -74,7 +74,7 @@ func Run(plugins func() discovery.Plugins,
 	managerFlavor := swarm.NewManagerFlavor(plugins, swarm.DockerClient, mt, managerStop)
 	workerFlavor := swarm.NewWorkerFlavor(plugins, swarm.DockerClient, wt, workerStop)
 
-	name = plugin.Name(options.Name)
+	transport.Name = plugin.Name(options.Name)
 	impls = map[run.PluginCode]interface{}{
 		run.Flavor: map[string]flavor.Plugin{
 			"manager": managerFlavor,

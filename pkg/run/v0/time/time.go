@@ -41,7 +41,7 @@ var DefaultOptions = Options{
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins,
-	config *types.Any) (name plugin.Name, impls map[run.PluginCode]interface{}, onStop func(), err error) {
+	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -67,7 +67,7 @@ func Run(plugins func() discovery.Plugins,
 	// For events
 	timerEvents := (&timer{stop: stop}).init()
 
-	name = plugin.Name(options.Name)
+	transport.Name = plugin.Name(options.Name)
 	impls = map[run.PluginCode]interface{}{
 		run.Metadata: map[string]metadata.Plugin{
 			"time": metadata_plugin.NewPluginFromData(timeQueries),

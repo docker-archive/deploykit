@@ -21,6 +21,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/aws"
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
 	_ "github.com/docker/infrakit/pkg/run/v0/group"
+	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
 	_ "github.com/docker/infrakit/pkg/run/v0/manager"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"

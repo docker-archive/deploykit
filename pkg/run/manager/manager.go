@@ -179,7 +179,7 @@ func (m *Manager) Launch(exec string, name plugin.Name, options *types.Any) erro
 		m.started <- name
 		return nil
 	}
-
+	m.wgStartAll.Add(1)
 	m.startPlugin <- launch.StartPlugin{
 		Plugin:  name,
 		Exec:    launch.ExecName(exec),
@@ -195,7 +195,6 @@ func (m *Manager) Launch(exec string, name plugin.Name, options *types.Any) erro
 			m.wgStartAll.Done()
 		},
 	}
-	m.wgStartAll.Add(1)
 	return nil
 }
 

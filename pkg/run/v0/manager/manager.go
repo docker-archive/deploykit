@@ -102,7 +102,7 @@ func defaultOptions() (options Options) {
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins,
-	config *types.Any) (name plugin.Name, impls map[run.PluginCode]interface{}, onStop func(), err error) {
+	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	if plugins == nil {
 		panic("no plugins()")
@@ -189,7 +189,7 @@ func Run(plugins func() discovery.Plugins,
 	}
 	updatableModel, _ := updatable.pluginModel()
 
-	name = plugin.Name(LookupName)
+	transport.Name = plugin.Name(LookupName)
 
 	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
 		metadata_plugin.NewPluginFromChannel(updatableModel),
