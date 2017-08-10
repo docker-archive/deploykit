@@ -17,13 +17,15 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 
+	// Supported "kinds"
+	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
+	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
+
 	// Load the inprocess plugins supported
 	_ "github.com/docker/infrakit/pkg/run/v0/aws"
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
-	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
 	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
-	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
 	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
