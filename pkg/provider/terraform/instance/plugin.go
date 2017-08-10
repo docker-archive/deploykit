@@ -38,6 +38,13 @@ const (
 	attachTag = "infrakit.attach"
 )
 
+// tfFileRegex is used to determine the files that contain a terraform instance
+// definition; files with a ".new" suffix have not yet been processed by terraform
+var tfFileRegex = regexp.MustCompile("(^instance-[0-9]+)(.tf.json)([.new]*)$")
+
+// instNameRegex is used to determine the name of an instance
+var instNameRegex = regexp.MustCompile("(.*)(instance-[0-9]+)")
+
 type plugin struct {
 	Dir          string
 	fs           afero.Fs
@@ -321,9 +328,8 @@ func (p *plugin) Validate(req *types.Any) error {
 	return nil
 }
 
-// scanLocalFiles reads the filesystem and loads as tf.json files
+// scanLocalFiles reads the filesystem and loads all tf.json and tf.json.new files
 func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-	re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
 
 	vms := map[TResourceType]map[TResourceName]TResourceProperties{}
 
@@ -332,9 +338,9 @@ func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResource
 	err := fs.Walk(p.Dir,
 
 		func(path string, info os.FileInfo, err error) error {
-			matches := re.FindStringSubmatch(info.Name())
+			matches := tfFileRegex.FindStringSubmatch(info.Name())
 
-			if len(matches) == 3 {
+			if len(matches) == 4 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
 					log.Warningln("Cannot parse:", err)
@@ -589,11 +595,12 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 
 	for filename, tfVal := range fileMap {
 		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
-		log.Debugln("writeTerraformFiles", filename, "data=", string(buff), "err=", err)
+		path := filepath.Join(p.Dir, filename+".tf.json.new")
+		log.Debugln("writeTerraformFiles", path, "data=", string(buff), "err=", err)
 		if err != nil {
 			return err
 		}
-		err = afero.WriteFile(p.fs, filepath.Join(p.Dir, filename+".tf.json"), buff, 0644)
+		err = afero.WriteFile(p.fs, path, buff, 0644)
 		if err != nil {
 			return err
 		}
@@ -607,6 +614,10 @@ func ensureUniqueFile(dir string) string {
 	n := fmt.Sprintf("instance-%d", time.Now().Unix())
 	// if we can open then we have to try again... the file cannot exist currently
 	if f, err := os.Open(filepath.Join(dir, n) + ".tf.json"); err == nil {
+		f.Close()
+		return ensureUniqueFile(dir)
+	}
+	if f, err := os.Open(filepath.Join(dir, n) + ".tf.json.new"); err == nil {
 		f.Close()
 		return ensureUniqueFile(dir)
 	}
@@ -681,18 +692,12 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 		time.Sleep(time.Second)
 	}
 
-	buff, err := afero.ReadFile(p.fs, filepath.Join(p.Dir, string(instance)+".tf.json"))
+	tf, filename, err := p.parseFileForInstanceID(instance)
 	if err != nil {
 		return err
 	}
 
-	tf := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tf)
-	if err != nil {
-		return err
-	}
-
-	vmType, vmName, vmProps, err := FindVM(&tf)
+	vmType, vmName, vmProps, err := FindVM(tf)
 	if err != nil {
 		return err
 	}
@@ -703,11 +708,11 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 
 	mergeTagsIntoVMProps(vmType, vmProps, labels)
 
-	buff, err = json.MarshalIndent(tf, "  ", "  ")
+	buff, err := json.MarshalIndent(tf, "  ", "  ")
 	if err != nil {
 		return err
 	}
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, string(instance)+".tf.json"), buff, 0644)
+	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, filename), buff, 0644)
 	if err != nil {
 		return err
 	}
@@ -737,14 +742,18 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 		time.Sleep(time.Second)
 	}
 
-	filename := string(inst) + ".tf.json"
-	fp := filepath.Join(p.Dir, filename)
+	tf, filename, err := p.parseFileForInstanceID(inst)
+	if err != nil {
+		return err
+	}
 
-	log.Debugf("Destroying instance %v, processAttach: %v", fp, processAttach)
+	log.Debugf("Destroying instance %v, processAttach: %v", filename, processAttach)
+
 	// Optionally destroy the related resources
 	if processAttach {
 		// Get an referenced resources in the "infrakit.attach" tag
-		attachIDs, err := parseAttachTagFromFile(fp)
+		var attachIDs []string
+		attachIDs, err = parseAttachTag(tf)
 		if err != nil {
 			return err
 		}
@@ -754,15 +763,23 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 				idsToDestroy[attachID] = ""
 			}
 			// Load all other instance files and determine other references exist
-			re := regexp.MustCompile("(^instance-[0-9]+)(.tf.json)")
 			fs := &afero.Afero{Fs: p.fs}
-			err := fs.Walk(p.Dir,
+			err = fs.Walk(p.Dir,
 				func(path string, info os.FileInfo, err error) error {
-					matches := re.FindStringSubmatch(info.Name())
+					matches := tfFileRegex.FindStringSubmatch(info.Name())
 					// Note that the current instance (being destroyed) still exists; filter
 					// this file out.
-					if len(matches) == 3 && filename != info.Name() {
-						ids, err := parseAttachTagFromFile(filepath.Join(p.Dir, info.Name()))
+					if len(matches) == 4 && filename != info.Name() {
+						// Load this file
+						buff, err := afero.ReadFile(p.fs, filepath.Join(p.Dir, info.Name()))
+						if err != nil {
+							return err
+						}
+						tFormat := TFormat{}
+						if err = types.AnyBytes(buff).Decode(&tFormat); err != nil {
+							return err
+						}
+						ids, err := parseAttachTag(&tFormat)
 						if err != nil {
 							return err
 						}
@@ -790,26 +807,17 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 			}
 		}
 	}
-	err := p.fs.Remove(fp)
+	err = p.fs.Remove(filepath.Join(p.Dir, filename))
 	if err != nil {
 		return err
 	}
 	return p.terraformApply()
 }
 
-// parseAttachTagFromFile parses the file at the given path and returns value of
+// parseAttachTag parses the file at the given path and returns value of
 // the "infrakit.attach" tag
-func parseAttachTagFromFile(fp string) ([]string, error) {
-	buff, err := ioutil.ReadFile(fp)
-	if err != nil {
-		log.Warningln("Cannot load file to destroy:", err)
-		return nil, err
-	}
-	tf := TFormat{}
-	if err = types.AnyBytes(buff).Decode(&tf); err != nil {
-		return nil, err
-	}
-	vmType, _, vmProps, err := FindVM(&tf)
+func parseAttachTag(tf *TFormat) ([]string, error) {
+	vmType, _, vmProps, err := FindVM(tf)
 	if err != nil {
 		return nil, err
 	}
@@ -854,14 +862,13 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		}
 	}
 
-	re := regexp.MustCompile("(.*)(instance-[0-9]+)")
 	result := []instance.Description{}
 	// now we scan for <instance_type.instance-<timestamp>> as keys
 	for vmType, vm := range localSpecs {
 	scan:
 		for vmName, vmProps := range vm {
 			// Only process valid instance-xxxx resources
-			matches := re.FindStringSubmatch(string(vmName))
+			matches := instNameRegex.FindStringSubmatch(string(vmName))
 			if len(matches) == 3 {
 				id := matches[2]
 
@@ -974,9 +981,9 @@ type importFns struct {
 }
 
 // importResource imports the resource with the given ID into terraform and creates a
-// .tf.json file based on the given spec
+// .tf.json.new file based on the given spec
 func (p *plugin) importResource(fns importFns, resourceID string, spec *instance.Spec) (*instance.ID, error) {
-	// Acquire lock since we are creating a tf.json file and updating terraform state
+	// Acquire lock since we are creating a tf.json.new file and updating terraform state
 	var filename string
 	for {
 		if err := p.fsLock.TryLock(); err == nil {
@@ -1093,11 +1100,12 @@ func (p *plugin) writeTfJSONForImport(specProps, importedProps TResourceProperti
 		},
 	}
 	buff, err := json.MarshalIndent(tf, "  ", "  ")
-	log.Debugln("writeTfJSONForImport", filename, "data=", string(buff), "err=", err)
+	path := filepath.Join(p.Dir, filename+".tf.json.new")
+	log.Debugln("writeTfJSONForImport", path, "data=", string(buff), "err=", err)
 	if err != nil {
 		return err
 	}
-	err = afero.WriteFile(p.fs, filepath.Join(p.Dir, filename+".tf.json"), buff, 0644)
+	err = afero.WriteFile(p.fs, path, buff, 0644)
 	if err != nil {
 		return err
 	}
@@ -1176,4 +1184,30 @@ func mergeProp(source, dest TResourceProperties, key string) {
 		// Not a complex type, override
 		dest[key] = sourceData
 	}
+}
+
+// parseFileForInstanceID attempted to load a tf.json (or tf.json.new) file, returning
+// the parsed spec and the filename parsed
+func (p *plugin) parseFileForInstanceID(instance instance.ID) (*TFormat, string, error) {
+	// Instance may not have been processed by terraform; attempt to open both files
+	filenames := []string{string(instance) + ".tf.json", string(instance) + ".tf.json.new"}
+	var filename string
+	var buff []byte
+	var err error
+	for _, filename = range filenames {
+		buff, err = afero.ReadFile(p.fs, filepath.Join(p.Dir, filename))
+		// Successfully read a file
+		if err == nil {
+			break
+		}
+	}
+	// Failed to read a file
+	if err != nil {
+		return nil, "", err
+	}
+	tf := TFormat{}
+	if err = types.AnyBytes(buff).Decode(&tf); err != nil {
+		return nil, "", err
+	}
+	return &tf, filename, nil
 }
