@@ -1,6 +1,6 @@
 package plugin
 
-// Transport
+// Transport describes how the plugin communicates
 type Transport struct {
 	// Name is the name of the plugin
 	Name Name
