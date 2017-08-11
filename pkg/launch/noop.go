@@ -1,7 +1,7 @@
 package launch
 
 import (
-	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -18,10 +18,10 @@ func (n noOp) Name() string {
 }
 
 // Launch starts the plugin given the name
-func (n noOp) Exec(name string, config *types.Any) (<-chan error, error) {
-	log.Infoln("NO-OP Exec: not automatically starting plugin", name, "args=", config)
+func (n noOp) Exec(kind string, name plugin.Name, config *types.Any) (plugin.Name, <-chan error, error) {
+	log.Info("NO-OP Exec: not automatically starting plugin", "plugin", name, "args", config)
 
 	starting := make(chan error)
 	close(starting) // channel won't block
-	return starting, nil
+	return name, starting, nil
 }

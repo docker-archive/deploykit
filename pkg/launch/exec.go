@@ -1,6 +1,7 @@
 package launch
 
 import (
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -18,5 +19,5 @@ type Exec interface {
 	// status of the plugin.
 	// The client can receive and block on the returned channel
 	// and add optional timeout in its own select statement.
-	Exec(name string, config *types.Any) (<-chan error, error)
+	Exec(kind string, name plugin.Name, config *types.Any) (plugin.Name, <-chan error, error)
 }

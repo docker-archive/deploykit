@@ -3,6 +3,7 @@ package launch
 import (
 	"testing"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -22,22 +23,24 @@ func (l *testLauncher) Name() string {
 	return l.name
 }
 
-func (l *testLauncher) Exec(name string, config *types.Any) (<-chan error, error) {
+func (l *testLauncher) Exec(kind string, pn plugin.Name, config *types.Any) (plugin.Name, <-chan error, error) {
 	rule := testConfig{}
 	err := config.Decode(&rule)
 	if err != nil {
-		return nil, err
+		return pn, nil, err
 	}
 	c := make(chan error)
 	l.callback(config)
 	close(c)
-	return c, nil
+	return pn, c, nil
 }
 
 func TestMonitorLoopNoRules(t *testing.T) {
-	monitor := NewMonitor(&testLauncher{
-		name: "test",
-		t:    t,
+	monitor := NewMonitor([]Exec{
+		&testLauncher{
+			name: "test",
+			t:    t,
+		},
 	}, []Rule{})
 
 	input, err := monitor.Start()
@@ -47,8 +50,10 @@ func TestMonitorLoopNoRules(t *testing.T) {
 	errChan := make(chan error)
 
 	input <- StartPlugin{
-		Plugin: "test",
-		Error: func(config *types.Any, e error) {
+		Kind: "test",
+		Name: plugin.Name("test"),
+		Exec: ExecName("test"),
+		Error: func(kind string, pn plugin.Name, config *types.Any, e error) {
 			errChan <- e
 		},
 	}
@@ -68,16 +73,18 @@ func TestMonitorLoopValidRule(t *testing.T) {
 
 	var receivedArgs *types.Any
 	rule := Rule{
-		Plugin: "hello",
+		Kind: "hello",
 		Launch: map[ExecName]*types.Any{
 			"test": types.AnyValueMust(config),
 		},
 	}
-	monitor := NewMonitor(&testLauncher{
-		name: "test",
-		t:    t,
-		callback: func(c *types.Any) {
-			receivedArgs = c
+	monitor := NewMonitor([]Exec{
+		&testLauncher{
+			name: "test",
+			t:    t,
+			callback: func(c *types.Any) {
+				receivedArgs = c
+			},
 		},
 	}, []Rule{rule})
 
@@ -87,8 +94,10 @@ func TestMonitorLoopValidRule(t *testing.T) {
 
 	started := make(chan interface{})
 	input <- StartPlugin{
-		Plugin: "hello",
-		Started: func(config *types.Any) {
+		Kind: "hello",
+		Name: plugin.Name("hello"),
+		Exec: ExecName("test"),
+		Started: func(kind string, pn plugin.Name, config *types.Any) {
 			close(started)
 		},
 	}
@@ -110,16 +119,18 @@ func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
 
 	var receivedArgs *types.Any
 	rule := Rule{
-		Plugin: "hello",
+		Kind: "hello",
 		Launch: map[ExecName]*types.Any{
 			"test": types.AnyValueMust(config),
 		},
 	}
-	monitor := NewMonitor(&testLauncher{
-		name: "test",
-		t:    t,
-		callback: func(c *types.Any) {
-			receivedArgs = c
+	monitor := NewMonitor([]Exec{
+		&testLauncher{
+			name: "test",
+			t:    t,
+			callback: func(c *types.Any) {
+				receivedArgs = c
+			},
 		},
 	}, []Rule{rule})
 
@@ -129,8 +140,10 @@ func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
 
 	started := make(chan interface{})
 	input <- StartPlugin{
-		Plugin: "hello",
-		Started: func(config *types.Any) {
+		Kind: "hello",
+		Name: plugin.Name("hello"),
+		Exec: ExecName("test"),
+		Started: func(kind string, pn plugin.Name, config *types.Any) {
 			close(started)
 		},
 	}
@@ -141,4 +154,137 @@ func TestMonitorLoopRuleLookupBehavior(t *testing.T) {
 	require.Equal(t, *expected, *receivedArgs)
 
 	monitor.Stop()
+}
+
+func TestMonitorLoopRuleOverrideOptions(t *testing.T) {
+
+	config := &testConfig{
+		Cmd:  "hello",
+		Args: []string{"world", "hello"},
+	}
+
+	var receivedArgs *types.Any
+	rule := Rule{
+		Kind: "hello",
+		Launch: map[ExecName]*types.Any{
+			"test": types.AnyValueMust(config),
+		},
+	}
+	monitor := NewMonitor([]Exec{
+		&testLauncher{
+			name: "test",
+			t:    t,
+			callback: func(c *types.Any) {
+				receivedArgs = c
+			},
+		},
+	}, []Rule{rule})
+
+	input, err := monitor.Start()
+	require.NoError(t, err)
+	require.NotNil(t, input)
+
+	options := map[string]interface{}{
+		"some":   "override",
+		"values": true,
+	}
+
+	started := make(chan interface{})
+	input <- StartPlugin{
+		Kind:    "hello",
+		Name:    plugin.Name("hello"),
+		Exec:    ExecName("test"),
+		Options: types.AnyValueMust(options),
+		Started: func(kind string, pn plugin.Name, config *types.Any) {
+			close(started)
+		},
+	}
+
+	<-started
+
+	expected := types.AnyValueMust(options)
+	require.Equal(t, *expected, *receivedArgs)
+
+	monitor.Stop()
+}
+
+func TestMergeRule(t *testing.T) {
+
+	m1 := map[ExecName]*types.Any{
+		ExecName("exec1"): types.AnyValueMust("test"),
+	}
+	m2 := map[ExecName]*types.Any{
+		ExecName("exec2"): types.AnyValueMust("test2"),
+	}
+
+	r1 := Rule{
+		Kind:   "foo",
+		Launch: m1,
+	}
+
+	r2 := r1.Merge(Rule{Kind: "no"})
+	require.Equal(t, r1, r2) // expects no effect
+	require.Equal(t, m1, r1.Launch)
+
+	r3 := r1.Merge(Rule{Kind: "foo", Launch: m2})
+	require.Equal(t, map[ExecName]*types.Any{
+		ExecName("exec1"): types.AnyValueMust("test"),
+		ExecName("exec2"): types.AnyValueMust("test2"),
+	}, r3.Launch)
+
+	expect, err := types.AnyValueMust([]Rule{
+		{
+			Kind: "bar",
+			Launch: map[ExecName]*types.Any{
+				ExecName("exec2"): types.AnyValueMust("test2"),
+			},
+		},
+		{
+			Kind: "baz",
+			Launch: map[ExecName]*types.Any{
+				ExecName("exec1"): types.AnyValueMust("test1"),
+				ExecName("exec2"): types.AnyValueMust("test2"),
+			},
+		},
+		{
+			Kind: "foo",
+			Launch: map[ExecName]*types.Any{
+				ExecName("exec"): types.AnyValueMust("test"),
+			},
+		},
+	}).MarshalYAML()
+	require.NoError(t, err)
+
+	actual, err := types.AnyValueMust(MergeRules(
+		[]Rule{
+			{
+				Kind: "foo",
+				Launch: map[ExecName]*types.Any{
+					ExecName("exec"): types.AnyValueMust("test"),
+				},
+			},
+			{
+				Kind: "baz",
+				Launch: map[ExecName]*types.Any{
+					ExecName("exec1"): types.AnyValueMust("test1"),
+				},
+			},
+		},
+		[]Rule{
+			{
+				Kind: "bar",
+				Launch: map[ExecName]*types.Any{
+					ExecName("exec2"): types.AnyValueMust("test2"),
+				},
+			},
+			{
+				Kind: "baz",
+				Launch: map[ExecName]*types.Any{
+					ExecName("exec2"): types.AnyValueMust("test2"),
+				},
+			},
+		})).MarshalYAML()
+	require.NoError(t, err)
+
+	require.Equal(t, string(expect), string(actual))
 }

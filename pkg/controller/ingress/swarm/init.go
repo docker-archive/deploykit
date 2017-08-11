@@ -24,13 +24,7 @@ func init() {
 type Spec struct {
 
 	// Docker holds the connection params to the Docker engine for join tokens, etc.
-	Docker ConnectInfo
-}
-
-// ConnectInfo holds the connection parameters for connecting to a Docker engine to get join tokens, etc.
-type ConnectInfo struct {
-	Host string
-	TLS  *tlsconfig.Options
+	Docker docker.ConnectInfo
 }
 
 // RoutesFromSwarmServices determines the routes based on the services running in the Docker swarm

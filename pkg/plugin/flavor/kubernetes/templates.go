@@ -1,4 +1,4 @@
-package main
+package kubernetes
 
 const (
 	// DefaultManagerInitScriptTemplate is the default template for the init script which

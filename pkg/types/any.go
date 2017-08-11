@@ -64,7 +64,7 @@ func AnyValue(v interface{}) (*Any, error) {
 func AnyValueMust(v interface{}) *Any {
 	any, err := AnyValue(v)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("err: %v, v: %v", err, v))
 	}
 	return any
 }

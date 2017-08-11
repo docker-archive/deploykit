@@ -45,7 +45,7 @@ func main() {
 		os.MkdirAll(*vmDir, os.ModePerm)
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunListener([]string{*listen, *advertise}, *name,
+		cli.RunListener([]string{*listen, *advertise}, *name, nil,
 			instance_plugin.PluginServer(hyperkit.NewPlugin(*vmDir, *hyperkitCmd, *vpnkitSock)),
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(
 				map[string]interface{}{

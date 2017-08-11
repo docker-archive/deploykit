@@ -62,10 +62,10 @@ type Options struct {
 	DelimRight string
 
 	// CustomizeFetch allows setting of http request header, etc. during fetch
-	CustomizeFetch func(*http.Request)
+	CustomizeFetch func(*http.Request) `json:"-" yaml:"-"`
 
 	// Stderr is a function that returns stream to use for stderr
-	Stderr func() io.Writer
+	Stderr func() io.Writer `json:"-" yaml:"-"`
 
 	// MultiPass can affect the behavior of some functions like `var` where
 	// evaluation of the function return different results based on whether the

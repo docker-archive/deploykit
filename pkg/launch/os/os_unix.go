@@ -8,16 +8,17 @@ import (
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/launch"
 )
 
-func start(name, sh string, setPgID bool) <-chan error {
+func start(executor launch.Exec, name, sh string, setPgID bool) <-chan error {
 	block := make(chan error)
 
 	go func() {
 
 		defer close(block)
 
-		log.Infoln("OS launcher: Plugin", name, "setPgId=", setPgID, "starting", sh)
+		log.Infoln("OS(", executor.Name(), ") launcher: Plugin", name, "setPgId=", setPgID, "starting", sh)
 		cmd := exec.Command("/bin/sh", "-c", sh)
 
 		log.Infoln("Running", cmd.Path, strings.Join(cmd.Args, " "))

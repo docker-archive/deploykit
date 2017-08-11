@@ -1,27 +1,29 @@
-package main
+package swarm
 
 import (
 	"errors"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/docker"
 )
 
-// NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a kubernetes.
-func NewManagerFlavor(plugins func() discovery.Plugins,
+// NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
+func NewManagerFlavor(plugins func() discovery.Plugins, connect func(Spec) (docker.APIClientCloser, error),
 	templ *template.Template,
-	dir string,
 	stop <-chan struct{}) *ManagerFlavor {
 
-	base := &baseFlavor{initScript: templ, plugins: plugins, kubeConfDir: dir}
-	//	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
+	base := &baseFlavor{initScript: templ, getDockerClient: connect, plugins: plugins}
+	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
 	return &ManagerFlavor{baseFlavor: base}
 }
 
-// ManagerFlavor is the flavor for kube managers
+// ManagerFlavor is the flavor for swarm managers
 type ManagerFlavor struct {
 	*baseFlavor
 }
@@ -39,8 +41,8 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 		return err
 	}
 
-	if len(allocation.LogicalIDs) != 1 {
-		return errors.New("kubernetes flaver currently support only one manager")
+	if len(allocation.LogicalIDs)%2 == 0 {
+		return errors.New("must have odd number for quorum")
 	}
 
 	for _, id := range allocation.LogicalIDs {
@@ -48,22 +50,10 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 			log.Warnf("LogicalID %s has no attachments, which is needed for durability", id)
 		}
 	}
-	ads := map[string]string{}
-	for _, a := range spec.KubeAddOns {
-		if a.Type == "network" || a.Type == "visualise" {
-			ads[a.Type] = a.Name
-		}
-	}
-	if _, ok := ads["network"]; !ok {
-		log.Warnf("No Network addon configured. Your cluster will not be Ready status until apply network addon.")
-	}
-	for k, v := range ads {
-		log.Infof("Type : %v, Name : %v addon will be apply", k, v)
-	}
 	return nil
 }
 
-// Prepare sets up the provisioner / instance plugin's spec based on information about the kubernetes to join.
+// Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
 func (s *ManagerFlavor) Prepare(flavorProperties *types.Any,
 	instanceSpec instance.Spec, allocation group_types.AllocationMethod,
 	index group_types.Index) (instance.Spec, error) {

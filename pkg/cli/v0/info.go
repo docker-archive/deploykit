@@ -1,4 +1,4 @@
-package v1
+package v0
 
 import (
 	"encoding/json"
@@ -15,13 +15,13 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 
-	// v1 loads these packages
-	_ "github.com/docker/infrakit/pkg/cli/v1/event"
-	_ "github.com/docker/infrakit/pkg/cli/v1/flavor"
-	_ "github.com/docker/infrakit/pkg/cli/v1/group"
-	_ "github.com/docker/infrakit/pkg/cli/v1/instance"
-	_ "github.com/docker/infrakit/pkg/cli/v1/metadata"
-	_ "github.com/docker/infrakit/pkg/cli/v1/resource"
+	// v0 loads these packages
+	_ "github.com/docker/infrakit/pkg/cli/v0/event"
+	_ "github.com/docker/infrakit/pkg/cli/v0/flavor"
+	_ "github.com/docker/infrakit/pkg/cli/v0/group"
+	_ "github.com/docker/infrakit/pkg/cli/v0/instance"
+	_ "github.com/docker/infrakit/pkg/cli/v0/metadata"
+	_ "github.com/docker/infrakit/pkg/cli/v0/resource"
 )
 
 func init() {

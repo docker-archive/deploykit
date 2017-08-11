@@ -6,6 +6,7 @@ import (
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +19,7 @@ func TestParseSpec(t *testing.T) {
 			RouteSources: map[string]*types.Any{
 				"swarm": types.AnyValueMust(
 					Spec{
-						Docker: ConnectInfo{
+						Docker: docker.ConnectInfo{
 							Host: "/var/run/docker.sock",
 						},
 					},

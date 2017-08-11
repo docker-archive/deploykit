@@ -7,6 +7,7 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
+	"github.com/docker/infrakit/pkg/plugin/flavor/swarm"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -51,11 +52,11 @@ func main() {
 
 		cli.SetLogLevel(*logLevel)
 
-		mt, err := getTemplate(*managerInitScriptTemplURL, DefaultManagerInitScriptTemplate, defaultTemplateOptions)
+		mt, err := getTemplate(*managerInitScriptTemplURL, swarm.DefaultManagerInitScriptTemplate, defaultTemplateOptions)
 		if err != nil {
 			return err
 		}
-		wt, err := getTemplate(*workerInitScriptTemplURL, DefaultWorkerInitScriptTemplate, defaultTemplateOptions)
+		wt, err := getTemplate(*workerInitScriptTemplURL, swarm.DefaultWorkerInitScriptTemplate, defaultTemplateOptions)
 		if err != nil {
 			return err
 		}
@@ -63,8 +64,8 @@ func main() {
 		managerStop := make(chan struct{})
 		workerStop := make(chan struct{})
 
-		managerFlavor := NewManagerFlavor(plugins, DockerClient, mt, managerStop)
-		workerFlavor := NewWorkerFlavor(plugins, DockerClient, wt, workerStop)
+		managerFlavor := swarm.NewManagerFlavor(plugins, swarm.DockerClient, mt, managerStop)
+		workerFlavor := swarm.NewWorkerFlavor(plugins, swarm.DockerClient, wt, workerStop)
 
 		cli.RunPlugin(*name,
 

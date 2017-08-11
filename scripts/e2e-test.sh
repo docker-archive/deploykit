@@ -64,7 +64,10 @@ rm -rf $INSTANCE_FILE_DIR/*
 export LOG_DIR=$LOG_DIR
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
-infrakit plugin start --wait --config-url file:///$PWD/scripts/e2e-test-plugins.json --exec os group-stateless instance-file flavor-vanilla &
+infrakit plugin start --config-url file:///$PWD/scripts/e2e-test-plugins.json \
+	 group-stateless=os \
+	 instance-file=os \
+	 flavor-vanilla=os &
 
 starterpid=$!
 echo "plugin start pid=$starterpid"

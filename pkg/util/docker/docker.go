@@ -20,6 +20,12 @@ var (
 	ClientVersion = "1.24"
 )
 
+// ConnectInfo holds the connection parameters for connecting to a Docker engine to get join tokens, etc.
+type ConnectInfo struct {
+	Host string
+	TLS  *tlsconfig.Options
+}
+
 // APIClientCloser is a closeable API client.
 type APIClientCloser interface {
 	io.Closer

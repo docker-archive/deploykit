@@ -1,4 +1,4 @@
-package main
+package vanilla
 
 import (
 	"fmt"
@@ -31,11 +31,16 @@ type Spec struct {
 // identical (cattles) but can assume specific identities (via the LogicalIDs).  The
 // instances here are treated identically because we have constant Init that applies
 // to all instances
-func NewPlugin() flavor.Plugin {
-	return vanillaFlavor(0)
+func NewPlugin(opt template.Options) flavor.Plugin {
+	return vanillaFlavor{options: opt}
 }
 
-type vanillaFlavor int
+// DefaultOptions contains the default settings.
+var DefaultOptions = template.Options{}
+
+type vanillaFlavor struct {
+	options template.Options
+}
 
 func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
 	spec := Spec{}
@@ -48,7 +53,7 @@ func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group_ty
 	}
 
 	if spec.InitScriptTemplateURL != "" {
-		template, err := template.NewTemplate(spec.InitScriptTemplateURL, defaultTemplateOptions)
+		template, err := template.NewTemplate(spec.InitScriptTemplateURL, f.options)
 		if err != nil {
 			return err
 		}
@@ -89,7 +94,7 @@ func (f vanillaFlavor) Prepare(flavor *types.Any,
 		lines = append(lines, instance.Init)
 	}
 	if s.InitScriptTemplateURL != "" {
-		template, err := template.NewTemplate(s.InitScriptTemplateURL, defaultTemplateOptions)
+		template, err := template.NewTemplate(s.InitScriptTemplateURL, f.options)
 		if err != nil {
 			return instance, err
 		}

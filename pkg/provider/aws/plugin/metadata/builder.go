@@ -21,12 +21,13 @@ import (
 
 // Options containe properties important for the AWS api
 type Options struct {
-	Region          string
-	AccessKeyID     string
-	SecretAccessKey string
-	SessionToken    string
-	Retries         int
+	instance.Options `json:",inline" yaml:",inline"`
+
 	Debug           bool
+	Template        string
+	TemplateOptions template.Options
+	StackName       string
+	PollInterval    time.Duration
 }
 
 // Flags returns the flags required.
@@ -42,8 +43,7 @@ func (options *Options) Flags() *pflag.FlagSet {
 }
 
 // NewPlugin creates an instance of the plugin
-func NewPlugin(templateURL string, templateOptions template.Options, poll time.Duration,
-	stackName string, options Options, stop <-chan struct{}) (*Context, error) {
+func NewPlugin(options Options, stop <-chan struct{}) (*Context, error) {
 
 	providers := []credentials.Provider{
 		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
@@ -83,11 +83,11 @@ func NewPlugin(templateURL string, templateOptions template.Options, poll time.D
 	session := session.New(config)
 
 	context := &Context{
-		templateURL:     templateURL,
-		templateOptions: templateOptions,
-		poll:            poll,
+		templateURL:     options.Template,
+		templateOptions: options.TemplateOptions,
+		poll:            options.PollInterval,
 		stop:            stop,
-		stackName:       stackName,
+		stackName:       options.StackName,
 		clients: AWSClients{
 			Cfn: cloudformation.New(session),
 			Ec2: ec2.New(session),

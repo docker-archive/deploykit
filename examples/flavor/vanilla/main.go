@@ -5,8 +5,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/v0/vanilla"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -18,11 +21,26 @@ func main() {
 		Use:   os.Args[0],
 		Short: "Vanilla flavor plugin",
 	}
+
+	options := vanilla.DefaultOptions
+
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
-	name := cmd.Flags().String("name", "flavor-vanilla", "Plugin name to advertise for discovery")
+
+	name := "flavor-vanilla"
+	cmd.Flags().StringVar(&name, "name", name, "Plugin name to advertise for discovery")
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, flavor_plugin.PluginServer(NewPlugin()))
+
+		name, impl, onStop, err := vanilla.Run(nil, plugin.Name(name), types.AnyValueMust(options))
+		if err != nil {
+			return
+		}
+
+		_, running, err := run.ServeRPC(name, onStop, impl)
+		if err != nil {
+			return
+		}
+		<-running
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
