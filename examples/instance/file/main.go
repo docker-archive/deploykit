@@ -5,6 +5,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/v0/file"
 	"github.com/docker/infrakit/pkg/types"
@@ -19,7 +20,8 @@ func main() {
 	}
 
 	options := file.DefaultOptions
-	cmd.Flags().StringVar(&options.Name, "name", options.Name, "Plugin name to advertise for discovery")
+	name := "instance-file"
+	cmd.Flags().StringVar(&name, "name", name, "Plugin name to advertise for discovery")
 	cmd.Flags().StringVar(&options.Dir, "dir", options.Dir, "Directory path to store the files")
 
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
@@ -27,7 +29,7 @@ func main() {
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
 
-		name, impl, onStop, err := file.Run(nil, types.AnyValueMust(options))
+		name, impl, onStop, err := file.Run(nil, plugin.Name(name), types.AnyValueMust(options))
 		if err != nil {
 			return
 		}
