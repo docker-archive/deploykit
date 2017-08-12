@@ -72,7 +72,7 @@ func SelectOne(spec instance.Spec, choices []selector.Choice,
 	distribution := biasesFrom(choices)
 	index := roll(distribution)
 	if index < 0 {
-		err = fmt.Errorf("bad roll", "choices", choices, "distribution", distribution)
+		err = fmt.Errorf("bad roll with distribution %v", distribution)
 		return
 	}
 	return choices[index], nil

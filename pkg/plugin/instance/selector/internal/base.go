@@ -11,15 +11,16 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 
-	. "github.com/docker/infrakit/pkg/plugin/instance/selector"
+	"github.com/docker/infrakit/pkg/plugin/instance/selector"
 )
 
 var log = logutil.New("module", "plugin/instance/selector")
 
+// Base is the base implementation of an instance plugin
 type Base struct {
 	Plugins    func() discovery.Plugins
-	Choices    []Choice
-	SelectFunc func(instance.Spec, []Choice, func(Choice) instance.Plugin) (Choice, error)
+	Choices    []selector.Choice
+	SelectFunc func(instance.Spec, []selector.Choice, func(selector.Choice) instance.Plugin) (selector.Choice, error)
 }
 
 func instancePlugin(plugins map[string]*plugin.Endpoint, name plugin.Name) instance.Plugin {
@@ -27,17 +28,16 @@ func instancePlugin(plugins map[string]*plugin.Endpoint, name plugin.Name) insta
 	if endpoint, has := plugins[lookup]; has {
 		if p, err := instance_rpc.NewClient(name, endpoint.Address); err == nil {
 			return p
-		} else {
-			log.Warn("not an instance plugin", "name", name, "endpoint", endpoint)
 		}
+		log.Warn("not an instance plugin", "name", name, "endpoint", endpoint)
 	}
 	return nil
 }
 
-func (b *Base) selectOne(spec instance.Spec) (match Choice, p instance.Plugin, err error) {
+func (b *Base) selectOne(spec instance.Spec) (match selector.Choice, p instance.Plugin, err error) {
 	all := map[plugin.Name]instance.Plugin{}
-	var matchByLogicalID *Choice
-	b.visit(func(c Choice, p instance.Plugin) error {
+	var matchByLogicalID *selector.Choice
+	b.visit(func(c selector.Choice, p instance.Plugin) error {
 		all[c.Name] = p
 		if spec.LogicalID != nil && c.HasLogicalID(*spec.LogicalID) {
 			found := c // allocate a copy
@@ -49,7 +49,7 @@ func (b *Base) selectOne(spec instance.Spec) (match Choice, p instance.Plugin, e
 	if matchByLogicalID != nil {
 		match = *matchByLogicalID
 	} else {
-		match, err = b.SelectFunc(spec, b.Choices, func(c Choice) instance.Plugin { return all[c.Name] })
+		match, err = b.SelectFunc(spec, b.Choices, func(c selector.Choice) instance.Plugin { return all[c.Name] })
 		if err != nil {
 			return
 		}
@@ -59,7 +59,7 @@ func (b *Base) selectOne(spec instance.Spec) (match Choice, p instance.Plugin, e
 	return
 }
 
-func (b *Base) visit(f func(Choice, instance.Plugin) error) error {
+func (b *Base) visit(f func(selector.Choice, instance.Plugin) error) error {
 	plugins, err := b.Plugins().List()
 	if err != nil {
 		return err
@@ -82,7 +82,7 @@ func (b *Base) doAll(work func(instance.Plugin) error) error {
 	errs := make(chan error, len(b.Choices))
 	done := make(chan struct{})
 
-	err := b.visit(func(c Choice, p instance.Plugin) error {
+	err := b.visit(func(c selector.Choice, p instance.Plugin) error {
 		go func() {
 			if localErr := work(p); localErr != nil {
 				errs <- localErr
@@ -113,7 +113,7 @@ func (b *Base) doAll(work func(instance.Plugin) error) error {
 
 // Validate performs local validation on a provision request.
 func (b *Base) Validate(req *types.Any) error {
-	return b.visit(func(c Choice, p instance.Plugin) error {
+	return b.visit(func(c selector.Choice, p instance.Plugin) error {
 		return p.Validate(req)
 	})
 }
@@ -135,7 +135,7 @@ func (b *Base) DescribeInstances(tags map[string]string, properties bool) ([]ins
 	keys := []string{}
 	uniques := map[string]instance.Description{}
 
-	err := b.visit(func(c Choice, p instance.Plugin) error {
+	err := b.visit(func(c selector.Choice, p instance.Plugin) error {
 		instances, err := p.DescribeInstances(tags, properties)
 		if err != nil {
 			return err
