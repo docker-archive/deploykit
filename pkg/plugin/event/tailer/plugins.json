@@ -1,0 +1,16 @@
+[
+    {
+        "Kind" : "tailer",
+        "Launch" : {
+            "inproc": [
+		{
+		    "Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test1.log"
+		}
+		,
+		{
+		    "Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test2.log"
+		}
+	    ]
+        }
+    }
+]
