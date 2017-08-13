@@ -7,11 +7,10 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/plugin/instance/selector"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
-
-	"github.com/docker/infrakit/pkg/plugin/instance/selector"
 )
 
 var log = logutil.New("module", "plugin/instance/selector")
@@ -77,18 +76,19 @@ func (b *Base) visit(f func(selector.Choice, instance.Plugin) error) error {
 	return nil
 }
 
-func (b *Base) doAll(work func(instance.Plugin) error) error {
+func (b *Base) doAll(count int, work func(instance.Plugin) error) error {
 
 	errs := make(chan error, len(b.Choices))
-	done := make(chan struct{})
-
+	success := make(chan interface{}, len(b.Choices))
 	err := b.visit(func(c selector.Choice, p instance.Plugin) error {
 		go func() {
-			if localErr := work(p); localErr != nil {
-				errs <- localErr
-				return
+			e := work(p)
+			if e == nil {
+				success <- 1
+			} else {
+				errs <- e
 			}
-			close(done)
+			return
 		}()
 		return nil
 	})
@@ -97,15 +97,18 @@ func (b *Base) doAll(work func(instance.Plugin) error) error {
 		return err
 	}
 
+	succeeded := 0
 	collect := errorGroup{}
 	for i := 0; i < len(b.Choices); i++ {
 		select {
-		case pErr := <-errs:
-			collect.Add(pErr)
-		case <-done:
+		case <-success:
+			succeeded++
+		case e := <-errs:
+			collect.Add(e)
 		}
 	}
-	if len(collect) == len(b.Choices) {
+
+	if succeeded != count {
 		return collect
 	}
 	return nil
@@ -121,7 +124,7 @@ func (b *Base) Validate(req *types.Any) error {
 // Provision creates a new instance based on the spec.
 func (b *Base) Provision(spec instance.Spec) (*instance.ID, error) {
 	match, selected, err := b.selectOne(spec)
-	log.Debug("provision", "match", match, "err", err)
+	log.Debug("provision", "match", match, "err", err, "spec", spec)
 	if err != nil {
 		return nil, err
 	}
@@ -160,14 +163,14 @@ func (b *Base) DescribeInstances(tags map[string]string, properties bool) ([]ins
 
 // Label labels the instance
 func (b *Base) Label(inst instance.ID, labels map[string]string) error {
-	return b.doAll(func(p instance.Plugin) error {
+	return b.doAll(1, func(p instance.Plugin) error {
 		return p.Label(inst, labels)
 	})
 }
 
 // Destroy terminates an existing instance.
 func (b *Base) Destroy(inst instance.ID, context instance.Context) error {
-	return b.doAll(func(p instance.Plugin) error {
+	return b.doAll(1, func(p instance.Plugin) error {
 		return p.Destroy(inst, context)
 	})
 }

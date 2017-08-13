@@ -14,10 +14,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/provider/aws/plugin"
+	"github.com/docker/infrakit/pkg/plugin"
+	aws_plugin "github.com/docker/infrakit/pkg/provider/aws/plugin"
 	"github.com/docker/infrakit/pkg/provider/aws/plugin/instance"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/event"
 	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
@@ -61,7 +63,7 @@ func main() {
 			sqsClient := sqs.New(builder.Config)
 
 			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name,
+			run.Plugin(plugin.DefaultTransport(name),
 				// As event plugin
 				event_rpc.PluginServerWithTypes(
 					map[string]event.Plugin{
@@ -103,7 +105,7 @@ func main() {
 	// user to pass in command line args like containers with entrypoint.
 	cmd.Flags().AddFlagSet(builder.Flags())
 
-	cmd.AddCommand(plugin.VersionCommand())
+	cmd.AddCommand(aws_plugin.VersionCommand())
 
 	err := cmd.Execute()
 	if err != nil {

@@ -6,8 +6,10 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/instance/packet"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +48,8 @@ func main() {
 			namespace[keyAndValue[0]] = keyAndValue[1]
 		}
 
-		cli.RunPlugin(*name, instance_plugin.PluginServer(packet.NewPlugin(*projectID, *apiToken, namespace)))
+		run.Plugin(plugin.DefaultTransport(*name),
+			instance_plugin.PluginServer(packet.NewPlugin(*projectID, *apiToken, namespace)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())

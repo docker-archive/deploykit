@@ -12,7 +12,6 @@ type Options []Choice
 // Choice represents one of the possible instance plugins
 type Choice struct {
 	Name      plugin.Name
-	Vars      map[string]*types.Any
 	Instances []instance.LogicalID
 	Affinity  *types.Any
 }

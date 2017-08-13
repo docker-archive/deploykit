@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/resource"
 	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
 	resource_server "github.com/docker/infrakit/pkg/rpc/resource"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +43,7 @@ func main() {
 
 		resourcePlugin := resource.NewResourcePlugin(instancePluginLookup)
 
-		cli.RunPlugin(*name, resource_server.PluginServer(resourcePlugin))
+		run.Plugin(plugin.DefaultTransport(*name), resource_server.PluginServer(resourcePlugin))
 
 		return nil
 	}

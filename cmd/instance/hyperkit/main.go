@@ -7,10 +7,12 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/instance/hyperkit"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +47,11 @@ func main() {
 		os.MkdirAll(*vmDir, os.ModePerm)
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunListener([]string{*listen, *advertise}, *name, nil,
+		run.Listener(plugin.Transport{
+			Name:      plugin.Name(*name),
+			Listen:    *listen,
+			Advertise: *advertise,
+		}, nil,
 			instance_plugin.PluginServer(hyperkit.NewPlugin(*vmDir, *hyperkitCmd, *vpnkitSock)),
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(
 				map[string]interface{}{

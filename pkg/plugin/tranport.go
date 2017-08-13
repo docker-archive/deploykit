@@ -10,4 +10,16 @@ type Transport struct {
 
 	// Advertise is the host:port used for others to discover this endpoint
 	Advertise string
+
+	// Dir is the directory for discovery (ie location of the socket files, etc.)
+	// If not specified, it will default to system settings (via environment variable -- see pkg/discovery/local
+	Dir string
+}
+
+// DefaultTransport returns the default transport based on a simple name.  The default is to
+// use unix socket, at directory specified by the pkg/discovery/local discovery mechanism.
+func DefaultTransport(name string) Transport {
+	return Transport{
+		Name: Name(name),
+	}
 }
