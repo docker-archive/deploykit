@@ -9,9 +9,11 @@ import (
 	apitypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
@@ -89,7 +91,7 @@ func main() {
 			}()
 
 			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name,
+			run.Plugin(plugin.DefaultTransport(name),
 				metadata_rpc.PluginServer(metadata.NewPluginFromChannel(updateSnapshot)),
 				instance_plugin.PluginServer(instancePlugin),
 			)

@@ -7,9 +7,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
@@ -62,7 +64,7 @@ func main() {
 		}
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 			instance_plugin.PluginServer(NewVagrantPlugin(*dir, templ)),
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(
 				map[string]interface{}{

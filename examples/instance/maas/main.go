@@ -5,9 +5,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
 	metadata_spi "github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/spf13/cobra"
@@ -37,7 +39,7 @@ func main() {
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 		cli.SetLogLevel(*logLevel)
 
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(map[string]interface{}{
 				"version":    cli.Version,
 				"revision":   cli.Revision,

@@ -5,7 +5,9 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +21,7 @@ func main() {
 	logLevel := cmd.Flags().Int("log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, flavor_plugin.PluginServer(NewPlugin()))
+		run.Plugin(plugin.DefaultTransport(*name), flavor_plugin.PluginServer(NewPlugin()))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
