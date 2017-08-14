@@ -34,8 +34,14 @@ import (
 // tf.json file and call terraform apply again.
 
 const (
-	// AttachTag contains a space separated list of IDs that are to the instance
+	// attachTag contains a space separated list of IDs that are to the instance
 	attachTag = "infrakit.attach"
+
+	// scopeDedicated is the scope key for dedicated resources
+	scopeDedicated = "dedicated"
+
+	// scopeGlobal is the scope key for global resources
+	scopeGlobal = "global"
 )
 
 // tfFileRegex is used to determine the all terraform files; files with a ".new" suffix
@@ -556,7 +562,8 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) error {
 	// Map file names to the data in each file based on the "@scope" property:
 	// - @default: resources in same "instance-xxxx.tf.json" file as VM
-	// - @dedicated: resources in different file as VM with the same ID (instance-xxxx-dedicated.tf.json)
+	// - @dedicated: resources in different file as VM using the logical ID (<logicalID>-dedicated.tf.json) or with
+	//   the same generated ID (instance-xxxx-dedicated.tf.json)
 	// - <other>: resource defined in different file with a scope identifier (scope-<other>.tf.json)
 	fileMap := make(map[string]*TFormat)
 
@@ -569,27 +576,50 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 				resourceProps = vmProperties
 				newResourceName = generatedName
 			} else {
-				newResourceName = fmt.Sprintf("%s-%s", generatedName, resourceName)
+				if logicalID == nil {
+					newResourceName = fmt.Sprintf("%s-%s", generatedName, resourceName)
+				} else {
+					newResourceName = fmt.Sprintf("%s-%s", string(*logicalID), resourceName)
+				}
 			}
 			// Determine the scope value (default to 'default')
-			scope, has := resourceProps[PropScope]
-			if has {
+			var scope string
+			if s, has := resourceProps[PropScope]; has {
+				scope = s.(string)
 				delete(resourceProps, PropScope)
 			} else {
 				scope = ValScopeDefault
 			}
-			// Determine the filename based off of the scope value
+			// Determine the filename and resource name based off of the scope value
 			var filename string
-			switch scope {
-			case ValScopeDefault:
+			if scope == ValScopeDefault {
+				// Default scope, filename is just the resource name (instance-XXXX)
 				filename = generatedName
-			case ValScopeDedicated:
-				filename = fmt.Sprintf("%s-dedicated", generatedName)
-			default:
-				filename = fmt.Sprintf("scope-%s", scope)
-				// If the scope is global use it as the prefix for the resource name
+			} else if strings.HasPrefix(scope, ValScopeDedicated) {
+				// Dedicated scope, filename has a scope identifier and the generated name or logical
+				// ID: <id>_dedicated_<instance-XXXX|logicalID>
+				var identifier string
+				if strings.Contains(scope, "-") {
+					identifier = strings.SplitN(scope, "-", 2)[1]
+				} else {
+					identifier = "default"
+				}
+				// And the resource name as <id>-<instance-XXXX|logicalID>-<resourceName>
+				var key string
+				if logicalID == nil {
+					key = generatedName
+				} else {
+					key = string(*logicalID)
+				}
+				filename = fmt.Sprintf("%s_%s_%s", identifier, scopeDedicated, key)
+				newResourceName = fmt.Sprintf("%s-%s-%s", identifier, key, resourceName)
+			} else {
+				// Global scope, filename is just the given scope with a "global_" suffix
+				filename = fmt.Sprintf("%s_%s", scope, scopeGlobal)
+				// And the resource name has the given scope as the prefix
 				newResourceName = fmt.Sprintf("%s-%s", scope, resourceName)
 			}
+
 			// Get the associated value in the file map
 			tfPersistence, has := fileMap[filename]
 			if !has {
