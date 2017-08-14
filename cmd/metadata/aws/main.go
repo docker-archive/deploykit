@@ -6,8 +6,10 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/provider/aws/plugin/metadata"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
@@ -30,7 +32,7 @@ func main() {
 
 			stop := make(chan struct{})
 
-			plugin, err := metadata.NewPlugin(metadata.Options{
+			metadataPlugin, err := metadata.NewPlugin(metadata.Options{
 				Template:        templateURL,
 				TemplateOptions: template.Options{},
 				PollInterval:    poll,
@@ -41,7 +43,7 @@ func main() {
 				return err
 			}
 
-			cli.RunPlugin(name, metadata_rpc.PluginServer(plugin))
+			run.Plugin(plugin.DefaultTransport(name), metadata_rpc.PluginServer(metadataPlugin))
 
 			close(stop)
 			return nil

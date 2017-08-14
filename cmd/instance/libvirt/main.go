@@ -7,14 +7,15 @@ import (
 	"os/user"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/spf13/cobra"
-
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	instance "github.com/docker/infrakit/pkg/plugin/instance/libvirt"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/spf13/cobra"
 )
 
 func main() {
@@ -31,7 +32,7 @@ func main() {
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 			instance_plugin.PluginServer(instance.NewLibvirtPlugin(*uri)),
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(
 				map[string]interface{}{

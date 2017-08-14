@@ -8,8 +8,10 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
@@ -63,7 +65,7 @@ func main() {
 			InstanceID:   importInstID,
 		}
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(
+		run.Plugin(plugin_base.DefaultTransport(*name), instance_plugin.PluginServer(
 			NewTerraformInstancePlugin(*dir, *pollInterval, *standalone, &importOpts)),
 		)
 	}

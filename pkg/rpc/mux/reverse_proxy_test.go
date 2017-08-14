@@ -118,7 +118,7 @@ func TestMuxPlugins(t *testing.T) {
 	socketPath, server := startPlugin(t, pluginName)
 	defer server.Stop()
 
-	lookup, err := local.NewPluginDiscoveryWithDirectory(filepath.Dir(socketPath))
+	lookup, err := local.NewPluginDiscoveryWithDir(filepath.Dir(socketPath))
 	require.NoError(t, err)
 
 	T(100).Infoln("checking to see if discovery works")

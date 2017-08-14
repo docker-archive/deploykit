@@ -1,4 +1,4 @@
-package cli
+package run
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery/local"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/server"
 )
 
@@ -16,10 +17,10 @@ func EnsureDirExists(dir string) {
 	os.MkdirAll(dir, 0700)
 }
 
-// RunPlugin runs a plugin server, advertising with the provided name for discovery.
+// Plugin runs a plugin server, advertising with the provided name for discovery.
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
-func RunPlugin(name string, plugin server.VersionedInterface, more ...server.VersionedInterface) {
-	_, running := BackgroundPlugin(name, nil, plugin, more...)
+func Plugin(transport plugin.Transport, plugin server.VersionedInterface, more ...server.VersionedInterface) {
+	_, running := BackgroundPlugin(transport, nil, plugin, more...)
 	<-running
 }
 
@@ -27,24 +28,28 @@ func RunPlugin(name string, plugin server.VersionedInterface, more ...server.Ver
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
 // This function does not block. Instead, use the returned channel to optionally block while the server is running.
 // The provided callback, if not nil, will be called when the server stops, before the returned channel is closed.
-func BackgroundPlugin(name string, onStop func(), plugin server.VersionedInterface,
+func BackgroundPlugin(transport plugin.Transport, onStop func(), plugin server.VersionedInterface,
 	more ...server.VersionedInterface) (server.Stoppable, <-chan struct{}) {
 
-	dir := local.Dir()
+	dir := transport.Dir
+	if dir == "" {
+		dir = local.Dir()
+	}
 	EnsureDirExists(dir)
+	name, _ := transport.Name.GetLookupAndType()
 
 	socketPath := path.Join(dir, name)
 	pidPath := path.Join(dir, name+".pid")
 	return run(nil, socketPath, pidPath, onStop, plugin, more...)
 }
 
-// RunListener runs a plugin server, listening at listen address, and
+// Listener runs a plugin server, listening at listen address, and
 // advertising with the provided name for discovery.
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
-func RunListener(listen []string, name string, onStop func(), plugin server.VersionedInterface,
+func Listener(transport plugin.Transport, onStop func(), plugin server.VersionedInterface,
 	more ...server.VersionedInterface) {
 
-	_, running := BackgroundListener(listen, name, onStop, plugin, more...)
+	_, running := BackgroundListener(transport, onStop, plugin, more...)
 	<-running
 }
 
@@ -52,15 +57,19 @@ func RunListener(listen []string, name string, onStop func(), plugin server.Vers
 // advertising with the provided name for discovery.
 // The plugin should conform to the rpc call convention as implemented in the rpc package.
 // This function does not block. Use the returned channel to optionally block while the server is running.
-func BackgroundListener(listen []string, name string, onStop func(), plugin server.VersionedInterface,
+func BackgroundListener(transport plugin.Transport, onStop func(), plugin server.VersionedInterface,
 	more ...server.VersionedInterface) (server.Stoppable, <-chan struct{}) {
 
-	dir := local.Dir()
+	dir := transport.Dir
+	if dir == "" {
+		dir = local.Dir()
+	}
 	EnsureDirExists(dir)
+	name, _ := transport.Name.GetLookupAndType()
 
 	discoverPath := path.Join(dir, name+".listen")
 	pidPath := path.Join(dir, name+".pid")
-	return run(listen, discoverPath, pidPath, onStop, plugin, more...)
+	return run([]string{transport.Listen, transport.Advertise}, discoverPath, pidPath, onStop, plugin, more...)
 }
 
 func run(listen []string, discoverPath, pidPath string, onStop func(),

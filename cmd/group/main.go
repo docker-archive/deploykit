@@ -14,6 +14,7 @@ import (
 	group_server "github.com/docker/infrakit/pkg/rpc/group"
 	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -106,7 +107,7 @@ func main() {
 			}
 		}()
 
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 			metadata_rpc.PluginServer(metadata_plugin.NewPluginFromChannel(updateSnapshot)),
 			group_server.PluginServer(groupPlugin))
 

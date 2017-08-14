@@ -8,10 +8,12 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	discovery_local "github.com/docker/infrakit/pkg/discovery/local"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/instance/image"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	instance_spi "github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
@@ -55,11 +57,11 @@ func main() {
 	}
 
 	// RUN -------------------------------------
-	run := &cobra.Command{
+	runCmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run the plugin",
 	}
-	run.RunE = func(c *cobra.Command, args []string) error {
+	runCmd.RunE = func(c *cobra.Command, args []string) error {
 
 		if len(args) != 0 {
 			cmd.Usage()
@@ -84,7 +86,7 @@ func main() {
 			return err
 		}
 
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 			instance_plugin.PluginServer(imagePlugin),
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(
 				map[string]interface{}{
@@ -97,7 +99,7 @@ func main() {
 		return nil
 	}
 
-	cmd.AddCommand(cli.VersionCommand(), run)
+	cmd.AddCommand(cli.VersionCommand(), runCmd)
 
 	if err := cmd.Execute(); err != nil {
 		log.Crit("Error", "err", err)

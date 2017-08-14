@@ -26,6 +26,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
 	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
 	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
+	_ "github.com/docker/infrakit/pkg/run/v0/selector"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
 	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
