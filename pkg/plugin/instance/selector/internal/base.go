@@ -116,7 +116,7 @@ func (b *Base) doAll(count int, work func(instance.Plugin) error) error {
 
 // Validate performs local validation on a provision request.
 func (b *Base) Validate(req *types.Any) error {
-	return b.visit(func(c selector.Choice, p instance.Plugin) error {
+	return b.doAll(1, func(p instance.Plugin) error {
 		return p.Validate(req)
 	})
 }
@@ -141,6 +141,9 @@ func (b *Base) DescribeInstances(tags map[string]string, properties bool) ([]ins
 	err := b.visit(func(c selector.Choice, p instance.Plugin) error {
 		instances, err := p.DescribeInstances(tags, properties)
 		if err != nil {
+			// It's important to fail at this point if we can't get an accurate list of instances
+			// across the zones. This way, other controllers won't be fooled into thinking that
+			// they need reconcile state by provisioning more instances.
 			return err
 		}
 		for _, instance := range instances {

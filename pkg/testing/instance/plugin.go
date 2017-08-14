@@ -1,8 +1,14 @@
 package instance
 
 import (
+	"testing"
+
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/stretchr/testify/require"
 )
 
 // Plugin implements the instance.Plugin interface and supports testing by letting user assemble behavior dyanmically.
@@ -46,4 +52,14 @@ func (t *Plugin) Destroy(instance instance.ID, context instance.Context) error {
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (t *Plugin) DescribeInstances(tags map[string]string, details bool) ([]instance.Description, error) {
 	return t.DoDescribeInstances(tags, details)
+}
+
+// StartInstancePlugin starts instance plugin for testing
+func StartInstancePlugin(t *testing.T, dir string, name plugin.Name,
+	p instance.Plugin) (server.Stoppable, <-chan struct{}) {
+
+	s, running, err := run.ServeRPC(plugin.Transport{Name: name, Dir: dir}, nil,
+		map[run.PluginCode]interface{}{run.Instance: p})
+	require.NoError(t, err)
+	return s, running
 }
