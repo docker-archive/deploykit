@@ -99,6 +99,7 @@ func SelectOne(spec instance.Spec, choices []selector.Choice,
 
 		if len(list) < min {
 			match = choice
+			min = len(list)
 		}
 	}
 	return

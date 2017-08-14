@@ -70,7 +70,8 @@ func SelectOne(spec instance.Spec, choices []selector.Choice,
 	lookup func(selector.Choice) instance.Plugin) (match selector.Choice, err error) {
 
 	distribution := biasesFrom(choices)
-	index := roll(distribution)
+	pick := roll(distribution)
+	index := bin(distribution, pick)
 	if index < 0 {
 		err = fmt.Errorf("bad roll with distribution %v", distribution)
 		return
@@ -107,7 +108,12 @@ func roll(biases []int) int {
 	for _, mass := range biases {
 		max += mass
 	}
-	pick := rand.Intn(max) // [0, max)
+	return rand.Intn(max) // [0, max)
+}
+
+// The biases distribution must be stationary (not changing). Otherwise long term we will not have the distribution
+// of instances across the choices.
+func bin(biases []int, pick int) int {
 	sum := 0
 	for i, mass := range biases {
 		sum += mass
