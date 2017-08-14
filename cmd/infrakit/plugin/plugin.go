@@ -28,6 +28,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
 	_ "github.com/docker/infrakit/pkg/run/v0/selector"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
+	_ "github.com/docker/infrakit/pkg/run/v0/tailer"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
 	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
 )
@@ -196,7 +197,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				for k := range r.Launch {
 					execs = append(execs, string(k))
 				}
-				fmt.Printf("%-20v\t%v\n", r.Kind, strings.Join(execs, ","))
+				fmt.Printf("%-20v\t%v\n", r.Key, strings.Join(execs, ","))
 			}
 			return nil
 		}

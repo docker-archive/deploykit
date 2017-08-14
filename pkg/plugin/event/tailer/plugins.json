@@ -1,0 +1,32 @@
+[
+    {
+        "Key" : "applogs",
+        "Launch" : {
+            "inproc": {
+		"Kind" : "tailer",
+		"Options" : [
+		    {
+			"Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test1.log"
+		    }
+		]
+	    }
+        }
+    }
+    ,
+    {
+        "Key" : "syslogs",
+        "Launch" : {
+            "inproc": {
+		"Kind" : "tailer",
+		"Options" : [
+		    {
+			"Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test2.log"
+		    },
+		    {
+			"Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test3.log"
+		    }
+		]
+	    }
+        }
+    }
+]

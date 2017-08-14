@@ -166,7 +166,7 @@ func (m *Manager) Start(rules []launch.Rule) error {
 }
 
 // Launch launches the plugin
-func (m *Manager) Launch(exec string, kind string, name plugin.Name, options *types.Any) error {
+func (m *Manager) Launch(exec string, key string, name plugin.Name, options *types.Any) error {
 
 	// check that the plugin is not currently running
 	running, err := m.plugins().List()
@@ -181,15 +181,15 @@ func (m *Manager) Launch(exec string, kind string, name plugin.Name, options *ty
 	}
 	m.wgStartAll.Add(1)
 	m.startPlugin <- launch.StartPlugin{
-		Kind:    kind,
+		Key:     key,
 		Name:    name,
 		Exec:    launch.ExecName(exec),
 		Options: options,
-		Started: func(kind string, n plugin.Name, config *types.Any) {
+		Started: func(key string, n plugin.Name, config *types.Any) {
 			m.started <- n
 			m.wgStartAll.Done()
 		},
-		Error: func(kind string, n plugin.Name, config *types.Any, err error) {
+		Error: func(key string, n plugin.Name, config *types.Any, err error) {
 			if m.mustAll {
 				panic(err)
 			}

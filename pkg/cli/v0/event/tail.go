@@ -20,9 +20,8 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 		Short: "Get event entry by path",
 	}
 	globals := []string{}
-	templateURL := "str://{{.}}"
+	templateURL := "str://{{jsonDecode .Data}}"
 	tail.Flags().StringVar(&templateURL, "view", templateURL, "URL for view template")
-
 	tail.RunE = func(cmd *cobra.Command, args []string) error {
 
 		eventPlugin, err := LoadPlugin(services.Plugins(), name)
@@ -31,7 +30,7 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 		}
 		cli.MustNotNil(eventPlugin, "event plugin not found", "name", name)
 
-		log.Info("rendering view", "template=", templateURL)
+		log.Debug("rendering view", "template=", templateURL)
 		engine, err := template.NewTemplate(templateURL, template.Options{})
 		if err != nil {
 			return err
@@ -92,7 +91,7 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 				return fmt.Errorf("not a subscriber: %s, %v", target, eventPlugin)
 			}
 
-			log.Info("Subscribing", "topic", eventTopic)
+			log.Debug("Subscribing", "topic", eventTopic)
 
 			stream, stop, err := client.SubscribeOn(eventTopic)
 			if err != nil {
