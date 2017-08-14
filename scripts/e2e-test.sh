@@ -63,16 +63,26 @@ rm -rf $INSTANCE_FILE_DIR/*
 
 export LOG_DIR=$LOG_DIR
 
+#echo "generating logfiles"
+#pkg/plugin/event/tailer/test-gen.sh $LOG_DIR/test1.log &
+
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
 infrakit plugin start --config-url file:///$PWD/scripts/e2e-test-plugins.json \
 	 group-stateless=os \
 	 instance-file=os \
-	 flavor-vanilla=os &
+	 flavor-vanilla=os \
+	 mylogs:testlogs=inproc &
 
 starterpid=$!
 echo "plugin start pid=$starterpid"
 
 sleep 5
+
+found=$(infrakit -h | grep 'testlogs')
+if [ "$found" = "" ]; then
+    echo "tailer not started"
+    exit 1
+fi
 
 expect_exact_output() {
   message=$1
@@ -110,7 +120,7 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "16 plugins should be discoverable" "infrakit plugin ls -q" "16"
+expect_output_lines "18 plugins should be discoverable" "infrakit plugin ls -q" "18"
 expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
 
 echo "Commiting"

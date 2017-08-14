@@ -3,7 +3,6 @@ package run
 import (
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -132,13 +131,10 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 
 	}
 
-	lookupName, _ := transport.Name.GetLookupAndType() // for aws/ec2, start with 'aws' for example.
 	if transport.Listen == "" {
-		stoppable, running = cli.BackgroundPlugin(lookupName, onStop, plugins[0], plugins[1:]...)
+		stoppable, running = BackgroundPlugin(transport, onStop, plugins[0], plugins[1:]...)
 		return
 	}
-
-	stoppable, running = cli.BackgroundListener([]string{transport.Listen, transport.Advertise},
-		lookupName, onStop, plugins[0], plugins[1:]...)
+	stoppable, running = BackgroundListener(transport, onStop, plugins[0], plugins[1:]...)
 	return
 }

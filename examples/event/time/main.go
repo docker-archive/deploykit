@@ -6,9 +6,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
@@ -166,7 +168,7 @@ func main() {
 		// For events
 		timerEvents := (&timer{stop: stop}).init()
 
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 
 			// As metadata plugin
 			metadata_rpc.PluginServer(metadata_plugin.NewPluginFromData(map[string]interface{}{

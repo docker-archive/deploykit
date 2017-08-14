@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/event/instance"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/spf13/cobra"
 )
@@ -64,7 +64,7 @@ func trackCommand(plugins func() discovery.Plugins) *cobra.Command {
 			}
 		}
 
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 			// As event plugin
 			event_rpc.PluginServerWithTypes(trackers),
 		)

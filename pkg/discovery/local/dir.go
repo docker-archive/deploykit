@@ -35,11 +35,11 @@ func Dir() string {
 
 // NewPluginDiscovery creates a plugin discovery based on the environment configuration.
 func NewPluginDiscovery() (discovery.Plugins, error) {
-	return NewPluginDiscoveryWithDirectory(Dir())
+	return NewPluginDiscoveryWithDir(Dir())
 }
 
-// NewPluginDiscoveryWithDirectory creates a plugin discovery based on the directory given.
-func NewPluginDiscoveryWithDirectory(pluginDir string) (discovery.Plugins, error) {
+// NewPluginDiscoveryWithDir creates a plugin discovery based on the directory given.
+func NewPluginDiscoveryWithDir(pluginDir string) (discovery.Plugins, error) {
 	stat, err := os.Stat(pluginDir)
 	if err == nil {
 		if !stat.IsDir() {

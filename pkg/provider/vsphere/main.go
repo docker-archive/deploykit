@@ -5,7 +5,9 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	plugin_base "github.com/docker/infrakit/pkg/plugin"
+	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +36,8 @@ func main() {
 
 	cmd.Run = func(c *cobra.Command, args []string) {
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, instance_plugin.PluginServer(NewVSphereInstancePlugin(&newVCenter, *ignoreOnDestroy)))
+		run.Plugin(plugin_base.DefaultTransport(*name),
+			instance_rpc.PluginServer(NewVSphereInstancePlugin(&newVCenter, *ignoreOnDestroy)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())

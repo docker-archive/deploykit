@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/provider/google/plugin/group"
 	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/spf13/cobra"
 )
@@ -40,7 +41,8 @@ func main() {
 			return flavor_client.NewClient(n, endpoint.Address)
 		}
 
-		cli.RunPlugin(*name, group_plugin.PluginServer(group.NewGCEGroupPlugin(*project, *zone, flavorPluginLookup)))
+		run.Plugin(plugin.DefaultTransport(*name),
+			group_plugin.PluginServer(group.NewGCEGroupPlugin(*project, *zone, flavorPluginLookup)))
 
 		return nil
 	}

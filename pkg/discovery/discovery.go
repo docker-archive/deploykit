@@ -43,3 +43,14 @@ func IsErrNotFound(e error) bool {
 	_, is := e.(ErrNotFound)
 	return is
 }
+
+// Must returns a plugins lookup or panics on error.  The plugin lookup function is common throughout
+// the plugin codebase.
+func Must(d Plugins, err error) func() Plugins {
+	if err != nil {
+		panic(err)
+	}
+	return func() Plugins {
+		return d
+	}
+}
