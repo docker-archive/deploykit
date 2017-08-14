@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/ssh"
 )
 
 const (
@@ -30,6 +31,27 @@ func HostsFile() string {
 type Remote struct {
 	Endpoints HostList
 	TunnelSSH bool
+}
+
+// parse the , delimited string into a url list
+func (r Remote) endpoints() ([]*url.URL, error) {
+	ulist := []*url.URL{}
+	for _, h := range strings.Split(string(r.Endpoints), ",") {
+		addProtocol := false
+		if !strings.Contains(h, "://") {
+			h = "http://" + h
+			addProtocol = true
+		}
+		u, err := url.Parse(h)
+		if err != nil {
+			return nil, err
+		}
+		if addProtocol {
+			u.Scheme = "http"
+		}
+		ulist = append(ulist, u)
+	}
+	return ulist, nil
 }
 
 // HostList is a comma-delimited list of protocol://host:port
@@ -75,7 +97,6 @@ func LoadHosts() (Hosts, error) {
 func Remotes() ([]*url.URL, error) {
 	ulist := []*url.URL{}
 
-	hosts := []string{}
 	// See if INFRAKIT_HOST is set to point to a host list in the $INFRAKIT_HOME/hosts file.
 	host := os.Getenv(EnvInfrakitHost)
 	if host == "" {
@@ -102,42 +123,56 @@ func Remotes() ([]*url.URL, error) {
 	}
 
 	remote, has := m[host]
-	if has {
-		hosts = strings.Split(string(remote.Endpoints), ",")
-	} else {
+	if !has {
 		return nil, fmt.Errorf("no entry in hosts file at %s for INFRAKIT_HOST=%s", hostsFile, host)
-	}
-
-	for _, h := range hosts {
-		addProtocol := false
-		if !strings.Contains(h, "://") {
-			h = "http://" + h
-			addProtocol = true
-		}
-		u, err := url.Parse(h)
-		if err != nil {
-			panic(err)
-		}
-		if addProtocol {
-			u.Scheme = "http"
-		}
-		ulist = append(ulist, u)
 	}
 
 	if remote.TunnelSSH {
 		return urlFromTunnel(host, remote)
 	}
-	return ulist, nil
+	return remote.endpoints()
 }
 
 var (
-	tunnels     = map[string]tunnel{}
+	tunnels     = map[string]*site{}
 	tunnelsLock = sync.Mutex{}
 )
 
-type tunnel struct {
-	remote Remote
-	urls   []*url.URL
+type site struct {
+	rule    Remote
+	urls    []*url.URL
+	tunnels []*ssh.Tunnel
+}
+
+func (r *site) startTunnels() ([]*url.URL, error) {
+	endpoints, err := r.rule.endpoints()
+	if err != nil {
+		return nil, err
+	}
+
+	// endpoints are urls.  url.Host is host:port.
+	for _, u := range endpoints {
+		tunnel := &ssh.Tunnel{
+			Local:  ssh.HostPort(fmt.Sprintf("%s:%d", "127.0.0.1", ssh.RandPort(2200, 2299))),
+			Server: ssh.HostPort(fmt.Sprintf("%s:%d", strings.Split(u.Host, ":")[0], 22)),
+			Remote: ssh.HostPort(u.Host),
+			Config: ssh.DefaultClientConfig,
+		}
+		err := <-tunnel.Start()
+		if err != nil {
+			return nil, err
+		}
+
+		r.tunnels = append(r.tunnels, tunnel)
+
+		parsed, err := url.Parse(string(tunnel.Local))
+		if err != nil {
+			return nil, err
+		}
+		parsed.Scheme = "http"
+		r.urls = append(r.urls, parsed)
+	}
+	return r.urls, nil
 }
 
 func urlFromTunnel(host string, remote Remote) ([]*url.URL, error) {
@@ -148,6 +183,13 @@ func urlFromTunnel(host string, remote Remote) ([]*url.URL, error) {
 	if has {
 		return t.urls, nil
 	}
-
+	tunnels[host] = &site{
+		rule:    remote,
+		urls:    []*url.URL{},
+		tunnels: []*ssh.Tunnel{},
+	}
+	if remote.TunnelSSH {
+		return tunnels[host].startTunnels()
+	}
 	return nil, nil
 }
