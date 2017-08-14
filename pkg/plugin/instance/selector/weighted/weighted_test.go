@@ -81,7 +81,7 @@ func TestRoll(t *testing.T) {
 	require.Equal(t, -1, bin(biases, 100))
 
 	for i := 0; i < 100; i++ {
-		bins[bin(biases, i)] += 1
+		bins[bin(biases, i)]++
 	}
 	require.Equal(t, 2, len(bins))
 	require.Equal(t, 20, bins[0])
@@ -89,7 +89,7 @@ func TestRoll(t *testing.T) {
 
 	bins = map[int]int{}
 	for i := 0; i < 1000; i++ {
-		bins[bin(biases, roll(biases))] += 1
+		bins[bin(biases, roll(biases))]++
 	}
 	require.Equal(t, 2, len(bins))
 }
@@ -119,7 +119,7 @@ func TestSelectOne(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		m, err := SelectOne(instance.Spec{}, choices, nil)
 		require.NoError(t, err)
-		bins[m.Name] += 1
+		bins[m.Name]++
 	}
 	require.Equal(t, 2, len(bins))
 
