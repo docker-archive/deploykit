@@ -31,21 +31,6 @@ Available Commands:
   event       Access event exposed by infrakit plugins
   manager     Access the manager
   metadata    Access metadata exposed by infrakit plugins
-  mylogfile   Access plugin mylogfile which implements Event/0.1.0,Metadata/0.1.0
-  playbook    Manage playbooks
-  plugin      Manage plugins
-  remote      Manage remotes$ infrakit
-
-
-infrakit command line interface
-
-Usage:
-  infrakit [command]
-
-Available Commands:
-  event       Access event exposed by infrakit plugins
-  manager     Access the manager
-  metadata    Access metadata exposed by infrakit plugins
   mylogfile   Access plugin mylogfile which implements Event/0.1.0,Metadata/0.1.0  <----- This is new
   playbook    Manage playbooks
   plugin      Manage plugins
