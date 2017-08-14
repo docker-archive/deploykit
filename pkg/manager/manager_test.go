@@ -59,7 +59,7 @@ func testEnsemble(t *testing.T,
 	configStore func(*store_mock.MockSnapshot),
 	configureGroup func(*group_mock.MockPlugin)) (Backend, server.Stoppable) {
 
-	disc, err := local.NewPluginDiscoveryWithDirectory(dir)
+	disc, err := local.NewPluginDiscoveryWithDir(dir)
 	require.NoError(t, err)
 
 	detector := &testLeaderDetector{t: t, me: id, input: leader}

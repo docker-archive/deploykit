@@ -6,11 +6,13 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/provider/google/plugin"
+	"github.com/docker/infrakit/pkg/plugin"
+	google_plugin "github.com/docker/infrakit/pkg/provider/google/plugin"
 	instance_plugin "github.com/docker/infrakit/pkg/provider/google/plugin/instance"
 	metadata_plugin "github.com/docker/infrakit/pkg/provider/google/plugin/metadata"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/spf13/cobra"
 )
 
@@ -42,13 +44,13 @@ func main() {
 
 		log.Debug("Using namespace", namespace)
 
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 			instance_rpc.PluginServer(instance_plugin.NewGCEInstancePlugin(*project, *zone, namespace)),
 			metadata_rpc.PluginServer(metadata_plugin.NewGCEMetadataPlugin(*project, *zone)),
 		)
 	}
 
-	cmd.AddCommand(plugin.VersionCommand())
+	cmd.AddCommand(google_plugin.VersionCommand())
 
 	err := cmd.Execute()
 	if err != nil {

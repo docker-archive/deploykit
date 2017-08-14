@@ -8,6 +8,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/spf13/cobra"
 )
@@ -37,7 +38,7 @@ func main() {
 		}
 
 		cli.SetLogLevel(*logLevel)
-		cli.RunPlugin(*name, flavor_rpc.PluginServer(NewPlugin(flavorPluginLookup)))
+		run.Plugin(plugin.DefaultTransport(*name), flavor_rpc.PluginServer(NewPlugin(flavorPluginLookup)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())

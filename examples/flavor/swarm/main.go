@@ -7,10 +7,12 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/flavor/swarm"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_plugin "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	flavor_spi "github.com/docker/infrakit/pkg/spi/flavor"
 	metadata_spi "github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
@@ -67,7 +69,7 @@ func main() {
 		managerFlavor := swarm.NewManagerFlavor(plugins, swarm.DockerClient, mt, managerStop)
 		workerFlavor := swarm.NewWorkerFlavor(plugins, swarm.DockerClient, wt, workerStop)
 
-		cli.RunPlugin(*name,
+		run.Plugin(plugin.DefaultTransport(*name),
 
 			// Metadata plugins
 			metadata_plugin.PluginServer(metadata.NewPluginFromData(map[string]interface{}{

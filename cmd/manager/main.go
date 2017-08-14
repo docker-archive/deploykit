@@ -18,6 +18,7 @@ import (
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
@@ -226,7 +227,7 @@ func runMain(cfg config) error {
 		}
 		return nil
 	}
-	cli.RunPlugin(cfg.id,
+	run.Plugin(plugin.DefaultTransport(cfg.id),
 		metadata_rpc.UpdatablePluginServer(metadata_plugin.NewUpdatablePlugin(
 			metadata_plugin.NewPluginFromChannel(updatableModel),
 			loadFunc,

@@ -8,8 +8,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/digitalocean/godo"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/provider/digitalocean/plugin/instance"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 )
@@ -53,7 +55,8 @@ func main() {
 			namespace[keyAndValue[0]] = keyAndValue[1]
 		}
 
-		cli.RunPlugin(*name, instance_plugin.PluginServer(instance.NewDOInstancePlugin(client, namespace)))
+		run.Plugin(plugin.DefaultTransport(*name),
+			instance_plugin.PluginServer(instance.NewDOInstancePlugin(client, namespace)))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
