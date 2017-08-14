@@ -17,9 +17,10 @@ var log = logutil.New("module", "plugin/instance/selector")
 
 // Base is the base implementation of an instance plugin
 type Base struct {
-	Plugins    func() discovery.Plugins
-	Choices    []selector.Choice
-	SelectFunc func(instance.Spec, []selector.Choice, func(selector.Choice) instance.Plugin) (selector.Choice, error)
+	Plugins          func() discovery.Plugins
+	Choices          []selector.Choice
+	SelectFunc       func(instance.Spec, []selector.Choice, func(selector.Choice) instance.Plugin) (selector.Choice, error)
+	PluginClientFunc func(map[string]*plugin.Endpoint, plugin.Name) instance.Plugin
 }
 
 func instancePlugin(plugins map[string]*plugin.Endpoint, name plugin.Name) instance.Plugin {
@@ -59,13 +60,17 @@ func (b *Base) selectOne(spec instance.Spec) (match selector.Choice, p instance.
 }
 
 func (b *Base) visit(f func(selector.Choice, instance.Plugin) error) error {
+	if b.PluginClientFunc == nil {
+		b.PluginClientFunc = instancePlugin
+	}
+
 	plugins, err := b.Plugins().List()
 	if err != nil {
 		return err
 	}
 
 	for _, choice := range b.Choices {
-		instancePlugin := instancePlugin(plugins, choice.Name)
+		instancePlugin := b.PluginClientFunc(plugins, choice.Name)
 		if instancePlugin == nil {
 			continue
 		}

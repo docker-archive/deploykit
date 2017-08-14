@@ -2,11 +2,9 @@ package internal
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/instance/selector"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -15,18 +13,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetInstancePluginClientVisit(t *testing.T) {
+type testDiscovery map[string]*plugin.Endpoint
 
-	dir := os.TempDir()
+func (td testDiscovery) List() (map[string]*plugin.Endpoint, error) {
+	return map[string]*plugin.Endpoint(td), nil
+}
+func (td testDiscovery) Find(n plugin.Name) (*plugin.Endpoint, error) {
+	return td[string(n)], nil
+}
+
+func TestVisit(t *testing.T) {
 
 	n1 := plugin.Name("us-west-2a")
 	n2 := plugin.Name("us-west-2b")
 
 	p1 := &instance_testing.Plugin{}
 	p2 := &instance_testing.Plugin{}
-
-	s1, _ := instance_testing.StartInstancePlugin(t, dir, n1, p1)
-	s2, _ := instance_testing.StartInstancePlugin(t, dir, n2, p2)
 
 	options := selector.Options{
 		selector.Choice{
@@ -50,15 +52,28 @@ func TestGetInstancePluginClientVisit(t *testing.T) {
 	}
 
 	b := &Base{
-		Plugins: discovery.Must(local.NewPluginDiscoveryWithDir(dir)),
+		Plugins: func() discovery.Plugins {
+			return testDiscovery{
+				string(n1): &plugin.Endpoint{Name: string(n1), Address: string(n1)},
+				string(n2): &plugin.Endpoint{Name: string(n2), Address: string(n2)},
+			}
+		},
 		Choices: options,
+		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+			switch n {
+			case n1:
+				return p1
+			case n2:
+				return p2
+			}
+			return nil
+		},
 	}
 
 	m, err := b.Plugins().List()
 	require.NoError(t, err)
-
-	require.NotNil(t, instancePlugin(m, options[0].Name))
-	require.NotNil(t, instancePlugin(m, options[1].Name))
+	require.Equal(t, p1, b.PluginClientFunc(m, options[0].Name))
+	require.Equal(t, p2, b.PluginClientFunc(m, options[1].Name))
 
 	// Check error handling
 	require.Error(t, b.visit(
@@ -74,14 +89,9 @@ func TestGetInstancePluginClientVisit(t *testing.T) {
 			return nil
 		}))
 	require.Equal(t, []plugin.Name{options[0].Name, options[1].Name}, visited)
-
-	s1.Stop()
-	s2.Stop()
 }
 
 func TestDoAll(t *testing.T) {
-
-	dir := os.TempDir()
 
 	n1 := plugin.Name("us-west-2a")
 	n2 := plugin.Name("us-west-2b")
@@ -101,9 +111,6 @@ func TestDoAll(t *testing.T) {
 		},
 	}
 
-	s1, _ := instance_testing.StartInstancePlugin(t, dir, n1, p1)
-	s2, _ := instance_testing.StartInstancePlugin(t, dir, n2, p2)
-
 	options := selector.Options{
 		selector.Choice{
 			Name: plugin.Name("us-west-2a"),
@@ -114,8 +121,22 @@ func TestDoAll(t *testing.T) {
 	}
 
 	b := &Base{
-		Plugins: discovery.Must(local.NewPluginDiscoveryWithDir(dir)),
+		Plugins: func() discovery.Plugins {
+			return testDiscovery{
+				string(n1): &plugin.Endpoint{Name: string(n1), Address: string(n1)},
+				string(n2): &plugin.Endpoint{Name: string(n2), Address: string(n2)},
+			}
+		},
 		Choices: options,
+		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+			switch n {
+			case n1:
+				return p1
+			case n2:
+				return p2
+			}
+			return nil
+		},
 	}
 
 	require.NoError(t, b.doAll(len(options),
@@ -126,14 +147,9 @@ func TestDoAll(t *testing.T) {
 
 	<-called1
 	<-called2
-
-	s1.Stop()
-	s2.Stop()
 }
 
 func TestDescribeInstances(t *testing.T) {
-
-	dir := os.TempDir()
 
 	n1 := plugin.Name("us-west-2a")
 	n2 := plugin.Name("us-west-2b")
@@ -150,13 +166,8 @@ func TestDescribeInstances(t *testing.T) {
 		{ID: instance.ID("us-west-2b-3")},
 	}
 
-	called1 := make(chan struct{})
-	called2 := make(chan struct{})
 	p1 := &instance_testing.Plugin{}
 	p2 := &instance_testing.Plugin{}
-
-	s1, _ := instance_testing.StartInstancePlugin(t, dir, n1, p1)
-	s2, _ := instance_testing.StartInstancePlugin(t, dir, n2, p2)
 
 	options := selector.Options{
 		selector.Choice{
@@ -168,8 +179,22 @@ func TestDescribeInstances(t *testing.T) {
 	}
 
 	b := &Base{
-		Plugins: discovery.Must(local.NewPluginDiscoveryWithDir(dir)),
+		Plugins: func() discovery.Plugins {
+			return testDiscovery{
+				string(n1): &plugin.Endpoint{Name: string(n1), Address: string(n1)},
+				string(n2): &plugin.Endpoint{Name: string(n2), Address: string(n2)},
+			}
+		},
 		Choices: options,
+		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+			switch n {
+			case n1:
+				return p1
+			case n2:
+				return p2
+			}
+			return nil
+		},
 	}
 
 	qtags := map[string]string{
@@ -177,12 +202,10 @@ func TestDescribeInstances(t *testing.T) {
 		"sha":   "xyz",
 	}
 	p1.DoDescribeInstances = func(tags map[string]string, properties bool) ([]instance.Description, error) {
-		close(called1)
 		require.Equal(t, qtags, tags)
 		return instances1, nil
 	}
 	p2.DoDescribeInstances = func(tags map[string]string, properties bool) ([]instance.Description, error) {
-		close(called2)
 		require.Equal(t, qtags, tags)
 		return instances2, nil
 	}
@@ -205,29 +228,15 @@ func TestDescribeInstances(t *testing.T) {
 	}
 	_, err = b.DescribeInstances(qtags, false)
 	require.Error(t, err)
-
-	<-called1
-	<-called2
-
-	s1.Stop()
-	s2.Stop()
 }
 
 func TestValidate(t *testing.T) {
 
-	dir := os.TempDir()
-
 	n1 := plugin.Name("us-west-2a")
 	n2 := plugin.Name("us-west-2b")
 
-	called1 := make(chan struct{})
-	called2 := make(chan struct{})
-
 	p1 := &instance_testing.Plugin{}
 	p2 := &instance_testing.Plugin{}
-
-	s1, _ := instance_testing.StartInstancePlugin(t, dir, n1, p1)
-	s2, _ := instance_testing.StartInstancePlugin(t, dir, n2, p2)
 
 	options := selector.Options{
 		selector.Choice{
@@ -239,16 +248,28 @@ func TestValidate(t *testing.T) {
 	}
 
 	b := &Base{
-		Plugins: discovery.Must(local.NewPluginDiscoveryWithDir(dir)),
+		Plugins: func() discovery.Plugins {
+			return testDiscovery{
+				string(n1): &plugin.Endpoint{Name: string(n1), Address: string(n1)},
+				string(n2): &plugin.Endpoint{Name: string(n2), Address: string(n2)},
+			}
+		},
 		Choices: options,
+		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+			switch n {
+			case n1:
+				return p1
+			case n2:
+				return p2
+			}
+			return nil
+		},
 	}
 
 	p1.DoValidate = func(req *types.Any) error {
-		close(called1)
 		return nil
 	}
 	p2.DoValidate = func(req *types.Any) error {
-		close(called2)
 		return fmt.Errorf("error")
 	}
 
@@ -264,29 +285,15 @@ func TestValidate(t *testing.T) {
 	}
 
 	require.Error(t, b.Validate(types.AnyValueMust("foo")))
-
-	<-called1
-	<-called2
-
-	s1.Stop()
-	s2.Stop()
 }
 
 func TestLabel(t *testing.T) {
 
-	dir := os.TempDir()
-
 	n1 := plugin.Name("us-west-2a")
 	n2 := plugin.Name("us-west-2b")
 
-	called1 := make(chan struct{})
-	called2 := make(chan struct{})
-
 	p1 := &instance_testing.Plugin{}
 	p2 := &instance_testing.Plugin{}
-
-	s1, _ := instance_testing.StartInstancePlugin(t, dir, n1, p1)
-	s2, _ := instance_testing.StartInstancePlugin(t, dir, n2, p2)
 
 	options := selector.Options{
 		selector.Choice{
@@ -298,8 +305,22 @@ func TestLabel(t *testing.T) {
 	}
 
 	b := &Base{
-		Plugins: discovery.Must(local.NewPluginDiscoveryWithDir(dir)),
+		Plugins: func() discovery.Plugins {
+			return testDiscovery{
+				string(n1): &plugin.Endpoint{Name: string(n1), Address: string(n1)},
+				string(n2): &plugin.Endpoint{Name: string(n2), Address: string(n2)},
+			}
+		},
 		Choices: options,
+		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+			switch n {
+			case n1:
+				return p1
+			case n2:
+				return p2
+			}
+			return nil
+		},
 	}
 
 	qid := instance.ID("fool")
@@ -308,12 +329,10 @@ func TestLabel(t *testing.T) {
 	}
 
 	p1.DoLabel = func(inst instance.ID, labels map[string]string) error {
-		close(called1)
 		require.Equal(t, qlabels, labels)
 		return fmt.Errorf("not found")
 	}
 	p2.DoLabel = func(inst instance.ID, labels map[string]string) error {
-		close(called2)
 		require.Equal(t, qlabels, labels)
 		return nil // labeled ok
 	}
@@ -332,29 +351,15 @@ func TestLabel(t *testing.T) {
 	}
 
 	require.Error(t, b.Label(qid, qlabels))
-
-	<-called1
-	<-called2
-
-	s1.Stop()
-	s2.Stop()
 }
 
 func TestDestroy(t *testing.T) {
 
-	dir := os.TempDir()
-
 	n1 := plugin.Name("us-west-2a")
 	n2 := plugin.Name("us-west-2b")
 
-	called1 := make(chan struct{})
-	called2 := make(chan struct{})
-
 	p1 := &instance_testing.Plugin{}
 	p2 := &instance_testing.Plugin{}
-
-	s1, _ := instance_testing.StartInstancePlugin(t, dir, n1, p1)
-	s2, _ := instance_testing.StartInstancePlugin(t, dir, n2, p2)
 
 	options := selector.Options{
 		selector.Choice{
@@ -366,19 +371,31 @@ func TestDestroy(t *testing.T) {
 	}
 
 	b := &Base{
-		Plugins: discovery.Must(local.NewPluginDiscoveryWithDir(dir)),
+		Plugins: func() discovery.Plugins {
+			return testDiscovery{
+				string(n1): &plugin.Endpoint{Name: string(n1), Address: string(n1)},
+				string(n2): &plugin.Endpoint{Name: string(n2), Address: string(n2)},
+			}
+		},
 		Choices: options,
+		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+			switch n {
+			case n1:
+				return p1
+			case n2:
+				return p2
+			}
+			return nil
+		},
 	}
 
 	qid := instance.ID("fool")
 
 	p1.DoDestroy = func(inst instance.ID, context instance.Context) error {
-		close(called1)
 		require.Equal(t, qid, inst)
 		return fmt.Errorf("not found")
 	}
 	p2.DoDestroy = func(inst instance.ID, context instance.Context) error {
-		close(called2)
 		require.Equal(t, qid, inst)
 		return nil // labeled ok
 	}
@@ -397,28 +414,15 @@ func TestDestroy(t *testing.T) {
 	}
 
 	require.Error(t, b.Destroy(qid, instance.Context{}))
-
-	<-called1
-	<-called2
-
-	s1.Stop()
-	s2.Stop()
 }
 
 func TestProvision(t *testing.T) {
 
-	dir := os.TempDir()
-
 	n1 := plugin.Name("us-west-2a")
 	n2 := plugin.Name("us-west-2b")
 
-	called2 := make(chan struct{})
-
 	p1 := &instance_testing.Plugin{}
 	p2 := &instance_testing.Plugin{}
-
-	s1, _ := instance_testing.StartInstancePlugin(t, dir, n1, p1)
-	s2, _ := instance_testing.StartInstancePlugin(t, dir, n2, p2)
 
 	options := selector.Options{
 		selector.Choice{
@@ -430,8 +434,22 @@ func TestProvision(t *testing.T) {
 	}
 
 	b := &Base{
-		Plugins: discovery.Must(local.NewPluginDiscoveryWithDir(dir)),
+		Plugins: func() discovery.Plugins {
+			return testDiscovery{
+				string(n1): &plugin.Endpoint{Name: string(n1), Address: string(n1)},
+				string(n2): &plugin.Endpoint{Name: string(n2), Address: string(n2)},
+			}
+		},
 		Choices: options,
+		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+			switch n {
+			case n1:
+				return p1
+			case n2:
+				return p2
+			}
+			return nil
+		},
 	}
 
 	qid := instance.ID("foo-instance")
@@ -449,7 +467,6 @@ func TestProvision(t *testing.T) {
 		panic("shouldn't be here")
 	}
 	p2.DoProvision = func(spec instance.Spec) (*instance.ID, error) {
-		close(called2)
 		require.Equal(t, qspec, spec)
 		return &qid, nil // provisioned ok
 	}
@@ -465,11 +482,6 @@ func TestProvision(t *testing.T) {
 
 	_, err = b.Provision(qspec)
 	require.Error(t, err)
-
-	<-called2
-
-	s1.Stop()
-	s2.Stop()
 }
 
 func TestErrorGroup(t *testing.T) {
