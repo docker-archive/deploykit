@@ -22,14 +22,8 @@ type ExecName string
 // Rule provides the instructions on starting the plugin
 type Rule struct {
 
-	// Kind is the canonical name that are defined for each package under pkg/run/v[0-9]+.
-	// Kind is an organization of multiple plugin's. For example, there is a kubernetes Kind and this
-	// would correspond to pkg/types/Spec.Kind.  This is used to identify the subsystem to start (e.g. kubernetes).
-	// However, it is possible to have multiple instances of objects in a same Kind.  For example, for aws Kind,
-	// it's possible to have two instance plugins, one called us-west-1a and one us-west-2a. So the kind is aws,
-	// but the lookup name for discovery (which plugin.Name is used), would be us-west-1a.sock and us-west-1b.sock,
-	// and each endpoint would have multiple objects (e.g. us-west-1a/ec2-instance and us-west-1b/ec2-instance).
-	Kind string
+	// Key is a string identifying which rule to use.  This can be used in the command line, e.g. plugin start.
+	Key string
 
 	// Launch is the rule for starting / launching the plugin. It's a dictionary with the key being
 	// the name of the executor and the value being the properties used by that executor.
@@ -49,7 +43,7 @@ func (r Rule) Merge(o Rule) Rule {
 		copy.Launch[k] = &c
 	}
 
-	if r.Kind != o.Kind {
+	if r.Key != o.Key {
 		return copy
 	}
 	for k, v := range o.Launch {
@@ -67,20 +61,20 @@ type Rules []Rule
 
 func (r Rules) Len() int           { return len(r) }
 func (r Rules) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
-func (r Rules) Less(i, j int) bool { return r[i].Kind < r[j].Kind }
+func (r Rules) Less(i, j int) bool { return r[i].Key < r[j].Key }
 
 // MergeRules input rules into another slice
 func MergeRules(a, b []Rule) []Rule {
 	out := Rules{}
 	q := map[string]Rule{}
 	for _, v := range a {
-		q[v.Kind] = v
+		q[v.Key] = v
 	}
 	for _, r := range b {
-		if found, has := q[r.Kind]; !has {
+		if found, has := q[r.Key]; !has {
 			out = append(out, r)
 		} else {
-			q[r.Kind] = found.Merge(r)
+			q[r.Key] = found.Merge(r)
 		}
 	}
 	for _, r := range q {
@@ -110,7 +104,7 @@ func NewMonitor(execs []Exec, rules []Rule) *Monitor {
 	mm := map[ExecName]Exec{}
 
 	for _, r := range rules {
-		m[r.Kind] = map[ExecName]*types.Any{}
+		m[r.Key] = map[ExecName]*types.Any{}
 	}
 
 	// index by name of plugin
@@ -120,7 +114,7 @@ func NewMonitor(execs []Exec, rules []Rule) *Monitor {
 		mm[n] = exec
 		for _, r := range rules {
 			if cfg, has := r.Launch[n]; has {
-				m[r.Kind][n] = cfg
+				m[r.Key][n] = cfg
 			}
 		}
 	}
@@ -132,7 +126,7 @@ func NewMonitor(execs []Exec, rules []Rule) *Monitor {
 
 // StartPlugin is the command to start a plugin
 type StartPlugin struct {
-	Kind    string
+	Key     string
 	Name    plugin.Name
 	Exec    ExecName
 	Options *types.Any // options that can override the defaults in the rules
@@ -180,10 +174,10 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 
 			if req.Options == nil {
 				// match first by full name of the form lookup/type -- 'specialization'
-				properties, has := m.rules[req.Kind][req.Exec]
+				properties, has := m.rules[req.Key][req.Exec]
 				if !has {
-					log.Warn("no plugin kind defined", "kind", req.Kind)
-					req.reportError(req.Kind, plugin.Name(""), nil, errNoConfig)
+					log.Warn("no plugin kind defined", "key", req.Key)
+					req.reportError(req.Key, plugin.Name(""), nil, errNoConfig)
 					continue loop
 				}
 				if properties != nil {
@@ -195,30 +189,30 @@ func (m *Monitor) Start() (chan<- StartPlugin, error) {
 
 			exec, has := m.execs[req.Exec]
 			if !has {
-				req.reportError(req.Kind, plugin.Name(""), configCopy, fmt.Errorf("no exec:%v", req.Exec))
+				req.reportError(req.Key, plugin.Name(""), configCopy, fmt.Errorf("no exec:%v", req.Exec))
 				continue loop
 			}
 
-			log.Info("Starting plugin", "executor", exec.Name(), "kind", req.Kind, "name", req.Name, "exec", req.Exec)
+			log.Info("Starting plugin", "executor", exec.Name(), "key", req.Key, "name", req.Name, "exec", req.Exec)
 
-			name, block, err := exec.Exec(req.Kind, req.Name, configCopy)
+			name, block, err := exec.Exec(req.Key, req.Name, configCopy)
 			if err != nil {
 				log.Warn("error starting plugin", "err", err, "config", configCopy,
-					"kind", req.Kind, "name", req.Name, "as", name)
-				req.reportError(req.Kind, req.Name, configCopy, err)
+					"key", req.Key, "name", req.Name, "as", name)
+				req.reportError(req.Key, req.Name, configCopy, err)
 				continue loop
 			}
 
-			log.Info("Waiting for startup", "kind", req.Kind, "name", req.Name,
+			log.Info("Waiting for startup", "key", req.Key, "name", req.Name,
 				"config", configCopy.String(), "as", name)
 			err = <-block
 			if err != nil {
-				log.Warn("error startup", "err", err, "config", configCopy, "kind", req.Kind, "name", req.Name)
-				req.reportError(req.Kind, name, configCopy, err)
+				log.Warn("error startup", "err", err, "config", configCopy, "key", req.Key, "name", req.Name)
+				req.reportError(req.Key, name, configCopy, err)
 				continue loop
 			}
 
-			req.reportSuccess(req.Kind, name, configCopy)
+			req.reportSuccess(req.Key, name, configCopy)
 		}
 	}()
 

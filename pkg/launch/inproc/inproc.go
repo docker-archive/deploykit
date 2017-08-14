@@ -46,6 +46,20 @@ func Register(lookup string, prf PluginRunFunc, defaultOptions interface{}) {
 	}
 }
 
+// Rule is the rule for starting an inproc plugin.
+type Rule struct {
+
+	// Kind is the canonical name that are defined for each package under pkg/run/v[0-9]+.
+	// Kind is an organization of multiple plugin's. For example, there is a kubernetes Kind and this
+	// would correspond to pkg/types/Spec.Kind.  This is used to identify the subsystem to start (e.g. kubernetes).
+	// However, it is possible to have multiple instances of objects in a same Kind.  For example, for aws Kind,
+	// it's possible to have two instance plugins, one called us-west-1a and one us-west-2a. So the kind is aws,
+	// but the lookup name for discovery (which plugin.Name is used), would be us-west-1a.sock and us-west-1b.sock,
+	// and each endpoint would have multiple objects (e.g. us-west-1a/ec2-instance and us-west-1b/ec2-instance).
+	Kind    string
+	Options *types.Any
+}
+
 // Rules returns a list of default launch rules.  This is a set of rules required by the monitor
 func Rules() []launch.Rule {
 	rules := []launch.Rule{}
@@ -58,9 +72,14 @@ func Rules() []launch.Rule {
 		}
 
 		rules = append(rules, launch.Rule{
-			Kind: lookup,
+			Key: lookup,
 			Launch: map[launch.ExecName]*types.Any{
-				launch.ExecName("inproc"): defaultOptions,
+				launch.ExecName("inproc"): types.AnyValueMust(
+					Rule{
+						Kind:    lookup,
+						Options: defaultOptions,
+					},
+				),
 			},
 		})
 	}
@@ -100,7 +119,7 @@ func (l *Launcher) Name() string {
 // The channel is closed as soon as an error (or nil for success completion) is written.
 // The command is run in the background / asynchronously.  The returned read channel
 // stops blocking as soon as the command completes.  However, the plugin is running in process.
-func (l *Launcher) Exec(kind string, pn plugin.Name,
+func (l *Launcher) Exec(key string, pn plugin.Name,
 	config *types.Any) (pluginName plugin.Name, starting <-chan error, err error) {
 
 	name, _ := pn.GetLookupAndType()
@@ -109,9 +128,15 @@ func (l *Launcher) Exec(kind string, pn plugin.Name,
 		return pluginName, s.wait, nil
 	}
 
-	builder, has := builders[kind]
+	inprocRule := Rule{}
+	err = config.Decode(&inprocRule)
+	if err != nil {
+		return
+	}
+
+	builder, has := builders[inprocRule.Kind]
 	if !has {
-		return pluginName, nil, fmt.Errorf("cannot start plugin of kind %v", kind)
+		return pluginName, nil, fmt.Errorf("cannot start plugin of kind %v", inprocRule.Kind)
 	}
 
 	s := state{}
@@ -122,9 +147,9 @@ func (l *Launcher) Exec(kind string, pn plugin.Name,
 
 	s.wait = sc
 
-	transport, impls, onStop, err := builder.run(l.plugins, plugin.Name(name), config)
+	transport, impls, onStop, err := builder.run(l.plugins, plugin.Name(name), inprocRule.Options)
 	if err != nil {
-		log.Warn("error executing inproc", "plugin", name, "config", config, "err", err)
+		log.Warn("error executing inproc", "plugin", name, "config", inprocRule.Options, "err", err)
 		sc <- err
 		return transport.Name, s.wait, err
 	}

@@ -1,6 +1,8 @@
 package tailer
 
 import (
+	"path/filepath"
+
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -14,6 +16,9 @@ import (
 const (
 	// Kind is the canonical name of the plugin for starting up, etc.
 	Kind = "tailer"
+
+	// EnvPath is the environment variable to set to tail when no additional configs are used.
+	EnvPath = "INFRAKIT_EVENT_TAILER_PATH"
 )
 
 var (
@@ -25,7 +30,12 @@ func init() {
 }
 
 // DefaultOptions return an Options with default values filled in.
-var DefaultOptions = tailer.Options{}
+var DefaultOptions = tailer.Options{
+	tailer.Rule{
+		Path:      run.GetEnv(EnvPath, filepath.Join(run.GetEnv("PWD", ""), "test.log")),
+		MustExist: false,
+	},
+}
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
@@ -36,6 +46,9 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	err = config.Decode(&options)
 	if err != nil {
 		return
+	}
+	if len(options) == 0 {
+		options = DefaultOptions
 	}
 
 	var events *tailer.Tailer

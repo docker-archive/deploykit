@@ -1,16 +1,32 @@
 [
     {
-        "Kind" : "tailer",
+        "Key" : "applogs",
         "Launch" : {
-            "inproc": [
-		{
-		    "Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test1.log"
-		}
-		,
-		{
-		    "Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test2.log"
-		}
-	    ]
+            "inproc": {
+		"Kind" : "tailer",
+		"Options" : [
+		    {
+			"Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test1.log"
+		    }
+		]
+	    }
+        }
+    }
+    ,
+    {
+        "Key" : "syslogs",
+        "Launch" : {
+            "inproc": {
+		"Kind" : "tailer",
+		"Options" : [
+		    {
+			"Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test2.log"
+		    },
+		    {
+			"Path" : "{{env `PWD`}}/pkg/plugin/event/tailer/test3.log"
+		    }
+		]
+	    }
         }
     }
 ]

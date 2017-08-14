@@ -197,7 +197,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				for k := range r.Launch {
 					execs = append(execs, string(k))
 				}
-				fmt.Printf("%-20v\t%v\n", r.Kind, strings.Join(execs, ","))
+				fmt.Printf("%-20v\t%v\n", r.Key, strings.Join(execs, ","))
 			}
 			return nil
 		}
