@@ -5,42 +5,38 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
-	// HostsFileEnvVar is the location of the hosts file
-	HostsFileEnvVar = "INFRAKIT_HOSTS_FILE"
+	// EnvInfrakitHost is the environment variable to set to point to specific backends.
+	// The value is used as key into the $INFRAKIT_HOME/hosts file.
+	EnvInfrakitHost = "INFRAKIT_HOST"
+	// EnvHostsFile is the location of the hosts file
+	EnvHostsFile = "INFRAKIT_HOSTS_FILE"
 )
 
 // HostsFile returns the hsots file used for looking up hosts
 func HostsFile() string {
-	if hostsFile := os.Getenv(HostsFileEnvVar); hostsFile != "" {
-		return hostsFile
-	}
+	return run.GetEnv(EnvHostsFile, filepath.Join(run.InfrakitHome(), "hosts"))
+}
 
-	// if there's INFRAKIT_HOME defined
-	home := os.Getenv("INFRAKIT_HOME")
-	if home != "" {
-		return filepath.Join(home, "hosts")
-	}
-
-	home = os.Getenv("HOME")
-	if usr, err := user.Current(); err == nil {
-		home = usr.HomeDir
-	}
-	return filepath.Join(home, ".infrakit/hosts")
+// Remote is a remote infrakit endpoint
+type Remote struct {
+	Endpoints HostList
+	TunnelSSH bool
 }
 
 // HostList is a comma-delimited list of protocol://host:port
 type HostList string
 
 // Hosts is the schema of the hosts file
-type Hosts map[string]HostList
+type Hosts map[string]Remote
 
 // Save saves the hosts
 func (h Hosts) Save() error {
@@ -81,7 +77,7 @@ func Remotes() ([]*url.URL, error) {
 
 	hosts := []string{}
 	// See if INFRAKIT_HOST is set to point to a host list in the $INFRAKIT_HOME/hosts file.
-	host := os.Getenv("INFRAKIT_HOST")
+	host := os.Getenv(EnvInfrakitHost)
 	if host == "" {
 		return ulist, nil // do nothing -- local mode
 	}
@@ -95,7 +91,7 @@ func Remotes() ([]*url.URL, error) {
 		return ulist, nil // do nothing -- local mode
 	}
 
-	m := map[string]string{}
+	m := Hosts{}
 	yaml, err := types.AnyYAML(buff)
 	if err != nil {
 		return nil, fmt.Errorf("bad format for hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
@@ -105,8 +101,9 @@ func Remotes() ([]*url.URL, error) {
 		return nil, fmt.Errorf("cannot decode hosts file at %s for INFRAKIT_HOST=%s, err=%v", hostsFile, host, err)
 	}
 
-	if list, has := m[host]; has {
-		hosts = strings.Split(list, ",")
+	remote, has := m[host]
+	if has {
+		hosts = strings.Split(string(remote.Endpoints), ",")
 	} else {
 		return nil, fmt.Errorf("no entry in hosts file at %s for INFRAKIT_HOST=%s", hostsFile, host)
 	}
@@ -127,5 +124,30 @@ func Remotes() ([]*url.URL, error) {
 		ulist = append(ulist, u)
 	}
 
+	if remote.TunnelSSH {
+		return urlFromTunnel(host, remote)
+	}
 	return ulist, nil
+}
+
+var (
+	tunnels     = map[string]tunnel{}
+	tunnelsLock = sync.Mutex{}
+)
+
+type tunnel struct {
+	remote Remote
+	urls   []*url.URL
+}
+
+func urlFromTunnel(host string, remote Remote) ([]*url.URL, error) {
+	tunnelsLock.Lock()
+	defer tunnelsLock.Unlock()
+
+	t, has := tunnels[host]
+	if has {
+		return t.urls, nil
+	}
+
+	return nil, nil
 }

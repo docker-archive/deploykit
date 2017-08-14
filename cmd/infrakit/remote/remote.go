@@ -31,6 +31,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	quiet := cmd.PersistentFlags().BoolP("quiet", "q", false, "Print rows without column headers")
 
+	tunnelSSH := true
 	add := &cobra.Command{
 		Use:   "add <name> <url_list>",
 		Short: "Add a remote",
@@ -49,11 +50,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			hosts[name] = cli.HostList(urls)
+			hosts[name] = cli.Remote{
+				Endpoints: cli.HostList(urls),
+				TunnelSSH: tunnelSSH,
+			}
 
 			return hosts.Save()
 		},
 	}
+	add.Flags().BoolVar(&tunnelSSH, "ssh-tunnel", tunnelSSH, "True to create ssh tunnel when connecting")
+
 	remove := &cobra.Command{
 		Use:   "rm <name>",
 		Short: "Remove a remote",
@@ -105,19 +111,19 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return output(os.Stdout, hosts,
 				func(io.Writer, interface{}) error {
 					if !*quiet {
-						fmt.Printf("%-30s\t%-30s\n", "HOST", "URL LIST")
+						fmt.Printf("%-20s\t%-10s\t%-60v\n", "HOST", "SSH TUNNEL", "URL LIST")
 					}
 
 					h := []string{}
-					for host := range hosts {
-						h = append(h, host)
+					for name := range hosts {
+						h = append(h, name)
 					}
 
 					sort.Strings(h)
 
-					for _, host := range h {
-						urls := hosts[host]
-						fmt.Printf("%-30v\t%-30v\n", host, urls)
+					for _, name := range h {
+						remote := hosts[name]
+						fmt.Printf("%-20v\t%-10v\t%-60v\n", name, remote.TunnelSSH, remote.Endpoints)
 					}
 					return nil
 				})
