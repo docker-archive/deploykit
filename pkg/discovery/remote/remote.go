@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -77,15 +78,14 @@ func (r *remotePluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 		// master, plugins
 		c := &http.Client{}
 
+		// List of plugins and leadership information is available via HTTP OPTIONS call
 		body, err := doHTTPOptions(remote, nil, c)
-
-		log.Debug("http options", "remote", remote, "body", string(body), "err", err)
 
 		// If an error occurs, we continue -- with the assumption that at some point
 		// one of the remotes which responded would be a leader.  In that case, we
 		// don't care about the other ones that failed to respond.
 		if err != nil {
-			log.Debug("error getting remote plugin info", "err", err)
+			fmt.Println("error getting remote plugin info", "err", err)
 			continue
 		}
 
@@ -93,20 +93,19 @@ func (r *remotePluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 		if err := types.AnyBytes(body).Decode(&data); err != nil {
 			return nil, err
 		}
+		// Only if it's the leader or if it's the only remote do we actually include the endpoints
+		// This way, we ensure the proxy has only one set of plugins (those on the leader) and not the replicas.
+		if data.Leader || len(r.remotes) == 1 {
 
-		for _, p := range data.Plugins {
+			for _, p := range data.Plugins {
 
-			copy := *remote
+				copy := *remote
+				if p[len(p)-1] == '/' {
+					copy.Path = p
+				} else {
+					copy.Path = p + "/"
+				}
 
-			if p[len(p)-1] == '/' {
-				copy.Path = p
-			} else {
-				copy.Path = p + "/"
-			}
-
-			// Only if it's the leader or if it's the only remote do we actually include the endpoints
-			// This way, we ensure the proxy has only one set of plugins (those on the leader) and not the replicas.
-			if data.Leader || len(r.remotes) == 1 {
 				plugins[p] = &plugin.Endpoint{
 					Name: p,
 					// Protocol is the transport protocol -- unix, tcp, etc.
@@ -115,6 +114,7 @@ func (r *remotePluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 					Address: copy.String(),
 				}
 			}
+			break
 		}
 	}
 

@@ -36,18 +36,23 @@ func RandPort(lo, hi int) int {
 	return lo + rand.Intn(hi-lo)
 }
 
-// DefaultClientConfig is the default settings of the ssh client
-var DefaultClientConfig = &ssh.ClientConfig{
-	Auth: []ssh.AuthMethod{
-		Agent(),
-	},
-	HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO - add ways to set host's public key
+// DefaultClientConfig returns the default settings of the ssh client
+func DefaultClientConfig() ssh.ClientConfig {
+	return ssh.ClientConfig{
+		Auth: []ssh.AuthMethod{
+			Agent(),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO - add ways to set host's public key
+	}
 }
 
 // Start starts the tunnel
-func (tunnel *Tunnel) Start() <-chan error {
-	ready := make(chan error, 1)
+func (tunnel *Tunnel) Start() error {
+	return <-tunnel.startAsync()
+}
 
+func (tunnel *Tunnel) startAsync() <-chan error {
+	ready := make(chan error, 1)
 	go func() {
 		listener, err := net.Listen("tcp", string(tunnel.Local))
 		if err != nil {
@@ -56,7 +61,6 @@ func (tunnel *Tunnel) Start() <-chan error {
 			return
 		}
 		defer listener.Close()
-
 		close(ready) // notify caller before we block
 		for {
 			conn, err := listener.Accept()

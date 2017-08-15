@@ -31,7 +31,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	quiet := cmd.PersistentFlags().BoolP("quiet", "q", false, "Print rows without column headers")
 
-	tunnelSSH := true
+	bastionAddr := ""
+	user := ""
 	add := &cobra.Command{
 		Use:   "add <name> <url_list>",
 		Short: "Add a remote",
@@ -51,14 +52,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			hosts[name] = cli.Remote{
+				SSH:       bastionAddr,
+				User:      user,
 				Endpoints: cli.HostList(urls),
-				TunnelSSH: tunnelSSH,
 			}
 
 			return hosts.Save()
 		},
 	}
-	add.Flags().BoolVar(&tunnelSSH, "ssh-tunnel", tunnelSSH, "True to create ssh tunnel when connecting")
+	add.Flags().StringVar(&bastionAddr, "ssh-addr", bastionAddr, "The public host to tunnel")
+	add.Flags().StringVar(&user, "ssh-user", user, "The ssh user")
 
 	remove := &cobra.Command{
 		Use:   "rm <name>",
@@ -123,7 +126,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 					for _, name := range h {
 						remote := hosts[name]
-						fmt.Printf("%-20v\t%-10v\t%-60v\n", name, remote.TunnelSSH, remote.Endpoints)
+						fmt.Printf("%-20v\t%-10v\t%-60v\n", name, remote.SSH, remote.Endpoints)
 					}
 					return nil
 				})

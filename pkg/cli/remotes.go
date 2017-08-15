@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -30,7 +31,8 @@ func HostsFile() string {
 // Remote is a remote infrakit endpoint
 type Remote struct {
 	Endpoints HostList
-	TunnelSSH bool
+	SSH       string // The bastion host
+	User      string
 }
 
 // parse the , delimited string into a url list
@@ -127,7 +129,7 @@ func Remotes() ([]*url.URL, error) {
 		return nil, fmt.Errorf("no entry in hosts file at %s for INFRAKIT_HOST=%s", hostsFile, host)
 	}
 
-	if remote.TunnelSSH {
+	if remote.SSH != "" {
 		return urlFromTunnel(host, remote)
 	}
 	return remote.endpoints()
@@ -152,25 +154,39 @@ func (r *site) startTunnels() ([]*url.URL, error) {
 
 	// endpoints are urls.  url.Host is host:port.
 	for _, u := range endpoints {
+
+		host, port, err := net.SplitHostPort(u.Host)
+		if err != nil {
+			return nil, err
+		}
+
+		bastionHost := r.rule.SSH
+		if bastionHost == "" {
+			bastionHost = u.Host
+		}
+		if h, p, err := net.SplitHostPort(bastionHost); err == nil && p == "" {
+			bastionHost = net.JoinHostPort(h, "22") // default
+		}
+
+		config := ssh.DefaultClientConfig()
+		config.User = r.rule.User
 		tunnel := &ssh.Tunnel{
 			Local:  ssh.HostPort(fmt.Sprintf("%s:%d", "127.0.0.1", ssh.RandPort(2200, 2299))),
-			Server: ssh.HostPort(fmt.Sprintf("%s:%d", strings.Split(u.Host, ":")[0], 22)),
-			Remote: ssh.HostPort(u.Host),
-			Config: ssh.DefaultClientConfig,
+			Server: ssh.HostPort(bastionHost),
+			Remote: ssh.HostPort(net.JoinHostPort(host, port)),
+			Config: &config,
 		}
-		err := <-tunnel.Start()
+
+		err = tunnel.Start()
 		if err != nil {
 			return nil, err
 		}
 
 		r.tunnels = append(r.tunnels, tunnel)
-
-		parsed, err := url.Parse(string(tunnel.Local))
-		if err != nil {
-			return nil, err
-		}
-		parsed.Scheme = "http"
-		r.urls = append(r.urls, parsed)
+		r.urls = append(r.urls, &url.URL{
+			Scheme: "http",
+			Host:   string(tunnel.Local),
+		})
 	}
 	return r.urls, nil
 }
@@ -188,7 +204,7 @@ func urlFromTunnel(host string, remote Remote) ([]*url.URL, error) {
 		urls:    []*url.URL{},
 		tunnels: []*ssh.Tunnel{},
 	}
-	if remote.TunnelSSH {
+	if remote.SSH != "" {
 		return tunnels[host].startTunnels()
 	}
 	return nil, nil
