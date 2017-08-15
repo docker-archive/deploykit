@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"net/url"
+
 	"github.com/docker/infrakit/pkg/manager"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 )
@@ -29,4 +31,12 @@ func (c client) IsLeader() (bool, error) {
 	resp := IsLeaderResponse{}
 	err := c.client.Call("Manager.IsLeader", req, &resp)
 	return resp.Leader, err
+}
+
+// LeaderLocation returns the location of the leader
+func (c client) LeaderLocation() (*url.URL, error) {
+	req := LeaderLocationRequest{}
+	resp := LeaderLocationResponse{}
+	err := c.client.Call("Manager.LeaderLocation", req, &resp)
+	return resp.Location, err
 }

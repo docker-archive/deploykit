@@ -3,7 +3,9 @@ package manager
 import (
 	"time"
 
+	"github.com/docker/go-connections/tlsconfig"
 	swarm_leader "github.com/docker/infrakit/pkg/leader/swarm"
+	logutil "github.com/docker/infrakit/pkg/log"
 	swarm_store "github.com/docker/infrakit/pkg/store/swarm"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
@@ -25,6 +27,7 @@ var DefaultBackendSwarmOptions = Options{
 			PollInterval: 5 * time.Second,
 			Docker: docker.ConnectInfo{
 				Host: "unix:///var/run/docker.sock",
+				TLS:  &tlsconfig.Options{},
 			},
 		},
 	),
@@ -32,7 +35,7 @@ var DefaultBackendSwarmOptions = Options{
 
 func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options, muxConfig *MuxConfig) error {
 	dockerClient, err := docker.NewClient(options.Docker.Host, options.Docker.TLS)
-	log.Info("Connect to docker", "host", options.Docker.Host, "err=", err)
+	log.Debug("Connect to docker", "host", options.Docker.Host, "err=", err, "V", logutil.V(100))
 	if err != nil {
 		return err
 	}
@@ -48,7 +51,10 @@ func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options, mu
 	if managerConfig != nil {
 		managerConfig.leader = leader
 		managerConfig.store = snapshot
-		managerConfig.cleanUpFunc = func() { dockerClient.Close() }
+		managerConfig.cleanUpFunc = func() {
+			dockerClient.Close()
+			log.Debug("closed docker connection", "client", dockerClient, "V", logutil.V(100))
+		}
 	}
 
 	if muxConfig != nil {

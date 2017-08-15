@@ -108,7 +108,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		panic("no plugins()")
 	}
 
-	options := DefaultOptions
+	options := Options{}
 	err = config.Decode(&options)
 	if err != nil {
 		return

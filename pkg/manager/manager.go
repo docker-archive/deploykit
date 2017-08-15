@@ -3,6 +3,7 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -31,6 +32,9 @@ type Leadership interface {
 // Manager is the interface for interacting locally or remotely with the manager
 type Manager interface {
 	Leadership
+
+	// LeaderLocation returns the location of the leader
+	LeaderLocation() (*url.URL, error)
 }
 
 // Backend is the admin / server interface
@@ -104,6 +108,11 @@ func (m *manager) initRunning() bool {
 // IsLeader returns leader status.  False if not or unknown.
 func (m *manager) IsLeader() (bool, error) {
 	return m.isLeader, nil
+}
+
+// LeaderLocation returns the location of the leader
+func (m *manager) LeaderLocation() (*url.URL, error) {
+	return nil, fmt.Errorf("not-implemented")
 }
 
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.

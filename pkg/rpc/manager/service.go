@@ -2,6 +2,7 @@ package manager
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/spi"
@@ -41,6 +42,24 @@ func (p *Manager) IsLeader(_ *http.Request, req *IsLeaderRequest, resp *IsLeader
 	is, err := p.manager.IsLeader()
 	if err == nil {
 		resp.Leader = is
+	}
+	return err
+}
+
+// LeaderLocationRequest is the rpc request
+type LeaderLocationRequest struct {
+}
+
+// LeaderLocationResponse is the rpc response
+type LeaderLocationResponse struct {
+	Location *url.URL
+}
+
+// LeaderLocation returns the location of the leader
+func (p *Manager) LeaderLocation(_ *http.Request, req *LeaderLocationRequest, resp *LeaderLocationResponse) error {
+	u, err := p.manager.LeaderLocation()
+	if err == nil {
+		resp.Location = u
 	}
 	return err
 }
