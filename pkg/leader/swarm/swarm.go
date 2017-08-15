@@ -4,12 +4,14 @@ import (
 	"net/url"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/infrakit/pkg/leader"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"golang.org/x/net/context"
 )
+
+var log = logutil.New("module", "leader/swarm")
 
 // NewDetector return an implementation of leader detector
 func NewDetector(pollInterval time.Duration, client docker.APIClientCloser) *leader.Poller {
@@ -35,7 +37,7 @@ func amISwarmLeader(ctx context.Context, client docker.APIClientCloser) (bool, e
 	if node.ManagerStatus == nil {
 		return false, nil
 	}
-	log.Debugln("leader=", node.ManagerStatus.Leader, "node=", node)
+	log.Debug("Leadership", "leader", node.ManagerStatus.Leader, "node", node)
 	return node.ManagerStatus.Leader, nil
 }
 
@@ -77,7 +79,7 @@ func (s Store) GetLocation() (*url.URL, error) {
 
 	if info.ClusterInfo.Spec.Annotations.Labels != nil {
 		if l, has := info.ClusterInfo.Spec.Annotations.Labels[SwarmLabel]; has {
-			log.Debugln("leader.loc=", l)
+			log.Debug("leader location", "location", l)
 			return url.Parse(l)
 		}
 	}
