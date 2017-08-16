@@ -35,11 +35,12 @@ func init() {
 }
 
 type config struct {
-	id         string
-	plugins    discovery.Plugins
-	leader     leader.Detector
-	snapshot   store.Snapshot
-	pluginName string //This is the name of the stateless group plugin that the manager will proxy for.
+	id          string
+	plugins     discovery.Plugins
+	leader      leader.Detector
+	leaderStore leader.Store
+	snapshot    store.Snapshot
+	pluginName  string //This is the name of the stateless group plugin that the manager will proxy for.
 }
 
 func main() {
@@ -131,7 +132,7 @@ func runMain(cfg config) error {
 
 	logrus.Infoln("Starting up manager:", cfg)
 
-	mgr, err := manager.NewManager(cfg.plugins, cfg.leader, cfg.snapshot, cfg.pluginName)
+	mgr, err := manager.NewManager(cfg.plugins, cfg.leader, cfg.leaderStore, cfg.snapshot, cfg.pluginName)
 	if err != nil {
 		return err
 	}

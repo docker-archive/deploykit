@@ -18,7 +18,7 @@ type config struct {
 	autoStop     *bool
 	interval     *time.Duration
 	pollInterval *time.Duration
-	location     *url.URL
+	location     *string
 	plugins      func() discovery.Plugins
 	poller       *leader.Poller
 	store        leader.Store
@@ -37,8 +37,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	autoStop := cmd.PersistentFlags().BoolP("auto-stop", "a", false, "True to stop when no plugins are running")
 	interval := cmd.PersistentFlags().DurationP("scan", "s", 1*time.Minute, "Scan interval to check for plugins")
 	pollInterval := cmd.PersistentFlags().DurationP("poll-interval", "p", 5*time.Second, "Leader polling interval")
+	locateURL := cmd.Flags().StringP("locate-url", "u", "", "Locate URL of this node, eg. http://public_ip:24864")
 
 	config := &config{
+		location:     locateURL,
 		plugins:      plugins,
 		listen:       listen,
 		autoStop:     autoStop,
@@ -65,10 +67,7 @@ func runMux(config *config) error {
 
 	if config.store != nil && config.poller != nil {
 		logger.Info("Starting leader poller")
-		config.poller.ReportLocation(config.location, config.store)
-
 		defer config.poller.Stop()
-
 		l, err := config.poller.Start()
 		if err != nil {
 			return err
@@ -76,8 +75,12 @@ func runMux(config *config) error {
 		leadership = l
 	}
 
+	advertise, err := url.Parse(*config.location)
+	if err != nil {
+		return err
+	}
 	logger.Info("Starting mux server", "listen", *config.listen)
-	server, err := mux.NewServer(*config.listen, config.plugins,
+	server, err := mux.NewServer(*config.listen, advertise, config.plugins,
 		mux.Options{
 			Leadership: leadership,
 			Registry:   config.store,

@@ -44,7 +44,7 @@ func NewDetector(pollInterval time.Duration, filename, id string) (*leader.Polle
 type Store string
 
 // NewStore returns the store implementation
-func NewStore(s string) Store {
+func NewStore(s string) leader.Store {
 	return Store(s)
 }
 

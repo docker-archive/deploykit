@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	broker "github.com/docker/infrakit/pkg/broker/server"
+	logutil "github.com/docker/infrakit/pkg/log"
 	rpc_server "github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
@@ -20,6 +20,8 @@ import (
 	"github.com/gorilla/rpc/v2/json2"
 	"gopkg.in/tylerb/graceful.v1"
 )
+
+var log = logutil.New("module", "rpc/server")
 
 // Stoppable support proactive stopping, and blocking until stopped.
 type Stoppable interface {
@@ -51,9 +53,9 @@ type loggingHandler struct {
 func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestData, err := httputil.DumpRequest(req, true)
 	if err == nil {
-		log.Debugf("Received request %s", string(requestData))
+		log.Debug("Server RECEIVE", "payload", string(requestData), "V", logutil.V(400))
 	} else {
-		log.Error(err)
+		log.Warn("Server RECEIVE", "err", err)
 	}
 
 	recorder := rpc_server.NewRecorder()
@@ -62,9 +64,9 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	responseData, err := httputil.DumpResponse(recorder.Result(), true)
 	if err == nil {
-		log.Debugf("Sending response %s", string(responseData))
+		log.Debug("Server REPLY", "payload", string(responseData), "V", logutil.V(400))
 	} else {
-		log.Error(err)
+		log.Warn("Server REPLY", "err", err)
 	}
 
 	w.WriteHeader(recorder.Code)
@@ -147,8 +149,8 @@ func startAtPath(listen []string, discoverPath string,
 		return nil, err
 	}
 
-	httpLog := log.New()
-	httpLog.Level = log.GetLevel()
+	// httpLog := log.New()
+	// httpLog.Level = log.GetLevel()
 
 	router := mux.NewRouter()
 	router.HandleFunc(rpc_server.URLAPI, info.ShowAPI)
@@ -167,7 +169,7 @@ func startAtPath(listen []string, discoverPath string,
 		},
 		Do: events.ServeHTTP,
 		Post: func(topic string) {
-			log.Infoln("Client left", topic)
+			log.Debug("Client left", "topic", topic, "V", logutil.V(100))
 		},
 	}
 	router.HandleFunc(rpc_server.URLEventsPrefix, intercept.ServeHTTP)
@@ -200,7 +202,7 @@ func startAtPath(listen []string, discoverPath string,
 			return nil, err
 		}
 
-		log.Infof("Listening at: %s, discoverable at %s", listen, discoverPath)
+		log.Info("Listening", "listen", listen, "discover", discoverPath)
 
 	} else {
 		gracefulServer.Server = &http.Server{
@@ -212,14 +214,14 @@ func startAtPath(listen []string, discoverPath string,
 			return nil, err
 		}
 		listener = l
-		log.Infof("Listening at: %s", discoverPath)
+		log.Info("Listening", "discover", discoverPath)
 
 	}
 
 	go func() {
 		err := gracefulServer.Serve(listener)
 		if err != nil {
-			log.Warn(err)
+			log.Warn("err", "err", err)
 		}
 		events.Stop()
 		if len(listen) > 0 {

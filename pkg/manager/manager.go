@@ -53,13 +53,14 @@ type Backend interface {
 type manager struct {
 	group.Plugin
 
-	plugins  discovery.Plugins
-	leader   leader.Detector
-	snapshot store.Snapshot
-	isLeader bool
-	lock     sync.Mutex
-	stop     chan struct{}
-	running  chan struct{}
+	plugins     discovery.Plugins
+	leader      leader.Detector
+	leaderStore leader.Store
+	snapshot    store.Snapshot
+	isLeader    bool
+	lock        sync.Mutex
+	stop        chan struct{}
+	running     chan struct{}
 
 	backendName string
 	backendOps  chan<- backendOp
@@ -75,13 +76,15 @@ type backendOp struct {
 func NewManager(
 	plugins discovery.Plugins,
 	leader leader.Detector,
+	leaderStore leader.Store,
 	snapshot store.Snapshot,
 	backendName string) (Backend, error) {
 
 	m := &manager{
-		plugins:  plugins,
-		leader:   leader,
-		snapshot: snapshot,
+		plugins:     plugins,
+		leader:      leader,
+		leaderStore: leaderStore,
+		snapshot:    snapshot,
 	}
 
 	gp, err := m.proxyForGroupPlugin(backendName)
@@ -112,7 +115,7 @@ func (m *manager) IsLeader() (bool, error) {
 
 // LeaderLocation returns the location of the leader
 func (m *manager) LeaderLocation() (*url.URL, error) {
-	return nil, fmt.Errorf("not-implemented")
+	return m.leaderStore.GetLocation()
 }
 
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.

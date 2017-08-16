@@ -1,7 +1,6 @@
 package mux
 
 import (
-	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -57,18 +56,11 @@ func osEnvironment(cfg *config) *cobra.Command {
 		Short: "os",
 	}
 
-	locateURL := cmd.Flags().StringP("locate-url", "u", "", "Locate URL of this node, eg. http://public_ip:24864")
 	id := cmd.Flags().String("name", defaultLeaderFile(), "Name of this node, for matching in leader file")
 	leaderFile := cmd.Flags().String("leader-file", defaultLeaderFile(), "File used for leader election/detection")
 	leaderLocation := cmd.Flags().String("leader-location-file", defaultLeaderLocationFile(), "File used for storing location")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
-
-		u, err := url.Parse(*locateURL)
-		if err != nil {
-			return err
-		}
-		cfg.location = u
 
 		poller, err := file.NewDetector(*cfg.pollInterval, *leaderFile, *id)
 		if err != nil {

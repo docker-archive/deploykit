@@ -47,6 +47,9 @@ type Detector interface {
 	// Start starts leadership detection
 	Start() (<-chan Leadership, error)
 
+	// Receive allocates a channel for the caller to receive on. Messages are sent to all receivers.
+	Receive() <-chan Leadership
+
 	// Stop stops
 	Stop()
 }

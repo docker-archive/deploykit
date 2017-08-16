@@ -20,20 +20,17 @@ type BackendSwarmOptions struct {
 }
 
 // DefaultBackendSwarmOptions is the Options for using the swarm backend.
-var DefaultBackendSwarmOptions = Options{
-	Backend: "swarm",
-	Settings: types.AnyValueMust(
-		BackendSwarmOptions{
-			PollInterval: 5 * time.Second,
-			Docker: docker.ConnectInfo{
-				Host: "unix:///var/run/docker.sock",
-				TLS:  &tlsconfig.Options{},
-			},
+var DefaultBackendSwarmOptions = types.AnyValueMust(
+	BackendSwarmOptions{
+		PollInterval: 5 * time.Second,
+		Docker: docker.ConnectInfo{
+			Host: "unix:///var/run/docker.sock",
+			TLS:  &tlsconfig.Options{},
 		},
-	),
-}
+	},
+)
 
-func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options, muxConfig *MuxConfig) error {
+func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options) error {
 	dockerClient, err := docker.NewClient(options.Docker.Host, options.Docker.TLS)
 	log.Debug("Connect to docker", "host", options.Docker.Host, "err=", err, "V", logutil.V(100))
 	if err != nil {
@@ -47,19 +44,16 @@ func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options, mu
 	}
 
 	leader := swarm_leader.NewDetector(options.PollInterval, dockerClient)
+	leaderStore := swarm_leader.NewStore(dockerClient)
 
 	if managerConfig != nil {
 		managerConfig.leader = leader
+		managerConfig.leaderStore = leaderStore
 		managerConfig.store = snapshot
 		managerConfig.cleanUpFunc = func() {
 			dockerClient.Close()
 			log.Debug("closed docker connection", "client", dockerClient, "V", logutil.V(100))
 		}
-	}
-
-	if muxConfig != nil {
-		muxConfig.poller = swarm_leader.NewDetector(muxConfig.PollInterval, dockerClient)
-		muxConfig.store = swarm_leader.NewStore(dockerClient)
 	}
 
 	return nil

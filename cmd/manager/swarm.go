@@ -39,6 +39,7 @@ func swarmEnvironment(getConfig func() config) *cobra.Command {
 		defer dockerClient.Close()
 
 		leader := swarm_leader.NewDetector(*pollInterval, dockerClient)
+		leaderStore := swarm_leader.NewStore(dockerClient)
 		snapshot, err := swarm_store.NewSnapshot(dockerClient)
 		if err != nil {
 			return err
@@ -52,6 +53,7 @@ func swarmEnvironment(getConfig func() config) *cobra.Command {
 		cfg := getConfig()
 		cfg.plugins = plugins
 		cfg.leader = leader
+		cfg.leaderStore = leaderStore
 		cfg.snapshot = snapshot
 
 		return runMain(cfg)

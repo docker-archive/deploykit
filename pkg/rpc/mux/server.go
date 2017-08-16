@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/leader"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/rpc"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"gopkg.in/tylerb/graceful.v1"
@@ -49,12 +51,38 @@ func SavePID(listen string) (string, error) {
 }
 
 // NewServer returns a tcp server listening at the listen address (e.g. ':8080'), or error
-func NewServer(listen string, plugins func() discovery.Plugins, options Options) (rpc_server.Stoppable, error) {
+func NewServer(listen string, advertise *url.URL,
+	plugins func() discovery.Plugins, options Options) (rpc_server.Stoppable, error) {
 
 	proxy := NewReverseProxy(plugins)
 	server := &graceful.Server{
 		Timeout: 10 * time.Second,
 		Server:  &http.Server{Addr: listen, Handler: proxy},
+	}
+
+	var advertiseURL *url.URL
+	if advertise != nil {
+		copy := *advertise
+		advertiseURL = &copy
+	}
+
+	leaderStop := make(chan struct{})
+	leaderChan := options.Leadership
+	leaderStore := options.Registry
+	if leaderChan != nil && leaderStore != nil && advertiseURL != nil {
+		go func() {
+			log.Debug("Starting location updater", "url", *advertiseURL, "V", logutil.V(100))
+			select {
+			case <-leaderStop:
+				log.Info("Stop checking leadership")
+				return
+			case l := <-leaderChan:
+				if l.Status == leader.Leader {
+					leaderStore.UpdateLocation(advertiseURL)
+					log.Debug("Updated leader location", "advertise", *advertiseURL, "V", logutil.V(100))
+				}
+			}
+		}()
 	}
 
 	pidPath, err := SavePID(listen)
@@ -71,6 +99,7 @@ func NewServer(listen string, plugins func() discovery.Plugins, options Options)
 
 	go func() {
 		defer func() {
+			close(leaderStop)
 			log.Info("listener stopped")
 			os.Remove(pidPath)
 		}()

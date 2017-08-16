@@ -1,7 +1,6 @@
 package mux
 
 import (
-	"net/url"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -20,7 +19,6 @@ func etcdEnvironment(cfg *config) *cobra.Command {
 		Short: "etcd v3 for leader detection and storage",
 	}
 
-	locateURL := cmd.Flags().StringP("locate-url", "u", "", "Locate URL of this node, eg. http://public_ip:24864")
 	requestTimeout := cmd.Flags().Duration("request-timeout", 1*time.Second, "Request timeout")
 	endpoint := cmd.Flags().String("endpoint", defaultEndpoint, "Etcd endpoint (v3 grpc)")
 	caFile := cmd.Flags().String("tlscacert", "", "TLS CA cert file path")
@@ -29,12 +27,6 @@ func etcdEnvironment(cfg *config) *cobra.Command {
 	insecureSkipVerify := cmd.Flags().Bool("tlsverify", true, "True to skip TLS")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
-
-		u, err := url.Parse(*locateURL)
-		if err != nil {
-			return err
-		}
-		cfg.location = u
 
 		options := etcd.Options{
 			Config: clientv3.Config{

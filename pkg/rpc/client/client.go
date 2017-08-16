@@ -13,11 +13,13 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/gorilla/rpc/v2/json2"
 )
+
+var log = logutil.New("module", "rpc/client")
 
 type client struct {
 	http *http.Client
@@ -144,9 +146,9 @@ func (c client) Call(method string, arg interface{}, result interface{}) error {
 
 	requestData, err := httputil.DumpRequest(req, true)
 	if err == nil {
-		log.Debugf("Sending request %s", string(requestData))
+		log.Debug("Client SEND", "payload", string(requestData), "V", logutil.V(500))
 	} else {
-		log.Error(err)
+		log.Warn("Client SEND", "err", err)
 	}
 
 	resp, err := c.http.Do(req)
@@ -158,9 +160,9 @@ func (c client) Call(method string, arg interface{}, result interface{}) error {
 
 	responseData, err := httputil.DumpResponse(resp, true)
 	if err == nil {
-		log.Debugf("Received response %s", string(responseData))
+		log.Debug("Client RECEIVE", "payload", string(responseData), "V", logutil.V(500))
 	} else {
-		log.Error(err)
+		log.Warn("Client RECEIVE", "err", err)
 	}
 
 	return json2.DecodeClientResponse(resp.Body, result)
