@@ -51,8 +51,14 @@ func SavePID(listen string) (string, error) {
 }
 
 // NewServer returns a tcp server listening at the listen address (e.g. ':8080'), or error
-func NewServer(listen string, advertise *url.URL,
+func NewServer(listen string, advertiseHostPort string,
 	plugins func() discovery.Plugins, options Options) (rpc_server.Stoppable, error) {
+
+	advertise, err := url.Parse(advertiseHostPort)
+	if err != nil {
+		return nil, err
+	}
+	advertise.Scheme = "http"
 
 	proxy := NewReverseProxy(plugins)
 	server := &graceful.Server{

@@ -80,7 +80,7 @@ func runMux(config *config) error {
 		return err
 	}
 	logger.Info("Starting mux server", "listen", *config.listen)
-	server, err := mux.NewServer(*config.listen, advertise, config.plugins,
+	server, err := mux.NewServer(*config.listen, advertise.Host, config.plugins,
 		mux.Options{
 			Leadership: leadership,
 			Registry:   config.store,

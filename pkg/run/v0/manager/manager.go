@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 
@@ -33,8 +32,8 @@ const (
 	// EnvMuxListen is the listen string (:24864)
 	EnvMuxListen = "INFRAKIT_MUX_LISTEN"
 
-	// EnvURL is the location of this node (http://127.0.0.1:24864)
-	EnvURL = "INFRAKIT_URL"
+	// EnvAdvertise is the location of this node (127.0.0.1:24864)
+	EnvAdvertise = "INFRAKIT_ADVERTISE"
 )
 
 var (
@@ -73,10 +72,8 @@ type MuxConfig struct {
 	// Listen string e.g. :24864
 	Listen string
 
-	// URL is the url of this node -- e.g. http://public_ip:24864
-	URL string
-
-	location *url.URL // from parsing URL
+	// Advertise is the public listen string e.g. public_ip:24864
+	Advertise string
 }
 
 // DefaultOptions return an Options with default values filled in.
@@ -87,8 +84,8 @@ func defaultOptions() (options Options) {
 	options = Options{
 		BackendName: plugin.Name("group-stateless"),
 		Mux: &MuxConfig{
-			Listen: run.GetEnv(EnvMuxListen, ":24864"),
-			URL:    run.GetEnv(EnvURL, "http://localhost:24864"),
+			Listen:    run.GetEnv(EnvMuxListen, ":24864"),
+			Advertise: run.GetEnv(EnvAdvertise, "localhost:24864"),
 		},
 	}
 
@@ -212,13 +209,8 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	if options.Mux != nil {
 
-		options.Mux.location, err = url.Parse(options.Mux.URL)
-		if err != nil {
-			return
-		}
-
-		log.Info("Starting mux server", "listen", options.Mux.Listen, "advertise", options.Mux.location)
-		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.location, options.plugins,
+		log.Info("Starting mux server", "listen", options.Mux.Listen, "advertise", options.Mux.Advertise)
+		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.Advertise, options.plugins,
 			mux.Options{
 				Leadership: options.leader.Receive(),
 				Registry:   options.leaderStore,
