@@ -3,11 +3,12 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/leader"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi"
@@ -16,11 +17,15 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
-// InterfaceSpec is the current name and version of the Instance API.
-var InterfaceSpec = spi.InterfaceSpec{
-	Name:    "Manager",
-	Version: "0.1.0",
-}
+var (
+	log = logutil.New("module", "manager")
+
+	// InterfaceSpec is the current name and version of the Instance API.
+	InterfaceSpec = spi.InterfaceSpec{
+		Name:    "Manager",
+		Version: "0.1.0",
+	}
+)
 
 // Leadership is the interface for getting information about the current leader node
 type Leadership interface {
@@ -31,6 +36,9 @@ type Leadership interface {
 // Manager is the interface for interacting locally or remotely with the manager
 type Manager interface {
 	Leadership
+
+	// LeaderLocation returns the location of the leader
+	LeaderLocation() (*url.URL, error)
 }
 
 // Backend is the admin / server interface
@@ -49,13 +57,14 @@ type Backend interface {
 type manager struct {
 	group.Plugin
 
-	plugins  discovery.Plugins
-	leader   leader.Detector
-	snapshot store.Snapshot
-	isLeader bool
-	lock     sync.Mutex
-	stop     chan struct{}
-	running  chan struct{}
+	plugins     discovery.Plugins
+	leader      leader.Detector
+	leaderStore leader.Store
+	snapshot    store.Snapshot
+	isLeader    bool
+	lock        sync.Mutex
+	stop        chan struct{}
+	running     chan struct{}
 
 	backendName string
 	backendOps  chan<- backendOp
@@ -71,13 +80,15 @@ type backendOp struct {
 func NewManager(
 	plugins discovery.Plugins,
 	leader leader.Detector,
+	leaderStore leader.Store,
 	snapshot store.Snapshot,
 	backendName string) (Backend, error) {
 
 	m := &manager{
-		plugins:  plugins,
-		leader:   leader,
-		snapshot: snapshot,
+		plugins:     plugins,
+		leader:      leader,
+		leaderStore: leaderStore,
+		snapshot:    snapshot,
 	}
 
 	gp, err := m.proxyForGroupPlugin(backendName)
@@ -106,6 +117,15 @@ func (m *manager) IsLeader() (bool, error) {
 	return m.isLeader, nil
 }
 
+// LeaderLocation returns the location of the leader
+func (m *manager) LeaderLocation() (*url.URL, error) {
+	if m.leaderStore == nil {
+		return nil, fmt.Errorf("cannot locate leader")
+	}
+
+	return m.leaderStore.GetLocation()
+}
+
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.
 func (m *manager) Start() (<-chan struct{}, error) {
 
@@ -115,7 +135,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 		return m.running, nil
 	}
 
-	log.Infoln("Manager starting")
+	log.Info("Manager starting")
 
 	leaderChan, err := m.leader.Start()
 	if err != nil {
@@ -137,16 +157,16 @@ func (m *manager) Start() (<-chan struct{}, error) {
 			select {
 
 			case op := <-backendOps:
-				log.Debugln("Backend operation:", op)
+				log.Debug("Backend operation", "op", op, "V", logutil.V(100))
 				if m.isLeader {
 					op.operation()
 				}
 
 			case <-stopWorkQueue:
 
-				log.Infoln("Stopping work queue.")
+				log.Info("Stopping work queue.")
 				close(m.running)
-				log.Infoln("Manager stopped.")
+				log.Info("Manager stopped.")
 				return
 
 			case leader, open := <-notify:
@@ -157,7 +177,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 
 				// This channel has data only when there's been a leadership change.
 
-				log.Debugln("leader:", leader)
+				log.Debug("leader event", "leader", leader, "V", logutil.V(100))
 				if leader {
 					m.onAssumeLeadership()
 				} else {
@@ -176,7 +196,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 
 			case <-m.stop:
 
-				log.Infoln("Stopping..")
+				log.Info("Stopping..")
 				m.stop = nil
 				close(stopWorkQueue)
 				close(notify)
@@ -196,7 +216,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 				current := m.isLeader
 
 				if evt.Status == leader.Unknown {
-					log.Warningln("Leadership status is uncertain:", evt.Error)
+					log.Warn("Leadership status is uncertain", "err", evt.Error)
 
 					// if we are currently the leader then there's a possibility of split brain depending on
 					// the robustness of the leader election process.
@@ -268,7 +288,7 @@ func (m *manager) getCurrentState() (globalSpec, error) {
 }
 
 func (m *manager) onAssumeLeadership() error {
-	log.Infoln("Assuming leadership")
+	log.Info("Assuming leadership")
 
 	// load the config
 	config := globalSpec{}
@@ -276,11 +296,11 @@ func (m *manager) onAssumeLeadership() error {
 	// load the latest version -- assumption here is that it's been persisted already.
 	err := m.snapshot.Load(&config)
 	if err != nil {
-		log.Warningln("Error loading config", err)
+		log.Warn("Error loading config", "err", err)
 		return err
 	}
 
-	log.Infoln("Loaded snapshot. err=", err)
+	log.Info("Loaded snapshot", "err", err)
 	if err != nil {
 		return err
 	}
@@ -288,7 +308,7 @@ func (m *manager) onAssumeLeadership() error {
 }
 
 func (m *manager) onLostLeadership() error {
-	log.Infoln("Lost leadership")
+	log.Info("Lost leadership")
 	config, err := m.getCurrentState()
 	if err != nil {
 		return err
@@ -307,7 +327,7 @@ func (m *manager) doCommit() error {
 		return err
 	}
 
-	log.Infoln("Committing. Loaded snapshot. err=", err)
+	log.Info("Committing. Loaded snapshot.", "err", err)
 	if err != nil {
 		return err
 	}
@@ -318,25 +338,25 @@ func (m *manager) doCommitGroups(config globalSpec) error {
 	return m.execPlugins(config,
 		func(plugin group.Plugin, spec group.Spec) error {
 
-			log.Infoln("Committing group", spec.ID, "with spec:", spec)
+			log.Info("Committing group", spec.ID, "with spec:", spec)
 
 			_, err := plugin.CommitGroup(spec, false)
 			if err != nil {
-				log.Warningln("Error committing group:", spec.ID, "Err=", err)
+				log.Warn("Error committing group.", "groupID", spec.ID, "err", err)
 			}
 			return err
 		})
 }
 
 func (m *manager) doFreeGroups(config globalSpec) error {
-	log.Infoln("Freeing groups")
+	log.Info("Freeing groups")
 	return m.execPlugins(config,
 		func(plugin group.Plugin, spec group.Spec) error {
 
-			log.Infoln("Freeing group", spec.ID)
+			log.Info("Freeing group", "groupID", spec.ID)
 			err := plugin.FreeGroup(spec.ID)
 			if err != nil {
-				log.Warningln("Error freeing group:", spec.ID, "Err=", err)
+				log.Warn("Error freeing group", "groupID", spec.ID, "err", err)
 			}
 			return nil
 		})
@@ -350,22 +370,22 @@ func (m *manager) execPlugins(config globalSpec, work func(group.Plugin, group.S
 
 	for id, pluginSpec := range config.Groups {
 
-		log.Infoln("Processing group", id, "with plugin", pluginSpec.Plugin)
+		log.Info("Processing group", "groupID", id, "plugin", pluginSpec.Plugin)
 		name := pluginSpec.Plugin.String()
 
 		ep, has := running[name]
 		if !has {
-			log.Warningln("Plugin", name, "isn't running")
+			log.Warn("Not running", "plugin", name)
 			return err
 		}
 
 		gp, err := rpc.NewClient(ep.Address)
 		if err != nil {
-			log.Warningln("Cannot contact group", id, " at plugin", name, "endpoint=", ep.Address)
+			log.Warn("Cannot contact group", "groupID", id, "plugin", name, "endpoint", ep.Address)
 			return err
 		}
 
-		log.Debugln("exec on group", id, "plugin=", name)
+		log.Debug("exec on group", "groupID", id, "plugin", name, "V", logutil.V(100))
 
 		// spec is store in the properties
 		if pluginSpec.Properties == nil {
@@ -380,7 +400,7 @@ func (m *manager) execPlugins(config globalSpec, work func(group.Plugin, group.S
 
 		err = work(gp, spec)
 		if err != nil {
-			log.Warningln("Error from exec on plugin", err)
+			log.Warn("Error from exec on plugin", "err", err)
 			return err
 		}
 

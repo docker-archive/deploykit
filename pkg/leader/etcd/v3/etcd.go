@@ -62,8 +62,8 @@ type Store struct {
 }
 
 // NewStore returns a store for registration of leader location
-func NewStore(c *etcd.Client) Store {
-	return Store{client: c}
+func NewStore(c *etcd.Client) leader.Store {
+	return &Store{client: c}
 }
 
 const (

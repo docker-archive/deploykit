@@ -17,8 +17,8 @@ const (
 	// EnvStoreDir is the directory where the configs are stored
 	EnvStoreDir = "INFRAKIT_STORE_DIR"
 
-	// EnvURL is the location of this node
-	EnvURL = "INFRAKIT_URL"
+	// EnvID is the id for the manager node (for file backend only)
+	EnvID = "INFRAKIT_ID"
 )
 
 // BackendFileOptions contain the options for the file backend
@@ -34,37 +34,26 @@ type BackendFileOptions struct {
 
 	// ID is the id of the node
 	ID string
-
-	// LeaderLocationFile is the path to the file that stores the leader's location
-	LeaderLocationFile string
 }
 
 // DefaultBackendFileOptions is the default for the file backend
-var DefaultBackendFileOptions = Options{
-	Backend: "file",
-	Settings: types.AnyValueMust(
-		BackendFileOptions{
-			ID:                 "manager1",
-			PollInterval:       5 * time.Second,
-			LeaderFile:         run.GetEnv(EnvLeaderFile, filepath.Join(run.InfrakitHome(), "leader")),
-			StoreDir:           run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "configs")),
-			LeaderLocationFile: run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "leader.loc")),
-		},
-	),
-	Mux: &MuxConfig{
-		Listen:       ":24864",
-		URL:          run.GetEnv(EnvURL, "http://localhost:24864"),
+var DefaultBackendFileOptions = types.AnyValueMust(
+	BackendFileOptions{
+		ID:           run.GetEnv(EnvID, "manager1"),
 		PollInterval: 5 * time.Second,
+		LeaderFile:   run.GetEnv(EnvLeaderFile, filepath.Join(run.InfrakitHome(), "leader")),
+		StoreDir:     run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "configs")),
 	},
-}
+)
 
-func configFileBackends(options BackendFileOptions, managerConfig *Options, muxConfig *MuxConfig) error {
+func configFileBackends(options BackendFileOptions, managerConfig *Options) error {
 
 	leader, err := file_leader.NewDetector(options.PollInterval, options.LeaderFile, options.ID)
 	if err != nil {
 		return err
 	}
 
+	leaderStore := file_leader.NewStore(options.LeaderFile + ".loc")
 	snapshot, err := file_store.NewSnapshot(options.StoreDir, "global.config")
 	if err != nil {
 		return err
@@ -72,19 +61,8 @@ func configFileBackends(options BackendFileOptions, managerConfig *Options, muxC
 
 	if managerConfig != nil {
 		managerConfig.leader = leader
+		managerConfig.leaderStore = leaderStore
 		managerConfig.store = snapshot
 	}
-
-	if muxConfig != nil {
-
-		poller, err := file_leader.NewDetector(muxConfig.PollInterval, options.LeaderFile, options.ID)
-		if err != nil {
-			return err
-		}
-
-		muxConfig.poller = poller
-		muxConfig.store = file_leader.NewStore(options.LeaderLocationFile)
-	}
-
 	return nil
 }

@@ -23,22 +23,19 @@ type BackendEtcdOptions struct {
 }
 
 // DefaultBackendEtcdOptions contains the defaults for running etcd as backend
-var DefaultBackendEtcdOptions = Options{
-	Backend: "etcd",
-	Settings: types.AnyValueMust(
-		BackendEtcdOptions{
-			PollInterval: 5 * time.Second,
-			Options: etcd.Options{
-				RequestTimeout: 1 * time.Second,
-				Config: clientv3.Config{
-					Endpoints: []string{etcd.LocalIP() + ":2379"},
-				},
+var DefaultBackendEtcdOptions = types.AnyValueMust(
+	BackendEtcdOptions{
+		PollInterval: 5 * time.Second,
+		Options: etcd.Options{
+			RequestTimeout: 1 * time.Second,
+			Config: clientv3.Config{
+				Endpoints: []string{etcd.LocalIP() + ":2379"},
 			},
 		},
-	),
-}
+	},
+)
 
-func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options, muxConfig *MuxConfig) error {
+func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options) error {
 	if options.TLS != nil {
 		config, err := tlsconfig.Client(*options.TLS)
 		if err != nil {
@@ -54,6 +51,7 @@ func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options, muxC
 	}
 
 	leader := etcd_leader.NewDetector(options.PollInterval, etcdClient)
+	leaderStore := etcd_leader.NewStore(etcdClient)
 	snapshot, err := etcd_store.NewSnapshot(etcdClient)
 	if err != nil {
 		return err
@@ -61,13 +59,9 @@ func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options, muxC
 
 	if managerConfig != nil {
 		managerConfig.leader = leader
+		managerConfig.leaderStore = leaderStore
 		managerConfig.store = snapshot
 		managerConfig.cleanUpFunc = func() { etcdClient.Close() }
-	}
-
-	if muxConfig != nil {
-		muxConfig.poller = etcd_leader.NewDetector(muxConfig.PollInterval, etcdClient)
-		muxConfig.store = etcd_leader.NewStore(etcdClient)
 	}
 
 	return nil

@@ -43,7 +43,7 @@ func TestMuxServer(t *testing.T) {
 	T(100).Infoln("info=", info)
 
 	T(100).Infoln("Starting mux server")
-	server, err = NewServer(":9090", func() discovery.Plugins {
+	server, err = NewServer(":9090", "127.0.0.1:9090", func() discovery.Plugins {
 		return lookup
 	}, Options{})
 	require.NoError(t, err)

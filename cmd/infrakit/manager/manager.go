@@ -200,6 +200,59 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	inspect.Flags().AddFlagSet(templateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
+	// leader
+
+	leader := &cobra.Command{
+		Use:   "leader",
+		Short: "Leader returns the leadership information",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if len(args) != 0 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+			// Scan for a manager
+			pm, err := plugins().List()
+			if err != nil {
+				return err
+			}
+
+			for _, endpoint := range pm {
+				rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
+				if err == nil {
+
+					m := manager_rpc.Adapt(rpcClient)
+
+					isleader := "unknown"
+					if l, err := m.IsLeader(); err == nil {
+						if l {
+							isleader = "true"
+						} else {
+							isleader = "false"
+						}
+					} else {
+						log.Warn("error determining leader", "err", err)
+					}
+					fmt.Printf("IsLeader       : %v\n", isleader)
+
+					location := "unknown"
+					if l, err := m.LeaderLocation(); err == nil {
+						location = l.String()
+					} else {
+						log.Warn("error getting location of leader", "err", err)
+					}
+					fmt.Printf("LeaderLocation : %v\n", location)
+
+					return nil
+				}
+			}
+
+			fmt.Println("no manager found")
+			return nil
+		},
+	}
+
+	///////////////////////////////////////////////////////////////////////////////////
 	// change
 	change := &cobra.Command{
 		Use:   "change",
@@ -304,7 +357,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	change.AddCommand(changeList, changeGet)
 
-	cmd.AddCommand(commit, inspect, change)
+	cmd.AddCommand(commit, inspect, change, leader)
 
 	return cmd
 }

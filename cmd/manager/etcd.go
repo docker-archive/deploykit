@@ -61,6 +61,7 @@ func etcdEnvironment(getConfig func() config) *cobra.Command {
 		// Start the leader and storage backends
 
 		leader := etcd_leader.NewDetector(*pollInterval, etcdClient)
+		leaderStore := etcd_leader.NewStore(etcdClient)
 		snapshot, err := etcd_store.NewSnapshot(etcdClient)
 		if err != nil {
 			return err
@@ -74,6 +75,7 @@ func etcdEnvironment(getConfig func() config) *cobra.Command {
 		cfg := getConfig()
 		cfg.plugins = plugins
 		cfg.leader = leader
+		cfg.leaderStore = leaderStore
 		cfg.snapshot = snapshot
 
 		return runMain(cfg)

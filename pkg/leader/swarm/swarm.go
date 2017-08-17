@@ -47,8 +47,8 @@ type Store struct {
 }
 
 // NewStore constructs a store
-func NewStore(c docker.APIClientCloser) Store {
-	return Store{client: c}
+func NewStore(c docker.APIClientCloser) leader.Store {
+	return &Store{client: c}
 }
 
 const (
