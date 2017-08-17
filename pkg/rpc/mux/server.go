@@ -54,11 +54,7 @@ func SavePID(listen string) (string, error) {
 func NewServer(listen string, advertiseHostPort string,
 	plugins func() discovery.Plugins, options Options) (rpc_server.Stoppable, error) {
 
-	advertise, err := url.Parse(advertiseHostPort)
-	if err != nil {
-		return nil, err
-	}
-	advertise.Scheme = "http"
+	advertise := &url.URL{Host: advertiseHostPort, Scheme: "http"}
 
 	proxy := NewReverseProxy(plugins)
 	server := &graceful.Server{
