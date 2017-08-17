@@ -130,7 +130,7 @@ func (m maasPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		}
 		r, hn := ipcont(string(*spec.LogicalID), ms)
 		if !r {
-			return nil, fmt.Errorf("Invalid LogicalID (%s) you should set static IP", spec.LogicalID)
+			return nil, fmt.Errorf("Invalid LogicalID (%s) you should set static IP", *spec.LogicalID)
 		}
 		ama.Hostname = hn
 	}

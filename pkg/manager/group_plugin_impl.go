@@ -1,7 +1,6 @@
 package manager
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -26,7 +25,7 @@ func (m *manager) proxyForGroupPlugin(name string) (group.Plugin, error) {
 }
 
 func (m *manager) updateConfig(spec group.Spec) error {
-	log.Debugln("Updating config", spec)
+	log.Debug("Updating config", "spec", spec)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -53,13 +52,13 @@ func (m *manager) updateConfig(spec group.Spec) error {
 		Plugin:     plugin.Name(m.backendName),
 		Properties: any,
 	}
-	log.Debugln("Saving updated config", stored)
+	log.Debug("Saving updated config", "config", stored)
 
 	return m.snapshot.Save(stored)
 }
 
 func (m *manager) removeConfig(id group.ID) error {
-	log.Debugln("Removing config", id)
+	log.Debug("Removing config", "groupID", id)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -78,7 +77,7 @@ func (m *manager) removeConfig(id group.ID) error {
 	}
 
 	delete(stored.Groups, id)
-	log.Debugln("Saving updated config", stored)
+	log.Debug("Saving updated config", "config", stored)
 
 	return m.snapshot.Save(stored)
 }
@@ -91,7 +90,7 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 	m.backendOps <- backendOp{
 		name: "commit",
 		operation: func() error {
-			log.Infoln("Proxy CommitGroup:", grp)
+			log.Info("Proxy CommitGroup", "spec", grp)
 
 			var txnResp string
 			var txnErr error
@@ -104,7 +103,7 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 			// We first update the user's desired state first
 			if !pretend {
 				if updateErr := m.updateConfig(grp); updateErr != nil {
-					log.Warningln("Error updating", updateErr)
+					log.Warn("Error updating", "err", updateErr)
 					txnErr = updateErr
 					txnResp = "Cannot update spec. Abort"
 					return txnErr
@@ -136,7 +135,7 @@ func (m *manager) DestroyGroup(id group.ID) (err error) {
 		name: "destroy",
 		operation: func() error {
 
-			log.Infoln("Proxy DestroyGroup", id)
+			log.Info("Proxy DestroyGroup", "groupID", id)
 
 			var txnErr error
 
@@ -147,7 +146,7 @@ func (m *manager) DestroyGroup(id group.ID) (err error) {
 
 			// We first update the user's desired state first
 			if removeErr := m.removeConfig(id); removeErr != nil {
-				log.Warningln("Error updating", removeErr)
+				log.Warn("Error updating/ remove", "err", removeErr)
 				txnErr = removeErr
 				return txnErr
 			}
@@ -173,7 +172,7 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 		name: "free",
 		operation: func() error {
 
-			log.Infoln("Proxy FreeGroup", id)
+			log.Info("Proxy FreeGroup", "groupID", id)
 
 			var txnErr error
 
@@ -184,7 +183,7 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 
 			// We first update the user's desired state first
 			if removeErr := m.removeConfig(id); removeErr != nil {
-				log.Warningln("Error updating", removeErr)
+				log.Warn("Error updating / remove", "err", removeErr)
 				txnErr = removeErr
 				return txnErr
 			}

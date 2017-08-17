@@ -28,6 +28,10 @@ type testLeaderDetector struct {
 	ch    chan leader.Leadership
 }
 
+func (l *testLeaderDetector) Receive() <-chan leader.Leadership {
+	return l.ch
+}
+
 func (l *testLeaderDetector) Start() (<-chan leader.Leadership, error) {
 	l.stop = make(chan struct{})
 	l.ch = make(chan leader.Leadership)
@@ -75,7 +79,7 @@ func testEnsemble(t *testing.T,
 	st, err := server.StartPluginAtPath(filepath.Join(dir, "group-stateless"), gs)
 	require.NoError(t, err)
 
-	m, err := NewManager(disc, detector, snap, "group-stateless")
+	m, err := NewManager(disc, detector, nil, snap, "group-stateless")
 	require.NoError(t, err)
 
 	return m, st

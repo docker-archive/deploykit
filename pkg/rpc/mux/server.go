@@ -72,6 +72,9 @@ func NewServer(listen string, advertise *url.URL,
 	if leaderChan != nil && leaderStore != nil && advertiseURL != nil {
 		go func() {
 			log.Debug("Starting location updater", "url", *advertiseURL, "V", logutil.V(100))
+
+			var last *url.URL // track changes to avoid excessive updates
+			isLeader := false // update only when status changes
 			for {
 				select {
 				case <-leaderStop:
@@ -79,17 +82,25 @@ func NewServer(listen string, advertise *url.URL,
 					return
 				case l := <-leaderChan:
 					if l.Status == leader.Leader {
-						leaderStore.UpdateLocation(advertiseURL)
-						log.Debug("Updated leader location", "advertise", *advertiseURL, "V", logutil.V(100))
+						if !isLeader {
+							leaderStore.UpdateLocation(advertiseURL)
+							log.Debug("Updated leader location", "advertise", *advertiseURL, "V", logutil.V(100))
+						}
 						proxy.ForwardTo(nil)
+						last = nil
+						isLeader = true
 					} else {
 						// Get the forwarding address
 						f, err := leaderStore.GetLocation()
-						log.Debug("Lost leadership. updating forwarding URL", "url", f, "err", err, "V", logutil.V(100))
-						if err == nil && f != nil && f.String() != advertiseURL.String() {
-							log.Debug("Forwarding traffic to new leader", "url", f, "V", logutil.V(100))
-							proxy.ForwardTo(f)
+						if last == nil || f.String() != last.String() {
+							log.Debug("Lost leadership. updating forwarding URL", "url", f, "err", err, "V", logutil.V(100))
+							if err == nil && f != nil && f.String() != advertiseURL.String() {
+								log.Debug("Forwarding traffic to new leader", "url", f, "V", logutil.V(100))
+								proxy.ForwardTo(f)
+								last = f
+							}
 						}
+						isLeader = false
 					}
 				}
 			}

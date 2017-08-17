@@ -80,6 +80,9 @@ func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	return
 }
 
+// We need to rewrite the request to change the host. This is so that
+// some CDNs that checks for the Host header won't barf.
+// We modify this only after the default Director has done its thing.
 func defaultDirector(u *url.URL) func(*http.Request) {
 	targetQuery := u.RawQuery
 	return func(req *http.Request) {
@@ -102,9 +105,6 @@ func defaultDirector(u *url.URL) func(*http.Request) {
 func (rp *ReverseProxy) forwardHTTP(resp http.ResponseWriter, req *http.Request) {
 	log.Debug("forwarding traffic", "url", rp.forward, "V", logutil.V(100), "req", req)
 	reversep := httputil.NewSingleHostReverseProxy(rp.forward)
-	// We need to rewrite the request to change the host. This is so that
-	// some CDNs that checks for the Host header won't barf.
-	// We modify this only after the default Director has done its thing.
 	reversep.Director = defaultDirector(rp.forward)
 	handler := &loggingHandler{handler: reversep}
 	handler.ServeHTTP(resp, req)
@@ -238,9 +238,11 @@ func (rp *ReverseProxy) serveHTTPLocal(resp http.ResponseWriter, req *http.Reque
 func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, prefix string) {
 	var socketPath string
 
-	defer func() {
-		log.Debug("reverse proxy lookup", "url", u, "socket", socketPath, "prefix", prefix)
-	}()
+	log.Debug("reverse proxy lookup", "url", u, "socket", socketPath, "prefix", prefix)
+
+	// defer func() {
+	// log.Debug("reverse proxy lookup", "url", u, "socket", socketPath, "prefix", prefix)
+	// }()
 
 	reversep := httputil.NewSingleHostReverseProxy(u)
 	socketPath, prefix = rp.socketPath(u)
@@ -277,27 +279,7 @@ func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, pre
 		}
 
 	}
-
-	// We need to rewrite the request to change the host. This is so that
-	// some CDNs that checks for the Host header won't barf.
-	// We modify this only after the default Director has done its thing.
 	reversep.Director = defaultDirector(u)
-	// targetQuery := u.RawQuery
-	// reversep.Director = func(req *http.Request) {
-	// 	req.URL.Scheme = u.Scheme
-	// 	req.URL.Host = u.Host
-	// 	if targetQuery == "" || req.URL.RawQuery == "" {
-	// 		req.URL.RawQuery = targetQuery + req.URL.RawQuery
-	// 	} else {
-	// 		req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
-	// 	}
-	// 	if _, ok := req.Header["User-Agent"]; !ok {
-	// 		// explicitly disable User-Agent so it's not set to default value
-	// 		req.Header.Set("User-Agent", "")
-	// 	}
-	// 	req.Header.Set("Host", u.Host)
-	// 	req.Host = u.Host
-	// }
 	proxy = reversep
 	return
 }
