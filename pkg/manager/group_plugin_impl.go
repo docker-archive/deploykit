@@ -116,7 +116,6 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 	}
 
 	r := <-resultChan
-
 	if v, has := r[0].(string); has {
 		resp = v
 	}
@@ -197,5 +196,83 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 	if v, has := r[0].(error); has && v != nil {
 		err = v
 	}
+	return
+}
+
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) DestroyInstances(id group.ID, instances []instance.ID) (err error) {
+
+	resultChan := make(chan []interface{})
+
+	m.backendOps <- backendOp{
+		name: "destroyInstances",
+		operation: func() error {
+
+			log.Info("Proxy DestroyInstances", "groupID", id, "instances", instances)
+
+			var txnErr error
+
+			// Always send a response so we don't block forever
+			defer func() {
+				resultChan <- []interface{}{txnErr}
+			}()
+
+			txnErr = m.Plugin.DestroyInstances(id, instances)
+			return txnErr
+		},
+	}
+
+	r := <-resultChan
+	if v, has := r[0].(error); has && v != nil {
+		err = v
+	}
+	return
+}
+
+func (m *manager) loadGroupSpec(id group.ID) (found group.Spec, err error) {
+	// load the config
+	config := globalSpec{}
+
+	// load the latest version -- assumption here is that it's been persisted already.
+	err = m.snapshot.Load(&config)
+	if err != nil {
+		log.Warn("Error loading config", "err", err)
+		return
+	}
+	for _, g := range config {
+		if g.ID == id {
+			found = g
+			return
+		}
+	}
+	err = fmt.Errorf("group %v not found", id)
+	return
+}
+
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) SetSize(id group.ID, size int) error {
+	spec, err := m.loadGroupSpec(id)
+	if err != nil {
+		return err
+	}
+	if s := len(spec.Allocation.LogicalIDs); s > 0 {
+		return fmt.Errorf("cannot set size when logical ids are explicitly set")
+	}
+	spec.Allocation.Size = size
+	_, err := m.CommitGroup(spec, false)
+	return err
+}
+
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) Size(id group.ID) (size int, err error) {
+	spec, err := m.loadGroupSpec(id)
+	if err != nil {
+		return err
+	}
+	if s := len(spec.Allocation.LogicalIDs); s > 0 {
+		size = s
+		return
+	}
+	size = spec.Allocation.Size
 	return
 }

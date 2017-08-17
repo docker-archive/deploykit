@@ -10,7 +10,7 @@ func TestObject(t *testing.T) {
 
 	text := `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -32,7 +32,7 @@ func TestObject(t *testing.T) {
          volume/size: properties/sizeGb
 
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     uid: disk1-1234
     name: disk1

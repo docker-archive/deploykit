@@ -3,6 +3,7 @@ package group
 import (
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
@@ -42,7 +43,7 @@ func (c client) FreeGroup(id group.ID) error {
 	if err != nil {
 		return err
 	}
-	resp.OK = true
+	resp.ID = id
 	return nil
 }
 
@@ -60,7 +61,7 @@ func (c client) DestroyGroup(id group.ID) error {
 	if err != nil {
 		return err
 	}
-	resp.OK = true
+	resp.ID = id
 	return nil
 }
 
@@ -69,4 +70,33 @@ func (c client) InspectGroups() ([]group.Spec, error) {
 	resp := InspectGroupsResponse{}
 	err := c.client.Call("Group.InspectGroups", req, &resp)
 	return resp.Groups, err
+}
+
+func (c client) DestroyInstances(id group.ID, instances []instance.ID) error {
+	req := DestroyInstancesRequest{
+		ID:        id,
+		Instances: instances,
+	}
+	resp := DestroyInstancesResponse{}
+	return c.client.Call("Group.DestroyInstances", req, &resp)
+}
+
+func (c client) Size(id group.ID) (int, error) {
+	req := SizeRequest{
+		ID: id,
+	}
+	resp := SizeResponse{}
+	err := c.client.Call("Group.Size", req, &resp)
+	return resp.Size, err
+}
+
+func (c client) SetSize(id group.ID, size int) error {
+	req := SetSizeRequest{
+		ID:   id,
+		Size: size,
+	}
+	resp := SetSizeResponse{
+		ID: id,
+	}
+	return c.client.Call("Group.SetSize", req, &resp)
 }

@@ -12,8 +12,8 @@ type Spec struct {
 	// Kind is the category of the resources and kind can have types  -- e.g. instance-aws/ec2-instance
 	Kind string `json:"kind"`
 
-	// SpiVersion is the name of the interface and version - instance/v0.1.0
-	SpiVersion string `json:"spiVersion"`
+	// Version is the name of the interface and version - instance/v0.1.0
+	Version string `json:"version"`
 
 	// Metadata is metadata / useful information about object
 	Metadata Metadata `json:"metadata"`
@@ -39,8 +39,8 @@ func (s Spec) Validate() error {
 	if s.Kind == "" {
 		return errMissingAttribute("kind")
 	}
-	if s.SpiVersion == "" {
-		return errMissingAttribute("spiVersion")
+	if s.Version == "" {
+		return errMissingAttribute("version")
 	}
 	if s.Metadata.Name == "" {
 		return errMissingAttribute("metadata.name")

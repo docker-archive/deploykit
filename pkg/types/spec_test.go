@@ -11,7 +11,7 @@ func TestEncodeDecodeSpec(t *testing.T) {
 
 	spec := `
 kind:        instance-aws/ec2-instance
-spiVersion:   instance/v0.1.0
+version:   instance/v0.1.0
 metadata:
   name: host1
   tags:
@@ -29,8 +29,8 @@ options:
 	require.NoError(t, yaml.Unmarshal([]byte(spec), &s))
 
 	expected := Spec{
-		Kind:       "instance-aws/ec2-instance",
-		SpiVersion: "instance/v0.1.0",
+		Kind:    "instance-aws/ec2-instance",
+		Version: "instance/v0.1.0",
 		Metadata: Metadata{
 			Name: "host1",
 			Tags: map[string]string{
@@ -54,7 +54,7 @@ options:
 	s.Kind = ""
 	require.Error(t, s.Validate())
 
-	s.SpiVersion = ""
+	s.Version = ""
 	require.Error(t, s.Validate())
 }
 
@@ -62,7 +62,7 @@ func TestEncodeDecodeObject(t *testing.T) {
 
 	object := `
 kind:        instance-aws/ec2-instance
-spiVersion:   instance/v0.1.0
+version:   instance/v0.1.0
 metadata:
   uid : u-12134
   name: host1
@@ -95,8 +95,8 @@ state:
 
 	expected := Object{
 		Spec: Spec{
-			Kind:       "instance-aws/ec2-instance",
-			SpiVersion: "instance/v0.1.0",
+			Kind:    "instance-aws/ec2-instance",
+			Version: "instance/v0.1.0",
 			Metadata: Metadata{
 				Identity: &Identity{
 					UID: "u-12134",
@@ -136,7 +136,7 @@ state:
 
 	require.Equal(t, AnyValueMust(expected), AnyValueMust(o))
 	require.Equal(t, "u-12134", o.Spec.Metadata.Identity.UID)
-	require.Equal(t, "instance/v0.1.0", o.Spec.SpiVersion)
+	require.Equal(t, "instance/v0.1.0", o.Spec.Version)
 
 	require.NoError(t, o.Validate())
 

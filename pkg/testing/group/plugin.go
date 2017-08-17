@@ -2,6 +2,7 @@ package group
 
 import (
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 // Plugin implements group.Plugin
@@ -21,6 +22,15 @@ type Plugin struct {
 
 	// DoInspectGroups implements InspectGroups
 	DoInspectGroups func() ([]group.Spec, error)
+
+	// DoDestroyInstances implements DestroyInstances
+	DoDestroyInstances func(id group.ID, instances []instance.ID) error
+
+	// DoSize implements Size
+	DoSize func(id group.ID) (int, error)
+
+	// DoSetSize implements SetSize
+	DoSetSize func(id group.ID, size int) error
 }
 
 // CommitGroup commits spec for a group
@@ -46,4 +56,19 @@ func (t *Plugin) DestroyGroup(id group.ID) error {
 // InspectGroups returns the specs of all groups known
 func (t *Plugin) InspectGroups() ([]group.Spec, error) {
 	return t.DoInspectGroups()
+}
+
+// DestroyInstances destroys instances
+func (t *Plugin) DestroyInstances(id group.ID, instances []instance.ID) error {
+	return t.DoDestroyInstances(id, instances)
+}
+
+// DestroyInstances destroys instances
+func (t *Plugin) Size(id group.ID) (int, error) {
+	return t.DoSize(id)
+}
+
+// DestroyInstances destroys instances
+func (t *Plugin) SetSize(id group.ID, size int) error {
+	return t.DoSetSize(id, size)
 }

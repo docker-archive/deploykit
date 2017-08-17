@@ -5,6 +5,7 @@ package group
 
 import (
 	group "github.com/docker/infrakit/pkg/spi/group"
+	instance "github.com/docker/infrakit/pkg/spi/instance"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -61,6 +62,16 @@ func (_mr *_MockPluginRecorder) DestroyGroup(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DestroyGroup", arg0)
 }
 
+func (_m *MockPlugin) DestroyInstances(_param0 group.ID, _param1 []instance.ID) error {
+	ret := _m.ctrl.Call(_m, "DestroyInstances", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockPluginRecorder) DestroyInstances(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DestroyInstances", arg0, arg1)
+}
+
 func (_m *MockPlugin) FreeGroup(_param0 group.ID) error {
 	ret := _m.ctrl.Call(_m, "FreeGroup", _param0)
 	ret0, _ := ret[0].(error)
@@ -80,4 +91,25 @@ func (_m *MockPlugin) InspectGroups() ([]group.Spec, error) {
 
 func (_mr *_MockPluginRecorder) InspectGroups() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InspectGroups")
+}
+
+func (_m *MockPlugin) SetSize(_param0 group.ID, _param1 int) error {
+	ret := _m.ctrl.Call(_m, "SetSize", _param0, _param1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockPluginRecorder) SetSize(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetSize", arg0, arg1)
+}
+
+func (_m *MockPlugin) Size(_param0 group.ID) (int, error) {
+	ret := _m.ctrl.Call(_m, "Size", _param0)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockPluginRecorder) Size(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Size", arg0)
 }
