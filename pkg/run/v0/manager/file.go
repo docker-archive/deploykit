@@ -17,8 +17,8 @@ const (
 	// EnvStoreDir is the directory where the configs are stored
 	EnvStoreDir = "INFRAKIT_STORE_DIR"
 
-	// EnvURL is the location of this node
-	EnvURL = "INFRAKIT_URL"
+	// EnvID is the id for the manager node (for file backend only)
+	EnvID = "INFRAKIT_ID"
 )
 
 // BackendFileOptions contain the options for the file backend
@@ -39,7 +39,7 @@ type BackendFileOptions struct {
 // DefaultBackendFileOptions is the default for the file backend
 var DefaultBackendFileOptions = types.AnyValueMust(
 	BackendFileOptions{
-		ID:           "manager1",
+		ID:           run.GetEnv(EnvID, "manager1"),
 		PollInterval: 5 * time.Second,
 		LeaderFile:   run.GetEnv(EnvLeaderFile, filepath.Join(run.InfrakitHome(), "leader")),
 		StoreDir:     run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "configs")),

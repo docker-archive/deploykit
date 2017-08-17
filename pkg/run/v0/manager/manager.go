@@ -28,7 +28,13 @@ const (
 	LookupName = "group"
 
 	// EnvOptionsBackend is the environment variable to use to set the default value of Options.Backend
-	EnvOptionsBackend = "INFRAKIT_MANAGER_OPTIONS_BACKEND"
+	EnvOptionsBackend = "INFRAKIT_MANAGER_BACKEND"
+
+	// EnvMuxListen is the listen string (:24864)
+	EnvMuxListen = "INFRAKIT_MUX_LISTEN"
+
+	// EnvURL is the location of this node (http://127.0.0.1:24864)
+	EnvURL = "INFRAKIT_URL"
 )
 
 var (
@@ -81,7 +87,7 @@ func defaultOptions() (options Options) {
 	options = Options{
 		BackendName: plugin.Name("group-stateless"),
 		Mux: &MuxConfig{
-			Listen: ":24864",
+			Listen: run.GetEnv(EnvMuxListen, ":24864"),
 			URL:    run.GetEnv(EnvURL, "http://localhost:24864"),
 		},
 	}

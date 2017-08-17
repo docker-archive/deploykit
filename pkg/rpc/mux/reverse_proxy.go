@@ -9,8 +9,10 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/event"
@@ -23,6 +25,10 @@ import (
 type ReverseProxy struct {
 	http.Handler
 	plugins func() discovery.Plugins
+
+	// if this is nil, consider this is local.  If it's not nil, then redirect to this url instead
+	forward     *url.URL
+	forwardLock sync.Mutex
 }
 
 // NewReverseProxy creates a mux reverse proxy
@@ -31,6 +37,13 @@ func NewReverseProxy(plugins func() discovery.Plugins) *ReverseProxy {
 		plugins: plugins,
 	}
 	return rp
+}
+
+// ForwardTo sends the traffic to this url (host:port) instead of local plugins
+func (rp *ReverseProxy) ForwardTo(u *url.URL) {
+	rp.forwardLock.Lock()
+	defer rp.forwardLock.Unlock()
+	rp.forward = u
 }
 
 func (rp *ReverseProxy) listPlugins(resp http.ResponseWriter, req *http.Request, leader bool) {
@@ -59,11 +72,50 @@ func (rp *ReverseProxy) listPlugins(resp http.ResponseWriter, req *http.Request,
 
 // ServeHTTP implements HTTP handler
 func (rp *ReverseProxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	if rp.forward != nil {
+		rp.forwardHTTP(resp, req)
+		return
+	}
+	rp.serveHTTPLocal(resp, req)
+	return
+}
 
+func defaultDirector(u *url.URL) func(*http.Request) {
+	targetQuery := u.RawQuery
+	return func(req *http.Request) {
+		req.URL.Scheme = u.Scheme
+		req.URL.Host = u.Host
+		if targetQuery == "" || req.URL.RawQuery == "" {
+			req.URL.RawQuery = targetQuery + req.URL.RawQuery
+		} else {
+			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
+		}
+		if _, ok := req.Header["User-Agent"]; !ok {
+			// explicitly disable User-Agent so it's not set to default value
+			req.Header.Set("User-Agent", "")
+		}
+		req.Header.Set("Host", u.Host)
+		req.Host = u.Host
+	}
+}
+
+func (rp *ReverseProxy) forwardHTTP(resp http.ResponseWriter, req *http.Request) {
+	log.Debug("forwarding traffic", "url", rp.forward, "V", logutil.V(100), "req", req)
+	reversep := httputil.NewSingleHostReverseProxy(rp.forward)
+	// We need to rewrite the request to change the host. This is so that
+	// some CDNs that checks for the Host header won't barf.
+	// We modify this only after the default Director has done its thing.
+	reversep.Director = defaultDirector(rp.forward)
+	handler := &loggingHandler{handler: reversep}
+	handler.ServeHTTP(resp, req)
+	return
+}
+
+// serves HTTP traffic to local resources (on the same node)
+func (rp *ReverseProxy) serveHTTPLocal(resp http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/" {
 		switch req.Method {
 		case http.MethodOptions:
-
 			leader := false
 			if manager, err := manager_discovery.Locate(rp.plugins); err == nil {
 				if l, err := manager.IsLeader(); err == nil {
@@ -229,22 +281,23 @@ func (rp *ReverseProxy) reverseProxyHandler(u *url.URL) (proxy http.Handler, pre
 	// We need to rewrite the request to change the host. This is so that
 	// some CDNs that checks for the Host header won't barf.
 	// We modify this only after the default Director has done its thing.
-	targetQuery := u.RawQuery
-	reversep.Director = func(req *http.Request) {
-		req.URL.Scheme = u.Scheme
-		req.URL.Host = u.Host
-		if targetQuery == "" || req.URL.RawQuery == "" {
-			req.URL.RawQuery = targetQuery + req.URL.RawQuery
-		} else {
-			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
-		}
-		if _, ok := req.Header["User-Agent"]; !ok {
-			// explicitly disable User-Agent so it's not set to default value
-			req.Header.Set("User-Agent", "")
-		}
-		req.Header.Set("Host", u.Host)
-		req.Host = u.Host
-	}
+	reversep.Director = defaultDirector(u)
+	// targetQuery := u.RawQuery
+	// reversep.Director = func(req *http.Request) {
+	// 	req.URL.Scheme = u.Scheme
+	// 	req.URL.Host = u.Host
+	// 	if targetQuery == "" || req.URL.RawQuery == "" {
+	// 		req.URL.RawQuery = targetQuery + req.URL.RawQuery
+	// 	} else {
+	// 		req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
+	// 	}
+	// 	if _, ok := req.Header["User-Agent"]; !ok {
+	// 		// explicitly disable User-Agent so it's not set to default value
+	// 		req.Header.Set("User-Agent", "")
+	// 	}
+	// 	req.Header.Set("Host", u.Host)
+	// 	req.Host = u.Host
+	// }
 	proxy = reversep
 	return
 }
