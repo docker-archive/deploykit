@@ -1,6 +1,6 @@
 # Group plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/group/* 98638b90e25c24c9c750b61d8a288ee332977214 -->
+<!-- SOURCE-CHECKSUM pkg/spi/group/* a6d8f72dcc8a12031839fa737631c6bfaa6af355 -->
 
 ## API
 
@@ -138,3 +138,81 @@ Parameters: None
 
 Fields:
 - `Groups`: An array of [Group Specs](types.md#group-spec)
+
+### Method `Group.DestroyInstances`
+Destroy instances identified from the given group.  Returns error if any of the given
+are not found in the group or if the destroy fails.
+
+#### Request
+```json
+{
+  "ID" : "group_id",
+  "Instances" : [
+     "instance-id1",
+     "instance-id2",
+     "instance-id3"
+  ]
+}
+```
+
+Parameters: None
+
+Fields:
+- `ID`: The group id.
+- `Instances` : An array of Instance IDs
+
+#### Response
+```json
+{
+  "ID": "group_id"
+}
+```
+
+### Method `Group.Size`
+Returns the desired / target size of the group.  This may not match the size of
+the list from DescribeGroup()
+
+#### Request
+```json
+{
+  "ID" : "group_id"
+}
+```
+
+Parameters: None
+
+Fields:
+- `ID`: The group id.
+
+#### Response
+```json
+{
+  "ID": "group_id"
+  "Size": 100
+}
+```
+
+### Method `Group.SetSize`
+Sets the desired / target size of the group.  This is the same as editing the config
+and call commit.
+
+#### Request
+```json
+{
+  "ID" : "group_id",
+  "Size" : 100
+}
+```
+
+Parameters: None
+
+Fields:
+- `ID`: The group id.
+- `Size`: The group target size.
+
+#### Response
+```json
+{
+  "ID" : "group_id"
+}
+```
