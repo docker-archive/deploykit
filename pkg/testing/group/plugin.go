@@ -63,12 +63,12 @@ func (t *Plugin) DestroyInstances(id group.ID, instances []instance.ID) error {
 	return t.DoDestroyInstances(id, instances)
 }
 
-// DestroyInstances destroys instances
+// Size returns the target size
 func (t *Plugin) Size(id group.ID) (int, error) {
 	return t.DoSize(id)
 }
 
-// DestroyInstances destroys instances
+// SetSize sets the target size
 func (t *Plugin) SetSize(id group.ID, size int) error {
 	return t.DoSetSize(id, size)
 }
