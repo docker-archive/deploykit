@@ -15,7 +15,7 @@ func TestObject(t *testing.T) {
 
 	text := `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -37,7 +37,7 @@ func TestObject(t *testing.T) {
          volume/size: properties/sizeGb
 
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk1
     tags:
@@ -100,7 +100,7 @@ func TestObjectNested(t *testing.T) {
 
 	text := `
 - kind:        group
-  spiVersion:   group/v0.1.0
+  version:   group/v0.1.0
   metadata:
     name: managers
     tags:
@@ -109,7 +109,7 @@ func TestObjectNested(t *testing.T) {
   properties:
     instance:
       kind:        instance-aws/ec2-instance
-      spiVersion:   instance/v0.1.0
+      version:   instance/v0.1.0
       metadata:
         name: manager-node
         tags:
@@ -139,7 +139,7 @@ func TestObjectNested(t *testing.T) {
 
     flavor:
       kind:        flavor-swarm/manager
-      spiVersion:   flavor/v0.1.0
+      version:   flavor/v0.1.0
       metadata:
         name: swarm-manager
         tags:
@@ -150,7 +150,7 @@ func TestObjectNested(t *testing.T) {
           region: us-west-1
           stack:  test
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk1
     tags:
@@ -164,7 +164,7 @@ func TestObjectNested(t *testing.T) {
     region: us-west-1
     stack:  test
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk2
     tags:
@@ -178,7 +178,7 @@ func TestObjectNested(t *testing.T) {
     region: us-west-1
     stack:  test
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk3
     tags:

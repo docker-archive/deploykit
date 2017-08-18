@@ -39,7 +39,7 @@ func TestPointer(t *testing.T) {
 }`, any.String())
 
 	text := `class:        instance-aws/ec2-instance
-spiVersion:   instance/v0.1.0
+version:   instance/v0.1.0
 metadata:
   uid : u-12134
   name: host1

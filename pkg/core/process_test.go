@@ -109,7 +109,7 @@ func TestRenderProperties(t *testing.T) {
 	// Case - no template, just properties. Note the escapes here.
 	testRenderProperties(t, `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -159,7 +159,7 @@ func TestRenderProperties(t *testing.T) {
 	// Case - has template.  No properties
 	testRenderProperties(t, `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -190,7 +190,7 @@ func TestRenderProperties(t *testing.T) {
 	// Case - has template, with properties override
 	testRenderProperties(t, `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -233,7 +233,7 @@ func TestProcess(t *testing.T) {
 
 	text := `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: workers
     tags:
