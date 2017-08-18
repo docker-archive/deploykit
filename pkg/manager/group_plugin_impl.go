@@ -1,9 +1,13 @@
 package manager
 
 import (
+	"fmt"
+
 	"github.com/docker/infrakit/pkg/plugin"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -239,10 +243,14 @@ func (m *manager) loadGroupSpec(id group.ID) (found group.Spec, err error) {
 		log.Warn("Error loading config", "err", err)
 		return
 	}
-	for _, g := range config {
-		if g.ID == id {
-			found = g
-			return
+	for gid, g := range config.Groups {
+		if gid == id {
+			spec := group.Spec{}
+			err = g.Properties.Decode(&spec)
+			if err != nil {
+				return
+			}
+			return spec, nil
 		}
 	}
 	err = fmt.Errorf("group %v not found", id)
@@ -255,11 +263,16 @@ func (m *manager) SetSize(id group.ID, size int) error {
 	if err != nil {
 		return err
 	}
-	if s := len(spec.Allocation.LogicalIDs); s > 0 {
+	parsed, err := group_types.ParseProperties(spec)
+	if err != nil {
+		return err
+	}
+	if s := len(parsed.Allocation.LogicalIDs); s > 0 {
 		return fmt.Errorf("cannot set size when logical ids are explicitly set")
 	}
-	spec.Allocation.Size = size
-	_, err := m.CommitGroup(spec, false)
+	parsed.Allocation.Size = uint(size)
+	spec.Properties = types.AnyValueMust(parsed)
+	_, err = m.CommitGroup(spec, false)
 	return err
 }
 
@@ -267,12 +280,15 @@ func (m *manager) SetSize(id group.ID, size int) error {
 func (m *manager) Size(id group.ID) (size int, err error) {
 	spec, err := m.loadGroupSpec(id)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	if s := len(spec.Allocation.LogicalIDs); s > 0 {
+	parsed, err := group_types.ParseProperties(spec)
+	if err != nil {
+		return 0, err
+	}
+	if s := len(parsed.Allocation.LogicalIDs); s > 0 {
 		size = s
-		return
+		return size, nil
 	}
-	size = spec.Allocation.Size
-	return
+	return int(parsed.Allocation.Size), nil
 }

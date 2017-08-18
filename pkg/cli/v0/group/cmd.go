@@ -20,6 +20,9 @@ func init() {
 			Commit,
 			Free,
 			Destroy,
+			Size,
+			SetSize,
+			DestroyInstances,
 		})
 }
 

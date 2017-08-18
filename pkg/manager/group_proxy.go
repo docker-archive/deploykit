@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 // newProxy returns a plugin interface.  The proxy is late-binding in that
@@ -68,6 +69,29 @@ func (c *proxy) DestroyGroup(id group.ID) (err error) {
 func (c *proxy) InspectGroups() (specs []group.Spec, err error) {
 	err = c.run(func(g group.Plugin) error {
 		specs, err = g.InspectGroups()
+		return err
+	})
+	return
+}
+
+func (c *proxy) DestroyInstances(id group.ID, instances []instance.ID) (err error) {
+	err = c.run(func(g group.Plugin) error {
+		return g.DestroyInstances(id, instances)
+	})
+	return
+}
+
+func (c *proxy) Size(id group.ID) (size int, err error) {
+	err = c.run(func(g group.Plugin) error {
+		size, err = g.Size(id)
+		return err
+	})
+	return
+}
+
+func (c *proxy) SetSize(id group.ID, size int) (err error) {
+	err = c.run(func(g group.Plugin) error {
+		err = g.SetSize(id, size)
 		return err
 	})
 	return
