@@ -42,8 +42,8 @@ func TestControllerStartStop(t *testing.T) {
 	}
 
 	spec := types.Spec{
-		Kind:       "ingress-controller",
-		SpiVersion: "0.1",
+		Kind:    "ingress-controller",
+		Version: "0.1",
 		Metadata: types.Metadata{
 			Name: "ingress-controller",
 		},
