@@ -28,18 +28,22 @@ type Controller struct {
 	DoFree func(metadata *types.Metadata) ([]types.Object, error)
 }
 
+// Plan implements pkg/controller/Controller.Plan
 func (t *Controller) Plan(operation controller.Operation, spec types.Spec) (types.Object, controller.Plan, error) {
 	return t.DoPlan(operation, spec)
 }
 
+// Commit implements pkg/controller/Controller.Commit
 func (t *Controller) Commit(operation controller.Operation, spec types.Spec) (types.Object, error) {
 	return t.DoCommit(operation, spec)
 }
 
+// Describe implements pkg/controller/Controller.Describe
 func (t *Controller) Describe(metadata *types.Metadata) ([]types.Object, error) {
 	return t.DoDescribe(metadata)
 }
 
+// Free implements pkg/controller/Controller.Free
 func (t *Controller) Free(metadata *types.Metadata) ([]types.Object, error) {
 	return t.DoFree(metadata)
 
