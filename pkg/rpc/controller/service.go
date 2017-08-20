@@ -39,7 +39,6 @@ func (c *Controller) ImplementedInterface() spi.InterfaceSpec {
 // Types returns the types exposed by this kind of RPC service
 func (c *Controller) Types() []string {
 	m, err := c.subcontrollers()
-	log.Warn(">>>>>>>>> TYPES", "m", m, "err", err)
 	if err != nil {
 		return nil
 	}

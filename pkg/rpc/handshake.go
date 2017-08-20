@@ -28,7 +28,7 @@ type TypesResponse struct {
 }
 
 // Handshake is a simple RPC object for doing handshake
-type Handshake map[spi.InterfaceSpec][]string
+type Handshake map[spi.InterfaceSpec]func() []string
 
 // Implements responds to a request for the supported plugin interfaces.
 func (h Handshake) Implements(_ *http.Request, req *ImplementsRequest, resp *ImplementsResponse) error {
@@ -44,7 +44,7 @@ func (h Handshake) Implements(_ *http.Request, req *ImplementsRequest, resp *Imp
 func (h Handshake) Types(_ *http.Request, req *TypesRequest, resp *TypesResponse) error {
 	m := map[InterfaceSpec][]string{}
 	for k, v := range h {
-		m[InterfaceSpec(k.Encode())] = v
+		m[InterfaceSpec(k.Encode())] = v()
 	}
 	resp.Types = m
 	return nil

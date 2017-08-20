@@ -102,10 +102,10 @@ func startAtPath(listen []string, discoverPath string,
 
 	targets := append([]VersionedInterface{receiver}, more...)
 
-	interfaces := map[spi.InterfaceSpec][]string{}
+	interfaces := map[spi.InterfaceSpec]func() []string{}
 	for _, t := range targets {
 
-		interfaces[t.ImplementedInterface()] = t.Types()
+		interfaces[t.ImplementedInterface()] = t.Types
 
 		if err := server.RegisterService(t, ""); err != nil {
 			return nil, err
