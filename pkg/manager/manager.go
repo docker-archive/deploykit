@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -44,6 +45,8 @@ type Manager interface {
 // Backend is the admin / server interface
 type Backend interface {
 	group.Plugin
+
+	GroupControllers() (map[string]controller.Controller, error)
 
 	Manager
 
@@ -91,12 +94,12 @@ func NewManager(
 		snapshot:    snapshot,
 	}
 
-	gp, err := m.proxyForGroupPlugin(backendName)
+	var err error
+	m.Plugin, err = m.proxyForGroupPlugin(backendName)
 	if err != nil {
 		return nil, err
 	}
 
-	m.Plugin = gp
 	return m, nil
 }
 

@@ -64,7 +64,7 @@ func TestEncodeDecodeObject(t *testing.T) {
 kind:        instance-aws/ec2-instance
 version:   instance/v0.1.0
 metadata:
-  uid : u-12134
+  id : u-12134
   name: host1
   tags:
     role:    worker
@@ -81,7 +81,7 @@ depends:
     - kind: instance-aws/ebs-volume
       name: /var/lib/docker
       bind:
-         volume/id : Spec/Metadata/Identity/UID
+         volume/id : Spec/Metadata/Identity/ID
 
 state:
     instanceType: c2xlarge
@@ -99,7 +99,7 @@ state:
 			Version: "instance/v0.1.0",
 			Metadata: Metadata{
 				Identity: &Identity{
-					UID: "u-12134",
+					ID: "u-12134",
 				},
 				Name: "host1",
 				Tags: map[string]string{
@@ -122,7 +122,7 @@ state:
 					Kind: "instance-aws/ebs-volume",
 					Name: "/var/lib/docker",
 					Bind: map[string]*Pointer{
-						"volume/id": PointerFromString("Spec/Metadata/Identity/UID"),
+						"volume/id": PointerFromString("Spec/Metadata/Identity/ID"),
 					},
 				},
 			},
@@ -135,11 +135,11 @@ state:
 	}
 
 	require.Equal(t, AnyValueMust(expected), AnyValueMust(o))
-	require.Equal(t, "u-12134", o.Spec.Metadata.Identity.UID)
+	require.Equal(t, "u-12134", o.Spec.Metadata.Identity.ID)
 	require.Equal(t, "instance/v0.1.0", o.Spec.Version)
 
 	require.NoError(t, o.Validate())
 
-	o.Metadata.Identity.UID = ""
+	o.Metadata.Identity.ID = ""
 	require.Error(t, o.Validate())
 }

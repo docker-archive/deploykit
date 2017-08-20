@@ -65,7 +65,7 @@ func TestControllerStartStop(t *testing.T) {
 	stateObject := controller.object()
 	require.NotNil(t, stateObject)
 	require.NoError(t, stateObject.Validate())
-	require.Equal(t, "ingress-singleton", stateObject.Metadata.Identity.UID)
+	require.Equal(t, "ingress-singleton", stateObject.Metadata.Identity.ID)
 	require.Equal(t, "ingress-controller", stateObject.Metadata.Name)
 
 	// initial state

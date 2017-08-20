@@ -3,9 +3,11 @@ package run
 import (
 	"fmt"
 
+	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
+	controller_rpc "github.com/docker/infrakit/pkg/rpc/controller"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
@@ -31,14 +33,16 @@ var log = logutil.New("module", "run")
 type PluginCode int
 
 const (
+	// Manager is the type code for Manager
+	Manager PluginCode = iota
+	// Controller is the type code for Controller implementation
+	Controller
 	//Instance is the type code for Instance SPI implementation
-	Instance PluginCode = iota
+	Instance
 	// Flavor is the type code for Flavor SPI implementation
 	Flavor
 	// Group is the type code for Group SPI implementation
 	Group
-	// Manager is the type code for Manager
-	Manager
 	// Metadata is the type code for Metadata SPI implementation
 	Metadata
 	// MetadataUpdatable is the type code for updatable Metadata SPI implementation
@@ -65,9 +69,18 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 		case Manager:
 			log.Debug("manager_rpc.PluginServer", "p", p)
 			plugins = append(plugins, manager_rpc.PluginServer(p.(manager.Manager)))
-		case Group:
-			log.Debug("group_rpc.PluginServer", "p", p)
-			plugins = append(plugins, group_rpc.PluginServer(p.(group.Plugin)))
+		case Controller:
+			switch pp := p.(type) {
+			case func() (map[string]controller.Controller, error):
+				log.Debug("controller_rpc.ControllerServerWithTypes", "pp", pp)
+				plugins = append(plugins, controller_rpc.ServerWithTypes(pp))
+			case controller.Controller:
+				log.Debug("controller_rpc.ControllerServer", "p", p)
+				plugins = append(plugins, controller_rpc.Server(p.(controller.Controller)))
+			default:
+				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				return
+			}
 		case Instance:
 			switch pp := p.(type) {
 			case map[string]instance.Plugin:
@@ -92,7 +105,6 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
 				return
 			}
-
 		case MetadataUpdatable:
 			log.Debug("metadata_rpc.UpdatablePluginServer", "p", p)
 			plugins = append(plugins, metadata_rpc.UpdatablePluginServer(p.(metadata.Updatable)))
@@ -120,6 +132,9 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
 				return
 			}
+		case Group:
+			log.Debug("group_rpc.PluginServer", "p", p)
+			plugins = append(plugins, group_rpc.PluginServer(p.(group.Plugin)))
 		case Resource:
 			log.Debug("resource_rpc.PluginServer", "p", p)
 			plugins = append(plugins, resource_rpc.PluginServer(p.(resource.Plugin)))

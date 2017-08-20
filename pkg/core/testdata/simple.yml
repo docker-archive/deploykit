@@ -17,7 +17,7 @@
     - kind: instance-aws/ec2-volume
       name: disk1
       bind:
-         volumeId : metadata/UID
+         volumeId : metadata/ID
 
 - kind:        instance-aws/ec2-volume
   version:   instance/v0.1.0

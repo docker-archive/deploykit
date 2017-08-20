@@ -28,13 +28,13 @@ func TestObject(t *testing.T) {
     - kind: instance-aws/ec2-volume
       name: disk1
       bind:
-         volume/id : metadata/UID
+         volume/id : metadata/ID
          volume/size: properties/sizeGb
 
 - kind:        instance-aws/ec2-volume
   version:   instance/v0.1.0
   metadata:
-    uid: disk1-1234
+    id: disk1-1234
     name: disk1
     tags:
       role:    worker

@@ -38,10 +38,11 @@ func TestPointer(t *testing.T) {
 "pointerPtr": "github.com/docker/infrakit/pkg/testing"
 }`, any.String())
 
-	text := `class:        instance-aws/ec2-instance
+	text := `
+class:        instance-aws/ec2-instance
 version:   instance/v0.1.0
 metadata:
-  uid : u-12134
+  id : u-12134
   name: host1
   tags:
     role:    worker
@@ -58,7 +59,7 @@ depends:
     - class: instance-aws/ebs-volume
       name: /var/lib/docker
       bind:
-         volume/id : Spec/Metadata/Identity/UID
+         volume/id : Spec/Metadata/Identity/ID
 
 state:
     instanceType: c2xlarge
@@ -88,4 +89,6 @@ state:
 	require.NoError(t, err)
 
 	require.Equal(t, object1, object2)
+
+	require.Equal(t, "u-12134", object1.Metadata.Identity.ID)
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -16,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 
 	// v0 loads these packages
+	_ "github.com/docker/infrakit/pkg/cli/v0/controller"
 	_ "github.com/docker/infrakit/pkg/cli/v0/event"
 	_ "github.com/docker/infrakit/pkg/cli/v0/flavor"
 	_ "github.com/docker/infrakit/pkg/cli/v0/group"
@@ -25,6 +27,11 @@ import (
 )
 
 func init() {
+	cli.Register(controller.InterfaceSpec,
+		[]cli.CmdBuilder{
+			Info,
+		})
+
 	cli.Register(instance.InterfaceSpec,
 		[]cli.CmdBuilder{
 			Info,

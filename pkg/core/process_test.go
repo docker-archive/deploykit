@@ -268,7 +268,7 @@ func TestProcess(t *testing.T) {
 	)
 
 	store := NewObjects(func(o *types.Object) []interface{} {
-		return []interface{}{o.Metadata.Name, o.Metadata.Identity.UID}
+		return []interface{}{o.Metadata.Name, o.Metadata.Identity.ID}
 	})
 
 	createArgs := make(chan *types.Any)
@@ -304,7 +304,7 @@ func TestProcess(t *testing.T) {
 			Constructor: func(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
 				createArgs <- properties
 				createSpec <- spec
-				return &types.Identity{UID: "new"}, nil, nil
+				return &types.Identity{ID: "new"}, nil, nil
 			},
 		},
 
@@ -345,5 +345,5 @@ func TestProcess(t *testing.T) {
 	// get the object
 	obj := proc.Object(instance)
 	require.NotNil(t, obj)
-	require.Equal(t, "new", obj.Metadata.Identity.UID)
+	require.Equal(t, "new", obj.Metadata.Identity.ID)
 }

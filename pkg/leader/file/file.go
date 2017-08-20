@@ -34,7 +34,7 @@ func NewDetector(pollInterval time.Duration, filename, id string) (*leader.Polle
 
 			match := strings.Trim(string(content), " \t\n")
 
-			log.Debug("poll for leadership", "id", id, "file", filename, "match", match, "err", err)
+			log.Debug("poll for leadership", "id", id, "file", filename, "match", match, "err", err, "V", logutil.V(500))
 
 			return match == id, err
 		}), nil

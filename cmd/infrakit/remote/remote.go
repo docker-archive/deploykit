@@ -114,7 +114,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return output(os.Stdout, hosts,
 				func(io.Writer, interface{}) error {
 					if !*quiet {
-						fmt.Printf("%-20s\t%-10s\t%-60v\n", "HOST", "SSH TUNNEL", "URL LIST")
+						fmt.Printf("%-20s\t%-20s\t%-v\n", "HOST", "SSH TUNNEL", "URL LIST")
 					}
 
 					h := []string{}
@@ -126,7 +126,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 					for _, name := range h {
 						remote := hosts[name]
-						fmt.Printf("%-20v\t%-10v\t%-60v\n", name, remote.SSH, remote.Endpoints)
+						fmt.Printf("%-20v\t%-20v\t%-v\n", name, remote.SSH, remote.Endpoints)
 					}
 					return nil
 				})
