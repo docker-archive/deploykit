@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/controller"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -22,7 +23,7 @@ func (m *manager) GroupControllers() (map[string]controller.Controller, error) {
 		gid := spec.ID
 		controllers[string(gid)] = newControllerProxy(&gid, m.Plugin)
 	}
-	log.Debug("GroupControllers", "map", controllers)
+	log.Debug("GroupControllers", "map", controllers, "V", logutil.V(500))
 	return controllers, nil
 }
 

@@ -22,6 +22,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/cli/v0/flavor"
 	_ "github.com/docker/infrakit/pkg/cli/v0/group"
 	_ "github.com/docker/infrakit/pkg/cli/v0/instance"
+	_ "github.com/docker/infrakit/pkg/cli/v0/loadbalancer"
 	_ "github.com/docker/infrakit/pkg/cli/v0/metadata"
 	_ "github.com/docker/infrakit/pkg/cli/v0/resource"
 )

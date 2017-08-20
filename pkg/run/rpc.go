@@ -12,6 +12,7 @@ import (
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	loadbalancer_rpc "github.com/docker/infrakit/pkg/rpc/loadbalancer"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	resource_rpc "github.com/docker/infrakit/pkg/rpc/resource"
@@ -20,6 +21,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/resource"
 )
@@ -51,6 +53,8 @@ const (
 	Event
 	// Resource is the type code for Resource SPI implementation
 	Resource
+	// L4 is the type code for L4 loadbalancer implementation
+	L4
 )
 
 // ServeRPC starts the RPC endpoint / server given a plugin name for lookup and a list of plugin objects
@@ -138,6 +142,12 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 		case Resource:
 			log.Debug("resource_rpc.PluginServer", "p", p)
 			plugins = append(plugins, resource_rpc.PluginServer(p.(resource.Plugin)))
+		case L4:
+			log.Debug("loadbalancer_rpc.PluginServer", "p", p)
+			// This will create a plugin at name/type so that it's fully qualified.
+			// Note that L4 will be bound to an ingress which is a Controller, and Controllers can have subtypes
+			// so that they map to the domain/host associated to the loadbalancer. For example ingress/test.com
+			plugins = append(plugins, loadbalancer_rpc.PluginServer(p.(loadbalancer.L4)).WithType(p.(loadbalancer.L4).Name()))
 
 		default:
 			err = fmt.Errorf("unknown plugin %v, code %v", p, code)
