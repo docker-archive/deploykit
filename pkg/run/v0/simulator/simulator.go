@@ -1,6 +1,8 @@
 package simulator
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/infrakit/pkg/discovery"
@@ -15,6 +17,9 @@ import (
 const (
 	// Kind is the canonical name of the plugin for starting up, etc.
 	Kind = "simulator"
+
+	// EnvDir is the env for directory for file storage
+	EnvDir = "INFRAKIT_SIMULATOR_DIR"
 
 	// EnvInstanceNames is the env var to set for the instance spi type names (comma-delimited)
 	EnvInstanceNames = "INFRAKIT_SIMULATOR_INSTANCE_NAMES"
@@ -33,12 +38,14 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
+	Dir           string
 	InstanceTypes []string
 	L4HostName    string
 }
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
+	Dir:           run.GetEnv(EnvDir, filepath.Join(run.InfrakitHome(), "simulator")),
 	InstanceTypes: strings.Split(run.GetEnv(EnvInstanceNames, "compute,net,disk"), ","),
 	L4HostName:    "test.com",
 }
@@ -54,6 +61,8 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		return
 	}
 
+	os.MkdirAll(options.Dir, 0644)
+
 	impls = map[run.PluginCode]interface{}{}
 
 	instanceMap := map[string]instance.Plugin{}
@@ -61,11 +70,11 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		impls[run.Instance] = instanceMap
 	}
 	for _, n := range options.InstanceTypes {
-		instanceMap[n] = (&instanceSimulator{name: n}).alloc()
+		instanceMap[n] = NewInstance(n, options.Dir)
 	}
 
 	if options.L4HostName != "" {
-		impls[run.L4] = (&l4Simulator{name: options.L4HostName}).alloc()
+		impls[run.L4] = NewL4(options.L4HostName, options.Dir)
 	}
 
 	transport.Name = name

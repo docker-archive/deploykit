@@ -3,27 +3,34 @@ package simulator
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/store/file"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 var instanceLogger = logutil.New("module", "simulator/instance")
 
-type instanceSimulator struct {
-	name      string
-	instances map[instance.ID]instance.Description
-	lock      sync.Mutex
+// NewInstance returns a typed instance plugin
+func NewInstance(name, dir string) instance.Plugin {
+	l := &instanceSimulator{
+		name:      name,
+		instances: file.NewStore(name, dir, true).Init(),
+	}
+	return l
 }
 
-func (s *instanceSimulator) alloc() *instanceSimulator {
-	s.instances = map[instance.ID]instance.Description{}
-	return s
+type instanceSimulator struct {
+	name      string
+	instances *file.Store
+	lock      sync.Mutex
 }
 
 // Validate performs local validation on a provision request.
 func (s *instanceSimulator) Validate(req *types.Any) error {
+	instanceLogger.Info("Validate", "req", req)
 	return nil
 }
 
@@ -32,27 +39,41 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 	instanceLogger.Info("Provision", "name", s.name, "spec", spec)
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	key := time.Now().UnixNano()
 	description := instance.Description{
-		ID:         instance.ID(fmt.Sprintf("i-%d", len(s.instances))),
+		ID:         instance.ID(key),
 		Tags:       spec.Tags,
 		LogicalID:  spec.LogicalID,
 		Properties: types.AnyValueMust(spec),
 	}
-	s.instances[description.ID] = description
-	return &description.ID, nil
+	err := s.instances.Write(description.ID, description)
+	return &description.ID, err
 }
 
 // Label labels the instance
-func (s *instanceSimulator) Label(instance instance.ID, labels map[string]string) error {
-	instanceLogger.Info("Label", "name", s.name, "instance", instance, "labels", labels)
+func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) error {
+	instanceLogger.Info("Label", "name", s.name, "instance", key, "labels", labels)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	n, has := s.instances[instance]
-	if !has {
-		return fmt.Errorf("not found %v", instance)
+	exists, err := s.instances.Exists(key)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("not found %v", key)
 	}
 
+	v, err := s.instances.Read(key, func(buff []byte) (interface{}, error) {
+		d := instance.Description{}
+		err := types.AnyYAMLMust(buff).Decode(&d)
+		return d, err
+	})
+	if err != nil {
+		return err
+	}
+
+	n := v.(instance.Description)
 	if n.Tags == nil {
 		n.Tags = map[string]string{}
 	}
@@ -60,7 +81,7 @@ func (s *instanceSimulator) Label(instance instance.ID, labels map[string]string
 	for k, v := range labels {
 		n.Tags[k] = v
 	}
-	return nil
+	return s.instances.Write(key, n)
 }
 
 // Destroy terminates an existing instance.
@@ -69,13 +90,14 @@ func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Conte
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	_, has := s.instances[instance]
-	if !has {
+	exists, err := s.instances.Exists(instance)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return fmt.Errorf("not found %v", instance)
 	}
-
-	delete(s.instances, instance)
-	return nil
+	return s.instances.Delete(instance)
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
@@ -87,25 +109,20 @@ func (s *instanceSimulator) DescribeInstances(labels map[string]string,
 	defer s.lock.Unlock()
 
 	matches := []instance.Description{}
-	for _, v := range s.instances {
 
-		if hasDifferentTag(labels, v.Tags) {
-			continue
-		}
-		matches = append(matches, v)
-	}
-	return matches, nil
-}
+	err := s.instances.All(labels,
+		func(v interface{}) map[string]string {
+			return v.(instance.Description).Tags
+		},
+		func(buff []byte) (interface{}, error) {
+			desc := instance.Description{}
+			err := types.AnyYAMLMust(buff).Decode(&desc)
+			return desc, err
+		},
+		func(v interface{}) (bool, error) {
+			matches = append(matches, v.(instance.Description))
+			return true, nil
+		})
 
-func hasDifferentTag(expected, actual map[string]string) bool {
-	if len(actual) == 0 {
-		return true
-	}
-	for k, v := range expected {
-		if a, ok := actual[k]; ok && a != v {
-			return true
-		}
-	}
-
-	return false
+	return matches, err
 }
