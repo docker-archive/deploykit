@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	fake "github.com/docker/infrakit/pkg/testing/loadbalancer"
@@ -127,9 +126,9 @@ func TestGroupsInstanceIDs(t *testing.T) {
 				},
 			},
 			Backends: BackendSpec{
-				Groups: []group.ID{
-					group.ID("managers"),
-					group.ID("workers"),
+				Groups: []Group{
+					Group(plugin.Name("group/managers")),
+					Group(plugin.Name("group/workers")),
 				},
 			},
 		},
@@ -159,12 +158,12 @@ func TestGroupsInstanceIDs(t *testing.T) {
 
 	m, err := properties.Groups()
 	require.NoError(t, err)
-	require.Equal(t, map[Vhost][]group.ID{
+	require.EqualValues(t, map[Vhost][]Group{
 		Vhost("test.com"): {
-			group.ID("managers"),
-			group.ID("workers"),
+			Group(plugin.Name("group/managers")),
+			Group(plugin.Name("group/workers")),
 		},
-		Vhost("test2.com"): nil,
+		Vhost("test2.com"): {},
 	}, m)
 
 	mm, err := properties.InstanceIDs()

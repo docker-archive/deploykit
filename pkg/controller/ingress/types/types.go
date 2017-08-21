@@ -39,12 +39,27 @@ type Spec struct {
 	HealthChecks []HealthCheck
 }
 
+// Group is a qualified plugin name. The 'type' field of the name is the group ID.
+type Group plugin.Name
+
+// ID returns the group id.
+func (gs Group) ID() group.ID {
+	_, t := plugin.Name(gs).GetLookupAndType()
+	return group.ID(t)
+}
+
+// Plugin returns the plugin to contact
+func (gs Group) Plugin() plugin.Name {
+	return plugin.Name(gs)
+}
+
 // BackendSpec specifies the instances that are the backends.  They can come from groups of
 // a given group controller or speccific instance ids.
 type BackendSpec struct {
 
-	// Groups are the ids of the groups managed by the group controller
-	Groups []group.ID
+	// Groups are the ids of the groups managed by the group controller.
+	// The plugin name is used ==> plugin name and type. type is the group id.
+	Groups []Group
 
 	// Instances are static instance ids
 	Instances []instance.ID

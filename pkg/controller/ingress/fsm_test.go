@@ -84,32 +84,32 @@ func TestMustTrue(t *testing.T) {
 func TestControllerInitSpec(t *testing.T) {
 	expectedInterval := 10 * time.Second
 
-	controller := &Controller{
+	managedObject := &managed{
 		options: ingress.Options{
 			SyncInterval: expectedInterval,
 		},
 	}
 
-	err := controller.init(types.Spec{})
+	err := managedObject.init(types.Spec{})
 	require.NoError(t, err)
 
 	t.Log("verify that the default value remains despite no Options in the spec")
-	require.Equal(t, expectedInterval, controller.options.SyncInterval)
+	require.Equal(t, expectedInterval, managedObject.options.SyncInterval)
 
 	t.Log("verify that spec's option value makes into the ingress.Options")
-	controller = &Controller{}
+	managedObject = &managed{}
 
 	expectedOptions := ingress.Options{
 		HardSync:     true,
 		SyncInterval: expectedInterval,
 	}
 
-	err = controller.init(types.Spec{
+	err = managedObject.init(types.Spec{
 		Options: types.AnyValueMust(expectedOptions),
 	})
 	require.NoError(t, err)
-	require.Equal(t, expectedOptions, controller.options)
+	require.Equal(t, expectedOptions, managedObject.options)
 
 	t.Log("verify initial state machine is in the follower state")
-	require.Equal(t, follower, controller.stateMachine.State())
+	require.Equal(t, follower, managedObject.stateMachine.State())
 }

@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
@@ -58,10 +57,14 @@ func (p Properties) HealthChecks() (result map[Vhost][]HealthCheck, err error) {
 }
 
 // Groups returns a list of group ids by Vhost
-func (p Properties) Groups() (result map[Vhost][]group.ID, err error) {
-	result = map[Vhost][]group.ID{}
+func (p Properties) Groups() (result map[Vhost][]Group, err error) {
+	result = map[Vhost][]Group{}
 	for _, spec := range p {
-		result[spec.Vhost] = spec.Backends.Groups
+
+		if _, has := result[spec.Vhost]; !has {
+			result[spec.Vhost] = []Group{}
+		}
+		result[spec.Vhost] = append(result[spec.Vhost], spec.Backends.Groups...)
 	}
 	return
 }

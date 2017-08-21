@@ -9,7 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
-func (c *Controller) syncRoutesL4() error {
+func (c *managed) syncRoutesL4() error {
 	// to avoid multiple updates when ELBs have aliases need to agregate all of them by elb than just hostname
 	// since different hostnames can point to the same ELB.
 	targets := map[loadbalancer.L4][]loadbalancer.Route{}
@@ -44,7 +44,7 @@ func (c *Controller) syncRoutesL4() error {
 	return nil
 }
 
-func (c *Controller) syncBackends() error {
+func (c *managed) syncBackends() error {
 	groupsByVhost, err := c.groups()
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (c *Controller) syncBackends() error {
 	unresolved := []types.Vhost{}
 	for vhost, l4 := range loadbalancersByVhost {
 
-		groupIDs, has := groupsByVhost[vhost]
+		groups, has := groupsByVhost[vhost]
 		if !has {
 			unresolved = append(unresolved, vhost)
 			continue
@@ -86,11 +86,13 @@ func (c *Controller) syncBackends() error {
 			nodes.Add(id)
 		}
 
-		groupPlugin, err := c.groupPlugin()
-		if err != nil {
-			return err
-		}
-		for _, gid := range groupIDs {
+		for _, g := range groups {
+
+			gid := g.ID()
+			groupPlugin, err := c.groupPlugin(g)
+			if err != nil {
+				return err
+			}
 
 			desc, err := groupPlugin.DescribeGroup(gid)
 			if err != nil {
@@ -130,7 +132,7 @@ func (c *Controller) syncBackends() error {
 
 }
 
-func (c *Controller) syncHealthChecks() error {
+func (c *managed) syncHealthChecks() error {
 	targets := map[loadbalancer.L4][]types.HealthCheck{}
 	healthChecksByVhost, err := c.healthChecks()
 	if err != nil {
