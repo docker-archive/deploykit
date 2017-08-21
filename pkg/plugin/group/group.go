@@ -3,6 +3,7 @@ package group
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
@@ -173,6 +175,119 @@ func (p *plugin) DestroyGroup(gid group.ID) error {
 	}
 
 	return err
+}
+
+func (p *plugin) Size(gid group.ID) (size int, err error) {
+	var all []group.Spec
+	all, err = p.InspectGroups()
+	if err != nil {
+		return
+	}
+	for _, gg := range all {
+		if gg.ID == gid {
+			g, err := group_types.ParseProperties(gg)
+			if err != nil {
+				return 0, err
+			}
+
+			if s := len(g.Allocation.LogicalIDs); s > 0 {
+				return s, nil
+			}
+			return int(g.Allocation.Size), nil
+		}
+	}
+	err = fmt.Errorf("group %v not found", gid)
+	return
+}
+
+func (p *plugin) SetSize(gid group.ID, size int) (err error) {
+	if size < 0 {
+		return fmt.Errorf("size cannot be negative")
+	}
+	var all []group.Spec
+	all, err = p.InspectGroups()
+	if err != nil {
+		return
+	}
+	for _, gg := range all {
+		if gg.ID == gid {
+			g, err := group_types.ParseProperties(gg)
+			if err != nil {
+				return err
+			}
+
+			if s := len(g.Allocation.LogicalIDs); s > 0 {
+				return fmt.Errorf("cannot set size if logic ids are explicitly set")
+			}
+			g.Allocation.Size = uint(size)
+			gg.Properties = types.AnyValueMust(g)
+			_, err = p.CommitGroup(gg, false)
+			return err
+		}
+	}
+	err = fmt.Errorf("group not found %v", gid)
+	return
+}
+
+type instancesErr []string
+
+func (e instancesErr) Error() string {
+	return strings.Join(e, ",")
+}
+
+func (p *plugin) DestroyInstances(gid group.ID, toDestroy []instance.ID) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	context, exists := p.groups.get(gid)
+	if !exists {
+		return fmt.Errorf("Group '%s' is not being watched", gid)
+	}
+
+	instances, err := context.scaled.List()
+	if err != nil {
+		return err
+	}
+
+	// build index by instance id
+	index := map[instance.ID]instance.Description{}
+	for _, inst := range instances {
+		index[inst.ID] = inst
+	}
+
+	missing := []string{}
+	targets := []instance.Description{}
+	for _, inst := range toDestroy {
+		if desc, has := index[inst]; !has {
+			missing = append(missing, string(inst))
+		} else {
+			targets = append(targets, desc)
+		}
+	}
+
+	if len(missing) > 0 {
+		return instancesErr(missing)
+	}
+
+	// tell the group to pause before we start killing the instances
+	_, err = p.doFree(gid)
+	if err != nil {
+		return err
+	}
+
+	// kill the instances
+	for _, target := range targets {
+		if err := context.scaled.Destroy(target, instance.Termination); err != nil {
+			return err
+		}
+	}
+	// update the spec to lower count
+	sizeSpec, err := p.Size(gid)
+	if err != nil {
+		return err
+	}
+
+	return p.SetSize(gid, sizeSpec-len(toDestroy)) // this will commit the change and watch again
 }
 
 func (p *plugin) InspectGroups() ([]group.Spec, error) {

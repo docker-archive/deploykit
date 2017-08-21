@@ -1,5 +1,5 @@
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -17,10 +17,10 @@
     - kind: instance-aws/ec2-volume
       name: disk1
       bind:
-         volumeId : metadata/UID
+         volumeId : metadata/ID
 
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk1
     tags:

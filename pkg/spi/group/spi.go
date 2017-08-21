@@ -16,13 +16,25 @@ var InterfaceSpec = spi.InterfaceSpec{
 type Plugin interface {
 	CommitGroup(grp Spec, pretend bool) (string, error)
 
-	FreeGroup(id ID) error
+	FreeGroup(ID) error
 
-	DescribeGroup(id ID) (Description, error)
+	DescribeGroup(ID) (Description, error)
 
-	DestroyGroup(id ID) error
+	DestroyGroup(ID) error
 
 	InspectGroups() ([]Spec, error)
+
+	// DestroyInstances deletes instances from this group. Error is returned either on
+	// failure or if any instances don't belong to the group. This function
+	// should wait until group size is updated.
+	DestroyInstances(ID, []instance.ID) error
+
+	// Size returns the current size of the group.
+	Size(ID) (int, error)
+
+	// SetSize sets the size.
+	// This function should block until completion.
+	SetSize(ID, int) error
 }
 
 // ID is the unique identifier for a Group.

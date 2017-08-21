@@ -310,6 +310,20 @@ func (p *plugin) InspectGroups() ([]group.Spec, error) {
 	return specs, nil
 }
 
+// DestroyInstances TODO(chungers) - implement this
+func (p *plugin) DestroyInstances(id group.ID, instances []instance.ID) error {
+	return fmt.Errorf("not implemented")
+}
+
+// Size TODO(chungers) - implement this
+func (p *plugin) Size(id group.ID) (int, error) {
+	return 0, fmt.Errorf("not implemented")
+}
+
+func (p *plugin) SetSize(id group.ID, size int) error {
+	return p.API.ResizeInstanceGroupManager(string(id), int64(size))
+}
+
 func last(url string) string {
 	parts := strings.Split(url, "/")
 	return parts[len(parts)-1]

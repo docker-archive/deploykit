@@ -15,6 +15,13 @@ func PluginServer(l4 loadbalancer.L4) *L4 {
 // L4 is the exported type for json-rpc
 type L4 struct {
 	l4 loadbalancer.L4
+	tn string
+}
+
+// WithType adds a qualifier to the name
+func (l4 *L4) WithType(t string) *L4 {
+	l4.tn = t
+	return l4
 }
 
 // ImplementedInterface returns the interface implemented by this RPC service.
@@ -24,6 +31,9 @@ func (l4 *L4) ImplementedInterface() spi.InterfaceSpec {
 
 // Types returns the types exposed by this kind of RPC service
 func (l4 *L4) Types() []string {
+	if l4.tn != "" {
+		return []string{l4.tn}
+	}
 	return []string{"."} // no types
 }
 

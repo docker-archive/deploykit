@@ -200,6 +200,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	impls = map[run.PluginCode]interface{}{
 		run.Manager:           mgr,
+		run.Controller:        mgr.GroupControllers,
 		run.Group:             mgr,
 		run.MetadataUpdatable: metadataUpdatable,
 		run.Metadata:          metadataUpdatable,

@@ -1,33 +1,20 @@
 package spi
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // InterfaceSpec is metadata about an API.
-type InterfaceSpec struct {
-	// Name of the interface.
-	Name string
+type InterfaceSpec types.InterfaceSpec
 
-	// Version is the identifier for the API version.
-	Version string
+// DecodeInterfaceSpec takes a string and returns the struct
+func DecodeInterfaceSpec(s string) InterfaceSpec {
+	return InterfaceSpec(types.DecodeInterfaceSpec(s))
 }
 
 // Encode encodes a struct form to string
 func (i InterfaceSpec) Encode() string {
-	return fmt.Sprintf("%s/%s", i.Name, i.Version)
-}
-
-// DecodeInterfaceSpec takes a string and returns the struct
-func DecodeInterfaceSpec(s string) InterfaceSpec {
-	p := strings.SplitN(s, "/", 2)
-	return InterfaceSpec{
-		Name:    p[0],
-		Version: p[1],
-	}
+	return types.InterfaceSpec(i).Encode()
 }
 
 // VendorInfo provides vendor-specific information

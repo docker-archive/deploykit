@@ -109,7 +109,7 @@ func TestRenderProperties(t *testing.T) {
 	// Case - no template, just properties. Note the escapes here.
 	testRenderProperties(t, `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -159,7 +159,7 @@ func TestRenderProperties(t *testing.T) {
 	// Case - has template.  No properties
 	testRenderProperties(t, `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -190,7 +190,7 @@ func TestRenderProperties(t *testing.T) {
 	// Case - has template, with properties override
 	testRenderProperties(t, `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -233,7 +233,7 @@ func TestProcess(t *testing.T) {
 
 	text := `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: workers
     tags:
@@ -268,7 +268,7 @@ func TestProcess(t *testing.T) {
 	)
 
 	store := NewObjects(func(o *types.Object) []interface{} {
-		return []interface{}{o.Metadata.Name, o.Metadata.Identity.UID}
+		return []interface{}{o.Metadata.Name, o.Metadata.Identity.ID}
 	})
 
 	createArgs := make(chan *types.Any)
@@ -304,7 +304,7 @@ func TestProcess(t *testing.T) {
 			Constructor: func(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
 				createArgs <- properties
 				createSpec <- spec
-				return &types.Identity{UID: "new"}, nil, nil
+				return &types.Identity{ID: "new"}, nil, nil
 			},
 		},
 
@@ -345,5 +345,5 @@ func TestProcess(t *testing.T) {
 	// get the object
 	obj := proc.Object(instance)
 	require.NotNil(t, obj)
-	require.Equal(t, "new", obj.Metadata.Identity.UID)
+	require.Equal(t, "new", obj.Metadata.Identity.ID)
 }

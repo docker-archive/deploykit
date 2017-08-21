@@ -28,6 +28,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/ingress"
 	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
 	_ "github.com/docker/infrakit/pkg/run/v0/selector"
+	_ "github.com/docker/infrakit/pkg/run/v0/simulator"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
 	_ "github.com/docker/infrakit/pkg/run/v0/tailer"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
@@ -132,7 +133,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		if !*quiet {
-			fmt.Printf("%-20s%-50s%-s\n", "INTERFACE", "LISTEN", "NAME")
+			fmt.Printf("%-20s%-30s%-s\n", "INTERFACE", "NAME", "LISTEN")
 		}
 
 		sort.Strings(keys)
@@ -140,7 +141,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		for _, k := range keys {
 
 			ep := view[k]
-			fmt.Printf("%-20s%-50s%-s\n", ep.spi, ep.listen, ep.name)
+			fmt.Printf("%-20s%-30s%-s\n", ep.spi, ep.name, ep.listen)
 
 		}
 

@@ -20,7 +20,7 @@ func (o Object) Validate() error {
 	if o.Metadata.Identity == nil {
 		return errMissingAttribute("metadata.identity")
 	}
-	if o.Metadata.Identity.UID == "" {
+	if o.Metadata.Identity.ID == "" {
 		return errMissingAttribute("metadata.identity.uid")
 	}
 	return nil

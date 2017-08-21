@@ -212,7 +212,7 @@ func (m *Manager) WaitForAllShutdown() {
 			targets = append(targets, lookup)
 
 		case <-checkNow:
-			log.Debug("Checking on targets", "targets", targets, "V", logutil.V(100))
+			log.Debug("Checking on targets", "targets", targets, "V", logutil.V(400))
 			if m, err := m.plugins().List(); err == nil {
 				if countMatches(targets, m) == 0 {
 					log.Info("Scan found plugins not running now", "plugins", targets)
@@ -228,7 +228,7 @@ func countMatches(list []string, found map[string]*plugin.Endpoint) int {
 	c := 0
 	for _, l := range list {
 		if _, has := found[l]; has {
-			log.Debug("Scan found", "lookup", l, "V", logutil.V(100))
+			log.Debug("Scan found", "lookup", l, "V", logutil.V(400))
 			c++
 		}
 	}
