@@ -9,6 +9,7 @@ import (
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
+	ingress_rpc "github.com/docker/infrakit/pkg/rpc/ingress"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -17,6 +18,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/ingress"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/resource"
@@ -47,6 +49,8 @@ const (
 	Event
 	// Resource is the type code for Resource SPI implementation
 	Resource
+	// Ingress is the type code for the Ingress SPI implementation
+	Ingress
 )
 
 // ServeRPC starts the RPC endpoint / server given a plugin name for lookup and a list of plugin objects
@@ -123,6 +127,9 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 		case Resource:
 			log.Debug("resource_rpc.PluginServer", "p", p)
 			plugins = append(plugins, resource_rpc.PluginServer(p.(resource.Plugin)))
+		case Ingress:
+			log.Debug("ingress_rpc.PluginServer", "p", p)
+			plugins = append(plugins, ingress_rpc.PluginServer(p.(ingress.Plugin)))
 
 		default:
 			err = fmt.Errorf("unknown plugin %v, code %v", p, code)
