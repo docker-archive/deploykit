@@ -75,7 +75,7 @@ func (l *l4Simulator) Publish(route loadbalancer.Route) (loadbalancer.Result, er
 	if err != nil {
 		return result(""), err
 	}
-	if !exists {
+	if exists {
 		return result(""), fmt.Errorf("duplicate port %v", route.LoadBalancerPort)
 	}
 	return result("publish"), l.routes.Write(route.LoadBalancerPort, route)

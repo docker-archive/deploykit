@@ -61,7 +61,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		return
 	}
 
-	os.MkdirAll(options.Dir, 0644)
+	os.MkdirAll(options.Dir, 0755)
 
 	impls = map[run.PluginCode]interface{}{}
 

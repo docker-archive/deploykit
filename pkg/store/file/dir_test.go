@@ -18,7 +18,7 @@ func TestUsage(t *testing.T) {
 	store := NewStore(typeName, dir, true).Init()
 
 	exists, err := store.Exists("hello")
-	require.Error(t, err)
+	require.NoError(t, err)
 	require.False(t, exists)
 
 	err = store.Write("hello", "world")

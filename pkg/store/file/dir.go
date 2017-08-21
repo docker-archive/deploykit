@@ -107,7 +107,11 @@ func (s *Store) Exists(key interface{}) (bool, error) {
 	fp := filepath.Join(s.Dir, id)
 	_, err := s.fs.Stat(fp)
 	log.Debug("Exists", "id", id, "path", fp, "err", err)
-	return !os.IsNotExist(err), err
+	v := os.IsNotExist(err)
+	if v {
+		return false, nil
+	}
+	return !v, err
 }
 
 // Delete deletes the object by id
