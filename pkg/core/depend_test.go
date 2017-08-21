@@ -15,7 +15,7 @@ func TestFindSpecs0(t *testing.T) {
 
 	spec := `
 kind:        top
-spiVersion:   top-version
+version:   top-version
 metadata:
   name: top
 properties:
@@ -38,17 +38,17 @@ func TestFindSpecs1(t *testing.T) {
 
 	spec := `
 kind:        top
-spiVersion:   top-version
+version:   top-version
 metadata:
   name: top
 properties:
   kind: nest1
-  spiVersion: nest1-version
+  version: nest1-version
   metadata:
     name: nest1
   properties:
     kind: nest2
-    spiVersion: nest2-version
+    version: nest2-version
     metadata:
       name: nest2
 `
@@ -69,28 +69,28 @@ func TestFindSpecs2(t *testing.T) {
 
 	spec := `
 kind:        top
-spiVersion:   top-version
+version:   top-version
 metadata:
   name: top
 properties:
   instance:
     kind: nest1
-    spiVersion: nest1-version
+    version: nest1-version
     metadata:
       name: nest1
     properties:
       kind: nest2
-      spiVersion: nest2-version
+      version: nest2-version
       metadata:
         name: nest2
   flavor:
     kind: nest3
-    spiVersion: nest3-version
+    version: nest3-version
     metadata:
       name: nest3
     properties:
       kind: nest4
-      spiVersion: nest4-version
+      version: nest4-version
       metadata:
         name: nest4
 `
@@ -111,41 +111,41 @@ func TestFindSpecs3(t *testing.T) {
 
 	spec := `
 kind:        top
-spiVersion:   top-version
+version:   top-version
 metadata:
   name: top
 properties:
   instance:
     kind: nest1
-    spiVersion: nest1-version
+    version: nest1-version
     metadata:
       name: nest1
     properties:
       kind: nest2
-      spiVersion: nest2-version
+      version: nest2-version
       metadata:
         name: nest2
       properties:
         - kind: nest5
-          spiVersion: nest5-version
+          version: nest5-version
           metadata:
             name: nest5
         - kind: nest6
-          spiVersion: nest6-version
+          version: nest6-version
           metadata:
             name: nest6
         - kind: nest7
-          spiVersion: nest7-version
+          version: nest7-version
           metadata:
             name: nest7
   flavor:
     kind: nest3
-    spiVersion: nest3-version
+    version: nest3-version
     metadata:
       name: nest3
     properties:
       kind: nest4
-      spiVersion: nest4-version
+      version: nest4-version
       metadata:
         name: nest4
 `
@@ -191,18 +191,18 @@ func TestDepedencyOrder1(t *testing.T) {
 
 	testDependency(t, `
 - kind:        top1C
-  spiVersion:   top1-version
+  version:   top1-version
   metadata:
     name: top1N
   properties:
     instance:
       kind: nest1C
-      spiVersion: nest1-version
+      version: nest1-version
       metadata:
         name: nest1N
       properties:
         kind: nest2C
-        spiVersion: nest2-version
+        version: nest2-version
         metadata:
           name: nest2N
         properties:
@@ -210,25 +210,25 @@ func TestDepedencyOrder1(t *testing.T) {
           nest2Prop2: nest2Val2
     flavor:
       kind: nest3C
-      spiVersion: nest3-version
+      version: nest3-version
       metadata:
         name: nest3N
 - kind:        top2C
-  spiVersion:   top2-version
+  version:   top2-version
   metadata:
     name: top2N
   depends:
     - kind: top1C
       name: top1N
 - kind:        top3C
-  spiVersion:   top3-version
+  version:   top3-version
   metadata:
     name: top3N
   depends:
     - kind: top2C
       name: top2N
 - kind:        top4C
-  spiVersion:   top4-version
+  version:   top4-version
   metadata:
     name: top4N
   depends:
@@ -241,26 +241,26 @@ func TestDepedencyOrder1(t *testing.T) {
 
 	testDependency(t, `
 - kind:        top1C
-  spiVersion:   top1-version
+  version:   top1-version
   metadata:
     name: top1N
   properties:
 - kind:        top2C
-  spiVersion:   top2-version
+  version:   top2-version
   metadata:
     name: top2N
   depends:
     - kind: top3C
       name: top3N
 - kind:        top3C
-  spiVersion:   top3-version
+  version:   top3-version
   metadata:
     name: top3N
   depends:
     - kind: top4C
       name: top4N
 - kind:        top4C
-  spiVersion:   top4-version
+  version:   top4-version
   metadata:
     name: top4N
 `,
@@ -270,26 +270,26 @@ func TestDepedencyOrder1(t *testing.T) {
 
 	testDependency(t, `
 - kind:        top1C
-  spiVersion:   top1-version
+  version:   top1-version
   metadata:
     name: top1N
   properties:
 - kind:        top2C
-  spiVersion:   top2-version
+  version:   top2-version
   metadata:
     name: top2N
   depends:
     - kind: top1C
       name: top1N
 - kind:        top3C
-  spiVersion:   top3-version
+  version:   top3-version
   metadata:
     name: top3N
   depends:
     - kind: top1C
       name: top1N
 - kind:        top4C
-  spiVersion:   top4-version
+  version:   top4-version
   metadata:
     name: top4N
   depends:
@@ -302,40 +302,40 @@ func TestDepedencyOrder1(t *testing.T) {
 
 	testDependency(t, `
 - kind:        pool
-  spiVersion:   poolVersion
+  version:   poolVersion
   metadata:
     name: pool1
   properties:
     instance:
       kind: ebs
-      spiVersion: ebsVersion
+      version: ebsVersion
       metadata:
         name: ebs1
 
 - kind:        pool
-  spiVersion:   poolVersion
+  version:   poolVersion
   metadata:
     name: pool2
   properties:
     instance:
       kind: ebs
-      spiVersion: ebsVersion
+      version: ebsVersion
       metadata:
         name: ebs2
 
 - kind:        group
-  spiVersion:   groupVersion
+  version:   groupVersion
   metadata:
     name: managers
   properties:
     instance:
        kind : instance
-       spiVersion: instanceVersion
+       version: instanceVersion
        metadata:
           name: instance-managers
     flavor:
        kind : flavor
-       spiVersion: flavorVersion
+       version: flavorVersion
        metadata:
           name: flavor-swarm-manager
   depends:
@@ -343,18 +343,18 @@ func TestDepedencyOrder1(t *testing.T) {
       name: pool1
 
 - kind:        group
-  spiVersion:   groupVersion
+  version:   groupVersion
   metadata:
     name: workers
   properties:
     instance:
        kind : instance
-       spiVersion: instanceVersion
+       version: instanceVersion
        metadata:
           name: instance-workers
     flavor:
        kind : flavor
-       spiVersion: flavorVersion
+       version: flavorVersion
        metadata:
           name: flavor-swarm-worker
   depends:
@@ -406,18 +406,18 @@ func TestDepedencyOrder2Cycles(t *testing.T) {
 
 	testDependencyCycles(t, `
 - kind:        top1C
-  spiVersion:   top1-version
+  version:   top1-version
   metadata:
     name: top1N
   properties:
     instance:
       kind: nest1C
-      spiVersion: nest1-version
+      version: nest1-version
       metadata:
         name: nest1N
       properties:
         kind: nest2C
-        spiVersion: nest2-version
+        version: nest2-version
         metadata:
           name: nest2N
         properties:
@@ -425,18 +425,18 @@ func TestDepedencyOrder2Cycles(t *testing.T) {
           nest2Prop2: nest2Val2
     flavor:
       kind: nest3C
-      spiVersion: nest3-version
+      version: nest3-version
       metadata:
         name: nest3N
 - kind:        top2C
-  spiVersion:   top2-version
+  version:   top2-version
   metadata:
     name: top2N
   depends:
     - kind: top1C
       name: top1N
 - kind:        top3C
-  spiVersion:   top3-version
+  version:   top3-version
   metadata:
     name: top3N
   depends:
@@ -445,7 +445,7 @@ func TestDepedencyOrder2Cycles(t *testing.T) {
     - kind: top4C
       name: top4N
 - kind:        top4C
-  spiVersion:   top4-version
+  version:   top4-version
   metadata:
     name: top4N
   depends:

@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 )
 
@@ -147,7 +148,7 @@ func (r *dirPluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 				continue
 			}
 
-			log.Debug("Discovered plugin", "address", instance.Address)
+			log.Debug("Discovered plugin", "address", instance.Address, "V", logutil.V(500))
 			plugins[instance.Name] = instance
 		}
 	}

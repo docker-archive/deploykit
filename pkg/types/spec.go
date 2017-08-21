@@ -12,8 +12,8 @@ type Spec struct {
 	// Kind is the category of the resources and kind can have types  -- e.g. instance-aws/ec2-instance
 	Kind string `json:"kind"`
 
-	// SpiVersion is the name of the interface and version - instance/v0.1.0
-	SpiVersion string `json:"spiVersion"`
+	// Version is the name of the interface and version - instance/v0.1.0
+	Version string `json:"version"`
 
 	// Metadata is metadata / useful information about object
 	Metadata Metadata `json:"metadata"`
@@ -39,8 +39,8 @@ func (s Spec) Validate() error {
 	if s.Kind == "" {
 		return errMissingAttribute("kind")
 	}
-	if s.SpiVersion == "" {
-		return errMissingAttribute("spiVersion")
+	if s.Version == "" {
+		return errMissingAttribute("version")
 	}
 	if s.Metadata.Name == "" {
 		return errMissingAttribute("metadata.name")
@@ -66,21 +66,34 @@ type Dependency struct {
 // Identity uniquely identifies an instance
 type Identity struct {
 
-	// UID is a unique identifier for the object instance.
-	UID string `json:"uid"`
+	// ID is a unique identifier for the object instance.
+	ID string `json:"id" yaml:"id"`
 }
 
 // Metadata captures label and descriptive information about the object
 type Metadata struct {
 
 	// Identity is an optional component that exists only in the case of a real object instance.
-	*Identity `json:",omitempty" yaml:",omitempty"`
+	*Identity `json:",inline,omitempty" yaml:",inline,omitempty"`
 
 	// Name is a user-friendly name.  It may or may not be unique.
 	Name string `json:"name"`
 
 	// Tags are a collection of labels, in key-value form, about the object
 	Tags map[string]string `json:"tags"`
+}
+
+// AddTagsFromStringSlice will parse any '=' delimited strings and set the Tags map. It overwrites on duplicate keys.
+func (m Metadata) AddTagsFromStringSlice(v []string) Metadata {
+	other := m
+	if other.Tags == nil {
+		other.Tags = map[string]string{}
+	}
+	for _, vv := range v {
+		p := strings.Split(vv, "=")
+		other.Tags[p[0]] = p[1]
+	}
+	return other
 }
 
 // URL is an alias of url

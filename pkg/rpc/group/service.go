@@ -52,6 +52,7 @@ func (p *Group) CommitGroup(_ *http.Request, req *CommitGroupRequest, resp *Comm
 		return err
 	}
 	resp.Details = details
+	resp.ID = req.Spec.ID
 	return nil
 }
 
@@ -61,7 +62,7 @@ func (p *Group) FreeGroup(_ *http.Request, req *FreeGroupRequest, resp *FreeGrou
 	if err != nil {
 		return err
 	}
-	resp.OK = true
+	resp.ID = req.ID
 	return nil
 }
 
@@ -71,6 +72,7 @@ func (p *Group) DescribeGroup(_ *http.Request, req *DescribeGroupRequest, resp *
 	if err != nil {
 		return err
 	}
+	resp.ID = req.ID
 	resp.Description = desc
 	return nil
 }
@@ -81,7 +83,7 @@ func (p *Group) DestroyGroup(_ *http.Request, req *DestroyGroupRequest, resp *De
 	if err != nil {
 		return err
 	}
-	resp.OK = true
+	resp.ID = req.ID
 	return nil
 }
 
@@ -92,5 +94,36 @@ func (p *Group) InspectGroups(_ *http.Request, req *InspectGroupsRequest, resp *
 		return err
 	}
 	resp.Groups = groups
+	return nil
+}
+
+// DestroyInstances is the rpc method to destroy specific instances
+func (p *Group) DestroyInstances(_ *http.Request, req *DestroyInstancesRequest, resp *DestroyInstancesResponse) error {
+	err := p.plugin.DestroyInstances(req.ID, req.Instances)
+	if err != nil {
+		return err
+	}
+	resp.ID = req.ID
+	return nil
+}
+
+// Size is the rpc method to get the group target size
+func (p *Group) Size(_ *http.Request, req *SizeRequest, resp *SizeResponse) error {
+	size, err := p.plugin.Size(req.ID)
+	if err != nil {
+		return err
+	}
+	resp.ID = req.ID
+	resp.Size = size
+	return nil
+}
+
+// SetSize is the rpc method to set the group target size
+func (p *Group) SetSize(_ *http.Request, req *SetSizeRequest, resp *SetSizeResponse) error {
+	err := p.plugin.SetSize(req.ID, req.Size)
+	if err != nil {
+		return err
+	}
+	resp.ID = req.ID
 	return nil
 }

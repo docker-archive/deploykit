@@ -140,7 +140,7 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 				})
 			}
 
-			command.Short = fmt.Sprintf("Access plugin %s which implements %s",
+			command.Short = fmt.Sprintf("Access object %s which implements %s",
 				name, strings.Join(list, ","))
 
 			commands = append(commands, command)

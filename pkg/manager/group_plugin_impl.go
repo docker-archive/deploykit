@@ -1,9 +1,13 @@
 package manager
 
 import (
+	"fmt"
+
 	"github.com/docker/infrakit/pkg/plugin"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -15,7 +19,7 @@ func (m *manager) proxyForGroupPlugin(name string) (group.Plugin, error) {
 
 	// A late-binding proxy so that we don't have a problem with having to
 	// start up the manager as the last of all the plugins.
-	return newProxy(func() (group.Plugin, error) {
+	return newGroupProxy(func() (group.Plugin, error) {
 		endpoint, err := m.plugins.Find(plugin.Name(name))
 		if err != nil {
 			return nil, err
@@ -116,7 +120,6 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 	}
 
 	r := <-resultChan
-
 	if v, has := r[0].(string); has {
 		resp = v
 	}
@@ -198,4 +201,94 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 		err = v
 	}
 	return
+}
+
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) DestroyInstances(id group.ID, instances []instance.ID) (err error) {
+
+	resultChan := make(chan []interface{})
+
+	m.backendOps <- backendOp{
+		name: "destroyInstances",
+		operation: func() error {
+
+			log.Info("Proxy DestroyInstances", "groupID", id, "instances", instances)
+
+			var txnErr error
+
+			// Always send a response so we don't block forever
+			defer func() {
+				resultChan <- []interface{}{txnErr}
+			}()
+
+			txnErr = m.Plugin.DestroyInstances(id, instances)
+			return txnErr
+		},
+	}
+
+	r := <-resultChan
+	if v, has := r[0].(error); has && v != nil {
+		err = v
+	}
+	return
+}
+
+func (m *manager) loadGroupSpec(id group.ID) (found group.Spec, err error) {
+	// load the config
+	config := globalSpec{}
+
+	// load the latest version -- assumption here is that it's been persisted already.
+	err = m.snapshot.Load(&config)
+	if err != nil {
+		log.Warn("Error loading config", "err", err)
+		return
+	}
+	for gid, g := range config.Groups {
+		if gid == id {
+			spec := group.Spec{}
+			err = g.Properties.Decode(&spec)
+			if err != nil {
+				return
+			}
+			return spec, nil
+		}
+	}
+	err = fmt.Errorf("group %v not found", id)
+	return
+}
+
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) SetSize(id group.ID, size int) error {
+	spec, err := m.loadGroupSpec(id)
+	if err != nil {
+		return err
+	}
+	parsed, err := group_types.ParseProperties(spec)
+	if err != nil {
+		return err
+	}
+	if s := len(parsed.Allocation.LogicalIDs); s > 0 {
+		return fmt.Errorf("cannot set size when logical ids are explicitly set")
+	}
+	parsed.Allocation.Size = uint(size)
+	spec.Properties = types.AnyValueMust(parsed)
+	_, err = m.CommitGroup(spec, false)
+	return err
+}
+
+// This implements/ overrides the Group Plugin interface to support single group-only operations
+func (m *manager) Size(id group.ID) (size int, err error) {
+	spec, err := m.loadGroupSpec(id)
+	if err != nil {
+		return 0, err
+	}
+	parsed, err := group_types.ParseProperties(spec)
+	if err != nil {
+		return 0, err
+	}
+	if s := len(parsed.Allocation.LogicalIDs); s > 0 {
+		size = s
+		return size, nil
+	}
+	return int(parsed.Allocation.Size), nil
 }

@@ -148,7 +148,7 @@ func (c *Controller) init(in types.Spec) (err error) {
 		},
 
 		core.NewObjects(func(o *types.Object) []interface{} {
-			return []interface{}{o.Metadata.Name, o.Metadata.Identity.UID}
+			return []interface{}{o.Metadata.Name, o.Metadata.Identity.ID}
 		}),
 
 		c.plugins,
@@ -201,7 +201,7 @@ func mustTrue(v bool, e error) bool {
 
 func (c *Controller) construct(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
 	state, err := types.AnyValue(c.state())
-	return &types.Identity{UID: "ingress-singleton"}, state, err
+	return &types.Identity{ID: "ingress-singleton"}, state, err
 }
 
 func (c *Controller) object() *types.Object {

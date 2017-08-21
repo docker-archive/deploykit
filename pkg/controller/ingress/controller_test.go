@@ -42,8 +42,8 @@ func TestControllerStartStop(t *testing.T) {
 	}
 
 	spec := types.Spec{
-		Kind:       "ingress-controller",
-		SpiVersion: "0.1",
+		Kind:    "ingress-controller",
+		Version: "0.1",
 		Metadata: types.Metadata{
 			Name: "ingress-controller",
 		},
@@ -65,7 +65,7 @@ func TestControllerStartStop(t *testing.T) {
 	stateObject := controller.object()
 	require.NotNil(t, stateObject)
 	require.NoError(t, stateObject.Validate())
-	require.Equal(t, "ingress-singleton", stateObject.Metadata.Identity.UID)
+	require.Equal(t, "ingress-singleton", stateObject.Metadata.Identity.ID)
 	require.Equal(t, "ingress-controller", stateObject.Metadata.Name)
 
 	// initial state

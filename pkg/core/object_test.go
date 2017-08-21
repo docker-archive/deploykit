@@ -15,7 +15,7 @@ func TestObject(t *testing.T) {
 
 	text := `
 - kind:        instance-aws/ec2-instance
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: host1
     tags:
@@ -33,11 +33,11 @@ func TestObject(t *testing.T) {
     - kind: instance-aws/ec2-volume
       name: disk1
       bind:
-         volume/id : metadata/uid
+         volume/id : metadata/id
          volume/size: properties/sizeGb
 
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk1
     tags:
@@ -74,7 +74,7 @@ func TestObject(t *testing.T) {
 	disk := objects.FindBy("instance-aws/ec2-volume", "disk1")
 	require.NotNil(t, disk)
 
-	disk.Metadata.Identity = &types.Identity{UID: "disk-11234"}
+	disk.Metadata.Identity = &types.Identity{ID: "disk-11234"}
 
 	host := objects.FindBy("instance-aws/ec2-volume", "host1")
 	require.Nil(t, host) // wrong kind
@@ -100,7 +100,7 @@ func TestObjectNested(t *testing.T) {
 
 	text := `
 - kind:        group
-  spiVersion:   group/v0.1.0
+  version:   group/v0.1.0
   metadata:
     name: managers
     tags:
@@ -109,7 +109,7 @@ func TestObjectNested(t *testing.T) {
   properties:
     instance:
       kind:        instance-aws/ec2-instance
-      spiVersion:   instance/v0.1.0
+      version:   instance/v0.1.0
       metadata:
         name: manager-node
         tags:
@@ -127,19 +127,19 @@ func TestObjectNested(t *testing.T) {
         - kind: instance-aws/ec2-volume
           name: disk1
           bind:
-            disk1VolumeId : metadata/uid
+            disk1VolumeId : metadata/id
         - kind: instance-aws/ec2-volume
           name: disk2
           bind:
-            disk2VolumeId : metadata/uid
+            disk2VolumeId : metadata/id
         - kind: instance-aws/ec2-volume
           name: disk3
           bind:
-            disk3VolumeId : metadata/uid
+            disk3VolumeId : metadata/id
 
     flavor:
       kind:        flavor-swarm/manager
-      spiVersion:   flavor/v0.1.0
+      version:   flavor/v0.1.0
       metadata:
         name: swarm-manager
         tags:
@@ -150,7 +150,7 @@ func TestObjectNested(t *testing.T) {
           region: us-west-1
           stack:  test
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk1
     tags:
@@ -164,7 +164,7 @@ func TestObjectNested(t *testing.T) {
     region: us-west-1
     stack:  test
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk2
     tags:
@@ -178,7 +178,7 @@ func TestObjectNested(t *testing.T) {
     region: us-west-1
     stack:  test
 - kind:        instance-aws/ec2-volume
-  spiVersion:   instance/v0.1.0
+  version:   instance/v0.1.0
   metadata:
     name: disk3
     tags:
@@ -231,7 +231,7 @@ func TestObjectNested(t *testing.T) {
 	for i, n := range []string{"disk1", "disk2", "disk3"} {
 		disk := objects.FindBy("instance-aws/ec2-volume", n)
 		require.NotNil(t, disk)
-		disk.Metadata.Identity = &types.Identity{UID: fmt.Sprintf("disk-%d", i)}
+		disk.Metadata.Identity = &types.Identity{ID: fmt.Sprintf("disk-%d", i)}
 	}
 
 	node := objects.FindBy("instance-aws/ec2-instance", "manager-node")
