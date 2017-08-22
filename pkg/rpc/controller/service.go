@@ -7,6 +7,7 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc/internal"
 	"github.com/docker/infrakit/pkg/spi"
 )
 
@@ -28,6 +29,7 @@ func Server(c controller.Controller) *Controller {
 
 // Controller is the exported type for json-rpc
 type Controller struct {
+	internal.Keyed
 	subcontrollers func() (map[string]controller.Controller, error)
 }
 

@@ -137,8 +137,17 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				return
 			}
 		case Group:
-			log.Debug("group_rpc.PluginServer", "p", p)
-			plugins = append(plugins, group_rpc.PluginServer(p.(group.Plugin)))
+			switch pp := p.(type) {
+			case func() (map[string]group.Plugin, error):
+				log.Debug("group_rpc.PluginServerWithTypes", "pp", pp)
+				plugins = append(plugins, group_rpc.PluginServerWithTypes(pp))
+			case group.Plugin:
+				log.Debug("group_rpc.PluginServer", "p", p)
+				plugins = append(plugins, group_rpc.PluginServer(p.(group.Plugin)))
+			default:
+				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				return
+			}
 		case Resource:
 			log.Debug("resource_rpc.PluginServer", "p", p)
 			plugins = append(plugins, resource_rpc.PluginServer(p.(resource.Plugin)))
