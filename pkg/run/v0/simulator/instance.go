@@ -39,7 +39,7 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 	instanceLogger.Info("Provision", "name", s.name, "spec", spec)
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	key := time.Now().UnixNano()
+	key := fmt.Sprintf("%v", time.Now().UnixNano())
 	description := instance.Description{
 		ID:         instance.ID(key),
 		Tags:       spec.Tags,
@@ -47,6 +47,7 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 		Properties: types.AnyValueMust(spec),
 	}
 	err := s.instances.Write(description.ID, description)
+	instanceLogger.Debug("Provisioned", "id", description.ID, "spec", spec)
 	return &description.ID, err
 }
 

@@ -4,10 +4,10 @@ import (
 	"os"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/controller/ingress"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/manager"
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/types"
@@ -74,10 +74,7 @@ func handleConfigAndRun(plugins func() discovery.Plugins, groupPluginName string
 		return nil, err
 	}
 
-	controller := &ingress.Controller{
-		Leadership:      leadership,
-		GroupPluginName: plugin.Name(groupPluginName),
-	}
+	c := ingress.NewController(leadership)
 
 	spec := types.Spec{}
 	err = blob.Decode(&spec)
@@ -86,5 +83,24 @@ func handleConfigAndRun(plugins func() discovery.Plugins, groupPluginName string
 	}
 
 	log.Info("Starting controller")
-	return make(chan error), controller.Run(spec)
+
+	current, plan, err := c.Plan(controller.Manage, spec)
+
+	log.Info("Plan", "object", current, "plan", plan, "err", err)
+	if err != nil {
+		return nil, err
+	}
+
+	errChan := make(chan error, 1)
+
+	current, err = c.Commit(controller.Manage, spec)
+
+	errChan <- err
+	close(errChan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return errChan, err
 }

@@ -11,11 +11,11 @@ import (
 
 // Manage is the interface implemented by managed objects within a controller
 type Managed interface {
-	Plan(controller.Operation, types.Spec) (types.Object, controller.Plan, error)
-	Manage(types.Spec) (types.Object, error)
-	Object() (types.Object, error)
-	Free() (types.Object, error)
-	Dispose() (types.Object, error)
+	Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error)
+	Manage(types.Spec) (*types.Object, error)
+	Object() (*types.Object, error)
+	Free() (*types.Object, error)
+	Dispose() (*types.Object, error)
 }
 
 // Controller implements the pkg/controller/Controller interface and manages a collection of controls
@@ -108,7 +108,15 @@ func (c *Controller) Plan(operation controller.Operation,
 		err = fmt.Errorf("duplicate objects", m)
 	}
 
-	return m[0].Plan(operation, spec)
+	o, p, e := m[0].Plan(operation, spec)
+	if o != nil {
+		object = *o
+	}
+	if p != nil {
+		plan = controller.Plan{}
+	}
+	err = e
+	return
 }
 
 // Commit commits the spec to the controller for management or destruction.  The controller's job is to ensure reality
@@ -138,9 +146,20 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 
 	switch operation {
 	case controller.Manage:
-		return m[0].Manage(spec)
+		o, e := m[0].Manage(spec)
+		if o != nil {
+			object = *o
+		}
+		err = e
+		return
+
 	case controller.Destroy:
-		return m[0].Dispose()
+		o, e := m[0].Dispose()
+		if o != nil {
+			object = *o
+		}
+		err = e
+		return
 	default:
 		err = fmt.Errorf("unknown operation: %v", operation)
 		return
@@ -165,7 +184,9 @@ func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, e
 		if err != nil {
 			return nil, err
 		}
-		objects = append(objects, o)
+		if o != nil {
+			objects = append(objects, *o)
+		}
 	}
 	return
 }
@@ -211,5 +232,6 @@ func (c *Controller) ManagedObjects() (map[string]controller.Controller, error) 
 	for k, v := range c.managed {
 		out[k] = v.(controller.Controller)
 	}
+	out["controller"] = c
 	return out, nil
 }
