@@ -9,7 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
-// Manage is the interface implemented by managed objects within a controller
+// Managed is the interface implemented by managed objects within a controller
 type Managed interface {
 	Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error)
 	Manage(types.Spec) (*types.Object, error)
@@ -105,7 +105,7 @@ func (c *Controller) Plan(operation controller.Operation,
 
 	// In the future maybe will consider wildcard commits...  but this is highly discouraged at this time.
 	if len(m) != 1 {
-		err = fmt.Errorf("duplicate objects", m)
+		err = fmt.Errorf("duplicate objects: %v", m)
 	}
 
 	o, p, e := m[0].Plan(operation, spec)
@@ -141,7 +141,7 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 
 	// In the future maybe will consider wildcard commits...  but this is highly discouraged at this time.
 	if len(m) != 1 {
-		err = fmt.Errorf("duplicate objects", m)
+		err = fmt.Errorf("duplicate objects: %v", m)
 	}
 
 	switch operation {

@@ -48,6 +48,7 @@ func (k *Keyed) Types() []string {
 	return types
 }
 
+// Do performs work calling the work function once the request resolves to an object
 func (k *Keyed) Do(request Addressable, work func(resolved interface{}) error) error {
 	resolved, err := k.Resolve(request)
 	if err != nil {
@@ -56,6 +57,7 @@ func (k *Keyed) Do(request Addressable, work func(resolved interface{}) error) e
 	return work(resolved)
 }
 
+// Resolve resolves input (a request object for example) that implements the Addressable interface into a plugin
 func (k *Keyed) Resolve(request Addressable) (interface{}, error) {
 	to, err := request.Plugin()
 	if err != nil {
@@ -65,6 +67,7 @@ func (k *Keyed) Resolve(request Addressable) (interface{}, error) {
 	return k.Keyed(to)
 }
 
+// Keyed performs a lookup of the object by plugin name
 func (k *Keyed) Keyed(name plugin.Name) (interface{}, error) {
 	m, err := k.listFunc()
 	if err != nil {
