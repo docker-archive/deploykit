@@ -103,8 +103,10 @@ func (c *Controller) Commit(_ *http.Request, req *ChangeRequest, resp *ChangeRes
 
 // Describe is the rpc method for Describe
 func (c *Controller) Describe(_ *http.Request, req *FindRequest, resp *FindResponse) error {
-
+	pn, _ := req.Plugin()
 	return c.keyed.Do(req, func(v interface{}) error {
+		log.Debug("Describe", "req", req, "p", pn, "v", v, "meta", req.Metadata)
+
 		resp.Name = req.Name
 		objects, err := v.(controller.Controller).Describe(req.Metadata)
 		if err == nil {

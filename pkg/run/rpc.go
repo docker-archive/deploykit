@@ -76,8 +76,8 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 		case Controller:
 			switch pp := p.(type) {
 			case func() (map[string]controller.Controller, error):
-				log.Debug("controller_rpc.ControllerServerWithTypes", "pp", pp)
-				plugins = append(plugins, controller_rpc.ServerWithTypes(pp))
+				log.Debug("controller_rpc.ControllerServerWithNamed", "pp", pp)
+				plugins = append(plugins, controller_rpc.ServerWithNamed(pp))
 			case controller.Controller:
 				log.Debug("controller_rpc.ControllerServer", "p", p)
 				plugins = append(plugins, controller_rpc.Server(p.(controller.Controller)))
@@ -138,9 +138,9 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 			}
 		case Group:
 			switch pp := p.(type) {
-			case func() (map[string]group.Plugin, error):
+			case func() (map[group.ID]group.Plugin, error):
 				log.Debug("group_rpc.PluginServerWithTypes", "pp", pp)
-				plugins = append(plugins, group_rpc.PluginServerWithTypes(pp))
+				plugins = append(plugins, group_rpc.PluginServerWithGroups(pp))
 			case group.Plugin:
 				log.Debug("group_rpc.PluginServer", "p", p)
 				plugins = append(plugins, group_rpc.PluginServer(p.(group.Plugin)))

@@ -41,6 +41,7 @@ func (k *Keyed) Types() []string {
 	if err != nil {
 		return nil
 	}
+	log.Debug("Types", "map", m, "V", debugV)
 	types := []string{}
 	for key := range m {
 		types = append(types, fmt.Sprintf("%v", key))
@@ -51,6 +52,7 @@ func (k *Keyed) Types() []string {
 // Do performs work calling the work function once the request resolves to an object
 func (k *Keyed) Do(request Addressable, work func(resolved interface{}) error) error {
 	resolved, err := k.Resolve(request)
+	log.Debug("Do", "resolved", resolved, "err", err, "req", request, "V", debugV)
 	if err != nil {
 		return err
 	}
@@ -60,6 +62,7 @@ func (k *Keyed) Do(request Addressable, work func(resolved interface{}) error) e
 // Resolve resolves input (a request object for example) that implements the Addressable interface into a plugin
 func (k *Keyed) Resolve(request Addressable) (interface{}, error) {
 	to, err := request.Plugin()
+	log.Debug("Resolve", "to", to, "err", err, "req", request, "V", debugV)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +79,7 @@ func (k *Keyed) Keyed(name plugin.Name) (interface{}, error) {
 	l, subtype := name.GetLookupAndType()
 
 	// Special case of single, unkeyed plugin object
-	if l == "." {
+	if l == "." || l == "" {
 		if len(m) == 1 {
 			for _, v := range m {
 				return v, nil // first value

@@ -13,7 +13,7 @@ import (
 func (m *manager) GroupControllers() (map[string]controller.Controller, error) {
 	base := newControllerProxy(nil, m.Plugin)
 	controllers := map[string]controller.Controller{
-		"controller": base,
+		"": base,
 	}
 	all, err := m.Plugin.InspectGroups()
 	if err != nil {

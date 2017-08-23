@@ -5,9 +5,14 @@ import (
 	"sync"
 
 	"github.com/docker/infrakit/pkg/controller"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/types"
 )
+
+var log = logutil.New("module", "controller/internal")
+
+const debugV = logutil.V(500)
 
 // Managed is the interface implemented by managed objects within a controller
 type Managed interface {
@@ -53,12 +58,7 @@ func (c *Controller) leaderGuard() error {
 }
 
 func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]Managed, error) {
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	out := []Managed{}
-
 	if search == nil {
 		// all managed objects
 		for _, v := range c.managed {
@@ -80,7 +80,7 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]Man
 			}
 			c.managed[key] = m
 		} else {
-			return nil, fmt.Errorf("not found %v", key)
+			return out, nil
 		}
 	}
 	out = append(out, c.managed[key])
@@ -170,11 +170,15 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 // metadata can be a tags search.  An object has state, and its original spec can be accessed as well.
 // A nil Metadata will instruct the controller to return all objects under management.
 func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, err error) {
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	m := []Managed{}
 	m, err = c.getManaged(search, nil)
+
+	log.Debug("Describe", "search", search, "V", debugV, "managed", m, "err", err)
+
 	if err != nil {
 		return
 	}
@@ -228,10 +232,11 @@ func (c *Controller) ManagedObjects() (map[string]controller.Controller, error) 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	out := map[string]controller.Controller{}
+	out := map[string]controller.Controller{
+		"": c,
+	}
 	for k, v := range c.managed {
 		out[k] = v.(controller.Controller)
 	}
-	out["controller"] = c
 	return out, nil
 }

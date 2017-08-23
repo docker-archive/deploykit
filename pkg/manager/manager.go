@@ -21,6 +21,8 @@ import (
 var (
 	log = logutil.New("module", "manager")
 
+	debugV = logutil.V(500)
+
 	// InterfaceSpec is the current name and version of the Instance API.
 	InterfaceSpec = spi.InterfaceSpec{
 		Name:    "Manager",
@@ -47,6 +49,7 @@ type Backend interface {
 	group.Plugin
 
 	GroupControllers() (map[string]controller.Controller, error)
+	Groups() (map[group.ID]group.Plugin, error)
 
 	Manager
 
@@ -160,7 +163,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 			select {
 
 			case op := <-backendOps:
-				log.Debug("Backend operation", "op", op, "V", logutil.V(100))
+				log.Debug("Backend operation", "op", op, "V", debugV)
 				if m.isLeader {
 					op.operation()
 				}
@@ -180,7 +183,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 
 				// This channel has data only when there's been a leadership change.
 
-				log.Debug("leader event", "leader", leader, "V", logutil.V(100))
+				log.Debug("leader event", "leader", leader)
 				if leader {
 					m.onAssumeLeadership()
 				} else {
