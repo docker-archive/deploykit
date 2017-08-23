@@ -7,6 +7,7 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	controller_rpc "github.com/docker/infrakit/pkg/rpc/controller"
+	"github.com/spf13/cobra"
 )
 
 var log = logutil.New("module", "cli/v0/controller")
@@ -14,8 +15,25 @@ var log = logutil.New("module", "cli/v0/controller")
 func init() {
 	cli.Register(controller.InterfaceSpec,
 		[]cli.CmdBuilder{
-			Describe,
+			Controller,
+			// Describe,
+			// Commit,
 		})
+}
+
+// Controller returns the controller sub command
+func Controller(name string, services *cli.Services) *cobra.Command {
+	controller := &cobra.Command{
+		Use:   "controller",
+		Short: "Commands to access the Controller SPI",
+	}
+
+	controller.AddCommand(
+		Describe(name, services),
+		Commit(name, services),
+	)
+
+	return controller
 }
 
 // Load loads the typed object
