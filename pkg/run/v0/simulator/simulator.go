@@ -18,6 +18,9 @@ const (
 	// Kind is the canonical name of the plugin for starting up, etc.
 	Kind = "simulator"
 
+	// EnvStore is the enviornment variable to control the backend to use. e.g. 'mem', 'file'
+	EnvStore = "mem"
+
 	// EnvDir is the env for directory for file storage
 	EnvDir = "INFRAKIT_SIMULATOR_DIR"
 
@@ -26,6 +29,12 @@ const (
 
 	// EnvL4Name is the env var to set for the L4 name
 	EnvL4Name = "INFRAKIT_SIMULATOR_L4_NAME"
+
+	// StoreMem is the value for using memory store
+	StoreMem = "mem"
+
+	// StoreFile is the value for using file store
+	StoreFile = "file"
 )
 
 var (
@@ -38,6 +47,7 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
+	Store         string
 	Dir           string
 	InstanceTypes []string
 	L4HostName    string
@@ -45,6 +55,7 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
+	Store:         run.GetEnv(EnvStore, "mem"),
 	Dir:           run.GetEnv(EnvDir, filepath.Join(run.InfrakitHome(), "simulator")),
 	InstanceTypes: strings.Split(run.GetEnv(EnvInstanceNames, "compute,net,disk"), ","),
 	L4HostName:    "test.com",
@@ -70,11 +81,11 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		impls[run.Instance] = instanceMap
 	}
 	for _, n := range options.InstanceTypes {
-		instanceMap[n] = NewInstance(n, options.Dir)
+		instanceMap[n] = NewInstance(n, options)
 	}
 
 	if options.L4HostName != "" {
-		impls[run.L4] = NewL4(options.L4HostName, options.Dir)
+		impls[run.L4] = NewL4(options.L4HostName, options)
 	}
 
 	transport.Name = name

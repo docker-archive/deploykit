@@ -46,11 +46,14 @@ func (c *managed) syncRoutesL4() error {
 
 func (c *managed) syncBackends() error {
 	groupsByVhost, err := c.groups()
+	log.Debug("groups by vhost", "groups", groupsByVhost)
+
 	if err != nil {
 		return err
 	}
 
 	loadbalancersByVhost, err := c.l4s()
+	log.Debug("L4s by vhost", "l4s", loadbalancersByVhost)
 	if err != nil {
 		return err
 	}
@@ -86,6 +89,7 @@ func (c *managed) syncBackends() error {
 			nodes.Add(id)
 		}
 
+		log.Debug("backend groups", "groups", groups)
 		for _, g := range groups {
 
 			gid := g.ID()
@@ -100,6 +104,8 @@ func (c *managed) syncBackends() error {
 				continue
 			}
 
+			log.Debug("found backends", "groupID", gid, "desc", desc, "vhost", vhost, "L4", l4.Name())
+
 			for _, inst := range desc.Instances {
 				nodes.Add(inst.ID)
 			}
@@ -110,20 +116,22 @@ func (c *managed) syncBackends() error {
 		for n := range registered.Difference(nodes).Iter() {
 			list = append(list, n.(instance.ID))
 		}
-		if result, err := l4.RegisterBackends(list); err != nil {
-			log.Warn("error registering backends", "err", err)
+		log.Info("De-register backends", "instances", list, "vhost", vhost, "L4", l4.Name())
+		if result, err := l4.DeregisterBackends(list); err != nil {
+			log.Warn("error deregistering backends", "err", err)
 		} else {
-			log.Info("registered backends", "vhost", vhost, "result", result)
+			log.Info("deregistered backends", "vhost", vhost, "result", result)
 		}
 
 		list = []instance.ID{}
 		for n := range nodes.Difference(registered).Iter() {
 			list = append(list, n.(instance.ID))
 		}
-		if result, err := l4.DeregisterBackends(list); err != nil {
-			log.Warn("error de-registering backends", "err", err)
+		log.Info("Register backends", "instances", list, "vhost", vhost, "L4", l4.Name())
+		if result, err := l4.RegisterBackends(list); err != nil {
+			log.Warn("error registering backends", "err", err)
 		} else {
-			log.Info("deregistered backends", "vhost", vhost, "result", result)
+			log.Info("registered backends", "vhost", vhost, "result", result)
 		}
 
 	}

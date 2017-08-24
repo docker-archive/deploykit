@@ -87,9 +87,14 @@ func parseAddress(address string) (*url.URL, *http.Client, error) {
 		return u, &http.Client{
 			Timeout: timeout(),
 			Transport: &http.Transport{
+				// TODO(chungers) - fix this deprecation
 				Dial: func(proto, addr string) (conn net.Conn, err error) {
 					return net.Dial("unix", address)
 				},
+				MaxIdleConns:          1,
+				IdleConnTimeout:       5 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
 			}}, nil
 	case "tcp":
 		u.Scheme = "http"

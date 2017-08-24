@@ -344,7 +344,7 @@ func (m *manager) doCommitGroups(config globalSpec) error {
 	return m.execPlugins(config,
 		func(plugin group.Plugin, spec group.Spec) error {
 
-			log.Info("Committing group", spec.ID, "with spec:", spec)
+			log.Info("Committing group", "groupID", spec.ID, "spec", spec)
 
 			_, err := plugin.CommitGroup(spec, false)
 			if err != nil {

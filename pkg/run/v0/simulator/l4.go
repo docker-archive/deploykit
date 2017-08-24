@@ -8,28 +8,38 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/store/file"
+	"github.com/docker/infrakit/pkg/store/mem"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 var l4Logger = logutil.New("module", "simulator/l4")
 
 // NewL4 returns a L4 loadbalancer
-func NewL4(name, dir string) loadbalancer.L4 {
+func NewL4(name string, options Options) loadbalancer.L4 {
 	l := &l4Simulator{
-		name:         name,
-		routes:       file.NewStore("route", dir, true).Init(),
-		backends:     file.NewStore("backend", dir, true).Init(),
-		healthchecks: file.NewStore("healthcheck", dir, true).Init(),
+		name: name,
+	}
+
+	switch options.Store {
+	case StoreFile:
+		l.routes = file.NewStore("route", options.Dir)
+		l.backends = file.NewStore("backend", options.Dir)
+		l.healthchecks = file.NewStore("healthcheck", options.Dir)
+	case StoreMem:
+		l.routes = mem.NewStore("route")
+		l.backends = mem.NewStore("backend")
+		l.healthchecks = mem.NewStore("healthcheck")
 	}
 	return l
 }
 
 type l4Simulator struct {
 	name         string
-	routes       *file.Store
-	backends     *file.Store
-	healthchecks *file.Store
+	routes       store.KV
+	backends     store.KV
+	healthchecks store.KV
 	lock         sync.Mutex
 }
 
@@ -52,7 +62,7 @@ func (l *l4Simulator) Routes() ([]loadbalancer.Route, error) {
 	defer l.lock.Unlock()
 
 	out := []loadbalancer.Route{}
-	l.routes.All(nil, nil,
+	err := store.Visit(l.routes, nil, nil,
 		func(buff []byte) (interface{}, error) {
 			route := loadbalancer.Route{}
 			err := types.AnyYAMLMust(buff).Decode(&route)
@@ -62,7 +72,15 @@ func (l *l4Simulator) Routes() ([]loadbalancer.Route, error) {
 			out = append(out, o.(loadbalancer.Route))
 			return true, nil
 		})
-	return out, nil
+	return out, err
+}
+
+func mustEncode(v interface{}) []byte {
+	buff, err := types.AnyValueMust(v).MarshalYAML()
+	if err != nil {
+		panic(err)
+	}
+	return buff
 }
 
 // Publish publishes a route in the LB by adding a load balancing rule
@@ -78,7 +96,8 @@ func (l *l4Simulator) Publish(route loadbalancer.Route) (loadbalancer.Result, er
 	if exists {
 		return result(""), fmt.Errorf("duplicate port %v", route.LoadBalancerPort)
 	}
-	return result("publish"), l.routes.Write(route.LoadBalancerPort, route)
+
+	return result("publish"), l.routes.Write(route.LoadBalancerPort, mustEncode(route))
 }
 
 // Unpublish dissociates the load balancer from the backend service at the given port.
@@ -113,14 +132,14 @@ func (l *l4Simulator) ConfigureHealthCheck(backendPort uint32, healthy,
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	return result("healthcheck"), l.routes.Write(backendPort, map[string]interface{}{
+	return result("healthcheck"), l.routes.Write(backendPort, mustEncode(map[string]interface{}{
 		"name":        l.name,
 		"backendPort": backendPort,
 		"healthy":     healthy,
 		"unhealthy":   unhealthy,
 		"interval":    interval,
 		"timeout":     timeout,
-	})
+	}))
 }
 
 // RegisterBackend registers instances identified by the IDs to the LB's backend pool
@@ -130,7 +149,7 @@ func (l *l4Simulator) RegisterBackends(ids []instance.ID) (loadbalancer.Result, 
 	defer l.lock.Unlock()
 
 	for _, id := range ids {
-		err := l.backends.Write(id, id)
+		err := l.backends.Write(id, mustEncode(id))
 		if err != nil {
 			return result("err"), err
 		}
@@ -157,7 +176,7 @@ func (l *l4Simulator) Backends() ([]instance.ID, error) {
 	defer l.lock.Unlock()
 
 	out := []instance.ID{}
-	l.backends.All(nil, nil,
+	err := store.Visit(l.backends, nil, nil,
 		func(buff []byte) (interface{}, error) {
 			var backend instance.ID
 			err := types.AnyBytes(buff).Decode(&backend)
@@ -167,5 +186,5 @@ func (l *l4Simulator) Backends() ([]instance.ID, error) {
 			out = append(out, o.(instance.ID))
 			return true, nil
 		})
-	return out, nil
+	return out, err
 }
