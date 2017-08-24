@@ -23,6 +23,14 @@ import (
 
 var log = logutil.New("module", "controller/ingress")
 
+func newManaged(plugins func() discovery.Plugins,
+	leader manager.Leadership) *managed {
+	return &managed{
+		Leadership: leader,
+		plugins:    plugins,
+	}
+}
+
 // managed is the entity that reconciles desired routes with loadbalancers
 type managed struct {
 	// Leader controls whether this ingress is active or not

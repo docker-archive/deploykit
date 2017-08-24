@@ -36,10 +36,7 @@ func NewTypedControllers(plugins func() discovery.Plugins,
 		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
-			return &managed{
-				Leadership: leader,
-				plugins:    plugins,
-			}, nil
+			return newManaged(plugins, leader), nil
 		},
 		// the key function
 		func(metadata types.Metadata) string {

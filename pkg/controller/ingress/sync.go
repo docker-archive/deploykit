@@ -112,24 +112,26 @@ func (c *managed) syncBackends() error {
 		}
 
 		// compute the difference between registered and nodes
-		list := []instance.ID{}
+		toRemove := []instance.ID{}
 		for n := range registered.Difference(nodes).Iter() {
-			list = append(list, n.(instance.ID))
+			toRemove = append(toRemove, n.(instance.ID))
 		}
-		log.Info("De-register backends", "instances", list, "vhost", vhost, "L4", l4.Name())
-		if result, err := l4.DeregisterBackends(list); err != nil {
-			log.Warn("error deregistering backends", "err", err)
+
+		log.Info("De-register backends", "instances", toRemove, "vhost", vhost, "L4", l4.Name())
+
+		if result, err := l4.DeregisterBackends(toRemove); err != nil {
+			log.Warn("error deregistering backends", "toRemove", toRemove, "err", err)
 		} else {
 			log.Info("deregistered backends", "vhost", vhost, "result", result)
 		}
 
-		list = []instance.ID{}
+		toAdd := []instance.ID{}
 		for n := range nodes.Difference(registered).Iter() {
-			list = append(list, n.(instance.ID))
+			toAdd = append(toAdd, n.(instance.ID))
 		}
-		log.Info("Register backends", "instances", list, "vhost", vhost, "L4", l4.Name())
-		if result, err := l4.RegisterBackends(list); err != nil {
-			log.Warn("error registering backends", "err", err)
+		log.Info("Register backends", "instances", toAdd, "vhost", vhost, "L4", l4.Name())
+		if result, err := l4.RegisterBackends(toAdd); err != nil {
+			log.Warn("error registering backends", "toAdd", toAdd, "err", err)
 		} else {
 			log.Info("registered backends", "vhost", vhost, "result", result)
 		}
