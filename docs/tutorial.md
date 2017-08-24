@@ -374,7 +374,7 @@ To see that the Group plugin can enforce the size of the group, let's simulate a
 
 For comparison, we capture the listing before we destroy instances
 ```shell
-$ build/nfrakit group describe cattle > before
+$ build/infrakit group describe cattle > before
 ```
 
 ```shell
@@ -383,7 +383,7 @@ $ rm ./tutorial/instance-4857202356361893780 ./tutorial/instance-891623868370011
 
 After a few moments, let's capture the listing
 ```shell
-$ build/nfrakit group describe cattle > after
+$ build/infrakit group describe cattle > after
 ```
 
 A quick diff shows that 2 instances have been replaced:
