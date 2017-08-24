@@ -94,6 +94,12 @@ func (s *Store) Read(key interface{}, decode func([]byte) (interface{}, error)) 
 	f, err := s.fs.Open(fp)
 	log.Debug("Read", "id", id, "path", fp, "err", err)
 
+	if err != nil {
+		return nil, err
+	}
+
+	defer f.Close()
+
 	buff, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, err
@@ -150,6 +156,8 @@ func (s *Store) All(tags map[string]string,
 			log.Warn("error opening", "path", fp, "err", err)
 			return err
 		}
+
+		defer file.Close()
 
 		buff, err := ioutil.ReadAll(file)
 		if err != nil {

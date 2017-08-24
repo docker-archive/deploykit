@@ -68,6 +68,11 @@ type BackendSpec struct {
 // Vhost is the virtual host / domain
 type Vhost string
 
+const (
+	// DefaultSyncInterval is the interval between syncing backends
+	DefaultSyncInterval = 2 * time.Second
+)
+
 // Options is the controller options
 type Options struct {
 	HardSync          bool

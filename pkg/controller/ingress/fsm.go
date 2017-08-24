@@ -169,8 +169,12 @@ func (c *managed) init(in types.Spec) (err error) {
 		return
 	}
 
-	if c.ticker == nil && c.options.SyncInterval > 0 {
-		c.ticker = time.Tick(c.options.SyncInterval)
+	if c.ticker == nil {
+		interval := c.options.SyncInterval
+		if interval == 0 {
+			interval = ingress.DefaultSyncInterval
+		}
+		c.ticker = time.Tick(interval)
 	}
 
 	// add the poller

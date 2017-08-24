@@ -89,7 +89,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: ingress.NewTypedControllers(options.leadership),
+		run.Controller: ingress.NewTypedControllers(plugins, options.leadership),
 	}
 
 	return

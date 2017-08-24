@@ -6,12 +6,13 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/controller/internal"
+	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewController returns a controller implementation
-func NewController(leader manager.Leadership) controller.Controller {
+func NewController(plugins func() discovery.Plugins, leader manager.Leadership) controller.Controller {
 	return internal.NewController(
 		leader,
 		// the constructor
@@ -28,13 +29,16 @@ func NewController(leader manager.Leadership) controller.Controller {
 }
 
 // NewTypedControllers return typed controllers
-func NewTypedControllers(leader manager.Leadership) func() (map[string]controller.Controller, error) {
+func NewTypedControllers(plugins func() discovery.Plugins,
+	leader manager.Leadership) func() (map[string]controller.Controller, error) {
+
 	return (internal.NewController(
 		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
 			return &managed{
 				Leadership: leader,
+				plugins:    plugins,
 			}, nil
 		},
 		// the key function

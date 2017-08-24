@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	log               = logutil.New("module", "ingress/types")
+	log               = logutil.New("module", "controller/ingress/types")
 	routeHandlers     = map[string]func(*types.Any, Options) (map[Vhost][]loadbalancer.Route, error){}
 	routeHandlersLock = sync.Mutex{}
 )
@@ -37,7 +37,7 @@ func (p Properties) L4Func(findL4 func(spec Spec) (loadbalancer.L4, error)) func
 
 			l4, err := findL4(spec)
 			if err != nil || l4 == nil {
-				log.Warn("cannot locate L4 plugin", "vhost", vhost, "spec", spec)
+				log.Warn("cannot locate L4 plugin", "vhost", vhost, "spec", spec, "err", err)
 				continue
 			}
 

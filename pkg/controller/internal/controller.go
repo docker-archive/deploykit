@@ -236,7 +236,14 @@ func (c *Controller) ManagedObjects() (map[string]controller.Controller, error) 
 		"": c,
 	}
 	for k, v := range c.managed {
-		out[k] = v.(controller.Controller)
+		out[k] = &Controller{
+			alloc:   c.alloc,
+			keyfunc: c.keyfunc,
+			managed: map[string]Managed{
+				k: v, // Scope to this as only instance
+			},
+			leader: c.leader,
+		}
 	}
 	return out, nil
 }

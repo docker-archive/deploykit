@@ -80,6 +80,8 @@ func (c *managed) groupPlugin(g ingress.Group) (group.Plugin, error) {
 }
 
 func (c *managed) l4Client(spec ingress.Spec) (loadbalancer.L4, error) {
+	log.Debug("Locating L4", "name", spec.L4Plugin)
+
 	if c.plugins == nil {
 		return nil, fmt.Errorf("no L4 plugin %v", spec.L4Plugin)
 	}
