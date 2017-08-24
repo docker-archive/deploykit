@@ -159,7 +159,7 @@ func TestLoadbalancerUnpublish(t *testing.T) {
 	name := plugin.Name(filepath.Base(socketPath))
 
 	portActual := make(chan int, 1)
-	var port int = 1234
+	port := 1234
 
 	result := fakeResult("result")
 
@@ -183,7 +183,7 @@ func TestLoadbalancerUnpublishError(t *testing.T) {
 	name := plugin.Name(filepath.Base(socketPath))
 
 	portActual := make(chan int, 1)
-	var port int = 1234
+	port := 1234
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
 		DoUnpublish: func(port int) (loadbalancer.Result, error) {
@@ -205,7 +205,7 @@ func TestLoadbalancerConfigureHealthCheck(t *testing.T) {
 	name := plugin.Name(filepath.Base(socketPath))
 
 	portActual := make(chan int, 1)
-	var port int = 1234
+	port := 1234
 	healthyActual := make(chan int, 1)
 	healthy := 1
 	unhealthyActual := make(chan int, 1)
@@ -252,7 +252,7 @@ func TestLoadbalancerConfigureHealthCheckError(t *testing.T) {
 	name := plugin.Name(filepath.Base(socketPath))
 
 	portActual := make(chan int, 1)
-	var port int = 1234
+	port := 1234
 	healthyActual := make(chan int, 1)
 	healthy := 1
 	unhealthyActual := make(chan int, 1)
