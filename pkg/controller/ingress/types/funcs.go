@@ -48,8 +48,8 @@ func (p Properties) L4Func(findL4 func(spec Spec) (loadbalancer.L4, error)) func
 }
 
 // HealthChecks returns a map of health checks by vhost
-func (p Properties) HealthChecks() (result map[Vhost][]HealthCheck, err error) {
-	result = map[Vhost][]HealthCheck{}
+func (p Properties) HealthChecks() (result map[Vhost][]loadbalancer.HealthCheck, err error) {
+	result = map[Vhost][]loadbalancer.HealthCheck{}
 	for _, spec := range p {
 		result[spec.Vhost] = spec.HealthChecks
 	}

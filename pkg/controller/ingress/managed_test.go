@@ -27,7 +27,7 @@ func TestManagedStartStop(t *testing.T) {
 	managedObject := &managed{
 		Leadership:   fakeLeadership(leader),
 		ticker:       ticker,
-		healthChecks: func() (map[ingress.Vhost][]ingress.HealthCheck, error) { return nil, nil },
+		healthChecks: func() (map[ingress.Vhost][]loadbalancer.HealthCheck, error) { return nil, nil },
 		groups:       func() (map[ingress.Vhost][]ingress.Group, error) { return nil, nil },
 		l4s:          func() (map[ingress.Vhost]loadbalancer.L4, error) { return nil, nil },
 

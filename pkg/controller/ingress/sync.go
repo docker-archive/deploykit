@@ -1,8 +1,6 @@
 package ingress
 
 import (
-	"time"
-
 	"github.com/deckarep/golang-set"
 	"github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -143,7 +141,7 @@ func (c *managed) syncBackends() error {
 }
 
 func (c *managed) syncHealthChecks() error {
-	targets := map[loadbalancer.L4][]types.HealthCheck{}
+	targets := map[loadbalancer.L4][]loadbalancer.HealthCheck{}
 	healthChecksByVhost, err := c.healthChecks()
 	if err != nil {
 		return err
@@ -164,17 +162,15 @@ func (c *managed) syncHealthChecks() error {
 	for elb, healthChecks := range targets {
 		log.Info("Configuring healthcheck", "name", elb.Name())
 		for _, healthCheck := range healthChecks {
-			if healthCheck.Port > 0 {
-				log.Info("HEALTH CHECK - Configuring the health check to ping", "port", healthCheck.Port)
-				_, err := elb.ConfigureHealthCheck(healthCheck.Port,
-					healthCheck.Healthy, healthCheck.Unhealthy,
-					time.Duration(healthCheck.IntervalSeconds)*time.Second,
-					time.Duration(healthCheck.TimeoutSeconds)*time.Second)
+			if healthCheck.BackendPort > 0 {
+				log.Info("HEALTH CHECK - Configuring the health check to ping", "port", healthCheck.BackendPort)
+				_, err := elb.ConfigureHealthCheck(healthCheck)
+
 				if err != nil {
 					log.Warn("err config health check", "err", err)
 					return err
 				}
-				log.Info("HEALTH CHECK CONFIGURED", "port", healthCheck.Port, "config", healthCheck)
+				log.Info("HEALTH CHECK CONFIGURED", "port", healthCheck.BackendPort, "config", healthCheck)
 			}
 		}
 	}

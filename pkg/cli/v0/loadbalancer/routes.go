@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -23,19 +24,19 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 	}
 
 	publish := &cobra.Command{
-		Use:   "publish",
+		Use:   "add",
 		Short: "Publish a loadbalancer route",
 	}
 	unpublish := &cobra.Command{
-		Use:   "unpublish",
+		Use:   "rm <frontend_port>, ....",
 		Short: "Unpublish a loadbalancer route",
 	}
 
 	routes.AddCommand(ls, publish, unpublish)
 
-	port := publish.Flags().Uint32("port", 80, "Backend listening port")
+	port := publish.Flags().Int("port", 80, "Backend listening port")
 	protocol := publish.Flags().String("protocol", "http", "Protocol: http|https|tcp|udp|ssl")
-	frontendPort := publish.Flags().Uint32("frontend-port", 80, "Frontend loadbalancer port")
+	frontendPort := publish.Flags().Int("frontend-port", 80, "Frontend loadbalancer port")
 	cert := publish.Flags().String("cert", "", "Certificate")
 
 	publish.RunE = func(cmd *cobra.Command, args []string) error {
@@ -59,7 +60,6 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 		return err
 	}
 
-	extPort := unpublish.Flags().Uint32("frontend-port", 80, "External loadbalancer port")
 	unpublish.RunE = func(cmd *cobra.Command, args []string) error {
 		l4, err := Load(services.Plugins(), name)
 		if err != nil {
@@ -67,8 +67,22 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 		}
 		cli.MustNotNil(l4, "L4 not found", "name", name)
 
-		res, err := l4.Unpublish(*extPort)
-		fmt.Println(res)
+		targets := []int{}
+		for _, a := range args {
+			v, err := strconv.Atoi(a)
+			if err != nil {
+				return err
+			}
+			targets = append(targets, v)
+		}
+
+		for _, t := range targets {
+			res, err := l4.Unpublish(t)
+			if err != nil {
+				return err
+			}
+			fmt.Println(res)
+		}
 		return err
 	}
 

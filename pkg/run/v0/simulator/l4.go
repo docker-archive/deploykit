@@ -3,7 +3,6 @@ package simulator
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -101,7 +100,7 @@ func (l *l4Simulator) Publish(route loadbalancer.Route) (loadbalancer.Result, er
 }
 
 // Unpublish dissociates the load balancer from the backend service at the given port.
-func (l *l4Simulator) Unpublish(extPort uint32) (loadbalancer.Result, error) {
+func (l *l4Simulator) Unpublish(extPort int) (loadbalancer.Result, error) {
 	l4Logger.Info("Unpublish", "name", l.name, "extPort", extPort)
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -120,26 +119,12 @@ func (l *l4Simulator) Unpublish(extPort uint32) (loadbalancer.Result, error) {
 // The parameters healthy and unhealthy indicate the number of consecutive success or fail pings required to
 // mark a backend instance as healthy or unhealthy.   The ping occurs on the backendPort parameter and
 // at the interval specified.
-func (l *l4Simulator) ConfigureHealthCheck(backendPort uint32, healthy,
-	unhealthy int, interval, timeout time.Duration) (loadbalancer.Result, error) {
-	l4Logger.Info("ConfigureHealthCheck",
-		"name", l.name,
-		"backendPort", backendPort,
-		"healthy", healthy,
-		"unhealthy", unhealthy,
-		"interval", interval,
-		"timeout", timeout)
+func (l *l4Simulator) ConfigureHealthCheck(hc loadbalancer.HealthCheck) (loadbalancer.Result, error) {
+	l4Logger.Info("ConfigureHealthCheck", "name", l.name, "heathCheck", hc)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	return result("healthcheck"), l.routes.Write(backendPort, mustEncode(map[string]interface{}{
-		"name":        l.name,
-		"backendPort": backendPort,
-		"healthy":     healthy,
-		"unhealthy":   unhealthy,
-		"interval":    interval,
-		"timeout":     timeout,
-	}))
+	return result("healthcheck"), l.routes.Write(hc.BackendPort, mustEncode(hc))
 }
 
 // RegisterBackend registers instances identified by the IDs to the LB's backend pool

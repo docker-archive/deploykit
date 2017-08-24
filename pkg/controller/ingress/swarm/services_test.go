@@ -43,11 +43,11 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 	require.Equal(t, 1, len(listeners))
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
-	require.Equal(t, uint32(8080), listener.SwarmPort)
+	require.Equal(t, 8080, listener.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "default", listener.host())
 	require.Equal(t, loadbalancer.HTTP, listener.protocol())
-	require.Equal(t, uint32(8080), listener.extPort())
+	require.Equal(t, 8080, listener.extPort())
 }
 
 func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
@@ -77,11 +77,11 @@ func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 	require.Equal(t, 1, len(listeners))
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
-	require.Equal(t, uint32(30000), listener.SwarmPort)
+	require.Equal(t, 30000, listener.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "default", listener.host())
 	require.Equal(t, loadbalancer.HTTP, listener.protocol())
-	require.Equal(t, uint32(80), listener.extPort())
+	require.Equal(t, 80, listener.extPort())
 }
 
 func TestExternalLoadBalancerListenersFromService3(t *testing.T) {
@@ -111,11 +111,11 @@ func TestExternalLoadBalancerListenersFromService3(t *testing.T) {
 	require.Equal(t, 1, len(listeners))
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
-	require.Equal(t, uint32(5000), listener.SwarmPort)
+	require.Equal(t, 5000, listener.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "foo.bar.com", listener.host())
 	require.Equal(t, loadbalancer.HTTP, listener.protocol())
-	require.Equal(t, uint32(80), listener.extPort())
+	require.Equal(t, 80, listener.extPort())
 }
 
 func TestExternalLoadBalancerListenersFromService4(t *testing.T) {
@@ -150,14 +150,14 @@ func TestExternalLoadBalancerListenersFromService4(t *testing.T) {
 	require.Equal(t, 1, len(listeners))
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
-	require.Equal(t, uint32(4556), listener.SwarmPort)
+	require.Equal(t, 4556, listener.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "foo.bar.com", listener.host())
 	require.Equal(t, loadbalancer.TCP, listener.protocol())
-	require.Equal(t, uint32(4556), listener.extPort())
+	require.Equal(t, 4556, listener.extPort())
 }
 
-func findListener(listeners []*listener, protocol loadbalancer.Protocol, host string, extPort, swarmPort uint32) bool {
+func findListener(listeners []*listener, protocol loadbalancer.Protocol, host string, extPort, swarmPort int) bool {
 	for _, l := range listeners {
 		if l.extPort() == extPort && l.host() == host && l.protocol() == protocol && l.SwarmPort == swarmPort {
 			return true
@@ -222,11 +222,11 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 	require.Equal(t, 1, len(listeners))
 	listener := listeners[0]
 	require.Equal(t, "web1", listener.Service)
-	require.Equal(t, uint32(8080), listener.SwarmPort)
+	require.Equal(t, 8080, listener.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "foo.bar.com", listener.host())
 	require.Equal(t, loadbalancer.HTTP, listener.protocol())
-	require.Equal(t, uint32(8080), listener.extPort())
+	require.Equal(t, 8080, listener.extPort())
 
 	hostname = "secret.com"
 	listeners, has = listenersByHost[hostname]
@@ -234,11 +234,11 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 	require.Equal(t, 1, len(listeners))
 	listener = listeners[0]
 	require.Equal(t, "web1", listener.Service)
-	require.Equal(t, uint32(4343), listener.SwarmPort)
+	require.Equal(t, 4343, listener.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
 	require.Equal(t, "secret.com", listener.host())
 	require.Equal(t, loadbalancer.HTTPS, listener.protocol())
-	require.Equal(t, uint32(443), listener.extPort())
+	require.Equal(t, 443, listener.extPort())
 }
 
 func TestExternalLoadBalancerListenersFromServiceWithNoLabels(t *testing.T) {

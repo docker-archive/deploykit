@@ -1,8 +1,6 @@
 package loadbalancer
 
 import (
-	"time"
-
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -65,7 +63,7 @@ func (c client) Publish(route loadbalancer.Route) (loadbalancer.Result, error) {
 }
 
 // Unpublish dissociates the load balancer from the backend service at the given port.
-func (c client) Unpublish(extPort uint32) (loadbalancer.Result, error) {
+func (c client) Unpublish(extPort int) (loadbalancer.Result, error) {
 	_, l4Type := c.name.GetLookupAndType()
 	req := UnpublishRequest{Type: l4Type, ExtPort: extPort}
 	resp := UnpublishResponse{}
@@ -77,15 +75,11 @@ func (c client) Unpublish(extPort uint32) (loadbalancer.Result, error) {
 }
 
 // ConfigureHealthCheck configures the health checks for instance removal and reconfiguration
-func (c client) ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int, interval, timeout time.Duration) (loadbalancer.Result, error) {
+func (c client) ConfigureHealthCheck(hc loadbalancer.HealthCheck) (loadbalancer.Result, error) {
 	_, l4Type := c.name.GetLookupAndType()
 	req := ConfigureHealthCheckRequest{
 		Type:        l4Type,
-		BackendPort: backendPort,
-		Healthy:     healthy,
-		Unhealthy:   unhealthy,
-		Interval:    interval,
-		Timeout:     timeout,
+		HealthCheck: hc,
 	}
 	resp := ConfigureHealthCheckResponse{}
 

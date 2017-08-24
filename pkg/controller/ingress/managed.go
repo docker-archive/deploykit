@@ -43,7 +43,7 @@ type managed struct {
 	routes func() (map[ingress.Vhost][]loadbalancer.Route, error)
 
 	// healthChecks returns the healthchecks by vhost
-	healthChecks func() (map[ingress.Vhost][]ingress.HealthCheck, error)
+	healthChecks func() (map[ingress.Vhost][]loadbalancer.HealthCheck, error)
 
 	// groups is a function that looks up an association of vhost to lists of group ids
 	groups func() (map[ingress.Vhost][]ingress.Group, error)

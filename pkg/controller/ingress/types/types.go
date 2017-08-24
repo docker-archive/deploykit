@@ -36,7 +36,7 @@ type Spec struct {
 	Backends BackendSpec
 
 	// HealthChecks specify how to do health check against the backend services
-	HealthChecks []HealthCheck
+	HealthChecks []loadbalancer.HealthCheck
 }
 
 // Group is a qualified plugin name. The 'type' field of the name is the group ID.
@@ -79,13 +79,4 @@ type Options struct {
 	RemoveListeners   bool
 	PublishAllExposed bool
 	SyncInterval      time.Duration
-}
-
-// HealthCheck is the configuration for an operation to determine if a service is healthy.
-type HealthCheck struct {
-	Port            uint32
-	Healthy         int
-	Unhealthy       int
-	IntervalSeconds int
-	TimeoutSeconds  int
 }

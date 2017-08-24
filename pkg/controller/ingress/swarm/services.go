@@ -40,16 +40,16 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service,
 	for _, s := range services {
 
 		// We index all the exposed ports by swarm port
-		exposedPorts := map[uint32]swarm.PortConfig{}
+		exposedPorts := map[int]swarm.PortConfig{}
 		for _, exposed := range s.Endpoint.Ports {
-			exposedPorts[exposed.PublishedPort] = exposed
+			exposedPorts[int(exposed.PublishedPort)] = exposed
 		}
 		log.Infoln("exposedPorts: ", exposedPorts)
 
 		// Now go through the list that we need to publish and match up the exposed ports
 		for _, publish := range listenersFromLabel(s, lbSpecLabel, certLabel) {
 
-			if sp, has := exposedPorts[publish.SwarmPort]; has {
+			if sp, has := exposedPorts[int(publish.SwarmPort)]; has {
 
 				// This is the case where we have a clear mapping of swarm port to url
 				publish.SwarmProtocol = loadbalancer.ProtocolFromString(string(sp.Protocol))
@@ -63,7 +63,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service,
 				// swarm port to url mappings.
 				for _, exposed := range exposedPorts {
 					publish.SwarmProtocol = loadbalancer.ProtocolFromString(string(exposed.Protocol))
-					publish.SwarmPort = exposed.PublishedPort
+					publish.SwarmPort = int(exposed.PublishedPort)
 					log.Debugln("only one exposed port")
 					break // Just grab the first one
 				}
@@ -89,8 +89,8 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service,
 
 func findRoutePort(
 	routes []loadbalancer.Route,
-	loadbalancerPort uint32,
-	protocol loadbalancer.Protocol) (uint32, bool) {
+	loadbalancerPort int,
+	protocol loadbalancer.Protocol) (int, bool) {
 
 	for _, route := range routes {
 		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol {

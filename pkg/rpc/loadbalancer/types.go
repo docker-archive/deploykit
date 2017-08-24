@@ -1,8 +1,6 @@
 package loadbalancer
 
 import (
-	"time"
-
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
@@ -44,7 +42,7 @@ type PublishResponse struct {
 // UnpublishRequest is the rpc wrapper for Unpublish request
 type UnpublishRequest struct {
 	Type    string
-	ExtPort uint32
+	ExtPort int
 }
 
 // UnpublishResponse is the rpc wrapper for Unpublish response
@@ -55,12 +53,8 @@ type UnpublishResponse struct {
 
 // ConfigureHealthCheckRequest is the rpc wrapper for ConfigureHealthCheck request
 type ConfigureHealthCheckRequest struct {
-	Type        string
-	BackendPort uint32
-	Healthy     int
-	Unhealthy   int
-	Interval    time.Duration
-	Timeout     time.Duration
+	Type                     string
+	loadbalancer.HealthCheck `json:",inline" yaml:",inline"`
 }
 
 // ConfigureHealthCheckResponse is the rpc wrapper for ConfigureHealthCheck response

@@ -22,7 +22,7 @@ func Backends(name string, services *cli.Services) *cobra.Command {
 		Short: "List loadbalancer backends",
 	}
 	register := &cobra.Command{
-		Use:   "register",
+		Use:   "add <instance.ID> ...",
 		Short: "Register backends []instance.ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			l4, err := Load(services.Plugins(), name)
@@ -43,7 +43,7 @@ func Backends(name string, services *cli.Services) *cobra.Command {
 	}
 
 	deregister := &cobra.Command{
-		Use:   "deregister",
+		Use:   "rm <instance.ID> ...",
 		Short: "Deregister backends []instance.ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			l4, err := Load(services.Plugins(), name)

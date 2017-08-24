@@ -14,12 +14,12 @@ import (
 type listener struct {
 	Service       string
 	URL           *url.URL
-	SwarmPort     uint32
+	SwarmPort     int
 	SwarmProtocol loadbalancer.Protocol
 	Certificate   *string
 }
 
-func newListener(service string, swarmPort uint32, urlStr string, cert *string) (*listener, error) {
+func newListener(service string, swarmPort int, urlStr string, cert *string) (*listener, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
@@ -56,14 +56,14 @@ func (l *listener) CertASN() *string {
 }
 
 // Get the ports that are associated with the certificate from the service label
-func (l *listener) CertPorts() []uint32 {
+func (l *listener) CertPorts() []int {
 	if l.Certificate == nil {
 		// if we have not Certificate then return 443
-		return []uint32{443}
+		return []int{443}
 	}
 	parts := strings.Split(*l.Certificate, "@")
 	if len(parts) > 1 {
-		var finalPorts = []uint32{}
+		var finalPorts = []int{}
 		ports := strings.Split(parts[1], ",")
 		log.Infoln("ports ", ports)
 		if len(ports) > 0 {
@@ -75,7 +75,7 @@ func (l *listener) CertPorts() []uint32 {
 					if err != nil {
 						log.Infoln("Can't convert to int: ", port, "; error=", err)
 					}
-					finalPorts = append(finalPorts, uint32(j))
+					finalPorts = append(finalPorts, int(j))
 				}
 			}
 		}
@@ -85,12 +85,12 @@ func (l *listener) CertPorts() []uint32 {
 			// asn:blah@
 			// an at symbol but no ports after, if that is the case
 			// default to 443.
-			finalPorts = append(finalPorts, uint32(443))
+			finalPorts = append(finalPorts, int(443))
 		}
 		return finalPorts
 	}
 	// if there is no port, default to 443
-	return []uint32{443}
+	return []int{443}
 }
 
 // String value of the listener, good for log statements.
@@ -98,7 +98,7 @@ func (l *listener) String() string {
 	return fmt.Sprintf("service(%s):%d ==> %s", l.Service, l.SwarmPort, l.URL)
 }
 
-func (l *listener) extPort() uint32 {
+func (l *listener) extPort() int {
 	hostport := ":80"
 	scheme := "http"
 	if l.URL != nil {
@@ -109,15 +109,15 @@ func (l *listener) extPort() uint32 {
 	parts := strings.Split(hostport, ":")
 	if len(parts) > 1 {
 		p, _ := strconv.Atoi(parts[1])
-		return uint32(p)
+		return int(p)
 	}
 	switch scheme {
 	case "http":
-		return uint32(80)
+		return int(80)
 	case "https":
-		return uint32(443)
+		return int(443)
 	default:
-		return uint32(0) // Intentionally invalid
+		return int(0) // Intentionally invalid
 	}
 }
 
@@ -167,7 +167,7 @@ func explicitSwarmPortToURL(service, spec string) (*listener, error) {
 		return nil, fmt.Errorf("bad spec: %s for service %s", parts[1], service)
 	}
 	log.Infoln("swarmPort: ", swarmPort)
-	listener.SwarmPort = uint32(swarmPort)
+	listener.SwarmPort = int(swarmPort)
 	return listener, nil
 }
 
@@ -181,7 +181,7 @@ func impliedSwarmPortToURL(service, spec string) (*listener, error) {
 		return nil, err
 	}
 	var cert *string
-	return newListener(service, uint32(0), serviceURL.String(), cert)
+	return newListener(service, int(0), serviceURL.String(), cert)
 }
 
 func serviceCert(service swarm.Service, certLabel string) *string {
@@ -208,7 +208,7 @@ func addListenerToHostMap(m map[string][]*listener, l *listener) {
 	m[host] = append(m[host], l)
 }
 
-func intInSlice(a uint32, list []uint32) bool {
+func intInSlice(a int, list []int) bool {
 	for _, b := range list {
 		if b == a {
 			return true
@@ -225,12 +225,12 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 	// was assigned by Swarm, then we leave it alone.
 
 	// Given -p X:Y option when starting up services, we look at what's requested and what's actually published:
-	requestedPublishPorts := map[uint32][]uint32{} // key - target port Y (app/container port), value = publish port X
+	requestedPublishPorts := map[int][]int{} // key - target port Y (app/container port), value = publish port X
 	if service.Spec.EndpointSpec != nil {
 		for _, p := range service.Spec.EndpointSpec.Ports {
 			if p.PublishedPort > 0 && strings.EqualFold(string(p.PublishMode), "ingress") {
 				// Only if the user has specify the desired publish port
-				requestedPublishPorts[p.TargetPort] = append(requestedPublishPorts[p.TargetPort], p.PublishedPort)
+				requestedPublishPorts[int(p.TargetPort)] = append(requestedPublishPorts[int(p.TargetPort)], int(p.PublishedPort))
 			}
 		}
 	}
@@ -241,13 +241,13 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 	for _, exposed := range service.Endpoint.Ports {
 
 		log.Infoln("exposed: ", exposed)
-		if intInSlice(exposed.PublishedPort, requestedPublishPorts[exposed.TargetPort]) {
+		if intInSlice(int(exposed.PublishedPort), requestedPublishPorts[int(exposed.TargetPort)]) {
 			cert := serviceCert(service, certLabel)
 
 			log.Infoln("Cert: ", cert)
 			urlString := fmt.Sprintf("%v://:%d", strings.ToLower(string(exposed.Protocol)), exposed.PublishedPort)
 			log.Infoln("urlString: ", urlString)
-			if listener, err := newListener(service.Spec.Name, exposed.PublishedPort, urlString, cert); err == nil {
+			if listener, err := newListener(service.Spec.Name, int(exposed.PublishedPort), urlString, cert); err == nil {
 				listeners = append(listeners, listener)
 			} else {
 				log.Warningln("Error creating listener for exposed port:", exposed, "err=", err)

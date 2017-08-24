@@ -2,6 +2,7 @@ package types
 
 import (
 	"testing"
+	"time"
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -61,26 +62,26 @@ func TestHealthChecks(t *testing.T) {
 		{
 			Vhost:    Vhost("test.com"),
 			L4Plugin: plugin.Name("ingress/elb1"),
-			HealthChecks: []HealthCheck{
+			HealthChecks: []loadbalancer.HealthCheck{
 				{
-					Port:            8080,
-					Healthy:         1,
-					Unhealthy:       10,
-					IntervalSeconds: 10,
-					TimeoutSeconds:  60,
+					BackendPort: 8080,
+					Healthy:     1,
+					Unhealthy:   10,
+					Interval:    10 * time.Second,
+					Timeout:     60 * time.Second,
 				},
 			},
 		},
 		{
 			Vhost:    Vhost("test2.com"),
 			L4Plugin: plugin.Name("ingress/elb2"),
-			HealthChecks: []HealthCheck{
+			HealthChecks: []loadbalancer.HealthCheck{
 				{
-					Port:            80,
-					Healthy:         1,
-					Unhealthy:       10,
-					IntervalSeconds: 10,
-					TimeoutSeconds:  60,
+					BackendPort: 80,
+					Healthy:     1,
+					Unhealthy:   10,
+					Interval:    10 * time.Second,
+					Timeout:     60 * time.Second,
 				},
 			},
 		},
@@ -88,23 +89,23 @@ func TestHealthChecks(t *testing.T) {
 
 	m, err := properties.HealthChecks()
 	require.NoError(t, err)
-	require.Equal(t, map[Vhost][]HealthCheck{
+	require.Equal(t, map[Vhost][]loadbalancer.HealthCheck{
 		Vhost("test.com"): {
 			{
-				Port:            8080,
-				Healthy:         1,
-				Unhealthy:       10,
-				IntervalSeconds: 10,
-				TimeoutSeconds:  60,
+				BackendPort: 8080,
+				Healthy:     1,
+				Unhealthy:   10,
+				Interval:    10 * time.Second,
+				Timeout:     60 * time.Second,
 			},
 		},
 		Vhost("test2.com"): {
 			{
-				Port:            80,
-				Healthy:         1,
-				Unhealthy:       10,
-				IntervalSeconds: 10,
-				TimeoutSeconds:  60,
+				BackendPort: 80,
+				Healthy:     1,
+				Unhealthy:   10,
+				Interval:    10 * time.Second,
+				Timeout:     60 * time.Second,
 			},
 		},
 	}, m)
@@ -116,13 +117,13 @@ func TestGroupsInstanceIDs(t *testing.T) {
 		{
 			Vhost:    Vhost("test.com"),
 			L4Plugin: plugin.Name("ingress/elb1"),
-			HealthChecks: []HealthCheck{
+			HealthChecks: []loadbalancer.HealthCheck{
 				{
-					Port:            8080,
-					Healthy:         1,
-					Unhealthy:       10,
-					IntervalSeconds: 10,
-					TimeoutSeconds:  60,
+					BackendPort: 8080,
+					Healthy:     1,
+					Unhealthy:   10,
+					Interval:    10 * time.Second,
+					Timeout:     60 * time.Second,
 				},
 			},
 			Backends: BackendSpec{
@@ -135,13 +136,13 @@ func TestGroupsInstanceIDs(t *testing.T) {
 		{
 			Vhost:    Vhost("test2.com"),
 			L4Plugin: plugin.Name("ingress/elb2"),
-			HealthChecks: []HealthCheck{
+			HealthChecks: []loadbalancer.HealthCheck{
 				{
-					Port:            80,
-					Healthy:         1,
-					Unhealthy:       10,
-					IntervalSeconds: 10,
-					TimeoutSeconds:  60,
+					BackendPort: 80,
+					Healthy:     1,
+					Unhealthy:   10,
+					Interval:    10 * time.Second,
+					Timeout:     60 * time.Second,
 				},
 			},
 			Backends: BackendSpec{
