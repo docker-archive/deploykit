@@ -1,0 +1,23 @@
+# Ingress example
+kind: ingress
+metadata:
+  name: test.com
+  tags:
+    project: testing
+    user: chungers
+properties:
+  - Vhost: test.com
+    L4Plugin: simulator/test.com
+    Routes:
+      - LoadBalancerPort: 80
+        Port: 8080
+        Protocol: http
+      - LoadBalancerPort: 443
+        Port: 4430
+        Protocol: tcp
+    Backends:
+      Groups:
+        - group/cattle
+    RouteSources:
+      swarm:
+        Host: unix:///var/run/docker.sock
