@@ -43,8 +43,6 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 
 		groupID := group.ID(gid)
 
-		fmt.Println("describing group", groupID, "plugin", name)
-
 		desc, err := groupPlugin.DescribeGroup(groupID)
 		if err != nil {
 			return err

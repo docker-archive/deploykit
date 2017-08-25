@@ -76,7 +76,7 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 	m.backendOps <- backendOp{
 		name: "commit",
 		operation: func() error {
-			log.Info("Manager CommitGroup", "spec", grp)
+			log.Debug("Manager CommitGroup", "spec", grp, "V", debugV)
 
 			var txnResp string
 			var txnErr error
@@ -119,7 +119,7 @@ func (m *manager) DescribeGroup(id group.ID) (desc group.Description, err error)
 	m.backendOps <- backendOp{
 		name: "describe",
 		operation: func() error {
-			log.Info("Manager DescribeGroup", "id", id)
+			log.Debug("Manager DescribeGroup", "id", id, "V", debugV)
 
 			var txnResp group.Description
 			var txnErr error
@@ -152,8 +152,7 @@ func (m *manager) DestroyGroup(id group.ID) (err error) {
 	m.backendOps <- backendOp{
 		name: "destroy",
 		operation: func() error {
-
-			log.Info("Manager DestroyGroup", "groupID", id)
+			log.Debug("Manager DestroyGroup", "groupID", id, "V", debugV)
 
 			var txnErr error
 
@@ -189,8 +188,7 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 	m.backendOps <- backendOp{
 		name: "free",
 		operation: func() error {
-
-			log.Info("Manager FreeGroup", "groupID", id)
+			log.Debug("Manager FreeGroup", "groupID", id, "V", debugV)
 
 			var txnErr error
 
@@ -226,8 +224,7 @@ func (m *manager) DestroyInstances(id group.ID, instances []instance.ID) (err er
 	m.backendOps <- backendOp{
 		name: "destroyInstances",
 		operation: func() error {
-
-			log.Info("Manager DestroyInstances", "groupID", id, "instances", instances)
+			log.Debug("Manager DestroyInstances", "groupID", id, "instances", instances, "V", debugV)
 
 			var txnErr error
 

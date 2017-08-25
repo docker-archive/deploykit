@@ -45,7 +45,6 @@ func DestroyInstances(name string, services *cli.Services) *cobra.Command {
 				instances = append(instances, instance.ID(a))
 			}
 
-			fmt.Println("Destroying instances on group", groupID, "@", pluginName, ":", instances)
 			err = groupPlugin.DestroyInstances(groupID, instances)
 			if err != nil {
 				return err
