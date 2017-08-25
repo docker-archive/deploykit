@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
@@ -165,7 +164,7 @@ func (s *scaler) SetSize(size uint) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	log.Infof("Set target size to %d", size)
+	log.Info("Set target size", "size", size)
 	s.size = size
 }
 
@@ -180,7 +179,7 @@ func (s *scaler) SetMaxParallelNum(psize uint) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	log.Infof("Set max parallel instance creation  to %d", psize)
+	log.Info("Set max parallel instance creation", "max", psize)
 	s.maxParallelNum = psize
 }
 
@@ -220,7 +219,7 @@ func (s *scaler) Size() uint {
 
 func (s *scaler) waitIfReachParallelLimit(current int, batch *sync.WaitGroup) {
 	if s.maxParallelNum > 0 && (current+1)%int(s.maxParallelNum) == 0 {
-		log.Infof("Reach limit parallel instance operation number %d, waiting...", s.maxParallelNum)
+		log.Warn("Reach limit parallel instance operation number, waiting", "max", s.maxParallelNum)
 		batch.Wait()
 	}
 	return
@@ -229,11 +228,11 @@ func (s *scaler) waitIfReachParallelLimit(current int, batch *sync.WaitGroup) {
 func (s *scaler) converge() {
 	descriptions, err := labelAndList(s.scaled)
 	if err != nil {
-		log.Errorf("Failed to list group instances: %s", err)
+		log.Error("Failed to list group instances", "err", err)
 		return
 	}
 
-	log.Debugf("Found existing instances: %v", descriptions)
+	log.Debug("Found existing instances", "descriptions", descriptions, "V", debugV)
 
 	grp := sync.WaitGroup{}
 
@@ -241,11 +240,11 @@ func (s *scaler) converge() {
 	desiredSize := s.getSize()
 	switch {
 	case actualSize == desiredSize:
-		log.Debugf("Group has %d instances, no action is needed", desiredSize)
+		log.Debug("No action - Group has enough instances", "desired", desiredSize)
 
 	case actualSize > desiredSize:
 		remove := actualSize - desiredSize
-		log.Infof("Removing %d instances from group to reach desired %d", remove, desiredSize)
+		log.Info("Removing instances", "remove", remove, "desired", desiredSize)
 
 		sorted := make([]instance.Description, len(descriptions))
 		copy(sorted, descriptions)
@@ -267,7 +266,7 @@ func (s *scaler) converge() {
 
 	case actualSize < desiredSize:
 		add := desiredSize - actualSize
-		log.Infof("Adding %d instances to group to reach desired %d", add, desiredSize)
+		log.Info("Adding instances to group", "add", add, "desired", desiredSize)
 
 		for i := 0; i < int(add); i++ {
 			grp.Add(1)

@@ -79,8 +79,7 @@ func testEnsemble(t *testing.T,
 	st, err := server.StartPluginAtPath(filepath.Join(dir, "group-stateless"), gs)
 	require.NoError(t, err)
 
-	m, err := NewManager(disc, detector, nil, snap, "group-stateless")
-	require.NoError(t, err)
+	m := NewManager(disc, detector, nil, snap, "group-stateless")
 
 	return m, st
 }

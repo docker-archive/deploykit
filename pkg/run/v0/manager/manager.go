@@ -170,21 +170,16 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		return
 	}
 
-	var mgr manager.Backend
 	lookup, _ := options.BackendName.GetLookupAndType()
-	mgr, err = manager.NewManager(plugins(), options.leader, options.leaderStore, options.store, lookup)
-	if err != nil {
-		return
-	}
-
-	log.Info("start manager")
+	mgr := manager.NewManager(plugins(), options.leader, options.leaderStore, options.store, lookup)
+	log.Info("Start manager", "m", mgr)
 
 	_, err = mgr.Start()
 	if err != nil {
 		return
 	}
 
-	log.Info("manager running")
+	log.Info("Manager running")
 
 	updatable := &metadataModel{
 		snapshot: options.store,
@@ -200,7 +195,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	impls = map[run.PluginCode]interface{}{
 		run.Manager:           mgr,
-		run.Controller:        mgr.GroupControllers,
+		run.Controller:        mgr.Controllers,
 		run.Group:             mgr.Groups,
 		run.MetadataUpdatable: metadataUpdatable,
 		run.Metadata:          metadataUpdatable,

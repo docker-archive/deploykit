@@ -44,7 +44,7 @@ type l4Simulator struct {
 
 // Name is the name of the load balancer
 func (l *l4Simulator) Name() string {
-	l4Logger.Info("Name")
+	l4Logger.Debug("Name", "V", debugV)
 	return l.name
 }
 
@@ -56,7 +56,7 @@ func (r result) String() string {
 
 // Routes lists all known routes.
 func (l *l4Simulator) Routes() ([]loadbalancer.Route, error) {
-	l4Logger.Info("Routes")
+	l4Logger.Debug("Routes", "V", debugV)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -84,7 +84,7 @@ func mustEncode(v interface{}) []byte {
 
 // Publish publishes a route in the LB by adding a load balancing rule
 func (l *l4Simulator) Publish(route loadbalancer.Route) (loadbalancer.Result, error) {
-	l4Logger.Info("Public", "name", l.name, "route", route)
+	l4Logger.Debug("Public", "name", l.name, "route", route, "V", debugV)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -101,7 +101,7 @@ func (l *l4Simulator) Publish(route loadbalancer.Route) (loadbalancer.Result, er
 
 // Unpublish dissociates the load balancer from the backend service at the given port.
 func (l *l4Simulator) Unpublish(extPort int) (loadbalancer.Result, error) {
-	l4Logger.Info("Unpublish", "name", l.name, "extPort", extPort)
+	l4Logger.Debug("Unpublish", "name", l.name, "extPort", extPort, "V", debugV)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -120,7 +120,7 @@ func (l *l4Simulator) Unpublish(extPort int) (loadbalancer.Result, error) {
 // mark a backend instance as healthy or unhealthy.   The ping occurs on the backendPort parameter and
 // at the interval specified.
 func (l *l4Simulator) ConfigureHealthCheck(hc loadbalancer.HealthCheck) (loadbalancer.Result, error) {
-	l4Logger.Info("ConfigureHealthCheck", "name", l.name, "heathCheck", hc)
+	l4Logger.Debug("ConfigureHealthCheck", "name", l.name, "heathCheck", hc, "V", debugV)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -129,7 +129,7 @@ func (l *l4Simulator) ConfigureHealthCheck(hc loadbalancer.HealthCheck) (loadbal
 
 // RegisterBackend registers instances identified by the IDs to the LB's backend pool
 func (l *l4Simulator) RegisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
-	l4Logger.Info("RegisterBackends", "name", l.name, "ids", ids)
+	l4Logger.Debug("RegisterBackends", "name", l.name, "ids", ids, "V", debugV)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -144,7 +144,7 @@ func (l *l4Simulator) RegisterBackends(ids []instance.ID) (loadbalancer.Result, 
 
 // DeregisterBackend removes the specified instances from the backend pool
 func (l *l4Simulator) DeregisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
-	l4Logger.Info("DeregisterBackends", "name", l.name, "ids", ids)
+	l4Logger.Debug("DeregisterBackends", "name", l.name, "ids", ids, "V", debugV)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -156,7 +156,7 @@ func (l *l4Simulator) DeregisterBackends(ids []instance.ID) (loadbalancer.Result
 
 // Backends returns a list of backends
 func (l *l4Simulator) Backends() ([]instance.ID, error) {
-	l4Logger.Info("Backends", "name", l.name)
+	l4Logger.Debug("Backends", "name", l.name, "V", debugV)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
