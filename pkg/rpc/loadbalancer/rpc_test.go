@@ -158,13 +158,13 @@ func TestLoadbalancerUnpublish(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	portActual := make(chan uint32, 1)
-	var port uint32 = 1234
+	portActual := make(chan int, 1)
+	port := 1234
 
 	result := fakeResult("result")
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
-		DoUnpublish: func(port uint32) (loadbalancer.Result, error) {
+		DoUnpublish: func(port int) (loadbalancer.Result, error) {
 			portActual <- port
 			return result, nil
 		},
@@ -182,11 +182,11 @@ func TestLoadbalancerUnpublishError(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	portActual := make(chan uint32, 1)
-	var port uint32 = 1234
+	portActual := make(chan int, 1)
+	port := 1234
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
-		DoUnpublish: func(port uint32) (loadbalancer.Result, error) {
+		DoUnpublish: func(port int) (loadbalancer.Result, error) {
 			portActual <- port
 			return nil, errors.New("backend-error")
 		},
@@ -204,8 +204,8 @@ func TestLoadbalancerConfigureHealthCheck(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	portActual := make(chan uint32, 1)
-	var port uint32 = 1234
+	portActual := make(chan int, 1)
+	port := 1234
 	healthyActual := make(chan int, 1)
 	healthy := 1
 	unhealthyActual := make(chan int, 1)
@@ -218,23 +218,25 @@ func TestLoadbalancerConfigureHealthCheck(t *testing.T) {
 	result := fakeResult("result")
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
-		DoConfigureHealthCheck: func(port uint32, healthy, unhealthy int, interval, timeout time.Duration) (loadbalancer.Result, error) {
-			portActual <- port
-			healthyActual <- healthy
-			unhealthyActual <- unhealthy
-			intervalActual <- interval
-			timeoutActual <- timeout
+		DoConfigureHealthCheck: func(hc loadbalancer.HealthCheck) (loadbalancer.Result, error) {
+			portActual <- hc.BackendPort
+			healthyActual <- hc.Healthy
+			unhealthyActual <- hc.Unhealthy
+			intervalActual <- hc.Interval
+			timeoutActual <- hc.Timeout
 			return result, nil
 		},
 	}))
 	require.NoError(t, err)
 
 	actualResult, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).ConfigureHealthCheck(
-		port,
-		healthy,
-		unhealthy,
-		interval,
-		timeout)
+		loadbalancer.HealthCheck{
+			BackendPort: port,
+			Healthy:     healthy,
+			Unhealthy:   unhealthy,
+			Interval:    interval,
+			Timeout:     timeout,
+		})
 	server.Stop()
 	require.NoError(t, err)
 	require.Equal(t, result.String(), actualResult.String())
@@ -249,8 +251,8 @@ func TestLoadbalancerConfigureHealthCheckError(t *testing.T) {
 	socketPath := tempSocket()
 	name := plugin.Name(filepath.Base(socketPath))
 
-	portActual := make(chan uint32, 1)
-	var port uint32 = 1234
+	portActual := make(chan int, 1)
+	port := 1234
 	healthyActual := make(chan int, 1)
 	healthy := 1
 	unhealthyActual := make(chan int, 1)
@@ -261,23 +263,25 @@ func TestLoadbalancerConfigureHealthCheckError(t *testing.T) {
 	timeout := time.Duration(time.Minute * 2)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
-		DoConfigureHealthCheck: func(port uint32, healthy, unhealthy int, interval, timeout time.Duration) (loadbalancer.Result, error) {
-			portActual <- port
-			healthyActual <- healthy
-			unhealthyActual <- unhealthy
-			intervalActual <- interval
-			timeoutActual <- timeout
+		DoConfigureHealthCheck: func(hc loadbalancer.HealthCheck) (loadbalancer.Result, error) {
+			portActual <- hc.BackendPort
+			healthyActual <- hc.Healthy
+			unhealthyActual <- hc.Unhealthy
+			intervalActual <- hc.Interval
+			timeoutActual <- hc.Timeout
 			return nil, errors.New("backend-error")
 		},
 	}))
 	require.NoError(t, err)
 
 	result, err := must(NewClient(plugin.Name(name+"/type1"), socketPath)).ConfigureHealthCheck(
-		port,
-		healthy,
-		unhealthy,
-		interval,
-		timeout)
+		loadbalancer.HealthCheck{
+			BackendPort: port,
+			Healthy:     healthy,
+			Unhealthy:   unhealthy,
+			Interval:    interval,
+			Timeout:     timeout,
+		})
 	server.Stop()
 	require.Error(t, err)
 	require.Nil(t, result)

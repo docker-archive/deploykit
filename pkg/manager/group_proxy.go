@@ -7,6 +7,23 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
+// Groups returns a map of *scoped* group controllers by ID of the group.
+func (m *manager) Groups() (map[group.ID]group.Plugin, error) {
+	groups := map[group.ID]group.Plugin{
+		group.ID(""): m.Plugin,
+	}
+	all, err := m.Plugin.InspectGroups()
+	if err != nil {
+		return groups, nil
+	}
+	for _, spec := range all {
+		gid := spec.ID
+		groups[gid] = m.Plugin
+	}
+	log.Debug("Groups", "map", groups, "V", debugV)
+	return groups, nil
+}
+
 type proxy struct {
 	lock   sync.Mutex
 	client group.Plugin

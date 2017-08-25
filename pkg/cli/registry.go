@@ -133,10 +133,20 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 
 					subcommand := buildCmd(name, services)
 
-					if _, has := seen[subcommand.Use]; !has {
-						command.AddCommand(subcommand)
-						seen[subcommand.Use] = subcommand
+					parts := strings.Split(subcommand.Use, " ")
+					verb := parts[0]
+
+					if _, has := seen[verb]; has {
+						if verb == "info" {
+							return // skip this
+						}
+						// splice the spi into the usage.. eg. describe-group
+						subcommand.Use = strings.Join(append(
+							[]string{verb + "-" + strings.ToLower(spi.Name)}, parts[1:]...), " ")
 					}
+
+					command.AddCommand(subcommand)
+					seen[verb] = subcommand
 				})
 			}
 

@@ -6,7 +6,6 @@ import (
 
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -18,18 +17,18 @@ func (l fakeLeadership) IsLeader() (bool, error) {
 	return <-l, nil
 }
 
-func TestControllerStartStop(t *testing.T) {
+func TestManagedStartStop(t *testing.T) {
 
 	ticker := make(chan time.Time, 1)
 	leader := make(chan bool, 1)
 
 	doneWork := make(chan interface{})
 
-	controller := &Controller{
+	managedObject := &managed{
 		Leadership:   fakeLeadership(leader),
 		ticker:       ticker,
-		healthChecks: func() (map[ingress.Vhost][]ingress.HealthCheck, error) { return nil, nil },
-		groups:       func() (map[ingress.Vhost][]group.ID, error) { return nil, nil },
+		healthChecks: func() (map[ingress.Vhost][]loadbalancer.HealthCheck, error) { return nil, nil },
+		groups:       func() (map[ingress.Vhost][]ingress.Group, error) { return nil, nil },
 		l4s:          func() (map[ingress.Vhost]loadbalancer.L4, error) { return nil, nil },
 
 		routes: func() (map[ingress.Vhost][]loadbalancer.Route, error) {
@@ -54,15 +53,15 @@ func TestControllerStartStop(t *testing.T) {
 			},
 		}),
 	}
-	err := controller.init(spec)
+	err := managedObject.init(spec)
 	require.NoError(t, err)
 
-	controller.start()
+	managedObject.start()
 
 	t.Log("verify initial state machine is in the follower state")
-	require.Equal(t, follower, controller.stateMachine.State())
+	require.Equal(t, follower, managedObject.stateMachine.State())
 
-	stateObject := controller.object()
+	stateObject := managedObject.object()
 	require.NotNil(t, stateObject)
 	require.NoError(t, stateObject.Validate())
 	require.Equal(t, "ingress-singleton", stateObject.Metadata.Identity.ID)
@@ -81,7 +80,7 @@ func TestControllerStartStop(t *testing.T) {
 	<-doneWork
 
 	t.Log("verify state machine moved to the waiting state")
-	require.Equal(t, waiting, controller.stateMachine.State())
+	require.Equal(t, waiting, managedObject.stateMachine.State())
 
 	// leadership changed
 	leader <- false
@@ -91,14 +90,14 @@ func TestControllerStartStop(t *testing.T) {
 	t.Log("verify state machine moved to the follower state")
 
 	time.Sleep(500 * time.Millisecond)
-	require.Equal(t, follower, controller.stateMachine.State())
+	require.Equal(t, follower, managedObject.stateMachine.State())
 
 	// leadership changed
 	leader <- true
 
 	// here we change the routes function to test for another close
 	doneWork2 := make(chan interface{})
-	controller.routes = func() (map[ingress.Vhost][]loadbalancer.Route, error) {
+	managedObject.routes = func() (map[ingress.Vhost][]loadbalancer.Route, error) {
 		// if this function is called then we know we've done work in the state transition
 		// from syncing to waiting
 		close(doneWork2)
@@ -110,7 +109,7 @@ func TestControllerStartStop(t *testing.T) {
 	t.Log("verify state machine moved to the waiting state")
 
 	<-doneWork2 // if not called, the test will hang here
-	require.Equal(t, waiting, controller.stateMachine.State())
+	require.Equal(t, waiting, managedObject.stateMachine.State())
 
-	controller.stop()
+	managedObject.stop()
 }

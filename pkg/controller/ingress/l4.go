@@ -25,7 +25,7 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 
 	// Index the listener set up
 	listenerIndex := map[string]loadbalancer.Route{}
-	listenerIndexKey := func(p loadbalancer.Protocol, extPort, instancePort uint32) string {
+	listenerIndexKey := func(p loadbalancer.Protocol, extPort, instancePort int) string {
 		return fmt.Sprintf("%v/%5d/%5d", p, extPort, instancePort)
 	}
 
@@ -105,8 +105,8 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 	return nil
 }
 
-func findRoutePort(routes []loadbalancer.Route, loadbalancerPort uint32,
-	protocol loadbalancer.Protocol) (uint32, bool) {
+func findRoutePort(routes []loadbalancer.Route, loadbalancerPort int,
+	protocol loadbalancer.Protocol) (int, bool) {
 
 	for _, route := range routes {
 		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol {

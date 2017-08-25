@@ -14,8 +14,8 @@ func TestListener(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
-	require.Equal(t, uint32(80), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(80), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 
@@ -23,8 +23,8 @@ func TestListener(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
-	require.Equal(t, uint32(80), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(80), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 
@@ -32,8 +32,8 @@ func TestListener(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
-	require.Equal(t, uint32(8080), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(8080), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "localswarm", l.host())
 }
@@ -47,12 +47,12 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
-	require.Equal(t, uint32(443), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(443), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 	require.Equal(t, &cert, l.CertASN())
-	require.Equal(t, []uint32{443}, l.CertPorts())
+	require.Equal(t, []int{443}, l.CertPorts())
 	r := l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, &cert, r.Certificate)
@@ -63,12 +63,12 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.TCP, l.protocol())
-	require.Equal(t, uint32(444), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(444), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 	require.Equal(t, &cert, l.CertASN())
-	require.Equal(t, []uint32{443}, l.CertPorts())
+	require.Equal(t, []int{443}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
 	require.Equal(t, &cert, r.Certificate)
@@ -78,12 +78,12 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.TCP, l.protocol())
-	require.Equal(t, uint32(443), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(443), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 	require.Equal(t, emptyCert, l.CertASN())
-	require.Equal(t, []uint32{443}, l.CertPorts())
+	require.Equal(t, []int{443}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
 	require.Equal(t, emptyCert, r.Certificate)
@@ -101,12 +101,12 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
-	require.Equal(t, uint32(443), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(443), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []uint32{443}, l.CertPorts())
+	require.Equal(t, []int{443}, l.CertPorts())
 	r := l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
@@ -116,12 +116,12 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
-	require.Equal(t, uint32(442), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(442), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []uint32{442}, l.CertPorts())
+	require.Equal(t, []int{442}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
@@ -131,12 +131,12 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
-	require.Equal(t, uint32(442), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(442), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []uint32{443, 442}, l.CertPorts())
+	require.Equal(t, []int{443, 442}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
@@ -146,12 +146,12 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.TCP, l.protocol())
-	require.Equal(t, uint32(442), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(442), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []uint32{443}, l.CertPorts())
+	require.Equal(t, []int{443}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
@@ -161,12 +161,12 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
-	require.Equal(t, uint32(443), l.extPort())
-	require.Equal(t, uint32(30000), l.SwarmPort)
+	require.Equal(t, int(443), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, "default", l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []uint32{443}, l.CertPorts())
+	require.Equal(t, []int{443}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
@@ -179,57 +179,57 @@ func TestImpliedSwarmPortToUrl(t *testing.T) {
 	l, err = impliedSwarmPortToURL("foo", "http://:8080")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(8080), l.extPort())
+	require.Equal(t, int(8080), l.extPort())
 	require.Equal(t, "default", l.host())
-	require.Equal(t, uint32(0), l.SwarmPort)
+	require.Equal(t, int(0), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
 
 	l, err = impliedSwarmPortToURL("foo", "https://")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(443), l.extPort())
+	require.Equal(t, int(443), l.extPort())
 	require.Equal(t, "default", l.host())
-	require.Equal(t, uint32(0), l.SwarmPort)
+	require.Equal(t, int(0), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTPS, l.protocol())
 
 	l, err = impliedSwarmPortToURL("foo", "http://myapp.domain.com")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(80), l.extPort())
+	require.Equal(t, int(80), l.extPort())
 	require.Equal(t, "myapp.domain.com", l.host())
-	require.Equal(t, uint32(0), l.SwarmPort)
+	require.Equal(t, int(0), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
 
 	l, err = impliedSwarmPortToURL("foo", "HTTP://myapp.domain.com")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(80), l.extPort())
+	require.Equal(t, int(80), l.extPort())
 	require.Equal(t, "myapp.domain.com", l.host())
-	require.Equal(t, uint32(0), l.SwarmPort)
+	require.Equal(t, int(0), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
 
 	l, err = impliedSwarmPortToURL("foo", "tcp://myapp.domain.com:2333")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(2333), l.extPort())
+	require.Equal(t, int(2333), l.extPort())
 	require.Equal(t, "myapp.domain.com", l.host())
-	require.Equal(t, uint32(0), l.SwarmPort)
+	require.Equal(t, int(0), l.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, l.protocol())
 
 	l, err = impliedSwarmPortToURL("foo", "ssl://myapp.domain.com")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(0), l.extPort())
+	require.Equal(t, int(0), l.extPort())
 	require.Equal(t, "myapp.domain.com", l.host())
-	require.Equal(t, uint32(0), l.SwarmPort)
+	require.Equal(t, int(0), l.SwarmPort)
 	require.Equal(t, loadbalancer.SSL, l.protocol())
 
 	l, err = impliedSwarmPortToURL("foo", "https://myapp.domain.com")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(443), l.extPort())
+	require.Equal(t, int(443), l.extPort())
 	require.Equal(t, "myapp.domain.com", l.host())
-	require.Equal(t, uint32(0), l.SwarmPort)
+	require.Equal(t, int(0), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTPS, l.protocol())
 }
 
@@ -240,41 +240,41 @@ func TestExplicitSwarmPortToUrl(t *testing.T) {
 	l, err = explicitSwarmPortToURL("foo", "7000=http://:8080")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(8080), l.extPort())
+	require.Equal(t, int(8080), l.extPort())
 	require.Equal(t, "default", l.host())
-	require.Equal(t, uint32(7000), l.SwarmPort)
+	require.Equal(t, int(7000), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
 
 	l, err = explicitSwarmPortToURL("foo", "8999=https://")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(443), l.extPort())
+	require.Equal(t, int(443), l.extPort())
 	require.Equal(t, "default", l.host())
-	require.Equal(t, uint32(8999), l.SwarmPort)
+	require.Equal(t, int(8999), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTPS, l.protocol())
 
 	l, err = explicitSwarmPortToURL("foo", "80=http://myapp.domain.com")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(80), l.extPort())
+	require.Equal(t, int(80), l.extPort())
 	require.Equal(t, "myapp.domain.com", l.host())
-	require.Equal(t, uint32(80), l.SwarmPort)
+	require.Equal(t, int(80), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
 
 	l, err = explicitSwarmPortToURL("foo", "8088=HTTP://myapp.domain.com")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(80), l.extPort())
+	require.Equal(t, int(80), l.extPort())
 	require.Equal(t, "myapp.domain.com", l.host())
-	require.Equal(t, uint32(8088), l.SwarmPort)
+	require.Equal(t, int(8088), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
 
 	l, err = explicitSwarmPortToURL("foo", "7543=tcp://myapp.domain.com:2333")
 	require.NoError(t, err)
 	require.NotNil(t, l.URL)
-	require.Equal(t, uint32(2333), l.extPort())
+	require.Equal(t, int(2333), l.extPort())
 	require.Equal(t, "myapp.domain.com", l.host())
-	require.Equal(t, uint32(7543), l.SwarmPort)
+	require.Equal(t, int(7543), l.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, l.protocol())
 }
 
@@ -307,9 +307,9 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 	require.Equal(t, "web1", l[0].Service)
 	require.Equal(t, "default", l[0].host())
 	require.Equal(t, loadbalancer.HTTP, l[0].protocol())
-	require.Equal(t, uint32(8080), l[0].extPort())
+	require.Equal(t, int(8080), l[0].extPort())
 
-	require.Equal(t, uint32(0), l[0].SwarmPort)  // implied, no explicit port=url mapping
+	require.Equal(t, int(0), l[0].SwarmPort)     // implied, no explicit port=url mapping
 	require.False(t, l[0].SwarmProtocol.Valid()) // not known yet.
 
 	s.Spec.Labels = map[string]string{
@@ -322,9 +322,9 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 	require.Equal(t, "web1", l[0].Service)
 	require.Equal(t, "default", l[0].host())
 	require.Equal(t, loadbalancer.HTTP, l[0].protocol())
-	require.Equal(t, uint32(80), l[0].extPort())
+	require.Equal(t, int(80), l[0].extPort())
 
-	require.Equal(t, uint32(0), l[0].SwarmPort)  // implied, no explicit port=url mapping
+	require.Equal(t, int(0), l[0].SwarmPort)     // implied, no explicit port=url mapping
 	require.False(t, l[0].SwarmProtocol.Valid()) // not known yet.
 
 	s.Spec.Labels = map[string]string{
@@ -337,9 +337,9 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 	require.Equal(t, "web1", l[0].Service)
 	require.Equal(t, "app1.domain.com", l[0].host())
 	require.Equal(t, loadbalancer.HTTPS, l[0].protocol())
-	require.Equal(t, uint32(443), l[0].extPort())
+	require.Equal(t, int(443), l[0].extPort())
 
-	require.Equal(t, uint32(0), l[0].SwarmPort)  // implied, no explicit port=url mapping
+	require.Equal(t, int(0), l[0].SwarmPort)     // implied, no explicit port=url mapping
 	require.False(t, l[0].SwarmProtocol.Valid()) // not known yet.
 
 	s.Spec.Labels = map[string]string{
@@ -352,9 +352,9 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 	require.Equal(t, "web1", l[0].Service)
 	require.Equal(t, "app1.domain.com", l[0].host())
 	require.Equal(t, loadbalancer.TCP, l[0].protocol())
-	require.Equal(t, uint32(2375), l[0].extPort())
+	require.Equal(t, int(2375), l[0].extPort())
 
-	require.Equal(t, uint32(0), l[0].SwarmPort)  // implied, no explicit port=url mapping
+	require.Equal(t, int(0), l[0].SwarmPort)     // implied, no explicit port=url mapping
 	require.False(t, l[0].SwarmProtocol.Valid()) // not known yet.
 
 	s.Spec.Labels = map[string]string{
@@ -367,14 +367,14 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 	require.Equal(t, "web1", l[0].Service)
 	require.Equal(t, "app1.domain.com", l[0].host())
 	require.Equal(t, loadbalancer.TCP, l[0].protocol())
-	require.Equal(t, uint32(2375), l[0].extPort())
-	require.Equal(t, uint32(0), l[0].SwarmPort)  // implied, no explicit port=url mapping
+	require.Equal(t, int(2375), l[0].extPort())
+	require.Equal(t, int(0), l[0].SwarmPort)     // implied, no explicit port=url mapping
 	require.False(t, l[0].SwarmProtocol.Valid()) // not known yet.
 	require.Equal(t, "web1", l[1].Service)
 	require.Equal(t, "default", l[1].host())
 	require.Equal(t, loadbalancer.HTTPS, l[1].protocol())
-	require.Equal(t, uint32(443), l[1].extPort())
-	require.Equal(t, uint32(0), l[1].SwarmPort)  // implied, no explicit port=url mapping
+	require.Equal(t, int(443), l[1].extPort())
+	require.Equal(t, int(0), l[1].SwarmPort)     // implied, no explicit port=url mapping
 	require.False(t, l[1].SwarmProtocol.Valid()) // not known yet.
 }
 
@@ -395,9 +395,9 @@ func TestListenersToPublishExplicitMapping(t *testing.T) {
 	require.Equal(t, "web1", l[0].Service)
 	require.Equal(t, "default", l[0].host())
 	require.Equal(t, loadbalancer.HTTP, l[0].protocol())
-	require.Equal(t, uint32(8080), l[0].extPort())
-	require.Equal(t, uint32(30000), l[0].SwarmPort) // implied, no explicit port=url mapping
-	require.False(t, l[0].SwarmProtocol.Valid())    // not known yet.
+	require.Equal(t, int(8080), l[0].extPort())
+	require.Equal(t, int(30000), l[0].SwarmPort) // implied, no explicit port=url mapping
+	require.False(t, l[0].SwarmProtocol.Valid()) // not known yet.
 
 	s.Spec.Labels = map[string]string{
 		LabelExternalLoadBalancerSpec: "30000=https://, 4040=tcp://foo.com:4040",
@@ -408,15 +408,15 @@ func TestListenersToPublishExplicitMapping(t *testing.T) {
 	require.Equal(t, "web1", l[0].Service)
 	require.Equal(t, "default", l[0].host())
 	require.Equal(t, loadbalancer.HTTPS, l[0].protocol())
-	require.Equal(t, uint32(443), l[0].extPort())
-	require.Equal(t, uint32(30000), l[0].SwarmPort)
+	require.Equal(t, int(443), l[0].extPort())
+	require.Equal(t, int(30000), l[0].SwarmPort)
 	require.False(t, l[0].SwarmProtocol.Valid())
 
 	require.Equal(t, "web1", l[1].Service)
 	require.Equal(t, "foo.com", l[1].host())
 	require.Equal(t, loadbalancer.TCP, l[1].protocol())
-	require.Equal(t, uint32(4040), l[1].extPort())
-	require.Equal(t, uint32(4040), l[1].SwarmPort)
+	require.Equal(t, int(4040), l[1].extPort())
+	require.Equal(t, int(4040), l[1].SwarmPort)
 	require.False(t, l[1].SwarmProtocol.Valid())
 }
 
@@ -493,7 +493,7 @@ func TestListenersFromExposedPorts(t *testing.T) {
 	require.Equal(t, "web1", l[0].Service)
 	require.Equal(t, "default", l[0].host())
 	require.Equal(t, loadbalancer.TCP, l[0].protocol())
-	require.Equal(t, uint32(8080), l[0].extPort())
-	require.Equal(t, uint32(8080), l[0].SwarmPort)
+	require.Equal(t, 8080, l[0].extPort())
+	require.Equal(t, 8080, l[0].SwarmPort)
 	require.False(t, l[0].SwarmProtocol.Valid())
 }

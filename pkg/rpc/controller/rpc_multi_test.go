@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/docker/infrakit/pkg/controller"
@@ -60,7 +61,7 @@ func TestMultiControllerPlan(t *testing.T) {
 			return largeObject, largePlan, nil
 		},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithTypes(
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNamed(
 		func() (map[string]controller.Controller, error) {
 			return map[string]controller.Controller{
 				"small": small,
@@ -78,7 +79,7 @@ func TestMultiControllerPlan(t *testing.T) {
 
 	_, _, err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Plan(controller.Manage, largeSpec)
 	require.Error(t, err)
-	require.Equal(t, "no-controller:controller-impl-test/typeUnknown", err.Error())
+	require.True(t, strings.Contains(err.Error(), "controller-impl-test/typeUnknown"))
 
 	smallArgs := <-smallActual
 	largeArgs := <-largeActual
@@ -134,7 +135,7 @@ func TestMultiControllerCommit(t *testing.T) {
 			return largeObject, nil
 		},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithTypes(
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNamed(
 		func() (map[string]controller.Controller, error) {
 			return map[string]controller.Controller{
 				"small": small,
@@ -152,7 +153,7 @@ func TestMultiControllerCommit(t *testing.T) {
 
 	_, err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Commit(controller.Manage, largeSpec)
 	require.Error(t, err)
-	require.Equal(t, "no-controller:controller-impl-test/typeUnknown", err.Error())
+	require.True(t, strings.Contains(err.Error(), "controller-impl-test/typeUnknown"))
 
 	smallArgs := <-smallActual
 	largeArgs := <-largeActual
@@ -206,7 +207,7 @@ func TestMultiControllerDescribe(t *testing.T) {
 			return []types.Object{largeObject}, nil
 		},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithTypes(
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNamed(
 		func() (map[string]controller.Controller, error) {
 			return map[string]controller.Controller{
 				"small": small,
@@ -227,7 +228,7 @@ func TestMultiControllerDescribe(t *testing.T) {
 
 	_, err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Describe(nil)
 	require.Error(t, err)
-	require.Equal(t, "no-controller:controller-impl-test/typeUnknown", err.Error())
+	require.True(t, strings.Contains(err.Error(), "controller-impl-test/typeUnknown"))
 
 	smallArgs := <-smallActual
 	largeArgs := <-largeActual
@@ -279,7 +280,7 @@ func TestMultiControllerFree(t *testing.T) {
 			return []types.Object{largeObject}, nil
 		},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithTypes(
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNamed(
 		func() (map[string]controller.Controller, error) {
 			return map[string]controller.Controller{
 				"small": small,
@@ -300,7 +301,7 @@ func TestMultiControllerFree(t *testing.T) {
 
 	_, err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Free(nil)
 	require.Error(t, err)
-	require.Equal(t, "no-controller:controller-impl-test/typeUnknown", err.Error())
+	require.True(t, strings.Contains(err.Error(), "controller-impl-test/typeUnknown"))
 
 	smallArgs := <-smallActual
 	largeArgs := <-largeActual

@@ -7,24 +7,32 @@ import (
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/store/file"
+	"github.com/docker/infrakit/pkg/store/mem"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 var instanceLogger = logutil.New("module", "simulator/instance")
 
 // NewInstance returns a typed instance plugin
-func NewInstance(name, dir string) instance.Plugin {
+func NewInstance(name string, options Options) instance.Plugin {
 	l := &instanceSimulator{
-		name:      name,
-		instances: file.NewStore(name, dir, true).Init(),
+		name: name,
+	}
+
+	switch options.Store {
+	case StoreFile:
+		l.instances = file.NewStore(name, options.Dir)
+	case StoreMem:
+		l.instances = mem.NewStore(name)
 	}
 	return l
 }
 
 type instanceSimulator struct {
 	name      string
-	instances *file.Store
+	instances store.KV
 	lock      sync.Mutex
 }
 
@@ -39,14 +47,20 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 	instanceLogger.Info("Provision", "name", s.name, "spec", spec)
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	key := time.Now().UnixNano()
+	key := fmt.Sprintf("%v", time.Now().UnixNano())
 	description := instance.Description{
 		ID:         instance.ID(key),
 		Tags:       spec.Tags,
 		LogicalID:  spec.LogicalID,
 		Properties: types.AnyValueMust(spec),
 	}
-	err := s.instances.Write(description.ID, description)
+	buff, err := types.AnyValueMust(description).MarshalYAML()
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.instances.Write(description.ID, buff)
+	instanceLogger.Debug("Provisioned", "id", description.ID, "spec", spec, "err", err)
 	return &description.ID, err
 }
 
@@ -64,16 +78,15 @@ func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) err
 		return fmt.Errorf("not found %v", key)
 	}
 
-	v, err := s.instances.Read(key, func(buff []byte) (interface{}, error) {
-		d := instance.Description{}
-		err := types.AnyYAMLMust(buff).Decode(&d)
-		return d, err
-	})
+	buff, err := s.instances.Read(key)
 	if err != nil {
 		return err
 	}
 
-	n := v.(instance.Description)
+	n := instance.Description{}
+	if err := types.AnyYAMLMust(buff).Decode(&n); err != nil {
+		return err
+	}
 	if n.Tags == nil {
 		n.Tags = map[string]string{}
 	}
@@ -81,7 +94,13 @@ func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) err
 	for k, v := range labels {
 		n.Tags[k] = v
 	}
-	return s.instances.Write(key, n)
+
+	buff, err = types.AnyValueMust(n).MarshalYAML()
+	if err != nil {
+		return err
+	}
+
+	return s.instances.Write(key, buff)
 }
 
 // Destroy terminates an existing instance.
@@ -110,7 +129,8 @@ func (s *instanceSimulator) DescribeInstances(labels map[string]string,
 
 	matches := []instance.Description{}
 
-	err := s.instances.All(labels,
+	err := store.Visit(s.instances,
+		labels,
 		func(v interface{}) map[string]string {
 			return v.(instance.Description).Tags
 		},

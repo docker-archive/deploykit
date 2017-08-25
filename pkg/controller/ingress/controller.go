@@ -2,113 +2,101 @@ package ingress
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
-	"github.com/docker/infrakit/pkg/core"
+	"github.com/docker/infrakit/pkg/controller/internal"
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/fsm"
-	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
-	"github.com/docker/infrakit/pkg/plugin"
-	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
-	loadbalancer_rpc "github.com/docker/infrakit/pkg/rpc/loadbalancer"
-	"github.com/docker/infrakit/pkg/spi/group"
-	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
-	"golang.org/x/net/context"
 )
 
-var log = logutil.New("module", "controller/ingress")
-
-// Controller is the entity that reconciles desired routes with loadbalancers
-type Controller struct {
-	manager.Leadership
-
-	// Name of the group plugin / controller to lookup
-	GroupPluginName plugin.Name
-
-	// l4s is a function that get retrieve a map of L4 loadbalancers by name
-	l4s func() (map[ingress.Vhost]loadbalancer.L4, error)
-
-	// routes is a function returning the desired state of routes by vhosts
-	routes func() (map[ingress.Vhost][]loadbalancer.Route, error)
-
-	// healthChecks returns the healthchecks by vhost
-	healthChecks func() (map[ingress.Vhost][]ingress.HealthCheck, error)
-
-	// groups is a function that looks up an association of vhost to lists of group ids
-	groups func() (map[ingress.Vhost][]group.ID, error)
-
-	// list of instance ids by vhost
-	instanceIDs func() (map[ingress.Vhost][]instance.ID, error)
-
-	// Options are properties controlling behavior of the controller
-	options ingress.Options
-
-	spec       types.Spec
-	properties ingress.Properties
-
-	plugins func() discovery.Plugins
-
-	// Finite state machine tracking
-	process      *core.Process
-	stateMachine fsm.Instance
-
-	// polling
-	ticker <-chan time.Time
-	poller *controller.Poller
+// NewController returns a controller implementation
+func NewController(plugins func() discovery.Plugins, leader manager.Leadership) controller.Controller {
+	return internal.NewController(
+		leader,
+		// the constructor
+		func(spec types.Spec) (internal.Managed, error) {
+			return &managed{
+				Leadership: leader,
+			}, nil
+		},
+		// the key function
+		func(metadata types.Metadata) string {
+			return metadata.Name
+		},
+	)
 }
 
-func (c *Controller) state() ingress.Properties {
-	// TODO - compute this from results of polling
-	return ingress.Properties{}
+// NewTypedControllers return typed controllers
+func NewTypedControllers(plugins func() discovery.Plugins,
+	leader manager.Leadership) func() (map[string]controller.Controller, error) {
+
+	return (internal.NewController(
+		leader,
+		// the constructor
+		func(spec types.Spec) (internal.Managed, error) {
+			return newManaged(plugins, leader), nil
+		},
+		// the key function
+		func(metadata types.Metadata) string {
+			return metadata.Name
+		},
+	)).ManagedObjects
 }
 
-func (c *Controller) groupPlugin() (group.Plugin, error) {
-	if c.plugins == nil {
-		return nil, fmt.Errorf("no group plugin %v", c.GroupPluginName)
+// Plan implements internal/Managed
+func (m *managed) Plan(operation controller.Operation, spec types.Spec) (*types.Object, *controller.Plan, error) {
+
+	// Do basic validation
+	// TODO(chungers) - provide detail plan for reconciling between current object state (types.Object) and input spec
+
+	if operation == controller.Destroy {
+		return m.object(), nil, nil
 	}
 
-	endpoint, err := c.plugins().Find(c.GroupPluginName)
+	if spec.Properties == nil {
+		return nil, nil, fmt.Errorf("missing properties")
+	}
+	ispec := ingress.Spec{}
+	err := spec.Properties.Decode(&ispec)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// TODO - get current state to get all the routes and backends
+	return &types.Object{
+		Spec: spec,
+	}, &controller.Plan{}, nil
+}
+
+// Manage implements internal/Managed
+func (m *managed) Manage(spec types.Spec) (*types.Object, error) {
+	err := m.init(spec)
 	if err != nil {
 		return nil, err
 	}
-	return group_rpc.NewClient(endpoint.Address)
+	m.start()
+	return m.object(), nil
 }
 
-func (c *Controller) l4Client(spec ingress.Spec) (loadbalancer.L4, error) {
-	if c.plugins == nil {
-		return nil, fmt.Errorf("no L4 plugin %v", spec.L4Plugin)
-	}
-
-	endpoint, err := c.plugins().Find(spec.L4Plugin)
-	if err != nil {
-		return nil, err
-	}
-	return loadbalancer_rpc.NewClient(spec.L4Plugin, endpoint.Address)
+// Object implements internal/Managed
+func (m *managed) Object() (*types.Object, error) {
+	return m.object(), nil
 }
 
-// Run starts the controller given the spec it needs to maintain
-func (c *Controller) Run(spec types.Spec) error {
-	err := c.init(spec)
-	if err != nil {
-		return err
+// Free implements internal/Managed
+func (m *managed) Free() (*types.Object, error) {
+	if m.started() {
+		m.stop()
 	}
-	c.start()
-	return nil
+	return m.Object()
 }
 
-func (c *Controller) start() {
-	if c.process != nil && c.poller != nil {
-		go c.poller.Run(context.Background())
+// Dispose implements internal/Managed
+func (m *managed) Dispose() (*types.Object, error) {
+	if m.started() {
+		m.stop()
 	}
-}
-
-func (c *Controller) stop() {
-	if c.process != nil && c.poller != nil {
-		c.poller.Stop()
-	}
+	return m.Object()
 }

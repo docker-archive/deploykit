@@ -73,13 +73,7 @@ func (l4 *L4) Unpublish(_ *http.Request, req *UnpublishRequest, resp *UnpublishR
 
 // ConfigureHealthCheck configures the health checks for instance removal and reconfiguration
 func (l4 *L4) ConfigureHealthCheck(_ *http.Request, req *ConfigureHealthCheckRequest, resp *ConfigureHealthCheckResponse) error {
-	result, err := l4.l4.ConfigureHealthCheck(
-		req.BackendPort,
-		req.Healthy,
-		req.Unhealthy,
-		req.Interval,
-		req.Timeout,
-	)
+	result, err := l4.l4.ConfigureHealthCheck(req.HealthCheck)
 	if err == nil {
 		resp.Result = result.String()
 	}

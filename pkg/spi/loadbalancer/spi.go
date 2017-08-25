@@ -17,15 +17,30 @@ var InterfaceSpec = spi.InterfaceSpec{
 // Route is a description of a network target for a load balancer.
 type Route struct {
 	// Port is the TCP port that the backend instance is listening on.
-	Port uint32
+	Port int
 
 	// Protocol is the network protocol that the load balancer is routing.
 	Protocol Protocol
 
 	// LoadBalancerPort is the TCP port that the load balancer is listening on.
-	LoadBalancerPort uint32
+	LoadBalancerPort int
 
 	Certificate *string
+}
+
+// HealthCheck models the a probe that checks against a given backend port at given
+// intervals and with timeout.
+type HealthCheck struct {
+	// BackendPort is the port on a backend node to probe
+	BackendPort int
+	// Healthy is the number of tries to succeed to be considered healthy
+	Healthy int
+	// Unhealthy is the number of tries to fail to be considered unhealthy
+	Unhealthy int
+	// Interval is the probe / ping interval
+	Interval time.Duration
+	// Timeout is the duration to wait before timing out.
+	Timeout time.Duration
 }
 
 // Result is the result of an operation
@@ -48,13 +63,13 @@ type L4 interface {
 	Publish(route Route) (Result, error)
 
 	// Unpublish dissociates the load balancer from the backend service at the given port.
-	Unpublish(extPort uint32) (Result, error)
+	Unpublish(extPort int) (Result, error)
 
 	// ConfigureHealthCheck configures the health checks for instance removal and reconfiguration
 	// The parameters healthy and unhealthy indicate the number of consecutive success or fail pings required to
 	// mark a backend instance as healthy or unhealthy.   The ping occurs on the backendPort parameter and
 	// at the interval specified.
-	ConfigureHealthCheck(backendPort uint32, healthy, unhealthy int, interval, timeout time.Duration) (Result, error)
+	ConfigureHealthCheck(hc HealthCheck) (Result, error)
 
 	// RegisterBackend registers instances identified by the IDs to the LB's backend pool
 	RegisterBackends(ids []instance.ID) (Result, error)

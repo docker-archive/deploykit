@@ -7,6 +7,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/spf13/cobra"
 )
 
 var log = logutil.New("module", "cli/v1/group")
@@ -14,6 +15,7 @@ var log = logutil.New("module", "cli/v1/group")
 func init() {
 	cli.Register(group.InterfaceSpec,
 		[]cli.CmdBuilder{
+			//Group,
 			Ls,
 			Inspect,
 			Describe,
@@ -24,6 +26,28 @@ func init() {
 			SetSize,
 			DestroyInstances,
 		})
+}
+
+// Group returns the group command
+func Group(name string, services *cli.Services) *cobra.Command {
+	group := &cobra.Command{
+		Use:   "group",
+		Short: "Commands to access the Group SPI",
+	}
+
+	group.AddCommand(
+		Ls(name, services),
+		Inspect(name, services),
+		Describe(name, services),
+		Commit(name, services),
+		Free(name, services),
+		Destroy(name, services),
+		Size(name, services),
+		SetSize(name, services),
+		DestroyInstances(name, services),
+	)
+
+	return group
 }
 
 // LoadPlugin loads the typed plugin

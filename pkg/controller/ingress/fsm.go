@@ -63,7 +63,7 @@ var stateMachineSpec, _ = fsm.Define(
 	},
 )
 
-func (c *Controller) defaultBehaviors(spec types.Spec) {
+func (c *managed) defaultBehaviors(spec types.Spec) {
 
 	properties := ingress.Properties{}
 	if spec.Properties != nil {
@@ -97,7 +97,7 @@ func (c *Controller) defaultBehaviors(spec types.Spec) {
 	}
 }
 
-func (c *Controller) init(in types.Spec) (err error) {
+func (c *managed) init(in types.Spec) (err error) {
 	if c.process != nil {
 		return nil // no op
 	}
@@ -169,8 +169,12 @@ func (c *Controller) init(in types.Spec) (err error) {
 		return
 	}
 
-	if c.ticker == nil && c.options.SyncInterval > 0 {
-		c.ticker = time.Tick(c.options.SyncInterval)
+	if c.ticker == nil {
+		interval := c.options.SyncInterval
+		if interval == 0 {
+			interval = ingress.DefaultSyncInterval
+		}
+		c.ticker = time.Tick(interval)
 	}
 
 	// add the poller
@@ -199,11 +203,11 @@ func mustTrue(v bool, e error) bool {
 	return v
 }
 
-func (c *Controller) construct(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
+func (c *managed) construct(spec types.Spec, properties *types.Any) (*types.Identity, *types.Any, error) {
 	state, err := types.AnyValue(c.state())
 	return &types.Identity{ID: "ingress-singleton"}, state, err
 }
 
-func (c *Controller) object() *types.Object {
+func (c *managed) object() *types.Object {
 	return c.process.Object(c.stateMachine)
 }

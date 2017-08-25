@@ -13,6 +13,11 @@ type ChangeRequest struct {
 	Spec      types.Spec
 }
 
+// Plugin implements pkg/rpc/internal/Addressable
+func (r ChangeRequest) Plugin() (plugin.Name, error) {
+	return r.Name, nil
+}
+
 // ChangeResponse is the common response message for Plan and Commit
 type ChangeResponse struct {
 	Name   plugin.Name
@@ -24,6 +29,11 @@ type ChangeResponse struct {
 type FindRequest struct {
 	Name     plugin.Name
 	Metadata *types.Metadata
+}
+
+// Plugin implements pkg/rpc/internal/Addressable
+func (r FindRequest) Plugin() (plugin.Name, error) {
+	return r.Name, nil
 }
 
 // FindResponse is the common response message for Describe and Free

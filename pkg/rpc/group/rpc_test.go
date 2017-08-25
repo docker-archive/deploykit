@@ -56,6 +56,75 @@ func TestGroupPluginCommitGroup(t *testing.T) {
 	require.Equal(t, groupSpec, <-groupSpecActual)
 }
 
+func TestGroupNamedPluginCommitGroupDefault(t *testing.T) {
+	socketPath := tempSocket()
+
+	groupSpecActual := make(chan group.Spec, 1)
+	groupSpec := group.Spec{
+		ID:         group.ID("group1"),
+		Properties: types.AnyString(`{"foo":"bar"}`),
+	}
+
+	server, err := rpc_server.StartPluginAtPath(socketPath,
+		PluginServerWithGroups(
+			func() (map[group.ID]group.Plugin, error) {
+				return map[group.ID]group.Plugin{
+					group.ID("*"): &testing_group.Plugin{
+						DoCommitGroup: func(req group.Spec, pretend bool) (string, error) {
+							groupSpecActual <- req
+							return "commit details", nil
+						},
+					},
+				}, nil
+			}))
+
+	// Make call
+	details, err := must(NewClient(socketPath)).CommitGroup(groupSpec, false)
+	require.NoError(t, err)
+	require.Equal(t, "commit details", details)
+
+	server.Stop()
+
+	require.Equal(t, groupSpec, <-groupSpecActual)
+}
+
+func TestGroupNamedPluginCommitGroup(t *testing.T) {
+	socketPath := tempSocket()
+
+	groupSpecActual := make(chan group.Spec, 1)
+	groupSpec := group.Spec{
+		ID:         group.ID("group1"),
+		Properties: types.AnyString(`{"foo":"bar"}`),
+	}
+
+	server, err := rpc_server.StartPluginAtPath(socketPath,
+		PluginServerWithGroups(
+			func() (map[group.ID]group.Plugin, error) {
+				return map[group.ID]group.Plugin{
+					group.ID(""): &testing_group.Plugin{
+						DoCommitGroup: func(req group.Spec, pretend bool) (string, error) {
+							panic("shouldn't be here")
+						},
+					},
+					group.ID("group1"): &testing_group.Plugin{
+						DoCommitGroup: func(req group.Spec, pretend bool) (string, error) {
+							groupSpecActual <- req
+							return "commit details", nil
+						},
+					},
+				}, nil
+			}))
+
+	// Make call
+	details, err := must(NewClient(socketPath)).CommitGroup(groupSpec, false)
+	require.NoError(t, err)
+	require.Equal(t, "commit details", details)
+
+	server.Stop()
+
+	require.Equal(t, groupSpec, <-groupSpecActual)
+}
+
 func TestGroupPluginCommitGroupError(t *testing.T) {
 	socketPath := tempSocket()
 

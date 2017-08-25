@@ -1,15 +1,13 @@
 package ingress
 
 import (
-	"time"
-
 	"github.com/deckarep/golang-set"
 	"github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
 
-func (c *Controller) syncRoutesL4() error {
+func (c *managed) syncRoutesL4() error {
 	// to avoid multiple updates when ELBs have aliases need to agregate all of them by elb than just hostname
 	// since different hostnames can point to the same ELB.
 	targets := map[loadbalancer.L4][]loadbalancer.Route{}
@@ -44,13 +42,16 @@ func (c *Controller) syncRoutesL4() error {
 	return nil
 }
 
-func (c *Controller) syncBackends() error {
+func (c *managed) syncBackends() error {
 	groupsByVhost, err := c.groups()
+	log.Debug("groups by vhost", "groups", groupsByVhost)
+
 	if err != nil {
 		return err
 	}
 
 	loadbalancersByVhost, err := c.l4s()
+	log.Debug("L4s by vhost", "l4s", loadbalancersByVhost)
 	if err != nil {
 		return err
 	}
@@ -61,7 +62,7 @@ func (c *Controller) syncBackends() error {
 	unresolved := []types.Vhost{}
 	for vhost, l4 := range loadbalancersByVhost {
 
-		groupIDs, has := groupsByVhost[vhost]
+		groups, has := groupsByVhost[vhost]
 		if !has {
 			unresolved = append(unresolved, vhost)
 			continue
@@ -86,11 +87,14 @@ func (c *Controller) syncBackends() error {
 			nodes.Add(id)
 		}
 
-		groupPlugin, err := c.groupPlugin()
-		if err != nil {
-			return err
-		}
-		for _, gid := range groupIDs {
+		log.Debug("backend groups", "groups", groups)
+		for _, g := range groups {
+
+			gid := g.ID()
+			groupPlugin, err := c.groupPlugin(g)
+			if err != nil {
+				return err
+			}
 
 			desc, err := groupPlugin.DescribeGroup(gid)
 			if err != nil {
@@ -98,30 +102,36 @@ func (c *Controller) syncBackends() error {
 				continue
 			}
 
+			log.Debug("found backends", "groupID", gid, "desc", desc, "vhost", vhost, "L4", l4.Name())
+
 			for _, inst := range desc.Instances {
 				nodes.Add(inst.ID)
 			}
 		}
 
 		// compute the difference between registered and nodes
-		list := []instance.ID{}
+		toRemove := []instance.ID{}
 		for n := range registered.Difference(nodes).Iter() {
-			list = append(list, n.(instance.ID))
-		}
-		if result, err := l4.RegisterBackends(list); err != nil {
-			log.Warn("error registering backends", "err", err)
-		} else {
-			log.Info("registered backends", "vhost", vhost, "result", result)
+			toRemove = append(toRemove, n.(instance.ID))
 		}
 
-		list = []instance.ID{}
-		for n := range nodes.Difference(registered).Iter() {
-			list = append(list, n.(instance.ID))
-		}
-		if result, err := l4.DeregisterBackends(list); err != nil {
-			log.Warn("error de-registering backends", "err", err)
+		log.Info("De-register backends", "instances", toRemove, "vhost", vhost, "L4", l4.Name())
+
+		if result, err := l4.DeregisterBackends(toRemove); err != nil {
+			log.Warn("error deregistering backends", "toRemove", toRemove, "err", err)
 		} else {
 			log.Info("deregistered backends", "vhost", vhost, "result", result)
+		}
+
+		toAdd := []instance.ID{}
+		for n := range nodes.Difference(registered).Iter() {
+			toAdd = append(toAdd, n.(instance.ID))
+		}
+		log.Info("Register backends", "instances", toAdd, "vhost", vhost, "L4", l4.Name())
+		if result, err := l4.RegisterBackends(toAdd); err != nil {
+			log.Warn("error registering backends", "toAdd", toAdd, "err", err)
+		} else {
+			log.Info("registered backends", "vhost", vhost, "result", result)
 		}
 
 	}
@@ -130,8 +140,8 @@ func (c *Controller) syncBackends() error {
 
 }
 
-func (c *Controller) syncHealthChecks() error {
-	targets := map[loadbalancer.L4][]types.HealthCheck{}
+func (c *managed) syncHealthChecks() error {
+	targets := map[loadbalancer.L4][]loadbalancer.HealthCheck{}
 	healthChecksByVhost, err := c.healthChecks()
 	if err != nil {
 		return err
@@ -152,17 +162,15 @@ func (c *Controller) syncHealthChecks() error {
 	for elb, healthChecks := range targets {
 		log.Info("Configuring healthcheck", "name", elb.Name())
 		for _, healthCheck := range healthChecks {
-			if healthCheck.Port > 0 {
-				log.Info("HEALTH CHECK - Configuring the health check to ping", "port", healthCheck.Port)
-				_, err := elb.ConfigureHealthCheck(healthCheck.Port,
-					healthCheck.Healthy, healthCheck.Unhealthy,
-					time.Duration(healthCheck.IntervalSeconds)*time.Second,
-					time.Duration(healthCheck.TimeoutSeconds)*time.Second)
+			if healthCheck.BackendPort > 0 {
+				log.Info("HEALTH CHECK - Configuring the health check to ping", "port", healthCheck.BackendPort)
+				_, err := elb.ConfigureHealthCheck(healthCheck)
+
 				if err != nil {
 					log.Warn("err config health check", "err", err)
 					return err
 				}
-				log.Info("HEALTH CHECK CONFIGURED", "port", healthCheck.Port, "config", healthCheck)
+				log.Info("HEALTH CHECK CONFIGURED", "port", healthCheck.BackendPort, "config", healthCheck)
 			}
 		}
 	}

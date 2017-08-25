@@ -19,9 +19,9 @@ import (
 	"github.com/spf13/cobra"
 
 	// CLI commands
-	_ "github.com/docker/infrakit/cmd/infrakit/event"
+	//_ "github.com/docker/infrakit/cmd/infrakit/event"
 	_ "github.com/docker/infrakit/cmd/infrakit/manager"
-	_ "github.com/docker/infrakit/cmd/infrakit/metadata"
+	//_ "github.com/docker/infrakit/cmd/infrakit/metadata"
 	_ "github.com/docker/infrakit/cmd/infrakit/playbook"
 	_ "github.com/docker/infrakit/cmd/infrakit/plugin"
 	_ "github.com/docker/infrakit/cmd/infrakit/remote"
