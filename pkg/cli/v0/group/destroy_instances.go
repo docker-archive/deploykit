@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
@@ -18,9 +19,17 @@ func DestroyInstances(name string, services *cli.Services) *cobra.Command {
 		Short: "Destroy a group's instances",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if len(args) < 2 {
-				cmd.Usage()
-				os.Exit(1)
+			targets := args
+			pluginName := plugin.Name(name)
+			_, gid := pluginName.GetLookupAndType()
+			if gid == "" {
+				if len(args) < 1 {
+					cmd.Usage()
+					os.Exit(1)
+				} else {
+					gid = args[0]
+					targets = args[1:]
+				}
 			}
 
 			groupPlugin, err := LoadPlugin(services.Plugins(), name)
@@ -29,19 +38,20 @@ func DestroyInstances(name string, services *cli.Services) *cobra.Command {
 			}
 			cli.MustNotNil(groupPlugin, "group plugin not found", "name", name)
 
-			groupID := group.ID(args[0])
+			groupID := group.ID(gid)
 
 			instances := []instance.ID{}
-			for i := 1; i < len(args); i++ {
-				instances = append(instances, instance.ID(i))
+			for _, a := range targets {
+				instances = append(instances, instance.ID(a))
 			}
 
+			fmt.Println("Destroying instances on group", groupID, "@", pluginName, ":", instances)
 			err = groupPlugin.DestroyInstances(groupID, instances)
 			if err != nil {
 				return err
 			}
 
-			fmt.Println("DestroyInstances", groupID, "initiated for instances", instances)
+			fmt.Println("Initiated.")
 			return nil
 		},
 	}

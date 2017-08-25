@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 )
@@ -17,9 +18,15 @@ func Inspect(name string, services *cli.Services) *cobra.Command {
 		Short: "Insepct a group. Returns the raw configuration associated with a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
+			pluginName := plugin.Name(name)
+			_, gid := pluginName.GetLookupAndType()
+			if gid == "" {
+				if len(args) < 1 {
+					cmd.Usage()
+					os.Exit(1)
+				} else {
+					gid = args[0]
+				}
 			}
 
 			groupPlugin, err := LoadPlugin(services.Plugins(), name)
@@ -28,7 +35,7 @@ func Inspect(name string, services *cli.Services) *cobra.Command {
 			}
 			cli.MustNotNil(groupPlugin, "group plugin not found", "name", name)
 
-			groupID := group.ID(args[0])
+			groupID := group.ID(gid)
 			specs, err := groupPlugin.InspectGroups()
 
 			if err == nil {

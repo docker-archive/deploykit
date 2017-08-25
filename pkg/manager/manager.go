@@ -21,7 +21,8 @@ import (
 var (
 	log = logutil.New("module", "manager")
 
-	debugV = logutil.V(500)
+	debugV  = logutil.V(100)
+	debugV2 = logutil.V(500)
 
 	// InterfaceSpec is the current name and version of the Instance API.
 	InterfaceSpec = spi.InterfaceSpec{
@@ -48,7 +49,7 @@ type Manager interface {
 type Backend interface {
 	group.Plugin
 
-	GroupControllers() (map[string]controller.Controller, error)
+	Controllers() (map[string]controller.Controller, error)
 	Groups() (map[group.ID]group.Plugin, error)
 
 	Manager
@@ -61,7 +62,7 @@ type Backend interface {
 // such as leadership changes and configuration changes and perform the necessary actions
 // to activate / deactivate plugins
 type manager struct {
-	group.Plugin
+	group.Plugin // Note that some methods are overridden
 
 	plugins     discovery.Plugins
 	leader      leader.Detector
@@ -83,27 +84,29 @@ type backendOp struct {
 
 // NewManager returns the manager which depends on other services to coordinate and manage
 // the plugins in order to ensure the infrastructure state matches the user's spec.
-func NewManager(
-	plugins discovery.Plugins,
+func NewManager(plugins discovery.Plugins,
 	leader leader.Detector,
 	leaderStore leader.Store,
 	snapshot store.Snapshot,
-	backendName string) (Backend, error) {
+	backendName string) Backend {
 
-	m := &manager{
+	return &manager{
+		// "base class" is the stateless backend group plugin
+		Plugin: &lateBindGroup{
+			finder: func() (group.Plugin, error) {
+				endpoint, err := plugins.Find(plugin.Name(backendName))
+				if err != nil {
+					return nil, err
+				}
+				return rpc.NewClient(endpoint.Address)
+			},
+		},
 		plugins:     plugins,
 		leader:      leader,
 		leaderStore: leaderStore,
 		snapshot:    snapshot,
+		backendName: backendName,
 	}
-
-	var err error
-	m.Plugin, err = m.proxyForGroupPlugin(backendName)
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
 }
 
 // return true only if the current call caused an allocation of the running channel.

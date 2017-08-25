@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
@@ -85,16 +84,16 @@ func (q *quorum) Size() uint {
 func (q *quorum) converge() {
 	descriptions, err := labelAndList(q.scaled)
 	if err != nil {
-		log.Errorf("Failed to check group: %s", err)
+		log.Error("Failed to check to group", "err", err)
 		return
 	}
 
-	log.Debugf("Found existing instances: %v", descriptions)
+	log.Debug("Found existing instances", "groupID", q.ID(), "descriptions", descriptions, "V", debugV)
 
 	unknownIPs := []instance.Description{}
 	for _, description := range descriptions {
 		if description.LogicalID == nil {
-			log.Warnf("Instance %s has no logical ID", description.ID)
+			log.Warn("No logical ID", "description", description, "id", description.ID)
 			continue
 		}
 
@@ -113,7 +112,7 @@ func (q *quorum) converge() {
 
 	for _, ip := range unknownIPs {
 		unknownInstance := ip
-		log.Warnf("Destroying instances with unknown IP address: %+v", unknownInstance)
+		log.Warn("Destroying instances with unknown IP address", "instance", unknownInstance)
 
 		grp.Add(1)
 		go func() {
@@ -140,7 +139,7 @@ func (q *quorum) converge() {
 	}
 
 	for _, missingID := range missingIDs {
-		log.Infof("Logical ID %s is missing, provisioning new instance", missingID)
+		log.Info("Logical ID is missing, provisioning new instance", "instance", missingID)
 		id := missingID
 
 		grp.Add(1)
