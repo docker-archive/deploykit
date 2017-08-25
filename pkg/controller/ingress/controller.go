@@ -82,6 +82,7 @@ func (m *managed) Manage(spec types.Spec) (*types.Object, error) {
 
 // Object implements internal/Managed
 func (m *managed) Object() (*types.Object, error) {
+	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>", m)
 	return m.object(), nil
 }
 
