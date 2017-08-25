@@ -48,6 +48,10 @@ const (
 // have not yet been processed by terraform
 var tfFileRegex = regexp.MustCompile("(^.*).tf.json([.new]*)$")
 
+// dedicatedScopedFileRegex is used to determine the scope ID and the instance
+// ID (instance-XXXX|logicalID) for a file that contains dedicated resources
+var dedicatedScopedFileRegex = regexp.MustCompile("^([a-z]*){1}_dedicated_([a-zA-Z0-9-]*).tf.json([.new]*)$")
+
 // instanceTfFileRegex is used to determine the files that contain a terraform instance
 // definition; files with a ".new" suffix have not yet been processed by terraform
 var instanceTfFileRegex = regexp.MustCompile("(^instance-[0-9]+)(.tf.json)([.new]*)$")
@@ -562,10 +566,13 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) error {
 	// Map file names to the data in each file based on the "@scope" property:
 	// - @default: resources in same "instance-xxxx.tf.json" file as VM
-	// - @dedicated: resources in different file as VM using the logical ID (<logicalID>-dedicated.tf.json) or with
-	//   the same generated ID (instance-xxxx-dedicated.tf.json)
-	// - <other>: resource defined in different file with a scope identifier (scope-<other>.tf.json)
+	// - @dedicated: resources in different file as VM using the logical ID (<scopeID>_dedicated_<logicalID>.tf.json) or with
+	//   the same generated ID (<scopeID>_dedicated_instance-xxxx.tf.json)
+	// - <other>: resource defined in different file with a scope identifier (<other>_global.tf.json)
 	fileMap := make(map[string]*TFormat)
+
+	// Track current files, used to determine existing dedicated and global resources
+	currentFiles := make(map[string]map[TResourceType]map[TResourceName]TResourceProperties)
 
 	for resourceType, resourceObj := range tf.Resource {
 		vmList := mapset.NewSetFromSlice(VMTypes)
@@ -596,24 +603,49 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 				// Default scope, filename is just the resource name (instance-XXXX)
 				filename = generatedName
 			} else if strings.HasPrefix(scope, ValScopeDedicated) {
+				// Get current files
+				if len(currentFiles) == 0 {
+					if files, err := p.listCurrentTfFiles(); err == nil {
+						currentFiles = files
+					} else {
+						return err
+					}
+				}
 				// Dedicated scope, filename has a scope identifier and the generated name or logical
-				// ID: <id>_dedicated_<instance-XXXX|logicalID>
+				// ID: <scope-id>_dedicated_<instance-XXXX|logicalID>
 				var identifier string
 				if strings.Contains(scope, "-") {
 					identifier = strings.SplitN(scope, "-", 2)[1]
 				} else {
 					identifier = "default"
 				}
-				// And the resource name as <id>-<instance-XXXX|logicalID>-<resourceName>
+				// And the resource name as <scopeID>-<instance-XXXX|logicalID>-<resourceName>
 				var key string
 				if logicalID == nil {
-					key = generatedName
+					// On a rolling update, the dedicated file for a scaler group is not removed, search
+					// for an orphaned file with the appropriate format to attach
+					orphanKeys := findOrphanedDedicatedAttachmentKeys(currentFiles, identifier)
+					if len(orphanKeys) == 0 {
+						log.Infof("No orphaned attachment with prefix '%s-%s', using current name: %s", identifier, scopeDedicated, generatedName)
+						key = generatedName
+					} else {
+						key = orphanKeys[0]
+						log.Infof("Using orphaned attachment '%s' for prefix '%s-%s'", key, identifier, scopeDedicated)
+					}
 				} else {
 					key = string(*logicalID)
 				}
 				filename = fmt.Sprintf("%s_%s_%s", identifier, scopeDedicated, key)
 				newResourceName = fmt.Sprintf("%s-%s-%s", identifier, key, resourceName)
 			} else {
+				// Get current files
+				if len(currentFiles) == 0 {
+					if files, err := p.listCurrentTfFiles(); err == nil {
+						currentFiles = files
+					} else {
+						return err
+					}
+				}
 				// Global scope, filename is just the given scope with a "global_" suffix
 				filename = fmt.Sprintf("%s_%s", scope, scopeGlobal)
 				// And the resource name has the given scope as the prefix
@@ -653,6 +685,7 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 	// Handle any platform specific updates to the VM properties prior to writing out
 	platformSpecificUpdates(vmType, TResourceName(generatedName), logicalID, vmProperties)
 
+	// And write out each file.
 	for filename, tfVal := range fileMap {
 		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
 		path := filepath.Join(p.Dir, filename+".tf.json.new")
@@ -666,6 +699,102 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 		}
 	}
 	return nil
+}
+
+// listCurrentTfFiles populates the map with the names of all tf.json and tf.json.new files
+func (p *plugin) listCurrentTfFiles() (map[string]map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	// TODO(kaufers): Replace scanLocalFiles with this function once this plugin is updated
+	//                to handle any resource type instead of only VMs
+	result := make(map[string]map[TResourceType]map[TResourceName]TResourceProperties)
+	fs := &afero.Afero{Fs: p.fs}
+	err := fs.Walk(p.Dir,
+		func(path string, info os.FileInfo, err error) error {
+			matches := tfFileRegex.FindStringSubmatch(info.Name())
+			if len(matches) == 3 {
+				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
+				if err != nil {
+					log.Warningln("Cannot parse:", err)
+					return err
+				}
+				tf := TFormat{}
+				if err = types.AnyBytes(buff).Decode(&tf); err != nil {
+					return err
+				}
+				props := make(map[TResourceType]map[TResourceName]TResourceProperties)
+				for resType, resNameProps := range tf.Resource {
+					for resName, resProps := range resNameProps {
+						if _, has := props[resType]; !has {
+							props[resType] = make(map[TResourceName]TResourceProperties)
+						}
+						props[resType][resName] = resProps
+					}
+				}
+				result[info.Name()] = props
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// findOrphanedDedicatedAttachmentKeys proceeses the current files to determine:
+// - All files that match the scope patten (ie, <scopeID>_dedicated_*)
+// - A file with the given patten that is not already attached to an instance
+// Returns all keys that are orphaned
+func findOrphanedDedicatedAttachmentKeys(currentFiles map[string]map[TResourceType]map[TResourceName]TResourceProperties, scopeID string) []string {
+	// Find all files that match this scope ID and scope
+	filesIDMap := make(map[string]string)
+	for filename := range currentFiles {
+		matches := dedicatedScopedFileRegex.FindStringSubmatch(filename)
+		if len(matches) != 4 {
+			continue
+		}
+		if matches[1] != scopeID {
+			log.Debugf("Ignoring file '%s', scope ID '%s' does not match", filename, scopeID)
+			continue
+		}
+		log.Infof("Found candidate file '%s' for scope ID '%s'", filename, scopeID)
+		filesIDMap[strings.Split(filename, ".")[0]] = matches[2]
+	}
+	if len(filesIDMap) == 0 {
+		log.Infof("No candidate attchment files for scope ID '%s'", scopeID)
+		return []string{}
+	}
+	// Prune the candidate files that already have attachments
+	supportedVMs := mapset.NewSetFromSlice(VMTypes)
+	for filename, resTypeNameProps := range currentFiles {
+		matches := instanceTfFileRegex.FindStringSubmatch(filename)
+		if len(matches) != 4 {
+			continue
+		}
+		for resType, resNameProps := range resTypeNameProps {
+			if !supportedVMs.Contains(resType) {
+				continue
+			}
+			for _, vmProps := range resNameProps {
+				tags := parseTerraformTags(resType, vmProps)
+				attachTag, has := tags[attachTag]
+				if !has {
+					continue
+				}
+				for _, tag := range strings.Split(attachTag, ",") {
+					if _, contains := filesIDMap[tag]; contains {
+						log.Infof("Attachment '%s' is used in %s for scope ID '%s'", tag, filename, scopeID)
+						delete(filesIDMap, tag)
+					}
+				}
+			}
+		}
+	}
+	results := []string{}
+	for _, v := range filesIDMap {
+		results = append(results, v)
+	}
+	log.Infof("Detected %v orphaned attachments for scope ID '%v': %v", len(results), scopeID, results)
+	return results
 }
 
 // ensureUniqueFile returns a filename that is not in use

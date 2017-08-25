@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	. "github.com/docker/infrakit/pkg/testing"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 func TestRunTerraformApply(t *testing.T) {
@@ -43,8 +44,9 @@ func TestContinuePollingStandalone(t *testing.T) {
 
 // resInfo holds the resource type and resource name
 type resInfo struct {
-	ResType TResourceType
-	ResName TResourceName
+	ResType  TResourceType
+	ResName  TResourceName
+	ResProps TResourceProperties
 }
 
 // fileInfo holds the data for a file to create in the plugin's working dir
@@ -60,8 +62,11 @@ func writeFile(info fileInfo, t *testing.T) {
 	require.NotZero(t, len(info.ResInfo))
 	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
 	for _, resInfo := range info.ResInfo {
+		if len(resInfo.ResProps) == 0 {
+			resInfo.ResProps = TResourceProperties{"key": "val"}
+		}
 		inst[resInfo.ResType] = map[TResourceName]TResourceProperties{
-			resInfo.ResName: {"key": "val"},
+			resInfo.ResName: resInfo.ResProps,
 		}
 	}
 	buff, err := json.MarshalIndent(TFormat{Resource: inst}, " ", " ")
@@ -852,23 +857,10 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 					defaultNFS[TResourceName(fmt.Sprintf("default-nfs-instance-%v", i))] = struct{}{}
 				}
 			}
-			dedicatedNFS := map[TResourceName]struct{}{}
-			for i := 110; i < 115; i++ {
-				if i%2 != 0 && i != 111 {
-					dedicatedNFS[TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i))] = struct{}{}
-				}
-			}
-			globalNFS := map[TResourceName]struct{}{}
-			for i := 115; i < 117; i++ {
-				if i%2 != 0 && i != 115 {
-					globalNFS[TResourceName(fmt.Sprintf("global-nfs-instance-%v", i))] = struct{}{}
-				}
-			}
+			// Do not return anything for dedicated/global since they are not valid for pruning
 			return map[TResourceType]map[TResourceName]struct{}{
-				VMIBMCloud:                     vms,
-				TResourceType("default-nfs"):   defaultNFS,
-				TResourceType("dedicated-nfs"): dedicatedNFS,
-				TResourceType("global-nfs"):    globalNFS,
+				VMIBMCloud:                   vms,
+				TResourceType("default-nfs"): defaultNFS,
 			}, nil
 		},
 	}
@@ -878,7 +870,7 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 	// No files removed
 	tfFiles, tfFilesNew = getFilenames(t, tf)
 	require.Len(t, tfFilesNew, 0)
-	require.Len(t, tfFiles, 15+5+2-4)
+	require.Len(t, tfFiles, 15-2+5+2)
 	for i := 100; i < 115; i++ {
 		// 105 has both the VM and default NFS removed, 107 has the VM removed so the entire file is removed
 		if i == 105 || i == 107 {
@@ -887,15 +879,105 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
 	}
 	for i := 110; i < 115; i++ {
-		if i == 111 {
-			continue
-		}
 		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
 	}
 	for i := 115; i < 117; i++ {
-		if i == 115 {
-			continue
-		}
 		require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
+	}
+}
+
+func TestHandleFilesDuplicates(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Create 10 dedicated files
+	for i := 100; i < 110; i++ {
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType:  TResourceType("dedicated-nfs"),
+					ResName:  TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
+					ResProps: TResourceProperties{"key": "val"},
+				},
+			},
+			FilePrefix: fmt.Sprintf("dedicated-nfs-instance-%v", i),
+			NewFile:    true,
+			Plugin:     tf,
+		}
+		writeFile(info, t)
+	}
+
+	fns := tfFuncs{
+		tfRefresh: func() error { return nil },
+		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+			return map[TResourceType]map[TResourceName]struct{}{}, nil
+		},
+	}
+	err := tf.handleFiles(fns)
+	require.NoError(t, err)
+
+	tfFiles, tfFilesNew := getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	require.Len(t, tfFiles, 10)
+	for i := 100; i < 110; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+		buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i)))
+		require.NoError(t, err)
+		tFormat := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tFormat)
+		require.NoError(t, err)
+		require.Equal(t,
+			map[TResourceType]map[TResourceName]TResourceProperties{
+				TResourceType("dedicated-nfs"): {
+					TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)): {
+						"key": "val",
+					},
+				},
+			},
+			tFormat.Resource,
+		)
+	}
+
+	// Update 5 of them
+	for i := 105; i < 110; i++ {
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType:  TResourceType("dedicated-nfs"),
+					ResName:  TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
+					ResProps: TResourceProperties{"key-update": "val-update"},
+				},
+			},
+			FilePrefix: fmt.Sprintf("dedicated-nfs-instance-%v", i),
+			NewFile:    true,
+			Plugin:     tf,
+		}
+		writeFile(info, t)
+	}
+	err = tf.handleFiles(fns)
+	require.NoError(t, err)
+
+	tfFiles, tfFilesNew = getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	require.Len(t, tfFiles, 10)
+	for i := 100; i < 110; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+		buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i)))
+		require.NoError(t, err)
+		tFormat := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tFormat)
+		require.NoError(t, err)
+		props := TResourceProperties{"key": "val"}
+		if i >= 105 {
+			props = TResourceProperties{"key-update": "val-update"}
+		}
+		require.Equal(t,
+			map[TResourceType]map[TResourceName]TResourceProperties{
+				TResourceType("dedicated-nfs"): {
+					TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)): props,
+				},
+			},
+			tFormat.Resource,
+		)
 	}
 }
