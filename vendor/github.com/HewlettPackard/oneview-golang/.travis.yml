@@ -1,0 +1,12 @@
+language: go
+go:
+- 1.6
+install:
+- go get github.com/mattn/goveralls
+- go get -u github.com/golang/lint/golint
+script:
+- make test
+# - make vet
+# - make test-short
+# - make test-long
+# - make coverage-send
