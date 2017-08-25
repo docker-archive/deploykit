@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -84,13 +83,13 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 		settings.config.Allocation,
 		index)
 	if err != nil {
-		log.Errorf("Failed to Prepare instance: %s", err)
+		log.Error("Failed to Prepare instance", "err", err)
 		return
 	}
 
 	id, err := settings.instancePlugin.Provision(spec)
 	if err != nil {
-		log.Errorf("Failed to provision: %s", err)
+		log.Error("Failed to provision", "err", err)
 		return
 	}
 
@@ -99,7 +98,7 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 		volumeDesc = fmt.Sprintf(" and attachments %s", spec.Attachments)
 	}
 
-	log.Infof("Created instance %s with tags %v%s", *id, spec.Tags, volumeDesc)
+	log.Info("Created instance", "id", *id, "tags", spec.Tags, "volumeDesc", volumeDesc)
 }
 
 func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
@@ -107,7 +106,7 @@ func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
 
 	health, err := settings.flavorPlugin.Healthy(types.AnyCopy(settings.config.Flavor.Properties), inst)
 	if err != nil {
-		log.Warnf("Failed to check health of instance %s: %s", inst.ID, err)
+		log.Warn("Failed to check health of instance", "id", inst.ID, "err", err)
 		return flavor.Unknown
 	}
 	return health
@@ -119,13 +118,13 @@ func (s *scaledGroup) Destroy(inst instance.Description, ctx instance.Context) e
 
 	flavorProperties := types.AnyCopy(settings.config.Flavor.Properties)
 	if err := settings.flavorPlugin.Drain(flavorProperties, inst); err != nil {
-		log.Errorf("Failed to drain %s: %s", inst.ID, err)
+		log.Error("Failed to drain", "id", inst.ID, "err", err)
 		return err
 	}
 
-	log.Infof("Destroying instance %s", inst.ID)
+	log.Info("Destroying instance", "id", inst.ID)
 	if err := settings.instancePlugin.Destroy(inst.ID, instance.Termination); err != nil {
-		log.Errorf("Failed to destroy %s: %s", inst.ID, err)
+		log.Error("Failed to destroy instance", "id", inst.ID, "err", err)
 		return err
 	}
 	return nil
@@ -153,7 +152,7 @@ func (s *scaledGroup) Label() error {
 
 	for _, inst := range instances {
 		if instanceNeedsLabel(inst) {
-			log.Infof("Labelling instance %s", inst.ID)
+			log.Info("Labelling instance", "id", inst.ID)
 
 			if err := settings.instancePlugin.Label(inst.ID, tagsWithConfigSha); err != nil {
 				return err

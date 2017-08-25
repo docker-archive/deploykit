@@ -3,11 +3,11 @@ package group
 import (
 	"errors"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/spi/flavor"
-	"github.com/docker/infrakit/pkg/spi/instance"
 	"sort"
 	"time"
+
+	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 func minInt(a, b int) int {
@@ -144,7 +144,7 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 			break
 		}
 
-		log.Infof("Found %d undesired instances", len(undesiredInstances))
+		log.Info("Found undesired instances", "count", len(undesiredInstances))
 
 		// Sort instances first to ensure predictable destroy order.
 		sort.Sort(sortByID(undesiredInstances))

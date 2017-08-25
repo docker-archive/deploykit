@@ -10,7 +10,7 @@ import (
 // Groups returns a map of *scoped* group controllers by ID of the group.
 func (m *manager) Groups() (map[group.ID]group.Plugin, error) {
 	groups := map[group.ID]group.Plugin{
-		group.ID(""): m.Plugin,
+		group.ID(""): m,
 	}
 	all, err := m.Plugin.InspectGroups()
 	if err != nil {
@@ -18,110 +18,90 @@ func (m *manager) Groups() (map[group.ID]group.Plugin, error) {
 	}
 	for _, spec := range all {
 		gid := spec.ID
-		groups[gid] = m.Plugin
+		groups[gid] = m
 	}
-	log.Debug("Groups", "map", groups, "V", debugV)
+	log.Debug("Groups", "map", groups, "V", debugV2)
 	return groups, nil
 }
 
-type proxy struct {
+type lateBindGroup struct {
 	lock   sync.Mutex
 	client group.Plugin
 	finder func() (group.Plugin, error)
 }
 
-type pluginHelper interface {
-	getPlugin() (group.Plugin, error)
-}
-
-func (p *proxy) getPlugin() (group.Plugin, error) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	if p.client != nil {
-		return p.client, nil
+func (c *lateBindGroup) do(f func(p group.Plugin) error) (err error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.client == nil {
+		c.client, err = c.finder()
+		if err != nil {
+			return
+		}
 	}
-	return p.finder()
+	return f(c.client)
 }
 
-// newGroupProxy returns a plugin interface.  The proxy is late-binding in that
-// it does not resolve plugin until a method is called.
-func newGroupProxy(finder func() (group.Plugin, error)) group.Plugin {
-	return &pGroup{&proxy{finder: finder}}
+func (c *lateBindGroup) CommitGroup(grp group.Spec, pretend bool) (resp string, err error) {
+	err = c.do(func(p group.Plugin) error {
+		resp, err = p.CommitGroup(grp, pretend)
+		return err
+	})
+	return
 }
 
-type pGroup struct {
-	pluginHelper
+func (c *lateBindGroup) FreeGroup(id group.ID) (err error) {
+	err = c.do(func(p group.Plugin) error {
+		err = p.FreeGroup(id)
+		return err
+	})
+	return
 }
 
-func (c *pGroup) CommitGroup(grp group.Spec, pretend bool) (resp string, err error) {
-	var p group.Plugin
-	p, err = c.getPlugin()
-	if err != nil {
-		return
-	}
-	return p.CommitGroup(grp, pretend)
+func (c *lateBindGroup) DescribeGroup(id group.ID) (desc group.Description, err error) {
+	err = c.do(func(p group.Plugin) error {
+		desc, err = p.DescribeGroup(id)
+		return err
+	})
+	return
 }
 
-func (c *pGroup) FreeGroup(id group.ID) (err error) {
-	var p group.Plugin
-	p, err = c.getPlugin()
-	if err != nil {
-		return
-	}
-	return p.FreeGroup(id)
+func (c *lateBindGroup) DestroyGroup(id group.ID) (err error) {
+	err = c.do(func(p group.Plugin) error {
+		err = p.DestroyGroup(id)
+		return err
+	})
+	return
 }
 
-func (c *pGroup) DescribeGroup(id group.ID) (desc group.Description, err error) {
-	var p group.Plugin
-	p, err = c.getPlugin()
-	if err != nil {
-		return
-	}
-	return p.DescribeGroup(id)
+func (c *lateBindGroup) InspectGroups() (specs []group.Spec, err error) {
+	err = c.do(func(p group.Plugin) error {
+		specs, err = p.InspectGroups()
+		return err
+	})
+	return
 }
 
-func (c *pGroup) DestroyGroup(id group.ID) (err error) {
-	var p group.Plugin
-	p, err = c.getPlugin()
-	if err != nil {
-		return
-	}
-	return p.DestroyGroup(id)
+func (c *lateBindGroup) DestroyInstances(id group.ID, instances []instance.ID) (err error) {
+	err = c.do(func(p group.Plugin) error {
+		err = p.DestroyInstances(id, instances)
+		return err
+	})
+	return
 }
 
-func (c *pGroup) InspectGroups() (specs []group.Spec, err error) {
-	var p group.Plugin
-	p, err = c.getPlugin()
-	if err != nil {
-		return
-	}
-	return p.InspectGroups()
+func (c *lateBindGroup) Size(id group.ID) (size int, err error) {
+	err = c.do(func(p group.Plugin) error {
+		size, err = p.Size(id)
+		return err
+	})
+	return
 }
 
-func (c *pGroup) DestroyInstances(id group.ID, instances []instance.ID) (err error) {
-	var p group.Plugin
-	p, err = c.getPlugin()
-	if err != nil {
-		return
-	}
-	return p.DestroyInstances(id, instances)
-}
-
-func (c *pGroup) Size(id group.ID) (size int, err error) {
-	var p group.Plugin
-	p, err = c.getPlugin()
-	if err != nil {
-		return
-	}
-	return p.Size(id)
-}
-
-func (c *pGroup) SetSize(id group.ID, size int) (err error) {
-	var p group.Plugin
-	p, err = c.getPlugin()
-	if err != nil {
-		return
-	}
-	return p.SetSize(id, size)
+func (c *lateBindGroup) SetSize(id group.ID, size int) (err error) {
+	err = c.do(func(p group.Plugin) error {
+		err = p.SetSize(id, size)
+		return err
+	})
+	return
 }

@@ -11,9 +11,9 @@ import (
 func TestErrorOnCallsToNilPlugin(t *testing.T) {
 
 	errMessage := "no-plugin"
-	proxy := newGroupProxy(func() (group.Plugin, error) {
+	proxy := &lateBindGroup{finder: func() (group.Plugin, error) {
 		return nil, errors.New(errMessage)
-	})
+	}}
 
 	err := proxy.FreeGroup(group.ID("test"))
 	require.Error(t, err)
@@ -45,7 +45,7 @@ func TestDelayPluginLookupCallingMethod(t *testing.T) {
 		},
 	}
 
-	proxy := newGroupProxy(func() (group.Plugin, error) { return fake, nil })
+	proxy := &lateBindGroup{finder: func() (group.Plugin, error) { return fake, nil }}
 
 	require.False(t, called)
 
@@ -66,7 +66,7 @@ func TestDelayPluginLookupCallingMethodReturnsError(t *testing.T) {
 		},
 	}
 
-	proxy := newGroupProxy(func() (group.Plugin, error) { return fake, nil })
+	proxy := &lateBindGroup{finder: func() (group.Plugin, error) { return fake, nil }}
 
 	require.False(t, called)
 
@@ -93,7 +93,7 @@ func TestDelayPluginLookupCallingMultipleMethods(t *testing.T) {
 		},
 	}
 
-	proxy := newGroupProxy(func() (group.Plugin, error) { return fake, nil })
+	proxy := &lateBindGroup{finder: func() (group.Plugin, error) { return fake, nil }}
 
 	require.False(t, called)
 
