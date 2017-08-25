@@ -109,7 +109,7 @@ func TestHandleFilesRefreshFail(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -184,7 +184,7 @@ func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
 	for i := 100; i < 105; i++ {
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -232,7 +232,7 @@ func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
 	for i := 100; i < 105; i++ {
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -245,11 +245,11 @@ func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
 	for i := 105; i < 110; i++ {
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
-				resInfo{
+				{
 					ResType: TResourceType("default-nfs"),
 					ResName: TResourceName(fmt.Sprintf("default-nfs-instance-%v", i)),
 				},
@@ -262,7 +262,7 @@ func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
 	for i := 110; i < 115; i++ {
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -274,7 +274,7 @@ func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
 		// Dedicated
 		info = fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: TResourceType("dedicated-nfs"),
 					ResName: TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
 				},
@@ -289,7 +289,7 @@ func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
 		// Global
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: TResourceType("global-nfs"),
 					ResName: TResourceName(fmt.Sprintf("global-nfs-instance-%v", i)),
 				},
@@ -374,7 +374,7 @@ func TestHandleFilesNoPruneWithNewFiles(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -429,7 +429,7 @@ func TestHandleFilesPruneMultipleVMTypes(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: resType,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -483,7 +483,7 @@ func TestHandleFilesPruneWithNewFiles(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -536,7 +536,7 @@ func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -553,11 +553,11 @@ func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
-				resInfo{
+				{
 					ResType: TResourceType("default-nfs"),
 					ResName: TResourceName(fmt.Sprintf("default-nfs-instance-%v", i)),
 				},
@@ -574,7 +574,7 @@ func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -586,7 +586,7 @@ func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
 		// Dedicated
 		info = fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: TResourceType("dedicated-nfs"),
 					ResName: TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
 				},
@@ -605,7 +605,7 @@ func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
 		// Global
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: TResourceType("global-nfs"),
 					ResName: TResourceName(fmt.Sprintf("global-nfs-instance-%v", i)),
 				},
@@ -719,7 +719,7 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -736,11 +736,11 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
-				resInfo{
+				{
 					ResType: TResourceType("default-nfs"),
 					ResName: TResourceName(fmt.Sprintf("default-nfs-instance-%v", i)),
 				},
@@ -757,7 +757,7 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 		}
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: VMIBMCloud,
 					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
 				},
@@ -769,7 +769,7 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 		// Dedicated
 		info = fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: TResourceType("dedicated-nfs"),
 					ResName: TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
 				},
@@ -788,7 +788,7 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 		// Global
 		info := fileInfo{
 			ResInfo: []resInfo{
-				resInfo{
+				{
 					ResType: TResourceType("global-nfs"),
 					ResName: TResourceName(fmt.Sprintf("global-nfs-instance-%v", i)),
 				},
