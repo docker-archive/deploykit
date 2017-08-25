@@ -141,7 +141,6 @@ func (p *Group) InspectGroups(_ *http.Request, req *InspectGroupsRequest, resp *
 // DestroyInstances is the rpc method to destroy specific instances
 func (p *Group) DestroyInstances(_ *http.Request, req *DestroyInstancesRequest, resp *DestroyInstancesResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
-
 		err := v.(group.Plugin).DestroyInstances(req.ID, req.Instances)
 		if err != nil {
 			return err

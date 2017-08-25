@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 )
@@ -23,9 +24,15 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 	quiet := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 
-		if len(args) != 1 {
-			cmd.Usage()
-			os.Exit(1)
+		pluginName := plugin.Name(name)
+		_, gid := pluginName.GetLookupAndType()
+		if gid == "" {
+			if len(args) < 1 {
+				cmd.Usage()
+				os.Exit(1)
+			} else {
+				gid = args[0]
+			}
 		}
 
 		groupPlugin, err := LoadPlugin(services.Plugins(), name)
@@ -34,7 +41,10 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 		}
 		cli.MustNotNil(groupPlugin, "group plugin not found", "name", name)
 
-		groupID := group.ID(args[0])
+		groupID := group.ID(gid)
+
+		fmt.Println("describing group", groupID, "plugin", name)
+
 		desc, err := groupPlugin.DescribeGroup(groupID)
 		if err != nil {
 			return err

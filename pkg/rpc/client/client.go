@@ -92,7 +92,7 @@ func parseAddress(address string) (*url.URL, *http.Client, error) {
 					return net.Dial("unix", address)
 				},
 				MaxIdleConns:          1,
-				IdleConnTimeout:       5 * time.Second,
+				IdleConnTimeout:       1 * time.Second,
 				TLSHandshakeTimeout:   10 * time.Second,
 				ExpectContinueTimeout: 1 * time.Second,
 			}}, nil

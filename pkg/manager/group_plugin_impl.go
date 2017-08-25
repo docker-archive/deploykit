@@ -5,28 +5,10 @@ import (
 
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
-
-// proxyForGroupPlugin registers a group plugin that this manager will proxy for.
-func (m *manager) proxyForGroupPlugin(name string) (group.Plugin, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.backendName = name
-
-	// A late-binding proxy so that we don't have a problem with having to
-	// start up the manager as the last of all the plugins.
-	return newGroupProxy(func() (group.Plugin, error) {
-		endpoint, err := m.plugins.Find(plugin.Name(name))
-		if err != nil {
-			return nil, err
-		}
-		return rpc.NewClient(endpoint.Address)
-	}), nil
-}
 
 func (m *manager) updateConfig(spec group.Spec) error {
 	log.Debug("Updating config", "spec", spec)
@@ -94,7 +76,7 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 	m.backendOps <- backendOp{
 		name: "commit",
 		operation: func() error {
-			log.Info("Proxy CommitGroup", "spec", grp)
+			log.Info("Manager CommitGroup", "spec", grp)
 
 			var txnResp string
 			var txnErr error
@@ -129,6 +111,39 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 	return
 }
 
+// Serialized describe group
+func (m *manager) DescribeGroup(id group.ID) (desc group.Description, err error) {
+	log.Debug("Describe group", "id", id, "V", debugV)
+	resultChan := make(chan []interface{})
+
+	m.backendOps <- backendOp{
+		name: "describe",
+		operation: func() error {
+			log.Info("Manager DescribeGroup", "id", id)
+
+			var txnResp group.Description
+			var txnErr error
+
+			// Always send a response so we don't block forever
+			defer func() {
+				resultChan <- []interface{}{txnResp, txnErr}
+			}()
+
+			txnResp, txnErr = m.Plugin.DescribeGroup(id)
+			return txnErr
+		},
+	}
+
+	r := <-resultChan
+	if v, has := r[0].(group.Description); has {
+		desc = v
+	}
+	if v, has := r[1].(error); has && v != nil {
+		err = v
+	}
+	return
+}
+
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) DestroyGroup(id group.ID) (err error) {
 
@@ -138,7 +153,7 @@ func (m *manager) DestroyGroup(id group.ID) (err error) {
 		name: "destroy",
 		operation: func() error {
 
-			log.Info("Proxy DestroyGroup", "groupID", id)
+			log.Info("Manager DestroyGroup", "groupID", id)
 
 			var txnErr error
 
@@ -175,7 +190,7 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 		name: "free",
 		operation: func() error {
 
-			log.Info("Proxy FreeGroup", "groupID", id)
+			log.Info("Manager FreeGroup", "groupID", id)
 
 			var txnErr error
 
@@ -205,14 +220,14 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) DestroyInstances(id group.ID, instances []instance.ID) (err error) {
-
+	log.Debug("manager.DestroyInstances", "id", id, "instances", instances, "V", debugV)
 	resultChan := make(chan []interface{})
 
 	m.backendOps <- backendOp{
 		name: "destroyInstances",
 		operation: func() error {
 
-			log.Info("Proxy DestroyInstances", "groupID", id, "instances", instances)
+			log.Info("Manager DestroyInstances", "groupID", id, "instances", instances)
 
 			var txnErr error
 

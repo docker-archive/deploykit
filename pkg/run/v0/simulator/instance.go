@@ -15,6 +15,10 @@ import (
 
 var instanceLogger = logutil.New("module", "simulator/instance")
 
+const (
+	debugV = logutil.V(500)
+)
+
 // NewInstance returns a typed instance plugin
 func NewInstance(name string, options Options) instance.Plugin {
 	l := &instanceSimulator{
@@ -38,13 +42,13 @@ type instanceSimulator struct {
 
 // Validate performs local validation on a provision request.
 func (s *instanceSimulator) Validate(req *types.Any) error {
-	instanceLogger.Info("Validate", "req", req)
+	instanceLogger.Debug("Validate", "req", req)
 	return nil
 }
 
 // Provision creates a new instance based on the spec.
 func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) {
-	instanceLogger.Info("Provision", "name", s.name, "spec", spec)
+	instanceLogger.Debug("Provision", "name", s.name, "spec", spec, "V", debugV)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	key := fmt.Sprintf("%v", time.Now().UnixNano())
@@ -66,7 +70,7 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 
 // Label labels the instance
 func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) error {
-	instanceLogger.Info("Label", "name", s.name, "instance", key, "labels", labels)
+	instanceLogger.Debug("Label", "name", s.name, "instance", key, "labels", labels, "V", debugV)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -105,7 +109,7 @@ func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) err
 
 // Destroy terminates an existing instance.
 func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Context) error {
-	instanceLogger.Info("Destroy", "name", s.name, "instance", instance, "context", context)
+	instanceLogger.Debug("Destroy", "name", s.name, "instance", instance, "context", context, "V", debugV)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -123,7 +127,7 @@ func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Conte
 // The properties flag indicates the client is interested in receiving details about each instance.
 func (s *instanceSimulator) DescribeInstances(labels map[string]string,
 	properties bool) ([]instance.Description, error) {
-	instanceLogger.Info("DescribeInstances", "name", s.name, "labels", labels)
+	instanceLogger.Debug("DescribeInstances", "name", s.name, "labels", labels, "V", debugV)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

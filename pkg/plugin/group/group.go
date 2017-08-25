@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -19,7 +19,11 @@ import (
 const (
 	groupTag  = "infrakit.group"
 	configTag = "infrakit.config_sha"
+
+	debugV = logutil.V(300)
 )
+
+var log = logutil.New("module", "plugin/group")
 
 // InstancePluginLookup helps with looking up an instance plugin by name
 type InstancePluginLookup func(plugin_base.Name) (instance.Plugin, error)
@@ -61,7 +65,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 		return "", err
 	}
 
-	log.Infof("Committing group %s (pretend=%t)", config.ID, pretend)
+	log.Info("Committing", "groupID", config.ID, "pretend", pretend)
 
 	context, exists := p.groups.get(config.ID)
 	if exists {
@@ -83,11 +87,11 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 			context.setUpdate(updatePlan)
 			context.changeSettings(settings)
 			go func() {
-				log.Infof("Executing update plan for '%s': %s", config.ID, updatePlan.Explain())
+				log.Info("Executing update plan", "groupID", config.ID, "plan", updatePlan.Explain())
 				if err := updatePlan.Run(p.pollInterval); err != nil {
-					log.Errorf("Update to %s failed: %s", config.ID, err)
+					log.Error("Update failed", "groupID", config.ID, "err", err)
 				} else {
-					log.Infof("Group %s has converged", config.ID)
+					log.Info("Convergence", "groupID", config.ID)
 				}
 				context.setUpdate(nil)
 			}()
@@ -132,7 +136,7 @@ func (p *plugin) doFree(id group.ID) (*groupContext, error) {
 	grp.supervisor.Stop()
 	p.groups.del(id)
 
-	log.Infof("Ignored group '%s'", id)
+	log.Info("Ignored", "groupID", id)
 	return grp, nil
 }
 
@@ -236,8 +240,7 @@ func (e instancesErr) Error() string {
 }
 
 func (p *plugin) DestroyInstances(gid group.ID, toDestroy []instance.ID) error {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	log.Debug("Destorying instances", "gid", gid, "targets", toDestroy)
 
 	context, exists := p.groups.get(gid)
 	if !exists {
@@ -265,15 +268,10 @@ func (p *plugin) DestroyInstances(gid group.ID, toDestroy []instance.ID) error {
 		}
 	}
 
-	if len(missing) > 0 {
-		return instancesErr(missing)
-	}
-
 	// tell the group to pause before we start killing the instances
-	_, err = p.doFree(gid)
-	if err != nil {
-		return err
-	}
+	log.Debug("pausing before destroy instances")
+	context.stopUpdating()
+	log.Debug("paused")
 
 	// kill the instances
 	for _, target := range targets {

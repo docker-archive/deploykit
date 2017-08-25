@@ -286,3 +286,88 @@ func TestGroupPluginInspectGroupError(t *testing.T) {
 	server.Stop()
 	require.Equal(t, id, <-idActual)
 }
+
+func TestGroupNamedPluginDestroyInstances(t *testing.T) {
+	socketPath := tempSocket()
+
+	idsActual := make(chan []instance.ID, 1)
+	gidActual := make(chan group.ID, 1)
+
+	server, err := rpc_server.StartPluginAtPath(socketPath,
+		PluginServerWithGroups(
+			func() (map[group.ID]group.Plugin, error) {
+				return map[group.ID]group.Plugin{
+					group.ID(""): &testing_group.Plugin{
+						DoDestroyInstances: func(gid group.ID, ids []instance.ID) error {
+							panic("shouldn't be here")
+						},
+					},
+					group.ID("group1"): &testing_group.Plugin{
+						DoDestroyInstances: func(gid group.ID, ids []instance.ID) error {
+							gidActual <- gid
+							idsActual <- ids
+							return nil
+						},
+					},
+				}, nil
+			}))
+
+	// Make call
+	gid := group.ID("group1")
+	ids := []instance.ID{instance.ID("foo"), instance.ID("bar")}
+	err = must(NewClient(socketPath)).DestroyInstances(gid, ids)
+	require.NoError(t, err)
+
+	server.Stop()
+
+	require.Equal(t, ids, <-idsActual)
+	require.Equal(t, gid, <-gidActual)
+}
+
+func TestGroupNamedPluginSizeSetSize(t *testing.T) {
+	socketPath := tempSocket()
+
+	gidActual := make(chan group.ID, 1)
+	sizeActual := make(chan int, 1)
+
+	server, err := rpc_server.StartPluginAtPath(socketPath,
+		PluginServerWithGroups(
+			func() (map[group.ID]group.Plugin, error) {
+				return map[group.ID]group.Plugin{
+					group.ID(""): &testing_group.Plugin{
+						DoSize: func(gid group.ID) (int, error) {
+							panic("shouldn't be here")
+						},
+						DoSetSize: func(gid group.ID, size int) error {
+							panic("shouldn't be here")
+						},
+					},
+					group.ID("group1"): &testing_group.Plugin{
+						DoSize: func(gid group.ID) (int, error) {
+							gidActual <- gid
+							return 100, nil
+						},
+						DoSetSize: func(gid group.ID, size int) error {
+							sizeActual <- size
+							return nil
+						},
+					},
+				}, nil
+			}))
+
+	// Make call
+	gid := group.ID("group1")
+
+	size, err := must(NewClient(socketPath)).Size(gid)
+	require.NoError(t, err)
+	require.Equal(t, 100, size)
+
+	err = must(NewClient(socketPath)).SetSize(gid, 1001)
+	require.NoError(t, err)
+	require.Equal(t, 100, size)
+
+	server.Stop()
+
+	require.Equal(t, 1001, <-sizeActual)
+	require.Equal(t, gid, <-gidActual)
+}

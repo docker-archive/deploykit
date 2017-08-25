@@ -4,16 +4,16 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/controller"
-	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // GroupControllers returns a map of *scoped* group controllers by ID of the group.
-func (m *manager) GroupControllers() (map[string]controller.Controller, error) {
-	base := newControllerProxy(nil, m.Plugin)
+func (m *manager) Controllers() (map[string]controller.Controller, error) {
 	controllers := map[string]controller.Controller{
-		"": base,
+		"": &pController{
+			plugin: m,
+		},
 	}
 	all, err := m.Plugin.InspectGroups()
 	if err != nil {
@@ -21,19 +21,13 @@ func (m *manager) GroupControllers() (map[string]controller.Controller, error) {
 	}
 	for _, spec := range all {
 		gid := spec.ID
-		controllers[string(gid)] = newControllerProxy(&gid, m.Plugin)
+		controllers[string(gid)] = &pController{
+			plugin: m,
+			scope:  &gid,
+		}
 	}
-	log.Debug("GroupControllers", "map", controllers, "V", logutil.V(500))
+	log.Debug("Controllers", "map", controllers, "V", debugV2)
 	return controllers, nil
-}
-
-// newControllerProxy returns a Controller implementation that optionally
-// enforces scoping by group ID if provided
-func newControllerProxy(id *group.ID, g group.Plugin) controller.Controller {
-	return &pController{
-		plugin: g,
-		scope:  id,
-	}
 }
 
 // This controller is used to implement a generic controller *as well as* a named controller
