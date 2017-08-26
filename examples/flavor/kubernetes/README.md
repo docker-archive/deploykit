@@ -36,7 +36,7 @@ For workers
 Note `KubeJoinIP`, `KubeBindPort` that the Kubernetes connection information, as well as what IP in the Kubernetes managers and workers should use
 to advertise and join.
 
-`KubeAddOns` is list of (kubernetes addons)[https://kubernetes.io/docs/concepts/cluster-administration/addons/]. 
+`KubeAddOns` is list of [kubernetes addons](https://kubernetes.io/docs/concepts/cluster-administration/addons/). 
 You can set Type as network or visualise.
 `network` Type addon should be set as your cluster will not be Ready status until network addon is applyed.
 
