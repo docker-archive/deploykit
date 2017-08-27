@@ -38,9 +38,13 @@ const (
 	attachTag = "infrakit.attach"
 )
 
-// tfFileRegex is used to determine the files that contain a terraform instance
+// tfFileRegex is used to determine the all terraform files; files with a ".new" suffix
+// have not yet been processed by terraform
+var tfFileRegex = regexp.MustCompile("(^.*).tf.json([.new]*)$")
+
+// instanceTfFileRegex is used to determine the files that contain a terraform instance
 // definition; files with a ".new" suffix have not yet been processed by terraform
-var tfFileRegex = regexp.MustCompile("(^instance-[0-9]+)(.tf.json)([.new]*)$")
+var instanceTfFileRegex = regexp.MustCompile("(^instance-[0-9]+)(.tf.json)([.new]*)$")
 
 // instNameRegex is used to determine the name of an instance
 var instNameRegex = regexp.MustCompile("(.*)(instance-[0-9]+)")
@@ -338,7 +342,7 @@ func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResource
 	err := fs.Walk(p.Dir,
 
 		func(path string, info os.FileInfo, err error) error {
-			matches := tfFileRegex.FindStringSubmatch(info.Name())
+			matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
 
 			if len(matches) == 4 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
@@ -772,7 +776,7 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 			fs := &afero.Afero{Fs: p.fs}
 			err = fs.Walk(p.Dir,
 				func(path string, info os.FileInfo, err error) error {
-					matches := tfFileRegex.FindStringSubmatch(info.Name())
+					matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
 					// Note that the current instance (being destroyed) still exists; filter
 					// this file out.
 					if len(matches) == 4 && filename != info.Name() {
