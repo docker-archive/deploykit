@@ -38,9 +38,13 @@ const (
 	attachTag = "infrakit.attach"
 )
 
-// tfFileRegex is used to determine the files that contain a terraform instance
+// tfFileRegex is used to determine the all terraform files; files with a ".new" suffix
+// have not yet been processed by terraform
+var tfFileRegex = regexp.MustCompile("(^.*).tf.json([.new]*)$")
+
+// instanceTfFileRegex is used to determine the files that contain a terraform instance
 // definition; files with a ".new" suffix have not yet been processed by terraform
-var tfFileRegex = regexp.MustCompile("(^instance-[0-9]+)(.tf.json)([.new]*)$")
+var instanceTfFileRegex = regexp.MustCompile("(^instance-[0-9]+)(.tf.json)([.new]*)$")
 
 // instNameRegex is used to determine the name of an instance
 var instNameRegex = regexp.MustCompile("(.*)(instance-[0-9]+)")
@@ -338,7 +342,7 @@ func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResource
 	err := fs.Walk(p.Dir,
 
 		func(path string, info os.FileInfo, err error) error {
-			matches := tfFileRegex.FindStringSubmatch(info.Name())
+			matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
 
 			if len(matches) == 4 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
@@ -444,11 +448,17 @@ func mergeInitScript(spec instance.Spec, id instance.ID, vmType TResourceType, p
 	}
 }
 
-// renderInstIdVar applies the "/self/instId" as a global option and renders
-// the given string
-func renderInstIDVar(data string, id instance.ID) (string, error) {
+// renderInstVars applies the "/self/instId" and "/self/logicalId" variables as global options
+// on the input string
+func renderInstVars(data string, id instance.ID, logicalID *instance.LogicalID) (string, error) {
+	// Instance ID is always supplied
 	t, _ := template.NewTemplate("str://"+data, template.Options{})
-	return t.Global("/self/instId", id).Render(nil)
+	t = t.Global("/self/instId", id)
+	// LogicalID is optional
+	if logicalID != nil {
+		t = t.Global("/self/logicalId", string(*logicalID))
+	}
+	return t.Render(nil)
 }
 
 // handleProvisionTags sets the Infrakit-specific tags and merges with the user-defined in the instance spec
@@ -643,13 +653,13 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	id := instance.ID(name)
 
-	// Template the {{ var "/self/instId" }} var in both the Properties and the Init
-	rendered, err := renderInstIDVar(spec.Properties.String(), id)
+	// Template the "self" instance specific vars in both the Properties and the Init
+	rendered, err := renderInstVars(spec.Properties.String(), id, spec.LogicalID)
 	if err != nil {
 		return nil, err
 	}
 	spec.Properties = types.AnyBytes([]byte(rendered))
-	rendered, err = renderInstIDVar(spec.Init, id)
+	rendered, err = renderInstVars(spec.Init, id, spec.LogicalID)
 	if err != nil {
 		return nil, err
 	}
@@ -766,7 +776,7 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 			fs := &afero.Afero{Fs: p.fs}
 			err = fs.Walk(p.Dir,
 				func(path string, info os.FileInfo, err error) error {
-					matches := tfFileRegex.FindStringSubmatch(info.Name())
+					matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
 					// Note that the current instance (being destroyed) still exists; filter
 					// this file out.
 					if len(matches) == 4 && filename != info.Name() {

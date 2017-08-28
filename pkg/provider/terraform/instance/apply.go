@@ -157,11 +157,11 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	tfFiles := map[TResourceType]map[TResourceName]string{}
 	tfNewFiles := map[TResourceType]map[TResourceName]string{}
 	fs := &afero.Afero{Fs: p.fs}
-	// just scan the directory for the instance-*.tf.json[.new] files
+	// just scan the directory for the *.tf.json[.new] files
 	err = fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			matches := tfFileRegex.FindStringSubmatch(info.Name())
-			if len(matches) == 4 {
+			if len(matches) == 3 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
 					log.Warningln("Cannot parse:", err)
@@ -171,21 +171,22 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 				if err = types.AnyBytes(buff).Decode(&tf); err != nil {
 					return err
 				}
-				vmType, vmName, _, err := FindVM(&tf)
-				if err != nil {
-					return err
-				}
 				// Populate the correct tf map
 				var tfMap map[TResourceType]map[TResourceName]string
-				if matches[3] == ".new" {
+				if matches[2] == ".new" {
 					tfMap = tfNewFiles
 				} else {
 					tfMap = tfFiles
 				}
-				if _, has := tfMap[vmType]; !has {
-					tfMap[vmType] = map[TResourceName]string{}
+				for resType, resNameProps := range tf.Resource {
+					for resName := range resNameProps {
+						if _, has := tfMap[resType]; !has {
+							tfMap[resType] = map[TResourceName]string{}
+						}
+						tfMap[resType][resName] = info.Name()
+						log.Debugf("File %s contains resource %s.%s", info.Name(), resType, resName)
+					}
 				}
-				tfMap[vmType][vmName] = info.Name()
 			}
 			return nil
 		},
@@ -194,8 +195,9 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 		return err
 	}
 
-	// Determine files to prune
-	prunes := []string{}
+	// Determine files to prune, since multiple resource types can exist per file we want to
+	// track unique filenames
+	prunes := make(map[string]struct{})
 	for resType, resNameFilenameMap := range tfFiles {
 		log.Infof("Detected %v tf.json files for resource type %v", len(resNameFilenameMap), resType)
 		if tfStateResNames, has := tfStateResources[resType]; has {
@@ -205,7 +207,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 					log.Infof("Instance %v.%v exists in terraform state", resType, resName)
 				} else {
 					log.Infof("Detected instance %v.%v to prune at file: %v", resType, resName, filename)
-					prunes = append(prunes, filename)
+					prunes[filename] = struct{}{}
 				}
 			}
 		} else {
@@ -213,13 +215,13 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 			log.Infof("State files has no resources of type %v, pruning all %v instances ...", resType, len(resNameFilenameMap))
 			for resName, filename := range resNameFilenameMap {
 				log.Infof("Detected instance %v.%v to prune at file: %v", resType, resName, filename)
-				prunes = append(prunes, filename)
+				prunes[filename] = struct{}{}
 			}
 		}
 	}
 
 	log.Infof("Pruning %v tf.json files", len(prunes))
-	for _, filename := range prunes {
+	for filename := range prunes {
 		path := filepath.Join(p.Dir, filename)
 		err = p.fs.Remove(path)
 		if err != nil {
@@ -231,14 +233,20 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	if len(tfNewFiles) == 0 {
 		log.Infof("No tf.json.new files to move")
 	} else {
+		// Any .tf.json.new file with multiple resources will result in duplicates, remove
+		// them before moving files
+		files := make(map[string]struct{})
 		for _, resNameFileMap := range tfNewFiles {
 			for _, filename := range resNameFileMap {
-				path := filepath.Join(p.Dir, filename)
-				log.Infof("Removing .new suffix from file: %v", path)
-				err = p.fs.Rename(path, strings.Replace(path, "tf.json.new", "tf.json", -1))
-				if err != nil {
-					return err
-				}
+				files[filename] = struct{}{}
+			}
+		}
+		for file := range files {
+			path := filepath.Join(p.Dir, file)
+			log.Infof("Removing .new suffix from file: %v", path)
+			err = p.fs.Rename(path, strings.Replace(path, "tf.json.new", "tf.json", -1))
+			if err != nil {
+				return err
 			}
 		}
 	}

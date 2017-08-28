@@ -41,27 +41,40 @@ func TestContinuePollingStandalone(t *testing.T) {
 	require.True(t, shoudApply)
 }
 
-// fileInfo holds the data for a file to create in the plugin's working dir
-type fileInfo struct {
+// resInfo holds the resource type and resource name
+type resInfo struct {
 	ResType TResourceType
 	ResName TResourceName
-	NewFile bool
-	Plugin  *plugin
+}
+
+// fileInfo holds the data for a file to create in the plugin's working dir
+type fileInfo struct {
+	ResInfo    []resInfo
+	NewFile    bool
+	FilePrefix string
+	Plugin     *plugin
 }
 
 // writeFile is a utility function to write out a terraform file
 func writeFile(info fileInfo, t *testing.T) {
+	require.NotZero(t, len(info.ResInfo))
 	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
-	inst[info.ResType] = map[TResourceName]TResourceProperties{
-		info.ResName: {"key": "val"},
+	for _, resInfo := range info.ResInfo {
+		inst[resInfo.ResType] = map[TResourceName]TResourceProperties{
+			resInfo.ResName: {"key": "val"},
+		}
 	}
 	buff, err := json.MarshalIndent(TFormat{Resource: inst}, " ", " ")
 	require.NoError(t, err)
+	// Default file prefix to the name of the first instance
+	if info.FilePrefix == "" {
+		info.FilePrefix = string(info.ResInfo[0].ResName)
+	}
 	var filename string
 	if info.NewFile {
-		filename = fmt.Sprintf("%v.tf.json.new", string(info.ResName))
+		filename = fmt.Sprintf("%v.tf.json.new", info.FilePrefix)
 	} else {
-		filename = fmt.Sprintf("%v.tf.json", string(info.ResName))
+		filename = fmt.Sprintf("%v.tf.json", info.FilePrefix)
 	}
 	err = afero.WriteFile(info.Plugin.fs, filepath.Join(info.Plugin.Dir, filename), buff, 0644)
 	require.NoError(t, err)
@@ -95,8 +108,12 @@ func TestHandleFilesRefreshFail(t *testing.T) {
 			newFile = true
 		}
 		info := fileInfo{
-			ResType: VMIBMCloud,
-			ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
 			NewFile: newFile,
 			Plugin:  tf,
 		}
@@ -166,8 +183,12 @@ func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
 	// Write out 5 files
 	for i := 100; i < 105; i++ {
 		info := fileInfo{
-			ResType: VMIBMCloud,
-			ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
 			NewFile: false,
 			Plugin:  tf,
 		}
@@ -202,6 +223,145 @@ func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
 	}
 }
 
+func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Write out 5 files with VMs, 5 with VMs and a default, 5 with VMs
+	// and dedicated, and a global
+	for i := 100; i < 105; i++ {
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: false,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 105; i < 110; i++ {
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+				{
+					ResType: TResourceType("default-nfs"),
+					ResName: TResourceName(fmt.Sprintf("default-nfs-instance-%v", i)),
+				},
+			},
+			NewFile: false,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 110; i < 115; i++ {
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: false,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+		// Dedicated
+		info = fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: TResourceType("dedicated-nfs"),
+					ResName: TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
+				},
+			},
+			FilePrefix: fmt.Sprintf("dedicated-nfs-instance-%v", i),
+			NewFile:    false,
+			Plugin:     tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 115; i < 117; i++ {
+		// Global
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: TResourceType("global-nfs"),
+					ResName: TResourceName(fmt.Sprintf("global-nfs-instance-%v", i)),
+				},
+			},
+			NewFile: false,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	tfFiles, tfFilesNew := getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	// 15 VMs, 5 dedicated NFS, 2 global NFS
+	require.Len(t, tfFiles, 15+5+2)
+	for i := 100; i < 115; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+	}
+	for i := 110; i < 115; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+	}
+	for i := 115; i < 117; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
+	}
+
+	fns := tfFuncs{
+		tfRefresh: func() error { return nil },
+		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+			// Return all VMs
+			vms := map[TResourceName]struct{}{}
+			for i := 100; i < 115; i++ {
+				vms[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
+			}
+			// The default NFS
+			defaultNFS := map[TResourceName]struct{}{}
+			for i := 105; i < 110; i++ {
+				defaultNFS[TResourceName(fmt.Sprintf("default-nfs-instance-%v", i))] = struct{}{}
+			}
+			// The dedicated NFS
+			dedicatedNFS := map[TResourceName]struct{}{}
+			for i := 110; i < 115; i++ {
+				dedicatedNFS[TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i))] = struct{}{}
+			}
+			// And the global
+			globalNFS := map[TResourceName]struct{}{}
+			for i := 115; i < 117; i++ {
+				globalNFS[TResourceName(fmt.Sprintf("global-nfs-instance-%v", i))] = struct{}{}
+			}
+			return map[TResourceType]map[TResourceName]struct{}{
+				VMIBMCloud:                     vms,
+				TResourceType("default-nfs"):   defaultNFS,
+				TResourceType("dedicated-nfs"): dedicatedNFS,
+				TResourceType("global-nfs"):    globalNFS,
+			}, nil
+		},
+	}
+	err := tf.handleFiles(fns)
+	require.NoError(t, err)
+
+	// No files removed
+	tfFiles, tfFilesNew = getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	require.Len(t, tfFiles, 15+5+2)
+	for i := 100; i < 115; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+	}
+	for i := 110; i < 115; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+	}
+	for i := 115; i < 117; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
+	}
+}
+
 func TestHandleFilesNoPruneWithNewFiles(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
@@ -213,8 +373,12 @@ func TestHandleFilesNoPruneWithNewFiles(t *testing.T) {
 			newFile = true
 		}
 		info := fileInfo{
-			ResType: VMIBMCloud,
-			ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
 			NewFile: newFile,
 			Plugin:  tf,
 		}
@@ -249,7 +413,7 @@ func TestHandleFilesNoPruneWithNewFiles(t *testing.T) {
 	}
 }
 
-func TestHandleFilesPruneMultipleResourceTypes(t *testing.T) {
+func TestHandleFilesPruneMultipleVMTypes(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
@@ -264,8 +428,12 @@ func TestHandleFilesPruneMultipleResourceTypes(t *testing.T) {
 			resType = VMGoogleCloud
 		}
 		info := fileInfo{
-			ResType: resType,
-			ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+			ResInfo: []resInfo{
+				{
+					ResType: resType,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
 			NewFile: false,
 			Plugin:  tf,
 		}
@@ -314,8 +482,12 @@ func TestHandleFilesPruneWithNewFiles(t *testing.T) {
 			newFile = true
 		}
 		info := fileInfo{
-			ResType: VMIBMCloud,
-			ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
 			NewFile: newFile,
 			Plugin:  tf,
 		}
@@ -348,5 +520,382 @@ func TestHandleFilesPruneWithNewFiles(t *testing.T) {
 	require.Len(t, tfFiles, 8)
 	for i := 102; i < 110; i++ {
 		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+	}
+}
+
+func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Write out 5 files with VMs, 5 with VMs and a default, 5 with VMs
+	// and dedicated, and a global. Every even file is new.
+	for i := 100; i < 105; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 105; i < 110; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+				{
+					ResType: TResourceType("default-nfs"),
+					ResName: TResourceName(fmt.Sprintf("default-nfs-instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 110; i < 115; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+		// Dedicated
+		info = fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: TResourceType("dedicated-nfs"),
+					ResName: TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
+				},
+			},
+			FilePrefix: fmt.Sprintf("dedicated-nfs-instance-%v", i),
+			NewFile:    newFile,
+			Plugin:     tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 115; i < 117; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		// Global
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: TResourceType("global-nfs"),
+					ResName: TResourceName(fmt.Sprintf("global-nfs-instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	tfFiles, tfFilesNew := getFilenames(t, tf)
+	// 100, 102, 104, 106, 108, 110, 112, 114 VMs
+	// 110, 112, 114 dedicated
+	// 116 global
+	require.Len(t, tfFilesNew, 8+3+1)
+	for i := 100; i < 115; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("instance-%v.tf.json.new", i))
+		}
+	}
+	for i := 110; i < 115; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json.new", i))
+		}
+	}
+	for i := 115; i < 117; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("global-nfs-instance-%v.tf.json.new", i))
+		}
+	}
+	require.Len(t, tfFiles, 22-(8+3+1))
+	for i := 100; i < 115; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+		}
+	}
+	for i := 110; i < 115; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+		}
+	}
+	for i := 115; i < 117; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
+		}
+	}
+
+	fns := tfFuncs{
+		tfRefresh: func() error { return nil },
+		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+			// Return only existing instances (ie, only odd ones)
+			vms := map[TResourceName]struct{}{}
+			for i := 100; i < 115; i++ {
+				if i%2 != 0 {
+					vms[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
+				}
+			}
+			defaultNFS := map[TResourceName]struct{}{}
+			for i := 105; i < 110; i++ {
+				if i%2 != 0 {
+					defaultNFS[TResourceName(fmt.Sprintf("default-nfs-instance-%v", i))] = struct{}{}
+				}
+			}
+			dedicatedNFS := map[TResourceName]struct{}{}
+			for i := 110; i < 115; i++ {
+				if i%2 != 0 {
+					dedicatedNFS[TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i))] = struct{}{}
+				}
+			}
+			globalNFS := map[TResourceName]struct{}{}
+			for i := 115; i < 117; i++ {
+				if i%2 != 0 {
+					globalNFS[TResourceName(fmt.Sprintf("global-nfs-instance-%v", i))] = struct{}{}
+				}
+			}
+			return map[TResourceType]map[TResourceName]struct{}{
+				VMIBMCloud:                     vms,
+				TResourceType("default-nfs"):   defaultNFS,
+				TResourceType("dedicated-nfs"): dedicatedNFS,
+				TResourceType("global-nfs"):    globalNFS,
+			}, nil
+		},
+	}
+	err := tf.handleFiles(fns)
+	require.NoError(t, err)
+
+	// No files removed
+	tfFiles, tfFilesNew = getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	require.Len(t, tfFiles, 15+5+2)
+	for i := 100; i < 115; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+	}
+	for i := 110; i < 115; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+	}
+	for i := 115; i < 117; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
+	}
+}
+
+func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Write out 5 files with VMs, 5 with VMs and a default, 5 with VMs
+	// and dedicated, and a global. Every even file is new.
+	for i := 100; i < 105; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 105; i < 110; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+				{
+					ResType: TResourceType("default-nfs"),
+					ResName: TResourceName(fmt.Sprintf("default-nfs-instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 110; i < 115; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+		// Dedicated
+		info = fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: TResourceType("dedicated-nfs"),
+					ResName: TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
+				},
+			},
+			FilePrefix: fmt.Sprintf("dedicated-nfs-instance-%v", i),
+			NewFile:    newFile,
+			Plugin:     tf,
+		}
+		writeFile(info, t)
+	}
+	for i := 115; i < 117; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		// Global
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: TResourceType("global-nfs"),
+					ResName: TResourceName(fmt.Sprintf("global-nfs-instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFile(info, t)
+	}
+	tfFiles, tfFilesNew := getFilenames(t, tf)
+	// 100, 102, 104, 106, 108, 110, 112, 114 VMs
+	// 110, 112, 114 dedicated
+	// 116 global
+	require.Len(t, tfFilesNew, 8+3+1)
+	for i := 100; i < 115; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("instance-%v.tf.json.new", i))
+		}
+	}
+	for i := 110; i < 115; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json.new", i))
+		}
+	}
+	for i := 115; i < 117; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("global-nfs-instance-%v.tf.json.new", i))
+		}
+	}
+	require.Len(t, tfFiles, 22-(8+3+1))
+	for i := 100; i < 115; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+		}
+	}
+	for i := 110; i < 115; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+		}
+	}
+	for i := 115; i < 117; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
+		}
+	}
+
+	fns := tfFuncs{
+		tfRefresh: func() error { return nil },
+		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+			// Return only existing instances (ie, only odd ones) EXCEPT 1 in each group
+			vms := map[TResourceName]struct{}{}
+			for i := 100; i < 115; i++ {
+				// 105 will not return for both the VM and NFS, 107 will not return for the VM only
+				if i%2 != 0 && i != 105 && i != 107 {
+					vms[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
+				}
+			}
+			defaultNFS := map[TResourceName]struct{}{}
+			for i := 105; i < 110; i++ {
+				if i%2 != 0 && i != 105 {
+					defaultNFS[TResourceName(fmt.Sprintf("default-nfs-instance-%v", i))] = struct{}{}
+				}
+			}
+			dedicatedNFS := map[TResourceName]struct{}{}
+			for i := 110; i < 115; i++ {
+				if i%2 != 0 && i != 111 {
+					dedicatedNFS[TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i))] = struct{}{}
+				}
+			}
+			globalNFS := map[TResourceName]struct{}{}
+			for i := 115; i < 117; i++ {
+				if i%2 != 0 && i != 115 {
+					globalNFS[TResourceName(fmt.Sprintf("global-nfs-instance-%v", i))] = struct{}{}
+				}
+			}
+			return map[TResourceType]map[TResourceName]struct{}{
+				VMIBMCloud:                     vms,
+				TResourceType("default-nfs"):   defaultNFS,
+				TResourceType("dedicated-nfs"): dedicatedNFS,
+				TResourceType("global-nfs"):    globalNFS,
+			}, nil
+		},
+	}
+	err := tf.handleFiles(fns)
+	require.NoError(t, err)
+
+	// No files removed
+	tfFiles, tfFilesNew = getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	require.Len(t, tfFiles, 15+5+2-4)
+	for i := 100; i < 115; i++ {
+		// 105 has both the VM and default NFS removed, 107 has the VM removed so the entire file is removed
+		if i == 105 || i == 107 {
+			continue
+		}
+		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+	}
+	for i := 110; i < 115; i++ {
+		if i == 111 {
+			continue
+		}
+		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+	}
+	for i := 115; i < 117; i++ {
+		if i == 115 {
+			continue
+		}
+		require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
 	}
 }
