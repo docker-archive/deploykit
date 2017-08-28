@@ -15,7 +15,7 @@ func Inspect(name string, services *cli.Services) *cobra.Command {
 
 	inspect := &cobra.Command{
 		Use:   "inspect <group ID>",
-		Short: "Insepct a group. Returns the raw configuration associated with a group",
+		Short: "Inspect a group. Returns the raw configuration associated with a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			pluginName := plugin.Name(name)

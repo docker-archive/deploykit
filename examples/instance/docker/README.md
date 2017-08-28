@@ -20,7 +20,7 @@ INFO[0000] Listening on: unix:///run/infrakit/plugins/group.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <nil>
 ```
 
-and the [Vanilla](https://github.com/docker/infrakit/tree/master/examples/flavor/vanilla) Flavor plugin:
+the [Vanilla](https://github.com/docker/infrakit/tree/master/examples/flavor/vanilla) Flavor plugin:
 ```console
 $ build/infrakit-flavor-vanilla
 INFO[0000] Starting plugin
@@ -28,9 +28,17 @@ INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-vanilla.sock
 INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.sock err= <nil>
 ```
 
+and the Docker Instance plugin:
+
+```console
+$ build/infrakit-instance-docker
+INFO[0000] PID file at unix:///run/infrakit/plugins/instance-docker.pid
+INFO[0000] Server waiting at unix:///run/infrakit/plugins/instance-docker
+```
+
 We will use a basic configuration that creates a single instance:
 ```console
-$ cat << EOF > aws-vanilla.json
+$ cat << EOF > docker-vanilla.json
 {
   "ID": "docker-example",
   "Properties": {
@@ -41,7 +49,7 @@ $ cat << EOF > aws-vanilla.json
       "Plugin": "instance-docker",
       "Properties": {
         "Config": {
-          "Image": "alpine:3.5"
+          "Image": "httpd:2.2"
         },
         "HostConfig": {
           "AutoRemove": true
@@ -66,22 +74,15 @@ EOF
 
 For the structure of `Config` `HostConfig`, see the plugin properties definition below.
 
-Finally, instruct the Group plugin to start watching the group:
+Finally, instruct the Group plugin to `commit` the group:
 ```console
-$ build/infrakit group watch docker-vanilla.json
-watching docker-example
-```
-
-In the console running the Group plugin, we will see input like the following:
-```
-INFO[1208] Watching group 'docker-example'
-INFO[1219] Adding 1 instances to group to reach desired 1
-INFO[1219] Created instance i-ba0412a2 with tags map[infrakit.config_sha:dUBtWGmkptbGg29ecBgv1VJYzys= infrakit.group:aws-example]
+$ build/infrakit group commit docker-vanilla.json
+Committed docker-example: Managing 1 instances
 ```
 
 Additionally, the CLI will report the newly-created instance:
 ```console
-$ build/infrakit group inspect docker-example
+$ build/infrakit group describe docker-example
 ID                             	LOGICAL                        	TAGS
 90e6f3de4918                   	elusive_leaky                  	Name=infrakit-example,infrakit.config_sha=dUBtWGmkptbGg29ecBgv1VJYzys=,infrakit.group=docker-example
 ```
