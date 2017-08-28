@@ -167,7 +167,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	// inspect
 	inspect := &cobra.Command{
 		Use:   "inspect <group ID>",
-		Short: "Insepct a group. Returns the raw configuration associated with a group",
+		Short: "Inspect a group. Returns the raw configuration associated with a group",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) != 1 {

@@ -1603,13 +1603,18 @@ func TestMergeTagsIntoVMProps(t *testing.T) {
 	}
 }
 
-func TestRenderInstIDVarNoReplace(t *testing.T) {
-	result, err := renderInstIDVar("{}", instance.ID("id"))
+func TestRenderInstVarsNoReplace(t *testing.T) {
+	result, err := renderInstVars("{}", instance.ID("id"), nil)
+	require.NoError(t, err)
+	require.Equal(t, "{}", result)
+
+	logicalID := instance.LogicalID("mgr1")
+	result, err = renderInstVars("{}", instance.ID("id"), &logicalID)
 	require.NoError(t, err)
 	require.Equal(t, "{}", result)
 }
 
-func TestRenderInstIDVar(t *testing.T) {
+func TestRenderInstVarsWithoutLogicalID(t *testing.T) {
 	input := `{
  "id": "{{ var "/self/instId" }}",
  "key": "val"
@@ -1618,7 +1623,29 @@ func TestRenderInstIDVar(t *testing.T) {
  "id": "id",
  "key": "val"
 }`
-	result, err := renderInstIDVar(input, instance.ID("id"))
+	result, err := renderInstVars(input, instance.ID("id"), nil)
+	require.NoError(t, err)
+	require.JSONEq(t, expected, result)
+
+	logicalID := instance.LogicalID("mgr1")
+	result, err = renderInstVars(input, instance.ID("id"), &logicalID)
+	require.NoError(t, err)
+	require.JSONEq(t, expected, result)
+}
+
+func TestRenderInstVarsWithLogicalID(t *testing.T) {
+	input := `{
+ "id": "{{ var "/self/instId" }}",
+ "logicalId": "{{ var "/self/logicalId" }}",
+ "key": "val"
+}`
+	expected := `{
+ "id": "id",
+ "logicalId": "mgr1",
+ "key": "val"
+}`
+	logicalID := instance.LogicalID("mgr1")
+	result, err := renderInstVars(input, instance.ID("id"), &logicalID)
 	require.NoError(t, err)
 	require.JSONEq(t, expected, result)
 }
