@@ -412,6 +412,15 @@ func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID
 				}
 			}
 		}
+		// Encode user data
+		if data, has := properties["user_data"]; has {
+			properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(data.(string)))
+		}
+	case VMDigitalOcean:
+		// Encode user data
+		if data, has := properties["user_data"]; has {
+			properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(data.(string)))
+		}
 	}
 }
 
@@ -430,7 +439,6 @@ func mergeInitScript(spec instance.Spec, id instance.ID, vmType TResourceType, p
 	switch vmType {
 	case VMAmazon, VMDigitalOcean:
 		addUserData(properties, "user_data", spec.Init)
-		properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(properties["user_data"].(string)))
 	case VMSoftLayer, VMIBMCloud:
 		addUserData(properties, "user_metadata", spec.Init)
 	case VMAzure:
@@ -448,17 +456,29 @@ func mergeInitScript(spec instance.Spec, id instance.ID, vmType TResourceType, p
 	}
 }
 
-// renderInstVars applies the "/self/instId" and "/self/logicalId" variables as global options
-// on the input string
-func renderInstVars(data string, id instance.ID, logicalID *instance.LogicalID) (string, error) {
+// renderInstVars applies the "/self/instId" and "/self/logicalId" variables
+// as global options on the input properties
+func renderInstVars(props *TResourceProperties, id string, logicalID *instance.LogicalID) error {
+	data, err := json.Marshal(props)
+	if err != nil {
+		return err
+	}
+	t, err := template.NewTemplate("str://"+string(data), template.Options{})
+	if err != nil {
+		return err
+	}
 	// Instance ID is always supplied
-	t, _ := template.NewTemplate("str://"+data, template.Options{})
 	t = t.Global("/self/instId", id)
 	// LogicalID is optional
 	if logicalID != nil {
 		t = t.Global("/self/logicalId", string(*logicalID))
 	}
-	return t.Render(nil)
+	result, err := t.Render(nil)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal([]byte(result), &props)
+	return err
 }
 
 // handleProvisionTags sets the Infrakit-specific tags and merges with the user-defined in the instance spec
@@ -653,21 +673,9 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	id := instance.ID(name)
 
-	// Template the "self" instance specific vars in both the Properties and the Init
-	rendered, err := renderInstVars(spec.Properties.String(), id, spec.LogicalID)
-	if err != nil {
-		return nil, err
-	}
-	spec.Properties = types.AnyBytes([]byte(rendered))
-	rendered, err = renderInstVars(spec.Init, id, spec.LogicalID)
-	if err != nil {
-		return nil, err
-	}
-	spec.Init = rendered
-
 	// Decode the given spec and find the VM resource
 	tf := TFormat{}
-	err = spec.Properties.Decode(&tf)
+	err := spec.Properties.Decode(&tf)
 	if err != nil {
 		return nil, err
 	}
@@ -683,6 +691,10 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	handleProvisionTags(spec, id, vmType, vmProps)
 	// Merge the init scripts into the VM properties
 	mergeInitScript(spec, id, vmType, vmProps)
+	// Render any instance specific variables
+	if err = renderInstVars(&vmProps, name, spec.LogicalID); err != nil {
+		return nil, err
+	}
 	// Write out the tf.json file
 	if err = p.writeTerraformFiles(spec.LogicalID, name, &tf, vmType, vmProps); err != nil {
 		return nil, err

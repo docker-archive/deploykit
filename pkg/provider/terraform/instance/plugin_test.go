@@ -61,7 +61,7 @@ func TestProcessImportOptions(t *testing.T) {
 func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false, nil)
+	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, nil)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)
@@ -198,7 +198,7 @@ func TestMergeInitScriptNoUserDefined(t *testing.T) {
 		switch vmType {
 		case VMAmazon, VMDigitalOcean:
 			require.Equal(t,
-				TResourceProperties{"user_data": base64.StdEncoding.EncodeToString([]byte(initData))},
+				TResourceProperties{"user_data": initData},
 				props)
 		case VMSoftLayer, VMIBMCloud:
 			require.Equal(t,
@@ -250,7 +250,7 @@ func TestMergeInitScriptWithUserDefined(t *testing.T) {
 		switch vmType {
 		case VMAmazon, VMDigitalOcean:
 			require.Equal(t,
-				TResourceProperties{"user_data": base64.StdEncoding.EncodeToString([]byte(expectedInit))},
+				TResourceProperties{"user_data": expectedInit},
 				props)
 		case VMSoftLayer, VMIBMCloud:
 			require.Equal(t,
@@ -327,22 +327,6 @@ func TestProvisionInvalidTemplateProperties(t *testing.T) {
 	}
 	_, err := tf.Provision(spec)
 	require.Error(t, err)
-	require.True(t, strings.HasPrefix(err.Error(), "template:"))
-}
-
-func TestProvisionInvalidTemplateInit(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	spec := instance.Spec{
-		Properties:  types.AnyString("{}"),
-		Tags:        map[string]string{},
-		Init:        "{{}",
-		Attachments: []instance.Attachment{},
-		LogicalID:   nil,
-	}
-	_, err := tf.Provision(spec)
-	require.Error(t, err)
-	require.True(t, strings.HasPrefix(err.Error(), "template:"))
 }
 
 func TestProvisionDescribeDestroyScope(t *testing.T) {
@@ -1483,6 +1467,33 @@ func TestPlatformSpecificUpdatesWithEmptyHostanmePrefix(t *testing.T) {
 	require.Equal(t, "instance-1234", props["hostname"])
 }
 
+func TestPlatformSpecificUpdatesBase64UserData(t *testing.T) {
+	for _, vmType := range VMTypes {
+		var key string
+		switch vmType {
+		case VMAmazon, VMDigitalOcean:
+			key = "user_data"
+		case VMSoftLayer, VMIBMCloud:
+			key = "user_metadata"
+		case VMAzure:
+			key = "custom_data"
+		case VMGoogleCloud:
+			key = "metadata_startup_script"
+		}
+		props := TResourceProperties{key: "my-user-data"}
+		platformSpecificUpdates(vmType.(TResourceType), "instance-1234", nil, props)
+		switch vmType {
+		case VMAmazon, VMDigitalOcean:
+			// Only these types convert to base64
+			require.Equal(t, base64.StdEncoding.EncodeToString([]byte("my-user-data")), props[key])
+		case VMSoftLayer, VMIBMCloud, VMAzure, VMGoogleCloud:
+			require.Equal(t, "my-user-data", props[key])
+		default:
+			require.Fail(t, fmt.Sprintf("Verifying base64 user data not handled for type: %v", vmType))
+		}
+	}
+}
+
 func TestMergeTagsIntoVMPropsEmpty(t *testing.T) {
 	for _, vmType := range VMTypes {
 		props := TResourceProperties{}
@@ -1604,50 +1615,51 @@ func TestMergeTagsIntoVMProps(t *testing.T) {
 }
 
 func TestRenderInstVarsNoReplace(t *testing.T) {
-	result, err := renderInstVars("{}", instance.ID("id"), nil)
+	props := TResourceProperties{}
+	err := renderInstVars(&props, "id", nil)
 	require.NoError(t, err)
-	require.Equal(t, "{}", result)
+	require.Equal(t, TResourceProperties{}, props)
 
 	logicalID := instance.LogicalID("mgr1")
-	result, err = renderInstVars("{}", instance.ID("id"), &logicalID)
+	err = renderInstVars(&props, "id", &logicalID)
 	require.NoError(t, err)
-	require.Equal(t, "{}", result)
+	require.Equal(t, TResourceProperties{}, props)
 }
 
 func TestRenderInstVarsWithoutLogicalID(t *testing.T) {
-	input := `{
- "id": "{{ var "/self/instId" }}",
- "key": "val"
-}`
-	expected := `{
- "id": "id",
- "key": "val"
-}`
-	result, err := renderInstVars(input, instance.ID("id"), nil)
+	props := TResourceProperties{
+		"id":  "{{ var `/self/instId` }}",
+		"key": "val",
+	}
+	expected := TResourceProperties{
+		"id":  "id",
+		"key": "val",
+	}
+	err := renderInstVars(&props, "id", nil)
 	require.NoError(t, err)
-	require.JSONEq(t, expected, result)
+	require.Equal(t, expected, props)
 
 	logicalID := instance.LogicalID("mgr1")
-	result, err = renderInstVars(input, instance.ID("id"), &logicalID)
+	err = renderInstVars(&props, "id", &logicalID)
 	require.NoError(t, err)
-	require.JSONEq(t, expected, result)
+	require.Equal(t, expected, props)
 }
 
 func TestRenderInstVarsWithLogicalID(t *testing.T) {
-	input := `{
- "id": "{{ var "/self/instId" }}",
- "logicalId": "{{ var "/self/logicalId" }}",
- "key": "val"
-}`
-	expected := `{
- "id": "id",
- "logicalId": "mgr1",
- "key": "val"
-}`
+	props := TResourceProperties{
+		"id":        "{{ var `/self/instId` }}",
+		"logicalId": "{{ var `/self/logicalId` }}",
+		"key":       "val",
+	}
+	expected := TResourceProperties{
+		"id":        "id",
+		"logicalId": "mgr1",
+		"key":       "val",
+	}
 	logicalID := instance.LogicalID("mgr1")
-	result, err := renderInstVars(input, instance.ID("id"), &logicalID)
+	err := renderInstVars(&props, "id", &logicalID)
 	require.NoError(t, err)
-	require.JSONEq(t, expected, result)
+	require.Equal(t, expected, props)
 }
 
 func TestLabelNoFiles(t *testing.T) {
