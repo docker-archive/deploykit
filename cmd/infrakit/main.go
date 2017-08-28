@@ -26,6 +26,7 @@ import (
 	_ "github.com/docker/infrakit/cmd/infrakit/plugin"
 	_ "github.com/docker/infrakit/cmd/infrakit/remote"
 	_ "github.com/docker/infrakit/cmd/infrakit/template"
+	_ "github.com/docker/infrakit/cmd/infrakit/up"
 	_ "github.com/docker/infrakit/cmd/infrakit/util"
 	_ "github.com/docker/infrakit/cmd/infrakit/x"
 	_ "github.com/docker/infrakit/pkg/cli/v0"
@@ -36,6 +37,21 @@ import (
 	_ "github.com/docker/infrakit/pkg/cli/backend/manager"
 	_ "github.com/docker/infrakit/pkg/cli/backend/print"
 	_ "github.com/docker/infrakit/pkg/cli/backend/sh"
+
+	// Supported "kinds"
+	_ "github.com/docker/infrakit/pkg/run/v0/aws"
+	_ "github.com/docker/infrakit/pkg/run/v0/file"
+	_ "github.com/docker/infrakit/pkg/run/v0/group"
+	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
+	_ "github.com/docker/infrakit/pkg/run/v0/ingress"
+	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
+	_ "github.com/docker/infrakit/pkg/run/v0/manager"
+	_ "github.com/docker/infrakit/pkg/run/v0/selector"
+	_ "github.com/docker/infrakit/pkg/run/v0/simulator"
+	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
+	_ "github.com/docker/infrakit/pkg/run/v0/tailer"
+	_ "github.com/docker/infrakit/pkg/run/v0/time"
+	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
 )
 
 func init() {

@@ -27,8 +27,10 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 		_, objectName := pluginName.GetLookupAndType()
 		if objectName == "" {
 			if len(args) < 1 {
-				cmd.Usage()
-				os.Exit(1)
+				objectName = ""
+				// cmd.Usage()
+				// os.Exit(1)
+
 			} else {
 				objectName = args[0]
 			}
@@ -44,21 +46,21 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			Name: objectName,
 		}).AddTagsFromStringSlice(*tags)
 
-		objects, err := controller.Describe(&search)
+		q := &search
+		if q.Name == "" {
+			q = nil // select all if nil
+		}
+
+		objects, err := controller.Describe(q)
 		if err != nil {
 			return err
 		}
 
 		return services.Output(os.Stdout, objects,
 			func(w io.Writer, v interface{}) error {
-
+				fmt.Printf("%-10s  %-15s  %-15s\n", "KIND", "NAME", "ID")
 				for _, o := range objects {
-
-					buff, err := types.AnyValueMust(o).MarshalYAML()
-					if err != nil {
-						return err
-					}
-					fmt.Printf("%v\n", string(buff))
+					fmt.Printf("%-10s  %-15s  %-15s\n", o.Spec.Kind, o.Spec.Metadata.Name, o.Spec.Metadata.Identity.ID)
 				}
 				return nil
 			})

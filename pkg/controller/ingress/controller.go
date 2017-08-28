@@ -71,7 +71,7 @@ func (m *managed) Plan(operation controller.Operation, spec types.Spec) (*types.
 }
 
 // Manage implements internal/Managed
-func (m *managed) Manage(spec types.Spec) (*types.Object, error) {
+func (m *managed) Enforce(spec types.Spec) (*types.Object, error) {
 	err := m.init(spec)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,6 @@ func (m *managed) Manage(spec types.Spec) (*types.Object, error) {
 
 // Object implements internal/Managed
 func (m *managed) Object() (*types.Object, error) {
-	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>", m)
 	return m.object(), nil
 }
 
