@@ -466,9 +466,9 @@ func mergeInitScript(spec instance.Spec, id instance.ID, vmType TResourceType, p
 	}
 }
 
-// renderInstVars applies the "/self/instId" and "/self/logicalId" variables
+// renderInstVars applies the "/self/instId", "/self/logicalId", and "/self/dedicated/attachId" variables
 // as global options on the input properties
-func renderInstVars(props *TResourceProperties, id string, logicalID *instance.LogicalID) error {
+func renderInstVars(props *TResourceProperties, id instance.ID, logicalID *instance.LogicalID, dedicatedAttachKey string) error {
 	data, err := json.Marshal(props)
 	if err != nil {
 		return err
@@ -479,16 +479,18 @@ func renderInstVars(props *TResourceProperties, id string, logicalID *instance.L
 	}
 	// Instance ID is always supplied
 	t = t.Global("/self/instId", id)
-	// LogicalID is optional
+	// LogicalID and dedicated attach key values are optional
 	if logicalID != nil {
 		t = t.Global("/self/logicalId", string(*logicalID))
+	}
+	if dedicatedAttachKey != "" {
+		t = t.Global("/self/dedicated/attachId", dedicatedAttachKey)
 	}
 	result, err := t.Render(nil)
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal([]byte(result), &props)
-	return err
+	return json.Unmarshal([]byte(result), &props)
 }
 
 // handleProvisionTags sets the Infrakit-specific tags and merges with the user-defined in the instance spec
@@ -561,15 +563,26 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 	}
 }
 
-// writeTerraformFiles uses the data in the TFormat to create one or more .tf.json files with the
-// generated name. The properties of the VM resource are overriden by vmProperties.
-func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) error {
+// decomposedFiles is populated by the decompose function
+type decomposedFiles struct {
+	FileMap            map[string]*TFormat
+	CurrentFiles       map[string]struct{}
+	DedicatedAttachKey string
+}
+
+// decompose splits the data in the TFormat object into one or more terraform specs, each
+// corresponding to a file that should be created. The properties of the VM resource are
+// update to use the generated name and the given vmProperties.
+func (p *plugin) decompose(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) (*decomposedFiles, error) {
 	// Map file names to the data in each file based on the "@scope" property:
-	// - @default: resources in same "instance-xxxx.tf.json" file as VM
-	// - @dedicated: resources in different file as VM using the logical ID (<scopeID>_dedicated_<logicalID>.tf.json) or with
-	//   the same generated ID (<scopeID>_dedicated_instance-xxxx.tf.json)
-	// - <other>: resource defined in different file with a scope identifier (<other>_global.tf.json)
+	// - @default: resources in same "instance-xxxx" file as VM
+	// - @dedicated: resources in different file as VM using the logical ID (<scopeID>_dedicated_<logicalID>) or with
+	//   the same generated ID (<scopeID>_dedicated_instance-xxxx)
+	// - <other>: resource defined in different file with a scope identifier (<other>_global)
 	fileMap := make(map[string]*TFormat)
+	// Track the dedicated attach ID for this VM, this is set if there is an orphaned dedicated
+	// file that matches the desired format
+	dedicatedAttachKey := ""
 
 	// Track current files, used to determine existing dedicated and global resources
 	currentFiles := make(map[string]map[TResourceType]map[TResourceName]TResourceProperties)
@@ -608,7 +621,7 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 					if files, err := p.listCurrentTfFiles(); err == nil {
 						currentFiles = files
 					} else {
-						return err
+						return nil, err
 					}
 				}
 				// Dedicated scope, filename has a scope identifier and the generated name or logical
@@ -636,6 +649,7 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 					key = string(*logicalID)
 				}
 				filename = fmt.Sprintf("%s_%s_%s", identifier, scopeDedicated, key)
+				dedicatedAttachKey = key
 				newResourceName = fmt.Sprintf("%s-%s-%s", identifier, key, resourceName)
 			} else {
 				// Get current files
@@ -643,10 +657,10 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 					if files, err := p.listCurrentTfFiles(); err == nil {
 						currentFiles = files
 					} else {
-						return err
+						return nil, err
 					}
 				}
-				// Global scope, filename is just the given scope with a "global_" suffix
+				// Global scope, filename is just the given scope with a "global" suffix
 				filename = fmt.Sprintf("%s_%s", scope, scopeGlobal)
 				// And the resource name has the given scope as the prefix
 				newResourceName = fmt.Sprintf("%s-%s", scope, resourceName)
@@ -682,8 +696,30 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 		}
 		mergeTagsIntoVMProps(vmType, vmProperties, tags)
 	}
-	// Handle any platform specific updates to the VM properties prior to writing out
-	platformSpecificUpdates(vmType, TResourceName(generatedName), logicalID, vmProperties)
+
+	currentFilenames := make(map[string]struct{}, len(currentFiles))
+	for filename := range currentFiles {
+		currentFilenames[filename] = struct{}{}
+	}
+	result := decomposedFiles{
+		FileMap:            fileMap,
+		CurrentFiles:       currentFilenames,
+		DedicatedAttachKey: dedicatedAttachKey,
+	}
+	return &result, nil
+}
+
+// writeTerraformFiles writes *.tf.json[.new] files for each entry in the given fileMap
+func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles map[string]struct{}) error {
+	// First verify that there are no formatting errors
+	dataMap := make(map[string][]byte, len(fileMap))
+	for filename, tfVal := range fileMap {
+		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
+		if err != nil {
+			return err
+		}
+		dataMap[filename] = buff
+	}
 
 	// And write out each file.
 	for filename, tfVal := range fileMap {
@@ -850,12 +886,19 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	handleProvisionTags(spec, id, vmType, vmProps)
 	// Merge the init scripts into the VM properties
 	mergeInitScript(spec, id, vmType, vmProps)
-	// Render any instance specific variables
-	if err = renderInstVars(&vmProps, name, spec.LogicalID); err != nil {
+	// Decomponse the spec into scope'd files
+	decomposedFiles, err := p.decompose(spec.LogicalID, name, &tf, vmType, vmProps)
+	if err != nil {
 		return nil, err
 	}
+	// Render any instance specific variables
+	if err = renderInstVars(&vmProps, id, spec.LogicalID, decomposedFiles.DedicatedAttachKey); err != nil {
+		return nil, err
+	}
+	// Handle any platform specific updates to the VM properties prior to writing out
+	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, vmProps)
 	// Write out the tf.json file
-	if err = p.writeTerraformFiles(spec.LogicalID, name, &tf, vmType, vmProps); err != nil {
+	if err = p.writeTerraformFiles(decomposedFiles.FileMap, decomposedFiles.CurrentFiles); err != nil {
 		return nil, err
 	}
 	// And apply the updates
