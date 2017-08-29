@@ -101,7 +101,7 @@ $(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/c
 $(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
 $(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
 $(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
-$(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/pkg/provider/terraform/instance)
+$(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/pkg/provider/terraform/instance/cmd)
 $(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
 $(call define_binary_target,infrakit-instance-vsphere,github.com/docker/infrakit/pkg/provider/vsphere)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)

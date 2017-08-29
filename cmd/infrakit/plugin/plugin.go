@@ -20,19 +20,6 @@ import (
 	// Supported "kinds"
 	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
-
-	// Load the inprocess plugins supported
-	_ "github.com/docker/infrakit/pkg/run/v0/aws"
-	_ "github.com/docker/infrakit/pkg/run/v0/file"
-	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
-	_ "github.com/docker/infrakit/pkg/run/v0/ingress"
-	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
-	_ "github.com/docker/infrakit/pkg/run/v0/selector"
-	_ "github.com/docker/infrakit/pkg/run/v0/simulator"
-	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
-	_ "github.com/docker/infrakit/pkg/run/v0/tailer"
-	_ "github.com/docker/infrakit/pkg/run/v0/time"
-	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
 )
 
 var log = logutil.New("module", "cli/plugin")
