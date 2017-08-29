@@ -483,14 +483,10 @@ func TestTerraformShowParseResultAwsSecurityGroup(t *testing.T) {
 	require.Equal(t, expected, props)
 }
 
-// DISABLED_TestRunTerraformShow is disabled because it assumes some local state.
-// TODO(chunger) -- refactor to use mock or rewrite it.
-func DISABLED_TestRunTerraformShow(t *testing.T) {
+func TestRunTerraformShow(t *testing.T) {
 
-	// Run this test locally only if terraform is set up
-	if SkipTests("terraform") {
-		t.SkipNow()
-	}
+	t.Log("Test DISABLED -- TODO(chungers) - this requires some local state. refactor this test or use mocks")
+	t.SkipNow()
 
 	dir, err := os.Getwd()
 	require.NoError(t, err)
