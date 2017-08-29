@@ -483,8 +483,8 @@ func TestTerraformShowParseResultAwsSecurityGroup(t *testing.T) {
 	require.Equal(t, expected, props)
 }
 
-// DISABLED because this test seems to assume some local state with terraform, which isn't part of a clean checkout.
-// TODO(chungers) - clean this up or use mocks.
+// DISABLED_TestRunTerraformShow is disabled because it assumes some local state.
+// TODO(chunger) -- refactor to use mock or rewrite it.
 func DISABLED_TestRunTerraformShow(t *testing.T) {
 
 	// Run this test locally only if terraform is set up
