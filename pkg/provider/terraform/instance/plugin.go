@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -637,12 +638,31 @@ func (p *plugin) decompose(logicalID *instance.LogicalID, generatedName string, 
 				if logicalID == nil {
 					// On a rolling update, the dedicated file for a scaler group is not removed, search
 					// for an orphaned file with the appropriate format to attach
-					orphanKeys := findOrphanedDedicatedAttachmentKeys(currentFiles, identifier)
+					allKeys, orphanKeys := findDedicatedAttachmentKeys(currentFiles, identifier)
 					if len(orphanKeys) == 0 {
-						log.Infof("No orphaned attachment with prefix '%s-%s', using current name: %s", identifier, scopeDedicated, generatedName)
-						key = generatedName
+						// No orphans, choose the lowest available index based on the existing files
+						index := 1
+						for ; ; index = index + 1 {
+							match := false
+							for _, existingKey := range allKeys {
+								if existingKey == strconv.Itoa(index) {
+									match = true
+									break
+								}
+							}
+							if !match {
+								break
+							}
+						}
+						key = strconv.Itoa(index)
+						log.Infof("No orphaned attachment with prefix '%v-%s', using current name: %s", identifier, scopeDedicated, key)
 					} else {
-						key = orphanKeys[0]
+						// At least 1 orphaned file exists, pick the index with the lowest index
+						key = getLowestDedicatedOrphanIndex(orphanKeys)
+						for _, instID := range orphanKeys {
+							key = instID
+							break
+						}
 						log.Infof("Using orphaned attachment '%s' for prefix '%s-%s'", key, identifier, scopeDedicated)
 					}
 				} else {
@@ -707,6 +727,26 @@ func (p *plugin) decompose(logicalID *instance.LogicalID, generatedName string, 
 		DedicatedAttachKey: dedicatedAttachKey,
 	}
 	return &result, nil
+}
+
+// getLowestDedicatedOrphanIndex gets the lowest numerical slice value
+func getLowestDedicatedOrphanIndex(data []string) string {
+	// All values should be ints as strings (but handle non-ints), convert and sort
+	ints := []int{}
+	other := []string{}
+	for _, v := range data {
+		if intVal, err := strconv.Atoi(v); err == nil {
+			ints = append(ints, intVal)
+		} else {
+			other = append(other, v)
+		}
+	}
+	if len(ints) > 0 {
+		sort.Ints(ints)
+		return strconv.Itoa(ints[0])
+	}
+	sort.Strings(other)
+	return other[0]
 }
 
 // writeTerraformFiles writes *.tf.json[.new] files for each entry in the given fileMap
@@ -779,10 +819,13 @@ func (p *plugin) listCurrentTfFiles() (map[string]map[TResourceType]map[TResourc
 // findOrphanedDedicatedAttachmentKeys proceeses the current files to determine:
 // - All files that match the scope patten (ie, <scopeID>_dedicated_*)
 // - A file with the given patten that is not already attached to an instance
-// Returns all keys that are orphaned
-func findOrphanedDedicatedAttachmentKeys(currentFiles map[string]map[TResourceType]map[TResourceName]TResourceProperties, scopeID string) []string {
+// Returns all matching dedicated keys and those that are orphaned
+func findDedicatedAttachmentKeys(currentFiles map[string]map[TResourceType]map[TResourceName]TResourceProperties, scopeID string) ([]string, []string) {
 	// Find all files that match this scope ID and scope
-	filesIDMap := make(map[string]string)
+	allFilesMap := make(map[string]string)
+	// And those that are orphaned
+	orphanedFilesMap := make(map[string]string)
+
 	for filename := range currentFiles {
 		matches := dedicatedScopedFileRegex.FindStringSubmatch(filename)
 		if len(matches) != 4 {
@@ -793,11 +836,13 @@ func findOrphanedDedicatedAttachmentKeys(currentFiles map[string]map[TResourceTy
 			continue
 		}
 		log.Infof("Found candidate file '%s' for scope ID '%s'", filename, scopeID)
-		filesIDMap[strings.Split(filename, ".")[0]] = matches[2]
+		fileKey := strings.Split(filename, ".")[0]
+		allFilesMap[fileKey] = matches[2]
+		orphanedFilesMap[fileKey] = matches[2]
 	}
-	if len(filesIDMap) == 0 {
+	if len(allFilesMap) == 0 {
 		log.Infof("No candidate attchment files for scope ID '%s'", scopeID)
-		return []string{}
+		return []string{}, []string{}
 	}
 	// Prune the candidate files that already have attachments
 	supportedVMs := mapset.NewSetFromSlice(VMTypes)
@@ -817,20 +862,28 @@ func findOrphanedDedicatedAttachmentKeys(currentFiles map[string]map[TResourceTy
 					continue
 				}
 				for _, tag := range strings.Split(attachTag, ",") {
-					if _, contains := filesIDMap[tag]; contains {
+					if _, contains := allFilesMap[tag]; contains {
 						log.Infof("Attachment '%s' is used in %s for scope ID '%s'", tag, filename, scopeID)
-						delete(filesIDMap, tag)
+						delete(orphanedFilesMap, tag)
 					}
 				}
 			}
 		}
 	}
-	results := []string{}
-	for _, v := range filesIDMap {
-		results = append(results, v)
+	allMatches := []string{}
+	for _, v := range allFilesMap {
+		allMatches = append(allMatches, v)
 	}
-	log.Infof("Detected %v orphaned attachments for scope ID '%v': %v", len(results), scopeID, results)
-	return results
+	orphans := []string{}
+	for _, v := range orphanedFilesMap {
+		orphans = append(orphans, v)
+	}
+	log.Infof("Detected %v matching files and %v orphan attachments for scope ID '%v': %v",
+		len(allMatches),
+		len(orphans),
+		scopeID,
+		orphans)
+	return allMatches, orphans
 }
 
 // ensureUniqueFile returns a filename that is not in use
