@@ -225,6 +225,5 @@ func (m *Monitor) Stop() {
 	defer m.lock.Unlock()
 	if m.inputChan != nil {
 		close(m.inputChan)
-		m.inputChan = nil
 	}
 }

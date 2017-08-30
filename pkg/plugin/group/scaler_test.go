@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -52,6 +53,11 @@ func TestScaleUp(t *testing.T) {
 }
 
 func TestBufferScaleUp(t *testing.T) {
+
+	if testutil.SkipTests("flaky") {
+		t.SkipNow()
+	}
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -101,6 +107,11 @@ func TestScaleDown(t *testing.T) {
 }
 
 func TestBufferScaleDown(t *testing.T) {
+
+	if testutil.SkipTests("flaky") {
+		t.SkipNow()
+	}
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
