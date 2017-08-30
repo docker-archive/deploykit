@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/instance/hyperkit"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -56,8 +57,8 @@ type Options struct {
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
 	Listen:            ":24865",
-	DiscoveryHostPort: run.GetEnv(EnvDiscoveryHostPort, "192.168.65.1:24865"),
-	Dir:               run.GetEnv(EnvDir, filepath.Join(run.InfrakitHome(), "hyperkit-vms")),
+	DiscoveryHostPort: local.Getenv(EnvDiscoveryHostPort, "192.168.65.1:24865"),
+	Dir:               local.Getenv(EnvDir, filepath.Join(local.InfrakitHome(), "hyperkit-vms")),
 	VpnKitSock:        "auto",
 	HyperKitCmd:       "hyperkit",
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/event/tailer"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -32,7 +33,7 @@ func init() {
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = tailer.Options{
 	tailer.Rule{
-		Path:      run.GetEnv(EnvPath, filepath.Join(run.GetEnv("PWD", ""), "test.log")),
+		Path:      local.Getenv(EnvPath, filepath.Join(local.Getenv("PWD", ""), "test.log")),
 		MustExist: false,
 	},
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/flavor/kubernetes"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
@@ -54,7 +55,7 @@ func getWd() string {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	ConfigDir: run.GetEnv(EnvConfigDir, getWd()),
+	ConfigDir: local.Getenv(EnvConfigDir, getWd()),
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately

@@ -1,7 +1,6 @@
 package simulator
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
@@ -56,10 +56,10 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Store:         run.GetEnv(EnvStore, "mem"),
-	Dir:           run.GetEnv(EnvDir, filepath.Join(run.InfrakitHome(), "simulator")),
-	InstanceTypes: strings.Split(run.GetEnv(EnvInstanceTypes, "compute,net,disk"), ","),
-	L4Names:       strings.Split(run.GetEnv(EnvL4Names, "lb1,lb2,lb3"), ","),
+	Store:         local.Getenv(EnvStore, "mem"),
+	Dir:           local.Getenv(EnvDir, filepath.Join(local.InfrakitHome(), "simulator")),
+	InstanceTypes: strings.Split(local.Getenv(EnvInstanceTypes, "compute,net,disk"), ","),
+	L4Names:       strings.Split(local.Getenv(EnvL4Names, "lb1,lb2,lb3"), ","),
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
@@ -73,7 +73,10 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		return
 	}
 
-	os.MkdirAll(options.Dir, 0755)
+	err = local.EnsureDir(options.Dir)
+	if err != nil {
+		return
+	}
 
 	impls = map[run.PluginCode]interface{}{}
 

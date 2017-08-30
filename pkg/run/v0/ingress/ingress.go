@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/rpc/client"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -44,7 +45,7 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Group: plugin.Name(run.GetEnv(EnvOptionsGroup, "group")),
+	Group: plugin.Name(local.Getenv(EnvOptionsGroup, "group")),
 }
 
 func leadership(plugins func() discovery.Plugins) (manager.Leadership, error) {

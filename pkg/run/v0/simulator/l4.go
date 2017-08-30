@@ -34,6 +34,8 @@ func NewL4(name string, options Options) loadbalancer.L4 {
 	return l
 }
 
+// This is an example L4 simulator that shows how to implement a L4 plugin that can
+// be controlled by the ingress controller.
 type l4Simulator struct {
 	name         string
 	routes       store.KV
