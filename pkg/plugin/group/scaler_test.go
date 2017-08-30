@@ -137,6 +137,11 @@ func TestBufferScaleDown(t *testing.T) {
 }
 
 func TestLabel(t *testing.T) {
+
+	if testutil.SkipTests("flaky") {
+		t.SkipNow()
+	}
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

@@ -39,21 +39,21 @@ func TestControllerPlan(t *testing.T) {
 	server, err := rpc_server.StartPluginAtPath(socketPath, Server(small))
 	require.NoError(t, err)
 
-	a1, p1, err := must(NewClient(plugin.Name(name), socketPath)).Plan(controller.Manage, smallSpec)
+	a1, p1, err := must(NewClient(plugin.Name(name), socketPath)).Plan(controller.Enforce, smallSpec)
 	require.NoError(t, err)
 
-	_, _, err = must(NewClient(plugin.Name("unknown"), socketPath)).Plan(controller.Manage, smallSpec)
+	_, _, err = must(NewClient(plugin.Name("unknown"), socketPath)).Plan(controller.Enforce, smallSpec)
 	require.Error(t, err)
 
 	smallArgs := <-smallActual
 
-	require.EqualValues(t, controller.Manage, smallArgs[0].(controller.Operation))
+	require.EqualValues(t, controller.Enforce, smallArgs[0].(controller.Operation))
 	require.Equal(t, smallSpec, smallArgs[1])
 	require.Equal(t, smallObject, a1)
 	require.Equal(t, smallPlan, p1)
 
 	// now return error
-	_, _, err = must(NewClient(plugin.Name(name), socketPath)).Plan(controller.Manage, largeSpec)
+	_, _, err = must(NewClient(plugin.Name(name), socketPath)).Plan(controller.Enforce, largeSpec)
 	require.Error(t, err)
 
 	server.Stop()
@@ -84,19 +84,19 @@ func TestControllerCommit(t *testing.T) {
 	server, err := rpc_server.StartPluginAtPath(socketPath, Server(small))
 	require.NoError(t, err)
 
-	a1, err := must(NewClient(plugin.Name(name), socketPath)).Commit(controller.Manage, smallSpec)
+	a1, err := must(NewClient(plugin.Name(name), socketPath)).Commit(controller.Enforce, smallSpec)
 	require.NoError(t, err)
 
-	_, err = must(NewClient(plugin.Name("unknown"), socketPath)).Commit(controller.Manage, smallSpec)
+	_, err = must(NewClient(plugin.Name("unknown"), socketPath)).Commit(controller.Enforce, smallSpec)
 	require.Error(t, err)
 
 	smallArgs := <-smallActual
 
-	require.EqualValues(t, controller.Manage, smallArgs[0].(controller.Operation))
+	require.EqualValues(t, controller.Enforce, smallArgs[0].(controller.Operation))
 	require.Equal(t, smallSpec, smallArgs[1])
 	require.Equal(t, smallObject, a1)
 
-	_, err = must(NewClient(plugin.Name(name), socketPath)).Commit(controller.Manage, largeSpec)
+	_, err = must(NewClient(plugin.Name(name), socketPath)).Commit(controller.Enforce, largeSpec)
 	require.Error(t, err)
 	server.Stop()
 

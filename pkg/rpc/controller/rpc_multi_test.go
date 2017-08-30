@@ -71,20 +71,20 @@ func TestMultiControllerPlan(t *testing.T) {
 	))
 	require.NoError(t, err)
 
-	a1, p1, err := must(NewClient(plugin.Name(name+"/small"), socketPath)).Plan(controller.Manage, smallSpec)
+	a1, p1, err := must(NewClient(plugin.Name(name+"/small"), socketPath)).Plan(controller.Enforce, smallSpec)
 	require.NoError(t, err)
 
 	a2, p2, err := must(NewClient(plugin.Name(name+"/large"), socketPath)).Plan(controller.Destroy, largeSpec)
 	require.NoError(t, err)
 
-	_, _, err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Plan(controller.Manage, largeSpec)
+	_, _, err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Plan(controller.Enforce, largeSpec)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "controller-impl-test/typeUnknown"))
 
 	smallArgs := <-smallActual
 	largeArgs := <-largeActual
 
-	require.EqualValues(t, controller.Manage, smallArgs[0].(controller.Operation))
+	require.EqualValues(t, controller.Enforce, smallArgs[0].(controller.Operation))
 	require.Equal(t, smallSpec, smallArgs[1])
 	require.Equal(t, smallObject, a1)
 	require.Equal(t, smallPlan, p1)
@@ -99,7 +99,7 @@ func TestMultiControllerPlan(t *testing.T) {
 		return largeObject, largePlan, fmt.Errorf("boom")
 	}
 
-	_, _, err = must(NewClient(plugin.Name(name+"/small"), socketPath)).Plan(controller.Manage, smallSpec)
+	_, _, err = must(NewClient(plugin.Name(name+"/small"), socketPath)).Plan(controller.Enforce, smallSpec)
 	require.Error(t, err)
 
 	server.Stop()
@@ -145,20 +145,20 @@ func TestMultiControllerCommit(t *testing.T) {
 	))
 	require.NoError(t, err)
 
-	a1, err := must(NewClient(plugin.Name(name+"/small"), socketPath)).Commit(controller.Manage, smallSpec)
+	a1, err := must(NewClient(plugin.Name(name+"/small"), socketPath)).Commit(controller.Enforce, smallSpec)
 	require.NoError(t, err)
 
 	a2, err := must(NewClient(plugin.Name(name+"/large"), socketPath)).Commit(controller.Destroy, largeSpec)
 	require.NoError(t, err)
 
-	_, err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Commit(controller.Manage, largeSpec)
+	_, err = must(NewClient(plugin.Name(name+"/typeUnknown"), socketPath)).Commit(controller.Enforce, largeSpec)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "controller-impl-test/typeUnknown"))
 
 	smallArgs := <-smallActual
 	largeArgs := <-largeActual
 
-	require.EqualValues(t, controller.Manage, smallArgs[0].(controller.Operation))
+	require.EqualValues(t, controller.Enforce, smallArgs[0].(controller.Operation))
 	require.Equal(t, smallSpec, smallArgs[1])
 	require.Equal(t, smallObject, a1)
 
@@ -171,7 +171,7 @@ func TestMultiControllerCommit(t *testing.T) {
 		return largeObject, fmt.Errorf("boom")
 	}
 
-	_, err = must(NewClient(plugin.Name(name+"/small"), socketPath)).Commit(controller.Manage, smallSpec)
+	_, err = must(NewClient(plugin.Name(name+"/small"), socketPath)).Commit(controller.Enforce, smallSpec)
 	require.Error(t, err)
 
 	server.Stop()
