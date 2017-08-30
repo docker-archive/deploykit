@@ -71,8 +71,6 @@ func (updatable *metadataModel) pluginModel() (chan func(map[string]interface{})
 		for {
 			select {
 			case <-tick:
-				snapshot := map[string]interface{}{}
-
 				// update leadership
 				if isLeader, err := updatable.manager.IsLeader(); err == nil {
 					model <- func(view map[string]interface{}) {
@@ -83,12 +81,17 @@ func (updatable *metadataModel) pluginModel() (chan func(map[string]interface{})
 				}
 
 				// update config
-				if err := updatable.snapshot.Load(&snapshot); err == nil {
-					model <- func(view map[string]interface{}) {
-						types.Put([]string{"configs"}, snapshot, view)
-					}
-				} else {
-					log.Warn("Cannot load snapshot for metadata", "err", err)
+				snapshot := map[string]interface{}{}
+				objects, err := updatable.manager.Inspect()
+				if err != nil {
+					log.Warn("Error inspecting manager states", "err", err)
+					continue
+				}
+				for _, o := range objects {
+					snapshot[o.Spec.Metadata.Name] = o.Spec
+				}
+				model <- func(view map[string]interface{}) {
+					types.Put([]string{"configs"}, snapshot, view)
 				}
 
 			case <-stop:

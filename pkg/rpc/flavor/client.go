@@ -18,6 +18,11 @@ func NewClient(name plugin.Name, socketPath string) (flavor.Plugin, error) {
 	return &client{name: name, client: rpcClient}, nil
 }
 
+// Adapt converts a rpc client to a Plugin object
+func Adapt(name plugin.Name, rpcClient rpc_client.Client) flavor.Plugin {
+	return &client{name: name, client: rpcClient}
+}
+
 type client struct {
 	name   plugin.Name
 	client rpc_client.Client

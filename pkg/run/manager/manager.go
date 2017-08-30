@@ -47,7 +47,7 @@ type Manager struct {
 	startPlugin chan<- launch.StartPlugin
 	wgStartAll  sync.WaitGroup
 	started     chan plugin.Name
-	lock        sync.Mutex
+	lock        sync.RWMutex
 }
 
 // Rules returns a list of plugins that can be launched via this manager
@@ -129,17 +129,12 @@ func (m *Manager) Start(rules []launch.Rule) error {
 	}
 
 	// launch plugin via os process
-	osExec, err := os.NewLauncher("os")
-	if err != nil {
-		return err
-	}
-	// launch docker run, implemented by the same os executor. We just search for a different key (docker-run)
-	dockerExec, err := os.NewLauncher("docker-run")
+	osExec, err := os.NewLauncher(os.DefaultExecName)
 	if err != nil {
 		return err
 	}
 	// launch inprocess plugins
-	inprocExec, err := inproc.NewLauncher("inproc", m.plugins)
+	inprocExec, err := inproc.NewLauncher(inproc.DefaultExecName, m.plugins)
 	if err != nil {
 		return err
 	}
@@ -147,7 +142,6 @@ func (m *Manager) Start(rules []launch.Rule) error {
 	m.rules = launch.MergeRules(inproc.Rules(), rules)
 	m.monitor = launch.NewMonitor([]launch.Exec{
 		osExec,
-		dockerExec,
 		inprocExec,
 	}, m.rules)
 
@@ -165,8 +159,17 @@ func (m *Manager) Start(rules []launch.Rule) error {
 	return nil
 }
 
+func stringFrom(a *types.Any) string {
+	if a != nil {
+		return a.String()
+	}
+	return "<nil>"
+}
+
 // Launch launches the plugin
 func (m *Manager) Launch(exec string, key string, name plugin.Name, options *types.Any) error {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	// check that the plugin is not currently running
 	running, err := m.plugins().List()
@@ -180,6 +183,13 @@ func (m *Manager) Launch(exec string, key string, name plugin.Name, options *typ
 		return nil
 	}
 	m.wgStartAll.Add(1)
+
+	log.Debug("starting", "key", key, "name", name, "exec", exec, "options", options)
+	if m.startPlugin == nil {
+		log.Info("monitor not running anymore")
+		return nil
+	}
+
 	m.startPlugin <- launch.StartPlugin{
 		Key:     key,
 		Name:    name,
@@ -188,9 +198,13 @@ func (m *Manager) Launch(exec string, key string, name plugin.Name, options *typ
 		Started: func(key string, n plugin.Name, config *types.Any) {
 			m.started <- n
 			m.wgStartAll.Done()
+			log.Debug("started", "key", key, "name", name, "exec", exec, "options", options)
 		},
 		Error: func(key string, n plugin.Name, config *types.Any, err error) {
+			log.Error("error starting", "key", key, "name", name, "exec", exec, "options", options)
 			if m.mustAll {
+				log.Crit("Terminating due to error starting plugin", "err", err,
+					"key", key, "name", n, "config", stringFrom(config))
 				panic(err)
 			}
 			m.wgStartAll.Done()
@@ -202,17 +216,23 @@ func (m *Manager) Launch(exec string, key string, name plugin.Name, options *typ
 // WaitForAllShutdown blocks until all the plugins stopped.
 func (m *Manager) WaitForAllShutdown() {
 	targets := []string{}
+	seen := map[string]struct{}{}
 	checkNow := time.Tick(m.scanInterval)
 
 	for {
 		select {
 		case target := <-m.started:
+
 			lookup, _ := target.GetLookupAndType()
-			log.Debug("Start watching", "lookup", lookup)
-			targets = append(targets, lookup)
+
+			if _, has := seen[lookup]; !has {
+				log.Debug("Start watching", "lookup", lookup)
+				targets = append(targets, lookup)
+				seen[lookup] = struct{}{}
+			}
 
 		case <-checkNow:
-			log.Debug("Checking on targets", "targets", targets, "V", logutil.V(400))
+			log.Debug("Checking on targets", "targets", targets, "V", logutil.V(500))
 			if m, err := m.plugins().List(); err == nil {
 				if countMatches(targets, m) == 0 {
 					log.Info("Scan found plugins not running now", "plugins", targets)
@@ -242,6 +262,10 @@ func (m *Manager) WaitStarting() {
 
 // Stop stops the manager
 func (m *Manager) Stop() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	m.monitor.Stop()
+	m.startPlugin = nil
 	log.Debug("Stopped plugin manager")
 }

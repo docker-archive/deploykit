@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/ssh"
 )
@@ -25,7 +25,7 @@ const (
 
 // HostsFile returns the hsots file used for looking up hosts
 func HostsFile() string {
-	return run.GetEnv(EnvHostsFile, filepath.Join(run.InfrakitHome(), "hosts"))
+	return local.Getenv(EnvHostsFile, filepath.Join(local.InfrakitHome(), "hosts"))
 }
 
 // Remote is a remote infrakit endpoint

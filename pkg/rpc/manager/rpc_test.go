@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	testing_manager "github.com/docker/infrakit/pkg/testing/manager"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -72,6 +73,156 @@ func TestManagerIsLeaderError(t *testing.T) {
 	_, err = must(NewClient(socketPath)).IsLeader()
 	require.Error(t, err)
 	<-called
+
+	server.Stop()
+
+}
+
+func TestManagerEnforce(t *testing.T) {
+	socketPath := tempSocket()
+
+	rawActual := make(chan []types.Spec, 1)
+	expect := []types.Spec{
+		{
+			Kind: "group",
+			Metadata: types.Metadata{
+				Name: "workers",
+			},
+			Properties: types.AnyValueMust(map[string]interface{}{"a": 1, "b": 2}),
+		},
+		{
+			Kind: "group",
+			Metadata: types.Metadata{
+				Name: "managers",
+			},
+			Properties: types.AnyValueMust(map[string]interface{}{"a": 11, "b": 22}),
+		},
+	}
+
+	m := &testing_manager.Plugin{
+		DoEnforce: func(specs []types.Spec) error {
+
+			rawActual <- specs
+
+			return nil
+		},
+	}
+	server, err := server.StartPluginAtPath(socketPath, PluginServer(m))
+	require.NoError(t, err)
+
+	err = must(NewClient(socketPath)).Enforce(expect)
+	require.NoError(t, err)
+	require.EqualValues(t, types.AnyValueMust(expect), types.AnyValueMust(<-rawActual))
+
+	expectErr := errors.New("boom")
+
+	// test for error
+	m.DoEnforce = func(specs []types.Spec) error {
+		return expectErr
+	}
+	err = must(NewClient(socketPath)).Enforce(expect)
+	require.Error(t, err)
+	require.Equal(t, expectErr.Error(), err.Error())
+
+	server.Stop()
+
+}
+
+func TestManagerTerminate(t *testing.T) {
+	socketPath := tempSocket()
+
+	rawActual := make(chan []types.Spec, 1)
+	expect := []types.Spec{
+		{
+			Kind: "group",
+			Metadata: types.Metadata{
+				Name: "workers",
+			},
+			Properties: types.AnyValueMust(map[string]interface{}{"a": 1, "b": 2}),
+		},
+		{
+			Kind: "group",
+			Metadata: types.Metadata{
+				Name: "managers",
+			},
+			Properties: types.AnyValueMust(map[string]interface{}{"a": 11, "b": 22}),
+		},
+	}
+
+	m := &testing_manager.Plugin{
+		DoTerminate: func(specs []types.Spec) error {
+
+			rawActual <- specs
+
+			return nil
+		},
+	}
+	server, err := server.StartPluginAtPath(socketPath, PluginServer(m))
+	require.NoError(t, err)
+
+	err = must(NewClient(socketPath)).Terminate(expect)
+	require.NoError(t, err)
+	require.EqualValues(t, types.AnyValueMust(expect), types.AnyValueMust(<-rawActual))
+
+	expectErr := errors.New("boom")
+
+	// test for error
+	m.DoTerminate = func(specs []types.Spec) error {
+		return expectErr
+	}
+	err = must(NewClient(socketPath)).Terminate(expect)
+	require.Error(t, err)
+	require.Equal(t, expectErr.Error(), err.Error())
+
+	server.Stop()
+
+}
+
+func TestManagerInspect(t *testing.T) {
+	socketPath := tempSocket()
+
+	expect := []types.Object{
+		{
+			Spec: types.Spec{
+				Kind: "group",
+				Metadata: types.Metadata{
+					Name: "workers",
+				},
+				Properties: types.AnyValueMust(map[string]interface{}{"a": 1, "b": 2}),
+			},
+		},
+		{
+			Spec: types.Spec{
+				Kind: "group",
+				Metadata: types.Metadata{
+					Name: "managers",
+				},
+				Properties: types.AnyValueMust(map[string]interface{}{"a": 11, "b": 22}),
+			},
+		},
+	}
+
+	m := &testing_manager.Plugin{
+		DoInspect: func() ([]types.Object, error) {
+			return expect, nil
+		},
+	}
+	server, err := server.StartPluginAtPath(socketPath, PluginServer(m))
+	require.NoError(t, err)
+
+	objects, err := must(NewClient(socketPath)).Inspect()
+	require.NoError(t, err)
+	require.EqualValues(t, types.AnyValueMust(expect), types.AnyValueMust(objects))
+
+	expectErr := errors.New("boom")
+
+	// test for error
+	m.DoInspect = func() ([]types.Object, error) {
+		return nil, expectErr
+	}
+	_, err = must(NewClient(socketPath)).Inspect()
+	require.Error(t, err)
+	require.Equal(t, expectErr.Error(), err.Error())
 
 	server.Stop()
 

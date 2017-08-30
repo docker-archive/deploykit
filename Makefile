@@ -32,6 +32,7 @@ AUTHORS: .mailmap .git/HEAD
 # Package list
 PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor)
 PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
+PKGS_TEST := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep pkg$)
 
 get-tools:
 	@echo "+ $@"
@@ -156,11 +157,11 @@ generate:
 
 test:
 	@echo "+ $@"
-	@go test -test.short -timeout 30s -race -v $(PKGS)
+	@go test -test.short -timeout 30s -race -v $(PKGS_TEST)
 
 coverage:
 	@echo "+ $@"
-	@for pkg in $(PKGS); do \
+	@for pkg in $(PKGS_TEST); do \
 		go test -test.short -race -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 

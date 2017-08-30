@@ -18,29 +18,15 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	// Always read and then update with the current value.  Assumes the user's input
 	// is always authoritative.
 	stored := globalSpec{}
-
-	err := m.snapshot.Load(&stored)
+	err := stored.store(m.snapshot)
 	if err != nil {
 		return err
 	}
 
-	// if not-found ok to continue...
-
-	if stored.Groups == nil {
-		stored.Groups = map[group.ID]plugin.Spec{}
-	}
-
-	any, err := types.AnyValue(spec)
-	if err != nil {
-		return err
-	}
-	stored.Groups[spec.ID] = plugin.Spec{
-		Plugin:     plugin.Name(m.backendName),
-		Properties: any,
-	}
+	stored.updateGroupSpec(spec, plugin.Name(m.backendName))
 	log.Debug("Saving updated config", "config", stored)
 
-	return m.snapshot.Save(stored)
+	return stored.store(m.snapshot)
 }
 
 func (m *manager) removeConfig(id group.ID) error {
@@ -51,21 +37,15 @@ func (m *manager) removeConfig(id group.ID) error {
 	// Always read and then update with the current value.  Assumes the user's input
 	// is always authoritative.
 	stored := globalSpec{}
-
-	err := m.snapshot.Load(&stored)
+	err := stored.load(m.snapshot)
 	if err != nil {
 		return err
 	}
 
-	// if not-found just return without error.
-	if stored.Groups == nil {
-		return nil
-	}
-
-	delete(stored.Groups, id)
+	stored.removeGroup(id)
 	log.Debug("Saving updated config", "config", stored)
 
-	return m.snapshot.Save(stored)
+	return stored.store(m.snapshot)
 }
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations
@@ -245,28 +225,17 @@ func (m *manager) DestroyInstances(id group.ID, instances []instance.ID) (err er
 	return
 }
 
-func (m *manager) loadGroupSpec(id group.ID) (found group.Spec, err error) {
+func (m *manager) loadGroupSpec(id group.ID) (group.Spec, error) {
 	// load the config
 	config := globalSpec{}
 
 	// load the latest version -- assumption here is that it's been persisted already.
-	err = m.snapshot.Load(&config)
+	err := config.load(m.snapshot)
 	if err != nil {
 		log.Warn("Error loading config", "err", err)
-		return
+		return group.Spec{}, err
 	}
-	for gid, g := range config.Groups {
-		if gid == id {
-			spec := group.Spec{}
-			err = g.Properties.Decode(&spec)
-			if err != nil {
-				return
-			}
-			return spec, nil
-		}
-	}
-	err = fmt.Errorf("group %v not found", id)
-	return
+	return config.getGroupSpec(id)
 }
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations

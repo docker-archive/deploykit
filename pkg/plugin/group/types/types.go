@@ -8,10 +8,30 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
+
+func init() {
+	depends.Register("group", types.InterfaceSpec(group.InterfaceSpec), ResolveDependencies)
+}
+
+// ResolveDependencies returns a list of dependencies by parsing the opaque Properties blob.
+func ResolveDependencies(spec types.Spec) ([]plugin.Name, error) {
+	if spec.Properties == nil {
+		return nil, nil
+	}
+
+	groupSpec := Spec{}
+	err := spec.Properties.Decode(&groupSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return []plugin.Name{groupSpec.Instance.Plugin, groupSpec.Flavor.Plugin}, nil
+}
 
 // Spec is the configuration schema for the plugin, provided in group.Spec.Properties
 type Spec struct {
