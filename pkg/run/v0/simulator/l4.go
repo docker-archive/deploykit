@@ -64,7 +64,7 @@ func (l *l4Simulator) Routes() ([]loadbalancer.Route, error) {
 	err := store.Visit(l.routes, nil, nil,
 		func(buff []byte) (interface{}, error) {
 			route := loadbalancer.Route{}
-			err := types.AnyYAMLMust(buff).Decode(&route)
+			err := decode(buff, &route)
 			return route, err
 		},
 		func(o interface{}) (bool, error) {
@@ -80,6 +80,14 @@ func mustEncode(v interface{}) []byte {
 		panic(err)
 	}
 	return buff
+}
+
+func decode(buff []byte, v interface{}) error {
+	a, err := types.AnyYAML(buff)
+	if err != nil {
+		return err
+	}
+	return a.Decode(v)
 }
 
 // Publish publishes a route in the LB by adding a load balancing rule
@@ -161,10 +169,13 @@ func (l *l4Simulator) Backends() ([]instance.ID, error) {
 	defer l.lock.Unlock()
 
 	out := []instance.ID{}
+
+	defer l4Logger.Debug("Backends", "name", l.name, "V", debugV, "backends", out)
+
 	err := store.Visit(l.backends, nil, nil,
 		func(buff []byte) (interface{}, error) {
 			var backend instance.ID
-			err := types.AnyBytes(buff).Decode(&backend)
+			err := decode(buff, &backend)
 			return backend, err
 		},
 		func(o interface{}) (bool, error) {
