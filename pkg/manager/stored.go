@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -29,15 +28,11 @@ type persisted struct {
 }
 
 type globalSpec struct {
-	data  []persisted    // Actually written on disk
-	index map[key]record `json:"-" yaml:"-"`
-	lock  sync.RWMutex   `json:"-" yaml:"-"`
+	data  []persisted
+	index map[key]record
 }
 
 func (g *globalSpec) visit(f func(key, record) error) error {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
 	for k, v := range g.index {
 		if err := f(k, v); err != nil {
 			return err
@@ -47,9 +42,6 @@ func (g *globalSpec) visit(f func(key, record) error) error {
 }
 
 func (g *globalSpec) store(store store.Snapshot) error {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
 	data := []persisted{}
 	for k, v := range g.index {
 		data = append(data, persisted{Key: k, Record: v})
@@ -59,9 +51,6 @@ func (g *globalSpec) store(store store.Snapshot) error {
 }
 
 func (g *globalSpec) load(store store.Snapshot) error {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
 	g.data = []persisted{}
 	err := store.Load(&g.data)
 	if err != nil {
@@ -75,9 +64,6 @@ func (g *globalSpec) load(store store.Snapshot) error {
 }
 
 func (g *globalSpec) updateSpec(spec types.Spec, handler plugin.Name) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
 	if g.index == nil {
 		g.index = map[key]record{}
 	}
@@ -103,9 +89,6 @@ func keyFromGroupID(id group.ID) key {
 }
 
 func (g *globalSpec) removeSpec(kind string, metadata types.Metadata) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
 	if g.index == nil {
 		g.index = map[key]record{}
 	}
@@ -113,9 +96,6 @@ func (g *globalSpec) removeSpec(kind string, metadata types.Metadata) {
 }
 
 func (g *globalSpec) getSpec(kind string, metadata types.Metadata) (types.Spec, error) {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
 	if g.index == nil {
 		g.index = map[key]record{}
 	}
@@ -127,9 +107,6 @@ func (g *globalSpec) getSpec(kind string, metadata types.Metadata) (types.Spec, 
 }
 
 func (g *globalSpec) removeGroup(id group.ID) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
 	if g.index == nil {
 		g.index = map[key]record{}
 	}
@@ -137,9 +114,6 @@ func (g *globalSpec) removeGroup(id group.ID) {
 }
 
 func (g *globalSpec) getGroupSpec(id group.ID) (group.Spec, error) {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
 	if g.index == nil {
 		g.index = map[key]record{}
 	}
@@ -156,9 +130,6 @@ func (g *globalSpec) getGroupSpec(id group.ID) (group.Spec, error) {
 }
 
 func (g *globalSpec) updateGroupSpec(gspec group.Spec, handler plugin.Name) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
 	if g.index == nil {
 		g.index = map[key]record{}
 	}

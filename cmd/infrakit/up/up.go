@@ -79,9 +79,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		if *launchConfigURL != "" {
 			if list, err := loadRules(*launchConfigURL); err != nil {
 				return err
-			} else {
-				launchRules = list
 			}
+			launchRules = list
 		}
 
 		// Plugin launcher runs asynchronously

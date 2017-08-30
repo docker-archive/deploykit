@@ -18,9 +18,9 @@ const debugV = logutil.V(500)
 type Managed interface {
 	Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error)
 	Enforce(types.Spec) (*types.Object, error)
-	Object() (*types.Object, error)
+	Inspect() (*types.Object, error)
 	Free() (*types.Object, error)
-	Dispose() (*types.Object, error)
+	Terminate() (*types.Object, error)
 }
 
 // Controller implements the pkg/controller/Controller interface and manages a collection of controls
@@ -154,7 +154,7 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 		return
 
 	case controller.Destroy:
-		o, e := m[0].Dispose()
+		o, e := m[0].Terminate()
 		if o != nil {
 			object = *o
 		}
@@ -184,7 +184,7 @@ func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, e
 	}
 	objects = []types.Object{}
 	for _, s := range m {
-		o, err := s.Object()
+		o, err := s.Inspect()
 		if err != nil {
 			return nil, err
 		}
