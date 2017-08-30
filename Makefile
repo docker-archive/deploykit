@@ -161,7 +161,7 @@ test:
 
 coverage:
 	@echo "+ $@"
-	@for pkg in $(PKGS); do \
+	@for pkg in $(PKGS_TEST); do \
 		go test -test.short -race -coverprofile="../../../$$pkg/coverage.txt" $${pkg} || exit 1; \
 	done
 
