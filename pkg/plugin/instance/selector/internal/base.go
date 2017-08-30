@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -121,18 +122,44 @@ func (b *Base) doAll(count int, work func(instance.Plugin) error) error {
 
 // Validate performs local validation on a provision request.
 func (b *Base) Validate(req *types.Any) error {
-	return b.doAll(1, func(p instance.Plugin) error {
-		return p.Validate(req)
-	})
+	cprops := map[string]*types.Any{}
+	err := req.Decode(&cprops)
+	if err != nil {
+		return err
+	}
+	// TODO: Ideally, this function should validate each specs as below. But many instance plugins are not validete properly, so skip validate now.
+	//	for _, s := range cprops {
+	//		err = b.doAll(1, func(p instance.Plugin) error {
+	//			return p.Validate(s.Properties)
+	//		})
+	//		if err != nil {
+	//			return err
+	//		}
+	//	}
+	return nil
 }
 
 // Provision creates a new instance based on the spec.
 func (b *Base) Provision(spec instance.Spec) (*instance.ID, error) {
-	match, selected, err := b.selectOne(spec)
-	log.Debug("provision", "match", match, "err", err, "spec", spec)
+	cprops := map[string]*types.Any{}
+	err := spec.Properties.Decode(&cprops)
 	if err != nil {
 		return nil, err
 	}
+	match, selected, err := b.selectOne(spec)
+	if err != nil {
+		return nil, err
+	}
+	var matchedname string
+	if _, ok := cprops[string(match.Name)]; !ok {
+		if _, ok := cprops["default"]; !ok {
+			return nil, fmt.Errorf("There is no Properties for choice %s", match.Name)
+		}
+	} else {
+		matchedname = string(match.Name)
+	}
+	spec.Properties = cprops[matchedname]
+	log.Debug("provision", "match", match, "err", err, "spec", spec)
 	return selected.Provision(spec)
 }
 
