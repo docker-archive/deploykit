@@ -18,10 +18,11 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 
-	// CLI commands
 	//_ "github.com/docker/infrakit/cmd/infrakit/event"
-	_ "github.com/docker/infrakit/cmd/infrakit/manager"
 	//_ "github.com/docker/infrakit/cmd/infrakit/metadata"
+
+	// CLI commands
+	_ "github.com/docker/infrakit/cmd/infrakit/manager"
 	_ "github.com/docker/infrakit/cmd/infrakit/playbook"
 	_ "github.com/docker/infrakit/cmd/infrakit/plugin"
 	_ "github.com/docker/infrakit/cmd/infrakit/remote"
@@ -50,6 +51,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/simulator"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"
 	_ "github.com/docker/infrakit/pkg/run/v0/tailer"
+	_ "github.com/docker/infrakit/pkg/run/v0/terraform"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
 	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
 )

@@ -216,17 +216,23 @@ func (m *Manager) Launch(exec string, key string, name plugin.Name, options *typ
 // WaitForAllShutdown blocks until all the plugins stopped.
 func (m *Manager) WaitForAllShutdown() {
 	targets := []string{}
+	seen := map[string]struct{}{}
 	checkNow := time.Tick(m.scanInterval)
 
 	for {
 		select {
 		case target := <-m.started:
+
 			lookup, _ := target.GetLookupAndType()
-			log.Debug("Start watching", "lookup", lookup)
-			targets = append(targets, lookup)
+
+			if _, has := seen[lookup]; !has {
+				log.Debug("Start watching", "lookup", lookup)
+				targets = append(targets, lookup)
+				seen[lookup] = struct{}{}
+			}
 
 		case <-checkNow:
-			log.Debug("Checking on targets", "targets", targets, "V", logutil.V(400))
+			log.Debug("Checking on targets", "targets", targets, "V", logutil.V(500))
 			if m, err := m.plugins().List(); err == nil {
 				if countMatches(targets, m) == 0 {
 					log.Info("Scan found plugins not running now", "plugins", targets)

@@ -9,8 +9,10 @@ import (
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/run/manager"
+	"github.com/docker/infrakit/pkg/run"
+	run_manager "github.com/docker/infrakit/pkg/run/manager"
 	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
 	"github.com/docker/infrakit/pkg/types"
@@ -83,7 +85,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		// Plugin launcher runs asynchronously
-		pluginManager, err := manager.ManagePlugins(launchRules, plugins, false, 5*time.Second)
+		pluginManager, err := run_manager.ManagePlugins(launchRules, plugins, false, 5*time.Second)
 		if err != nil {
 			return err
 		}
@@ -107,6 +109,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		stop := make(chan struct{})
 
 		go func() {
+
 		main:
 			for {
 				select {
@@ -137,6 +140,16 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				if err != nil {
 					log.Error("Error from input. Not committing.", "err", err)
 					continue main
+				}
+
+				// Now tell the manager to enforce
+				err = run.Call(plugins, manager.InterfaceSpec, nil,
+					func(m manager.Manager) error {
+						log.Debug("Calling manager to enforce", "m", m, "specs", specs)
+						return m.Enforce(specs)
+					})
+				if err != nil {
+					log.Error("Error making call to manager", "err", err)
 				}
 
 			}

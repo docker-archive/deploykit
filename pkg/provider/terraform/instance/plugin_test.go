@@ -1,4 +1,4 @@
-package main
+package instance
 
 import (
 	"encoding/base64"

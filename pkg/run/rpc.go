@@ -1,12 +1,16 @@
 package run
 
+// TODO -- this needs to be versioned because all the interface / spi packages are versioned.
+
 import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/controller"
+	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc/client"
 	controller_rpc "github.com/docker/infrakit/pkg/rpc/controller"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
@@ -17,6 +21,7 @@ import (
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	resource_rpc "github.com/docker/infrakit/pkg/rpc/resource"
 	"github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -153,10 +158,21 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 			plugins = append(plugins, resource_rpc.PluginServer(p.(resource.Plugin)))
 		case L4:
 			log.Debug("loadbalancer_rpc.PluginServer", "p", p)
+			switch pp := p.(type) {
+
 			// This will create a plugin at name/type so that it's fully qualified.
 			// Note that L4 will be bound to an ingress which is a Controller, and Controllers can have subtypes
 			// so that they map to the domain/host associated to the loadbalancer. For example ingress/test.com
-			plugins = append(plugins, loadbalancer_rpc.PluginServer(p.(loadbalancer.L4)).WithType(p.(loadbalancer.L4).Name()))
+			case func() (map[string]loadbalancer.L4, error):
+				log.Debug("loadbalancer_rpc.PluginServerWithNames", "pp", pp)
+				plugins = append(plugins, loadbalancer_rpc.PluginServerWithNames(pp))
+			case loadbalancer.L4:
+				log.Debug("loadbalancer_rpc.PluginServer", "p", p)
+				plugins = append(plugins, loadbalancer_rpc.PluginServer(p.(loadbalancer.L4)))
+			default:
+				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				return
+			}
 
 		default:
 			err = fmt.Errorf("unknown plugin %v, code %v", p, code)
@@ -171,4 +187,88 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 	}
 	stoppable, running = BackgroundListener(transport, onStop, plugins[0], plugins[1:]...)
 	return
+}
+
+// Call looks up the the plugin objects by the interface type and executes the work.
+func Call(plugins func() discovery.Plugins,
+	interfaceSpec spi.InterfaceSpec, name *plugin.Name, work interface{}) error {
+
+	pm, err := plugins().List()
+	if err != nil {
+		return err
+	}
+
+	lookup := ""
+	if name != nil {
+		lookup, _ = name.GetLookupAndType()
+	}
+
+	for n, endpoint := range pm {
+
+		rpcClient, err := client.New(endpoint.Address, interfaceSpec)
+		if err == nil {
+			// interface type match.  now check for name match
+			if lookup != "" && lookup != n {
+				continue
+			}
+
+			pn := plugin.Name(n)
+			if name != nil {
+				pn = *name
+			}
+			switch interfaceSpec {
+			case manager.InterfaceSpec:
+				do, is := work.(func(manager.Manager) error)
+				if !is {
+					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
+				}
+				v := manager_rpc.Adapt(rpcClient)
+				return do(v)
+			case controller.InterfaceSpec:
+				do, is := work.(func(controller.Controller) error)
+				if !is {
+					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
+				}
+				v := controller_rpc.Adapt(pn, rpcClient)
+				return do(v)
+			case group.InterfaceSpec:
+				do, is := work.(func(group.Plugin) error)
+				if !is {
+					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
+				}
+				v := group_rpc.Adapt(rpcClient)
+				return do(v)
+			case instance.InterfaceSpec:
+				do, is := work.(func(instance.Plugin) error)
+				if !is {
+					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
+				}
+				v := instance_rpc.Adapt(pn, rpcClient)
+				return do(v)
+			case flavor.InterfaceSpec:
+				do, is := work.(func(flavor.Plugin) error)
+				if !is {
+					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
+				}
+				v := flavor_rpc.Adapt(pn, rpcClient)
+				return do(v)
+			case metadata.InterfaceSpec:
+				do, is := work.(func(metadata.Plugin) error)
+				if !is {
+					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
+				}
+				v := metadata_rpc.Adapt(rpcClient)
+				return do(v)
+			case loadbalancer.InterfaceSpec:
+				do, is := work.(func(loadbalancer.L4) error)
+				if !is {
+					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
+				}
+				v := loadbalancer_rpc.Adapt(pn, rpcClient)
+				return do(v)
+			default:
+			}
+		}
+	}
+	return nil
 }

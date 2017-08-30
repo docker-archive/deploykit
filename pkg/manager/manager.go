@@ -145,7 +145,15 @@ func (m *manager) LeaderLocation() (*url.URL, error) {
 
 // Enforce enforces infrastructure state to match that of the specs
 func (m *manager) Enforce(specs []types.Spec) error {
-	return fmt.Errorf("not implemented")
+
+	buff, err := types.AnyValueMust(specs).MarshalYAML()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(buff))
+
+	return nil
 }
 
 // Inspect returns the current state of the infrastructure

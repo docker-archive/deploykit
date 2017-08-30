@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -24,11 +25,11 @@ const (
 	// EnvDir is the env for directory for file storage
 	EnvDir = "INFRAKIT_SIMULATOR_DIR"
 
-	// EnvInstanceNames is the env var to set for the instance spi type names (comma-delimited)
-	EnvInstanceNames = "INFRAKIT_SIMULATOR_INSTANCE_NAMES"
+	// EnvInstanceTypes is the env var to set for the instance spi type names (comma-delimited)
+	EnvInstanceTypes = "INFRAKIT_SIMULATOR_INSTANCE_TYPES"
 
-	// EnvL4Name is the env var to set for the L4 name
-	EnvL4Name = "INFRAKIT_SIMULATOR_L4_NAME"
+	// EnvL4Names is the env var to set for the L4 name
+	EnvL4Names = "INFRAKIT_SIMULATOR_L4_NAMES"
 
 	// StoreMem is the value for using memory store
 	StoreMem = "mem"
@@ -50,15 +51,15 @@ type Options struct {
 	Store         string
 	Dir           string
 	InstanceTypes []string
-	L4HostName    string
+	L4Names       []string
 }
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
 	Store:         run.GetEnv(EnvStore, "mem"),
 	Dir:           run.GetEnv(EnvDir, filepath.Join(run.InfrakitHome(), "simulator")),
-	InstanceTypes: strings.Split(run.GetEnv(EnvInstanceNames, "compute,net,disk"), ","),
-	L4HostName:    "test.com",
+	InstanceTypes: strings.Split(run.GetEnv(EnvInstanceTypes, "compute,net,disk"), ","),
+	L4Names:       strings.Split(run.GetEnv(EnvL4Names, "lb1,lb2,lb3"), ","),
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
@@ -84,8 +85,12 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		instanceMap[n] = NewInstance(n, options)
 	}
 
-	if options.L4HostName != "" {
-		impls[run.L4] = NewL4(options.L4HostName, options)
+	l4Map := map[string]loadbalancer.L4{}
+	if len(options.L4Names) > 0 {
+		impls[run.L4] = func() (map[string]loadbalancer.L4, error) { return l4Map, nil }
+	}
+	for _, n := range options.L4Names {
+		l4Map[n] = NewL4(n, options)
 	}
 
 	transport.Name = name
