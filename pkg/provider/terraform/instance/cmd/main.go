@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	terraform "github.com/docker/infrakit/pkg/provider/terraform/instance"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -60,13 +61,13 @@ func main() {
 			log.Error(err)
 			panic(err)
 		}
-		importOpts := ImportOptions{
+		importOpts := terraform.ImportOptions{
 			InstanceSpec: importInstSpec,
 			InstanceID:   importInstID,
 		}
 		cli.SetLogLevel(*logLevel)
 		run.Plugin(plugin_base.DefaultTransport(*name), instance_plugin.PluginServer(
-			NewTerraformInstancePlugin(*dir, *pollInterval, *standalone, &importOpts)),
+			terraform.NewTerraformInstancePlugin(*dir, *pollInterval, *standalone, &importOpts)),
 		)
 	}
 
