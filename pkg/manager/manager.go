@@ -158,7 +158,7 @@ func (m *manager) Enforce(specs []types.Spec) error {
 
 // Inspect returns the current state of the infrastructure
 func (m *manager) Inspect() ([]types.Object, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, nil
 }
 
 // Terminate destroys all resources associated with the specs

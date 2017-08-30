@@ -77,7 +77,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		launchRules := []launch.Rule{}
 		// parse the launch rules if any
 		if *launchConfigURL != "" {
-			if list, err := loadRules(*launchConfigURL); err != nil {
+			list, err := loadRules(*launchConfigURL)
+			if err != nil {
 				return err
 			}
 			launchRules = list
