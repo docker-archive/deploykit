@@ -3,12 +3,37 @@ package types
 import (
 	"time"
 
+	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
 )
+
+func init() {
+	depends.Register("ingress", types.InterfaceSpec(controller.InterfaceSpec), ResolveDependencies)
+}
+
+// ResolveDependencies returns a list of dependencies by parsing the opaque Properties blob.
+func ResolveDependencies(spec types.Spec) ([]plugin.Name, error) {
+	if spec.Properties == nil {
+		return nil, nil
+	}
+
+	properties := Properties{}
+	err := spec.Properties.Decode(&properties)
+	if err != nil {
+		return nil, err
+	}
+
+	out := []plugin.Name{}
+	for _, p := range properties {
+		out = append(out, p.L4Plugin)
+	}
+	return out, nil
+}
 
 // Properties is the properties for the ingress controller.  This struct is used to parse
 // the `Properties` field of a pkg/types/Spec.

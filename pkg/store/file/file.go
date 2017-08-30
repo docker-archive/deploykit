@@ -2,11 +2,11 @@ package file
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/store"
 )
 
@@ -18,16 +18,10 @@ type snapshot struct {
 // NewSnapshot returns an instance of the snapshot service where data is stored in the directory given.
 // This is a simple implementation that assumes a single file for the entire snapshot.
 func NewSnapshot(dir, name string) (store.Snapshot, error) {
-	// file must exist
-	info, err := os.Stat(dir)
-	if err != nil {
+
+	if err := local.EnsureDir(dir); err != nil {
 		return nil, err
 	}
-
-	if !info.IsDir() {
-		return nil, fmt.Errorf("file %s must be a directory", dir)
-	}
-
 	return &snapshot{dir: dir, name: name}, nil
 }
 

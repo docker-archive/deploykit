@@ -24,7 +24,7 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 	}
 
 	publish := &cobra.Command{
-		Use:   "add",
+		Use:   "add <frontend_port> <backend_port>",
 		Short: "Publish a loadbalancer route",
 	}
 	unpublish := &cobra.Command{
@@ -34,12 +34,26 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 
 	routes.AddCommand(ls, publish, unpublish)
 
-	port := publish.Flags().Int("port", 80, "Backend listening port")
-	protocol := publish.Flags().String("protocol", "http", "Protocol: http|https|tcp|udp|ssl")
-	frontendPort := publish.Flags().Int("frontend-port", 80, "Frontend loadbalancer port")
+	protocol := publish.Flags().String("protocol", "tcp", "Protocol: http|https|tcp|udp|ssl")
 	cert := publish.Flags().String("cert", "", "Certificate")
 
 	publish.RunE = func(cmd *cobra.Command, args []string) error {
+
+		if len(args) != 2 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		frontendPort, err := strconv.Atoi(args[0])
+		if err != nil {
+			return err
+		}
+
+		backendPort, err := strconv.Atoi(args[1])
+		if err != nil {
+			return err
+		}
+
 		l4, err := Load(services.Plugins(), name)
 		if err != nil {
 			return nil
@@ -47,8 +61,8 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 		cli.MustNotNil(l4, "L4 not found", "name", name)
 
 		route := loadbalancer.Route{
-			Port:             *port,
-			LoadBalancerPort: *frontendPort,
+			Port:             backendPort,
+			LoadBalancerPort: frontendPort,
 			Protocol:         loadbalancer.Protocol(*protocol),
 		}
 		if *cert != "" {

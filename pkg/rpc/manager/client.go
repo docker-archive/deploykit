@@ -5,6 +5,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/manager"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
@@ -39,4 +40,32 @@ func (c client) LeaderLocation() (*url.URL, error) {
 	resp := LeaderLocationResponse{}
 	err := c.client.Call("Manager.LeaderLocation", req, &resp)
 	return resp.Location, err
+}
+
+// Enforce enforces infrastructure state to match that of the specs
+func (c client) Enforce(specs []types.Spec) error {
+	req := EnforceRequest{
+		Specs: specs,
+	}
+	resp := EnforceResponse{}
+	err := c.client.Call("Manager.Enforce", req, &resp)
+	return err
+}
+
+// Inspect returns the current state of the infrastructure
+func (c client) Inspect() ([]types.Object, error) {
+	req := InspectRequest{}
+	resp := InspectResponse{}
+	err := c.client.Call("Manager.Inspect", req, &resp)
+	return resp.Objects, err
+}
+
+// Terminate destroys all resources associated with the specs
+func (c client) Terminate(specs []types.Spec) error {
+	req := TerminateRequest{
+		Specs: specs,
+	}
+	resp := TerminateResponse{}
+	err := c.client.Call("Manager.Terminate", req, &resp)
+	return err
 }

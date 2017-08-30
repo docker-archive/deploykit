@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -19,13 +20,20 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 	describe.Flags().AddFlagSet(services.OutputFlags)
 
 	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
-	objectName := describe.Flags().String("name", "", "Name of object")
-	objectID := describe.Flags().String("id", "", "ID of object")
 
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
-		if len(args) != 0 {
-			cmd.Usage()
-			os.Exit(1)
+
+		pluginName := plugin.Name(name)
+		_, objectName := pluginName.GetLookupAndType()
+		if objectName == "" {
+			if len(args) < 1 {
+				objectName = ""
+				// cmd.Usage()
+				// os.Exit(1)
+
+			} else {
+				objectName = args[0]
+			}
 		}
 
 		controller, err := Load(services.Plugins(), name)
@@ -35,29 +43,24 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 		cli.MustNotNil(controller, "controller not found", "name", name)
 
 		search := (types.Metadata{
-			Name: *objectName,
+			Name: objectName,
 		}).AddTagsFromStringSlice(*tags)
 
-		if *objectID != "" {
-			search.Identity = &types.Identity{
-				ID: *objectID,
-			}
+		q := &search
+		if q.Name == "" {
+			q = nil // select all if nil
 		}
-		objects, err := controller.Describe(&search)
+
+		objects, err := controller.Describe(q)
 		if err != nil {
 			return err
 		}
 
 		return services.Output(os.Stdout, objects,
 			func(w io.Writer, v interface{}) error {
-
+				fmt.Printf("%-10s  %-15s  %-15s\n", "KIND", "NAME", "ID")
 				for _, o := range objects {
-
-					buff, err := types.AnyValueMust(o).MarshalYAML()
-					if err != nil {
-						return err
-					}
-					fmt.Printf("%v\n", string(buff))
+					fmt.Printf("%-10s  %-15s  %-15s\n", o.Spec.Kind, o.Spec.Metadata.Name, o.Spec.Metadata.Identity.ID)
 				}
 				return nil
 			})

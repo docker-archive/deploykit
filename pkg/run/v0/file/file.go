@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/instance/file"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -36,7 +37,7 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Dir: run.GetEnv(EnvOptionsDir, os.TempDir()),
+	Dir: local.Getenv(EnvOptionsDir, os.TempDir()),
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately

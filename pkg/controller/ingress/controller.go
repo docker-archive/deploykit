@@ -71,7 +71,7 @@ func (m *managed) Plan(operation controller.Operation, spec types.Spec) (*types.
 }
 
 // Manage implements internal/Managed
-func (m *managed) Manage(spec types.Spec) (*types.Object, error) {
+func (m *managed) Enforce(spec types.Spec) (*types.Object, error) {
 	err := m.init(spec)
 	if err != nil {
 		return nil, err
@@ -80,8 +80,8 @@ func (m *managed) Manage(spec types.Spec) (*types.Object, error) {
 	return m.object(), nil
 }
 
-// Object implements internal/Managed
-func (m *managed) Object() (*types.Object, error) {
+// Inspect implements internal/Managed
+func (m *managed) Inspect() (*types.Object, error) {
 	return m.object(), nil
 }
 
@@ -90,13 +90,13 @@ func (m *managed) Free() (*types.Object, error) {
 	if m.started() {
 		m.stop()
 	}
-	return m.Object()
+	return m.Inspect()
 }
 
-// Dispose implements internal/Managed
-func (m *managed) Dispose() (*types.Object, error) {
+// Terminate implements internal/Managed
+func (m *managed) Terminate() (*types.Object, error) {
 	if m.started() {
 		m.stop()
 	}
-	return m.Object()
+	return m.Inspect()
 }

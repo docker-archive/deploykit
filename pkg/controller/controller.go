@@ -15,8 +15,8 @@ type Plan struct {
 type Operation int
 
 const (
-	// Manage represents create, update, reconcile operations
-	Manage = iota
+	// Enforce represents create, update, reconcile operations
+	Enforce = iota
 
 	// Destroy is the destroy operation. Destroy also implies Free.
 	Destroy

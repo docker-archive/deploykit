@@ -14,6 +14,7 @@ import (
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	terraform "github.com/docker/infrakit/pkg/provider/terraform/instance"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
@@ -60,7 +61,7 @@ type Options struct {
 // DefaultOptions return an Options with default values filled in.  If you want to expose these to the CLI,
 // simply get this struct and bind the fields to the flags.
 var DefaultOptions = Options{
-	Dir:          run.GetEnv(EnvDir, filepath.Join(run.InfrakitHome(), "terraform")),
+	Dir:          local.Getenv(EnvDir, filepath.Join(local.InfrakitHome(), "terraform")),
 	PollInterval: 30 * time.Second,
 	Standalone:   false,
 }

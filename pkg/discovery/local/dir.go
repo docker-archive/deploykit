@@ -1,7 +1,6 @@
 package local
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/run/local"
 )
 
 // Dir returns the directory to use for plugin discovery, which may be customized by the environment.
@@ -41,21 +41,9 @@ func NewPluginDiscovery() (discovery.Plugins, error) {
 
 // NewPluginDiscoveryWithDir creates a plugin discovery based on the directory given.
 func NewPluginDiscoveryWithDir(pluginDir string) (discovery.Plugins, error) {
-	stat, err := os.Stat(pluginDir)
-	if err == nil {
-		if !stat.IsDir() {
-			return nil, fmt.Errorf("Plugin dir %s is a file", pluginDir)
-		}
-	} else {
-		if os.IsNotExist(err) {
-			if err := os.MkdirAll(pluginDir, 0700); err != nil {
-				return nil, fmt.Errorf("Failed to create plugin dir %s: %s", pluginDir, err)
-			}
-		} else {
-			return nil, fmt.Errorf("Failed to access plugin dir %s: %s", pluginDir, err)
-		}
+	if err := local.EnsureDir(pluginDir); err != nil {
+		return nil, err
 	}
-
 	return newDirPluginDiscovery(pluginDir)
 }
 

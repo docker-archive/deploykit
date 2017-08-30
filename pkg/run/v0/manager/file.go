@@ -5,7 +5,7 @@ import (
 	"time"
 
 	file_leader "github.com/docker/infrakit/pkg/leader/file"
-	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	file_store "github.com/docker/infrakit/pkg/store/file"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -39,10 +39,10 @@ type BackendFileOptions struct {
 // DefaultBackendFileOptions is the default for the file backend
 var DefaultBackendFileOptions = types.AnyValueMust(
 	BackendFileOptions{
-		ID:           run.GetEnv(EnvID, "manager1"),
+		ID:           local.Getenv(EnvID, "manager1"),
 		PollInterval: 5 * time.Second,
-		LeaderFile:   run.GetEnv(EnvLeaderFile, filepath.Join(run.InfrakitHome(), "leader")),
-		StoreDir:     run.GetEnv(EnvStoreDir, filepath.Join(run.InfrakitHome(), "configs")),
+		LeaderFile:   local.Getenv(EnvLeaderFile, filepath.Join(local.InfrakitHome(), "leader")),
+		StoreDir:     local.Getenv(EnvStoreDir, filepath.Join(local.InfrakitHome(), "configs")),
 	},
 )
 

@@ -18,6 +18,11 @@ type LaunchConfig struct {
 	SamePgID bool
 }
 
+const (
+	// DefaultExecName is the default exec name to identify this launcher in the config
+	DefaultExecName = "os"
+)
+
 // NewLauncher returns a Launcher that can install and start plugins.  The OS version is simple - it translates
 // plugin names as command names and uses os.Exec
 func NewLauncher(n string) (*Launcher, error) {
