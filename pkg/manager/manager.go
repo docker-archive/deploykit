@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"sync"
@@ -43,6 +42,15 @@ type Manager interface {
 
 	// LeaderLocation returns the location of the leader
 	LeaderLocation() (*url.URL, error)
+
+	// Enforce enforces infrastructure state to match that of the specs
+	Enforce(specs []types.Spec) error
+
+	// Inspect returns the current state of the infrastructure
+	Inspect() ([]types.Object, error)
+
+	// Terminate destroys all resources associated with the specs
+	Terminate(specs []types.Spec) error
 }
 
 // Backend is the admin / server interface
@@ -133,6 +141,21 @@ func (m *manager) LeaderLocation() (*url.URL, error) {
 	}
 
 	return m.leaderStore.GetLocation()
+}
+
+// Enforce enforces infrastructure state to match that of the specs
+func (m *manager) Enforce(specs []types.Spec) error {
+	return fmt.Errorf("not implemented")
+}
+
+// Inspect returns the current state of the infrastructure
+func (m *manager) Inspect() ([]types.Object, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// Terminate destroys all resources associated with the specs
+func (m *manager) Terminate(specs []types.Spec) error {
+	return fmt.Errorf("not implemented")
 }
 
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.
@@ -273,9 +296,7 @@ func (m *manager) getCurrentState() (globalSpec, error) {
 	// For now this just uses the gross simplification of asking the group plugin that the manager
 	// proxies.
 
-	global := globalSpec{
-		Groups: map[group.ID]plugin.Spec{},
-	}
+	global := globalSpec{}
 
 	specs, err := m.Plugin.InspectGroups()
 	if err != nil {
@@ -283,15 +304,7 @@ func (m *manager) getCurrentState() (globalSpec, error) {
 	}
 
 	for _, spec := range specs {
-
-		any, err := types.AnyValue(spec)
-		if err != nil {
-			return global, err
-		}
-		global.Groups[spec.ID] = plugin.Spec{
-			Plugin:     plugin.Name(m.backendName),
-			Properties: any,
-		}
+		global.updateGroupSpec(spec, plugin.Name(m.backendName))
 	}
 	return global, nil
 }
@@ -300,20 +313,16 @@ func (m *manager) onAssumeLeadership() error {
 	log.Info("Assuming leadership")
 
 	// load the config
-	config := globalSpec{}
-
+	config := &globalSpec{}
 	// load the latest version -- assumption here is that it's been persisted already.
-	err := m.snapshot.Load(&config)
+	log.Info("Loading snapshot")
+	err := config.load(m.snapshot)
+	log.Info("Loaded snapshot", "err", err)
 	if err != nil {
 		log.Warn("Error loading config", "err", err)
 		return err
 	}
-
-	log.Info("Loaded snapshot", "err", err)
-	if err != nil {
-		return err
-	}
-	return m.doCommitGroups(config)
+	return m.doCommitGroups(*config)
 }
 
 func (m *manager) onLostLeadership() error {
@@ -331,7 +340,7 @@ func (m *manager) doCommit() error {
 	config := globalSpec{}
 
 	// load the latest version -- assumption here is that it's been persisted already.
-	err := m.snapshot.Load(&config)
+	err := config.load(m.snapshot)
 	if err != nil {
 		return err
 	}
@@ -377,34 +386,40 @@ func (m *manager) execPlugins(config globalSpec, work func(group.Plugin, group.S
 		return err
 	}
 
-	for id, pluginSpec := range config.Groups {
+	return config.visit(func(k key, r record) error {
 
-		log.Info("Processing group", "groupID", id, "plugin", pluginSpec.Plugin)
-		name := pluginSpec.Plugin.String()
+		// TODO(chungers) ==> temporary
+		if k.Kind != "group" {
+			return nil
+		}
 
-		ep, has := running[name]
+		id := group.ID(k.Name)
+
+		lookup, _ := r.Handler.GetLookupAndType()
+		log.Debug("Processing group", "groupID", id, "plugin", r.Handler, "V", logutil.V(100))
+
+		ep, has := running[lookup]
 		if !has {
-			log.Warn("Not running", "plugin", name)
+			log.Warn("Not running", "plugin", lookup, "name", r.Handler)
 			return err
 		}
 
 		gp, err := rpc.NewClient(ep.Address)
 		if err != nil {
-			log.Warn("Cannot contact group", "groupID", id, "plugin", name, "endpoint", ep.Address)
+			log.Warn("Cannot contact group", "groupID", id, "plugin", r.Handler, "endpoint", ep.Address)
 			return err
 		}
 
-		log.Debug("exec on group", "groupID", id, "plugin", name, "V", logutil.V(100))
+		log.Debug("exec on group", "groupID", id, "plugin", r.Handler, "V", logutil.V(100))
 
 		// spec is store in the properties
-		if pluginSpec.Properties == nil {
-			return fmt.Errorf("no spec for group %s plugin=%v", id, name)
+		if r.Spec.Properties == nil {
+			return fmt.Errorf("no spec for group %s plugin=%v", id, r.Handler)
 		}
 
-		spec := group.Spec{}
-		err = json.Unmarshal([]byte(*pluginSpec.Properties), &spec)
-		if err != nil {
-			return err
+		spec := group.Spec{
+			ID:         id,
+			Properties: r.Spec.Properties,
 		}
 
 		err = work(gp, spec)
@@ -413,7 +428,6 @@ func (m *manager) execPlugins(config globalSpec, work func(group.Plugin, group.S
 			return err
 		}
 
-	}
-
-	return nil
+		return nil
+	})
 }
