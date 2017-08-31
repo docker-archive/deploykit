@@ -123,7 +123,7 @@ func (s *scaledGroup) Destroy(inst instance.Description, ctx instance.Context) e
 	}
 
 	log.Info("Destroying instance", "id", inst.ID)
-	if err := settings.instancePlugin.Destroy(inst.ID, instance.Termination); err != nil {
+	if err := settings.instancePlugin.Destroy(inst.ID, ctx); err != nil {
 		log.Error("Failed to destroy instance", "id", inst.ID, "err", err)
 		return err
 	}
