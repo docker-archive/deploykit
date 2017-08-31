@@ -47,7 +47,7 @@ func Commit(name string, services *cli.Services) *cobra.Command {
 			return err
 		}
 
-		object, err := c.Commit(controller.Manage, spec)
+		object, err := c.Commit(controller.Enforce, spec)
 		if err != nil {
 			return err
 		}

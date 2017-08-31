@@ -105,16 +105,13 @@ func testBuildGroupSpec(groupID, properties string) group.Spec {
 }
 
 func testBuildGlobalSpec(t *testing.T, gs group.Spec) globalSpec {
-	any, err := types.AnyValue(gs)
-	require.NoError(t, err)
-	return globalSpec{
-		Groups: map[group.ID]plugin.Spec{
-			gs.ID: {
-				Plugin:     plugin.Name("group-stateless"),
-				Properties: any,
-			},
-		},
+	global := globalSpec{}
+	global.updateGroupSpec(gs, plugin.Name("group-stateless"))
+	global.data = []persisted{}
+	for k, r := range global.index {
+		global.data = append(global.data, persisted{Key: k, Record: r})
 	}
+	return global
 }
 
 func testToStruct(m *types.Any) interface{} {
@@ -180,12 +177,12 @@ func TestStartOneLeader(t *testing.T) {
 
 	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &globalSpec{}
+			empty := &[]persisted{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*globalSpec)
+					p, is := o.(*[]persisted)
 					require.True(t, is)
-					*p = global
+					*p = global.data
 					return nil
 				}).Return(nil)
 		},
@@ -242,12 +239,12 @@ func TestChangeLeadership(t *testing.T) {
 
 	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &globalSpec{}
+			empty := &[]persisted{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*globalSpec)
+					p, is := o.(*[]persisted)
 					require.True(t, is)
-					*p = global
+					*p = global.data
 					return nil
 				},
 			).Return(nil)
@@ -279,12 +276,12 @@ func TestChangeLeadership(t *testing.T) {
 		})
 	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderChans[1], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &globalSpec{}
+			empty := &[]persisted{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*globalSpec)
+					p, is := o.(*[]persisted)
 					require.True(t, is)
-					*p = global
+					*p = global.data
 					return nil
 				},
 			).Return(nil)

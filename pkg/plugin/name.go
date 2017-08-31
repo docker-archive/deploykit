@@ -8,6 +8,11 @@ import (
 // Name is a reference to the plugin.  Places where it appears include JSON files as type of field `Plugin`.
 type Name string
 
+// NameFrom creates a name from the parts
+func NameFrom(lookup, sub string) Name {
+	return Name(strings.Join([]string{lookup, sub}, "/"))
+}
+
 // GetLookupAndType returns the plugin name for lookup and sub-type supported by the plugin.
 // The name follows a microformat of $plugin[/$subtype] where $plugin is used for the discovery / lookup by name.
 // The $subtype is used for the Type parameter in the RPC requests.

@@ -272,8 +272,11 @@ func TestValidate(t *testing.T) {
 	p2.DoValidate = func(req *types.Any) error {
 		return fmt.Errorf("error")
 	}
-
-	err := b.Validate(types.AnyValueMust("foo"))
+	qproperty := map[string]*types.Any{
+		"us-west-2a": types.AnyValueMust("foo"),
+		"us-west-2b": types.AnyValueMust("baa"),
+	}
+	err := b.Validate(types.AnyValueMust(qproperty))
 	require.NoError(t, err)
 
 	// Now all of them will return error
@@ -454,7 +457,11 @@ func TestProvision(t *testing.T) {
 
 	qid := instance.ID("foo-instance")
 	qlid := instance.LogicalID("logical-foo")
-	qspec := instance.Spec{LogicalID: &qlid, Properties: types.AnyValueMust("bar")}
+	qproperty := map[string]*types.Any{
+		"us-west-2a": types.AnyValueMust("foo"),
+		"us-west-2b": types.AnyValueMust("baa"),
+	}
+	qspec := instance.Spec{LogicalID: &qlid, Properties: types.AnyValueMust(qproperty)}
 
 	b.SelectFunc = func(s instance.Spec, c []selector.Choice,
 		f func(selector.Choice) instance.Plugin) (selector.Choice, error) {
@@ -467,7 +474,8 @@ func TestProvision(t *testing.T) {
 		panic("shouldn't be here")
 	}
 	p2.DoProvision = func(spec instance.Spec) (*instance.ID, error) {
-		require.Equal(t, qspec, spec)
+		expectSpec := instance.Spec{LogicalID: &qlid, Properties: types.AnyValueMust(qproperty["us-west-2b"])}
+		require.Equal(t, expectSpec, spec)
 		return &qid, nil // provisioned ok
 	}
 
@@ -476,7 +484,8 @@ func TestProvision(t *testing.T) {
 	require.Equal(t, qid, *id)
 
 	p2.DoProvision = func(spec instance.Spec) (*instance.ID, error) {
-		require.Equal(t, qspec, spec)
+		expectSpec := instance.Spec{LogicalID: &qlid, Properties: types.AnyValueMust(qproperty["us-west-2b"])}
+		require.Equal(t, expectSpec, spec)
 		return nil, fmt.Errorf("error")
 	}
 

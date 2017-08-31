@@ -1,6 +1,7 @@
-package run
+package local
 
 import (
+	"fmt"
 	"os"
 	"os/user"
 )
@@ -33,12 +34,27 @@ func InfrakitHome() string {
 	return os.TempDir()
 }
 
-// GetEnv returns the value at the environment variable 'env'.  If the value is not found
+// Getenv returns the value at the environment variable 'env'.  If the value is not found
 // then default value is returned
-func GetEnv(env string, defaultValue string) string {
+func Getenv(env string, defaultValue string) string {
 	v := os.Getenv(env)
 	if v != "" {
 		return v
 	}
 	return defaultValue
+}
+
+// EnsureDir ensures the directory exists
+func EnsureDir(dir string) error {
+	stat, err := os.Stat(dir)
+	if err == nil {
+		if !stat.IsDir() {
+			return fmt.Errorf("not a directory %v", dir)
+		}
+		return nil
+	}
+	if os.IsNotExist(err) {
+		return os.MkdirAll(dir, 0755)
+	}
+	return fmt.Errorf("error access dir %s: %s", dir, err)
 }

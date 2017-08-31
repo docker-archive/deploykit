@@ -18,14 +18,16 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 
-	// CLI commands
 	//_ "github.com/docker/infrakit/cmd/infrakit/event"
-	_ "github.com/docker/infrakit/cmd/infrakit/manager"
 	//_ "github.com/docker/infrakit/cmd/infrakit/metadata"
+
+	// CLI commands
+	_ "github.com/docker/infrakit/cmd/infrakit/manager"
 	_ "github.com/docker/infrakit/cmd/infrakit/playbook"
 	_ "github.com/docker/infrakit/cmd/infrakit/plugin"
 	_ "github.com/docker/infrakit/cmd/infrakit/remote"
 	_ "github.com/docker/infrakit/cmd/infrakit/template"
+	_ "github.com/docker/infrakit/cmd/infrakit/up"
 	_ "github.com/docker/infrakit/cmd/infrakit/util"
 	_ "github.com/docker/infrakit/cmd/infrakit/x"
 	_ "github.com/docker/infrakit/pkg/cli/v0"
@@ -37,12 +39,14 @@ import (
 	_ "github.com/docker/infrakit/pkg/cli/backend/print"
 	_ "github.com/docker/infrakit/pkg/cli/backend/sh"
 
-	// Load the inprocess plugins supported
+	// Supported "kinds"
 	_ "github.com/docker/infrakit/pkg/run/v0/aws"
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
+	_ "github.com/docker/infrakit/pkg/run/v0/group"
 	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
 	_ "github.com/docker/infrakit/pkg/run/v0/ingress"
 	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
+	_ "github.com/docker/infrakit/pkg/run/v0/manager"
 	_ "github.com/docker/infrakit/pkg/run/v0/selector"
 	_ "github.com/docker/infrakit/pkg/run/v0/simulator"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"

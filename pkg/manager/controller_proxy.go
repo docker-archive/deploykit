@@ -93,7 +93,7 @@ func (c *pController) Commit(operation controller.Operation, spec types.Spec) (o
 
 	object = objectFromSpec(spec)
 	switch operation {
-	case controller.Manage:
+	case controller.Enforce:
 		_, err = c.plugin.CommitGroup(gSpec, false)
 	case controller.Destroy:
 		err = c.plugin.DestroyGroup(group.ID(spec.Metadata.Name))

@@ -15,6 +15,7 @@ import (
 	"github.com/docker/infrakit/pkg/rpc/mux"
 	rpc "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -38,7 +39,7 @@ const (
 
 var (
 	log                   = logutil.New("module", "run/manager")
-	defaultOptionsBackend = run.GetEnv(EnvOptionsBackend, "file")
+	defaultOptionsBackend = local.Getenv(EnvOptionsBackend, "file")
 )
 
 func init() {
@@ -84,8 +85,8 @@ func defaultOptions() (options Options) {
 	options = Options{
 		BackendName: plugin.Name("group-stateless"),
 		Mux: &MuxConfig{
-			Listen:    run.GetEnv(EnvMuxListen, ":24864"),
-			Advertise: run.GetEnv(EnvAdvertise, "localhost:24864"),
+			Listen:    local.Getenv(EnvMuxListen, ":24864"),
+			Advertise: local.Getenv(EnvAdvertise, "localhost:24864"),
 		},
 	}
 

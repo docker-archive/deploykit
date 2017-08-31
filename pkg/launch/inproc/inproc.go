@@ -15,6 +15,11 @@ import (
 
 var log = logutil.New("module", "launch/inproc")
 
+const (
+	// ExecName is the name to use in the launch rule configs
+	ExecName = "inproc"
+)
+
 // PluginRunFunc is a function that takes the plugin lookup, a configuration blob and starts the plugin
 // and returns a stoppable, running channel (for optionally blocking), and error.
 type PluginRunFunc func(func() discovery.Plugins, plugin.Name,
@@ -87,6 +92,11 @@ func Rules() []launch.Rule {
 	return rules
 }
 
+const (
+	// DefaultExecName is the default exec name to identify this launcher in the config
+	DefaultExecName = "inproc"
+)
+
 // NewLauncher returns a Launcher that can install and start plugins.
 // The inproc launcher will start up the plugin in process.
 func NewLauncher(n string, plugins func() discovery.Plugins) (*Launcher, error) {
@@ -124,6 +134,8 @@ func (l *Launcher) Exec(key string, pn plugin.Name,
 
 	name, _ := pn.GetLookupAndType()
 
+	log.Debug("exec", "key", key, "pn", pn, "config", config)
+
 	if s, has := l.running[name]; has {
 		return pluginName, s.wait, nil
 	}
@@ -133,6 +145,8 @@ func (l *Launcher) Exec(key string, pn plugin.Name,
 	if err != nil {
 		return
 	}
+
+	log.Debug("parsed rule", "key", key, "pn", pn, "config", config, "rule", inprocRule)
 
 	builder, has := builders[inprocRule.Kind]
 	if !has {
@@ -146,6 +160,8 @@ func (l *Launcher) Exec(key string, pn plugin.Name,
 	defer close(sc)
 
 	s.wait = sc
+
+	log.Debug("about to run", "key", key, "name", name, "config", config, "options", inprocRule.Options)
 
 	transport, impls, onStop, err := builder.run(l.plugins, plugin.Name(name), inprocRule.Options)
 	if err != nil {

@@ -14,12 +14,10 @@ import (
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/run/manager"
-	"github.com/docker/infrakit/pkg/types"
-	"github.com/spf13/cobra"
-
-	// Supported "kinds"
 	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
+	"github.com/docker/infrakit/pkg/types"
+	"github.com/spf13/cobra"
 )
 
 var log = logutil.New("module", "cli/plugin")
