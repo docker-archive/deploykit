@@ -736,13 +736,13 @@ func (p *plugin) Destroy(instID instance.ID, context instance.Context) error {
 		// Do not destroy related resources since this instance will be re-provisioned
 		processAttach = false
 	}
-	err := p.doDestroy(instID, processAttach)
+	err := p.doDestroy(instID, processAttach, true)
 	return err
 }
 
 // doDestroy terminates an existing instance and optionally terminates any related
 // resources
-func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
+func (p *plugin) doDestroy(inst instance.ID, processAttach, executeTfApply bool) error {
 	// Acquire lock
 	for {
 		if err := p.fsLock.TryLock(); err == nil {
@@ -768,9 +768,9 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 			return err
 		}
 		if len(attachIDs) > 0 {
-			idsToDestroy := make(map[string]string)
+			idsToDestroy := make(map[string]struct{})
 			for _, attachID := range attachIDs {
-				idsToDestroy[attachID] = ""
+				idsToDestroy[attachID] = struct{}{}
 			}
 			// Load all other instance files and determine other references exist
 			fs := &afero.Afero{Fs: p.fs}
@@ -810,7 +810,7 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 			}
 			// Delete any resources that are no longer referenced
 			for id := range idsToDestroy {
-				err = p.doDestroy(instance.ID(id), false)
+				err = p.doDestroy(instance.ID(id), false, false)
 				if err != nil {
 					return err
 				}
@@ -821,7 +821,10 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach bool) error {
 	if err != nil {
 		return err
 	}
-	return p.terraformApply()
+	if executeTfApply {
+		return p.terraformApply()
+	}
+	return nil
 }
 
 // parseAttachTag parses the file at the given path and returns value of
