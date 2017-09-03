@@ -93,5 +93,10 @@ func (p *impl) Provision(spec instance.Spec) (*instance.ID, error) {
 			}
 			return true, nil
 		})
+
+	if provisioned == nil {
+		err = fmt.Errorf("cannot provision instance")
+	}
+
 	return provisioned, err
 }
