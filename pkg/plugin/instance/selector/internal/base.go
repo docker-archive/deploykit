@@ -60,6 +60,36 @@ func (b *Base) selectOne(spec instance.Spec) (match selector.Choice, p instance.
 	return
 }
 
+// VisitChoices visits all the choices linearly one by one.  If the work function returns
+// false or error, the visit stops.
+func (b *Base) VisitChoices(visit func(selector.Choice, instance.Plugin) (bool, error)) error {
+	if b.PluginClientFunc == nil {
+		b.PluginClientFunc = instancePlugin
+	}
+
+	plugins, err := b.Plugins().List()
+	if err != nil {
+		return err
+	}
+
+	for _, choice := range b.Choices {
+		instancePlugin := b.PluginClientFunc(plugins, choice.Name)
+		if instancePlugin == nil {
+			// TODO -- implement retry??
+
+			log.Warn("cannot contact plugin", "name", choice.Name)
+			continue
+
+		}
+		if continueRun, err := visit(choice, instancePlugin); err != nil {
+			return err
+		} else if !continueRun {
+			return nil
+		}
+	}
+	return nil
+}
+
 func (b *Base) visit(f func(selector.Choice, instance.Plugin) error) error {
 	if b.PluginClientFunc == nil {
 		b.PluginClientFunc = instancePlugin
