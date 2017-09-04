@@ -23,7 +23,7 @@ type awsSpotInstancePlugin struct {
 	namespaceTags map[string]string
 }
 
-// NewInstancePlugin creates a new plugin that creates spot instances in AWS EC2.
+// NewSpotInstancePlugin creates a new plugin that creates spot instances in AWS EC2.
 func NewSpotInstancePlugin(client ec2iface.EC2API, namespaceTags map[string]string) instance.Plugin {
 	return &awsSpotInstancePlugin{client: client, namespaceTags: namespaceTags}
 }
@@ -222,7 +222,7 @@ func (p awsSpotInstancePlugin) Provision(spec instance.Spec) (*instance.ID, erro
 			request.RequestSpotInstancesInput.LaunchSpecification.NetworkInterfaces[0].PrivateIpAddress = (*string)(spec.LogicalID)
 		} else {
 			request.RequestSpotInstancesInput.LaunchSpecification.SetNetworkInterfaces([]*ec2.InstanceNetworkInterfaceSpecification{
-				&ec2.InstanceNetworkInterfaceSpecification{
+				{
 					PrivateIpAddress: (*string)(spec.LogicalID),
 				},
 			})
