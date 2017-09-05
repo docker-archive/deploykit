@@ -90,10 +90,10 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service,
 func findRoutePort(
 	routes []loadbalancer.Route,
 	loadbalancerPort int,
-	protocol loadbalancer.Protocol) (int, bool) {
+	protocol, lbProtocol loadbalancer.Protocol) (int, bool) {
 
 	for _, route := range routes {
-		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol {
+		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol && route.LoadBalancerProtocol == lbProtocol {
 			return route.Port, true
 		}
 	}

@@ -34,10 +34,11 @@ func newListener(service string, swarmPort int, urlStr string, cert *string) (*l
 
 func (l *listener) asRoute() loadbalancer.Route {
 	return loadbalancer.Route{
-		Port:             l.SwarmPort,
-		Protocol:         l.protocol(),
-		LoadBalancerPort: l.extPort(),
-		Certificate:      l.CertASN(),
+		Port:                 l.SwarmPort,
+		Protocol:             l.protocol(),
+		LoadBalancerPort:     l.extPort(),
+		LoadBalancerProtocol: l.loadbalancerProtocol(),
+		Certificate:          l.CertASN(),
 	}
 }
 
@@ -131,6 +132,24 @@ func (l *listener) host() string {
 		return "default"
 	}
 	return h
+}
+
+// Protocol gets the network protocol used by the load balancer.
+func (l *listener) loadbalancerProtocol() loadbalancer.Protocol {
+	scheme := ""
+	if l.URL != nil {
+		scheme = l.URL.Scheme
+	}
+
+	// check if this should be SSL because it has a certificate.
+	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
+		log.Infoln("port ", l.extPort(), " Is in ", l.CertPorts())
+		scheme = string(loadbalancer.SSL)
+	} else {
+		log.Infoln("cert is nil, or port ", l.extPort(), " Is NOT in ", l.CertPorts())
+	}
+
+	return loadbalancer.ProtocolFromString(scheme)
 }
 
 // Protocol gets the network protocol used by the service.
