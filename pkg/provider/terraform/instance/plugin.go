@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,13 +35,23 @@ import (
 // tf.json file and call terraform apply again.
 
 const (
-	// AttachTag contains a space separated list of IDs that are to the instance
+	// attachTag contains a space separated list of IDs that are to the instance
 	attachTag = "infrakit.attach"
+
+	// scopeDedicated is the scope key for dedicated resources
+	scopeDedicated = "dedicated"
+
+	// scopeGlobal is the scope key for global resources
+	scopeGlobal = "global"
 )
 
 // tfFileRegex is used to determine the all terraform files; files with a ".new" suffix
 // have not yet been processed by terraform
 var tfFileRegex = regexp.MustCompile("(^.*).tf.json([.new]*)$")
+
+// dedicatedScopedFileRegex is used to determine the scope ID and the instance
+// ID (instance-XXXX|logicalID) for a file that contains dedicated resources
+var dedicatedScopedFileRegex = regexp.MustCompile("^([a-z]*){1}_dedicated_([a-zA-Z0-9-]*).tf.json([.new]*)$")
 
 // instanceTfFileRegex is used to determine the files that contain a terraform instance
 // definition; files with a ".new" suffix have not yet been processed by terraform
@@ -412,6 +423,15 @@ func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID
 				}
 			}
 		}
+		// Encode user data
+		if data, has := properties["user_data"]; has {
+			properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(data.(string)))
+		}
+	case VMDigitalOcean:
+		// Encode user data
+		if data, has := properties["user_data"]; has {
+			properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(data.(string)))
+		}
 	}
 }
 
@@ -430,7 +450,6 @@ func mergeInitScript(spec instance.Spec, id instance.ID, vmType TResourceType, p
 	switch vmType {
 	case VMAmazon, VMDigitalOcean:
 		addUserData(properties, "user_data", spec.Init)
-		properties["user_data"] = base64.StdEncoding.EncodeToString([]byte(properties["user_data"].(string)))
 	case VMSoftLayer, VMIBMCloud:
 		addUserData(properties, "user_metadata", spec.Init)
 	case VMAzure:
@@ -448,17 +467,31 @@ func mergeInitScript(spec instance.Spec, id instance.ID, vmType TResourceType, p
 	}
 }
 
-// renderInstVars applies the "/self/instId" and "/self/logicalId" variables as global options
-// on the input string
-func renderInstVars(data string, id instance.ID, logicalID *instance.LogicalID) (string, error) {
+// renderInstVars applies the "/self/instId", "/self/logicalId", and "/self/dedicated/attachId" variables
+// as global options on the input properties
+func renderInstVars(props *TResourceProperties, id instance.ID, logicalID *instance.LogicalID, dedicatedAttachKey string) error {
+	data, err := json.Marshal(props)
+	if err != nil {
+		return err
+	}
+	t, err := template.NewTemplate("str://"+string(data), template.Options{})
+	if err != nil {
+		return err
+	}
 	// Instance ID is always supplied
-	t, _ := template.NewTemplate("str://"+data, template.Options{})
 	t = t.Global("/self/instId", id)
-	// LogicalID is optional
+	// LogicalID and dedicated attach key values are optional
 	if logicalID != nil {
 		t = t.Global("/self/logicalId", string(*logicalID))
 	}
-	return t.Render(nil)
+	if dedicatedAttachKey != "" {
+		t = t.Global("/self/dedicated/attachId", dedicatedAttachKey)
+	}
+	result, err := t.Render(nil)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(result), &props)
 }
 
 // handleProvisionTags sets the Infrakit-specific tags and merges with the user-defined in the instance spec
@@ -531,14 +564,29 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 	}
 }
 
-// writeTerraformFiles uses the data in the TFormat to create one or more .tf.json files with the
-// generated name. The properties of the VM resource are overriden by vmProperties.
-func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) error {
+// decomposedFiles is populated by the decompose function
+type decomposedFiles struct {
+	FileMap            map[string]*TFormat
+	CurrentFiles       map[string]struct{}
+	DedicatedAttachKey string
+}
+
+// decompose splits the data in the TFormat object into one or more terraform specs, each
+// corresponding to a file that should be created. The properties of the VM resource are
+// update to use the generated name and the given vmProperties.
+func (p *plugin) decompose(logicalID *instance.LogicalID, generatedName string, tf *TFormat, vmType TResourceType, vmProperties TResourceProperties) (*decomposedFiles, error) {
 	// Map file names to the data in each file based on the "@scope" property:
-	// - @default: resources in same "instance-xxxx.tf.json" file as VM
-	// - @dedicated: resources in different file as VM with the same ID (instance-xxxx-dedicated.tf.json)
-	// - <other>: resource defined in different file with a scope identifier (scope-<other>.tf.json)
+	// - @default: resources in same "instance-xxxx" file as VM
+	// - @dedicated: resources in different file as VM using the logical ID (<scopeID>_dedicated_<logicalID>) or with
+	//   the same generated ID (<scopeID>_dedicated_instance-xxxx)
+	// - <other>: resource defined in different file with a scope identifier (<other>_global)
 	fileMap := make(map[string]*TFormat)
+	// Track the dedicated attach ID for this VM, this is set if there is an orphaned dedicated
+	// file that matches the desired format
+	dedicatedAttachKey := ""
+
+	// Track current files, used to determine existing dedicated and global resources
+	currentFiles := make(map[string]map[TResourceType]map[TResourceName]TResourceProperties)
 
 	for resourceType, resourceObj := range tf.Resource {
 		vmList := mapset.NewSetFromSlice(VMTypes)
@@ -549,27 +597,95 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 				resourceProps = vmProperties
 				newResourceName = generatedName
 			} else {
-				newResourceName = fmt.Sprintf("%s-%s", generatedName, resourceName)
+				if logicalID == nil {
+					newResourceName = fmt.Sprintf("%s-%s", generatedName, resourceName)
+				} else {
+					newResourceName = fmt.Sprintf("%s-%s", string(*logicalID), resourceName)
+				}
 			}
 			// Determine the scope value (default to 'default')
-			scope, has := resourceProps[PropScope]
-			if has {
+			var scope string
+			if s, has := resourceProps[PropScope]; has {
+				scope = s.(string)
 				delete(resourceProps, PropScope)
 			} else {
 				scope = ValScopeDefault
 			}
-			// Determine the filename based off of the scope value
+			// Determine the filename and resource name based off of the scope value
 			var filename string
-			switch scope {
-			case ValScopeDefault:
+			if scope == ValScopeDefault {
+				// Default scope, filename is just the resource name (instance-XXXX)
 				filename = generatedName
-			case ValScopeDedicated:
-				filename = fmt.Sprintf("%s-dedicated", generatedName)
-			default:
-				filename = fmt.Sprintf("scope-%s", scope)
-				// If the scope is global use it as the prefix for the resource name
+			} else if strings.HasPrefix(scope, ValScopeDedicated) {
+				// Get current files
+				if len(currentFiles) == 0 {
+					if files, err := p.listCurrentTfFiles(); err == nil {
+						currentFiles = files
+					} else {
+						return nil, err
+					}
+				}
+				// Dedicated scope, filename has a scope identifier and the generated name or logical
+				// ID: <scope-id>_dedicated_<instance-XXXX|logicalID>
+				var identifier string
+				if strings.Contains(scope, "-") {
+					identifier = strings.SplitN(scope, "-", 2)[1]
+				} else {
+					identifier = "default"
+				}
+				// And the resource name as <scopeID>-<instance-XXXX|logicalID>-<resourceName>
+				var key string
+				if logicalID == nil {
+					// On a rolling update, the dedicated file for a scaler group is not removed, search
+					// for an orphaned file with the appropriate format to attach
+					allKeys, orphanKeys := findDedicatedAttachmentKeys(currentFiles, identifier)
+					if len(orphanKeys) == 0 {
+						// No orphans, choose the lowest available index based on the existing files
+						index := 1
+						for ; ; index = index + 1 {
+							match := false
+							for _, existingKey := range allKeys {
+								if existingKey == strconv.Itoa(index) {
+									match = true
+									break
+								}
+							}
+							if !match {
+								break
+							}
+						}
+						key = strconv.Itoa(index)
+						log.Infof("No orphaned attachment with prefix '%v-%s', using current name: %s", identifier, scopeDedicated, key)
+					} else {
+						// At least 1 orphaned file exists, pick the index with the lowest index
+						key = getLowestDedicatedOrphanIndex(orphanKeys)
+						for _, instID := range orphanKeys {
+							key = instID
+							break
+						}
+						log.Infof("Using orphaned attachment '%s' for prefix '%s-%s'", key, identifier, scopeDedicated)
+					}
+				} else {
+					key = string(*logicalID)
+				}
+				filename = fmt.Sprintf("%s_%s_%s", identifier, scopeDedicated, key)
+				dedicatedAttachKey = key
+				newResourceName = fmt.Sprintf("%s-%s-%s", identifier, key, resourceName)
+			} else {
+				// Get current files
+				if len(currentFiles) == 0 {
+					if files, err := p.listCurrentTfFiles(); err == nil {
+						currentFiles = files
+					} else {
+						return nil, err
+					}
+				}
+				// Global scope, filename is just the given scope with a "global" suffix
+				filename = fmt.Sprintf("%s_%s", scope, scopeGlobal)
+				// And the resource name has the given scope as the prefix
 				newResourceName = fmt.Sprintf("%s-%s", scope, resourceName)
 			}
+
 			// Get the associated value in the file map
 			tfPersistence, has := fileMap[filename]
 			if !has {
@@ -600,9 +716,52 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 		}
 		mergeTagsIntoVMProps(vmType, vmProperties, tags)
 	}
-	// Handle any platform specific updates to the VM properties prior to writing out
-	platformSpecificUpdates(vmType, TResourceName(generatedName), logicalID, vmProperties)
 
+	currentFilenames := make(map[string]struct{}, len(currentFiles))
+	for filename := range currentFiles {
+		currentFilenames[filename] = struct{}{}
+	}
+	result := decomposedFiles{
+		FileMap:            fileMap,
+		CurrentFiles:       currentFilenames,
+		DedicatedAttachKey: dedicatedAttachKey,
+	}
+	return &result, nil
+}
+
+// getLowestDedicatedOrphanIndex gets the lowest numerical slice value
+func getLowestDedicatedOrphanIndex(data []string) string {
+	// All values should be ints as strings (but handle non-ints), convert and sort
+	ints := []int{}
+	other := []string{}
+	for _, v := range data {
+		if intVal, err := strconv.Atoi(v); err == nil {
+			ints = append(ints, intVal)
+		} else {
+			other = append(other, v)
+		}
+	}
+	if len(ints) > 0 {
+		sort.Ints(ints)
+		return strconv.Itoa(ints[0])
+	}
+	sort.Strings(other)
+	return other[0]
+}
+
+// writeTerraformFiles writes *.tf.json[.new] files for each entry in the given fileMap
+func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles map[string]struct{}) error {
+	// First verify that there are no formatting errors
+	dataMap := make(map[string][]byte, len(fileMap))
+	for filename, tfVal := range fileMap {
+		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
+		if err != nil {
+			return err
+		}
+		dataMap[filename] = buff
+	}
+
+	// And write out each file.
 	for filename, tfVal := range fileMap {
 		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
 		path := filepath.Join(p.Dir, filename+".tf.json.new")
@@ -616,6 +775,115 @@ func (p *plugin) writeTerraformFiles(logicalID *instance.LogicalID, generatedNam
 		}
 	}
 	return nil
+}
+
+// listCurrentTfFiles populates the map with the names of all tf.json and tf.json.new files
+func (p *plugin) listCurrentTfFiles() (map[string]map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	// TODO(kaufers): Replace scanLocalFiles with this function once this plugin is updated
+	//                to handle any resource type instead of only VMs
+	result := make(map[string]map[TResourceType]map[TResourceName]TResourceProperties)
+	fs := &afero.Afero{Fs: p.fs}
+	err := fs.Walk(p.Dir,
+		func(path string, info os.FileInfo, err error) error {
+			matches := tfFileRegex.FindStringSubmatch(info.Name())
+			if len(matches) == 3 {
+				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
+				if err != nil {
+					log.Warningln("Cannot parse:", err)
+					return err
+				}
+				tf := TFormat{}
+				if err = types.AnyBytes(buff).Decode(&tf); err != nil {
+					return err
+				}
+				props := make(map[TResourceType]map[TResourceName]TResourceProperties)
+				for resType, resNameProps := range tf.Resource {
+					for resName, resProps := range resNameProps {
+						if _, has := props[resType]; !has {
+							props[resType] = make(map[TResourceName]TResourceProperties)
+						}
+						props[resType][resName] = resProps
+					}
+				}
+				result[info.Name()] = props
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// findOrphanedDedicatedAttachmentKeys proceeses the current files to determine:
+// - All files that match the scope patten (ie, <scopeID>_dedicated_*)
+// - A file with the given patten that is not already attached to an instance
+// Returns all matching dedicated keys and those that are orphaned
+func findDedicatedAttachmentKeys(currentFiles map[string]map[TResourceType]map[TResourceName]TResourceProperties, scopeID string) ([]string, []string) {
+	// Find all files that match this scope ID and scope
+	allFilesMap := make(map[string]string)
+	// And those that are orphaned
+	orphanedFilesMap := make(map[string]string)
+
+	for filename := range currentFiles {
+		matches := dedicatedScopedFileRegex.FindStringSubmatch(filename)
+		if len(matches) != 4 {
+			continue
+		}
+		if matches[1] != scopeID {
+			log.Debugf("Ignoring file '%s', scope ID '%s' does not match", filename, scopeID)
+			continue
+		}
+		log.Infof("Found candidate file '%s' for scope ID '%s'", filename, scopeID)
+		fileKey := strings.Split(filename, ".")[0]
+		allFilesMap[fileKey] = matches[2]
+		orphanedFilesMap[fileKey] = matches[2]
+	}
+	if len(allFilesMap) == 0 {
+		log.Infof("No candidate attchment files for scope ID '%s'", scopeID)
+		return []string{}, []string{}
+	}
+	// Prune the candidate files that already have attachments
+	supportedVMs := mapset.NewSetFromSlice(VMTypes)
+	for filename, resTypeNameProps := range currentFiles {
+		matches := instanceTfFileRegex.FindStringSubmatch(filename)
+		if len(matches) != 4 {
+			continue
+		}
+		for resType, resNameProps := range resTypeNameProps {
+			if !supportedVMs.Contains(resType) {
+				continue
+			}
+			for _, vmProps := range resNameProps {
+				tags := parseTerraformTags(resType, vmProps)
+				attachTag, has := tags[attachTag]
+				if !has {
+					continue
+				}
+				for _, tag := range strings.Split(attachTag, ",") {
+					if _, contains := allFilesMap[tag]; contains {
+						log.Infof("Attachment '%s' is used in %s for scope ID '%s'", tag, filename, scopeID)
+						delete(orphanedFilesMap, tag)
+					}
+				}
+			}
+		}
+	}
+	allMatches := []string{}
+	for _, v := range allFilesMap {
+		allMatches = append(allMatches, v)
+	}
+	orphans := []string{}
+	for _, v := range orphanedFilesMap {
+		orphans = append(orphans, v)
+	}
+	log.Infof("Detected %v matching files and %v orphan attachments for scope ID '%v': %v",
+		len(allMatches),
+		len(orphans),
+		scopeID,
+		orphans)
+	return allMatches, orphans
 }
 
 // ensureUniqueFile returns a filename that is not in use
@@ -653,21 +921,9 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	id := instance.ID(name)
 
-	// Template the "self" instance specific vars in both the Properties and the Init
-	rendered, err := renderInstVars(spec.Properties.String(), id, spec.LogicalID)
-	if err != nil {
-		return nil, err
-	}
-	spec.Properties = types.AnyBytes([]byte(rendered))
-	rendered, err = renderInstVars(spec.Init, id, spec.LogicalID)
-	if err != nil {
-		return nil, err
-	}
-	spec.Init = rendered
-
 	// Decode the given spec and find the VM resource
 	tf := TFormat{}
-	err = spec.Properties.Decode(&tf)
+	err := spec.Properties.Decode(&tf)
 	if err != nil {
 		return nil, err
 	}
@@ -683,8 +939,19 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	handleProvisionTags(spec, id, vmType, vmProps)
 	// Merge the init scripts into the VM properties
 	mergeInitScript(spec, id, vmType, vmProps)
+	// Decomponse the spec into scope'd files
+	decomposedFiles, err := p.decompose(spec.LogicalID, name, &tf, vmType, vmProps)
+	if err != nil {
+		return nil, err
+	}
+	// Render any instance specific variables
+	if err = renderInstVars(&vmProps, id, spec.LogicalID, decomposedFiles.DedicatedAttachKey); err != nil {
+		return nil, err
+	}
+	// Handle any platform specific updates to the VM properties prior to writing out
+	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, vmProps)
 	// Write out the tf.json file
-	if err = p.writeTerraformFiles(spec.LogicalID, name, &tf, vmType, vmProps); err != nil {
+	if err = p.writeTerraformFiles(decomposedFiles.FileMap, decomposedFiles.CurrentFiles); err != nil {
 		return nil, err
 	}
 	// And apply the updates
