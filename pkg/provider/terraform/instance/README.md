@@ -116,7 +116,7 @@ The supported fields are:
 
 The plugin also supports importing an existing resource into terraform; this can be used to import the initial manager into terraform. Once the resource is imported into terraform, a corresponding `.tf.json` file is also created. The following optional fields are used for this purpose:
 * `import-group-spec-url`: The group specification URL that contains a nested instance specification; the `.tf.json` file for the imported resource contains the properties in the instance specification
-* `import-instance-id`: The ID of the instance to import
+* `import-resource`: The terraform resource type, optional resource name, and resource ID to import into in the form of `<type>:[<name>:]<id>`. The `<type>` and `<name>` must match a resource in the instance specification; the `<name>` is required if there is more then one resource of the given type in the specification. This value may be specified multiple times.
 * `import-group-id`: Optional group ID that the imported resource should be tagged with
 
 The plugin also checks to make sure it can call `terraform`. Install Terraform [here](https://www.terraform.io/downloads.html) if you haven't done so.

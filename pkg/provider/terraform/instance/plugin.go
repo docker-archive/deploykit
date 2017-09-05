@@ -72,11 +72,25 @@ type plugin struct {
 	pluginLookup func() discovery.Plugins
 }
 
-// ImportOptions defines the resource that should be imported into terraform before
+// ImportResource defines a resource that should be imported
+type ImportResource struct {
+	ResourceID           *string
+	ResourceType         *TResourceType
+	ResourceName         *TResourceName      // Name of resource in the instance spec
+	ResourceProps        TResourceProperties // Populated via tf show
+	SpecProps            TResourceProperties // Parsed from instance spec
+	FinalProps           TResourceProperties // Properties for the tf.json.new file
+	FinalResourceName    TResourceName       // Formatted resource name
+	FinalFilename        string              // Filename for the tf.json.new file
+	AlreadyImported      bool                // Track if this resource already exists in tf state
+	SuccessfullyImported bool                // Track if this resource was imported
+}
+
+// ImportOptions defines the resources that should be imported into terraform before
 // the plugin is started
 type ImportOptions struct {
 	InstanceSpec *instance.Spec
-	InstanceID   *string
+	Resources    []*ImportResource
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
@@ -126,22 +140,33 @@ func (p *plugin) processImport(importOpts *ImportOptions) error {
 	}
 
 	if importOpts.InstanceSpec == nil {
-		if importOpts.InstanceID != nil && string(*importOpts.InstanceID) != "" {
-			return fmt.Errorf("Import instance spec required with import instance ID")
+		if len(importOpts.Resources) > 0 {
+			return fmt.Errorf("Import instance spec required with imported resources")
 		}
 		// Values are empty, nothing to import
 		return nil
 	}
-	if importOpts.InstanceID == nil || string(*importOpts.InstanceID) == "" {
-		return fmt.Errorf("Import instance ID required with import instance spec")
+	if len(importOpts.Resources) == 0 {
+		return fmt.Errorf("Resources required with import instance spec")
 	}
-	log.Infof("Processing import for instance ID: %v", string(*importOpts.InstanceID))
+	for _, res := range importOpts.Resources {
+		if res.ResourceName == nil {
+			log.Infof("Processing import for resource: %v:%v",
+				string(*res.ResourceType),
+				string(*res.ResourceID))
+		} else {
+			log.Infof("Processing import for resource: %v:%v:%v",
+				string(*res.ResourceType),
+				string(*res.ResourceName),
+				string(*res.ResourceID))
+		}
+	}
 
 	// Define the functions for import and import the VM
 	fns := importFns{
 		tfShow: doTerraformShow,
-		tfImport: func(vmType TResourceType, filename, vmID string) error {
-			command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", vmType, filename, vmID)).InheritEnvs(true).WithDir(p.Dir)
+		tfImport: func(resType TResourceType, resName, id string) error {
+			command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", resType, resName, id)).InheritEnvs(true).WithDir(p.Dir)
 			if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
 				return err
 			}
@@ -150,13 +175,12 @@ func (p *plugin) processImport(importOpts *ImportOptions) error {
 		tfShowInst: doTerraformShowForInstance,
 		tfClean:    p.cleanupFailedImport,
 	}
-	instID, err := p.importResource(fns, string(*importOpts.InstanceID), importOpts.InstanceSpec)
-	if err == nil {
-		log.Infof("Successfull imported instance %v with id %v", *instID, string(*importOpts.InstanceID))
-		return nil
+	err := p.importResources(fns, importOpts.Resources, importOpts.InstanceSpec)
+	if err != nil {
+		log.Errorf("Failed to import instances, error: %v", err)
+		return err
 	}
-	log.Errorf("Failed to import instance %v, error: %v", string(*importOpts.InstanceID), err)
-	return err
+	return nil
 }
 
 /*
@@ -750,16 +774,19 @@ func getLowestDedicatedOrphanIndex(data []string) string {
 }
 
 // writeTerraformFiles writes *.tf.json[.new] files for each entry in the given fileMap
-func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles map[string]struct{}) error {
+func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles map[string]struct{}) ([]string, error) {
 	// First verify that there are no formatting errors
 	dataMap := make(map[string][]byte, len(fileMap))
 	for filename, tfVal := range fileMap {
 		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
 		if err != nil {
-			return err
+			return []string{}, err
 		}
 		dataMap[filename] = buff
 	}
+
+	// Track files written
+	paths := []string{}
 
 	// And write out each file, override data in tf.json if it already exists
 	for filename, buff := range dataMap {
@@ -771,12 +798,13 @@ func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles m
 			path = filepath.Join(p.Dir, filename+".tf.json.new")
 		}
 		log.Debugln("writeTerraformFiles", path, "data=", string(buff))
+		paths = append(paths, path)
 		err := afero.WriteFile(p.fs, path, buff, 0644)
 		if err != nil {
-			return err
+			return paths, err
 		}
 	}
-	return nil
+	return paths, nil
 }
 
 // listCurrentTfFiles populates the map with the names of all tf.json and tf.json.new files
@@ -941,7 +969,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	handleProvisionTags(spec, id, vmType, vmProps)
 	// Merge the init scripts into the VM properties
 	mergeInitScript(spec, id, vmType, vmProps)
-	// Decomponse the spec into scope'd files
+	// Decompose the spec into scope'd files
 	decomposedFiles, err := p.decompose(spec.LogicalID, name, &tf, vmType, vmProps)
 	if err != nil {
 		return nil, err
@@ -953,7 +981,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// Handle any platform specific updates to the VM properties prior to writing out
 	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, vmProps)
 	// Write out the tf.json[.new] files
-	if err = p.writeTerraformFiles(decomposedFiles.FileMap, decomposedFiles.CurrentFiles); err != nil {
+	if _, err = p.writeTerraformFiles(decomposedFiles.FileMap, decomposedFiles.CurrentFiles); err != nil {
 		return nil, err
 	}
 	// And apply the updates
@@ -1255,20 +1283,20 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 // External functions using during import; broken out for testing
 type importFns struct {
 	tfShow     func(dir string, resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
-	tfImport   func(vmType TResourceType, filename, vmID string) error
+	tfImport   func(resType TResourceType, filename, resID string) error
 	tfShowInst func(dir, id string) (TResourceProperties, error)
-	tfClean    func(vmType TResourceType, vmName string)
+	tfClean    func(resType TResourceType, resName string)
 }
 
 // importResource imports the resource with the given ID into terraform and creates a
 // .tf.json.new file based on the given spec
-func (p *plugin) importResource(fns importFns, resourceID string, spec *instance.Spec) (*instance.ID, error) {
+func (p *plugin) importResources(fns importFns, resources []*ImportResource, spec *instance.Spec) error {
 	// Acquire lock since we are creating a tf.json.new file and updating terraform state
-	var filename string
+	var vmResName string
 	for {
 		if err := p.fsLock.TryLock(); err == nil {
 			defer p.fsLock.Unlock()
-			filename = ensureUniqueFile(p.Dir)
+			vmResName = ensureUniqueFile(p.Dir)
 			break
 		}
 		log.Infoln("Can't acquire fsLock on importResource, waiting")
@@ -1279,67 +1307,188 @@ func (p *plugin) importResource(fns importFns, resourceID string, spec *instance
 	tf := TFormat{}
 	err := spec.Properties.Decode(&tf)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	specVMType, _, specVMProps, err := FindVM(&tf)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if specVMProps == nil {
-		return nil, fmt.Errorf("Missing resource properties")
+		return fmt.Errorf("Missing resource properties")
 	}
 
-	// Only import if terraform is not already managing
-	existingResources, err := fns.tfShow(p.Dir, []TResourceType{specVMType}, []string{"id"})
-	if err != nil {
-		return nil, err
+	// Map resources to import with resources in the spec
+	var specLogicalID instance.LogicalID
+	if spec.Tags != nil {
+		if logicalID, has := spec.Tags["LogicalID"]; has {
+			specLogicalID = instance.LogicalID(logicalID)
+		}
 	}
-	for resType, resNameProps := range existingResources {
-		log.Infof("Terraform is managing %v resources of type %v", len(resNameProps), resType)
-		if specVMType != resType {
+	decomposedFiles, err := p.decompose(&specLogicalID, vmResName, &tf, specVMType, specVMProps)
+	if err != nil {
+		return err
+	}
+	err = determineImportInfo(resources, decomposedFiles)
+	if err != nil {
+		return err
+	}
+
+	// Check if terraform is already managing the resource(s) being imported
+	showResourceTypesMap := map[TResourceType]struct{}{}
+	for _, r := range resources {
+		showResourceTypesMap[*r.ResourceType] = struct{}{}
+	}
+	showResourceTypes := []TResourceType{}
+	for resType := range showResourceTypesMap {
+		showResourceTypes = append(showResourceTypes, resType)
+	}
+	existingResources, err := fns.tfShow(p.Dir, showResourceTypes, []string{"id"})
+	if err != nil {
+		return err
+	}
+	for _, r := range resources {
+		if resNameProps, has := existingResources[*r.ResourceType]; has {
+			log.Infof("Terraform is managing %v resources of type %v", len(resNameProps), string(*r.ResourceType))
+			for name, props := range resNameProps {
+				if idVal, has := props["id"]; has {
+					idStr := fmt.Sprintf("%v", idVal)
+					if idStr == *r.ResourceID {
+						log.Infof("Resource %v with ID %v is already managed by terraform", name, idStr)
+						r.AlreadyImported = true
+						// The filename for the instance needs to be updated with the actual
+						// instance timestamp that corresponds to when it was imported
+						if r.FinalResourceName == TResourceName(vmResName) {
+							r.FinalResourceName = name
+							r.FinalFilename = string(name)
+							vmResName = string(name)
+						}
+					} else {
+						log.Debugf("Resource with ID '%s' does not match '%s'", idStr, *r.ResourceID)
+					}
+				} else {
+					log.Warnf("Resource %v is missing 'id' prop", name)
+				}
+			}
+		} else {
+			log.Infof("Terraform is managing 0 resources of type %v", string(*r.ResourceType))
+		}
+	}
+
+	// No-op if everything is already imported AND all of the tf.json[.new] files exist
+	allImported := true
+	for _, r := range resources {
+		if !r.AlreadyImported {
+			allImported = false
+			break
+		}
+	}
+	if allImported {
+		// Check for files
+		allFilesExist := true
+		files, err := ioutil.ReadDir(p.Dir)
+		if err != nil {
+			return err
+		}
+		fileMap := make(map[string]struct{})
+		for _, f := range files {
+			fileMap[f.Name()] = struct{}{}
+		}
+		for _, r := range resources {
+			match := false
+			for _, suffix := range []string{".tf.json", ".tf.json.new"} {
+				filename := r.FinalFilename + suffix
+				if _, has := fileMap[filename]; has {
+					log.Infof("File exists for imported resource: %v", filename)
+					match = true
+					break
+				}
+			}
+			if !match {
+				log.Infof("tf.json file with prefix '%v' does not exist for imported resource: %v", r.FinalFilename)
+				allFilesExist = false
+				break
+			}
+		}
+		if allFilesExist {
+			return nil
+		}
+	}
+
+	// Track any error that would require cleaning the tf state
+	var errorToThrow error
+
+	// Import into terraform
+	for _, r := range resources {
+		if r.AlreadyImported {
 			continue
 		}
-		for name, props := range resNameProps {
-			if idVal, has := props["id"]; has {
-				idStr := fmt.Sprintf("%v", idVal)
-				if idStr == resourceID {
-					log.Infof("Resource %v with ID %v is already managed by terraform", name, idStr)
-					id := instance.ID(name)
-					return &id, nil
-				}
-				log.Debugf("Resource with ID '%s' does not match '%s'", idStr, resourceID)
-			} else {
-				log.Warnf("Resource %v is missing 'id' prop", name)
+		log.Infof("Importing %v %v into terraform as resource %v ...", string(*r.ResourceType), string(*r.ResourceID), string(r.FinalResourceName))
+		r.SuccessfullyImported = true
+		if err = fns.tfImport(*r.ResourceType, string(r.FinalResourceName), *r.ResourceID); err != nil {
+			errorToThrow = err
+			break
+		}
+	}
+
+	// Parse the terraform show output
+	if errorToThrow == nil {
+		for _, r := range resources {
+			importedProps, err := fns.tfShowInst(p.Dir, fmt.Sprintf("%v.%v", string(*r.ResourceType), r.FinalResourceName))
+			if err != nil {
+				errorToThrow = err
+				break
+			}
+			r.ResourceProps = importedProps
+		}
+	}
+
+	// Merge tags from the spec into the imported instance resource tags
+	if errorToThrow == nil && spec.Tags != nil && len(spec.Tags) > 0 {
+		for _, r := range resources {
+			if r.FinalFilename == vmResName {
+				// Tags explicitly set on the spec
+				mergeTagsIntoVMProps(*r.ResourceType, r.ResourceProps, spec.Tags)
+				// "tags" property in the spec instance defn
+				mergeProp(r.SpecProps, r.ResourceProps, "tags")
+				break
 			}
 		}
 	}
 
-	// Import into terraform
-	log.Infof("Importing %v %v into terraform ...", specVMType, resourceID)
-	if err = fns.tfImport(specVMType, filename, resourceID); err != nil {
-		fns.tfClean(specVMType, filename)
-		return nil, err
+	// Determine the actual property values for the tf.json.new file
+	if errorToThrow == nil {
+		for _, r := range resources {
+			determineFinalPropsForImport(r)
+		}
 	}
 
-	// Parse the terraform show output
-	importedProps, err := fns.tfShowInst(p.Dir, fmt.Sprintf("%v.%v", specVMType, filename))
-	if err != nil {
-		fns.tfClean(specVMType, filename)
-		return nil, err
+	// Write out the tf.json.new file(s)
+	paths := []string{}
+	if errorToThrow == nil {
+		paths, err = p.writeTfJSONFilesForImport(resources)
+		if err != nil {
+			errorToThrow = err
+		}
 	}
 
-	// Merge in the group tags
-	if spec.Tags != nil && len(spec.Tags) > 0 {
-		mergeTagsIntoVMProps(specVMType, specVMProps, spec.Tags)
+	// If there is an err then remove any new state from terraform and any new files
+	if errorToThrow != nil {
+		for _, r := range resources {
+			if r.SuccessfullyImported {
+				fns.tfClean(*r.ResourceType, string(r.FinalResourceName))
+			}
+		}
+		for _, path := range paths {
+			if err = p.fs.Remove(path); err == nil {
+				log.Info("Successfully removed file created by import: %v", path)
+			} else {
+				log.Info("Failed to remove file %v created by import: %v", path, err)
+			}
+		}
+		return errorToThrow
 	}
-	// Write out tf.json file
-	log.Infoln("Using spec for import", specVMProps)
-	if err = p.writeTfJSONForImport(specVMProps, importedProps, specVMType, filename); err != nil {
-		fns.tfClean(specVMType, filename)
-		return nil, err
-	}
-	id := instance.ID(filename)
-	return &id, p.terraformApply()
+
+	return p.terraformApply()
 }
 
 // cleanupFailedImport removes the resource from the terraform state file
@@ -1351,50 +1500,41 @@ func (p *plugin) cleanupFailedImport(vmType TResourceType, vmName string) {
 	}
 }
 
-// writeTfJSONForImport writes the .tf.json file for the imported resource
-func (p *plugin) writeTfJSONForImport(specProps, importedProps TResourceProperties, vmType TResourceType, filename string) error {
-	// Build the props for the tf.json file
-	finalProps := TResourceProperties{}
-	for k := range specProps {
-		// Ignore certain keys in spec
-		if k == PropScope {
-			continue
+// writeTfJSONFilesForImport writes out the final tf.json[.new] file by grouping all
+// imported resources by common filename.
+func (p *plugin) writeTfJSONFilesForImport(resources []*ImportResource) ([]string, error) {
+	// Group resources by common filename
+	fileMap := map[string]*TFormat{}
+	for _, r := range resources {
+		var tf TFormat
+		if tfVal, has := fileMap[r.FinalFilename]; has {
+			tf = *tfVal
+		} else {
+			tf = TFormat{
+				Resource: map[TResourceType]map[TResourceName]TResourceProperties{},
+			}
+			fileMap[r.FinalFilename] = &tf
 		}
-		if k == PropHostnamePrefix {
-			k = "hostname"
+		var resNameProps map[TResourceName]TResourceProperties
+		if resNamePropsVal, has := tf.Resource[*r.ResourceType]; has {
+			resNameProps = resNamePropsVal
+		} else {
+			resNameProps = map[TResourceName]TResourceProperties{}
+			tf.Resource[*r.ResourceType] = resNameProps
 		}
-		v, has := importedProps[k]
-		if !has {
-			log.Warningf("Imported terraform resource missing '%s' property, not setting", k)
-			continue
-		}
-		finalProps[k] = v
+		resNameProps[r.FinalResourceName] = r.FinalProps
 	}
-	// Also honor "tags" on imported resource, merge with any in the spec
-	mergeProp(importedProps, specProps, "tags")
-	if tags, has := specProps["tags"]; has {
-		finalProps["tags"] = tags
-	}
-
-	// Create the spec and write out the tf.json file
-	tf := TFormat{
-		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
-			vmType: {
-				TResourceName(filename): finalProps,
-			},
-		},
-	}
-	buff, err := json.MarshalIndent(tf, "  ", "  ")
-	path := filepath.Join(p.Dir, filename+".tf.json.new")
-	log.Debugln("writeTfJSONForImport", path, "data=", string(buff), "err=", err)
+	// Retrieve the current files, used so that we do not create a tf.json.new file
+	// if a corresponding tf.json file already exists
+	files, err := ioutil.ReadDir(p.Dir)
 	if err != nil {
-		return err
+		return []string{}, err
 	}
-	err = afero.WriteFile(p.fs, path, buff, 0644)
-	if err != nil {
-		return err
+	currentFiles := map[string]struct{}{}
+	for _, file := range files {
+		currentFiles[file.Name()] = struct{}{}
 	}
-	return nil
+	return p.writeTerraformFiles(fileMap, currentFiles)
 }
 
 // mergeProps ensures that the peroperty at the given key in the "source" is set
@@ -1471,7 +1611,7 @@ func mergeProp(source, dest TResourceProperties, key string) {
 	}
 }
 
-// parseFileForInstanceID attempted to load a tf.json (or tf.json.new) file, returning
+// parseFileForInstanceID attempts to load a tf.json (or tf.json.new) file, returning
 // the parsed spec and the filename parsed
 func (p *plugin) parseFileForInstanceID(instance instance.ID) (*TFormat, string, error) {
 	// Instance may not have been processed by terraform; attempt to open both files
@@ -1495,4 +1635,139 @@ func (p *plugin) parseFileForInstanceID(instance instance.ID) (*TFormat, string,
 		return nil, "", err
 	}
 	return &tf, filename, nil
+}
+
+// determineImportInfo maps the resources being imported to a the specific file and
+// resource name based on the instance spec decomposition.
+func determineImportInfo(resources []*ImportResource, files *decomposedFiles) error {
+	// Resources without a specific name, should match to the single resource in the spec
+	noNames := map[TResourceType]*ImportResource{}
+	for _, r := range resources {
+		if r.ResourceName != nil {
+			continue
+		}
+		resType := *r.ResourceType
+		if _, has := noNames[resType]; has {
+			return fmt.Errorf("Error importing resources, more then a single non-named resource of type %v", resType)
+		}
+		noNames[resType] = r
+	}
+	// Resources with name
+	withNames := map[TResourceType]map[TResourceName]*ImportResource{}
+	for _, r := range resources {
+		if r.ResourceName == nil {
+			continue
+		}
+		resType := *r.ResourceType
+		resName := *r.ResourceName
+		var nameMap map[TResourceName]*ImportResource
+		if existingMap, has := withNames[resType]; has {
+			if _, has := existingMap[resName]; has {
+				return fmt.Errorf("Error importing resources, duplicate %s resource with name %v", resType, resName)
+			}
+			nameMap = existingMap
+		} else {
+			nameMap = make(map[TResourceName]*ImportResource)
+		}
+		nameMap[resName] = r
+		withNames[resType] = nameMap
+	}
+
+	for filename, decomposedTf := range files.FileMap {
+		for resType, resNameProps := range decomposedTf.Resource {
+			for resName, resProps := range resNameProps {
+				// Check for instances with matching name
+				if nameMap, has := withNames[resType]; has {
+					match := false
+					for name, r := range nameMap {
+						if strings.HasSuffix(string(resName), string(name)) {
+							if err := setFinalResourceAndFilename(r, filename, &resName, resProps); err != nil {
+								return err
+							}
+							match = true
+							break
+						}
+					}
+					if match {
+						continue
+					}
+				}
+				// Check for resource type only
+				if r, has := noNames[resType]; has {
+					if err := setFinalResourceAndFilename(r, filename, &resName, resProps); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	// Verify that each imported resource matched something in the spec
+	for _, r := range resources {
+		if r.FinalFilename == "" || r.FinalResourceName == "" {
+			if r.ResourceName == nil {
+				return fmt.Errorf("Unable to determine import resource in spec for: %v", string(*r.ResourceType))
+			}
+			return fmt.Errorf(
+				"Unable to determine import resource in spec for %v:%v",
+				string(*r.ResourceType),
+				string(*r.ResourceName),
+			)
+		}
+	}
+	return nil
+}
+
+// setFinalResourceAndFilename updates the ImportResource struct to set the final
+// resource and filename. An error is returned if either of these values have
+// already been set.
+func setFinalResourceAndFilename(resource *ImportResource, filename string, resourceName *TResourceName, resourceProps TResourceProperties) error {
+	if resource.FinalFilename != "" || resource.FinalResourceName != "" {
+		if resource.ResourceName == nil {
+			return fmt.Errorf(
+				"Ambiguous import resource definition %v:%v",
+				string(*resource.ResourceType),
+				string(*resource.ResourceID),
+			)
+		}
+		return fmt.Errorf(
+			"Ambiguous import resource definition %v:%v:%v",
+			string(*resource.ResourceType),
+			string(*resource.ResourceName),
+			string(*resource.ResourceID),
+		)
+	}
+	resource.FinalResourceName = TResourceName(*resourceName)
+	resource.FinalFilename = filename
+	resource.SpecProps = resourceProps
+	return nil
+}
+
+// determineFinalPropsForImport set the FinalProps struct value to the properties that
+// should be contained in the tf.json file for an imported resource. The property keys
+// are those from the spec and the values are current values (from tf show).
+func determineFinalPropsForImport(res *ImportResource) {
+	log.Infof("Using spec for %v import: %v", string(*res.ResourceType), res.SpecProps)
+	finalProps := TResourceProperties{}
+	for k := range res.SpecProps {
+		// Ignore certain keys in spec
+		if k == PropScope {
+			continue
+		}
+		if k == PropHostnamePrefix {
+			k = "hostname"
+		}
+		v, has := res.ResourceProps[k]
+		if !has {
+			log.Warningf("Imported terraform resource missing '%s' property, not setting", k)
+			continue
+		}
+		finalProps[k] = v
+	}
+	// Always keep the tags, even if the spec does not have them as a property
+	if _, has := finalProps["tags"]; !has {
+		if tags, has := res.ResourceProps["tags"]; has {
+			finalProps["tags"] = tags
+		}
+	}
+	res.FinalProps = finalProps
 }
