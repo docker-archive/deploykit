@@ -79,7 +79,7 @@ var mapRegex = regexp.MustCompile("^([^.]+)\\.%")
 // set -o nounset
 // set -o xtrace
 // apt-get -y update
-func parseTerraformShowOutput(byType TResourceType, input io.Reader) (map[TResourceName]TResourceProperties, error) {
+func parseTerraformShowOutput(byType TResourceType, propFilter []string, input io.Reader) (map[TResourceName]TResourceProperties, error) {
 	found := map[TResourceName]TResourceProperties{}
 
 	reader := bufio.NewReader(input)
@@ -115,9 +115,22 @@ func parseTerraformShowOutput(byType TResourceType, input io.Reader) (map[TResou
 			}
 		}
 	}
+
 	// Process the properties to convert from string to native types
 	for _, props := range found {
 		expandProps(props)
+		// TODO(kaufers): Move this filtering to where the lines are being processed
+		if propFilter != nil && len(propFilter) > 0 {
+			propMap := make(map[string]struct{}, len(propFilter))
+			for _, propID := range propFilter {
+				propMap[propID] = struct{}{}
+			}
+			for propID, _ := range props {
+				if _, has := propMap[propID]; !has {
+					delete(props, propID)
+				}
+			}
+		}
 	}
 	return found, nil
 }
@@ -251,13 +264,14 @@ func convertToType(val string) interface{} {
 
 // doTerraformShow shells out to run `terraform show` and parses the result
 func doTerraformShow(dir string,
-	resourceType TResourceType) (result map[TResourceName]TResourceProperties, err error) {
+	resourceType TResourceType,
+	propFilter []string) (result map[TResourceName]TResourceProperties, err error) {
 
 	command := exec.Command("terraform show -no-color").InheritEnvs(true).WithDir(dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {
-			found, err := parseTerraformShowOutput(resourceType, r)
+			found, err := parseTerraformShowOutput(resourceType, propFilter, r)
 			result = found
 			return err
 		},

@@ -1133,7 +1133,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		// TODO - not the most efficient, but here we assume we're usually just one vm type
 		for vmResourceType := range localSpecs {
 
-			if instances, err := doTerraformShow(p.Dir, vmResourceType); err == nil {
+			if instances, err := doTerraformShow(p.Dir, vmResourceType, nil); err == nil {
 
 				terraformShowResult[vmResourceType] = instances
 
@@ -1256,7 +1256,7 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 
 // External functions using during import; broken out for testing
 type importFns struct {
-	tfShow     func(dir string, vmType TResourceType) (map[TResourceName]TResourceProperties, error)
+	tfShow     func(dir string, types TResourceType, propFilter []string) (map[TResourceName]TResourceProperties, error)
 	tfImport   func(vmType TResourceType, filename, vmID string) error
 	tfShowInst func(dir, id string) (TResourceProperties, error)
 	tfClean    func(vmType TResourceType, vmName string)
@@ -1292,7 +1292,7 @@ func (p *plugin) importResource(fns importFns, resourceID string, spec *instance
 	}
 
 	// Only import if terraform is not already managing
-	existingVMs, err := fns.tfShow(p.Dir, specVMType)
+	existingVMs, err := fns.tfShow(p.Dir, specVMType, []string{"id"})
 	if err != nil {
 		return nil, err
 	}

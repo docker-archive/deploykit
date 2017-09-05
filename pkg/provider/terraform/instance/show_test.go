@@ -14,7 +14,7 @@ import (
 )
 
 func TestTerraformShowParseResultEmpty(t *testing.T) {
-	found, err := parseTerraformShowOutput(TResourceType("aws_vpc"), bytes.NewBuffer([]byte("")))
+	found, err := parseTerraformShowOutput(TResourceType("aws_vpc"), nil, bytes.NewBuffer([]byte("")))
 	require.NoError(t, err)
 	require.Equal(t, map[TResourceName]TResourceProperties{}, found)
 }
@@ -29,22 +29,34 @@ res-type2.host1:
   id = type2-host1
 res-type3.host1:
   id = type3-host1`)
-	found, err := parseTerraformShowOutput(TResourceType("unknown"), bytes.NewBuffer(data))
+	found, err := parseTerraformShowOutput(TResourceType("unknown"), nil, bytes.NewBuffer(data))
 	require.NoError(t, err)
 	require.Equal(t, map[TResourceName]TResourceProperties{}, found)
 
-	found, err = parseTerraformShowOutput(TResourceType("res-type1"), bytes.NewBuffer(data))
+	found, err = parseTerraformShowOutput(TResourceType("res-type1"), nil, bytes.NewBuffer(data))
 	require.NoError(t, err)
 	require.Equal(t, TResourceProperties{"id": "type1-host1"}, found[TResourceName("host1")])
 	require.Equal(t, TResourceProperties{"id": "type1-host2"}, found[TResourceName("host2")])
 
-	found, err = parseTerraformShowOutput(TResourceType("res-type2"), bytes.NewBuffer(data))
+	found, err = parseTerraformShowOutput(TResourceType("res-type2"), nil, bytes.NewBuffer(data))
 	require.NoError(t, err)
 	require.Equal(t, TResourceProperties{"id": "type2-host1"}, found[TResourceName("host1")])
 
-	found, err = parseTerraformShowOutput(TResourceType("res-type3"), bytes.NewBuffer(data))
+	found, err = parseTerraformShowOutput(TResourceType("res-type3"), nil, bytes.NewBuffer(data))
 	require.NoError(t, err)
 	require.Equal(t, TResourceProperties{"id": "type3-host1"}, found[TResourceName("host1")])
+
+	found, err = parseTerraformShowOutput(TResourceType("res-type3"), []string{"id"}, bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, TResourceProperties{"id": "type3-host1"}, found[TResourceName("host1")])
+
+	found, err = parseTerraformShowOutput(TResourceType("res-type3"), []string{"id", "foo"}, bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, TResourceProperties{"id": "type3-host1"}, found[TResourceName("host1")])
+
+	found, err = parseTerraformShowOutput(TResourceType("res-type3"), []string{"foo"}, bytes.NewBuffer(data))
+	require.NoError(t, err)
+	require.Equal(t, TResourceProperties{}, found[TResourceName("host1")])
 }
 
 func convertToSingleInstanceOutput(data []byte, resTypeName string) []byte {
@@ -100,7 +112,7 @@ type.host:
   instance_owner_id          =
   pie                        = 3.14
 `, "=\n", "= \n", -1)
-	found, err := parseTerraformShowOutput(TResourceType("type"), bytes.NewBuffer([]byte(input)))
+	found, err := parseTerraformShowOutput(TResourceType("type"), nil, bytes.NewBuffer([]byte(input)))
 	require.NoError(t, err)
 	expected := TResourceProperties{
 		"id": 123,
@@ -139,7 +151,7 @@ type.host:
   keys.345 = false
   z-foo = z-bar
 `)
-	found, err := parseTerraformShowOutput(TResourceType("type"), bytes.NewBuffer(data))
+	found, err := parseTerraformShowOutput(TResourceType("type"), nil, bytes.NewBuffer(data))
 	require.NoError(t, err)
 	expected := TResourceProperties{
 		"id":    1,
@@ -181,7 +193,7 @@ type.host:
   keys.key3 = false
   z-foo = z-bar
 `)
-	found, err := parseTerraformShowOutput(TResourceType("type"), bytes.NewBuffer(data))
+	found, err := parseTerraformShowOutput(TResourceType("type"), nil, bytes.NewBuffer(data))
 	require.NoError(t, err)
 	expected := TResourceProperties{
 		"id":    1,
@@ -222,7 +234,7 @@ type.host:
   tags.333.list2.111 = 3
   tags.333.list2.222 = 4
 `)
-	found, err := parseTerraformShowOutput(TResourceType("type"), bytes.NewBuffer(data))
+	found, err := parseTerraformShowOutput(TResourceType("type"), nil, bytes.NewBuffer(data))
 	require.NoError(t, err)
 	require.Equal(t, 1, len(found))
 	props := found[TResourceName("host")]
@@ -346,7 +358,7 @@ aws_vpc.default:
 
 func TestTerraformShowParseResultTagsList(t *testing.T) {
 
-	found, err := parseTerraformShowOutput(TResourceType("ibm_compute_vm_instance"), bytes.NewBuffer(terraformShowOutput))
+	found, err := parseTerraformShowOutput(TResourceType("ibm_compute_vm_instance"), nil, bytes.NewBuffer(terraformShowOutput))
 	require.NoError(t, err)
 	expected := TResourceProperties{
 		"id":               36147555,
@@ -368,6 +380,10 @@ func TestTerraformShowParseResultTagsList(t *testing.T) {
 	}
 	require.Equal(t, expected, found[TResourceName("instance-1499827079")])
 
+	found, err = parseTerraformShowOutput(TResourceType("ibm_compute_vm_instance"), []string{}, bytes.NewBuffer(terraformShowOutput))
+	require.NoError(t, err)
+	require.Equal(t, expected, found[TResourceName("instance-1499827079")])
+
 	// Also verify single instance output
 	data := convertToSingleInstanceOutput(terraformShowOutput, "ibm_compute_vm_instance.instance-1499827079")
 	props, err := parseTerraformShowForInstanceOutput(bytes.NewBuffer(data))
@@ -375,8 +391,29 @@ func TestTerraformShowParseResultTagsList(t *testing.T) {
 	require.Equal(t, expected, props)
 }
 
+func TestTerraformShowParseResultTagsListWithFilters(t *testing.T) {
+	found, err := parseTerraformShowOutput(
+		TResourceType("ibm_compute_vm_instance"),
+		[]string{"id", "cores", "tags", "foo"},
+		bytes.NewBuffer(terraformShowOutput),
+	)
+	require.NoError(t, err)
+	expected := TResourceProperties{
+		"id":    36147555,
+		"cores": 1,
+		"tags": []interface{}{
+			"infrakit.group:workers",
+			"infrakit.config_sha:tubmesopo6lrsfnl5otajlpvwd23v46j",
+			"name:instance-1499827079",
+			"infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker",
+			"swarm-id:c80s4c4kq0kgjs64ojxzvsdjz",
+		},
+	}
+	require.Equal(t, expected, found[TResourceName("instance-1499827079")])
+}
+
 func TestTerraformShowParseResultAwsVpc(t *testing.T) {
-	found, err := parseTerraformShowOutput(TResourceType("aws_vpc"), bytes.NewBuffer(terraformShowOutput))
+	found, err := parseTerraformShowOutput(TResourceType("aws_vpc"), nil, bytes.NewBuffer(terraformShowOutput))
 	require.NoError(t, err)
 	expected := TResourceProperties{
 		"id":                        "vpc-f8d45a90",
@@ -401,7 +438,7 @@ func TestTerraformShowParseResultAwsVpc(t *testing.T) {
 }
 
 func TestTerraformShowParseResultAwsSubnet(t *testing.T) {
-	found, err := parseTerraformShowOutput(TResourceType("aws_subnet"), bytes.NewBuffer(terraformShowOutput))
+	found, err := parseTerraformShowOutput(TResourceType("aws_subnet"), nil, bytes.NewBuffer(terraformShowOutput))
 	require.NoError(t, err)
 	expected := TResourceProperties{
 		"id":                      "subnet-32feb75a",
@@ -421,7 +458,7 @@ func TestTerraformShowParseResultAwsSubnet(t *testing.T) {
 }
 
 func TestTerraformShowParseResultAwsSecurityGroup(t *testing.T) {
-	found, err := parseTerraformShowOutput(TResourceType("aws_security_group"), bytes.NewBuffer(terraformShowOutput))
+	found, err := parseTerraformShowOutput(TResourceType("aws_security_group"), nil, bytes.NewBuffer(terraformShowOutput))
 	require.NoError(t, err)
 	require.Equal(t, 1, len(found))
 	props := found[TResourceName("default")]
@@ -492,7 +529,7 @@ func TestRunTerraformShow(t *testing.T) {
 	require.NoError(t, err)
 	dir = path.Join(dir, "aws-two-tier")
 
-	found, err := doTerraformShow(dir, TResourceType("aws_vpc"))
+	found, err := doTerraformShow(dir, TResourceType("aws_vpc"), nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(found))
 	T(100).Infoln(found)
