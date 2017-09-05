@@ -61,7 +61,7 @@ func TestProcessImportOptions(t *testing.T) {
 func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 1*time.Second, false, nil)
+	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, nil)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)
@@ -198,7 +198,7 @@ func TestMergeInitScriptNoUserDefined(t *testing.T) {
 		switch vmType {
 		case VMAmazon, VMDigitalOcean:
 			require.Equal(t,
-				TResourceProperties{"user_data": base64.StdEncoding.EncodeToString([]byte(initData))},
+				TResourceProperties{"user_data": initData},
 				props)
 		case VMSoftLayer, VMIBMCloud:
 			require.Equal(t,
@@ -250,7 +250,7 @@ func TestMergeInitScriptWithUserDefined(t *testing.T) {
 		switch vmType {
 		case VMAmazon, VMDigitalOcean:
 			require.Equal(t,
-				TResourceProperties{"user_data": base64.StdEncoding.EncodeToString([]byte(expectedInit))},
+				TResourceProperties{"user_data": expectedInit},
 				props)
 		case VMSoftLayer, VMIBMCloud:
 			require.Equal(t,
@@ -327,25 +327,9 @@ func TestProvisionInvalidTemplateProperties(t *testing.T) {
 	}
 	_, err := tf.Provision(spec)
 	require.Error(t, err)
-	require.True(t, strings.HasPrefix(err.Error(), "template:"))
 }
 
-func TestProvisionInvalidTemplateInit(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	spec := instance.Spec{
-		Properties:  types.AnyString("{}"),
-		Tags:        map[string]string{},
-		Init:        "{{}",
-		Attachments: []instance.Attachment{},
-		LogicalID:   nil,
-	}
-	_, err := tf.Provision(spec)
-	require.Error(t, err)
-	require.True(t, strings.HasPrefix(err.Error(), "template:"))
-}
-
-func TestProvisionDescribeDestroyScope(t *testing.T) {
+func TestProvisionDescribeDestroyScopeWithoutLogicalID(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
@@ -397,7 +381,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
-	expectedAttach1 := []string{string(*id1) + "-dedicated", "scope-managers"}
+	expectedAttach1 := []string{"default_dedicated_1", "managers_global"}
 	require.Contains(t,
 		results,
 		instance.Description{
@@ -408,7 +392,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 				"tag1":    "val1",
 			},
 		})
-	expectedAttach2 := []string{string(*id2) + "-dedicated", "scope-managers"}
+	expectedAttach2 := []string{"default_dedicated_2", "managers_global"}
 	require.Contains(t,
 		results,
 		instance.Description{
@@ -431,7 +415,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 		expectedAttach2[0],
 		string(*id1),
 		string(*id2),
-		"scope-managers",
+		"managers_global",
 	}
 	for _, path := range expectedPaths {
 		tfPath1 := filepath.Join(dir, path+".tf.json.new")
@@ -447,7 +431,7 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 	expectedPaths = []string{
 		expectedAttach2[0],
 		string(*id2),
-		"scope-managers",
+		"managers_global",
 	}
 	for _, path := range expectedPaths {
 		tfPath1 := filepath.Join(dir, path+".tf.json.new")
@@ -460,6 +444,339 @@ func TestProvisionDescribeDestroyScope(t *testing.T) {
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
 	require.Len(t, files, 0)
+}
+
+func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	m := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMAmazon: {
+			TResourceName("host"): {
+				"vmp1": "vmv1", "vmp2": "vmv2",
+				PropScope: ValScopeDefault,
+			},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {
+				"fsp1": "fsv1", "fsp2": "fsv2",
+				PropScope: ValScopeDedicated,
+			},
+		},
+		TResourceType("softlayer_block_storage"): {
+			TResourceName("worker_bs"): {
+				"bsp1": "bsv1", "bsp2": "bsv2",
+				PropScope: "managers",
+			},
+		},
+		TResourceType("another-dedicated"): {
+			TResourceName("another-dedicated-name"): {
+				"kded-1":  "vded-1",
+				PropScope: ValScopeDedicated,
+			},
+		},
+		TResourceType("another-default"): {
+			TResourceName("another-default-name"): {"kdef-1": "vdef-1"},
+		},
+	}
+	tformat := TFormat{Resource: m}
+	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	// Issue 2 provisions; should get dedicated for both and a single global
+	logicalID1 := instance.LogicalID("mgr1")
+	id1, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		LogicalID:  &logicalID1,
+		Tags:       map[string]string{"tag1": "val1"},
+	})
+	require.NoError(t, err)
+	logicalID2 := instance.LogicalID("mgr2")
+	id2, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		LogicalID:  &logicalID2,
+		Tags:       map[string]string{"tag1": "val1"},
+	})
+	require.NoError(t, err)
+	results, err := tf.DescribeInstances(
+		map[string]string{"tag1": "val1"},
+		false,
+	)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	expectedAttach1 := []string{"default_dedicated_" + string(logicalID1), "managers_global"}
+	require.Contains(t,
+		results,
+		instance.Description{
+			ID: *id1,
+			Tags: map[string]string{
+				attachTag:   strings.Join(expectedAttach1, ","),
+				"Name":      string(*id1),
+				"tag1":      "val1",
+				"LogicalID": "mgr1",
+			},
+			LogicalID: &logicalID1,
+		})
+	expectedAttach2 := []string{"default_dedicated_" + string(logicalID2), "managers_global"}
+	require.Contains(t,
+		results,
+		instance.Description{
+			ID: *id2,
+			Tags: map[string]string{
+				attachTag:   strings.Join(expectedAttach2, ","),
+				"Name":      string(*id2),
+				"tag1":      "val1",
+				"LogicalID": "mgr2",
+			},
+			LogicalID: &logicalID2,
+		})
+	// Should be files for:
+	// 2 VMs
+	// 2 dedicated
+	// 1 global ("managers" scope)
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 5)
+	expectedPaths := []string{
+		expectedAttach1[0],
+		expectedAttach2[0],
+		string(*id1),
+		string(*id2),
+		"managers_global",
+	}
+	for _, path := range expectedPaths {
+		tfPath1 := filepath.Join(dir, path)
+		_, err = ioutil.ReadFile(tfPath1 + ".tf.json.new")
+		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
+	}
+	// Should be able to Destroy the first VM and the dedicated file should be removed
+	err = tf.Destroy(*id1, instance.Termination)
+	require.NoError(t, err)
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 3)
+	expectedPaths = []string{
+		expectedAttach2[0],
+		string(*id2),
+		"managers_global",
+	}
+	for _, path := range expectedPaths {
+		tfPath1 := filepath.Join(dir, path+".tf.json.new")
+		_, err = ioutil.ReadFile(tfPath1)
+		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
+	}
+	// Destroying the second VM should remove everything
+	err = tf.Destroy(*id2, instance.Termination)
+	require.NoError(t, err)
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 0)
+}
+
+func TestProvisionUpdateDedicatedGlobal(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	instSpec := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMAmazon: {
+			TResourceName("host"): {
+				"vmp1": "vmv1", "vmp2": "vmv2",
+				PropScope: ValScopeDefault,
+			},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {
+				"fsp1": "fsv1", "fsp2": "fsv2",
+				PropScope: ValScopeDedicated,
+			},
+		},
+		TResourceType("softlayer_block_storage"): {
+			TResourceName("worker_bs"): {
+				"bsp1": "bsv1", "bsp2": "bsv2",
+				PropScope: "managers",
+			},
+		},
+	}
+	tformat := TFormat{Resource: instSpec}
+	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	// Provision, should get 3 files
+	id1, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		Tags: map[string]string{
+			"tag1": "val1",
+		},
+		Init: "ID={{ var `/self/instId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
+	})
+	require.NoError(t, err)
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 3)
+	filenames := []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", string(*id1)))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", string(*id1))))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	// Userdata is base64 encoded, pop and compare
+	expectedUserData := fmt.Sprintf("ID=%s DedicatedAttachId=1", string(*id1))
+	actualUserData := tFormat.Resource[VMAmazon][TResourceName(string(*id1))]["user_data"]
+	actualUserDataBytes, err := base64.StdEncoding.DecodeString(actualUserData.(string))
+	require.NoError(t, err)
+	require.Equal(t, expectedUserData, string(actualUserDataBytes))
+	delete(tFormat.Resource[VMAmazon][TResourceName(string(*id1))], "user_data")
+	// And compare the rest
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName(string(*id1)): {
+					"tags": map[string]interface{}{
+						attachTag: "default_dedicated_1,managers_global",
+						"Name":    string(*id1),
+						"tag1":    "val1",
+					},
+					"vmp1": "vmv1",
+					"vmp2": "vmv2",
+				},
+			},
+		},
+		tFormat.Resource)
+	require.Contains(t, filenames, "default_dedicated_1.tf.json.new")
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "default_dedicated_1.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("default-1-worker_fs"): {
+					"fsp1": "fsv1",
+					"fsp2": "fsv2",
+				},
+			},
+		},
+		tFormat.Resource,
+	)
+	require.Contains(t, filenames, "managers_global.tf.json.new")
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "managers_global.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("managers-worker_bs"): {
+					"bsp1": "bsv1",
+					"bsp2": "bsv2",
+				},
+			},
+		},
+		tFormat.Resource,
+	)
+	// Rolling update on the instance
+	err = tf.Destroy(instance.ID(*id1), instance.RollingUpdate)
+	require.NoError(t, err)
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+	filenames = []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	require.Contains(t, filenames, "default_dedicated_1.tf.json.new")
+	require.Contains(t, filenames, "managers_global.tf.json.new")
+	// Update the instance spec to change the dedicated and global data
+	instSpec[TResourceType("softlayer_file_storage")][TResourceName("worker_fs")]["fsp1"] = "fsv1-updated"
+	instSpec[TResourceType("softlayer_file_storage")][TResourceName("worker_fs")]["fsp2"] = "fsv2-updated"
+	instSpec[TResourceType("softlayer_block_storage")][TResourceName("worker_bs")]["bsp1"] = "bsv1-updated"
+	instSpec[TResourceType("softlayer_block_storage")][TResourceName("worker_bs")]["bsp2"] = "bsv2-updated"
+	tformat = TFormat{Resource: instSpec}
+	buff, err = json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	// Provision, should have 3 files
+	time.Sleep(time.Second)
+	id2, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		Tags: map[string]string{
+			"tag1": "val1",
+		},
+		Init: "ID={{ var `/self/instId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
+	})
+	require.NoError(t, err)
+	require.NotEqual(t, string(*id1), string(*id2))
+	// Content for the dedicated and global files should have changed
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 3)
+	filenames = []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", string(*id2)))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", string(*id2))))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	// Userdata should still point to older attach ID
+	expectedUserData = fmt.Sprintf("ID=%s DedicatedAttachId=1", string(*id2))
+	actualUserData = tFormat.Resource[VMAmazon][TResourceName(string(*id2))]["user_data"]
+	actualUserDataBytes, err = base64.StdEncoding.DecodeString(actualUserData.(string))
+	require.NoError(t, err)
+	require.Equal(t, expectedUserData, string(actualUserDataBytes))
+	delete(tFormat.Resource[VMAmazon][TResourceName(string(*id2))], "user_data")
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName(string(*id2)): {
+					"tags": map[string]interface{}{
+						attachTag: "default_dedicated_1,managers_global",
+						"Name":    string(*id2),
+						"tag1":    "val1",
+					},
+					"vmp1": "vmv1",
+					"vmp2": "vmv2",
+				},
+			},
+		},
+		tFormat.Resource)
+	require.Contains(t, filenames, "default_dedicated_1.tf.json.new")
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "default_dedicated_1.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("default-1-worker_fs"): {
+					"fsp1": "fsv1-updated",
+					"fsp2": "fsv2-updated",
+				},
+			},
+		},
+		tFormat.Resource,
+	)
+	require.Contains(t, filenames, "managers_global.tf.json.new")
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "managers_global.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("managers-worker_bs"): {
+					"bsp1": "bsv1-updated",
+					"bsp2": "bsv2-updated",
+				},
+			},
+		},
+		tFormat.Resource,
+	)
 }
 
 func TestRunValidateProvisionDescribe(t *testing.T) {
@@ -737,9 +1054,8 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				}
 			}
 			require.True(t, resourceFound)
-			// Other resources should be renamed to include the id
-			require.Equal(t, name, fmt.Sprintf("%s-%s", string(*id2), resourceName))
-
+			// Other resources should be renamed to include the logical ID
+			require.Equal(t, fmt.Sprintf("%s-%s", string(logicalID2), resourceName), name)
 		}
 	}
 
@@ -992,75 +1308,49 @@ func TestAddUserDataMerge(t *testing.T) {
 func TestWriteTerraformFilesError(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	tformat := TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
-		VMSoftLayer: {"host": {}}},
-	}
 	// Before writing the file delete the directory to create an error
 	os.RemoveAll(dir)
-	err := tf.writeTerraformFiles(nil, "instance-1234", &tformat, VMSoftLayer, TResourceProperties{})
+	fileMap := make(map[string]*TFormat)
+	tFormat := TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+		VMSoftLayer: {"host": {}}},
+	}
+	fileMap["instance-1234"] = &tFormat
+	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
 	require.Error(t, err)
 }
 
-func TestWriteTerraformFilesVMOnly(t *testing.T) {
+func TestWriteTerraformFilesSingle(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	name := "instance-1234"
-	m := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMSoftLayer: {
-			TResourceName("host"): {"p1": "v1", "p2": "v2"},
+	fileMap := make(map[string]*TFormat)
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("instance-1234"): {"p1": "v1"},
+			},
 		},
 	}
-	tformat := TFormat{Resource: m}
-	err := tf.writeTerraformFiles(nil, name, &tformat, VMSoftLayer, TResourceProperties{"p3": "v3"})
+	fileMap["instance-1234"] = &tFormat
+	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
 	require.NoError(t, err)
 	// Read single file from disk
 	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json.new"))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, "instance-1234.tf.json.new"))
 	require.NoError(t, err)
-	tFormat := TFormat{}
+	tFormat = TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
-	// 1 resource type
-	require.Len(t, tFormat.Resource, 1)
 	require.Equal(t,
-		map[TResourceName]TResourceProperties{TResourceName(name): {
-			"hostname": "instance-1234",
-			"p3":       "v3"}},
-		tFormat.Resource[VMSoftLayer],
-	)
-}
-
-func TestWriteTerraformFilesVMOnlyLogicalId(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	logicalID := instance.LogicalID("mgr1")
-	name := "instance-1234"
-	m := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMSoftLayer: {
-			TResourceName("host"): {"p1": "v1", "p2": "v2"},
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				VMSoftLayer: {
+					TResourceName("instance-1234"): {"p1": "v1"},
+				},
+			},
 		},
-	}
-	tformat := TFormat{Resource: m}
-	err := tf.writeTerraformFiles(&logicalID, name, &tformat, VMSoftLayer, TResourceProperties{"p3": "v3"})
-	require.NoError(t, err)
-	// Read single file from disk
-	files, err := ioutil.ReadDir(tf.Dir)
-	require.NoError(t, err)
-	require.Len(t, files, 1)
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json.new"))
-	require.NoError(t, err)
-	tFormat := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tFormat)
-	require.NoError(t, err)
-	// 1 resource type
-	require.Len(t, tFormat.Resource, 1)
-	require.Equal(t,
-		map[TResourceName]TResourceProperties{TResourceName(name): {
-			"hostname": "mgr1",
-			"p3":       "v3"}},
-		tFormat.Resource[VMSoftLayer],
+		tFormat,
 	)
 }
 
@@ -1068,19 +1358,22 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	name := "instance-1234"
-	m := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMSoftLayer: {
-			TResourceName("host"): {"vmp1": "vmv1", "vmp2": "vmv2"},
-		},
-		TResourceType("softlayer_file_storage"): {
-			TResourceName("worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
-		},
-		TResourceType("softlayer_block_storage"): {
-			TResourceName("worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+	fileMap := make(map[string]*TFormat)
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName(name): {"vmp1": "vmv1"},
+			},
+			TResourceType("softlayer_file_storage"): {
+				TResourceName(name + "-worker_fs"): {"fsp1": "fsv1"},
+			},
+			TResourceType("softlayer_block_storage"): {
+				TResourceName(name + "-worker_bs"): {"bsp1": "bsv1"},
+			},
 		},
 	}
-	tformat := TFormat{Resource: m}
-	err := tf.writeTerraformFiles(nil, name, &tformat, VMSoftLayer, TResourceProperties{"vmp3": "vmv3"})
+	fileMap[name] = &tFormat
+	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
 	require.NoError(t, err)
 	// Read single file from disk
 	files, err := ioutil.ReadDir(tf.Dir)
@@ -1088,7 +1381,7 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 	require.Len(t, files, 1)
 	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json.new"))
 	require.NoError(t, err)
-	tFormat := TFormat{}
+	tFormat = TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
 	// 3 resource type
@@ -1098,10 +1391,7 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 	require.NotNil(t, vmType)
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{
-			TResourceName(name): {
-				"hostname": name,
-				"vmp3":     "vmv3",
-			},
+			TResourceName(name): {"vmp1": "vmv1"},
 		},
 		vmType,
 	)
@@ -1110,7 +1400,7 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 	require.NotNil(t, fsType)
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{
-			TResourceName(name + "-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+			TResourceName(name + "-worker_fs"): {"fsp1": "fsv1"},
 		},
 		fsType,
 	)
@@ -1119,7 +1409,7 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 	require.NotNil(t, bsType)
 	require.Equal(t,
 		map[TResourceName]TResourceProperties{
-			TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+			TResourceName(name + "-worker_bs"): {"bsp1": "bsv1"},
 		},
 		bsType,
 	)
@@ -1130,41 +1420,44 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	defer os.RemoveAll(dir)
 	name := "instance-1234"
 	globalName := "managers"
-	m := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMAmazon: {
-			TResourceName("host"): {
-				"vmp1": "vmv1", "vmp2": "vmv2",
-				PropScope: ValScopeDefault,
+	fileMap := make(map[string]*TFormat)
+	tFormatDefault := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName(name): {"vmp1": "vmv1"},
 			},
-		},
-		TResourceType("softlayer_file_storage"): {
-			TResourceName("worker_fs"): {
-				"fsp1": "fsv1", "fsp2": "fsv2",
-				PropScope: ValScopeDedicated,
+			TResourceType("another-default"): {
+				TResourceName(name + "-another-default-name"): {"kdef-1": "vdef-1"},
 			},
-		},
-		TResourceType("softlayer_block_storage"): {
-			TResourceName("worker_bs"): {
-				"bsp1": "bsv1", "bsp2": "bsv2",
-				PropScope: globalName,
-			},
-		},
-		TResourceType("another-dedicated"): {
-			TResourceName("another-dedicated-name"): {
-				"kded-1":  "vded-1",
-				PropScope: ValScopeDedicated,
-			},
-		},
-		TResourceType("another-default"): {
-			TResourceName("another-default-name"): {"kdef-1": "vdef-1"},
 		},
 	}
-	tformat := TFormat{Resource: m}
-	err := tf.writeTerraformFiles(nil,
-		name,
-		&tformat,
-		VMAmazon,
-		TResourceProperties{"vmp3": "vmv3"})
+	tFormatDedicated := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("default-" + name + "-worker_fs"): {
+					"fsp1": "fsv1", "fsp2": "fsv2",
+				},
+			},
+			TResourceType("another-dedicated"): {
+				TResourceName("default-" + name + "-another-dedicated-name"): {
+					"kded-1": "vded-1",
+				},
+			},
+		},
+	}
+	tFormatGlobal := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_block_storage"): {
+				TResourceName(globalName + "-bs"): {
+					"bsp1": "bsv1", "bsp2": "bsv2",
+				},
+			},
+		},
+	}
+	fileMap[name] = &tFormatDefault
+	fileMap[fmt.Sprintf("default_dedicated_%s", name)] = &tFormatDedicated
+	fileMap[fmt.Sprintf("%s_global", globalName)] = &tFormatGlobal
+	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
 	require.NoError(t, err)
 	// Should be 3 files on disk
 	files, err := ioutil.ReadDir(tf.Dir)
@@ -1175,8 +1468,8 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 		filenames = append(filenames, file.Name())
 	}
 	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", name))
-	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json.new", name))
-	expectedGlobalFilename := fmt.Sprintf("scope-%s.tf.json.new", globalName)
+	require.Contains(t, filenames, fmt.Sprintf("default_dedicated_%s.tf.json.new", name))
+	expectedGlobalFilename := fmt.Sprintf("%s_global.tf.json.new", globalName)
 	require.Contains(t, filenames, expectedGlobalFilename)
 	// Default
 	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", name)))
@@ -1187,12 +1480,7 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
 			VMAmazon: {
-				TResourceName(name): {
-					"vmp3": "vmv3",
-					"tags": map[string]interface{}{
-						attachTag: fmt.Sprintf("%s-dedicated,%s", name, "scope-managers"),
-					},
-				},
+				TResourceName(name): {"vmp1": "vmv1"},
 			},
 			TResourceType("another-default"): {
 				TResourceName(name + "-another-default-name"): {"kdef-1": "vdef-1"},
@@ -1201,7 +1489,7 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 		tFormat.Resource,
 	)
 	// Dedicated
-	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s-dedicated.tf.json.new", name)))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("default_dedicated_%s.tf.json.new", name)))
 	require.NoError(t, err)
 	tFormat = TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1209,10 +1497,10 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
 			TResourceType("softlayer_file_storage"): {
-				TResourceName(name + "-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+				TResourceName("default-" + name + "-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
 			},
 			TResourceType("another-dedicated"): {
-				TResourceName(name + "-another-dedicated-name"): {"kded-1": "vded-1"},
+				TResourceName("default-" + name + "-another-dedicated-name"): {"kded-1": "vded-1"},
 			},
 		},
 		tFormat.Resource,
@@ -1226,80 +1514,67 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	require.Equal(t,
 		map[TResourceType]map[TResourceName]TResourceProperties{
 			TResourceType("softlayer_block_storage"): {
-				TResourceName(globalName + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+				TResourceName(globalName + "-bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
 			},
 		},
 		tFormat.Resource,
 	)
 }
 
-func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
+func TestDecomposeVMOnly(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	logicalID := instance.LogicalID("mgr1")
 	name := "instance-1234"
-	m := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMSoftLayer: {
-			TResourceName("host"): {"vmp1": "vmv1", "vmp2": "vmv2"},
-		},
-		TResourceType("softlayer_file_storage"): {
-			TResourceName("worker_fs"): {
-				"fsp1": "fsv1", "fsp2": "fsv2",
-				PropScope: ValScopeDedicated,
-			},
-		},
-		TResourceType("softlayer_block_storage"): {
-			TResourceName("worker_bs"): {
-				"bsp1": "bsv1", "bsp2": "bsv2",
-				PropScope: ValScopeDedicated,
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("host"): {"p1": "v1", "p2": "v2"},
 			},
 		},
 	}
-	tformat := TFormat{Resource: m}
-	err := tf.writeTerraformFiles(&logicalID,
-		name,
-		&tformat,
-		VMSoftLayer,
-		TResourceProperties{"vmp3": "vmv3"})
+	decomposedFiles, err := tf.decompose(nil, name, &tFormat, VMSoftLayer, TResourceProperties{"p3": "v3"})
 	require.NoError(t, err)
-	// Should be 2 files on disk
-	files, err := ioutil.ReadDir(tf.Dir)
-	require.NoError(t, err)
-	require.Len(t, files, 2)
-	filenames := []string{}
-	for _, file := range files {
-		filenames = append(filenames, file.Name())
-	}
-	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", name))
-	require.Contains(t, filenames, fmt.Sprintf("%s-dedicated.tf.json.new", name))
-	// VM file
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, name+".tf.json.new"))
-	require.NoError(t, err)
-	tFormat := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tFormat)
-	require.NoError(t, err)
-	require.Len(t, tFormat.Resource, 1)
-	vmType := tFormat.Resource[VMSoftLayer]
-	require.Equal(t,
-		map[TResourceName]TResourceProperties{
-			TResourceName(name): {
-				"hostname": "mgr1",
-				"vmp3":     "vmv3",
-				"tags": []interface{}{
-					fmt.Sprintf("%s:%s-dedicated", attachTag, name),
-				},
+	require.Len(t, decomposedFiles.CurrentFiles, 0)
+	require.Equal(t, "", decomposedFiles.DedicatedAttachKey)
+	expectedTf := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName(name): {"p3": "v3"},
 			},
 		},
-		vmType,
-	)
-	// File storage and block storage
-	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s-dedicated.tf.json.new", name)))
+	}
+	fileMap := make(map[string]*TFormat)
+	fileMap["instance-1234"] = &expectedTf
+	require.Equal(t, fileMap, decomposedFiles.FileMap)
+}
+
+func TestDecomposeMultipleDefaultResources(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	name := "instance-1234"
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("host"): {"vmp1": "vmv1", "vmp2": "vmv2"},
+			},
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+			},
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+			},
+		},
+	}
+	decomposedFiles, err := tf.decompose(nil, name, &tFormat, VMSoftLayer, TResourceProperties{"vmp3": "vmv3"})
 	require.NoError(t, err)
-	tFormat = TFormat{}
-	err = types.AnyBytes(buff).Decode(&tFormat)
-	require.NoError(t, err)
-	require.Equal(t,
-		map[TResourceType]map[TResourceName]TResourceProperties{
+	require.Len(t, decomposedFiles.CurrentFiles, 0)
+	require.Equal(t, "", decomposedFiles.DedicatedAttachKey)
+	// Verify decomposed files
+	expectedTf := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName(name): {"vmp3": "vmv3"},
+			},
 			TResourceType("softlayer_file_storage"): {
 				TResourceName(name + "-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
 			},
@@ -1307,8 +1582,312 @@ func TestWriteTerraformFilesMultipleResourcesDedicatedScope(t *testing.T) {
 				TResourceName(name + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
 			},
 		},
-		tFormat.Resource,
-	)
+	}
+	fileMap := make(map[string]*TFormat)
+	fileMap[name] = &expectedTf
+	require.Equal(t, fileMap, decomposedFiles.FileMap)
+}
+
+func TestDecomposeMultipleResourcesScopeTypes(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	name := "instance-1234"
+	globalName := "managers"
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName("host"): {
+					"vmp1": "vmv1", "vmp2": "vmv2",
+					PropScope: ValScopeDefault,
+				},
+			},
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("worker_fs"): {
+					"fsp1": "fsv1", "fsp2": "fsv2",
+					PropScope: ValScopeDedicated,
+				},
+			},
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("worker_bs"): {
+					"bsp1": "bsv1", "bsp2": "bsv2",
+					PropScope: globalName,
+				},
+			},
+			TResourceType("another-dedicated"): {
+				TResourceName("another-dedicated-name"): {
+					"kded-1":  "vded-1",
+					PropScope: ValScopeDedicated,
+				},
+			},
+			TResourceType("another-default"): {
+				TResourceName("another-default-name"): {"kdef-1": "vdef-1"},
+			},
+		},
+	}
+	decomposedFiles, err := tf.decompose(nil, name, &tFormat, VMAmazon, TResourceProperties{"vmp3": "vmv3"})
+	require.NoError(t, err)
+	require.Len(t, decomposedFiles.CurrentFiles, 0)
+	require.Equal(t, "1", decomposedFiles.DedicatedAttachKey)
+	// Verify decomposed files, should be 3
+	require.Len(t, decomposedFiles.FileMap, 3)
+	expectedTfDefault := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName(name): {
+					"vmp3": "vmv3",
+					"tags": map[string]interface{}{
+						attachTag: "default_dedicated_1,managers_global",
+					},
+				},
+			},
+			TResourceType("another-default"): {
+				TResourceName(name + "-another-default-name"): {"kdef-1": "vdef-1"},
+			},
+		},
+	}
+	require.Equal(t, expectedTfDefault, *decomposedFiles.FileMap[name])
+	expectedTfDedicated := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("default-1-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+			},
+			TResourceType("another-dedicated"): {
+				TResourceName("default-1-another-dedicated-name"): {"kded-1": "vded-1"},
+			},
+		},
+	}
+	require.Equal(t, expectedTfDedicated, *decomposedFiles.FileMap["default_dedicated_1"])
+	expectedTfGlobal := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_block_storage"): {
+				TResourceName(globalName + "-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+			},
+		},
+	}
+	require.Equal(t, expectedTfGlobal, *decomposedFiles.FileMap[fmt.Sprintf("%s_global", globalName)])
+}
+
+func TestDecomposeMultipleResDedicatedWithLogicalID(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	logicalID := instance.LogicalID("mgr1")
+	name := "instance-1234"
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("host"): {"vmp1": "vmv1", "vmp2": "vmv2"},
+			},
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("worker_fs"): {
+					"fsp1": "fsv1", "fsp2": "fsv2",
+					PropScope: ValScopeDedicated + "-workers",
+				},
+			},
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("worker_bs"): {
+					"bsp1": "bsv1", "bsp2": "bsv2",
+					PropScope: ValScopeDedicated + "-workers",
+				},
+			},
+		},
+	}
+	decomposedFiles, err := tf.decompose(&logicalID, name, &tFormat, VMSoftLayer, TResourceProperties{"vmp3": "vmv3"})
+	require.NoError(t, err)
+	require.Len(t, decomposedFiles.CurrentFiles, 0)
+	require.Equal(t, string(logicalID), decomposedFiles.DedicatedAttachKey)
+	// Verify decomposed files, should be 2
+	require.Len(t, decomposedFiles.FileMap, 2)
+	expectedTfDefault := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName(name): {
+					"vmp3": "vmv3",
+					"tags": []interface{}{
+						fmt.Sprintf("%s:workers_dedicated_%s", attachTag, logicalID),
+					},
+				},
+			},
+		},
+	}
+	require.Equal(t, expectedTfDefault, *decomposedFiles.FileMap[name])
+	expectedTfDedicated := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("workers-mgr1-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+			},
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("workers-mgr1-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+			},
+		},
+	}
+	require.Equal(t, expectedTfDedicated, *decomposedFiles.FileMap[fmt.Sprintf("workers_dedicated_%s", logicalID)])
+}
+
+func TestDecomposeMultipleResDedicatedWithoutLogicalID(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	name := "instance-1234"
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("host"): {"vmp1": "vmv1", "vmp2": "vmv2"},
+			},
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("worker_fs"): {
+					"fsp1": "fsv1", "fsp2": "fsv2",
+					PropScope: ValScopeDedicated,
+				},
+			},
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("worker_bs"): {
+					"bsp1": "bsv1", "bsp2": "bsv2",
+					PropScope: ValScopeDedicated,
+				},
+			},
+		},
+	}
+	decomposedFiles, err := tf.decompose(nil, name, &tFormat, VMSoftLayer, TResourceProperties{"vmp3": "vmv3"})
+	require.NoError(t, err)
+	require.Len(t, decomposedFiles.CurrentFiles, 0)
+	require.Equal(t, "1", decomposedFiles.DedicatedAttachKey)
+	// Verify decomposed files, should be 2
+	require.Len(t, decomposedFiles.FileMap, 2)
+	expectedTfDefault := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName(name): {
+					"vmp3": "vmv3",
+					"tags": []interface{}{
+						fmt.Sprintf("%s:default_dedicated_1", attachTag),
+					},
+				},
+			},
+		},
+	}
+	require.Equal(t, expectedTfDefault, *decomposedFiles.FileMap[name])
+	expectedTfDedicated := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("default-1-worker_fs"): {"fsp1": "fsv1", "fsp2": "fsv2"},
+			},
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("default-1-worker_bs"): {"bsp1": "bsv1", "bsp2": "bsv2"},
+			},
+		},
+	}
+	require.Equal(t, expectedTfDedicated, *decomposedFiles.FileMap["default_dedicated_1"])
+}
+
+func TestGetLowestDedicatedOrphanIndexSingle(t *testing.T) {
+	result := getLowestDedicatedOrphanIndex([]string{"1"})
+	require.Equal(t, "1", result)
+}
+
+func TestGetLowestDedicatedOrphanIndexWithInits(t *testing.T) {
+	result := getLowestDedicatedOrphanIndex([]string{"8", "9", "10", "a"})
+	require.Equal(t, "8", result)
+}
+
+func TestGetLowestDedicatedOrphanIndexNoInits(t *testing.T) {
+	result := getLowestDedicatedOrphanIndex([]string{"alpha", "beta", "zulu"})
+	require.Equal(t, "alpha", result)
+}
+
+func TestFindOrphanedDedicatedAttachmentKeysNoFiles(t *testing.T) {
+	allKeys, orphanKeys := findDedicatedAttachmentKeys(map[string]map[TResourceType]map[TResourceName]TResourceProperties{}, "scopeID")
+	require.Len(t, allKeys, 0)
+	require.Len(t, orphanKeys, 0)
+}
+
+func TestFindOrphanedDedicatedAttachmentKeysNoScopeIDMatch(t *testing.T) {
+	currentFiles := map[string]map[TResourceType]map[TResourceName]TResourceProperties{
+		"foo.tf.json":                             {},
+		"default_dedicated_mgr1.tf.json":          {},
+		"default_dedicated_instance-1234.tf.json": {},
+		"instance-1234.tf.json": {
+			VMIBMCloud: {
+				TResourceName("instance-1234"): {
+					"tags": []interface{}{fmt.Sprintf("%s:default_dedicated_instance-1234", attachTag)},
+				},
+			},
+		},
+	}
+	allKeys, orphanKeys := findDedicatedAttachmentKeys(currentFiles, "scopeID")
+	require.Len(t, allKeys, 0)
+	require.Len(t, orphanKeys, 0)
+}
+
+func TestFindOrphanedDedicatedAttachmentKeys(t *testing.T) {
+	currentFiles := map[string]map[TResourceType]map[TResourceName]TResourceProperties{
+		"workers_dedicated_instance-1234.tf.json": {},
+		"workers_dedicated_instance-2345.tf.json": {},
+		"workers_dedicated_instance-3456.tf.json": {},
+		"workers_dedicated_instance-4567.tf.json": {},
+		"managers_dedicated_mgr1.tf.json":         {},
+		"managers_dedicated_mgr2.tf.json":         {},
+		"managers_dedicated_mgr3.tf.json":         {},
+		"managers_global.tf.json":                 {},
+		"instance-1234.tf.json": {
+			VMIBMCloud: {
+				TResourceName("instance-1234"): {
+					"tags": []interface{}{fmt.Sprintf("%s:workers_dedicated_instance-1234", attachTag)},
+				},
+			},
+		},
+		"instance-2345.tf.json": {
+			VMIBMCloud: {
+				TResourceName("instance-1234"): {
+					"tags": []interface{}{fmt.Sprintf("%s:workers_dedicated_instance-2345", attachTag)},
+				},
+			},
+		},
+		// Without attach tag
+		"instance-9999.tf.json": {
+			VMIBMCloud: {
+				TResourceName("instance-9999"): {
+					"tags": []interface{}{},
+				},
+			},
+		},
+		// Without any tags
+		"instance-99999.tf.json": {
+			VMIBMCloud: {
+				TResourceName("instance-99999"): {},
+			},
+		},
+		"instance-1111.tf.json": {
+			VMIBMCloud: {
+				TResourceName("instance-1111"): {
+					"tags": []interface{}{fmt.Sprintf("%s:managers_dedicated_mgr1,mangers_global", attachTag)},
+				},
+			},
+		},
+		"instance-2222.tf.json": {
+			VMIBMCloud: {
+				TResourceName("instance-2222"): {
+					"tags": []interface{}{fmt.Sprintf("%s:managers_dedicated_mgr2,mangers_global", attachTag)},
+				},
+			},
+		},
+	}
+	allKeys, orphanKeys := findDedicatedAttachmentKeys(currentFiles, "other-scope-id")
+	require.Len(t, allKeys, 0)
+	require.Len(t, orphanKeys, 0)
+	allKeys, orphanKeys = findDedicatedAttachmentKeys(currentFiles, "workers")
+	require.Len(t, allKeys, 4)
+	require.Contains(t, allKeys, "instance-1234")
+	require.Contains(t, allKeys, "instance-2345")
+	require.Contains(t, allKeys, "instance-3456")
+	require.Contains(t, allKeys, "instance-4567")
+	require.Len(t, orphanKeys, 2)
+	require.Contains(t, orphanKeys, "instance-3456")
+	require.Contains(t, orphanKeys, "instance-4567")
+	allKeys, orphanKeys = findDedicatedAttachmentKeys(currentFiles, "managers")
+	require.Len(t, allKeys, 3)
+	require.Contains(t, allKeys, "mgr1")
+	require.Contains(t, allKeys, "mgr2")
+	require.Contains(t, allKeys, "mgr3")
+	require.Equal(t, []string{"mgr3"}, orphanKeys)
 }
 
 func TestScanLocalFilesNoFiles(t *testing.T) {
@@ -1483,6 +2062,33 @@ func TestPlatformSpecificUpdatesWithEmptyHostanmePrefix(t *testing.T) {
 	require.Equal(t, "instance-1234", props["hostname"])
 }
 
+func TestPlatformSpecificUpdatesBase64UserData(t *testing.T) {
+	for _, vmType := range VMTypes {
+		var key string
+		switch vmType {
+		case VMAmazon, VMDigitalOcean:
+			key = "user_data"
+		case VMSoftLayer, VMIBMCloud:
+			key = "user_metadata"
+		case VMAzure:
+			key = "custom_data"
+		case VMGoogleCloud:
+			key = "metadata_startup_script"
+		}
+		props := TResourceProperties{key: "my-user-data"}
+		platformSpecificUpdates(vmType.(TResourceType), "instance-1234", nil, props)
+		switch vmType {
+		case VMAmazon, VMDigitalOcean:
+			// Only these types convert to base64
+			require.Equal(t, base64.StdEncoding.EncodeToString([]byte("my-user-data")), props[key])
+		case VMSoftLayer, VMIBMCloud, VMAzure, VMGoogleCloud:
+			require.Equal(t, "my-user-data", props[key])
+		default:
+			require.Fail(t, fmt.Sprintf("Verifying base64 user data not handled for type: %v", vmType))
+		}
+	}
+}
+
 func TestMergeTagsIntoVMPropsEmpty(t *testing.T) {
 	for _, vmType := range VMTypes {
 		props := TResourceProperties{}
@@ -1604,50 +2210,53 @@ func TestMergeTagsIntoVMProps(t *testing.T) {
 }
 
 func TestRenderInstVarsNoReplace(t *testing.T) {
-	result, err := renderInstVars("{}", instance.ID("id"), nil)
+	props := TResourceProperties{}
+	err := renderInstVars(&props, "id", nil, "")
 	require.NoError(t, err)
-	require.Equal(t, "{}", result)
+	require.Equal(t, TResourceProperties{}, props)
 
 	logicalID := instance.LogicalID("mgr1")
-	result, err = renderInstVars("{}", instance.ID("id"), &logicalID)
+	err = renderInstVars(&props, "id", &logicalID, "")
 	require.NoError(t, err)
-	require.Equal(t, "{}", result)
+	require.Equal(t, TResourceProperties{}, props)
 }
 
-func TestRenderInstVarsWithoutLogicalID(t *testing.T) {
-	input := `{
- "id": "{{ var "/self/instId" }}",
- "key": "val"
-}`
-	expected := `{
- "id": "id",
- "key": "val"
-}`
-	result, err := renderInstVars(input, instance.ID("id"), nil)
+func TestRenderInstVarsWithoutOptional(t *testing.T) {
+	props := TResourceProperties{
+		"id":  "{{ var `/self/instId` }}",
+		"key": "val",
+	}
+	expected := TResourceProperties{
+		"id":  "id",
+		"key": "val",
+	}
+	err := renderInstVars(&props, "id", nil, "")
 	require.NoError(t, err)
-	require.JSONEq(t, expected, result)
+	require.Equal(t, expected, props)
 
 	logicalID := instance.LogicalID("mgr1")
-	result, err = renderInstVars(input, instance.ID("id"), &logicalID)
+	err = renderInstVars(&props, "id", &logicalID, "some-attach-id")
 	require.NoError(t, err)
-	require.JSONEq(t, expected, result)
+	require.Equal(t, expected, props)
 }
 
-func TestRenderInstVarsWithLogicalID(t *testing.T) {
-	input := `{
- "id": "{{ var "/self/instId" }}",
- "logicalId": "{{ var "/self/logicalId" }}",
- "key": "val"
-}`
-	expected := `{
- "id": "id",
- "logicalId": "mgr1",
- "key": "val"
-}`
+func TestRenderInstVarsWithOptional(t *testing.T) {
+	props := TResourceProperties{
+		"attachId":  "{{ var `/self/dedicated/attachId` }}",
+		"id":        "{{ var `/self/instId` }}",
+		"logicalId": "{{ var `/self/logicalId` }}",
+		"key":       "val",
+	}
+	expected := TResourceProperties{
+		"attachId":  "some-attach-id",
+		"id":        "id",
+		"logicalId": "mgr1",
+		"key":       "val",
+	}
 	logicalID := instance.LogicalID("mgr1")
-	result, err := renderInstVars(input, instance.ID("id"), &logicalID)
+	err := renderInstVars(&props, "id", &logicalID, "some-attach-id")
 	require.NoError(t, err)
-	require.JSONEq(t, expected, result)
+	require.Equal(t, expected, props)
 }
 
 func TestLabelNoFiles(t *testing.T) {
@@ -2024,11 +2633,11 @@ func TestDestroyScaleDown(t *testing.T) {
 	require.Len(t, files, 0)
 }
 
-func TestDestroyRollingUpdate(t *testing.T) {
+func TestDestroyRollingUpdateLogicalID(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	m := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMSoftLayer: {
+		VMAmazon: {
 			TResourceName("host"): {},
 		},
 		TResourceType("softlayer_file_storage"): {
@@ -2038,27 +2647,335 @@ func TestDestroyRollingUpdate(t *testing.T) {
 		},
 	}
 	tformat := TFormat{Resource: m}
-	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	instanceSpecBuff, err := json.MarshalIndent(tformat, "  ", "  ")
 	require.NoError(t, err)
-	id, err := tf.Provision(instance.Spec{
-		Properties: types.AnyBytes(buff),
+	logicalID := instance.LogicalID("mgr1")
+	id1, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(instanceSpecBuff),
 		Tags:       map[string]string{"tag1": "val1"},
+		LogicalID:  &logicalID,
+		Init:       "ID={{ var `/self/instId` }} LogicalID={{ var `/self/logicalId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
 	})
 	require.NoError(t, err)
 	// 2 files created
 	files, err := ioutil.ReadDir(dir)
 	require.NoError(t, err)
 	require.Len(t, files, 2)
-	// Destroy the instance and the related files
-	err = tf.Destroy(instance.ID(*id), instance.RollingUpdate)
+	filenames := []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", string(*id1)))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", string(*id1))))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	// Userdata is base64 encoded, pop and compare
+	expectedUserData := fmt.Sprintf(
+		"ID=%s LogicalID=%s DedicatedAttachId=%s",
+		string(*id1),
+		string(logicalID),
+		string(logicalID),
+	)
+	actualUserData := tFormat.Resource[VMAmazon][TResourceName(string(*id1))]["user_data"]
+	actualUserDataBytes, err := base64.StdEncoding.DecodeString(actualUserData.(string))
+	require.NoError(t, err)
+	require.Equal(t, expectedUserData, string(actualUserDataBytes))
+	delete(tFormat.Resource[VMAmazon][TResourceName(string(*id1))], "user_data")
+	// And compare the rest
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName(string(*id1)): {
+					"tags": map[string]interface{}{
+						"tag1":      "val1",
+						attachTag:   fmt.Sprintf("default_dedicated_%s", logicalID),
+						"LogicalID": string(logicalID),
+						"Name":      string(*id1),
+					},
+				},
+			},
+		},
+		tFormat.Resource,
+	)
+	require.Contains(t, filenames, fmt.Sprintf("default_dedicated_%s.tf.json.new", logicalID))
+	buff1, err := ioutil.ReadFile(filepath.Join(dir, fmt.Sprintf("default_dedicated_%s.tf.json.new", logicalID)))
+	require.NoError(t, err)
+	// Destroy the instance with a rolling update
+	err = tf.Destroy(instance.ID(*id1), instance.RollingUpdate)
 	require.NoError(t, err)
 	// Instance file has been removed; dedicated file still exists
 	files, err = ioutil.ReadDir(dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
-	path := filepath.Join(dir, fmt.Sprintf("%s-dedicated.tf.json.new", string(*id)))
-	_, err = ioutil.ReadFile(path)
+	path := filepath.Join(dir, fmt.Sprintf("default_dedicated_%s.tf.json.new", logicalID))
+	buff2, err := ioutil.ReadFile(path)
+	require.NoError(t, err)
 	require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
+	require.Equal(t, string(buff1), string(buff2))
+
+	// Issue another provision, ID should changed (sleep 1 sec to ensure) but the dedicated
+	// file content should not change
+	time.Sleep(time.Second)
+	id2, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(instanceSpecBuff),
+		Tags:       map[string]string{"tag1": "val1"},
+		LogicalID:  &logicalID,
+		Init:       "ID={{ var `/self/instId` }} LogicalID={{ var `/self/logicalId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
+	})
+	require.NoError(t, err)
+	require.NotEqual(t, string(*id1), string(*id2))
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+	filenames = []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", string(*id2)))
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", string(*id2))))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	// Userdata is base64 encoded, pop and compare
+	expectedUserData = fmt.Sprintf(
+		"ID=%s LogicalID=%s DedicatedAttachId=%s",
+		string(*id2),
+		string(logicalID),
+		string(logicalID),
+	)
+	actualUserData = tFormat.Resource[VMAmazon][TResourceName(string(*id2))]["user_data"]
+	actualUserDataBytes, err = base64.StdEncoding.DecodeString(actualUserData.(string))
+	require.NoError(t, err)
+	require.Equal(t, expectedUserData, string(actualUserDataBytes))
+	delete(tFormat.Resource[VMAmazon][TResourceName(string(*id2))], "user_data")
+	// And compare the rest
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName(string(*id2)): {
+					"tags": map[string]interface{}{
+						"tag1":      "val1",
+						attachTag:   fmt.Sprintf("default_dedicated_%s", logicalID),
+						"LogicalID": string(logicalID),
+						"Name":      string(*id2),
+					},
+				},
+			},
+		},
+		tFormat.Resource,
+	)
+	require.Contains(t, filenames, fmt.Sprintf("default_dedicated_%s.tf.json.new", logicalID))
+	buff3, err := ioutil.ReadFile(filepath.Join(dir, fmt.Sprintf("default_dedicated_%s.tf.json.new", logicalID)))
+	require.NoError(t, err)
+	require.Equal(t, string(buff2), string(buff3))
+	// Verify file contents of the dedicated file
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff3).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				TResourceType("softlayer_file_storage"): {
+					TResourceName("default-mgr1-worker_fs"): {},
+				},
+			},
+		},
+		tFormat)
+}
+
+func TestDestroyRollingUpdateWithoutLogicalID(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	tformat := TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+		VMAmazon: {
+			TResourceName("host"): {},
+		},
+		TResourceType("file_storage"): {
+			TResourceName("worker_fs"): {
+				PropScope: ValScopeDedicated,
+			},
+		},
+	},
+	}
+	instanceSpecBuff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	// Provision 3 instances
+	id1, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(instanceSpecBuff),
+		Tags:       map[string]string{"tag1": "val1"},
+		Init:       "ID={{ var `/self/instId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
+	})
+	require.NoError(t, err)
+	id2, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(instanceSpecBuff),
+		Tags:       map[string]string{"tag2": "val2"},
+		Init:       "ID={{ var `/self/instId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
+	})
+	require.NoError(t, err)
+	id3, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(instanceSpecBuff),
+		Tags:       map[string]string{"tag3": "val3"},
+		Init:       "ID={{ var `/self/instId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
+	})
+	require.NoError(t, err)
+	// 6 files created
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 6)
+	filenames := []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	for index, id := range []string{string(*id1), string(*id2), string(*id3)} {
+		require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", id))
+		buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", id)))
+		require.NoError(t, err)
+		tFormat := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tFormat)
+		require.NoError(t, err)
+		// Userdata is base64 encoded, pop and compare
+		expectedUserData := fmt.Sprintf("ID=%s DedicatedAttachId=%v", id, index+1)
+		actualUserData := tFormat.Resource[VMAmazon][TResourceName(id)]["user_data"]
+		actualUserDataBytes, err := base64.StdEncoding.DecodeString(actualUserData.(string))
+		require.NoError(t, err)
+		require.Equal(t, expectedUserData, string(actualUserDataBytes))
+		delete(tFormat.Resource[VMAmazon][TResourceName(id)], "user_data")
+		// And compare the rest
+		require.Equal(t,
+			map[TResourceType]map[TResourceName]TResourceProperties{
+				VMAmazon: {
+					TResourceName(id): {
+						"tags": map[string]interface{}{
+							fmt.Sprintf("tag%v", index+1): fmt.Sprintf("val%v", index+1),
+							attachTag:                     fmt.Sprintf("default_dedicated_%v", index+1),
+							"Name":                        id,
+						},
+					},
+				},
+			},
+			tFormat.Resource,
+		)
+	}
+	require.Contains(t, filenames, "default_dedicated_1.tf.json.new")
+	buffDed1, err := ioutil.ReadFile(filepath.Join(dir, "default_dedicated_1.tf.json.new"))
+	require.NoError(t, err)
+	require.Contains(t, filenames, "default_dedicated_2.tf.json.new")
+	buffDed2, err := ioutil.ReadFile(filepath.Join(dir, "default_dedicated_2.tf.json.new"))
+	require.NoError(t, err)
+	require.Contains(t, filenames, "default_dedicated_3.tf.json.new")
+	buffDed3, err := ioutil.ReadFile(filepath.Join(dir, "default_dedicated_3.tf.json.new"))
+	require.NoError(t, err)
+
+	// Destroy the second instance with a rolling update
+	err = tf.Destroy(instance.ID(*id2), instance.RollingUpdate)
+	require.NoError(t, err)
+
+	// Instance file has been removed; dedicated file still exists and not updatd
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 5)
+	expectedPaths := []string{
+		"default_dedicated_1",
+		"default_dedicated_2",
+		"default_dedicated_3",
+		string(*id1),
+		string(*id3),
+	}
+	for _, path := range expectedPaths {
+		tfPath1 := filepath.Join(dir, path+".tf.json.new")
+		_, err = ioutil.ReadFile(tfPath1)
+		require.NoError(t, err, fmt.Sprintf("Expected path %s does not exist", path))
+	}
+	buffDed1New, err := ioutil.ReadFile(filepath.Join(dir, "default_dedicated_1.tf.json.new"))
+	require.NoError(t, err)
+	require.Equal(t, string(buffDed1), string(buffDed1New))
+	buffDed2New, err := ioutil.ReadFile(filepath.Join(dir, "default_dedicated_2.tf.json.new"))
+	require.NoError(t, err)
+	require.Equal(t, string(buffDed2), string(buffDed2New))
+	buffDed3New, err := ioutil.ReadFile(filepath.Join(dir, "default_dedicated_3.tf.json.new"))
+	require.NoError(t, err)
+	require.Equal(t, string(buffDed3), string(buffDed3New))
+
+	// Issue another provision, ID should changed (sleep 1 sec to ensure) but the dedicated
+	// file content should not change; the instance should still be attached to the previous
+	// dedicated instance
+	time.Sleep(time.Second)
+	id4, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(instanceSpecBuff),
+		Tags:       map[string]string{"tag2": "val2"},
+		Init:       "ID={{ var `/self/instId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
+	})
+	require.NoError(t, err)
+	require.NotEqual(t, string(*id1), string(*id4))
+	require.NotEqual(t, string(*id2), string(*id4))
+	require.NotEqual(t, string(*id3), string(*id4))
+	files, err = ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 6)
+	filenames = []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	for index, id := range []string{string(*id1), string(*id4), string(*id3)} {
+		require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", id))
+		buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", id)))
+		require.NoError(t, err)
+		tFormat := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tFormat)
+		require.NoError(t, err)
+		// Userdata is base64 encoded, pop and compare
+		expectedUserData := fmt.Sprintf("ID=%s DedicatedAttachId=%v", id, index+1)
+		actualUserData := tFormat.Resource[VMAmazon][TResourceName(id)]["user_data"]
+		actualUserDataBytes, err := base64.StdEncoding.DecodeString(actualUserData.(string))
+		require.NoError(t, err)
+		require.Equal(t, expectedUserData, string(actualUserDataBytes))
+		delete(tFormat.Resource[VMAmazon][TResourceName(id)], "user_data")
+		// And compare the rest
+		require.Equal(t,
+			map[TResourceType]map[TResourceName]TResourceProperties{
+				VMAmazon: {
+					TResourceName(id): {
+						"tags": map[string]interface{}{
+							fmt.Sprintf("tag%v", index+1): fmt.Sprintf("val%v", index+1),
+							attachTag:                     fmt.Sprintf("default_dedicated_%v", index+1),
+							"Name":                        id,
+						},
+					},
+				},
+			},
+			tFormat.Resource,
+		)
+	}
+	require.Contains(t, filenames, "default_dedicated_1.tf.json.new")
+	buffDed1New, err = ioutil.ReadFile(filepath.Join(dir, "default_dedicated_1.tf.json.new"))
+	require.NoError(t, err)
+	require.Equal(t, string(buffDed1), string(buffDed1New))
+	require.Contains(t, filenames, "default_dedicated_2.tf.json.new")
+	buffDed2New, err = ioutil.ReadFile(filepath.Join(dir, "default_dedicated_2.tf.json.new"))
+	require.NoError(t, err)
+	require.Equal(t, string(buffDed2), string(buffDed2New))
+	require.Contains(t, filenames, "default_dedicated_3.tf.json.new")
+	buffDed3New, err = ioutil.ReadFile(filepath.Join(dir, "default_dedicated_3.tf.json.new"))
+	require.NoError(t, err)
+	require.Equal(t, string(buffDed3), string(buffDed3New))
+	// Verify file contents of the dedicated files
+	for index, buff := range [][]byte{buffDed1New, buffDed2New, buffDed3New} {
+		tFormat := TFormat{}
+		err = types.AnyBytes(buff).Decode(&tFormat)
+		require.NoError(t, err)
+		require.Equal(t,
+			TFormat{
+				Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+					TResourceType("file_storage"): {
+						TResourceName(fmt.Sprintf("default-%v-worker_fs", index+1)): {},
+					},
+				},
+			},
+			tFormat)
+	}
 }
 
 func TestParseAttachTagNoVM(t *testing.T) {
@@ -2884,4 +3801,111 @@ func TestParseFileForInstanceID(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, tFormat)
 	require.Equal(t, "", filename)
+}
+
+func TestListCurrentTfFilesNoFiles(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	fileMap, err := tf.listCurrentTfFiles()
+	require.NoError(t, err)
+	require.NotNil(t, fileMap)
+	require.Equal(t, 0, len(fileMap))
+}
+
+func TestListCurrentTfFiles(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// File with VM and default NFS
+	resources := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	resources[VMSoftLayer] = map[TResourceName]TResourceProperties{
+		"instance-12": {"key1": "val1"},
+	}
+	resources[TResourceType("nfs")] = map[TResourceName]TResourceProperties{
+		"instance-12-default-nfs": {"nfs-k1": "nfs-v1"},
+	}
+	tformat := TFormat{Resource: resources}
+	buff, err := json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12.tf.json.new"), buff, 0644)
+	require.NoError(t, err)
+	// File with only a VM
+	resources = make(map[TResourceType]map[TResourceName]TResourceProperties)
+	resources[VMSoftLayer] = map[TResourceName]TResourceProperties{
+		"instance-34": {"key2": "val2"},
+	}
+	tformat = TFormat{Resource: resources}
+	buff, err = json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-34.tf.json"), buff, 0644)
+	require.NoError(t, err)
+	// And a dedicated resource
+	resources = make(map[TResourceType]map[TResourceName]TResourceProperties)
+	resources[TResourceType("nfs")] = map[TResourceName]TResourceProperties{
+		"instance-34-dedicated-nfs": {"nfs-k2": "nfs-v2"},
+	}
+	tformat = TFormat{Resource: resources}
+	buff, err = json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "default-dedicated-instance-34.tf.json"), buff, 0644)
+	require.NoError(t, err)
+	// And a global type
+	resources = make(map[TResourceType]map[TResourceName]TResourceProperties)
+	resources[TResourceType("nfs")] = map[TResourceName]TResourceProperties{
+		"global-nfs": {"nfs-k3": "nfs-v3"},
+	}
+	tformat = TFormat{Resource: resources}
+	buff, err = json.MarshalIndent(tformat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "scope_global.tf.json"), buff, 0644)
+	require.NoError(t, err)
+
+	// Should get 4 files
+	fileMap, err := tf.listCurrentTfFiles()
+	require.NoError(t, err)
+	require.NotNil(t, fileMap)
+	require.Equal(t, 4, len(fileMap))
+	data, contains := fileMap["instance-12.tf.json.new"]
+	require.True(t, contains)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("instance-12"): {"key1": "val1"},
+			},
+			TResourceType("nfs"): {
+				TResourceName("instance-12-default-nfs"): {"nfs-k1": "nfs-v1"},
+			},
+		},
+		data,
+	)
+	data, contains = fileMap["instance-34.tf.json"]
+	require.True(t, contains)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("instance-34"): {"key2": "val2"},
+			},
+		},
+		data,
+	)
+	data, contains = fileMap["default-dedicated-instance-34.tf.json"]
+	require.True(t, contains)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("nfs"): {
+				TResourceName("instance-34-dedicated-nfs"): {"nfs-k2": "nfs-v2"},
+			},
+		},
+		data,
+	)
+	data, contains = fileMap["scope_global.tf.json"]
+	require.True(t, contains)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("nfs"): {
+				TResourceName("global-nfs"): {"nfs-k3": "nfs-v3"},
+			},
+		},
+		data,
+	)
 }

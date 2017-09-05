@@ -213,7 +213,199 @@ ID                            	LOGICAL                       	TAGS
 
 ![RSG Screenshot](terminated.png)
 
-## Technical Details
+## Resource Scoping
+
+The most basic instance specification contains a VM definition, `Provision` is executed on this
+specification multiple times when creating a group of similar resources. But what about resources
+that need to survive rolling updates? Or resources that are shared across an entire group? In order
+to address these infrastructure needs, the terraform instance plugin has a "scoping" concept with
+the following options:
+
+- **Default:** Resources defined with this scope have a 1-to-1 relationship with the VM and
+a _tightly coupled_ lifecyle
+- **Dedicated:**  Resources defined with this scope have a 1-to-1 relationship with the VM
+and a _loosly coupled_ lifecycle
+- **Global:** Resources defined with this scope are _not coupled_ with the lifecycle of any
+specific VM
+
+The implications of these scoping options with group actions are highlighted below:
+
+| Scope     | Group Create | Rolling Update    | Scale Up  | Scale Down | Group Destroy |
+| ---       | ---          | ---               | ---       | ---        | ---           |
+| Default   | -            | Destroy/Provision | Provision | Destroy    | -             |
+| Dedicated | -            | -                 | Provision | Destroy    | -             |
+| Global    | Provision    | -                 | -         | -          | Destroy       |
+
+The scope defined using the `@scope` property in the terraform resource definition. The values
+of this property are as follows:
+
+- **Default**: `@default`. All resources are of this type if the `@scope` property is omitted.
+- **Dedicated**: `@dedicated-<id>`. The `<id>` value is used as a dedicated scope identifier and, if
+omitted, defaults to `default`. The recommendation is to use the group ID as the dedicated scope ID.
+- **Global**: Any other value.
+
+### Logical ID (pets) example
+
+For example, the following defines a manager group with 3 members, globally shared NFS, and dedicated
+block storage.
+
+```json
+{
+  "ID": "managers",
+  "Properties": {
+    "Allocation": {
+      "LogicalIDs": [
+        "mgr1", "mgr2", "mgr3"
+      ]
+    },
+    "Instance": {
+      "Plugin": "instance-terraform",
+      "Properties": {
+        "resource": {
+          "ibm_compute_vm_instance": {
+            "host": {
+              ...
+            }
+          },
+          "ibm_storage_block": {
+            "my_block_storage": {
+              "@scope": "@dedicated-managers",
+              ...
+            }
+          },
+          "ibm_storage_file": {
+            "my_file_storage": {
+              "@scope": "managers",
+              ...
+            }
+          }
+        }
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-swarm/worker",
+      "Properties": {
+        "Init": [
+          "echo \"NFS ID: \"${ibm_storage_file.managers-my_file_storage.id}\"",
+          "echo \"Block storage ID: \"${ibm_storage_block.managers-{{ var \"/self/logicalId\" }}-my_block_storage.id}\""
+        ]
+      }
+    }
+  }
+}
+```
+The dedicated/global files and resources for a group specification **with logical IDs** adhere to the following format:
+
+| Type      | Filename                                  | Terraform Resource Path                               |
+| ---       | ---                                       | ---                                                   |
+| Dedicated | `<scopeID>_dedicated_<logicalID>.tf.json` | `<resourceType>.<scopeID>-<logicalID>-<resourceName>` |
+| Global    | `<scopeValue>_global.tf.json`             | `<resourceType>.<scopeValue>-<resourceName>`          |
+
+For example, the specific resources created by the above specification are:
+
+| Resource        | Filename                          | Terraform Resource Path                            |
+| ---             | ---                               | ---                                                |
+| Manager-1 VM    | `instance-xxx1.tf.json`           | `ibm_compute_vm_instance.instance-xxx1`            |
+| Manager-2 VM    | `instance-xxx2.tf.json`           | `ibm_compute_vm_instance.instance-xxx2`            |
+| Manager-3 VM    | `instance-xxx3.tf.json`           | `ibm_compute_vm_instance.instance-xxx3`            |
+| Manager-1 Block | `managers_dedicated_mgr1.tf.json` | `ibm_storage_block.managers-mgr1-my_block_storage` |
+| Manager-2 Block | `managers_dedicated_mgr2.tf.json` | `ibm_storage_block.managers-mgr2-my_block_storage` |
+| Manager-3 Block | `managers_dedicated_mgr3.tf.json` | `ibm_storage_block.managers-mgr3-my_block_storage` |
+| Global NFS      | `managers_global.tf.json`         | `ibm_storage_file.managers-my_file_storage`        |
+
+Dedicated resources for VMs **with a logical ID** assigned have the logical ID in the resource name.
+Note that the template variable `/self/logicalId` is used in the `Init` script to dynamically determine
+the specific instance in the quorum group that is being provisioned.
+
+### Cattle example
+
+In the first example, the dedicated resources have a predictable naming scheme since logical IDs are
+supplied. The following example shows how a similarly defined scaling group is handled:
+
+```json
+{
+  "ID": "workers",
+  "Properties": {
+    "Allocation": {
+      "Size": 3
+    },
+    "Instance": {
+      "Plugin": "instance-terraform",
+      "Properties": {
+        "resource": {
+          "ibm_compute_vm_instance": {
+            "host": {
+              ...
+            }
+          },
+          "ibm_storage_block": {
+            "my_block_storage": {
+              "@scope": "@dedicated-workers",
+              ...
+            }
+          },
+          "ibm_storage_file": {
+            "my_file_storage": {
+              "@scope": "workers",
+              ...
+            }
+          }
+        }
+      }
+    },
+    "Flavor": {
+      "Plugin": "flavor-swarm/worker",
+      "Properties": {
+        "Init": [
+          "echo \"NFS ID: \"${ibm_storage_file.workers-my_file_storage.id}\"",
+          "echo \"Block storage ID: \"${ibm_storage_block.workers-{{ var \"/self/dedicated/attachId\" }}-my_block_storage.id}\""
+        ]
+      }
+    }
+  }
+}
+```
+The dedicated/global files and resources for a group specification **without logical IDs** adhere to the following format:
+
+| Type      | Filename                              | Terraform Resource Path                               |
+| ---       | ---                                   | ---                                                   |
+| Dedicated | `<scopeID>_dedicated_<index>.tf.json` | `<resourceType>.<scopeID>-<index>-<resourceName>` |
+| Global    | `<scopeValue>_global.tf.json`         | `<resourceType>.<scopeValue>-<resourceName>`          |
+
+For example, the specific resources created by the above specification are:
+
+| Resource       | Filename                      | Terraform Resource Path                        |
+| ---            | ---                           | ---                                            |
+| Worker-1 VM    | `instance-yyy1.tf.json`       | `ibm_compute_vm_instance.instance-yyy1`        |
+| Worker-2 VM    | `instance-yyy2.tf.json`       | `ibm_compute_vm_instance.instance-yyy2`        |
+| Worker-3 VM    | `instance-yyy3.tf.json`       | `ibm_compute_vm_instance.instance-yyy3`        |
+| Worker-1 Block | `workers_dedicated_1.tf.json` | `ibm_storage_block.workers-1-my_block_storage` |
+| Worker-2 Block | `workers_dedicated_2.tf.json` | `ibm_storage_block.workers-2-my_block_storage` |
+| Worker-3 Block | `workers_dedicated_3.tf.json` | `ibm_storage_block.workers-3-my_block_storage` |
+| Global NFS     | `workers_global.tf.json`      | `ibm_storage_file.workers-my_file_storage`     |
+
+Dedicated resources for VMs **without a logical ID** assigned are not as easily mapped to the as those with
+a logical ID; the file and resource name has an index value that increments as the group scales. The template
+variable `/self/dedicated/attachId` is used in the `Init` script to dynamically determine the dedicated resource
+name that is associated with the instance.
+
+Next, assume that a rolling update was done on this group, resulting in all of `yyy` VM instances being
+replaced with `zzz` instances. After the update is completed the resources look like:
+
+| Resource       | Filename                      | Terraform Resource Path                        |
+| ---            | ---                           | ---                                            |
+| Worker-1 VM    | `instance-zzz1.tf.json`       | `ibm_compute_vm_instance.instance-zzz1`        |
+| Worker-2 VM    | `instance-zzz2.tf.json`       | `ibm_compute_vm_instance.instance-zzz2`        |
+| Worker-3 VM    | `instance-zzz3.tf.json`       | `ibm_compute_vm_instance.instance-zzz3`        |
+| Worker-1 Block | `workers_dedicated_1.tf.json` | `ibm_storage_block.workers-1-my_block_storage` |
+| Worker-2 Block | `workers_dedicated_2.tf.json` | `ibm_storage_block.workers-2-my_block_storage` |
+| Worker-3 Block | `workers_dedicated_3.tf.json` | `ibm_storage_block.workers-3-my_block_storage` |
+| Global NFS     | `workers_global.tf.json`      | `ibm_storage_file.workers-my_file_storage`     |
+
+During provision, the plugin determines an orphaned dedicated block storage resource and links it with the
+new instance.
+
+## Orphan Detection
 
 Terraform tracks the state of resources (corresponding to `.tf.json` files) in the `.tfstate` file.
 
@@ -234,5 +426,5 @@ executes the following:
 6. Releases file lock (from step 1)
 7. Executes `terraform apply -no-refresh`
 
-But naming new files with the `.tf.json.new` suffix in the `Provision` flow, the plugin can differentiate
+By naming new files with the `.tf.json.new` suffix in the `Provision` flow, the plugin can differentiate
 between orphaned resources and those queued up for creation.

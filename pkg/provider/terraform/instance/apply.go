@@ -150,18 +150,25 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	}
 	tfStateResources, err := fns.tfStateList(p.Dir)
 	if err != nil {
+		// TODO(kaufers): If it possible that not all of the .new files were moved to
+		//  .tf.json files (NFS connection could be lost) and this could make the refresh
+		//  always fail due to references that are not valid. Update this flow to still
+		//  rename .new files even if the refresh fails (but do not prune or apply since
+		//  we need valid refresh'd data) and then let the next iteration attempt to
+		//  reconsile things.
 		return err
 	}
 
-	// Get current file system instances
-	tfFiles := map[TResourceType]map[TResourceName]string{}
-	tfNewFiles := map[TResourceType]map[TResourceName]string{}
+	// Get all instance files and all new files
+	tfInstFiles := map[TResourceType]map[TResourceName]string{}
+	tfNewFiles := map[string]struct{}{}
 	fs := &afero.Afero{Fs: p.fs}
-	// just scan the directory for the *.tf.json[.new] files
 	err = fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
-			matches := tfFileRegex.FindStringSubmatch(info.Name())
-			if len(matches) == 3 {
+			// Only the VM files are valid for pruning; once pruned then the group controller polling will
+			// ensure that a replacement is created. There is no mechanism that ensures consistency for
+			// dedicated and global resources.
+			if m := instanceTfFileRegex.FindStringSubmatch(info.Name()); len(m) == 4 && m[3] == "" {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
 					log.Warningln("Cannot parse:", err)
@@ -171,22 +178,17 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 				if err = types.AnyBytes(buff).Decode(&tf); err != nil {
 					return err
 				}
-				// Populate the correct tf map
-				var tfMap map[TResourceType]map[TResourceName]string
-				if matches[2] == ".new" {
-					tfMap = tfNewFiles
-				} else {
-					tfMap = tfFiles
-				}
 				for resType, resNameProps := range tf.Resource {
 					for resName := range resNameProps {
-						if _, has := tfMap[resType]; !has {
-							tfMap[resType] = map[TResourceName]string{}
+						if _, has := tfInstFiles[resType]; !has {
+							tfInstFiles[resType] = map[TResourceName]string{}
 						}
-						tfMap[resType][resName] = info.Name()
+						tfInstFiles[resType][resName] = info.Name()
 						log.Debugf("File %s contains resource %s.%s", info.Name(), resType, resName)
 					}
 				}
+			} else if m := tfFileRegex.FindStringSubmatch(info.Name()); len(m) == 3 && m[2] == ".new" {
+				tfNewFiles[info.Name()] = struct{}{}
 			}
 			return nil
 		},
@@ -198,7 +200,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	// Determine files to prune, since multiple resource types can exist per file we want to
 	// track unique filenames
 	prunes := make(map[string]struct{})
-	for resType, resNameFilenameMap := range tfFiles {
+	for resType, resNameFilenameMap := range tfInstFiles {
 		log.Infof("Detected %v tf.json files for resource type %v", len(resNameFilenameMap), resType)
 		if tfStateResNames, has := tfStateResources[resType]; has {
 			// State files have instances of this type, check each resource name
@@ -233,15 +235,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	if len(tfNewFiles) == 0 {
 		log.Infof("No tf.json.new files to move")
 	} else {
-		// Any .tf.json.new file with multiple resources will result in duplicates, remove
-		// them before moving files
-		files := make(map[string]struct{})
-		for _, resNameFileMap := range tfNewFiles {
-			for _, filename := range resNameFileMap {
-				files[filename] = struct{}{}
-			}
-		}
-		for file := range files {
+		for file := range tfNewFiles {
 			path := filepath.Join(p.Dir, file)
 			log.Infof("Removing .new suffix from file: %v", path)
 			err = p.fs.Rename(path, strings.Replace(path, "tf.json.new", "tf.json", -1))
