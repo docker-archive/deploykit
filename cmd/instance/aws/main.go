@@ -79,6 +79,7 @@ func main() {
 					"cloudwatchlogs-loggroup":         instance.NewLogGroupPlugin(cloudWatchLogsClient, namespace),
 					"dynamodb-table":                  instance.NewTablePlugin(dynamodbClient, namespace),
 					"ec2-instance":                    instancePlugin,
+					"ec2-spot-instance":               instance.NewSpotInstancePlugin(ec2Client, namespace),
 					"ec2-internetgateway":             instance.NewInternetGatewayPlugin(ec2Client, namespace),
 					"ec2-routetable":                  instance.NewRouteTablePlugin(ec2Client, namespace),
 					"ec2-securitygroup":               instance.NewSecurityGroupPlugin(ec2Client, namespace),
