@@ -78,6 +78,12 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 	}
 
 	unpublish.RunE = func(cmd *cobra.Command, args []string) error {
+
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
 		l4, err := Load(services.Plugins(), name)
 		if err != nil {
 			return nil
