@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
@@ -17,9 +18,10 @@ import (
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
-	kubediscovery "github.com/kubernetes/kubernetes/cmd/kubeadm/app/discovery"
-	kubetoken "github.com/kubernetes/kubernetes/cmd/kubeadm/app/util/token"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubediscovery "k8s.io/kubernetes/cmd/kubeadm/app/discovery"
+	kubetoken "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 )
 
 var (
@@ -72,6 +74,17 @@ type baseFlavor struct {
 	metadataPlugin metadata.Plugin
 	plugins        func() discovery.Plugins
 	kubeConfDir    string
+}
+
+func checkKubeAPIServer(cfg kubeadmapi.NodeConfiguration, check chan error, clcfg *clientcmdapi.Config) {
+	defer close(check)
+	clcfg, err := kubediscovery.For(&cfg)
+	if err != nil {
+		log.Warn("Cannot connect to Kubernetes API server", "err", err)
+		check <- err
+	}
+	check <- nil
+	return
 }
 
 // Validate checks the configuration of flavor plugin.
@@ -144,15 +157,27 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	var token string
 	switch role {
 	case "manager":
-		if err := os.Mkdir(clDir, 0777); err != nil {
-			return instanceSpec, err
-		}
-		token, err = kubetoken.GenerateToken()
-		if err != nil {
-			return instanceSpec, err
+		if _, err := os.Stat(clDir); err != nil {
+			if err := os.Mkdir(clDir, 0777); err != nil {
+				return instanceSpec, err
+			}
 		}
 		f := path.Join(clDir, "kubeadm-token")
-		ioutil.WriteFile(f, []byte(token), 0666)
+		if _, err := os.Stat(f); err == nil {
+			if btoken, err := ioutil.ReadFile(f); err != nil {
+				return instanceSpec, err
+			}
+			token = string(btoken)
+		} else {
+			token, err = kubetoken.GenerateToken()
+			if err != nil {
+				return instanceSpec, err
+			}
+			if err := ioutil.WriteFile(f, []byte(token), 0666); err != nil {
+				return instanceSpec, err
+			}
+		}
+		token = strings.TrimRight(token, "\n")
 	case "worker":
 		f := path.Join(clDir, "kubeadm-token")
 		d, err := ioutil.ReadFile(f)
@@ -160,22 +185,24 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			return instanceSpec, err
 		}
 		token = string(d)
+		token = strings.TrimRight(token, "\n")
 		if !spec.SkipManagerValidation {
 			cfg := kubeadmapi.NodeConfiguration{
 				DiscoveryTokenAPIServers: []string{spec.KubeJoinIP + ":" + strconv.Itoa(spec.KubeBindPort)},
 				DiscoveryToken:           token,
 			}
-			for i := 0; ; i++ {
-				_, err := kubediscovery.For(&cfg)
-				log.Debug("Querying Kubernetes API server", "role", role, "i", i)
-				if err != nil {
-					log.Warn("Cannot connect to Kubernetes API server", "err", err)
-					if i > 10 {
-						return instanceSpec, err
-					}
-				} else {
-					break
+			c := make(chan error)
+			var clcfg *clientcmdapi.Config
+			go checkKubeApiServer(cfg, c, clcfg)
+			select {
+			case apicheck := <-c:
+				if apicheck != nil {
+					return instanceSpec, err
 				}
+			case <-time.After(120 * time.Second):
+				log.Warn("Connection time out for Kubernetes API server")
+				log.Warn("If Kubernetes API server is not reachable, you can set `SkipManagerValidation: true` in your configuration.")
+				return instanceSpec, fmt.Errorf("Connection time out for Kubernetes API server %s", spec.KubeJoinIP+":"+strconv.Itoa(spec.KubeBindPort))
 			}
 		}
 	}
