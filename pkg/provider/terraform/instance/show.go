@@ -79,12 +79,19 @@ var mapRegex = regexp.MustCompile("^([^.]+)\\.%")
 // set -o nounset
 // set -o xtrace
 // apt-get -y update
-func parseTerraformShowOutput(byType TResourceType, propFilter []string, input io.Reader) (map[TResourceName]TResourceProperties, error) {
-	found := map[TResourceName]TResourceProperties{}
-
-	reader := bufio.NewReader(input)
-	var resourceName TResourceName
+func parseTerraformShowOutput(resTypes []TResourceType, propFilter []string, input io.Reader) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	// Convert types to map for filtering on resource types
+	resTypeFilter := make(map[TResourceType]struct{}, len(resTypes))
+	for _, resType := range resTypes {
+		resTypeFilter[resType] = struct{}{}
+	}
+	// Track property key for multi-line property
 	var propKey string
+	// Track properties for current resource
+	var props TResourceProperties
+
+	results := map[TResourceType]map[TResourceName]TResourceProperties{}
+	reader := bufio.NewReader(input)
 	for {
 		line, _, err := reader.ReadLine()
 		if err != nil {
@@ -93,46 +100,54 @@ func parseTerraformShowOutput(byType TResourceType, propFilter []string, input i
 
 		m := title.FindAllStringSubmatch(string(line), -1)
 		if m != nil && len(m[0][1]) > 0 && len(m[0][2]) > 0 {
-			// Line is for a new resource type
-			resourceType := TResourceType(m[0][1])
-			if resourceType != byType {
-				resourceName = ""
+			// Line is for a new resource, verify supported type
+			resType := TResourceType(m[0][1])
+			if _, has := resTypeFilter[resType]; !has {
+				props = nil
 				continue
 			}
-			resourceName = TResourceName(m[0][2])
-			found[resourceName] = TResourceProperties{}
-		} else if resourceName != "" {
-			if props, has := found[resourceName]; has {
-				p := properties.FindAllStringSubmatch(string(line), -1)
-				if p != nil && len(p[0][1]) > 0 {
-					propKey = strings.TrimSpace(p[0][1])
-					value := strings.TrimSpace(p[0][2])
-					props[propKey] = value
-				} else {
-					// Append to previous key
-					props[propKey] = fmt.Sprintf("%s\n%s", props[propKey], line)
-				}
+			resourceName := TResourceName(m[0][2])
+			var resNamePropMap map[TResourceName]TResourceProperties
+			if entry, has := results[resType]; has {
+				resNamePropMap = entry
+			} else {
+				resNamePropMap = make(map[TResourceName]TResourceProperties)
+				results[resType] = resNamePropMap
+			}
+			props = TResourceProperties{}
+			resNamePropMap[resourceName] = props
+		} else if props != nil {
+			p := properties.FindAllStringSubmatch(string(line), -1)
+			if p != nil && len(p[0][1]) > 0 {
+				propKey = strings.TrimSpace(p[0][1])
+				value := strings.TrimSpace(p[0][2])
+				props[propKey] = value
+			} else {
+				// Append to previous key
+				props[propKey] = fmt.Sprintf("%s\n%s", props[propKey], line)
 			}
 		}
 	}
 
 	// Process the properties to convert from string to native types
-	for _, props := range found {
-		expandProps(props)
-		// TODO(kaufers): Move this filtering to where the lines are being processed
-		if propFilter != nil && len(propFilter) > 0 {
-			propMap := make(map[string]struct{}, len(propFilter))
-			for _, propID := range propFilter {
-				propMap[propID] = struct{}{}
-			}
-			for propID, _ := range props {
-				if _, has := propMap[propID]; !has {
-					delete(props, propID)
+	for _, resNameProps := range results {
+		for _, props := range resNameProps {
+			expandProps(props)
+			// TODO(kaufers): Move this filtering to where the lines are being processed
+			if propFilter != nil && len(propFilter) > 0 {
+				propMap := make(map[string]struct{}, len(propFilter))
+				for _, propID := range propFilter {
+					propMap[propID] = struct{}{}
+				}
+				for propID := range props {
+					if _, has := propMap[propID]; !has {
+						delete(props, propID)
+					}
 				}
 			}
 		}
 	}
-	return found, nil
+	return results, nil
 }
 
 // parseTerraformShowForInstanceOutput calls terraform show for a specific resource
@@ -264,14 +279,14 @@ func convertToType(val string) interface{} {
 
 // doTerraformShow shells out to run `terraform show` and parses the result
 func doTerraformShow(dir string,
-	resourceType TResourceType,
-	propFilter []string) (result map[TResourceName]TResourceProperties, err error) {
+	resTypes []TResourceType,
+	propFilter []string) (result map[TResourceType]map[TResourceName]TResourceProperties, err error) {
 
 	command := exec.Command("terraform show -no-color").InheritEnvs(true).WithDir(dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {
-			found, err := parseTerraformShowOutput(resourceType, propFilter, r)
+			found, err := parseTerraformShowOutput(resTypes, propFilter, r)
 			result = found
 			return err
 		},

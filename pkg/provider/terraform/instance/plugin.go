@@ -1133,10 +1133,8 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		// TODO - not the most efficient, but here we assume we're usually just one vm type
 		for vmResourceType := range localSpecs {
 
-			if instances, err := doTerraformShow(p.Dir, vmResourceType, nil); err == nil {
-
-				terraformShowResult[vmResourceType] = instances
-
+			if result, err := doTerraformShow(p.Dir, []TResourceType{vmResourceType}, nil); err == nil {
+				terraformShowResult = result
 			} else {
 				// Don't blow up... just do best and show what we can find.
 				log.Warnln("cannot terraform show:", err)
@@ -1256,7 +1254,7 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 
 // External functions using during import; broken out for testing
 type importFns struct {
-	tfShow     func(dir string, types TResourceType, propFilter []string) (map[TResourceName]TResourceProperties, error)
+	tfShow     func(dir string, resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
 	tfImport   func(vmType TResourceType, filename, vmID string) error
 	tfShowInst func(dir, id string) (TResourceProperties, error)
 	tfClean    func(vmType TResourceType, vmName string)
@@ -1292,22 +1290,27 @@ func (p *plugin) importResource(fns importFns, resourceID string, spec *instance
 	}
 
 	// Only import if terraform is not already managing
-	existingVMs, err := fns.tfShow(p.Dir, specVMType, []string{"id"})
+	existingResources, err := fns.tfShow(p.Dir, []TResourceType{specVMType}, []string{"id"})
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("Terraform is managing %v resources of type %v", len(existingVMs), specVMType)
-	for name, props := range existingVMs {
-		if idVal, has := props["id"]; has {
-			idStr := fmt.Sprintf("%v", idVal)
-			if idStr == resourceID {
-				log.Infof("Resource %v with ID %v is already managed by terraform", name, idStr)
-				id := instance.ID(name)
-				return &id, nil
+	for resType, resNameProps := range existingResources {
+		log.Infof("Terraform is managing %v resources of type %v", len(resNameProps), resType)
+		if specVMType != resType {
+			continue
+		}
+		for name, props := range resNameProps {
+			if idVal, has := props["id"]; has {
+				idStr := fmt.Sprintf("%v", idVal)
+				if idStr == resourceID {
+					log.Infof("Resource %v with ID %v is already managed by terraform", name, idStr)
+					id := instance.ID(name)
+					return &id, nil
+				}
+				log.Debugf("Resource with ID '%s' does not match '%s'", idStr, resourceID)
+			} else {
+				log.Warnf("Resource %v is missing 'id' prop", name)
 			}
-			log.Debugf("Resource with ID '%s' does not match '%s'", idStr, resourceID)
-		} else {
-			log.Warnf("Resource %v is missing 'id' prop", name)
 		}
 	}
 
