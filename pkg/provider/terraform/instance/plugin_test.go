@@ -1354,6 +1354,50 @@ func TestWriteTerraformFilesSingle(t *testing.T) {
 	)
 }
 
+func TestWriteTerraformFilesSingleOverride(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	fileMap := make(map[string]*TFormat)
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("instance-1234"): {"p1": "v1"},
+			},
+		},
+	}
+	fileMap["instance-1234"] = &tFormat
+	// Indicate that the file already exists as .tf.json file, create it with
+	// garbage (it should be overriden)
+	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-1234.tf.json"), []byte("not-json"), 0644)
+	require.NoError(t, err)
+	err = tf.writeTerraformFiles(
+		fileMap,
+		map[string]struct{}{
+			"instance-1234.tf.json": struct{}{},
+		},
+	)
+	require.NoError(t, err)
+	// Read single file from disk
+	files, err := ioutil.ReadDir(tf.Dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, "instance-1234.tf.json"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				VMSoftLayer: {
+					TResourceName("instance-1234"): {"p1": "v1"},
+				},
+			},
+		},
+		tFormat,
+	)
+}
+
 func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
@@ -1457,7 +1501,13 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	fileMap[name] = &tFormatDefault
 	fileMap[fmt.Sprintf("default_dedicated_%s", name)] = &tFormatDedicated
 	fileMap[fmt.Sprintf("%s_global", globalName)] = &tFormatGlobal
-	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
+	err := tf.writeTerraformFiles(
+		fileMap,
+		map[string]struct{}{
+			"instance-1111.tf.json":                      struct{}{},
+			fmt.Sprintf("%s_global.tf.json", globalName): struct{}{},
+		},
+	)
 	require.NoError(t, err)
 	// Should be 3 files on disk
 	files, err := ioutil.ReadDir(tf.Dir)
@@ -1469,7 +1519,7 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	}
 	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", name))
 	require.Contains(t, filenames, fmt.Sprintf("default_dedicated_%s.tf.json.new", name))
-	expectedGlobalFilename := fmt.Sprintf("%s_global.tf.json.new", globalName)
+	expectedGlobalFilename := fmt.Sprintf("%s_global.tf.json", globalName)
 	require.Contains(t, filenames, expectedGlobalFilename)
 	// Default
 	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", name)))

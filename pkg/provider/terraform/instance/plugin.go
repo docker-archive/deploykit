@@ -761,15 +761,17 @@ func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles m
 		dataMap[filename] = buff
 	}
 
-	// And write out each file.
-	for filename, tfVal := range fileMap {
-		buff, err := json.MarshalIndent(tfVal, "  ", "  ")
-		path := filepath.Join(p.Dir, filename+".tf.json.new")
-		log.Debugln("writeTerraformFiles", path, "data=", string(buff), "err=", err)
-		if err != nil {
-			return err
+	// And write out each file, override data in tf.json if it already exists
+	for filename, buff := range dataMap {
+		var path string
+		if _, has := currentFiles[filename+".tf.json"]; has {
+			path = filepath.Join(p.Dir, filename+".tf.json")
+			log.Infof("Overriding data in file: %v", path)
+		} else {
+			path = filepath.Join(p.Dir, filename+".tf.json.new")
 		}
-		err = afero.WriteFile(p.fs, path, buff, 0644)
+		log.Debugln("writeTerraformFiles", path, "data=", string(buff))
+		err := afero.WriteFile(p.fs, path, buff, 0644)
 		if err != nil {
 			return err
 		}
@@ -950,7 +952,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	// Handle any platform specific updates to the VM properties prior to writing out
 	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, vmProps)
-	// Write out the tf.json file
+	// Write out the tf.json[.new] files
 	if err = p.writeTerraformFiles(decomposedFiles.FileMap, decomposedFiles.CurrentFiles); err != nil {
 		return nil, err
 	}
