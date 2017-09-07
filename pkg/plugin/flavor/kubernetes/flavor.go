@@ -164,7 +164,8 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		}
 		f := path.Join(clDir, "kubeadm-token")
 		if _, err := os.Stat(f); err == nil {
-			if btoken, err := ioutil.ReadFile(f); err != nil {
+			var btoken []byte
+			if btoken, err = ioutil.ReadFile(f); err != nil {
 				return instanceSpec, err
 			}
 			token = string(btoken)
@@ -193,7 +194,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			}
 			c := make(chan error)
 			var clcfg *clientcmdapi.Config
-			go checkKubeApiServer(cfg, c, clcfg)
+			go checkKubeAPIServer(cfg, c, clcfg)
 			select {
 			case apicheck := <-c:
 				if apicheck != nil {
