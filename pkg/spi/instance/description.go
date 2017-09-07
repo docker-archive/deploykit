@@ -5,8 +5,8 @@ import (
 )
 
 // Fingerprint returns the fingerprint of the spec
-func (s Description) Fingerprint() string {
-	return types.Fingerprint(types.AnyValueMust(s))
+func (d Description) Fingerprint() string {
+	return types.Fingerprint(types.AnyValueMust(d))
 }
 
 // Compare compares the two descriptions by ID

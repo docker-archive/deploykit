@@ -82,7 +82,7 @@ func mustTrue(v bool, e error) bool {
 }
 
 // object returns the state
-func (l enroller) object() (*types.Object, error) {
+func (l *enroller) object() (*types.Object, error) {
 	object := types.Object{
 		Spec: l.spec,
 	}

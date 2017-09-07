@@ -18,7 +18,7 @@ func (l *enroller) getSourceInstances() ([]instance.Description, error) {
 
 		pn, err := l.properties.List.GroupPlugin()
 		if err != nil {
-			return nil, fmt.Errorf("No list source specified.")
+			return nil, fmt.Errorf("no list source specified")
 		}
 
 		// we have a plugin name. -- eg. us-east/workers
@@ -26,7 +26,7 @@ func (l *enroller) getSourceInstances() ([]instance.Description, error) {
 
 		gp, err := l.getGroupPlugin(plugin.Name(lookup))
 		if err != nil {
-			return nil, fmt.Errorf("Cannot connect to group %v", pn)
+			return nil, fmt.Errorf("cannot connect to group %v", pn)
 		}
 
 		desc, err := gp.DescribeGroup(group.ID(gid))

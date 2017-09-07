@@ -81,7 +81,7 @@ func (u *ListSourceUnion) InstanceDescriptions() ([]instance.Description, error)
 	return list, err
 }
 
-// GroupPluginName tries to 'cast' the union value as a group plugin name
+// GroupPlugin tries to 'cast' the union value as a group plugin name
 func (u *ListSourceUnion) GroupPlugin() (plugin.Name, error) {
 	p := plugin.Name("")
 	err := (*types.Any)(u).Decode(&p)
