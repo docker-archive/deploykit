@@ -1,5 +1,20 @@
 # Oracle BMC Golang SDK
+===============================================================
 Unofficial Oracle Bare Metal Cloud Golang SDK
+
+
+
+<p align="center">
+  <a href="http://golang.org" target="_blank"><img alt="Go package" src="https://golang.org/doc/gopher/pencil/gopherhat.jpg" width="20%" /></a>
+</p>
+<p align="center">
+  <img src="https://cdn4.iconfinder.com/data/icons/linecon/512/add-128.png" alt="plus" />
+</p>
+<p align="center">
+  <a href="https://www.oraclecloud.com/" target="_blank"><img src="https://static1.squarespace.com/static/587d94cf4402432706cdd02d/t/58cee1bd1b10e37dbd70b243/1489953226294/oracle-logo" alt="Oracle Cloud Logo"/></a>
+</p>
+
+
 
 
 ## Requirements
