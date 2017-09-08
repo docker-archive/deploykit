@@ -1,2 +1,56 @@
-# oracle-sdk-go
+# Oracle BMC Golang SDK
 Unofficial Oracle Bare Metal Cloud Golang SDK
+
+
+## Requirements
+The following variables are needed in order to make successful calls to the BMC API
+
+* User - The user for the compartment
+```
+user=ocid1.user.oc1..aaaaaaaat5nvwcna5j6aqzjcaty5eqbb6qt2jvpkanghtgdaqedqw3rynjq
+```
+* Fingerprint - The API key fingerprint; this fingerprint can be found within the Oracle BMC console
+```
+fingerprint=20:3b:97:13:55:1c:5b:0d:d3:37:d8:50:4e:c5:3a:34
+```
+* KeyFile - The API key file location
+```
+key_file=~/.oraclebmc/bmcs_api_key.pem
+```
+* Tenancy - Your tenancy compartment ID
+```
+tenancy=ocid1.tenancy.oc1..aaaaaaaaba3pv6wkcr4jqae5f15p2b2m2yt2j6rx32uzr4h25vqstifsfdsq
+```
+* Region - The region corresponding to the compartment in use
+```
+region=us-ashburn-1
+```
+
+A default config file can also be used; the typical location for the Oracle BMC config is: `~/.oraclebmc/config`
+The config file should have the following format:
+```
+[DEFAULT]
+  user=ocid1.user.oc1..aaaaaaaat5nvwcna5j6aqzjcaty5eqbb6qt2jvpkanghtgdaqedqw3rynjq
+  fingerprint=20:3b:97:13:55:1c:5b:0d:d3:37:d8:50:4e:c5:3a:34
+  key_file=~/.oraclebmc/bmcs_api_key.pem
+  tenancy=ocid1.tenancy.oc1..aaaaaaaaba3pv6wkcr4jqae5f15p2b2m2yt2j6rx32uzr4h25vqstifsfdsq
+  region=us-ashburn-1
+```
+
+# Support Endpoint
+
+The following endpoints are provided by the [Oracle BMC API](https://docs.us-phoenix-1.oraclecloud.com/api/)
+
+| Name | Support |
+| --- | --- |
+| Audit API | NO |
+| Database Service API | NO |
+| Core Services API | NO |
+| Identity and Access Management Service API | NO |
+| Load Balancing Service API | NO |
+| Object Storage Service API | NO |
+| S3 Object Storage Service API | NO |
+
+Only API supported at the moment is to get instance details
+* List instances
+* Get instance
