@@ -129,6 +129,12 @@ type Properties struct {
 // Options is the controller options
 type Options struct {
 
+	// SourceKeySelector is a string template for selecting the join key from
+	// a source instance.Description. This selector template should use escapes
+	// so that the template {{ and }} are preserved.  For example,
+	// SourceKeySelector: \{\{ .ID \}\}  # selects the ID field.
+	SourceKeySelector string
+
 	// SyncInterval is the time interval between reconciliation
 	SyncInterval time.Duration
 

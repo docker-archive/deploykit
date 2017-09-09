@@ -1,6 +1,7 @@
 package enrollment
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/plugin"
@@ -34,7 +35,7 @@ func (l *enroller) getSourceInstances() ([]instance.Description, error) {
 			return nil, err
 		}
 
-		list = desc.Instances
+		return desc.Instances, nil
 	}
 	return list, err
 }
@@ -46,6 +47,56 @@ func (l *enroller) getEnrolledInstances() ([]instance.Description, error) {
 	}
 
 	return instancePlugin.DescribeInstances(l.properties.Instance.Labels, true)
+}
+
+func buildTemplate(source []byte) (*template.Template, error) {
+	if source == nil {
+		return nil, nil
+	}
+	// Apply the template but we need escape the \{\{ if any
+	buff := source
+	buff = bytes.Replace(buff, []byte("\\{\\{"), []byte("{{"), -1)
+	buff = bytes.Replace(buff, []byte("\\}\\}"), []byte("}}"), -1)
+
+	// YAML will escape the escapes... so twice
+	buff = bytes.Replace(buff, []byte("\\\\{\\\\{"), []byte("{{"), -1)
+	buff = bytes.Replace(buff, []byte("\\\\}\\\\}"), []byte("}}"), -1)
+
+	return template.NewTemplate("str://"+string(buff), template.Options{MultiPass: false})
+}
+
+func (l *enroller) getSourceKeySelectorTemplate() (*template.Template, error) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if l.options.SourceKeySelector != "" {
+		if l.sourceKeySelectorTemplate == nil {
+			t, err := buildTemplate([]byte(l.options.SourceKeySelector))
+			if err != nil {
+				return nil, err
+			}
+			l.sourceKeySelectorTemplate = t
+		}
+	}
+
+	return l.sourceKeySelectorTemplate, nil
+}
+
+func (l *enroller) getEnrollmentPropertiesTemplate() (*template.Template, error) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if l.properties.Instance.Properties != nil {
+		if l.enrollmentPropertiesTemplate == nil {
+			t, err := buildTemplate(l.properties.Instance.Properties.Bytes())
+			if err != nil {
+				return nil, err
+			}
+			l.enrollmentPropertiesTemplate = t
+		}
+	}
+
+	return l.enrollmentPropertiesTemplate, nil
 }
 
 // run one synchronization round
@@ -67,21 +118,39 @@ func (l *enroller) sync() error {
 	// them.  This is because instance IDs from the respective lists are likely
 	// to be different.  Instead there's a join key / common attribute somewhere
 	// embedded in the Description.Properties.
-	sourceKeyFunc := func(d instance.Description) string {
-		// TODO render a template
-		return string(d.ID)
-	}
-	enrolledKeyFunc := func(d instance.Description) string {
-		// TODO render a template
-		if d.LogicalID != nil {
-			return string(*d.LogicalID)
+	sourceKeyFunc := func(d instance.Description) (string, error) {
+
+		t, err := l.getSourceKeySelectorTemplate()
+		if err != nil {
+			return "", err
 		}
-		return string(d.ID)
+		if t != nil {
+			view, err := t.Render(d)
+			if err != nil {
+				return "", err
+			}
+			return view, nil
+		}
+
+		return string(d.ID), nil
 	}
 
-	add, remove, _ := Delta(instance.Descriptions(enrolled), enrolledKeyFunc, instance.Descriptions(source), sourceKeyFunc)
+	// As long as the downstream enrollment records are labeled correctly we
+	// can even support 'importing' out-of-band created enrollment records
+	enrolledKeyFunc := func(d instance.Description) (string, error) {
+		if v, has := d.Tags["infrakit.enrollment.sourceID"]; has {
+			return v, nil
+		}
+		return "", fmt.Errorf("not-matched:%v", d.ID)
+	}
 
-	log.Debug("Computed delta", "add", add, "remove", remove)
+	// compute the delta required to make enrolled look like source
+	add, remove, _ := Delta(
+		instance.Descriptions(source), sourceKeyFunc,
+		instance.Descriptions(enrolled), enrolledKeyFunc,
+	)
+
+	log.Info("Computed delta", "add", add, "remove", remove)
 
 	instancePlugin, err := l.getInstancePlugin(l.properties.Instance.Plugin)
 	if err != nil {
@@ -96,11 +165,7 @@ func (l *enroller) sync() error {
 			log.Error("Cannot bulid properties to enroll", "err", err, "description", n)
 			continue
 		}
-
-		logicalID := instance.LogicalID(string(n.ID))
 		spec := instance.Spec{
-			LogicalID: &logicalID,
-			// TODO - render a template using the value n as context?
 			Properties: props,
 			Tags:       l.labels(n),
 		}
@@ -114,29 +179,24 @@ func (l *enroller) sync() error {
 		err = instancePlugin.Destroy(n.ID, instance.Termination)
 		if err != nil {
 			log.Error("Failed to remove enrollment", "err", err, "id", n.ID)
+			continue // get them next time...
 		}
 	}
 	return nil
 }
 
 // buildProperties for calling enrollment / Provision
-func (l *enroller) buildProperties(d instance.Description) (props *types.Any, err error) {
-	props = l.properties.Instance.Properties
-
-	if props == nil {
-		return
+func (l *enroller) buildProperties(d instance.Description) (*types.Any, error) {
+	t, err := l.getEnrollmentPropertiesTemplate()
+	if err != nil {
+		return nil, err
 	}
-
-	t, e := template.NewTemplate(props.String(), template.Options{MultiPass: false})
-	if e != nil {
-		err = e
-		return
+	if t == nil {
+		return types.AnyValue(d)
 	}
-
-	view, e := t.Render(d)
-	if e != nil {
-		err = e
-		return
+	view, err := t.Render(d)
+	if err != nil {
+		return nil, err
 	}
 	return types.AnyString(view), nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
@@ -42,6 +43,11 @@ type enroller struct {
 	groupPlugin    group.Plugin    // source -- where members are to be enrolled
 	instancePlugin instance.Plugin // sink -- where enrollments are made
 	running        bool
+
+	// template that we use to render with a source instance.Description to get the link Key
+	sourceKeySelectorTemplate *template.Template
+	// template used to render the enrollment's Provision propertiesx
+	enrollmentPropertiesTemplate *template.Template
 }
 
 func newEnroller(plugins func() discovery.Plugins,
@@ -115,10 +121,35 @@ func (l *enroller) Plan(operation controller.Operation, spec types.Spec) (*types
 
 }
 
+func (l *enroller) updateSpec(spec types.Spec) error {
+	if spec.Options != nil {
+		options := enrollment.Options{}
+		if err := spec.Options.Decode(&options); err != nil {
+			return err
+		}
+		l.options = options
+	}
+
+	if spec.Properties != nil {
+		properties := enrollment.Properties{}
+		if err := spec.Properties.Decode(&properties); err != nil {
+			return err
+		}
+		l.properties = properties
+	}
+
+	l.spec = spec
+	return nil
+}
+
 // Enforce implements internal.Managed.Enforce
-func (l *enroller) Enforce(types.Spec) (*types.Object, error) {
+func (l *enroller) Enforce(spec types.Spec) (*types.Object, error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
+
+	if err := l.updateSpec(spec); err != nil {
+		return nil, err
+	}
 
 	l.Start()
 	return l.object()

@@ -8,13 +8,17 @@ import (
 )
 
 // keyFunc is a function that extracts the key from the description
-type keyFunc func(instance.Description) string
+type keyFunc func(instance.Description) (string, error)
 
 func index(list instance.Descriptions, getKey keyFunc) (map[string]instance.Description, mapset.Set) {
 	index := map[string]instance.Description{}
 	this := mapset.NewSet()
 	for _, n := range list {
-		key := getKey(n)
+		key, err := getKey(n)
+		if err != nil {
+			log.Error("cannot index entry", "instane.Description", n)
+			continue
+		}
 		this.Add(key)
 		index[key] = n
 	}

@@ -24,8 +24,8 @@ func TestSet(t *testing.T) {
 		{ID: instance.ID("6")},
 	}
 
-	keyFunc := func(i instance.Description) string {
-		return string(i.ID)
+	keyFunc := func(i instance.Description) (string, error) {
+		return string(i.ID), nil
 	}
 
 	diff := Difference(a, keyFunc, b, keyFunc)
@@ -68,11 +68,11 @@ func TestSetKeyFuncs(t *testing.T) {
 		{ID: instance.ID("6")},
 	}
 
-	aKeyFunc := func(i instance.Description) string {
-		return string(*i.LogicalID)
+	aKeyFunc := func(i instance.Description) (string, error) {
+		return string(*i.LogicalID), nil
 	}
-	bKeyFunc := func(i instance.Description) string {
-		return string(i.ID)
+	bKeyFunc := func(i instance.Description) (string, error) {
+		return string(i.ID), nil
 	}
 
 	diff := Difference(a, aKeyFunc, b, bKeyFunc)
