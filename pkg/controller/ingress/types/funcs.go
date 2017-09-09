@@ -1,6 +1,7 @@
 package types
 
 import (
+	"io"
 	"sync"
 
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -12,12 +13,19 @@ import (
 var (
 	log               = logutil.New("module", "controller/ingress/types")
 	debugV            = logutil.V(300)
-	routeHandlers     = map[string]func(*types.Any, Options) (map[Vhost][]loadbalancer.Route, error){}
+	routeHandlers     = map[string]func() (RouteHandler, error){}
 	routeHandlersLock = sync.Mutex{}
 )
 
+// RouteHandler is the interface that different modules must support
+type RouteHandler interface {
+	io.Closer
+	// Routes returns a map of vhost and loadbalancer routes given the input blob
+	Routes(*types.Any, Options) (map[Vhost][]loadbalancer.Route, error)
+}
+
 // RegisterRouteHandler registers a package specific handler for determining the L4 routes (e.g. static or swarm)
-func RegisterRouteHandler(key string, f func(*types.Any, Options) (map[Vhost][]loadbalancer.Route, error)) {
+func RegisterRouteHandler(key string, f func() (RouteHandler, error)) {
 
 	routeHandlersLock.Lock()
 	defer routeHandlersLock.Unlock()
@@ -89,7 +97,7 @@ func (p Properties) Routes(options Options) (result map[Vhost][]loadbalancer.Rou
 		result[spec.Vhost] = spec.Routes
 
 		for key, config := range spec.RouteSources {
-			handler, has := routeHandlers[key]
+			handlerFunc, has := routeHandlers[key]
 
 			log.Debug("route handler", "key", key, "exists", has, "V", debugV)
 			if !has {
@@ -97,7 +105,14 @@ func (p Properties) Routes(options Options) (result map[Vhost][]loadbalancer.Rou
 			}
 
 			log.Debug("calling route handler", "config", config, "options", options, "V", debugV)
-			vhostRoutes, err := handler(config, options)
+
+			handler, err := handlerFunc()
+			if err != nil {
+				return nil, err
+			}
+			defer handler.Close()
+
+			vhostRoutes, err := handler.Routes(config, options)
 
 			log.Debug("found routes", "routesByVhost", vhostRoutes, "err", err)
 			if err != nil {
