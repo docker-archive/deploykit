@@ -78,7 +78,7 @@ func TestPollerShouldNotRun(t *testing.T) {
 	<-calledShouldRun
 }
 
-func _TestPollerShouldRunError(t *testing.T) {
+func TestPollerShouldRunError(t *testing.T) {
 
 	poller := Poll(
 		func() bool {
@@ -96,9 +96,7 @@ func _TestPollerShouldRunError(t *testing.T) {
 
 	go poller.Run(context.Background())
 
-	tick <- time.Now()
-
-	require.Equal(t, "test", <-poller.Err())
+	require.Equal(t, fmt.Errorf("test"), poller.Err())
 
 	poller.Stop()
 
