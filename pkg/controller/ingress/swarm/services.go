@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -33,7 +32,7 @@ func toVhostRoutes(listeners map[string][]*listener) map[ingress.Vhost][]loadbal
 }
 
 func externalLoadBalancerListenersFromServices(services []swarm.Service,
-	publishAllExposed bool, lbSpecLabel, certLabel string) map[string][]*listener {
+	matchByLabels bool, lbSpecLabel, certLabel string) map[string][]*listener {
 
 	// group the listeners by hostname.  hostname maps to a ELB somewhere else.
 	listeners := map[string][]*listener{}
@@ -44,43 +43,44 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service,
 		for _, exposed := range s.Endpoint.Ports {
 			exposedPorts[int(exposed.PublishedPort)] = exposed
 		}
-		log.Infoln("exposedPorts: ", exposedPorts)
+		log.Debug("exposedPorts: ", exposedPorts, "V", debugV)
 
-		// Now go through the list that we need to publish and match up the exposed ports
-		for _, publish := range listenersFromLabel(s, lbSpecLabel, certLabel) {
+		if matchByLabels {
+			// Now go through the list that we need to publish and match up the exposed ports
+			for _, publish := range listenersFromLabel(s, lbSpecLabel, certLabel) {
 
-			if sp, has := exposedPorts[int(publish.SwarmPort)]; has {
+				if sp, has := exposedPorts[int(publish.SwarmPort)]; has {
 
-				// This is the case where we have a clear mapping of swarm port to url
-				publish.SwarmProtocol = loadbalancer.ProtocolFromString(string(sp.Protocol))
-				addListenerToHostMap(listeners, publish)
+					// This is the case where we have a clear mapping of swarm port to url
+					publish.SwarmProtocol = loadbalancer.ProtocolFromString(string(sp.Protocol))
+					addListenerToHostMap(listeners, publish)
 
-			} else if publish.SwarmPort == 0 && len(exposedPorts) == 1 {
+				} else if publish.SwarmPort == 0 && len(exposedPorts) == 1 {
 
-				// This is the case where we have only one exposed port, and we don't specify the swarm port
-				// because it's an randomly assigned port by the swarm manager.
-				// We can't handle the case where there are more than one exposed port and we don't have explicit
-				// swarm port to url mappings.
-				for _, exposed := range exposedPorts {
-					publish.SwarmProtocol = loadbalancer.ProtocolFromString(string(exposed.Protocol))
-					publish.SwarmPort = int(exposed.PublishedPort)
-					log.Debugln("only one exposed port")
-					break // Just grab the first one
+					// This is the case where we have only one exposed port, and we don't specify the swarm port
+					// because it's an randomly assigned port by the swarm manager.
+					// We can't handle the case where there are more than one exposed port and we don't have explicit
+					// swarm port to url mappings.
+					for _, exposed := range exposedPorts {
+						publish.SwarmProtocol = loadbalancer.ProtocolFromString(string(exposed.Protocol))
+						publish.SwarmPort = int(exposed.PublishedPort)
+						log.Debug("only one exposed port")
+						break // Just grab the first one
+					}
+					addListenerToHostMap(listeners, publish)
+
+				} else {
+
+					// There are unresolved publishing listeners
+					log.Warn("Cannot match exposed port in service", "service", s.Spec.Name, "publish", publish)
+
 				}
-				addListenerToHostMap(listeners, publish)
-
-			} else {
-
-				// There are unresolved publishing listeners
-				log.Warningln("Cannot match exposed port in service", s.Spec.Name, "for", publish)
-
 			}
 		}
 
-		if publishAllExposed {
-			for _, l := range listenersFromExposedPorts(s, certLabel) {
-				addListenerToHostMap(listeners, l)
-			}
+		// Publish all exposed is always on
+		for _, l := range listenersFromExposedPorts(s, certLabel) {
+			addListenerToHostMap(listeners, l)
 		}
 
 	}

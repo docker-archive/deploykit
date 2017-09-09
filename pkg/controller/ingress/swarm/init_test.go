@@ -19,9 +19,9 @@ func TestParseSpec(t *testing.T) {
 			RouteSources: map[string]*types.Any{
 				"swarm": types.AnyValueMust(
 					Spec{
-						Docker: docker.ConnectInfo{
+						Docker(docker.ConnectInfo{
 							Host: "/var/run/docker.sock",
-						},
+						}),
 					},
 				),
 			},
