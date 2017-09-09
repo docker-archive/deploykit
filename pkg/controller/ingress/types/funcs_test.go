@@ -181,6 +181,15 @@ func TestGroupsInstanceIDs(t *testing.T) {
 	}, mm)
 }
 
+type routeHandlerFunc func(customConfig *types.Any, options Options) (map[Vhost][]loadbalancer.Route, error)
+
+func (r routeHandlerFunc) Close() error {
+	return nil
+}
+func (r routeHandlerFunc) Routes(customConfig *types.Any, options Options) (map[Vhost][]loadbalancer.Route, error) {
+	return r(customConfig, options)
+}
+
 func TestRegisterRouteHandler(t *testing.T) {
 
 	RegisterRouteHandler("nil", nil)
@@ -192,7 +201,9 @@ func TestRegisterRouteHandler(t *testing.T) {
 		calledChan <- customConfig
 		return <-routesChan, nil
 	}
-	RegisterRouteHandler("test", f)
+	RegisterRouteHandler("test", func() (RouteHandler, error) {
+		return routeHandlerFunc(f), nil
+	})
 	require.Equal(t, 1, len(routeHandlers))
 
 	vhost := Vhost("test")

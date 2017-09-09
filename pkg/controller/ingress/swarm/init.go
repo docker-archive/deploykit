@@ -37,8 +37,17 @@ type Spec struct {
 	Docker `json:",inline" yaml:",inline"`
 }
 
-// RoutesFromSwarmServices determines the routes based on the services running in the Docker swarm
-func RoutesFromSwarmServices(properties *types.Any,
+type handler struct {
+	dockerClient docker.APIClientCloser
+}
+
+// Close implements io.Closer
+func (h *handler) Close() error {
+	return h.dockerClient.Close()
+}
+
+// Routes implements ingress/types/RouteHandler
+func (h *handler) Routes(properties *types.Any,
 	options ingress.Options) (map[ingress.Vhost][]loadbalancer.Route, error) {
 
 	spec := Spec{}
@@ -63,10 +72,17 @@ func RoutesFromSwarmServices(properties *types.Any,
 	}
 
 	log.Info("Connected to Docker", "client", dockerClient)
+	h.dockerClient = dockerClient
+
 	routes, err := NewServiceRoutes(dockerClient).SetOptions(options).Build()
 	if err != nil {
 		return nil, err
 	}
 
 	return routes.List()
+}
+
+// RoutesFromSwarmServices determines the routes based on the services running in the Docker swarm
+func RoutesFromSwarmServices() (ingress.RouteHandler, error) {
+	return &handler{}, nil
 }
