@@ -64,7 +64,7 @@ func leadership(plugins func() discovery.Plugins) (manager.Leadership, error) {
 
 // DefaultOptions container options for default behavior
 var DefaultOptions = ingress_types.Options{
-	SyncInterval: ingress_types.DefaultSyncInterval,
+	SyncInterval: types.FromDuration(ingress_types.DefaultSyncInterval),
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately

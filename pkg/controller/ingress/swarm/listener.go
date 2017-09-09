@@ -142,10 +142,10 @@ func (l *listener) loadbalancerProtocol() loadbalancer.Protocol {
 
 	// check if this should be SSL because it has a certificate.
 	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
-		log.Infoln("port ", l.extPort(), " Is in ", l.CertPorts())
+		log.Debug("external port is in cert ports", "extPort", l.extPort(), "certPorts", l.CertPorts())
 		scheme = string(loadbalancer.SSL)
 	} else {
-		log.Infoln("cert is nil, or port ", l.extPort(), " Is NOT in ", l.CertPorts())
+		log.Debug("cert is nil, or port is not in cert ports", "exPort", l.extPort(), "certPorts", l.CertPorts())
 	}
 
 	return loadbalancer.ProtocolFromString(scheme)
@@ -262,7 +262,7 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 		if intInSlice(int(exposed.PublishedPort), requestedPublishPorts[int(exposed.TargetPort)]) {
 			cert := serviceCert(service, certLabel)
 
-			log.Debug("Cert: ", cert, "V", debugV)
+			log.Debug("Found cert", "cert", cert, "V", debugV)
 			urlString := fmt.Sprintf("%v://:%d", strings.ToLower(string(exposed.Protocol)), exposed.PublishedPort)
 			log.Debug("urlString", "urlString", urlString, "V", debugV)
 			if listener, err := newListener(service.Spec.Name, int(exposed.PublishedPort), urlString, cert); err == nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/types"
+	"golang.org/x/net/context"
 )
 
 // NewController returns a controller implementation
@@ -76,7 +77,7 @@ func (m *managed) Enforce(spec types.Spec) (*types.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	m.start()
+	m.Start()
 	return m.object(), nil
 }
 
@@ -88,7 +89,7 @@ func (m *managed) Inspect() (*types.Object, error) {
 // Free implements internal/Managed
 func (m *managed) Free() (*types.Object, error) {
 	if m.started() {
-		m.stop()
+		m.Stop()
 	}
 	return m.Inspect()
 }
@@ -96,7 +97,33 @@ func (m *managed) Free() (*types.Object, error) {
 // Terminate implements internal/Managed
 func (m *managed) Terminate() (*types.Object, error) {
 	if m.started() {
-		m.stop()
+		m.Stop()
 	}
 	return m.Inspect()
+}
+
+// Start implements internal/ControlLoop
+func (c *managed) Start() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.process != nil && c.poller != nil {
+		go c.poller.Run(context.Background())
+	}
+}
+
+// Stop implements internal/ControlLoop
+func (c *managed) Stop() error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.process != nil && c.poller != nil {
+		c.poller.Stop()
+	}
+	return nil
+}
+
+// Running implements internal/ControlLoop
+func (m *managed) Running() bool {
+	return m.started()
 }

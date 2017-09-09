@@ -39,15 +39,28 @@ metadata:
   tags:
     project: testing
     user: chungers
+
+# options block map to pkg/controller/ingress/types/Options
+options:
+  # SyncInterval is how often to sync changes between the services and the LB
+  SyncInterval: 1s  # syntax is a string form of Go time.Duration
+
+# properties block map to pkg/controller/ingress/types/Properties
 properties:
   - Backends:
     Groups:
+
+      # This is a group at socket(group), groupID(cattle).
       - group/cattle
+
+    # This is the plugin name of the L4 plugin. When you run `infrakit plugin start ... simulator`
+    # the default socket file name is 'simulator' and there's a default lb2 in the RPC object.
     L4Plugin: simulator/lb1
 
     # Here we have a static route that is always present.
     Routes:
       - LoadBalancerPort: 80
+        LoadBalancerProtocol: https
         Port: 8080
         Protocol: http
 
@@ -56,7 +69,7 @@ properties:
       swarm:
         Host: unix:///var/run/docker.sock
 
-    # This field here is required
+    # This field here is required and leave it at 'default'. (TODO - make this not required).
     # default will match any services that don't have vhost information.
     # There are ways to specify the vhost for a service in the label.  If that information
     # isn't there, the service will have to be lumped to a 'default' vhost.  Otherwise,

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"sync"
 	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -17,6 +18,7 @@ type Poller struct {
 	shouldRun func() bool
 	work      func() error
 	running   bool
+	lock      sync.Mutex
 }
 
 // Poll creates a poller
@@ -37,6 +39,9 @@ func (p *Poller) Err() <-chan error {
 
 // Stop stops the Poller
 func (p Poller) Stop() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	if p.stop != nil {
 		close(p.stop)
 		p.stop = nil
@@ -63,6 +68,17 @@ func (p Poller) Run(ctx context.Context) {
 	}
 
 	for {
+
+		if p.shouldRun() {
+			err := p.work()
+			if err != nil {
+				log.Warn("Poller error", "err", err)
+				select {
+				case p.err <- err:
+				}
+			}
+		}
+
 		select {
 
 		case <-p.stop:
@@ -78,14 +94,5 @@ func (p Poller) Run(ctx context.Context) {
 
 		}
 
-		if p.shouldRun() {
-			err := p.work()
-			if err != nil {
-				log.Warn("Poller error", "err", err)
-				select {
-				case p.err <- err:
-				}
-			}
-		}
 	}
 }

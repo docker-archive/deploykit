@@ -108,5 +108,8 @@ type Options struct {
 	// MatchByLabels figures out services by looking at swarm service labels.
 	// This is normally OFF and instead we just look at publish and target ports.
 	MatchByLabels bool
-	SyncInterval  time.Duration
+
+	// SyncInterval is how often to run the sync. The syntax is the string form
+	// of Go time.Duration (e.g. 1min)
+	SyncInterval types.Duration
 }

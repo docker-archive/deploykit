@@ -43,7 +43,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service,
 		for _, exposed := range s.Endpoint.Ports {
 			exposedPorts[int(exposed.PublishedPort)] = exposed
 		}
-		log.Debug("exposedPorts: ", exposedPorts, "V", debugV)
+		log.Debug("exposedPorts", "exposedPorts", exposedPorts, "V", debugV)
 
 		if matchByLabels {
 			// Now go through the list that we need to publish and match up the exposed ports
