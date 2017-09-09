@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
@@ -139,10 +138,14 @@ func (b *RoutesBuilder) Build() (*Routes, error) {
 
 	// use defaults if nothing is set.. this will match any service, with
 	// the action that generates the routes from matched services.
-	if b.matchers == nil || len(b.matchers) == 0 {
-		b.AddRule("default",
-			AnyServices,
-			routes.RoutesFromServices)
+	if len(b.matchers) == 0 {
+		routes.matchers = []*matcher{
+			{
+				name:      "default",
+				matchFunc: AnyServices,
+				toRoutes:  routes.RoutesFromServices,
+			},
+		}
 	}
 	return routes, nil
 }
@@ -151,7 +154,7 @@ func (b *RoutesBuilder) Build() (*Routes, error) {
 func (p *Routes) RoutesFromServices(services []swarm.Service) (map[ingress.Vhost][]loadbalancer.Route, error) {
 	return toVhostRoutes(externalLoadBalancerListenersFromServices(
 		services,
-		p.options.PublishAllExposed,
+		p.options.MatchByLabels,
 		p.lbSpecLabel,
 		p.certSpecLabel,
 	)), nil
@@ -160,17 +163,26 @@ func (p *Routes) RoutesFromServices(services []swarm.Service) (map[ingress.Vhost
 // List will return all the known routes for this Docker swarm of matching services.
 func (p *Routes) List() (map[ingress.Vhost][]loadbalancer.Route, error) {
 
+	log.Info("Listing services from swarm")
+
 	ctx := context.Background()
 	services, err := p.client.ServiceList(ctx, types.ServiceListOptions{})
+
+	log.Debug("Swarm serviceList", "services", services, "err", err, "matchers", p.matchers, "V", debugV)
+
 	if err != nil {
+		log.Error("Error getting swarm services", "err", err)
 		return nil, err
 	}
 
 	for _, matcher := range p.matchers {
+
+		log.Debug("running matcher", "matcher", matcher)
+
 		found := []swarm.Service{}
 		for _, s := range services {
 			if matcher.matchFunc(s) {
-				log.Debugln("Service", s.Spec.Name, "matches", matcher.name)
+				log.Debug("Found match", "service", s.Spec.Name, "match", matcher.name)
 				found = append(found, s)
 			}
 		}
@@ -193,7 +205,7 @@ func (p *Routes) List() (map[ingress.Vhost][]loadbalancer.Route, error) {
 		// This is not very efficient when there are lots of swarm services and we are basically calling the
 		// backend api each run.
 		if p.options.HardSync || different(lastKnown, found) || p.iteration == 0 {
-			log.Infoln(len(found), "matches found. Processing.")
+			log.Debug("Found matches", "total", len(found))
 			return matcher.toRoutes(found)
 		}
 

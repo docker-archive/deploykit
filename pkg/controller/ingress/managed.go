@@ -18,7 +18,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
-	"golang.org/x/net/context"
 )
 
 var log = logutil.New("module", "controller/ingress")
@@ -101,37 +100,9 @@ func (c *managed) l4Client(spec ingress.Spec) (loadbalancer.L4, error) {
 	return loadbalancer_rpc.NewClient(spec.L4Plugin, endpoint.Address)
 }
 
-// Run starts the controller given the spec it needs to maintain
-func (c *managed) Run(spec types.Spec) error {
-	err := c.init(spec)
-	if err != nil {
-		return err
-	}
-	c.start()
-	return nil
-}
-
 func (c *managed) started() bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
 	return c.process != nil && c.poller != nil
-}
-
-func (c *managed) start() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if c.process != nil && c.poller != nil {
-		go c.poller.Run(context.Background())
-	}
-}
-
-func (c *managed) stop() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if c.process != nil && c.poller != nil {
-		c.poller.Stop()
-	}
 }

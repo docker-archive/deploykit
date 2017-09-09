@@ -219,7 +219,7 @@ func (s *Set) handleAdd(tid int64, initial Index) error {
 		},
 	}
 
-	log.Debug("add: set deadline", "name", s.options.Name, tid, "id", id, "initial", initial)
+	log.Debug("add: set deadline", "name", s.options.Name, "tid", tid, "id", id, "initial", initial)
 	if err := s.processDeadline(tid, new, initial); err != nil {
 		return err
 	}

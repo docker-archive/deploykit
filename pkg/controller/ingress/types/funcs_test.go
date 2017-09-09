@@ -216,6 +216,8 @@ func TestRegisterRouteHandler(t *testing.T) {
 			Protocol: loadbalancer.Protocol("http"),
 			// LoadBalancerPort is the TCP port that the load balancer is listening on.
 			LoadBalancerPort: 8080,
+			// LoadBalancerProtocol is the network protocol that the load balancer is listening on.
+			LoadBalancerProtocol: loadbalancer.Protocol("http"),
 		},
 	}
 	routesChan <- map[Vhost][]loadbalancer.Route{

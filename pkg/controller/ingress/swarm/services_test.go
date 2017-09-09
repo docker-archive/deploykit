@@ -32,7 +32,7 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 		},
 	}
 
-	listenersByHost = externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+	listenersByHost = externalLoadBalancerListenersFromServices([]swarm.Service{s}, true,
 		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
@@ -66,7 +66,7 @@ func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 		},
 	}
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, true,
 		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
@@ -100,7 +100,7 @@ func TestExternalLoadBalancerListenersFromService3(t *testing.T) {
 		},
 	}
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, true,
 		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
@@ -139,7 +139,7 @@ func TestExternalLoadBalancerListenersFromService4(t *testing.T) {
 		},
 	}
 
-	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, false,
+	listenersByHost := externalLoadBalancerListenersFromServices([]swarm.Service{s}, true,
 		LabelExternalLoadBalancerSpec, certLabel)
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))

@@ -25,6 +25,11 @@ func Backends(name string, services *cli.Services) *cobra.Command {
 		Use:   "add <instance.ID> ...",
 		Short: "Register backends []instance.ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
 			l4, err := Load(services.Plugins(), name)
 			if err != nil {
 				return nil
@@ -46,6 +51,11 @@ func Backends(name string, services *cli.Services) *cobra.Command {
 		Use:   "rm <instance.ID> ...",
 		Short: "Deregister backends []instance.ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				cmd.Usage()
+				os.Exit(1)
+			}
+
 			l4, err := Load(services.Plugins(), name)
 			if err != nil {
 				return nil

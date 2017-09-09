@@ -63,9 +63,10 @@ func TestLoadbalancerRoutes(t *testing.T) {
 	routesActual := make(chan []loadbalancer.Route, 1)
 	routes := []loadbalancer.Route{
 		{
-			Port:             1234,
-			Protocol:         loadbalancer.HTTP,
-			LoadBalancerPort: 2345,
+			Port:                 1234,
+			Protocol:             loadbalancer.HTTP,
+			LoadBalancerPort:     2345,
+			LoadBalancerProtocol: loadbalancer.HTTP,
 		},
 	}
 
@@ -107,9 +108,10 @@ func TestLoadbalancerPublish(t *testing.T) {
 
 	routeActual := make(chan loadbalancer.Route, 1)
 	route := loadbalancer.Route{
-		Port:             1234,
-		Protocol:         loadbalancer.HTTP,
-		LoadBalancerPort: 2345,
+		Port:                 1234,
+		Protocol:             loadbalancer.HTTP,
+		LoadBalancerPort:     2345,
+		LoadBalancerProtocol: loadbalancer.HTTP,
 	}
 	result := fakeResult("result")
 
@@ -134,9 +136,10 @@ func TestLoadbalancerPublishError(t *testing.T) {
 
 	routeActual := make(chan loadbalancer.Route, 1)
 	route := loadbalancer.Route{
-		Port:             1234,
-		Protocol:         loadbalancer.HTTP,
-		LoadBalancerPort: 2345,
+		Port:                 1234,
+		Protocol:             loadbalancer.HTTP,
+		LoadBalancerPort:     2345,
+		LoadBalancerProtocol: loadbalancer.HTTP,
 	}
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_lb.L4{
