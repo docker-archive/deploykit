@@ -34,7 +34,7 @@ type Docker docker.ConnectInfo
 // Spec is the struct that captures the configuration of the swarm-based ingress route finder
 type Spec struct {
 	// Docker holds the connection params to the Docker engine for join tokens, etc.
-	Docker `json:",inline yaml:",inline"`
+	Docker `json:",inline" yaml:",inline"`
 }
 
 // RoutesFromSwarmServices determines the routes based on the services running in the Docker swarm

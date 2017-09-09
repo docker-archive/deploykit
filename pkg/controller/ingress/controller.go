@@ -103,22 +103,22 @@ func (m *managed) Terminate() (*types.Object, error) {
 }
 
 // Start implements internal/ControlLoop
-func (c *managed) Start() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (m *managed) Start() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	if c.process != nil && c.poller != nil {
-		go c.poller.Run(context.Background())
+	if m.process != nil && m.poller != nil {
+		go m.poller.Run(context.Background())
 	}
 }
 
 // Stop implements internal/ControlLoop
-func (c *managed) Stop() error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (m *managed) Stop() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	if c.process != nil && c.poller != nil {
-		c.poller.Stop()
+	if m.process != nil && m.poller != nil {
+		m.poller.Stop()
 	}
 	return nil
 }

@@ -38,7 +38,7 @@ func (p *Poller) Err() <-chan error {
 }
 
 // Stop stops the Poller
-func (p Poller) Stop() {
+func (p *Poller) Stop() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -49,7 +49,7 @@ func (p Poller) Stop() {
 }
 
 // Run will start all the matchers and query the services at defined polling interval.  It blocks until stop is called.
-func (p Poller) Run(ctx context.Context) {
+func (p *Poller) Run(ctx context.Context) {
 	if p.ticker == nil {
 		panic("no ticker") // programming error.  not runtime.
 	}
