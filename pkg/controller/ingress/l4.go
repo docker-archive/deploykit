@@ -25,12 +25,12 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 
 	// Index the listener set up
 	listenerIndex := map[string]loadbalancer.Route{}
-	listenerIndexKey := func(p loadbalancer.Protocol, extPort, instancePort int) string {
-		return fmt.Sprintf("%v/%5d/%5d", p, extPort, instancePort)
+	listenerIndexKey := func(p, lp loadbalancer.Protocol, extPort, instancePort int) string {
+		return fmt.Sprintf("%v/%v/%5d/%5d", p, lp, extPort, instancePort)
 	}
 
 	for _, l := range desired {
-		instancePort, hasListener := findRoutePort(routes, l.LoadBalancerPort, l.Protocol)
+		instancePort, hasListener := findRoutePort(routes, l.LoadBalancerPort, l.Protocol, l.LoadBalancerProtocol)
 
 		if !hasListener {
 			toCreate = append(toCreate, l)
@@ -38,25 +38,27 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 			toChange = append(toChange, l)
 		}
 
-		listenerIndex[listenerIndexKey(l.Protocol, l.LoadBalancerPort, instancePort)] = l
+		listenerIndex[listenerIndexKey(l.LoadBalancerProtocol, l.Protocol, l.LoadBalancerPort, instancePort)] = l
 	}
 	log.Debug("Listener", "index", listenerIndex)
 
 	for _, route := range routes {
-		protocol := route.Protocol
+		instanceProtocol := route.Protocol
+		lbProtocol := route.LoadBalancerProtocol
 		lbPort := route.LoadBalancerPort
 		instancePort := route.Port
 		cert := route.Certificate
 
-		if _, has := listenerIndex[listenerIndexKey(protocol, lbPort, instancePort)]; !has {
+		if _, has := listenerIndex[listenerIndexKey(lbProtocol, instanceProtocol, lbPort, instancePort)]; !has {
 			toRemove = append(toRemove, loadbalancer.Route{
-				Port:             instancePort,
-				Protocol:         protocol,
-				LoadBalancerPort: lbPort,
-				Certificate:      cert,
+				Port:                 instancePort,
+				Protocol:             instanceProtocol,
+				LoadBalancerPort:     lbPort,
+				LoadBalancerProtocol: lbProtocol,
+				Certificate:          cert,
 			})
 		} else {
-			log.Info("keeping", "protocol", protocol, "port", lbPort, "instancePort", instancePort)
+			log.Info("keeping", "protocol", lbProtocol, "instanceProtocol", instanceProtocol, "port", lbPort, "instancePort", instancePort)
 		}
 	}
 
@@ -106,10 +108,10 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 }
 
 func findRoutePort(routes []loadbalancer.Route, loadbalancerPort int,
-	protocol loadbalancer.Protocol) (int, bool) {
+	protocol, loadbalancerProtocol loadbalancer.Protocol) (int, bool) {
 
 	for _, route := range routes {
-		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol {
+		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol && route.LoadBalancerProtocol == loadbalancerProtocol {
 			return route.Port, true
 		}
 	}

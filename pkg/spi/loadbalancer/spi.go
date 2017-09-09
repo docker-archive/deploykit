@@ -19,12 +19,16 @@ type Route struct {
 	// Port is the TCP port that the backend instance is listening on.
 	Port int
 
-	// Protocol is the network protocol that the load balancer is routing.
+	// Protocol is the network protocol that the backend instance is listening on.
 	Protocol Protocol
 
 	// LoadBalancerPort is the TCP port that the load balancer is listening on.
 	LoadBalancerPort int
 
+	// LoadBalancerProtocol is the network protocol that the load balancer is listening on.
+	LoadBalancerProtocol Protocol
+
+	// Certificate is the certificate used by the load balancer.
 	Certificate *string
 }
 
