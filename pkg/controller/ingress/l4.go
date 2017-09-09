@@ -93,16 +93,14 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 		log.Info("CHANGED", "name", elb.Name(), "listener", l)
 	}
 	for _, l := range toRemove {
-		log.Info("REMOVE", "name", elb.Name(), "listener", l)
 
-		if options.RemoveListeners {
-			_, err := elb.Unpublish(l.LoadBalancerPort)
-			if err != nil {
-				log.Warn("err unpublishing", "route", l, "err", err)
-				return err
-			}
-			log.Info("REMOVED", "name", elb.Name(), "listener", l)
+		log.Info("REMOVE", "name", elb.Name(), "listener", l)
+		_, err := elb.Unpublish(l.LoadBalancerPort)
+		if err != nil {
+			log.Warn("err unpublishing", "route", l, "err", err)
+			return err
 		}
+		log.Info("REMOVED", "name", elb.Name(), "listener", l)
 	}
 	return nil
 }

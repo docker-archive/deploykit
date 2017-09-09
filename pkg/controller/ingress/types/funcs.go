@@ -11,6 +11,7 @@ import (
 
 var (
 	log               = logutil.New("module", "controller/ingress/types")
+	debugV            = logutil.V(300)
 	routeHandlers     = map[string]func(*types.Any, Options) (map[Vhost][]loadbalancer.Route, error){}
 	routeHandlersLock = sync.Mutex{}
 )
@@ -89,11 +90,16 @@ func (p Properties) Routes(options Options) (result map[Vhost][]loadbalancer.Rou
 
 		for key, config := range spec.RouteSources {
 			handler, has := routeHandlers[key]
+
+			log.Debug("route handler", "key", key, "exists", has, "V", debugV)
 			if !has {
 				continue
 			}
 
+			log.Debug("calling route handler", "config", config, "options", options, "V", debugV)
 			vhostRoutes, err := handler(config, options)
+
+			log.Debug("found routes", "routesByVhost", vhostRoutes, "err", err)
 			if err != nil {
 				continue
 			}
