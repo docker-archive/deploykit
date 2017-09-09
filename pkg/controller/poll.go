@@ -64,7 +64,7 @@ func (p *Poller) Run(ctx context.Context) {
 	}
 
 	if p.err == nil {
-		p.err = make(chan error)
+		p.err = make(chan error, 1)
 	}
 
 	for {
