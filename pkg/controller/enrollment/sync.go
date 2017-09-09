@@ -51,11 +51,6 @@ func (l *enroller) getEnrolledInstances() ([]instance.Description, error) {
 // run one synchronization round
 func (l *enroller) sync() error {
 
-	instancePlugin, err := l.getInstancePlugin(l.properties.Instance.Plugin)
-	if err != nil {
-		return err
-	}
-
 	source, err := l.getSourceInstances()
 	if err != nil {
 		log.Error("Error getting sources. No action", "err", err)
@@ -84,9 +79,15 @@ func (l *enroller) sync() error {
 		return string(d.ID)
 	}
 
-	add, remove, _ := Delta(Descriptions(enrolled), enrolledKeyFunc, Descriptions(source), sourceKeyFunc)
+	add, remove, _ := Delta(instance.Descriptions(enrolled), enrolledKeyFunc, instance.Descriptions(source), sourceKeyFunc)
 
 	log.Debug("Computed delta", "add", add, "remove", remove)
+
+	instancePlugin, err := l.getInstancePlugin(l.properties.Instance.Plugin)
+	if err != nil {
+		log.Error("cannot get instance plugin", "err", err)
+		return err
+	}
 
 	for _, n := range add {
 

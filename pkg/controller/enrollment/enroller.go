@@ -12,6 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
+	"golang.org/x/net/context"
 )
 
 // enroller implements the internal.Managed interface.
@@ -119,7 +120,7 @@ func (l *enroller) Enforce(types.Spec) (*types.Object, error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	l.start()
+	l.Start()
 	return l.object()
 }
 
@@ -138,8 +139,8 @@ func (l *enroller) Pause() (*types.Object, error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	if l.started() {
-		l.stop()
+	if l.Running() {
+		l.Stop()
 	}
 	return l.Inspect()
 }
@@ -154,8 +155,8 @@ func (l *enroller) Terminate() (*types.Object, error) {
 		return nil, err
 	}
 
-	if l.started() {
-		l.stop()
+	if l.Running() {
+		l.Stop()
 	}
 
 	if l.options.DestroyOnTerminate {
@@ -167,4 +168,31 @@ func (l *enroller) Terminate() (*types.Object, error) {
 		}
 	}
 	return o, nil
+}
+
+// Start implements internal/ControlLoop.Start
+func (l *enroller) Start() {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if l.poller != nil {
+		go l.poller.Run(context.Background())
+		l.running = true
+	}
+}
+
+// Start implements internal/ControlLoop.Stop
+func (l *enroller) Stop() error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if l.poller != nil {
+		l.poller.Stop()
+	}
+	return nil
+}
+
+// Running implements internal/ControlLoop.Running
+func (l *enroller) Running() bool {
+	return l.started()
 }

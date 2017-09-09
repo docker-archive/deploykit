@@ -8,7 +8,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/types"
-	"golang.org/x/net/context"
 )
 
 var log = logutil.New("module", "controller/enrollment")
@@ -46,28 +45,9 @@ func NewTypedControllers(plugins func() discovery.Plugins, leader manager.Leader
 	)).ManagedObjects
 }
 
-func (l *enroller) start() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	if l.poller != nil {
-		go l.poller.Run(context.Background())
-		l.running = true
-	}
-}
-
 func (l *enroller) started() bool {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 
 	return l.running
-}
-
-func (l *enroller) stop() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	if l.poller != nil {
-		l.poller.Stop()
-	}
 }
