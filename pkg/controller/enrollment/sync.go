@@ -1,7 +1,6 @@
 package enrollment
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/plugin"
@@ -9,7 +8,6 @@ import (
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -49,29 +47,13 @@ func (l *enroller) getEnrolledInstances() ([]instance.Description, error) {
 	return instancePlugin.DescribeInstances(l.properties.Instance.Labels, true)
 }
 
-func buildTemplate(source []byte) (*template.Template, error) {
-	if source == nil {
-		return nil, nil
-	}
-	// Apply the template but we need escape the \{\{ if any
-	buff := source
-	buff = bytes.Replace(buff, []byte("\\{\\{"), []byte("{{"), -1)
-	buff = bytes.Replace(buff, []byte("\\}\\}"), []byte("}}"), -1)
-
-	// YAML will escape the escapes... so twice
-	buff = bytes.Replace(buff, []byte("\\\\{\\\\{"), []byte("{{"), -1)
-	buff = bytes.Replace(buff, []byte("\\\\}\\\\}"), []byte("}}"), -1)
-
-	return template.NewTemplate("str://"+string(buff), template.Options{MultiPass: false})
-}
-
 func (l *enroller) getSourceKeySelectorTemplate() (*template.Template, error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
 	if l.options.SourceKeySelector != "" {
 		if l.sourceKeySelectorTemplate == nil {
-			t, err := buildTemplate([]byte(l.options.SourceKeySelector))
+			t, err := enrollment.TemplateFrom([]byte(l.options.SourceKeySelector))
 			if err != nil {
 				return nil, err
 			}
@@ -88,7 +70,7 @@ func (l *enroller) getEnrollmentPropertiesTemplate() (*template.Template, error)
 
 	if l.properties.Instance.Properties != nil {
 		if l.enrollmentPropertiesTemplate == nil {
-			t, err := buildTemplate(l.properties.Instance.Properties.Bytes())
+			t, err := enrollment.TemplateFrom(l.properties.Instance.Properties.Bytes())
 			if err != nil {
 				return nil, err
 			}

@@ -58,7 +58,7 @@ func newEnroller(plugins func() discovery.Plugins,
 		options:    options,
 	}
 
-	interval := l.options.SyncInterval
+	interval := l.options.SyncInterval.Duration()
 	if interval == 0 {
 		interval = enrollment.DefaultSyncInterval
 	}

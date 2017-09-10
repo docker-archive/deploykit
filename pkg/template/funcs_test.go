@@ -413,3 +413,17 @@ func TestYAML(t *testing.T) {
 
 	require.Equal(t, v, v2)
 }
+
+func TestEscapeUnescape(t *testing.T) {
+
+	text := `"\{\{.ID\}\}"`
+	buff := Unescape([]byte(text))
+	text2 := Escape(buff)
+	require.Equal(t, string(text), string(text2))
+
+	tt, err := NewTemplateFromBytes(buff, "", Options{})
+	require.NoError(t, err)
+	v, err := tt.Render(map[string]string{"ID": "hello"})
+	require.NoError(t, err)
+	require.Equal(t, `"hello"`, v)
+}

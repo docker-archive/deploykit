@@ -114,4 +114,53 @@ properties:
 	g, err := p.List.GroupPlugin()
 	require.NoError(t, err)
 	require.Equal(t, plugin.Name("us-east/workers"), g)
+
+	spec2 := types.Spec{}
+	require.NoError(t, types.AnyString(`
+{
+  "kind": "enrollment",
+  "metadata" : {
+    "name" : "nfs"
+  },
+  "options" : {
+    "SourceKeySelector" : "\\{\\{.ID\\}\\}"
+  },
+  "properties" : {
+    "List" : [
+      { "ID" : "h1" },
+      { "ID" : "h2" }
+    ],
+    "Instance" : {
+      "Plugin" : "us-east/nfs-authorizer",
+      "Properties" : {
+        "ID" : "\\{\\{.ID\\}\\}"
+      }
+    }
+  }
+}
+`).Decode(&spec2))
+
+	tt, err := TemplateFrom(spec2.Options.Bytes())
+	require.NoError(t, err)
+
+	obj := map[string]string{"ID": "hello"}
+	view, err := tt.Render(obj)
+	require.NoError(t, err)
+	require.Equal(t, "{\n    \"SourceKeySelector\" : \"hello\"\n  }", view)
+
+	type properties struct {
+		Instance struct {
+			Properties struct {
+				ID string
+			}
+		}
+	}
+
+	pp := properties{}
+	tt, err = TemplateFrom(spec2.Properties.Bytes())
+	require.NoError(t, err)
+	view, err = tt.Render(obj)
+	require.NoError(t, err)
+	require.NoError(t, types.AnyString(view).Decode(&pp))
+	require.Equal(t, "hello", pp.Instance.Properties.ID)
 }

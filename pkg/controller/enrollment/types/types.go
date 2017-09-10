@@ -1,12 +1,14 @@
 package types
 
 import (
+	"bytes"
 	"time"
 
 	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -33,41 +35,6 @@ func ResolveDependencies(spec types.Spec) ([]plugin.Name, error) {
 
 	return []plugin.Name{properties.Instance.Plugin}, nil
 }
-
-// // ListSourceUnion is a union type of possible values:
-// // a list of []intsance.Description
-// // a group plugin name
-// type ListSourceUnion struct {
-// 	*types.Any `json:",inline" yaml:",inline"`
-// }
-
-// // InstanceDescriptions tries to 'cast' the union as list of descriptions
-// func (u ListSourceUnion) InstanceDescriptions() ([]instance.Description, error) {
-// 	list := []instance.Description{}
-// 	err := u.Any.Decode(&list)
-// 	return list, err
-// }
-
-// // GroupPluginName tries to 'cast' the union value as a group plugin name
-// func (u ListSourceUnion) GroupPlugin() (plugin.Name, error) {
-// 	p := plugin.Name("")
-// 	err := u.Any.Decode(&p)
-// 	return p, err
-// }
-
-// // UnmarshalJSON implements json.Unmarshaler
-// func (u *ListSourceUnion) UnmarshalJSON(buff []byte) error {
-// 	u.Any = types.AnyBytes(buff)
-// 	return nil
-// }
-
-// // MarshalJSON implements json.Marshaler
-// func (u *ListSourceUnion) MarshalJSON() ([]byte, error) {
-// 	if u.Any != nil {
-// 		return u.Any.MarshalJSON()
-// 	}
-// 	return []byte{}, nil
-// }
 
 // ListSourceUnion is a union type of possible values:
 // a list of []intsance.Description
@@ -135,12 +102,19 @@ type Options struct {
 	// SourceKeySelector: \{\{ .ID \}\}  # selects the ID field.
 	SourceKeySelector string
 
-	// SyncInterval is the time interval between reconciliation
-	SyncInterval time.Duration
+	// SyncInterval is the time interval between reconciliation. Syntax
+	// is go's time.Duration string representation (e.g. 1m, 30s)
+	SyncInterval types.Duration
 
 	// DestroyOnTerminiate tells the controller to call instace.Destroy
 	// for each member it is maintaining.  This is a matter of ownership
 	// depending on use cases the controller may not *own* the data in the
 	// downstream instance.  The controller merely reconciles it.
 	DestroyOnTerminate bool
+}
+
+// TemplateFrom returns a template after it has un-escapes any escape sequences
+func TemplateFrom(source []byte) (*template.Template, error) {
+	buff := template.Unescape(source)
+	return template.NewTemplate("str://"+string(buff), template.Options{MultiPass: false})
 }

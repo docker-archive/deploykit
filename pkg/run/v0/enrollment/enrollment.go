@@ -1,8 +1,6 @@
 package enrollment
 
 import (
-	"time"
-
 	enrollment_controller "github.com/docker/infrakit/pkg/controller/enrollment"
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/discovery"
@@ -31,7 +29,7 @@ func init() {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = enrollment.Options{
-	SyncInterval:       5 * time.Second,
+	SyncInterval:       types.Duration(enrollment.DefaultSyncInterval),
 	DestroyOnTerminate: false,
 }
 
