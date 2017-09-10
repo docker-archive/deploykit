@@ -144,11 +144,19 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	log.Debug("committing", "operation", operation, "spec", spec)
+
 	m := []**Managed{}
 	copy := spec
 	m, err = c.getManaged(&spec.Metadata, &copy)
 	if err != nil {
 		return
+	}
+
+	log.Debug("got managed", "operation", operation, "spec", spec, "m", m)
+
+	if len(m) == 0 {
+		return types.Object{}, fmt.Errorf("no managed object found %v", spec.Metadata.Name)
 	}
 
 	// In the future maybe will consider wildcard commits...  but this is highly discouraged at this time.
@@ -161,6 +169,8 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 
 		managed := *(m[0])
 		if (*managed).Running() {
+
+			log.Debug("creating new object to replace running instance.")
 
 			// Create a new object
 			newManaged, err := c.alloc(spec)
@@ -180,6 +190,7 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 			log.Debug("Swapped running managed object", "managed", m[0])
 		}
 
+		log.Debug("calling enforce", "spec", spec, "m", managed)
 		o, e := (*managed).Enforce(spec)
 		if o != nil {
 			object = *o
@@ -216,6 +227,15 @@ func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, e
 	if err != nil {
 		return
 	}
+
+	if len(m) == 0 {
+		ss := fmt.Sprintf("%v", search)
+		if search != nil {
+			ss = fmt.Sprintf("%v", *search)
+		}
+		return nil, fmt.Errorf("no managed object found %v", ss)
+	}
+
 	objects = []types.Object{}
 	for _, s := range m {
 		o, err := (**s).Inspect()
