@@ -3,11 +3,13 @@ package enrollment
 import (
 	"fmt"
 
+	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
