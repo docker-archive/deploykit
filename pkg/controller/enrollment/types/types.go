@@ -1,7 +1,6 @@
 package types
 
 import (
-	"bytes"
 	"time"
 
 	"github.com/docker/infrakit/pkg/controller"
