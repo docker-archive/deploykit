@@ -23,7 +23,7 @@
 #
 #  Verify the group has workers:
 #
-#  infrakit group describe workers
+#  infrakit group/workers group describe
 #
 #  3. Commit this file to create the enrollments
 #
@@ -32,7 +32,7 @@
 #  4. Verify that entries are in sync: check the group describe and nfs-auth/disk (that's
 #     the Plugin specified in the Instance section of this config.
 #
-#  infrakit group describe workers   # returns the list of nodes in the group
+#  infrakit group/workers group describe     # returns the list of nodes in the group
 #  infrakit infrakit nfs-auth/disk describe  # returns the list of corresponding enrollments
 #
 #  For each member of the group workers you should see a corresponding entry in the enrollments.
@@ -40,7 +40,15 @@
 #  ID of a member in group/workers; however, the ID of a member of group/workers should show up as
 #  a label in the instance of nfs-auth/disk (as infrakit.enrollment.sourceID).
 #
+#  5. Try scale up the workers group
 #
+#  infrakit group/workers group scale 10
+#
+#  After a while, verify enrollment:
+#
+#  infrakit nfs-auth/disk describe
+
+
 kind: enrollment
 metadata:
   name: nfs/workers  # socket file = nfs and the name of control loop is 'workers'
