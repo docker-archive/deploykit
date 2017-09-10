@@ -197,7 +197,6 @@ func (l *enroller) labels(n instance.Description) map[string]string {
 
 // destroy all the instances in the enrolled instance plugin
 func (l *enroller) destroy() error {
-
 	instancePlugin, err := l.getInstancePlugin(l.properties.Instance.Plugin)
 	if err != nil {
 		return err

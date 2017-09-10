@@ -10,7 +10,10 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
-var log = logutil.New("module", "controller/enrollment")
+var (
+	log    = logutil.New("module", "controller/enrollment")
+	debugV = logutil.V(200)
+)
 
 // NewController returns a controller implementation
 func NewController(plugins func() discovery.Plugins, leader manager.Leadership,
@@ -36,6 +39,7 @@ func NewTypedControllers(plugins func() discovery.Plugins, leader manager.Leader
 		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
+			log.Debug("Creating managed object", "spec", spec)
 			return newEnroller(plugins, leader, options), nil
 		},
 		// the key function

@@ -122,6 +122,10 @@ func (l *enroller) Plan(operation controller.Operation, spec types.Spec) (*types
 }
 
 func (l *enroller) updateSpec(spec types.Spec) error {
+
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
 	if spec.Options != nil {
 		options := enrollment.Options{}
 		if err := spec.Options.Decode(&options); err != nil {
@@ -139,13 +143,16 @@ func (l *enroller) updateSpec(spec types.Spec) error {
 	}
 
 	l.spec = spec
+	// set identity
+	l.spec.Metadata.Identity = &types.Identity{
+		ID: l.spec.Metadata.Name,
+	}
 	return nil
 }
 
 // Enforce implements internal.Managed.Enforce
 func (l *enroller) Enforce(spec types.Spec) (*types.Object, error) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
+	log.Debug("Enforce", "spec", spec, "V", debugV)
 
 	if err := l.updateSpec(spec); err != nil {
 		return nil, err
@@ -167,9 +174,6 @@ func (l *enroller) Free() (*types.Object, error) {
 
 // Pause implements internal.Managed.Pause
 func (l *enroller) Pause() (*types.Object, error) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
 	if l.Running() {
 		l.Stop()
 	}
@@ -178,9 +182,6 @@ func (l *enroller) Pause() (*types.Object, error) {
 
 // Terminate implements internal.Managed.Terminate
 func (l *enroller) Terminate() (*types.Object, error) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
 	o, err := l.object()
 	if err != nil {
 		return nil, err
