@@ -15,15 +15,15 @@ var log = logutil.New("module", "cli/v1/group")
 func init() {
 	cli.Register(group.InterfaceSpec,
 		[]cli.CmdBuilder{
-			Group,
-			// Ls,
-			// Inspect,
-			// Describe,
-			// Commit,
-			// Free,
-			// Destroy,
-			// Scale,
-			// DestroyInstances,
+			// Group,
+			Ls,
+			Inspect,
+			Describe,
+			Commit,
+			Free,
+			Destroy,
+			Scale,
+			DestroyInstances,
 		})
 }
 
