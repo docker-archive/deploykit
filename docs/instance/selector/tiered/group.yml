@@ -1,0 +1,70 @@
+#
+#  Tiered provisioning example
+#
+#  Start up infrakit:
+#
+#  export INFRAKIT_SELECTOR_TIERED_PLUGINS='spot/compute;ondemand/compute'
+#
+#  In the env variable above we set the ordering of the plugins...
+#  First, we try spot/compute then ondemand/compute.  We will use the 'simulator'
+#  kind to simulate the different types of instances by starting the plugin at
+#  specific socket addresses: one as ondemand and the other as spot.
+#  In the infrakit CLI you will see ondemand/compute and spot/compute as available
+#  commands.  These will allow you to directly query the instance plugins.
+#
+#  infrakit plugin start manager group vanilla simulator:ondemand simulator:spot selector/tiered --log 5 --log-stack
+#
+#  * Note on the use of env variable...  when we support multiple plugins in a single
+#  spec and automatic activation, you will create sections of spec/metadata/Options
+#  to actually set the options for the tiered selector.
+#
+#  Commit this file:
+#
+#  infrakit group controller commit -y docs/instance/selector/tiered/group.yml
+#
+#  After a while, you can verify that 3 are created in spot/compute and 2 in ondemand/compute
+#  infrakit spot/compute describe
+#  infrakit ondemand/compute describe
+#
+#
+#
+kind: group
+metadata:
+    name: workers
+properties:
+    Allocation:
+      Size: 5
+    Flavor:
+      Plugin: vanilla
+      Properties:
+        Init:
+          - apt-get install curl
+          - curl -sSL https://get.docker.com | sh
+        Tags:
+          project: infrakit
+          tier: app
+    Instance:
+
+      # here we reference the tiered selector at the socket location, selector.
+      Plugin: selector/tiered
+      Properties:
+
+        spot/compute:
+          # This is a special property that the simulator understands to limit
+          # the number of instances it can provision.  So for cluster size > 3
+          # we expect to see the ondemand/compute instances getting added.
+          Cap: 3
+          instanceType: small
+          bid: 0.02
+          labels:
+            project: infrakit
+            billing: spot
+
+        # Properties for the ondemand/compute instances.  The section after the
+        # name of the plugin (ondemand/compute) is the properties blob to be fed
+        # to the plugin.
+        ondemand/compute:
+          instanceType: small
+          labels:
+            project: infrakit
+            billing: ondemand

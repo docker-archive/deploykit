@@ -13,6 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func mustPlugin(p instance.Plugin, err error) instance.Plugin {
+	if err != nil {
+		panic(err)
+	}
+	return p
+}
+
 type testDiscovery map[string]*plugin.Endpoint
 
 func (td testDiscovery) List() (map[string]*plugin.Endpoint, error) {
@@ -59,21 +66,21 @@ func TestVisit(t *testing.T) {
 			}
 		},
 		Choices: options,
-		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+		PluginClientFunc: func(n plugin.Name) (instance.Plugin, error) {
 			switch n {
 			case n1:
-				return p1
+				return p1, nil
 			case n2:
-				return p2
+				return p2, nil
 			}
-			return nil
+			return nil, nil
 		},
 	}
 
-	m, err := b.Plugins().List()
+	_, err := b.Plugins().List()
 	require.NoError(t, err)
-	require.Equal(t, p1, b.PluginClientFunc(m, options[0].Name))
-	require.Equal(t, p2, b.PluginClientFunc(m, options[1].Name))
+	require.Equal(t, p1, mustPlugin(b.PluginClientFunc(options[0].Name)))
+	require.Equal(t, p2, mustPlugin(b.PluginClientFunc(options[1].Name)))
 
 	// Check error handling
 	require.Error(t, b.visit(
@@ -128,14 +135,14 @@ func TestDoAll(t *testing.T) {
 			}
 		},
 		Choices: options,
-		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+		PluginClientFunc: func(n plugin.Name) (instance.Plugin, error) {
 			switch n {
 			case n1:
-				return p1
+				return p1, nil
 			case n2:
-				return p2
+				return p2, nil
 			}
-			return nil
+			return nil, nil
 		},
 	}
 
@@ -186,14 +193,14 @@ func TestDescribeInstances(t *testing.T) {
 			}
 		},
 		Choices: options,
-		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+		PluginClientFunc: func(n plugin.Name) (instance.Plugin, error) {
 			switch n {
 			case n1:
-				return p1
+				return p1, nil
 			case n2:
-				return p2
+				return p2, nil
 			}
-			return nil
+			return nil, nil
 		},
 	}
 
@@ -255,14 +262,14 @@ func TestValidate(t *testing.T) {
 			}
 		},
 		Choices: options,
-		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+		PluginClientFunc: func(n plugin.Name) (instance.Plugin, error) {
 			switch n {
 			case n1:
-				return p1
+				return p1, nil
 			case n2:
-				return p2
+				return p2, nil
 			}
-			return nil
+			return nil, nil
 		},
 	}
 
@@ -315,14 +322,14 @@ func TestLabel(t *testing.T) {
 			}
 		},
 		Choices: options,
-		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+		PluginClientFunc: func(n plugin.Name) (instance.Plugin, error) {
 			switch n {
 			case n1:
-				return p1
+				return p1, nil
 			case n2:
-				return p2
+				return p2, nil
 			}
-			return nil
+			return nil, nil
 		},
 	}
 
@@ -381,14 +388,14 @@ func TestDestroy(t *testing.T) {
 			}
 		},
 		Choices: options,
-		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+		PluginClientFunc: func(n plugin.Name) (instance.Plugin, error) {
 			switch n {
 			case n1:
-				return p1
+				return p1, nil
 			case n2:
-				return p2
+				return p2, nil
 			}
-			return nil
+			return nil, nil
 		},
 	}
 
@@ -444,14 +451,14 @@ func TestProvision(t *testing.T) {
 			}
 		},
 		Choices: options,
-		PluginClientFunc: func(m map[string]*plugin.Endpoint, n plugin.Name) instance.Plugin {
+		PluginClientFunc: func(n plugin.Name) (instance.Plugin, error) {
 			switch n {
 			case n1:
-				return p1
+				return p1, nil
 			case n2:
-				return p2
+				return p2, nil
 			}
-			return nil
+			return nil, nil
 		},
 	}
 

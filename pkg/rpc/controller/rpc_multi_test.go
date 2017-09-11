@@ -61,7 +61,7 @@ func TestMultiControllerPlan(t *testing.T) {
 			return largeObject, largePlan, nil
 		},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNamed(
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNames(
 		func() (map[string]controller.Controller, error) {
 			return map[string]controller.Controller{
 				"small": small,
@@ -135,7 +135,7 @@ func TestMultiControllerCommit(t *testing.T) {
 			return largeObject, nil
 		},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNamed(
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNames(
 		func() (map[string]controller.Controller, error) {
 			return map[string]controller.Controller{
 				"small": small,
@@ -207,7 +207,7 @@ func TestMultiControllerDescribe(t *testing.T) {
 			return []types.Object{largeObject}, nil
 		},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNamed(
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNames(
 		func() (map[string]controller.Controller, error) {
 			return map[string]controller.Controller{
 				"small": small,
@@ -280,7 +280,7 @@ func TestMultiControllerFree(t *testing.T) {
 			return []types.Object{largeObject}, nil
 		},
 	}
-	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNamed(
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNames(
 		func() (map[string]controller.Controller, error) {
 			return map[string]controller.Controller{
 				"small": small,

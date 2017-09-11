@@ -136,7 +136,7 @@ func (r *dirPluginDiscovery) List() (map[string]*plugin.Endpoint, error) {
 				continue
 			}
 
-			log.Debug("Discovered plugin", "address", instance.Address, "V", logutil.V(500))
+			log.Debug("Discovered plugin", "address", instance.Address, "V", logutil.V(1000))
 			plugins[instance.Name] = instance
 		}
 	}
