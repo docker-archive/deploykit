@@ -15,10 +15,12 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	aws_instance "github.com/docker/infrakit/pkg/provider/aws/plugin/instance"
+	aws_loadbalancer "github.com/docker/infrakit/pkg/provider/aws/plugin/loadbalancer"
 	aws_metadata "github.com/docker/infrakit/pkg/provider/aws/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -81,11 +83,18 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	if err != nil {
 		return
 	}
+
+	var elbPlugin loadbalancer.L4
+	elbClient := elb.New(builder.Config)
+	elbPlugin, err = aws_loadbalancer.NewELBPlugin(elbClient, "elb-lb")
+	if err != nil {
+		return
+	}
+
 	autoscalingClient := autoscaling.New(builder.Config)
 	cloudWatchLogsClient := cloudwatchlogs.New(builder.Config)
 	dynamodbClient := dynamodb.New(builder.Config)
 	ec2Client := ec2.New(builder.Config)
-	elbClient := elb.New(builder.Config)
 	iamClient := iam.New(builder.Config)
 	sqsClient := sqs.New(builder.Config)
 
@@ -95,6 +104,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 			"ec2-instance": (&aws_instance.Monitor{Plugin: instancePlugin}).Init(),
 		},
 		run.Metadata: metadataPlugin,
+		run.L4:       elbPlugin,
 		run.Instance: map[string]instance.Plugin{
 			"autoscaling-autoscalinggroup":    aws_instance.NewAutoScalingGroupPlugin(autoscalingClient, options.Namespace),
 			"autoscaling-launchconfiguration": aws_instance.NewLaunchConfigurationPlugin(autoscalingClient, options.Namespace),
