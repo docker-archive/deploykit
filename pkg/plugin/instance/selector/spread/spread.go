@@ -3,12 +3,10 @@ package spread
 import (
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/instance/selector"
 	"github.com/docker/infrakit/pkg/plugin/instance/selector/internal"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/types"
 )
 
 var log = logutil.New("module", "plugin/instance/selector/spread")
@@ -32,12 +30,13 @@ type impl struct {
 
 // NewPlugin returns an instance plugin that implements this algorithm
 func NewPlugin(plugins func() discovery.Plugins, choices selector.Options) instance.Plugin {
+	base := &internal.Base{
+		Plugins:    plugins,
+		Choices:    choices,
+		SelectFunc: SelectOne,
+	}
 	return &impl{
-		Plugin: &internal.Base{
-			Plugins:    plugins,
-			Choices:    choices,
-			SelectFunc: SelectOne,
-		},
+		Plugin: base.Init(),
 	}
 }
 
@@ -50,17 +49,6 @@ func (p *impl) VendorInfo() *spi.VendorInfo {
 		},
 		URL: "https://github.com/docker/infrakit",
 	}
-}
-
-// DefaultOptions is the default/example configuration of this plugin
-var DefaultOptions = types.AnyValueMust(selector.Options{
-	selector.Choice{Name: plugin.Name("zone1")},
-	selector.Choice{Name: plugin.Name("zone2")},
-})
-
-// ExampleProperties returns the properties / config of this plugin
-func (p *impl) ExampleProperties() *types.Any {
-	return DefaultOptions
 }
 
 func getLabels(choice selector.Choice) map[string]string {

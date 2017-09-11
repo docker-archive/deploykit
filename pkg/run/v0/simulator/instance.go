@@ -51,6 +51,20 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 	instanceLogger.Debug("Provision", "name", s.name, "spec", spec, "V", debugV)
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	// simulator feature....
+	control := struct {
+		Cap int
+	}{}
+
+	if err := spec.Properties.Decode(&control); err == nil && control.Cap > 0 {
+		if found, err := s.DescribeInstances(spec.Tags, false); err == nil {
+			if len(found) >= control.Cap {
+				return nil, fmt.Errorf("at capacity %v", control.Cap)
+			}
+		}
+	}
+
 	key := fmt.Sprintf("%v", time.Now().UnixNano())
 	description := instance.Description{
 		ID:         instance.ID(key),
@@ -128,9 +142,6 @@ func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Conte
 func (s *instanceSimulator) DescribeInstances(labels map[string]string,
 	properties bool) ([]instance.Description, error) {
 	instanceLogger.Debug("DescribeInstances", "name", s.name, "labels", labels, "V", debugV)
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	matches := []instance.Description{}
 
 	err := store.Visit(s.instances,

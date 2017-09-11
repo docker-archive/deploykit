@@ -58,7 +58,7 @@ type Options struct {
 var DefaultOptions = Options{
 	Store:         local.Getenv(EnvStore, "mem"),
 	Dir:           local.Getenv(EnvDir, filepath.Join(local.InfrakitHome(), "simulator")),
-	InstanceTypes: strings.Split(local.Getenv(EnvInstanceTypes, "compute,net,disk,compute-spot"), ","),
+	InstanceTypes: strings.Split(local.Getenv(EnvInstanceTypes, "compute,net,disk"), ","),
 	L4Names:       strings.Split(local.Getenv(EnvL4Names, "lb1,lb2,lb3"), ","),
 }
 
