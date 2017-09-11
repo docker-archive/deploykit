@@ -2,17 +2,14 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/FrenchBen/oracle-sdk-go/compute"
 )
 
 func main() {
-	apiEndpoint, err := url.Parse("myAPIEndpoint")
-	if err != nil {
-		fmt.Errorf("Error parsing API Endpoint: %s", err)
-	}
+	// Pass the region or let the instance metadata dictate it
+	apiEndpoint := bmc.GetAPIEndpoint()
 
 	config := &bmc.Config{
 		User:        bmc.String("ocid1.user.oc1..aaaaaaaat5nvwcna5j6aqzjcaty5eqbb6qt2jvpkanghtgdaqedqw3rynjq"),
