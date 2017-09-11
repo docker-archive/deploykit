@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/client"
 	"golang.org/x/net/context"
 )
@@ -10,7 +9,7 @@ import (
 func AmISwarmLeader(ctx context.Context, client client.APIClient) (bool, error) {
 	info, err := client.Info(ctx)
 
-	log.Debugln("info=", info, "err=", err)
+	log.Debug("Swarm info", "info", info, "err", err)
 
 	if err != nil {
 		return false, err
@@ -19,19 +18,19 @@ func AmISwarmLeader(ctx context.Context, client client.APIClient) (bool, error) 
 	// inspect itself to see if i am the leader
 	node, _, err := client.NodeInspectWithRaw(ctx, info.Swarm.NodeID)
 
-	log.Debugln("nodeId=", info.Swarm.NodeID, "node=", node, "err=", err)
+	log.Debug("Inspect node", "nodeID", info.Swarm.NodeID, "node", node, "err", err, "V", debugV)
 
 	if err != nil {
 		return false, err
 	}
 
-	log.Debugln("manager=", node.ManagerStatus)
+	log.Debug("manager status", "status", node.ManagerStatus, "V", debugV)
 
 	if node.ManagerStatus == nil {
 		return false, nil
 	}
 
-	log.Debugln("leader=", node.ManagerStatus.Leader)
+	log.Debug("leader status", "leader", node.ManagerStatus.Leader)
 
 	return node.ManagerStatus.Leader, nil
 }

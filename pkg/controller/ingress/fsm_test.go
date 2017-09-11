@@ -86,7 +86,7 @@ func TestControllerInitSpec(t *testing.T) {
 
 	managedObject := &managed{
 		options: ingress.Options{
-			SyncInterval: expectedInterval,
+			SyncInterval: types.Duration(expectedInterval),
 		},
 	}
 
@@ -94,14 +94,14 @@ func TestControllerInitSpec(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("verify that the default value remains despite no Options in the spec")
-	require.Equal(t, expectedInterval, managedObject.options.SyncInterval)
+	require.Equal(t, expectedInterval, managedObject.options.SyncInterval.Duration())
 
 	t.Log("verify that spec's option value makes into the ingress.Options")
 	managedObject = &managed{}
 
 	expectedOptions := ingress.Options{
 		HardSync:     true,
-		SyncInterval: expectedInterval,
+		SyncInterval: types.Duration(expectedInterval),
 	}
 
 	err = managedObject.init(types.Spec{

@@ -1,0 +1,79 @@
+#
+#
+#  Example for enrollment controller
+#
+#  Enrollment controller makes sure the instances in the source group (specified
+#  by the List field) are in sync with entries in the downstream instance plugin
+#  specified by Instance field.
+#
+#  This example uses swarm as backend.  So be sure your swarm on the same host
+#  is a leader via `docker swarm init`.
+#
+#
+#  1. Start up all the plugins:
+#  INFRAKIT_MANAGER_BACKEND=swarm build/infrakit plugin start manager group \
+#     enrollment:nfs \
+#     simulator:nfs-auth simulator:simulator vanilla
+#
+#  This starts up the group at 'us-east', one simulator at 'nfs' and another at 'simulator'
+#
+#  2. Commit the group to create the groups -- see the group.yml included.
+#
+#  infrakit group controller commit -y docs/controller/enrollment/group.yml
+#
+#  Verify the group has workers:
+#
+#  infrakit group/workers describe
+#
+#  3. Commit this file to create the enrollments
+#
+#  infrakit nfs controller commit -y docs/controller/enrollment/example.yml
+#
+#  4. Verify that entries are in sync: check the group describe and nfs-auth/disk (that's
+#     the Plugin specified in the Instance section of this config.
+#
+#  infrakit group/workers describe     # returns the list of nodes in the group
+#  infrakit infrakit nfs-auth/disk describe  # returns the list of corresponding enrollments
+#
+#  For each member of the group workers you should see a corresponding entry in the enrollments.
+#  Note that the instance ID of an enrollment (in nfs-auth/disk) will be different from the instance
+#  ID of a member in group/workers; however, the ID of a member of group/workers should show up as
+#  a label in the instance of nfs-auth/disk (as infrakit.enrollment.sourceID).
+#
+#  5. Try scale up the workers group
+#
+#  infrakit group/workers scale 10
+#
+#  After a while, verify enrollment:
+#
+#  infrakit nfs-auth/disk describe
+
+
+kind: enrollment
+metadata:
+  name: nfs/workers  # socket file = nfs and the name of control loop is 'workers'
+properties:
+  List: group/workers  # socket file = group and group id is 'workers'
+  Instance:
+
+    # the name of a plugin that has disk as subtype.
+    Plugin: nfs-auth/disk
+
+    # the entire Properties block here will be rendered and included as the downstream
+    # instance plugin's instance.Spec when Provision() is called.
+    Properties:
+
+       # You can include template expressions in this block; however, you need to
+       # escape the braces.
+       host: \{\{.ID\}\}
+       iops: 10
+options:
+  # This expression is a template used to select the key from each source entry
+  # of instance.Description.  Note here we escape the template tags
+  # so that template expressions don't get clobbered by infrakit template when
+  # using that as a preprocessor prior to committing.
+  SourceKeySelector: \{\{.ID\}\}
+
+  # How often to run the sync.  The string value here is in the format of Go's time.Duration.
+  # For example, 1m means 1 minute.
+  SyncInterval: 5s  # seconds

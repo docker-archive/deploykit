@@ -5,9 +5,17 @@ import (
 
 	"github.com/docker/go-connections/tlsconfig"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
+)
+
+var log = logutil.New("module", "controller/ingress/swarm")
+
+const (
+	debugV  = logutil.V(300)
+	debugV2 = logutil.V(310)
 )
 
 func init() {
@@ -20,15 +28,26 @@ func init() {
 	)
 }
 
+// Docker is alias for docker connection information
+type Docker docker.ConnectInfo
+
 // Spec is the struct that captures the configuration of the swarm-based ingress route finder
 type Spec struct {
-
 	// Docker holds the connection params to the Docker engine for join tokens, etc.
-	Docker docker.ConnectInfo
+	Docker `json:",inline" yaml:",inline"`
 }
 
-// RoutesFromSwarmServices determines the routes based on the services running in the Docker swarm
-func RoutesFromSwarmServices(properties *types.Any,
+type handler struct {
+	dockerClient docker.APIClientCloser
+}
+
+// Close implements io.Closer
+func (h *handler) Close() error {
+	return h.dockerClient.Close()
+}
+
+// Routes implements ingress/types/RouteHandler
+func (h *handler) Routes(properties *types.Any,
 	options ingress.Options) (map[ingress.Vhost][]loadbalancer.Route, error) {
 
 	spec := Spec{}
@@ -52,10 +71,18 @@ func RoutesFromSwarmServices(properties *types.Any,
 		return nil, err
 	}
 
+	log.Info("Connected to Docker", "client", dockerClient)
+	h.dockerClient = dockerClient
+
 	routes, err := NewServiceRoutes(dockerClient).SetOptions(options).Build()
 	if err != nil {
 		return nil, err
 	}
 
 	return routes.List()
+}
+
+// RoutesFromSwarmServices determines the routes based on the services running in the Docker swarm
+func RoutesFromSwarmServices() (ingress.RouteHandler, error) {
+	return &handler{}, nil
 }
