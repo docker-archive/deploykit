@@ -24,6 +24,7 @@ type Config struct {
 	User        *string
 	Fingerprint *string
 	KeyFile     *string
+	PassPhrase  *string
 	Tenancy     *string
 	Region      *string
 	APIEndpoint *url.URL
