@@ -44,7 +44,7 @@ This configuration file is used by the `infrakit plugin start` command.  It has 
 ```
 infrakit plugin start <plugin_spec> [ <plugin_spec> ... ]
 ```
-where the spec looks like `<plugin_spec>` is `<key>[:<socke_file>[=<exec>]]`
+where `<plugin_spec>` is `<key>[:<socke_file>[=<exec>]]`
 
 For example:
 
