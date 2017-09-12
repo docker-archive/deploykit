@@ -14,8 +14,44 @@ func init() {
 Now you need to create a `plugins.json` file and use that when you use `infrakit plugin start`.
 This file will have the actual config parameters you need to start things up.
 
+This format actually supports a variety of plugin startup mechanism (eg. exec to shell, to docker, etc.)
+but the one we care about for best UX is the `inproc` which essentially embeds all the important plugins
+in the same binary and will run in the same infrakit daemon process.  The `inproc` lauch system uses
+the go packages and registration mechanism mentioned above (in the `pkg/run/v0` and all the subpackages
+below it).  So the block here will set up the input for a key `terraform` which uses `inproc` subsystem
+to launch the `terraform` kind:
+
+```
+    {
+        "Key" : "terraform",
+        "Launch" : {
+            "inproc": {
+		"Kind" : "terraform",
+		"Options" : {
+		    "Dir": "{{ env `INFRAKIT_HOME` }}/terraform",
+		    "Standalone": true,
+		    "NewOption" : "hello world"
+		}
+	    }
+        }
+    }
+```
+
+So a command of the form `infrakit plugin start <key>:<socke_file>=<exec>` like
+```
+infrakit plugin start terraform
+```
+is equal to
+```
+infrakit plugin start terraform:terraform=inproc
+```
+
+where the launch system will look for `Key` of `terraform`, and use the `inproc` launcher which uses the
+embeded `terraform` Kind.  That then will look for the `Options` field and provide that to the code
+that is in `terraform.go`.
+
 Once you have the new fields defined and updated your `plugins.json` file to reflect these new changes,
-you provide this `plugins.json` to complement/override a set of defaults in the system:
+you have to provide this `plugins.json` to complement/override a set of defaults in the system:
 
 ```
 build/infrakit plugin --config-url file://$(pwd)/pkg/run/v0/terraform/plugins.json start terraform
@@ -37,7 +73,10 @@ and may not have a state file yet for the first run.
 
 ```
 
-Note that the value `hello world` for has been loaded and recognized by the plugin.  A couple of notes:
+There -- your plugin just came up with customized fields and is now running inside the same process
+as the rest of infrakit. Note that the value `hello world` for has been loaded and printed out in `INFO`.
+
+A couple of notes:
 
   1. The `plugins.json` will be evaluated as a template.  This means you can use template functions
   like `env` or even `source`/`include` to bring in other complex configurations.
