@@ -19,7 +19,7 @@ const (
 	Kind = "tailer"
 
 	// EnvPath is the environment variable to set to tail when no additional configs are used.
-	EnvPath = "INFRAKIT_EVENT_TAILER_PATH"
+	EnvPath = "INFRAKIT_TAILER_PATH"
 )
 
 var (

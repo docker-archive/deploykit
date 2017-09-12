@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -17,6 +18,7 @@ import (
 	aws_instance "github.com/docker/infrakit/pkg/provider/aws/plugin/instance"
 	aws_metadata "github.com/docker/infrakit/pkg/provider/aws/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -26,6 +28,18 @@ import (
 const (
 	// Kind is the canonical name of the plugin for starting up, etc.
 	Kind = "aws"
+
+	// EnvRegion is the env for aws region.  Don't set this if want auto detect.
+	EnvRegion = "INFRAKIT_AWS_REGION"
+
+	// EnvStackName is the env for stack name
+	EnvStackName = "INFRAKIT_AWS_STACKNAME"
+
+	// EnvMetadataTemplateURL is the location of the template for Metadata plugin
+	EnvMetadataTemplateURL = "INFRAKIT_AWS_METADATA_TEMPLATE_URL"
+
+	// EnvNameSpaceTags is the env to set for namespace tags. It's k=v,...
+	EnvNamespaceTags = "INFRAKIT_AWS_NAMESPACE_TAGS"
 )
 
 var (
@@ -44,12 +58,26 @@ type Options struct {
 	aws_metadata.Options `json:",inline" yaml:",inline"`
 }
 
+func defaultNamespace() map[string]string {
+	t := map[string]string{}
+	list := local.Getenv(EnvNamespaceTags, "")
+	for _, v := range strings.Split(list, ",") {
+		p := strings.Split(v, "=")
+		if len(p) == 2 {
+			t[p[0]] = p[1]
+		}
+	}
+	return t
+}
+
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Namespace: map[string]string{},
+	Namespace: defaultNamespace(),
 	Options: aws_metadata.Options{
+		Template:  local.Getenv(EnvMetadataTemplateURL, ""),
+		StackName: local.Getenv(EnvStackName, ""),
 		Options: aws_instance.Options{
-			Region: "us-west-1",
+			Region: local.Getenv(EnvRegion, ""), // empty string trigger auto-detect
 		},
 		PollInterval: 60 * time.Second,
 	},
