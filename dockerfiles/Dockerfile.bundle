@@ -1,4 +1,5 @@
-FROM docker:latest
+#FROM docker:latest
+FROM alpine:latest
 
 RUN mkdir -p /infrakit/plugins /infrakit/configs /infrakit/logs /infrakit/cli /infrakit/instance/terraform
 

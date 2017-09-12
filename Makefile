@@ -111,29 +111,29 @@ $(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/res
 
 binaries: clean build-binaries
 build-binaries:	build/infrakit \
-		build/infrakit-event-time \
-		build/infrakit-flavor-combo \
-		build/infrakit-flavor-kubernetes \
-		build/infrakit-flavor-swarm \
-		build/infrakit-flavor-vanilla \
-		build/infrakit-flavor-zookeeper \
-		build/infrakit-group-default \
-		build/infrakit-instance-aws \
-		build/infrakit-instance-digitalocean \
-		build/infrakit-instance-docker \
-		build/infrakit-instance-file \
-		build/infrakit-instance-gcp \
-		build/infrakit-instance-hyperkit \
-		build/infrakit-instance-image \
-		build/infrakit-instance-libvirt \
-		build/infrakit-instance-maas \
-		build/infrakit-instance-packet \
-		build/infrakit-instance-terraform \
-		build/infrakit-instance-vagrant \
-		build/infrakit-instance-vsphere \
-		build/infrakit-manager \
-		build/infrakit-metadata-aws \
-		build/infrakit-resource \
+		# build/infrakit-event-time \
+		# build/infrakit-flavor-combo \
+		# build/infrakit-flavor-kubernetes \
+		# build/infrakit-flavor-swarm \
+		# build/infrakit-flavor-vanilla \
+		# build/infrakit-flavor-zookeeper \
+		# build/infrakit-group-default \
+		# build/infrakit-instance-aws \
+		# build/infrakit-instance-digitalocean \
+		# build/infrakit-instance-docker \
+		# build/infrakit-instance-file \
+		# build/infrakit-instance-gcp \
+		# build/infrakit-instance-hyperkit \
+		# build/infrakit-instance-image \
+		# build/infrakit-instance-libvirt \
+		# build/infrakit-instance-maas \
+		# build/infrakit-instance-packet \
+		# build/infrakit-instance-terraform \
+		# build/infrakit-instance-vagrant \
+		# build/infrakit-instance-vsphere \
+		# build/infrakit-manager \
+		# build/infrakit-metadata-aws \
+		# build/infrakit-resource \
 
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
