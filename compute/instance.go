@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/google/go-querystring/query"
 )
 
 // InstanceClient is a client for the Instance functions of the Compute API.
@@ -32,6 +33,14 @@ type Instance struct {
 	Region      string `json:"region"`
 	Shape       string `json:"shape"`
 	TimeCreated string `json:"timeCreated"`
+}
+
+// InstancesParameters
+type InstancesParameters struct {
+	AvailabilityDomain string `url:"availabilityDomain"`
+	DisplayName        string `url:"displayName"`
+	Limit              int    `url:"limit"`
+	Page               string `url:"page"`
 }
 
 // NewInstanceClient provides a client interface for instance API calls
@@ -61,8 +70,13 @@ func (ic *InstanceClient) GetInstance(instanceID string) Instance {
 }
 
 // ListInstances returns a slice struct of all instance
-func (ic *InstanceClient) ListInstances() {
-	resp, err := ic.client.Get(fmt.Sprintf("/instances?compartmentId=%s", url.QueryEscape(ic.compartmendID)))
+func (ic *InstanceClient) ListInstances(options *InstancesParameters) {
+	queryString := url.QueryEscape(ic.compartmendID)
+	if options != nil {
+		v, _ := query.Values(*options)
+		queryString = queryString + "&" + v.Encode()
+	}
+	resp, err := ic.client.Get(fmt.Sprintf("/instances?compartmentId=%s", queryString))
 	if err != nil {
 		logrus.Error(err)
 	}
