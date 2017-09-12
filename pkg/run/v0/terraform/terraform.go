@@ -56,6 +56,9 @@ type Options struct {
 
 	// ImportGroupID defines the group ID to import the resource into (optional)
 	ImportGroupID string
+
+	// NewOption is an example... see the plugins.json file in this directory.
+	NewOption string
 }
 
 // DefaultOptions return an Options with default values filled in.  If you want to expose these to the CLI,
@@ -91,6 +94,9 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		log.Error("error parsing instance spec from group", "err", err)
 		return
 	}
+
+	// Do we have the new options?
+	log.Info("NewOptions", "value", options.NewOption, "Dir", options.Dir)
 
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: terraform.NewTerraformInstancePlugin(options.Dir, options.PollInterval,
