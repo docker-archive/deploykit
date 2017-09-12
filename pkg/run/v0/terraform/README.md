@@ -16,9 +16,11 @@ This file will have the actual config parameters you need to start things up.
 
 This format actually supports a variety of plugin startup mechanism (eg. exec to shell, to docker, etc.)
 but the one we care about for best UX is the `inproc` which essentially embeds all the important plugins
-in the same binary and will run in the same infrakit daemon process.  The `inproc` lauch system uses
+in the same binary and will run in the same infrakit daemon process.  The `inproc` launch system uses
 the go packages and registration mechanism mentioned above (in the `pkg/run/v0` and all the subpackages
-below it).  So the block here will set up the input for a key `terraform` which uses `inproc` subsystem
+below it).
+
+The block here will set up the input for a key `terraform` which uses `inproc` subsystem
 to launch the `terraform` kind:
 
 ```
@@ -37,7 +39,15 @@ to launch the `terraform` kind:
     }
 ```
 
-So a command of the form `infrakit plugin start <key>:<socke_file>=<exec>` like
+This configuration file is used by the `infrakit plugin start` command.  It has a usage like this:
+
+```
+infrakit plugin start <plugin_spec> [ <plugin_spec> ... ]
+```
+where the spec looks like `<plugin_spec>` is `<key>[:<socke_file>[=<exec>]]`
+
+For example:
+
 ```
 infrakit plugin start terraform
 ```
