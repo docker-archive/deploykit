@@ -37,10 +37,10 @@ type Instance struct {
 
 // InstancesParameters
 type InstancesParameters struct {
-	AvailabilityDomain string `url:"availabilityDomain"` //The name of the Availability Domain.
-	DisplayName        string `url:"displayName"`        //A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information.
-	Limit              int    `url:"limit"`              //The maximum number of items to return in a paginated "List" call.
-	Page               string `url:"page"`               //The value of the opc-next-page response header from the previous "List" call
+	AvailabilityDomain string `url:"availabilityDomain,omitempty"` //The name of the Availability Domain.
+	DisplayName        string `url:"displayName,omitempty"`        //A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information.
+	Limit              int    `url:"limit,omitempty"`              //The maximum number of items to return in a paginated "List" call.
+	Page               string `url:"page,omitempty"`               //The value of the opc-next-page response header from the previous "List" call
 }
 
 // NewInstanceClient provides a client interface for instance API calls
