@@ -18,6 +18,7 @@ import (
 	aws_loadbalancer "github.com/docker/infrakit/pkg/provider/aws/plugin/loadbalancer"
 	aws_metadata "github.com/docker/infrakit/pkg/provider/aws/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -27,7 +28,8 @@ import (
 
 const (
 	// Kind is the canonical name of the plugin for starting up, etc.
-	Kind = "aws"
+	Kind       = "aws"
+	EnvELBName = "INFRAKIT_AWS_ELB_NAME"
 )
 
 var (
@@ -86,7 +88,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	var elbPlugin loadbalancer.L4
 	elbClient := elb.New(builder.Config)
-	elbPlugin, err = aws_loadbalancer.NewELBPlugin(elbClient, "elb-lb")
+	elbPlugin, err = aws_loadbalancer.NewELBPlugin(elbClient, local.Getenv(EnvELBName, "default"))
 	if err != nil {
 		return
 	}
@@ -104,7 +106,11 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 			"ec2-instance": (&aws_instance.Monitor{Plugin: instancePlugin}).Init(),
 		},
 		run.Metadata: metadataPlugin,
-		run.L4:       elbPlugin,
+		run.L4: func() (map[string]loadbalancer.L4, error) {
+			return map[string]loadbalancer.L4{
+				local.Getenv(EnvELBName, "default"): elbPlugin,
+			}, nil
+		},
 		run.Instance: map[string]instance.Plugin{
 			"autoscaling-autoscalinggroup":    aws_instance.NewAutoScalingGroupPlugin(autoscalingClient, options.Namespace),
 			"autoscaling-launchconfiguration": aws_instance.NewLaunchConfigurationPlugin(autoscalingClient, options.Namespace),
