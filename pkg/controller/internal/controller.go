@@ -14,8 +14,17 @@ var log = logutil.New("module", "controller/internal")
 
 const debugV = logutil.V(500)
 
+// ControlLoop gives status and means to stop the object
+type ControlLoop interface {
+	Start()
+	Running() bool
+	Stop() error
+}
+
 // Managed is the interface implemented by managed objects within a controller
 type Managed interface {
+	ControlLoop
+
 	Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error)
 	Enforce(types.Spec) (*types.Object, error)
 	Inspect() (*types.Object, error)
@@ -27,7 +36,7 @@ type Managed interface {
 type Controller struct {
 	alloc   func(types.Spec) (Managed, error)
 	keyfunc func(types.Metadata) string
-	managed map[string]Managed
+	managed map[string]*Managed
 	leader  manager.Leadership
 	lock    sync.RWMutex
 }
@@ -41,7 +50,7 @@ func NewController(l manager.Leadership,
 		keyfunc: keyfunc,
 		alloc:   alloc,
 		leader:  l,
-		managed: map[string]Managed{},
+		managed: map[string]*Managed{},
 	}
 	return c
 }
@@ -57,12 +66,13 @@ func (c *Controller) leaderGuard() error {
 	return nil
 }
 
-func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]Managed, error) {
-	out := []Managed{}
+func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**Managed, error) {
+	out := []**Managed{}
 	if search == nil {
 		// all managed objects
 		for _, v := range c.managed {
-			out = append(out, v)
+			copy := v
+			out = append(out, &copy)
 		}
 		return out, nil
 	}
@@ -78,12 +88,14 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]Man
 			if err != nil {
 				return nil, err
 			}
-			c.managed[key] = m
+
+			c.managed[key] = &m
 		} else {
 			return out, nil
 		}
 	}
-	out = append(out, c.managed[key])
+	ptr := c.managed[key]
+	out = append(out, &ptr)
 	return out, nil
 }
 
@@ -96,7 +108,7 @@ func (c *Controller) Plan(operation controller.Operation,
 		return
 	}
 
-	m := []Managed{}
+	m := []**Managed{}
 	copy := spec
 	m, err = c.getManaged(&spec.Metadata, &copy)
 	if err != nil {
@@ -108,7 +120,7 @@ func (c *Controller) Plan(operation controller.Operation,
 		err = fmt.Errorf("duplicate objects: %v", m)
 	}
 
-	o, p, e := m[0].Plan(operation, spec)
+	o, p, e := (**m[0]).Plan(operation, spec)
 	if o != nil {
 		object = *o
 	}
@@ -132,11 +144,19 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	m := []Managed{}
+	log.Debug("committing", "operation", operation, "spec", spec)
+
+	m := []**Managed{}
 	copy := spec
 	m, err = c.getManaged(&spec.Metadata, &copy)
 	if err != nil {
 		return
+	}
+
+	log.Debug("got managed", "operation", operation, "spec", spec, "m", m)
+
+	if len(m) == 0 {
+		return types.Object{}, fmt.Errorf("no managed object found %v", spec.Metadata.Name)
 	}
 
 	// In the future maybe will consider wildcard commits...  but this is highly discouraged at this time.
@@ -146,7 +166,32 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 
 	switch operation {
 	case controller.Enforce:
-		o, e := m[0].Enforce(spec)
+
+		managed := *(m[0])
+		if (*managed).Running() {
+
+			log.Debug("creating new object to replace running instance.")
+
+			// Create a new object
+			newManaged, err := c.alloc(spec)
+			if err != nil {
+				log.Error("cannot allocate a new managed object", "spec", spec, "err", err)
+				return types.Object{}, err
+			}
+
+			// Tell the old to stop
+			(*managed).Stop()
+
+			log.Debug("Currently running managed object", "managed", m[0])
+
+			// swap
+			**m[0] = newManaged
+
+			log.Debug("Swapped running managed object", "managed", m[0])
+		}
+
+		log.Debug("calling enforce", "spec", spec, "m", managed)
+		o, e := (*managed).Enforce(spec)
 		if o != nil {
 			object = *o
 		}
@@ -154,7 +199,7 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 		return
 
 	case controller.Destroy:
-		o, e := m[0].Terminate()
+		o, e := (**m[0]).Terminate()
 		if o != nil {
 			object = *o
 		}
@@ -174,7 +219,7 @@ func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, e
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	m := []Managed{}
+	m := []**Managed{}
 	m, err = c.getManaged(search, nil)
 
 	log.Debug("Describe", "search", search, "V", debugV, "managed", m, "err", err)
@@ -182,9 +227,18 @@ func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, e
 	if err != nil {
 		return
 	}
+
+	if len(m) == 0 {
+		ss := fmt.Sprintf("%v", search)
+		if search != nil {
+			ss = fmt.Sprintf("%v", *search)
+		}
+		return nil, fmt.Errorf("no managed object found %v", ss)
+	}
+
 	objects = []types.Object{}
 	for _, s := range m {
-		o, err := s.Inspect()
+		o, err := (**s).Inspect()
 		if err != nil {
 			return nil, err
 		}
@@ -220,7 +274,7 @@ func (c *Controller) Free(search *types.Metadata) (objects []types.Object, err e
 		if len(m) != 1 {
 			continue
 		}
-		m[0].Free()
+		(**m[0]).Free()
 
 		objects = append(objects, candidate)
 	}
@@ -239,7 +293,7 @@ func (c *Controller) ManagedObjects() (map[string]controller.Controller, error) 
 		out[k] = &Controller{
 			alloc:   c.alloc,
 			keyfunc: c.keyfunc,
-			managed: map[string]Managed{
+			managed: map[string]*Managed{
 				k: v, // Scope to this as only instance
 			},
 			leader: c.leader,

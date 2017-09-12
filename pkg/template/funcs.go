@@ -17,6 +17,33 @@ import (
 	"github.com/vaughan0/go-ini"
 )
 
+// Unescape replaces all the \{\{ and \}\} back to the normal unescaped {{ and }}.
+func Unescape(source []byte) []byte {
+	if source == nil {
+		return source
+	}
+	// Apply the template but we need escape the \{\{ if any
+	buff := source
+	buff = bytes.Replace(buff, []byte("\\{\\{"), []byte("{{"), -1)
+	buff = bytes.Replace(buff, []byte("\\}\\}"), []byte("}}"), -1)
+
+	// YAML will escape the escapes... so twice
+	buff = bytes.Replace(buff, []byte("\\\\{\\\\{"), []byte("{{"), -1)
+	buff = bytes.Replace(buff, []byte("\\\\}\\\\}"), []byte("}}"), -1)
+	return buff
+}
+
+// Escape replaces all the {{ and }} with \{\{ and \}\} to escape template content.
+func Escape(source []byte) []byte {
+	if source == nil {
+		return source
+	}
+	buff := source
+	buff = bytes.Replace(buff, []byte("{{"), []byte("\\{\\{"), -1)
+	buff = bytes.Replace(buff, []byte("}}"), []byte("\\}\\}"), -1)
+	return buff
+}
+
 // DeepCopyObject makes a deep copy of the argument, using encoding/gob encode/decode.
 func DeepCopyObject(from interface{}) (interface{}, error) {
 	var mod bytes.Buffer
@@ -261,24 +288,26 @@ func (t *Template) Fetch(p string, opt ...interface{}) (string, error) {
 
 // Source 'sources' the input file at url, also inherits all the variables.
 func (t *Template) Source(p string, opt ...interface{}) (string, error) {
-	headers, context := headersAndContext(opt...)
-	loc := p
-	if strings.Index(loc, "str://") == -1 {
-		u, err := GetURL(t.url, p)
-		if err != nil {
-			return "", err
-		}
-		loc = u.String()
-	}
+	// headers, context := headersAndContext(opt...)
+	// loc := p
+	// if strings.Index(loc, "str://") == -1 {
+	// 	u, err := GetURL(t.url, p)
+	// 	if err != nil {
+	// 		return "", err
+	// 	}
+	// 	loc = u.String()
+	// }
 
-	prev := t.options.CustomizeFetch
-	t.options.CustomizeFetch = func(req *http.Request) {
-		setHeaders(req, headers)
-		if prev != nil {
-			prev(req)
-		}
-	}
-	sourced, err := NewTemplate(loc, t.options)
+	// prev := t.options.CustomizeFetch
+	// t.options.CustomizeFetch = func(req *http.Request) {
+	// 	setHeaders(req, headers)
+	// 	if prev != nil {
+	// 		prev(req)
+	// 	}
+	// }
+	// sourced, err := NewTemplate(loc, t.options)
+
+	_, context, sourced, err := t.raw(p, opt...)
 	if err != nil {
 		return "", err
 	}
@@ -296,25 +325,27 @@ func (t *Template) Source(p string, opt ...interface{}) (string, error) {
 
 // Include includes the template at the url inline.
 func (t *Template) Include(p string, opt ...interface{}) (string, error) {
-	headers, context := headersAndContext(opt...)
-	loc := p
-	if strings.Index(loc, "str://") == -1 {
-		u, err := GetURL(t.url, p)
-		if err != nil {
-			return "", err
-		}
-		loc = u.String()
-	}
+	// headers, context := headersAndContext(opt...)
+	// loc := p
+	// if strings.Index(loc, "str://") == -1 {
+	// 	u, err := GetURL(t.url, p)
+	// 	if err != nil {
+	// 		return "", err
+	// 	}
+	// 	loc = u.String()
+	// }
 
-	prev := t.options.CustomizeFetch
-	t.options.CustomizeFetch = func(req *http.Request) {
-		setHeaders(req, headers)
-		if prev != nil {
-			prev(req)
-		}
-	}
+	// prev := t.options.CustomizeFetch
+	// t.options.CustomizeFetch = func(req *http.Request) {
+	// 	setHeaders(req, headers)
+	// 	if prev != nil {
+	// 		prev(req)
+	// 	}
+	// }
 
-	included, err := NewTemplate(loc, t.options)
+	// included, err := NewTemplate(loc, t.options)
+
+	_, context, included, err := t.raw(p, opt...)
 	if err != nil {
 		return "", err
 	}
@@ -331,6 +362,37 @@ func (t *Template) Include(p string, opt ...interface{}) (string, error) {
 	return included.Render(context)
 }
 
+// Raw includes the raw bytes fetched from the url inline.
+func (t *Template) Raw(p string, opt ...interface{}) ([]byte, error) {
+	_, _, included, err := t.raw(p, opt...)
+	if err != nil {
+		return []byte{}, err
+	}
+	return included.body, nil
+}
+
+func (t *Template) raw(p string, opt ...interface{}) (map[string][]string, interface{}, *Template, error) {
+
+	headers, context := headersAndContext(opt...)
+	loc := p
+	if strings.Index(loc, "str://") == -1 {
+		u, err := GetURL(t.url, p)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		loc = u.String()
+	}
+	prev := t.options.CustomizeFetch
+	t.options.CustomizeFetch = func(req *http.Request) {
+		setHeaders(req, headers)
+		if prev != nil {
+			prev(req)
+		}
+	}
+	tt, err := NewTemplate(loc, t.options)
+	return headers, context, tt, err
+}
+
 // DefaultFuncs returns a list of default functions for binding in the template
 func (t *Template) DefaultFuncs() []Function {
 
@@ -338,7 +400,14 @@ func (t *Template) DefaultFuncs() []Function {
 		{
 			Name: "fetch",
 			Description: []string{
-				"Fetches a resource without evaluation as template",
+				"Fetches a resource without evaluation as template. The results are cached locally by the url fetched from.",
+			},
+			Func: t.Fetch,
+		},
+		{
+			Name: "raw",
+			Description: []string{
+				"Get a resource and returns the raw bytes.  The results are not cached.",
 			},
 			Func: t.Fetch,
 		},
@@ -489,6 +558,22 @@ func (t *Template) DefaultFuncs() []Function {
 				"This is useful for working with HCL formatted output.",
 			},
 			Func: FromHCL,
+		},
+		{
+			Name: "escape",
+			Description: []string{
+				"Escapes the content as template so it can be inlined another template",
+				"and not be evaluated all at the same time.",
+			},
+			Func: Escape,
+		},
+		{
+			Name: "unescape",
+			Description: []string{
+				"Unescapes the content back into a template so that the content",
+				"can be evaluated.",
+			},
+			Func: Escape,
 		},
 		{
 			Name: "echo",

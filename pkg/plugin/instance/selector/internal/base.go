@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -14,25 +15,55 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
-var log = logutil.New("module", "plugin/instance/selector")
+var log = logutil.New("module", "plugin/instance/selector/base")
 
 // Base is the base implementation of an instance plugin
 type Base struct {
 	Plugins          func() discovery.Plugins
 	Choices          []selector.Choice
 	SelectFunc       func(instance.Spec, []selector.Choice, func(selector.Choice) instance.Plugin) (selector.Choice, error)
-	PluginClientFunc func(map[string]*plugin.Endpoint, plugin.Name) instance.Plugin
+	PluginClientFunc func(plugin.Name) (instance.Plugin, error)
 }
 
-func instancePlugin(plugins map[string]*plugin.Endpoint, name plugin.Name) instance.Plugin {
+var (
+	clients = map[string]instance.Plugin{}
+	lock    sync.RWMutex
+)
+
+func (b *Base) instancePlugin(name plugin.Name) (instance.Plugin, error) {
+
 	lookup, _ := name.GetLookupAndType()
+
+	lock.RLock()
+	if p, has := clients[lookup]; has {
+		lock.RUnlock()
+		return p, nil
+	}
+	lock.RUnlock()
+
+	lock.Lock()
+	defer lock.Unlock()
+
+	plugins, err := b.Plugins().List()
+	if err != nil {
+		return nil, err
+	}
+
 	if endpoint, has := plugins[lookup]; has {
 		if p, err := instance_rpc.NewClient(name, endpoint.Address); err == nil {
-			return p
+			return p, nil
 		}
 		log.Warn("not an instance plugin", "name", name, "endpoint", endpoint)
 	}
-	return nil
+	return nil, nil
+}
+
+// Init initializes the base by setting any unset properties with defaults
+func (b *Base) Init() *Base {
+	if b.PluginClientFunc == nil {
+		b.PluginClientFunc = b.instancePlugin
+	}
+	return b
 }
 
 func (b *Base) selectOne(spec instance.Spec) (match selector.Choice, p instance.Plugin, err error) {
@@ -60,21 +91,44 @@ func (b *Base) selectOne(spec instance.Spec) (match selector.Choice, p instance.
 	return
 }
 
-func (b *Base) visit(f func(selector.Choice, instance.Plugin) error) error {
-	if b.PluginClientFunc == nil {
-		b.PluginClientFunc = instancePlugin
-	}
-
-	plugins, err := b.Plugins().List()
-	if err != nil {
-		return err
-	}
+// VisitChoices visits all the choices linearly one by one.  If the work function returns
+// false or error, the visit stops.
+func (b *Base) VisitChoices(visit func(selector.Choice, instance.Plugin) (bool, error)) error {
 
 	for _, choice := range b.Choices {
-		instancePlugin := b.PluginClientFunc(plugins, choice.Name)
+		instancePlugin, err := b.PluginClientFunc(choice.Name)
+		if err != nil {
+			return err
+		}
+
+		if instancePlugin == nil {
+			// TODO -- implement retry??
+			log.Warn("cannot contact plugin", "name", choice.Name)
+			continue
+
+		}
+		if continueRun, err := visit(choice, instancePlugin); err != nil {
+			return err
+		} else if !continueRun {
+			return nil
+		}
+	}
+	return nil
+}
+
+func (b *Base) visit(f func(selector.Choice, instance.Plugin) error) error {
+	for _, choice := range b.Choices {
+		log.Debug("checking choice", "choice", choice)
+
+		instancePlugin, err := b.PluginClientFunc(choice.Name)
+		if err != nil {
+			return err
+		}
+
 		if instancePlugin == nil {
 			continue
 		}
+		log.Debug("found instance plugin", "name", choice.Name, "client", instancePlugin)
 		if err := f(choice, instancePlugin); err != nil {
 			return err
 		}
@@ -83,7 +137,6 @@ func (b *Base) visit(f func(selector.Choice, instance.Plugin) error) error {
 }
 
 func (b *Base) doAll(count int, work func(instance.Plugin) error) error {
-
 	errs := make(chan error, len(b.Choices))
 	success := make(chan interface{}, len(b.Choices))
 	err := b.visit(func(c selector.Choice, p instance.Plugin) error {
@@ -165,6 +218,9 @@ func (b *Base) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (b *Base) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
+
+	log.Debug("DescribeInstances", "tags", tags, "properties", properties)
+
 	// Loop through all the choices and aggregate all the instances
 
 	keys := []string{}
@@ -172,10 +228,13 @@ func (b *Base) DescribeInstances(tags map[string]string, properties bool) ([]ins
 
 	err := b.visit(func(c selector.Choice, p instance.Plugin) error {
 		instances, err := p.DescribeInstances(tags, properties)
+
+		log.Debug("describing instances", "choice", c, "instances", instances, "err", err)
 		if err != nil {
 			// It's important to fail at this point if we can't get an accurate list of instances
 			// across the zones. This way, other controllers won't be fooled into thinking that
 			// they need reconcile state by provisioning more instances.
+			log.Error("describing instances", "choice", c, "err", err)
 			return err
 		}
 		for _, instance := range instances {
@@ -193,6 +252,7 @@ func (b *Base) DescribeInstances(tags map[string]string, properties bool) ([]ins
 	for _, k := range keys {
 		result = append(result, uniques[k])
 	}
+
 	return result, nil
 }
 

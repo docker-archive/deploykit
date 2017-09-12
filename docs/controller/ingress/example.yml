@@ -1,0 +1,77 @@
+#
+# Example Ingress YML that will sync services in Docker Swarm to the backend.
+# The backend is specified by the L4Plugin property.
+#
+# To run this:
+#
+# INFRAKIT_MANAGER_BACKEND=swarm infrakit plugin start manager simulator ingress
+#
+# In another console:
+# infrakit ingress controller commit -y path/to/this/file
+#
+# Creating Docker services
+# docker network create --driver overlay --ingress ingress
+# docker service create --network ingress --name t2 --publish 7777:80 nginx
+#
+# Verify that the route has been added in the simulator/lb1:
+# infrakit simulator/lb1 routes ls
+#
+# FRONTEND PORT    PROTOCOL   BACKEND PORT  CERT
+# 7777             TCP        7777  <-- from the swarm service
+# 80               http       8080  <-- from the static route in the config
+#
+# In Docker:
+#  docker service ls
+#ID                  NAME                MODE                REPLICAS            IMAGE               PORTS
+#m4fghruao79i        t2                  replicated          1/1                 nginx:latest        *:7777->80/tcp
+#
+# Remove the service
+# docker service rm test1
+#
+# infrakit simulator/lb1 routes ls  # should be empty
+#
+# FRONTEND PORT    PROTOCOL   BACKEND PORT  CERT
+# 80               http       8080  <-- from the static route
+
+kind: ingress
+metadata:
+  name: test.com
+  tags:
+    project: testing
+    user: chungers
+
+# options block map to pkg/controller/ingress/types/Options
+options:
+  # SyncInterval is how often to sync changes between the services and the LB
+  SyncInterval: 1s  # syntax is a string form of Go time.Duration
+
+# properties block map to pkg/controller/ingress/types/Properties
+properties:
+  - Backends:
+    Groups:
+
+      # This is a group at socket(group), groupID(cattle).
+      - group/cattle
+
+    # This is the plugin name of the L4 plugin. When you run `infrakit plugin start ... simulator`
+    # the default socket file name is 'simulator' and there's a default lb2 in the RPC object.
+    L4Plugin: simulator/lb1
+
+    # Here we have a static route that is always present.
+    Routes:
+      - LoadBalancerPort: 80
+        LoadBalancerProtocol: https
+        Port: 8080
+        Protocol: http
+
+    # Plus all the services in Swarm that have --publish <frontend-port>:<container_port>
+    RouteSources:
+      swarm:
+        Host: unix:///var/run/docker.sock
+
+    # This field here is required and leave it at 'default'. (TODO - make this not required).
+    # default will match any services that don't have vhost information.
+    # There are ways to specify the vhost for a service in the label.  If that information
+    # isn't there, the service will have to be lumped to a 'default' vhost.  Otherwise,
+    # the value of this field will be used to group and match the service which loadbalancer.
+    Vhost: default

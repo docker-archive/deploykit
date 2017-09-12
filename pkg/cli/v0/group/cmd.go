@@ -15,15 +15,14 @@ var log = logutil.New("module", "cli/v1/group")
 func init() {
 	cli.Register(group.InterfaceSpec,
 		[]cli.CmdBuilder{
-			//Group,
+			// Group,
 			Ls,
 			Inspect,
 			Describe,
 			Commit,
 			Free,
 			Destroy,
-			Size,
-			SetSize,
+			Scale,
 			DestroyInstances,
 		})
 }
@@ -42,8 +41,7 @@ func Group(name string, services *cli.Services) *cobra.Command {
 		Commit(name, services),
 		Free(name, services),
 		Destroy(name, services),
-		Size(name, services),
-		SetSize(name, services),
+		Scale(name, services),
 		DestroyInstances(name, services),
 	)
 

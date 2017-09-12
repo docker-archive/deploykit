@@ -170,7 +170,7 @@ func (c *managed) init(in types.Spec) (err error) {
 	}
 
 	if c.ticker == nil {
-		interval := c.options.SyncInterval
+		interval := c.options.SyncInterval.Duration()
 		if interval == 0 {
 			interval = ingress.DefaultSyncInterval
 		}

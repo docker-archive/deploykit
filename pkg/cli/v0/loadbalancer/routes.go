@@ -35,6 +35,8 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 	routes.AddCommand(ls, publish, unpublish)
 
 	protocol := publish.Flags().String("protocol", "tcp", "Protocol: http|https|tcp|udp|ssl")
+	loadbalancerProtocol := publish.Flags().String("loadbalancerprotocol", "tcp", "Protocol: http|https|tcp|udp|ssl")
+
 	cert := publish.Flags().String("cert", "", "Certificate")
 
 	publish.RunE = func(cmd *cobra.Command, args []string) error {
@@ -61,9 +63,10 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 		cli.MustNotNil(l4, "L4 not found", "name", name)
 
 		route := loadbalancer.Route{
-			Port:             backendPort,
-			LoadBalancerPort: frontendPort,
-			Protocol:         loadbalancer.Protocol(*protocol),
+			LoadBalancerPort:     frontendPort,
+			LoadBalancerProtocol: loadbalancer.Protocol(*loadbalancerProtocol),
+			Port:                 backendPort,
+			Protocol:             loadbalancer.Protocol(*protocol),
 		}
 		if *cert != "" {
 			copy := *cert
@@ -75,6 +78,12 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 	}
 
 	unpublish.RunE = func(cmd *cobra.Command, args []string) error {
+
+		if len(args) != 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
 		l4, err := Load(services.Plugins(), name)
 		if err != nil {
 			return nil
@@ -121,13 +130,13 @@ func Routes(name string, services *cli.Services) *cobra.Command {
 		return services.Output(os.Stdout, list,
 			func(w io.Writer, v interface{}) error {
 
-				fmt.Printf("%-15v  %-10v %-10v  %-20v\n", "FRONTEND PORT", "PROTOCOL", "BACKEND PORT", "CERT")
+				fmt.Printf("%-15v  %-20v   %-15v   %-20v    %-20v\n", "FRONTEND PORT", "FRONTEND PROTOCOL", "BACKEND PORT", "BACKEND PROTOCOL", "CERT")
 				for _, r := range list {
 					cert := ""
 					if r.Certificate != nil {
 						cert = *r.Certificate
 					}
-					fmt.Printf("%-15v  %-10v %-10v %-20v\n", r.LoadBalancerPort, r.Protocol, r.Port, cert)
+					fmt.Printf("%-15v  %-20v   %-15v   %-20v    %-20v\n", r.LoadBalancerPort, r.LoadBalancerProtocol, r.Port, r.Protocol, cert)
 				}
 				return nil
 			})

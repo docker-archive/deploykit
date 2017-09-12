@@ -95,13 +95,21 @@ type Vhost string
 
 const (
 	// DefaultSyncInterval is the interval between syncing backends
-	DefaultSyncInterval = 2 * time.Second
+	DefaultSyncInterval = 5 * time.Second
 )
 
 // Options is the controller options
 type Options struct {
-	HardSync          bool
-	RemoveListeners   bool
-	PublishAllExposed bool
-	SyncInterval      time.Duration
+
+	// HardSync when set to true will remove entries already in the L4 that
+	// may have been added by the user out of band.  Default is false.
+	HardSync bool
+
+	// MatchByLabels figures out services by looking at swarm service labels.
+	// This is normally OFF and instead we just look at publish and target ports.
+	MatchByLabels bool
+
+	// SyncInterval is how often to run the sync. The syntax is the string form
+	// of Go time.Duration (e.g. 1min)
+	SyncInterval types.Duration
 }

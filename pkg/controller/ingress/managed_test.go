@@ -22,8 +22,7 @@ func TestManagedStartStop(t *testing.T) {
 	ticker := make(chan time.Time, 1)
 	leader := make(chan bool, 1)
 
-	doneWork := make(chan interface{})
-
+	doneWork := make(chan int, 1)
 	managedObject := &managed{
 		Leadership:   fakeLeadership(leader),
 		ticker:       ticker,
@@ -33,9 +32,7 @@ func TestManagedStartStop(t *testing.T) {
 
 		routes: func() (map[ingress.Vhost][]loadbalancer.Route, error) {
 			// if this function is called then we know we've done work in the state transition
-			// from syncing to waiting
-			close(doneWork)
-
+			doneWork <- 1
 			return nil, nil
 		},
 	}
@@ -56,7 +53,7 @@ func TestManagedStartStop(t *testing.T) {
 	err := managedObject.init(spec)
 	require.NoError(t, err)
 
-	managedObject.start()
+	managedObject.Start()
 
 	t.Log("verify initial state machine is in the follower state")
 	require.Equal(t, follower, managedObject.stateMachine.State())
@@ -96,20 +93,14 @@ func TestManagedStartStop(t *testing.T) {
 	leader <- true
 
 	// here we change the routes function to test for another close
-	doneWork2 := make(chan interface{})
-	managedObject.routes = func() (map[ingress.Vhost][]loadbalancer.Route, error) {
-		// if this function is called then we know we've done work in the state transition
-		// from syncing to waiting
-		close(doneWork2)
-		return nil, nil
-	}
 
 	ticker <- time.Now()
 
-	t.Log("verify state machine moved to the waiting state")
+	<-doneWork // if not called, the test will hang here
 
-	<-doneWork2 // if not called, the test will hang here
+	t.Log("verify state machine moved to the waiting state")
 	require.Equal(t, waiting, managedObject.stateMachine.State())
 
-	managedObject.stop()
+	managedObject.Stop()
+
 }

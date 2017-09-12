@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 )
@@ -34,10 +33,11 @@ func newListener(service string, swarmPort int, urlStr string, cert *string) (*l
 
 func (l *listener) asRoute() loadbalancer.Route {
 	return loadbalancer.Route{
-		Port:             l.SwarmPort,
-		Protocol:         l.protocol(),
-		LoadBalancerPort: l.extPort(),
-		Certificate:      l.CertASN(),
+		Port:                 l.SwarmPort,
+		Protocol:             l.protocol(),
+		LoadBalancerPort:     l.extPort(),
+		LoadBalancerProtocol: l.loadbalancerProtocol(),
+		Certificate:          l.CertASN(),
 	}
 }
 
@@ -65,21 +65,21 @@ func (l *listener) CertPorts() []int {
 	if len(parts) > 1 {
 		var finalPorts = []int{}
 		ports := strings.Split(parts[1], ",")
-		log.Infoln("ports ", ports)
+		log.Debug("ports", "ports ", ports)
 		if len(ports) > 0 {
-			log.Infoln("# of ports ", len(ports))
+			log.Debug("Number of ports", "count", len(ports))
 			for _, port := range ports {
-				log.Infoln("port: ", port)
+				log.Debug("port", "port: ", port, "V", debugV)
 				if port != "" {
 					j, err := strconv.ParseUint(port, 10, 32)
 					if err != nil {
-						log.Infoln("Can't convert to int: ", port, "; error=", err)
+						log.Error("Can't convert to int: ", "port", port, "err", err)
 					}
 					finalPorts = append(finalPorts, int(j))
 				}
 			}
 		}
-		log.Infoln("finalPorts ", finalPorts)
+		log.Debug("final ports", "ports", finalPorts)
 		if len(finalPorts) == 0 {
 			// this would happen if there was an ASN like this
 			// asn:blah@
@@ -133,6 +133,24 @@ func (l *listener) host() string {
 	return h
 }
 
+// Protocol gets the network protocol used by the load balancer.
+func (l *listener) loadbalancerProtocol() loadbalancer.Protocol {
+	scheme := ""
+	if l.URL != nil {
+		scheme = l.URL.Scheme
+	}
+
+	// check if this should be SSL because it has a certificate.
+	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
+		log.Debug("external port is in cert ports", "extPort", l.extPort(), "certPorts", l.CertPorts())
+		scheme = string(loadbalancer.SSL)
+	} else {
+		log.Debug("cert is nil, or port is not in cert ports", "exPort", l.extPort(), "certPorts", l.CertPorts())
+	}
+
+	return loadbalancer.ProtocolFromString(scheme)
+}
+
 // Protocol gets the network protocol used by the service.
 func (l *listener) protocol() loadbalancer.Protocol {
 	scheme := ""
@@ -142,10 +160,10 @@ func (l *listener) protocol() loadbalancer.Protocol {
 
 	// check if this should be SSL because it has a certificate.
 	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
-		log.Infoln("port ", l.extPort(), " Is in ", l.CertPorts())
+		log.Debug("ext port is in cert ports", "extPort", l.extPort(), "certPorts", l.CertPorts())
 		scheme = string(loadbalancer.SSL)
 	} else {
-		log.Infoln("cert is nil, or port ", l.extPort(), " Is NOT in ", l.CertPorts())
+		log.Debug("cert is nil, or port is not in cert ports ", "extPort", l.extPort(), "certPorts", l.CertPorts())
 	}
 
 	return loadbalancer.ProtocolFromString(scheme)
@@ -166,7 +184,7 @@ func explicitSwarmPortToURL(service, spec string) (*listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bad spec: %s for service %s", parts[1], service)
 	}
-	log.Infoln("swarmPort: ", swarmPort)
+	log.Debug("found swarmPort", "swarmPort", swarmPort, "V", debugV)
 	listener.SwarmPort = int(swarmPort)
 	return listener, nil
 }
@@ -235,26 +253,26 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 		}
 	}
 
-	log.Infoln("requestedPublishPorts: ", requestedPublishPorts)
+	log.Debug("requestedPublishPorts", "requestedPublishPorts", requestedPublishPorts, "V", debugV)
 	// Now look at the ports that are actually published:
 	listeners := []*listener{}
 	for _, exposed := range service.Endpoint.Ports {
 
-		log.Infoln("exposed: ", exposed)
+		log.Debug("Exposed port", "exposed", exposed, "V", debugV)
 		if intInSlice(int(exposed.PublishedPort), requestedPublishPorts[int(exposed.TargetPort)]) {
 			cert := serviceCert(service, certLabel)
 
-			log.Infoln("Cert: ", cert)
+			log.Debug("Found cert", "cert", cert, "V", debugV)
 			urlString := fmt.Sprintf("%v://:%d", strings.ToLower(string(exposed.Protocol)), exposed.PublishedPort)
-			log.Infoln("urlString: ", urlString)
+			log.Debug("urlString", "urlString", urlString, "V", debugV)
 			if listener, err := newListener(service.Spec.Name, int(exposed.PublishedPort), urlString, cert); err == nil {
 				listeners = append(listeners, listener)
 			} else {
-				log.Warningln("Error creating listener for exposed port:", exposed, "err=", err)
+				log.Error("Error creating listener for exposed port", "exposed", exposed, "err", err)
 			}
 
 		} else {
-			log.Infoln("Skipping exposed port:", exposed)
+			log.Debug("Skipping exposed port", "exposed", exposed)
 		}
 	}
 	return listeners
@@ -285,7 +303,7 @@ func listenersFromLabel(service swarm.Service, label string, certLabel string) [
 
 		listener, err := specParser(service.Spec.Name, strings.Trim(spec, " \t"))
 		if err != nil {
-			log.Warningln("Error=", err)
+			log.Error("Err parsing spec", "err", err)
 			continue
 		}
 		// need to add the certificate after it is parsed since service isn't available

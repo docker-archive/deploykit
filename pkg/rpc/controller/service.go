@@ -13,8 +13,8 @@ import (
 
 var log = logutil.New("module", "rpc/controller")
 
-// ServerWithNamed returns a Controller map
-func ServerWithNamed(subcontrollers func() (map[string]controller.Controller, error)) *Controller {
+// ServerWithNames returns a Controller map
+func ServerWithNames(subcontrollers func() (map[string]controller.Controller, error)) *Controller {
 
 	keyed := internal.ServeKeyed(
 
