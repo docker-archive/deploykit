@@ -28,7 +28,8 @@ import (
 
 const (
 	// Kind is the canonical name of the plugin for starting up, etc.
-	Kind       = "aws"
+	Kind = "aws"
+	// EnvELBName is the name of the ELB ENV variable name for the ELB plugin.
 	EnvELBName = "INFRAKIT_AWS_ELB_NAME"
 )
 

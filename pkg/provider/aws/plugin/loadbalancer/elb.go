@@ -98,9 +98,9 @@ func (p *elbPlugin) Routes() ([]loadbalancer.Route, error) {
 func (p *elbPlugin) RegisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
 
 	addInstances := []*elb.Instance{}
-	for _, instanceId := range ids {
+	for _, instanceID := range ids {
 		addInstance := &elb.Instance{}
-		strID := string(instanceId)
+		strID := string(instanceID)
 		addInstance.InstanceId = &strID
 		addInstances = append(addInstances, addInstance)
 	}
@@ -114,9 +114,9 @@ func (p *elbPlugin) RegisterBackends(ids []instance.ID) (loadbalancer.Result, er
 func (p *elbPlugin) DeregisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
 
 	rmInstances := []*elb.Instance{}
-	for _, instanceId := range ids {
+	for _, instanceID := range ids {
 		rmInstance := &elb.Instance{}
-		strID := string(instanceId)
+		strID := string(instanceID)
 		rmInstance.InstanceId = &strID
 		rmInstances = append(rmInstances, rmInstance)
 	}
