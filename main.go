@@ -24,6 +24,9 @@ func main() {
 
 	// Create instances client for the CompartmentID desired
 	instanceClient := client.NewInstanceClient("ocid1.compartment.oc1..aaaaaaaam3we6vgnherjq5q2idnccdflvjsnog7mlr6rtdb25gilchfeyjxa")
-
-	instanceClient.ListInstances()
+	options := &compute.InstancesParameters{
+		Limit: 500,
+		Page:  "1",
+	}
+	instanceClient.ListInstances(options)
 }
