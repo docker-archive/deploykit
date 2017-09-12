@@ -1,0 +1,15 @@
+[
+    {
+        "Key" : "terraform",
+        "Launch" : {
+            "inproc": {
+		"Kind" : "terraform",
+		"Options" : {
+		    "Dir": "{{ env `INFRAKIT_HOME` }}/terraform",
+		    "Standalone": true,
+		    "NewOption" : "hello world"
+		}
+	    }
+        }
+    }
+]
