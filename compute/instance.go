@@ -35,7 +35,7 @@ type Instance struct {
 	TimeCreated string `json:"timeCreated"`
 }
 
-// InstancesParameters
+// InstancesParameters are optional parameters when listing instances
 type InstancesParameters struct {
 	AvailabilityDomain string `url:"availabilityDomain,omitempty"` //The name of the Availability Domain.
 	DisplayName        string `url:"displayName,omitempty"`        //A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information.
@@ -60,6 +60,7 @@ func (ic *InstanceClient) GetInstance(instanceID string) Instance {
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
+	logrus.Info("Body: ", string(body))
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
@@ -80,12 +81,13 @@ func (ic *InstanceClient) ListInstances(options *InstancesParameters) {
 	if err != nil {
 		logrus.Error(err)
 	}
+	logrus.Info("StatusCode: ", resp.StatusCode)
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
-	logrus.Info(string(body))
+	logrus.Info("Body: ", string(body))
 	// if err = json.Unmarshal(body, &instance); err != nil {
 	// 	logrus.Fatalf("Unmarshal impossible: %s", err)
 	// }
