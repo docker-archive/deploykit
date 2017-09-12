@@ -42,9 +42,10 @@ to launch the `terraform` kind:
 This configuration file is used by the `infrakit plugin start` command.  It has a usage like this:
 
 ```
-infrakit plugin start <plugin_spec> [ <plugin_spec> ... ]
+infrakit plugin start [--config-url <url>] <plugin_spec> [ <plugin_spec> ... ]
 ```
-where `<plugin_spec>` is `<key>[:<socke_file>[=<exec>]]`
+where `--config-url` will point to the `plugins.json` file and
+`<plugin_spec>` is `<key>[:<socke_file>[=<exec>]]`
 
 For example:
 
