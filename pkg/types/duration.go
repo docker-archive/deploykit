@@ -19,6 +19,15 @@ func FromDuration(d time.Duration) Duration {
 	return Duration(d)
 }
 
+// MustParseDuration returns a duration from a string, panics if can't parse
+func MustParseDuration(s string) Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		panic(err)
+	}
+	return Duration(d)
+}
+
 // Durations is a wrapper to make Duration sortable
 type Durations []time.Duration
 

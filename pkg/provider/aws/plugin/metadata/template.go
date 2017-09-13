@@ -50,35 +50,34 @@ func (c *Context) start() {
 
 	loop:
 		for {
+			log.Debugln("Running template to export metadata:", c.templateURL)
+
+			t, err := template.NewTemplate(c.templateURL, c.templateOptions)
+			if err != nil {
+				log.Warningln("err running template:", err)
+				update <- func(view map[string]interface{}) {
+					view["err"] = err.Error()
+				}
+				continue loop
+			}
+
+			// Note the actual exporting of the values is done via the 'export' function
+			// that are invoked as part of processing the template.
+			_, err = t.Render(c)
+			if err != nil {
+				log.Warningln("err evaluating template:", err)
+				update <- func(view map[string]interface{}) {
+					view["err"] = err.Error()
+				}
+				continue loop
+			} else {
+				update <- func(view map[string]interface{}) {
+					delete(view, "err")
+				}
+			}
+
 			select {
 			case <-tick:
-
-				log.Debugln("Running template to export metadata:", c.templateURL)
-
-				t, err := template.NewTemplate(c.templateURL, c.templateOptions)
-				if err != nil {
-					log.Warningln("err running template:", err)
-					update <- func(view map[string]interface{}) {
-						view["err"] = err.Error()
-					}
-					continue loop
-				}
-
-				// Note the actual exporting of the values is done via the 'export' function
-				// that are invoked as part of processing the template.
-				_, err = t.Render(c)
-				if err != nil {
-					log.Warningln("err evaluating template:", err)
-					update <- func(view map[string]interface{}) {
-						view["err"] = err.Error()
-					}
-					continue loop
-				} else {
-					update <- func(view map[string]interface{}) {
-						delete(view, "err")
-					}
-				}
-
 			case <-c.stop:
 				log.Infoln("Stopping aws metadata")
 				close(update)

@@ -81,7 +81,7 @@ func (k *Keyed) Keyed(name plugin.Name) (interface{}, error) {
 	lookup, subtype := name.GetLookupAndType()
 	log.Debug("Keyed", "m", m, "lookup", lookup, "subtype", subtype, "V", debugV)
 
-	if subtype == "" && len(m) == 1 {
+	if (subtype == "" || lookup == ".") && len(m) == 1 {
 		// this case we just match the default .
 		for _, p := range m {
 			return p, nil

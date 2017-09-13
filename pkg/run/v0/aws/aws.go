@@ -2,7 +2,6 @@ package aws
 
 import (
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -39,6 +38,9 @@ const (
 
 	// EnvMetadataTemplateURL is the location of the template for Metadata plugin
 	EnvMetadataTemplateURL = "INFRAKIT_AWS_METADATA_TEMPLATE_URL"
+
+	// EnvMetadataPollInterval is the env to set fo polling for metadata updates
+	EnvMetadataPollInterval = "INFRAKIT_AWS_METADATA_POLL_INTERVAL"
 
 	// EnvNamespaceTags is the env to set for namespace tags. It's k=v,...
 	EnvNamespaceTags = "INFRAKIT_AWS_NAMESPACE_TAGS"
@@ -84,7 +86,7 @@ var DefaultOptions = Options{
 		Options: aws_instance.Options{
 			Region: local.Getenv(EnvRegion, ""), // empty string trigger auto-detect
 		},
-		PollInterval: 60 * time.Second,
+		PollInterval: types.MustParseDuration(local.Getenv(EnvMetadataPollInterval, "5s")),
 	},
 }
 

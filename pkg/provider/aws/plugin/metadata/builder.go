@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -16,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/infrakit/pkg/provider/aws/plugin/instance"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/pflag"
 )
 
@@ -27,7 +27,7 @@ type Options struct {
 	Template        string
 	TemplateOptions template.Options
 	StackName       string
-	PollInterval    time.Duration
+	PollInterval    types.Duration
 }
 
 // Flags returns the flags required.
@@ -85,7 +85,7 @@ func NewPlugin(options Options, stop <-chan struct{}) (*Context, error) {
 	context := &Context{
 		templateURL:     options.Template,
 		templateOptions: options.TemplateOptions,
-		poll:            options.PollInterval,
+		poll:            options.PollInterval.Duration(),
 		stop:            stop,
 		stackName:       options.StackName,
 		clients: AWSClients{
