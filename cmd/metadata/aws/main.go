@@ -11,6 +11,7 @@ import (
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,7 @@ func main() {
 			metadataPlugin, err := metadata.NewPlugin(metadata.Options{
 				Template:        templateURL,
 				TemplateOptions: template.Options{},
-				PollInterval:    poll,
+				PollInterval:    types.Duration(poll),
 				StackName:       stack,
 			},
 				stop)
