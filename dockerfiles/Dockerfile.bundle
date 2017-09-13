@@ -1,4 +1,3 @@
-#FROM docker:latest
 FROM alpine:latest
 
 RUN apk add --update wget ca-certificates openssl libvirt-dev openssh
