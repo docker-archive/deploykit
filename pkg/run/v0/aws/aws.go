@@ -40,7 +40,7 @@ const (
 	// EnvMetadataTemplateURL is the location of the template for Metadata plugin
 	EnvMetadataTemplateURL = "INFRAKIT_AWS_METADATA_TEMPLATE_URL"
 
-	// EnvNameSpaceTags is the env to set for namespace tags. It's k=v,...
+	// EnvNamespaceTags is the env to set for namespace tags. It's k=v,...
 	EnvNamespaceTags = "INFRAKIT_AWS_NAMESPACE_TAGS"
 
 	// EnvELBName is the name of the ELB ENV variable name for the ELB plugin.
