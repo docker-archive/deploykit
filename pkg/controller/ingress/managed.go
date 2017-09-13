@@ -12,6 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
+	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	loadbalancer_rpc "github.com/docker/infrakit/pkg/rpc/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -66,6 +67,9 @@ type managed struct {
 	ticker <-chan time.Time
 	poller *controller.Poller
 
+	groupClients     map[plugin.Name]group.Plugin
+	groupClientsLock gsync.RWMutex
+
 	lock gsync.RWMutex
 }
 
@@ -75,15 +79,31 @@ func (c *managed) state() ingress.Properties {
 }
 
 func (c *managed) groupPlugin(g ingress.Group) (group.Plugin, error) {
+	c.groupClientsLock.Lock()
+	defer c.groupClientsLock.Unlock()
+
 	if c.plugins == nil {
 		return nil, fmt.Errorf("no lookup")
 	}
 
-	endpoint, err := c.plugins().Find(g.Plugin())
-	if err != nil {
-		return nil, err
+	if c.groupClients == nil {
+		c.groupClients = map[plugin.Name]group.Plugin{}
 	}
-	return group_rpc.NewClient(endpoint.Address)
+
+	found, has := c.groupClients[g.Plugin()]
+	if !has {
+		endpoint, err := c.plugins().Find(g.Plugin())
+		if err != nil {
+			return nil, err
+		}
+		cl, err := group_rpc.NewClient(endpoint.Address)
+		if err != nil {
+			return nil, err
+		}
+		c.groupClients[g.Plugin()] = cl
+		found = cl
+	}
+	return found, nil
 }
 
 func (c *managed) l4Client(spec ingress.Spec) (loadbalancer.L4, error) {

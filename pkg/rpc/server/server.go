@@ -21,7 +21,10 @@ import (
 	"gopkg.in/tylerb/graceful.v1"
 )
 
-var log = logutil.New("module", "rpc/server")
+var (
+	log    = logutil.New("module", "rpc/server")
+	debugV = logutil.V(1000)
+)
 
 // Stoppable support proactive stopping, and blocking until stopped.
 type Stoppable interface {
@@ -53,7 +56,7 @@ type loggingHandler struct {
 func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestData, err := httputil.DumpRequest(req, true)
 	if err == nil {
-		log.Debug("Server RECEIVE", "payload", string(requestData), "V", logutil.V(400))
+		log.Debug("Server RECEIVE", "payload", string(requestData), "V", debugV)
 	} else {
 		log.Warn("Server RECEIVE", "err", err)
 	}
@@ -64,7 +67,7 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	responseData, err := httputil.DumpResponse(recorder.Result(), true)
 	if err == nil {
-		log.Debug("Server REPLY", "payload", string(responseData), "V", logutil.V(400))
+		log.Debug("Server REPLY", "payload", string(responseData), "V", debugV)
 	} else {
 		log.Warn("Server REPLY", "err", err)
 	}

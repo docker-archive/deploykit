@@ -69,7 +69,7 @@ func (p Properties) HealthChecks() (result map[Vhost][]loadbalancer.HealthCheck,
 func (p Properties) Groups() (result map[Vhost][]Group, err error) {
 	result = map[Vhost][]Group{}
 	for _, spec := range p {
-
+		log.Debug("found spec", "spec", spec, "vhost", spec.Vhost)
 		if _, has := result[spec.Vhost]; !has {
 			result[spec.Vhost] = []Group{}
 		}

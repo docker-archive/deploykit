@@ -48,10 +48,8 @@ options:
 # properties block map to pkg/controller/ingress/types/Properties
 properties:
   - Backends:
-    Groups:
-
-      # This is a group at socket(group), groupID(cattle).
-      - group/cattle
+      Groups:
+        - group/workers # This is a group at socket(group), groupID(workers).
 
     # This is the plugin name of the L4 plugin. When you run `infrakit plugin start ... simulator`
     # the default socket file name is 'simulator' and there's a default lb2 in the RPC object.
