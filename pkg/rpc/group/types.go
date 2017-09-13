@@ -2,6 +2,7 @@ package group
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -32,6 +33,9 @@ type FreeGroupRequest struct {
 
 // Plugin implements pkg/rpc/internal/Addressable
 func (r FreeGroupRequest) Plugin() (plugin.Name, error) {
+	if i := strings.Index(string(r.ID), "/"); i > 0 {
+		return plugin.Name(string(r.ID)), nil
+	}
 	return plugin.Name(fmt.Sprintf("./%v", r.ID)), nil
 }
 

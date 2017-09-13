@@ -11,7 +11,7 @@ import (
 // GroupControllers returns a map of *scoped* group controllers by ID of the group.
 func (m *manager) Controllers() (map[string]controller.Controller, error) {
 	controllers := map[string]controller.Controller{
-		"": &pController{
+		".": &pController{
 			plugin: m,
 		},
 	}
