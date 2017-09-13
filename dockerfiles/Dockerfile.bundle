@@ -1,4 +1,6 @@
-FROM docker:latest
+FROM alpine:latest
+
+RUN apk add --update wget ca-certificates openssl libvirt-dev openssh
 
 RUN mkdir -p /infrakit/plugins /infrakit/configs /infrakit/logs /infrakit/cli /infrakit/instance/terraform
 

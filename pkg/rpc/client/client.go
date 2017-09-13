@@ -19,7 +19,10 @@ import (
 	"github.com/gorilla/rpc/v2/json2"
 )
 
-var log = logutil.New("module", "rpc/client")
+var (
+	log    = logutil.New("module", "rpc/client")
+	debugV = logutil.V(1100)
+)
 
 type client struct {
 	http *http.Client
@@ -151,7 +154,7 @@ func (c client) Call(method string, arg interface{}, result interface{}) error {
 
 	requestData, err := httputil.DumpRequest(req, true)
 	if err == nil {
-		log.Debug("Client SEND", "payload", string(requestData), "V", logutil.V(500))
+		log.Debug("Client SEND", "payload", string(requestData), "V", debugV)
 	} else {
 		log.Warn("Client SEND", "err", err)
 	}
@@ -165,7 +168,7 @@ func (c client) Call(method string, arg interface{}, result interface{}) error {
 
 	responseData, err := httputil.DumpResponse(resp, true)
 	if err == nil {
-		log.Debug("Client RECEIVE", "payload", string(responseData), "V", logutil.V(500))
+		log.Debug("Client RECEIVE", "payload", string(responseData), "V", debugV)
 	} else {
 		log.Warn("Client RECEIVE", "err", err)
 	}

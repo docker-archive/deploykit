@@ -61,7 +61,7 @@ func (b *Builder) BuildInstancePlugin(namespaceTags map[string]string) (instance
 			providers = append(providers, &staticCreds)
 		}
 
-		if b.Options.Region == "" {
+		if b.Options.Region == "" || b.Options.Region == "auto" {
 			log.Println("region not specified, attempting to discover from EC2 instance metadata")
 			region, err := GetRegion()
 			if err != nil {

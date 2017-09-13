@@ -18,14 +18,15 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	// Always read and then update with the current value.  Assumes the user's input
 	// is always authoritative.
 	stored := globalSpec{}
-	err := stored.store(m.snapshot)
+	err := stored.load(m.snapshot)
 	if err != nil {
 		return err
 	}
 
-	stored.updateGroupSpec(spec, plugin.Name(m.backendName))
-	log.Debug("Saving updated config", "config", stored)
+	log.Debug("Saving updated config", "global", stored, "spec", spec)
+	defer log.Debug("Saved snapshot", "global", stored, "spec", spec)
 
+	stored.updateGroupSpec(spec, plugin.Name(m.backendName))
 	return stored.store(m.snapshot)
 }
 
@@ -41,10 +42,10 @@ func (m *manager) removeConfig(id group.ID) error {
 	if err != nil {
 		return err
 	}
+	log.Debug("Deleting config", "global", stored, "id", id)
+	defer log.Debug("Saved snapshot", "global", stored, "id", id)
 
 	stored.removeGroup(id)
-	log.Debug("Saving updated config", "config", stored)
-
 	return stored.store(m.snapshot)
 }
 

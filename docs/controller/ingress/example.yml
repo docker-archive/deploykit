@@ -48,10 +48,8 @@ options:
 # properties block map to pkg/controller/ingress/types/Properties
 properties:
   - Backends:
-    Groups:
-
-      # This is a group at socket(group), groupID(cattle).
-      - group/cattle
+      Groups:
+        - group/workers # This is a group at socket(group), groupID(workers).
 
     # This is the plugin name of the L4 plugin. When you run `infrakit plugin start ... simulator`
     # the default socket file name is 'simulator' and there's a default lb2 in the RPC object.
@@ -68,10 +66,8 @@ properties:
     RouteSources:
       swarm:
         Host: unix:///var/run/docker.sock
-
-    # This field here is required and leave it at 'default'. (TODO - make this not required).
-    # default will match any services that don't have vhost information.
-    # There are ways to specify the vhost for a service in the label.  If that information
-    # isn't there, the service will have to be lumped to a 'default' vhost.  Otherwise,
-    # the value of this field will be used to group and match the service which loadbalancer.
-    Vhost: default
+    # This is the vhost corresponding to the public service endpoint.  Currently there is only
+    # one matcher in the system which matches all services in a swarm to all 'vhosts'.  Additional
+    # matchers can be implemented to take swarm service label and match services to different vhosts
+    # and therefore different loadbalancers.  Because it's match-all, it's ok to leave this field out.
+    #Vhost: test.com

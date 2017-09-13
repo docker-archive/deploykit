@@ -37,7 +37,7 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
 
-	hostname := "default"
+	hostname := HostNotSpecified
 	listeners, has := listenersByHost[hostname]
 	require.True(t, has)
 	require.Equal(t, 1, len(listeners))
@@ -45,7 +45,7 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 	require.Equal(t, "web1", listener.Service)
 	require.Equal(t, 8080, listener.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
-	require.Equal(t, "default", listener.host())
+	require.Equal(t, HostNotSpecified, listener.host())
 	require.Equal(t, loadbalancer.HTTP, listener.protocol())
 	require.Equal(t, 8080, listener.extPort())
 }
@@ -71,7 +71,7 @@ func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
 
-	hostname := "default"
+	hostname := HostNotSpecified
 	listeners, has := listenersByHost[hostname]
 	require.True(t, has)
 	require.Equal(t, 1, len(listeners))
@@ -79,7 +79,7 @@ func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 	require.Equal(t, "web1", listener.Service)
 	require.Equal(t, 30000, listener.SwarmPort)
 	require.Equal(t, loadbalancer.TCP, listener.SwarmProtocol)
-	require.Equal(t, "default", listener.host())
+	require.Equal(t, HostNotSpecified, listener.host())
 	require.Equal(t, loadbalancer.HTTP, listener.protocol())
 	require.Equal(t, 80, listener.extPort())
 }
@@ -209,12 +209,12 @@ func TestExternalLoadBalancerListenersFromService5(t *testing.T) {
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 3, len(listenersByHost))
 
-	hostname := "default"
+	hostname := HostNotSpecified
 	listeners, has := listenersByHost[hostname]
 	require.True(t, has)
 	require.Equal(t, 2, len(listeners))
-	require.True(t, findListener(listeners, loadbalancer.TCP, "default", 8080, 8080))
-	require.True(t, findListener(listeners, loadbalancer.TCP, "default", 4343, 4343))
+	require.True(t, findListener(listeners, loadbalancer.TCP, HostNotSpecified, 8080, 8080))
+	require.True(t, findListener(listeners, loadbalancer.TCP, HostNotSpecified, 4343, 4343))
 
 	hostname = "foo.bar.com"
 	listeners, has = listenersByHost[hostname]
@@ -281,10 +281,10 @@ func TestExternalLoadBalancerListenersFromServiceWithNoLabels(t *testing.T) {
 	require.NotNil(t, listenersByHost)
 	require.Equal(t, 1, len(listenersByHost))
 
-	hostname := "default"
+	hostname := HostNotSpecified
 	listeners, has := listenersByHost[hostname]
 	require.True(t, has)
 	require.Equal(t, 2, len(listeners))
-	require.True(t, findListener(listeners, loadbalancer.TCP, "default", 8080, 8080))
-	require.True(t, findListener(listeners, loadbalancer.TCP, "default", 4343, 4343))
+	require.True(t, findListener(listeners, loadbalancer.TCP, HostNotSpecified, 8080, 8080))
+	require.True(t, findListener(listeners, loadbalancer.TCP, HostNotSpecified, 4343, 4343))
 }
