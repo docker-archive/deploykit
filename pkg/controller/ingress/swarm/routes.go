@@ -141,7 +141,7 @@ func (b *RoutesBuilder) Build() (*Routes, error) {
 	if len(b.matchers) == 0 {
 		routes.matchers = []*matcher{
 			{
-				name:      "default",
+				name:      "*",
 				matchFunc: AnyServices,
 				toRoutes:  routes.RoutesFromServices,
 			},

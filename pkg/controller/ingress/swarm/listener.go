@@ -121,6 +121,12 @@ func (l *listener) extPort() int {
 	}
 }
 
+const (
+	// HostNotSpecified is a constant that indicates no host information is provided
+	// so a route / listener derived from this Swarm service should apply to any (or all) loadbalancers.
+	HostNotSpecified = ""
+)
+
 func (l *listener) host() string {
 	hostport := ":80"
 	if l.URL != nil {
@@ -128,7 +134,7 @@ func (l *listener) host() string {
 	}
 	h := strings.Split(hostport, ":")[0]
 	if h == "" {
-		return "default"
+		return HostNotSpecified
 	}
 	return h
 }
