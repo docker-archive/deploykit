@@ -27,6 +27,10 @@ func main() {
 	options := &compute.InstancesParameters{
 		Limit: 500,
 		Page:  "1",
+		Filter: &compute.InstanceFilter{
+			DisplayName:    "MyInst*", // Filter instance names using globbing
+			LifeCycleState: "RUNNING", // and by state (uppercase and lowercase accepted)
+		},
 	}
 	instances := instanceClient.ListInstances(options)
 	fmt.Println("Instances: ", instances)
