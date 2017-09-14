@@ -1,4 +1,4 @@
-package compute
+package core
 
 import (
 	"strings"

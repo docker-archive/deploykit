@@ -1,7 +1,6 @@
-package compute
+package api
 
 import (
-	"crypto/rsa"
 	"net/http"
 	"net/url"
 	"path"
@@ -12,14 +11,6 @@ import (
 	"github.com/spacemonkeygo/httpsig"
 )
 
-// APIClient represents the struct for basic api calls
-type APIClient struct {
-	apiEndpoint   *url.URL
-	apiKey        string
-	apiPrivateKey *rsa.PrivateKey
-	httpClient    *http.Client
-}
-
 var headersToSign = []string{"date", "(request-target)", "host"}
 
 // Sign request with POST/PUT:
@@ -27,7 +18,7 @@ var headersToSign = []string{"date", "(request-target)", "host"}
 // Sign request with GET:
 // Authorization: Signature version="1",keyId="<TENANCY OCID>/<USER OCID>/<KEY FINGERPRINT>",algorithm="rsa-sha256",headers="(request-target) date host",signature="Base64(RSA-SHA256(SIGNING STRING))"
 
-func (c *APIClient) signAuthHeader(req *http.Request) {
+func (c *Client) signAuthHeader(req *http.Request) {
 	// Add missing defaults
 	if req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
@@ -53,7 +44,7 @@ func (c *APIClient) signAuthHeader(req *http.Request) {
 }
 
 // Get request a resource from Oracle
-func (c *APIClient) Get(path string) (*http.Response, error) {
+func (c *Client) Get(path string) (*http.Response, error) {
 	// Parse URL Path
 	urlPath, err := url.Parse(path)
 	if err != nil {
@@ -71,7 +62,7 @@ func (c *APIClient) Get(path string) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
-func (c *APIClient) formatURL(urlPath *url.URL) string {
+func (c *Client) formatURL(urlPath *url.URL) string {
 	urlEndpoint := *c.apiEndpoint
 	urlEndpoint.Path = path.Join(urlEndpoint.Path, urlPath.Path)
 	urlEndpoint.RawQuery = urlPath.RawQuery

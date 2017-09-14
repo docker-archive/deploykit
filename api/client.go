@@ -1,10 +1,11 @@
-package compute
+package api
 
 import (
 	"crypto/rsa"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -13,8 +14,16 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// NewComputeClient creates a new, unauthenticated compute Client.
-func NewComputeClient(config *bmc.Config) (*APIClient, error) {
+// Client represents the struct for basic api calls
+type Client struct {
+	apiEndpoint   *url.URL
+	apiKey        string
+	apiPrivateKey *rsa.PrivateKey
+	httpClient    *http.Client
+}
+
+// NewAPIClient creates a new, unauthenticated compute Client.
+func NewAPIClient(config *bmc.Config) (*Client, error) {
 	apiKey := fmt.Sprintf("%s/%s/%s", *config.Tenancy, *config.User, *config.Fingerprint)
 	logrus.Debug("Api Key: ", apiKey)
 	privateKey, err := loadKeyFromFile(config.KeyFile, config.PassPhrase)
@@ -25,7 +34,7 @@ func NewComputeClient(config *bmc.Config) (*APIClient, error) {
 		return nil, err
 	}
 
-	return &APIClient{
+	return &Client{
 		apiEndpoint:   config.APIEndpoint,
 		apiKey:        apiKey,
 		apiPrivateKey: privateKey,

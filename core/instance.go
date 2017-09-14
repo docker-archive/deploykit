@@ -1,4 +1,4 @@
-package compute
+package core
 
 import (
 	"encoding/json"
@@ -9,12 +9,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/google/go-querystring/query"
 )
-
-// InstanceClient is a client for the Instance functions of the Compute API.
-type InstanceClient struct {
-	client        *APIClient
-	compartmendID string
-}
 
 // Instance contains the instance reference from:
 // https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/Instance/
@@ -59,19 +53,11 @@ type InstancesParameters struct {
 	Filter             *InstanceFilter
 }
 
-// NewInstanceClient provides a client interface for instance API calls
-func (c *APIClient) NewInstanceClient(compartment string) *InstanceClient {
-	return &InstanceClient{
-		client:        c,
-		compartmendID: compartment,
-	}
-}
-
 // GetInstance returns a struct of an instance request given an instance ID
-func (ic *InstanceClient) GetInstance(instanceID string) Instance {
+func (c *CoreClient) GetInstance(instanceID string) Instance {
 	instance := Instance{}
 	queryString := url.QueryEscape(instanceID)
-	resp, err := ic.client.Get("/instances/" + queryString)
+	resp, err := c.Client.Get("/instances/" + queryString)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -89,14 +75,14 @@ func (ic *InstanceClient) GetInstance(instanceID string) Instance {
 }
 
 // ListInstances returns a slice struct of all instance
-func (ic *InstanceClient) ListInstances(options *InstancesParameters) []Instance {
+func (c *CoreClient) ListInstances(options *InstancesParameters) []Instance {
 	instances := []Instance{}
-	queryString := url.QueryEscape(ic.compartmendID)
+	queryString := url.QueryEscape(c.CompartmentID)
 	if options != nil {
 		v, _ := query.Values(*options)
 		queryString = queryString + "&" + v.Encode()
 	}
-	resp, err := ic.client.Get(fmt.Sprintf("/instances?compartmentId=%s", queryString))
+	resp, err := c.Client.Get(fmt.Sprintf("/instances?compartmentId=%s", queryString))
 	if err != nil {
 		logrus.Error(err)
 	}
