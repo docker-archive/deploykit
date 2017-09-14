@@ -41,10 +41,10 @@ type VNic struct {
 }
 
 // GetVNic returns a struct of a VNic request given an VNic ID
-func (c *CoreClient) GetVNic(vnicID string) VNic {
+func (c *Client) GetVNic(vnicID string) VNic {
 	vnic := VNic{}
 	queryString := url.QueryEscape(vnicID)
-	resp, err := c.Client.Get("/vnics/" + queryString)
+	resp, err := c.Client.Request("GET", "/vnics/"+queryString, nil)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -62,7 +62,7 @@ func (c *CoreClient) GetVNic(vnicID string) VNic {
 }
 
 // ListVNic returns all VNic associated with an instance ID
-func (c *CoreClient) ListVNic(instanceID string) []VNic {
+func (c *Client) ListVNic(instanceID string) []VNic {
 	vNicAttachments := c.ListVNicAttachments(instanceID)
 	vNics := []VNic{}
 	for _, vNicAttachment := range vNicAttachments {

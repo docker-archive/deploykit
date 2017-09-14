@@ -1,6 +1,10 @@
 package api
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -18,7 +22,7 @@ var headersToSign = []string{"date", "(request-target)", "host"}
 // Sign request with GET:
 // Authorization: Signature version="1",keyId="<TENANCY OCID>/<USER OCID>/<KEY FINGERPRINT>",algorithm="rsa-sha256",headers="(request-target) date host",signature="Base64(RSA-SHA256(SIGNING STRING))"
 
-func (c *Client) signAuthHeader(req *http.Request) {
+func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 	// Add missing defaults
 	if req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
@@ -32,8 +36,15 @@ func (c *Client) signAuthHeader(req *http.Request) {
 	}
 
 	if strings.HasPrefix(req.Method, "P") {
+		if len(body) > 0 {
+			req.Header.Set("Content-Type", "application/oracle-compute-v3+json")
+		}
 		headersToSign = append(headersToSign, "x-content-sha256", "content-type", "content-length")
+		bodyHash := sha256.Sum256(body)
+		req.Header.Set("Content-Length", string(len(body)))
+		req.Header.Set("x-content-sha256", string(bodyHash[:]))
 	}
+
 	signer := httpsig.NewRSASHA256Signer(c.apiKey, c.apiPrivateKey, headersToSign)
 	err := signer.Sign(req)
 	if err != nil {
@@ -43,28 +54,40 @@ func (c *Client) signAuthHeader(req *http.Request) {
 	return
 }
 
-// Get request a resource from Oracle
-func (c *Client) Get(path string) (*http.Response, error) {
-	// Parse URL Path
-	urlPath, err := url.Parse(path)
-	if err != nil {
-		return nil, err
-	}
-	// Create Request
-	req, err := http.NewRequest("GET", c.formatURL(urlPath), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	c.signAuthHeader(req)
-	logrus.Debug("Auth: ", req.Header)
-	logrus.Debug("Request URL: ", req.URL.String())
-	return c.httpClient.Do(req)
-}
-
 func (c *Client) formatURL(urlPath *url.URL) string {
 	urlEndpoint := *c.apiEndpoint
 	urlEndpoint.Path = path.Join(urlEndpoint.Path, urlPath.Path)
 	urlEndpoint.RawQuery = urlPath.RawQuery
 	return urlEndpoint.String()
+}
+
+// Request request a resource from Oracle
+func (c *Client) Request(method string, path string, body interface{}) (*http.Response, error) {
+	// Parse URL Path
+	urlPath, err := url.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Marshall request body
+	var requestBody io.ReadSeeker
+	var marshaled []byte
+	if body != nil {
+		marshaled, err = json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		requestBody = bytes.NewReader(marshaled)
+	}
+
+	// Create Request
+	req, err := http.NewRequest(method, c.formatURL(urlPath), requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	c.signAuthHeader(req, marshaled)
+	logrus.Debug("Auth: ", req.Header)
+	logrus.Debug("Request URL: ", req.URL.String())
+	return c.httpClient.Do(req)
 }

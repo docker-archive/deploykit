@@ -54,10 +54,10 @@ type InstancesParameters struct {
 }
 
 // GetInstance returns a struct of an instance request given an instance ID
-func (c *CoreClient) GetInstance(instanceID string) Instance {
+func (c *Client) GetInstance(instanceID string) Instance {
 	instance := Instance{}
 	queryString := url.QueryEscape(instanceID)
-	resp, err := c.Client.Get("/instances/" + queryString)
+	resp, err := c.Client.Request("GET", "/instances/"+queryString, nil)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -75,14 +75,14 @@ func (c *CoreClient) GetInstance(instanceID string) Instance {
 }
 
 // ListInstances returns a slice struct of all instance
-func (c *CoreClient) ListInstances(options *InstancesParameters) []Instance {
+func (c *Client) ListInstances(options *InstancesParameters) []Instance {
 	instances := []Instance{}
 	queryString := url.QueryEscape(c.CompartmentID)
 	if options != nil {
 		v, _ := query.Values(*options)
 		queryString = queryString + "&" + v.Encode()
 	}
-	resp, err := c.Client.Get(fmt.Sprintf("/instances?compartmentId=%s", queryString))
+	resp, err := c.Client.Request("GET", fmt.Sprintf("/instances?compartmentId=%s", queryString), nil)
 	if err != nil {
 		logrus.Error(err)
 	}

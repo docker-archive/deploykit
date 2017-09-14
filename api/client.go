@@ -22,8 +22,8 @@ type Client struct {
 	httpClient    *http.Client
 }
 
-// NewAPIClient creates a new, unauthenticated compute Client.
-func NewAPIClient(config *bmc.Config) (*Client, error) {
+// NewClient creates a new, unauthenticated compute Client.
+func NewClient(config *bmc.Config) (*Client, error) {
 	apiKey := fmt.Sprintf("%s/%s/%s", *config.Tenancy, *config.User, *config.Fingerprint)
 	logrus.Debug("Api Key: ", apiKey)
 	privateKey, err := loadKeyFromFile(config.KeyFile, config.PassPhrase)

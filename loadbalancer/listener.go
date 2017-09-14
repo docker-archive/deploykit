@@ -1,16 +1,11 @@
 package lb
 
-// ListenerClient is a client struct for the load balancing listener
-type ListenerClient struct {
-	Client *LBClient
-}
+import (
+	"fmt"
+	"net/url"
 
-// ListenerClient provides a Client interface for load balancing listener API calls
-func (c *LBClient) ListenerClient() *ListenerClient {
-	return &ListenerClient{
-		Client: c,
-	}
-}
+	"github.com/Sirupsen/logrus"
+)
 
 type Listener struct {
 	BackendName string `json:"defaultBackendSetName"`
@@ -20,23 +15,31 @@ type Listener struct {
 	SSLConfig   string `json:"sslConfiguration"`
 }
 
-type SSLConfiguration struct {
-	CertName    string `json:"certificateName"`
-	VerifyDepth int    `json:"verifyDepth"`
-	VerifyPeer  bool   `json:"verifyPeerCertificate"`
+// CreateListener adds a listener to a load balancer
+func (c *Client) CreateListener(loadBalancerID string, listener *Listener) bool {
+	loadBalancerID = url.PathEscape(loadBalancerID)
+	resp, err := c.Client.Request("POST", fmt.Sprintf("/loadBalancers/%s/listeners", loadBalancerID), *listener)
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 204 {
+		return false
+	}
+	return true
 }
 
-// When creating a Listener a Backend Set is needed
-
-func (l *ListenerClient) CreateListener(listener *Listener) {
-	// POST loadBalancers/{loadBalancerId}/listeners
-}
-
-func (l *ListenerClient) UpdateListener(listener *Listener) {
+// UpdateListener updates a listener from a load balancer
+func (c *Client) UpdateListener(listener *Listener) {
 	// PUT loadBalancers/{loadBalancerId}/listeners/{listenerName}
-
+	logrus.Warning("Method not yet implemented")
+	return
 }
 
-func (l *ListenerClient) DeleteListener(listener *Listener) {
+// DeleteListener deletes a listener from a load balancer
+func (c *Client) DeleteListener(listener *Listener) {
 	// DELETE loadBalancers/{loadBalancerId}/listeners/{listenerName}
+	logrus.Warning("Method not yet implemented")
+	return
 }
