@@ -70,13 +70,15 @@ func (c *APIClient) NewInstanceClient(compartment string) *InstanceClient {
 // GetInstance returns a struct of an instance request given an instance ID
 func (ic *InstanceClient) GetInstance(instanceID string) Instance {
 	instance := Instance{}
-	resp, err := ic.client.Get("/instances/" + instanceID)
+	queryString := url.QueryEscape(instanceID)
+	resp, err := ic.client.Get("/instances/" + queryString)
 	if err != nil {
 		logrus.Error(err)
 	}
+	logrus.Debug("StatusCode: ", resp.StatusCode)
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
-	logrus.Info("Body: ", string(body))
+	logrus.Debug("Body: ", string(body))
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
@@ -98,13 +100,13 @@ func (ic *InstanceClient) ListInstances(options *InstancesParameters) []Instance
 	if err != nil {
 		logrus.Error(err)
 	}
-	logrus.Info("StatusCode: ", resp.StatusCode)
+	logrus.Debug("StatusCode: ", resp.StatusCode)
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
-	// logrus.Info("Body: ", string(body))
+	logrus.Debug("Body: ", string(body))
 
 	if err = json.Unmarshal(body, &instances); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)

@@ -16,12 +16,12 @@ import (
 // NewComputeClient creates a new, unauthenticated compute Client.
 func NewComputeClient(config *bmc.Config) (*APIClient, error) {
 	apiKey := fmt.Sprintf("%s/%s/%s", *config.Tenancy, *config.User, *config.Fingerprint)
-	logrus.Infof("Api Key: %s", apiKey)
+	logrus.Debug("Api Key: ", apiKey)
 	privateKey, err := loadKeyFromFile(config.KeyFile, config.PassPhrase)
 	if err != nil {
 		// If we failed to read the file because the key does not exist,
 		// just issue a warning and continue.
-		logrus.Infof("private key error: %s", err)
+		logrus.Error("private key error: ", err)
 		return nil, err
 	}
 
@@ -40,7 +40,7 @@ func NewComputeClient(config *bmc.Config) (*APIClient, error) {
 // only load keys that have no password for now :(
 func loadKeyFromFile(pemFile *string, passphrase *string) (*rsa.PrivateKey, error) {
 	pemPath, err := filepath.Abs(*pemFile)
-	logrus.Infof("Loading key file from: %s - %s", *pemFile, pemPath)
+	logrus.Debugf("Loading key file from: %s - %s", *pemFile, pemPath)
 	if err != nil {
 		logrus.Errorf("KeyFile error: %s", err)
 		return nil, err

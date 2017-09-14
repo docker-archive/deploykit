@@ -67,12 +67,12 @@ func (c *APIClient) Get(path string) (*http.Response, error) {
 
 	c.signAuthHeader(req)
 	logrus.Debug("Auth: ", req.Header)
-	logrus.Info("Request URL: ", req.URL.String())
+	logrus.Debug("Request URL: ", req.URL.String())
 	return c.httpClient.Do(req)
 }
 
 func (c *APIClient) formatURL(urlPath *url.URL) string {
-	urlEndpoint := c.apiEndpoint
+	urlEndpoint := *c.apiEndpoint
 	urlEndpoint.Path = path.Join(urlEndpoint.Path, urlPath.Path)
 	urlEndpoint.RawQuery = urlPath.RawQuery
 	return urlEndpoint.String()
