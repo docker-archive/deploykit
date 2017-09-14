@@ -19,19 +19,34 @@ type InstanceClient struct {
 // Instance contains the instance reference from:
 // https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/Instance/
 type Instance struct {
+	// The Availability Domain the instance is running in
 	AvailabilityDomain string `json:"availabilityDomain"`
-	CompartmentID      string `json:"compartmentId"`
-	DisplayName        string `json:"displayName"`
-	ExtendedMetadata   struct {
-	} `json:"extendedMetadata"`
-	ID             string `json:"id"`
-	ImageID        string `json:"imageId"`
-	IpxeScript     string `json:"ipxeScript"`
-	LifecycleState string `json:"lifecycleState"`
-	Metadata       struct {
+	// The OCID of the compartment that contains the instance
+	CompartmentID string `json:"compartmentId"`
+	// A user-friendly name
+	DisplayName string `json:"displayName"`
+	// Additional metadata key/value pairs that you provide
+	ExtendedMetadata *json.RawMessage
+	// The OCID of the instance
+	ID string `json:"id"`
+	// The image used to boot the instance
+	ImageID string `json:"imageId"`
+	// iPXE script to continue the boot process.
+	IpxeScript string `json:"ipxeScript"`
+	// The current state of the instance.
+	// PROVISIONING | RUNNING | STARTING |
+	// STOPPING | STOPPED | CREATING_IMAGE | TERMINATING | TERMINATED
+	LifeCycleState string `json:"lifecycleState"`
+	// Custom metadata that you provide
+	Metadata struct {
+		PublicKey string `json:"ssh_authorized_keys"`
+		UserData  string `json:"user_data"`
 	} `json:"metadata"`
-	Region      string `json:"region"`
-	Shape       string `json:"shape"`
+	// The region that contains the Availability Domain the instance is running in
+	Region string `json:"region"`
+	// The shape of the instance
+	Shape string `json:"shape"`
+	// The date and time the instance was created (RFC3339)
 	TimeCreated string `json:"timeCreated"`
 }
 
@@ -41,6 +56,7 @@ type InstancesParameters struct {
 	DisplayName        string `url:"displayName,omitempty"`        //A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information.
 	Limit              int    `url:"limit,omitempty"`              //The maximum number of items to return in a paginated "List" call.
 	Page               string `url:"page,omitempty"`               //The value of the opc-next-page response header from the previous "List" call
+	Filter             *InstanceFilter
 }
 
 // NewInstanceClient provides a client interface for instance API calls
@@ -71,7 +87,8 @@ func (ic *InstanceClient) GetInstance(instanceID string) Instance {
 }
 
 // ListInstances returns a slice struct of all instance
-func (ic *InstanceClient) ListInstances(options *InstancesParameters) {
+func (ic *InstanceClient) ListInstances(options *InstancesParameters) []Instance {
+	instances := []Instance{}
 	queryString := url.QueryEscape(ic.compartmendID)
 	if options != nil {
 		v, _ := query.Values(*options)
@@ -87,9 +104,13 @@ func (ic *InstanceClient) ListInstances(options *InstancesParameters) {
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
-	logrus.Info("Body: ", string(body))
-	// if err = json.Unmarshal(body, &instance); err != nil {
-	// 	logrus.Fatalf("Unmarshal impossible: %s", err)
-	// }
-	return
+	// logrus.Info("Body: ", string(body))
+
+	if err = json.Unmarshal(body, &instances); err != nil {
+		logrus.Fatalf("Unmarshal impossible: %s", err)
+	}
+	if options.Filter != nil {
+		instances = filterInstances(instances, *options.Filter)
+	}
+	return instances
 }

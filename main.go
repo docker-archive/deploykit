@@ -28,5 +28,6 @@ func main() {
 		Limit: 500,
 		Page:  "1",
 	}
-	instanceClient.ListInstances(options)
+	instances := instanceClient.ListInstances(options)
+	fmt.Println("Instances: ", instances)
 }
