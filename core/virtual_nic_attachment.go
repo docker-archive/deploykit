@@ -36,10 +36,10 @@ type VNicAttachment struct {
 }
 
 // GetVNicAttachment returns a struct of a VNicAttachment request given an VNicAttachment ID
-func (v *VNicClient) GetVNicAttachment(vNicAttachmentID string) VNicAttachment {
+func (c *CoreClient) GetVNicAttachment(vNicAttachmentID string) VNicAttachment {
 	vNicAttachment := VNicAttachment{}
 	queryString := url.QueryEscape(vNicAttachmentID)
-	resp, err := v.Client.Get("/vnicAttachments/" + queryString)
+	resp, err := c.Client.Get("/vnicAttachments/" + queryString)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -57,13 +57,13 @@ func (v *VNicClient) GetVNicAttachment(vNicAttachmentID string) VNicAttachment {
 }
 
 // ListVNicAttachments returns a slice struct of all instance
-func (v *VNicClient) ListVNicAttachments(instanceID string) []VNicAttachment {
+func (c *CoreClient) ListVNicAttachments(instanceID string) []VNicAttachment {
 	vNicAttachments := []VNicAttachment{}
-	queryString := url.QueryEscape(vc.Client.compartmendID)
+	queryString := url.QueryEscape(c.CompartmentID)
 	if instanceID != "" {
 		queryString = queryString + "&" + url.QueryEscape(instanceID)
 	}
-	resp, err := v.Client.Get(fmt.Sprintf("/vnicAttachments?compartmentId=%s", queryString))
+	resp, err := c.Client.Get(fmt.Sprintf("/vnicAttachments?compartmentId=%s", queryString))
 	if err != nil {
 		logrus.Error(err)
 	}

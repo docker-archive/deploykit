@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/FrenchBen/oracle-sdk-go/compute"
 	"github.com/Sirupsen/logrus"
 )
 
@@ -42,7 +41,7 @@ type VNic struct {
 }
 
 // GetVNic returns a struct of a VNic request given an VNic ID
-func (c *VNicClient) GetVNic(vnicID string) VNic {
+func (c *CoreClient) GetVNic(vnicID string) VNic {
 	vnic := VNic{}
 	queryString := url.QueryEscape(vnicID)
 	resp, err := c.Client.Get("/vnics/" + queryString)
@@ -63,11 +62,11 @@ func (c *VNicClient) GetVNic(vnicID string) VNic {
 }
 
 // ListVNic returns all VNic associated with an instance ID
-func (c *VNicClient) ListVNic(instanceID string) []VNic {
-	vNicAttachments := vn.ListVNicAttachments(instanceID)
+func (c *CoreClient) ListVNic(instanceID string) []VNic {
+	vNicAttachments := c.ListVNicAttachments(instanceID)
 	vNics := []VNic{}
 	for _, vNicAttachment := range vNicAttachments {
-		vNics = append(vNics, vn.GetVNic(vNicAttachment.VNicID))
+		vNics = append(vNics, c.GetVNic(vNicAttachment.VNicID))
 	}
 	return vNics
 }
