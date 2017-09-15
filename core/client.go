@@ -7,6 +7,7 @@ import "github.com/FrenchBen/oracle-sdk-go/api"
 // Client is a client for the core services API.
 type Client struct {
 	Client        *api.Client
+	APIVersion    string
 	CompartmentID string
 }
 
@@ -14,6 +15,7 @@ type Client struct {
 func NewClient(c *api.Client, compartmentID string) *Client {
 	return &Client{
 		Client:        c,
+		APIVersion:    api.CoreAPIVersion,
 		CompartmentID: compartmentID,
 	}
 }

@@ -1,10 +1,8 @@
 package bmc
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,12 +10,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/go-ini/ini"
-)
-
-const (
-	apiEndpointFormat = "https://iaas.%s.oraclecloud.com/%s/"
-	apiVersion        = "20160918"
-	metaDataURL       = "http://169.254.169.254/opc/v1/instance/"
 )
 
 // A Config provides service configuration for service clients.
@@ -123,56 +115,8 @@ func (c *Config) setFromIniFile(profile string, file *ini.File) error {
 			KeyFile:     String(keyFile),
 			Tenancy:     String(tenancy),
 			Region:      String(region),
-			APIEndpoint: GetAPIEndpoint(region),
 		}
 	}
 
 	return nil
-}
-
-type metaData struct {
-	AvailabilityDomain string `json:"availabilityDomain"`
-	CompartmentID      string `json:"compartmentId"`
-	DisplayName        string `json:"displayName"`
-	ID                 string `json:"id"`
-	Image              string `json:"image"`
-	Metadata           struct {
-		PublicKey string `json:"ssh_authorized_keys"`
-		UserData  string `json:"user_data"`
-	} `json:"metadata"`
-	Region      string `json:"region"`
-	Shape       string `json:"shape"`
-	State       string `json:"state"`
-	TimeCreated string `json:"timeCreated"`
-}
-
-// GetAPIEndpoint gets the endpoint from metadata or using the region passed
-func GetAPIEndpoint(region string) *url.URL {
-	if region != "" {
-		apiEndpoint, err := url.Parse(fmt.Sprintf(apiEndpointFormat, "us-phoenix-1", apiVersion))
-		if err != nil {
-			log.Fatalf("Error parsing API Endpoint: %s", err)
-		}
-		return apiEndpoint
-	}
-	res, err := http.Get(metaDataURL)
-	if err != nil {
-		log.Fatalf("Error getting metadata: %s", err)
-	}
-	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var meta = new(metaData)
-	err = json.Unmarshal(body, &meta)
-	if err != nil {
-		log.Fatalf("Error parsing JSON: %s", err)
-	}
-	apiEndpoint, err := url.Parse(fmt.Sprintf(apiEndpointFormat, meta.Region, apiVersion))
-	if err != nil {
-		log.Fatalf("Error parsing API Endpoint: %s", err)
-	}
-
-	return apiEndpoint
 }

@@ -12,14 +12,14 @@ import (
 
 // HealthChecker reference from https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/HealthChecker/
 type HealthChecker struct {
-	Interval   int    `json:"intervalInMillis"`
-	Port       int    `json:"port"`
-	Protocol   string `json:"protocol"`          // HTTP or TCP
-	Response   string `json:"responseBodyRegex"` // ^(500|40[1348])$
-	Retries    int    `json:"retries"`
-	ReturnCode int    `json:"returnCode"`
-	Timeout    int    `json:"timeoutInMillis"`
-	URLPath    string `json:"urlPath"`
+	Interval   int    `json:"intervalInMillis,omitempty"`
+	Port       int    `json:"port,omitempty"`
+	Protocol   string `json:"protocol"`                    // HTTP or TCP
+	Response   string `json:"responseBodyRegex,omitempty"` // ^(500|40[1348])$
+	Retries    int    `json:"retries,omitempty"`
+	ReturnCode int    `json:"returnCode,omitempty"`
+	Timeout    int    `json:"timeoutInMillis,omitempty"`
+	URLPath    string `json:"urlPath,omitempty"`
 }
 
 // GetHealthChecker gets the health check policy information for a given load balancer and backend set.
@@ -34,15 +34,16 @@ func (c *Client) GetHealthChecker(loadBalancerID string, backendSetName string) 
 		return healthChecker, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return healthChecker, bmc.NewError(*resp)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	logrus.Debug("Body: ", string(body))
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
-	if resp.StatusCode != 200 {
-		return healthChecker, bmc.NewError(resp)
-	}
+
 	if err = json.Unmarshal(body, &healthChecker); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}

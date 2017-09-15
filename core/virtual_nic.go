@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
+	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
 )
 
@@ -41,32 +42,41 @@ type VNic struct {
 }
 
 // GetVNic returns a struct of a VNic request given an VNic ID
-func (c *Client) GetVNic(vnicID string) VNic {
-	vnic := VNic{}
+func (c *Client) GetVNic(vnicID string) (VNic, *bmc.Error) {
+	vNic := VNic{}
 	queryString := url.QueryEscape(vnicID)
 	resp, err := c.Client.Request("GET", "/vnics/"+queryString, nil)
 	if err != nil {
 		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return vNic, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return vNic, bmc.NewError(*resp)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	logrus.Debug("Body: ", string(body))
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
-	if err = json.Unmarshal(body, &vnic); err != nil {
+	if err = json.Unmarshal(body, &vNic); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}
-	return vnic
+	return vNic, nil
 }
 
 // ListVNic returns all VNic associated with an instance ID
 func (c *Client) ListVNic(instanceID string) []VNic {
-	vNicAttachments := c.ListVNicAttachments(instanceID)
+	vNicAttachments, err := c.ListVNicAttachments(instanceID)
+	if err != nil {
+		logrus.Fatalf("Could not retrieve Virtual Nic attachments: %s", err.Message)
+	}
 	vNics := []VNic{}
 	for _, vNicAttachment := range vNicAttachments {
-		vNics = append(vNics, c.GetVNic(vNicAttachment.VNicID))
+		vNic, _ := c.GetVNic(vNicAttachment.VNicID)
+		vNics = append(vNics, vNic)
 	}
 	return vNics
 }

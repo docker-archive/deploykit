@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
+	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
 )
 
@@ -36,14 +37,19 @@ type VNicAttachment struct {
 }
 
 // GetVNicAttachment returns a struct of a VNicAttachment request given an VNicAttachment ID
-func (c *Client) GetVNicAttachment(vNicAttachmentID string) VNicAttachment {
+func (c *Client) GetVNicAttachment(vNicAttachmentID string) (VNicAttachment, *bmc.Error) {
 	vNicAttachment := VNicAttachment{}
 	queryString := url.QueryEscape(vNicAttachmentID)
 	resp, err := c.Client.Request("GET", "/vnicAttachments/"+queryString, nil)
 	if err != nil {
 		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return vNicAttachment, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return vNicAttachment, bmc.NewError(*resp)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	logrus.Debug("Body: ", string(body))
@@ -53,11 +59,11 @@ func (c *Client) GetVNicAttachment(vNicAttachmentID string) VNicAttachment {
 	if err = json.Unmarshal(body, &vNicAttachment); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}
-	return vNicAttachment
+	return vNicAttachment, nil
 }
 
 // ListVNicAttachments returns a slice struct of all instance
-func (c *Client) ListVNicAttachments(instanceID string) []VNicAttachment {
+func (c *Client) ListVNicAttachments(instanceID string) ([]VNicAttachment, *bmc.Error) {
 	vNicAttachments := []VNicAttachment{}
 	queryString := url.QueryEscape(c.CompartmentID)
 	if instanceID != "" {
@@ -66,16 +72,22 @@ func (c *Client) ListVNicAttachments(instanceID string) []VNicAttachment {
 	resp, err := c.Client.Request("GET", fmt.Sprintf("/vnicAttachments?compartmentId=%s", queryString), nil)
 	if err != nil {
 		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return vNicAttachments, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return vNicAttachments, bmc.NewError(*resp)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
+
 	logrus.Debug("Body: ", string(body))
 	if err = json.Unmarshal(body, &vNicAttachments); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}
-	return vNicAttachments
+	return vNicAttachments, nil
 }

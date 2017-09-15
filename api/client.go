@@ -2,10 +2,11 @@ package api
 
 import (
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"time"
 
@@ -14,12 +15,38 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const (
+	apiEndpointFormat = "https://iaas.%s.oraclecloud.com/%s/"
+	// CoreAPIVersion is the API version for core services
+	CoreAPIVersion = "20160918"
+	// LoadBalancerAPIVersion is the API version for load balancing services
+	LoadBalancerAPIVersion = "20170115"
+	metaDataURL            = "http://169.254.169.254/opc/v1/instance/"
+)
+
 // Client represents the struct for basic api calls
 type Client struct {
-	apiEndpoint   *url.URL
 	apiKey        string
+	apiRegion     string
+	APIVersion    string
 	apiPrivateKey *rsa.PrivateKey
 	httpClient    *http.Client
+}
+
+type metaData struct {
+	AvailabilityDomain string `json:"availabilityDomain"`
+	CompartmentID      string `json:"compartmentId"`
+	DisplayName        string `json:"displayName"`
+	ID                 string `json:"id"`
+	Image              string `json:"image"`
+	Metadata           struct {
+		PublicKey string `json:"ssh_authorized_keys"`
+		UserData  string `json:"user_data"`
+	} `json:"metadata"`
+	Region      string `json:"region"`
+	Shape       string `json:"shape"`
+	State       string `json:"state"`
+	TimeCreated string `json:"timeCreated"`
 }
 
 // NewClient creates a new, unauthenticated compute Client.
@@ -35,7 +62,7 @@ func NewClient(config *bmc.Config) (*Client, error) {
 	}
 
 	return &Client{
-		apiEndpoint:   config.APIEndpoint,
+		apiRegion:     getRegion(config),
 		apiKey:        apiKey,
 		apiPrivateKey: privateKey,
 		httpClient: &http.Client{
@@ -74,4 +101,25 @@ func loadKeyFromFile(pemFile *string, passphrase *string) (*rsa.PrivateKey, erro
 		return nil, err
 	}
 	return rsaKey, err
+}
+
+func getRegion(config *bmc.Config) string {
+	if config.Region != nil {
+		return *config.Region
+	}
+	res, err := http.Get(metaDataURL)
+	if err != nil {
+		log.Fatalf("Error getting metadata: %s", err)
+	}
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var meta = new(metaData)
+	err = json.Unmarshal(body, &meta)
+	if err != nil {
+		log.Fatalf("Error parsing JSON: %s", err)
+	}
+	return meta.Region
 }

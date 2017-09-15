@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
+	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
 	"github.com/google/go-querystring/query"
 )
@@ -54,14 +55,19 @@ type InstancesParameters struct {
 }
 
 // GetInstance returns a struct of an instance request given an instance ID
-func (c *Client) GetInstance(instanceID string) Instance {
+func (c *Client) GetInstance(instanceID string) (Instance, *bmc.Error) {
 	instance := Instance{}
 	queryString := url.QueryEscape(instanceID)
 	resp, err := c.Client.Request("GET", "/instances/"+queryString, nil)
 	if err != nil {
 		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return instance, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return instance, bmc.NewError(*resp)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	logrus.Debug("Body: ", string(body))
@@ -71,11 +77,11 @@ func (c *Client) GetInstance(instanceID string) Instance {
 	if err = json.Unmarshal(body, &instance); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}
-	return instance
+	return instance, nil
 }
 
 // ListInstances returns a slice struct of all instance
-func (c *Client) ListInstances(options *InstancesParameters) []Instance {
+func (c *Client) ListInstances(options *InstancesParameters) ([]Instance, *bmc.Error) {
 	instances := []Instance{}
 	queryString := url.QueryEscape(c.CompartmentID)
 	if options != nil {
@@ -85,14 +91,19 @@ func (c *Client) ListInstances(options *InstancesParameters) []Instance {
 	resp, err := c.Client.Request("GET", fmt.Sprintf("/instances?compartmentId=%s", queryString), nil)
 	if err != nil {
 		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return instances, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		logrus.Info("Incorrect Status code")
+		return instances, bmc.NewError(*resp)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
-	logrus.Debug("Body: ", string(body))
 
 	if err = json.Unmarshal(body, &instances); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
@@ -100,5 +111,5 @@ func (c *Client) ListInstances(options *InstancesParameters) []Instance {
 	if options.Filter != nil {
 		instances = filterInstances(instances, *options.Filter)
 	}
-	return instances
+	return instances, nil
 }

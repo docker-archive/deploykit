@@ -29,7 +29,7 @@ func (c *Client) CreateListener(loadBalancerID string, listener *Listener) (bool
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
 	if resp.StatusCode != 204 {
-		return false, bmc.NewError(resp)
+		return false, bmc.NewError(*resp)
 	}
 	return true, nil
 }

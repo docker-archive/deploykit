@@ -3,12 +3,15 @@ package api
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,12 +19,9 @@ import (
 	"github.com/spacemonkeygo/httpsig"
 )
 
-var headersToSign = []string{"date", "(request-target)", "host"}
+// Signing details: https://docs.us-phoenix-1.oraclecloud.com/Content/API/Concepts/signingrequests.htm
 
-// Sign request with POST/PUT:
-// Authorization: Signature version="1",keyId="<TENANCY OCID>/<USER OCID>/<KEY FINGERPRINT>",algorithm="rsa-sha256",headers="(request-target) date host x-content-sha256 content-type content-length",signature="Base64(RSA-SHA256(SIGNING STRING))"
-// Sign request with GET:
-// Authorization: Signature version="1",keyId="<TENANCY OCID>/<USER OCID>/<KEY FINGERPRINT>",algorithm="rsa-sha256",headers="(request-target) date host",signature="Base64(RSA-SHA256(SIGNING STRING))"
+var headersToSign = []string{"date", "(request-target)", "host"}
 
 func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 	// Add missing defaults
@@ -29,7 +29,7 @@ func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if req.Header.Get("Host") == "" {
-		req.Header.Set("Host", c.apiEndpoint.Hostname())
+		req.Header.Set("Host", req.URL.Hostname())
 	}
 	if req.Header.Get("Date") == "" {
 		t := time.Now()
@@ -37,13 +37,10 @@ func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 	}
 
 	if strings.HasPrefix(req.Method, "P") {
-		// if len(body) > 0 {
-		// 	req.Header.Set("Content-Type", "application/oracle-compute-v3+json")
-		// }
 		headersToSign = append(headersToSign, "x-content-sha256", "content-type", "content-length")
 		bodyHash := sha256.Sum256(body)
-		req.Header.Set("Content-Length", string(len(body)))
-		req.Header.Set("X-Content-Sha256", fmt.Sprintf("%x", bodyHash))
+		req.Header.Set("Content-Length", strconv.Itoa(len(body)))
+		req.Header.Set("X-Content-Sha256", base64.StdEncoding.EncodeToString(bodyHash[:]))
 	}
 
 	signer := httpsig.NewRSASHA256Signer(c.apiKey, c.apiPrivateKey, headersToSign)
@@ -53,13 +50,6 @@ func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 	}
 
 	return
-}
-
-func (c *Client) formatURL(urlPath *url.URL) string {
-	urlEndpoint := *c.apiEndpoint
-	urlEndpoint.Path = path.Join(urlEndpoint.Path, urlPath.Path)
-	urlEndpoint.RawQuery = urlPath.RawQuery
-	return urlEndpoint.String()
 }
 
 // Request request a resource from Oracle
@@ -82,7 +72,7 @@ func (c *Client) Request(method string, path string, body interface{}) (*http.Re
 	}
 
 	// Create Request
-	req, err := http.NewRequest(method, c.formatURL(urlPath), requestBody)
+	req, err := http.NewRequest(method, c.buildAPIEndpoint(urlPath), requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -91,4 +81,15 @@ func (c *Client) Request(method string, path string, body interface{}) (*http.Re
 	logrus.Debug("Auth: ", req.Header)
 	logrus.Debug("Request URL: ", req.URL.String())
 	return c.httpClient.Do(req)
+}
+
+// getAPIEndpoint builds the API endpoint given a URL
+func (c *Client) buildAPIEndpoint(urlPath *url.URL) string {
+	urlEndpoint, err := url.Parse(fmt.Sprintf(apiEndpointFormat, c.apiRegion, c.APIVersion))
+	if err != nil {
+		log.Fatalf("Error parsing API Endpoint: %s", err)
+	}
+	urlEndpoint.Path = path.Join(urlEndpoint.Path, urlPath.Path)
+	urlEndpoint.RawQuery = urlPath.RawQuery
+	return urlEndpoint.String()
 }

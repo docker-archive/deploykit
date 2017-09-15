@@ -13,12 +13,12 @@ import (
 
 // BackendSet reference from https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/BackendSet/
 type BackendSet struct {
-	Backends           []Backend                       `json:"backends"`
+	Backends           []Backend                       `json:"backends,omitempty"`
 	HealthChecker      HealthChecker                   `json:"healthChecker"`
 	Name               string                          `json:"name"`
 	Policy             string                          `json:"policy"`
-	SSLConfig          SSLConfiguration                `json:"sslConfiguration"`
-	SessionPersistence SessionPersistenceConfiguration `json:"sessionPersistenceConfiguration"`
+	SSLConfig          SSLConfiguration                `json:"sslConfiguration,omitempty"`
+	SessionPersistence SessionPersistenceConfiguration `json:"sessionPersistenceConfiguration,omitempty"`
 }
 
 // SSLConfiguration for the struct within the Listener
@@ -45,7 +45,7 @@ func (c *Client) CreateBackendSet(loadBalancerID string, backendSet *BackendSet)
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
 	if resp.StatusCode != 204 {
-		return false, bmc.NewError(resp)
+		return false, bmc.NewError(*resp)
 	}
 	return true, nil
 }
@@ -62,15 +62,16 @@ func (c *Client) GetBackendSet(loadBalancerID string, backendSetName string) (Ba
 		return backendSet, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return backendSet, bmc.NewError(*resp)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	logrus.Debug("Body: ", string(body))
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
-	if resp.StatusCode != 200 {
-		return backendSet, bmc.NewError(resp)
-	}
+
 	if err = json.Unmarshal(body, &backendSet); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}
@@ -88,15 +89,16 @@ func (c *Client) ListBackendSet(loadBalancerID string) ([]BackendSet, *bmc.Error
 		return backendSets, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return backendSets, bmc.NewError(*resp)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	logrus.Debug("Body: ", string(body))
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
-	if resp.StatusCode != 200 {
-		return backendSets, bmc.NewError(resp)
-	}
+
 	if err = json.Unmarshal(body, &backendSets); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}

@@ -15,12 +15,13 @@ type Error struct {
 }
 
 // NewError returns a pointer to the BMC error
-func NewError(resp *http.Response) *Error {
+func NewError(resp http.Response) *Error {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
+	logrus.Debugf("Error body: %s", body)
 	bmcError := Error{}
 	if err = json.Unmarshal(body, &bmcError); err != nil {
-		logrus.Fatalf("Unmarshal impossible: %s", err)
+		logrus.Fatalf("Cannot unmarshal Error resp impossible: %s", err)
 	}
 	return &bmcError
 }
