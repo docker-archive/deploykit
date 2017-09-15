@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,12 +16,15 @@ import (
 )
 
 func TestLaunchOSCommand(t *testing.T) {
-
+	sleepCmd := "sleep 100"
+	if runtime.GOOS == "windows" {
+		sleepCmd = "timeout 100"
+	}
 	launcher, err := NewLauncher("os")
 	require.NoError(t, err)
 
 	_, starting, err := launcher.Exec("sleepPlugin", plugin.Name("sleepPlugin"), types.AnyValueMust(&LaunchConfig{
-		Cmd: "sleep 100",
+		Cmd: sleepCmd,
 	}))
 	require.NoError(t, err)
 
@@ -47,5 +52,5 @@ func TestLaunchWithLog(t *testing.T) {
 
 	v, err := ioutil.ReadFile(logfile)
 	require.NoError(t, err)
-	require.Equal(t, "hello\n", string(v))
+	require.Equal(t, "hello", strings.TrimSpace(string(v)))
 }

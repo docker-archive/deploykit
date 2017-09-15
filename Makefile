@@ -29,10 +29,22 @@ ci: fmt vet lint check-docs coverage e2e-test
 AUTHORS: .mailmap .git/HEAD
 	git log --format='%aN <%aE>' | sort -fu > $@
 
+# Handle file extension suffix (for Windows)
+EXE_EXT:=
+ifeq ($(OS),Windows_NT)
+	EXE_EXT:=.exe
+endif
+
 # Package list
 PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor)
+ifeq ($(OS),Windows_NT)
+	# skip libvirt instance plugin on Windows (does not compile)
+	PKGS_AND_MOCKS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v libvirt)
+endif
 PKGS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v /mock$)
 PKGS_TEST := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep pkg$)
+
+
 
 get-tools:
 	@echo "+ $@"
@@ -76,7 +88,7 @@ clean:
 
 define binary_target_template
 build/$(1): $(SRCS)
-	go build -o build/$(1) \
+	go build -o build/$(1)$(EXE_EXT) \
 		-ldflags "-X github.com/docker/infrakit/pkg/cli.Version=$(VERSION) -X github.com/docker/infrakit/pkg/cli.Revision=$(REVISION) -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=$(DOCKER_CLIENT_VERSION)" $(2)
 endef
 define define_binary_target
@@ -99,7 +111,12 @@ $(call define_binary_target,infrakit-instance-file,github.com/docker/infrakit/ex
 $(call define_binary_target,infrakit-instance-gcp,github.com/docker/infrakit/cmd/instance/google)
 $(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
 $(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
+ifeq ($(OS),Windows_NT)
+build/infrakit-instance-libvirt:
+# noop on windows
+else
 $(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
+endif
 $(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
 $(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
 $(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/pkg/provider/terraform/instance/cmd)
