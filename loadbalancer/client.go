@@ -1,4 +1,4 @@
-package lb
+package loadbalancer
 
 import "github.com/FrenchBen/oracle-sdk-go/api"
 

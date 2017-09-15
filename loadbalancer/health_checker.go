@@ -1,4 +1,4 @@
-package lb
+package loadbalancer
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
+	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
 )
 
@@ -22,13 +23,15 @@ type HealthChecker struct {
 }
 
 // GetHealthChecker gets the health check policy information for a given load balancer and backend set.
-func (c *Client) GetHealthChecker(loadBalancerID string, backendSetName string) HealthChecker {
+func (c *Client) GetHealthChecker(loadBalancerID string, backendSetName string) (HealthChecker, *bmc.Error) {
 	healthChecker := HealthChecker{}
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	backendSetName = url.PathEscape(backendSetName)
 	resp, err := c.Client.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/healthChecker", loadBalancerID, backendSetName), nil)
 	if err != nil {
 		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return healthChecker, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
 	defer resp.Body.Close()
@@ -37,8 +40,11 @@ func (c *Client) GetHealthChecker(loadBalancerID string, backendSetName string) 
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
+	if resp.StatusCode != 200 {
+		return healthChecker, bmc.NewError(resp)
+	}
 	if err = json.Unmarshal(body, &healthChecker); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}
-	return healthChecker
+	return healthChecker, nil
 }

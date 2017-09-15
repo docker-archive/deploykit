@@ -1,34 +1,37 @@
-package lb
+package loadbalancer
 
 import (
 	"fmt"
 	"net/url"
+
+	"github.com/FrenchBen/oracle-sdk-go/bmc"
 
 	"github.com/Sirupsen/logrus"
 )
 
 // Listener represents the listener's configuration: https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/Listener/
 type Listener struct {
-	BackendSetName string `json:"defaultBackendSetName"`
-	Name           string `json:"name"`
-	Port           int    `json:"port"`
-	Protocol       string `json:"protocol"` // HTTP or TCP
-	SSLConfig      string `json:"sslConfiguration"`
+	BackendSetName string           `json:"defaultBackendSetName"`
+	Name           string           `json:"name"`
+	Port           int              `json:"port"`
+	Protocol       string           `json:"protocol"` // HTTP or TCP
+	SSLConfig      SSLConfiguration `json:"sslConfiguration"`
 }
 
 // CreateListener adds a listener to a load balancer
-func (c *Client) CreateListener(loadBalancerID string, listener *Listener) bool {
+func (c *Client) CreateListener(loadBalancerID string, listener *Listener) (bool, *bmc.Error) {
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	resp, err := c.Client.Request("POST", fmt.Sprintf("/loadBalancers/%s/listeners", loadBalancerID), *listener)
 	if err != nil {
 		logrus.Error(err)
-		return false
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return false, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
 	if resp.StatusCode != 204 {
-		return false
+		return false, bmc.NewError(resp)
 	}
-	return true
+	return true, nil
 }
 
 // UpdateListener updates a listener from a load balancer

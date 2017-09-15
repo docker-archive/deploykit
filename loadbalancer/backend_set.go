@@ -1,4 +1,4 @@
-package lb
+package loadbalancer
 
 import (
 	"encoding/json"
@@ -6,17 +6,19 @@ import (
 	"io/ioutil"
 	"net/url"
 
+	"github.com/FrenchBen/oracle-sdk-go/bmc"
+
 	"github.com/Sirupsen/logrus"
 )
 
 // BackendSet reference from https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/BackendSet/
 type BackendSet struct {
-	Backends           string `json:"backends"`
-	HealthChecker      string `json:"healthChecker"`
-	Name               string `json:"name"`
-	Policy             string `json:"policy"`
-	SSLConfig          string `json:"sslConfiguration"`
-	SessionPersistence string `json:"sessionPersistenceConfiguration"`
+	Backends           []Backend                       `json:"backends"`
+	HealthChecker      HealthChecker                   `json:"healthChecker"`
+	Name               string                          `json:"name"`
+	Policy             string                          `json:"policy"`
+	SSLConfig          SSLConfiguration                `json:"sslConfiguration"`
+	SessionPersistence SessionPersistenceConfiguration `json:"sessionPersistenceConfiguration"`
 }
 
 // SSLConfiguration for the struct within the Listener
@@ -33,28 +35,31 @@ type SessionPersistenceConfiguration struct {
 }
 
 // CreateBackendSet adds a backend set to a load balancer
-func (c *Client) CreateBackendSet(loadBalancerID string, backendSet *BackendSet) bool {
+func (c *Client) CreateBackendSet(loadBalancerID string, backendSet *BackendSet) (bool, *bmc.Error) {
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	resp, err := c.Client.Request("POST", fmt.Sprintf("/loadBalancers/%s/backendSets", loadBalancerID), *backendSet)
 	if err != nil {
 		logrus.Error(err)
-		return false
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return false, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
 	if resp.StatusCode != 204 {
-		return false
+		return false, bmc.NewError(resp)
 	}
-	return true
+	return true, nil
 }
 
 // GetBackendSet gets the health check policy information for a given load balancer and backend set.
-func (c *Client) GetBackendSet(loadBalancerID string, backendSetName string) BackendSet {
+func (c *Client) GetBackendSet(loadBalancerID string, backendSetName string) (BackendSet, *bmc.Error) {
 	backendSet := BackendSet{}
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	backendSetName = url.PathEscape(backendSetName)
 	resp, err := c.Client.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s", loadBalancerID, backendSetName), nil)
 	if err != nil {
 		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return backendSet, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
 	defer resp.Body.Close()
@@ -63,19 +68,24 @@ func (c *Client) GetBackendSet(loadBalancerID string, backendSetName string) Bac
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
+	if resp.StatusCode != 200 {
+		return backendSet, bmc.NewError(resp)
+	}
 	if err = json.Unmarshal(body, &backendSet); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}
-	return backendSet
+	return backendSet, nil
 }
 
 // ListBackendSet gets the health check policy information for a given load balancer and backend set.
-func (c *Client) ListBackendSet(loadBalancerID string) []BackendSet {
+func (c *Client) ListBackendSet(loadBalancerID string) ([]BackendSet, *bmc.Error) {
 	backendSets := []BackendSet{}
 	loadBalancerID = url.QueryEscape(loadBalancerID)
 	resp, err := c.Client.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets", loadBalancerID), nil)
 	if err != nil {
 		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return backendSets, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
 	defer resp.Body.Close()
@@ -84,10 +94,13 @@ func (c *Client) ListBackendSet(loadBalancerID string) []BackendSet {
 	if err != nil {
 		logrus.Fatalf("Could not read JSON response: %s", err)
 	}
+	if resp.StatusCode != 200 {
+		return backendSets, bmc.NewError(resp)
+	}
 	if err = json.Unmarshal(body, &backendSets); err != nil {
 		logrus.Fatalf("Unmarshal impossible: %s", err)
 	}
-	return backendSets
+	return backendSets, nil
 }
 
 // UpdateBackendSet updates a backend set to a load balancer

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -36,13 +37,13 @@ func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 	}
 
 	if strings.HasPrefix(req.Method, "P") {
-		if len(body) > 0 {
-			req.Header.Set("Content-Type", "application/oracle-compute-v3+json")
-		}
+		// if len(body) > 0 {
+		// 	req.Header.Set("Content-Type", "application/oracle-compute-v3+json")
+		// }
 		headersToSign = append(headersToSign, "x-content-sha256", "content-type", "content-length")
 		bodyHash := sha256.Sum256(body)
 		req.Header.Set("Content-Length", string(len(body)))
-		req.Header.Set("x-content-sha256", string(bodyHash[:]))
+		req.Header.Set("X-Content-Sha256", fmt.Sprintf("%x", bodyHash))
 	}
 
 	signer := httpsig.NewRSASHA256Signer(c.apiKey, c.apiPrivateKey, headersToSign)
