@@ -34,6 +34,7 @@ func (c *Client) Request(method string, reqURL string, body interface{}) (*http.
 	if err != nil {
 		return nil, err
 	}
+	// build URL using proper API version
 	urlEndpoint, err := url.Parse(fmt.Sprintf(api.EndpointFormat, c.Client.APIRegion, api.CoreAPIVersion))
 	if err != nil {
 		log.Fatalf("Error parsing API Endpoint: %s", err)
