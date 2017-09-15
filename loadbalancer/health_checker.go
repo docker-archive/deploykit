@@ -12,9 +12,9 @@ import (
 // HealthChecker reference from https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/HealthChecker/
 type HealthChecker struct {
 	Interval   int    `json:"intervalInMillis"`
-	Port       string `json:"port"`
-	Protocol   string `json:"protocol"`
-	Response   string `json:"responseBodyRegex"`
+	Port       int    `json:"port"`
+	Protocol   string `json:"protocol"`          // HTTP or TCP
+	Response   string `json:"responseBodyRegex"` // ^(500|40[1348])$
 	Retries    int    `json:"retries"`
 	ReturnCode int    `json:"returnCode"`
 	Timeout    int    `json:"timeoutInMillis"`
