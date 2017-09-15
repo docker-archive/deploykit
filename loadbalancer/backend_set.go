@@ -37,7 +37,7 @@ type SessionPersistenceConfiguration struct {
 // CreateBackendSet adds a backend set to a load balancer
 func (c *Client) CreateBackendSet(loadBalancerID string, backendSet *BackendSet) (bool, *bmc.Error) {
 	loadBalancerID = url.PathEscape(loadBalancerID)
-	resp, err := c.Client.Request("POST", fmt.Sprintf("/loadBalancers/%s/backendSets", loadBalancerID), *backendSet)
+	resp, err := c.Request("POST", fmt.Sprintf("/loadBalancers/%s/backendSets", loadBalancerID), *backendSet)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
@@ -55,7 +55,7 @@ func (c *Client) GetBackendSet(loadBalancerID string, backendSetName string) (Ba
 	backendSet := BackendSet{}
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	backendSetName = url.PathEscape(backendSetName)
-	resp, err := c.Client.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s", loadBalancerID, backendSetName), nil)
+	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s", loadBalancerID, backendSetName), nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
@@ -82,7 +82,7 @@ func (c *Client) GetBackendSet(loadBalancerID string, backendSetName string) (Ba
 func (c *Client) ListBackendSet(loadBalancerID string) ([]BackendSet, *bmc.Error) {
 	backendSets := []BackendSet{}
 	loadBalancerID = url.QueryEscape(loadBalancerID)
-	resp, err := c.Client.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets", loadBalancerID), nil)
+	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets", loadBalancerID), nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}

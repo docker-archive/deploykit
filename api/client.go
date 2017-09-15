@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	apiEndpointFormat = "https://iaas.%s.oraclecloud.com/%s/"
+	// EndpointFormat provides the base template for all API url
+	EndpointFormat = "https://iaas.%s.oraclecloud.com/%s/"
 	// CoreAPIVersion is the API version for core services
 	CoreAPIVersion = "20160918"
 	// LoadBalancerAPIVersion is the API version for load balancing services
@@ -24,12 +25,15 @@ const (
 	metaDataURL            = "http://169.254.169.254/opc/v1/instance/"
 )
 
+// Config holds the general API bmcConf
+type config struct {
+}
+
 // Client represents the struct for basic api calls
 type Client struct {
 	apiKey        string
-	apiRegion     string
-	APIVersion    string
 	apiPrivateKey *rsa.PrivateKey
+	APIRegion     string
 	httpClient    *http.Client
 }
 
@@ -50,10 +54,10 @@ type metaData struct {
 }
 
 // NewClient creates a new, unauthenticated compute Client.
-func NewClient(config *bmc.Config) (*Client, error) {
-	apiKey := fmt.Sprintf("%s/%s/%s", *config.Tenancy, *config.User, *config.Fingerprint)
+func NewClient(bmcConf *bmc.Config) (*Client, error) {
+	apiKey := fmt.Sprintf("%s/%s/%s", *bmcConf.Tenancy, *bmcConf.User, *bmcConf.Fingerprint)
 	logrus.Debug("Api Key: ", apiKey)
-	privateKey, err := loadKeyFromFile(config.KeyFile, config.PassPhrase)
+	privateKey, err := loadKeyFromFile(bmcConf.KeyFile, bmcConf.PassPhrase)
 	if err != nil {
 		// If we failed to read the file because the key does not exist,
 		// just issue a warning and continue.
@@ -62,9 +66,9 @@ func NewClient(config *bmc.Config) (*Client, error) {
 	}
 
 	return &Client{
-		apiRegion:     getRegion(config),
 		apiKey:        apiKey,
 		apiPrivateKey: privateKey,
+		APIRegion:     getRegion(bmcConf),
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				Proxy:               http.ProxyFromEnvironment,
@@ -103,9 +107,9 @@ func loadKeyFromFile(pemFile *string, passphrase *string) (*rsa.PrivateKey, erro
 	return rsaKey, err
 }
 
-func getRegion(config *bmc.Config) string {
-	if config.Region != nil {
-		return *config.Region
+func getRegion(bmcConf *bmc.Config) string {
+	if bmcConf.Region != nil {
+		return *bmcConf.Region
 	}
 	res, err := http.Get(metaDataURL)
 	if err != nil {

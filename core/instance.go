@@ -58,7 +58,7 @@ type InstancesParameters struct {
 func (c *Client) GetInstance(instanceID string) (Instance, *bmc.Error) {
 	instance := Instance{}
 	queryString := url.QueryEscape(instanceID)
-	resp, err := c.Client.Request("GET", "/instances/"+queryString, nil)
+	resp, err := c.Request("GET", "/instances/"+queryString, nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
@@ -88,7 +88,7 @@ func (c *Client) ListInstances(options *InstancesParameters) ([]Instance, *bmc.E
 		v, _ := query.Values(*options)
 		queryString = queryString + "&" + v.Encode()
 	}
-	resp, err := c.Client.Request("GET", fmt.Sprintf("/instances?compartmentId=%s", queryString), nil)
+	resp, err := c.Request("GET", fmt.Sprintf("/instances?compartmentId=%s", queryString), nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
@@ -96,7 +96,6 @@ func (c *Client) ListInstances(options *InstancesParameters) ([]Instance, *bmc.E
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
 	if resp.StatusCode != 200 {
-		logrus.Info("Incorrect Status code")
 		return instances, bmc.NewError(*resp)
 	}
 	defer resp.Body.Close()

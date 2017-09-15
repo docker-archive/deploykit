@@ -5,12 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +19,11 @@ import (
 // Signing details: https://docs.us-phoenix-1.oraclecloud.com/Content/API/Concepts/signingrequests.htm
 
 var headersToSign = []string{"date", "(request-target)", "host"}
+
+// Clienter is the client interface for all requests
+type Clienter interface {
+	Request(string, string, interface{}) (*http.Response, error)
+}
 
 func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 	// Add missing defaults
@@ -53,9 +55,9 @@ func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 }
 
 // Request request a resource from Oracle
-func (c *Client) Request(method string, path string, body interface{}) (*http.Response, error) {
+func (c *Client) Request(method string, reqURL string, body interface{}) (*http.Response, error) {
 	// Parse URL Path
-	urlPath, err := url.Parse(path)
+	urlPath, err := url.Parse(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +74,7 @@ func (c *Client) Request(method string, path string, body interface{}) (*http.Re
 	}
 
 	// Create Request
-	req, err := http.NewRequest(method, c.buildAPIEndpoint(urlPath), requestBody)
+	req, err := http.NewRequest(method, urlPath.String(), requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -81,15 +83,4 @@ func (c *Client) Request(method string, path string, body interface{}) (*http.Re
 	logrus.Debug("Auth: ", req.Header)
 	logrus.Debug("Request URL: ", req.URL.String())
 	return c.httpClient.Do(req)
-}
-
-// getAPIEndpoint builds the API endpoint given a URL
-func (c *Client) buildAPIEndpoint(urlPath *url.URL) string {
-	urlEndpoint, err := url.Parse(fmt.Sprintf(apiEndpointFormat, c.apiRegion, c.APIVersion))
-	if err != nil {
-		log.Fatalf("Error parsing API Endpoint: %s", err)
-	}
-	urlEndpoint.Path = path.Join(urlEndpoint.Path, urlPath.Path)
-	urlEndpoint.RawQuery = urlPath.RawQuery
-	return urlEndpoint.String()
 }

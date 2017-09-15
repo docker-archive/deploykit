@@ -27,7 +27,7 @@ func (c *Client) GetHealthChecker(loadBalancerID string, backendSetName string) 
 	healthChecker := HealthChecker{}
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	backendSetName = url.PathEscape(backendSetName)
-	resp, err := c.Client.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/healthChecker", loadBalancerID, backendSetName), nil)
+	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/healthChecker", loadBalancerID, backendSetName), nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}

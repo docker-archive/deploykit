@@ -26,7 +26,7 @@ type Backend struct {
 func (c *Client) CreateBackend(loadBalancerID string, backendSetName string, backend *Backend) (bool, *bmc.Error) {
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	backendSetName = url.PathEscape(backendSetName)
-	resp, err := c.Client.Request("POST", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/backends", loadBalancerID, backendSetName), *backend)
+	resp, err := c.Request("POST", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/backends", loadBalancerID, backendSetName), *backend)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
@@ -45,7 +45,7 @@ func (c *Client) GetBackend(loadBalancerID string, backendSetName string, backen
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	backendSetName = url.PathEscape(backendSetName)
 	backendName = url.PathEscape(backendName)
-	resp, err := c.Client.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/backends/%s", loadBalancerID, backendSetName, backendName), nil)
+	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/backends/%s", loadBalancerID, backendSetName, backendName), nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
@@ -73,7 +73,7 @@ func (c *Client) ListBackend(loadBalancerID string, backendSetName string) ([]Ba
 	backends := []Backend{}
 	loadBalancerID = url.QueryEscape(loadBalancerID)
 	backendSetName = url.PathEscape(backendSetName)
-	resp, err := c.Client.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/backends", loadBalancerID, backendSetName), nil)
+	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers/%s/backendSets/%s/backends", loadBalancerID, backendSetName), nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}

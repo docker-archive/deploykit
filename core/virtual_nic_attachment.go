@@ -40,7 +40,7 @@ type VNicAttachment struct {
 func (c *Client) GetVNicAttachment(vNicAttachmentID string) (VNicAttachment, *bmc.Error) {
 	vNicAttachment := VNicAttachment{}
 	queryString := url.QueryEscape(vNicAttachmentID)
-	resp, err := c.Client.Request("GET", "/vnicAttachments/"+queryString, nil)
+	resp, err := c.Request("GET", "/vnicAttachments/"+queryString, nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
@@ -69,7 +69,7 @@ func (c *Client) ListVNicAttachments(instanceID string) ([]VNicAttachment, *bmc.
 	if instanceID != "" {
 		queryString = queryString + "&" + url.QueryEscape(instanceID)
 	}
-	resp, err := c.Client.Request("GET", fmt.Sprintf("/vnicAttachments?compartmentId=%s", queryString), nil)
+	resp, err := c.Request("GET", fmt.Sprintf("/vnicAttachments?compartmentId=%s", queryString), nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}

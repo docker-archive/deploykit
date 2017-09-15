@@ -45,7 +45,7 @@ type VNic struct {
 func (c *Client) GetVNic(vnicID string) (VNic, *bmc.Error) {
 	vNic := VNic{}
 	queryString := url.QueryEscape(vnicID)
-	resp, err := c.Client.Request("GET", "/vnics/"+queryString, nil)
+	resp, err := c.Request("GET", "/vnics/"+queryString, nil)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}

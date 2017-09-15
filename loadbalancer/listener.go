@@ -21,7 +21,7 @@ type Listener struct {
 // CreateListener adds a listener to a load balancer
 func (c *Client) CreateListener(loadBalancerID string, listener *Listener) (bool, *bmc.Error) {
 	loadBalancerID = url.PathEscape(loadBalancerID)
-	resp, err := c.Client.Request("POST", fmt.Sprintf("/loadBalancers/%s/listeners", loadBalancerID), *listener)
+	resp, err := c.Request("POST", fmt.Sprintf("/loadBalancers/%s/listeners", loadBalancerID), *listener)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}

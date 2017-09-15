@@ -1,13 +1,21 @@
 package core
 
-import "github.com/FrenchBen/oracle-sdk-go/api"
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"net/url"
+	"path"
+
+	"github.com/FrenchBen/oracle-sdk-go/api"
+	"github.com/Sirupsen/logrus"
+)
 
 // API details https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/
 
 // Client is a client for the core services API.
 type Client struct {
 	Client        *api.Client
-	APIVersion    string
 	CompartmentID string
 }
 
@@ -15,7 +23,23 @@ type Client struct {
 func NewClient(c *api.Client, compartmentID string) *Client {
 	return &Client{
 		Client:        c,
-		APIVersion:    api.CoreAPIVersion,
 		CompartmentID: compartmentID,
 	}
+}
+
+// Request builds the API endpoint given a URL and sends it to the API request
+func (c *Client) Request(method string, reqURL string, body interface{}) (*http.Response, error) {
+	// Parse URL Path
+	urlPath, err := url.Parse(reqURL)
+	if err != nil {
+		return nil, err
+	}
+	urlEndpoint, err := url.Parse(fmt.Sprintf(api.EndpointFormat, c.Client.APIRegion, api.CoreAPIVersion))
+	if err != nil {
+		log.Fatalf("Error parsing API Endpoint: %s", err)
+	}
+	logrus.Infof("Endpoint: %s - EPath: %s - Path: %s", urlEndpoint.String(), urlEndpoint.Path, urlPath.Path)
+	urlEndpoint.Path = path.Join(urlEndpoint.Path, urlPath.Path)
+	urlEndpoint.RawQuery = urlPath.RawQuery
+	return c.Client.Request(method, urlEndpoint.String(), body)
 }
