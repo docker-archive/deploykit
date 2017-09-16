@@ -8,7 +8,6 @@ import (
 	"path"
 
 	"github.com/FrenchBen/oracle-sdk-go/api"
-	"github.com/Sirupsen/logrus"
 )
 
 // API details https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/
@@ -39,7 +38,6 @@ func (c *Client) Request(method string, reqURL string, body interface{}) (*http.
 	if err != nil {
 		log.Fatalf("Error parsing API Endpoint: %s", err)
 	}
-	logrus.Infof("Endpoint: %s - EPath: %s - Path: %s", urlEndpoint.String(), urlEndpoint.Path, urlPath.Path)
 	urlEndpoint.Path = path.Join(urlEndpoint.Path, urlPath.Path)
 	urlEndpoint.RawQuery = urlPath.RawQuery
 	return c.Client.Request(method, urlEndpoint.String(), body)

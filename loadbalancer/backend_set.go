@@ -13,12 +13,12 @@ import (
 
 // BackendSet reference from https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/BackendSet/
 type BackendSet struct {
-	Backends           []Backend                       `json:"backends,omitempty"`
-	HealthChecker      HealthChecker                   `json:"healthChecker"`
-	Name               string                          `json:"name"`
-	Policy             string                          `json:"policy"`
-	SSLConfig          SSLConfiguration                `json:"sslConfiguration,omitempty"`
-	SessionPersistence SessionPersistenceConfiguration `json:"sessionPersistenceConfiguration,omitempty"`
+	Backends           []Backend                        `json:"backends,omitempty"`
+	HealthChecker      *HealthChecker                   `json:"healthChecker,omitempty"`
+	Name               string                           `json:"name"`
+	Policy             string                           `json:"policy"`
+	SSLConfig          *SSLConfiguration                `json:"sslConfiguration,omitempty"`
+	SessionPersistence *SessionPersistenceConfiguration `json:"sessionPersistenceConfiguration,omitempty"`
 }
 
 // SSLConfiguration for the struct within the Listener
@@ -37,6 +37,7 @@ type SessionPersistenceConfiguration struct {
 // CreateBackendSet adds a backend set to a load balancer
 func (c *Client) CreateBackendSet(loadBalancerID string, backendSet *BackendSet) (bool, *bmc.Error) {
 	loadBalancerID = url.PathEscape(loadBalancerID)
+	logrus.Info("Set: ", backendSet)
 	resp, err := c.Request("POST", fmt.Sprintf("/loadBalancers/%s/backendSets", loadBalancerID), *backendSet)
 	if err != nil {
 		logrus.Error(err)

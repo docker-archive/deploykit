@@ -11,11 +11,11 @@ import (
 
 // Listener represents the listener's configuration: https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/Listener/
 type Listener struct {
-	BackendSetName string           `json:"defaultBackendSetName"`
-	Name           string           `json:"name"`
-	Port           int              `json:"port"`
-	Protocol       string           `json:"protocol"` // HTTP or TCP
-	SSLConfig      SSLConfiguration `json:"sslConfiguration"`
+	BackendSetName string            `json:"defaultBackendSetName"`
+	Name           string            `json:"name"`
+	Port           int               `json:"port"`
+	Protocol       string            `json:"protocol"` // HTTP or TCP
+	SSLConfig      *SSLConfiguration `json:"sslConfiguration, omitempty"`
 }
 
 // CreateListener adds a listener to a load balancer

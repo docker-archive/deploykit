@@ -19,7 +19,7 @@ type HealthChecker struct {
 	Retries    int    `json:"retries,omitempty"`
 	ReturnCode int    `json:"returnCode,omitempty"`
 	Timeout    int    `json:"timeoutInMillis,omitempty"`
-	URLPath    string `json:"urlPath,omitempty"`
+	URLPath    string `json:"urlPath"`
 }
 
 // GetHealthChecker gets the health check policy information for a given load balancer and backend set.

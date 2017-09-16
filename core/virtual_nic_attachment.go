@@ -67,7 +67,7 @@ func (c *Client) ListVNicAttachments(instanceID string) ([]VNicAttachment, *bmc.
 	vNicAttachments := []VNicAttachment{}
 	queryString := url.QueryEscape(c.CompartmentID)
 	if instanceID != "" {
-		queryString = queryString + "&" + url.QueryEscape(instanceID)
+		queryString = queryString + "&instanceId=" + url.QueryEscape(instanceID)
 	}
 	resp, err := c.Request("GET", fmt.Sprintf("/vnicAttachments?compartmentId=%s", queryString), nil)
 	if err != nil {
