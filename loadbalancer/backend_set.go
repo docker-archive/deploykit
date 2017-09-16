@@ -114,8 +114,18 @@ func (c *Client) UpdateBackendSet(listener *BackendSet) {
 }
 
 // DeleteBackendSet deletes a backend set to a load balancer
-func (c *Client) DeleteBackendSet(listener *BackendSet) {
-	// DELETE loadBalancers/{loadBalancerId}/listeners/{listenerName}
-	logrus.Warning("Method not yet implemented")
-	return
+func (c *Client) DeleteBackendSet(loadBalancerID string, backendSetName string) (bool, *bmc.Error) {
+	loadBalancerID = url.PathEscape(loadBalancerID)
+	backendSetName = url.PathEscape(backendSetName)
+	resp, err := c.Request("DELETE", fmt.Sprintf("/loadBalancers/%s/backendSets/%s", loadBalancerID, backendSetName), nil)
+	if err != nil {
+		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return false, &bmcError
+	}
+	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 204 {
+		return false, bmc.NewError(*resp)
+	}
+	return true, nil
 }

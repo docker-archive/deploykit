@@ -18,7 +18,7 @@ import (
 
 // Signing details: https://docs.us-phoenix-1.oraclecloud.com/Content/API/Concepts/signingrequests.htm
 
-var headersToSign = []string{"date", "(request-target)", "host"}
+var headersConst = []string{"date", "(request-target)", "host"}
 
 // Clienter is the client interface for all requests
 type Clienter interface {
@@ -37,9 +37,10 @@ func (c *Client) signAuthHeader(req *http.Request, body []byte) {
 		t := time.Now()
 		req.Header.Set("Date", t.Format(time.RFC1123))
 	}
-
+	headersToSign := headersConst
 	if strings.HasPrefix(req.Method, "P") {
-		headersToSign = append(headersToSign, "x-content-sha256", "content-type", "content-length")
+
+		headersToSign = append(headersConst, "x-content-sha256", "content-type", "content-length")
 		bodyHash := sha256.Sum256(body)
 		req.Header.Set("Content-Length", strconv.Itoa(len(body)))
 		req.Header.Set("X-Content-Sha256", base64.StdEncoding.EncodeToString(bodyHash[:]))

@@ -15,7 +15,7 @@ type Listener struct {
 	Name           string            `json:"name"`
 	Port           int               `json:"port"`
 	Protocol       string            `json:"protocol"` // HTTP or TCP
-	SSLConfig      *SSLConfiguration `json:"sslConfiguration, omitempty"`
+	SSLConfig      *SSLConfiguration `json:"sslConfiguration,omitempty"`
 }
 
 // CreateListener adds a listener to a load balancer
@@ -42,8 +42,18 @@ func (c *Client) UpdateListener(listener *Listener) {
 }
 
 // DeleteListener deletes a listener from a load balancer
-func (c *Client) DeleteListener(listener *Listener) {
-	// DELETE loadBalancers/{loadBalancerId}/listeners/{listenerName}
-	logrus.Warning("Method not yet implemented")
-	return
+func (c *Client) DeleteListener(loadBalancerID string, listenerName string) (bool, *bmc.Error) {
+	loadBalancerID = url.PathEscape(loadBalancerID)
+	listenerName = url.PathEscape(listenerName)
+	resp, err := c.Request("DELETE", fmt.Sprintf("/loadBalancers/%s/listeners/%s", loadBalancerID, listenerName), nil)
+	if err != nil {
+		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return false, &bmcError
+	}
+	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 204 {
+		return false, bmc.NewError(*resp)
+	}
+	return true, nil
 }
