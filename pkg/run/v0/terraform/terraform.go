@@ -43,7 +43,7 @@ type Options struct {
 	Dir string
 
 	// PollInterval is the Terraform polling interval
-	PollInterval time.Duration
+	PollInterval types.Duration
 
 	// Standalone - set if running standalone, disables manager leadership verification
 	Standalone bool
@@ -65,7 +65,7 @@ type Options struct {
 // simply get this struct and bind the fields to the flags.
 var DefaultOptions = Options{
 	Dir:          local.Getenv(EnvDir, filepath.Join(local.InfrakitHome(), "terraform")),
-	PollInterval: 30 * time.Second,
+	PollInterval: types.FromDuration(30 * time.Second),
 	Standalone:   false,
 }
 
@@ -99,7 +99,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	log.Info("NewOptions", "value", options.NewOption, "Dir", options.Dir)
 
 	impls = map[run.PluginCode]interface{}{
-		run.Instance: terraform.NewTerraformInstancePlugin(options.Dir, options.PollInterval,
+		run.Instance: terraform.NewTerraformInstancePlugin(options.Dir, options.PollInterval.Duration(),
 			options.Standalone, &terraform.ImportOptions{
 				InstanceSpec: importInstSpec,
 				InstanceID:   &options.ImportInstanceID,
