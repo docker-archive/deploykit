@@ -14,7 +14,7 @@ import (
 // BackendSwarmOptions contain the options for the swarm backend
 type BackendSwarmOptions struct {
 	// PollInterval is how often to check
-	PollInterval time.Duration
+	PollInterval types.Duration
 	// Docker holds the connection params to the Docker engine for join tokens, etc.
 	Docker docker.ConnectInfo `json:",inline" yaml:",inline"`
 }
@@ -22,7 +22,7 @@ type BackendSwarmOptions struct {
 // DefaultBackendSwarmOptions is the Options for using the swarm backend.
 var DefaultBackendSwarmOptions = types.AnyValueMust(
 	BackendSwarmOptions{
-		PollInterval: 5 * time.Second,
+		PollInterval: types.FromDuration(5 * time.Second),
 		Docker: docker.ConnectInfo{
 			Host: "unix:///var/run/docker.sock",
 			TLS:  &tlsconfig.Options{},
@@ -43,7 +43,7 @@ func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options) er
 		return err
 	}
 
-	leader := swarm_leader.NewDetector(options.PollInterval, dockerClient)
+	leader := swarm_leader.NewDetector(options.PollInterval.Duration(), dockerClient)
 	leaderStore := swarm_leader.NewStore(dockerClient)
 
 	if managerConfig != nil {

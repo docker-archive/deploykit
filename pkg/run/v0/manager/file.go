@@ -24,7 +24,7 @@ const (
 // BackendFileOptions contain the options for the file backend
 type BackendFileOptions struct {
 	// PollInterval is how often to check
-	PollInterval time.Duration
+	PollInterval types.Duration
 
 	// LeaderFile is the location of the leader file
 	LeaderFile string
@@ -40,7 +40,7 @@ type BackendFileOptions struct {
 var DefaultBackendFileOptions = types.AnyValueMust(
 	BackendFileOptions{
 		ID:           local.Getenv(EnvID, "manager1"),
-		PollInterval: 5 * time.Second,
+		PollInterval: types.FromDuration(5 * time.Second),
 		LeaderFile:   local.Getenv(EnvLeaderFile, filepath.Join(local.InfrakitHome(), "leader")),
 		StoreDir:     local.Getenv(EnvStoreDir, filepath.Join(local.InfrakitHome(), "configs")),
 	},
@@ -48,7 +48,7 @@ var DefaultBackendFileOptions = types.AnyValueMust(
 
 func configFileBackends(options BackendFileOptions, managerConfig *Options) error {
 
-	leader, err := file_leader.NewDetector(options.PollInterval, options.LeaderFile, options.ID)
+	leader, err := file_leader.NewDetector(options.PollInterval.Duration(), options.LeaderFile, options.ID)
 	if err != nil {
 		return err
 	}

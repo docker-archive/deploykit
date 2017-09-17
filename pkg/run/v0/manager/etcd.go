@@ -14,7 +14,7 @@ import (
 // BackendEtcdOptions contain the options for the etcd backend
 type BackendEtcdOptions struct {
 	// PollInterval is how often to check
-	PollInterval time.Duration
+	PollInterval types.Duration
 
 	etcd.Options `json:",inline" yaml:",inline"`
 
@@ -25,7 +25,7 @@ type BackendEtcdOptions struct {
 // DefaultBackendEtcdOptions contains the defaults for running etcd as backend
 var DefaultBackendEtcdOptions = types.AnyValueMust(
 	BackendEtcdOptions{
-		PollInterval: 5 * time.Second,
+		PollInterval: types.FromDuration(5 * time.Second),
 		Options: etcd.Options{
 			RequestTimeout: 1 * time.Second,
 			Config: clientv3.Config{
@@ -50,7 +50,7 @@ func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options) erro
 		return err
 	}
 
-	leader := etcd_leader.NewDetector(options.PollInterval, etcdClient)
+	leader := etcd_leader.NewDetector(options.PollInterval.Duration(), etcdClient)
 	leaderStore := etcd_leader.NewStore(etcdClient)
 	snapshot, err := etcd_store.NewSnapshot(etcdClient)
 	if err != nil {
