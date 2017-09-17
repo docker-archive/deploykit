@@ -37,7 +37,7 @@ func init() {
 // Options capture the options for starting up the group controller.
 type Options struct {
 	// PollInterval is the frequency for syncing the state
-	PollInterval time.Duration
+	PollInterval types.Duration
 
 	// MaxParallelNum is the max number of parallel instance operation. Default =0 (no limit)
 	MaxParallelNum uint
@@ -51,7 +51,7 @@ type Options struct {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	PollInterval:            10 * time.Second,
+	PollInterval:            types.FromDuration(10 * time.Second),
 	MaxParallelNum:          0,
 	PollIntervalGroupSpec:   1 * time.Second,
 	PollIntervalGroupDetail: 30 * time.Second,
@@ -87,7 +87,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	}
 
 	groupPlugin := group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup,
-		options.PollInterval, options.MaxParallelNum)
+		options.PollInterval.Duration(), options.MaxParallelNum)
 
 	// Start a poller to load the snapshot and make that available as metadata
 	updateSnapshot := make(chan func(map[string]interface{}))
