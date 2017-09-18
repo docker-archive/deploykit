@@ -20,15 +20,13 @@ type BackendSwarmOptions struct {
 }
 
 // DefaultBackendSwarmOptions is the Options for using the swarm backend.
-var DefaultBackendSwarmOptions = types.AnyValueMust(
-	BackendSwarmOptions{
-		PollInterval: types.FromDuration(5 * time.Second),
-		Docker: docker.ConnectInfo{
-			Host: "unix:///var/run/docker.sock",
-			TLS:  &tlsconfig.Options{},
-		},
+var DefaultBackendSwarmOptions = BackendSwarmOptions{
+	PollInterval: types.FromDuration(5 * time.Second),
+	Docker: docker.ConnectInfo{
+		Host: "unix:///var/run/docker.sock",
+		TLS:  &tlsconfig.Options{},
 	},
-)
+}
 
 func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options) error {
 	dockerClient, err := docker.NewClient(options.Docker.Host, options.Docker.TLS)

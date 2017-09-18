@@ -23,17 +23,15 @@ type BackendEtcdOptions struct {
 }
 
 // DefaultBackendEtcdOptions contains the defaults for running etcd as backend
-var DefaultBackendEtcdOptions = types.AnyValueMust(
-	BackendEtcdOptions{
-		PollInterval: types.FromDuration(5 * time.Second),
-		Options: etcd.Options{
-			RequestTimeout: 1 * time.Second,
-			Config: clientv3.Config{
-				Endpoints: []string{etcd.LocalIP() + ":2379"},
-			},
+var DefaultBackendEtcdOptions = BackendEtcdOptions{
+	PollInterval: types.FromDuration(5 * time.Second),
+	Options: etcd.Options{
+		RequestTimeout: 1 * time.Second,
+		Config: clientv3.Config{
+			Endpoints: []string{etcd.LocalIP() + ":2379"},
 		},
 	},
-)
+}
 
 func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options) error {
 	if options.TLS != nil {
