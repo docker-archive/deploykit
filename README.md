@@ -60,12 +60,27 @@ The following endpoints are provided by the [Oracle BMC API](https://docs.us-pho
 | --- | --- |
 | Audit API | NO |
 | Database Service API | NO |
-| Core Services API | NO |
+| Core Services API | NO-partial |
 | Identity and Access Management Service API | NO |
-| Load Balancing Service API | NO |
+| Load Balancing Service API | YES |
 | Object Storage Service API | NO |
 | S3 Object Storage Service API | NO |
 
 Only API supported at the moment is to get instance details
 * List instances
 * Get instance
+* List VNIC
+* Get VNIC
+* List VNICAttachment
+* Get VNICAttachment
+* List Backend
+* Get Backend
+* Create Backend
+* Delete Backend
+* List BackendSet
+* Get BackendSet
+* Create BackendSet
+* Delete BackendSet
+* Create Listener
+* Delete Listener
+
