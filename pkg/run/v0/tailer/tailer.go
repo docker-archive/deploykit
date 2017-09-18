@@ -43,7 +43,7 @@ var DefaultOptions = tailer.Options{
 func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
-	options := tailer.Options{}
+	options := DefaultOptions
 	err = config.Decode(&options)
 	if err != nil {
 		return

@@ -37,14 +37,12 @@ type BackendFileOptions struct {
 }
 
 // DefaultBackendFileOptions is the default for the file backend
-var DefaultBackendFileOptions = types.AnyValueMust(
-	BackendFileOptions{
-		ID:           local.Getenv(EnvID, "manager1"),
-		PollInterval: types.FromDuration(5 * time.Second),
-		LeaderFile:   local.Getenv(EnvLeaderFile, filepath.Join(local.InfrakitHome(), "leader")),
-		StoreDir:     local.Getenv(EnvStoreDir, filepath.Join(local.InfrakitHome(), "configs")),
-	},
-)
+var DefaultBackendFileOptions = BackendFileOptions{
+	ID:           local.Getenv(EnvID, "manager1"),
+	PollInterval: types.FromDuration(5 * time.Second),
+	LeaderFile:   local.Getenv(EnvLeaderFile, filepath.Join(local.InfrakitHome(), "leader")),
+	StoreDir:     local.Getenv(EnvStoreDir, filepath.Join(local.InfrakitHome(), "configs")),
+}
 
 func configFileBackends(options BackendFileOptions, managerConfig *Options) error {
 
