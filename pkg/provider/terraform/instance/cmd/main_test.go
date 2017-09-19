@@ -48,6 +48,34 @@ func TestParseInstanceSpecFromGroup(t *testing.T) {
 		*instSpec)
 }
 
+func TestParseInstanceSpecFromGroupLogicalID(t *testing.T) {
+	groupSpecURL := `str://
+{
+  "ID": "managers",
+  "Properties": {
+    "Allocation": {
+      "LogicalIDs": ["mgr1", "mgr2", "mgr3"]
+    },
+    "instance": {
+      "Properties": {"resource": {"aws_instance": {}}}
+    }
+  }
+}`
+	groupID := "managers"
+	instSpec, err := parseInstanceSpecFromGroup(groupSpecURL, groupID)
+	require.NoError(t, err)
+	require.Equal(t,
+		instance.Spec{
+			Properties: types.AnyString(`{"resource": {"aws_instance": {}}}`),
+			Tags: map[string]string{
+				"infrakit.config_sha": "bootstrap",
+				"infrakit.group":      groupID,
+				"LogicalID":           "mgr1",
+			},
+		},
+		*instSpec)
+}
+
 func TestParseInstanceSpecFromGroupNoGroupIDSpecified(t *testing.T) {
 	groupSpecURL := `str://
 {

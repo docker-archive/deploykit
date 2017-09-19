@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -49,21 +50,48 @@ func main() {
 	standalone := cmd.Flags().Bool("standalone", false, "Set if running standalone, disables manager leadership verification")
 	// Import options
 	importGrpSpecURL := cmd.Flags().String("import-group-spec-url", "", "Defines the group spec that the instance is imported into")
-	importInstID := cmd.Flags().String("import-instance-id", "", "Defines the instance ID to import ")
+	importResources := cmd.Flags().StringArray("import-resource", []string{}, "Defines the resource to import in the format <type>:[<name>:]<id>")
 	importGrpID := cmd.Flags().String("import-group-id", "", "Defines the group ID to import the resource into (optional)")
 
 	cmd.Run = func(c *cobra.Command, args []string) {
 		mustHaveTerraform()
 		importInstSpec, err := parseInstanceSpecFromGroup(*importGrpSpecURL, *importGrpID)
 		if err != nil {
-			// If we cannot prase the group spec then we cannot import the resource, the plugin should
+			// If we cannot parse the group spec then we cannot import the resource, the plugin should
 			// not start since terraform is not managing the resource
 			log.Error(err)
 			panic(err)
 		}
+		resources := []*terraform.ImportResource{}
+		for _, resourceString := range *importResources {
+			split := strings.Split(resourceString, ":")
+			if len(split) < 2 || len(split) > 3 {
+				err := fmt.Errorf("Imported resource value is not valid: %v", resourceString)
+				log.Error(err)
+				panic(err)
+			}
+			resType := terraform.TResourceType(split[0])
+			var resName string
+			var resID string
+			if len(split) == 3 {
+				resName = split[1]
+				resID = split[2]
+			} else {
+				resID = split[1]
+			}
+			res := terraform.ImportResource{
+				ResourceID:   &resID,
+				ResourceType: &resType,
+			}
+			if resName != "" {
+				tResName := terraform.TResourceName(resName)
+				res.ResourceName = &tResName
+			}
+			resources = append(resources, &res)
+		}
 		importOpts := terraform.ImportOptions{
 			InstanceSpec: importInstSpec,
-			InstanceID:   importInstID,
+			Resources:    resources,
 		}
 		cli.SetLogLevel(*logLevel)
 		run.Plugin(plugin_base.DefaultTransport(*name), instance_plugin.PluginServer(
@@ -117,6 +145,10 @@ func parseInstanceSpecFromGroup(groupSpecURL, groupID string) (*instance.Spec, e
 				string(groupSpec.ID), groupID)
 		}
 		tags["infrakit.group"] = groupID
+	}
+	// Use the first logical ID if set
+	if len(groupProps.Allocation.LogicalIDs) > 0 {
+		tags["LogicalID"] = string(groupProps.Allocation.LogicalIDs[0])
 	}
 
 	spec := instance.Spec{

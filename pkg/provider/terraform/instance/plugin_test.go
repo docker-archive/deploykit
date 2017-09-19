@@ -21,37 +21,29 @@ import (
 func TestProcessImportOptions(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	// Instance spec but no instance ID
+	// Instance spec but no instances to import
 	instSpec := instance.Spec{}
-	instID := ""
-	importOpts := ImportOptions{InstanceSpec: &instSpec, InstanceID: &instID}
+	importOpts := ImportOptions{InstanceSpec: &instSpec, Resources: []*ImportResource{}}
 	err := tf.processImport(&importOpts)
 	require.Error(t, err)
 	require.Equal(t,
-		"Import instance ID required with import instance spec",
-		err.Error())
-	importOpts = ImportOptions{InstanceSpec: &instSpec, InstanceID: nil}
-	err = tf.processImport(&importOpts)
-	require.Error(t, err)
-	require.Equal(t,
-		"Import instance ID required with import instance spec",
+		"Resources required with import instance spec",
 		err.Error())
 
 	// No instance spec but instance ID
-	instID = "1234"
-	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: &instID}
+	resID := "some-id"
+	importRes := ImportResource{
+		ResourceID: &resID,
+	}
+	importOpts = ImportOptions{InstanceSpec: nil, Resources: []*ImportResource{&importRes}}
 	err = tf.processImport(&importOpts)
 	require.Error(t, err)
 	require.Equal(t,
-		"Import instance spec required with import instance ID",
+		"Import instance spec required with imported resources",
 		err.Error())
 
 	// Neither specified
-	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: nil}
-	err = tf.processImport(&importOpts)
-	require.NoError(t, err)
-	instID = ""
-	importOpts = ImportOptions{InstanceSpec: nil, InstanceID: &instID}
+	importOpts = ImportOptions{InstanceSpec: nil, Resources: []*ImportResource{}}
 	err = tf.processImport(&importOpts)
 	require.NoError(t, err)
 }
@@ -1315,8 +1307,9 @@ func TestWriteTerraformFilesError(t *testing.T) {
 		VMSoftLayer: {"host": {}}},
 	}
 	fileMap["instance-1234"] = &tFormat
-	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
+	paths, err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
 	require.Error(t, err)
+	require.Equal(t, []string{filepath.Join(tf.Dir, "instance-1234.tf.json.new")}, paths)
 }
 
 func TestWriteTerraformFilesSingle(t *testing.T) {
@@ -1331,13 +1324,59 @@ func TestWriteTerraformFilesSingle(t *testing.T) {
 		},
 	}
 	fileMap["instance-1234"] = &tFormat
-	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
+	paths, err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
 	require.NoError(t, err)
+	require.Equal(t, []string{filepath.Join(tf.Dir, "instance-1234.tf.json.new")}, paths)
 	// Read single file from disk
 	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, "instance-1234.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				VMSoftLayer: {
+					TResourceName("instance-1234"): {"p1": "v1"},
+				},
+			},
+		},
+		tFormat,
+	)
+}
+
+func TestWriteTerraformFilesSingleOverride(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	fileMap := make(map[string]*TFormat)
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("instance-1234"): {"p1": "v1"},
+			},
+		},
+	}
+	fileMap["instance-1234"] = &tFormat
+	// Indicate that the file already exists as .tf.json file, create it with
+	// garbage (it should be overriden)
+	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-1234.tf.json"), []byte("not-json"), 0644)
+	require.NoError(t, err)
+	paths, err := tf.writeTerraformFiles(
+		fileMap,
+		map[string]struct{}{
+			"instance-1234.tf.json": {},
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, []string{filepath.Join(tf.Dir, "instance-1234.tf.json")}, paths)
+	// Read single file from disk
+	files, err := ioutil.ReadDir(tf.Dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, "instance-1234.tf.json"))
 	require.NoError(t, err)
 	tFormat = TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -1373,8 +1412,9 @@ func TestWriteTerraformFilesMultipleDefaultResources(t *testing.T) {
 		},
 	}
 	fileMap[name] = &tFormat
-	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
+	paths, err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
 	require.NoError(t, err)
+	require.Equal(t, []string{filepath.Join(tf.Dir, name+".tf.json.new")}, paths)
 	// Read single file from disk
 	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
@@ -1457,8 +1497,15 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 	fileMap[name] = &tFormatDefault
 	fileMap[fmt.Sprintf("default_dedicated_%s", name)] = &tFormatDedicated
 	fileMap[fmt.Sprintf("%s_global", globalName)] = &tFormatGlobal
-	err := tf.writeTerraformFiles(fileMap, make(map[string]struct{}))
+	paths, err := tf.writeTerraformFiles(
+		fileMap,
+		map[string]struct{}{
+			"instance-1111.tf.json":                      {},
+			fmt.Sprintf("%s_global.tf.json", globalName): {},
+		},
+	)
 	require.NoError(t, err)
+	require.Len(t, paths, 3)
 	// Should be 3 files on disk
 	files, err := ioutil.ReadDir(tf.Dir)
 	require.NoError(t, err)
@@ -1468,9 +1515,12 @@ func TestWriteTerraformFilesMultipleResourcesScopeTypes(t *testing.T) {
 		filenames = append(filenames, file.Name())
 	}
 	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", name))
+	require.Contains(t, paths, filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", name)))
 	require.Contains(t, filenames, fmt.Sprintf("default_dedicated_%s.tf.json.new", name))
-	expectedGlobalFilename := fmt.Sprintf("%s_global.tf.json.new", globalName)
+	require.Contains(t, paths, filepath.Join(tf.Dir, fmt.Sprintf("default_dedicated_%s.tf.json.new", name)))
+	expectedGlobalFilename := fmt.Sprintf("%s_global.tf.json", globalName)
 	require.Contains(t, filenames, expectedGlobalFilename)
+	require.Contains(t, paths, filepath.Join(tf.Dir, expectedGlobalFilename))
 	// Default
 	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", name)))
 	require.NoError(t, err)
@@ -3365,19 +3415,191 @@ func TestMergeMapIntoWrongType(t *testing.T) {
 		dest)
 }
 
-func TestWriteTfJSONForImport(t *testing.T) {
+func TestWriteTfJSONFilesForImportSingleFile(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
+	resType := VMIBMCloud
+	resName := TResourceName("instance-12345")
+	finalProps := TResourceProperties{
+		"hostname":    "actual-hostname",
+		"ssh-key-ids": []interface{}{float64(123)},
+		"datacenter":  "actual-datacenter",
+		"tags": []interface{}{
+			"actual-tag1:actual-val1",
+			"actual-tag2:actual-val2",
+		},
+	}
+	res := ImportResource{
+		ResourceType:      &resType,
+		ResourceName:      &resName,
+		FinalFilename:     string(resName),
+		FinalResourceName: resName,
+		FinalProps:        finalProps,
+	}
+	paths, err := tf.writeTfJSONFilesForImport([]*ImportResource{&res})
+	require.NoError(t, err)
+	require.Equal(t, []string{filepath.Join(tf.Dir, string(resName)+".tf.json.new")}, paths)
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, string(resName)+".tf.json.new"))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				VMIBMCloud: {
+					resName: finalProps,
+				},
+			},
+		},
+		tFormat,
+	)
+}
+
+func TestWriteTfJSONFilesForImportMultipleFiles(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	vmResType := VMIBMCloud
+	vmResName := TResourceName("instance-12345")
+	vmFinalProps := TResourceProperties{
+		"hostname":    "actual-hostname",
+		"ssh-key-ids": []interface{}{float64(123)},
+		"datacenter":  "actual-datacenter",
+		"tags": []interface{}{
+			"actual-tag1:actual-val1",
+		},
+	}
+	vmRes := ImportResource{
+		ResourceType:      &vmResType,
+		ResourceName:      &vmResName,
+		FinalFilename:     string(vmResName),
+		FinalResourceName: vmResName,
+		FinalProps:        vmFinalProps,
+	}
+
+	dedicatedResType1 := TResourceType("block_storage")
+	dedicatedResName1 := TResourceName("my_block_storage")
+	dedicatedFinalProps1 := TResourceProperties{
+		"key-ded1": "val-ded1",
+	}
+	dedicatedRes1 := ImportResource{
+		ResourceType:      &dedicatedResType1,
+		ResourceName:      &dedicatedResName1,
+		FinalFilename:     "scopeID_dedicated_1",
+		FinalResourceName: TResourceName("scopeID-1-my_block_storage"),
+		FinalProps:        dedicatedFinalProps1,
+	}
+
+	dedicatedResType2 := TResourceType("other_dedicated_type")
+	dedicatedResName2 := TResourceName("my_other_dedicated")
+	dedicatedFinalProps2 := TResourceProperties{
+		"key-ded2": "val-ded2",
+	}
+	dedicatedRes2 := ImportResource{
+		ResourceType:      &dedicatedResType2,
+		ResourceName:      &dedicatedResName2,
+		FinalFilename:     "scopeID_dedicated_1",
+		FinalResourceName: TResourceName("scopeID-1-my_other_dedicated"),
+		FinalProps:        dedicatedFinalProps2,
+	}
+
+	globalResType := TResourceType("file_storage")
+	globalResName1 := TResourceName("my_file_storage")
+	globalFinalProps1 := TResourceProperties{
+		"key-global1": "val-global1",
+	}
+	globalRes1 := ImportResource{
+		ResourceType:      &globalResType,
+		ResourceName:      &globalResName1,
+		FinalFilename:     "scopeID_global",
+		FinalResourceName: "scopeID-my_file_storage",
+		FinalProps:        globalFinalProps1,
+	}
+
+	globalResName2 := TResourceName("my_other_file_storage")
+	globalFinalProps2 := TResourceProperties{
+		"key-global2": "val-global2",
+	}
+	globalRes2 := ImportResource{
+		ResourceType:      &globalResType,
+		ResourceName:      &globalResName2,
+		FinalFilename:     "scopeID_global",
+		FinalResourceName: "scopeID-my_other_file_storage",
+		FinalProps:        globalFinalProps2,
+	}
+
+	paths, err := tf.writeTfJSONFilesForImport([]*ImportResource{&vmRes, &dedicatedRes1, &globalRes1, &dedicatedRes2, &globalRes2})
+	require.NoError(t, err)
+	require.Len(t, paths, 3)
+	require.Contains(t, paths, filepath.Join(dir, "instance-12345.tf.json.new"))
+	require.Contains(t, paths, filepath.Join(dir, "scopeID_dedicated_1.tf.json.new"))
+	require.Contains(t, paths, filepath.Join(dir, "scopeID_global.tf.json.new"))
+
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, "instance-12345.tf.json.new"))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				VMIBMCloud: {
+					vmResName: vmFinalProps,
+				},
+			},
+		},
+		tFormat,
+	)
+
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "scopeID_dedicated_1.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				dedicatedResType1: {
+					dedicatedRes1.FinalResourceName: dedicatedFinalProps1,
+				},
+				dedicatedResType2: {
+					dedicatedRes2.FinalResourceName: dedicatedFinalProps2,
+				},
+			},
+		},
+		tFormat,
+	)
+
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "scopeID_global.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				globalResType: {
+					globalRes1.FinalResourceName: globalFinalProps1,
+					globalRes2.FinalResourceName: globalFinalProps2,
+				},
+			},
+		},
+		tFormat,
+	)
+}
+
+func TestDetermineFinalPropsForImport(t *testing.T) {
 	specProps := TResourceProperties{
 		PropHostnamePrefix: "some-prefix",
 		PropScope:          "some-scope",
 		"ssh-key-ids":      []interface{}{789},
 		"datacenter":       "some-datacenter",
-		"tags":             []interface{}{"spec-tag1:spec-val1"},
 		"z-other":          "not-imported",
 	}
-	importedProps := TResourceProperties{
+	// Include tags
+	resourceProps := TResourceProperties{
 		"hostname":    "actual-hostname",
 		"ssh-key-ids": []interface{}{123},
 		"datacenter":  "actual-datacenter",
@@ -3388,30 +3610,33 @@ func TestWriteTfJSONForImport(t *testing.T) {
 		"ip":         "10.0.0.1",
 		"z-imported": "imported-but-not-in-spec",
 	}
-
-	id := "instance-12345"
-	err := tf.writeTfJSONForImport(specProps, importedProps, VMIBMCloud, id)
-	require.NoError(t, err)
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, id+".tf.json.new"))
-	require.NoError(t, err)
-	tFormat := TFormat{}
-	err = types.AnyBytes(buff).Decode(&tFormat)
-	require.NoError(t, err)
-	actualVMType, vmName, props, err := FindVM(&tFormat)
-	require.NoError(t, err)
-	require.Equal(t, VMIBMCloud, actualVMType)
-	require.Equal(t, TResourceName("instance-12345"), vmName)
+	resType := VMIBMCloud
+	res := ImportResource{
+		ResourceType:  &resType,
+		ResourceProps: resourceProps,
+		SpecProps:     specProps,
+	}
+	determineFinalPropsForImport(&res)
 	expectedProps := TResourceProperties{
 		"hostname":    "actual-hostname",
-		"ssh-key-ids": []interface{}{float64(123)},
+		"ssh-key-ids": []interface{}{123},
 		"datacenter":  "actual-datacenter",
 		"tags": []interface{}{
-			"spec-tag1:spec-val1",
 			"actual-tag1:actual-val1",
 			"actual-tag2:actual-val2",
 		},
 	}
-	require.Equal(t, expectedProps, props)
+	require.Equal(t, expectedProps, res.FinalProps)
+	// Without tags
+	delete(resourceProps, "tags")
+	res = ImportResource{
+		ResourceType:  &resType,
+		ResourceProps: resourceProps,
+		SpecProps:     specProps,
+	}
+	determineFinalPropsForImport(&res)
+	delete(expectedProps, "tags")
+	require.Equal(t, expectedProps, res.FinalProps)
 }
 
 func TestImportNoVm(t *testing.T) {
@@ -3421,7 +3646,7 @@ func TestImportNoVm(t *testing.T) {
 	spec := instance.Spec{
 		Properties: types.AnyString("{}"),
 	}
-	_, err := tf.importResource(importFns{}, "123", &spec)
+	err := tf.importResources(importFns{}, []*ImportResource{}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "no resource section", err.Error())
 }
@@ -3437,9 +3662,38 @@ func TestImportNoVmProps(t *testing.T) {
     "aws_instance": {}
   }
 }`)}
-	_, err := tf.importResource(importFns{}, "123", &spec)
+	err := tf.importResources(importFns{}, []*ImportResource{}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "Missing resource properties", err.Error())
+}
+
+func TestImportTypeNotInSpec(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	spec := instance.Spec{
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "aws_instance": {
+      "host": {
+        "hostnane": "host1"
+      }
+    }
+  }
+}`)}
+	resType := VMIBMCloud
+	resID := "123"
+	res := ImportResource{
+		ResourceID:   &resID,
+		ResourceType: &resType,
+	}
+	err := tf.importResources(importFns{}, []*ImportResource{&res}, &spec)
+	require.Error(t, err)
+	require.Equal(t,
+		fmt.Sprintf("Unable to determine import resource in spec for: %v", VMIBMCloud),
+		err.Error(),
+	)
 }
 
 func TestImportTfShowError(t *testing.T) {
@@ -3447,9 +3701,10 @@ func TestImportTfShowError(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	fns := importFns{
-		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, dir, dirArg)
-			require.Equal(t, VMAmazon, vmType)
+			require.Equal(t, []TResourceType{VMAmazon}, types)
+			require.Equal(t, []string{"id"}, propFilter)
 			return nil, fmt.Errorf("Custom show error")
 		},
 	}
@@ -3464,7 +3719,13 @@ func TestImportTfShowError(t *testing.T) {
     }
   }
 }`)}
-	_, err := tf.importResource(fns, "123", &spec)
+	resType := VMAmazon
+	resID := "123"
+	res := ImportResource{
+		ResourceID:   &resID,
+		ResourceType: &resType,
+	}
+	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom show error", err.Error())
 }
@@ -3474,13 +3735,16 @@ func TestImportAlreadyExists(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	fns := importFns{
-		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, dir, dirArg)
-			require.Equal(t, VMAmazon, vmType)
-			return map[TResourceName]TResourceProperties{
-				TResourceName("instance-foo"): {},
-				TResourceName("instance-123"): {
-					"id": 123,
+			require.Equal(t, []TResourceType{VMAmazon}, types)
+			require.Equal(t, []string{"id"}, propFilter)
+			return map[TResourceType]map[TResourceName]TResourceProperties{
+				VMAmazon: {
+					TResourceName("instance-foo"): {},
+					TResourceName("instance-123"): {
+						"id": 123,
+					},
 				},
 			}, nil
 		},
@@ -3496,32 +3760,45 @@ func TestImportAlreadyExists(t *testing.T) {
     }
   }
 }`)}
-	id, err := tf.importResource(fns, "123", &spec)
+	resType := VMAmazon
+	resID := "123"
+	res := ImportResource{
+		ResourceID:   &resID,
+		ResourceType: &resType,
+	}
+	// Ensure that a tf.json file exists
+	err := afero.WriteFile(
+		tf.fs,
+		filepath.Join(dir, "instance-123.tf.json"),
+		[]byte("random-content"),
+		0644)
 	require.NoError(t, err)
-	require.Equal(t, "instance-123", string(*id))
+	err = tf.importResources(fns, []*ImportResource{&res}, &spec)
+	require.NoError(t, err)
 }
 
 func TestImportTfImportError(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
-	cleanInvoked := false
+	cleanVals := []string{}
 	fns := importFns{
-		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, dir, dirArg)
-			require.Equal(t, VMAmazon, vmType)
-			return map[TResourceName]TResourceProperties{}, nil
+			require.Equal(t, []TResourceType{VMAmazon}, types)
+			require.Equal(t, []string{"id"}, propFilter)
+			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
 		},
-		tfImport: func(vmType TResourceType, filename, vmID string) error {
-			require.Equal(t, VMAmazon, vmType)
-			require.True(t, strings.HasPrefix(filename, "instance-"))
-			require.Equal(t, "123", vmID)
+		tfImport: func(resType TResourceType, resName, id string) error {
+			require.Equal(t, VMAmazon, resType)
+			require.True(t, strings.HasPrefix(resName, "instance-"))
+			require.Equal(t, "123", id)
 			return fmt.Errorf("Custom import error")
 		},
-		tfClean: func(vmType TResourceType, vmName string) {
-			require.Equal(t, VMAmazon, vmType)
-			require.True(t, strings.HasPrefix(vmName, "instance-"))
-			cleanInvoked = true
+		tfClean: func(resType TResourceType, name string) {
+			require.Equal(t, VMAmazon, resType)
+			require.True(t, strings.HasPrefix(name, "instance-"))
+			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
 		},
 	}
 	spec := instance.Spec{
@@ -3535,37 +3812,49 @@ func TestImportTfImportError(t *testing.T) {
     }
   }
 }`)}
-	_, err := tf.importResource(fns, "123", &spec)
+	resType := VMAmazon
+	resID := "123"
+	res := ImportResource{
+		ResourceID:   &resID,
+		ResourceType: &resType,
+	}
+	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom import error", err.Error())
-	require.True(t, cleanInvoked)
+	require.Len(t, cleanVals, 1)
+	prefix := "aws_instance.instance-"
+	require.True(t,
+		strings.HasPrefix(cleanVals[0], prefix),
+		fmt.Sprintf("'%v' does not have prefix: %v", cleanVals[0], prefix),
+	)
 }
 
 func TestImportTfShowInstError(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
-	cleanInvoked := false
+	cleanVals := []string{}
 	fns := importFns{
-		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, dir, dirArg)
-			require.Equal(t, VMAmazon, vmType)
-			return map[TResourceName]TResourceProperties{}, nil
+			require.Equal(t, []TResourceType{VMAmazon}, types)
+			require.Equal(t, []string{"id"}, propFilter)
+			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
 		},
-		tfImport: func(vmType TResourceType, filename, vmID string) error {
-			require.Equal(t, VMAmazon, vmType)
-			require.True(t, strings.HasPrefix(filename, "instance-"))
-			require.Equal(t, "123", vmID)
+		tfImport: func(resType TResourceType, resName, id string) error {
+			require.Equal(t, VMAmazon, resType)
+			require.True(t, strings.HasPrefix(resName, "instance-"))
+			require.Equal(t, "123", id)
 			return nil
 		},
 		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
 			require.Equal(t, dir, dirArg)
 			return nil, fmt.Errorf("Custom show inst error")
 		},
-		tfClean: func(vmType TResourceType, vmName string) {
-			require.Equal(t, VMAmazon, vmType)
-			require.True(t, strings.HasPrefix(vmName, "instance-"))
-			cleanInvoked = true
+		tfClean: func(resType TResourceType, name string) {
+			require.Equal(t, VMAmazon, resType)
+			require.True(t, strings.HasPrefix(name, "instance-"))
+			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
 		},
 	}
 	spec := instance.Spec{
@@ -3579,10 +3868,21 @@ func TestImportTfShowInstError(t *testing.T) {
     }
   }
 }`)}
-	_, err := tf.importResource(fns, "123", &spec)
+	resType := VMAmazon
+	resID := "123"
+	res := ImportResource{
+		ResourceID:   &resID,
+		ResourceType: &resType,
+	}
+	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom show inst error", err.Error())
-	require.True(t, cleanInvoked)
+	require.Len(t, cleanVals, 1)
+	prefix := "aws_instance.instance-"
+	require.True(t,
+		strings.HasPrefix(cleanVals[0], prefix),
+		fmt.Sprintf("'%v' does not have prefix: %v", cleanVals[0], prefix),
+	)
 }
 
 func TestImportResourceTagMap(t *testing.T) {
@@ -3590,25 +3890,32 @@ func TestImportResourceTagMap(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	cleanInvoked := false
+	resourceName := ""
 	fns := importFns{
-		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, dir, dirArg)
-			require.Equal(t, VMAmazon, vmType)
-			return map[TResourceName]TResourceProperties{}, nil
+			require.Equal(t, []TResourceType{VMAmazon}, types)
+			require.Equal(t, []string{"id"}, propFilter)
+			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
 		},
-		tfImport: func(vmType TResourceType, filename, vmID string) error {
-			require.Equal(t, VMAmazon, vmType)
-			require.True(t, strings.HasPrefix(filename, "instance-"))
-			require.Equal(t, "123", vmID)
+		tfImport: func(resType TResourceType, resName, id string) error {
+			require.Equal(t, VMAmazon, resType)
+			require.True(t, strings.HasPrefix(resName, "instance-"))
+			resourceName = resName
+			require.Equal(t, "123", id)
 			return nil
 		},
 		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
 			require.Equal(t, dir, dirArg)
-			require.True(t, strings.HasPrefix(id, "aws_instance.instance-"))
+			prefix := "aws_instance.instance-"
+			require.True(t, strings.HasPrefix(id, prefix), fmt.Sprintf("'%v' should have prefix '%v'", id, prefix))
 			props := TResourceProperties{
 				"hostname": "actual-hostname",
 				"spec-key": "actual-val",
 				"other":    "foo",
+				"tags": map[string]interface{}{
+					"imported-tag1": "val1",
+				},
 			}
 			return props, nil
 		},
@@ -3633,30 +3940,41 @@ func TestImportResourceTagMap(t *testing.T) {
     }
   }
 }`)}
-	id, err := tf.importResource(fns, "123", &spec)
+	resType := VMAmazon
+	resID := "123"
+	res := ImportResource{
+		ResourceID:   &resID,
+		ResourceType: &resType,
+	}
+	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
+	require.NotEmpty(t, resourceName)
 
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", *id)))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", resourceName)))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
 	require.NoError(t, err)
-	actualVMType, vmName, props, err := FindVM(&tFormat)
-	require.NoError(t, err)
-	require.Equal(t, VMAmazon, actualVMType)
-	require.Equal(t, string(*id), string(vmName))
 	require.Equal(t,
-		TResourceProperties{
-			"hostname": "actual-hostname",
-			"spec-key": "actual-val",
-			"tags": map[string]interface{}{
-				"t1":                  "v1",
-				"infrakit.group":      "managers",
-				"infrakit.config_sha": "bootstrap",
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				VMAmazon: {
+					TResourceName(resourceName): TResourceProperties{
+						"hostname": "actual-hostname",
+						"spec-key": "actual-val",
+						"tags": map[string]interface{}{
+							"imported-tag1":       "val1",
+							"t1":                  "v1",
+							"infrakit.group":      "managers",
+							"infrakit.config_sha": "bootstrap",
+						},
+					},
+				},
 			},
 		},
-		props)
+		tFormat,
+	)
 }
 
 func TestImportResourceTagSlice(t *testing.T) {
@@ -3664,16 +3982,25 @@ func TestImportResourceTagSlice(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	cleanInvoked := false
+	resourceName := ""
 	fns := importFns{
-		tfShow: func(dirArg string, vmType TResourceType) (map[TResourceName]TResourceProperties, error) {
+		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, dir, dirArg)
-			require.Equal(t, VMIBMCloud, vmType)
-			return map[TResourceName]TResourceProperties{}, nil
+			require.Equal(t, []TResourceType{VMIBMCloud}, types)
+			require.Equal(t, []string{"id"}, propFilter)
+			return map[TResourceType]map[TResourceName]TResourceProperties{
+				VMIBMCloud: {
+					TResourceName("instance-98765"): {
+						"id": "some-other-id",
+					},
+				},
+			}, nil
 		},
-		tfImport: func(vmType TResourceType, filename, vmID string) error {
-			require.Equal(t, VMIBMCloud, vmType)
-			require.True(t, strings.HasPrefix(filename, "instance-"))
-			require.Equal(t, "123", vmID)
+		tfImport: func(resType TResourceType, resName, id string) error {
+			require.Equal(t, VMIBMCloud, resType)
+			require.True(t, strings.HasPrefix(resName, "instance-"))
+			resourceName = resName
+			require.Equal(t, "123", id)
 			return nil
 		},
 		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
@@ -3707,11 +4034,18 @@ func TestImportResourceTagSlice(t *testing.T) {
     }
   }
 }`)}
-	id, err := tf.importResource(fns, "123", &spec)
+	resType := VMIBMCloud
+	resID := "123"
+	res := ImportResource{
+		ResourceID:   &resID,
+		ResourceType: &resType,
+	}
+	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
+	require.NoError(t, err)
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
 
-	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", *id)))
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", resourceName)))
 	require.NoError(t, err)
 	tFormat := TFormat{}
 	err = types.AnyBytes(buff).Decode(&tFormat)
@@ -3719,7 +4053,7 @@ func TestImportResourceTagSlice(t *testing.T) {
 	actualVMType, vmName, props, err := FindVM(&tFormat)
 	require.NoError(t, err)
 	require.Equal(t, VMIBMCloud, actualVMType)
-	require.Equal(t, string(*id), string(vmName))
+	require.Equal(t, resourceName, string(vmName))
 	// Tag slice order not guaranteed since it is created by iterating over a map
 	tags := props["tags"]
 	delete(props, "tags")
@@ -3734,6 +4068,659 @@ func TestImportResourceTagSlice(t *testing.T) {
 			"spec-key": "actual-val",
 		},
 		props)
+}
+
+type importOptions struct {
+	ShowVM              bool
+	ShowNFS             bool
+	ShowBlock           bool
+	FileExistsVM        bool
+	FileExistsGlobal    bool
+	FileExistsDedicated bool
+}
+
+func TestImportResourceDedicatedGlobalNoneExisting(t *testing.T) {
+	internalTestImportResourceDedicatedGlobal(t, importOptions{})
+}
+
+func TestImportResourceDedicatedGlobalSomeInTf(t *testing.T) {
+	// Import has some, but no files
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: true, ShowNFS: true, ShowBlock: true},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: false, ShowNFS: true, ShowBlock: true},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: true, ShowNFS: false, ShowBlock: true},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: true, ShowNFS: true, ShowBlock: false},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: true, ShowNFS: false, ShowBlock: false},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: false, ShowNFS: true, ShowBlock: false},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: false, ShowNFS: false, ShowBlock: true},
+	)
+	// Some files, if VM imported then the file as must exist
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: true, FileExistsVM: true, FileExistsGlobal: true, FileExistsDedicated: true},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{FileExistsVM: false, FileExistsGlobal: true, FileExistsDedicated: true},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{ShowVM: true, FileExistsVM: true, FileExistsGlobal: false, FileExistsDedicated: false},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{FileExistsVM: false, FileExistsGlobal: true, FileExistsDedicated: false},
+	)
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{FileExistsVM: false, FileExistsGlobal: false, FileExistsDedicated: true},
+	)
+	// Nothing should be updated
+	internalTestImportResourceDedicatedGlobal(t,
+		importOptions{
+			ShowVM: true, ShowNFS: true, ShowBlock: true,
+			FileExistsVM: true, FileExistsGlobal: true, FileExistsDedicated: true,
+		},
+	)
+}
+
+func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptions) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	existingVMName := "instance-12345678"
+	cleanInvoked := false
+	imports := []string{}
+	fns := importFns{
+		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			require.Len(t, types, 3)
+			require.Contains(t, types, VMIBMCloud)
+			require.Contains(t, types, TResourceType("ibm_storage_file"))
+			require.Contains(t, types, TResourceType("ibm_storage_block"))
+			require.Equal(t, []string{"id"}, propFilter)
+			result := map[TResourceType]map[TResourceName]TResourceProperties{}
+			if options.ShowVM {
+				result[VMIBMCloud] = map[TResourceName]TResourceProperties{
+					TResourceName(existingVMName): {
+						"id": "123",
+					},
+				}
+			}
+			if options.ShowNFS {
+				result[TResourceType("ibm_storage_file")] = map[TResourceName]TResourceProperties{
+					TResourceName("managers-shared_nfs"): {
+						"id": "234",
+					},
+				}
+			}
+			if options.ShowBlock {
+				result[TResourceType("ibm_storage_block")] = map[TResourceName]TResourceProperties{
+					TResourceName("managers-mgr1-dedicated_block"): {
+						"id": "345",
+					},
+				}
+			}
+			return result, nil
+		},
+		tfImport: func(resType TResourceType, resName, id string) error {
+			imports = append(imports, fmt.Sprintf("%v.%v.%v", resType, resName, id))
+			return nil
+		},
+		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
+			require.Equal(t, dir, dirArg)
+			if strings.HasPrefix(id, "ibm_compute_vm_instance.instance-") {
+				props := TResourceProperties{
+					"hostname": "actual-hostname",
+					"spec-key": "actual-val",
+					"other":    "foo",
+				}
+				return props, nil
+			}
+			if id == "ibm_storage_file.managers-shared_nfs" {
+				props := TResourceProperties{
+					"type":  "Endurance",
+					"other": "foo",
+				}
+				return props, nil
+			}
+			if id == "ibm_storage_block.managers-mgr1-dedicated_block" {
+				props := TResourceProperties{
+					"type":  "Performance",
+					"other": "foo",
+				}
+				return props, nil
+			}
+			return nil, fmt.Errorf("Unknown show ID: %v", id)
+		},
+		tfClean: func(vmType TResourceType, vmName string) {
+			cleanInvoked = true
+		},
+	}
+	// Conditionally create existing files
+	if options.FileExistsVM {
+		tFormat := TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				VMIBMCloud: {
+					TResourceName(existingVMName): TResourceProperties{
+						"foo": "bar", // Note that the props are overridden if anything is updated
+					},
+				},
+			},
+		}
+		buff, err := json.MarshalIndent(tFormat, "  ", "  ")
+		require.NoError(t, err)
+		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", existingVMName)), buff, 0644)
+		require.NoError(t, err)
+	}
+	if options.FileExistsGlobal {
+		tFormat := TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				TResourceType("ibm_storage_file"): {
+					TResourceName("managers-shared_nfs"): TResourceProperties{
+						"foo": "bar",
+					},
+				},
+			},
+		}
+		buff, err := json.MarshalIndent(tFormat, "  ", "  ")
+		require.NoError(t, err)
+		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "managers_global.tf.json"), buff, 0644)
+		require.NoError(t, err)
+	}
+	if options.FileExistsDedicated {
+		tFormat := TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				TResourceType("ibm_storage_block"): {
+					TResourceName("managers-mgr1-dedicated_block"): TResourceProperties{
+						"foo": "bar",
+					},
+				},
+			},
+		}
+		buff, err := json.MarshalIndent(tFormat, "  ", "  ")
+		require.NoError(t, err)
+		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "managers_dedicated_mgr1.tf.json"), buff, 0644)
+		require.NoError(t, err)
+	}
+	spec := instance.Spec{
+		Tags: map[string]string{
+			"infrakit.group":      "managers",
+			"infrakit.config_sha": "bootstrap",
+			"LogicalID":           "mgr1",
+		},
+		Properties: types.AnyString(`
+{
+  "resource": {
+    "ibm_compute_vm_instance": {
+      "host": {
+        "@hostname_prefix": "host1",
+        "spec-key": "spec-val"
+      }
+    },
+    "ibm_storage_file": {
+      "shared_nfs": {
+        "@scope": "managers",
+        "type": "foo"
+      }
+    },
+    "ibm_storage_block": {
+      "dedicated_block": {
+        "@scope": "@dedicated-managers",
+        "type": "foo"
+      }
+    }
+  }
+}`)}
+	vmResType := VMIBMCloud
+	vmResID := "123"
+	vmImportRes := ImportResource{
+		ResourceID:   &vmResID,
+		ResourceType: &vmResType,
+	}
+	nfsResType := TResourceType("ibm_storage_file")
+	nfsResID := "234"
+	nfsImportRes := ImportResource{
+		ResourceID:   &nfsResID,
+		ResourceType: &nfsResType,
+	}
+	blockResType := TResourceType("ibm_storage_block")
+	blockResID := "345"
+	blockImportRes := ImportResource{
+		ResourceID:   &blockResID,
+		ResourceType: &blockResType,
+	}
+	err := tf.importResources(fns, []*ImportResource{&vmImportRes, &nfsImportRes, &blockImportRes}, &spec)
+	require.NoError(t, err)
+	require.False(t, cleanInvoked)
+
+	// Verify imports, based on what tf show returns
+	expectedImports := 0
+	if !options.ShowVM {
+		expectedImports = expectedImports + 1
+		for _, i := range imports {
+			if !strings.HasPrefix(i, "ibm_compute_vm_instance.instance-") {
+				continue
+			}
+			if !strings.HasSuffix(i, ".123") {
+				continue
+			}
+			existingVMName = strings.Split(i, ".")[1]
+		}
+	}
+	if !options.ShowNFS {
+		expectedImports = expectedImports + 1
+		require.Contains(t, imports, "ibm_storage_file.managers-shared_nfs.234")
+	}
+	if !options.ShowBlock {
+		expectedImports = expectedImports + 1
+		require.Contains(t, imports, "ibm_storage_block.managers-mgr1-dedicated_block.345")
+	}
+	require.Len(t, imports, expectedImports)
+
+	// Track if anything should have been updated
+	noUpdates := options.ShowVM && options.ShowNFS && options.ShowBlock && options.FileExistsVM && options.FileExistsDedicated && options.FileExistsGlobal
+	noUpdateProps := TResourceProperties{"foo": "bar"}
+
+	filenameVM := fmt.Sprintf("%v.tf.json", existingVMName)
+	if !options.FileExistsVM {
+		filenameVM = filenameVM + ".new"
+	}
+	buff, err := ioutil.ReadFile(filepath.Join(tf.Dir, filenameVM))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	actualVMType, vmName, props, err := FindVM(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t, VMIBMCloud, actualVMType)
+	require.Equal(t, existingVMName, string(vmName))
+	if noUpdates {
+		require.Equal(t, noUpdateProps, props)
+	} else {
+		// Tag slice order not guaranteed since it is created by iterating over a map
+		tags := props["tags"]
+		delete(props, "tags")
+		require.Len(t, tags, 4)
+		require.Contains(t, tags, "logicalid:mgr1")
+		require.Contains(t, tags, "infrakit.group:managers")
+		require.Contains(t, tags, "infrakit.config_sha:bootstrap")
+		require.Contains(t, tags, "infrakit.attach:managers_dedicated_mgr1 managers_global")
+		// Compare everythine else
+		require.Equal(t,
+			TResourceProperties{
+				"hostname": "actual-hostname",
+				"spec-key": "actual-val",
+			},
+			props)
+	}
+
+	filenameDedicated := "managers_dedicated_mgr1.tf.json"
+	if !options.FileExistsDedicated {
+		filenameDedicated = filenameDedicated + ".new"
+	}
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, filenameDedicated))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	blockProps := TResourceProperties{"type": "Performance"}
+	if noUpdates {
+		blockProps = noUpdateProps
+	}
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				TResourceType("ibm_storage_block"): {
+					TResourceName("managers-mgr1-dedicated_block"): blockProps,
+				},
+			},
+		},
+		tFormat,
+	)
+
+	filenameGlobal := "managers_global.tf.json"
+	if !options.FileExistsGlobal {
+		filenameGlobal = filenameGlobal + ".new"
+	}
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, filenameGlobal))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	nfsProps := TResourceProperties{"type": "Endurance"}
+	if noUpdates {
+		nfsProps = noUpdateProps
+	}
+	require.Equal(t,
+		TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				TResourceType("ibm_storage_file"): {
+					TResourceName("managers-shared_nfs"): nfsProps,
+				},
+			},
+		},
+		tFormat,
+	)
+}
+
+func TestDetermineImportInfoTypeDuplicate(t *testing.T) {
+	resType := TResourceType("res_type")
+	resName := TResourceName("res_name")
+	res1 := ImportResource{ResourceType: &resType}
+	res2 := ImportResource{ResourceType: &resType, ResourceName: &resName}
+	resources := []*ImportResource{&res1, &res2, &res1}
+	err := determineImportInfo(resources, nil)
+	require.Error(t, err)
+	require.Equal(t,
+		"Error importing resources, more then a single non-named resource of type res_type",
+		err.Error())
+}
+
+func TestDetermineImportInfoNameDuplicate(t *testing.T) {
+	resType := TResourceType("res_type")
+	resName1 := TResourceName("res_name1")
+	resName2 := TResourceName("res_name2")
+	res1 := ImportResource{ResourceType: &resType}
+	res2 := ImportResource{ResourceType: &resType, ResourceName: &resName1}
+	res3 := ImportResource{ResourceType: &resType, ResourceName: &resName2}
+	resources := []*ImportResource{&res1, &res2, &res3, &res2}
+	err := determineImportInfo(resources, nil)
+	require.Error(t, err)
+	require.Equal(t,
+		"Error importing resources, duplicate res_type resource with name res_name1",
+		err.Error())
+}
+
+func TestDetermineImportInfoNoImportNameAmbiguousResType(t *testing.T) {
+	// Import 2 resources of same type without a name but against a spec that shows
+	// more then 1 of the resource types
+	resTypeVM := VMIBMCloud
+	resType := TResourceType("res_type")
+	resID := "some-id"
+	resName1 := TResourceName("name-1")
+	resName2 := TResourceName("name-2")
+	resVM := ImportResource{ResourceType: &resTypeVM, ResourceID: &resID}
+	resNoName := ImportResource{ResourceType: &resType, ResourceID: &resID}
+	resources := []*ImportResource{&resVM, &resNoName}
+	tf := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			resTypeVM: {
+				"instance-1234": {},
+			},
+			resType: {
+				resName1: {},
+				resName2: {},
+			},
+		},
+	}
+	files := decomposedFiles{
+		FileMap: map[string]*TFormat{
+			"instance-1234": &tf,
+		},
+	}
+	err := determineImportInfo(resources, &files)
+	require.Error(t, err)
+	require.Equal(t,
+		"Ambiguous import resource definition res_type:some-id",
+		err.Error())
+
+	// Works if the resources include a name
+	resVM = ImportResource{ResourceType: &resTypeVM, ResourceID: &resID}
+	resNamed1 := ImportResource{ResourceType: &resType, ResourceName: &resName1, ResourceID: &resID}
+	resNamed2 := ImportResource{ResourceType: &resType, ResourceName: &resName2, ResourceID: &resID}
+	resources = []*ImportResource{&resVM, &resNamed1, &resNamed2}
+	err = determineImportInfo(resources, &files)
+	require.NoError(t, err)
+	require.Equal(t, "instance-1234", resVM.FinalFilename)
+	require.Equal(t, TResourceName("instance-1234"), resVM.FinalResourceName)
+	require.Equal(t, "instance-1234", resNamed1.FinalFilename)
+	require.Equal(t, TResourceName("name-1"), resNamed1.FinalResourceName)
+	require.Equal(t, "instance-1234", resNamed2.FinalFilename)
+	require.Equal(t, TResourceName("name-2"), resNamed2.FinalResourceName)
+}
+
+func TestDetermineImportInfoNoResourceWithName(t *testing.T) {
+	resTypeVM := VMIBMCloud
+	resID := "some-id"
+	resName := TResourceName("name-1")
+	resVM := ImportResource{ResourceType: &resTypeVM, ResourceName: &resName, ResourceID: &resID}
+	resources := []*ImportResource{&resVM}
+	tf := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				"instance-1234": {},
+			},
+		},
+	}
+	files := decomposedFiles{
+		FileMap: map[string]*TFormat{
+			"instance-1234": &tf,
+		},
+	}
+	err := determineImportInfo(resources, &files)
+	require.Error(t, err)
+	require.Equal(t,
+		fmt.Sprintf("Unable to determine import resource in spec for %v:%v", VMIBMCloud, resName),
+		err.Error())
+}
+
+func TestDetermineImportInfoNoResourceWithouthName(t *testing.T) {
+	resTypeVM := VMIBMCloud
+	resID := "some-id"
+	resVM := ImportResource{ResourceType: &resTypeVM, ResourceID: &resID}
+	resources := []*ImportResource{&resVM}
+	tf := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				"instance-1234": {},
+			},
+		},
+	}
+	files := decomposedFiles{
+		FileMap: map[string]*TFormat{
+			"instance-1234": &tf,
+		},
+	}
+	err := determineImportInfo(resources, &files)
+	require.Error(t, err)
+	require.Equal(t,
+		fmt.Sprintf("Unable to determine import resource in spec for: %v", VMIBMCloud),
+		err.Error())
+}
+
+func TestDetermineImportInfoWithImportNameAmbiguousResType(t *testing.T) {
+	// Import 2 resources of same type without a name but against a spec that shows
+	// more then 1 of the resource types
+	resTypeVM := VMIBMCloud
+	resType := TResourceType("res_type")
+	resID := "some-id"
+	resName := TResourceName("name")
+	resVM := ImportResource{ResourceType: &resTypeVM, ResourceID: &resID}
+	resNamed := ImportResource{ResourceType: &resType, ResourceName: &resName, ResourceID: &resID}
+	resources := []*ImportResource{&resVM, &resNamed}
+	tf := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			resTypeVM: {
+				"instance-1234": {},
+			},
+			resType: {
+				"1-name": {},
+				"2-name": {},
+			},
+		},
+	}
+	files := decomposedFiles{
+		FileMap: map[string]*TFormat{
+			"instance-1234": &tf,
+		},
+	}
+	err := determineImportInfo(resources, &files)
+	require.Error(t, err)
+	require.Equal(t,
+		"Ambiguous import resource definition res_type:name:some-id",
+		err.Error())
+
+	// Works if the resources include the full name
+	resVM = ImportResource{ResourceType: &resTypeVM, ResourceID: &resID}
+	resName1 := TResourceName("1-name")
+	resName2 := TResourceName("2-name")
+	resNamed1 := ImportResource{ResourceType: &resType, ResourceName: &resName1, ResourceID: &resID}
+	resNamed2 := ImportResource{ResourceType: &resType, ResourceName: &resName2, ResourceID: &resID}
+	resources = []*ImportResource{&resVM, &resNamed1, &resNamed2}
+	err = determineImportInfo(resources, &files)
+	require.NoError(t, err)
+	require.Equal(t, "instance-1234", resVM.FinalFilename)
+	require.Equal(t, TResourceName("instance-1234"), resVM.FinalResourceName)
+	require.Equal(t, "instance-1234", resNamed1.FinalFilename)
+	require.Equal(t, TResourceName("1-name"), resNamed1.FinalResourceName)
+	require.Equal(t, "instance-1234", resNamed2.FinalFilename)
+	require.Equal(t, TResourceName("2-name"), resNamed2.FinalResourceName)
+}
+
+func TestDetermineImportInfoSuccess(t *testing.T) {
+	resTypeVM := VMIBMCloud
+	resIDVM := "vm-id"
+	importVM := ImportResource{ResourceType: &resTypeVM, ResourceID: &resIDVM}
+
+	resTypeGlobal := TResourceType("global_type")
+	resIDGlobal := "global-id"
+	importGlobal := ImportResource{ResourceType: &resTypeGlobal, ResourceID: &resIDGlobal}
+
+	resTypeDedicated := TResourceType("dedicated_type")
+	resIDDedicated1 := "dedicated-id1"
+	importDedicated1 := ImportResource{ResourceType: &resTypeDedicated, ResourceID: &resIDDedicated1}
+	resIDDedicated2 := "dedicated-id2"
+	redNameDedicated2 := TResourceName("dedicated_given_name")
+	importDedicated2 := ImportResource{ResourceType: &resTypeDedicated, ResourceName: &redNameDedicated2, ResourceID: &resIDDedicated2}
+
+	resources := []*ImportResource{&importVM, &importGlobal, &importDedicated1, &importDedicated2}
+	tfVM := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			resTypeVM: {
+				"instance-1234": {"vm1": "vm_v1"},
+			},
+		},
+	}
+	tfGlobal := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			resTypeGlobal: {
+				"scopeID-global_name": {"g1": "g_v1"},
+			},
+		},
+	}
+	tfDedicated := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			resTypeDedicated: {
+				"scopeID-1-dedicated_name":       {"d1": "d_v1"},
+				"scopeID-1-dedicated_given_name": {"d2": "d_v2"},
+			},
+		},
+	}
+	files := decomposedFiles{
+		FileMap: map[string]*TFormat{
+			"instance-1234":          &tfVM,
+			"scopeID_global":         &tfGlobal,
+			"scopeID_dedicated_mgr1": &tfDedicated,
+		},
+	}
+	err := determineImportInfo(resources, &files)
+	require.NoError(t, err)
+	require.Equal(t, "instance-1234", importVM.FinalFilename)
+	require.Equal(t, TResourceName("instance-1234"), importVM.FinalResourceName)
+	require.Equal(t, TResourceProperties{"vm1": "vm_v1"}, importVM.SpecProps)
+	require.Equal(t, "scopeID_global", importGlobal.FinalFilename)
+	require.Equal(t, TResourceName("scopeID-global_name"), importGlobal.FinalResourceName)
+	require.Equal(t, TResourceProperties{"g1": "g_v1"}, importGlobal.SpecProps)
+	require.Equal(t, "scopeID_dedicated_mgr1", importDedicated1.FinalFilename)
+	require.Equal(t, TResourceName("scopeID-1-dedicated_name"), importDedicated1.FinalResourceName)
+	require.Equal(t, TResourceProperties{"d1": "d_v1"}, importDedicated1.SpecProps)
+	require.Equal(t, "scopeID_dedicated_mgr1", importDedicated2.FinalFilename)
+	require.Equal(t, TResourceName("scopeID-1-dedicated_given_name"), importDedicated2.FinalResourceName)
+	require.Equal(t, TResourceProperties{"d2": "d_v2"}, importDedicated2.SpecProps)
+}
+
+func TestSetFinalResourceAndFilename(t *testing.T) {
+	filename := "finalFilename"
+	resName := TResourceName("res-name")
+	resProps := TResourceProperties{"k": "v"}
+	resource := ImportResource{}
+	err := setFinalResourceAndFilename(&resource, filename, &resName, resProps)
+	require.NoError(t, err)
+	require.Equal(t, resource.FinalResourceName, resName)
+	require.Equal(t, resource.FinalFilename, filename)
+	require.Equal(t, resource.SpecProps, resProps)
+}
+
+func TestSetFinalResourceAndFilenameFinalFilenameAlreadySet(t *testing.T) {
+	resType := TResourceType("res_type")
+	resProps := TResourceProperties{"k": "v"}
+	resID := "some-id"
+	resource := ImportResource{
+		ResourceID:    &resID,
+		ResourceType:  &resType,
+		FinalFilename: "alreadySet",
+		SpecProps:     resProps,
+	}
+	finalResName := TResourceName("final-res-name")
+	err := setFinalResourceAndFilename(&resource, "finalFilename", &finalResName, TResourceProperties{})
+	require.Error(t, err)
+	require.Equal(t,
+		"Ambiguous import resource definition res_type:some-id",
+		err.Error())
+	require.Equal(t, resource.FinalResourceName, TResourceName(""))
+	require.Equal(t, resource.FinalFilename, "alreadySet")
+	require.Equal(t, resource.SpecProps, resProps)
+
+	resName := TResourceName("res-name")
+	resource.ResourceName = &resName
+	err = setFinalResourceAndFilename(&resource, "finalFilename", &finalResName, TResourceProperties{})
+	require.Error(t, err)
+	require.Equal(t,
+		"Ambiguous import resource definition res_type:res-name:some-id",
+		err.Error())
+	require.Equal(t, resource.FinalResourceName, TResourceName(""))
+	require.Equal(t, resource.FinalFilename, "alreadySet")
+	require.Equal(t, resource.SpecProps, resProps)
+}
+
+func TestSetFinalResourceAndFilenameFinalResnameAlreadySet(t *testing.T) {
+	resType := TResourceType("res_type")
+	resProps := TResourceProperties{"k": "v"}
+	resID := "some-id"
+	resource := ImportResource{
+		ResourceID:        &resID,
+		ResourceType:      &resType,
+		FinalResourceName: "alreadySet",
+		SpecProps:         resProps,
+	}
+	finalResName := TResourceName("final-res-name")
+	err := setFinalResourceAndFilename(&resource, "finalFilename", &finalResName, TResourceProperties{})
+	require.Error(t, err)
+	require.Equal(t,
+		"Ambiguous import resource definition res_type:some-id",
+		err.Error())
+	require.Equal(t, resource.FinalResourceName, TResourceName("alreadySet"))
+	require.Equal(t, resource.FinalFilename, "")
+	require.Equal(t, resource.SpecProps, resProps)
+
+	resName := TResourceName("res-name")
+	resource.ResourceName = &resName
+	err = setFinalResourceAndFilename(&resource, "finalFilename", &finalResName, TResourceProperties{})
+	require.Error(t, err)
+	require.Equal(t,
+		"Ambiguous import resource definition res_type:res-name:some-id",
+		err.Error())
+	require.Equal(t, resource.FinalResourceName, TResourceName("alreadySet"))
+	require.Equal(t, resource.FinalFilename, "")
+	require.Equal(t, resource.SpecProps, resProps)
 }
 
 func TestParseFileForInstanceIDNoMatch(t *testing.T) {
