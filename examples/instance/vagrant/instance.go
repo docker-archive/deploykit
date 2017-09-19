@@ -206,11 +206,7 @@ func (v vagrantPlugin) Destroy(id instance.ID, context instance.Context) error {
 		fmt.Println("Vagrant destroy failed: ", err)
 	}
 
-	if err := os.RemoveAll(machineDir); err != nil {
-		return err
-	}
-
-	return nil
+	return os.RemoveAll(machineDir)
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
