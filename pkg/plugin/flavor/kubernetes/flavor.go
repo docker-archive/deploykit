@@ -115,10 +115,7 @@ func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group_type
 		}
 	}
 
-	if err := validateIDsAndAttachments(allocation.LogicalIDs, spec.Attachments); err != nil {
-		return err
-	}
-	return nil
+	return validateIDsAndAttachments(allocation.LogicalIDs, spec.Attachments)
 }
 
 // Healthy determines whether an instance is healthy.

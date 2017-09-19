@@ -60,11 +60,7 @@ func (p *plugin) VendorInfo() *spi.VendorInfo {
 // Validate performs local validation on a provision request.
 func (p *plugin) Validate(req *types.Any) error {
 	properties := &Properties{}
-	if err := req.Decode(&properties); err != nil {
-		return err
-	}
-
-	return nil
+	return req.Decode(&properties)
 }
 
 // Label labels the instance

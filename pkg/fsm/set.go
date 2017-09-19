@@ -454,10 +454,7 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 	s.bystate[next][instance.id] = instance
 
 	// visits limit trigger
-	if err := s.processVisitLimit(tid, instance, next); err != nil {
-		return err
-	}
-	return nil
+	return s.processVisitLimit(tid, instance, next)
 }
 
 func (s *Set) tid() int64 {
