@@ -347,10 +347,7 @@ func (p dockerInstancePlugin) Destroy(id instance.ID, dc instance.Context) error
 	cli := p.client
 	ctx := context.Background()
 	log.Debugf("Destroying container ID %s", string(id))
-	if err := cli.ContainerRemove(ctx, string(id), options); err != nil {
-		return err
-	}
-	return nil
+	return cli.ContainerRemove(ctx, string(id), options)
 }
 
 func describeGroupRequest(namespaceTags, tags map[string]string) *apitypes.ContainerListOptions {

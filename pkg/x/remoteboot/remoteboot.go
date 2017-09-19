@@ -310,10 +310,7 @@ func (c *BootController) serveHTTP() error {
 
 	httpHandler := http.FileServer(http.Dir(docroot))
 
-	if err = http.ListenAndServe(":80", httpHandler); err != nil {
-		return err
-	}
-	return nil
+	return http.ListenAndServe(":80", httpHandler)
 }
 
 //////////////////////////////
