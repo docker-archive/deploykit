@@ -1,5 +1,11 @@
 # Oracle BMC Golang SDK
 
+[![GoDoc](https://godoc.org/github.com/FrenchBen/oracle-sdk-go?status.svg)](https://godoc.org/github.com/FrenchBen/oracle-sdk-go)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/FrenchBen/oracle-sdk-go/master/LICENSE)
+[![TravisCI](https://travis-ci.org/FrenchBen/oracle-sdk-go.svg?branch=master)](https://travis-ci.org/FrenchBen/oracle-sdk-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/FrenchBen/oracle-sdk-go)](https://goreportcard.com/report/github.com/FrenchBen/oracle-sdk-go)
+[![Badge Badge](http://doyouevenbadge.com/github.com/FrenchBen/oracle-sdk-go)](http://doyouevenbadge.com)
+
 Unofficial Oracle Bare Metal Cloud Golang SDK
 
 
@@ -83,4 +89,6 @@ Only API supported at the moment is to get instance details
 * Delete BackendSet
 * Create Listener
 * Delete Listener
+* List LoadBalancer
+* Get LoadBalancer
 

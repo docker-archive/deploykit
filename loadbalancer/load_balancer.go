@@ -73,3 +73,29 @@ func (c *Client) GetLoadBalancer(loadBalancerID string) (LoadBalancer, *bmc.Erro
 	}
 	return loadBalancer, nil
 }
+
+// ListLoadBalancer lists all load balancers in the specified compartment
+func (c *Client) ListLoadBalancer(loadBalancerID string) ([]LoadBalancer, *bmc.Error) {
+	loadBalancers := []LoadBalancer{}
+	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers"), nil)
+	if err != nil {
+		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return loadBalancers, &bmcError
+	}
+	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return loadBalancers, bmc.NewError(*resp)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	logrus.Debug("Body: ", string(body))
+	if err != nil {
+		logrus.Fatalf("Could not read JSON response: %s", err)
+	}
+
+	if err = json.Unmarshal(body, &loadBalancers); err != nil {
+		logrus.Fatalf("Unmarshal impossible: %s", err)
+	}
+	return loadBalancers, nil
+}
