@@ -66,9 +66,9 @@ The following endpoints are provided by the [Oracle BMC API](https://docs.us-pho
 | --- | --- |
 | Audit API | NO |
 | Database Service API | NO |
-| Core Services API | NO-partial |
+| Core Services API | YES-partial |
 | Identity and Access Management Service API | NO |
-| Load Balancing Service API | YES |
+| Load Balancing Service API | YES-partial |
 | Object Storage Service API | NO |
 | S3 Object Storage Service API | NO |
 
