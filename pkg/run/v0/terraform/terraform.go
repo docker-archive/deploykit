@@ -37,6 +37,18 @@ func init() {
 	inproc.Register(Kind, Run, DefaultOptions)
 }
 
+// ImportResourceOptions defines a resource to import
+type ImportResourceOptions struct {
+	// Terraform resource type
+	ResourceType string
+
+	// Resource name in the group spec
+	ResourceName string
+
+	// ID of the resource to import
+	ResourceID string
+}
+
 // Options capture the options for starting up the plugin.
 type Options struct {
 	// Dir for storing plan files
@@ -51,8 +63,8 @@ type Options struct {
 	// ImportGroupSpecURL defines the group spec that the instance is imported into.
 	ImportGroupSpecURL string
 
-	// ImportInstanceID defines the instance ID to import
-	ImportInstanceID string
+	// ImportResources defines the instances to import
+	ImportResources []ImportResourceOptions
 
 	// ImportGroupID defines the group ID to import the resource into (optional)
 	ImportGroupID string
@@ -89,7 +101,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	importInstSpec, err := parseInstanceSpecFromGroup(options.ImportGroupSpecURL, options.ImportGroupID)
 	if err != nil {
-		// If we cannot prase the group spec then we cannot import the resource, the plugin should
+		// If we cannot parse the group spec then we cannot import the resource, the plugin should
 		// not start since terraform is not managing the resource
 		log.Error("error parsing instance spec from group", "err", err)
 		return
@@ -98,11 +110,24 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	// Do we have the new options?
 	log.Info("NewOptions", "value", options.NewOption, "Dir", options.Dir)
 
+	// Parse import options
+	resources := []*terraform.ImportResource{}
+	for _, importResource := range options.ImportResources {
+		resType := terraform.TResourceType(importResource.ResourceType)
+		resName := terraform.TResourceName(importResource.ResourceName)
+		resID := importResource.ResourceID
+		res := terraform.ImportResource{
+			ResourceType: &resType,
+			ResourceName: &resName,
+			ResourceID:   &resID,
+		}
+		resources = append(resources, &res)
+	}
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: terraform.NewTerraformInstancePlugin(options.Dir, options.PollInterval.Duration(),
 			options.Standalone, &terraform.ImportOptions{
 				InstanceSpec: importInstSpec,
-				InstanceID:   &options.ImportInstanceID,
+				Resources:    resources,
 			}),
 	}
 
