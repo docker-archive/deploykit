@@ -135,9 +135,19 @@ func cfn(clients AWSClients, name string) (interface{}, error) {
 		parameters[*p.ParameterKey] = p
 	}
 
+	// index outputs by name
+	outputs := map[string]interface{}{}
+	for _, p := range output.Stacks[0].Outputs {
+		if p.OutputKey == nil {
+			continue
+		}
+		outputs[*p.OutputKey] = p
+	}
+
 	// JMESPath package has trouble with fields that are pointers
 	return template.ToMap(map[string]interface{}{
 		"Resources":  resources,
 		"Parameters": parameters,
+		"Outputs":    outputs,
 	})
 }

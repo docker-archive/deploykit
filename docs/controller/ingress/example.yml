@@ -26,7 +26,7 @@
 #m4fghruao79i        t2                  replicated          1/1                 nginx:latest        *:7777->80/tcp
 #
 # Remove the service
-# docker service rm test1
+# docker service rm t2
 #
 # infrakit simulator/lb1 routes ls  # should be empty
 #
