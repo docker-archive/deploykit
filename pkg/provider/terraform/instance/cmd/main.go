@@ -95,7 +95,7 @@ func main() {
 		}
 		cli.SetLogLevel(*logLevel)
 		run.Plugin(plugin_base.DefaultTransport(*name), instance_plugin.PluginServer(
-			terraform.NewTerraformInstancePlugin(*dir, *pollInterval, *standalone, &importOpts)),
+			terraform.NewTerraformInstancePlugin(*dir, *pollInterval, *standalone, []string{}, &importOpts)),
 		)
 	}
 

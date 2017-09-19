@@ -45,13 +45,16 @@ func (p *plugin) terraformApply() error {
 			if p.shouldApply() {
 				fns := tfFuncs{
 					tfRefresh: func() error {
-						command := exec.Command("terraform refresh").InheritEnvs(true).WithDir(p.Dir)
+						command := exec.Command("terraform refresh").
+							InheritEnvs(true).
+							WithEnvs(p.envs...).
+							WithDir(p.Dir)
 						if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
 							return err
 						}
 						return command.Wait()
 					},
-					tfStateList: doTerraformStateList,
+					tfStateList: p.doTerraformStateList,
 				}
 				// The trigger for an apply is typically from a group commit, sleep for a few seconds so
 				// that multiple .tf.json.new files have time to be created
@@ -90,7 +93,10 @@ func (p *plugin) terraformApply() error {
 // doTerraformApply executes "terraform apply"
 func (p *plugin) doTerraformApply() error {
 	log.Infoln("Applying plan")
-	command := exec.Command("terraform apply -refresh=false").InheritEnvs(true).WithDir(p.Dir)
+	command := exec.Command("terraform apply -refresh=false").
+		InheritEnvs(true).
+		WithEnvs(p.envs...).
+		WithDir(p.Dir)
 	err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start()
 	if err == nil {
 		return command.Wait()
@@ -249,9 +255,12 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 }
 
 // doTerraformStateList shells out to run `terraform state list` and parses the result
-func doTerraformStateList(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+func (p *plugin) doTerraformStateList(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
 	result := map[TResourceType]map[TResourceName]struct{}{}
-	command := exec.Command("terraform state list -no-color").InheritEnvs(true).WithDir(dir)
+	command := exec.Command("terraform state list -no-color").
+		InheritEnvs(true).
+		WithEnvs(p.envs...).
+		WithDir(dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {

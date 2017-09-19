@@ -278,11 +278,14 @@ func convertToType(val string) interface{} {
 }
 
 // doTerraformShow shells out to run `terraform show` and parses the result
-func doTerraformShow(dir string,
+func (p *plugin) doTerraformShow(dir string,
 	resTypes []TResourceType,
 	propFilter []string) (result map[TResourceType]map[TResourceName]TResourceProperties, err error) {
 
-	command := exec.Command("terraform show -no-color").InheritEnvs(true).WithDir(dir)
+	command := exec.Command("terraform show -no-color").
+		InheritEnvs(true).
+		WithEnvs(p.envs...).
+		WithDir(dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {
@@ -297,10 +300,13 @@ func doTerraformShow(dir string,
 }
 
 // doTerraformShowForInstance shells out to run `terraform state show <instance>` and parses the result
-func doTerraformShowForInstance(dir string,
+func (p *plugin) doTerraformShowForInstance(dir string,
 	instance string) (result TResourceProperties, err error) {
 
-	command := exec.Command(fmt.Sprintf("terraform state show %v -no-color", instance)).InheritEnvs(true).WithDir(dir)
+	command := exec.Command(fmt.Sprintf("terraform state show %v -no-color", instance)).
+		InheritEnvs(true).
+		WithEnvs(p.envs...).
+		WithDir(dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {

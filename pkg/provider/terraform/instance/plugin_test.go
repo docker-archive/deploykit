@@ -53,7 +53,7 @@ func TestProcessImportOptions(t *testing.T) {
 func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, nil)
+	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, []string{}, nil)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)

@@ -19,6 +19,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	util_options "github.com/docker/infrakit/pkg/util/options"
 )
 
 const (
@@ -71,6 +72,9 @@ type Options struct {
 
 	// NewOption is an example... see the plugins.json file in this directory.
 	NewOption string
+
+	// Envs are the environemtn variables to include when invoking terraform
+	Envs types.Any
 }
 
 // DefaultOptions return an Options with default values filled in.  If you want to expose these to the CLI,
@@ -123,9 +127,15 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		}
 		resources = append(resources, &res)
 	}
+	// Environment varables to include when invoking terraform
+	envs, err := util_options.ParseEnvs(&options.Envs)
+	if err != nil {
+		log.Error("error parsing configuration Env Options", "err", err)
+		return
+	}
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: terraform.NewTerraformInstancePlugin(options.Dir, options.PollInterval.Duration(),
-			options.Standalone, &terraform.ImportOptions{
+			options.Standalone, envs, &terraform.ImportOptions{
 				InstanceSpec: importInstSpec,
 				Resources:    resources,
 			}),
