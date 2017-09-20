@@ -16,7 +16,7 @@ type LoadBalancer struct {
 	// A mapping of strings to BackendSet objects
 	BackendSets []BackendSet `json:"backendSets,omitempty"`
 	// A user-friendly name
-	Name string `json:"displayName"`
+	DisplayName string `json:"displayName"`
 	// A mapping of strings to Certificate objects
 	Certificates string `json:"certificates"`
 	// The OCID of the compartment containing the load balancer
