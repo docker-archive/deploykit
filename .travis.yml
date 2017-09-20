@@ -1,7 +1,13 @@
 language: go
 
-go:
-  - 1.8
+branches:
+  only:
+    - master
+
+matrix:
+  include:
+    - go: 1.7.5
+    - go: 1.8
 
 script:
   - go test -coverprofile=coverage.txt -covermode=atomic -race
