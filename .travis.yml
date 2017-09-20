@@ -6,8 +6,9 @@ branches:
 
 matrix:
   include:
-    - go: 1.7.5
+    - go: 1.7.6
     - go: 1.8
+    - go: 1.9
 
 before_script:
   - go vet ./...
