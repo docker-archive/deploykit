@@ -109,40 +109,89 @@ This plugin will be called whenever you use a Flavor plugin and reference the pl
 in your config JSON.  For instance, you may start up this plugin as `french-vanilla`:
 
 ```shell
-$ build/infrakit-flavor-vanilla --name french-vanilla
-INFO[0000] Listening at: ~/.infrakit/plugins/french-vanilla
+$ build/infrakit plugin start vanilla:french-vanilla simulator group:group
+INFO[0000] Listening at: ~/.infrakit/plugins/french_vanilla
 ```
 
-Then in your JSON config for the default group plugin, you would reference it by name:
+Now -- in another terminal session:
 
-```json
-{
-  "ID": "cattle",
-  "Properties": {
-    "Allocation": {
-      "Size": 5
-    },
-    "Instance": {
-      "Plugin": "instance-file",
-      "Properties": {
-        "Note": "Here is a property that only the instance plugin cares about"
-      }
-    },
-    "Flavor": {
-      "Plugin": "french-vanilla",
-      "Properties": {
-        "Init": [
-          "sudo apt-get update -y",
-          "sudo apt-get install -y nginx",
-          "sudo service nginx start"
-        ],
-        "Tags": {
-          "tier": "web",
-          "project": "infrakit"
-        }
-      }
-    }
-  }
-}
+Your CLI should discover the new objects:
+
+```shell
+$ infrakit
+
+
+infrakit command line interface
+
+Usage:
+  infrakit [command]
+
+Available Commands:
+  french_vanilla    Access object french_vanilla which implements Flavor/0.1.0
+  group             Access object group which implements Group/0.1.0,Metadata/0.1.0
+  manager           Access the manager
+  playbook          Manage playbooks
+  plugin            Manage plugins
+  remote            Manage remotes
+  simulator/compute Access object simulator/compute which implements Instance/0.6.0
+  simulator/disk    Access object simulator/disk which implements Instance/0.6.0
+  simulator/lb1     Access object simulator/lb1 which implements L4/0.6.0
+  simulator/lb2     Access object simulator/lb2 which implements L4/0.6.0
+  simulator/lb3     Access object simulator/lb3 which implements L4/0.6.0
+  simulator/net     Access object simulator/net which implements Instance/0.6.0
+  template          Render an infrakit template at given url.  If url is '-', read from stdin
+  up                Up everything
+  util              Utilities
+  version           Print build version information
+  x                 Experimental features
 ```
-Then when you watch a group with the configuration above (`cattle`), the cattle will be `french-vanilla` flavored.
+
+Note `french_vanilla` and other objects are now accessible.
+
+Commit a group using the `example.yml`
+
+```shell
+$ build/infrakit group commit -y docs/plugins/flavor/vanilla/example.yml
+Committed vanilla: Managing 1 instances
+```
+
+Now we see one instance provisioned:
+
+```shell
+$ build/infrakit group ls
+ID
+vanilla
+$ build/infrakit group describe vanilla
+ID                            	LOGICAL                       	TAGS
+1505889013394060520           	  -                           	infrakit.config_sha=rvhmljoz72va6rrmbypwsxahwkb6g6sq,infrakit.group=vanilla,project=infrakit,tier=web
+```
+
+Checking on the actual instance:
+
+```shell
+$ build/infrakit simulator/compute describe -pry
+- ID: "1505889013394060520"
+  LogicalID: null
+  Properties:
+    Attachments: null
+    Init: |-
+      sudo apt-get update -y
+      sudo apt-get install -y nginx
+      sudo service nginx start
+    LogicalID: null
+    Properties:
+      Note: custom field
+    Tags:
+      infrakit.config_sha: rvhmljoz72va6rrmbypwsxahwkb6g6sq
+      infrakit.group: vanilla
+      project: infrakit
+      tier: web
+  Tags:
+    infrakit.config_sha: rvhmljoz72va6rrmbypwsxahwkb6g6sq
+    infrakit.group: vanilla
+    project: infrakit
+    tier: web
+```
+
+Note that the vanilla flavor (`french_vanilla`) has injected the init and
+tags into the configuration of this instance.

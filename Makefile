@@ -97,17 +97,13 @@ endef
 
 
 $(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
-$(call define_binary_target,infrakit-event-time,github.com/docker/infrakit/examples/event/time)
-$(call define_binary_target,infrakit-flavor-combo,github.com/docker/infrakit/examples/flavor/combo)
 $(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infrakit/examples/flavor/kubernetes)
 $(call define_binary_target,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
-$(call define_binary_target,infrakit-flavor-vanilla,github.com/docker/infrakit/examples/flavor/vanilla)
 $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
 $(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cmd/group)
 $(call define_binary_target,infrakit-instance-aws,github.com/docker/infrakit/cmd/instance/aws)
 $(call define_binary_target,infrakit-instance-digitalocean,github.com/docker/infrakit/cmd/instance/digitalocean)
 $(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
-$(call define_binary_target,infrakit-instance-file,github.com/docker/infrakit/examples/instance/file)
 $(call define_binary_target,infrakit-instance-gcp,github.com/docker/infrakit/cmd/instance/google)
 $(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
 $(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
@@ -128,17 +124,13 @@ $(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/res
 
 binaries: clean build-binaries
 build-binaries:	build/infrakit \
-		build/infrakit-event-time \
-		build/infrakit-flavor-combo \
 		build/infrakit-flavor-kubernetes \
 		build/infrakit-flavor-swarm \
-		build/infrakit-flavor-vanilla \
 		build/infrakit-flavor-zookeeper \
 		build/infrakit-group-default \
 		build/infrakit-instance-aws \
 		build/infrakit-instance-digitalocean \
 		build/infrakit-instance-docker \
-		build/infrakit-instance-file \
 		build/infrakit-instance-gcp \
 		build/infrakit-instance-hyperkit \
 		build/infrakit-instance-image \

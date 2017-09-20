@@ -45,6 +45,7 @@ volumes="-v $TEST_DIR:/ikt -v $PWD/docs:/root/docs"
 # set the environment variable to use a shorter path so we don't have
 # problems with Docker for Mac.  See https://github.com/docker/docker/issues/23545
 envs=" -e INFRAKIT_HOME=/ikt -e INFRAKIT_PLUGINS_DIR=/ikt/plugins"
+envs="$envs -e INFRAKIT_INSTANCE_FILE_DIR=/ikt/tutorial -e INFRAKIT_GROUP_POLL_INTERVAL=500ms"
 
 log="--log 5"
 
@@ -70,9 +71,15 @@ server manager2 infrakit-manager $log --name group2 --proxy-for-group group-stat
 
 sleep 5 # wait for leadership detection to run
 
-server instance-file infrakit-instance-file --dir /ikt/tutorial/ $log
-server group-default infrakit-group-default --poll-interval 500ms --name group-stateless $log
-server flavor-vanilla infrakit-flavor-vanilla $log
+server infrakit infrakit plugin start \
+       group:group-stateless \
+       file:instance-file \
+       vanilla:flavor-vanilla \
+       $log
+
+# server instance-file infrakit-instance-file --dir /ikt/tutorial/ $log
+# server group-default infrakit-group-default --poll-interval 500ms --name group-stateless $log
+# server flavor-vanilla infrakit-flavor-vanilla $log
 
 sleep 2
 

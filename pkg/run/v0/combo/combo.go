@@ -1,43 +1,26 @@
-package file
+package combo
 
 import (
-	"os"
-
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/instance/file"
+	"github.com/docker/infrakit/pkg/plugin/flavor/combo"
+	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/docker/infrakit/pkg/run"
-	"github.com/docker/infrakit/pkg/run/local"
+	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
 	// Kind is the canonical name of the plugin for starting up, etc.
-	Kind = "file"
-
-	// EnvDir is the environment variable to use to set the default value of Options.Dir
-	EnvDir = "INFRAKIT_INSTANCE_FILE_DIR"
+	Kind = "combo"
 )
 
-var (
-	log = logutil.New("module", "run/v0/file")
-)
+var log = logutil.New("module", "run/v0/combo")
 
 func init() {
-	inproc.Register(Kind, Run, DefaultOptions)
-}
-
-// Options capture the options for starting up the plugin.
-type Options struct {
-	// Dir is the path of the directory to store the files
-	Dir string
-}
-
-// DefaultOptions return an Options with default values filled in.
-var DefaultOptions = Options{
-	Dir: local.Getenv(EnvDir, os.TempDir()),
+	inproc.Register(Kind, Run, combo.DefaultOptions)
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
@@ -45,15 +28,24 @@ var DefaultOptions = Options{
 func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
-	options := DefaultOptions
+	options := combo.DefaultOptions
 	err = config.Decode(&options)
 	if err != nil {
 		return
 	}
 
 	transport.Name = name
+
+	flavorPluginLookup := func(n plugin.Name) (flavor.Plugin, error) {
+		endpoint, err := plugins().Find(n)
+		if err != nil {
+			return nil, err
+		}
+		return flavor_rpc.NewClient(n, endpoint.Address)
+	}
+
 	impls = map[run.PluginCode]interface{}{
-		run.Instance: file.NewPlugin(options.Dir),
+		run.Flavor: combo.NewPlugin(flavorPluginLookup, options),
 	}
 	return
 }
