@@ -1,4 +1,4 @@
-package main
+package combo
 
 import (
 	"errors"
@@ -48,7 +48,7 @@ func TestMergeBehavior(t *testing.T) {
 
 	plugins := map[string]flavor.Plugin{"a": a, "b": b}
 
-	combo := NewPlugin(pluginLookup(plugins))
+	combo := NewPlugin(pluginLookup(plugins), Options{})
 
 	flavorProperties := types.AnyString(`{
 	  "Flavors": [
@@ -112,7 +112,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 
 	plugins := map[string]flavor.Plugin{"a": a, "b": b}
 
-	combo := NewPlugin(pluginLookup(plugins))
+	combo := NewPlugin(pluginLookup(plugins), Options{})
 
 	flavorProperties := types.AnyString(`{
 	  "Flavors": [

@@ -1,0 +1,20 @@
+ID: vanilla
+Properties:
+  Allocation:
+    Size: 1
+  Flavor:
+    # Here we use vanilla but started with a different name
+    Plugin: french_vanilla
+    Properties:
+      Init:
+        - sudo apt-get update -y
+        - sudo apt-get install -y nginx
+        - sudo service nginx start
+      Tags:
+        project: infrakit
+        tier: web
+
+  Instance:
+    Plugin: simulator/compute
+    Properties:
+      Note: custom field

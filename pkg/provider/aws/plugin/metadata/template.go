@@ -91,7 +91,7 @@ func (c *Context) start() {
 // List returns a list of *child nodes* given a path, which is specified as a slice
 // where for i > j path[i] is the parent of path[j]
 func (c *Context) List(path types.Path) (child []string, err error) {
-	if path.Len() == 0 {
+	if path.Len() == 0 || path.Dot() {
 		return []string{"export", "local"}, nil
 	}
 	if first := path.Index(0); first != nil && "local" == *first {

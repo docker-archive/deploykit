@@ -1,4 +1,4 @@
-package main
+package combo
 
 import (
 	"errors"
@@ -16,8 +16,15 @@ type Spec struct {
 	Flavors []group_types.FlavorPlugin
 }
 
+// Options is the static properties required for starting things up
+type Options struct {
+}
+
+// DefaultOptions has the default values for options
+var DefaultOptions = Options{}
+
 // NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.  Each flavor
-func NewPlugin(flavorPlugins group.FlavorPluginLookup) flavor.Plugin {
+func NewPlugin(flavorPlugins group.FlavorPluginLookup, options Options) flavor.Plugin {
 	return flavorCombo{flavorPlugins: flavorPlugins}
 }
 

@@ -14,21 +14,23 @@ The plugin can be started without any arguments and will default to using unix s
 `~/.infrakit/plugins` for communications with the CLI and other plugins:
 
 ```shell
-$ build/infrakit-instance-file --dir=./test
-INFO[0000] Listening at: ~/.infrakit/plugins/instance-file
+$ INFRAKIT_INSTANCE_FILE_DIR=./test build/infrakit plugin start file
+INFO[0000] Listening at: ~/.infrakit/plugins/file
 ```
 
-This starts the plugin using `./test` as directory and `instance-file` as name.
+The environment variable `INFRAKIT_INSTANCE_FILE_DIR` sets the directory
+used by this plugin instance.  This starts the plugin starts up the
+plugin listening at socket file `file`.
 
-You can give the another plugin instance a different name via the `listen` flag:
+You can give the another plugin instance a different name:
 ```shell
-$ build/infrakit-instance-file --name=another-file --dir=./test
-INFO[0000] Listening at: ~/.infrakit/plugins/another-file
+$ INFRAKIT_INSTANCE_FILE_DIR=./test2 build/infrakit plugn start file:another
+INFO[0000] Listening at: ~/.infrakit/plugins/another
 ```
 
 Be sure to verify that the plugin is [discoverable](/cmd/infrakit/README.md#list-plugins).
 
 Note that there should be two file instance plugins running now with different names
-(`instance-file`, and `another-file`).
+(`file`, and `another`).
 
 See the [CLI Doc](/cmd/infrakit/README.md) for details on accessing the instance plugin via CLI.
