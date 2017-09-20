@@ -9,6 +9,9 @@ matrix:
     - go: 1.7.5
     - go: 1.8
 
+before_script:
+  - go vet ./...
+
 script:
   - go test -coverprofile=coverage.txt -covermode=atomic -race
 
