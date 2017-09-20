@@ -3701,8 +3701,7 @@ func TestImportTfShowError(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	fns := importFns{
-		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return nil, fmt.Errorf("Custom show error")
@@ -3735,8 +3734,7 @@ func TestImportAlreadyExists(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	fns := importFns{
-		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{
@@ -3783,8 +3781,7 @@ func TestImportTfImportError(t *testing.T) {
 
 	cleanVals := []string{}
 	fns := importFns{
-		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
@@ -3835,8 +3832,7 @@ func TestImportTfShowInstError(t *testing.T) {
 
 	cleanVals := []string{}
 	fns := importFns{
-		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
@@ -3847,8 +3843,7 @@ func TestImportTfShowInstError(t *testing.T) {
 			require.Equal(t, "123", id)
 			return nil
 		},
-		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShowInst: func(id string) (TResourceProperties, error) {
 			return nil, fmt.Errorf("Custom show inst error")
 		},
 		tfClean: func(resType TResourceType, name string) {
@@ -3892,8 +3887,7 @@ func TestImportResourceTagMap(t *testing.T) {
 	cleanInvoked := false
 	resourceName := ""
 	fns := importFns{
-		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
@@ -3905,8 +3899,7 @@ func TestImportResourceTagMap(t *testing.T) {
 			require.Equal(t, "123", id)
 			return nil
 		},
-		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShowInst: func(id string) (TResourceProperties, error) {
 			prefix := "aws_instance.instance-"
 			require.True(t, strings.HasPrefix(id, prefix), fmt.Sprintf("'%v' should have prefix '%v'", id, prefix))
 			props := TResourceProperties{
@@ -3984,8 +3977,7 @@ func TestImportResourceTagSlice(t *testing.T) {
 	cleanInvoked := false
 	resourceName := ""
 	fns := importFns{
-		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMIBMCloud}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{
@@ -4003,8 +3995,7 @@ func TestImportResourceTagSlice(t *testing.T) {
 			require.Equal(t, "123", id)
 			return nil
 		},
-		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShowInst: func(id string) (TResourceProperties, error) {
 			require.True(t, strings.HasPrefix(id, "ibm_compute_vm_instance.instance-"))
 			props := TResourceProperties{
 				"hostname": "actual-hostname",
@@ -4139,8 +4130,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 	cleanInvoked := false
 	imports := []string{}
 	fns := importFns{
-		tfShow: func(dirArg string, types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Len(t, types, 3)
 			require.Contains(t, types, VMIBMCloud)
 			require.Contains(t, types, TResourceType("ibm_storage_file"))
@@ -4174,8 +4164,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 			imports = append(imports, fmt.Sprintf("%v.%v.%v", resType, resName, id))
 			return nil
 		},
-		tfShowInst: func(dirArg, id string) (TResourceProperties, error) {
-			require.Equal(t, dir, dirArg)
+		tfShowInst: func(id string) (TResourceProperties, error) {
 			if strings.HasPrefix(id, "ibm_compute_vm_instance.instance-") {
 				props := TResourceProperties{
 					"hostname": "actual-hostname",

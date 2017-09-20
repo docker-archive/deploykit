@@ -1166,7 +1166,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		// TODO - not the most efficient, but here we assume we're usually just one vm type
 		for vmResourceType := range localSpecs {
 
-			if result, err := p.doTerraformShow(p.Dir, []TResourceType{vmResourceType}, nil); err == nil {
+			if result, err := p.doTerraformShow([]TResourceType{vmResourceType}, nil); err == nil {
 				terraformShowResult = result
 			} else {
 				// Don't blow up... just do best and show what we can find.
@@ -1287,9 +1287,9 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 
 // External functions using during import; broken out for testing
 type importFns struct {
-	tfShow     func(dir string, resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
+	tfShow     func(resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
 	tfImport   func(resType TResourceType, filename, resID string) error
-	tfShowInst func(dir, id string) (TResourceProperties, error)
+	tfShowInst func(id string) (TResourceProperties, error)
 	tfClean    func(resType TResourceType, resName string)
 }
 
@@ -1347,7 +1347,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	for resType := range showResourceTypesMap {
 		showResourceTypes = append(showResourceTypes, resType)
 	}
-	existingResources, err := fns.tfShow(p.Dir, showResourceTypes, []string{"id"})
+	existingResources, err := fns.tfShow(showResourceTypes, []string{"id"})
 	if err != nil {
 		return err
 	}
@@ -1438,7 +1438,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	// Parse the terraform show output
 	if errorToThrow == nil {
 		for _, r := range resources {
-			importedProps, err := fns.tfShowInst(p.Dir, fmt.Sprintf("%v.%v", string(*r.ResourceType), r.FinalResourceName))
+			importedProps, err := fns.tfShowInst(fmt.Sprintf("%v.%v", string(*r.ResourceType), r.FinalResourceName))
 			if err != nil {
 				errorToThrow = err
 				break

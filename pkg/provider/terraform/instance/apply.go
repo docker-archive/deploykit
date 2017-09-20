@@ -133,7 +133,7 @@ func (p *plugin) shouldApply() bool {
 // External functions to use during when pruning files; broken out for testing
 type tfFuncs struct {
 	tfRefresh   func() error
-	tfStateList func(string) (map[TResourceType]map[TResourceName]struct{}, error)
+	tfStateList func() (map[TResourceType]map[TResourceName]struct{}, error)
 }
 
 // handleFiles handles resource pruning and new resources via:
@@ -154,7 +154,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	if err := fns.tfRefresh(); err != nil {
 		return err
 	}
-	tfStateResources, err := fns.tfStateList(p.Dir)
+	tfStateResources, err := fns.tfStateList()
 	if err != nil {
 		// TODO(kaufers): If it possible that not all of the .new files were moved to
 		//  .tf.json files (NFS connection could be lost) and this could make the refresh
@@ -255,12 +255,12 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 }
 
 // doTerraformStateList shells out to run `terraform state list` and parses the result
-func (p *plugin) doTerraformStateList(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+func (p *plugin) doTerraformStateList() (map[TResourceType]map[TResourceName]struct{}, error) {
 	result := map[TResourceType]map[TResourceName]struct{}{}
 	command := exec.Command("terraform state list -no-color").
 		InheritEnvs(true).
 		WithEnvs(p.envs...).
-		WithDir(dir)
+		WithDir(p.Dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {
