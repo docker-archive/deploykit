@@ -34,6 +34,9 @@ func main() {
 			LifeCycleState: "RUNNING", // and by state (uppercase and lowercase accepted)
 		},
 	}
-	instances := coreClient.ListInstances(options)
+	instances, bmcErr := coreClient.ListInstances(options)
+	if bmcErr.Code != "200" {
+		log.Fatal("Error listing compute instance: ", bmcErr.Message)
+	}
 	fmt.Println("Instances: ", instances)
 }
