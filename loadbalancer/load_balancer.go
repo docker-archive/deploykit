@@ -74,8 +74,8 @@ func (c *Client) GetLoadBalancer(loadBalancerID string) (LoadBalancer, *bmc.Erro
 	return loadBalancer, nil
 }
 
-// ListLoadBalancer lists all load balancers in the specified compartment
-func (c *Client) ListLoadBalancer(loadBalancerID string) ([]LoadBalancer, *bmc.Error) {
+// ListLoadBalancers lists all load balancers in the specified compartment
+func (c *Client) ListLoadBalancers(loadBalancerID string) ([]LoadBalancer, *bmc.Error) {
 	loadBalancers := []LoadBalancer{}
 	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers"), nil)
 	if err != nil {
