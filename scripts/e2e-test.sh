@@ -63,14 +63,17 @@ rm -rf $INSTANCE_FILE_DIR/*
 
 export LOG_DIR=$LOG_DIR
 
+export INFRAKIT_INSTANCE_FILE_DIR=$INSTANCE_FILE_DIR
+export INFRAKIT_GROUP_POLL_INTERVAL=500ms
+
 #echo "generating logfiles"
 #pkg/plugin/event/tailer/test-gen.sh $LOG_DIR/test1.log &
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
 infrakit plugin start --config-url file:///$PWD/scripts/e2e-test-plugins.json \
-	 group-stateless=os \
-	 instance-file=os \
-	 flavor-vanilla=os \
+	 group:group-stateless \
+	 file:instance-file \
+	 vanilla:flavor-vanilla \
 	 mylogs:testlogs=inproc &
 
 starterpid=$!
@@ -144,7 +147,7 @@ expect_exact_output \
 
 infrakit group commit docs/cattle2.json
 
-sleep 5
+sleep 10
 
 expect_output_lines "10 instances should exist in group" "infrakit group describe cattle -q" "10"
 
@@ -153,7 +156,7 @@ pushd $INSTANCE_FILE_DIR
   rm $(ls | head -3)
 popd
 
-sleep 5
+sleep 10
 
 expect_output_lines "10 instances should exist in group" "infrakit group describe cattle -q" "10"
 
@@ -163,4 +166,4 @@ expect_output_lines "0 instances should exist" "infrakit instance-file describe 
 echo 'ALL TESTS PASSED'
 
 echo "Stopping plugins"
-infrakit plugin stop group-default instance-file flavor-vanilla
+infrakit plugin stop --all
