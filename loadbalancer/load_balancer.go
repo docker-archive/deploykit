@@ -18,7 +18,7 @@ type LoadBalancer struct {
 	// A user-friendly name
 	DisplayName string `json:"displayName"`
 	// A mapping of strings to Certificate objects
-	Certificates string `json:"certificates,omitempty"`
+	Certificates map[string]Certificate `json:"certificates,omitempty"`
 	// The OCID of the compartment containing the load balancer
 	CompartmentID string `json:"compartmentId"`
 	// The OCID of the load balancer
@@ -75,7 +75,7 @@ func (c *Client) GetLoadBalancer(loadBalancerID string) (LoadBalancer, *bmc.Erro
 }
 
 // ListLoadBalancers lists all load balancers in the specified compartment
-func (c *Client) ListLoadBalancers(loadBalancerID string) ([]LoadBalancer, *bmc.Error) {
+func (c *Client) ListLoadBalancers() ([]LoadBalancer, *bmc.Error) {
 	loadBalancers := []LoadBalancer{}
 	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers"), nil)
 	if err != nil {
