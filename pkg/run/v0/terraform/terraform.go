@@ -1,10 +1,12 @@
 package terraform
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
@@ -71,6 +73,9 @@ type Options struct {
 
 	// NewOption is an example... see the plugins.json file in this directory.
 	NewOption string
+
+	// Envs are the environemtn variables to include when invoking terraform
+	Envs types.Any
 }
 
 // DefaultOptions return an Options with default values filled in.  If you want to expose these to the CLI,
@@ -123,9 +128,15 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		}
 		resources = append(resources, &res)
 	}
+	// Environment varables to include when invoking terraform
+	envs, err := parseOptionsEnvs(&options.Envs)
+	if err != nil {
+		log.Error("error parsing configuration Env Options", "err", err)
+		return
+	}
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: terraform.NewTerraformInstancePlugin(options.Dir, options.PollInterval.Duration(),
-			options.Standalone, &terraform.ImportOptions{
+			options.Standalone, envs, &terraform.ImportOptions{
 				InstanceSpec: importInstSpec,
 				Resources:    resources,
 			}),
@@ -190,4 +201,23 @@ func parseInstanceSpecFromGroup(groupSpecURL, groupID string) (*instance.Spec, e
 	log.Info("Successfully processed instance spec from group.", "group", groupSpec.ID, "spec", spec)
 
 	return &spec, nil
+}
+
+// parseOptionsEnvs processes the data to create a key=value slice of strings
+func parseOptionsEnvs(data *types.Any) ([]string, error) {
+	envs := []string{}
+	if data == nil || len(data.Bytes()) == 0 {
+		return envs, nil
+	}
+	err := json.Unmarshal(data.Bytes(), &envs)
+	if err != nil {
+		return envs, fmt.Errorf("Failed to unmarshall Options.Envs data: %v", err)
+	}
+	// Must be key=value pairs
+	for _, val := range envs {
+		if !strings.Contains(val, "=") {
+			return []string{}, fmt.Errorf("Env var is missing '=' character: %v", val)
+		}
+	}
+	return envs, err
 }

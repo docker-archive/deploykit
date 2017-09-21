@@ -45,13 +45,16 @@ func (p *plugin) terraformApply() error {
 			if p.shouldApply() {
 				fns := tfFuncs{
 					tfRefresh: func() error {
-						command := exec.Command("terraform refresh").InheritEnvs(true).WithDir(p.Dir)
+						command := exec.Command("terraform refresh").
+							InheritEnvs(true).
+							WithEnvs(p.envs...).
+							WithDir(p.Dir)
 						if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
 							return err
 						}
 						return command.Wait()
 					},
-					tfStateList: doTerraformStateList,
+					tfStateList: p.doTerraformStateList,
 				}
 				// The trigger for an apply is typically from a group commit, sleep for a few seconds so
 				// that multiple .tf.json.new files have time to be created
@@ -90,7 +93,10 @@ func (p *plugin) terraformApply() error {
 // doTerraformApply executes "terraform apply"
 func (p *plugin) doTerraformApply() error {
 	log.Infoln("Applying plan")
-	command := exec.Command("terraform apply -refresh=false").InheritEnvs(true).WithDir(p.Dir)
+	command := exec.Command("terraform apply -refresh=false").
+		InheritEnvs(true).
+		WithEnvs(p.envs...).
+		WithDir(p.Dir)
 	err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start()
 	if err == nil {
 		return command.Wait()
@@ -127,7 +133,7 @@ func (p *plugin) shouldApply() bool {
 // External functions to use during when pruning files; broken out for testing
 type tfFuncs struct {
 	tfRefresh   func() error
-	tfStateList func(string) (map[TResourceType]map[TResourceName]struct{}, error)
+	tfStateList func() (map[TResourceType]map[TResourceName]struct{}, error)
 }
 
 // handleFiles handles resource pruning and new resources via:
@@ -148,7 +154,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	if err := fns.tfRefresh(); err != nil {
 		return err
 	}
-	tfStateResources, err := fns.tfStateList(p.Dir)
+	tfStateResources, err := fns.tfStateList()
 	if err != nil {
 		// TODO(kaufers): If it possible that not all of the .new files were moved to
 		//  .tf.json files (NFS connection could be lost) and this could make the refresh
@@ -249,9 +255,12 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 }
 
 // doTerraformStateList shells out to run `terraform state list` and parses the result
-func doTerraformStateList(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+func (p *plugin) doTerraformStateList() (map[TResourceType]map[TResourceName]struct{}, error) {
 	result := map[TResourceType]map[TResourceName]struct{}{}
-	command := exec.Command("terraform state list -no-color").InheritEnvs(true).WithDir(dir)
+	command := exec.Command("terraform state list -no-color").
+		InheritEnvs(true).
+		WithEnvs(p.envs...).
+		WithDir(p.Dir)
 	command.StartWithHandlers(
 		nil,
 		func(r io.Reader) error {

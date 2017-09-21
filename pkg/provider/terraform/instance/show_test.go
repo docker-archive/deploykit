@@ -688,15 +688,11 @@ func TestRunTerraformShow(t *testing.T) {
 	t.Log("Test DISABLED -- TODO(chungers) - this requires some local state. refactor this test or use mocks")
 	t.SkipNow()
 
-	dir, err := os.Getwd()
-	require.NoError(t, err)
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
 	dir = path.Join(dir, "aws-two-tier")
 
-	found, err := doTerraformShow(
-		dir,
-		[]TResourceType{TResourceType("aws_vpc")},
-		nil,
-	)
+	found, err := tf.doTerraformShow([]TResourceType{TResourceType("aws_vpc")}, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(found))
 	T(100).Infoln(found)

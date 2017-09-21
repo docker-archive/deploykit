@@ -26,7 +26,7 @@ func TestRunTerraformApply(t *testing.T) {
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	dir = path.Join(dir, "aws-two-tier")
-	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, false, nil)
+	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, false, []string{}, nil)
 	p, _ := terraform.(*plugin)
 	err = p.doTerraformApply()
 	require.NoError(t, err)
@@ -36,7 +36,7 @@ func TestContinuePollingStandalone(t *testing.T) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
-	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, true, nil)
+	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, true, []string{}, nil)
 	p, _ := terraform.(*plugin)
 	shoudApply := p.shouldApply()
 	require.True(t, shoudApply)
@@ -156,8 +156,7 @@ func TestHandleFilesStateListFail(t *testing.T) {
 			refreshInvoked = true
 			return nil
 		},
-		tfStateList: func(dirArg string) (map[TResourceType]map[TResourceName]struct{}, error) {
-			require.Equal(t, dir, dirArg)
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			return nil, fmt.Errorf("Custom state list error")
 		},
 	}
@@ -173,7 +172,7 @@ func TestHandleFilesNoFiles(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			return map[TResourceType]map[TResourceName]struct{}{}, nil
 		},
 	}
@@ -205,7 +204,7 @@ func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			// Return 5 files
 			result := map[TResourceName]struct{}{}
 			for i := 100; i < 105; i++ {
@@ -320,7 +319,7 @@ func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			// Return all VMs
 			vms := map[TResourceName]struct{}{}
 			for i := 100; i < 115; i++ {
@@ -395,7 +394,7 @@ func TestHandleFilesNoPruneWithNewFiles(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			// Return the 5 existing instances
 			result := map[TResourceName]struct{}{}
 			for i := 100; i < 105; i++ {
@@ -450,7 +449,7 @@ func TestHandleFilesPruneMultipleVMTypes(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			// Return all of 1 type, 1 of another type, 0 of the last type
 			return map[TResourceType]map[TResourceName]struct{}{
 				VMIBMCloud: {
@@ -504,7 +503,7 @@ func TestHandleFilesPruneWithNewFiles(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			// Return only 3 of the five existing
 			result := map[TResourceName]struct{}{
 				TResourceName("instance-102"): {},
@@ -659,7 +658,7 @@ func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			// Return only existing instances (ie, only odd ones)
 			vms := map[TResourceName]struct{}{}
 			for i := 100; i < 115; i++ {
@@ -842,7 +841,7 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			// Return only existing instances (ie, only odd ones) EXCEPT 1 in each group
 			vms := map[TResourceName]struct{}{}
 			for i := 100; i < 115; i++ {
@@ -909,7 +908,7 @@ func TestHandleFilesDuplicates(t *testing.T) {
 
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
-		tfStateList: func(dir string) (map[TResourceType]map[TResourceName]struct{}, error) {
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			return map[TResourceType]map[TResourceName]struct{}{}, nil
 		},
 	}

@@ -70,6 +70,7 @@ type plugin struct {
 	pollInterval time.Duration
 	pollChannel  chan bool
 	pluginLookup func() discovery.Plugins
+	envs         []string
 }
 
 // ImportResource defines a resource that should be imported
@@ -94,7 +95,7 @@ type ImportOptions struct {
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool, importOpts *ImportOptions) instance.Plugin {
+func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool, envs []string, importOpts *ImportOptions) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
 	fsLock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
 	if err != nil {
@@ -120,6 +121,7 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 		fsLock:       fsLock,
 		pollInterval: pollInterval,
 		pluginLookup: pluginLookup,
+		envs:         envs,
 	}
 	if err := p.processImport(importOpts); err != nil {
 		panic(err)
@@ -164,15 +166,18 @@ func (p *plugin) processImport(importOpts *ImportOptions) error {
 
 	// Define the functions for import and import the VM
 	fns := importFns{
-		tfShow: doTerraformShow,
+		tfShow: p.doTerraformShow,
 		tfImport: func(resType TResourceType, resName, id string) error {
-			command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", resType, resName, id)).InheritEnvs(true).WithDir(p.Dir)
+			command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", resType, resName, id)).
+				InheritEnvs(true).
+				WithEnvs(p.envs...).
+				WithDir(p.Dir)
 			if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
 				return err
 			}
 			return command.Wait()
 		},
-		tfShowInst: doTerraformShowForInstance,
+		tfShowInst: p.doTerraformShowForInstance,
 		tfClean:    p.cleanupFailedImport,
 	}
 	err := p.importResources(fns, importOpts.Resources, importOpts.InstanceSpec)
@@ -1161,7 +1166,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		// TODO - not the most efficient, but here we assume we're usually just one vm type
 		for vmResourceType := range localSpecs {
 
-			if result, err := doTerraformShow(p.Dir, []TResourceType{vmResourceType}, nil); err == nil {
+			if result, err := p.doTerraformShow([]TResourceType{vmResourceType}, nil); err == nil {
 				terraformShowResult = result
 			} else {
 				// Don't blow up... just do best and show what we can find.
@@ -1282,9 +1287,9 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 
 // External functions using during import; broken out for testing
 type importFns struct {
-	tfShow     func(dir string, resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
+	tfShow     func(resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
 	tfImport   func(resType TResourceType, filename, resID string) error
-	tfShowInst func(dir, id string) (TResourceProperties, error)
+	tfShowInst func(id string) (TResourceProperties, error)
 	tfClean    func(resType TResourceType, resName string)
 }
 
@@ -1342,7 +1347,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	for resType := range showResourceTypesMap {
 		showResourceTypes = append(showResourceTypes, resType)
 	}
-	existingResources, err := fns.tfShow(p.Dir, showResourceTypes, []string{"id"})
+	existingResources, err := fns.tfShow(showResourceTypes, []string{"id"})
 	if err != nil {
 		return err
 	}
@@ -1433,7 +1438,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	// Parse the terraform show output
 	if errorToThrow == nil {
 		for _, r := range resources {
-			importedProps, err := fns.tfShowInst(p.Dir, fmt.Sprintf("%v.%v", string(*r.ResourceType), r.FinalResourceName))
+			importedProps, err := fns.tfShowInst(fmt.Sprintf("%v.%v", string(*r.ResourceType), r.FinalResourceName))
 			if err != nil {
 				errorToThrow = err
 				break
@@ -1493,7 +1498,10 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 
 // cleanupFailedImport removes the resource from the terraform state file
 func (p *plugin) cleanupFailedImport(vmType TResourceType, vmName string) {
-	command := exec.Command(fmt.Sprintf("terraform state rm %v.%v", vmType, vmName)).InheritEnvs(true).WithDir(p.Dir)
+	command := exec.Command(fmt.Sprintf("terraform state rm %v.%v", vmType, vmName)).
+		InheritEnvs(true).
+		WithEnvs(p.envs...).
+		WithDir(p.Dir)
 	err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start()
 	if err == nil {
 		command.Wait()
