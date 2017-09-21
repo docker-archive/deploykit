@@ -14,11 +14,11 @@ import (
 // LoadBalancer represents the listener's configuration: https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/LoadBalancer/
 type LoadBalancer struct {
 	// A mapping of strings to BackendSet objects
-	BackendSets []BackendSet `json:"backendSets,omitempty"`
+	BackendSets map[string]BackendSet `json:"backendSets,omitempty"`
 	// A user-friendly name
 	DisplayName string `json:"displayName"`
 	// A mapping of strings to Certificate objects
-	Certificates string `json:"certificates"`
+	Certificates string `json:"certificates,omitempty"`
 	// The OCID of the compartment containing the load balancer
 	CompartmentID string `json:"compartmentId"`
 	// The OCID of the load balancer
