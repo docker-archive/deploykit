@@ -32,7 +32,7 @@ type LoadBalancer struct {
 	// FAILED | DELETING | DELETED
 	LifeCycleState string `json:"lifecycleState"`
 	// A mapping of strings to Listener objects
-	Listeners []Listener `json:"listeners"`
+	Listeners map[string]Listener `json:"listeners"`
 	// A template that determines the total pre-provisioned bandwidth
 	ShapeName string `json:"shapeName"` // HTTP or TCP
 	// An array of subnet OCIDs
