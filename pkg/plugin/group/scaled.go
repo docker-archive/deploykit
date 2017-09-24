@@ -83,13 +83,13 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 		settings.config.Allocation,
 		index)
 	if err != nil {
-		log.Error("Failed to Prepare instance", "err", err)
+		log.Error("Failed to Prepare instance", "settings", settings, "err", err)
 		return
 	}
 
 	id, err := settings.instancePlugin.Provision(spec)
 	if err != nil {
-		log.Error("Failed to provision", "err", err)
+		log.Error("Failed to provision", "settings", settings, "err", err)
 		return
 	}
 
