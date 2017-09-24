@@ -298,9 +298,8 @@ func (p rackHDInstancePlugin) hasAnActiveWorkflow(nodeID string, auth runtime.Cl
 	}
 	if len(activeWorkflows.Payload) > 0 {
 		return true, nil
-	} else {
-		return false, nil
 	}
+	return false, nil
 }
 
 func (p rackHDInstancePlugin) login() (runtime.ClientAuthInfoWriter, error) {
