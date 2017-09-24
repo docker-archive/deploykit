@@ -8,7 +8,10 @@ coverage.txt
 .tags
 
 # Build binaries
-build/
+build/*
+
+# Demo files
+demo/*
 
 # Vim temporary files.
 .*.swp
