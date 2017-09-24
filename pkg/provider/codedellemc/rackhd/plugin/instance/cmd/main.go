@@ -4,10 +4,12 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codedellemc/infrakit.rackhd/plugin"
-	"github.com/codedellemc/infrakit.rackhd/plugin/instance"
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/plugin"
+	rackhd "github.com/docker/infrakit/pkg/provider/codedellemc/rackhd/plugin"
+	"github.com/docker/infrakit/pkg/provider/codedellemc/rackhd/plugin/instance"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +30,7 @@ func main() {
 			}
 
 			cli.SetLogLevel(logLevel)
-			cli.RunPlugin(name, instance_plugin.PluginServer(instancePlugin))
+			run.Plugin(plugin.DefaultTransport(name), instance_plugin.PluginServer(instancePlugin))
 		},
 	}
 
@@ -36,7 +38,7 @@ func main() {
 	cmd.Flags().StringVar(&name, "name", "rackhd", "Plugin name to advertise for discovery")
 	cmd.Flags().AddFlagSet(builder.Flags())
 
-	cmd.AddCommand(plugin.VersionCommand())
+	cmd.AddCommand(rackhd.VersionCommand())
 
 	err := cmd.Execute()
 	if err != nil {

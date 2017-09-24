@@ -77,7 +77,7 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 					skuMock.EXPECT().
 						SkusIDGetNodes(gomock.Any(), gomock.Any()).
 						Times(1).
-						Return(&skus.SkusIDGetNodesOK{Payload: _Nodes(false)}, nil)
+						Return(&skus.SkusIDGetNodesOK{Payload: _SkuNodes(false)}, nil)
 
 					mockClient.EXPECT().
 						Nodes().Times(1).Return(nodeMock)
@@ -126,7 +126,7 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 				})
 
 				It("should delete without error", func() {
-					err := pluginImpl.Destroy(instanceID)
+					err := pluginImpl.Destroy(instanceID, instance.Termination)
 					Expect(err).To(BeNil())
 				})
 			})
@@ -222,10 +222,53 @@ func _Nodes(provisioned bool) []*models.Node20Node {
 			ID:           "58b028330b0d3789044b2ba3",
 			Name:         names[1],
 			Type:         "compute",
-			Tags:         tags1,
+			Tags:         strings.Join(tags1, ","),
 		},
 		{
 			AutoDiscover: "false",
+			ID:           "58b028330b0d3789044b2ba4",
+			Name:         names[2],
+			Type:         "compute",
+			Tags:         strings.Join(tags2, ","),
+		},
+	}
+	return nodes
+}
+
+func _SkuNodes(provisioned bool) []*models.Node20SkuNode {
+	names := []string{
+		"Enclosure Node QTFCJ05160195",
+		"52:54:be:ef:81:6d",
+		"52:54:be:ef:81:6e",
+	}
+	var tags1 []string
+	var tags2 []string
+	if provisioned {
+		tags1 = append(tags1, "infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y")
+		tags1 = append(tags1, "infrakit.group=cattle")
+		tags1 = append(tags1, "project=infrakit")
+		tags1 = append(tags1, "tier=web")
+		tags2 = append(tags1, "infrakit.config_sha=007429nMYW5gWExtUxfG8AcaF2Z")
+		tags2 = append(tags1, "infrakit.group=cattle")
+		tags2 = append(tags1, "project=infrakit")
+		tags2 = append(tags1, "tier=app")
+	}
+	nodes := []*models.Node20SkuNode{
+		{
+			AutoDiscover: false,
+			ID:           "58b02931ca8c52d204e60388",
+			Name:         names[0],
+			Type:         "enclosure",
+		},
+		{
+			AutoDiscover: false,
+			ID:           "58b028330b0d3789044b2ba3",
+			Name:         names[1],
+			Type:         "compute",
+			Tags:         tags1,
+		},
+		{
+			AutoDiscover: false,
 			ID:           "58b028330b0d3789044b2ba4",
 			Name:         names[2],
 			Type:         "compute",

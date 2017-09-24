@@ -100,7 +100,7 @@ func (p rackHDInstancePlugin) getTagMapForNode(node *models.Node20Node, auth run
 }
 
 // Destroy reformats a RackHD instance and performs a secure erase of the system
-func (p rackHDInstancePlugin) Destroy(id instance.ID) error {
+func (p rackHDInstancePlugin) Destroy(id instance.ID, ctx instance.Context) error {
 	auth, err := p.login()
 	if err != nil {
 		return err
