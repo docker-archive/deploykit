@@ -39,6 +39,10 @@ type Context struct {
 
 func (c *Context) start() {
 
+	if c.poll == 0 {
+		c.poll = 1 * time.Minute
+	}
+
 	log.Infoln("Staring context:", c, c.poll)
 	update := make(chan func(map[string]interface{}))
 	tick := time.Tick(c.poll)
