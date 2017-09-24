@@ -1,0 +1,60 @@
+# vim:set ft=ruby
+Vagrant.configure("2") do |config|
+    config.vm.box = "rackhd/rackhd"
+    config.vm.box_version = "2.1.0"
+    config.vm.provider "virtualbox" do |v|
+        v.memory = 4096
+        v.cpus = 4
+        v.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
+    end
+
+    config.vm.network "private_network", ip: "172.31.128.1", virtualbox__intnet: "closednet", auto_config: false, nic_type: "82540EM"
+    config.vm.network "forwarded_port", guest: 8080, host: 9090
+    config.vm.network "forwarded_port", guest: 5672, host: 9091
+    config.vm.network "forwarded_port", guest: 9080, host: 9092
+    config.vm.network "forwarded_port", guest: 8443, host: 9093
+    config.vm.network "forwarded_port", guest: 7080, host: 6080
+
+    # If true, then any SSH connections made will enable agent forwarding.
+    # Default value: false
+
+    config.ssh.forward_agent = true
+
+    # Enable admin user
+    config.vm.provision "shell", inline: <<-EOS
+      /usr/bin/curl -sk -H "Content-Type: application/json" -X POST https://localhost:8443/api/current/users -d '{"username": "admin", "password": "admin123", "role": "Administrator"}'
+      if [ ! -f on-tools ]
+      then
+        git clone https://github.com/RackHD/on-tools.git
+      fi
+      if [ ! -f /var/mirrors/Centos/7.0 ]
+      then
+        sudo python ./on-tools/scripts/setup_iso.py /vagrant/CentOS-7-x86_64-DVD-1611.iso /var/mirrors --link /var/renasar
+      fi
+      sudo ln -s /var/mirrors/Centos /var/renasar/on-http/static/http/centos
+      sudo mkdir /var/mirrors/Centos/7.0/os
+      sudo ln -s /var/mirrors/Centos/7.0 /var/mirors/Centos/7.0/os/x86_64
+      sudo ln -s /var/mirrors/Centos /var/renasar/on-http/static/http/centos
+      sudo perl -pi -e 's|monorail-undionly.kpxe|monorail.ipxe|g' /var/renasar/on-dhcp-proxy/lib/message-handler.js
+      sudo service on-dhcp-proxy restart
+    EOS
+
+    # Install Docker Infrakit
+    # config.vm.provision "shell",
+    #   env: {
+    #     "GOROOT" => "/home/vagrant/go",
+    #     "GOPATH" => "/home/vagrant/gocode"
+    #   },
+    #   inline: <<-EOS
+    #     mkdir /home/vagrant/go
+    #     mkdir /home/vagrant/gocode
+    #     /usr/bin/apt-get install -y gccgo-go
+    #     go get gofmt
+    #     go get github.com/docker/infrakit
+    #     go get github.com/codedellemc/infrakit.rackhd
+    #     cd infrakit
+    #     make binaries
+    #     build/infrakit-group-default &
+    #     build/infrakit-flavor-vanilla &
+    #   EOS
+end

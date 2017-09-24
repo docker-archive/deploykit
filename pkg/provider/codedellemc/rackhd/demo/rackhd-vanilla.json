@@ -1,0 +1,39 @@
+{
+    "ID": "rackhd-example",
+    "Properties": {
+        "Allocation": {
+            "Size": 1
+        },
+        "Instance": {
+            "Plugin": "rackhd",
+            "Properties": {
+                "Workflow": {
+                    "name": "Graph.InstallCentOS",
+                    "options": {
+                        "defaults": {
+                            "version": "7.0",
+                            "rootPassword": "root"
+                        }
+                    }
+                },
+                "SKUName": "VirtualBox"
+            },
+            "Tags": {
+                "Name": "infrakit-example"
+            }
+        },
+        "Flavor": {
+            "Plugin": "flavor-vanilla",
+            "Init": [
+                "sudo yum install -y nginx",
+                "sudo service nginx start"
+            ],
+            "Properties": {
+                "Tags": {
+                    "tier": "web",
+                    "project": "infrakit"
+                }
+            }
+        }
+    }
+}

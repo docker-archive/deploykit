@@ -1,0 +1,5 @@
+package: github.com/codedellemc/gorackhd
+import:
+  - package: github.com/go-swagger/go-swagger
+    version: 0.8.0
+    vcs:     git
