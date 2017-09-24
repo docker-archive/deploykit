@@ -50,8 +50,7 @@ func TestMergeBehavior(t *testing.T) {
 
 	combo := NewPlugin(pluginLookup(plugins), Options{})
 
-	flavorProperties := types.AnyString(`{
-	  "Flavors": [
+	flavorProperties := types.AnyString(`[
 	    {
 	      "Plugin": "a",
 	      "Properties": {"a": "1"}
@@ -60,8 +59,7 @@ func TestMergeBehavior(t *testing.T) {
 	      "Plugin": "b",
 	      "Properties": {"b": "2"}
 	    }
-	  ]
-	}`)
+	  ]`)
 
 	allocation := group_types.AllocationMethod{Size: 1}
 	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
@@ -114,8 +112,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 
 	combo := NewPlugin(pluginLookup(plugins), Options{})
 
-	flavorProperties := types.AnyString(`{
-	  "Flavors": [
+	flavorProperties := types.AnyString(`[
 	    {
 	      "Plugin": "a",
 	      "Properties": {"a": "1"}
@@ -124,8 +121,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 	      "Plugin": "b",
 	      "Properties": {"b": "2"}
 	    }
-	  ]
-	}`)
+	  ]`)
 
 	allocation := group_types.AllocationMethod{Size: 1}
 	index := group_types.Index{Group: group.ID("group"), Sequence: 0}

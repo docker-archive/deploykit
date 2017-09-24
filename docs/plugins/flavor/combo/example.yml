@@ -6,11 +6,10 @@ Properties:
     # Here we use combo to chain together two vanilla flavors
     Plugin: combo
     Properties:
-      Flavors:
       - Plugin: vanilla
         Properties:
           Init:
-          - vanilla one
+            - vanilla one
           Tags:
             v1: tag one
       - Plugin: vanilla

@@ -12,9 +12,7 @@ import (
 )
 
 // Spec is the model of the plugin Properties.
-type Spec struct {
-	Flavors []group_types.FlavorPlugin
-}
+type Spec []group_types.FlavorPlugin
 
 // Options is the static properties required for starting things up
 type Options struct {
@@ -47,7 +45,7 @@ func (f flavorCombo) Healthy(flavorProperties *types.Any, inst instance.Descript
 		return flavor.Unknown, err
 	}
 
-	for _, pluginSpec := range s.Flavors {
+	for _, pluginSpec := range s {
 		plugin, err := f.flavorPlugins(pluginSpec.Plugin)
 		if err != nil {
 			return flavor.Unknown, err
@@ -73,7 +71,7 @@ func (f flavorCombo) Drain(flavorProperties *types.Any, inst instance.Descriptio
 
 	errs := []string{}
 
-	for _, pluginSpec := range s.Flavors {
+	for _, pluginSpec := range s {
 		plugin, err := f.flavorPlugins(pluginSpec.Plugin)
 		if err != nil {
 			errs = append(errs, err.Error())
@@ -153,7 +151,7 @@ func (f flavorCombo) Prepare(flavor *types.Any,
 	}
 
 	specs := []instance.Spec{}
-	for _, pluginSpec := range combo.Flavors {
+	for _, pluginSpec := range combo {
 		// Copy the instance spec to prevent Flavor plugins from interfering with each other.
 		clone := cloneSpec(inst)
 

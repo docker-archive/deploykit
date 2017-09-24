@@ -13,20 +13,16 @@ The Combo plugin allows you to use Flavors as mixins, combining their Instance p
 
 Here's a skeleton of this Plugin's schema:
 ```json
-{
-  "Flavors": []
-}
-```
-
-A single field, `Flavors`, is supported, which is an array of the Flavors to compose.  Each element in the array is the
-same structure as how Flavors are used elsewhere:
-
-```json
-{
-  "Plugin": "",
-  "Properties": {
-  }
-}
+[
+  {
+    "Plugin": "",
+    "Properties": {
+  },
+  {
+    "Plugin": "",
+    "Properties": {
+  },...
+]
 ```
 
 
