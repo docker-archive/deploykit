@@ -12,7 +12,10 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 )
 
-var log = logutil.New("module", "leader/file")
+var (
+	log    = logutil.New("module", "leader/file")
+	debugV = logutil.V(1000)
+)
 
 // NewDetector return an implementation of leader detector
 // This implementation checks a file for its content.  If the content matches the id of the detector
@@ -34,7 +37,7 @@ func NewDetector(pollInterval time.Duration, filename, id string) (*leader.Polle
 
 			match := strings.Trim(string(content), " \t\n")
 
-			log.Debug("poll for leadership", "id", id, "file", filename, "match", match, "err", err, "V", logutil.V(500))
+			log.Debug("poll for leadership", "id", id, "file", filename, "match", match, "err", err, "V", debugV)
 
 			return match == id, err
 		}), nil
