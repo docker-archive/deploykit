@@ -6,28 +6,29 @@ import (
 	"github.com/spiegela/gorackhd/monorail"
 )
 
-type options struct {
-	endpoint string
-	username string
-	password string
+// Options contain parameters required to connect to RackHD
+type Options struct {
+	Endpoint string
+	Username string
+	Password string
 }
 
 // Builder is a ProvisionerBuilder that creates a RackHD instance provisioner
 type Builder struct {
-	options options
+	options Options
 }
 
 // Flags returns the flags required.
 func (b *Builder) Flags() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("rackhd", pflag.PanicOnError)
-	flags.StringVar(&b.options.endpoint, "endpoint", "http://localhost:9090", "RackHD API Endpoint")
-	flags.StringVar(&b.options.username, "username", "admin", "RackHD Username")
-	flags.StringVar(&b.options.password, "password", "admin123", "RackHD Password")
+	flags.StringVar(&b.options.Endpoint, "endpoint", "http://localhost:9090", "RackHD API Endpoint")
+	flags.StringVar(&b.options.Username, "username", "admin", "RackHD Username")
+	flags.StringVar(&b.options.Password, "password", "admin123", "RackHD Password")
 	return flags
 }
 
 // BuildInstancePlugin creates an instance Provisioner configured with the Flags.
 func (b *Builder) BuildInstancePlugin() (instance.Plugin, error) {
-	mc := monorail.New(b.options.endpoint)
-	return NewInstancePlugin(mc, b.options.username, b.options.password), nil
+	mc := monorail.New(b.options.Endpoint)
+	return NewInstancePlugin(mc, b.options.Username, b.options.Password), nil
 }
