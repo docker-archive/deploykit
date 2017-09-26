@@ -127,7 +127,7 @@ func (c *Client) CreateSecurityList(securityList *SecurityList) (bool, *bmc.Erro
 		return false, &bmcError
 	}
 	logrus.Debug("StatusCode: ", resp.StatusCode)
-	if resp.StatusCode != 204 {
+	if resp.StatusCode != 200 {
 		return false, bmc.NewError(*resp)
 	}
 	return true, nil
