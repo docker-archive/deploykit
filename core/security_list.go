@@ -19,9 +19,9 @@ type SecurityList struct {
 	// The OCID of the SecurityList
 	ID string `json:"id,omitempty"`
 	// Rules for allowing egress IP packets
-	EgressSecurityRules []EgressSecurityRule `json:"egressSecurityRules"`
+	EgressSecurityRules *[]EgressSecurityRule `json:"egressSecurityRules"`
 	// Rules for allowing ingress IP packets
-	IngressSecurityRules []IngressSecurityRule `json:"ingressSecurityRules"`
+	IngressSecurityRules *[]IngressSecurityRule `json:"ingressSecurityRules"`
 	// The SecurityList's current state
 	LifeCycleState string `json:"lifecycleState,omitempty"`
 	// The date and time the instance was created (RFC3339)
@@ -36,31 +36,30 @@ type EgressSecurityRule struct {
 	IcmpOptions string `json:"icmpOptions,omitempty"`
 	IsStateless string `json:"isStateless,omitempty"`
 	// Protocol values: all, ICMP ("1"), TCP ("6"), UDP ("17").
-	Protocol   string     `json:"protocol"`
-	TcpOptions PortConfig `json:"tcpOptions,omitempty"`
-	UdpOptions PortConfig `json:"udpOptions,omitempty"`
+	Protocol   string      `json:"protocol"`
+	TcpOptions *PortConfig `json:"tcpOptions,omitempty"`
+	UdpOptions *PortConfig `json:"udpOptions,omitempty"`
 }
 
 // IngressSecurityRule rule for allowing inbound IP packets
 type IngressSecurityRule struct {
-	Destination string `json:"destination"`
+	Source      string `json:"source"`
 	IcmpOptions string `json:"icmpOptions,omitempty"`
 	IsStateless string `json:"isStateless,omitempty"`
 	// Protocol values: all, ICMP ("1"), TCP ("6"), UDP ("17").
-	Protocol   string     `json:"protocol"`
-	Source     string     `json:"source,omitempty"`
-	TcpOptions PortConfig `json:"tcpOptions,omitempty"`
-	UdpOptions PortConfig `json:"udpOptions,omitempty"`
+	Protocol   string      `json:"protocol"`
+	TcpOptions *PortConfig `json:"tcpOptions,omitempty"`
+	UdpOptions *PortConfig `json:"udpOptions,omitempty"`
 }
 
 type PortConfig struct {
-	DestinationPortRange PortRange `json:"destinationPortRange"`
-	SourcePortRange      PortRange `json:"sourcePortRange"`
+	DestinationPortRange *PortRange `json:"destinationPortRange,omitempty"`
+	SourcePortRange      *PortRange `json:"sourcePortRange,omitempty"`
 }
 
 type PortRange struct {
-	Min string `json:"min"`
-	Max string `json:"max"`
+	Min string `json:"min,omitempty"`
+	Max string `json:"max,omitempty"`
 }
 
 // GetSecurityList returns a struct of a SecurityList request given an SecurityList ID
