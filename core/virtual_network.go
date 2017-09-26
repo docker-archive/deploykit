@@ -33,7 +33,7 @@ type VCN struct {
 	// The date and time the instance was created (RFC3339)
 	TimeCreated string `json:"timeCreated"`
 	// The VCN's domain name
-	vcnDomainName int `json:"vcnDomainName"`
+	VcnDomainName int `json:"vcnDomainName"`
 	// The OCID of the VNIC
 	VNicID string `json:"vnicId"`
 }
