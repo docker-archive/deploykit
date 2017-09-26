@@ -19,9 +19,9 @@ type SecurityList struct {
 	// The OCID of the SecurityList
 	ID string `json:"id,omitempty"`
 	// Rules for allowing egress IP packets
-	EgressSecurityRules EgressSecurityRule `json:"egressSecurityRules"`
+	EgressSecurityRules []EgressSecurityRule `json:"egressSecurityRules"`
 	// Rules for allowing ingress IP packets
-	IngressSecurityRules IngressSecurityRule `json:"ingressSecurityRules"`
+	IngressSecurityRules []IngressSecurityRule `json:"ingressSecurityRules"`
 	// The SecurityList's current state
 	LifeCycleState string `json:"lifecycleState,omitempty"`
 	// The date and time the instance was created (RFC3339)
