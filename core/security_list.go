@@ -32,9 +32,9 @@ type SecurityList struct {
 
 // EgressSecurityRule rule for allowing outbound IP packets
 type EgressSecurityRule struct {
-	Destination string `json:"destination"`
-	IcmpOptions string `json:"icmpOptions,omitempty"`
-	IsStateless string `json:"isStateless,omitempty"`
+	Destination string      `json:"destination"`
+	IcmpOptions *IcmpOption `json:"icmpOptions,omitempty"`
+	IsStateless bool        `json:"isStateless,omitempty"`
 	// Protocol values: all, ICMP ("1"), TCP ("6"), UDP ("17").
 	Protocol   string      `json:"protocol"`
 	TcpOptions *PortConfig `json:"tcpOptions,omitempty"`
@@ -43,13 +43,20 @@ type EgressSecurityRule struct {
 
 // IngressSecurityRule rule for allowing inbound IP packets
 type IngressSecurityRule struct {
-	Source      string `json:"source"`
-	IcmpOptions string `json:"icmpOptions,omitempty"`
-	IsStateless string `json:"isStateless,omitempty"`
+	Source      string      `json:"source"`
+	IcmpOptions *IcmpOption `json:"icmpOptions,omitempty"`
+	IsStateless bool        `json:"isStateless,omitempty"`
 	// Protocol values: all, ICMP ("1"), TCP ("6"), UDP ("17").
 	Protocol   string      `json:"protocol"`
 	TcpOptions *PortConfig `json:"tcpOptions,omitempty"`
 	UdpOptions *PortConfig `json:"udpOptions,omitempty"`
+}
+
+type IcmpOption struct {
+	// The ICMP code
+	Code int `json:"code,omitempty"`
+	// The ICMP type
+	Type int `json:"type,omitempty"`
 }
 
 type PortConfig struct {
@@ -58,8 +65,8 @@ type PortConfig struct {
 }
 
 type PortRange struct {
-	Min string `json:"min,omitempty"`
-	Max string `json:"max,omitempty"`
+	Min int `json:"min,omitempty"`
+	Max int `json:"max,omitempty"`
 }
 
 // GetSecurityList returns a struct of a SecurityList request given an SecurityList ID
