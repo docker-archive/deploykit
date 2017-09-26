@@ -101,6 +101,10 @@ type Options struct {
 	// SourceKeySelector: \{\{ .ID \}\}  # selects the ID field.
 	SourceKeySelector string
 
+	// SourceKeySelector is a string template for selecting the join key from
+	// a enrollment plugin's instance.Description.
+	EnrollmentKeySelector string
+
 	// SyncInterval is the time interval between reconciliation. Syntax
 	// is go's time.Duration string representation (e.g. 1m, 30s)
 	SyncInterval types.Duration

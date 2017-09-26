@@ -139,3 +139,224 @@ options:
 		"Destroy",
 	}, <-seen)
 }
+
+func TestEnrollerNoTags(t *testing.T) {
+
+	// Group members: 1, 2, 3
+	source := []instance.Description{
+		{ID: instance.ID("instance-1"), Properties: types.AnyString(`{"backend_id":"1"}`)},
+		{ID: instance.ID("instance-2"), Properties: types.AnyString(`{"backend_id":"2"}`)},
+		{ID: instance.ID("instance-3"), Properties: types.AnyString(`{"backend_id":"3"}`)},
+	}
+
+	// Currently enrolled: 1, 2, 4
+	enrolled := []instance.Description{
+		{ID: instance.ID("1")},
+		{ID: instance.ID("2")},
+		{ID: instance.ID("4")},
+	}
+
+	seen := make(chan []interface{}, 10)
+
+	enroller := newEnroller(
+		func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		},
+		fakeLeader(func() (bool, error) { return false, nil }),
+		enrollment.Options{})
+	enroller.groupPlugin = &group_test.Plugin{
+		DoDescribeGroup: func(gid group.ID) (group.Description, error) {
+			result := group.Description{Instances: source}
+			return result, nil
+		},
+	}
+	enroller.instancePlugin = &instance_test.Plugin{
+		DoDescribeInstances: func(t map[string]string, p bool) ([]instance.Description, error) {
+			return enrolled, nil
+		},
+		DoProvision: func(spec instance.Spec) (*instance.ID, error) {
+
+			seen <- []interface{}{spec, "Provision"}
+			return nil, nil
+		},
+		DoDestroy: func(id instance.ID, ctx instance.Context) error {
+
+			seen <- []interface{}{id, ctx, "Destroy"}
+			return nil
+		},
+	}
+
+	require.False(t, enroller.Running())
+
+	// Build a spec that uses the "backend_id" as the key for the source and just
+	// the "ID" for the enrolled
+	spec := types.Spec{}
+	require.NoError(t, types.AnyYAMLMust([]byte(`
+kind: enrollment
+metadata:
+  name: nfs
+properties:
+  List: group/workers
+  Instance:
+    Plugin: nfs/authorization
+    Properties:
+       backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+options:
+  SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+  EnrollmentKeySelector: \{\{.ID\}\}
+`)).Decode(&spec))
+
+	require.NoError(t, enroller.updateSpec(spec))
+
+	st, err := enroller.getSourceKeySelectorTemplate()
+	require.NoError(t, err)
+	require.NotNil(t, st)
+
+	et, err := enroller.getEnrollmentPropertiesTemplate()
+	require.NoError(t, err)
+	require.NotNil(t, et)
+
+	require.NoError(t, err)
+
+	s, err := enroller.getSourceInstances()
+	require.NoError(t, err)
+	require.Equal(t, source, s)
+
+	found, err := enroller.getEnrolledInstances()
+	require.NoError(t, err)
+	require.Equal(t, enrolled, found)
+
+	require.NoError(t, enroller.sync())
+
+	// check the provision and destroy calls, instance 3 should be added and 4
+	// should be removed
+	require.Equal(t, []interface{}{
+		instance.Spec{
+			Properties: types.AnyString(`{"backend_id":"3"}`),
+			Tags: map[string]string{
+				"infrakit.enrollment.sourceID": "instance-3",
+				"infrakit.enrollment.name":     "nfs",
+			},
+		},
+		"Provision",
+	}, <-seen)
+	require.Equal(t, []interface{}{
+		instance.ID("4"),
+		instance.Termination,
+		"Destroy",
+	}, <-seen)
+	require.Len(t, seen, 0)
+}
+
+func TestEnrollerMissingProps(t *testing.T) {
+
+	// Group members: 1, 2, 3 (no props), 4
+	source := []instance.Description{
+		{ID: instance.ID("instance-1"), Properties: types.AnyString(`{"backend_id":"1"}`)},
+		{ID: instance.ID("instance-2"), Properties: types.AnyString(`{"backend_id":"2"}`)},
+		{ID: instance.ID("instance-3")},
+		{ID: instance.ID("instance-4"), Properties: types.AnyString(`{"backend_id":"4"}`)},
+	}
+
+	// Currently enrolled: 1, 2, 5
+	enrolled := []instance.Description{
+		{ID: instance.ID("1")},
+		{ID: instance.ID("2")},
+		{ID: instance.ID("5")},
+	}
+
+	seen := make(chan []interface{}, 10)
+
+	enroller := newEnroller(
+		func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		},
+		fakeLeader(func() (bool, error) { return false, nil }),
+		enrollment.Options{})
+	enroller.groupPlugin = &group_test.Plugin{
+		DoDescribeGroup: func(gid group.ID) (group.Description, error) {
+			result := group.Description{Instances: source}
+			return result, nil
+		},
+	}
+	enroller.instancePlugin = &instance_test.Plugin{
+		DoDescribeInstances: func(t map[string]string, p bool) ([]instance.Description, error) {
+			return enrolled, nil
+		},
+		DoProvision: func(spec instance.Spec) (*instance.ID, error) {
+
+			seen <- []interface{}{spec, "Provision"}
+			return nil, nil
+		},
+		DoDestroy: func(id instance.ID, ctx instance.Context) error {
+
+			seen <- []interface{}{id, ctx, "Destroy"}
+			return nil
+		},
+	}
+
+	require.False(t, enroller.Running())
+
+	// Build a spec that uses the "backend_id" as the key for the source and just
+	// the "ID" for the enrolled
+	spec := types.Spec{}
+	require.NoError(t, types.AnyYAMLMust([]byte(`
+kind: enrollment
+metadata:
+  name: nfs
+properties:
+  List: group/workers
+  Instance:
+    Plugin: nfs/authorization
+    Properties:
+       backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+options:
+  SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+  EnrollmentKeySelector: \{\{.ID\}\}
+`)).Decode(&spec))
+
+	require.NoError(t, enroller.updateSpec(spec))
+
+	st, err := enroller.getSourceKeySelectorTemplate()
+	require.NoError(t, err)
+	require.NotNil(t, st)
+
+	et, err := enroller.getEnrollmentPropertiesTemplate()
+	require.NoError(t, err)
+	require.NotNil(t, et)
+
+	require.NoError(t, err)
+
+	s, err := enroller.getSourceInstances()
+	require.NoError(t, err)
+	require.Equal(t, source, s)
+
+	found, err := enroller.getEnrolledInstances()
+	require.NoError(t, err)
+	require.Equal(t, enrolled, found)
+
+	require.NoError(t, enroller.sync())
+
+	// check the provision and destroy calls, instance 3 should be added, instance
+	// 4 should be ignored (cannot be indexed), and 5 should be removed
+	require.Equal(t, []interface{}{
+		instance.Spec{
+			Properties: types.AnyString(`{"backend_id":"4"}`),
+			Tags: map[string]string{
+				"infrakit.enrollment.sourceID": "instance-4",
+				"infrakit.enrollment.name":     "nfs",
+			},
+		},
+		"Provision",
+	}, <-seen)
+	require.Equal(t, []interface{}{
+		instance.ID("5"),
+		instance.Termination,
+		"Destroy",
+	}, <-seen)
+	require.Len(t, seen, 0)
+}

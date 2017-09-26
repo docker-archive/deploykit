@@ -66,6 +66,23 @@ func (l *enroller) getSourceKeySelectorTemplate() (*template.Template, error) {
 	return l.sourceKeySelectorTemplate, nil
 }
 
+func (l *enroller) getEnrollmentKeySelectorTemplate() (*template.Template, error) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if l.options.EnrollmentKeySelector != "" {
+		if l.enrollmentKeySelectorTemplate == nil {
+			t, err := enrollment.TemplateFrom([]byte(l.options.EnrollmentKeySelector))
+			if err != nil {
+				return nil, err
+			}
+			l.enrollmentKeySelectorTemplate = t
+		}
+	}
+
+	return l.enrollmentKeySelectorTemplate, nil
+}
+
 func (l *enroller) getEnrollmentPropertiesTemplate() (*template.Template, error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -119,13 +136,27 @@ func (l *enroller) sync() error {
 		return string(d.ID), nil
 	}
 
-	// As long as the downstream enrollment records are labeled correctly we
-	// can even support 'importing' out-of-band created enrollment records
+	// If specified, use the given enrollment selectior to get the index key;
+	// else check for the labels so that we can even support 'importing'
+	// out-of-band created enrollment records
 	enrolledKeyFunc := func(d instance.Description) (string, error) {
-		if v, has := d.Tags["infrakit.enrollment.sourceID"]; has {
-			return v, nil
+
+		t, err := l.getEnrollmentKeySelectorTemplate()
+		if err != nil {
+			return "", err
 		}
-		return "", fmt.Errorf("not-matched:%v", d.ID)
+		if t == nil {
+			if v, has := d.Tags["infrakit.enrollment.sourceID"]; has {
+				return v, nil
+			}
+			return "", fmt.Errorf("not-matched:%v", d.ID)
+		}
+		view, err := t.Render(d)
+		if err != nil {
+			return "", err
+		}
+		return view, nil
+
 	}
 
 	// compute the delta required to make enrolled look like source
