@@ -13,9 +13,9 @@ import (
 // SecurityList contains the SecurityList reference from: https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/SecurityList/
 type SecurityList struct {
 	// The OCID of the compartment that contains the security list
-	CompartmentID string `json:"compartmentId"`
+	CompartmentID string `json:"compartmentId,omitempty"`
 	// A user-friendly name
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"displayName",omitempty`
 	// The OCID of the SecurityList
 	ID string `json:"id,omitempty"`
 	// Rules for allowing egress IP packets
@@ -27,7 +27,7 @@ type SecurityList struct {
 	// The date and time the instance was created (RFC3339)
 	TimeCreated string `json:"timeCreated,omitempty"`
 	// The OCID of the VCN
-	VcnID string `json:"vcnId"`
+	VcnID string `json:"vcnId",omitempty`
 }
 
 // EgressSecurityRule rule for allowing outbound IP packets
@@ -128,6 +128,22 @@ func (c *Client) ListSecurityLists(vcnID string) ([]SecurityList, *bmc.Error) {
 // CreateSecurityList creates a new security list for the specified VCN
 func (c *Client) CreateSecurityList(securityList *SecurityList) (bool, *bmc.Error) {
 	resp, err := c.Request("POST", fmt.Sprintf("/securityLists/"), *securityList)
+	if err != nil {
+		logrus.Error(err)
+		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
+		return false, &bmcError
+	}
+	logrus.Debug("StatusCode: ", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		return false, bmc.NewError(*resp)
+	}
+	return true, nil
+}
+
+// UpdateSecurityList creates a new security list for the specified VCN
+func (c *Client) UpdateSecurityList(securityListID string, securityList *SecurityList) (bool, *bmc.Error) {
+	securityListID = url.PathEscape(securityListID)
+	resp, err := c.Request("PUT", fmt.Sprintf("/securityLists/%s", securityListID), *securityList)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}

@@ -82,6 +82,7 @@ Only API supported at the moment is to get instance details
 * List SecurityList
 * Get SecurityList
 * Create SecurityList
+* Update SecurityList
 * Delete SecurityList
 * List VirtualCloudNetwork
 * Get VirtualCloudNetwork
