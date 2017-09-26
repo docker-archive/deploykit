@@ -79,6 +79,12 @@ Only API supported at the moment is to get instance details
 * Get VNIC
 * List VNICAttachment
 * Get VNICAttachment
+* List SecurityList
+* Get SecurityList
+* Create SecurityList
+* Delete SecurityList
+* List VirtualCloudNetwork
+* Get VirtualCloudNetwork
 * List Backend
 * Get Backend
 * Create Backend
