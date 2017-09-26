@@ -35,7 +35,7 @@ type Subnet struct {
 	// The date and time the instance was created (RFC3339)
 	TimeCreated string `json:"timeCreated"`
 	// OCIDs for the security lists to use for VNICs in this subnet
-	SecurityListIDs int `json:"securityListIds"`
+	SecurityListIDs []string `json:"securityListIds"`
 	// The OCID of the VNIC
 	VNicID string `json:"vnicId"`
 	// The subnet's domain name
