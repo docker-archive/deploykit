@@ -68,6 +68,7 @@ func (c *Client) Request(method string, reqURL string, body interface{}) (*http.
 	var marshaled []byte
 	if body != nil {
 		marshaled, err = json.Marshal(body)
+		logrus.Debug("Body: ", string(marshaled))
 		if err != nil {
 			return nil, err
 		}
