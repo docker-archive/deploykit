@@ -46,6 +46,8 @@ type enroller struct {
 
 	// template that we use to render with a source instance.Description to get the link Key
 	sourceKeySelectorTemplate *template.Template
+	// template that we use to render with an enrollment instance.Description to get the link Key
+	enrollmentKeySelectorTemplate *template.Template
 	// template used to render the enrollment's Provision propertiesx
 	enrollmentPropertiesTemplate *template.Template
 }
