@@ -129,15 +129,19 @@ endef
 
 $(call define_plugin_start_target,infrakit-group-default,group)
 $(call define_plugin_start_target,infrakit-instance-aws,aws)
+$(call define_plugin_start_target,infrakit-instance-digitalocean,digitalocean)
+$(call define_plugin_start_target,infrakit-instance-hyperkit,hyperkit)
+$(call define_plugin_start_target,infrakit-instance-terraform,terraform)
 $(call define_plugin_start_target,infrakit-flavor-swarm,swarm)
 $(call define_plugin_start_target,infrakit-metadata-aws,aws)
-$(call define_plugin_start_target,infrakit-instance-terraform,terraform)
 
 build-plugin-start-scripts: build/infrakit \
-		build/infrakit-instance-terraform \
-		build/infrakit-group-default \
 		build/infrakit-instance-aws \
+		build/infrakit-instance-digitalocean \
+		build/infrakit-instance-hyperkit \
+		build/infrakit-instance-terraform \
 		build/infrakit-flavor-swarm \
+		build/infrakit-group-default \
 		build/infrakit-metadata-aws \
 
 binaries: clean build-binaries build-plugin-start-scripts
@@ -145,10 +149,8 @@ build-binaries:	build/infrakit \
 		build/infrakit-manager \
 		build/infrakit-flavor-kubernetes \
 		build/infrakit-flavor-zookeeper \
-		build/infrakit-instance-digitalocean \
 		build/infrakit-instance-docker \
 		build/infrakit-instance-gcp \
-		build/infrakit-instance-hyperkit \
 		build/infrakit-instance-image \
 		build/infrakit-instance-libvirt \
 		build/infrakit-instance-maas \
