@@ -156,13 +156,6 @@ func (c *Client) UpdateSecurityList(securityListID string, securityList *Securit
 	return true, nil
 }
 
-// UpdateSecurityList updates a security list
-func (c *Client) UpdateSecurityList(listener *SecurityList) {
-	// PUT securityLists/{loadBalancerId}/listeners/{listenerName}
-	logrus.Warning("Method not yet implemented")
-	return
-}
-
 // DeleteSecurityList deletes the specified security list, but only if it's not associated with a subnet
 func (c *Client) DeleteSecurityList(securityListID string) (bool, *bmc.Error) {
 	securityListID = url.PathEscape(securityListID)
