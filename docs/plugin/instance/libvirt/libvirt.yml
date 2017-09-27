@@ -1,0 +1,59 @@
+ID: cattle
+Properties:
+  Allocation:
+    Size: 1
+  Instance:
+    Plugin: instance-libvirt
+    Properties:
+      MetadataStoragePool: default
+      Domain:
+      Domain:
+        Type: kvm
+        Memory:
+          Unit: GiB
+          Value: 1
+        VCPU:
+          Value: 1
+        OS:
+          Type:
+            Arch: x86_64
+            Machine: pc-i440fx-2.8
+            Type: hvm
+          Initrd: ../initrd.img
+          Kernel: ../bzImage
+          KernelArgs: console=ttyS0
+          BIOS:
+            UseSerial: 'yes'
+          Boot:
+            Dev: hd
+        Devices:
+          Interfaces:
+          - Type: bridge
+            Source:
+              Bridge: virbr0
+            Model:
+              Type: virtio
+          Serials:
+          - Type: pty
+          Consoles:
+          - Type: pty
+            Target:
+              Type: serial
+              Name: "0"
+          Channels:
+          - Type: unix
+            Target:
+              Type: virtio
+              Name: org.qemu.guest_agent.0
+        OnCrash: destroy
+        OnPoweroff: destroy
+        OnReboot: restart
+  Flavor:
+    Plugin: flavor-vanilla
+    Properties:
+      Init:
+      - "test1"
+      - "test2"
+      Tags:
+        project: infrakit
+        tier: sample
