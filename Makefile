@@ -101,10 +101,7 @@ $(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 $(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infrakit/examples/flavor/kubernetes)
 $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
-$(call define_binary_target,infrakit-instance-digitalocean,github.com/docker/infrakit/cmd/instance/digitalocean)
 $(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
-$(call define_binary_target,infrakit-instance-gcp,github.com/docker/infrakit/cmd/instance/google)
-$(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
 $(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
 ifeq ($(OS),Windows_NT)
 build/infrakit-instance-libvirt:
@@ -130,6 +127,7 @@ endef
 $(call define_plugin_start_target,infrakit-group-default,group)
 $(call define_plugin_start_target,infrakit-instance-aws,aws)
 $(call define_plugin_start_target,infrakit-instance-digitalocean,digitalocean)
+$(call define_plugin_start_target,infrakit-instance-gcp,google)
 $(call define_plugin_start_target,infrakit-instance-hyperkit,hyperkit)
 $(call define_plugin_start_target,infrakit-instance-terraform,terraform)
 $(call define_plugin_start_target,infrakit-flavor-swarm,swarm)
@@ -138,6 +136,7 @@ $(call define_plugin_start_target,infrakit-metadata-aws,aws)
 build-plugin-start-scripts: build/infrakit \
 		build/infrakit-instance-aws \
 		build/infrakit-instance-digitalocean \
+		build/infrakit-instance-gcp \
 		build/infrakit-instance-hyperkit \
 		build/infrakit-instance-terraform \
 		build/infrakit-flavor-swarm \
@@ -150,7 +149,6 @@ build-binaries:	build/infrakit \
 		build/infrakit-flavor-kubernetes \
 		build/infrakit-flavor-zookeeper \
 		build/infrakit-instance-docker \
-		build/infrakit-instance-gcp \
 		build/infrakit-instance-image \
 		build/infrakit-instance-libvirt \
 		build/infrakit-instance-maas \
@@ -266,10 +264,10 @@ endif
 
 build-docker: build-installer \
 	build-devbundle \
-	build-provider-aws \
-	build-provider-digitalocean \
-	build-provider-google \
-	build-provider-terraform \
+	#build-provider-aws \
+	#build-provider-digitalocean \
+	#build-provider-google \
+	#build-provider-terraform \
 
 # Provider: AWS
 build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws

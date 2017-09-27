@@ -45,6 +45,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/digitalocean"
 	_ "github.com/docker/infrakit/pkg/run/v0/enrollment"
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
+	_ "github.com/docker/infrakit/pkg/run/v0/google"
 	_ "github.com/docker/infrakit/pkg/run/v0/group"
 	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
 	_ "github.com/docker/infrakit/pkg/run/v0/ingress"
