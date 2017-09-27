@@ -1,5 +1,8 @@
 # A Quick Tour of InfraKit
 
+
+## Overview
+
 InfraKit is made up of a collection of small microservice controllers that are commonly referred to as 'plugins'.
 'Plugins' implement different Service Provider Interfaces (SPI) in InfraKit:
 
@@ -50,8 +53,7 @@ InfraKit can be run in different ways such as in Docker containers or as simple 
 going with the simple daemons that are built from source.  For a quick start with pre-built Docker containers,
 you can take a look at the [Playbook](./playbooks/README.md).
 
-There are many different plugins that InfraKit can use to provision resources.
-In this tutorial we use the very basic file plugin, which simply creates files on disk.
+## Tutorial
 
 To illustrate the concept of working with Group, Flavor, and Instance plugins, we use a simple setup composed of
   + The default `group` plugin - to manage a collection of instances
@@ -60,7 +62,7 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
 
 For more information on plugins and how they work, please see the [docs](./plugins/README.md).
 
-## Building infrakit
+### Building infrakit
 
 For the tutorial, we only need the `infrakit` binary.  Build it:
 ```shell
@@ -68,7 +70,7 @@ $ make build/infrakit
 $ cp build/infrakit /usr/local/bin/
 ```
 
-## Starting up InfraKit
+### Starting up InfraKit
 
 There are some basic environment set up required for infrakit.  Infrakit uses
 the environment variable `INFRAKIT_HOME` to locate the directory where it stores
@@ -97,7 +99,7 @@ $ infrakit plugin start manager group vanilla simulator
 
 Leave this running, and use another terminal session for the CLI.
 
-## The CLI
+### The CLI
 
 As a user, you typically interact with the cluster and resources you provisioned via the `infrakit` CLI.
 The `infrakit` CLI is used to start up servers as well as functions as a client.  A client can be used
@@ -208,7 +210,7 @@ ID                            	LOGICAL                       	TAGS
 ```
 At this point, we have no instances under management.  So let's provision some.
 
-## Provision a Single Instance
+### Provision a Single Instance
 
 You can use the `provision` verb on a instance plugin to provision an instance
 of the resource it represents. To create a single instance of `simulator/compute`
@@ -338,7 +340,7 @@ Layering and composition are key design tenets of Infrakit.  Now that we can
 provision and destroy single instances via the Instance plugins, let's layer on this
 with managing groups or collections of instances via the Group controller.
 
-## Provision a Group of Instances
+### Provision a Group of Instances
 
 While instance plugins provide methods for creating, terminating and describing
 resources such as compute (e.g. `simulator/compute`), the Group controller and other
@@ -489,6 +491,8 @@ Available Commands:
   ls                List groups
   scale             Returns size of the group if no args provided. Otherwise set the target size.
 ```
+
+### Working with Groups
 
 To show the instances in this group:
 
@@ -704,6 +708,42 @@ $ infrakit group describe workers
 CRIT[09-27|07:20:25] error executing                          module=main cmd=infrakit err="Group 'workers' is not being watched" fn=main.main
 Group 'workers' is not being watched
 ```
+
+### Use Real Plugins
+
+In this tutorial, we used the `simulator` in `infrakit plugin start` to simulate
+a number of different instance plugins (e.g. `ondemand` and `us-east-1a`).  Applying
+the patterns here to real plugins involve the following steps:
+
+  1. Start up the real plugins you intend to use in `infrakit plugin start`.
+  2. Modify the configuration YAML to include the actual `Properties` required
+  by the real plugin.
+
+For example, for AWS, you can run multiple instances of the Instance plugin listening
+at different socket names just like how we ran the `simulator`.
+An instance plugin for `us-east-1a` availability zone and another in `us-east-1b` can be
+started as
+
+```shell
+infrakit plugin start manager group swarm aws:us-east-1a aws:us-east-1b
+```
+
+This will start up a `us-east-1a/ec2-instance` instance plugin and another,
+`us-east-1b/ec2-instance`, plugin.   Then in your configuration, the plugins will
+be referred to using the names `us-east-1b/ec2-instance` and `us-east-1b/ec2-instance`.
+Note that all these plugins are running in a single process, even though they are
+listening on different sockets identified by the names after the `:` in the `plugin start`
+arguments.
+
+If you are using templates, be careful with the `include` template function
+when embedding YAML content.  This is because YAML uses indentations to describe
+the level of nesting for objects.  The template `include` function simply includes
+the text inline and will confuse the parser since the nested structure of the
+properties are now lost.  If you are going to use templates, consider using JSON
+configuration instead because JSON is better at preserving structure of nesting when
+texts are inserted without regards to indentation.
+
+## Conclusion
 
 This concludes our quick tutorial.  In this tutorial we:
   + Set up basic infrakit environment

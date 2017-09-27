@@ -430,6 +430,39 @@ In this current implementation, a single priority ordering is used for both prov
 and termination of instances.  Let us know if this is a reasonable assumption by opening
 an issue.
 
+### Use Real Plugins
+
+In this tutorial, we used the `simulator` in `infrakit plugin start` to simulate
+a number of different instance plugins (e.g. `ondemand` and `us-east-1a`).  Applying
+the patterns here to real plugins involve the following steps:
+
+  1. Start up the real plugins you intend to use in `infrakit plugin start`.
+  2. Modify the configuration YAML to include the actual `Properties` required
+  by the real plugin.
+
+For example, for AWS, you can run multiple instances of the Instance plugin listening
+at different socket names just like how we ran the `simulator`.
+An instance plugin for `us-east-1a` availability zone and another in `us-east-1b` can be
+started as
+
+```shell
+infrakit plugin start manager group swarm aws:us-east-1a aws:us-east-1b
+```
+
+This will start up a `us-east-1a/ec2-instance` instance plugin and another,
+`us-east-1b/ec2-instance`, plugin.   Then in your configuration, the plugins will
+be referred to using the names `us-east-1b/ec2-instance` and `us-east-1b/ec2-instance`.
+Note that all these plugins are running in a single process, even though they are
+listening on different sockets identified by the names after the `:` in the `plugin start`
+arguments.
+
+If you are using templates, be careful with the `include` template function
+when embedding YAML content.  This is because YAML uses indentations to describe
+the level of nesting for objects.  The template `include` function simply includes
+the text inline and will confuse the parser since the nested structure of the
+properties are now lost.  If you are going to use templates, consider using JSON
+configuration instead because JSON is better at preserving structure of nesting when
+texts are inserted without regards to indentation.
 
 ## Summary
 
