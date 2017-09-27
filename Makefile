@@ -103,14 +103,7 @@ $(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infraki
 $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
 $(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
 $(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
-ifeq ($(OS),Windows_NT)
-build/infrakit-instance-libvirt:
-# noop on windows
-else
-$(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
-endif
 $(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
-$(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
 $(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
 $(call define_binary_target,infrakit-instance-vsphere,github.com/docker/infrakit/pkg/provider/vsphere)
 
@@ -129,6 +122,8 @@ $(call define_plugin_start_target,infrakit-instance-aws,aws)
 $(call define_plugin_start_target,infrakit-instance-digitalocean,digitalocean)
 $(call define_plugin_start_target,infrakit-instance-gcp,google)
 $(call define_plugin_start_target,infrakit-instance-hyperkit,hyperkit)
+$(call define_plugin_start_target,infrakit-instance-libvirt,libvirt)
+$(call define_plugin_start_target,infrakit-instance-packet,packet)
 $(call define_plugin_start_target,infrakit-instance-terraform,terraform)
 $(call define_plugin_start_target,infrakit-flavor-swarm,swarm)
 $(call define_plugin_start_target,infrakit-metadata-aws,aws)
@@ -138,10 +133,19 @@ build-plugin-start-scripts: build/infrakit \
 		build/infrakit-instance-digitalocean \
 		build/infrakit-instance-gcp \
 		build/infrakit-instance-hyperkit \
+		build/infrakit-instance-packet \
 		build/infrakit-instance-terraform \
 		build/infrakit-flavor-swarm \
 		build/infrakit-group-default \
 		build/infrakit-metadata-aws \
+
+ifeq ($(OS),Windows_NT)
+build/infrakit-instance-libvirt:
+# noop on windows
+else
+$(call define_plugin_start_target,infrakit-instance-libvirt,libvirt)
+endif
+
 
 binaries: clean build-binaries build-plugin-start-scripts
 build-binaries:	build/infrakit \
@@ -150,9 +154,7 @@ build-binaries:	build/infrakit \
 		build/infrakit-flavor-zookeeper \
 		build/infrakit-instance-docker \
 		build/infrakit-instance-image \
-		build/infrakit-instance-libvirt \
 		build/infrakit-instance-maas \
-		build/infrakit-instance-packet \
 		build/infrakit-instance-vagrant \
 		build/infrakit-instance-vsphere \
 

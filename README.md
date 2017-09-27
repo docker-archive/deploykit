@@ -46,7 +46,7 @@ Plugins are active daemons that cooperate with one another to ensure the infrast
 
 ## Plugins
 _InfraKit_ makes extensive use of _Plugins_ to manage arbitrary systems in diverse environments, which can be composed
-to meet different needs. See the [plugins](docs/plugins) documentation for more technical details.
+to meet different needs. See the [plugins](docs/plugin) documentation for more technical details.
 
 Here is a list of plugins:
 
