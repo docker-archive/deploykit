@@ -723,7 +723,20 @@ This concludes our quick tutorial.  In this tutorial we:
 
 ## Next Step
 
-Now that you have completed the tutorial, it's time to explore the Playbooks.  Playbooks are 'scripts' that can
-be shared and reused.  Playbooks can drive the `infrakit` CLI by defining new commands and flags.  A good one to
-start is the [LinuxKit playbook](./docs/playbooks/linuxkit),
-where we explore integration with [LinuxKit](https://github.com/linuxkit/linuxkit).
+Now that you have completed the tutorial, there are additional topics you can explore:
+
+  + [Multi-zone and tiered deployments](./docs/tutorial/multi.md).  Expanding on the composition of plugins,
+  you can create a group controller that spans across multiple 'zones' or clouds,
+  across different instance types.  In the tiered deployment example, you can see how
+  the same composition approach is used to create a Group controller that can
+  provision resources following a proritized list of plugins so that some plugins
+  are tried to provision resources while others are used as fallbacks when earlier
+  provisioning requests cannot be fulfilled.
+  + Playbooks: Playbooks are 'scripts' that can be shared and reused.
+  Playbooks can drive the `infrakit` CLI by defining new commands and flags.
+  A good one to start is the [LinuxKit playbook](./docs/playbooks/linuxkit),
+  where we explore integration with [LinuxKit](https://github.com/linuxkit/linuxkit).
+  + Other controllers such as the Ingress controller for routing of traffic from
+  the internet to the cluster, and the Enrollment controller that performs associations
+  of instances in a group to instances of other resource types.
+

@@ -62,16 +62,17 @@ func spreadOptions() selector.Options {
 		p := strings.Split(s, "=")
 		n := plugin.Name(p[0])
 
-		// build the map from the string of the form a:b,...
-		t := map[string]string{}
-		for _, kv := range strings.Split(p[1], ",") {
-			kvp := strings.Split(kv, ":")
-			t[kvp[0]] = kvp[1]
+		choice := selector.Choice{Name: n}
+		if len(p) > 1 {
+			// build the map from the string of the form a:b,...
+			t := map[string]string{}
+			for _, kv := range strings.Split(p[1], ",") {
+				kvp := strings.Split(kv, ":")
+				t[kvp[0]] = kvp[1]
+			}
+			choice.Affinity = types.AnyValueMust(spread.AffinityArgs{Labels: t})
 		}
-		options = append(options, selector.Choice{
-			Name:     n,
-			Affinity: types.AnyValueMust(spread.AffinityArgs{Labels: t}),
-		})
+		options = append(options, choice)
 	}
 	return options
 }
