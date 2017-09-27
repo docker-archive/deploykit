@@ -30,6 +30,15 @@ type SecurityList struct {
 	VcnID string `json:"vcnId",omitempty`
 }
 
+type SecurityListUpdate struct {
+	// A user-friendly name
+	DisplayName string `json:"displayName",omitempty`
+	// Rules for allowing egress IP packets
+	EgressSecurityRules *[]EgressSecurityRule `json:"egressSecurityRules"`
+	// Rules for allowing ingress IP packets
+	IngressSecurityRules *[]IngressSecurityRule `json:"ingressSecurityRules"`
+}
+
 // EgressSecurityRule rule for allowing outbound IP packets
 type EgressSecurityRule struct {
 	Destination string      `json:"destination"`
@@ -141,9 +150,9 @@ func (c *Client) CreateSecurityList(securityList *SecurityList) (bool, *bmc.Erro
 }
 
 // UpdateSecurityList creates a new security list for the specified VCN
-func (c *Client) UpdateSecurityList(securityListID string, securityList *SecurityList) (bool, *bmc.Error) {
+func (c *Client) UpdateSecurityList(securityListID string, securityListUpdate *SecurityListUpdate) (bool, *bmc.Error) {
 	securityListID = url.PathEscape(securityListID)
-	resp, err := c.Request("PUT", fmt.Sprintf("/securityLists/%s", securityListID), *securityList)
+	resp, err := c.Request("PUT", fmt.Sprintf("/securityLists/%s", securityListID), *securityListUpdate)
 	if err != nil {
 		logrus.Error(err)
 		bmcError := bmc.Error{Code: string(resp.StatusCode), Message: err.Error()}
