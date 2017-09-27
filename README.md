@@ -12,7 +12,7 @@ With an emphasis on immutable infrastructure, it breaks down infrastructure auto
 These components work together to actively ensure the infrastructure state matches the user's specifications.
 InfraKit therefore provides infrastructure support for higher-level container orchestration systems and can make your infrastructure self-managing and self-healing.
 
-To get started, try the [tutorial](docs/tutorial.md), or check out the video below:
+To get started, try the [tutorial](docs/tutorial/README.md), or check out the video below:
 
 ### InfraKit + [LinuxKit](https://github.com/linuxkit/linuxkit) POC
 
