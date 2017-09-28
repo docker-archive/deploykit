@@ -95,11 +95,9 @@ define define_binary_target
 	$(eval $(call binary_target_template,$(1),$(2)))
 endef
 
-$(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
-
 # actual binaries that need to be built:
+$(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
-$(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infrakit/examples/flavor/kubernetes)
 
 
 # preserves the build/* binaries but use script to call 'infrakit plugin start' instead:
@@ -125,6 +123,7 @@ $(call define_plugin_start_target,infrakit-instance-rackhd,rackhd)
 $(call define_plugin_start_target,infrakit-instance-terraform,terraform)
 $(call define_plugin_start_target,infrakit-instance-vagrant,vagrant)
 $(call define_plugin_start_target,infrakit-instance-vsphere,vsphere)
+$(call define_plugin_start_target,infrakit-flavor-kubernetes,kubernetes)
 $(call define_plugin_start_target,infrakit-flavor-swarm,swarm)
 $(call define_plugin_start_target,infrakit-metadata-aws,aws)
 
@@ -141,6 +140,7 @@ build-plugin-start-scripts: build/infrakit \
 		build/infrakit-instance-terraform \
 		build/infrakit-instance-vagrant \
 		build/infrakit-instance-vsphere \
+		build/infrakit-flavor-kubernetes \
 		build/infrakit-flavor-swarm \
 		build/infrakit-group-default \
 		build/infrakit-metadata-aws \
@@ -156,7 +156,6 @@ endif
 binaries: clean build-binaries build-plugin-start-scripts
 build-binaries:	build/infrakit \
 		build/infrakit-manager \
-		build/infrakit-flavor-kubernetes \
 
 
 	@echo "+ $@"
