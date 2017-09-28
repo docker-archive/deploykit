@@ -1,4 +1,4 @@
-package hyperkit
+package instance
 
 import (
 	"errors"
