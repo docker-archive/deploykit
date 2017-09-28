@@ -19,7 +19,7 @@ const (
 	Kind = "vsphere"
 
 	// EnvNamespaceTags is the env to set for namespace tags. It's k=v,...
-	EnvNamespaceTags = "INFRAKIT_PACKET_NAMESPACE_TAGS"
+	EnvNamespaceTags = "INFRAKIT_VSPHERE_NAMESPACE_TAGS"
 
 	// EnvVCURL is the env for setting the VCenter URL to connect to
 	EnvVCURL = "INFRAKIT_VSPHERE_VCURL"
