@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -112,4 +113,14 @@ type Options struct {
 	// SyncInterval is how often to run the sync. The syntax is the string form
 	// of Go time.Duration (e.g. 1min)
 	SyncInterval types.Duration
+
+	// SourceKeySelector is a string template for selecting the join key from
+	// a source instance.Description.
+	SourceKeySelector string
+}
+
+// TemplateFrom returns a template after it has un-escapes any escape sequences
+func TemplateFrom(source []byte) (*template.Template, error) {
+	buff := template.Unescape(source)
+	return template.NewTemplate("str://"+string(buff), template.Options{MultiPass: false})
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/template"
 )
 
 func (c *managed) syncRoutesL4() error {
@@ -40,6 +41,23 @@ func (c *managed) syncRoutesL4() error {
 		}
 	}
 	return nil
+}
+
+func (c *managed) getSourceKeySelectorTemplate() (*template.Template, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.options.SourceKeySelector != "" {
+		if c.sourceKeySelectorTemplate == nil {
+			t, err := types.TemplateFrom([]byte(c.options.SourceKeySelector))
+			if err != nil {
+				return nil, err
+			}
+			c.sourceKeySelectorTemplate = t
+		}
+	}
+
+	return c.sourceKeySelectorTemplate, nil
 }
 
 func (c *managed) syncBackends() error {
@@ -78,6 +96,7 @@ func (c *managed) syncBackends() error {
 				registered.Add(b)
 			}
 		}
+		log.Info("Registered backends", "backends", registered)
 
 		// all the nodes from all the groups and nodes
 		nodes := mapset.NewSet()
@@ -105,9 +124,24 @@ func (c *managed) syncBackends() error {
 			log.Debug("found backends", "groupID", gid, "desc", desc, "vhost", vhost, "L4", l4.Name())
 
 			for _, inst := range desc.Instances {
-				nodes.Add(inst.ID)
+				t, err := c.getSourceKeySelectorTemplate()
+				if err != nil {
+					return err
+				}
+				if t == nil {
+					nodes.Add(inst.ID)
+				} else {
+					view, err := t.Render(inst)
+					if err != nil {
+						log.Error("cannot index entry", "instance.Description", inst, "err", err)
+						continue
+					}
+					nodes.Add(instance.ID(view))
+				}
 			}
 		}
+
+		log.Info("Group data", "nodes", nodes)
 
 		// compute the difference between registered and nodes
 		toRemove := []instance.ID{}
