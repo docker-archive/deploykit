@@ -43,6 +43,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/aws"
 	_ "github.com/docker/infrakit/pkg/run/v0/combo"
 	_ "github.com/docker/infrakit/pkg/run/v0/digitalocean"
+	_ "github.com/docker/infrakit/pkg/run/v0/docker"
 	_ "github.com/docker/infrakit/pkg/run/v0/enrollment"
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
 	_ "github.com/docker/infrakit/pkg/run/v0/google"

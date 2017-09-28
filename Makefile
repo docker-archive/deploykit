@@ -101,7 +101,6 @@ $(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 $(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infrakit/examples/flavor/kubernetes)
 $(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
-$(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
 $(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
 
 # preserves the build/* binaries but use script to call 'infrakit plugin start' instead:
@@ -117,6 +116,7 @@ endef
 $(call define_plugin_start_target,infrakit-group-default,group)
 $(call define_plugin_start_target,infrakit-instance-aws,aws)
 $(call define_plugin_start_target,infrakit-instance-digitalocean,digitalocean)
+$(call define_plugin_start_target,infrakit-instance-docker,docker)
 $(call define_plugin_start_target,infrakit-instance-gcp,google)
 $(call define_plugin_start_target,infrakit-instance-hyperkit,hyperkit)
 $(call define_plugin_start_target,infrakit-instance-image,image)
@@ -131,6 +131,7 @@ $(call define_plugin_start_target,infrakit-metadata-aws,aws)
 build-plugin-start-scripts: build/infrakit \
 		build/infrakit-instance-aws \
 		build/infrakit-instance-digitalocean \
+		build/infrakit-instance-docker \
 		build/infrakit-instance-gcp \
 		build/infrakit-instance-hyperkit \
 		build/infrakit-instance-image \
@@ -155,8 +156,6 @@ binaries: clean build-binaries build-plugin-start-scripts
 build-binaries:	build/infrakit \
 		build/infrakit-manager \
 		build/infrakit-flavor-kubernetes \
-		build/infrakit-flavor-zookeeper \
-		build/infrakit-instance-docker \
 		build/infrakit-instance-maas \
 
 

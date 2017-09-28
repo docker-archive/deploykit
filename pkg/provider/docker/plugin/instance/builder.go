@@ -1,4 +1,4 @@
-package main
+package instance
 
 import (
 	"fmt"
@@ -25,6 +25,11 @@ type options struct {
 type Builder struct {
 	client  *client.Client
 	options options
+}
+
+// DockerClient returns the docker client
+func (b *Builder) DockerClient() *client.Client {
+	return b.client
 }
 
 // Flags returns the flags required.
