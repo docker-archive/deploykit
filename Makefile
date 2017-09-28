@@ -100,8 +100,7 @@ $(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
 # actual binaries that need to be built:
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 $(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infrakit/examples/flavor/kubernetes)
-$(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
-$(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
+
 
 # preserves the build/* binaries but use script to call 'infrakit plugin start' instead:
 define plugin_start_template
@@ -120,6 +119,7 @@ $(call define_plugin_start_target,infrakit-instance-docker,docker)
 $(call define_plugin_start_target,infrakit-instance-gcp,google)
 $(call define_plugin_start_target,infrakit-instance-hyperkit,hyperkit)
 $(call define_plugin_start_target,infrakit-instance-image,image)
+$(call define_plugin_start_target,infrakit-instance-maas,maas)
 $(call define_plugin_start_target,infrakit-instance-packet,packet)
 $(call define_plugin_start_target,infrakit-instance-rackhd,rackhd)
 $(call define_plugin_start_target,infrakit-instance-terraform,terraform)
@@ -135,6 +135,7 @@ build-plugin-start-scripts: build/infrakit \
 		build/infrakit-instance-gcp \
 		build/infrakit-instance-hyperkit \
 		build/infrakit-instance-image \
+		build/infrakit-instance-maas \
 		build/infrakit-instance-packet \
 		build/infrakit-instance-rackhd \
 		build/infrakit-instance-terraform \
@@ -156,7 +157,6 @@ binaries: clean build-binaries build-plugin-start-scripts
 build-binaries:	build/infrakit \
 		build/infrakit-manager \
 		build/infrakit-flavor-kubernetes \
-		build/infrakit-instance-maas \
 
 
 	@echo "+ $@"
