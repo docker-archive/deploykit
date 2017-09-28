@@ -1,4 +1,4 @@
-package main
+package vagrant
 
 import (
 	"bufio"
@@ -16,6 +16,19 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
+
+// VagrantFile is the minimum definition of the vagrant file
+const VagrantFile = `
+Vagrant.configure("2") do |config|
+  config.vm.box = "{{.Properties.Box}}"
+  config.vm.hostname = "infrakit.box"
+  config.vm.network "private_network"{{.NetworkOptions}}
+  config.vm.provision :shell, path: "boot.sh"
+  config.vm.provider :virtualbox do |vb|
+    vb.memory = {{.Properties.Memory}}
+    vb.cpus = {{.Properties.CPUs}}
+  end
+end`
 
 // NewVagrantPlugin creates an instance plugin for vagrant.
 func NewVagrantPlugin(dir string, template *template.Template) instance.Plugin {

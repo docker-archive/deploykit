@@ -61,6 +61,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/tailer"
 	_ "github.com/docker/infrakit/pkg/run/v0/terraform"
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
+	_ "github.com/docker/infrakit/pkg/run/v0/vagrant"
 	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
 )
 
