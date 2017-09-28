@@ -1,4 +1,4 @@
-package main
+package vsphere
 
 import (
 	"context"
@@ -26,6 +26,17 @@ type plugin struct {
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
+}
+
+// NewInstancePlugin will take the cmdline/env configuration
+func NewInstancePlugin(vc Options) instance.Plugin {
+	return NewVSphereInstancePlugin(&vCenter{
+		vCenterURL:  &vc.VCenterURL,
+		dcName:      &vc.DataCenter,
+		dsName:      &vc.DataStore,
+		networkName: &vc.NetworkName,
+		vSphereHost: &vc.VSphereHost,
+	}, vc.IgnoreOnDestroy)
 }
 
 // NewVSphereInstancePlugin will take the cmdline/env configuration

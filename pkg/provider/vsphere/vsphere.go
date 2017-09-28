@@ -1,4 +1,4 @@
-package main
+package vsphere
 
 import (
 	"context"
@@ -12,6 +12,16 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 )
+
+// Options capture the config parameters required to create the plugin
+type Options struct {
+	VCenterURL      string
+	DataCenter      string
+	DataStore       string
+	NetworkName     string
+	VSphereHost     string
+	IgnoreOnDestroy bool
+}
 
 type vCenter struct {
 	vCenterURL  *string
