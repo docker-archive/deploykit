@@ -83,6 +83,6 @@ func (c *Client) Request(method string, reqURL string, body interface{}) (*http.
 
 	c.signAuthHeader(req, marshaled)
 	logrus.Debug("Auth: ", req.Header)
-	logrus.Debug("Request URL: ", req.URL.String())
+	logrus.Debug("Request URL: ", req.URL.String(), " Method: ", method)
 	return c.httpClient.Do(req)
 }
