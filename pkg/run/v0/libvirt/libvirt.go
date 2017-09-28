@@ -19,7 +19,7 @@ const (
 	Kind = "libvirt"
 
 	// EnvNamespaceTags is the env to set for namespace tags. It's k=v,...
-	EnvNamespaceTags = "INFRAKIT_PACKET_NAMESPACE_TAGS"
+	EnvNamespaceTags = "INFRAKIT_LIBVIRT_NAMESPACE_TAGS"
 
 	// EnvURIs is the env to set the list of connection URI.  The format
 	// is name1=uri1,name2=uri2,...
