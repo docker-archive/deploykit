@@ -7,7 +7,7 @@ import (
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/instance/packet"
+	packet "github.com/docker/infrakit/pkg/provider/packet/plugin/instance"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/spi/instance"
