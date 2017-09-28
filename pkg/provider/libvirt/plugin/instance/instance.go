@@ -1,4 +1,4 @@
-package libvirt
+package instance
 
 import (
 	"bytes"
