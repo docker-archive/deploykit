@@ -141,6 +141,9 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	index group_types.Index) (instance.Spec, error) {
 	spec := Spec{}
 
+	log.Debug("prepare", "role", role, "properties", flavorProperties, "spec", instanceSpec, "alloc", allocation,
+		"index", index)
+
 	if s.plugins == nil {
 		return instanceSpec, fmt.Errorf("no plugin discovery")
 	}

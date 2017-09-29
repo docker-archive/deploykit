@@ -40,7 +40,7 @@ rm -rf $TEST_DIR/tutorial/*
 
 
 # bind mounts
-volumes="-v $TEST_DIR:/ikt -v $PWD/docs:/root/docs"
+volumes="-v $TEST_DIR:/ikt -v $PWD/scripts:/root/scripts"
 
 # set the environment variable to use a shorter path so we don't have
 # problems with Docker for Mac.  See https://github.com/docker/docker/issues/23545
