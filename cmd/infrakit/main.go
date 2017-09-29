@@ -46,6 +46,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
 	_ "github.com/docker/infrakit/pkg/run/v0/group"
 	_ "github.com/docker/infrakit/pkg/run/v0/hyperkit"
+	_ "github.com/docker/infrakit/pkg/run/v0/ibmcloud"
 	_ "github.com/docker/infrakit/pkg/run/v0/ingress"
 	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
 	_ "github.com/docker/infrakit/pkg/run/v0/manager"
