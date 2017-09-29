@@ -2,12 +2,13 @@ package metadata
 
 import (
 	"fmt"
-	"reflect"
-
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/infrakit/pkg/template"
+	"reflect"
+	"sort"
 )
 
 var (
@@ -85,6 +86,38 @@ func describe(clients AWSClients, r *cloudformation.StackResource) (interface{},
 		return f(clients, r)
 	}
 	return nil, ErrNotSupported
+}
+
+// return a list of availablityZones for this region
+func availabilityZones(clients AWSClients) (interface{}, error) {
+
+	// we only want the Azs that are available.
+	input := &ec2.DescribeAvailabilityZonesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("state"),
+				Values: []*string{aws.String("available")},
+			},
+		},
+	}
+
+	result, err := clients.Ec2.DescribeAvailabilityZones(input)
+	if err != nil {
+		return nil, err
+	}
+
+	zones := []string{}
+	for _, p := range result.AvailabilityZones {
+		if p.ZoneName == nil {
+			// skip if it is nil
+			continue
+		}
+		zones = append(zones, *p.ZoneName)
+	}
+
+	// sort the zones, so we always return in the same order.
+	sort.Strings(zones)
+	return zones, nil
 }
 
 func cfn(clients AWSClients, name string) (interface{}, error) {
