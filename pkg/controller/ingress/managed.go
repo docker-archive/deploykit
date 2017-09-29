@@ -18,6 +18,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -71,6 +72,9 @@ type managed struct {
 	groupClientsLock gsync.RWMutex
 
 	lock gsync.RWMutex
+
+	// template that we use to render with a source instance.Description to get the link Key
+	sourceKeySelectorTemplate *template.Template
 }
 
 func (c *managed) state() ingress.Properties {
