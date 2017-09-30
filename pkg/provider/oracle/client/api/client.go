@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 	"golang.org/x/crypto/ssh"
 )
 

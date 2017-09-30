@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 )
 
 // VNicAttachment contains the VNICAttachement reference from: https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/VnicAttachment/

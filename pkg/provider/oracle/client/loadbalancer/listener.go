@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 
 	"github.com/Sirupsen/logrus"
 )

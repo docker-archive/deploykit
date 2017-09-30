@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -48,7 +48,7 @@ type IP struct {
 }
 
 // GetLoadBalancer gets the specified load balancer's configuration information
-func (c *Client) GetLoadBalancer(loadBalancerID string) (LoadBalancer, *bmc.Error) {
+func (c *Client) GetLoadBalancer(loadBalancerID string) (LoadBalancer, error) {
 	loadBalancer := LoadBalancer{}
 	loadBalancerID = url.PathEscape(loadBalancerID)
 	resp, err := c.Request("GET", fmt.Sprintf("/loadBalancers/%s", loadBalancerID), nil)

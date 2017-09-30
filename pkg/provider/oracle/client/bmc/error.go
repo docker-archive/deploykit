@@ -2,6 +2,7 @@ package bmc
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -12,6 +13,11 @@ import (
 type Error struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+// Error returns the error string
+func (e Error) Error() string {
+	return fmt.Sprintf("code:%v message:%v", e.Code, e.Message)
 }
 
 // NewError returns a pointer to the BMC error

@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 	"github.com/google/go-querystring/query"
 )
 
@@ -81,7 +81,7 @@ func (c *Client) GetInstance(instanceID string) (Instance, *bmc.Error) {
 }
 
 // ListInstances returns a slice struct of all instance
-func (c *Client) ListInstances(options *InstancesParameters) ([]Instance, *bmc.Error) {
+func (c *Client) ListInstances(options *InstancesParameters) ([]Instance, error) {
 	instances := []Instance{}
 	queryString := url.QueryEscape(c.CompartmentID)
 	if options != nil {

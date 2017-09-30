@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 )
 
 // HealthChecker reference from https://docs.us-phoenix-1.oraclecloud.com/api/#/en/loadbalancer/20170115/HealthChecker/

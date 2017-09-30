@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 )
 
 // SecurityList contains the SecurityList reference from: https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/SecurityList/
@@ -15,7 +15,7 @@ type SecurityList struct {
 	// The OCID of the compartment that contains the security list
 	CompartmentID string `json:"compartmentId,omitempty"`
 	// A user-friendly name
-	DisplayName string `json:"displayName",omitempty`
+	DisplayName string `json:"displayName,omitempty"`
 	// The OCID of the SecurityList
 	ID string `json:"id,omitempty"`
 	// Rules for allowing egress IP packets
@@ -27,12 +27,13 @@ type SecurityList struct {
 	// The date and time the instance was created (RFC3339)
 	TimeCreated string `json:"timeCreated,omitempty"`
 	// The OCID of the VCN
-	VcnID string `json:"vcnId",omitempty`
+	VcnID string `json:"vcnId,omitempty"`
 }
 
+// SecurityListUpdate message body for updating security list
 type SecurityListUpdate struct {
 	// A user-friendly name
-	DisplayName string `json:"displayName",omitempty`
+	DisplayName string `json:"displayName,omitempty"`
 	// Rules for allowing egress IP packets
 	EgressSecurityRules *[]EgressSecurityRule `json:"egressSecurityRules"`
 	// Rules for allowing ingress IP packets
@@ -46,8 +47,8 @@ type EgressSecurityRule struct {
 	IsStateless bool        `json:"isStateless,omitempty"`
 	// Protocol values: all, ICMP ("1"), TCP ("6"), UDP ("17").
 	Protocol   string      `json:"protocol"`
-	TcpOptions *PortConfig `json:"tcpOptions,omitempty"`
-	UdpOptions *PortConfig `json:"udpOptions,omitempty"`
+	TCPOptions *PortConfig `json:"tcpOptions,omitempty"`
+	UDPOptions *PortConfig `json:"udpOptions,omitempty"`
 }
 
 // IngressSecurityRule rule for allowing inbound IP packets
@@ -57,10 +58,11 @@ type IngressSecurityRule struct {
 	IsStateless bool        `json:"isStateless,omitempty"`
 	// Protocol values: all, ICMP ("1"), TCP ("6"), UDP ("17").
 	Protocol   string      `json:"protocol"`
-	TcpOptions *PortConfig `json:"tcpOptions,omitempty"`
-	UdpOptions *PortConfig `json:"udpOptions,omitempty"`
+	TCPOptions *PortConfig `json:"tcpOptions,omitempty"`
+	UDPOptions *PortConfig `json:"udpOptions,omitempty"`
 }
 
+// IcmpOption settings for ICMP
 type IcmpOption struct {
 	// The ICMP code
 	Code int `json:"code,omitempty"`
@@ -68,11 +70,13 @@ type IcmpOption struct {
 	Type int `json:"type,omitempty"`
 }
 
+// PortConfig contains port ranges for source and destinations
 type PortConfig struct {
 	DestinationPortRange *PortRange `json:"destinationPortRange,omitempty"`
 	SourcePortRange      *PortRange `json:"sourcePortRange,omitempty"`
 }
 
+// PortRange is a range of ports
 type PortRange struct {
 	Min int `json:"min,omitempty"`
 	Max int `json:"max,omitempty"`

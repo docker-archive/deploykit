@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 )
 
 // Subnet contains the Subnet reference from: https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/Subnet/
@@ -24,10 +24,10 @@ type Subnet struct {
 	ID string `json:"id"`
 	// The OCID of the set of DHCP options associated with the subnet
 	DhcpOptionsID string `json:"dhcpOptionsId"`
-	// Whether VNICs within this subnet can have public IP addresses
-	ProhibitPublicIpOnVnic bool `json:"prohibitPublicIpOnVnic"`
-	// The OCID of the route table the subnet is using
-	RouteTableId string `json:"routeTableId"`
+	// ProhibitPublicIPOnVnic sets whether VNICs within this subnet can have public IP addresses
+	ProhibitPublicIPOnVnic bool `json:"prohibitPublicIpOnVnic"`
+	// RouteTableID is the OCID of the route table the subnet is using
+	RouteTableID string `json:"routeTableId"`
 	// The Subnet's current state
 	LifeCycleState string `json:"lifecycleState"`
 	// A DNS label for the Subnet

@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/FrenchBen/oracle-sdk-go/api"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/api"
 )
 
 // API Ref: https://docs.us-phoenix-1.oraclecloud.com/api/#/en/iaas/20160918/
