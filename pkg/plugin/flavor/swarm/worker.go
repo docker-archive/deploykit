@@ -86,6 +86,6 @@ func (s *WorkerFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 		return nil
 
 	default:
-		return fmt.Errorf("Expected at most one node with label %s, but found %s", link.Value(), nodes)
+		return fmt.Errorf("Expected at most one node with label %s, but found %v", link.Value(), nodes)
 	}
 }
