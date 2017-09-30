@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/FrenchBen/oracle-sdk-go/api"
-	"github.com/FrenchBen/oracle-sdk-go/bmc"
-	"github.com/FrenchBen/oracle-sdk-go/core"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/api"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
+	"github.com/docker/infrakit/pkg/provider/oracle/client/core"
 )
 
 func main() {
@@ -35,8 +35,8 @@ func main() {
 		},
 	}
 	instances, bmcErr := coreClient.ListInstances(options)
-	if bmcErr.Code != "200" {
-		log.Fatal("Error listing compute instance: ", bmcErr.Message)
+	if bmcErr != nil {
+		log.Fatal("Error listing compute instance: ", bmcErr.Error())
 	}
 	fmt.Println("Instances: ", instances)
 }
