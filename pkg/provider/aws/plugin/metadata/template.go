@@ -192,6 +192,15 @@ func (c *Context) Funcs() []template.Function {
 			},
 		},
 		{
+			Name: "availabilityZones",
+			Description: []string{
+				"returns a list of availablity zones for this region",
+			},
+			Func: func() (interface{}, error) {
+				return availabilityZones(c.clients)
+			},
+		},
+		{
 			Name: "cfn",
 			Description: []string{
 				"cfn takes a string that is the stack name and retrieves the cloudformation data of the stack.",
