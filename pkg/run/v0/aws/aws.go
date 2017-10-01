@@ -90,7 +90,7 @@ var DefaultOptions = Options{
 		Options: aws_instance.Options{
 			Region: local.Getenv(EnvRegion, ""), // empty string trigger auto-detect
 		},
-		PollInterval: types.MustParseDuration(local.Getenv(EnvMetadataPollInterval, "5s")),
+		PollInterval: types.MustParseDuration(local.Getenv(EnvMetadataPollInterval, "60s")),
 	},
 }
 

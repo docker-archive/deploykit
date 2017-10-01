@@ -50,15 +50,18 @@ func (s *stoppableServer) AwaitStopped() {
 }
 
 type loggingHandler struct {
-	handler http.Handler
+	handler      http.Handler
+	listen       []string
+	discoverPath string
 }
 
 func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestData, err := httputil.DumpRequest(req, true)
 	if err == nil {
-		log.Debug("Server RECEIVE", "payload", string(requestData), "V", debugV)
+		log.Debug("Server RECEIVE", "payload", string(requestData), "V", debugV,
+			"url", fmt.Sprintf("%v", req.URL), "listen", h.listen, "discoverPath", h.discoverPath)
 	} else {
-		log.Warn("Server RECEIVE", "err", err)
+		log.Error("Server RECEIVE", "err", err, "url", fmt.Sprintf("%v", req.URL))
 	}
 
 	recorder := rpc_server.NewRecorder()
@@ -67,9 +70,11 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	responseData, err := httputil.DumpResponse(recorder.Result(), true)
 	if err == nil {
-		log.Debug("Server REPLY", "payload", string(responseData), "V", debugV)
+		log.Debug("Server REPLY", "payload", string(responseData), "V", debugV,
+			"url", fmt.Sprintf("%v", req.URL), "listen", h.listen, "discoverPath", h.discoverPath)
 	} else {
-		log.Warn("Server REPLY", "err", err)
+		log.Error("Server REPLY", "err", err, "url", fmt.Sprintf("%v", req.URL),
+			"url", fmt.Sprintf("%v", req.URL), "listen", h.listen, "discoverPath", h.discoverPath)
 	}
 
 	w.WriteHeader(recorder.Code)
@@ -177,7 +182,7 @@ func startAtPath(listen []string, discoverPath string,
 	}
 	router.HandleFunc(rpc_server.URLEventsPrefix, intercept.ServeHTTP)
 
-	logger := loggingHandler{handler: server}
+	logger := loggingHandler{handler: server, listen: listen, discoverPath: discoverPath}
 	router.Handle("/", logger)
 
 	gracefulServer := graceful.Server{

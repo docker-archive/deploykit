@@ -40,7 +40,7 @@ rm -rf $TEST_DIR/tutorial/*
 
 
 # bind mounts
-volumes="-v $TEST_DIR:/ikt -v $PWD/docs:/root/docs"
+volumes="-v $TEST_DIR:/ikt -v $PWD/scripts:/root/scripts"
 
 # set the environment variable to use a shorter path so we don't have
 # problems with Docker for Mac.  See https://github.com/docker/docker/issues/23545
@@ -125,7 +125,7 @@ expect_output_lines "16 plugins should be discoverable" "run infrakit plugin ls 
 expect_output_lines "0 instances should exist" "run infrakit instance-file describe -q " "0"
 
 echo "Commiting"
-run infrakit group commit /root/docs/cattle.json
+run infrakit group commit /root/scripts/cattle.json
 
 echo 'Waiting for group to be provisioned'
 sleep 2
@@ -137,16 +137,16 @@ echo "Free the cattle"
 run infrakit group free cattle
 
 echo "Commit again"
-run infrakit group commit /root/docs/cattle.json
+run infrakit group commit /root/scripts/cattle.json
 
 expect_exact_output "Should be watching one group" "run infrakit group ls -q" "cattle"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
-  "run infrakit group commit /root/docs/cattle2.json --pretend" \
+  "run infrakit group commit /root/scripts/cattle2.json --pretend" \
   "Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10"
 
-run infrakit group commit /root/docs/cattle2.json
+run infrakit group commit /root/scripts/cattle2.json
 
 sleep 5
 

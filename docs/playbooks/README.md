@@ -28,11 +28,6 @@ In your terminal, or add this to your `.bash_profile`:
 ```shell
 export INFRAKIT_HOME=~/.infrakit
 ```
-If you're on the Mac, also
-
-```shell
-export INFRAKIT_HOST=localhost
-```
 
 ## Add a Playbook
 

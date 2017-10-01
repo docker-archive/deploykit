@@ -127,7 +127,7 @@ expect_output_lines "18 plugins should be discoverable" "infrakit plugin ls -q" 
 expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
 
 echo "Commiting"
-infrakit group commit docs/cattle.json
+infrakit group commit scripts/cattle.json
 
 echo 'Waiting for group to be provisioned'
 sleep 2
@@ -136,16 +136,16 @@ expect_output_lines "5 instances should exist in group" "infrakit group describe
 expect_output_lines "5 instances should exist" "infrakit instance-file describe -q " "5"
 
 infrakit group free cattle
-infrakit group commit docs/cattle.json
+infrakit group commit scripts/cattle.json
 
 expect_exact_output "Should be watching one group" "infrakit group ls -q" "cattle"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
-  "infrakit group commit docs/cattle2.json --pretend" \
+  "infrakit group commit scripts/cattle2.json --pretend" \
   "Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10"
 
-infrakit group commit docs/cattle2.json
+infrakit group commit scripts/cattle2.json
 
 sleep 10
 

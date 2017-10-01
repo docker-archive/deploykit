@@ -2,8 +2,6 @@ package metadata
 
 import (
 	"errors"
-	"log"
-	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -62,13 +60,13 @@ func NewPlugin(options Options, stop <-chan struct{}) (*Context, error) {
 	}
 
 	if options.Region == "" {
-		log.Println("region not specified, attempting to discover from EC2 instance metadata")
+		log.Warn("region not specified, attempting to discover from EC2 instance metadata")
 		region, err := instance.GetRegion()
 		if err != nil {
 			return nil, errors.New("Unable to determine region")
 		}
 
-		log.Printf("Defaulting to local region %s\n", region)
+		log.Info("Defaulting to local region", "region", region)
 		options.Region = region
 	}
 
@@ -101,16 +99,13 @@ func NewPlugin(options Options, stop <-chan struct{}) (*Context, error) {
 }
 
 type logger struct {
-	logger *log.Logger
 }
 
 func (l logger) Log(args ...interface{}) {
-	l.logger.Println(args...)
+	log.Debug("log", "args", args)
 }
 
 // GetLogger gets a logger that can be used with the AWS SDK.
 func GetLogger() aws.Logger {
-	return &logger{
-		logger: log.New(os.Stderr, "", log.LstdFlags),
-	}
+	return &logger{}
 }

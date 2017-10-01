@@ -141,6 +141,9 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	index group_types.Index) (instance.Spec, error) {
 	spec := Spec{}
 
+	log.Debug("prepare", "role", role, "properties", flavorProperties, "spec", instanceSpec, "alloc", allocation,
+		"index", index)
+
 	if s.plugins == nil {
 		return instanceSpec, fmt.Errorf("no plugin discovery")
 	}
@@ -205,6 +208,8 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		}
 	}
 
+	log.Debug("rendering template", "spec", spec)
+
 	initTemplate := s.initScript
 	var initScript string
 	var link *types.Link
@@ -213,6 +218,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 		t, err := template.NewTemplate(spec.InitScriptTemplateURL, DefaultTemplateOptions)
 		if err != nil {
+			log.Error("error processing template", "template", spec.InitScriptTemplateURL, "err", err)
 			return instanceSpec, err
 		}
 
