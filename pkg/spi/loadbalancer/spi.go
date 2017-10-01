@@ -35,6 +35,8 @@ type Route struct {
 // HealthCheck models the a probe that checks against a given backend port at given
 // intervals and with timeout.
 type HealthCheck struct {
+	// Protocol is the backend service protocol to check
+	Protocol Protocol
 	// BackendPort is the port on a backend node to probe
 	BackendPort int
 	// Healthy is the number of tries to succeed to be considered healthy

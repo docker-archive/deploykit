@@ -6,6 +6,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/go-autorest/autorest"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/provider/azure/plugin"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -16,12 +17,12 @@ var (
 )
 
 // NewVirtualMachinePlugin returns a typed instance plugin
-func NewVirtualMachinePlugin(options Options) instance.Plugin {
+func NewVirtualMachinePlugin(options plugin.Options) instance.Plugin {
 	client := compute.NewVirtualMachinesClient(options.SubscriptionID)
 	client.Authorizer = autorest.NewBearerAuthorizer(options)
-	return &virtualMachinePlugin{
+	return &virtualMachinesPlugin{
 		virtualMachinesAPI: &virtualMachinesClient{
-			client: &client,
+			VirtualMachinesClient: &client,
 		},
 		options: options,
 	}
@@ -36,44 +37,44 @@ type virtualMachinesAPI interface {
 }
 
 type virtualMachinesClient struct {
-	client *compute.VirtualMachinesClient
+	*compute.VirtualMachinesClient
 }
 
 func (v *virtualMachinesClient) createOrUpdate(resourceGroupName, name string,
 	vm compute.VirtualMachine) (<-chan compute.VirtualMachine, <-chan error) {
-	return v.client.CreateOrUpdate(resourceGroupName, name, vm, nil)
+	return v.CreateOrUpdate(resourceGroupName, name, vm, nil)
 }
 
 func (v *virtualMachinesClient) list(resourceGroupName string) (compute.VirtualMachineListResult, error) {
-	return v.client.List(resourceGroupName)
+	return v.List(resourceGroupName)
 }
 
 func (v *virtualMachinesClient) next(r compute.VirtualMachineListResult) (compute.VirtualMachineListResult, error) {
-	return v.client.ListNextResults(r)
+	return v.ListNextResults(r)
 }
 
 func (v *virtualMachinesClient) get(resourceGroupName, name string) (compute.VirtualMachine, error) {
-	return v.client.Get(resourceGroupName, name, compute.InstanceView)
+	return v.Get(resourceGroupName, name, compute.InstanceView)
 }
 
 func (v *virtualMachinesClient) delete(resourceGroupName, name string) (<-chan compute.OperationStatusResponse, <-chan error) {
-	return v.client.Delete(resourceGroupName, name, nil)
+	return v.Delete(resourceGroupName, name, nil)
 }
 
-type virtualMachinePlugin struct {
+type virtualMachinesPlugin struct {
 	virtualMachinesAPI
-	options Options
+	options plugin.Options
 }
 
 // Validate performs local validation on a provision request.
-func (p *virtualMachinePlugin) Validate(req *types.Any) error {
+func (p *virtualMachinesPlugin) Validate(req *types.Any) error {
 	log.Debug("Validate", "req", req)
 	vm := compute.VirtualMachine{}
 	return req.Decode(&vm)
 }
 
 // Provision creates a new instance based on the spec.
-func (p *virtualMachinePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
+func (p *virtualMachinesPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	log.Debug("Provision", spec, "V", debugV)
 
 	vm := &virtualMachine{}
@@ -90,7 +91,7 @@ func (p *virtualMachinePlugin) Provision(spec instance.Spec) (*instance.ID, erro
 
 	vmName := fmt.Sprintf("vm-%v", randomSuffix(8))
 	vmChan, errChan := p.virtualMachinesAPI.createOrUpdate(
-		p.options.ResourceGroupName, vmName, compute.VirtualMachine(*vm))
+		p.options.ResourceGroup, vmName, compute.VirtualMachine(*vm))
 
 	provisioned := <-vmChan
 	err = <-errChan
@@ -107,10 +108,10 @@ func (p *virtualMachinePlugin) Provision(spec instance.Spec) (*instance.ID, erro
 }
 
 // Label labels the instance
-func (p *virtualMachinePlugin) Label(instance instance.ID, labels map[string]string) error {
+func (p *virtualMachinesPlugin) Label(instance instance.ID, labels map[string]string) error {
 	log.Debug("Label", "instance", instance, "labels", labels, "V", debugV)
 
-	v, err := p.virtualMachinesAPI.get(p.options.ResourceGroupName, string(instance))
+	v, err := p.virtualMachinesAPI.get(p.options.ResourceGroup, string(instance))
 	if err != nil {
 		return err
 	}
@@ -118,28 +119,28 @@ func (p *virtualMachinePlugin) Label(instance instance.ID, labels map[string]str
 	vm := virtualMachine(v).mergeTags(labels, p.options.Namespace)
 
 	_, errChan := p.virtualMachinesAPI.createOrUpdate(
-		p.options.ResourceGroupName, string(instance), compute.VirtualMachine(*vm))
+		p.options.ResourceGroup, string(instance), compute.VirtualMachine(*vm))
 
 	return <-errChan
 }
 
 // Destroy terminates an existing instance.
-func (p *virtualMachinePlugin) Destroy(instance instance.ID, context instance.Context) error {
+func (p *virtualMachinesPlugin) Destroy(instance instance.ID, context instance.Context) error {
 	log.Debug("Destroy", "instance", instance, "context", context, "V", debugV)
 
-	_, errChan := p.virtualMachinesAPI.delete(p.options.ResourceGroupName, string(instance))
+	_, errChan := p.virtualMachinesAPI.delete(p.options.ResourceGroup, string(instance))
 	return <-errChan
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 // The properties flag indicates the client is interested in receiving details about each instance.
-func (p *virtualMachinePlugin) DescribeInstances(labels map[string]string,
+func (p *virtualMachinesPlugin) DescribeInstances(labels map[string]string,
 	properties bool) ([]instance.Description, error) {
 	log.Debug("DescribeInstances", "labels", labels, "V", debugV)
 
 	matches := []instance.Description{}
 
-	all, err := p.virtualMachinesAPI.list(p.options.ResourceGroupName)
+	all, err := p.virtualMachinesAPI.list(p.options.ResourceGroup)
 	if err != nil {
 		return matches, err
 	}
