@@ -1,0 +1,21 @@
+# When provisioning a single instance, you can specify
+# tags that are associated with the instance.
+Tags:
+  custom.tag1 : tutorial
+  custom.tag2 : single-instance
+
+# Each instance has a notion of initialization. Often, on
+# public clouds this would correspond to some compute note
+# bootscript or cloud-init.
+Init: |
+  #!/bin/bash
+  sudo apt-get update -y
+  sudo apt-get install wget curl
+  wget -qO- https://get.docker.com | sh
+
+# Properties contain properties that are important for the downstream
+# systems that interfaces with this plugin plugin.  Often these
+# map to the specific API structures that are used to provision an instance.
+Properties:
+  apiProperty1 : value1
+  apiProperty2 : value2

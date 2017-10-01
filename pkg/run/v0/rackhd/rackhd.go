@@ -5,7 +5,7 @@ import (
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	rackhd "github.com/docker/infrakit/pkg/provider/codedellemc/rackhd/plugin/instance"
+	rackhd "github.com/docker/infrakit/pkg/provider/rackhd/plugin/instance"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/types"

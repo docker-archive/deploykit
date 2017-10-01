@@ -154,9 +154,9 @@ func (c client) Call(method string, arg interface{}, result interface{}) error {
 
 	requestData, err := httputil.DumpRequest(req, true)
 	if err == nil {
-		log.Debug("Client SEND", "payload", string(requestData), "V", debugV)
+		log.Debug("Client SEND", "addr", c.addr, "payload", string(requestData), "V", debugV)
 	} else {
-		log.Warn("Client SEND", "err", err)
+		log.Warn("Client SEND", "addr", c.addr, "err", err)
 	}
 
 	resp, err := c.http.Do(req)
@@ -168,9 +168,9 @@ func (c client) Call(method string, arg interface{}, result interface{}) error {
 
 	responseData, err := httputil.DumpResponse(resp, true)
 	if err == nil {
-		log.Debug("Client RECEIVE", "payload", string(responseData), "V", debugV)
+		log.Debug("Client RECEIVE", "addr", c.addr, "payload", string(responseData), "V", debugV)
 	} else {
-		log.Warn("Client RECEIVE", "err", err)
+		log.Warn("Client RECEIVE", "addr", c.addr, "err", err)
 	}
 
 	return json2.DecodeClientResponse(resp.Body, result)

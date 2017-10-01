@@ -12,7 +12,7 @@ With an emphasis on immutable infrastructure, it breaks down infrastructure auto
 These components work together to actively ensure the infrastructure state matches the user's specifications.
 InfraKit therefore provides infrastructure support for higher-level container orchestration systems and can make your infrastructure self-managing and self-healing.
 
-To get started, try the [tutorial](docs/tutorial.md), or check out the video below:
+To get started, try the [tutorial](docs/tutorial/README.md), or check out the video below:
 
 ### InfraKit + [LinuxKit](https://github.com/linuxkit/linuxkit) POC
 
@@ -46,7 +46,7 @@ Plugins are active daemons that cooperate with one another to ensure the infrast
 
 ## Plugins
 _InfraKit_ makes extensive use of _Plugins_ to manage arbitrary systems in diverse environments, which can be composed
-to meet different needs. See the [plugins](docs/plugins) documentation for more technical details.
+to meet different needs. See the [plugins](docs/plugin) documentation for more technical details.
 
 Here is a list of plugins:
 
@@ -54,29 +54,30 @@ Here is a list of plugins:
 
 | plugin                                                  | type     | description                             |
 |:--------------------------------------------------------|:---------|:----------------------------------------|
-| [infrakit/group](./cmd/group)                       | group    | core group controller for rolling updates, scale group, etc. |
-| [swarm](./examples/flavor/swarm)                    | flavor   | runs Docker in Swarm mode               |
-| [kubernetes](./examples/flavor/kubernetes)          | flavor   | bootstraps a single master kubernetes cluster    |
-| [vanilla](./examples/flavor/vanilla)                | flavor   | manual specification of instance fields |
-| [zookeeper](./examples/flavor/zookeeper)            | flavor   | run an Apache ZooKeeper ensemble        |
-| [infrakit/file](./examples/instance/file)           | instance | useful for development and testing      |
-| [infrakit/docker](./examples/instance/docker)       | instance | provisions container via Docker         |
-| [infrakit/terraform](./pkg/provider/terraform/instance) | instance | creates resources using Terraform       |
-| [infrakit/maas](./examples/instance/maas)           | instance | bare-metal provisioning using Ubuntu MAAS  |
-| [infrakit/vagrant](./examples/instance/vagrant)     | instance | creates Vagrant VMs                     |
-| [infrakit/hyperkit](./pkg/plugin/instance/hyperkit)   | instance | creates [HyperKit](https://github.com/moby/hyperkit) VMs on Mac OSX |
-| [infrakit/packet](./pkg/plugin/instance/packet)       | instance | provisions bare metal hosts on Packet   |
-| [infrakit/libvirt](./pkg/plugin/instance/libvirt)     | instance | provisions KVM vms via libvirt          |
-| [infrakit/aws](./pkg/provider/aws)                    | instance | creates Amazon EC2 instances and other resource types |
-| [infrakit/google](./pkg/provider/google/plugin/instance)     | instance | Google Cloud Platform compute instances |
-| [docker/infrakit.digitalocean](https://github.com/docker/infrakit.digitalocean) | instance | creates DigitalOcean droplets             |
+| [group](./pkg/plugin/group)                             | group    | core group controller for rolling updates, scale group, etc. |
+| [swarm](./pkg/plugin/flavor/swarm/README.md)            | flavor   | runs Docker in Swarm mode               |
+| [kubernetes](./pkg/plugin/flavor/kubernetes/README.md)  | flavor   | bootstraps a single master kubernetes cluster    |
+| [combo](./pkg/plugin/flavor/combo)                      | flavor   | [combine multiple flavor plugins](./docs/plugin/flavor/combo/README.md) |
+| [vanilla](./pkg/plugin/flavor/vanilla)                  | flavor   | [manual specification of instance fields](./docs/plugin/flavor/vanilla/README.md) |
+| [aws](./pkg/provider/aws)                               | instance | creates Amazon EC2 instances and other resource types |
+| [digitalocean](./pkg/provider/digitalocean)             | instance | creates DigitalOcean droplets             |
+| [docker](./pkg/provider/docker)                         | instance | [provisions container via Docker](./pkg/provider/docker/README.md)         |
+| [google](./pkg/provider/google/plugin/instance)         | instance | [Google Cloud Platform compute instances](./pkg/provider/google/README.md) |
+| [file](./pkg/plugin/instance/file)                      | instance | useful for development and testing      |
+| [hyperkit](./pkg/provider/hyperkit)                     | instance | creates [HyperKit](https://github.com/moby/hyperkit) VMs on Mac OSX |
+| [libvirt](./pkg/provider/libvirt)                       | instance | provisions KVM vms via libvirt          |
+| [maas](./pkg/provider/maas)                             | instance | [bare-metal provisioning using Ubuntu MAAS](./pkg/provider/maas/plugin/instance/README.md)  |
+| [packet](./pkg/provider/packet)                         | instance | provisions bare metal hosts on Packet   |
+| [rackhd](./pkg/provider/rackhd)                         | instance | [bare-metal server provisioning via RackHD](./pkg/provider/rackhd/README.md) |
+| [terraform](./pkg/provider/terraform/instance)          | instance | creates resources using Terraform       |
+| [vagrant](./pkg/provider/vagrant)                       | instance | creates Vagrant VMs                     |
+| [vsphere](./pkg/provider/vsphere)                       | instance | creates VMWare VMs                     |
 
 ### Community Implementations
 
 | plugin                                                  | type     | description                             |
 |:--------------------------------------------------------|:---------|:----------------------------------------|
 | [HewlettPackard/infrakit-instance-oneview](https://github.com/HewlettPackard/infrakit-instance-oneview)      | instance    | bare-metal server provisioning via HP-OneView |
-| [codedellemc/infrakit.rackhd](https://github.com/codedellemc/infrakit.rackhd)      | instance    | bare-metal server provisioning via RackHD |
 | [IBM Cloud](./pkg/provider/terraform/instance) | instance    | Provisions instances on IBM Cloud via terraform             |
 | [AliyunContainerService/infrakit.aliyun](https://github.com/AliyunContainerService/infrakit.aliyun) | instance    | Provisions instances on Alibaba Cloud |
 | [1and1/infrakit-instance-oneandone](https://github.com/1and1/infrakit-instance-oneandone) | instance    | Provisions instances on 1&1 Cloud Server |

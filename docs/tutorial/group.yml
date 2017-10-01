@@ -1,0 +1,34 @@
+#
+#  A group of workers
+#
+#  Start up -- plugin start should include manager, vanilla, simulator, and group
+#  Then commit
+#
+#  infrakit group controller commit -y docs/tutorial/group.yml
+#
+kind: group
+metadata:
+    name: workers
+properties:
+    Allocation:
+      Size: 5
+    Flavor:
+      Plugin: vanilla
+      Properties:
+        Init:
+          - sudo apt-get update -y
+          - sudo apt-get install wget curl
+          - wget -qO- https://get.docker.com | sh
+        Tags:
+          custom.tag1 : tutorial
+          custom.tag2 : single-instance
+          custom.tag3 : by-group
+
+    Instance:
+      Plugin: simulator/compute
+      # This section here for the Instance plugin is the same as the example
+      # for creating a single instance.  The Tags and Init sections are now
+      # handled by the Flavor plugin
+      Properties:
+        apiProperty1 : value1
+        apiProperty2 : value2

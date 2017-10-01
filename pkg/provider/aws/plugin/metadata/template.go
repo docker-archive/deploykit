@@ -6,16 +6,21 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudformation/cloudformationiface"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
+	logutil "github.com/docker/infrakit/pkg/log"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/provider/aws/plugin/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+)
+
+var (
+	log    = logutil.New("module", "aws/metadata")
+	debugV = logutil.V(1000)
 )
 
 // AWSClients holds a set of AWS API clients
@@ -39,7 +44,11 @@ type Context struct {
 
 func (c *Context) start() {
 
-	log.Infoln("Staring context:", c, c.poll)
+	if c.poll == 0 {
+		c.poll = 1 * time.Minute
+	}
+
+	log.Info("Staring", "context", c, "poll", c.poll)
 	update := make(chan func(map[string]interface{}))
 	tick := time.Tick(c.poll)
 
@@ -48,28 +57,25 @@ func (c *Context) start() {
 
 	go func() {
 
-	loop:
 		for {
-			log.Debugln("Running template to export metadata:", c.templateURL)
+			log.Debug("Running template to export metadata", "url", c.templateURL, "V", debugV)
 
 			t, err := template.NewTemplate(c.templateURL, c.templateOptions)
 			if err != nil {
-				log.Warningln("err running template:", err)
+				log.Warn("err running template", "err", err)
 				update <- func(view map[string]interface{}) {
 					view["err"] = err.Error()
 				}
-				continue loop
 			}
 
 			// Note the actual exporting of the values is done via the 'export' function
 			// that are invoked as part of processing the template.
 			_, err = t.Render(c)
 			if err != nil {
-				log.Warningln("err evaluating template:", err)
+				log.Warn("err evaluating template", "err", err)
 				update <- func(view map[string]interface{}) {
 					view["err"] = err.Error()
 				}
-				continue loop
 			} else {
 				update <- func(view map[string]interface{}) {
 					delete(view, "err")
@@ -79,7 +85,7 @@ func (c *Context) start() {
 			select {
 			case <-tick:
 			case <-c.stop:
-				log.Infoln("Stopping aws metadata")
+				log.Info("Stopping aws metadata")
 				close(update)
 				return
 			}

@@ -66,28 +66,28 @@ func (l *Poller) Stop() {
 
 func (l *Poller) poll() {
 	for {
+
+		isLeader, err := l.pollFunc()
+		event := Leadership{}
+		if err != nil {
+			event.Status = Unknown
+			event.Error = err
+		} else {
+			if isLeader {
+				event.Status = Leader
+
+			} else {
+				event.Status = NotLeader
+			}
+		}
+
+		for _, receiver := range l.receivers {
+			receiver <- event
+		}
+
 		select {
 
 		case <-l.tick:
-
-			isLeader, err := l.pollFunc()
-			event := Leadership{}
-			if err != nil {
-				event.Status = Unknown
-				event.Error = err
-			} else {
-				if isLeader {
-					event.Status = Leader
-
-				} else {
-					event.Status = NotLeader
-				}
-			}
-
-			for _, receiver := range l.receivers {
-				receiver <- event
-			}
-
 		case <-l.stop:
 
 			log.Info("Stopping leadership check")

@@ -95,54 +95,68 @@ define define_binary_target
 	$(eval $(call binary_target_template,$(1),$(2)))
 endef
 
-
+# actual binaries that need to be built:
 $(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
-$(call define_binary_target,infrakit-flavor-kubernetes,github.com/docker/infrakit/examples/flavor/kubernetes)
-$(call define_binary_target,infrakit-flavor-swarm,github.com/docker/infrakit/examples/flavor/swarm)
-$(call define_binary_target,infrakit-flavor-zookeeper,github.com/docker/infrakit/examples/flavor/zookeeper)
-$(call define_binary_target,infrakit-group-default,github.com/docker/infrakit/cmd/group)
-$(call define_binary_target,infrakit-instance-aws,github.com/docker/infrakit/cmd/instance/aws)
-$(call define_binary_target,infrakit-instance-digitalocean,github.com/docker/infrakit/cmd/instance/digitalocean)
-$(call define_binary_target,infrakit-instance-docker,github.com/docker/infrakit/examples/instance/docker)
-$(call define_binary_target,infrakit-instance-gcp,github.com/docker/infrakit/cmd/instance/google)
-$(call define_binary_target,infrakit-instance-hyperkit,github.com/docker/infrakit/cmd/instance/hyperkit)
-$(call define_binary_target,infrakit-instance-image,github.com/docker/infrakit/cmd/instance/image)
-ifeq ($(OS),Windows_NT)
-build/infrakit-instance-libvirt:
-# noop on windows
-else
-$(call define_binary_target,infrakit-instance-libvirt,github.com/docker/infrakit/cmd/instance/libvirt)
-endif
-$(call define_binary_target,infrakit-instance-maas,github.com/docker/infrakit/examples/instance/maas)
-$(call define_binary_target,infrakit-instance-packet,github.com/docker/infrakit/cmd/instance/packet)
-$(call define_binary_target,infrakit-instance-terraform,github.com/docker/infrakit/pkg/provider/terraform/instance/cmd)
-$(call define_binary_target,infrakit-instance-vagrant,github.com/docker/infrakit/examples/instance/vagrant)
-$(call define_binary_target,infrakit-instance-vsphere,github.com/docker/infrakit/pkg/provider/vsphere)
 $(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
-$(call define_binary_target,infrakit-metadata-aws,github.com/docker/infrakit/cmd/metadata/aws)
-$(call define_binary_target,infrakit-resource,github.com/docker/infrakit/cmd/resource)
 
-binaries: clean build-binaries
-build-binaries:	build/infrakit \
-		build/infrakit-flavor-kubernetes \
-		build/infrakit-flavor-swarm \
-		build/infrakit-flavor-zookeeper \
-		build/infrakit-group-default \
+
+# preserves the build/* binaries but use script to call 'infrakit plugin start' instead:
+define plugin_start_template
+build/$(1): $(SRCS)
+	@echo "#!/bin/sh\n# invoke plugin $(1) as $(2)\ninfrakit plugin start $(2) --log 5" > build/$(1)$(EXE_EXT)
+	@chmod a+x build/$(1)$(EXE_EXT)
+endef
+define define_plugin_start_target
+	$(eval $(call plugin_start_template,$(1),$(2)))
+endef
+
+$(call define_plugin_start_target,infrakit-group-default,group)
+$(call define_plugin_start_target,infrakit-instance-aws,aws)
+$(call define_plugin_start_target,infrakit-instance-digitalocean,digitalocean)
+$(call define_plugin_start_target,infrakit-instance-docker,docker)
+$(call define_plugin_start_target,infrakit-instance-gcp,google)
+$(call define_plugin_start_target,infrakit-instance-hyperkit,hyperkit)
+$(call define_plugin_start_target,infrakit-instance-image,image)
+$(call define_plugin_start_target,infrakit-instance-maas,maas)
+$(call define_plugin_start_target,infrakit-instance-packet,packet)
+$(call define_plugin_start_target,infrakit-instance-rackhd,rackhd)
+$(call define_plugin_start_target,infrakit-instance-terraform,terraform)
+$(call define_plugin_start_target,infrakit-instance-vagrant,vagrant)
+$(call define_plugin_start_target,infrakit-instance-vsphere,vsphere)
+$(call define_plugin_start_target,infrakit-flavor-kubernetes,kubernetes)
+$(call define_plugin_start_target,infrakit-flavor-swarm,swarm)
+$(call define_plugin_start_target,infrakit-metadata-aws,aws)
+
+build-plugin-start-scripts: build/infrakit \
 		build/infrakit-instance-aws \
 		build/infrakit-instance-digitalocean \
 		build/infrakit-instance-docker \
 		build/infrakit-instance-gcp \
 		build/infrakit-instance-hyperkit \
 		build/infrakit-instance-image \
-		build/infrakit-instance-libvirt \
 		build/infrakit-instance-maas \
 		build/infrakit-instance-packet \
+		build/infrakit-instance-rackhd \
 		build/infrakit-instance-terraform \
 		build/infrakit-instance-vagrant \
 		build/infrakit-instance-vsphere \
-		build/infrakit-manager \
+		build/infrakit-flavor-kubernetes \
+		build/infrakit-flavor-swarm \
+		build/infrakit-group-default \
 		build/infrakit-metadata-aws \
-		build/infrakit-resource \
+
+ifeq ($(OS),Windows_NT)
+build/infrakit-instance-libvirt:
+# noop on windows
+else
+$(call define_plugin_start_target,infrakit-instance-libvirt,libvirt)
+endif
+
+
+binaries: clean build-binaries build-plugin-start-scripts
+build-binaries:	build/infrakit \
+		build/infrakit-manager \
+
 
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
@@ -252,10 +266,10 @@ endif
 
 build-docker: build-installer \
 	build-devbundle \
-	build-provider-aws \
-	build-provider-digitalocean \
-	build-provider-google \
-	build-provider-terraform \
+	#build-provider-aws \
+	#build-provider-digitalocean \
+	#build-provider-google \
+	#build-provider-terraform \
 
 # Provider: AWS
 build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws

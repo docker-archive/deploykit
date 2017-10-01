@@ -1,0 +1,24 @@
+ID: combo
+Properties:
+  Allocation:
+    Size: 2
+  Flavor:
+    # Here we use combo to chain together two vanilla flavors
+    Plugin: combo
+    Properties:
+      - Plugin: vanilla
+        Properties:
+          Init:
+            - vanilla one
+          Tags:
+            v1: tag one
+      - Plugin: vanilla
+        Properties:
+          Init:
+          - vanilla two
+          Tags:
+            v2: tag two
+  Instance:
+    Plugin: simulator/compute
+    Properties:
+        Note: custom field

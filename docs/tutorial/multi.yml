@@ -1,0 +1,30 @@
+kind: group
+metadata:
+    name: workers
+properties:
+    Allocation:
+      Size: 10
+    Flavor:
+      Plugin: vanilla
+      Properties:
+        Init:
+          - sudo apt-get update -y
+          - sudo apt-get install wget curl
+          - wget -qO- https://get.docker.com | sh
+        Tags:
+          custom.tag1 : tutorial
+          custom.tag2 : single-instance
+          custom.tag3 : by-group
+
+    Instance:
+      # here we reference the spread  selector at the socket location, selector.
+      Plugin: selector/spread
+      Properties:
+        # The configuration follows the format of a map of pluginName : properties
+        us-east-1a/compute:
+          apiProperty1 : value1
+          apiProperty2 : us-east-1a
+        # The configuration follows the format of a map of pluginName : properties
+        us-east-1b/compute:
+          apiProperty1 : value1
+          apiProperty2 : us-east-1b

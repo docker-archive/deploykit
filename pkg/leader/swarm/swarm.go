@@ -11,7 +11,10 @@ import (
 	"golang.org/x/net/context"
 )
 
-var log = logutil.New("module", "leader/swarm")
+var (
+	log    = logutil.New("module", "leader/swarm")
+	debugV = logutil.V(1000)
+)
 
 // NewDetector return an implementation of leader detector
 func NewDetector(pollInterval time.Duration, client docker.APIClientCloser) *leader.Poller {
@@ -37,7 +40,7 @@ func amISwarmLeader(ctx context.Context, client docker.APIClientCloser) (bool, e
 	if node.ManagerStatus == nil {
 		return false, nil
 	}
-	log.Debug("Leadership", "leader", node.ManagerStatus.Leader, "node", node)
+	log.Debug("Leadership", "leader", node.ManagerStatus.Leader, "node", node, "V", debugV)
 	return node.ManagerStatus.Leader, nil
 }
 
@@ -79,7 +82,7 @@ func (s Store) GetLocation() (*url.URL, error) {
 
 	if info.ClusterInfo.Spec.Annotations.Labels != nil {
 		if l, has := info.ClusterInfo.Spec.Annotations.Labels[SwarmLabel]; has {
-			log.Debug("leader location", "location", l)
+			log.Debug("leader location", "location", l, "V", debugV)
 			return url.Parse(l)
 		}
 	}
