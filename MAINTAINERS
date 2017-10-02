@@ -13,6 +13,7 @@
 		people = [
 		       "chungers",
 		       "kaufers",
+		       "FrenchBen",
 		       "ndegory",
 		       "thebsdbox",
 		       "YujiOshima"
@@ -35,6 +36,11 @@
 	Name = "David Gageot"
 	Email = "david.gageot@docker.com"
 	GitHub = "dgageot"
+
+	[people.FrenchBen]
+	Name = "Ben French"
+	Email = "frenchben@docker.com"
+	GitHub = "FrenchBen"
 
 	[people.kaufers]
 	Name = "Steven Kaufer"
