@@ -2,6 +2,7 @@ package util
 
 import (
 	"github.com/docker/infrakit/cmd/infrakit/base"
+	init_cmd "github.com/docker/infrakit/cmd/infrakit/util/init"
 	"github.com/docker/infrakit/cmd/infrakit/util/mux"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/log"
@@ -24,6 +25,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	util.AddCommand(
 		mux.Command(plugins),
+		init_cmd.Command(plugins),
 		fileServerCommand(plugins),
 		trackCommand(plugins),
 	)

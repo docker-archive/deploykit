@@ -36,6 +36,24 @@ const (
 	AllInstances = instance.LogicalID("*")
 )
 
+// Options capture static plugin-related settings
+type Options struct {
+
+	// ConfigDir is the location where the plugin uses to store some state like join token
+	ConfigDir string
+
+	// DefaultManagerInitScriptTemplate is the URL for the default control plane template url.
+	// It's overridden by the init script template url specified in the properties.
+	DefaultManagerInitScriptTemplate types.URL
+
+	// DefaultWorkerInitScriptTemplate is the URL for the default data plane (workers) template url.
+	// This is overridden by the template specified in the properties
+	DefaultWorkerInitScriptTemplate types.URL
+
+	// MultiMaster specifies if the control plane supports multi master
+	MultiMaster bool
+}
+
 // Spec is the value passed in the `Properties` field of configs
 type Spec struct {
 
@@ -60,6 +78,11 @@ type Spec struct {
 
 	// SkipManagerValidation is skip to check manager for worker
 	SkipManagerValidation bool
+
+	// ControlPlane are the nodes that make up the Kube control plane.  This is a list of logical IDs
+	// that correspond to the manager group of nodes.  For a single master setup, this slice should
+	// contain a single element of the IP address or some identifier for the master node.
+	ControlPlane []instance.LogicalID
 }
 
 // AddOnInfo is info mation of kubernetes add on information. Type is add on type network and visualise. See https://kubernetes.io/docs/concepts/cluster-administration/addons/
@@ -73,7 +96,16 @@ type baseFlavor struct {
 	initScript     *template.Template
 	metadataPlugin metadata.Plugin
 	plugins        func() discovery.Plugins
-	kubeConfDir    string
+	options        Options
+}
+
+func getTemplate(url types.URL, defaultTemplate string, opts template.Options) (t *template.Template, err error) {
+	if url.String() == "" {
+		t, err = template.NewTemplate("str://"+defaultTemplate, opts)
+		return
+	}
+	t, err = template.NewTemplate(url.String(), opts)
+	return
 }
 
 func checkKubeAPIServer(cfg kubeadmapi.NodeConfiguration, check chan error, clcfg *clientcmdapi.Config) {
@@ -115,7 +147,61 @@ func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group_type
 		}
 	}
 
+	// If we support only single master then make sure the spec conforms to it
+	if s.options.MultiMaster {
+		if len(allocation.LogicalIDs) == 0 {
+			return fmt.Errorf("must have at least one logical id for control plane")
+		}
+		if len(allocation.LogicalIDs)%2 == 0 {
+			return fmt.Errorf("must have odd number of logical ids: %v", allocation.LogicalIDs)
+		}
+
+		if len(spec.ControlPlane) == 0 {
+			return fmt.Errorf("must specify ControlPlane in spec: %v", spec)
+		}
+	}
+
+	if len(spec.ControlPlane) > 0 && len(spec.ControlPlane)%2 == 0 {
+		return fmt.Errorf("must have odd number of control plane ids: %v", spec.ControlPlane)
+	}
+
+	// We require the control plane logical Ids to be a strict subset of the allocation's instance IDs, if specified.
+	if len(allocation.LogicalIDs) > 0 && len(spec.ControlPlane) > 0 {
+		if !strictSubset(spec.ControlPlane, allocation.LogicalIDs) {
+			return fmt.Errorf("ControlPlane ids must be equal or strict subset of allocations logical IDs: %v vs %v",
+				spec.ControlPlane, allocation.LogicalIDs)
+		}
+	}
+
 	return validateIDsAndAttachments(allocation.LogicalIDs, spec.Attachments)
+}
+
+func strictSubset(a, b []instance.LogicalID) bool {
+	bm := map[instance.LogicalID]struct{}{}
+
+	for _, bb := range b {
+		bm[bb] = struct{}{}
+	}
+
+	for _, aa := range a {
+		_, has := bm[aa]
+		if !has {
+			return false
+		}
+	}
+	return true
+}
+
+func isControlPlane(id *instance.LogicalID, cplane []instance.LogicalID) (int, bool) {
+	if id == nil {
+		return -1, false
+	}
+	for i, node := range cplane {
+		if *id == node {
+			return i, true
+		}
+	}
+	return -1, false
 }
 
 // Healthy determines whether an instance is healthy.
@@ -152,41 +238,72 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	if err != nil {
 		return instanceSpec, err
 	}
-	clDir := path.Join(s.kubeConfDir, "infrakit-kube-"+spec.KubeClusterID)
+
+	clDir := path.Join(s.options.ConfigDir, "infrakit-kube-"+spec.KubeClusterID)
+	tokenPath := path.Join(clDir, "kubeadm-token")
 
 	var token string
+	var bootstrap bool
+	var worker bool
 	switch role {
 	case "manager":
+		index, is := isControlPlane(instanceSpec.LogicalID, spec.ControlPlane)
+		if !is {
+			worker = true
+			break
+		}
+
+		if index == 0 {
+			bootstrap = true
+		}
+
 		if _, err := os.Stat(clDir); err != nil {
-			if err := os.Mkdir(clDir, 0777); err != nil {
+			if err := os.MkdirAll(clDir, 0777); err != nil {
+				log.Error("can't make dir", "dir", clDir, "err", err)
 				return instanceSpec, err
 			}
 		}
-		f := path.Join(clDir, "kubeadm-token")
-		if _, err := os.Stat(f); err == nil {
+
+		if _, err := os.Stat(tokenPath); err == nil {
 			var btoken []byte
-			if btoken, err = ioutil.ReadFile(f); err != nil {
+			if btoken, err = ioutil.ReadFile(tokenPath); err != nil {
+				log.Error("can't read token", "path", tokenPath, "err", err)
 				return instanceSpec, err
 			}
 			token = string(btoken)
 		} else {
+
+			log.Info("generating token", "path", tokenPath)
+
 			token, err = kubetoken.GenerateToken()
 			if err != nil {
 				return instanceSpec, err
 			}
-			if err := ioutil.WriteFile(f, []byte(token), 0666); err != nil {
+			if err := ioutil.WriteFile(tokenPath, []byte(token), 0666); err != nil {
+				log.Error("can't write token", "path", tokenPath, "err", err)
 				return instanceSpec, err
+			} else {
+				log.Info("written token", "path", tokenPath)
 			}
+
 		}
+
 		token = strings.TrimRight(token, "\n")
+
 	case "worker":
-		f := path.Join(clDir, "kubeadm-token")
-		d, err := ioutil.ReadFile(f)
+		worker = true
+	}
+
+	if worker {
+
+		d, err := ioutil.ReadFile(tokenPath)
 		if err != nil {
+			log.Error("can't find token at path", "path", tokenPath, "err", err)
 			return instanceSpec, err
 		}
 		token = string(d)
 		token = strings.TrimRight(token, "\n")
+
 		if !spec.SkipManagerValidation {
 			cfg := kubeadmapi.NodeConfiguration{
 				DiscoveryTokenAPIServers: []string{spec.KubeJoinIP + ":" + strconv.Itoa(spec.KubeBindPort)},
@@ -208,8 +325,6 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		}
 	}
 
-	log.Debug("rendering template", "spec", spec)
-
 	initTemplate := s.initScript
 	var initScript string
 	var link *types.Link
@@ -225,6 +340,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		initTemplate = t
 		log.Info("Init script template", "template", spec.InitScriptTemplateURL)
 	}
+
 	link = types.NewLink().WithContext("kubernetes::" + role)
 	context := &templateContext{
 		flavorSpec:   spec,
@@ -233,6 +349,8 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		index:        index,
 		link:         *link,
 		joinToken:    token,
+		bootstrap:    bootstrap,
+		worker:       worker,
 	}
 
 	initTemplate.WithFunctions(func() []template.Function {
@@ -254,6 +372,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	return instanceSpec, nil
 }
 
+// TODO - call kubectl drain and then delete node
 func (s *baseFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
 	return nil
 }
@@ -308,6 +427,8 @@ type templateContext struct {
 	retries      int
 	poll         time.Duration
 	joinToken    string
+	worker       bool
+	bootstrap    bool
 }
 
 func (c *templateContext) Funcs() []template.Function {
@@ -346,6 +467,20 @@ func (c *templateContext) Funcs() []template.Function {
 			Description: []string{"The launch index of this instance. Contains the group ID and the sequence number of instance."},
 			Func: func() interface{} {
 				return c.index
+			},
+		},
+		{
+			Name:        "BOOTSTRAP",
+			Description: []string{"True if this is a bootstrapper node"},
+			Func: func() interface{} {
+				return c.bootstrap
+			},
+		},
+		{
+			Name:        "WORKER",
+			Description: []string{"True if this is a member of the data plane (workers)"},
+			Func: func() interface{} {
+				return c.worker
 			},
 		},
 		{
