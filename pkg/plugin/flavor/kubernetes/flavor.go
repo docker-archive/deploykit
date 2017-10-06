@@ -282,9 +282,8 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			if err := ioutil.WriteFile(tokenPath, []byte(token), 0666); err != nil {
 				log.Error("can't write token", "path", tokenPath, "err", err)
 				return instanceSpec, err
-			} else {
-				log.Info("written token", "path", tokenPath)
 			}
+			log.Info("written token", "path", tokenPath)
 
 		}
 
