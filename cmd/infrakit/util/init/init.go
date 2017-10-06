@@ -96,9 +96,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	cmd.Flags().AddFlagSet(services.ProcessTemplateFlags)
 	groupID := cmd.Flags().String("group-id", "", "Group ID")
+	sequence := cmd.Flags().Uint("sequence", 0, "Sequence in the group")
 
 	configURL := cmd.Flags().String("config-url", "", "URL for the startup configs")
 	starts := cmd.Flags().StringSlice("start", []string{}, "start spec for plugin just like infrakit plugin start")
+
+	debug := cmd.Flags().Bool("debug", false, "True to debug with lots of traces")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
@@ -107,12 +110,14 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		logutil.Configure(&logutil.Options{
-			Level:    3,
-			Stdout:   false,
-			Format:   "term",
-			CallFunc: true,
-		})
+		if !*debug {
+			logutil.Configure(&logutil.Options{
+				Level:    3,
+				Stdout:   false,
+				Format:   "term",
+				CallFunc: true,
+			})
+		}
 
 		pluginManager, err := startPlugins(plugins, services, *configURL, *starts)
 		if err != nil {
@@ -177,20 +182,36 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		cli.MustNotNil(flavorPlugin, "flavor plugin not found", "name", groupSpec.Flavor.Plugin.String())
 
 		instanceSpec := instance.Spec{}
-		if len(groupSpec.Allocation.LogicalIDs) > 0 {
-			lid := instance.LogicalID(groupSpec.Allocation.LogicalIDs[0])
+		if lidLen := len(groupSpec.Allocation.LogicalIDs); lidLen > 0 {
+
+			if int(*sequence) >= lidLen {
+				return fmt.Errorf("out of bound sequence index: %v in %v", *sequence, groupSpec.Allocation.LogicalIDs)
+			}
+
+			lid := instance.LogicalID(groupSpec.Allocation.LogicalIDs[*sequence])
 			instanceSpec.LogicalID = &lid
 		}
 
 		instanceSpec, err = flavorPlugin.Prepare(groupSpec.Flavor.Properties, instanceSpec,
 			groupSpec.Allocation,
-			group_types.Index{Group: group.ID(*groupID), Sequence: 0})
+			group_types.Index{Group: group.ID(*groupID), Sequence: *sequence})
 
 		if err != nil {
 			return err
 		}
 
-		fmt.Print(instanceSpec.Init)
+		// Here the Init may contain template vars since in the evaluation of the manager / worker
+		// init templates, we do not propapage the vars set in the command line here.
+		// So we need to evaluate the entire Init as a template again.
+		// TODO - this is really better addressed via some formal globally available var store/section
+		// that is always available to the templates at the schema / document level.
+		applied, err := services.ProcessTemplate("str://" + instanceSpec.Init)
+		if err != nil {
+			return err
+		}
+
+		fmt.Print(applied)
+
 		return nil
 	}
 
