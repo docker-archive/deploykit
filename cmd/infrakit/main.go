@@ -67,6 +67,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
 	_ "github.com/docker/infrakit/pkg/run/v0/vagrant"
 	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
+	_ "github.com/docker/infrakit/pkg/run/v0/vars"
 	_ "github.com/docker/infrakit/pkg/run/v0/vsphere"
 )
 

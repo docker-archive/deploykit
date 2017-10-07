@@ -12,6 +12,7 @@ import (
 
 	"github.com/Masterminds/sprig"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 var log = logutil.New("module", "core/template")
@@ -273,6 +274,20 @@ func (t *Template) doVar(name string, optional ...interface{}) interface{} {
 	}
 	t.Global(name, optional[len(optional)-1])
 	return voidValue
+}
+
+// Globals return all the globals created
+func (t *Template) Globals() (map[string]interface{}, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	// deep copy
+	out := map[string]interface{}{}
+	v, err := types.AnyValue(t.globals)
+	if err != nil {
+		return out, err
+	}
+	err = v.Decode(&out)
+	return out, err
 }
 
 func (t *Template) updateGlobal(name string, value interface{}) {

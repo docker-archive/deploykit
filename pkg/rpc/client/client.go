@@ -49,7 +49,6 @@ func New(address string, api spi.InterfaceSpec) (Client, error) {
 	cl := &handshakingClient{client: unvalidatedClient, iface: api, lock: &sync.Mutex{}}
 	// check handshake
 	if err := cl.handshake(); err != nil {
-		log.Error("handshaking", "err", err)
 		// Note - we still return the client with the possibility of doing a handshake later on
 		// if we provide an api for the plugin to recheck later.  This way, individual components
 		// can stay running and recalibrate themselves after the user has corrected the problems.

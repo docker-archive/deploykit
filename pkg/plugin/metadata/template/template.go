@@ -4,9 +4,7 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/rpc/client"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
-	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -39,12 +37,12 @@ func MetadataFunc(discovery func() discovery.Plugins) func(string) (interface{},
 			return true, nil // This is a test for availability of the plugin
 		}
 
-		rpcClient, err := client.New(endpoint.Address, metadata.InterfaceSpec)
+		metadataPlugin, err := metadata_rpc.NewClient(endpoint.Address)
 		if err != nil {
 			return nil, fmt.Errorf("cannot connect to plugin: %s", *first)
 		}
 
-		any, err := metadata_rpc.Adapt(rpcClient).Get(mpath.Shift(1))
+		any, err := metadataPlugin.Get(mpath.Shift(1))
 		if err != nil {
 			return nil, err
 		}

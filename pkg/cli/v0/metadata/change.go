@@ -4,19 +4,16 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
-// Ls returns the Ls command
-func Ls(name string, services *cli.Services,
-	loader func(discovery.Plugins, string) (metadata.Plugin, error)) *cobra.Command {
+// Change returns the Change command
+func Change(name string, services *cli.Services) *cobra.Command {
 
 	ls := &cobra.Command{
-		Use:   "ls",
-		Short: "List metadata",
+		Use:   "change",
+		Short: "Update metadata",
 	}
 
 	long := ls.Flags().BoolP("long", "l", false, "Print full path")
@@ -25,7 +22,7 @@ func Ls(name string, services *cli.Services,
 
 	ls.RunE = func(cmd *cobra.Command, args []string) error {
 
-		metadataPlugin, err := loader(services.Plugins(), name)
+		metadataPlugin, err := LoadPlugin(services.Plugins(), name)
 		if err != nil {
 			return nil
 		}
@@ -98,29 +95,4 @@ func Ls(name string, services *cli.Services,
 		return nil
 	}
 	return ls
-}
-
-func listAll(m metadata.Plugin, path types.Path) ([]types.Path, error) {
-	if m == nil {
-		return nil, fmt.Errorf("no plugin")
-	}
-	result := []types.Path{}
-	nodes, err := m.List(path)
-	if err != nil {
-		return nil, err
-	}
-	for _, n := range nodes {
-		c := path.JoinString(n)
-		more, err := listAll(m, c)
-		if err != nil {
-			return nil, err
-		}
-		if len(more) == 0 {
-			result = append(result, c)
-		}
-		for _, pp := range more {
-			result = append(result, pp)
-		}
-	}
-	return result, nil
 }
