@@ -36,16 +36,6 @@ func init() {
 	inproc.Register(Kind, Run, DefaultOptions)
 }
 
-// Options capture the options for starting up the plugin.
-type Options struct {
-
-	// // Name of the backend pool controller
-	// Group plugin.Name
-
-	plugins    func() discovery.Plugins
-	leadership manager.Leadership
-}
-
 func leadership(plugins func() discovery.Plugins) (manager.Leadership, error) {
 	// Scan for a manager
 	pm, err := plugins().List()
@@ -76,7 +66,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		panic("no plugins()")
 	}
 
-	options := Options{}
+	options := DefaultOptions
 	err = config.Decode(&options)
 	if err != nil {
 		return
@@ -84,15 +74,14 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	log.Info("Decoded input", "config", options)
 
-	options.plugins = plugins
-	options.leadership, err = leadership(plugins)
+	leadership, err := leadership(plugins)
 	if err != nil {
 		return
 	}
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: ingress.NewTypedControllers(plugins, options.leadership),
+		run.Controller: ingress.NewTypedControllers(plugins, leadership),
 	}
 
 	return
