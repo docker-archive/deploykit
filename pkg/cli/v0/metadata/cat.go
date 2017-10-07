@@ -3,18 +3,20 @@ package metadata
 import (
 	"fmt"
 	"os"
+	gopath "path"
 	"strconv"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/spi/metadata"
+	//	"github.com/docker/infrakit/pkg/discovery"
+	//	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
 // Cat returns the Cat command
-func Cat(name string, services *cli.Services,
-	loader func(discovery.Plugins, string) (metadata.Plugin, error)) *cobra.Command {
+// func Cat(name string, services *cli.Services,
+// 	loader func(discovery.Plugins, string) (metadata.Plugin, error)) *cobra.Command {
+func Cat(name string, services *cli.Services) *cobra.Command {
 
 	cat := &cobra.Command{
 		Use:   "cat",
@@ -23,7 +25,7 @@ func Cat(name string, services *cli.Services,
 
 	cat.RunE = func(cmd *cobra.Command, args []string) error {
 
-		metadataPlugin, err := loader(services.Plugins(), name)
+		metadataPlugin, err := loadPlugin(services.Plugins(), name)
 		if err != nil {
 			return nil
 		}
@@ -31,9 +33,11 @@ func Cat(name string, services *cli.Services,
 
 		for _, p := range args {
 
-			path := types.PathFromString(p)
+			path := types.PathFromString(gopath.Join(name, p))
 			first := path.Index(0)
 			if first != nil {
+
+				path = path.Shift(1)
 
 				if path.Len() == 1 {
 					fmt.Printf("%v\n", metadataPlugin != nil)

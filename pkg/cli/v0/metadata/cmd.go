@@ -23,8 +23,8 @@ func init() {
 		})
 }
 
-// LoadPlugin loads the typed plugin
-func LoadPlugin(plugins discovery.Plugins, name string) (metadata.Plugin, error) {
+// loadPlugin loads the typed plugin
+func loadPlugin(plugins discovery.Plugins, name string) (metadata.Plugin, error) {
 	endpoint, err := plugins.Find(plugin.Name(name))
 	if err != nil {
 		return nil, err
@@ -32,8 +32,8 @@ func LoadPlugin(plugins discovery.Plugins, name string) (metadata.Plugin, error)
 	return metadata_rpc.NewClient(endpoint.Address)
 }
 
-// LoadPluginUpdatable loads the typed plugin
-func LoadPluginUpdatable(plugins discovery.Plugins, name string) (metadata.Plugin, error) {
+// loadPluginUpdatable loads the typed plugin
+func loadPluginUpdatable(plugins discovery.Plugins, name string) (metadata.Plugin, error) {
 	endpoint, err := plugins.Find(plugin.Name(name))
 	if err != nil {
 		return nil, err
@@ -50,8 +50,8 @@ func Metadata(name string, services *cli.Services) *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		Ls(name, services, LoadPlugin),
-		Cat(name, services, LoadPlugin),
+		Ls(name, services),
+		Cat(name, services),
 	)
 
 	return cmd
@@ -66,8 +66,8 @@ func MetadataUpdatable(name string, services *cli.Services) *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		Ls(name, services, LoadPluginUpdatable),
-		Cat(name, services, LoadPluginUpdatable),
+		Ls(name, services),
+		Cat(name, services),
 		Change(name, services),
 		Commit(name, services),
 	)

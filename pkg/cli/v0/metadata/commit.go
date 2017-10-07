@@ -15,7 +15,7 @@ func Commit(name string, services *cli.Services) *cobra.Command {
 
 	ls.RunE = func(cmd *cobra.Command, args []string) error {
 
-		metadataPlugin, err := LoadPlugin(services.Plugins(), name)
+		metadataPlugin, err := loadPluginUpdatable(services.Plugins(), name)
 		if err != nil {
 			return nil
 		}

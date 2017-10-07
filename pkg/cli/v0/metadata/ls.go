@@ -2,17 +2,19 @@ package metadata
 
 import (
 	"fmt"
+	gopath "path"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
+	//	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
 // Ls returns the Ls command
-func Ls(name string, services *cli.Services,
-	loader func(discovery.Plugins, string) (metadata.Plugin, error)) *cobra.Command {
+// func Ls(name string, services *cli.Services,
+// 	loader func(discovery.Plugins, string) (metadata.Plugin, error)) *cobra.Command {
+func Ls(name string, services *cli.Services) *cobra.Command {
 
 	ls := &cobra.Command{
 		Use:   "ls",
@@ -25,7 +27,7 @@ func Ls(name string, services *cli.Services,
 
 	ls.RunE = func(cmd *cobra.Command, args []string) error {
 
-		metadataPlugin, err := loader(services.Plugins(), name)
+		metadataPlugin, err := loadPlugin(services.Plugins(), name)
 		if err != nil {
 			return nil
 		}
@@ -45,12 +47,11 @@ func Ls(name string, services *cli.Services,
 		for i, p := range paths {
 
 			if p == "/" {
-				// TODO(chungers) -- this is a 'local' infrakit ensemble.
-				// Absolute paths will come in a multi-cluster / federated model.
 				return fmt.Errorf("No absolute path")
 			}
 
-			path := types.PathFromString(p)
+			//path := types.PathFromString(p)
+			path := types.PathFromString(gopath.Join(name, p)).Shift(1)
 
 			nodes := []types.Path{} // the result set to print
 
@@ -78,11 +79,7 @@ func Ls(name string, services *cli.Services,
 					fmt.Println()
 				}
 				for _, l := range nodes {
-					if *long {
-						fmt.Println(l.Rel(path))
-					} else {
-						fmt.Println(l.Rel(path))
-					}
+					fmt.Println(l.Rel(types.PathFromString(p)))
 				}
 				break
 			}
@@ -91,7 +88,7 @@ func Ls(name string, services *cli.Services,
 				fmt.Printf("total %d:\n", len(nodes))
 			}
 			for _, l := range nodes {
-				fmt.Println(l.Rel(path))
+				fmt.Println(l.Rel(types.PathFromString(p)))
 			}
 
 		}
