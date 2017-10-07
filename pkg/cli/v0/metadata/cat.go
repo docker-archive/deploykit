@@ -7,15 +7,10 @@ import (
 	"strconv"
 
 	"github.com/docker/infrakit/pkg/cli"
-	//	"github.com/docker/infrakit/pkg/discovery"
-	//	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
-// Cat returns the Cat command
-// func Cat(name string, services *cli.Services,
-// 	loader func(discovery.Plugins, string) (metadata.Plugin, error)) *cobra.Command {
 func Cat(name string, services *cli.Services) *cobra.Command {
 
 	cat := &cobra.Command{

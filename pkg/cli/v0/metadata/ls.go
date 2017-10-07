@@ -12,8 +12,6 @@ import (
 )
 
 // Ls returns the Ls command
-// func Ls(name string, services *cli.Services,
-// 	loader func(discovery.Plugins, string) (metadata.Plugin, error)) *cobra.Command {
 func Ls(name string, services *cli.Services) *cobra.Command {
 
 	ls := &cobra.Command{
@@ -50,7 +48,6 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 				return fmt.Errorf("No absolute path")
 			}
 
-			//path := types.PathFromString(p)
 			path := types.PathFromString(gopath.Join(name, p)).Shift(1)
 
 			nodes := []types.Path{} // the result set to print

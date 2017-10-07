@@ -67,7 +67,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	impls = map[run.PluginCode]interface{}{
 		run.Metadata: metadata_plugin.NewPluginFromData(timeQueries),
 		run.Event: map[string]event.Plugin{
-			"timer": timerEvents,
+			"streams": timerEvents,
 		},
 	}
 	onStop = func() { close(stop) }
