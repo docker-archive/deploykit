@@ -223,6 +223,8 @@ type Paths []Path
 func (p Paths) Len() int           { return len(p) }
 func (p Paths) Less(i, j int) bool { return Path(p[i]).Less(Path(p[j])) }
 func (p Paths) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+// Sort sorts the paths. This will mutate the ordering of the paths in this slice.
 func (p *Paths) Sort() {
 	sort.Sort(*p)
 }

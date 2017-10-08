@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Cat is the cat command
 func Cat(name string, services *cli.Services) *cobra.Command {
 
 	cat := &cobra.Command{

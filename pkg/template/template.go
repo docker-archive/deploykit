@@ -99,6 +99,7 @@ type Template struct {
 // Golang template does not allow functions with no return types to be bound.
 type Void string
 
+// VoidValue is the value of Void
 const VoidValue Void = ""
 
 // ValidURL makes sure the input is of the URL form.  If the input does not

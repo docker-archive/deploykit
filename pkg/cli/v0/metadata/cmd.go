@@ -19,7 +19,7 @@ func init() {
 		})
 	cli.Register(metadata.UpdatableInterfaceSpec,
 		[]cli.CmdBuilder{
-			MetadataUpdatable,
+			Updatable,
 		})
 }
 
@@ -57,8 +57,8 @@ func Metadata(name string, services *cli.Services) *cobra.Command {
 	return cmd
 }
 
-// MetadataUpdatable returns the metadata root command
-func MetadataUpdatable(name string, services *cli.Services) *cobra.Command {
+// Updatable returns the metadata root command
+func Updatable(name string, services *cli.Services) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "metadata",
