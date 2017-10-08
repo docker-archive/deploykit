@@ -12,6 +12,7 @@ import (
 
 	"github.com/Masterminds/sprig"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 var log = logutil.New("module", "core/template")
@@ -98,7 +99,8 @@ type Template struct {
 // Golang template does not allow functions with no return types to be bound.
 type Void string
 
-const voidValue Void = ""
+// VoidValue is the value of Void
+const VoidValue Void = ""
 
 // ValidURL makes sure the input is of the URL form.  If the input does not
 // container :// then a str:// is prepended so that the input string is interpreted
@@ -272,7 +274,21 @@ func (t *Template) doVar(name string, optional ...interface{}) interface{} {
 		return t.Ref(name)
 	}
 	t.Global(name, optional[len(optional)-1])
-	return voidValue
+	return VoidValue
+}
+
+// Globals return all the globals created
+func (t *Template) Globals() (map[string]interface{}, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	// deep copy
+	out := map[string]interface{}{}
+	v, err := types.AnyValue(t.globals)
+	if err != nil {
+		return out, err
+	}
+	err = v.Decode(&out)
+	return out, err
 }
 
 func (t *Template) updateGlobal(name string, value interface{}) {

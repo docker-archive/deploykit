@@ -1,7 +1,6 @@
 package metadata
 
 import (
-	"fmt"
 	"net/http"
 
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
@@ -38,7 +37,6 @@ func (u *Updatable) Get(q *http.Request, req *GetRequest, resp *GetResponse) err
 
 // Changes sends a batch of changes to get a proposed view and cas
 func (u *Updatable) Changes(_ *http.Request, req *ChangesRequest, resp *ChangesResponse) error {
-	fmt.Println(">>>> changes", req, u.updatable)
 	original, proposed, cas, err := u.updatable.Changes(req.Changes)
 	resp.Original = original
 	resp.Proposed = proposed
@@ -57,7 +55,7 @@ type updatable struct {
 }
 
 // NewClientUpdatable returns a plugin interface implementation connected to a remote plugin
-func NewClientUpdatable(socketPath string) (metadata.Plugin, error) {
+func NewClientUpdatable(socketPath string) (metadata.Updatable, error) {
 	rpcClient, err := rpc_client.New(socketPath, metadata.UpdatableInterfaceSpec)
 	if err != nil {
 		return nil, err

@@ -8,6 +8,10 @@ import (
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
 func NewClient(socketPath string) (metadata.Plugin, error) {
+	p, err := NewClientUpdatable(socketPath)
+	if err == nil {
+		return p, nil
+	}
 	rpcClient, err := rpc_client.New(socketPath, metadata.InterfaceSpec)
 	if err != nil {
 		return nil, err

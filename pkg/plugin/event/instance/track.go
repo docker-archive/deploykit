@@ -59,7 +59,7 @@ func (m *Tracker) init() *Tracker {
 		m.poll = time.Tick(3 * time.Second)
 	}
 
-	for _, topic := range types.PathFromStrings(
+	for _, topic := range types.PathsFromStrings(
 		"found",
 		"lost",
 		"error",

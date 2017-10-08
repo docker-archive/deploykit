@@ -10,7 +10,7 @@ import (
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/event"
-	"github.com/docker/infrakit/pkg/spi/metadata"
+	//	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -65,11 +65,9 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Metadata: map[string]metadata.Plugin{
-			"time": metadata_plugin.NewPluginFromData(timeQueries),
-		},
+		run.Metadata: metadata_plugin.NewPluginFromData(timeQueries),
 		run.Event: map[string]event.Plugin{
-			"timer": timerEvents,
+			"streams": timerEvents,
 		},
 	}
 	onStop = func() { close(stop) }
@@ -92,7 +90,7 @@ func (t *timer) getEndpoint() interface{} {
 func (t *timer) init() *timer {
 	t.topics = map[string]interface{}{}
 
-	for _, topic := range types.PathFromStrings(
+	for _, topic := range types.PathsFromStrings(
 		"msec/100",
 		"msec/500",
 		"sec/1",
