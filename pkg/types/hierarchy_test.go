@@ -39,8 +39,8 @@ func TestHierarchy(t *testing.T) {
 	all, err := ListAll(h, PathFromString("."))
 	require.NoError(t, err)
 
-	Sort(all)
-	require.Equal(t, []Path{
+	SortPaths(all)
+	require.Equal(t, Paths{
 		{"a"},
 		{"a", "b"},
 		{"a", "b", "c"},

@@ -26,7 +26,8 @@ func TestPath(t *testing.T) {
 	// Behavior of trailing slashes.. in our case we require explicit setting of trailing slash to indicate a 'directory'
 	// otherwise, we assume it's node and not all nodes under that branch.  This is necessary to delineate topics.
 	require.Equal(t, PathFromString("/a"), PathFromString("/a/b/..").Clean())
-	require.Equal(t, PathFromString("/a/"), PathFromString("/a/b/../").Clean())
+	require.Equal(t, PathFromString("a/"), PathFromString("a/").Clean())
+	require.NotEqual(t, PathFromString("a/"), PathFromString("a").Clean())
 	require.Equal(t, PathFromString("a/b/c/d/"), PathFromString("a/b/c/d/.").Clean())
 	require.Equal(t, PathFromString("a/b/c"), PathFromString("a/b/c/d/..").Clean())
 	require.Equal(t, PathFromString("a/b/c/"), PathFromString("a/b/c/d/../").Clean())
@@ -49,10 +50,9 @@ func TestPath(t *testing.T) {
 	require.True(t, PathFromString("a/b").Equal(PathFromString("a/b")))
 	require.False(t, PathFromString("a/b/c/d").Equal(PathFromString("b/c/d")))
 
-	list := PathFromStrings("a/b/c/d", "x/y/z", "a/b/e/f", "k/z/y/1")
-	Sort(list)
-
-	list2 := PathFromStrings("a/b/c/d", "a/b/e/f", "k/z/y/1", "x/y/z")
+	list := PathsFromStrings("a/b/c/d", "x/y/z", "a/b/e/f", "k/z/y/1")
+	list.Sort()
+	list2 := PathsFromStrings("a/b/c/d", "a/b/e/f", "k/z/y/1", "x/y/z")
 	require.Equal(t, list, list2)
 
 	require.NotEqual(t, PathFromString("/a/b/c/d/"), PathFromString("a/b/c/d/.").Clean())
@@ -62,6 +62,9 @@ func TestPath(t *testing.T) {
 	require.Equal(t, "/", PathFromString("/").String())
 	require.Equal(t, ".", PathFromString(".").String())
 	require.Equal(t, "/", PathFromString("/.").String())
+	require.Equal(t, "a/", PathFromString("a/").String())
+	require.Equal(t, "a/b/c/", PathFromString("a/").Join(PathFromString("b/c/")).String())
+	require.Equal(t, PathFromString("a/").Join(PathFromString("b/c/")), PathFromString("a/b/c/"))
 
 	require.Equal(t, PathFromString("."), PathFromString("").Clean())
 
