@@ -90,7 +90,7 @@ func (t *timer) getEndpoint() interface{} {
 func (t *timer) init() *timer {
 	t.topics = map[string]interface{}{}
 
-	for _, topic := range types.PathFromStrings(
+	for _, topic := range types.PathsFromStrings(
 		"msec/100",
 		"msec/500",
 		"sec/1",
