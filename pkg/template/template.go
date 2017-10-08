@@ -99,7 +99,7 @@ type Template struct {
 // Golang template does not allow functions with no return types to be bound.
 type Void string
 
-const voidValue Void = ""
+const VoidValue Void = ""
 
 // ValidURL makes sure the input is of the URL form.  If the input does not
 // container :// then a str:// is prepended so that the input string is interpreted
@@ -273,7 +273,7 @@ func (t *Template) doVar(name string, optional ...interface{}) interface{} {
 		return t.Ref(name)
 	}
 	t.Global(name, optional[len(optional)-1])
-	return voidValue
+	return VoidValue
 }
 
 // Globals return all the globals created

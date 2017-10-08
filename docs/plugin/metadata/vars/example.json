@@ -6,5 +6,6 @@
     "cluster" : {
 	"size" : 5,
 	"name" : "test"
-    }
+    },
+    "shell" : {{ env `SHELL` }}
 }

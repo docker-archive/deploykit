@@ -1,98 +1,108 @@
 package metadata
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 )
+
+func prettyPrintYAML(any *types.Any) ([]byte, error) {
+	return any.MarshalYAML()
+}
+
+func prettyPrintJSON(any *types.Any) ([]byte, error) {
+	var v interface{}
+	err := any.Decode(&v)
+	if err != nil {
+		return any.MarshalJSON()
+	}
+	return json.MarshalIndent(v, "", "  ")
+}
 
 // Change returns the Change command
 func Change(name string, services *cli.Services) *cobra.Command {
 
-	ls := &cobra.Command{
-		Use:   "change",
-		Short: "Update metadata",
+	change := &cobra.Command{
+		Use:   "change k1=v1 [, k2=v2]+",
+		Short: "Update metadata where args are key=value pairs and keys are within namespace of the plugin.",
 	}
 
-	long := ls.Flags().BoolP("long", "l", false, "Print full path")
-	all := ls.Flags().BoolP("all", "a", false, "Find all under the paths given")
-	quick := ls.Flags().BoolP("quick", "q", false, "True to turn off headers, etc.")
+	printYAML := change.Flags().BoolP("yaml", "y", false, "Show diff in YAML")
+	commitChange := change.Flags().BoolP("commit", "c", false, "Commit changes")
 
-	ls.RunE = func(cmd *cobra.Command, args []string) error {
+	updatablePlugin, err := loadPluginUpdatable(services.Plugins(), name)
+	if err != nil {
+		return nil
+	}
+	cli.MustNotNil(updatablePlugin, "updatable metadata plugin not found", "name", name)
 
-		metadataPlugin, err := loadPluginUpdatable(services.Plugins(), name)
+	change.RunE = func(cmd *cobra.Command, args []string) error {
+
+		printer := prettyPrintJSON
+		if *printYAML {
+			printer = prettyPrintYAML
+		}
+
+		// get the changes
+		changes, err := changeSet(args)
 		if err != nil {
-			return nil
+			return err
 		}
-		cli.MustNotNil(metadataPlugin, "metadata plugin not found", "name", name)
-
-		paths := []string{"."}
-
-		// All implies long
-		if *all {
-			*long = true
+		current, proposed, cas, err := updatablePlugin.Changes(changes)
+		if err != nil {
+			return err
 		}
-
-		if len(args) > 0 {
-			paths = args
+		currentBuff, err := printer(current)
+		if err != nil {
+			return err
 		}
 
-		for i, p := range paths {
+		proposedBuff, err := printer(proposed)
+		if err != nil {
+			return err
+		}
 
-			if p == "/" {
-				// TODO(chungers) -- this is a 'local' infrakit ensemble.
-				// Absolute paths will come in a multi-cluster / federated model.
-				return fmt.Errorf("No absolute path")
-			}
+		if *commitChange {
+			fmt.Printf("Committing %d changes, hash=%s\n", len(changes), cas)
+		} else {
+			fmt.Printf("Proposing %d changes, hash=%s\n", len(changes), cas)
+		}
 
-			path := types.PathFromString(p)
+		// Render the delta
+		dmp := diffmatchpatch.New()
+		diffs := dmp.DiffMain(string(currentBuff), string(proposedBuff), false)
+		fmt.Println(dmp.DiffPrettyText(diffs))
 
-			nodes := []types.Path{} // the result set to print
-
-			if *all {
-				allPaths, err := listAll(metadataPlugin, path)
-				if err != nil {
-					log.Warn("Cannot metadata ls on plugin", "name", name, "err", err)
-				}
-				for _, c := range allPaths {
-					nodes = append(nodes, c)
-				}
-			} else {
-				children, err := metadataPlugin.List(path)
-				if err != nil {
-					log.Warn("Cannot metadata ls on plugin", "name", name, "err", err)
-				}
-				for _, c := range children {
-					nodes = append(nodes, path.JoinString(c))
-				}
-			}
-
-			if p == "." && !*all {
-				// special case of showing the top level plugin namespaces
-				if i > 0 && !*quick {
-					fmt.Println()
-				}
-				for _, l := range nodes {
-					if *long {
-						fmt.Println(l.Rel(path))
-					} else {
-						fmt.Println(l.Rel(path))
-					}
-				}
-				break
-			}
-
-			if *long && !*quick {
-				fmt.Printf("total %d:\n", len(nodes))
-			}
-			for _, l := range nodes {
-				fmt.Println(l.Rel(path))
-			}
-
+		if *commitChange {
+			return updatablePlugin.Commit(proposed, cas)
 		}
 		return nil
 	}
-	return ls
+	return change
+}
+
+// changeSet returns a set of changes from the input pairs of path / value
+func changeSet(kvPairs []string) ([]metadata.Change, error) {
+	changes := []metadata.Change{}
+
+	for _, kv := range kvPairs {
+
+		parts := strings.SplitN(kv, "=", 2)
+		key := strings.Trim(parts[0], " \t\n")
+		value := strings.Trim(parts[1], " \t\n")
+
+		change := metadata.Change{
+			Path:  types.PathFromString(key),
+			Value: types.AnyYAMLMust([]byte(value)),
+		}
+
+		changes = append(changes, change)
+	}
+	return changes, nil
 }

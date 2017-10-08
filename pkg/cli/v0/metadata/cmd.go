@@ -33,7 +33,7 @@ func loadPlugin(plugins discovery.Plugins, name string) (metadata.Plugin, error)
 }
 
 // loadPluginUpdatable loads the typed plugin
-func loadPluginUpdatable(plugins discovery.Plugins, name string) (metadata.Plugin, error) {
+func loadPluginUpdatable(plugins discovery.Plugins, name string) (metadata.Updatable, error) {
 	endpoint, err := plugins.Find(plugin.Name(name))
 	if err != nil {
 		return nil, err
@@ -69,7 +69,6 @@ func MetadataUpdatable(name string, services *cli.Services) *cobra.Command {
 		Ls(name, services),
 		Cat(name, services),
 		Change(name, services),
-		Commit(name, services),
 	)
 
 	return cmd
