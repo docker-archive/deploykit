@@ -6,6 +6,18 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+// Metadata describes the plugin
+type Metadata struct {
+	// Kind is the kind of the plugin (e.g. group, ingress, aws)
+	Kind string
+	// Name is the endpoint of the object
+	Name Name
+	// Instance is optionally a key for an object indexable within the remote plugin
+	Instance string
+	// InterfaceSpec is the interface definition of the remote object
+	InterfaceSpec spi.InterfaceSpec
+}
+
 // Spec models a canonical pattern of fields that exist in a struct/ map / union that indicates the block is a plugin.
 type Spec struct {
 

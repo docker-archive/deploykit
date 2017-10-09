@@ -172,7 +172,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	}
 
 	lookup, _ := options.BackendName.GetLookupAndType()
-	mgr := manager.NewManager(plugins(), options.leader, options.leaderStore, options.store, lookup)
+	mgr := manager.NewManager(name, plugins(), options.leader, options.leaderStore, options.store, lookup)
 	log.Info("Start manager", "m", mgr)
 
 	_, err = mgr.Start()

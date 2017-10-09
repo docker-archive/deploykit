@@ -91,7 +91,8 @@ state:
 	o := Object{}
 	require.NoError(t, yaml.Unmarshal([]byte(object), &o))
 
-	templateURL, _ := NewURL("https://playbooks.test.com/aws-instance-template.ikt")
+	urlStr := "https://playbooks.test.com/aws-instance-template.ikt"
+	templateURL, _ := NewURL(urlStr)
 
 	expected := Object{
 		Spec: Spec{
@@ -137,9 +138,100 @@ state:
 	require.Equal(t, AnyValueMust(expected), AnyValueMust(o))
 	require.Equal(t, "u-12134", o.Spec.Metadata.Identity.ID)
 	require.Equal(t, "instance/v0.1.0", o.Spec.Version)
+	require.True(t, o.Template.Absolute())
+	require.Equal(t, urlStr, o.Template.Value().String())
 
 	require.NoError(t, o.Validate())
 
 	o.Metadata.Identity.ID = ""
 	require.Error(t, o.Validate())
+}
+
+func TestMetadata(t *testing.T) {
+	require.Equal(t, (Metadata{}).Fingerprint(), (Metadata{}).Fingerprint())
+	require.Equal(t, (Metadata{Name: "foo"}).Fingerprint(), (Metadata{Name: "foo"}).Fingerprint())
+	require.NotEqual(t, (Metadata{Name: "foo"}).Fingerprint(), (Metadata{}).Fingerprint())
+}
+
+func TestComparable(t *testing.T) {
+
+	require.Equal(t, 0, (Identity{ID: "1"}).Compare(Identity{ID: "1"}))
+	require.Equal(t, -1, (Identity{ID: "1"}).Compare(Identity{ID: "2"}))
+	require.Equal(t, 1, (Identity{ID: "2"}).Compare(Identity{ID: "1"}))
+
+	require.Equal(t, 0, (Metadata{Name: "1"}).Compare(Metadata{Name: "1"}))
+	require.Equal(t, 1, (Metadata{Name: "2"}).Compare(Metadata{Name: "1"}))
+	require.Equal(t, -1, (Metadata{Name: "1"}).Compare(Metadata{Name: "2"}))
+	require.Equal(t, -1, (Metadata{Identity: &Identity{ID: "1"}, Name: "1"}).Compare(
+		Metadata{Identity: &Identity{ID: "2"}, Name: "1"}))
+
+	// This case the name isn't as important as the identity.  This applies to the case where
+	// the name is a typed plugin name (eg. simulator/disk) but the identity is "mydisk1".
+	require.Equal(t, -1, (Metadata{Identity: &Identity{ID: "1"}, Name: "1"}).Compare(
+		Metadata{Identity: &Identity{ID: "2"}, Name: "1"}))
+
+	require.Equal(t, 0, (Metadata{Name: "1", Tags: map[string]string{"a": "b"}}).Compare(
+		Metadata{Name: "1", Tags: map[string]string{"a": "b"}}))
+	require.Equal(t, -1, (Metadata{Name: "1", Tags: map[string]string{"a": "a"}}).Compare(
+		Metadata{Name: "1", Tags: map[string]string{"a": "b"}}))
+	require.Equal(t, 1, (Metadata{Name: "1", Tags: map[string]string{"a": "c"}}).Compare(
+		Metadata{Name: "1", Tags: map[string]string{"a": "b"}}))
+	require.Equal(t, 1, (Metadata{Name: "1", Tags: map[string]string{"x": "c"}}).Compare(
+		Metadata{Name: "1", Tags: map[string]string{"a": "b"}}))
+
+	require.Equal(t, 0, (Spec{
+		Kind:    "group",
+		Version: "Group/0.1.0",
+		Metadata: Metadata{
+			Name: "group/workers",
+		},
+		Properties: AnyValueMust(map[string]interface{}{
+			"count": 100,
+			"type":  "foo",
+		}),
+		Options: AnyValueMust(map[string]interface{}{
+			"poll": true,
+		}),
+	}).Compare(Spec{
+		Kind:    "group",
+		Version: "Group/0.1.0",
+		Metadata: Metadata{
+			Name: "group/workers",
+		},
+		Properties: AnyValueMust(map[string]interface{}{
+			"count": 100,
+			"type":  "foo",
+		}),
+		Options: AnyValueMust(map[string]interface{}{
+			"poll": true,
+		}),
+	}))
+
+	require.Equal(t, -1, (Spec{
+		Kind:    "simulator/subnet",
+		Version: "Instance/0.1.0",
+		Metadata: Metadata{
+			Identity: &Identity{ID: "subnet1"},
+			Name:     "us-east",
+		},
+		Properties: AnyValueMust(map[string]interface{}{
+			"cidr": "10.20.100.100/16",
+		}),
+		Options: AnyValueMust(map[string]interface{}{
+			"flag": true,
+		}),
+	}).Compare(Spec{
+		Kind:    "simulator/subnet",
+		Version: "Instance/0.1.0",
+		Metadata: Metadata{
+			Identity: &Identity{ID: "subnet2"},
+			Name:     "us-east",
+		},
+		Properties: AnyValueMust(map[string]interface{}{
+			"cidr": "10.20.100.100/16",
+		}),
+		Options: AnyValueMust(map[string]interface{}{
+			"flag": true,
+		}),
+	}))
 }

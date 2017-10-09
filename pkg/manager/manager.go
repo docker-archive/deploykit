@@ -10,9 +10,12 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
+	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -34,14 +37,14 @@ var (
 type Leadership interface {
 	// IsLeader returns true only if for certain this is a leader. False if not or unknown.
 	IsLeader() (bool, error)
+
+	// LeaderLocation returns the location of the leader
+	LeaderLocation() (*url.URL, error)
 }
 
 // Manager is the interface for interacting locally or remotely with the manager
 type Manager interface {
 	Leadership
-
-	// LeaderLocation returns the location of the leader
-	LeaderLocation() (*url.URL, error)
 
 	// Enforce enforces infrastructure state to match that of the specs
 	Enforce(specs []types.Spec) error
@@ -57,6 +60,8 @@ type Manager interface {
 type Backend interface {
 	group.Plugin
 
+	metadata.Updatable
+
 	Controllers() (map[string]controller.Controller, error)
 	Groups() (map[group.ID]group.Plugin, error)
 
@@ -70,7 +75,11 @@ type Backend interface {
 // such as leadership changes and configuration changes and perform the necessary actions
 // to activate / deactivate plugins
 type manager struct {
+	name plugin.Name
+
 	group.Plugin // Note that some methods are overridden
+
+	metadata.Updatable
 
 	plugins     discovery.Plugins
 	leader      leader.Detector
@@ -83,6 +92,10 @@ type manager struct {
 
 	backendName string
 	backendOps  chan<- backendOp
+
+	// TODO - make this into a map to support multiple instances
+	metadataBackendName plugin.Name
+	metadataSnapshot    store.Snapshot
 }
 
 type backendOp struct {
@@ -92,28 +105,42 @@ type backendOp struct {
 
 // NewManager returns the manager which depends on other services to coordinate and manage
 // the plugins in order to ensure the infrastructure state matches the user's spec.
-func NewManager(plugins discovery.Plugins,
+func NewManager(name plugin.Name,
+	plugins discovery.Plugins,
 	leader leader.Detector,
 	leaderStore leader.Store,
 	snapshot store.Snapshot,
-	backendName string) Backend {
+	backendName string,
+	metadataSnapshot store.Snapshot,
+	metadataBackendName plugin.Name) Backend {
 
 	return &manager{
+		name: name,
 		// "base class" is the stateless backend group plugin
-		Plugin: &lateBindGroup{
-			finder: func() (group.Plugin, error) {
+		Plugin: group_plugin.LazyConnect(
+			func() (group.Plugin, error) {
 				endpoint, err := plugins.Find(plugin.Name(backendName))
 				if err != nil {
 					return nil, err
 				}
 				return rpc.NewClient(endpoint.Address)
-			},
-		},
-		plugins:     plugins,
-		leader:      leader,
-		leaderStore: leaderStore,
-		snapshot:    snapshot,
-		backendName: backendName,
+			}, 0),
+
+		// TODO - add storage
+		Updatable: metadata_plugin.UpdatableLazyConnect(func() (metadata.Updatable, error) {
+			endpoint, err := plugins.Find(metadataBackendName)
+			if err != nil {
+				return nil, err
+			}
+			return rpc.NewClient(endpoint.Address)
+		}, 0),
+		plugins:             plugins,
+		leader:              leader,
+		leaderStore:         leaderStore,
+		snapshot:            snapshot,
+		backendName:         backendName,
+		metadataSnapshot:    metadataSnapshot,
+		metadataBackendName: metadataBackendName,
 	}
 }
 
