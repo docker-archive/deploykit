@@ -4,19 +4,22 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewWorkerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a kubernetes.
-func NewWorkerFlavor(plugins func() discovery.Plugins,
-	templ *template.Template,
-	dir string,
-	stop <-chan struct{}) *WorkerFlavor {
+func NewWorkerFlavor(plugins func() discovery.Plugins, options Options, stop <-chan struct{}) (*WorkerFlavor, error) {
 
-	base := &baseFlavor{initScript: templ, plugins: plugins, kubeConfDir: dir}
+	wt, err := getTemplate(options.DefaultWorkerInitScriptTemplate,
+		DefaultWorkerInitScriptTemplate, DefaultTemplateOptions)
+
+	if err != nil {
+		return nil, err
+	}
+
+	base := &baseFlavor{initScript: wt, plugins: plugins, options: options}
 	//	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
-	return &WorkerFlavor{baseFlavor: base}
+	return &WorkerFlavor{baseFlavor: base}, nil
 }
 
 // WorkerFlavor is the flavor for kubernetes workers

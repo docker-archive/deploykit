@@ -12,7 +12,6 @@ import (
 	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/metadata"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -32,20 +31,6 @@ func init() {
 	inproc.Register(Kind, Run, DefaultOptions)
 }
 
-// Options capture the options for starting up the plugin.
-type Options struct {
-	// ConfigDir is the path of the directory to store the files
-	ConfigDir string
-
-	// ManaagerInitScriptTemplate is the URL of the template for manager init script
-	// This is overridden by the value provided in the spec.
-	ManagerInitScriptTemplate string
-
-	// WorkerInitScriptTemplate is the URL of the template for worker init script
-	// This is overridden by the value provided in the spec.
-	WorkerInitScriptTemplate string
-}
-
 func getWd() string {
 	if wd, err := os.Getwd(); err == nil {
 		return wd
@@ -53,8 +38,15 @@ func getWd() string {
 	return os.TempDir()
 }
 
+func mustBool(b bool, err error) bool {
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 // DefaultOptions return an Options with default values filled in.
-var DefaultOptions = Options{
+var DefaultOptions = kubernetes.Options{
 	ConfigDir: local.Getenv(EnvConfigDir, getWd()),
 }
 
@@ -69,21 +61,6 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		return
 	}
 
-	var mt, wt *template.Template
-
-	mt, err = getTemplate(options.ManagerInitScriptTemplate,
-		kubernetes.DefaultManagerInitScriptTemplate,
-		kubernetes.DefaultTemplateOptions)
-	if err != nil {
-		return
-	}
-	wt, err = getTemplate(options.WorkerInitScriptTemplate,
-		kubernetes.DefaultWorkerInitScriptTemplate,
-		kubernetes.DefaultTemplateOptions)
-	if err != nil {
-		return
-	}
-
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
@@ -92,8 +69,17 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		close(workerStop)
 	}
 
-	managerFlavor := kubernetes.NewManagerFlavor(plugins, mt, options.ConfigDir, managerStop)
-	workerFlavor := kubernetes.NewWorkerFlavor(plugins, wt, options.ConfigDir, workerStop)
+	managerFlavor, e := kubernetes.NewManagerFlavor(plugins, options, managerStop)
+	if e != nil {
+		err = e
+		return
+	}
+
+	workerFlavor, e := kubernetes.NewWorkerFlavor(plugins, options, workerStop)
+	if e != nil {
+		err = e
+		return
+	}
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
@@ -106,14 +92,5 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 			"worker":  workerFlavor,
 		},
 	}
-	return
-}
-
-func getTemplate(url string, defaultTemplate string, opts template.Options) (t *template.Template, err error) {
-	if url == "" {
-		t, err = template.NewTemplate("str://"+defaultTemplate, opts)
-		return
-	}
-	t, err = template.NewTemplate(url, opts)
 	return
 }

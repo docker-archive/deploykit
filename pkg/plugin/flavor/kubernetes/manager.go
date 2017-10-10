@@ -1,24 +1,29 @@
 package kubernetes
 
 import (
-	"errors"
-
 	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a kubernetes.
-func NewManagerFlavor(plugins func() discovery.Plugins,
-	templ *template.Template,
-	dir string,
-	stop <-chan struct{}) *ManagerFlavor {
+func NewManagerFlavor(plugins func() discovery.Plugins, options Options, stop <-chan struct{}) (*ManagerFlavor, error) {
 
-	base := &baseFlavor{initScript: templ, plugins: plugins, kubeConfDir: dir}
+	mt, err := getTemplate(options.DefaultManagerInitScriptTemplate,
+		DefaultManagerInitScriptTemplate, DefaultTemplateOptions)
+
+	if err != nil {
+		return nil, err
+	}
+
+	base := &baseFlavor{
+		initScript: mt,
+		plugins:    plugins,
+		options:    options,
+	}
 	//	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
-	return &ManagerFlavor{baseFlavor: base}
+	return &ManagerFlavor{baseFlavor: base}, nil
 }
 
 // ManagerFlavor is the flavor for kube managers
@@ -37,10 +42,6 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return err
-	}
-
-	if len(allocation.LogicalIDs) != 1 {
-		return errors.New("kubernetes flaver currently support only one manager")
 	}
 
 	for _, id := range allocation.LogicalIDs {
