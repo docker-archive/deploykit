@@ -121,23 +121,13 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		return
 	}
 
-	l4Map := map[string]loadbalancer.L4{}
-	elbClient := elb.New(builder.Config)
-	for _, elbName := range options.ELBNames {
-		var elbPlugin loadbalancer.L4
-		elbPlugin, err = aws_loadbalancer.NewELBPlugin(elbClient, elbName)
-		if err != nil {
-			return
-		}
-		l4Map[elbName] = elbPlugin
-	}
-
 	autoscalingClient := autoscaling.New(builder.Config)
 	cloudWatchLogsClient := cloudwatchlogs.New(builder.Config)
 	dynamodbClient := dynamodb.New(builder.Config)
 	ec2Client := ec2.New(builder.Config)
 	iamClient := iam.New(builder.Config)
 	sqsClient := sqs.New(builder.Config)
+	elbClient := elb.New(builder.Config)
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
@@ -145,7 +135,6 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 			"ec2-instance": (&aws_instance.Monitor{Plugin: instancePlugin}).Init(),
 		},
 		run.Metadata: metadataPlugin,
-		run.L4:       func() (map[string]loadbalancer.L4, error) { return l4Map, nil },
 		run.Instance: map[string]instance.Plugin{
 			"autoscaling-autoscalinggroup":    aws_instance.NewAutoScalingGroupPlugin(autoscalingClient, options.Namespace),
 			"autoscaling-launchconfiguration": aws_instance.NewLaunchConfigurationPlugin(autoscalingClient, options.Namespace),
@@ -164,6 +153,21 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 			"iam-role":                        aws_instance.NewRolePlugin(iamClient, options.Namespace),
 			"sqs-queue":                       aws_instance.NewQueuePlugin(sqsClient, options.Namespace),
 		},
+	}
+
+	// Expose ELBs
+	l4Map := map[string]loadbalancer.L4{}
+	for _, elbName := range options.ELBNames {
+		var elbPlugin loadbalancer.L4
+		elbPlugin, err = aws_loadbalancer.NewELBPlugin(elbClient, elbName)
+		if err != nil {
+			return
+		}
+		l4Map[elbName] = elbPlugin
+	}
+
+	if len(l4Map) > 0 {
+		impls[run.L4] = func() (map[string]loadbalancer.L4, error) { return l4Map, nil }
 	}
 
 	return

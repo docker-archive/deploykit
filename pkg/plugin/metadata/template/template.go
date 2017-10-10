@@ -2,6 +2,7 @@ package template
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -20,64 +21,179 @@ func MetadataFunc(discovery func() discovery.Plugins) func(string, ...interface{
 
 	return func(path string, optionalValue ...interface{}) (interface{}, error) {
 
-		if plugins == nil {
-			return nil, fmt.Errorf("no plugin discovery:%s", path)
+		switch len(optionalValue) {
+		case 0: // read
+			return doGetSet(plugins, path, optionalValue...)
+		case 1: // set
+			return doGetSet(plugins, path, optionalValue...)
+		case 2: // a retry time + timeout is specified for a read
+			retry, err := duration(optionalValue[0])
+			if err != nil {
+				return nil, err
+			}
+			timeout, err := duration(optionalValue[1])
+			if err != nil {
+				return nil, err
+			}
+			return doBlockingGet(plugins, path, retry, timeout)
+		case 3: // a retry time + timeout is specified for a read + bool to return error
+			retry, err := duration(optionalValue[0])
+			if err != nil {
+				return nil, err
+			}
+			timeout, err := duration(optionalValue[1])
+			if err != nil {
+				return nil, err
+			}
+			errOnTimeout, is := optionalValue[2].(bool)
+			if !is {
+				return nil, fmt.Errorf("must be boolean %v", optionalValue[2])
+			}
+			v, err := doBlockingGet(plugins, path, retry, timeout)
+			if errOnTimeout {
+				return v, err
+			}
+			return v, nil
 		}
+		return template.VoidValue, fmt.Errorf("wrong number of args")
+	}
+}
 
-		mpath := types.PathFromString(path)
-		first := mpath.Index(0)
-		if first == nil {
-			return nil, fmt.Errorf("unknown plugin from path: %s", path)
-		}
+func duration(v interface{}) (time.Duration, error) {
+	switch v := v.(type) {
+	case time.Duration:
+		return v, nil
+	case types.Duration:
+		return v.Duration(), nil
+	case []byte:
+		return time.ParseDuration(string(v))
+	case string:
+		return time.ParseDuration(string(v))
+	case int64:
+		return time.Duration(int64(v)), nil
+	case uint:
+		return time.Duration(int64(v)), nil
+	case uint64:
+		return time.Duration(int64(v)), nil
+	case int:
+		return time.Duration(int64(v)), nil
+	}
+	return 0, fmt.Errorf("cannot convert to duration: %v", v)
+}
 
-		lookup, err := plugins().List()
-		endpoint, has := lookup[*first]
-		if !has {
-			return false, nil // Don't return error.  Just return false for non-existence
-		} else if mpath.Len() == 1 {
-			return true, nil // This is a test for availability of the plugin
-		}
+// blocking get from metadata. block the same go routine / thread until timeout or value is available
+func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout time.Duration) (interface{}, error) {
 
-		metadataPlugin, err := metadata_rpc.NewClient(endpoint.Address)
-		if err != nil {
-			return nil, fmt.Errorf("cannot connect to plugin: %s", *first)
-		}
+	if plugins == nil {
+		return nil, fmt.Errorf("no plugin discovery:%s", path)
+	}
 
-		key := mpath.Shift(1)
-		var value interface{}
+	mpath := types.PathFromString(path)
+	first := mpath.Index(0)
+	if first == nil {
+		return nil, fmt.Errorf("unknown plugin from path: %s", path)
+	}
+
+	lookup, err := plugins().List()
+	endpoint, has := lookup[*first]
+	if !has {
+		return false, nil // Don't return error.  Just return false for non-existence
+	} else if mpath.Len() == 1 {
+		return true, nil // This is a test for availability of the plugin
+	}
+
+	metadataPlugin, err := metadata_rpc.NewClient(endpoint.Address)
+	if err != nil {
+		return nil, fmt.Errorf("cannot connect to plugin: %s", *first)
+	}
+
+	key := mpath.Shift(1)
+	var value interface{}
+
+	expiry := time.Now().Add(timeout)
+
+	for i := 0; ; i++ {
+
 		any, err := metadataPlugin.Get(key)
-		if err != nil {
-			return nil, err
+		if err == nil && any != nil {
+			err = any.Decode(&value)
+			if err != nil {
+				return any.String(), err // note the type changed to string in error return
+			}
+			return value, err
 		}
 
+		if i > 0 && time.Now().After(expiry) {
+			break
+		}
+
+		if retry > 0 {
+			<-time.After(retry)
+		}
+	}
+	return value, fmt.Errorf("expired waiting")
+}
+
+func doGetSet(plugins func() discovery.Plugins, path string, optionalValue ...interface{}) (interface{}, error) {
+	if plugins == nil {
+		return nil, fmt.Errorf("no plugin discovery:%s", path)
+	}
+
+	mpath := types.PathFromString(path)
+	first := mpath.Index(0)
+	if first == nil {
+		return nil, fmt.Errorf("unknown plugin from path: %s", path)
+	}
+
+	lookup, err := plugins().List()
+	endpoint, has := lookup[*first]
+	if !has {
+		return false, nil // Don't return error.  Just return false for non-existence
+	} else if mpath.Len() == 1 {
+		return true, nil // This is a test for availability of the plugin
+	}
+
+	metadataPlugin, err := metadata_rpc.NewClient(endpoint.Address)
+	if err != nil {
+		return nil, fmt.Errorf("cannot connect to plugin: %s", *first)
+	}
+
+	key := mpath.Shift(1)
+	var value interface{}
+	any, err := metadataPlugin.Get(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if any != nil {
 		err = any.Decode(&value)
 		if err != nil {
 			return any.String(), err // note the type changed to string in error return
 		}
+	}
 
-		// Update case: return value is the version before this successful commit.
-		if len(optionalValue) == 1 {
+	// Update case: return value is the version before this successful commit.
+	if len(optionalValue) == 1 {
 
-			any, err := types.AnyValue(optionalValue[0])
-			if err != nil {
-				return value, err
-			}
-
-			// update it
-			updatablePlugin, is := metadataPlugin.(metadata.Updatable)
-			if !is {
-				return value, fmt.Errorf("value is read-only")
-			}
-			_, proposed, cas, err := updatablePlugin.Changes([]metadata.Change{
-				{
-					Path:  key,
-					Value: any,
-				},
-			})
-			err = updatablePlugin.Commit(proposed, cas)
-			return template.VoidValue, err
+		any, err := types.AnyValue(optionalValue[0])
+		if err != nil {
+			return value, err
 		}
 
-		return value, err
+		// update it
+		updatablePlugin, is := metadataPlugin.(metadata.Updatable)
+		if !is {
+			return value, fmt.Errorf("value is read-only")
+		}
+		_, proposed, cas, err := updatablePlugin.Changes([]metadata.Change{
+			{
+				Path:  key,
+				Value: any,
+			},
+		})
+		err = updatablePlugin.Commit(proposed, cas)
+		return template.VoidValue, err
 	}
+
+	return value, err
 }
