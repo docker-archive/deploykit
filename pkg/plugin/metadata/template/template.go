@@ -4,18 +4,21 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/rpc/client"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // MetadataFunc returns a template function to support metadata retrieval in templates.
-func MetadataFunc(discovery func() discovery.Plugins) func(string) (interface{}, error) {
+// The function allows an additional parameter to set the value, provided the metadata plugin
+// is not readonly (supports the metadata.Updatable spi).  In the case of an update, the returned value
+// is always an empty string, with error (can be nil).  The behavior is the same as var function.
+func MetadataFunc(discovery func() discovery.Plugins) func(string, ...interface{}) (interface{}, error) {
 
 	plugins := discovery
 
-	return func(path string) (interface{}, error) {
+	return func(path string, optionalValue ...interface{}) (interface{}, error) {
 
 		if plugins == nil {
 			return nil, fmt.Errorf("no plugin discovery:%s", path)
@@ -28,10 +31,6 @@ func MetadataFunc(discovery func() discovery.Plugins) func(string) (interface{},
 		}
 
 		lookup, err := plugins().List()
-		if err != nil {
-			return nil, err
-		}
-
 		endpoint, has := lookup[*first]
 		if !has {
 			return false, nil // Don't return error.  Just return false for non-existence
@@ -39,20 +38,46 @@ func MetadataFunc(discovery func() discovery.Plugins) func(string) (interface{},
 			return true, nil // This is a test for availability of the plugin
 		}
 
-		rpcClient, err := client.New(endpoint.Address, metadata.InterfaceSpec)
+		metadataPlugin, err := metadata_rpc.NewClient(endpoint.Address)
 		if err != nil {
 			return nil, fmt.Errorf("cannot connect to plugin: %s", *first)
 		}
 
-		any, err := metadata_rpc.Adapt(rpcClient).Get(mpath.Shift(1))
+		key := mpath.Shift(1)
+		var value interface{}
+		any, err := metadataPlugin.Get(key)
 		if err != nil {
 			return nil, err
 		}
-		var value interface{}
+
 		err = any.Decode(&value)
 		if err != nil {
-			return any.String(), err
+			return any.String(), err // note the type changed to string in error return
 		}
-		return value, nil
+
+		// Update case: return value is the version before this successful commit.
+		if len(optionalValue) == 1 {
+
+			any, err := types.AnyValue(optionalValue[0])
+			if err != nil {
+				return value, err
+			}
+
+			// update it
+			updatablePlugin, is := metadataPlugin.(metadata.Updatable)
+			if !is {
+				return value, fmt.Errorf("value is read-only")
+			}
+			_, proposed, cas, err := updatablePlugin.Changes([]metadata.Change{
+				{
+					Path:  key,
+					Value: any,
+				},
+			})
+			err = updatablePlugin.Commit(proposed, cas)
+			return template.VoidValue, err
+		}
+
+		return value, err
 	}
 }

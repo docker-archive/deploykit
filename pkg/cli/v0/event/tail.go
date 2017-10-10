@@ -2,6 +2,7 @@ package event
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
@@ -84,7 +85,11 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 		for _, topic := range topics {
 
 			target := *topic.Index(0)
+
 			eventTopic := topic
+			if path.Dir(name) != "." {
+				eventTopic = types.PathFromString(path.Base(name)).Join(topic)
+			}
 
 			client, is := eventPlugin.(event.Subscriber)
 			if !is {
@@ -112,7 +117,7 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 						}
 
 						// Scope the topic
-						evt.Topic = types.PathFromString(target).Join(evt.Topic)
+						evt.Topic = topic
 						collector <- evt
 					}
 				}

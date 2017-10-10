@@ -14,6 +14,9 @@ E2E_TESTS?=true
 #Source file target
 SRCS  := $(shell find . -type f -name '*.go')
 
+# Set the go build tags here.  By default we disable building of libvirt
+GO_BUILD_TAGS?=nolibvirt
+
 # Allow turning off function inlining and variable registerization
 ifeq (${DISABLE_OPTIMIZATION},true)
 	GO_GCFLAGS=-gcflags "-N -l"
@@ -88,7 +91,7 @@ clean:
 
 define binary_target_template
 build/$(1): $(SRCS)
-	go build -o build/$(1)$(EXE_EXT) \
+	go build -o build/$(1)$(EXE_EXT) -tags $(GO_BUILD_TAGS) \
 		-ldflags "-X github.com/docker/infrakit/pkg/cli.Version=$(VERSION) -X github.com/docker/infrakit/pkg/cli.Revision=$(REVISION) -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=$(DOCKER_CLIENT_VERSION)" $(2)
 endef
 define define_binary_target

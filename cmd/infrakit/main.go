@@ -53,7 +53,6 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/image"
 	_ "github.com/docker/infrakit/pkg/run/v0/ingress"
 	_ "github.com/docker/infrakit/pkg/run/v0/kubernetes"
-	_ "github.com/docker/infrakit/pkg/run/v0/libvirt"
 	_ "github.com/docker/infrakit/pkg/run/v0/maas"
 	_ "github.com/docker/infrakit/pkg/run/v0/manager"
 	_ "github.com/docker/infrakit/pkg/run/v0/oracle"
@@ -67,6 +66,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/time"
 	_ "github.com/docker/infrakit/pkg/run/v0/vagrant"
 	_ "github.com/docker/infrakit/pkg/run/v0/vanilla"
+	_ "github.com/docker/infrakit/pkg/run/v0/vars"
 	_ "github.com/docker/infrakit/pkg/run/v0/vsphere"
 )
 

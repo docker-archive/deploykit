@@ -2,6 +2,7 @@ package event
 
 import (
 	"fmt"
+	gopath "path"
 
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/spi/event"
@@ -43,12 +44,10 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 		for i, p := range paths {
 
 			if p == "/" {
-				// TODO(chungers) -- this is a 'local' infrakit ensemble.
-				// Absolute paths will come in a multi-cluster / federated model.
 				return fmt.Errorf("No absolute path")
 			}
 
-			path := types.PathFromString(p)
+			path := types.PathFromString(gopath.Join(name, p)).Shift(1)
 
 			nodes := []types.Path{} // the result set to print
 
@@ -76,11 +75,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 					fmt.Println()
 				}
 				for _, l := range nodes {
-					if *long {
-						fmt.Println(l)
-					} else {
-						fmt.Println(l.Rel(path))
-					}
+					fmt.Println(l.Shift(1).Rel(types.PathFromString(p)))
 				}
 				break
 			}
@@ -89,11 +84,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 				fmt.Printf("total %d:\n", len(nodes))
 			}
 			for _, l := range nodes {
-				if *long {
-					fmt.Println(l)
-				} else {
-					fmt.Println(l.Rel(path))
-				}
+				fmt.Println(l.Shift(1).Rel(types.PathFromString(p)))
 			}
 
 		}
@@ -108,6 +99,7 @@ func listAll(m event.Plugin, path types.Path) ([]types.Path, error) {
 	}
 	result := []types.Path{}
 	nodes, err := m.List(path)
+
 	if err != nil {
 		return nil, err
 	}

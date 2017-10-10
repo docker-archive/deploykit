@@ -47,13 +47,13 @@ func PathFrom(a string, b ...string) Path {
 	return p.Clean()
 }
 
-// PathFromStrings returns the path from a list of strings
-func PathFromStrings(a string, b ...string) []Path {
+// PathsFromStrings returns the path from a list of strings
+func PathsFromStrings(a string, b ...string) Paths {
 	list := []Path{PathFromString(a)}
 	for _, p := range b {
 		list = append(list, PathFromString(p))
 	}
-	return list
+	return Paths(list)
 }
 
 // String returns the string representation of path
@@ -217,15 +217,21 @@ func (p Path) Less(other Path) bool {
 	return len(p) < len(other)
 }
 
-type pathSorter []Path
+// Paths is an alias for a slice of Path
+type Paths []Path
 
-func (p pathSorter) Len() int           { return len(p) }
-func (p pathSorter) Less(i, j int) bool { return Path(p[i]).Less(Path(p[j])) }
-func (p pathSorter) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p Paths) Len() int           { return len(p) }
+func (p Paths) Less(i, j int) bool { return Path(p[i]).Less(Path(p[j])) }
+func (p Paths) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-// Sort sorts the paths
-func Sort(p []Path) {
-	sort.Sort(pathSorter(p))
+// Sort sorts the paths. This will mutate the ordering of the paths in this slice.
+func (p *Paths) Sort() {
+	sort.Sort(*p)
+}
+
+// SortPaths sorts the paths
+func SortPaths(p []Path) {
+	sort.Sort(Paths(p))
 }
 
 // MarshalJSON returns the json representation

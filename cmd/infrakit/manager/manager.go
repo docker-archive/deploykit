@@ -325,7 +325,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			types.Sort(all)
+			types.SortPaths(all)
 			for _, p := range all {
 				fmt.Println(p.String())
 			}

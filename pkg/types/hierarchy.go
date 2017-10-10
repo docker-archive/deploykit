@@ -29,7 +29,7 @@ func (h hierarchical) Get(path Path) (value *Any, err error) {
 }
 
 // ListAll returns all the paths under the start path, unsorted
-func ListAll(h Hierarchical, start Path) ([]Path, error) {
+func ListAll(h Hierarchical, start Path) (Paths, error) {
 	all := []Path{}
 	children, err := h.List(start)
 	if err != nil {

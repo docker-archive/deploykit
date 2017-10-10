@@ -34,7 +34,7 @@ func (m *Monitor) Init() event.Plugin {
 	m.topics = map[string]interface{}{}
 	m.stop = make(chan struct{})
 
-	for _, topic := range types.PathFromStrings(
+	for _, topic := range types.PathsFromStrings(
 		"found",
 		"lost",
 		"error",

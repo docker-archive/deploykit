@@ -1,0 +1,11 @@
+{{ var `cluster/user/name` `user` }}
+{{ var `zones/east/cidr` `10.20.100.100/24` }}
+{{ var `zones/west/cidr` `10.20.100.200/24` }}
+
+{
+    "cluster" : {
+	"size" : 5,
+	"name" : "test"
+    },
+    "shell" : {{ env `SHELL` }}
+}
