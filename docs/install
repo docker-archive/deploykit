@@ -2,7 +2,7 @@
 
 # Installs infrakit by cross compiling locally inside a docker container.
 
-if [[ "$(which docker)" == "" ]]; then
+if [ "$(which docker)" = "" ]; then
     echo "You must have Docker locally."
     exit -1
 fi
@@ -22,5 +22,5 @@ case "$(uname)" in
 esac
 
 
-docker run --rm -v $dir:/build infrakit/installer build-infrakit $target
+docker run --rm -v $dir:/build infrakit/installer:latest build-infrakit $target
 sudo cp ./infrakit /usr/local/bin

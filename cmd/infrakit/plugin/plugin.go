@@ -151,6 +151,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		parsedRules := []launch.Rule{}
 
+		log.Info("config", "url", *configURL)
+
 		if *configURL != "" {
 			buff, err := processTemplate(*configURL)
 			if err != nil {
