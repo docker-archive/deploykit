@@ -9,7 +9,10 @@ import (
 	"github.com/imdario/mergo"
 )
 
-var log = logutil.New("module", "plugin/metadata/updatable")
+var (
+	log    = logutil.New("module", "plugin/metadata/updatable")
+	debugV = logutil.V(300)
+)
 
 // LoadFunc is the function for returning the original to modify
 type LoadFunc func() (original *types.Any, err error)
@@ -51,20 +54,20 @@ func (p updatable) Changes(changes []metadata.Change) (original, proposed *types
 	if err != nil {
 		return
 	}
-	log.Info("original", "original", original.String())
+	log.Debug("original", "original", original.String(), "V", debugV)
 
 	var current map[string]interface{}
 	if err = original.Decode(&current); err != nil {
 		return
 	}
-	log.Info("decoded", "current", current)
+	log.Debug("decoded", "current", current, "V", debugV)
 
 	changeSet, e := changeSet(changes)
 	if e != nil {
 		err = e
 		return
 	}
-	log.Info("changeset", "changeset", changeSet)
+	log.Debug("changeset", "changeset", changeSet, "V", debugV)
 
 	var applied map[string]interface{}
 	if err = changeSet.Decode(&applied); err != nil {
@@ -75,7 +78,7 @@ func (p updatable) Changes(changes []metadata.Change) (original, proposed *types
 		return
 	}
 
-	log.Info("decoded2", "applied", applied)
+	log.Debug("decoded2", "applied", applied, "V", debugV)
 
 	// encoded it back to bytes
 	proposed, err = types.AnyValue(applied)
@@ -83,7 +86,7 @@ func (p updatable) Changes(changes []metadata.Change) (original, proposed *types
 		return
 	}
 
-	log.Info("proposed", "proposed", proposed.String())
+	log.Debug("proposed", "proposed", proposed.String(), "V", debugV)
 
 	cas = types.Fingerprint(original, proposed)
 	return

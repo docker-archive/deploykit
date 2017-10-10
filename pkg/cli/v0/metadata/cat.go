@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/docker/infrakit/pkg/cli"
+	metadata "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -18,41 +19,41 @@ func Cat(name string, services *cli.Services) *cobra.Command {
 		Short: "Get metadata entry by path",
 	}
 
+	retry := cat.Flags().Duration("retry", 0, "Retry interval (e.g. 1s)")
+	timeout := cat.Flags().Duration("timeout", 0, "Timeout")
+	errOnTimeout := cat.Flags().Bool("err-on-timeout", false, "Return error on timeout")
+
 	cat.RunE = func(cmd *cobra.Command, args []string) error {
 
-		metadataPlugin, err := loadPlugin(services.Plugins(), name)
-		if err != nil {
-			return nil
-		}
-		cli.MustNotNil(metadataPlugin, "metadata plugin not found", "name", name)
+		metadataFunc := metadata.MetadataFunc(services.Plugins)
 
 		for _, p := range args {
 
-			path := types.PathFromString(gopath.Join(name, p))
-			first := path.Index(0)
-			if first != nil {
+			path := gopath.Join(name, p)
 
-				path = path.Shift(1)
+			var value interface{}
+			var err error
 
-				value, err := metadataPlugin.Get(path)
-				if err != nil {
-					log.Warn("Cannot metadata cat on plugin", "target", *first, "err", err)
-					continue
-				}
-				if value == nil {
-					log.Warn("value is nil")
-					continue
-				}
+			if *retry > 0 {
+				value, err = metadataFunc(path, *retry, *timeout, *errOnTimeout)
+			} else {
+				value, err = metadataFunc(path)
+			}
 
-				str := value.String()
+			result := value
+			if value, is := value.(*types.Any); is && value != nil {
 				if s, err := strconv.Unquote(value.String()); err == nil {
-					str = s
+					result = s
 				}
+			}
 
-				err = services.Output(os.Stdout, str, nil)
-				if err != nil {
-					return err
-				}
+			if result == nil {
+				result = false
+			}
+
+			err = services.Output(os.Stdout, result, nil)
+			if err != nil {
+				return err
 			}
 		}
 		return nil
