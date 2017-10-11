@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var swarmLabel = "infrakit"
+
 var input = map[string]interface{}{
 	"Group": map[string]interface{}{
 		"managers": map[string]interface{}{
@@ -33,12 +35,12 @@ func TestSaveLoadSnapshot(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mock_client.NewMockAPIClientCloser(ctrl)
-	snapshot, err := NewSnapshot(client)
+	snapshot, err := NewSnapshot(client, swarmLabel)
 
 	swarmInfo := swarm.Swarm{}
 	expectedSpec := swarm.Spec{
 		Annotations: swarm.Annotations{
-			Labels: map[string]string{SwarmLabel: encodedInput},
+			Labels: map[string]string{swarmLabel: encodedInput},
 		},
 	}
 	//Test first time save Snapshot (nil -> expectedSpec)
@@ -51,7 +53,7 @@ func TestSaveLoadSnapshot(t *testing.T) {
 	//Test update Snapshot(unexpectedSpec -> expectedSpec)
 	unexpectedSpec := swarm.Spec{
 		Annotations: swarm.Annotations{
-			Labels: map[string]string{SwarmLabel: "dummy"},
+			Labels: map[string]string{swarmLabel: "dummy"},
 		},
 	}
 	swarmInfo.Spec = unexpectedSpec

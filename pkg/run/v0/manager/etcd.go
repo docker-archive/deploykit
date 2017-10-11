@@ -56,9 +56,9 @@ func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options) erro
 	}
 
 	if managerConfig != nil {
-		managerConfig.leader = leader
-		managerConfig.leaderStore = leaderStore
-		managerConfig.store = snapshot
+		managerConfig.Leader = leader
+		managerConfig.LeaderStore = leaderStore
+		managerConfig.SpecStore = snapshot
 		managerConfig.cleanUpFunc = func() { etcdClient.Close() }
 	}
 

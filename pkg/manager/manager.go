@@ -5,97 +5,38 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/docker/infrakit/pkg/controller"
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/plugin"
 	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
-	rpc "github.com/docker/infrakit/pkg/rpc/group"
-	"github.com/docker/infrakit/pkg/spi"
+	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
+	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
-	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 )
-
-var (
-	log = logutil.New("module", "manager")
-
-	debugV  = logutil.V(100)
-	debugV2 = logutil.V(500)
-
-	// InterfaceSpec is the current name and version of the Instance API.
-	InterfaceSpec = spi.InterfaceSpec{
-		Name:    "Manager",
-		Version: "0.1.0",
-	}
-)
-
-// Leadership is the interface for getting information about the current leader node
-type Leadership interface {
-	// IsLeader returns true only if for certain this is a leader. False if not or unknown.
-	IsLeader() (bool, error)
-
-	// LeaderLocation returns the location of the leader
-	LeaderLocation() (*url.URL, error)
-}
-
-// Manager is the interface for interacting locally or remotely with the manager
-type Manager interface {
-	Leadership
-
-	// Enforce enforces infrastructure state to match that of the specs
-	Enforce(specs []types.Spec) error
-
-	// Inspect returns the current state of the infrastructure
-	Inspect() ([]types.Object, error)
-
-	// Terminate destroys all resources associated with the specs
-	Terminate(specs []types.Spec) error
-}
-
-// Backend is the admin / server interface
-type Backend interface {
-	group.Plugin
-
-	metadata.Updatable
-
-	Controllers() (map[string]controller.Controller, error)
-	Groups() (map[group.ID]group.Plugin, error)
-
-	Manager
-
-	Start() (<-chan struct{}, error)
-	Stop()
-}
 
 // manager is the controller of all the plugins.  It is able to process multiple inputs
 // such as leadership changes and configuration changes and perform the necessary actions
 // to activate / deactivate plugins
 type manager struct {
-	name plugin.Name
 
-	group.Plugin // Note that some methods are overridden
+	// Options include configurations
+	Options
 
+	// Some methods are overridden to provide persistence services
+	group.Plugin
+
+	// Some methods are overridden to provide persistence services
 	metadata.Updatable
 
-	plugins     discovery.Plugins
-	leader      leader.Detector
-	leaderStore leader.Store
-	snapshot    store.Snapshot
-	isLeader    bool
-	lock        sync.Mutex
-	stop        chan struct{}
-	running     chan struct{}
+	isLeader bool
+	lock     sync.Mutex
+	stop     chan struct{}
+	running  chan struct{}
 
-	backendName string
-	backendOps  chan<- backendOp
-
-	// TODO - make this into a map to support multiple instances
-	metadataBackendName plugin.Name
-	metadataSnapshot    store.Snapshot
+	// queued operations
+	backendOps chan<- backendOp
 }
 
 type backendOp struct {
@@ -105,42 +46,28 @@ type backendOp struct {
 
 // NewManager returns the manager which depends on other services to coordinate and manage
 // the plugins in order to ensure the infrastructure state matches the user's spec.
-func NewManager(name plugin.Name,
-	plugins discovery.Plugins,
-	leader leader.Detector,
-	leaderStore leader.Store,
-	snapshot store.Snapshot,
-	backendName string,
-	metadataSnapshot store.Snapshot,
-	metadataBackendName plugin.Name) Backend {
+func NewManager(options Options) Backend {
 
 	return &manager{
-		name: name,
+		Options: options,
 		// "base class" is the stateless backend group plugin
 		Plugin: group_plugin.LazyConnect(
 			func() (group.Plugin, error) {
-				endpoint, err := plugins.Find(plugin.Name(backendName))
+				endpoint, err := options.Plugins().Find(options.Group)
 				if err != nil {
 					return nil, err
 				}
-				return rpc.NewClient(endpoint.Address)
+				return group_rpc.NewClient(endpoint.Address)
 			}, 0),
 
-		// TODO - add storage
+		// This is the backend to delegate to.  The manager intercepts calls and provides storage
 		Updatable: metadata_plugin.UpdatableLazyConnect(func() (metadata.Updatable, error) {
-			endpoint, err := plugins.Find(metadataBackendName)
+			endpoint, err := options.Plugins().Find(options.Metadata)
 			if err != nil {
 				return nil, err
 			}
-			return rpc.NewClient(endpoint.Address)
+			return metadata_rpc.NewClientUpdatable(endpoint.Address)
 		}, 0),
-		plugins:             plugins,
-		leader:              leader,
-		leaderStore:         leaderStore,
-		snapshot:            snapshot,
-		backendName:         backendName,
-		metadataSnapshot:    metadataSnapshot,
-		metadataBackendName: metadataBackendName,
 	}
 }
 
@@ -163,11 +90,11 @@ func (m *manager) IsLeader() (bool, error) {
 
 // LeaderLocation returns the location of the leader
 func (m *manager) LeaderLocation() (*url.URL, error) {
-	if m.leaderStore == nil {
+	if m.Options.LeaderStore == nil {
 		return nil, fmt.Errorf("cannot locate leader")
 	}
 
-	return m.leaderStore.GetLocation()
+	return m.Options.LeaderStore.GetLocation()
 }
 
 // Enforce enforces infrastructure state to match that of the specs
@@ -204,7 +131,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 
 	log.Info("Manager starting")
 
-	leaderChan, err := m.leader.Start()
+	leaderChan, err := m.Options.Leader.Start()
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +246,7 @@ func (m *manager) Stop() {
 		return
 	}
 	close(m.stop)
-	m.leader.Stop()
+	m.Options.Leader.Stop()
 }
 
 func (m *manager) getCurrentState() (globalSpec, error) {
@@ -339,7 +266,7 @@ func (m *manager) getCurrentState() (globalSpec, error) {
 	}
 
 	for _, spec := range specs {
-		global.updateGroupSpec(spec, plugin.Name(m.backendName))
+		global.updateGroupSpec(spec, m.Options.Group)
 	}
 	return global, nil
 }
@@ -351,7 +278,7 @@ func (m *manager) onAssumeLeadership() error {
 	config := &globalSpec{}
 	// load the latest version -- assumption here is that it's been persisted already.
 	log.Info("Loading snapshot")
-	err := config.load(m.snapshot)
+	err := config.load(m.Options.SpecStore)
 	log.Info("Loaded snapshot", "err", err)
 	if err != nil {
 		log.Warn("Error loading config", "err", err)
@@ -375,7 +302,7 @@ func (m *manager) doCommit() error {
 	config := globalSpec{}
 
 	// load the latest version -- assumption here is that it's been persisted already.
-	err := config.load(m.snapshot)
+	err := config.load(m.Options.SpecStore)
 	if err != nil {
 		return err
 	}
@@ -416,7 +343,7 @@ func (m *manager) doFreeGroups(config globalSpec) error {
 }
 
 func (m *manager) execPlugins(config globalSpec, work func(group.Plugin, group.Spec) error) error {
-	running, err := m.plugins.List()
+	running, err := m.Options.Plugins().List()
 	if err != nil {
 		return err
 	}
@@ -439,7 +366,7 @@ func (m *manager) execPlugins(config globalSpec, work func(group.Plugin, group.S
 			return err
 		}
 
-		gp, err := rpc.NewClient(ep.Address)
+		gp, err := group_rpc.NewClient(ep.Address)
 		if err != nil {
 			log.Warn("Cannot contact group", "groupID", id, "plugin", r.Handler, "endpoint", ep.Address)
 			return err

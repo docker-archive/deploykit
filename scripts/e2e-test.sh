@@ -41,13 +41,12 @@ rm -rf $configstore/*
 
 # set the leader -- for os / file based leader detection for manager
 leaderfile=$INFRAKIT_HOME/leader
-echo group > $leaderfile
+echo manager1 > $leaderfile
 
-# start up multiple instances of manager -- typically we want multiple SETS of plugins and managers
-# but here for simplicity just start up with multiple managers and one set of plugins
-infrakit-manager --name group --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
-infrakit-manager --name group1 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
-infrakit-manager --name group2 --proxy-for-group group-stateless os --leader-file $leaderfile --store-dir $configstore &
+# Import env for the file backend
+INFRAKIT_LEADER_FILE=$leaderfile
+INFRAKIT_STORE_DIR=$configstore
+
 
 sleep 5  # manager needs to detect leadership
 
@@ -56,7 +55,7 @@ sleep 5  # manager needs to detect leadership
 LOG_DIR=$INFRAKIT_HOME/logs
 mkdir -p $LOG_DIR
 
-# see the config josn 'e2e-test-plugins.json' for reference of environment variable
+# see the config json 'e2e-test-plugins.json' for reference of environment variable
 INSTANCE_FILE_DIR=$INFRAKIT_HOME/instance-file
 mkdir -p $INSTANCE_FILE_DIR
 rm -rf $INSTANCE_FILE_DIR/*
@@ -71,7 +70,7 @@ export INFRAKIT_GROUP_POLL_INTERVAL=500ms
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
 infrakit plugin start --config-url file:///$PWD/scripts/e2e-test-plugins.json \
-	 group:group-stateless \
+	 manager group:group-stateless \
 	 file:instance-file \
 	 vanilla:flavor-vanilla \
 	 mylogs:testlogs=inproc &
@@ -123,33 +122,37 @@ expect_output_lines() {
   fi
 }
 
-expect_output_lines "18 plugins should be discoverable" "infrakit plugin ls -q" "18"
+echo "Starting test................................................................"
+
+expect_output_lines "11 plugins should be discoverable" "infrakit plugin ls -q" "11"
 expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
 
 echo "Commiting"
 infrakit group commit scripts/cattle.json
 
 echo 'Waiting for group to be provisioned'
-sleep 2
+sleep 5
 
-expect_output_lines "5 instances should exist in group" "infrakit group describe cattle -q" "5"
+expect_output_lines "5 instances should exist in group" "infrakit group/cattle describe -q" "5"
 expect_output_lines "5 instances should exist" "infrakit instance-file describe -q " "5"
 
-infrakit group free cattle
-infrakit group commit scripts/cattle.json
+infrakit group/cattle free
 
+echo "Freed cattles; committing again"
+
+infrakit group commit scripts/cattle.json
 expect_exact_output "Should be watching one group" "infrakit group ls -q" "cattle"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
-  "infrakit group commit scripts/cattle2.json --pretend" \
+  "infrakit group/cattle commit scripts/cattle2.json --pretend" \
   "Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10"
 
-infrakit group commit scripts/cattle2.json
+infrakit group/cattle commit scripts/cattle2.json
 
 sleep 10
 
-expect_output_lines "10 instances should exist in group" "infrakit group describe cattle -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit group/cattle describe -q" "10"
 
 # Terminate 3 instances.
 pushd $INSTANCE_FILE_DIR
@@ -160,7 +163,7 @@ sleep 10
 
 expect_output_lines "10 instances should exist in group" "infrakit group describe cattle -q" "10"
 
-infrakit group destroy cattle
+infrakit group/cattle destroy
 expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
 
 echo 'ALL TESTS PASSED'

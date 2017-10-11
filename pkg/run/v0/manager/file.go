@@ -58,9 +58,9 @@ func configFileBackends(options BackendFileOptions, managerConfig *Options) erro
 	}
 
 	if managerConfig != nil {
-		managerConfig.leader = leader
-		managerConfig.leaderStore = leaderStore
-		managerConfig.store = snapshot
+		managerConfig.Leader = leader
+		managerConfig.LeaderStore = leaderStore
+		managerConfig.SpecStore = snapshot
 	}
 	return nil
 }

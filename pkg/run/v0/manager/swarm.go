@@ -11,6 +11,10 @@ import (
 	"github.com/docker/infrakit/pkg/util/docker"
 )
 
+const (
+	SpecStoreKey = "infrakit"
+)
+
 // BackendSwarmOptions contain the options for the swarm backend
 type BackendSwarmOptions struct {
 	// PollInterval is how often to check
@@ -35,7 +39,7 @@ func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options) er
 		return err
 	}
 
-	snapshot, err := swarm_store.NewSnapshot(dockerClient)
+	snapshot, err := swarm_store.NewSnapshot(dockerClient, SpecStoreKey)
 	if err != nil {
 		dockerClient.Close()
 		return err
@@ -45,9 +49,9 @@ func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options) er
 	leaderStore := swarm_leader.NewStore(dockerClient)
 
 	if managerConfig != nil {
-		managerConfig.leader = leader
-		managerConfig.leaderStore = leaderStore
-		managerConfig.store = snapshot
+		managerConfig.Leader = leader
+		managerConfig.LeaderStore = leaderStore
+		managerConfig.SpecStore = snapshot
 		managerConfig.cleanUpFunc = func() {
 			dockerClient.Close()
 			log.Debug("closed docker connection", "client", dockerClient, "V", logutil.V(100))

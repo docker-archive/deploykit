@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/leader"
 	group_mock "github.com/docker/infrakit/pkg/mock/spi/group"
@@ -83,7 +84,13 @@ func testEnsemble(t *testing.T,
 	st, err := server.StartPluginAtPath(filepath.Join(dir, "group-stateless"), gs)
 	require.NoError(t, err)
 
-	m := NewManager(plugin.Name("group"), disc, detector, nil, snap, "group-stateless", metadataSnap, "vars-stateless")
+	m := NewManager(Options{
+		Name:      plugin.Name("group"),
+		Plugins:   func() discovery.Plugins { return disc },
+		Leader:    detector,
+		SpecStore: snap,
+		Group:     plugin.Name("group-stateless"),
+	})
 
 	return m, st
 }
