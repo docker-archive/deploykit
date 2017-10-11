@@ -139,7 +139,7 @@ Available Commands:
 Listing metadata values:
 
 ```shell
-$ infrakit vars metadata ls -al
+$ infrakit vars vars -al
 total 6:
 cluster/name
 cluster/size
@@ -152,7 +152,7 @@ zones/west/cidr
 or
 
 ```shell
-$ infrakit vars metadata ls -al zones
+$ infrakit vars vars -al zones
 total 2:
 east/cidr
 west/cidr
@@ -161,14 +161,14 @@ west/cidr
 Reading a value using `cat`:
 
 ```shell
-$ infrakit vars metadata cat zones/east/cidr
+$ infrakit vars cat zones/east/cidr
 10.20.100.100/24
 ```
 
 Complex values:
 
 ```shell
-$ infrakit vars metadata cat zones
+$ infrakit vars cat zones
 {"east":{"cidr":"10.20.100.100/24"},"west":{"cidr":"10.20.100.200/24"}}
 ```
 
@@ -200,7 +200,7 @@ unit.  The `change` verb either prints the proposal or prints the proposal and c
 No changes means getting a dump of the entire plugin's metadata as a document:
 
 ```shell
-$ infrakit vars metadata change
+$ infrakit vars change
 Proposing 0 changes, hash=f34a016c93733536ebd5de6e3e7aa87c
 {
   "cluster": {
@@ -225,7 +225,7 @@ Proposing 0 changes, hash=f34a016c93733536ebd5de6e3e7aa87c
 Updating multiple values:
 
 ```shell
-$ infrakit vars metadata change cluster/name=hello shell=/bin/zsh zones/east/cidr=10.20.100/16
+$ infrakit vars change cluster/name=hello shell=/bin/zsh zones/east/cidr=10.20.100/16
 Proposing 3 changes, hash=0d2e7576bafc24c7f07839f77fad6952
 {
   "cluster": {
@@ -251,7 +251,7 @@ Not shown above, your terminal show show color differences of the change.  Using
 commit the change (which has the hash `0d2e7576bafc24c7f07839f77fad6952`):
 
 ```shell
-$ infrakit vars metadata change cluster/name=hello shell=/bin/zsh zones/east/cidr=10.20.100/16 -c
+$ infrakit vars change cluster/name=hello shell=/bin/zsh zones/east/cidr=10.20.100/16 -c
 Committing 3 changes, hash=0d2e7576bafc24c7f07839f77fad6952
 {
   "cluster": {
@@ -276,16 +276,16 @@ Committing 3 changes, hash=0d2e7576bafc24c7f07839f77fad6952
 Verify:
 
 ```shell
-$ infrakit vars metadata cat cluster/name
+$ infrakit vars cat cluster/name
 hello
-$ infrakit vars metadata cat zones/east/cidr
+$ infrakit vars cat zones/east/cidr
 10.20.100/16
 ```
 
 You can also add new values / structs:
 
 ```shell
-$ infrakit vars metadata change this/is/a/new/struct='{ "message":"i am here"}' -c
+$ infrakit vars change this/is/a/new/struct='{ "message":"i am here"}' -c
 Committing 1 changes, hash=1c5bb84ad728337950127a3a4710509d
 {
   "cluster": {
@@ -321,7 +321,7 @@ Committing 1 changes, hash=1c5bb84ad728337950127a3a4710509d
 Verify:
 
 ```shell
-$ infrakit vars metadata cat this/is/a/new/struct/message
+$ infrakit vars cat this/is/a/new/struct/message
 i am here
 ```
 
