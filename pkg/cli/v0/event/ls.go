@@ -14,8 +14,8 @@ import (
 func Ls(name string, services *cli.Services) *cobra.Command {
 
 	ls := &cobra.Command{
-		Use:   "ls",
-		Short: "List event",
+		Use:   "topics",
+		Short: "List event topics",
 	}
 
 	long := ls.Flags().BoolP("long", "l", false, "Print full path")

@@ -15,7 +15,8 @@ var log = logutil.New("module", "cli/v1/event")
 func init() {
 	cli.Register(event.InterfaceSpec,
 		[]cli.CmdBuilder{
-			Event,
+			Ls,
+			Tail,
 		})
 }
 
