@@ -15,7 +15,7 @@ import (
 func Ls(name string, services *cli.Services) *cobra.Command {
 
 	ls := &cobra.Command{
-		Use:   "ls",
+		Use:   "vars",
 		Short: "List metadata",
 	}
 

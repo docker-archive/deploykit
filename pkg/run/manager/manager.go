@@ -32,6 +32,7 @@ func ManagePlugins(rules []launch.Rule,
 		plugins:      plugins,
 		mustAll:      mustAll,
 		scanInterval: scanInterval,
+		running:      []string{},
 	}
 	return m, m.Start(rules)
 }
@@ -51,11 +52,18 @@ type Manager struct {
 	wgStartAll  sync.WaitGroup
 	started     chan plugin.Name
 	lock        sync.RWMutex
+
+	running []string // lookups of those started
 }
 
 // Rules returns a list of plugins that can be launched via this manager
 func (m *Manager) Rules() []launch.Rule {
 	return m.rules
+}
+
+// TerminateRunning terminates those that have been started.
+func (m *Manager) TerminateRunning() error {
+	return m.Terminate(m.running)
 }
 
 // Terminate stops the plugins.  Note this is accomplished by sending a signal TERM to the
@@ -227,6 +235,8 @@ func (m *Manager) WaitForAllShutdown() {
 		case target := <-m.started:
 
 			lookup, _ := target.GetLookupAndType()
+
+			m.running = append(m.running, lookup)
 
 			if _, has := seen[lookup]; !has {
 				log.Debug("Start watching", "lookup", lookup)
