@@ -5,7 +5,7 @@ RUN apk add --update wget ca-certificates openssl libvirt-dev openssh
 RUN mkdir -p /infrakit/plugins /infrakit/configs /infrakit/logs /infrakit/cli /infrakit/instance/terraform
 
 VOLUME /infrakit
-
+WORKDIR /infrakit
 ENV INFRAKIT_HOME /infrakit
 
 # Defined in pkg/discovery

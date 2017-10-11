@@ -139,7 +139,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
-	mustAll := start.Flags().Bool("all", true, "Panic if any plugin fails to start")
+	mustAll := start.Flags().Bool("all", false, "Panic if any plugin fails to start")
 	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
 	start.Flags().AddFlagSet(templateFlags)
 
@@ -150,6 +150,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		}
 
 		parsedRules := []launch.Rule{}
+
+		log.Info("config", "url", *configURL)
 
 		if *configURL != "" {
 			buff, err := processTemplate(*configURL)
@@ -173,7 +175,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer pluginManager.Stop()
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("Error occurred. Recovered but exiting.", "err", r)
+				pluginManager.TerminateRunning()
+			}
+			pluginManager.WaitForAllShutdown()
+			log.Info("All plugins shutdown")
+			pluginManager.Stop()
+		}()
 
 		if len(args) == 0 {
 
@@ -225,9 +235,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		pluginManager.WaitStarting()
 
 		log.Info("Done waiting on plugin starts")
-
-		pluginManager.WaitForAllShutdown()
-		log.Info("All plugins shutdown")
 
 		return nil
 	}

@@ -57,7 +57,7 @@ func NewServices(plugins func() discovery.Plugins) *Services {
 }
 
 // ProcessTemplateFunc is the function that processes the template at url and returns view or error.
-type ProcessTemplateFunc func(url string) (rendered string, err error)
+type ProcessTemplateFunc func(url string, ctx ...interface{}) (rendered string, err error)
 
 // ToJSONFunc converts the input buffer to json format
 type ToJSONFunc func(in []byte) (json []byte, err error)
@@ -157,7 +157,7 @@ func templateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 
 		},
 		// ProcessTemplateFunc
-		func(url string) (view string, err error) {
+		func(url string, ctx ...interface{}) (view string, err error) {
 
 			if !strings.Contains(url, "://") {
 				p := url
@@ -199,7 +199,11 @@ func templateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 
 			configureTemplate(engine, plugins)
 
-			view, err = engine.Render(nil)
+			contextObject := (interface{})(nil)
+			if len(ctx) == 1 {
+				contextObject = ctx[0]
+			}
+			view, err = engine.Render(contextObject)
 			if err != nil {
 				return
 			}

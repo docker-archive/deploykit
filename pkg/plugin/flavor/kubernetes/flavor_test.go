@@ -6,7 +6,6 @@ import (
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -16,13 +15,13 @@ import (
 	"testing"
 )
 
-func templ(tpl string) *template.Template {
-	t, err := template.NewTemplate("str://"+tpl, template.Options{})
-	if err != nil {
-		panic(err)
-	}
-	return t
-}
+// func templ(tpl string) *template.Template {
+// 	t, err := template.NewTemplate("str://"+tpl, template.Options{})
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	return t
+// }
 
 func plugins() discovery.Plugins {
 	d, err := local.NewPluginDiscovery()
@@ -38,8 +37,15 @@ func TestValidate(t *testing.T) {
 	curdir, err := os.Getwd()
 	require.NoError(t, err)
 
-	managerFlavor := NewManagerFlavor(plugins, templ(DefaultManagerInitScriptTemplate), curdir, managerStop)
-	workerFlavor := NewWorkerFlavor(plugins, templ(DefaultWorkerInitScriptTemplate), curdir, workerStop)
+	options := Options{
+		ConfigDir: curdir,
+	}
+	managerFlavor, err := NewManagerFlavor(plugins, options, managerStop)
+	require.NoError(t, err)
+
+	workerFlavor, err := NewWorkerFlavor(plugins, options, workerStop)
+	require.NoError(t, err)
+
 	// Logical ID with multiple attachments is allowed.
 	require.NoError(t, workerFlavor.Validate(
 		types.AnyString(`{"KubeJoinIP" : "127.0.0.1", 
@@ -67,9 +73,8 @@ func TestValidate(t *testing.T) {
 				"Type" : "network",
 				"Path" : "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"}],
 		"KubeClusterID" : "test"}`),
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2"}})
-	require.Error(t, err)
-	require.Equal(t, "kubernetes flaver currently support only one manager", err.Error())
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
+	require.NoError(t, err)
 	close(managerStop)
 	close(workerStop)
 }
@@ -84,7 +89,10 @@ func TestManager(t *testing.T) {
 		err = os.RemoveAll(cfdir)
 		require.NoError(t, err)
 	}
-	managerFlavor := NewManagerFlavor(plugins, templ(DefaultManagerInitScriptTemplate), curdir, managerStop)
+
+	managerFlavor, err := NewManagerFlavor(plugins, Options{ConfigDir: curdir}, managerStop)
+	require.NoError(t, err)
+
 	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
 	id := instance.LogicalID("10.20.100.1")
 	flavorSpec := types.AnyString(`{"KubeJoinIP" : "10.20.100.1", 
@@ -95,10 +103,12 @@ func TestManager(t *testing.T) {
 				"Type" : "network",
 				"Path" : "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"}],
 		"KubeClusterID" : "test",
+                "SkipManagerValidation" : true,
+                "ControlPlane" : [ "10.20.100.1" ],
 		"Attachments": {"10.20.100.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`)
 	details, err := managerFlavor.Prepare(flavorSpec,
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1"}},
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
 		index)
 	require.NoError(t, err)
 	_, err = os.Stat(cfdir)
@@ -107,11 +117,59 @@ func TestManager(t *testing.T) {
 	_, err = os.Stat(cfdir)
 	require.NoError(t, err)
 	d, err := ioutil.ReadFile(cf)
-	err = os.RemoveAll(cfdir)
 	require.NoError(t, err)
+
 	i := strings.Index(details.Init, "kubeadm init --token "+string(d))
 	require.NotEqual(t, -1, i)
+
+	// Second node in manager group but it's not a control plane for kube
+	id = instance.LogicalID("10.20.100.2")
+	index = group_types.Index{Group: group.ID("group"), Sequence: 1}
+	details, err = managerFlavor.Prepare(flavorSpec,
+		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
+		index)
+	require.NoError(t, err)
+	require.Equal(t, -1, strings.Index(details.Init, "kubeadm init --token "+string(d)))
+	require.True(t, strings.Index(details.Init, "kubeadm join --token "+string(d)) > -1)
+
+	// Last node in manager group but it's not a control plane for kube
+	id = instance.LogicalID("10.20.100.3")
+	index = group_types.Index{Group: group.ID("group"), Sequence: 2}
+	details, err = managerFlavor.Prepare(flavorSpec,
+		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
+		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
+		index)
+	require.NoError(t, err)
+	require.Equal(t, -1, strings.Index(details.Init, "kubeadm init --token "+string(d)))
+	require.True(t, strings.Index(details.Init, "kubeadm join --token "+string(d)) > -1)
+
 	close(managerStop)
+
+	// clean up
+	require.NoError(t, os.RemoveAll(cfdir))
+}
+
+func TestSubset(t *testing.T) {
+
+	require.True(t, strictSubset(
+		[]instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"},
+		[]instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"},
+	))
+
+	require.True(t, strictSubset(
+		[]instance.LogicalID{"10.20.100.1"},
+		[]instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"},
+	))
+
+	require.False(t, strictSubset(
+		[]instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"},
+		[]instance.LogicalID{"10.20.100.1"},
+	))
+	require.False(t, strictSubset(
+		[]instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"},
+		[]instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.4"},
+	))
 }
 
 func TestWorker(t *testing.T) {
@@ -124,7 +182,9 @@ func TestWorker(t *testing.T) {
 		err = os.RemoveAll(cfdir)
 		require.NoError(t, err)
 	}
-	workerFlavor := NewWorkerFlavor(plugins, templ(DefaultWorkerInitScriptTemplate), curdir, workerStop)
+	workerFlavor, err := NewWorkerFlavor(plugins, Options{ConfigDir: curdir}, workerStop)
+	require.NoError(t, err)
+
 	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
 	flavorSpec := types.AnyString(`{"KubeJoinIP" : "10.20.100.1",
 		"KubeBindPort" : 6443,

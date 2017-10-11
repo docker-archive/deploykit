@@ -1,6 +1,8 @@
 package flavor
 
 import (
+	"fmt"
+	"io"
 	"os"
 
 	"github.com/docker/infrakit/pkg/cli"
@@ -17,16 +19,17 @@ func Prepare(name string, services *cli.Services) *cobra.Command {
 	groupSize := uint(0)
 	groupID := ""
 	groupSequence := uint(0)
-	flavorPropertiesURL := ""
+	logicalID := ""
+	viewTemplateURL := ""
 
 	prepare := &cobra.Command{
-		Use:   "prepare <instance Spec template url | - >",
+		Use:   "prepare < flavor properties template URL | - >",
 		Short: "Prepare provisioning inputs for an instance. Read from stdin if url is '-'",
 	}
 
 	prepare.RunE = func(cmd *cobra.Command, args []string) error {
 
-		if len(args) != 0 {
+		if len(args) != 1 {
 			cmd.Usage()
 			os.Exit(1)
 		}
@@ -36,16 +39,6 @@ func Prepare(name string, services *cli.Services) *cobra.Command {
 			return nil
 		}
 		cli.MustNotNil(flavorPlugin, "flavor plugin not found", "name", name)
-
-		if len(args) != 1 {
-			cmd.Usage()
-			os.Exit(1)
-		}
-
-		flavorProperties, err := services.ProcessTemplate(flavorPropertiesURL)
-		if err != nil {
-			return err
-		}
 
 		view, err := services.ReadFromStdinIfElse(
 			func() bool { return args[0] == "-" },
@@ -57,12 +50,12 @@ func Prepare(name string, services *cli.Services) *cobra.Command {
 		}
 
 		spec := instance.Spec{}
-		if err := types.AnyString(view).Decode(&spec); err != nil {
-			return err
+		if logicalID != "" {
+			lid := instance.LogicalID(logicalID)
+			spec.LogicalID = &lid
 		}
-
 		spec, err = flavorPlugin.Prepare(
-			types.AnyString(flavorProperties),
+			types.AnyString(view),
 			spec,
 			allocationMethodFromFlags(&logicalIDs, &groupSize),
 			indexFromFlags(&groupID, &groupSequence),
@@ -71,32 +64,29 @@ func Prepare(name string, services *cli.Services) *cobra.Command {
 			return err
 		}
 
-		return services.Output(os.Stdout, spec, nil)
+		var defaultView func(w io.Writer, v interface{}) error
+		if viewTemplateURL != "" {
+			defaultView = func(w io.Writer, v interface{}) error {
+
+				rendered, err := services.ProcessTemplate(viewTemplateURL, spec)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stdout, "%s", rendered)
+				return nil
+			}
+		}
+
+		return services.Output(os.Stdout, spec, defaultView)
 	}
 
-	prepare.Flags().String("properties", "", "Properties of the flavor plugin, a url")
-	prepare.Flags().StringSliceVar(
-		&logicalIDs,
-		"logical-ids",
-		[]string{},
-		"Logical IDs to use as the Allocation method")
-	prepare.Flags().UintVar(
-		&groupSize,
-		"size",
-		0,
-		"Group Size to use as the Allocation method")
 	prepare.Flags().AddFlagSet(services.ProcessTemplateFlags)
-
-	prepare.Flags().StringVar(
-		&groupID,
-		"index-group",
-		"",
-		"ID of the group")
-	prepare.Flags().UintVar(
-		&groupSequence,
-		"index-sequence",
-		0,
-		"Sequence number within the group")
+	prepare.Flags().StringSliceVar(&logicalIDs, "logical-ids", []string{}, "Logical IDs to use as the Allocation method")
+	prepare.Flags().UintVar(&groupSize, "size", 0, "Group Size to use as the Allocation method")
+	prepare.Flags().StringVar(&logicalID, "logical-id", "", "Logical ID of instance to provision")
+	prepare.Flags().StringVar(&groupID, "index-group", "", "ID of the group")
+	prepare.Flags().StringVar(&viewTemplateURL, "view", "", "Template to apply to result for rendering")
+	prepare.Flags().UintVar(&groupSequence, "index-sequence", 0, "Sequence number within the group")
 	return prepare
 }
 

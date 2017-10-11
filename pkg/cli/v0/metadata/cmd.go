@@ -13,13 +13,24 @@ import (
 var log = logutil.New("module", "cli/v1/metadata")
 
 func init() {
+	// cli.Register(metadata.InterfaceSpec,
+	// 	[]cli.CmdBuilder{
+	// 		Metadata,
+	// 	})
+	// cli.Register(metadata.UpdatableInterfaceSpec,
+	// 	[]cli.CmdBuilder{
+	// 		Updatable,
+	// 	})
 	cli.Register(metadata.InterfaceSpec,
 		[]cli.CmdBuilder{
-			Metadata,
+			Ls,
+			Cat,
 		})
 	cli.Register(metadata.UpdatableInterfaceSpec,
 		[]cli.CmdBuilder{
-			Updatable,
+			Ls,
+			Cat,
+			Change,
 		})
 }
 

@@ -14,8 +14,8 @@ import (
 func Ls(name string, services *cli.Services) *cobra.Command {
 
 	ls := &cobra.Command{
-		Use:   "ls",
-		Short: "List event",
+		Use:   "topics",
+		Short: "List event topics",
 	}
 
 	long := ls.Flags().BoolP("long", "l", false, "Print full path")
@@ -69,13 +69,20 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 				}
 			}
 
+			// list paths relative to this path
+			rel := types.PathFromString(p)
+			if gopath.Dir(name) != "." {
+				// the name has / in it. so the relative path is longer
+				// ex) timer/streams and streams/msec/
+				rel = types.PathFromString(name).Shift(1).Join(rel)
+			}
 			if p == "." && !*all {
 				// special case of showing the top level plugin namespaces
 				if i > 0 && !*quick {
 					fmt.Println()
 				}
 				for _, l := range nodes {
-					fmt.Println(l.Shift(1).Rel(types.PathFromString(p)))
+					fmt.Println(l.Rel(rel))
 				}
 				break
 			}
@@ -84,7 +91,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 				fmt.Printf("total %d:\n", len(nodes))
 			}
 			for _, l := range nodes {
-				fmt.Println(l.Shift(1).Rel(types.PathFromString(p)))
+				fmt.Println(l.Rel(rel))
 			}
 
 		}
