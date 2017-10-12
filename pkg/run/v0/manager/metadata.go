@@ -54,14 +54,6 @@ func (updatable *metadataModel) commit(proposed *types.Any) error {
 	return nil
 }
 
-// func (updatable *metadataModel) load() (original *types.Any, err error) {
-// 	var state interface{}
-// 	if err := updatable.snapshot.Load(&state); err != nil {
-// 		return nil, err
-// 	}
-// 	return types.AnyValue(state)
-// }
-
 func (updatable *metadataModel) pluginModel() (chan func(map[string]interface{}), chan struct{}) {
 	// Start a poller to load the snapshot and make that available as metadata
 	model := make(chan func(map[string]interface{}))

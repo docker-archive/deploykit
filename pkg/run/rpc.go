@@ -117,8 +117,8 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 		case MetadataUpdatable:
 			switch pp := p.(type) {
 			case map[string]metadata.Updatable:
-				// TODO - implement this
-				err = fmt.Errorf("to be implemented %v for code %v", p, code)
+				log.Debug("metadata_rpc.UpdatablePluginServerWithTypes", "p", pp)
+				//plugins = append(plugins, metadata_rpc.UpdatablePluginServerWithTypes(pp))
 				return
 			case metadata.Updatable:
 				log.Debug("metadata_rpc.UpdatablePluginServer", "p", p)
