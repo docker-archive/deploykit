@@ -380,8 +380,11 @@ func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResource
 	fs := &afero.Afero{Fs: p.fs}
 	// just scan the directory for the instance-*.tf.json files
 	err := fs.Walk(p.Dir,
-
 		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				log.Debugf("Ignoring file %s due to error: %s", path, err)
+				return nil
+			}
 			matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
 
 			if len(matches) == 4 {
@@ -820,6 +823,10 @@ func (p *plugin) listCurrentTfFiles() (map[string]map[TResourceType]map[TResourc
 	fs := &afero.Afero{Fs: p.fs}
 	err := fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				log.Debugf("Ignoring file %s due to error: %s", path, err)
+				return nil
+			}
 			matches := tfFileRegex.FindStringSubmatch(info.Name())
 			if len(matches) == 3 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
@@ -1078,6 +1085,10 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach, executeTfApply bool)
 			fs := &afero.Afero{Fs: p.fs}
 			err = fs.Walk(p.Dir,
 				func(path string, info os.FileInfo, err error) error {
+					if err != nil {
+						log.Debugf("Ignoring file %s due to error: %s", path, err)
+						return nil
+					}
 					matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
 					// Note that the current instance (being destroyed) still exists; filter
 					// this file out.
