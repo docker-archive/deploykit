@@ -187,8 +187,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	transport.Name = name
 
 	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
-		metadata_plugin.NewPluginFromChannel(updatableModel),
-		updatable.load, updatable.commit)
+		metadata_plugin.NewPluginFromChannel(updatableModel), updatable.commit)
 
 	impls = map[run.PluginCode]interface{}{
 		run.Manager:           mgr,

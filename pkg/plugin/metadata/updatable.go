@@ -21,17 +21,15 @@ type LoadFunc func() (original *types.Any, err error)
 type CommitFunc func(proposed *types.Any) error
 
 // NewUpdatablePlugin assembles the implementations into a Updatable implementation
-func NewUpdatablePlugin(reader metadata.Plugin, load LoadFunc, commit CommitFunc) metadata.Updatable {
+func NewUpdatablePlugin(reader metadata.Plugin, commit CommitFunc) metadata.Updatable {
 	return &updatable{
 		Plugin: reader,
-		load:   load,
 		commit: commit,
 	}
 }
 
 type updatable struct {
 	metadata.Plugin
-	load   LoadFunc
 	commit CommitFunc
 }
 
@@ -45,6 +43,10 @@ func changeSet(changes []metadata.Change) (*types.Any, error) {
 		}
 	}
 	return types.AnyValue(changed)
+}
+
+func (p updatable) load() (original *types.Any, err error) {
+	return p.Plugin.Get(types.NullPath)
 }
 
 // Changes sends a batch of changes and gets in return a proposed view of configuration and a cas hash.

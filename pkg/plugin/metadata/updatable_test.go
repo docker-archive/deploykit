@@ -9,6 +9,53 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUpdatable(t *testing.T) {
+
+	data := map[string]interface{}{
+		"a": "A",
+		"b": struct{ C string }{C: "C"},
+		"c": "d",
+	}
+	readonly := NewPluginFromData(data)
+
+	var store *types.Any
+	commit := func(proposed *types.Any) error {
+		store = proposed
+		return nil
+	}
+
+	u := NewUpdatablePlugin(readonly, commit)
+
+	buff, err := u.Get(types.PathFromString("a"))
+	require.NoError(t, err)
+	require.Equal(t, types.AnyString(`"A"`), buff)
+
+	buff, err = u.Get(types.PathFromString("b/C"))
+	require.NoError(t, err)
+	require.Equal(t, types.AnyString(`"C"`), buff)
+
+	before, proposed, cas, err := u.Changes([]metadata.Change{
+		{
+			Path:  types.PathFromString("e"),
+			Value: types.AnyValueMust(10),
+		},
+		{
+			Path:  types.PathFromString("b/C"),
+			Value: types.AnyValueMust("X"),
+		},
+	})
+
+	require.Equal(t, types.AnyValueMust(data), before)
+	require.True(t, len(cas) > 0)
+	require.Equal(t, types.AnyValueMust(map[string]interface{}{
+		"a": "A",
+		"b": struct{ C string }{C: "X"},
+		"c": "d",
+		"e": 10,
+	}), proposed)
+
+}
+
 func TestUpdatableOverlayChanges(t *testing.T) {
 
 	original := `
@@ -38,10 +85,12 @@ func TestUpdatableOverlayChanges(t *testing.T) {
 }
 `
 	commitChan := make(chan *types.Any, 1)
+
+	data := map[string]interface{}{}
+	require.NoError(t, types.AnyString(original).Decode(&data))
+
 	u := &updatable{
-		load: func() (*types.Any, error) {
-			return types.AnyString(original), nil
-		},
+		Plugin: NewPluginFromData(data),
 		commit: func(proposed *types.Any) error {
 			commitChan <- proposed
 			return nil

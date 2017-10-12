@@ -80,6 +80,9 @@ func initUpdatable(options Options) metadata.Updatable {
 		}
 		return types.AnyValue(data)
 	}
+
+	log.Debug("reader", "reader", reader)
+
 	writer := func(proposed *types.Any) error {
 		// write
 		if options.MetadataStore != nil {
@@ -101,7 +104,7 @@ func initUpdatable(options Options) metadata.Updatable {
 			var p metadata.Plugin
 			if options.Metadata.IsEmpty() {
 				// in-memory only
-				p = metadata_plugin.NewUpdatablePlugin(metadata_plugin.NewPluginFromData(data), reader, writer)
+				p = metadata_plugin.NewUpdatablePlugin(metadata_plugin.NewPluginFromData(data), writer)
 
 			} else {
 
@@ -121,7 +124,7 @@ func initUpdatable(options Options) metadata.Updatable {
 				return u, nil
 			}
 			// we have a readonly one
-			return metadata_plugin.NewUpdatablePlugin(p, reader, writer), nil
+			return metadata_plugin.NewUpdatablePlugin(p, writer), nil
 		}, 0)
 
 }

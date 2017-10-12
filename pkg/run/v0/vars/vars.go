@@ -102,9 +102,6 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.MetadataUpdatable: metadata_plugin.NewUpdatablePlugin(metadata_plugin.NewPluginFromData(data),
-			func() (*types.Any, error) {
-				return types.AnyValue(data)
-			},
 			func(proposed *types.Any) error {
 				return proposed.Decode(&data)
 			},
