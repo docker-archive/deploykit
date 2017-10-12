@@ -120,18 +120,18 @@ Available Commands:
 Getting help:
 
 ```shell
-$ infrakit vars metadata -h
+$ infrakit vars -h
 
 
 Access metadata of vars
 
 Usage:
-  infrakit vars metadata [command]
+  infrakit vars [command]
 
 Available Commands:
   cat         Get metadata entry by path
   change      Update metadata where args are key=value pairs and keys are within namespace of the plugin.
-  ls          List metadata
+  vars        List metadata
 ```
 
 ### Listing, Reading
