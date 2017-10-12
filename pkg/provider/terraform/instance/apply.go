@@ -2,10 +2,12 @@ package instance
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -143,12 +145,21 @@ type tfFuncs struct {
 // 4. Remove all "tf.json.new" files to "tf.json"
 // Once these steps are done then "terraform apply" can execute without the
 // file system lock.
-func (p *plugin) handleFiles(fns tfFuncs) error {
+func (p *plugin) handleFiles(fns tfFuncs) (err error) {
 	if err := p.fsLock.TryLock(); err != nil {
 		log.Infof("In handleFiles, cannot acquire file lock")
 		return err
 	}
 	defer p.fsLock.Unlock()
+
+	// Reading the files on NFS can cause panics, handles these here so that the
+	// calling goroute does not die.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warnf("Panic detected: %v, %s", r, debug.Stack())
+			err = fmt.Errorf("Panic detected: %v", r)
+		}
+	}()
 
 	// Refresh resources and get updated resources names
 	if err := fns.tfRefresh(); err != nil {
