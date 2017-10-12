@@ -82,14 +82,14 @@ type Options struct {
 	Plugins func() discovery.Plugins `json:"-" yaml:"-"`
 
 	// Leader is the leader detector
-	Leader leader.Detector
+	Leader leader.Detector `json:"-" yaml:"-"`
 
 	// LeaderStore persists leadership information
-	LeaderStore leader.Store
+	LeaderStore leader.Store `json:"-" yaml:"-"`
 
 	// SpecStore persists user specs
-	SpecStore store.Snapshot
+	SpecStore store.Snapshot `json:"-" yaml:"-"`
 
 	// MetadataStore persists var information
-	MetadataStore store.Snapshot
+	MetadataStore store.Snapshot `json:"-" yaml:"-"`
 }

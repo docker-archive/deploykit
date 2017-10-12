@@ -1,6 +1,8 @@
 package etcd
 
 import (
+	"path"
+
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/store"
@@ -10,18 +12,16 @@ import (
 )
 
 const (
-
-	// DefaultKey is the key used to persist the config.
-	DefaultKey = "infrakit/configs/groups.json"
+	namespace = "infrakit/configs"
 )
 
 var log = logutil.New("module", "etcd/store")
 
 // NewSnapshot returns a snapshot given the client
-func NewSnapshot(client *etcd.Client) (store.Snapshot, error) {
+func NewSnapshot(client *etcd.Client, key string) (store.Snapshot, error) {
 	return &snapshot{
 		client: client,
-		key:    DefaultKey,
+		key:    path.Join(namespace, key),
 	}, nil
 }
 

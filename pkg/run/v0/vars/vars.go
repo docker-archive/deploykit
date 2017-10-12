@@ -106,7 +106,6 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 				return types.AnyValue(data)
 			},
 			func(proposed *types.Any) error {
-				// TODO - make the change durable... via file or swarm or etcd
 				return proposed.Decode(&data)
 			},
 		),

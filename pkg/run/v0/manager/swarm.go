@@ -11,10 +11,6 @@ import (
 	"github.com/docker/infrakit/pkg/util/docker"
 )
 
-const (
-	SpecStoreKey = "infrakit"
-)
-
 // BackendSwarmOptions contain the options for the swarm backend
 type BackendSwarmOptions struct {
 	// PollInterval is how often to check
@@ -33,13 +29,17 @@ var DefaultBackendSwarmOptions = BackendSwarmOptions{
 }
 
 func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options) error {
+	if managerConfig == nil {
+		return nil
+	}
+
 	dockerClient, err := docker.NewClient(options.Docker.Host, options.Docker.TLS)
 	log.Debug("Connect to docker", "host", options.Docker.Host, "err=", err, "V", logutil.V(100))
 	if err != nil {
 		return err
 	}
 
-	snapshot, err := swarm_store.NewSnapshot(dockerClient, SpecStoreKey)
+	snapshot, err := swarm_store.NewSnapshot(dockerClient, "infrakit.specs")
 	if err != nil {
 		dockerClient.Close()
 		return err
@@ -48,15 +48,25 @@ func configSwarmBackends(options BackendSwarmOptions, managerConfig *Options) er
 	leader := swarm_leader.NewDetector(options.PollInterval.Duration(), dockerClient)
 	leaderStore := swarm_leader.NewStore(dockerClient)
 
-	if managerConfig != nil {
-		managerConfig.Leader = leader
-		managerConfig.LeaderStore = leaderStore
-		managerConfig.SpecStore = snapshot
-		managerConfig.cleanUpFunc = func() {
-			dockerClient.Close()
-			log.Debug("closed docker connection", "client", dockerClient, "V", logutil.V(100))
-		}
+	managerConfig.Leader = leader
+	managerConfig.LeaderStore = leaderStore
+	managerConfig.SpecStore = snapshot
+	managerConfig.cleanUpFunc = func() {
+		dockerClient.Close()
+		log.Debug("closed docker connection", "client", dockerClient, "V", logutil.V(100))
 	}
+
+	key := "infrakit.vars"
+	if !managerConfig.Metadata.IsEmpty() {
+		key = managerConfig.Metadata.Lookup()
+	}
+
+	metadataSnapshot, err := swarm_store.NewSnapshot(dockerClient, key)
+	if err != nil {
+		dockerClient.Close()
+		return err
+	}
+	managerConfig.MetadataStore = metadataSnapshot
 
 	return nil
 }

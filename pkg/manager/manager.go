@@ -48,7 +48,7 @@ type backendOp struct {
 // the plugins in order to ensure the infrastructure state matches the user's spec.
 func NewManager(options Options) Backend {
 
-	return &manager{
+	impl := &manager{
 		Options: options,
 		// "base class" is the stateless backend group plugin
 		Plugin: group_plugin.LazyConnect(
@@ -59,16 +59,71 @@ func NewManager(options Options) Backend {
 				}
 				return group_rpc.NewClient(endpoint.Address)
 			}, 0),
+		Updatable: initUpdatable(options),
+	}
+	return impl
+}
 
-		// This is the backend to delegate to.  The manager intercepts calls and provides storage
-		Updatable: metadata_plugin.UpdatableLazyConnect(func() (metadata.Updatable, error) {
-			endpoint, err := options.Plugins().Find(options.Metadata)
+func initUpdatable(options Options) metadata.Updatable {
+
+	data := map[string]interface{}{}
+
+	reader := func() (*types.Any, error) {
+		// read
+		if options.MetadataStore != nil {
+			var v interface{}
+			err := options.MetadataStore.Load(&v)
 			if err != nil {
 				return nil, err
 			}
-			return metadata_rpc.NewClientUpdatable(endpoint.Address)
-		}, 0),
+			return types.AnyValue(v)
+		}
+		return types.AnyValue(data)
 	}
+	writer := func(proposed *types.Any) error {
+		// write
+		if options.MetadataStore != nil {
+			var v interface{}
+			err := proposed.Decode(&v)
+			if err != nil {
+				return err
+			}
+			return options.MetadataStore.Save(v)
+		}
+		return proposed.Decode(&data)
+	}
+
+	// There's a chance the metadata is readonly.  In this case, we want to provide
+	// persistence services for this plugin and make it an Updatable
+	return metadata_plugin.UpdatableLazyConnect(
+		func() (metadata.Updatable, error) {
+
+			var p metadata.Plugin
+			if options.Metadata.IsEmpty() {
+				// in-memory only
+				p = metadata_plugin.NewUpdatablePlugin(metadata_plugin.NewPluginFromData(data), reader, writer)
+
+			} else {
+
+				endpoint, err := options.Plugins().Find(options.Metadata)
+				if err != nil {
+					return nil, err
+				}
+				found, err := metadata_rpc.NewClient(endpoint.Address)
+				if err != nil {
+					return nil, err
+				}
+				p = found
+
+			}
+
+			if u, is := p.(metadata.Updatable); is {
+				return u, nil
+			}
+			// we have a readonly one
+			return metadata_plugin.NewUpdatablePlugin(p, reader, writer), nil
+		}, 0)
+
 }
 
 // return true only if the current call caused an allocation of the running channel.

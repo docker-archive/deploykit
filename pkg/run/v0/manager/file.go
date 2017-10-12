@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -45,6 +46,9 @@ var DefaultBackendFileOptions = BackendFileOptions{
 }
 
 func configFileBackends(options BackendFileOptions, managerConfig *Options) error {
+	if managerConfig == nil {
+		return nil
+	}
 
 	leader, err := file_leader.NewDetector(options.PollInterval.Duration(), options.LeaderFile, options.ID)
 	if err != nil {
@@ -57,10 +61,20 @@ func configFileBackends(options BackendFileOptions, managerConfig *Options) erro
 		return err
 	}
 
-	if managerConfig != nil {
-		managerConfig.Leader = leader
-		managerConfig.LeaderStore = leaderStore
-		managerConfig.SpecStore = snapshot
+	managerConfig.Leader = leader
+	managerConfig.LeaderStore = leaderStore
+	managerConfig.SpecStore = snapshot
+
+	key := "global.vars"
+	if !managerConfig.Metadata.IsEmpty() {
+		key = fmt.Sprintf("%s.vars", managerConfig.Metadata.Lookup())
 	}
+
+	metadataSnapshot, err := file_store.NewSnapshot(options.StoreDir, key)
+	if err != nil {
+		return err
+	}
+	managerConfig.MetadataStore = metadataSnapshot
+
 	return nil
 }
