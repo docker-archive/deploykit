@@ -48,6 +48,10 @@ type backendOp struct {
 // the plugins in order to ensure the infrastructure state matches the user's spec.
 func NewManager(options Options) Backend {
 
+	if options.MetadataStore == nil {
+		log.Warn("no metadata store. nothing will be persisted")
+	}
+
 	impl := &manager{
 		Options: options,
 		// "base class" is the stateless backend group plugin
@@ -68,29 +72,16 @@ func initUpdatable(options Options) metadata.Updatable {
 
 	data := map[string]interface{}{}
 
-	reader := func() (*types.Any, error) {
-		// read
-		if options.MetadataStore != nil {
-			var v interface{}
-			err := options.MetadataStore.Load(&v)
-			if err != nil {
-				return nil, err
-			}
-			return types.AnyValue(v)
-		}
-		return types.AnyValue(data)
-	}
-
-	log.Debug("reader", "reader", reader)
-
 	writer := func(proposed *types.Any) error {
 		// write
+		log.Debug("updating", "proposed", proposed)
 		if options.MetadataStore != nil {
 			var v interface{}
 			err := proposed.Decode(&v)
 			if err != nil {
 				return err
 			}
+			log.Debug("saving", "proposed", proposed)
 			return options.MetadataStore.Save(v)
 		}
 		return proposed.Decode(&data)
@@ -101,10 +92,14 @@ func initUpdatable(options Options) metadata.Updatable {
 	return metadata_plugin.UpdatableLazyConnect(
 		func() (metadata.Updatable, error) {
 
+			log.Debug("looking up metadata backend", "name", options.Metadata)
+
 			var p metadata.Plugin
 			if options.Metadata.IsEmpty() {
 				// in-memory only
 				p = metadata_plugin.NewUpdatablePlugin(metadata_plugin.NewPluginFromData(data), writer)
+
+				log.Info("backend metadata is in memory only")
 
 			} else {
 
@@ -118,12 +113,10 @@ func initUpdatable(options Options) metadata.Updatable {
 				}
 				p = found
 
-			}
+				_, is := p.(metadata.Updatable)
+				log.Info("backend metadata", "name", options.Metadata, "plugin", p, "updatable", is)
 
-			if u, is := p.(metadata.Updatable); is {
-				return u, nil
 			}
-			// we have a readonly one
 			return metadata_plugin.NewUpdatablePlugin(p, writer), nil
 		}, 0)
 

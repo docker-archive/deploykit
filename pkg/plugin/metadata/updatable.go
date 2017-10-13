@@ -51,6 +51,11 @@ func (p updatable) load() (original *types.Any, err error) {
 
 // Changes sends a batch of changes and gets in return a proposed view of configuration and a cas hash.
 func (p updatable) Changes(changes []metadata.Change) (original, proposed *types.Any, cas string, err error) {
+
+	if u, is := p.Plugin.(metadata.Updatable); is {
+		return u.Changes(changes)
+	}
+
 	// first read the data to be modified
 	original, err = p.load()
 	if err != nil {
@@ -98,15 +103,32 @@ func (p updatable) Changes(changes []metadata.Change) (original, proposed *types
 // optimistic concurrency control.
 func (p updatable) Commit(proposed *types.Any, cas string) error {
 
-	// first read the data to be modified
-	buff, err := p.load()
-	if err != nil {
-		return err
-	}
+	log.Debug("commit", "proposed", proposed, "cas", cas, "V", debugV)
 
-	hash := types.Fingerprint(buff, proposed)
-	if hash != cas {
-		return fmt.Errorf("cas mismatch")
+	u, is := p.Plugin.(metadata.Updatable)
+
+	if is {
+
+		log.Debug("forward commit to backend", "plugin", u, "V", debugV)
+
+		if err := u.Commit(proposed, cas); err != nil {
+			return err
+		}
+
+	} else {
+
+		log.Debug("commit in local layer", "V", debugV)
+
+		// first read the data to be modified
+		buff, err := p.load()
+		if err != nil {
+			return err
+		}
+
+		hash := types.Fingerprint(buff, proposed)
+		if hash != cas {
+			return fmt.Errorf("cas mismatch")
+		}
 	}
 
 	return p.commit(proposed)
