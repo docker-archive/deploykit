@@ -6,12 +6,22 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
+	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	testing_metadata "github.com/docker/infrakit/pkg/testing/metadata"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
+
+func nameFromPath(p string, pp ...string) plugin.Name {
+	if len(pp) == 0 {
+		return plugin.Name(filepath.Base(p))
+	}
+	return plugin.Name(filepath.Base(p) + "/" + pp[0])
+}
 
 func tempSocket() string {
 	dir, err := ioutil.TempDir("", "infrakit-test-")
@@ -60,45 +70,59 @@ func TestMetadataMultiPlugin(t *testing.T) {
 	types.Put(types.PathFromString("region/us-west-2/vpc/vpc21/network/network211/id"), "id-network211", m)
 	types.Put(types.PathFromString("region/us-west-2/metrics/instances/count"), 100, m)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
-		map[string]metadata.Plugin{
-			"aws": &testing_metadata.Plugin{
-				DoList: func(path types.Path) ([]string, error) {
-					inputMetadataPathListActual1 <- path
-					return types.List(path, m), nil
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNames(
+		func() (map[string]metadata.Plugin, error) {
+			return map[string]metadata.Plugin{
+				"aws": &testing_metadata.Plugin{
+					DoList: func(path types.Path) ([]string, error) {
+						inputMetadataPathListActual1 <- path
+						return types.List(path, m), nil
+					},
+					DoGet: func(path types.Path) (*types.Any, error) {
+						inputMetadataPathGetActual1 <- path
+						return types.GetValue(path, m)
+					},
 				},
-				DoGet: func(path types.Path) (*types.Any, error) {
-					inputMetadataPathGetActual1 <- path
-					return types.GetValue(path, m)
+				"azure": &testing_metadata.Plugin{
+					DoList: func(path types.Path) ([]string, error) {
+						inputMetadataPathListActual2 <- path
+						return nil, errors.New("azure-error")
+					},
+					DoGet: func(path types.Path) (*types.Any, error) {
+						inputMetadataPathGetActual2 <- path
+						return nil, errors.New("azure-error2")
+					},
 				},
-			},
-			"azure": &testing_metadata.Plugin{
-				DoList: func(path types.Path) ([]string, error) {
-					inputMetadataPathListActual2 <- path
-					return nil, errors.New("azure-error")
-				},
-				DoGet: func(path types.Path) (*types.Any, error) {
-					inputMetadataPathGetActual2 <- path
-					return nil, errors.New("azure-error2")
-				},
-			},
+			}, nil
 		}))
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"region"}, first(must(NewClient(socketPath)).List(types.PathFromString("aws"))))
-	require.Error(t, second(must(NewClient(socketPath)).List(types.PathFromString("azure"))).(error))
+	rpcClient, err := rpc_client.NewHandshaker(socketPath)
+	require.NoError(t, err)
+	subs, err := rpcClient.Types()
+	require.NoError(t, err)
+	require.Equal(t, []string{"aws", "azure"}, subs[rpc.InterfaceSpec(metadata.InterfaceSpec.Encode())])
 
-	require.Equal(t, []string{"aws", "azure"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("/"))))
+	require.Equal(t, []string{"region"}, first(must(NewClient(nameFromPath(socketPath, "aws"),
+		socketPath)).List(types.PathFromString("."))))
+	require.Equal(t, []string(nil), first(must(NewClient(nameFromPath(socketPath),
+		socketPath)).List(types.PathFromString("aws"))))
+	require.Error(t, second(must(NewClient(nameFromPath(socketPath, "azure"),
+		socketPath)).List(types.PathFromString("."))).(error))
 
-	require.Equal(t, []string{}, <-inputMetadataPathListActual1)
-	require.Equal(t, []string{}, <-inputMetadataPathListActual2)
+	require.Equal(t, []string(nil),
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("/"))))
 
-	require.Equal(t, "3", firstAny(must(NewClient(socketPath)).Get(types.PathFromString("aws/region/count"))).String())
-	require.Error(t, second(must(NewClient(socketPath)).Get(types.PathFromString("azure"))).(error))
+	require.Equal(t, []string{"."}, <-inputMetadataPathListActual1)
+	require.Equal(t, []string{"."}, <-inputMetadataPathListActual2)
+
+	require.Equal(t, "3", firstAny(must(NewClient(nameFromPath(socketPath, "aws"),
+		socketPath)).Get(types.PathFromString("region/count"))).String())
+	require.Error(t, second(must(NewClient(nameFromPath(socketPath, "azure"),
+		socketPath)).Get(types.PathFromString("."))).(error))
 
 	require.Equal(t, []string{"region", "count"}, <-inputMetadataPathGetActual1)
-	require.Equal(t, []string{}, <-inputMetadataPathGetActual2)
+	require.Equal(t, []string{"."}, <-inputMetadataPathGetActual2)
 
 	server.Stop()
 }
@@ -122,45 +146,50 @@ func TestMetadataMultiPlugin2(t *testing.T) {
 	types.Put(types.PathFromString("dc/us-2/vpc/vpc21/network/network211/id"), "id-network211", m2)
 	types.Put(types.PathFromString("dc/us-2/metrics/instances/count"), 100, m2)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
-		map[string]metadata.Plugin{
-			"aws": &testing_metadata.Plugin{
-				DoList: func(path types.Path) ([]string, error) {
-					res := types.List(path, m1)
-					return res, nil
+	server, err := rpc_server.StartPluginAtPath(socketPath, ServerWithNames(
+		func() (map[string]metadata.Plugin, error) {
+			return map[string]metadata.Plugin{
+				"aws": &testing_metadata.Plugin{
+					DoList: func(path types.Path) ([]string, error) {
+						res := types.List(path, m1)
+						return res, nil
+					},
+					DoGet: func(path types.Path) (*types.Any, error) {
+						return types.GetValue(path, m1)
+					},
 				},
-				DoGet: func(path types.Path) (*types.Any, error) {
-					return types.GetValue(path, m1)
+				"azure": &testing_metadata.Plugin{
+					DoList: func(path types.Path) ([]string, error) {
+						res := types.List(path, m2)
+						return res, nil
+					},
+					DoGet: func(path types.Path) (*types.Any, error) {
+						return types.GetValue(path, m2)
+					},
 				},
-			},
-			"azure": &testing_metadata.Plugin{
-				DoList: func(path types.Path) ([]string, error) {
-					res := types.List(path, m2)
-					return res, nil
-				},
-				DoGet: func(path types.Path) (*types.Any, error) {
-					return types.GetValue(path, m2)
-				},
-			},
+			}, nil
 		}))
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"aws", "azure"},
-		first(must(NewClient(socketPath)).List(types.PathFromString(""))))
-	require.Equal(t, []string{"region"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("aws"))))
-	require.Equal(t, []string{"dc"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("azure/"))))
 	require.Equal(t, []string(nil),
-		first(must(NewClient(socketPath)).List(types.PathFromString("gce/"))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString(""))))
+	require.Equal(t, []string{"region"},
+		first(must(NewClient(nameFromPath(socketPath, "aws"), socketPath)).List(types.PathFromString("."))))
+	require.Equal(t, []string{"us-1", "us-2"},
+		first(must(NewClient(nameFromPath(socketPath, "azure"), socketPath)).List(types.PathFromString("dc/"))))
+	require.Equal(t, []string(nil),
+		first(must(NewClient(nameFromPath(socketPath, "gce"), socketPath)).List(types.PathFromString("."))))
 	require.Equal(t, []string{"network10", "network11"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("aws/region/us-west-1/vpc/vpc2/network"))))
+		first(must(NewClient(nameFromPath(socketPath, "aws"),
+			socketPath)).List(types.PathFromString("region/us-west-1/vpc/vpc2/network"))))
 
 	require.Equal(t, "100",
-		firstAny(must(NewClient(socketPath)).Get(types.PathFromString("aws/region/us-west-2/metrics/instances/count"))).String())
+		firstAny(must(NewClient(nameFromPath(socketPath, "aws"),
+			socketPath)).Get(types.PathFromString("region/us-west-2/metrics/instances/count"))).String())
 	require.Equal(t, "{\"network\":{\"network210\":{\"id\":\"id-network210\"},\"network211\":{\"id\":\"id-network211\"}}}",
-		firstAny(must(NewClient(socketPath)).Get(types.PathFromString("azure/dc/us-2/vpc/vpc21"))).String())
-	require.Nil(t, firstAny(must(NewClient(socketPath)).Get(types.PathFromString("aws/none"))))
+		firstAny(must(NewClient(nameFromPath(socketPath, "azure"),
+			socketPath)).Get(types.PathFromString("dc/us-2/vpc/vpc21"))).String())
+	require.Nil(t, firstAny(must(NewClient(nameFromPath(socketPath, "aws"), socketPath)).Get(types.PathFromString("none"))))
 
 	server.Stop()
 }
@@ -191,56 +220,60 @@ func TestMetadataMultiPlugin3(t *testing.T) {
 	types.Put(types.PathFromString("dc/us-2/metrics/instances/count"), 100, m2)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath,
-		PluginServer(&testing_metadata.Plugin{
-			DoList: func(path types.Path) ([]string, error) {
-				res := types.List(path, m0)
-				return res, nil
-			},
-			DoGet: func(path types.Path) (*types.Any, error) {
-				return types.GetValue(path, m0)
-			},
-		}).WithTypes(map[string]metadata.Plugin{
-			"aws": &testing_metadata.Plugin{
-				DoList: func(path types.Path) ([]string, error) {
-					res := types.List(path, m1)
-					return res, nil
+		ServerWithNames(func() (map[string]metadata.Plugin, error) {
+			return map[string]metadata.Plugin{
+				".": &testing_metadata.Plugin{
+					DoList: func(path types.Path) ([]string, error) {
+						res := types.List(path, m0)
+						return res, nil
+					},
+					DoGet: func(path types.Path) (*types.Any, error) {
+						return types.GetValue(path, m0)
+					},
 				},
-				DoGet: func(path types.Path) (*types.Any, error) {
-					return types.GetValue(path, m1)
+				"aws": &testing_metadata.Plugin{
+					DoList: func(path types.Path) ([]string, error) {
+						res := types.List(path, m1)
+						return res, nil
+					},
+					DoGet: func(path types.Path) (*types.Any, error) {
+						return types.GetValue(path, m1)
+					},
 				},
-			},
-			"azure": &testing_metadata.Plugin{
-				DoList: func(path types.Path) ([]string, error) {
-					res := types.List(path, m2)
-					return res, nil
+				"azure": &testing_metadata.Plugin{
+					DoList: func(path types.Path) ([]string, error) {
+						res := types.List(path, m2)
+						return res, nil
+					},
+					DoGet: func(path types.Path) (*types.Any, error) {
+						return types.GetValue(path, m2)
+					},
 				},
-				DoGet: func(path types.Path) (*types.Any, error) {
-					return types.GetValue(path, m2)
-				},
-			},
+			}, nil
 		}))
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"aws", "azure", "metrics"},
-		first(must(NewClient(socketPath)).List(types.Path([]string{}))))
-	require.Equal(t, []string{"aws", "azure", "metrics"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("/"))))
+	require.Equal(t, []string{"metrics"},
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.Path([]string{}))))
+	require.Equal(t, []string{"metrics"},
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("/"))))
 	require.Equal(t, []string{"region"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("aws"))))
+		first(must(NewClient(nameFromPath(socketPath, "aws"), socketPath)).List(types.PathFromString("."))))
 	require.Equal(t, []string{"dc"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("azure/"))))
+		first(must(NewClient(nameFromPath(socketPath, "azure"), socketPath)).List(types.PathFromString("."))))
 	require.Equal(t, []string(nil),
-		first(must(NewClient(socketPath)).List(types.PathFromString("gce/"))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("gce"))))
 	require.Equal(t, []string{"network10", "network11"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("aws/region/us-west-1/vpc/vpc2/network"))))
-	require.Equal(t, []string{"aws", "azure", "metrics"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("."))))
+		first(must(NewClient(nameFromPath(socketPath, "aws"),
+			socketPath)).List(types.PathFromString("region/us-west-1/vpc/vpc2/network"))))
 
 	require.Equal(t, "100",
-		firstAny(must(NewClient(socketPath)).Get(types.PathFromString("metrics/instances/count"))).String())
+		firstAny(must(NewClient(nameFromPath(socketPath),
+			socketPath)).Get(types.PathFromString("metrics/instances/count"))).String())
 	require.Equal(t, "{\"network\":{\"network210\":{\"id\":\"id-network210\"},\"network211\":{\"id\":\"id-network211\"}}}",
-		firstAny(must(NewClient(socketPath)).Get(types.PathFromString("azure/dc/us-2/vpc/vpc21"))).String())
-	require.Nil(t, firstAny(must(NewClient(socketPath)).Get(types.PathFromString("aws/none"))))
+		firstAny(must(NewClient(nameFromPath(socketPath, "azure"),
+			socketPath)).Get(types.PathFromString("dc/us-2/vpc/vpc21"))).String())
+	require.Nil(t, firstAny(must(NewClient(nameFromPath(socketPath, "aws"), socketPath)).Get(types.PathFromString("none"))))
 
 	server.Stop()
 }
@@ -255,7 +288,7 @@ func TestMetadataMultiPlugin4(t *testing.T) {
 	types.Put(types.PathFromString("metrics/managers/count"), 7, m0)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath,
-		PluginServer(&testing_metadata.Plugin{
+		Server(&testing_metadata.Plugin{
 			DoList: func(path types.Path) ([]string, error) {
 				res := types.List(path, m0)
 				return res, nil
@@ -267,14 +300,16 @@ func TestMetadataMultiPlugin4(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"metrics"},
-		first(must(NewClient(socketPath)).List(types.PathFromString(""))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString(""))))
 	require.Equal(t, []string{"instances", "managers", "networks", "workers"},
-		first(must(NewClient(socketPath)).List(types.PathFromString("metrics/"))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("metrics/"))))
 
 	require.Equal(t, "100",
-		firstAny(must(NewClient(socketPath)).Get(types.PathFromString("metrics/instances/count"))).String())
+		firstAny(must(NewClient(nameFromPath(socketPath),
+			socketPath)).Get(types.PathFromString("metrics/instances/count"))).String())
 	require.Equal(t, "{\"instances\":{\"count\":100},\"managers\":{\"count\":7},\"networks\":{\"count\":10},\"workers\":{\"count\":1000}}",
-		firstAny(must(NewClient(socketPath)).Get(types.PathFromString("metrics"))).String())
-	require.Nil(t, firstAny(must(NewClient(socketPath)).Get(types.PathFromString("aws/none"))))
+		firstAny(must(NewClient(nameFromPath(socketPath),
+			socketPath)).Get(types.PathFromString("metrics"))).String())
+	require.Nil(t, firstAny(must(NewClient(nameFromPath(socketPath), socketPath)).Get(types.PathFromString("aws/none"))))
 	server.Stop()
 }

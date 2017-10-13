@@ -36,20 +36,22 @@ func init() {
 
 // loadPlugin loads the typed plugin
 func loadPlugin(plugins discovery.Plugins, name string) (metadata.Plugin, error) {
-	endpoint, err := plugins.Find(plugin.Name(name))
+	pluginName := plugin.Name(name)
+	endpoint, err := plugins.Find(pluginName)
 	if err != nil {
 		return nil, err
 	}
-	return metadata_rpc.NewClient(endpoint.Address)
+	return metadata_rpc.NewClient(pluginName, endpoint.Address)
 }
 
 // loadPluginUpdatable loads the typed plugin
 func loadPluginUpdatable(plugins discovery.Plugins, name string) (metadata.Updatable, error) {
-	endpoint, err := plugins.Find(plugin.Name(name))
+	pluginName := plugin.Name(name)
+	endpoint, err := plugins.Find(pluginName)
 	if err != nil {
 		return nil, err
 	}
-	return metadata_rpc.NewClientUpdatable(endpoint.Address)
+	return metadata_rpc.NewClientUpdatable(pluginName, endpoint.Address)
 }
 
 // Metadata returns the metadata root command

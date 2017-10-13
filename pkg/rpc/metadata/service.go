@@ -4,96 +4,50 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc/internal"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/metadata"
-	"github.com/docker/infrakit/pkg/template"
 )
 
-// PluginServer returns a Metadata that conforms to the net/rpc rpc call convention.
-func PluginServer(p metadata.Plugin) *Metadata {
-	return &Metadata{plugin: p}
+// ServerWithNames which supports namespaced plugins
+func ServerWithNames(subplugins func() (map[string]metadata.Plugin, error)) *Metadata {
+
+	keyed := internal.ServeKeyed(
+		// This is where templates would be nice...
+		func() (map[string]interface{}, error) {
+			m, err := subplugins()
+			if err != nil {
+				return nil, err
+			}
+
+			out := map[string]interface{}{}
+			for k, v := range m {
+				out[string(k)] = v
+			}
+			return out, nil
+		},
+	)
+	return &Metadata{keyed: keyed}
 }
 
-// PluginServerWithTypes which supports multiple types of metadata plugins. The de-multiplexing
-// is done by the server's RPC method implementations.
-func PluginServerWithTypes(typed map[string]metadata.Plugin) *Metadata {
-	return &Metadata{typedPlugins: typed}
+// Server returns a Metadata that conforms to the net/rpc rpc call convention.
+func Server(p metadata.Plugin) *Metadata {
+	return &Metadata{keyed: internal.ServeSingle(p)}
 }
 
 // Metadata the exported type needed to conform to json-rpc call convention
 type Metadata struct {
-	plugin       metadata.Plugin
-	typedPlugins map[string]metadata.Plugin // by type, as qualified in the name of the plugin
-}
-
-// WithBase sets the base plugin to the given plugin object
-func (p *Metadata) WithBase(m metadata.Plugin) *Metadata {
-	p.plugin = m
-	return p
-}
-
-// WithTypes sets the typed plugins to the given map of plugins (by type name)
-func (p *Metadata) WithTypes(typed map[string]metadata.Plugin) *Metadata {
-	p.typedPlugins = typed
-	return p
+	keyed *internal.Keyed
 }
 
 // VendorInfo returns a metadata object about the plugin, if the plugin implements it.  See spi.Vendor
 func (p *Metadata) VendorInfo() *spi.VendorInfo {
-	// TODO(chungers) - support typed plugins
-	if p.plugin == nil {
-		return nil
-	}
-
-	if m, is := p.plugin.(spi.Vendor); is {
+	base, _ := p.keyed.Keyed(plugin.Name("."))
+	if m, is := base.(spi.Vendor); is {
 		return m.VendorInfo()
 	}
 	return nil
-}
-
-// Funcs implements the template.FunctionExporter method to expose help for plugin's template functions
-func (p *Metadata) Funcs() []template.Function {
-	f, is := p.plugin.(template.FunctionExporter)
-	if !is {
-		return []template.Function{}
-	}
-	return f.Funcs()
-}
-
-// Types returns the types exposed by this service (or kind/ category)
-func (p *Metadata) Types() []string {
-	types := []string{}
-	for k := range p.typedPlugins {
-		types = append(types, k)
-	}
-	if p.plugin != nil {
-		types = append(types, ".")
-	}
-	sort.Strings(types)
-	return types
-}
-
-// FuncsByType implements server.TypedFunctionExporter
-func (p *Metadata) FuncsByType(t string) []template.Function {
-	var fp metadata.Plugin
-	switch t {
-	case ".":
-		fp = p.plugin
-	default:
-		found, has := p.typedPlugins[t]
-		if !has {
-			return nil
-		}
-		fp = found
-	}
-	if fp == nil {
-		return nil
-	}
-	exp, is := fp.(template.FunctionExporter)
-	if !is {
-		return nil
-	}
-	return exp.Funcs()
 }
 
 // ImplementedInterface returns the interface implemented by this RPC service.
@@ -101,88 +55,34 @@ func (p *Metadata) ImplementedInterface() spi.InterfaceSpec {
 	return metadata.InterfaceSpec
 }
 
-func (p *Metadata) getPlugin(metadataType string) metadata.Plugin {
-	if metadataType == "" {
-		return p.plugin
-	}
-	if p, has := p.typedPlugins[metadataType]; has {
-		return p
-	}
-	return nil
+// Types returns the types exposed by this kind of RPC service
+func (p *Metadata) Types() []string {
+	return p.keyed.Types()
 }
 
 // List returns a list of child nodes given a path.
 func (p *Metadata) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
-	nodes := []string{}
 
-	// the . case - list the typed plugins and the default's first level.
-	if len(req.Path) == 0 || req.Path[0] == "" || req.Path[0] == "." {
-		if p.plugin != nil {
-			n, err := p.plugin.List(req.Path)
-			if err != nil {
-				return err
-			}
-			nodes = append(nodes, n...)
+	return p.keyed.Do(req, func(v interface{}) error {
+		resp.Name = req.Name
+		nodes, err := v.(metadata.Plugin).List(req.Path)
+		if err == nil {
+			sort.Strings(nodes)
+			resp.Nodes = nodes
 		}
-		for k := range p.typedPlugins {
-			nodes = append(nodes, k)
-		}
-		sort.Strings(nodes)
-		resp.Nodes = nodes
-		return nil
-	}
-
-	c, has := p.typedPlugins[req.Path[0]]
-	if !has {
-
-		if p.plugin == nil {
-			return nil
-		}
-
-		nodes, err := p.plugin.List(req.Path)
-		if err != nil {
-			return err
-		}
-		sort.Strings(nodes)
-		resp.Nodes = nodes
-		return nil
-	}
-
-	nodes, err := c.List(req.Path[1:])
-	if err != nil {
 		return err
-	}
-
-	sort.Strings(nodes)
-	resp.Nodes = nodes
-	return nil
+	})
 }
 
 // Get retrieves the value at path given.
 func (p *Metadata) Get(_ *http.Request, req *GetRequest, resp *GetResponse) error {
-	if len(req.Path) == 0 {
-		return nil
-	}
 
-	c, has := p.typedPlugins[req.Path[0]]
-	if !has {
-
-		if p.plugin == nil {
-			return nil
+	return p.keyed.Do(req, func(v interface{}) error {
+		resp.Name = req.Name
+		value, err := v.(metadata.Plugin).Get(req.Path)
+		if err == nil {
+			resp.Value = value
 		}
-
-		value, err := p.plugin.Get(req.Path)
-		if err != nil {
-			return err
-		}
-		resp.Value = value
-		return nil
-	}
-
-	value, err := c.Get(req.Path[1:])
-	if err != nil {
 		return err
-	}
-	resp.Value = value
-	return nil
+	})
 }

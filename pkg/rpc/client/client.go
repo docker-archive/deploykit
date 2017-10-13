@@ -39,6 +39,23 @@ func NewHandshaker(address string) (rpc.Handshaker, error) {
 	return &client{addr: address, http: httpC, url: u}, nil
 }
 
+// Client returns a full rpc client from handshaker
+func ClientFromHandshaker(handshaker rpc.Handshaker, api spi.InterfaceSpec) (Client, error) {
+	unvalidatedClient, is := handshaker.(*client)
+	if !is {
+		return nil, fmt.Errorf("not a valid client")
+	}
+	cl := &handshakingClient{client: unvalidatedClient, iface: api, lock: &sync.Mutex{}}
+	// check handshake
+	if err := cl.handshake(); err != nil {
+		// Note - we still return the client with the possibility of doing a handshake later on
+		// if we provide an api for the plugin to recheck later.  This way, individual components
+		// can stay running and recalibrate themselves after the user has corrected the problems.
+		return cl, err
+	}
+	return cl, nil
+}
+
 // New creates a new Client that communicates with a unix socket and validates the remote API.
 func New(address string, api spi.InterfaceSpec) (Client, error) {
 	u, httpC, err := parseAddress(address)

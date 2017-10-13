@@ -33,6 +33,12 @@ const (
 
 	// EnvAdvertise is the location of this node (127.0.0.1:24864)
 	EnvAdvertise = "INFRAKIT_ADVERTISE"
+
+	// EnvGroup is the group name backend
+	EnvGroup = "INFRAKIT_MANAGER_GROUP"
+
+	// EnvMetadata is the metadata backend
+	EnvMetadata = "INFRAKIT_MANAGER_METADATA"
 )
 
 var (
@@ -77,8 +83,8 @@ func defaultOptions() (options Options) {
 
 	options = Options{
 		Options: manager.Options{
-			Group:    plugin.Name("group-stateless"),
-			Metadata: plugin.Name("vars-stateless"),
+			Group:    plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
+			Metadata: plugin.Name(local.Getenv(EnvMetadata, "vars-stateless")),
 		},
 		Mux: &MuxConfig{
 			Listen:    local.Getenv(EnvMuxListen, ":24864"),
@@ -189,12 +195,14 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
 		metadata_plugin.NewPluginFromChannel(updatableModel), updatable.commit)
 
+	log.Info("meta", metadataUpdatable)
+
 	impls = map[run.PluginCode]interface{}{
 		run.Manager:           mgr,
 		run.Controller:        mgr.Controllers,
 		run.Group:             mgr.Groups,
-		run.MetadataUpdatable: metadataUpdatable,
-		run.Metadata:          metadataUpdatable,
+		run.MetadataUpdatable: mgr.Metadata, // metadataUpdatable,
+		//		run.Metadata:          metadataUpdatable,
 	}
 
 	var muxServer rpc.Stoppable

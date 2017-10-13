@@ -112,7 +112,7 @@ func initUpdatable(options Options) metadata.Updatable {
 				if err != nil {
 					return nil, err
 				}
-				found, err := metadata_rpc.NewClient(endpoint.Address)
+				found, err := metadata_rpc.NewClient(options.Metadata, endpoint.Address)
 				if err != nil {
 					return nil, err
 				}

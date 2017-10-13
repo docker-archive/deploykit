@@ -5,7 +5,6 @@ import (
 	gopath "path"
 
 	"github.com/docker/infrakit/pkg/cli"
-	//	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
