@@ -62,7 +62,6 @@ type Backend interface {
 	Metadata() (map[string]metadata.Updatable, error)
 
 	Manager
-
 	Start() (<-chan struct{}, error)
 	Stop()
 }

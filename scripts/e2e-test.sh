@@ -124,14 +124,14 @@ expect_output_lines() {
 
 echo "Starting test................................................................"
 
-expect_output_lines "11 plugins should be discoverable" "infrakit plugin ls -q" "11"
+expect_output_lines "10 plugins should be discoverable" "infrakit plugin ls -q" "10"
 expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
 
 echo "Commiting"
 infrakit group commit scripts/cattle.json
 
 echo 'Waiting for group to be provisioned'
-sleep 5
+sleep 10
 
 expect_output_lines "5 instances should exist in group" "infrakit group/cattle describe -q" "5"
 expect_output_lines "5 instances should exist" "infrakit instance-file describe -q " "5"
