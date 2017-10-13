@@ -16,6 +16,9 @@ const (
 	// Kind is the canonical name of the plugin for starting up, etc.
 	Kind = "vars"
 
+	// LookupName is the name used to look up the object via discovery
+	LookupName = "vars-stateless"
+
 	// EnvTemplate is the env for the template to evaluate
 	EnvTemplate = "INFRAKIT_VARS_TEMPLATE"
 )
