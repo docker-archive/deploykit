@@ -322,9 +322,12 @@ func (m *manager) getCurrentState() (globalSpec, error) {
 	return global, nil
 }
 
-func (m *manager) onAssumeLeadership() error {
-	log.Info("Assuming leadership")
+func (m *manager) loadSpecs() error {
+	if m.Options.SpecStore == nil {
+		return nil
+	}
 
+	log.Info("Loading specs and committing")
 	// load the config
 	config := &globalSpec{}
 	// load the latest version -- assumption here is that it's been persisted already.
@@ -336,6 +339,62 @@ func (m *manager) onAssumeLeadership() error {
 		return err
 	}
 	return m.doCommitGroups(*config)
+}
+
+func (m *manager) loadMetadata() (err error) {
+	if m.Options.MetadataStore == nil {
+		return nil
+	}
+
+	log.Info("loading metadata and committing")
+
+	var saved interface{}
+	err = m.Options.MetadataStore.Load(&saved)
+	if err != nil {
+		return
+	}
+
+	any, e := types.AnyValue(saved)
+	if e != nil {
+		err = e
+		return
+	}
+
+	if any == nil {
+		log.Info("no metadata stored")
+		return
+	}
+
+	log.Debug("loaded metadata", "data", any.String())
+	_, proposed, cas, e := m.Updatable.Changes([]metadata.Change{
+		{Path: types.Dot, Value: any},
+	})
+	if e != nil {
+		err = e
+		return
+	}
+
+	log.Debug("updating backend with stored metadata", "cas", cas, "proposed", proposed)
+	return m.Updatable.Commit(proposed, cas)
+}
+
+func (m *manager) onAssumeLeadership() (err error) {
+	log.Info("Assuming leadership")
+
+	defer log.Info("Running as leader")
+
+	// TODO - Assumption here is that the config here is consistent with the spec stored...
+	err = m.loadMetadata()
+	if err != nil {
+		log.Error("error loading metadata", "err", err)
+		return
+	}
+
+	err = m.loadSpecs()
+	if err != nil {
+		log.Error("error loading specs", "err", err)
+	}
+	return
 }
 
 func (m *manager) onLostLeadership() error {
