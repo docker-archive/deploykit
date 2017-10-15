@@ -10,7 +10,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc/mux"
 	rpc "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/run"
@@ -184,25 +183,13 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	log.Info("Manager running")
 
-	updatable := &metadataModel{
-		snapshot: options.SpecStore,
-		manager:  mgr,
-	}
-	updatableModel, _ := updatable.pluginModel()
-
 	transport.Name = name
-
-	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
-		metadata_plugin.NewPluginFromChannel(updatableModel), updatable.commit)
-
-	log.Info("meta", metadataUpdatable)
 
 	impls = map[run.PluginCode]interface{}{
 		run.Manager:           mgr,
 		run.Controller:        mgr.Controllers,
 		run.Group:             mgr.Groups,
-		run.MetadataUpdatable: mgr.Metadata, // metadataUpdatable,
-		//		run.Metadata:          metadataUpdatable,
+		run.MetadataUpdatable: mgr.Metadata,
 	}
 
 	var muxServer rpc.Stoppable

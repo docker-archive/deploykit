@@ -13,7 +13,7 @@ import (
 func Ls(name string, services *cli.Services) *cobra.Command {
 
 	ls := &cobra.Command{
-		Use:   "vars",
+		Use:   "ls",
 		Short: "List metadata",
 	}
 

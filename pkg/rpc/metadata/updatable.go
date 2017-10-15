@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 
@@ -13,7 +14,7 @@ import (
 )
 
 // UpdatableServerWithNames returns a Metadata that conforms to the net/rpc rpc call convention.
-func UpdatableServerWithNames(subplugins func() (map[string]metadata.Updatable, error)) *Updatable {
+func UpdatableServerWithNames(subplugins func() (map[string]metadata.Plugin, error)) *Updatable {
 
 	keyed := internal.ServeKeyed(
 		// This is where templates would be nice...
@@ -92,8 +93,14 @@ func (p *Updatable) Get(_ *http.Request, req *GetRequest, resp *GetResponse) err
 func (u *Updatable) Changes(_ *http.Request, req *ChangesRequest, resp *ChangesResponse) error {
 
 	return u.keyed.Do(req, func(v interface{}) error {
+
+		updater, is := v.(metadata.Updatable)
+		if !is {
+			return fmt.Errorf("readonly")
+		}
+
 		resp.Name = req.Name
-		original, proposed, cas, err := v.(metadata.Updatable).Changes(req.Changes)
+		original, proposed, cas, err := updater.Changes(req.Changes)
 		resp.Original = original
 		resp.Proposed = proposed
 		resp.Cas = cas
@@ -105,8 +112,14 @@ func (u *Updatable) Changes(_ *http.Request, req *ChangesRequest, resp *ChangesR
 func (u *Updatable) Commit(_ *http.Request, req *CommitRequest, resp *CommitResponse) error {
 
 	return u.keyed.Do(req, func(v interface{}) error {
+
+		updater, is := v.(metadata.Updatable)
+		if !is {
+			return fmt.Errorf("readonly")
+		}
+
 		resp.Name = req.Name
-		return v.(metadata.Updatable).Commit(req.Proposed, req.Cas)
+		return updater.Commit(req.Proposed, req.Cas)
 	})
 }
 

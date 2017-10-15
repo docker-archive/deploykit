@@ -9,7 +9,7 @@ import (
 // GroupControllers returns a map of *scoped* group controllers by ID of the group.
 func (m *manager) Controllers() (map[string]controller.Controller, error) {
 	controllers := map[string]controller.Controller{
-		".": group.AsController(core.NewAddressable("group", m.Options.Name, ""), m),
+		".": group.AsController(core.NewAddressable("group", m.Options.Name.LookupOnly(), ""), m),
 	}
 	all, err := m.Plugin.InspectGroups()
 	if err != nil {

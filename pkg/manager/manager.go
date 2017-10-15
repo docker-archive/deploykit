@@ -36,6 +36,10 @@ type manager struct {
 	stop     chan struct{}
 	running  chan struct{}
 
+	// Status is the status metadata (readonly)
+	Status            metadata.Plugin
+	doneStatusUpdates chan struct{}
+
 	// queued operations
 	backendOps chan<- backendOp
 }
@@ -71,6 +75,8 @@ func NewManager(options Options) Backend {
 			}, defaultPluginPollInterval),
 		Updatable: initUpdatable(options),
 	}
+
+	impl.Status = initStatusMetadata(impl)
 	return impl
 }
 
@@ -302,6 +308,7 @@ func (m *manager) Stop() {
 	if m.stop == nil {
 		return
 	}
+	close(m.doneStatusUpdates)
 	close(m.stop)
 	m.Options.Leader.Stop()
 }

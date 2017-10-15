@@ -116,7 +116,7 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 			}
 		case MetadataUpdatable:
 			switch pp := p.(type) {
-			case func() (map[string]metadata.Updatable, error):
+			case func() (map[string]metadata.Plugin, error):
 				log.Debug("metadata_rpc.UpdatablePluginServerWithNames", "p", pp)
 				plugins = append(plugins, metadata_rpc.UpdatableServerWithNames(pp))
 			case metadata.Updatable:

@@ -59,7 +59,7 @@ type Backend interface {
 
 	Controllers() (map[string]controller.Controller, error)
 	Groups() (map[group.ID]group.Plugin, error)
-	Metadata() (map[string]metadata.Updatable, error)
+	Metadata() (map[string]metadata.Plugin, error)
 
 	Manager
 	Start() (<-chan struct{}, error)
