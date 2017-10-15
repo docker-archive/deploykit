@@ -131,7 +131,7 @@ Usage:
 Available Commands:
   cat         Get metadata entry by path
   change      Update metadata where args are key=value pairs and keys are within namespace of the plugin.
-  ls          List metadata
+  vars        List metadata
 ```
 
 ### Listing, Reading
@@ -324,6 +324,123 @@ Verify:
 $ infrakit vars cat this/is/a/new/struct/message
 i am here
 ```
+
+## Template integration
+
+As mentioned earlier, metadata operations are integrated with templates so you
+can write templates that also access the variables stored in the vars plugin.
+
+As an example:
+
+```shell
+$infrakit plugin start vars  # starts up only the vars 
+```
+
+In another shell:
+
+```shell
+$ infrakit vars change
+Proposing 0 changes, hash=c53f4ebe9b2a50bc2b52fd88a5d503e1
+{}
+```
+
+Currently there's no data stored.
+
+Adding some values:
+
+```shell
+$ infrakit vars change cluster/name=foo cluster/workers/size=10 -c
+Committing 2 changes, hash=ad861ded7a0742f9662c2b78354c89f6
+{
+  "cluster": {
+    "name": "foo",
+    "workers": {
+      "size": 10
+    }
+  }
+}
+```
+
+Now querying:
+
+```shell
+$ infrakit vars vars -al
+total 2:
+cluster/name
+cluster/workers/size
+$ infrakit vars cat cluster/workers/size
+10
+```
+Or use template to read.
+
+```shell
+$ infrakit template -f 'str://{{ metadata `vars/cluster/workers/size`}}'
+10
+```
+
+Using template to update:
+
+```shell
+$ infrakit template -f 'str://{{ metadata `vars/cluster/workers/size` 1000 }}'
+~/project3/src/github.com/docker/infrakit$ infrakit vars change
+Proposing 0 changes, hash=8aff842d0f19e571e5c1e5810d562bb1
+{
+  "cluster": {
+    "name": "foo",
+    "workers": {
+      "size": 1000
+    }
+  }
+}
+$ infrakit vars cat cluster/workers/size
+1000
+```
+
+Sometimes, you want to have a single namespace between metadata and template
+variables to simplify writing templates.  The `var` template function, in
+correct contexts, can attempt to retrieve the value at the given path via accessing
+the path as though it's hosted in a metadata plugin, if the path cannot be resolved
+to an in-scope template variable:
+
+```shell
+$ infrakit template 'str://{{ var `vars/cluster/workers/size`}}'
+1000
+```
+which is the same as
+
+```shell
+$ infrakit template 'str://{{ metadata `vars/cluster/workers/size`}}'
+1000
+```
+
+This works even when a template is multi-pass: if a path cannot be resolved
+from in-scope template variables, then metadata plugins are tested.  Of course,
+the path has to also make sense in that the path can resolve to a running metadata
+plugin.
+
+If somewhere else in your template, a `var` function is used to set a value and
+that value comes into scope of the template, that value will takes precedence:
+
+```shell
+$ infrakit template 'str://{{ var `vars/cluster/workers/size` 4000 }}{{ var `vars/cluster/workers/size`}}'
+4000
+```
+This should not be surprising, as we are setting the `vars/cluster/workers/size`
+template variable to `4000`.  The next read will return that value and not the
+metadata stored in vars:
+
+```shell
+$ infrakit template 'str://{{ var `vars/cluster/workers/size`}}'
+1000
+```
+
+The value is back to 1000 because the second command line invocation is a
+totally different template context (ie a different shell process altogether).
+This makes it possible to implement a user override, while the backing
+metadata can be loaded from a JSON serving as default values.
+This also means that mutation of the value at a given path must be performed
+explicitly via the `metadata` template function (or via the `change -c` CLI) to
+affect durability across multiple template evaluations.
 
 ## TODO - Durability of Changes
 
