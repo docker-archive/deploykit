@@ -1,8 +1,7 @@
 Vars Plugin
 ===========
 
-Design
-======
+## Design
 
 The `vars` plugin implements the [`metadata.Updatable`](../pkg/spi/metadata) SPI.  It supports
 
