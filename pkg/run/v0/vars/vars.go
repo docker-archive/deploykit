@@ -16,6 +16,9 @@ const (
 	// Kind is the canonical name of the plugin for starting up, etc.
 	Kind = "vars"
 
+	// LookupName is the name used to look up the object via discovery
+	LookupName = "vars-stateless"
+
 	// EnvTemplate is the env for the template to evaluate
 	EnvTemplate = "INFRAKIT_VARS_TEMPLATE"
 )
@@ -53,6 +56,8 @@ var DefaultOptions = Options{
 // if the plugin cannot be started.
 func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
+
+	defer log.Info("Starting up vars plugin", "transport", transport, "impls", impls)
 
 	options := DefaultOptions
 	err = config.Decode(&options)

@@ -16,8 +16,32 @@ var (
 )
 
 // Put sets the attribute of an object at path to the given value
-func Put(path []string, value interface{}, object map[string]interface{}) bool {
-	return put(path, value, object)
+func Put(path []string, value interface{}, object interface{}) bool {
+	switch object := object.(type) {
+	case map[string]interface{}:
+		return put(path, value, object)
+	case *map[string]interface{}:
+		if len(path) == 1 && path[0] == "." {
+			switch value := value.(type) {
+			case map[string]interface{}:
+				*object = value
+				return true
+			case *map[string]interface{}:
+				*object = *value
+				return true
+			case *Any:
+				vv := map[string]interface{}{}
+				if err := value.Decode(&vv); err == nil {
+					*object = vv
+					return true
+				} else {
+					return false
+				}
+			}
+		}
+		return put(path, value, *object)
+	}
+	return false
 }
 
 // Get returns the attribute of the object at path
@@ -210,7 +234,6 @@ func tokenize(s string) []string {
 	if len(s) == 0 {
 		return []string{}
 	}
-
 	a := []string{}
 	start := 0
 	quoted := false
@@ -225,7 +248,7 @@ func tokenize(s string) []string {
 			quoted = !quoted
 		}
 	}
-	if start < len(s)-1 {
+	if start <= len(s)-1 {
 		a = append(a, strings.Replace(s[start:], "'", "", -1))
 	}
 

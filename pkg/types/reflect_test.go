@@ -16,6 +16,9 @@ func pretty(v interface{}) string {
 }
 
 func TestTokenizer(t *testing.T) {
+	require.Equal(t, []string{}, tokenize(""))
+	require.Equal(t, []string{"."}, tokenize("."))
+	require.Equal(t, []string{"a"}, tokenize("a"))
 	require.Equal(t, []string{"", "foo"}, tokenize("/foo"))
 	require.Equal(t, []string{"", "foo", "bar", "baz"}, tokenize("/foo/bar/baz"))
 	require.Equal(t, []string{"foo", "bar", "baz"}, tokenize("foo/bar/baz"))
@@ -26,6 +29,30 @@ func TestTokenizer(t *testing.T) {
 	require.Equal(t, []string{"", "foo/bar", "baz"}, tokenize("/'foo/bar'/baz"))
 	require.Equal(t, []string{"foo", "bar/baz"}, tokenize("foo/'bar/baz'"))
 	require.Equal(t, []string{"foo"}, tokenize("'foo'"))
+}
+
+func TestGetSetDot(t *testing.T) {
+	m := map[string]interface{}{
+		"key1": 1,
+		"key2": "key2",
+	}
+	require.Equal(t, m, Get(Dot, m))
+
+	m2 := m
+	m2["key2"] = "key2a"
+	m2["key3"] = "key3"
+
+	// Note we use &m to allow mutation of the entire struct when setting with path == Dot
+	require.True(t, Put(Dot, m2, &m))
+	require.Equal(t, m2, Get(Dot, m))
+	require.Equal(t, m2, m)
+
+	_, has := m["."]
+	require.False(t, has)
+
+	anym := AnyValueMust(m)
+	require.True(t, Put(Dot, anym, &m))
+	require.Equal(t, m, Get(Dot, m))
 }
 
 func TestMap(t *testing.T) {

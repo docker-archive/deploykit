@@ -16,6 +16,7 @@ import (
 	"github.com/docker/infrakit/pkg/run/manager"
 	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
+	vars_kind "github.com/docker/infrakit/pkg/run/v0/vars"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -219,6 +220,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				name = plugin.Name(manager_kind.LookupName)
 			case group_kind.Kind:
 				name = plugin.Name(group_kind.LookupName)
+			case vars_kind.Kind:
+				name = plugin.Name(vars_kind.LookupName)
 			}
 			// customized by user as override
 			if len(pp) > 1 {

@@ -56,15 +56,20 @@ func (c *lazyConnect) do(f func(p metadata.Plugin) error) (err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if c.client == nil {
+
+		log.Debug("looking up metadata plugin")
+
 		c.client, err = c.finder()
 		if err == nil && c.client != nil {
 			return f(c.client)
 		}
 
 		if c.retry == 0 {
+			log.Error("Error looking up plugin", "err", err)
 			return err
 		}
 
+		log.Warn("will retry looking up metadata plugin", "retry", c.retry)
 		tick := time.Tick(c.retry)
 		for {
 			select {
@@ -75,6 +80,7 @@ func (c *lazyConnect) do(f func(p metadata.Plugin) error) (err error) {
 
 			c.client, err = c.finder()
 			if err == nil && c.client != nil {
+				log.Info("Connected to metadata plugin client", "client", c.client)
 				break
 			}
 		}

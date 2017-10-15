@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -39,6 +40,11 @@ type manager struct {
 	backendOps chan<- backendOp
 }
 
+const (
+	// defaultPluginPollInterval is the interval to retry connection
+	defaultPluginPollInterval = 2 * time.Second
+)
+
 type backendOp struct {
 	name      string
 	operation func() error
@@ -62,7 +68,7 @@ func NewManager(options Options) Backend {
 					return nil, err
 				}
 				return group_rpc.NewClient(endpoint.Address)
-			}, 0),
+			}, defaultPluginPollInterval),
 		Updatable: initUpdatable(options),
 	}
 	return impl
@@ -118,7 +124,7 @@ func initUpdatable(options Options) metadata.Updatable {
 
 			}
 			return metadata_plugin.NewUpdatablePlugin(p, writer), nil
-		}, 0)
+		}, defaultPluginPollInterval)
 
 }
 
@@ -322,9 +328,12 @@ func (m *manager) getCurrentState() (globalSpec, error) {
 	return global, nil
 }
 
-func (m *manager) onAssumeLeadership() error {
-	log.Info("Assuming leadership")
+func (m *manager) loadSpecs() error {
+	if m.Options.SpecStore == nil {
+		return nil
+	}
 
+	log.Info("Loading specs and committing")
 	// load the config
 	config := &globalSpec{}
 	// load the latest version -- assumption here is that it's been persisted already.
@@ -336,6 +345,62 @@ func (m *manager) onAssumeLeadership() error {
 		return err
 	}
 	return m.doCommitGroups(*config)
+}
+
+func (m *manager) loadMetadata() (err error) {
+	if m.Options.MetadataStore == nil {
+		return nil
+	}
+
+	log.Info("loading metadata and committing")
+
+	var saved interface{}
+	err = m.Options.MetadataStore.Load(&saved)
+	if err != nil {
+		return
+	}
+
+	any, e := types.AnyValue(saved)
+	if e != nil {
+		err = e
+		return
+	}
+
+	if any == nil {
+		log.Info("no metadata stored")
+		return
+	}
+
+	log.Debug("loaded metadata", "data", any.String())
+	_, proposed, cas, e := m.Updatable.Changes([]metadata.Change{
+		{Path: types.Dot, Value: any},
+	})
+	if e != nil {
+		err = e
+		return
+	}
+
+	log.Debug("updating backend with stored metadata", "cas", cas, "proposed", proposed)
+	return m.Updatable.Commit(proposed, cas)
+}
+
+func (m *manager) onAssumeLeadership() (err error) {
+	log.Info("Assuming leadership")
+
+	defer log.Info("Running as leader")
+
+	// TODO - Assumption here is that the config here is consistent with the spec stored...
+	err = m.loadMetadata()
+	if err != nil {
+		log.Error("error loading metadata", "err", err)
+		return
+	}
+
+	err = m.loadSpecs()
+	if err != nil {
+		log.Error("error loading specs", "err", err)
+	}
+	return
 }
 
 func (m *manager) onLostLeadership() error {

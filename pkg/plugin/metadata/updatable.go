@@ -38,7 +38,7 @@ type updatable struct {
 func changeSet(changes []metadata.Change) (*types.Any, error) {
 	changed := map[string]interface{}{}
 	for _, c := range changes {
-		if !types.Put(c.Path, c.Value, changed) {
+		if !types.Put(c.Path, c.Value, &changed) {
 			return nil, fmt.Errorf("can't apply change %s %s", c.Path, c.Value)
 		}
 	}
@@ -46,7 +46,7 @@ func changeSet(changes []metadata.Change) (*types.Any, error) {
 }
 
 func (p updatable) load() (original *types.Any, err error) {
-	return p.Plugin.Get(types.NullPath)
+	return p.Plugin.Get(types.Dot)
 }
 
 // Changes sends a batch of changes and gets in return a proposed view of configuration and a cas hash.
