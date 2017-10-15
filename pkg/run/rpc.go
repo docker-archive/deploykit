@@ -119,7 +119,6 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 			case func() (map[string]metadata.Updatable, error):
 				log.Debug("metadata_rpc.UpdatablePluginServerWithNames", "p", pp)
 				plugins = append(plugins, metadata_rpc.UpdatableServerWithNames(pp))
-				return
 			case metadata.Updatable:
 				log.Debug("metadata_rpc.UpdatablePluginServer", "p", p)
 				plugins = append(plugins, metadata_rpc.UpdatableServer(pp))

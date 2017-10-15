@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"fmt"
-	gopath "path"
 
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -47,7 +46,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 				return fmt.Errorf("No absolute path")
 			}
 
-			path := types.PathFromString(gopath.Join(name, p)).Shift(1)
+			path := types.PathFromString(p)
 
 			nodes := []types.Path{} // the result set to print
 
