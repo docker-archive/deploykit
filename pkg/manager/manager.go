@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -39,6 +40,11 @@ type manager struct {
 	backendOps chan<- backendOp
 }
 
+const (
+	// defaultPluginPollInterval is the interval to retry connection
+	defaultPluginPollInterval = 2 * time.Second
+)
+
 type backendOp struct {
 	name      string
 	operation func() error
@@ -62,7 +68,7 @@ func NewManager(options Options) Backend {
 					return nil, err
 				}
 				return group_rpc.NewClient(endpoint.Address)
-			}, 0),
+			}, defaultPluginPollInterval),
 		Updatable: initUpdatable(options),
 	}
 	return impl
@@ -118,7 +124,7 @@ func initUpdatable(options Options) metadata.Updatable {
 
 			}
 			return metadata_plugin.NewUpdatablePlugin(p, writer), nil
-		}, 0)
+		}, defaultPluginPollInterval)
 
 }
 

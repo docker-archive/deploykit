@@ -57,6 +57,8 @@ var DefaultOptions = Options{
 func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
+	defer log.Info("Starting up vars plugin", "transport", transport, "impls", impls)
+
 	options := DefaultOptions
 	err = config.Decode(&options)
 	if err != nil {
