@@ -39,8 +39,8 @@ func NewHandshaker(address string) (rpc.Handshaker, error) {
 	return &client{addr: address, http: httpC, url: u}, nil
 }
 
-// Client returns a full rpc client from handshaker
-func ClientFromHandshaker(handshaker rpc.Handshaker, api spi.InterfaceSpec) (Client, error) {
+// FromHandshaker returns a full rpc client from handshaker
+func FromHandshaker(handshaker rpc.Handshaker, api spi.InterfaceSpec) (Client, error) {
 	unvalidatedClient, is := handshaker.(*client)
 	if !is {
 		return nil, fmt.Errorf("not a valid client")

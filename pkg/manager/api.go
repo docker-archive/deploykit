@@ -53,9 +53,9 @@ type Manager interface {
 
 // Backend is the admin / server interface
 type Backend interface {
-	group.Plugin
+	// group.Plugin
 
-	metadata.Updatable
+	// metadata.Updatable
 
 	Controllers() (map[string]controller.Controller, error)
 	Groups() (map[group.ID]group.Plugin, error)

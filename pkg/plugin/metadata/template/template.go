@@ -132,7 +132,7 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 	}
 
 	// now we have the plugin name
-	cl, err := rpc_client.ClientFromHandshaker(handshaker, metadata.InterfaceSpec)
+	cl, err := rpc_client.FromHandshaker(handshaker, metadata.InterfaceSpec)
 	if err != nil {
 		return nil, err
 	}

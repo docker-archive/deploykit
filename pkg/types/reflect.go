@@ -34,9 +34,8 @@ func Put(path []string, value interface{}, object interface{}) bool {
 				if err := value.Decode(&vv); err == nil {
 					*object = vv
 					return true
-				} else {
-					return false
 				}
+				return false
 			}
 		}
 		return put(path, value, *object)

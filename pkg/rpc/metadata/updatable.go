@@ -44,7 +44,7 @@ type Updatable struct {
 }
 
 // VendorInfo returns a metadata object about the plugin, if the plugin implements it.  See spi.Vendor
-func (p *Updatable) VendorInfo() *spi.VendorInfo {
+func (u *Updatable) VendorInfo() *spi.VendorInfo {
 	base, _ := p.keyed.Keyed(plugin.Name("."))
 	if m, is := base.(spi.Vendor); is {
 		return m.VendorInfo()
@@ -58,12 +58,12 @@ func (u *Updatable) ImplementedInterface() spi.InterfaceSpec {
 }
 
 // Types returns the types exposed by this kind of RPC service
-func (p *Updatable) Types() []string {
+func (u *Updatable) Types() []string {
 	return p.keyed.Types()
 }
 
 // List returns a list of child nodes given a path.
-func (p *Updatable) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
+func (u *Updatable) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
 
 	return p.keyed.Do(req, func(v interface{}) error {
 		resp.Name = req.Name
@@ -77,7 +77,7 @@ func (p *Updatable) List(_ *http.Request, req *ListRequest, resp *ListResponse) 
 }
 
 // Get retrieves the value at path given.
-func (p *Updatable) Get(_ *http.Request, req *GetRequest, resp *GetResponse) error {
+func (u *Updatable) Get(_ *http.Request, req *GetRequest, resp *GetResponse) error {
 
 	return p.keyed.Do(req, func(v interface{}) error {
 		resp.Name = req.Name
