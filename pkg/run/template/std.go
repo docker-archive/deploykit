@@ -1,4 +1,4 @@
-package cli
+package template
 
 import (
 	"fmt"
@@ -8,7 +8,8 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 )
 
-func configureTemplate(engine *template.Template, plugins func() discovery.Plugins) *template.Template {
+// StdFunctions adds a set of standard functions for access in templates
+func StdFunctions(engine *template.Template, plugins func() discovery.Plugins) *template.Template {
 	engine.WithFunctions(func() []template.Function {
 		return []template.Function{
 			{
