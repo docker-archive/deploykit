@@ -1,13 +1,10 @@
 package group
 
 import (
-	"fmt"
-	"io"
 	"os"
-	"sort"
-	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/cli/v0/instance"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
@@ -21,7 +18,10 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 		Short: "Describe a group. Returns a list of members",
 	}
 
-	quiet := describe.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
+	view := instance.View{}
+	describe.Flags().AddFlagSet(services.OutputFlags)
+	describe.Flags().AddFlagSet(view.FlagSet())
+
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 
 		pluginName := plugin.Name(name)
@@ -35,6 +35,12 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			}
 		}
 
+		// get renderers first before costly rpc
+		renderer, err := view.Renderer()
+		if err != nil {
+			return err
+		}
+
 		groupPlugin, err := LoadPlugin(services.Plugins(), name)
 		if err != nil {
 			return nil
@@ -43,33 +49,17 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 
 		groupID := group.ID(gid)
 
+		// TODO - here we are getting the properties back because
+		// in pkg/plugin/group/scaledGroup.List we are calling the instance
+		// plugin.Describe with 'true'.  We need to change the group SPI
+		// to allow control of this and taking in view filter, selectors
+		// to execute on the server side.
 		desc, err := groupPlugin.DescribeGroup(groupID)
 		if err != nil {
 			return err
 		}
 
-		return services.Output(os.Stdout, desc,
-			func(io.Writer, interface{}) error {
-				if !*quiet {
-					fmt.Printf("%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS")
-				}
-				for _, d := range desc.Instances {
-					logical := "  -   "
-					if d.LogicalID != nil {
-						logical = string(*d.LogicalID)
-					}
-
-					printTags := []string{}
-					for k, v := range d.Tags {
-						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
-					}
-					sort.Strings(printTags)
-
-					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, strings.Join(printTags, ","))
-				}
-				return nil
-			})
+		return services.Output(os.Stdout, desc.Instances, renderer)
 	}
-	describe.Flags().AddFlagSet(services.OutputFlags)
 	return describe
 }
