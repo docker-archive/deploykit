@@ -4,9 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/run/local"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -45,11 +47,18 @@ type Options struct {
 // (e.g. .Debug(msg, "key", log.V(100))
 type V int
 
+func mustFirst(v int, err error) int {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // DevDefaults is the default options for development
 var DevDefaults = Options{
-	Level:     5,
+	Level:     mustFirst(strconv.Atoi(local.Getenv("INFRAKIT_LOG_DEV_LEVEL", "4"))),
 	Stdout:    false,
-	Format:    "json",
+	Format:    local.Getenv("INFRAKIT_LOG_DEV_FORMAT", "term"),
 	CallStack: true,
 }
 
