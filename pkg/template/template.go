@@ -95,6 +95,11 @@ type Template struct {
 	parent *Template
 }
 
+// Options returns the options used to initialize this template engine
+func (t *Template) Options() Options {
+	return t.options
+}
+
 // Void is used in the template functions return value type to indicate a void.
 // Golang template does not allow functions with no return types to be bound.
 type Void string

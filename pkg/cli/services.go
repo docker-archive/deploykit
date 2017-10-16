@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/pflag"
@@ -197,7 +198,7 @@ func templateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 				}
 			}
 
-			configureTemplate(engine, plugins)
+			runtime.StdFunctions(engine, plugins)
 
 			contextObject := (interface{})(nil)
 			if len(ctx) == 1 {
