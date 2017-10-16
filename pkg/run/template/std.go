@@ -24,7 +24,7 @@ func StdFunctions(engine *template.Template, plugins func() discovery.Plugins) *
 			},
 			// This is an override of the existing Var function
 			{
-				Name: "var",
+				Name: "var2",
 				Func: func(name string, optional ...interface{}) (interface{}, error) {
 
 					// returns nil if it's a read and unresolved

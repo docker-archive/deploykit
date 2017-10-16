@@ -33,9 +33,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	bastionAddr := ""
 	user := ""
-	add := &cobra.Command{
-		Use:   "add <name> <url_list>",
-		Short: "Add a remote",
+	set := &cobra.Command{
+		Use:   "set <name> <url_list>",
+		Short: "Set a remote",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) != 2 {
@@ -60,28 +60,25 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return hosts.Save()
 		},
 	}
-	add.Flags().StringVar(&bastionAddr, "ssh-addr", bastionAddr, "The public host to tunnel")
-	add.Flags().StringVar(&user, "ssh-user", user, "The ssh user")
+	set.Flags().StringVar(&bastionAddr, "ssh-addr", bastionAddr, "The public host to tunnel")
+	set.Flags().StringVar(&user, "ssh-user", user, "The ssh user")
 
 	remove := &cobra.Command{
 		Use:   "rm <name>",
 		Short: "Remove a remote",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if len(args) != 1 {
+			if len(args) == 0 {
 				cmd.Usage()
 				os.Exit(1)
 			}
-
-			name := args[0]
-
 			hosts, err := cli.LoadHosts()
 			if err != nil {
 				return err
 			}
-
-			delete(hosts, name)
-
+			for _, name := range args {
+				delete(hosts, name)
+			}
 			return hosts.Save()
 		},
 	}
@@ -134,6 +131,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	list.Flags().AddFlagSet(outputFlags)
 
-	cmd.AddCommand(add, remove, list, current)
+	cmd.AddCommand(set, remove, list, current)
 	return cmd
 }
