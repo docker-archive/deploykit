@@ -1,9 +1,6 @@
 package template
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/docker/infrakit/pkg/discovery"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/template"
@@ -24,33 +21,17 @@ func StdFunctions(engine *template.Template, plugins func() discovery.Plugins) *
 			},
 			// This is an override of the existing Var function
 			{
-				Name: "var2",
+				Name: "var",
 				Func: func(name string, optional ...interface{}) (interface{}, error) {
 
 					// returns nil if it's a read and unresolved
 					// or if it's a write, returns a void value that is not nil (an empty string)
 					v := engine.Var(name, optional...)
-					switch {
-					case len(optional) > 0: // writing
-						return v, nil
-					case v != nil && !engine.Options().MultiPass: // reading, resolved
-						return v, nil
+					if v == nil {
+						// If not resolved, try to interpret the path as a path for metadata...
+						return metadata_template.MetadataFunc(plugins)(name, optional...)
 					}
-					// Check to see if the value is resolved...  in the case of multipass, we can get `{{ var foo }}` back
-					if engine.Options().MultiPass {
-						delim := `{{`
-						if engine.Options().DelimLeft != "" {
-							delim = engine.Options().DelimLeft
-						}
-						if strings.Index(fmt.Sprintf("%v", v), delim) < 0 {
-							return v, nil
-						}
-						// If it's multipass and we have a template expression returned, then the value is not resolved.
-						// continue to look up as metadata
-					}
-
-					// If not resolved, try to interpret the path as a path for metadata...
-					return metadata_template.MetadataFunc(plugins)(name, optional...)
+					return v, nil
 				},
 			},
 		}
