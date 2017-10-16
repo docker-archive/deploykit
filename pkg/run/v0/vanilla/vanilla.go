@@ -47,7 +47,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Flavor: vanilla.NewPlugin(options.Options),
+		run.Flavor: vanilla.NewPlugin(plugins, options.Options),
 	}
 	return
 }
