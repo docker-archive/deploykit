@@ -124,12 +124,14 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 		defer func() {
+			<-time.After(500 * time.Millisecond)
 			pluginManager.TerminateAll()
 			pluginManager.WaitForAllShutdown()
 			pluginManager.Stop()
 		}()
 
 		pluginManager.WaitStarting()
+		<-time.After(500 * time.Millisecond)
 
 		input, err := services.ReadFromStdinIfElse(
 			func() bool { return args[0] == "-" },
@@ -137,6 +139,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			services.ToJSON,
 		)
 		if err != nil {
+			log.Error("processing input", "err", err)
 			return err
 		}
 
@@ -171,6 +174,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		// Get the flavor properties and use that to call the prepare of the Flavor to generate the init
 		endpoint, err := plugins().Find(groupSpec.Flavor.Plugin)
 		if err != nil {
+			log.Error("error looking up plugin", "plugin", groupSpec.Flavor.Plugin, "err", err)
 			return err
 		}
 
@@ -197,8 +201,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			group_types.Index{Group: group.ID(*groupID), Sequence: *sequence})
 
 		if err != nil {
+			log.Error("error preparing", "err", err, "spec", instanceSpec)
 			return err
 		}
+
+		log.Info("apply init template", "init", instanceSpec.Init)
 
 		// Here the Init may contain template vars since in the evaluation of the manager / worker
 		// init templates, we do not propapage the vars set in the command line here.
