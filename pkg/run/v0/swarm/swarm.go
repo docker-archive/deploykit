@@ -76,9 +76,11 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 			"manager": managerFlavor,
 			"worker":  workerFlavor,
 		},
-		run.Metadata: map[string]metadata.Plugin{
-			"manager": managerFlavor,
-			"worker":  workerFlavor,
+		run.Metadata: func() (map[string]metadata.Plugin, error) {
+			return map[string]metadata.Plugin{
+				"manager": managerFlavor,
+				"worker":  workerFlavor,
+			}, nil
 		},
 	}
 	onStop = func() {
