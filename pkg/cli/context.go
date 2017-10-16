@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
@@ -461,7 +462,7 @@ func (c *Context) BuildFlags() (err error) {
 		return
 	}
 	t.SetOptions(c.options)
-	_, err = configureTemplate(t, c.plugins).Render(c)
+	_, err = runtime.StdFunctions(t, c.plugins).Render(c)
 	return
 }
 
@@ -484,7 +485,7 @@ func (c *Context) Execute() (err error) {
 	// Process the input, render the template
 	t.SetOptions(opt)
 
-	script, err := configureTemplate(t, c.plugins).Render(c)
+	script, err := runtime.StdFunctions(t, c.plugins).Render(c)
 	if err != nil {
 		return err
 	}

@@ -5,14 +5,17 @@ import (
 
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 
+	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
+var nilPlugins = func() discovery.Plugins { return nil }
+
 func TestValidateValid(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	err := plugin.Validate(
 		types.AnyString(`{
@@ -35,7 +38,7 @@ func TestValidateValid(t *testing.T) {
 }
 
 func TestValidateInvalidJSON(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	err := plugin.Validate(
 		types.AnyString("not-json"),
@@ -44,7 +47,7 @@ func TestValidateInvalidJSON(t *testing.T) {
 }
 
 func TestValidateInitLinesWithInitScript(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	err := plugin.Validate(
 		types.AnyString(`{
@@ -59,7 +62,7 @@ func TestValidateInitLinesWithInitScript(t *testing.T) {
 }
 
 func TestValidateInitScriptRenderError(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	err := plugin.Validate(
 		types.AnyString(`{
@@ -70,7 +73,7 @@ func TestValidateInitScriptRenderError(t *testing.T) {
 }
 
 func TestPrepareEmptyVanillaData(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	spec, err := plugin.Prepare(
 		types.AnyString(""),
@@ -88,7 +91,7 @@ func TestPrepareEmptyVanillaData(t *testing.T) {
 }
 
 func TestPrepareWithAttachments(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	spec, err := plugin.Prepare(
 		types.AnyString(`{
@@ -104,7 +107,7 @@ func TestPrepareWithAttachments(t *testing.T) {
 }
 
 func TestPrepareWithAttachmentsAndInstanceSpecAttachments(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	spec, err := plugin.Prepare(
 		types.AnyString(`{
@@ -120,7 +123,7 @@ func TestPrepareWithAttachmentsAndInstanceSpecAttachments(t *testing.T) {
 }
 
 func TestPrepareWithTags(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	spec, err := plugin.Prepare(
 		types.AnyString(`{
@@ -135,7 +138,7 @@ func TestPrepareWithTags(t *testing.T) {
 }
 
 func TestPrepareWithTagsAndInstanceSpecTags(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	spec, err := plugin.Prepare(
 		types.AnyString(`{
@@ -154,7 +157,7 @@ func TestPrepareWithTagsAndInstanceSpecTags(t *testing.T) {
 }
 
 func TestPrepareWithInit(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	spec, err := plugin.Prepare(
 		types.AnyString(`{
@@ -169,7 +172,7 @@ func TestPrepareWithInit(t *testing.T) {
 }
 
 func TestPrepareWithInitAndInstanceSpecInit(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	spec, err := plugin.Prepare(
 		types.AnyString(`{
@@ -186,7 +189,7 @@ func TestPrepareWithInitAndInstanceSpecInit(t *testing.T) {
 }
 
 func TestPrepareWithInitScriptAndInstanceSpecInit(t *testing.T) {
-	plugin := NewPlugin(DefaultOptions)
+	plugin := NewPlugin(nilPlugins, DefaultOptions)
 	require.NotNil(t, plugin)
 	spec, err := plugin.Prepare(
 		types.AnyString(`{

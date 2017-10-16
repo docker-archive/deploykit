@@ -12,7 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
+	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -352,20 +352,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		worker:       worker,
 	}
 
-	initTemplate.WithFunctions(func() []template.Function {
-		return []template.Function{
-			{
-				Name: "metadata",
-				Description: []string{
-					"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-					"and calls GET on the plugin with the path \"path/to/data\".",
-					"It's identical to the CLI command infrakit metadata cat ...",
-				},
-				Func: metadata_template.MetadataFunc(s.plugins),
-			},
-		}
-	})
-	initScript, err = initTemplate.Render(context)
+	initScript, err = runtime.StdFunctions(initTemplate, s.plugins).Render(context)
 	instanceSpec.Init = initScript
 	log.Debug("Init script", "content", initScript)
 	return instanceSpec, nil

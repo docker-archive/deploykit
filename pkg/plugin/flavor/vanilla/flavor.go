@@ -4,12 +4,19 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit/pkg/discovery"
+	logutil "github.com/docker/infrakit/pkg/log"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+)
+
+var (
+	log    = logutil.New("module", "vanilla")
+	debugV = logutil.V(300)
 )
 
 // Spec is the model of the Properties section of the top level group spec.
@@ -31,14 +38,15 @@ type Spec struct {
 // identical (cattles) but can assume specific identities (via the LogicalIDs).  The
 // instances here are treated identically because we have constant Init that applies
 // to all instances
-func NewPlugin(opt template.Options) flavor.Plugin {
-	return vanillaFlavor{options: opt}
+func NewPlugin(plugins func() discovery.Plugins, opt template.Options) flavor.Plugin {
+	return vanillaFlavor{plugins: plugins, options: opt}
 }
 
 // DefaultOptions contains the default settings.
 var DefaultOptions = template.Options{}
 
 type vanillaFlavor struct {
+	plugins func() discovery.Plugins
 	options template.Options
 }
 
@@ -57,7 +65,7 @@ func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group_ty
 		if err != nil {
 			return err
 		}
-		_, err = template.Render(nil)
+		_, err = runtime.StdFunctions(template, f.plugins).Render(nil)
 		if err != nil {
 			return err
 		}
@@ -98,12 +106,12 @@ func (f vanillaFlavor) Prepare(flavor *types.Any,
 		if err != nil {
 			return instance, err
 		}
-		initScript, err := template.Render(nil)
+		initScript, err := runtime.StdFunctions(template, f.plugins).Render(nil)
 		if err != nil {
 			return instance, err
 		}
 		lines = append(lines, initScript)
-		log.Infoln("Init script data:", initScript)
+		log.Debug("Init script data:", initScript, "V", debugV)
 	} else {
 		lines = append(lines, s.Init...)
 	}
