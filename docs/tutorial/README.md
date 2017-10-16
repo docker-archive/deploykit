@@ -74,7 +74,7 @@ $ cp build/infrakit /usr/local/bin/
 
 There are some basic environment set up required for infrakit.  Infrakit uses
 the environment variable `INFRAKIT_HOME` to locate the directory where it stores
-variaous files and create socket files for the various plugins that the daemon
+various files and create socket files for the various plugins that the daemon
 starts.  The `INFRAKIT_HOME` directory is typically `~/.infrakit`.
 
 ```shell
