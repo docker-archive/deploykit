@@ -19,13 +19,8 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 	describe.Flags().AddFlagSet(view.FlagSet())
 
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
-		if len(args) != 0 {
-			cmd.Usage()
-			os.Exit(1)
-		}
-
 		// get renderers first before costly rpc
-		renderer, err := view.Renderer()
+		renderer, err := view.Renderer(view.DefaultMatcher(args))
 		if err != nil {
 			return err
 		}

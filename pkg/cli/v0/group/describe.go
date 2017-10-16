@@ -30,13 +30,13 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			if len(args) < 1 {
 				cmd.Usage()
 				os.Exit(1)
-			} else {
-				gid = args[0]
 			}
+			gid = args[0]
+			args = args[1:]
 		}
 
 		// get renderers first before costly rpc
-		renderer, err := view.Renderer()
+		renderer, err := view.Renderer(view.DefaultMatcher(args))
 		if err != nil {
 			return err
 		}

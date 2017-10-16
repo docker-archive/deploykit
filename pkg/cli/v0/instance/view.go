@@ -57,8 +57,39 @@ func (v *View) TagFilter() map[string]string {
 	return filter
 }
 
+// DefaultMatcher is a matcher of instance ID and logical ID based on a list of allow values
+func (v *View) DefaultMatcher(args []string) func(instance.Description) bool {
+	matcher := func(instance.Description) bool { return true }
+
+	if len(args) > 0 {
+
+		ids := map[string]struct{}{}
+		logicalIDs := map[string]struct{}{}
+		for _, a := range args {
+			ids[a] = struct{}{}
+			logicalIDs[a] = struct{}{}
+		}
+
+		matcher = func(i instance.Description) (has bool) {
+			// search order.... by ID, then logical ID
+			_, has = ids[string(i.ID)]
+			if has {
+				return
+			}
+			if i.LogicalID != nil {
+				_, has = logicalIDs[string(*i.LogicalID)]
+				if has {
+					return
+				}
+			}
+			return false
+		}
+	}
+	return matcher
+}
+
 // Renderer returns the renderer for the results
-func (v *View) Renderer() (func(w io.Writer, v interface{}) error, error) {
+func (v *View) Renderer(matcher func(instance.Description) bool) (func(w io.Writer, v interface{}) error, error) {
 	tagsView, err := template.NewTemplate(template.ValidURL(v.tagsTemplate), v.options)
 	if err != nil {
 		return nil, err
@@ -85,6 +116,18 @@ func (v *View) Renderer() (func(w io.Writer, v interface{}) error, error) {
 		}
 		for _, d := range instances {
 
+			// TODO - filter on the client side by tags
+			if len(v.TagFilter()) > 0 {
+				if hasDifferentTag(v.TagFilter(), d.Tags) {
+					continue
+				}
+			}
+			if matcher != nil {
+				if !matcher(d) {
+					continue
+				}
+			}
+
 			logical := "  -   "
 			if d.LogicalID != nil {
 				logical = string(*d.LogicalID)
@@ -104,8 +147,14 @@ func (v *View) Renderer() (func(w io.Writer, v interface{}) error, error) {
 			}
 
 			if v.properties {
-				fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff,
-					renderProperties(d.Properties, propertiesView))
+
+				if v.quiet {
+					// special render only the properties
+					fmt.Printf("%s", renderProperties(d.Properties, propertiesView))
+				} else {
+					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff,
+						renderProperties(d.Properties, propertiesView))
+				}
 			} else {
 				fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff)
 			}
@@ -114,6 +163,18 @@ func (v *View) Renderer() (func(w io.Writer, v interface{}) error, error) {
 	}, nil
 }
 
+func hasDifferentTag(expected, actual map[string]string) bool {
+	if len(actual) == 0 {
+		return true
+	}
+	for k, v := range expected {
+		if a, ok := actual[k]; ok && a != v {
+			return true
+		}
+	}
+
+	return false
+}
 func renderTags(m map[string]string, view *template.Template) string {
 	buff, err := view.Render(m)
 	if err != nil {
