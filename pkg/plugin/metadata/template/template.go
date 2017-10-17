@@ -131,12 +131,13 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 		}
 	}
 
-	// now we have the plugin name
-	cl, err := rpc_client.FromHandshaker(handshaker, metadata.InterfaceSpec)
+	// now we have the plugin name -- try to get the interface
+	// note - that there are two different rpc interfaces
+	// TODO - consider eliminating and use only one
+	metadataPlugin, err := metadata_rpc.FromHandshaker(pluginName, handshaker)
 	if err != nil {
 		return nil, err
 	}
-	metadataPlugin := metadata_rpc.Adapt(pluginName, cl)
 
 	var value interface{}
 	expiry := time.Now().Add(timeout)
