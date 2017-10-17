@@ -71,7 +71,8 @@ func (s *WorkerFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 
 	switch {
 	case len(nodes) == 0:
-		return fmt.Errorf("Unable to drain %s, not found in swarm", inst.ID)
+		log.Warn("Unable to drain - not found in swarm", "id", inst.ID)
+		return nil
 
 	case len(nodes) == 1:
 		log.Debugln("Docker NodeRemove", nodes[0].ID)
