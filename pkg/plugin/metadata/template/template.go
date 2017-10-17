@@ -120,15 +120,22 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 	pluginName := plugin.Name(*first)
 	key := mpath.Shift(1)
 
-	subs, has := info[rpc.InterfaceSpec(metadata.InterfaceSpec.Encode())]
-	sub := mpath.Shift(1).Index(0)
-	if has && sub != nil {
-		for _, ss := range subs {
-			if *sub == ss {
-				pluginName = plugin.Name(gopath.Join(*first, *sub))
-				key = key.Shift(1)
+	// There are two interfaces possible so we need to search for both
+	for _, c := range []rpc.InterfaceSpec{
+		rpc.InterfaceSpec(metadata.UpdatableInterfaceSpec.Encode()),
+		rpc.InterfaceSpec(metadata.InterfaceSpec.Encode()),
+	} {
+		subs, has := info[c]
+		sub := mpath.Shift(1).Index(0)
+		if has && sub != nil {
+			for _, ss := range subs {
+				if *sub == ss {
+					pluginName = plugin.Name(gopath.Join(*first, *sub))
+					key = key.Shift(1)
+				}
 			}
 		}
+
 	}
 
 	// now we have the plugin name -- try to get the interface
@@ -197,12 +204,10 @@ func doGetSet(plugins func() discovery.Plugins, path string, optionalValue ...in
 	pluginName := plugin.Name(*first)
 	key := mpath.Shift(1)
 
-	checks := []rpc.InterfaceSpec{
+	for _, c := range []rpc.InterfaceSpec{
 		rpc.InterfaceSpec(metadata.UpdatableInterfaceSpec.Encode()),
 		rpc.InterfaceSpec(metadata.InterfaceSpec.Encode()),
-	}
-
-	for _, c := range checks {
+	} {
 		subs, has := info[c]
 		sub := mpath.Shift(1).Index(0)
 		if has && sub != nil {
