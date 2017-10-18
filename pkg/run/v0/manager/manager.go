@@ -38,6 +38,14 @@ const (
 
 	// EnvMetadata is the metadata backend
 	EnvMetadata = "INFRAKIT_MANAGER_METADATA"
+
+	// EnvMetadataUpdateInterval is the metadata backend update interval
+	// if > 0, this will allow non-leader updates of metadata to be synced
+	// to the leader. otherwise, a non-leader will not see the leader's updates
+	// until it becomes the leader.  This is because even though the data is
+	// persisted, it is not polled and read by the non-leaders on a regular basis
+	// (unless this is set).
+	EnvMetadataUpdateInterval = "INFRAKIT_MANAGER_METADATA_UPDATE_INTERVAL"
 )
 
 var (
@@ -84,7 +92,7 @@ func defaultOptions() (options Options) {
 		Options: manager.Options{
 			Group:                   plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
 			Metadata:                plugin.Name(local.Getenv(EnvMetadata, "vars")),
-			MetadataRefreshInterval: types.FromDuration(2 * time.Second),
+			MetadataRefreshInterval: types.MustParseDuration(local.Getenv(EnvMetadataUpdateInterval, "3s")),
 		},
 		Mux: &MuxConfig{
 			Listen:    local.Getenv(EnvMuxListen, ":24864"),
