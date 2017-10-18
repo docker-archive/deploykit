@@ -124,7 +124,7 @@ expect_output_lines() {
 
 echo "Starting test................................................................"
 
-expect_output_lines "10 plugins should be discoverable" "infrakit plugin ls -q" "10"
+expect_output_lines "12 plugins should be discoverable" "infrakit plugin ls -q" "12"
 expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
 
 echo "Commiting"
