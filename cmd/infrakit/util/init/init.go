@@ -102,6 +102,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	starts := cmd.Flags().StringSlice("start", []string{}, "start spec for plugin just like infrakit plugin start")
 
 	debug := cmd.Flags().Bool("debug", false, "True to debug with lots of traces")
+	waitDuration := cmd.Flags().String("wait", "3s", "Wait for plugins to be ready")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
@@ -119,19 +120,21 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			})
 		}
 
+		wait := types.MustParseDuration(*waitDuration)
+
 		pluginManager, err := startPlugins(plugins, services, *configURL, *starts)
 		if err != nil {
 			return err
 		}
 		defer func() {
-			<-time.After(500 * time.Millisecond)
+			<-time.After(wait.Duration())
 			pluginManager.TerminateAll()
 			pluginManager.WaitForAllShutdown()
 			pluginManager.Stop()
 		}()
 
 		pluginManager.WaitStarting()
-		<-time.After(500 * time.Millisecond)
+		<-time.After(wait.Duration())
 
 		input, err := services.ReadFromStdinIfElse(
 			func() bool { return args[0] == "-" },
