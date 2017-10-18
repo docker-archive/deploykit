@@ -53,13 +53,13 @@ type Manager interface {
 
 // Backend is the admin / server interface
 type Backend interface {
-	group.Plugin
+	// group.Plugin
 
-	metadata.Updatable
+	// metadata.Updatable
 
 	Controllers() (map[string]controller.Controller, error)
 	Groups() (map[group.ID]group.Plugin, error)
-	Metadata() (map[string]metadata.Updatable, error)
+	Metadata() (map[string]metadata.Plugin, error)
 
 	Manager
 	Start() (<-chan struct{}, error)
@@ -92,4 +92,7 @@ type Options struct {
 
 	// MetadataStore persists var information
 	MetadataStore store.Snapshot `json:"-" yaml:"-"`
+
+	// MetadataRefreshInterval is the interval to check for updates to metadata
+	MetadataRefreshInterval types.Duration
 }

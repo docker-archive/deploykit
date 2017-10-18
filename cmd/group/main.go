@@ -108,7 +108,7 @@ func main() {
 		}()
 
 		run.Plugin(plugin.DefaultTransport(*name),
-			metadata_rpc.PluginServer(metadata_plugin.NewPluginFromChannel(updateSnapshot)),
+			metadata_rpc.Server(metadata_plugin.NewPluginFromChannel(updateSnapshot)),
 			group_server.PluginServer(groupPlugin))
 
 		close(stopSnapshot)

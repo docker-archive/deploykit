@@ -10,7 +10,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc/mux"
 	rpc "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/run"
@@ -39,6 +38,14 @@ const (
 
 	// EnvMetadata is the metadata backend
 	EnvMetadata = "INFRAKIT_MANAGER_METADATA"
+
+	// EnvMetadataUpdateInterval is the metadata backend update interval
+	// if > 0, this will allow non-leader updates of metadata to be synced
+	// to the leader. otherwise, a non-leader will not see the leader's updates
+	// until it becomes the leader.  This is because even though the data is
+	// persisted, it is not polled and read by the non-leaders on a regular basis
+	// (unless this is set).
+	EnvMetadataUpdateInterval = "INFRAKIT_MANAGER_METADATA_UPDATE_INTERVAL"
 )
 
 var (
@@ -83,8 +90,9 @@ func defaultOptions() (options Options) {
 
 	options = Options{
 		Options: manager.Options{
-			Group:    plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
-			Metadata: plugin.Name(local.Getenv(EnvMetadata, "vars-stateless")),
+			Group:                   plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
+			Metadata:                plugin.Name(local.Getenv(EnvMetadata, "vars")),
+			MetadataRefreshInterval: types.MustParseDuration(local.Getenv(EnvMetadataUpdateInterval, "3s")),
 		},
 		Mux: &MuxConfig{
 			Listen:    local.Getenv(EnvMuxListen, ":24864"),
@@ -184,25 +192,13 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	log.Info("Manager running")
 
-	updatable := &metadataModel{
-		snapshot: options.SpecStore,
-		manager:  mgr,
-	}
-	updatableModel, _ := updatable.pluginModel()
-
 	transport.Name = name
-
-	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
-		metadata_plugin.NewPluginFromChannel(updatableModel), updatable.commit)
-
-	log.Info("meta", metadataUpdatable)
 
 	impls = map[run.PluginCode]interface{}{
 		run.Manager:           mgr,
 		run.Controller:        mgr.Controllers,
 		run.Group:             mgr.Groups,
-		run.MetadataUpdatable: mgr, //.Metadata, // metadataUpdatable,
-		//		run.Metadata:          metadataUpdatable,
+		run.MetadataUpdatable: mgr.Metadata,
 	}
 
 	var muxServer rpc.Stoppable

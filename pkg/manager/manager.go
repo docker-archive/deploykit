@@ -36,6 +36,10 @@ type manager struct {
 	stop     chan struct{}
 	running  chan struct{}
 
+	// Status is the status metadata (readonly)
+	Status            metadata.Plugin
+	doneStatusUpdates chan struct{}
+
 	// queued operations
 	backendOps chan<- backendOp
 }
@@ -71,6 +75,8 @@ func NewManager(options Options) Backend {
 			}, defaultPluginPollInterval),
 		Updatable: initUpdatable(options),
 	}
+
+	impl.Status = initStatusMetadata(impl)
 	return impl
 }
 
@@ -113,7 +119,7 @@ func initUpdatable(options Options) metadata.Updatable {
 				if err != nil {
 					return nil, err
 				}
-				found, err := metadata_rpc.NewClient(endpoint.Address)
+				found, err := metadata_rpc.NewClient(options.Metadata, endpoint.Address)
 				if err != nil {
 					return nil, err
 				}
@@ -187,6 +193,32 @@ func (m *manager) Start() (<-chan struct{}, error) {
 	}
 
 	log.Info("Manager starting")
+
+	// Refreshes metadata
+	metadataPoll := m.Options.MetadataRefreshInterval.Duration()
+	if metadataPoll > 0 {
+		metadataRefresh := time.Tick(metadataPoll)
+		go func() {
+			for {
+				// We load the metadata from the backend so
+				// that we have the latest. This is important
+				// in case that writes are performed on the same
+				// leader by another process.
+				// Note that we use optimistic concurrency of
+				// computing hashes from each change and each batch
+				// of changes require reading the entire data struct
+				// so this constant updating should not cause problem
+				// if writes are performed from another process on the
+				// same leader node.
+				err := m.loadMetadata()
+				if err != nil {
+					log.Error("error loading metadata", "err", err)
+				}
+
+				<-metadataRefresh
+			}
+		}()
+	}
 
 	leaderChan, err := m.Options.Leader.Start()
 	if err != nil {
@@ -302,6 +334,7 @@ func (m *manager) Stop() {
 	if m.stop == nil {
 		return
 	}
+	close(m.doneStatusUpdates)
 	close(m.stop)
 	m.Options.Leader.Stop()
 }
@@ -389,11 +422,9 @@ func (m *manager) onAssumeLeadership() (err error) {
 
 	defer log.Info("Running as leader")
 
-	// TODO - Assumption here is that the config here is consistent with the spec stored...
 	err = m.loadMetadata()
 	if err != nil {
 		log.Error("error loading metadata", "err", err)
-		return
 	}
 
 	err = m.loadSpecs()

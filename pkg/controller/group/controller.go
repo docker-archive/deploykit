@@ -46,7 +46,7 @@ func (c *gController) translateSpec(spec types.Spec) (group.Spec, error) {
 		return gSpec, nil
 	}
 	if addressable.Instance() != string(*c.scope) {
-		return group.Spec{}, fmt.Errorf("wrong group: %v", *c.scope)
+		return group.Spec{}, fmt.Errorf("wrong group: instance=%v scope=%v", addressable.Instance(), *c.scope)
 	}
 	gSpec.ID = *c.scope
 
