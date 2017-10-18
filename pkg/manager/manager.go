@@ -194,6 +194,29 @@ func (m *manager) Start() (<-chan struct{}, error) {
 
 	log.Info("Manager starting")
 
+	// Refreshes metadata
+	metadataRefresh := time.Tick(2 * time.Second) // TODO change this
+	metadataLeader := make(chan bool)
+	go func() {
+		leader := false
+		for {
+
+			if !leader {
+				// We load the metadata from the backend so
+				// that we have the latest
+				err := m.loadMetadata()
+				if err != nil {
+					log.Error("error loading metadata", "err", err)
+				}
+			}
+
+			select {
+			case <-metadataRefresh:
+			case leader = <-metadataLeader:
+			}
+		}
+	}()
+
 	leaderChan, err := m.Options.Leader.Start()
 	if err != nil {
 		return nil, err
@@ -235,6 +258,10 @@ func (m *manager) Start() (<-chan struct{}, error) {
 				// This channel has data only when there's been a leadership change.
 
 				log.Debug("leader event", "leader", leader)
+
+				// Notify the metadata updater
+				metadataLeader <- leader
+
 				if leader {
 					m.onAssumeLeadership()
 				} else {
@@ -396,11 +423,9 @@ func (m *manager) onAssumeLeadership() (err error) {
 
 	defer log.Info("Running as leader")
 
-	// TODO - Assumption here is that the config here is consistent with the spec stored...
 	err = m.loadMetadata()
 	if err != nil {
 		log.Error("error loading metadata", "err", err)
-		return
 	}
 
 	err = m.loadSpecs()
