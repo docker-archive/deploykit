@@ -92,4 +92,7 @@ type Options struct {
 
 	// MetadataStore persists var information
 	MetadataStore store.Snapshot `json:"-" yaml:"-"`
+
+	// MetadataRefreshInterval is the interval to check for updates to metadata
+	MetadataRefreshInterval types.Duration
 }

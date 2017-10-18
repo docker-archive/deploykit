@@ -195,27 +195,28 @@ func (m *manager) Start() (<-chan struct{}, error) {
 	log.Info("Manager starting")
 
 	// Refreshes metadata
-	metadataRefresh := time.Tick(2 * time.Second) // TODO change this
-	metadataLeader := make(chan bool)
-	go func() {
-		leader := false
-		for {
-
-			if !leader {
+	metadataPoll := m.Options.MetadataRefreshInterval.Duration()
+	if metadataPoll > 0 {
+		metadataRefresh := time.Tick(metadataPoll)
+		go func() {
+			for {
 				// We load the metadata from the backend so
-				// that we have the latest
+				// that we have the latest.
+				// Note that we use optimistic concurrency of
+				// computing hashes from each change and each batch
+				// of changes require reading the entire data struct
+				// so this constant updating should not cause problem
+				// if writes are performed from a non-leader node in
+				// between proposals and commits.
 				err := m.loadMetadata()
 				if err != nil {
 					log.Error("error loading metadata", "err", err)
 				}
-			}
 
-			select {
-			case <-metadataRefresh:
-			case leader = <-metadataLeader:
+				<-metadataRefresh
 			}
-		}
-	}()
+		}()
+	}
 
 	leaderChan, err := m.Options.Leader.Start()
 	if err != nil {
@@ -258,10 +259,6 @@ func (m *manager) Start() (<-chan struct{}, error) {
 				// This channel has data only when there's been a leadership change.
 
 				log.Debug("leader event", "leader", leader)
-
-				// Notify the metadata updater
-				metadataLeader <- leader
-
 				if leader {
 					m.onAssumeLeadership()
 				} else {

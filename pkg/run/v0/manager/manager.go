@@ -82,8 +82,9 @@ func defaultOptions() (options Options) {
 
 	options = Options{
 		Options: manager.Options{
-			Group:    plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
-			Metadata: plugin.Name(local.Getenv(EnvMetadata, "vars")),
+			Group:                   plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
+			Metadata:                plugin.Name(local.Getenv(EnvMetadata, "vars")),
+			MetadataRefreshInterval: types.FromDuration(2 * time.Second),
 		},
 		Mux: &MuxConfig{
 			Listen:    local.Getenv(EnvMuxListen, ":24864"),
