@@ -34,7 +34,9 @@ func TestMuxServer(t *testing.T) {
 
 	T(100).Infoln("Basic client")
 	require.Equal(t, []string{"region"},
-		first(must(rpc_metadata.NewClient(socketPath)).List(types.PathFromString("aws"))))
+		first(must(rpc_metadata.NewClient(nameFromPath(socketPath)+"/aws", socketPath)).List(types.PathFromString("."))))
+	require.Equal(t, []string(nil),
+		first(must(rpc_metadata.NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("aws"))))
 
 	infoClient, err := client.NewPluginInfoClient(socketPath)
 	require.NoError(t, err)
