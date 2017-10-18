@@ -201,13 +201,15 @@ func (m *manager) Start() (<-chan struct{}, error) {
 		go func() {
 			for {
 				// We load the metadata from the backend so
-				// that we have the latest.
+				// that we have the latest. This is important
+				// in case that writes are performed on the same
+				// leader by another process.
 				// Note that we use optimistic concurrency of
 				// computing hashes from each change and each batch
 				// of changes require reading the entire data struct
 				// so this constant updating should not cause problem
-				// if writes are performed from a non-leader node in
-				// between proposals and commits.
+				// if writes are performed from another process on the
+				// same leader node.
 				err := m.loadMetadata()
 				if err != nil {
 					log.Error("error loading metadata", "err", err)
