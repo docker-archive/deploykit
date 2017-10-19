@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/docker/infrakit/pkg/plugin"
@@ -101,7 +102,10 @@ func TestMetadataMultiPlugin(t *testing.T) {
 	require.NoError(t, err)
 	subs, err := rpcClient.Types()
 	require.NoError(t, err)
-	require.Equal(t, []string{"aws", "azure"}, subs[rpc.InterfaceSpec(metadata.InterfaceSpec.Encode())])
+
+	found := subs[rpc.InterfaceSpec(metadata.InterfaceSpec.Encode())]
+	sort.Strings(found)
+	require.Equal(t, []string{"aws", "azure"}, found)
 
 	require.Equal(t, []string{"region"}, first(must(NewClient(nameFromPath(socketPath, "aws"),
 		socketPath)).List(types.PathFromString("."))))
