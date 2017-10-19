@@ -51,7 +51,7 @@ calls to other Instance plugins.  So it's possible to compose new instance plugi
 
 InfraKit can be run in different ways such as in Docker containers or as simple daemons.  Here we are
 going with the simple daemons that are built from source.  For a quick start with pre-built Docker containers,
-you can take a look at the [Playbook](./playbooks/README.md).
+you can take a look at the [Playbook](../playbooks/README.md).
 
 ## Tutorial
 
@@ -60,7 +60,7 @@ To illustrate the concept of working with Group, Flavor, and Instance plugins, w
   + The `simulator` instance plugin - to simulate provisioning of various resource types.
   + The `vanilla` flavor plugin - to provide context/ flavor to the configuration of the instances
 
-For more information on plugins and how they work, please see the [docs](./plugins/README.md).
+For more information on plugins and how they work, please see the [docs](../plugins/README.md).
 
 ### Building infrakit
 
@@ -765,7 +765,7 @@ This concludes our quick tutorial.  In this tutorial we:
 
 Now that you have completed the tutorial, there are additional topics you can explore:
 
-  + [Multi-zone and tiered deployments](./docs/tutorial/multi.md).  Expanding on the composition of plugins,
+  + [Multi-zone and tiered deployments](./multi.md).  Expanding on the composition of plugins,
   you can create a group controller that spans across multiple 'zones' or clouds,
   across different instance types.  In the tiered deployment example, you can see how
   the same composition approach is used to create a Group controller that can
@@ -774,7 +774,7 @@ Now that you have completed the tutorial, there are additional topics you can ex
   provisioning requests cannot be fulfilled.
   + Playbooks: Playbooks are 'scripts' that can be shared and reused.
   Playbooks can drive the `infrakit` CLI by defining new commands and flags.
-  A good one to start is the [LinuxKit playbook](./docs/playbooks/linuxkit),
+  A good one to start is the [LinuxKit playbook](../playbooks/linuxkit),
   where we explore integration with [LinuxKit](https://github.com/linuxkit/linuxkit).
   + Other controllers such as the Ingress controller for routing of traffic from
   the internet to the cluster, and the Enrollment controller that performs associations
