@@ -10,6 +10,9 @@ import (
 var (
 	// NullPath means no path
 	NullPath = Path([]string{})
+
+	// Dot means self - this.
+	Dot = Path([]string{"."})
 )
 
 // RFC6901ToPath takes a path expression in the format of IETF RFC6901 (JSON pointer) and convert it to a Path

@@ -2,9 +2,13 @@ package template
 
 import (
 	"fmt"
+	gopath "path"
 	"time"
 
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
+	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
@@ -102,14 +106,47 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 		return true, nil // This is a test for availability of the plugin
 	}
 
-	metadataPlugin, err := metadata_rpc.NewClient(endpoint.Address)
+	handshaker, err := rpc_client.NewHandshaker(endpoint.Address)
 	if err != nil {
-		return nil, fmt.Errorf("cannot connect to plugin: %s", *first)
+		return nil, err
+	}
+	// we need to get the subtypes
+	info, err := handshaker.Types()
+	if err != nil {
+		return nil, err
 	}
 
+	// Need to derive the fully qualified plugin name from a long path
+	pluginName := plugin.Name(*first)
 	key := mpath.Shift(1)
-	var value interface{}
 
+	// There are two interfaces possible so we need to search for both
+	for _, c := range []rpc.InterfaceSpec{
+		rpc.InterfaceSpec(metadata.UpdatableInterfaceSpec.Encode()),
+		rpc.InterfaceSpec(metadata.InterfaceSpec.Encode()),
+	} {
+		subs, has := info[c]
+		sub := mpath.Shift(1).Index(0)
+		if has && sub != nil {
+			for _, ss := range subs {
+				if *sub == ss {
+					pluginName = plugin.Name(gopath.Join(*first, *sub))
+					key = key.Shift(1)
+				}
+			}
+		}
+
+	}
+
+	// now we have the plugin name -- try to get the interface
+	// note - that there are two different rpc interfaces
+	// TODO - consider eliminating and use only one
+	metadataPlugin, err := metadata_rpc.FromHandshaker(pluginName, handshaker)
+	if err != nil {
+		return nil, err
+	}
+
+	var value interface{}
 	expiry := time.Now().Add(timeout)
 
 	for i := 0; ; i++ {
@@ -153,12 +190,43 @@ func doGetSet(plugins func() discovery.Plugins, path string, optionalValue ...in
 		return true, nil // This is a test for availability of the plugin
 	}
 
-	metadataPlugin, err := metadata_rpc.NewClient(endpoint.Address)
+	handshaker, err := rpc_client.NewHandshaker(endpoint.Address)
 	if err != nil {
-		return nil, fmt.Errorf("cannot connect to plugin: %s", *first)
+		return nil, err
+	}
+	// we need to get the subtypes
+	info, err := handshaker.Types()
+	if err != nil {
+		return nil, err
 	}
 
+	// Need to derive the fully qualified plugin name from a long path
+	pluginName := plugin.Name(*first)
 	key := mpath.Shift(1)
+
+	for _, c := range []rpc.InterfaceSpec{
+		rpc.InterfaceSpec(metadata.UpdatableInterfaceSpec.Encode()),
+		rpc.InterfaceSpec(metadata.InterfaceSpec.Encode()),
+	} {
+		subs, has := info[c]
+		sub := mpath.Shift(1).Index(0)
+		if has && sub != nil {
+			for _, ss := range subs {
+				if *sub == ss {
+					pluginName = plugin.Name(gopath.Join(*first, *sub))
+					key = key.Shift(1)
+					break
+				}
+			}
+		}
+	}
+
+	metadataPlugin, err := metadata_rpc.NewClient(pluginName, endpoint.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	//key := mpath.Shift(1)
 	var value interface{}
 	any, err := metadataPlugin.Get(key)
 	if err != nil {

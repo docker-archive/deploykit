@@ -67,7 +67,6 @@ func (k *Keyed) Resolve(request Addressable) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("dispatching request", "to", to, "V", debugV)
 	return k.Keyed(to)
 }
 
@@ -86,6 +85,11 @@ func (k *Keyed) Keyed(name plugin.Name) (interface{}, error) {
 		for _, p := range m {
 			return p, nil
 		}
+	}
+
+	if subtype == "" && lookup != "." {
+		// This is the case like vars but we have vars/aws... so we look for a '.' or top level plugin
+		lookup = "."
 	}
 
 	if p, has := m[lookup]; has {

@@ -54,6 +54,8 @@ var DefaultOptions = Options{
 func Run(plugins func() discovery.Plugins, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
+	defer log.Info("Starting up vars plugin", "transport", transport, "impls", impls)
+
 	options := DefaultOptions
 	err = config.Decode(&options)
 	if err != nil {
@@ -102,11 +104,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.MetadataUpdatable: metadata_plugin.NewUpdatablePlugin(metadata_plugin.NewPluginFromData(data),
-			func() (*types.Any, error) {
-				return types.AnyValue(data)
-			},
 			func(proposed *types.Any) error {
-				// TODO - make the change durable... via file or swarm or etcd
 				return proposed.Decode(&data)
 			},
 		),

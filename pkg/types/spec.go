@@ -48,6 +48,49 @@ func (s Spec) Validate() error {
 	return nil
 }
 
+// Compare implements the comparable. This implementation will compute a finger print and use that
+// as a comparison.  So
+func (s Spec) Compare(other Spec) int {
+	if s.Kind < other.Kind {
+		return -1
+	}
+	if s.Kind > other.Kind {
+		return 1
+	}
+	if s.Version < other.Version {
+		return -1
+	}
+	if s.Version > other.Version {
+		return 1
+	}
+	if c := s.Metadata.Compare(other.Metadata); c != 0 {
+		return c
+	}
+	if s.Template != nil && other.Template != nil {
+		if c := s.Template.Compare(*other.Template); c != 0 {
+			return c
+		}
+	}
+	// By now we can't disambiguate enough... so just compute fingerprints of the whole thing
+	a, err := AnyValue(s)
+	if err != nil {
+		return -1
+	}
+	b, err := AnyValue(other)
+	if err != nil {
+		return 1
+	}
+	f1 := Fingerprint(a)
+	f2 := Fingerprint(b)
+	if f1 < f2 {
+		return -1
+	}
+	if f1 > f2 {
+		return 1
+	}
+	return 0
+}
+
 // Dependency models the reference and usage of another spec, by spec's Kind and Name, and a way
 // to extract its properties, and how it's referenced via the alias in the Properties section of the dependent Spec.
 type Dependency struct {
@@ -65,9 +108,19 @@ type Dependency struct {
 
 // Identity uniquely identifies an instance
 type Identity struct {
-
 	// ID is a unique identifier for the object instance.
 	ID string `json:"id" yaml:"id"`
+}
+
+// Compare implments comparable
+func (i Identity) Compare(other Identity) int {
+	switch {
+	case i.ID == other.ID:
+		return 0
+	case i.ID < other.ID:
+		return -1
+	}
+	return 1
 }
 
 // Metadata captures label and descriptive information about the object
@@ -81,6 +134,41 @@ type Metadata struct {
 
 	// Tags are a collection of labels, in key-value form, about the object
 	Tags map[string]string `json:"tags"`
+}
+
+// Fingerprint returns a unqiue key based on the content of this
+func (m Metadata) Fingerprint() string {
+	return Fingerprint(AnyValueMust(m))
+}
+
+// Compare implements comparable
+func (m Metadata) Compare(other Metadata) int {
+	if m.Identity != nil && other.Identity != nil {
+		return m.Identity.Compare(*other.Identity)
+	}
+	switch {
+	case m.Name < other.Name:
+		return -1
+	case m.Name > other.Name:
+		return 1
+	}
+	// when names are same compare the tags
+	if len(m.Tags) < len(other.Tags) {
+		return -1
+	}
+	if len(m.Tags) > len(other.Tags) {
+		return 1
+	}
+	for k, v := range m.Tags {
+		if v == other.Tags[k] {
+			continue
+		}
+		if v < other.Tags[k] {
+			return -1
+		}
+		return 1
+	}
+	return 0
 }
 
 // AddTagsFromStringSlice will parse any '=' delimited strings and set the Tags map. It overwrites on duplicate keys.
@@ -107,6 +195,17 @@ func NewURL(s string) (*URL, error) {
 	}
 	v := URL(*u)
 	return &v, nil
+}
+
+// Compare implements comparable
+func (u URL) Compare(other URL) int {
+	if u.String() < other.String() {
+		return -1
+	}
+	if u.String() > other.String() {
+		return 1
+	}
+	return 0
 }
 
 // Absolute returns true if the url is absolute (not relative)
@@ -140,4 +239,28 @@ func (u *URL) UnmarshalJSON(buff []byte) error {
 	copy := URL(*uu)
 	*u = copy
 	return nil
+}
+
+// MustSpec returns the spec or panic if errors
+func MustSpec(s Spec, err error) Spec {
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+// SpecFromString returns the Specs from input string as YAML or JSON
+func SpecFromString(s string) (Spec, error) {
+	return SpecFromBytes([]byte(s))
+}
+
+// SpecFromBytes parses the input either as YAML or JSON and returns the Specs
+func SpecFromBytes(b []byte) (Spec, error) {
+	out := Spec{}
+	any, err := AnyYAML(b)
+	if err != nil {
+		any = AnyBytes(b)
+	}
+	err = any.Decode(&out)
+	return out, err
 }

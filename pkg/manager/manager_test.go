@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/leader"
 	group_mock "github.com/docker/infrakit/pkg/mock/spi/group"
@@ -61,6 +62,7 @@ func testEnsemble(t *testing.T,
 	leader chan string,
 	ctrl *gomock.Controller,
 	configStore func(*store_mock.MockSnapshot),
+	configMetadataStore func(*store_mock.MockSnapshot),
 	configureGroup func(*group_mock.MockPlugin)) (Backend, server.Stoppable) {
 
 	disc, err := local.NewPluginDiscoveryWithDir(dir)
@@ -71,6 +73,9 @@ func testEnsemble(t *testing.T,
 	snap := store_mock.NewMockSnapshot(ctrl)
 	configStore(snap)
 
+	metadataSnap := store_mock.NewMockSnapshot(ctrl)
+	configMetadataStore(metadataSnap)
+
 	// start group
 	gm := group_mock.NewMockPlugin(ctrl)
 	configureGroup(gm)
@@ -79,7 +84,13 @@ func testEnsemble(t *testing.T,
 	st, err := server.StartPluginAtPath(filepath.Join(dir, "group-stateless"), gs)
 	require.NoError(t, err)
 
-	m := NewManager(disc, detector, nil, snap, "group-stateless")
+	m := NewManager(Options{
+		Name:      plugin.Name("group"),
+		Plugins:   func() discovery.Plugins { return disc },
+		Leader:    detector,
+		SpecStore: snap,
+		Group:     plugin.Name("group-stateless"),
+	})
 
 	return m, st
 }
@@ -136,10 +147,16 @@ func TestNoCallsToGroupWhenNoLeader(t *testing.T) {
 		func(s *store_mock.MockSnapshot) {
 			// no calls
 		},
+		func(s *store_mock.MockSnapshot) {
+			// no calls
+		},
 		func(g *group_mock.MockPlugin) {
 			// no calls
 		})
 	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderChans[1], ctrl,
+		func(s *store_mock.MockSnapshot) {
+			// no calls
+		},
 		func(s *store_mock.MockSnapshot) {
 			// no calls
 		},
@@ -186,6 +203,9 @@ func TestStartOneLeader(t *testing.T) {
 					return nil
 				}).Return(nil)
 		},
+		func(s *store_mock.MockSnapshot) {
+			// TODO
+		},
 		func(g *group_mock.MockPlugin) {
 			g.EXPECT().CommitGroup(gomock.Any(), false).Do(
 				func(spec group.Spec, pretend bool) (string, error) {
@@ -198,6 +218,9 @@ func TestStartOneLeader(t *testing.T) {
 				}).Return("ok", nil)
 		})
 	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderChans[1], ctrl,
+		func(s *store_mock.MockSnapshot) {
+			// no calls expected
+		},
 		func(s *store_mock.MockSnapshot) {
 			// no calls expected
 		},
@@ -249,6 +272,9 @@ func TestChangeLeadership(t *testing.T) {
 				},
 			).Return(nil)
 		},
+		func(s *store_mock.MockSnapshot) {
+			// no calls expected
+		},
 		func(g *group_mock.MockPlugin) {
 			g.EXPECT().CommitGroup(gomock.Any(), false).Do(
 				func(spec group.Spec, pretend bool) (string, error) {
@@ -285,6 +311,9 @@ func TestChangeLeadership(t *testing.T) {
 					return nil
 				},
 			).Return(nil)
+		},
+		func(s *store_mock.MockSnapshot) {
+			// no calls expected
 		},
 		func(g *group_mock.MockPlugin) {
 			g.EXPECT().CommitGroup(gomock.Any(), false).Do(

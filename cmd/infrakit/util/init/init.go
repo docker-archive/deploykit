@@ -102,6 +102,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	starts := cmd.Flags().StringSlice("start", []string{}, "start spec for plugin just like infrakit plugin start")
 
 	debug := cmd.Flags().Bool("debug", false, "True to debug with lots of traces")
+	waitDuration := cmd.Flags().String("wait", "3s", "Wait for plugins to be ready")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
@@ -119,17 +120,21 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			})
 		}
 
+		wait := types.MustParseDuration(*waitDuration)
+
 		pluginManager, err := startPlugins(plugins, services, *configURL, *starts)
 		if err != nil {
 			return err
 		}
 		defer func() {
+			<-time.After(wait.Duration())
 			pluginManager.TerminateAll()
 			pluginManager.WaitForAllShutdown()
 			pluginManager.Stop()
 		}()
 
 		pluginManager.WaitStarting()
+		<-time.After(wait.Duration())
 
 		input, err := services.ReadFromStdinIfElse(
 			func() bool { return args[0] == "-" },
@@ -137,6 +142,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			services.ToJSON,
 		)
 		if err != nil {
+			log.Error("processing input", "err", err)
 			return err
 		}
 
@@ -171,6 +177,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		// Get the flavor properties and use that to call the prepare of the Flavor to generate the init
 		endpoint, err := plugins().Find(groupSpec.Flavor.Plugin)
 		if err != nil {
+			log.Error("error looking up plugin", "plugin", groupSpec.Flavor.Plugin, "err", err)
 			return err
 		}
 
@@ -197,8 +204,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			group_types.Index{Group: group.ID(*groupID), Sequence: *sequence})
 
 		if err != nil {
+			log.Error("error preparing", "err", err, "spec", instanceSpec)
 			return err
 		}
+
+		log.Info("apply init template", "init", instanceSpec.Init)
 
 		// Here the Init may contain template vars since in the evaluation of the manager / worker
 		// init templates, we do not propapage the vars set in the command line here.

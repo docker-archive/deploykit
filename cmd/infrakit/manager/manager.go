@@ -72,7 +72,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 						log.Debug("Found manager", "name", name, "addr", endpoint.Address)
 
-						updatablePlugin = metadata_rpc.AdaptUpdatable(rpcClient)
+						updatablePlugin = metadata_rpc.AdaptUpdatable(plugin.Name(name), rpcClient)
 						updatablePluginName = name
 
 						log.Debug("Found updatable", "name", name, "addr", endpoint.Address)

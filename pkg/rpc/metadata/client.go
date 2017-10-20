@@ -1,14 +1,19 @@
 package metadata
 
 import (
+	"fmt"
+
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
-func NewClient(socketPath string) (metadata.Plugin, error) {
-	p, err := NewClientUpdatable(socketPath)
+// If the backend implements Updatable then the returned Plugin can be casted to Updatable.
+func NewClient(name plugin.Name, socketPath string) (metadata.Plugin, error) {
+	p, err := NewClientUpdatable(name, socketPath)
 	if err == nil {
 		return p, nil
 	}
@@ -16,41 +21,42 @@ func NewClient(socketPath string) (metadata.Plugin, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &client{client: rpcClient}, nil
+	return &client{name: name, client: rpcClient}, nil
+}
+
+// FromHandshaker returns a Plugin client.  If the backend implements
+// the Updatable interface, this can be type casted to metadata.Updatable
+func FromHandshaker(name plugin.Name, handshaker rpc.Handshaker) (metadata.Plugin, error) {
+	cl, err := rpc_client.FromHandshaker(handshaker, metadata.UpdatableInterfaceSpec)
+	if err == nil {
+		return AdaptUpdatable(name, cl), nil
+	}
+	if err != nil {
+		// try with a different interface
+		cl, err = rpc_client.FromHandshaker(handshaker, metadata.InterfaceSpec)
+		if err == nil {
+			return Adapt(name, cl), nil
+		}
+	}
+	return nil, fmt.Errorf("plugin named %v not a metadata.Plugin or Updatable", name)
 }
 
 // Adapt converts a rpc client to a Metadata plugin object
-func Adapt(rpcClient rpc_client.Client) metadata.Plugin {
-	return &client{client: rpcClient}
+func Adapt(name plugin.Name, rpcClient rpc_client.Client) metadata.Plugin {
+	return &client{name: name, client: rpcClient}
 }
 
 type client struct {
+	name   plugin.Name
 	client rpc_client.Client
-}
-
-func (c client) list(method string, path types.Path) ([]string, error) {
-	req := ListRequest{Path: path}
-	resp := ListResponse{}
-	err := c.client.Call(method, req, &resp)
-	return resp.Nodes, err
 }
 
 // List returns a list of nodes under path.
 func (c client) List(path types.Path) ([]string, error) {
-	return c.list("Metadata.List", path)
-}
-
-func (c client) get(method string, path types.Path) (*types.Any, error) {
-	req := GetRequest{Path: path}
-	resp := GetResponse{}
-	err := c.client.Call(method, req, &resp)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Value, err
+	return list(c.name, c.client, "Metadata.List", path)
 }
 
 // Get retrieves the metadata at path.
 func (c client) Get(path types.Path) (*types.Any, error) {
-	return c.get("Metadata.Get", path)
+	return get(c.name, c.client, "Metadata.Get", path)
 }

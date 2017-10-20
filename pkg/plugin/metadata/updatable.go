@@ -21,17 +21,15 @@ type LoadFunc func() (original *types.Any, err error)
 type CommitFunc func(proposed *types.Any) error
 
 // NewUpdatablePlugin assembles the implementations into a Updatable implementation
-func NewUpdatablePlugin(reader metadata.Plugin, load LoadFunc, commit CommitFunc) metadata.Updatable {
+func NewUpdatablePlugin(reader metadata.Plugin, commit CommitFunc) metadata.Updatable {
 	return &updatable{
 		Plugin: reader,
-		load:   load,
 		commit: commit,
 	}
 }
 
 type updatable struct {
 	metadata.Plugin
-	load   LoadFunc
 	commit CommitFunc
 }
 
@@ -40,15 +38,24 @@ type updatable struct {
 func changeSet(changes []metadata.Change) (*types.Any, error) {
 	changed := map[string]interface{}{}
 	for _, c := range changes {
-		if !types.Put(c.Path, c.Value, changed) {
+		if !types.Put(c.Path, c.Value, &changed) {
 			return nil, fmt.Errorf("can't apply change %s %s", c.Path, c.Value)
 		}
 	}
 	return types.AnyValue(changed)
 }
 
+func (p updatable) load() (original *types.Any, err error) {
+	return p.Plugin.Get(types.Dot)
+}
+
 // Changes sends a batch of changes and gets in return a proposed view of configuration and a cas hash.
 func (p updatable) Changes(changes []metadata.Change) (original, proposed *types.Any, cas string, err error) {
+
+	if u, is := p.Plugin.(metadata.Updatable); is {
+		return u.Changes(changes)
+	}
+
 	// first read the data to be modified
 	original, err = p.load()
 	if err != nil {
@@ -96,15 +103,32 @@ func (p updatable) Changes(changes []metadata.Change) (original, proposed *types
 // optimistic concurrency control.
 func (p updatable) Commit(proposed *types.Any, cas string) error {
 
-	// first read the data to be modified
-	buff, err := p.load()
-	if err != nil {
-		return err
-	}
+	log.Debug("commit", "proposed", proposed, "cas", cas, "V", debugV)
 
-	hash := types.Fingerprint(buff, proposed)
-	if hash != cas {
-		return fmt.Errorf("cas mismatch")
+	u, is := p.Plugin.(metadata.Updatable)
+
+	if is {
+
+		log.Debug("forward commit to backend", "plugin", u, "V", debugV)
+
+		if err := u.Commit(proposed, cas); err != nil {
+			return err
+		}
+
+	} else {
+
+		log.Debug("commit in local layer", "V", debugV)
+
+		// first read the data to be modified
+		buff, err := p.load()
+		if err != nil {
+			return err
+		}
+
+		hash := types.Fingerprint(buff, proposed)
+		if hash != cas {
+			return fmt.Errorf("cas mismatch")
+		}
 	}
 
 	return p.commit(proposed)

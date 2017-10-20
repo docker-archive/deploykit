@@ -18,9 +18,6 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 
-	//_ "github.com/docker/infrakit/cmd/infrakit/event"
-	//_ "github.com/docker/infrakit/cmd/infrakit/metadata"
-
 	// CLI commands
 	_ "github.com/docker/infrakit/cmd/infrakit/manager"
 	_ "github.com/docker/infrakit/cmd/infrakit/playbook"

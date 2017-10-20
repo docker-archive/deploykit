@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -34,6 +35,10 @@ var DefaultBackendEtcdOptions = BackendEtcdOptions{
 }
 
 func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options) error {
+	if managerConfig != nil {
+		return nil
+	}
+
 	if options.TLS != nil {
 		config, err := tlsconfig.Client(*options.TLS)
 		if err != nil {
@@ -50,17 +55,25 @@ func configEtcdBackends(options BackendEtcdOptions, managerConfig *Options) erro
 
 	leader := etcd_leader.NewDetector(options.PollInterval.Duration(), etcdClient)
 	leaderStore := etcd_leader.NewStore(etcdClient)
-	snapshot, err := etcd_store.NewSnapshot(etcdClient)
+	snapshot, err := etcd_store.NewSnapshot(etcdClient, "specs")
 	if err != nil {
 		return err
 	}
 
-	if managerConfig != nil {
-		managerConfig.leader = leader
-		managerConfig.leaderStore = leaderStore
-		managerConfig.store = snapshot
-		managerConfig.cleanUpFunc = func() { etcdClient.Close() }
+	managerConfig.Leader = leader
+	managerConfig.LeaderStore = leaderStore
+	managerConfig.SpecStore = snapshot
+	managerConfig.cleanUpFunc = func() { etcdClient.Close() }
+
+	key := "global.vars"
+	if !managerConfig.Metadata.IsEmpty() {
+		key = fmt.Sprintf("%s.vars", managerConfig.Metadata.Lookup())
 	}
 
+	metadataSnapshot, err := etcd_store.NewSnapshot(etcdClient, key)
+	if err != nil {
+		return err
+	}
+	managerConfig.MetadataStore = metadataSnapshot
 	return nil
 }

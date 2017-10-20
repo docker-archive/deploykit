@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/docker/infrakit/pkg/util/etcd/v3"
 	"github.com/stretchr/testify/require"
 )
+
+const defaultKey = "groups.json"
 
 func TestWithRealEtcd(t *testing.T) {
 
@@ -55,7 +58,7 @@ func testSaveLoad(t *testing.T) {
 
 	etcdClient, err := etcd.NewClient(options)
 	require.NoError(t, err)
-	snap, err := NewSnapshot(etcdClient)
+	snap, err := NewSnapshot(etcdClient, defaultKey)
 	require.NoError(t, err)
 
 	defer snap.Close()
@@ -85,7 +88,7 @@ func testSaveLoad(t *testing.T) {
 	require.Equal(t, config, config2)
 
 	// verify with the etcdctl client
-	output, err := etcd.Get.Output(ip, DefaultKey)
+	output, err := etcd.Get.Output(ip, path.Join(namespace, defaultKey))
 	require.NoError(t, err)
 
 	log.Info("read by etcdctl", "result", string(output))

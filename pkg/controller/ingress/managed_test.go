@@ -1,6 +1,7 @@
 package ingress
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
@@ -15,6 +16,10 @@ type fakeLeadership <-chan bool
 
 func (l fakeLeadership) IsLeader() (bool, error) {
 	return <-l, nil
+}
+
+func (l fakeLeadership) LeaderLocation() (*url.URL, error) {
+	return nil, nil
 }
 
 func TestManagedStartStop(t *testing.T) {

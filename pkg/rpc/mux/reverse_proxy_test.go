@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	rpc_metadata "github.com/docker/infrakit/pkg/rpc/metadata"
@@ -41,6 +42,13 @@ func TestPluginNameFromURL(t *testing.T) {
 	u, err = url.Parse("http://host:2302//")
 	require.NoError(t, err)
 	require.Equal(t, "", pluginName(u))
+}
+
+func nameFromPath(p string, pp ...string) plugin.Name {
+	if len(pp) == 0 {
+		return plugin.Name(filepath.Base(p))
+	}
+	return plugin.Name(filepath.Base(p) + "/" + pp[0])
 }
 
 func tempSocket(n string) string {
@@ -95,16 +103,18 @@ func startPlugin(t *testing.T, name string) (string, rpc_server.Stoppable) {
 	types.Put(types.PathFromString("region/us-west-2/vpc/vpc21/network/network211/id"), "id-network211", m)
 	types.Put(types.PathFromString("region/us-west-2/metrics/instances/count"), 100, m)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, rpc_metadata.PluginServerWithTypes(
-		map[string]metadata.Plugin{
-			"aws": &testing_metadata.Plugin{
-				DoList: func(path types.Path) ([]string, error) {
-					return types.List(path, m), nil
+	server, err := rpc_server.StartPluginAtPath(socketPath, rpc_metadata.ServerWithNames(
+		func() (map[string]metadata.Plugin, error) {
+			return map[string]metadata.Plugin{
+				"aws": &testing_metadata.Plugin{
+					DoList: func(path types.Path) ([]string, error) {
+						return types.List(path, m), nil
+					},
+					DoGet: func(path types.Path) (*types.Any, error) {
+						return types.GetValue(path, m)
+					},
 				},
-				DoGet: func(path types.Path) (*types.Any, error) {
-					return types.GetValue(path, m)
-				},
-			},
+			}, nil
 		}))
 	require.NoError(t, err)
 	T(100).Infoln("started plugin", server, "as", name, "at", socketPath)
@@ -128,8 +138,10 @@ func TestMuxPlugins(t *testing.T) {
 	require.Equal(t, pluginName, all[pluginName].Name)
 
 	T(100).Infoln("Basic client")
+	require.Equal(t, []string(nil),
+		first(must(rpc_metadata.NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("aws"))))
 	require.Equal(t, []string{"region"},
-		first(must(rpc_metadata.NewClient(socketPath)).List(types.PathFromString("aws"))))
+		first(must(rpc_metadata.NewClient(nameFromPath(socketPath)+"/aws", socketPath)).List(types.PathFromString("."))))
 
 	infoClient, err := client.NewPluginInfoClient(socketPath)
 	require.NoError(t, err)

@@ -100,7 +100,6 @@ endef
 
 # actual binaries that need to be built:
 $(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
-$(call define_binary_target,infrakit-manager,github.com/docker/infrakit/cmd/manager)
 
 
 # preserves the build/* binaries but use script to call 'infrakit plugin start' instead:
@@ -157,8 +156,7 @@ endif
 
 
 binaries: clean build-binaries build-plugin-start-scripts
-build-binaries:	build/infrakit \
-		build/infrakit-manager \
+build-binaries:	build/infrakit
 
 
 	@echo "+ $@"
@@ -240,10 +238,6 @@ build-devbundle:
 	@docker build ${DOCKER_BUILD_FLAGS} \
 	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
 	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
-ifeq (${E2E_TESTS},true)
-	@echo "Running tests -- scripts/e2e-test-docker-containers.sh to verify the binaries"
-	@scripts/e2e-test-docker-containers.sh
-endif
 ifeq (${DOCKER_PUSH},true)
 	@docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
 ifeq (${DOCKER_TAG_LATEST},true)

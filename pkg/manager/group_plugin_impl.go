@@ -3,7 +3,6 @@ package manager
 import (
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -18,7 +17,7 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	// Always read and then update with the current value.  Assumes the user's input
 	// is always authoritative.
 	stored := globalSpec{}
-	err := stored.load(m.snapshot)
+	err := stored.load(m.Options.SpecStore)
 	if err != nil {
 		return err
 	}
@@ -26,8 +25,8 @@ func (m *manager) updateConfig(spec group.Spec) error {
 	log.Debug("Saving updated config", "global", stored, "spec", spec)
 	defer log.Debug("Saved snapshot", "global", stored, "spec", spec)
 
-	stored.updateGroupSpec(spec, plugin.Name(m.backendName))
-	return stored.store(m.snapshot)
+	stored.updateGroupSpec(spec, m.Options.Group)
+	return stored.store(m.Options.SpecStore)
 }
 
 func (m *manager) removeConfig(id group.ID) error {
@@ -38,7 +37,7 @@ func (m *manager) removeConfig(id group.ID) error {
 	// Always read and then update with the current value.  Assumes the user's input
 	// is always authoritative.
 	stored := globalSpec{}
-	err := stored.load(m.snapshot)
+	err := stored.load(m.Options.SpecStore)
 	if err != nil {
 		return err
 	}
@@ -46,7 +45,7 @@ func (m *manager) removeConfig(id group.ID) error {
 	defer log.Debug("Saved snapshot", "global", stored, "id", id)
 
 	stored.removeGroup(id)
-	return stored.store(m.snapshot)
+	return stored.store(m.Options.SpecStore)
 }
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations
@@ -231,7 +230,7 @@ func (m *manager) loadGroupSpec(id group.ID) (group.Spec, error) {
 	config := globalSpec{}
 
 	// load the latest version -- assumption here is that it's been persisted already.
-	err := config.load(m.snapshot)
+	err := config.load(m.Options.SpecStore)
 	if err != nil {
 		log.Warn("Error loading config", "err", err)
 		return group.Spec{}, err

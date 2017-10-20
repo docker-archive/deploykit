@@ -119,13 +119,13 @@ Available Commands:
 Getting help:
 
 ```shell
-$ infrakit vars metadata -h
+$ infrakit vars -h
 
 
 Access metadata of vars
 
 Usage:
-  infrakit vars metadata [command]
+  infrakit vars [command]
 
 Available Commands:
   cat         Get metadata entry by path
@@ -246,7 +246,7 @@ Proposing 3 changes, hash=0d2e7576bafc24c7f07839f77fad6952
 }
 ```
 
-Not shown above, your terminal show show color differences of the change.  Using the `-c` option will
+Not shown above, your terminal should show color differences of the change.  Using the `-c` option will
 commit the change (which has the hash `0d2e7576bafc24c7f07839f77fad6952`):
 
 ```shell

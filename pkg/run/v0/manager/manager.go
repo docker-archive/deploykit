@@ -7,16 +7,13 @@ import (
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
-	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
-	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/rpc/mux"
 	rpc "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
-	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -35,6 +32,20 @@ const (
 
 	// EnvAdvertise is the location of this node (127.0.0.1:24864)
 	EnvAdvertise = "INFRAKIT_ADVERTISE"
+
+	// EnvGroup is the group name backend
+	EnvGroup = "INFRAKIT_MANAGER_GROUP"
+
+	// EnvMetadata is the metadata backend
+	EnvMetadata = "INFRAKIT_MANAGER_METADATA"
+
+	// EnvMetadataUpdateInterval is the metadata backend update interval
+	// if > 0, this will allow non-leader updates of metadata to be synced
+	// to the leader. otherwise, a non-leader will not see the leader's updates
+	// until it becomes the leader.  This is because even though the data is
+	// persisted, it is not polled and read by the non-leaders on a regular basis
+	// (unless this is set).
+	EnvMetadataUpdateInterval = "INFRAKIT_MANAGER_METADATA_UPDATE_INTERVAL"
 )
 
 var (
@@ -48,12 +59,11 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
+	manager.Options
+
 	// Backend is the backend used for leadership, persistence, etc.
 	// Possible values are file, etcd, and swarm
 	Backend string
-
-	// Name of the backend
-	BackendName plugin.Name
 
 	// Settings is the configuration of the backend
 	Settings *types.Any
@@ -61,10 +71,6 @@ type Options struct {
 	// Mux is the tcp frontend for remote connectivity
 	Mux *MuxConfig
 
-	plugins     func() discovery.Plugins
-	leader      leader.Detector
-	leaderStore leader.Store
-	store       store.Snapshot
 	cleanUpFunc func()
 }
 
@@ -83,7 +89,11 @@ var DefaultOptions = defaultOptions()
 func defaultOptions() (options Options) {
 
 	options = Options{
-		BackendName: plugin.Name("group-stateless"),
+		Options: manager.Options{
+			Group:                   plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
+			Metadata:                plugin.Name(local.Getenv(EnvMetadata, "vars")),
+			MetadataRefreshInterval: types.MustParseDuration(local.Getenv(EnvMetadataUpdateInterval, "3s")),
+		},
 		Mux: &MuxConfig{
 			Listen:    local.Getenv(EnvMuxListen, ":24864"),
 			Advertise: local.Getenv(EnvAdvertise, "localhost:24864"),
@@ -127,7 +137,8 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	log.Info("Decoded input", "config", options)
 	log.Info("Starting up", "backend", options.Backend)
 
-	options.plugins = plugins
+	options.Name = name
+	options.Plugins = plugins
 
 	switch strings.ToLower(options.Backend) {
 	case "etcd":
@@ -141,7 +152,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		if err != nil {
 			return
 		}
-		log.Info("etcd backend", "leader", options.leader, "store", options.store, "cleanup", options.cleanUpFunc)
+		log.Info("etcd backend", "leader", options.Leader, "store", options.SpecStore, "cleanup", options.cleanUpFunc)
 	case "file":
 		backendOptions := DefaultBackendFileOptions
 		err = options.Settings.Decode(&backendOptions)
@@ -153,7 +164,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		if err != nil {
 			return
 		}
-		log.Info("file backend", "leader", options.leader, "store", options.store, "cleanup", options.cleanUpFunc)
+		log.Info("file backend", "leader", options.Leader, "store", options.SpecStore, "cleanup", options.cleanUpFunc)
 	case "swarm":
 		backendOptions := DefaultBackendSwarmOptions
 		err = options.Settings.Decode(&backendOptions)
@@ -165,14 +176,13 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		if err != nil {
 			return
 		}
-		log.Info("swarm backend", "leader", options.leader, "store", options.store, "cleanup", options.cleanUpFunc)
+		log.Info("swarm backend", "leader", options.Leader, "store", options.SpecStore, "cleanup", options.cleanUpFunc)
 	default:
 		err = fmt.Errorf("unknown backend:%v", options.Backend)
 		return
 	}
 
-	lookup, _ := options.BackendName.GetLookupAndType()
-	mgr := manager.NewManager(plugins(), options.leader, options.leaderStore, options.store, lookup)
+	mgr := manager.NewManager(options.Options)
 	log.Info("Start manager", "m", mgr)
 
 	_, err = mgr.Start()
@@ -182,24 +192,13 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	log.Info("Manager running")
 
-	updatable := &metadataModel{
-		snapshot: options.store,
-		manager:  mgr,
-	}
-	updatableModel, _ := updatable.pluginModel()
-
 	transport.Name = name
-
-	metadataUpdatable := metadata_plugin.NewUpdatablePlugin(
-		metadata_plugin.NewPluginFromChannel(updatableModel),
-		updatable.load, updatable.commit)
 
 	impls = map[run.PluginCode]interface{}{
 		run.Manager:           mgr,
 		run.Controller:        mgr.Controllers,
 		run.Group:             mgr.Groups,
-		run.MetadataUpdatable: metadataUpdatable,
-		run.Metadata:          metadataUpdatable,
+		run.MetadataUpdatable: mgr.Metadata,
 	}
 
 	var muxServer rpc.Stoppable
@@ -207,10 +206,10 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	if options.Mux != nil {
 
 		log.Info("Starting mux server", "listen", options.Mux.Listen, "advertise", options.Mux.Advertise)
-		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.Advertise, options.plugins,
+		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.Advertise, options.Plugins,
 			mux.Options{
-				Leadership: options.leader.Receive(),
-				Registry:   options.leaderStore,
+				Leadership: options.Leader.Receive(),
+				Registry:   options.LeaderStore,
 			})
 		if err != nil {
 			panic(err)

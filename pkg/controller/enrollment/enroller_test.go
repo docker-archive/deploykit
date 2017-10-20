@@ -2,6 +2,7 @@ package enrollment
 
 import (
 	"fmt"
+	"net/url"
 	"testing"
 
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
@@ -19,6 +20,10 @@ type fakeLeader func() (bool, error)
 
 func (f fakeLeader) IsLeader() (bool, error) {
 	return f()
+}
+
+func (f fakeLeader) LeaderLocation() (*url.URL, error) {
+	return nil, nil
 }
 
 type fakePlugins map[string]*plugin.Endpoint

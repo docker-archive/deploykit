@@ -15,19 +15,15 @@ import (
 	"golang.org/x/net/context"
 )
 
-const (
-	// SwarmLabel is the label for the swarm annotation that stores a compressed version of the config.
-	SwarmLabel = "infrakit"
-)
-
 type snapshot struct {
 	client docker.APIClientCloser
+	key    string
 }
 
 // NewSnapshot returns an instance of the snapshot service where data is stored as a label
 // in the swarm raft store.
-func NewSnapshot(client docker.APIClientCloser) (store.Snapshot, error) {
-	return &snapshot{client: client}, nil
+func NewSnapshot(client docker.APIClientCloser, key string) (store.Snapshot, error) {
+	return &snapshot{client: client, key: key}, nil
 }
 
 // Save saves a snapshot of the given object and revision.
@@ -36,12 +32,12 @@ func (s *snapshot) Save(obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	return writeSwarm(s.client, label)
+	return writeSwarm(s.client, s.key, label)
 }
 
 // Load loads a snapshot and marshals into the given reference
 func (s *snapshot) Load(output interface{}) error {
-	label, err := readSwarm(s.client)
+	label, err := readSwarm(s.client, s.key)
 	if err == nil {
 		return decode(label, output)
 	}
@@ -61,14 +57,14 @@ func (s *snapshot) Close() error {
 
 var errNotFound = fmt.Errorf("not-found")
 
-func readSwarm(client docker.APIClientCloser) (string, error) {
+func readSwarm(client docker.APIClientCloser, key string) (string, error) {
 	info, err := client.SwarmInspect(context.Background())
 	if err != nil {
 		return "", err
 	}
 
 	if info.ClusterInfo.Spec.Annotations.Labels != nil {
-		if l, has := info.ClusterInfo.Spec.Annotations.Labels[SwarmLabel]; has {
+		if l, has := info.ClusterInfo.Spec.Annotations.Labels[key]; has {
 			log.Debugln("config=", l)
 			return l, nil
 		}
@@ -76,7 +72,7 @@ func readSwarm(client docker.APIClientCloser) (string, error) {
 	return "", errNotFound
 }
 
-func writeSwarm(client docker.APIClientCloser, value string) error {
+func writeSwarm(client docker.APIClientCloser, key, value string) error {
 	info, err := client.SwarmInspect(context.Background())
 	if err != nil {
 		return err
@@ -84,7 +80,7 @@ func writeSwarm(client docker.APIClientCloser, value string) error {
 	if info.ClusterInfo.Spec.Annotations.Labels == nil {
 		info.ClusterInfo.Spec.Annotations.Labels = map[string]string{}
 	}
-	info.ClusterInfo.Spec.Annotations.Labels[SwarmLabel] = value
+	info.ClusterInfo.Spec.Annotations.Labels[key] = value
 	return client.SwarmUpdate(context.Background(), info.ClusterInfo.Meta.Version, info.ClusterInfo.Spec,
 		swarm.UpdateFlags{})
 }

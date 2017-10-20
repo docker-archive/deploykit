@@ -115,16 +115,25 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				return
 			}
 		case MetadataUpdatable:
-			log.Debug("metadata_rpc.UpdatablePluginServer", "p", p)
-			plugins = append(plugins, metadata_rpc.UpdatablePluginServer(p.(metadata.Updatable)))
+			switch pp := p.(type) {
+			case func() (map[string]metadata.Plugin, error):
+				log.Debug("metadata_rpc.UpdatablePluginServerWithNames", "p", pp)
+				plugins = append(plugins, metadata_rpc.UpdatableServerWithNames(pp))
+			case metadata.Updatable:
+				log.Debug("metadata_rpc.UpdatablePluginServer", "p", p)
+				plugins = append(plugins, metadata_rpc.UpdatableServer(pp))
+			default:
+				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				return
+			}
 		case Metadata:
 			switch pp := p.(type) {
-			case map[string]metadata.Plugin:
+			case func() (map[string]metadata.Plugin, error):
 				log.Debug("metadata_rpc.PluginServerWithTypes", "pp", pp)
-				plugins = append(plugins, metadata_rpc.PluginServerWithTypes(pp))
+				plugins = append(plugins, metadata_rpc.ServerWithNames(pp))
 			case metadata.Plugin:
 				log.Debug("metadata_rpc.PluginServer", "p", pp)
-				plugins = append(plugins, metadata_rpc.PluginServer(pp))
+				plugins = append(plugins, metadata_rpc.Server(pp))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
 				return
@@ -257,7 +266,14 @@ func Call(plugins func() discovery.Plugins,
 				if !is {
 					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
 				}
-				v := metadata_rpc.Adapt(rpcClient)
+				v := metadata_rpc.Adapt(pn, rpcClient)
+				return do(v)
+			case metadata.UpdatableInterfaceSpec:
+				do, is := work.(func(metadata.Updatable) error)
+				if !is {
+					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
+				}
+				v := metadata_rpc.AdaptUpdatable(pn, rpcClient)
 				return do(v)
 			case loadbalancer.InterfaceSpec:
 				do, is := work.(func(loadbalancer.L4) error)
