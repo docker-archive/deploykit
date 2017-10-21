@@ -197,7 +197,7 @@ func (t *Template) RemoveFunc(name ...string) *Template {
 	return t
 }
 
-// Ref returns the value keyed by name in the context of this template. See 'ref' template function.
+// Ref returns the value keyed by name in the context of this template.
 func (t *Template) Ref(name string) interface{} {
 	if found, has := t.globals[name]; has {
 		return found
@@ -241,6 +241,24 @@ func (t *Template) Global(name string, value interface{}) *Template {
 	return t
 }
 
+// DeferVar returns a template expression for a var that isn't resolved at this iteration
+func (t *Template) DeferVar(name string) string {
+	dl := t.options.DelimLeft
+	dr := t.options.DelimRight
+	if dl == "" {
+		dl = "{{"
+	}
+	if dr == "" {
+		dr = "}}"
+	}
+	// Handling of optional parameter isn't possible here because by now the
+	// template engine has already done the variable expansions and we have full values.
+	// Cases like {{ var "my-var" $defaultValue }} will render to {{ var `my-var` }}.
+	// Also this will not work in the case of pipeline - like {{ $x | var "my-var" }} --
+	// which will just render to {{ var `my-var` }}
+	return fmt.Sprintf("%s var `%s` %s", dl, name, dr)
+}
+
 // Var implements the var function. It's a combination of global and ref
 // Note that the behavior of the var function depends on whether the template is used
 // in multiple passes where some var cannot be resolved to values in the first pass.
@@ -256,21 +274,7 @@ func (t *Template) Var(name string, optional ...interface{}) interface{} {
 	if base != nil {
 		return base
 	}
-
-	dl := t.options.DelimLeft
-	dr := t.options.DelimRight
-	if dl == "" {
-		dl = "{{"
-	}
-	if dr == "" {
-		dr = "}}"
-	}
-	// Handling of optional parameter isn't possible here because by now the
-	// template engine has already done the variable expansions and we have full values.
-	// Cases like {{ var "my-var" $defaultValue }} will render to {{ var `my-var` }}.
-	// Also this will not work in the case of pipeline - like {{ $x | var "my-var" }} --
-	// which will just render to {{ var `my-var` }}
-	return fmt.Sprintf("%s var `%s` %s", dl, name, dr)
+	return t.DeferVar(name)
 }
 
 // var implements the var function. It's a combination of global and ref
