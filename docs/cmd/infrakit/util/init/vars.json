@@ -1,0 +1,19 @@
+{{/*
+The vars.json is itself a template.  You can embed template functions
+which will be evaluated when the engine renders itself to create the
+JSON used by the vars plugin.
+*/}}
+{{ var `cluster/user/name` `user` }}
+{{ var `zones/east/cidr` `10.20.100.100/24` }}
+{{ var `zones/west/cidr` `10.20.100.200/24` }}
+{
+    "cluster" : {
+        "size" : 5,
+        "name" : "test",
+        "swarm" : {
+            "joinIP" : "10.20.100.101",
+            "managerIPs" : [ "10.20.100.101", "10.20.100.102", "10.20.100.103" ]
+        }
+    },
+    "shell" : {{ env `SHELL` }}
+}

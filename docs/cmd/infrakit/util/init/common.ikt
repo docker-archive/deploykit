@@ -1,0 +1,24 @@
+{{/* Var variables */}}
+
+{{ var `/cluster/swarm/join/ip` `172.31.16.101` }}
+{{ var `/cluster/swarm/manager/ips` (tuple `172.31.16.101` `172.31.16.102` `172.31.16.103`) }}
+{{ if empty (var `/local/docker/engine/labels`) }}{{ var `/local/docker/engine/labels` (jsonDecode `[]`) }}{{end}}
+
+{{/*
+Integration with the metadata plugin here.
+See infrakit.sh when booting up, we store the variables from cloudformation
+in the vars metadata plugin so that the user-entered values like cluster size can be
+queried later even after the bootstrapping (cloudformation) completes.
+*/}}
+{{ if metadata `vars` }}
+{{ var `/cluster/provider`            ( metadata `vars/cluster/provider` ) }}
+{{ var `/cluster/name`                ( metadata `vars/cluster/name` )}}
+{{ var `/cluster/size`                ( metadata `vars/cluster/size` )}}
+{{ var `/infrakit/config/root`        ( metadata `vars/infrakit/config/root` )}}
+{{ var `/infrakit/metadata/configURL` ( metadata `vars/infrakit/metadata/configURL` ) }}
+{{ var `/infrakit/docker/image`       ( metadata `vars/infrakit/docker/image` )}}
+{{ var `/provider/image/hasDocker`    ( metadata `vars/provider/image/hasDocker` )}}
+{{ end }}
+
+{{ var `/local/install/docker` (var `/provider/image/hasDocker` | default `no` | eq `no` ) }}
+{{ var `/local/docker/user` `ubuntu` }}

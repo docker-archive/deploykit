@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -24,6 +25,11 @@ var (
 // to use, etc.
 // The format is kind[:{plugin_name}][={os|inproc}]
 type StartPlugin string
+
+// FromAddressable returns a StartPlugin encoded string
+func FromAddressable(addr core.Addressable) StartPlugin {
+	return StartPlugin(fmt.Sprintf("%v:%v", addr.Kind(), addr.Plugin().Lookup()))
+}
 
 // Parse parses the specification into parts that the manager can use to launch plugins
 func (arg StartPlugin) Parse() (execName string, kind string, name plugin.Name, err error) {
@@ -83,12 +89,11 @@ func Execute(plugins func() discovery.Plugins,
 		if err != nil {
 			return err
 		}
-
 		err = pluginManager.Launch(execName, kind, name, nil)
 		if err != nil {
 			log.Warn("failed to launch", "exec", execName, "kind", kind, "name", name)
+			return err
 		}
-		return err
 	}
 
 	defer func() {

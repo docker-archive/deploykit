@@ -6,25 +6,28 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
+	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/run/manager"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/run/scope/local"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
 var log = logutil.New("module", "util/init")
 
-func getPluginManager(plugins func() discovery.Plugins, services *cli.Services,
-	configURL string, starts []string) (*manager.Manager, error) {
+func getPluginManager(plugins func() discovery.Plugins,
+	services *cli.Services, configURL string) (*manager.Manager, error) {
 
 	parsedRules := []launch.Rule{}
 
@@ -61,10 +64,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	sequence := cmd.Flags().Uint("sequence", 0, "Sequence in the group")
 
 	configURL := cmd.Flags().String("config-url", "", "URL for the startup configs")
-	starts := cmd.Flags().StringSlice("start", []string{}, "start spec for plugin just like infrakit plugin start")
 
 	debug := cmd.Flags().Bool("debug", false, "True to debug with lots of traces")
-	waitDuration := cmd.Flags().String("wait", "3s", "Wait for plugins to be ready")
+	waitDuration := cmd.Flags().String("wait", "1s", "Wait for plugins to be ready")
+
+	starts := cmd.Flags().StringSlice("start", []string{}, "start spec for plugin just like infrakit plugin start")
+
+	persist := cmd.Flags().Bool("persist", false, "True to persist any vars into backend")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
@@ -84,50 +90,81 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		wait := types.MustParseDuration(*waitDuration)
 
-		pluginManager, err := getPluginManager(plugins, services, *configURL, *starts)
+		pluginManager, err := getPluginManager(plugins, services, *configURL)
 		if err != nil {
 			return err
 		}
 
+		log.Info("Starting up base plugins")
+		basePlugins := []string{"vars"}
+		if *persist {
+			basePlugins = []string{"vars:vars-stateless", "manager:vars", "group:group-stateless"} // manager aliased to vars
+		}
+		for _, base := range basePlugins {
+			execName, kind, name, _ := local.StartPlugin(base).Parse()
+			err := pluginManager.Launch(execName, kind, name, nil)
+			if err != nil {
+				log.Error("cannot start base plugin", "spec", base)
+				return err
+			}
+		}
+		pluginManager.WaitStarting()
+		<-time.After(wait.Duration())
+
+		log.Info("Parsing the input groups.json as template")
+		input, err := services.ReadFromStdinIfElse(
+			func() bool { return args[0] == "-" },
+			func() (string, error) { return services.ProcessTemplate(args[0]) },
+			services.ToJSON,
+		)
+		if err != nil {
+			log.Error("processing input", "err", err)
+			return err
+		}
+
+		// TODO - update the schema soon. This is the Plugin/Properties schema
+		type spec struct {
+			Plugin     plugin.Name
+			Properties struct {
+				ID         group.ID
+				Properties group_types.Spec
+			}
+		}
+
+		specs := []spec{}
+		err = types.AnyString(input).Decode(&specs)
+		if err != nil {
+			return err
+		}
+
+		var groupSpec *group_types.Spec
+		for _, s := range specs {
+			if string(s.Properties.ID) == *groupID {
+				copy := s.Properties.Properties
+				groupSpec = &copy
+				break
+			}
+		}
+
+		if groupSpec == nil {
+			return fmt.Errorf("no such group: %v", *groupID)
+		}
+
+		// Found group spec
+		log.Info("Found group spec", "group", *groupID)
+
+		// Now load the plugins
+		pluginsToStart := func() (targets []local.StartPlugin, err error) {
+			for _, start := range *starts {
+				targets = append(targets, local.StartPlugin(start))
+			}
+
+			// TODO -- get the dependencies too
+			targets = append(targets, local.FromAddressable(core.AddressableFromPluginName(groupSpec.Flavor.Plugin)))
+			return
+		}
+
 		buildInit := func(scope scope.Scope) error {
-
-			input, err := services.ReadFromStdinIfElse(
-				func() bool { return args[0] == "-" },
-				func() (string, error) { return services.ProcessTemplate(args[0]) },
-				services.ToJSON,
-			)
-			if err != nil {
-				log.Error("processing input", "err", err)
-				return err
-			}
-
-			// TODO - update the schema -- this matches the current Plugin/Properties schema
-			type spec struct {
-				Plugin     plugin.Name
-				Properties struct {
-					ID         group.ID
-					Properties group_types.Spec
-				}
-			}
-
-			specs := []spec{}
-			err = types.AnyString(input).Decode(&specs)
-			if err != nil {
-				return err
-			}
-
-			var groupSpec *group_types.Spec
-			for _, s := range specs {
-				if string(s.Properties.ID) == *groupID {
-					copy := s.Properties.Properties
-					groupSpec = &copy
-					break
-				}
-			}
-
-			if groupSpec == nil {
-				return fmt.Errorf("no such group: %v", *groupID)
-			}
 
 			// Get the flavor properties and use that to call the prepare of the Flavor to generate the init
 			endpoint, err := scope.Plugins().Find(groupSpec.Flavor.Plugin)
@@ -175,18 +212,38 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
+			if *persist {
+				vars := plugin.Name("vars")
+				log.Info("Persisting data into the backend")
+				endpoint, err := scope.Plugins().Find(vars)
+				if err != nil {
+					return err
+				}
+				m, err := metadata_rpc.NewClient(vars, endpoint.Address)
+				if err != nil {
+					return err
+				}
+				u, is := m.(metadata.Updatable)
+				if !is {
+					return fmt.Errorf("not updatable")
+				}
+				_, proposed, cas, err := u.Changes([]metadata.Change{})
+				if err != nil {
+					return err
+				}
+				err = u.Commit(proposed, cas)
+				if err != nil {
+					return err
+				}
+			}
+
 			fmt.Print(applied)
 
 			return nil
 		}
 
 		return local.Execute(plugins, pluginManager,
-			func() (targets []local.StartPlugin, err error) {
-				for _, start := range *starts {
-					targets = append(targets, local.StartPlugin(start))
-				}
-				return
-			},
+			pluginsToStart,
 			buildInit,
 			local.Options{
 				StartWait: wait,
