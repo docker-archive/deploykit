@@ -98,7 +98,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		log.Info("Starting up base plugins")
 		basePlugins := []string{"vars"}
 		if *persist {
-			basePlugins = []string{"vars:vars-stateless", "manager:vars", "group:group-stateless"} // manager aliased to vars
+			basePlugins = []string{"vars", "manager", "group"} // manager aliased to vars
 		}
 		for _, base := range basePlugins {
 			execName, kind, name, _ := local.StartPlugin(base).Parse()
@@ -213,7 +213,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			if *persist {
-				vars := plugin.Name("vars")
+				vars := plugin.Name("group/vars")
 				log.Info("Persisting data into the backend")
 				endpoint, err := scope.Plugins().Find(vars)
 				if err != nil {
@@ -232,6 +232,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 					return err
 				}
 				err = u.Commit(proposed, cas)
+				log.Info("Committed to vars", "err", err)
 				if err != nil {
 					return err
 				}
