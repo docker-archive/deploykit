@@ -3,6 +3,7 @@ package init
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/docker/infrakit/pkg/cli"
@@ -12,6 +13,7 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/run/manager"
@@ -71,6 +73,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	starts := cmd.Flags().StringSlice("start", []string{}, "start spec for plugin just like infrakit plugin start")
 
 	persist := cmd.Flags().Bool("persist", false, "True to persist any vars into backend")
+	metadatas := cmd.Flags().StringSlice("metadata", []string{}, "key=value to set metadata")
 
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 
@@ -110,6 +113,24 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		}
 		pluginManager.WaitStarting()
 		<-time.After(wait.Duration())
+
+		if len(*metadatas) > 0 {
+			log.Info("Setting metadata entries")
+			mfunc := metadata_template.MetadataFunc(plugins)
+			for _, md := range *metadatas {
+				// TODO -- this is not transactional.... we don't know
+				// the paths and there may be changes to multiple metadata
+				// plugins.  For now we just process one by one.
+				kv := strings.Split(md, "=")
+				if len(kv) == 2 {
+					_, err := mfunc(kv[0], kv[1])
+					if err != nil {
+						return err
+					}
+					log.Info("written metadata", "key", kv[0], "value", kv[1])
+				}
+			}
+		}
 
 		log.Info("Parsing the input groups.json as template")
 		input, err := services.ReadFromStdinIfElse(
