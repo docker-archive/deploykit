@@ -146,8 +146,9 @@ data fully available.
 
 ### `--var` or `--metadata`?
 
-This is a matter of tasted as they serve different purposes.  If a parameter is only
-meant to be temporary, `--var` will avoid cluttering up the data store.  However,
+This is a matter of taste and requirements, as they serve different purposes.
+If a parameter is only meant to be temporary, `--var` will avoid cluttering up
+the data store.  However,
 `--metadata` is easier to reason about across time and location because that data
 is highly available.  For simplicity, `--metadata` may be the way to start off developing
 your custom templates.
