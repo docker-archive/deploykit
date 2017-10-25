@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -16,7 +15,6 @@ import (
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
-	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/run/manager"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/run/scope/local"
@@ -164,31 +162,22 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		// TODO - update the schema soon. This is the Plugin/Properties schema
-		type spec struct {
-			Plugin     plugin.Name
-			Properties struct {
-				ID         group.ID
-				Properties group_types.Spec
-			}
-		}
-
-		specs := []spec{}
-		err = types.AnyString(input).Decode(&specs)
+		found := false
+		var groupSpec group_types.Spec
+		var gid group.ID
+		err = local.ParseInputSpecs([]byte(input),
+			func(id group.ID, s group_types.Spec) {
+				if string(id) == *groupID {
+					gid = id
+					groupSpec = s
+					found = true
+				}
+			})
 		if err != nil {
+			log.Error("parsing input", "err", err)
 			return err
 		}
-
-		var groupSpec *group_types.Spec
-		for _, s := range specs {
-			if string(s.Properties.ID) == *groupID {
-				copy := s.Properties.Properties
-				groupSpec = &copy
-				break
-			}
-		}
-
-		if groupSpec == nil {
+		if !found {
 			return fmt.Errorf("no such group: %v", *groupID)
 		}
 
@@ -201,18 +190,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			for _, start := range *starts {
 				targets = append(targets, local.StartPlugin(start))
 			}
-
-			targets = append(targets, local.FromAddressable(core.AddressableFromPluginName(groupSpec.Flavor.Plugin)))
-
-			if spec, err := toSpec(group.ID(*groupID), *groupSpec); err == nil {
-				log.Debug("resolving", "groupID", *groupID, "spec", spec)
-				if other, err := depends.Resolve(spec, spec.Kind, nil); err == nil {
-					for _, r := range other {
-						targets = append(targets, local.FromAddressable(r))
-					}
-				}
+			more, err := local.Plugins(gid, groupSpec)
+			if err != nil {
+				return targets, err
 			}
-
+			targets = append(targets, more...)
 			log.Info("plugins to start", "targets", targets)
 			return
 		}
