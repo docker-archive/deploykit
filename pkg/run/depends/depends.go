@@ -5,14 +5,13 @@ import (
 	"sync"
 
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 var log = logutil.New("module", "run/depends")
 
 // ParseDependsFunc returns a list of dependencies of this spec.
-type ParseDependsFunc func(types.Spec) ([]plugin.Name, error)
+type ParseDependsFunc func(types.Spec) (Runnables, error)
 
 var (
 	parsers = map[string]map[types.InterfaceSpec]ParseDependsFunc{}
@@ -38,7 +37,7 @@ func Register(key string, interfaceSpec types.InterfaceSpec, f ParseDependsFunc)
 // Resolve returns the dependencies listed in the spec as well as inside the properties.
 // InterfaceSpec is optional.  If nil, the first match by key (kind) is used.  If nothing is registered, returns nil
 // and no error.  Error is returned for exceptions (eg. parsing, etc.)
-func Resolve(spec types.Spec, key string, interfaceSpec *types.InterfaceSpec) ([]plugin.Name, error) {
+func Resolve(spec types.Spec, key string, interfaceSpec *types.InterfaceSpec) (Runnables, error) {
 	lock.RLock()
 	defer lock.RUnlock()
 

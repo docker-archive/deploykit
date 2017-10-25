@@ -16,9 +16,11 @@ import (
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/run/manager"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/run/scope/local"
+	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -26,7 +28,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var log = logutil.New("module", "util/init")
+var log = logutil.New("module", "cmd/infrakit/util/init")
+
+func toSpec(gid group.ID, g group_types.Spec) (spec types.Spec, err error) {
+	any, e := types.AnyValue(g)
+	if e != nil {
+		err = e
+		return
+	}
+	spec = types.Spec{
+		Kind:    group_kind.Kind,
+		Version: group.InterfaceSpec.Encode(),
+		Metadata: types.Metadata{
+			Identity: &types.Identity{ID: string(gid)},
+			Name:     plugin.NameFrom(group_kind.Kind, string(gid)).String(),
+		},
+		Properties: any,
+		Options:    nil, // TOOD -- the old format doesn't have this information.
+	}
+	return
+}
 
 func getPluginManager(plugins func() discovery.Plugins,
 	services *cli.Services, configURL string) (*manager.Manager, error) {
@@ -176,12 +197,23 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		// Now load the plugins
 		pluginsToStart := func() (targets []local.StartPlugin, err error) {
+
 			for _, start := range *starts {
 				targets = append(targets, local.StartPlugin(start))
 			}
 
-			// TODO -- get the dependencies too
 			targets = append(targets, local.FromAddressable(core.AddressableFromPluginName(groupSpec.Flavor.Plugin)))
+
+			if spec, err := toSpec(group.ID(*groupID), *groupSpec); err == nil {
+				log.Debug("resolving", "groupID", *groupID, "spec", spec)
+				if other, err := depends.Resolve(spec, spec.Kind, nil); err == nil {
+					for _, r := range other {
+						targets = append(targets, local.FromAddressable(r))
+					}
+				}
+			}
+
+			log.Info("plugins to start", "targets", targets)
 			return
 		}
 

@@ -18,7 +18,7 @@ func init() {
 }
 
 // ResolveDependencies returns a list of dependencies by parsing the opaque Properties blob.
-func ResolveDependencies(spec types.Spec) ([]plugin.Name, error) {
+func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	if spec.Properties == nil {
 		return nil, nil
 	}
@@ -29,9 +29,9 @@ func ResolveDependencies(spec types.Spec) ([]plugin.Name, error) {
 		return nil, err
 	}
 
-	out := []plugin.Name{}
+	out := depends.Runnables{}
 	for _, p := range properties {
-		out = append(out, p.L4Plugin)
+		out = append(out, depends.RunnableFrom(p.L4Plugin))
 	}
 	return out, nil
 }

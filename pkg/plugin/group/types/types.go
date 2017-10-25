@@ -19,18 +19,66 @@ func init() {
 }
 
 // ResolveDependencies returns a list of dependencies by parsing the opaque Properties blob.
-func ResolveDependencies(spec types.Spec) ([]plugin.Name, error) {
+func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
+
 	if spec.Properties == nil {
 		return nil, nil
 	}
 
-	groupSpec := Spec{}
+	// This extends on the group plugin spec to add optional Options section
+	type t struct {
+		Instance struct {
+			Plugin     plugin.Name
+			Properties *types.Any
+			Options    *types.Any
+		}
+		Flavor struct {
+			Plugin     plugin.Name
+			Properties *types.Any
+			Options    *types.Any
+		}
+	}
+
+	groupSpec := t{}
 	err := spec.Properties.Decode(&groupSpec)
 	if err != nil {
 		return nil, err
 	}
 
-	return []plugin.Name{groupSpec.Instance.Plugin, groupSpec.Flavor.Plugin}, nil
+	instancePlugin := types.Spec{
+		Kind: groupSpec.Instance.Plugin.Lookup(),
+		Metadata: types.Metadata{
+			Name: groupSpec.Instance.Plugin.String(),
+		},
+		Properties: groupSpec.Instance.Properties,
+		Options:    groupSpec.Instance.Options,
+	}
+
+	flavorPlugin := types.Spec{
+		Kind: groupSpec.Flavor.Plugin.Lookup(),
+		Metadata: types.Metadata{
+			Name: groupSpec.Flavor.Plugin.String(),
+		},
+		Properties: groupSpec.Flavor.Properties,
+		Options:    groupSpec.Flavor.Options,
+	}
+
+	all := depends.Runnables{
+		depends.AsRunnable(instancePlugin),
+		depends.AsRunnable(flavorPlugin),
+	}
+
+	// For any instance / flavor plugins nested:
+
+	nestedInstances, err := depends.Resolve(instancePlugin, instancePlugin.Kind, nil)
+	if err == nil {
+		all = append(all, nestedInstances...)
+	}
+	nestedFlavors, err := depends.Resolve(flavorPlugin, flavorPlugin.Kind, nil)
+	if err == nil {
+		all = append(all, nestedFlavors...)
+	}
+	return all, nil
 }
 
 // Spec is the configuration schema for the plugin, provided in group.Spec.Properties

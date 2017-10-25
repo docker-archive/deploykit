@@ -190,6 +190,7 @@ func (m *Manager) Launch(exec string, key string, name plugin.Name, options *typ
 
 	lookup, _ := name.GetLookupAndType()
 	if countMatches([]string{lookup}, running) > 0 {
+		log.Debug("already running", "lookup", lookup, "name", name)
 		m.started <- name
 		return nil
 	}
