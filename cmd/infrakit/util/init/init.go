@@ -94,7 +94,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		wait := types.MustParseDuration(*waitDuration)
 
-		pluginManager, err := getPluginManager(plugins, services, *configURL)
+		pluginManager, err := cli.PluginManager(plugins, services, *configURL)
 		if err != nil {
 			return err
 		}
