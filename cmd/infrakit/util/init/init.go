@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/infrakit/cmd/infrakit/manager/schema"
+
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
@@ -18,7 +20,6 @@ import (
 	"github.com/docker/infrakit/pkg/run/manager"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/run/scope/local"
-	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -27,25 +28,6 @@ import (
 )
 
 var log = logutil.New("module", "cmd/infrakit/util/init")
-
-func toSpec(gid group.ID, g group_types.Spec) (spec types.Spec, err error) {
-	any, e := types.AnyValue(g)
-	if e != nil {
-		err = e
-		return
-	}
-	spec = types.Spec{
-		Kind:    group_kind.Kind,
-		Version: group.InterfaceSpec.Encode(),
-		Metadata: types.Metadata{
-			Identity: &types.Identity{ID: string(gid)},
-			Name:     plugin.NameFrom(group_kind.Kind, string(gid)).String(),
-		},
-		Properties: any,
-		Options:    nil, // TOOD -- the old format doesn't have this information.
-	}
-	return
-}
 
 func getPluginManager(plugins func() discovery.Plugins,
 	services *cli.Services, configURL string) (*manager.Manager, error) {
@@ -165,13 +147,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		found := false
 		var groupSpec group_types.Spec
 		var gid group.ID
-		err = local.ParseInputSpecs([]byte(input),
-			func(id group.ID, s group_types.Spec) {
+
+		err = schema.ParseInputSpecs([]byte(input),
+			func(name plugin.Name, id group.ID, s group_types.Spec) error {
 				if string(id) == *groupID {
 					gid = id
 					groupSpec = s
 					found = true
 				}
+				return nil
 			})
 		if err != nil {
 			log.Error("parsing input", "err", err)
