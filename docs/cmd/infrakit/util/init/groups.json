@@ -1,0 +1,65 @@
+{{ source "common.ikt" }}{{/* source some variables */}}
+
+{{/* Local variables */}}
+{{ $swarmLeaderIP := var `vars/cluster/swarm/joinIP` }}
+{{ $managerIPs := var `vars/cluster/swarm/managerIPs` }}
+{{ $workerSize := sub (var `vars/cluster/size`) (len $managerIPs) }}
+{{ $managerInit := cat (var `vars/config/root`) `/init.sh` | nospace }}
+
+{{ $dockerEngine := `unix:///var/run/docker.sock` }} {{/* for this flavor to connect to */}}
+[
+    {
+        "Plugin": "group",
+        "Properties": {
+            "ID": "managers",
+            "Properties": {
+                "Allocation": {
+                    "LogicalIDs": {{ $managerIPs | jsonEncode }}
+                },
+                "Flavor": {
+                    "Plugin" : "combo",
+                    "Properties" : [
+                        {
+                            "Plugin": "swarm/manager",
+                            "Properties": {
+                                "Attachments" : {
+                                    "{{index $managerIPs 0}}" : [
+                                        { "ID":"{{index $managerIPs 0}}", "Type":"ebs" }
+                                    ],
+                                    "{{index $managerIPs 1}}" : [
+                                        { "ID":"{{index $managerIPs 1}}", "Type":"ebs" }
+                                    ],
+                                    "{{index $managerIPs 2}}" : [
+                                        { "ID":"{{index $managerIPs 2}}", "Type":"ebs" }
+                                    ]
+                                },
+                                "InitScriptTemplateURL": "{{ $managerInit }}",
+                                "SwarmJoinIP": "{{ $swarmLeaderIP }}",
+                                "Docker" : {
+                                    "Host" : "{{ $dockerEngine }}"
+                                }
+                            }
+                        },
+                        {
+                            "Plugin": "vanilla",
+                            "Properties": {
+                                "Init" : [
+                                    "sudo apt-get install -y something-else",
+                                    "./configure-something-else"
+                                ]
+                            }
+                        }
+                    ]
+
+
+                },
+                "Instance": {
+                    "Plugin" : "simulator/compute",
+                    "Properties" : {
+                        "CustomNotes" : "This is custom for manager"
+                    }
+                }
+            }
+        }
+    }
+]

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
+
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -16,7 +18,6 @@ import (
 	"github.com/docker/infrakit/pkg/run/manager"
 	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
-	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -139,9 +140,9 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
-	mustAll := start.Flags().Bool("all", false, "Panic if any plugin fails to start")
-	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
-	start.Flags().AddFlagSet(templateFlags)
+
+	services := cli.NewServices(plugins)
+	start.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
 	start.RunE = func(c *cobra.Command, args []string) error {
 
@@ -149,32 +150,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			panic("no plugins()")
 		}
 
-		parsedRules := []launch.Rule{}
-
 		log.Info("config", "url", *configURL)
-
-		if *configURL != "" {
-			buff, err := processTemplate(*configURL)
-			if err != nil {
-				return err
-			}
-
-			view, err := toJSON([]byte(buff))
-			if err != nil {
-				return err
-			}
-
-			configs := types.AnyBytes(view)
-			err = configs.Decode(&parsedRules)
-			if err != nil {
-				return err
-			}
-		}
-
-		pluginManager, err := manager.ManagePlugins(parsedRules, plugins, *mustAll, 5*time.Second)
+		pluginManager, err := cli.PluginManager(plugins, services, *configURL)
 		if err != nil {
 			return err
 		}
+
 		defer func() {
 			if r := recover(); r != nil {
 				log.Error("Error occurred. Recovered but exiting.", "err", r)

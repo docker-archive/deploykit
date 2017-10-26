@@ -21,7 +21,7 @@ func init() {
 }
 
 // ResolveDependencies returns a list of dependencies by parsing the opaque Properties blob.
-func ResolveDependencies(spec types.Spec) ([]plugin.Name, error) {
+func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	if spec.Properties == nil {
 		return nil, nil
 	}
@@ -32,7 +32,14 @@ func ResolveDependencies(spec types.Spec) ([]plugin.Name, error) {
 		return nil, err
 	}
 
-	return []plugin.Name{properties.Instance.Plugin}, nil
+	return depends.Runnables{
+		depends.AsRunnable(types.Spec{
+			Kind: properties.Instance.Plugin.Lookup(),
+			Metadata: types.Metadata{
+				Name: properties.Instance.Plugin.String(),
+			},
+		}),
+	}, nil
 }
 
 // ListSourceUnion is a union type of possible values:

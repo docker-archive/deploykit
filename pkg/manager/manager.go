@@ -212,7 +212,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 				// same leader node.
 				err := m.loadMetadata()
 				if err != nil {
-					log.Error("error loading metadata", "err", err)
+					log.Debug("error loading metadata", "err", err)
 				}
 
 				<-metadataRefresh
@@ -385,7 +385,7 @@ func (m *manager) loadMetadata() (err error) {
 		return nil
 	}
 
-	log.Info("loading metadata and committing")
+	log.Debug("loading metadata and committing")
 
 	var saved interface{}
 	err = m.Options.MetadataStore.Load(&saved)
@@ -400,7 +400,7 @@ func (m *manager) loadMetadata() (err error) {
 	}
 
 	if any == nil {
-		log.Info("no metadata stored")
+		log.Debug("no metadata stored")
 		return
 	}
 

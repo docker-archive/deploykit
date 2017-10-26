@@ -21,16 +21,27 @@ func StdFunctions(engine *template.Template, plugins func() discovery.Plugins) *
 			},
 			// This is an override of the existing Var function
 			{
-				Name: "var2",
+				Name: "var",
 				Func: func(name string, optional ...interface{}) (interface{}, error) {
 
-					// returns nil if it's a read and unresolved
-					// or if it's a write, returns a void value that is not nil (an empty string)
-					v := engine.Var(name, optional...)
+					if len(optional) > 0 {
+						return engine.Var(name, optional...), nil
+					}
+
+					v := engine.Ref(name)
 					if v == nil {
 						// If not resolved, try to interpret the path as a path for metadata...
-						return metadata_template.MetadataFunc(plugins)(name, optional...)
+						m, err := metadata_template.MetadataFunc(plugins)(name, optional...)
+						if err != nil {
+							return nil, err
+						}
+						v = m
 					}
+
+					if v == nil && engine.Options().MultiPass {
+						return engine.DeferVar(name), nil
+					}
+
 					return v, nil
 				},
 			},

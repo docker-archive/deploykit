@@ -2,19 +2,21 @@ package up
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
+	"github.com/docker/infrakit/cmd/infrakit/manager/schema"
+
+	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/launch"
-	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/run"
-	run_manager "github.com/docker/infrakit/pkg/run/manager"
-	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
-	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
+	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/run/scope/local"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -28,38 +30,17 @@ func init() {
 // Command is the entrypoint
 func Command(plugins func() discovery.Plugins) *cobra.Command {
 
-	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
-
-	loadRules := func(url string) ([]launch.Rule, error) {
-		rules := []launch.Rule{}
-		if buff, err := processTemplate(url); err != nil {
-			return nil, err
-		} else if view, err := toJSON([]byte(buff)); err != nil {
-			return nil, err
-		} else if err = types.AnyBytes(view).Decode(&rules); err != nil {
-			return nil, err
-		}
-		return rules, nil
-	}
-	loadSpecs := func(url string) ([]types.Spec, error) {
-		specs := []types.Spec{}
-		if buff, err := processTemplate(url); err != nil {
-			return nil, err
-		} else if view, err := toJSON([]byte(buff)); err != nil {
-			return nil, err
-		} else if err = types.AnyBytes(view).Decode(&specs); err != nil {
-			return nil, err
-		}
-		return specs, nil
-	}
+	services := cli.NewServices(plugins)
 
 	up := &cobra.Command{
 		Use:   "up <url>",
 		Short: "Up everything",
 	}
 
-	launchConfigURL := up.Flags().String("launch-config-url", "", "URL for the startup configs")
-	up.Flags().AddFlagSet(templateFlags)
+	waitDuration := up.Flags().String("wait", "1s", "Wait for plugins to be ready")
+	configURL := up.Flags().String("config-url", "", "URL for the startup configs")
+	up.Flags().AddFlagSet(services.ProcessTemplateFlags)
+	metadatas := up.Flags().StringSlice("metadata", []string{}, "key=value to set metadata")
 
 	up.RunE = func(c *cobra.Command, args []string) error {
 
@@ -71,94 +52,88 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return fmt.Errorf("missing url arg")
 		}
 
-		// Now the actual spec of the infrastructure to stand up
-		specsURL := args[0]
+		pluginManager, err := cli.PluginManager(plugins, services, *configURL)
+		if err != nil {
+			return err
+		}
 
-		launchRules := []launch.Rule{}
-		// parse the launch rules if any
-		if *launchConfigURL != "" {
-			list, err := loadRules(*launchConfigURL)
+		wait := types.MustParseDuration(*waitDuration)
+
+		log.Info("Starting up base plugins")
+		basePlugins := []string{"vars", "manager"}
+		for _, base := range basePlugins {
+			execName, kind, name, _ := local.StartPlugin(base).Parse()
+			err := pluginManager.Launch(execName, kind, name, nil)
 			if err != nil {
+				log.Error("cannot start base plugin", "spec", base)
 				return err
 			}
-			launchRules = list
 		}
-
-		// Plugin launcher runs asynchronously
-		pluginManager, err := run_manager.ManagePlugins(launchRules, plugins, false, 5*time.Second)
-		if err != nil {
-			return err
-		}
-		defer pluginManager.Stop()
-
-		// start up the basics
-		err = pluginManager.Launch(inproc.ExecName, manager_kind.Kind, plugin.Name(manager_kind.LookupName), nil)
-		if err != nil {
-			return err
-		}
-		err = pluginManager.Launch(inproc.ExecName, group_kind.Kind, plugin.Name(group_kind.LookupName), nil)
-		if err != nil {
-			return err
-		}
-
 		pluginManager.WaitStarting()
+		<-time.After(wait.Duration())
 
-		log.Info("Entering main loop")
-
-		tick := time.Tick(5 * time.Second)
-		stop := make(chan struct{})
-
-		go func() {
-
-		main:
-			for {
-				select {
-				case <-tick:
-
-				// commit the specs to the manager
-				case <-stop:
-					log.Info("Stopped checking for config changes")
-					return
+		if len(*metadatas) > 0 {
+			log.Info("Setting metadata entries")
+			mfunc := metadata_template.MetadataFunc(plugins)
+			for _, md := range *metadatas {
+				// TODO -- this is not transactional.... we don't know
+				// the paths and there may be changes to multiple metadata
+				// plugins.  For now we just process one by one.
+				kv := strings.Split(md, "=")
+				if len(kv) == 2 {
+					_, err := mfunc(kv[0], kv[1])
+					if err != nil {
+						return err
+					}
+					log.Info("written metadata", "key", kv[0], "value", kv[1])
 				}
-
-				// refresh the specs from the url
-				log.Info("Checking", "url", specsURL)
-				specs, err := loadSpecs(specsURL)
-				if err != nil {
-					log.Error("Error loading specs", "url", specsURL, "err", err)
-					continue main
-				}
-
-				// from the specs get the plugin names and kind to start
-				log.Debug("Loaded specs", "specs", specs, "V", logutil.V(200))
-				err = pluginManager.StartPluginsFromSpecs(specs,
-					func(err error) bool {
-						log.Error("cannot start plugin", "err", err)
-						return false
-					})
-
-				if err != nil {
-					log.Error("Error from input. Not committing.", "err", err)
-					continue main
-				}
-
-				// Now tell the manager to enforce
-				err = run.Call(plugins, manager.InterfaceSpec, nil,
-					func(m manager.Manager) error {
-						log.Debug("Calling manager to enforce", "m", m, "specs", specs)
-						return m.Enforce(specs)
-					})
-				if err != nil {
-					log.Error("Error making call to manager", "err", err)
-				}
-
 			}
-		}()
+		}
 
-		pluginManager.WaitForAllShutdown()
-		log.Info("All plugins shutdown")
-		close(stop)
-		return nil
+		log.Info("Parsing the input groups.json as template")
+		input, err := services.ReadFromStdinIfElse(
+			func() bool { return args[0] == "-" },
+			func() (string, error) { return services.ProcessTemplate(args[0]) },
+			services.ToJSON,
+		)
+		if err != nil {
+			log.Error("processing input", "err", err)
+			return err
+		}
+
+		targets := []local.StartPlugin{}
+		err = schema.ParseInputSpecs([]byte(input),
+			func(name plugin.Name, id group.ID, s group_types.Spec) error {
+
+				more, err := local.Plugins(id, s)
+				if err != nil {
+					return err
+				}
+				targets = append(targets, more...)
+				return nil
+			})
+		if err != nil {
+			log.Error("parsing input", "err", err)
+			return err
+		}
+
+		return local.Execute(plugins, pluginManager,
+			func() ([]local.StartPlugin, error) {
+				log.Info("plugins to start", "targets", targets)
+				return targets, nil
+			},
+			func(scope scope.Scope) error {
+				// TODO - in here loop and commit periodically
+
+				pluginManager.WaitForAllShutdown()
+
+				return nil
+			},
+			local.Options{
+				StartWait: wait,
+				StopWait:  wait,
+			},
+		)
 	}
 
 	return up

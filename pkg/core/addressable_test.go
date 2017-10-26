@@ -53,6 +53,11 @@ metadata:
 	require.Equal(t, "group", c.Kind())
 	require.Equal(t, "group-stateless/mygroup", string(c.Plugin()))
 	require.Equal(t, "mygroup", c.Instance())
+
+	c = NewAddressableFromPluginName(plugin.Name("swarm/manager"))
+	require.Equal(t, "swarm", c.Kind())
+	require.Equal(t, "swarm/manager", string(c.Plugin()))
+	require.Equal(t, "swarm", c.Plugin().Lookup())
 }
 
 func TestDerivePluginNames(t *testing.T) {

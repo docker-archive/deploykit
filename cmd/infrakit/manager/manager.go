@@ -7,11 +7,14 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
+	"github.com/docker/infrakit/cmd/infrakit/manager/schema"
+
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
@@ -113,54 +116,36 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			// In any case, the view should be in JSON format
-
-			// Treat this as an Any and then convert
-			any := types.AnyString(view)
-
-			groups := []plugin.Spec{}
-			err = any.Decode(&groups)
-			if err != nil {
-				log.Warn("Error parsing the template for plugin specs.")
-				return err
-			}
-
-			// Check the list of plugins
-			for _, gp := range groups {
-
-				endpoint, err := plugins().Find(gp.Plugin)
+			commitEachGroup := func(name plugin.Name, gid group.ID, gspec group_types.Spec) error {
+				endpoint, err := plugins().Find(name)
 				if err != nil {
 					return err
 				}
-
-				// unmarshal the group spec
-				spec := group.Spec{}
-				if gp.Properties != nil {
-					err = gp.Properties.Decode(&spec)
-					if err != nil {
-						return err
-					}
-				}
-
-				// TODO(chungers) -- we need to enforce and confirm the type of this.
-				// Right now we assume the RPC endpoint is indeed a group.
 				target, err := group_rpc.NewClient(endpoint.Address)
-
-				log.Debug("commit", "plugin", gp.Plugin, "address", endpoint.Address, "err", err, "spec", spec)
+				log.Debug("commit", "plugin", name, "address", endpoint.Address, "err", err, "gspec", gspec)
 
 				if err != nil {
 					return err
 				}
 
-				plan, err := target.CommitGroup(spec, *pretend)
+				any, err := types.AnyValue(gspec)
 				if err != nil {
 					return err
 				}
 
-				fmt.Println("Group", spec.ID, "with plugin", gp.Plugin, "plan:", plan)
+				plan, err := target.CommitGroup(group.Spec{
+					ID:         gid,
+					Properties: any,
+				}, *pretend)
+
+				if err != nil {
+					return err
+				}
+
+				fmt.Println("Group", gid, "with plugin", name, "plan:", plan)
+				return nil
 			}
-
-			return nil
+			return schema.ParseInputSpecs([]byte(view), commitEachGroup)
 		},
 	}
 	commit.Flags().AddFlagSet(templateFlags)
@@ -357,7 +342,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	change.AddCommand(changeList, changeGet)
 
-	cmd.AddCommand(commit, inspect, change, leader)
+	cmd.AddCommand(commit, inspect, leader)
 
 	return cmd
 }
