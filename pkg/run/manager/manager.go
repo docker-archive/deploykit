@@ -16,6 +16,7 @@ import (
 	"github.com/docker/infrakit/pkg/launch/os"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -261,8 +262,19 @@ func (m *Manager) WaitForAllShutdown() {
 func countMatches(list []string, found map[string]*plugin.Endpoint) int {
 	c := 0
 	for _, l := range list {
-		if _, has := found[l]; has {
-			log.Debug("Scan found", "lookup", l, "V", debugLoopV)
+		if ep, has := found[l]; has {
+			// testing it with a handshaker
+			hs, err := client.NewHandshaker(ep.Address)
+			if err != nil {
+				log.Error("Plugin not responding", "lookup", l, "endpoint", ep, "err", err)
+				continue
+			}
+			implements, err := hs.Implements()
+			if err != nil {
+				log.Error("Bad handshake. Is this plugin running?", "lookup", l, "endpoint", ep)
+				continue
+			}
+			log.Debug("Scan found", "lookup", l, "endpoint", ep, "V", debugLoopV, "implements", implements)
 			c++
 		}
 	}

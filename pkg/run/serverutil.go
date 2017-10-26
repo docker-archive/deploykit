@@ -92,12 +92,14 @@ func run(listen []string, discoverPath, pidPath string, onStop func(),
 		s, err := server.StartListenerAtPath(listen, discoverPath, plugin, more...)
 		if err != nil {
 			log.Error("error starting listener", "err", err)
+			panic(err)
 		}
 		stoppable = s
 	} else {
 		s, err := server.StartPluginAtPath(discoverPath, plugin, more...)
 		if err != nil {
 			log.Error("error starting plugin", "err", err)
+			panic(err)
 		}
 		stoppable = s
 	}

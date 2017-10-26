@@ -212,7 +212,8 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 				Registry:   options.LeaderStore,
 			})
 		if err != nil {
-			panic(err)
+			fmt.Printf("Cannot start up mux server.  Error: %v\n", err)
+			os.Exit(-1)
 		}
 	}
 

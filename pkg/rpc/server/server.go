@@ -12,6 +12,7 @@ import (
 	broker "github.com/docker/infrakit/pkg/broker/server"
 	logutil "github.com/docker/infrakit/pkg/log"
 	rpc_server "github.com/docker/infrakit/pkg/rpc"
+	rpc_event "github.com/docker/infrakit/pkg/rpc/event"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/types"
@@ -105,6 +106,13 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 func startAtPath(listen []string, discoverPath string,
 	receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
 
+	df, err := os.Stat(discoverPath)
+	if os.IsExist(err) {
+		log.Error("socket exists", "path", discoverPath, "found", df)
+		fmt.Printf("Socket/ port file found at %v.  Please clean up if no other processes are listening.\n", discoverPath)
+		os.Exit(-1)
+	}
+
 	server := rpc.NewServer()
 	server.RegisterCodec(json2.NewCodec(), "application/json")
 
@@ -118,8 +126,20 @@ func startAtPath(listen []string, discoverPath string,
 		if err := server.RegisterService(t, ""); err != nil {
 			return nil, err
 		}
-	}
 
+		// polymorphic -- register additional interfaces
+		if pub, is := t.(event.Publisher); is {
+
+			t = rpc_event.PluginServer(pub)
+			interfaces[event.InterfaceSpec] = t.Types
+
+			if err := server.RegisterService(t, ""); err != nil {
+				return nil, err
+			}
+
+			log.Info("Object exported as event producer", "object", t)
+		}
+	}
 	// handshake service that can exchange interface versions with client
 	if err := server.RegisterService(rpc_server.Handshake(interfaces), ""); err != nil {
 		return nil, err
@@ -135,6 +155,8 @@ func startAtPath(listen []string, discoverPath string,
 		if !is {
 			continue
 		}
+
+		log.Info("Object is an event producer", "object", t, "discover", discoverPath)
 
 		// We give one channel per source to provide some isolation.  This we won't have the
 		// whole event bus stop just because one plugin closes the channel.
@@ -156,9 +178,6 @@ func startAtPath(listen []string, discoverPath string,
 	if err != nil {
 		return nil, err
 	}
-
-	// httpLog := log.New()
-	// httpLog.Level = log.GetLevel()
 
 	router := mux.NewRouter()
 	router.HandleFunc(rpc_server.URLAPI, info.ShowAPI)
