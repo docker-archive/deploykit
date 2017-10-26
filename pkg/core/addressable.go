@@ -49,9 +49,9 @@ func NewAddressableFromMetadata(kind string, metadata types.Metadata) Addressabl
 	return NewAddressable(kind, plugin.Name(metadata.Name), instance)
 }
 
-// NewAddressable returns a generic addressable object from just the plugin name.
+// NewAddressableFromPluginName returns a generic addressable object from just the plugin name.
 // The kind is assume to be the same as the lookup.
-func AddressableFromPluginName(pn plugin.Name) Addressable {
+func NewAddressableFromPluginName(pn plugin.Name) Addressable {
 	return NewAddressable(pn.Lookup(), pn, "")
 }
 

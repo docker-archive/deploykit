@@ -54,7 +54,7 @@ metadata:
 	require.Equal(t, "group-stateless/mygroup", string(c.Plugin()))
 	require.Equal(t, "mygroup", c.Instance())
 
-	c = AddressableFromPluginName(plugin.Name("swarm/manager"))
+	c = NewAddressableFromPluginName(plugin.Name("swarm/manager"))
 	require.Equal(t, "swarm", c.Kind())
 	require.Equal(t, "swarm/manager", string(c.Plugin()))
 	require.Equal(t, "swarm", c.Plugin().Lookup())
