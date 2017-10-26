@@ -174,11 +174,17 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			for _, start := range *starts {
 				targets = append(targets, local.StartPlugin(start))
 			}
-			more, err := local.Plugins(gid, groupSpec)
-			if err != nil {
-				return targets, err
+
+			// make this either-or to allow manual overriding.
+			if len(*starts) == 0 {
+
+				more, err := local.Plugins(gid, groupSpec)
+				if err != nil {
+					return targets, err
+				}
+				targets = append(targets, more...)
+
 			}
-			targets = append(targets, more...)
 			log.Info("plugins to start", "targets", targets)
 			return
 		}

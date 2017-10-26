@@ -29,7 +29,7 @@ type Validator interface {
 // Publisher is the interface that event sources also implement to be assigned
 // a publish function.
 type Publisher interface {
-
+	Plugin
 	// PublishOn sets the channel to publish
 	PublishOn(chan<- *Event)
 }
