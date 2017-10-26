@@ -72,7 +72,7 @@ func TestHandshakeFailWrongAPI(t *testing.T) {
 	client := rpcClient{client: r}
 	err = client.DoSomething()
 	require.Error(t, err)
-	require.Equal(t, "Plugin does not support interface {OtherPlugin 0.1.0}", err.Error())
+	require.Equal(t, "Plugin does not support interface OtherPlugin/0.1.0", err.Error())
 }
 
 type rpcClient struct {

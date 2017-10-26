@@ -49,7 +49,7 @@ func (c *handshakingClient) handshake() error {
 			return err
 		}
 
-		err = fmt.Errorf("Plugin does not support interface %v", c.iface)
+		err = fmt.Errorf("Plugin does not support interface %v", c.iface.Encode())
 		for _, iface := range apis {
 			if iface.Name == c.iface.Name {
 				if iface.Version == c.iface.Version {

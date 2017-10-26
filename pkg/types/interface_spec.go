@@ -17,6 +17,11 @@ type InterfaceSpec struct {
 	Sub string
 }
 
+// String implements the stringer for fmt printing
+func (i InterfaceSpec) String() string {
+	return i.Encode()
+}
+
 // Encode encodes a struct form to string
 func (i InterfaceSpec) Encode() string {
 	if i.Sub == "" {
