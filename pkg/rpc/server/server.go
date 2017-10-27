@@ -128,7 +128,7 @@ func startAtPath(listen []string, discoverPath string,
 		}
 
 		// polymorphic -- register additional interfaces
-		if pub, is := t.(event.Publisher); is {
+		if pub, is := t.(event.Plugin); is {
 
 			t = rpc_event.PluginServer(pub)
 			interfaces[event.InterfaceSpec] = t.Types

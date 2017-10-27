@@ -29,7 +29,6 @@ type Validator interface {
 // Publisher is the interface that event sources also implement to be assigned
 // a publish function.
 type Publisher interface {
-	Plugin
 
 	// PublishOn sets the channel to publish.  Note that the implementation is given a channel
 	// to publish on.  This is so that the server can optionally add buffering without the
