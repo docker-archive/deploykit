@@ -23,7 +23,7 @@ func TestPluginUnserializedReadWrites(t *testing.T) {
 
 	p := NewPluginFromData(m)
 
-	require.Equal(t, []string{"us-west-1", "us-west-2"}, first(p.List(types.PathFromString("/"))))
+	require.Equal(t, []string{"us-west-1", "us-west-2"}, first(p.Keys(types.PathFromString("/"))))
 	require.Nil(t, first(p.Get(types.PathFromString("us-west-1/metrics/instances/foo"))))
 	require.Equal(t, "2000", first(p.Get(types.PathFromString("us-west-1/metrics/instances/count"))).(*types.Any).String())
 
