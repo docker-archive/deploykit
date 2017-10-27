@@ -13,16 +13,16 @@ import (
 // Ls returns the Ls command
 func Ls(name string, services *cli.Services) *cobra.Command {
 
-	ls := &cobra.Command{
+	els := &cobra.Command{
 		Use:   "topics",
 		Short: "List event topics",
 	}
 
-	long := ls.Flags().BoolP("long", "l", false, "Print full path")
-	all := ls.Flags().BoolP("all", "a", false, "Find all under the paths given")
-	quick := ls.Flags().BoolP("quick", "q", false, "True to turn off headers, etc.")
+	long := els.Flags().BoolP("long", "l", false, "Print full path")
+	all := els.Flags().BoolP("all", "a", false, "Find all under the paths given")
+	quick := els.Flags().BoolP("quick", "q", false, "True to turn off headers, etc.")
 
-	ls.RunE = func(cmd *cobra.Command, args []string) error {
+	els.RunE = func(cmd *cobra.Command, args []string) error {
 
 		eventPlugin, err := LoadPlugin(services.Plugins(), name)
 		if err != nil {
@@ -97,7 +97,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 		}
 		return nil
 	}
-	return ls
+	return els
 }
 
 func listAll(m event.Plugin, path types.Path) ([]types.Path, error) {
