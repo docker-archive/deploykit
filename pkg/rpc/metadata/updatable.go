@@ -62,12 +62,12 @@ func (u *Updatable) Types() []string {
 	return u.keyed.Types()
 }
 
-// List returns a list of child nodes given a path.
-func (u *Updatable) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
+// Keys returns a list of child nodes given a path.
+func (u *Updatable) Keys(_ *http.Request, req *KeysRequest, resp *KeysResponse) error {
 
 	return u.keyed.Do(req, func(v interface{}) error {
 		resp.Name = req.Name
-		nodes, err := v.(metadata.Plugin).List(req.Path)
+		nodes, err := v.(metadata.Plugin).Keys(req.Path)
 		if err == nil {
 			sort.Strings(nodes)
 			resp.Nodes = nodes
@@ -143,9 +143,9 @@ func AdaptUpdatable(name plugin.Name, rpcClient rpc_client.Client) metadata.Upda
 	return &updatable{name: name, client: rpcClient}
 }
 
-// List returns a list of nodes under path.
-func (u updatable) List(path types.Path) ([]string, error) {
-	return list(u.name, u.client, "Updatable.List", path)
+// Keys returns a list of nodes under path.
+func (u updatable) Keys(path types.Path) ([]string, error) {
+	return list(u.name, u.client, "Updatable.Keys", path)
 }
 
 // Get retrieves the metadata at path.

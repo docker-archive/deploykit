@@ -52,9 +52,9 @@ type plugin struct {
 	reads chan func(data map[string]interface{})
 }
 
-// List returns a list of *child nodes* given a path, which is specified as a slice
+// Keys returns a list of *child nodes* given a path, which is specified as a slice
 // where for i > j path[i] is the parent of path[j]
-func (p *plugin) List(path types.Path) ([]string, error) {
+func (p *plugin) Keys(path types.Path) ([]string, error) {
 	if p.reads == nil && p.data != nil {
 		return types.List(path, p.data), nil
 	}

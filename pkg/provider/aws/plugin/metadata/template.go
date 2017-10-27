@@ -94,9 +94,9 @@ func (c *Context) start() {
 	}()
 }
 
-// List returns a list of *child nodes* given a path, which is specified as a slice
+// Keys returns a list of *child nodes* given a path, which is specified as a slice
 // where for i > j path[i] is the parent of path[j]
-func (c *Context) List(path types.Path) (child []string, err error) {
+func (c *Context) Keys(path types.Path) (child []string, err error) {
 	if path.Len() == 0 || path.Dot() {
 		return []string{"export", "local"}, nil
 	}
@@ -116,7 +116,7 @@ func (c *Context) List(path types.Path) (child []string, err error) {
 		}
 		return trimmed, nil
 	}
-	return c.impl.List(path.Shift(1))
+	return c.impl.Keys(path.Shift(1))
 }
 
 // Get retrieves the value at path given.

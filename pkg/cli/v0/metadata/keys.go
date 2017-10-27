@@ -59,7 +59,7 @@ func Keys(name string, services *cli.Services) *cobra.Command {
 					nodes = append(nodes, c)
 				}
 			} else {
-				children, err := metadataPlugin.List(path)
+				children, err := metadataPlugin.Keys(path)
 				if err != nil {
 					log.Warn("Cannot metadata ls on plugin", "name", name, "err", err)
 				}
@@ -97,7 +97,7 @@ func listAll(m metadata.Plugin, path types.Path) ([]types.Path, error) {
 		return nil, fmt.Errorf("no plugin")
 	}
 	result := []types.Path{}
-	nodes, err := m.List(path)
+	nodes, err := m.Keys(path)
 	if err != nil {
 		return nil, err
 	}

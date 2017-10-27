@@ -403,15 +403,15 @@ func (p dockerInstancePlugin) DescribeInstances(tags map[string]string, properti
 	return p.describeInstances(tags)
 }
 
-// List implements the metadata.Plugin SPI's List method
-func (p dockerInstancePlugin) List(path types.Path) ([]string, error) {
+// Keys implements the metadata.Plugin SPI's Keys method
+func (p dockerInstancePlugin) Keys(path types.Path) ([]string, error) {
 	if p.metadataPlugin != nil {
-		return p.metadataPlugin.List(path)
+		return p.metadataPlugin.Keys(path)
 	}
 	return nil, nil
 }
 
-// Get implements the metadata.Plugin SPI's List method
+// Get implements the metadata.Plugin SPI's Get method
 func (p dockerInstancePlugin) Get(path types.Path) (*types.Any, error) {
 	if p.metadataPlugin != nil {
 		return p.metadataPlugin.Get(path)

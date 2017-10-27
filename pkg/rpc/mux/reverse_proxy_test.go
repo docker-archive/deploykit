@@ -107,7 +107,7 @@ func startPlugin(t *testing.T, name string) (string, rpc_server.Stoppable) {
 		func() (map[string]metadata.Plugin, error) {
 			return map[string]metadata.Plugin{
 				"aws": &testing_metadata.Plugin{
-					DoList: func(path types.Path) ([]string, error) {
+					DoKeys: func(path types.Path) ([]string, error) {
 						return types.List(path, m), nil
 					},
 					DoGet: func(path types.Path) (*types.Any, error) {
@@ -139,9 +139,9 @@ func TestMuxPlugins(t *testing.T) {
 
 	T(100).Infoln("Basic client")
 	require.Equal(t, []string(nil),
-		first(must(rpc_metadata.NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("aws"))))
+		first(must(rpc_metadata.NewClient(nameFromPath(socketPath), socketPath)).Keys(types.PathFromString("aws"))))
 	require.Equal(t, []string{"region"},
-		first(must(rpc_metadata.NewClient(nameFromPath(socketPath)+"/aws", socketPath)).List(types.PathFromString("."))))
+		first(must(rpc_metadata.NewClient(nameFromPath(socketPath)+"/aws", socketPath)).Keys(types.PathFromString("."))))
 
 	infoClient, err := client.NewPluginInfoClient(socketPath)
 	require.NoError(t, err)

@@ -88,9 +88,9 @@ func (c *lazyConnect) do(f func(p metadata.Plugin) error) (err error) {
 	return f(c.client)
 }
 
-func (c *lazyConnect) List(path types.Path) (child []string, err error) {
+func (c *lazyConnect) Keys(path types.Path) (child []string, err error) {
 	err = c.do(func(p metadata.Plugin) error {
-		child, err = p.List(path)
+		child, err = p.Keys(path)
 		return err
 	})
 	return

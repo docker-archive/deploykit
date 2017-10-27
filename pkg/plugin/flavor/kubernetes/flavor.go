@@ -209,12 +209,12 @@ func (s *baseFlavor) Healthy(flavorProperties *types.Any, inst instance.Descript
 	return flavor.Healthy, nil
 }
 
-// List implements the metadata.Plugin SPI's List method
-func (s *baseFlavor) List(path types.Path) ([]string, error) {
+// Keys implements the metadata.Plugin SPI's Keys method
+func (s *baseFlavor) Keys(path types.Path) ([]string, error) {
 	return nil, nil
 }
 
-// Get implements the metadata.Plugin SPI's List method
+// Get implements the metadata.Plugin SPI's Get method
 func (s *baseFlavor) Get(path types.Path) (*types.Any, error) {
 	if s.metadataPlugin != nil {
 		return s.metadataPlugin.Get(path)

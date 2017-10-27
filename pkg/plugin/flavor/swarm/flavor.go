@@ -113,15 +113,15 @@ func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func
 	return updateSnapshot
 }
 
-// List implements the metadata.Plugin SPI's List method
-func (s *baseFlavor) List(path types.Path) ([]string, error) {
+// Keys implements the metadata.Plugin SPI's Keys method
+func (s *baseFlavor) Keys(path types.Path) ([]string, error) {
 	if s.metadataPlugin != nil {
-		return s.metadataPlugin.List(path)
+		return s.metadataPlugin.Keys(path)
 	}
 	return nil, nil
 }
 
-// Get implements the metadata.Plugin SPI's List method
+// Get implements the metadata.Plugin SPI's Get method
 func (s *baseFlavor) Get(path types.Path) (*types.Any, error) {
 	if s.metadataPlugin != nil {
 		return s.metadataPlugin.Get(path)
