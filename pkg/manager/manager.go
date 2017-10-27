@@ -361,7 +361,7 @@ func (m *manager) getCurrentState() (globalSpec, error) {
 	return global, nil
 }
 
-func (m *manager) loadSpecs() error {
+func (m *manager) loadAndCommitSpecs() error {
 	if m.Options.SpecStore == nil {
 		return nil
 	}
@@ -385,7 +385,7 @@ func (m *manager) loadMetadata() (err error) {
 		return nil
 	}
 
-	log.Debug("loading metadata and committing")
+	log.Debug("loading metadata and committing", "V", debugV2)
 
 	var saved interface{}
 	err = m.Options.MetadataStore.Load(&saved)
@@ -400,11 +400,11 @@ func (m *manager) loadMetadata() (err error) {
 	}
 
 	if any == nil {
-		log.Debug("no metadata stored")
+		log.Debug("no metadata stored", "V", debugV2)
 		return
 	}
 
-	log.Debug("loaded metadata", "data", any.String())
+	log.Debug("loaded metadata", "data", any.String(), "V", debugV2)
 	_, proposed, cas, e := m.Updatable.Changes([]metadata.Change{
 		{Path: types.Dot, Value: any},
 	})
@@ -413,7 +413,7 @@ func (m *manager) loadMetadata() (err error) {
 		return
 	}
 
-	log.Debug("updating backend with stored metadata", "cas", cas, "proposed", proposed)
+	log.Debug("updating backend with stored metadata", "cas", cas, "proposed", proposed, "V", debugV2)
 	return m.Updatable.Commit(proposed, cas)
 }
 
@@ -427,11 +427,39 @@ func (m *manager) onAssumeLeadership() (err error) {
 		log.Error("error loading metadata", "err", err)
 	}
 
-	err = m.loadSpecs()
-	if err != nil {
-		log.Error("error loading specs", "err", err)
+	err = m.loadAndCommitSpecs()
+	log.Debug("Loading and committing specs", "err", err)
+
+	if err != nil && m.Options.LeaderCommitSpecsRetries > 0 {
+
+		log.Info("Retry loading and committing specs",
+			"retries", m.Options.LeaderCommitSpecsRetries,
+			"interval", m.Options.LeaderCommitSpecsRetryInterval)
+
+		delay := 1 * time.Second
+		if m.Options.LeaderCommitSpecsRetryInterval > 0 {
+			delay = m.Options.LeaderCommitSpecsRetryInterval.Duration()
+		}
+
+		for i := 1; i < m.Options.LeaderCommitSpecsRetries; i++ {
+
+			<-time.After(delay)
+
+			err = m.loadAndCommitSpecs()
+			if err == nil {
+				log.Info("Loaded and committed specs")
+				return nil
+			}
+
+			if err != nil {
+				log.Error("error loading specs", "err", err, "attempt", i)
+			}
+
+		}
+
 	}
-	return
+
+	return err
 }
 
 func (m *manager) onLostLeadership() error {

@@ -12,6 +12,7 @@ import (
 	broker "github.com/docker/infrakit/pkg/broker/server"
 	logutil "github.com/docker/infrakit/pkg/log"
 	rpc_server "github.com/docker/infrakit/pkg/rpc"
+	//rpc_event "github.com/docker/infrakit/pkg/rpc/event"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/types"
@@ -105,6 +106,13 @@ func StartPluginAtPath(socketPath string, receiver VersionedInterface, more ...V
 func startAtPath(listen []string, discoverPath string,
 	receiver VersionedInterface, more ...VersionedInterface) (Stoppable, error) {
 
+	df, err := os.Stat(discoverPath)
+	if os.IsExist(err) {
+		log.Error("socket exists", "path", discoverPath, "found", df)
+		fmt.Printf("Socket/ port file found at %v.  Please clean up if no other processes are listening.\n", discoverPath)
+		os.Exit(-1)
+	}
+
 	server := rpc.NewServer()
 	server.RegisterCodec(json2.NewCodec(), "application/json")
 
@@ -118,12 +126,27 @@ func startAtPath(listen []string, discoverPath string,
 		if err := server.RegisterService(t, ""); err != nil {
 			return nil, err
 		}
-	}
 
+		// polymorphic -- register additional interfaces
+		// if pub, is := t.(event.Plugin); is {
+
+		// 	t = rpc_event.PluginServer(pub)
+		// 	interfaces[event.InterfaceSpec] = t.Types
+
+		// 	if err := server.RegisterService(t, ""); err != nil {
+		// 		return nil, err
+		// 	}
+
+		// 	log.Info("Object exported as event producer", "object", t)
+		// }
+	}
 	// handshake service that can exchange interface versions with client
 	if err := server.RegisterService(rpc_server.Handshake(interfaces), ""); err != nil {
 		return nil, err
 	}
+
+	// a list of channels to close on stop
+	stops := []chan struct{}{}
 
 	// events handler
 	events := broker.NewBroker()
@@ -136,17 +159,27 @@ func startAtPath(listen []string, discoverPath string,
 			continue
 		}
 
+		log.Info("Object is an event producer", "object", t, "discover", discoverPath)
+
+		stop := make(chan struct{})
+		stops = append(stops, stop)
+
 		// We give one channel per source to provide some isolation.  This we won't have the
 		// whole event bus stop just because one plugin closes the channel.
 		eventChan := make(chan *event.Event)
 		pub.PublishOn(eventChan)
 		go func() {
 			for {
-				event, ok := <-eventChan
-				if !ok {
+				select {
+				case event, ok := <-eventChan:
+					if !ok {
+						return
+					}
+					events.Publish(event.Topic.String(), event, 1*time.Second)
+				case <-stop:
+					log.Info("Stopping event relay")
 					return
 				}
-				events.Publish(event.Topic.String(), event, 1*time.Second)
 			}
 		}()
 	}
@@ -156,9 +189,6 @@ func startAtPath(listen []string, discoverPath string,
 	if err != nil {
 		return nil, err
 	}
-
-	// httpLog := log.New()
-	// httpLog.Level = log.GetLevel()
 
 	router := mux.NewRouter()
 	router.HandleFunc(rpc_server.URLAPI, info.ShowAPI)
@@ -192,6 +222,9 @@ func startAtPath(listen []string, discoverPath string,
 	var listener net.Listener
 
 	if len(listen) > 0 {
+
+		// TCP listener
+
 		gracefulServer.Server = &http.Server{
 			Addr:    listen[0],
 			Handler: router,
@@ -213,6 +246,9 @@ func startAtPath(listen []string, discoverPath string,
 		log.Info("Listening", "listen", listen, "discover", discoverPath)
 
 	} else {
+
+		// Unix Socket listener
+
 		gracefulServer.Server = &http.Server{
 			Addr:    fmt.Sprintf("unix://%s", discoverPath),
 			Handler: router,
@@ -227,10 +263,20 @@ func startAtPath(listen []string, discoverPath string,
 	}
 
 	go func() {
+
+		// This is the core server loop.  Note that it will block and return
+		// when signals are received.  We then perform cleanup after that
+		// by closing all the channels to signal shutdown.
+
 		err := gracefulServer.Serve(listener)
 		if err != nil {
 			log.Warn("err", "err", err)
 		}
+
+		for _, ch := range stops {
+			close(ch)
+		}
+
 		events.Stop()
 		if len(listen) > 0 {
 			os.Remove(discoverPath)

@@ -46,6 +46,10 @@ const (
 	// persisted, it is not polled and read by the non-leaders on a regular basis
 	// (unless this is set).
 	EnvMetadataUpdateInterval = "INFRAKIT_MANAGER_METADATA_UPDATE_INTERVAL"
+
+	// EnvLeaderCommitSpecsRetryInterval is the interval to wait between retries when
+	// the manager becomes the leader and fails to commit the replicated specs.
+	EnvLeaderCommitSpecsRetryInterval = "INFRAKIT_MANAGER_COMMIT_SPECS_RETRY_INTERVAL"
 )
 
 var (
@@ -90,9 +94,11 @@ func defaultOptions() (options Options) {
 
 	options = Options{
 		Options: manager.Options{
-			Group:                   plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
-			Metadata:                plugin.Name(local.Getenv(EnvMetadata, "vars")),
-			MetadataRefreshInterval: types.MustParseDuration(local.Getenv(EnvMetadataUpdateInterval, "3s")),
+			Group:                          plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
+			Metadata:                       plugin.Name(local.Getenv(EnvMetadata, "vars")),
+			MetadataRefreshInterval:        types.MustParseDuration(local.Getenv(EnvMetadataUpdateInterval, "5s")),
+			LeaderCommitSpecsRetries:       10,
+			LeaderCommitSpecsRetryInterval: types.MustParseDuration(local.Getenv(EnvLeaderCommitSpecsRetryInterval, "2s")),
 		},
 		Mux: &MuxConfig{
 			Listen:    local.Getenv(EnvMuxListen, ":24864"),
@@ -212,7 +218,8 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 				Registry:   options.LeaderStore,
 			})
 		if err != nil {
-			panic(err)
+			fmt.Printf("Cannot start up mux server.  Error: %v\n", err)
+			os.Exit(-1)
 		}
 	}
 

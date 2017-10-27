@@ -39,6 +39,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	waitDuration := up.Flags().String("wait", "1s", "Wait for plugins to be ready")
 	configURL := up.Flags().String("config-url", "", "URL for the startup configs")
+	stack := up.Flags().String("stack", "mystack", "Name of the stack")
+
 	up.Flags().AddFlagSet(services.ProcessTemplateFlags)
 	metadatas := up.Flags().StringSlice("metadata", []string{}, "key=value to set metadata")
 
@@ -60,7 +62,8 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		wait := types.MustParseDuration(*waitDuration)
 
 		log.Info("Starting up base plugins")
-		basePlugins := []string{"vars", "manager"}
+		baseStack := fmt.Sprintf("manager:%v", *stack)
+		basePlugins := []string{"vars", "group:group-stateless", baseStack}
 		for _, base := range basePlugins {
 			execName, kind, name, _ := local.StartPlugin(base).Parse()
 			err := pluginManager.Launch(execName, kind, name, nil)

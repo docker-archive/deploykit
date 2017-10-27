@@ -95,4 +95,10 @@ type Options struct {
 
 	// MetadataRefreshInterval is the interval to check for updates to metadata
 	MetadataRefreshInterval types.Duration
+
+	// LeaderCommitSpecsRetries is how many times to retry commit specs when becomes leader
+	LeaderCommitSpecsRetries int
+
+	// LeaderCommitSpecsRetryInterval is how long to wait before next retry
+	LeaderCommitSpecsRetryInterval types.Duration
 }
