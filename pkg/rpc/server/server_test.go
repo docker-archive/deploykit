@@ -86,7 +86,7 @@ func TestTCPServer(t *testing.T) {
 
 	discover := filepath.Join(os.TempDir(), fmt.Sprintf("%d.listen", time.Now().Unix()))
 	name := plugin.Name(filepath.Base(discover))
-	server, err := StartListenerAtPath([]string{"localhost:7777"}, discover, service)
+	server, err := StartListenerAtPath([]string{"localhost:7778"}, discover, service)
 	require.NoError(t, err)
 
 	c, err := plugin_rpc.NewClient(name, discover)

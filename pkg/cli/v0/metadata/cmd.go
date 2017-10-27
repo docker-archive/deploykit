@@ -13,22 +13,14 @@ import (
 var log = logutil.New("module", "cli/v1/metadata")
 
 func init() {
-	// cli.Register(metadata.InterfaceSpec,
-	// 	[]cli.CmdBuilder{
-	// 		Metadata,
-	// 	})
-	// cli.Register(metadata.UpdatableInterfaceSpec,
-	// 	[]cli.CmdBuilder{
-	// 		Updatable,
-	// 	})
 	cli.Register(metadata.InterfaceSpec,
 		[]cli.CmdBuilder{
-			Ls,
+			Keys,
 			Cat,
 		})
 	cli.Register(metadata.UpdatableInterfaceSpec,
 		[]cli.CmdBuilder{
-			Ls,
+			Keys,
 			Cat,
 			Change,
 		})
@@ -63,7 +55,7 @@ func Metadata(name string, services *cli.Services) *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		Ls(name, services),
+		Keys(name, services),
 		Cat(name, services),
 	)
 
@@ -79,7 +71,7 @@ func Updatable(name string, services *cli.Services) *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		Ls(name, services),
+		Keys(name, services),
 		Cat(name, services),
 		Change(name, services),
 	)
