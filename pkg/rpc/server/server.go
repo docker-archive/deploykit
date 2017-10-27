@@ -12,7 +12,7 @@ import (
 	broker "github.com/docker/infrakit/pkg/broker/server"
 	logutil "github.com/docker/infrakit/pkg/log"
 	rpc_server "github.com/docker/infrakit/pkg/rpc"
-	rpc_event "github.com/docker/infrakit/pkg/rpc/event"
+	//rpc_event "github.com/docker/infrakit/pkg/rpc/event"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/types"
@@ -128,17 +128,17 @@ func startAtPath(listen []string, discoverPath string,
 		}
 
 		// polymorphic -- register additional interfaces
-		if pub, is := t.(event.Plugin); is {
+		// if pub, is := t.(event.Plugin); is {
 
-			t = rpc_event.PluginServer(pub)
-			interfaces[event.InterfaceSpec] = t.Types
+		// 	t = rpc_event.PluginServer(pub)
+		// 	interfaces[event.InterfaceSpec] = t.Types
 
-			if err := server.RegisterService(t, ""); err != nil {
-				return nil, err
-			}
+		// 	if err := server.RegisterService(t, ""); err != nil {
+		// 		return nil, err
+		// 	}
 
-			log.Info("Object exported as event producer", "object", t)
-		}
+		// 	log.Info("Object exported as event producer", "object", t)
+		// }
 	}
 	// handshake service that can exchange interface versions with client
 	if err := server.RegisterService(rpc_server.Handshake(interfaces), ""); err != nil {
