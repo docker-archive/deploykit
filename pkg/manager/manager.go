@@ -460,8 +460,6 @@ func (m *manager) onAssumeLeadership() (err error) {
 	}
 
 	return err
-
-	return
 }
 
 func (m *manager) onLostLeadership() error {
