@@ -30,7 +30,10 @@ type Validator interface {
 // a publish function.
 type Publisher interface {
 	Plugin
-	// PublishOn sets the channel to publish
+
+	// PublishOn sets the channel to publish.  Note that the implementation is given a channel
+	// to publish on.  This is so that the server can optionally add buffering without the
+	// implementations having any knowledge.
 	PublishOn(chan<- *Event)
 }
 

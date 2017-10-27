@@ -145,6 +145,9 @@ func startAtPath(listen []string, discoverPath string,
 		return nil, err
 	}
 
+	// a list of channels to close on stop
+	stops := []chan struct{}{}
+
 	// events handler
 	events := broker.NewBroker()
 
@@ -158,17 +161,25 @@ func startAtPath(listen []string, discoverPath string,
 
 		log.Info("Object is an event producer", "object", t, "discover", discoverPath)
 
+		stop := make(chan struct{})
+		stops = append(stops, stop)
+
 		// We give one channel per source to provide some isolation.  This we won't have the
 		// whole event bus stop just because one plugin closes the channel.
 		eventChan := make(chan *event.Event)
 		pub.PublishOn(eventChan)
 		go func() {
 			for {
-				event, ok := <-eventChan
-				if !ok {
+				select {
+				case event, ok := <-eventChan:
+					if !ok {
+						return
+					}
+					events.Publish(event.Topic.String(), event, 1*time.Second)
+				case <-stop:
+					log.Info("Stopping event relay")
 					return
 				}
-				events.Publish(event.Topic.String(), event, 1*time.Second)
 			}
 		}()
 	}
@@ -211,6 +222,9 @@ func startAtPath(listen []string, discoverPath string,
 	var listener net.Listener
 
 	if len(listen) > 0 {
+
+		// TCP listener
+
 		gracefulServer.Server = &http.Server{
 			Addr:    listen[0],
 			Handler: router,
@@ -232,6 +246,9 @@ func startAtPath(listen []string, discoverPath string,
 		log.Info("Listening", "listen", listen, "discover", discoverPath)
 
 	} else {
+
+		// Unix Socket listener
+
 		gracefulServer.Server = &http.Server{
 			Addr:    fmt.Sprintf("unix://%s", discoverPath),
 			Handler: router,
@@ -246,10 +263,20 @@ func startAtPath(listen []string, discoverPath string,
 	}
 
 	go func() {
+
+		// This is the core server loop.  Note that it will block and return
+		// when signals are received.  We then perform cleanup after that
+		// by closing all the channels to signal shutdown.
+
 		err := gracefulServer.Serve(listener)
 		if err != nil {
 			log.Warn("err", "err", err)
 		}
+
+		for _, ch := range stops {
+			close(ch)
+		}
+
 		events.Stop()
 		if len(listen) > 0 {
 			os.Remove(discoverPath)

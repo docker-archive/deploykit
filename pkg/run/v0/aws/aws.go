@@ -112,13 +112,18 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		return
 	}
 
-	onStop = func() { close(stopMetadataPlugin) }
-
 	var instancePlugin instance.Plugin
 	builder := aws_instance.Builder{Options: options.Options.Options}
 	instancePlugin, err = builder.BuildInstancePlugin(options.Namespace)
 	if err != nil {
 		return
+	}
+
+	monitor := &aws_instance.Monitor{Plugin: instancePlugin}
+
+	onStop = func() {
+		close(stopMetadataPlugin)
+		monitor.Stop()
 	}
 
 	autoscalingClient := autoscaling.New(builder.Config)
@@ -132,7 +137,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Event: map[string]event.Plugin{
-			"ec2-instance": (&aws_instance.Monitor{Plugin: instancePlugin}).Init(),
+			"ec2-instance": monitor.Init(),
 		},
 		run.Metadata: metadataPlugin,
 		run.Instance: map[string]instance.Plugin{
