@@ -51,9 +51,9 @@ type client struct {
 	client rpc_client.Client
 }
 
-// List returns a list of nodes under path.
-func (c client) List(path types.Path) ([]string, error) {
-	return list(c.name, c.client, "Metadata.List", path)
+// Keys returns a list of nodes under path.
+func (c client) Keys(path types.Path) ([]string, error) {
+	return list(c.name, c.client, "Metadata.Keys", path)
 }
 
 // Get retrieves the metadata at path.

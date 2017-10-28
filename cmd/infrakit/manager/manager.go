@@ -22,7 +22,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 )
 
@@ -236,111 +235,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
-
-	///////////////////////////////////////////////////////////////////////////////////
-	// change
-	change := &cobra.Command{
-		Use:   "change",
-		Short: "Change returns the plugin configurations known by the manager",
-	}
-	vars := change.Flags().StringSlice("var", []string{}, "key=value pairs")
-	commitChange := change.Flags().BoolP("commit", "c", false, "Commit changes")
-
-	// This is the only interactive command.  We want to show the user the proposal, with the diff
-	// and when the user accepts the change, call a commit.
-	change.RunE = func(cmd *cobra.Command, args []string) error {
-
-		if len(args) != 0 {
-			cmd.Usage()
-			os.Exit(1)
-		}
-
-		// get the changes
-		changes, err := changeSet(*vars)
-		if err != nil {
-			return err
-		}
-		current, proposed, cas, err := updatablePlugin.Changes(changes)
-		if err != nil {
-			return err
-		}
-		currentBuff, err := current.MarshalYAML()
-		if err != nil {
-			return err
-		}
-
-		proposedBuff, err := proposed.MarshalYAML()
-		if err != nil {
-			return err
-		}
-
-		if *commitChange {
-			fmt.Printf("Committing changes, hash=%s\n", cas)
-		} else {
-			fmt.Printf("Proposed changes, hash=%s\n", cas)
-		}
-
-		// Render the delta
-		dmp := diffmatchpatch.New()
-		diffs := dmp.DiffMain(string(currentBuff), string(proposedBuff), false)
-		fmt.Println(dmp.DiffPrettyText(diffs))
-
-		if *commitChange {
-			return updatablePlugin.Commit(proposed, cas)
-		}
-
-		return nil
-	}
-	change.Flags().AddFlagSet(templateFlags)
-
-	///////////////////////////////////////////////////////////////////////////////////
-	// change-list
-	changeList := &cobra.Command{
-		Use:   "ls",
-		Short: "Lists all the changeable paths",
-		RunE: func(cmd *cobra.Command, args []string) error {
-
-			if len(args) != 0 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			all, err := types.ListAll(updatablePlugin, types.PathFromString("."))
-			if err != nil {
-				return err
-			}
-
-			types.SortPaths(all)
-			for _, p := range all {
-				fmt.Println(p.String())
-			}
-			return nil
-		},
-	}
-	///////////////////////////////////////////////////////////////////////////////////
-	// change-cat
-	changeGet := &cobra.Command{
-		Use:   "cat",
-		Short: "Cat returns the current value at given path",
-		RunE: func(cmd *cobra.Command, args []string) error {
-
-			if len(args) != 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
-
-			path := types.PathFromString(args[0])
-			any, err := updatablePlugin.Get(path)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(any.String())
-
-			return nil
-		},
-	}
-	change.AddCommand(changeList, changeGet)
 
 	cmd.AddCommand(commit, inspect, leader)
 

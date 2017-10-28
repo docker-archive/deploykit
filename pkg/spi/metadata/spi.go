@@ -22,8 +22,8 @@ var (
 // Plugin is the interface for metadata-related operations.
 type Plugin interface {
 
-	// List returns a list of *child nodes* given a path, which is specified as a slice
-	List(path types.Path) (child []string, err error)
+	// Keys returns a list of *child nodes* given a path, which is specified as a slice
+	Keys(path types.Path) (child []string, err error)
 
 	// Get retrieves the value at path given.
 	Get(path types.Path) (value *types.Any, err error)

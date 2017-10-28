@@ -54,7 +54,7 @@ func TestLazyNoBlock(t *testing.T) {
 
 type fake chan int
 
-func (f fake) List(path types.Path) (child []string, err error) {
+func (f fake) Keys(path types.Path) (child []string, err error) {
 	f <- 1
 	return
 }

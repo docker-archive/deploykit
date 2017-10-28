@@ -60,12 +60,12 @@ func (p *Metadata) Types() []string {
 	return p.keyed.Types()
 }
 
-// List returns a list of child nodes given a path.
-func (p *Metadata) List(_ *http.Request, req *ListRequest, resp *ListResponse) error {
+// Keys returns a list of child nodes given a path.
+func (p *Metadata) Keys(_ *http.Request, req *KeysRequest, resp *KeysResponse) error {
 
 	return p.keyed.Do(req, func(v interface{}) error {
 		resp.Name = req.Name
-		nodes, err := v.(metadata.Plugin).List(req.Path)
+		nodes, err := v.(metadata.Plugin).Keys(req.Path)
 		if err == nil {
 			sort.Strings(nodes)
 			resp.Nodes = nodes

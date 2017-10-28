@@ -64,7 +64,7 @@ variable `INFRAKIT_VARS_TEMPLATE` as a way to set it.
 
 Corresponding to the SPI methods, there are new commands / verbs as `metadata`:
 
-  + `ls` lists the metadata paths
+  + `keys` lists the metadata paths
   + `cat` reads metadata values
   + `change` updates metadata values, provided the plugin implements the updatable SPI (not readonly)
 
@@ -130,7 +130,7 @@ Usage:
 Available Commands:
   cat         Get metadata entry by path
   change      Update metadata where args are key=value pairs and keys are within namespace of the plugin.
-  vars        List metadata
+  keys        List metadata
 ```
 
 ### Listing, Reading
@@ -138,7 +138,7 @@ Available Commands:
 Listing metadata values:
 
 ```shell
-$ infrakit vars vars -al
+$ infrakit vars keys -al
 total 6:
 cluster/name
 cluster/size
@@ -151,7 +151,7 @@ zones/west/cidr
 or
 
 ```shell
-$ infrakit vars vars -al zones
+$ infrakit vars keys -al zones
 total 2:
 east/cidr
 west/cidr
@@ -363,7 +363,7 @@ Committing 2 changes, hash=ad861ded7a0742f9662c2b78354c89f6
 Now querying:
 
 ```shell
-$ infrakit vars vars -al
+$ infrakit vars keys -al
 total 2:
 cluster/name
 cluster/workers/size

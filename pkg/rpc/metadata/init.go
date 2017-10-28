@@ -10,8 +10,8 @@ import (
 var log = logutil.New("module", "rpc/controller")
 
 func list(name plugin.Name, client rpc.Client, method string, path types.Path) ([]string, error) {
-	req := ListRequest{Name: name, Path: path}
-	resp := ListResponse{}
+	req := KeysRequest{Name: name, Path: path}
+	resp := KeysResponse{}
 	err := client.Call(method, req, &resp)
 	return resp.Nodes, err
 }

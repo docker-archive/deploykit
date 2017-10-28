@@ -23,11 +23,11 @@ func NewPlugin(api gcloud.API, apiMetadata gcloud.APIMetadata) metadata.Plugin {
 	}
 }
 
-func TestList(t *testing.T) {
+func TestKeys(t *testing.T) {
 	api, apiMetadata, _ := NewMockAPI(t)
 
 	plugin := NewPlugin(api, apiMetadata)
-	children, err := plugin.List(types.Path([]string{""}))
+	children, err := plugin.Keys(types.Path([]string{""}))
 
 	require.EqualValues(t, []string{"instance", "project", "zone"}, children)
 	require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestListInstance(t *testing.T) {
 	api, apiMetadata, _ := NewMockAPI(t)
 
 	plugin := NewPlugin(api, apiMetadata)
-	children, err := plugin.List(types.Path([]string{"instance"}))
+	children, err := plugin.Keys(types.Path([]string{"instance"}))
 
 	require.EqualValues(t, []string{"ID", "externalIP", "hostname", "internalIP", "name", "network", "numericalProjectID", "projectID", "zone"}, children)
 	require.NoError(t, err)

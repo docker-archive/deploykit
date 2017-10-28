@@ -6,19 +6,19 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
-// ListRequest is the rpc wrapper for request parameters to List
-type ListRequest struct {
+// KeysRequest is the rpc wrapper for request parameters to Keys
+type KeysRequest struct {
 	Name plugin.Name
 	Path types.Path
 }
 
 // Plugin implements pkg/rpc/internal/Addressable
-func (r ListRequest) Plugin() (plugin.Name, error) {
+func (r KeysRequest) Plugin() (plugin.Name, error) {
 	return r.Name, nil
 }
 
-// ListResponse is the rpc wrapper for the results of List
-type ListResponse struct {
+// KeysResponse is the rpc wrapper for the results of Keys
+type KeysResponse struct {
 	Name  plugin.Name
 	Nodes []string
 }

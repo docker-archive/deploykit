@@ -9,19 +9,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Ls returns the Ls command
-func Ls(name string, services *cli.Services) *cobra.Command {
+// Keys returns the Keys command
+func Keys(name string, services *cli.Services) *cobra.Command {
 
-	ls := &cobra.Command{
-		Use:   "ls",
+	keys := &cobra.Command{
+		Use:   "keys",
 		Short: "List metadata",
 	}
 
-	long := ls.Flags().BoolP("long", "l", false, "Print full path")
-	all := ls.Flags().BoolP("all", "a", false, "Find all under the paths given")
-	quick := ls.Flags().BoolP("quick", "q", false, "True to turn off headers, etc.")
+	long := keys.Flags().BoolP("long", "l", false, "Print full path")
+	all := keys.Flags().BoolP("all", "a", false, "Find all under the paths given")
+	quick := keys.Flags().BoolP("quick", "q", false, "True to turn off headers, etc.")
 
-	ls.RunE = func(cmd *cobra.Command, args []string) error {
+	keys.RunE = func(cmd *cobra.Command, args []string) error {
 
 		metadataPlugin, err := loadPlugin(services.Plugins(), name)
 		if err != nil {
@@ -59,7 +59,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 					nodes = append(nodes, c)
 				}
 			} else {
-				children, err := metadataPlugin.List(path)
+				children, err := metadataPlugin.Keys(path)
 				if err != nil {
 					log.Warn("Cannot metadata ls on plugin", "name", name, "err", err)
 				}
@@ -89,7 +89,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 		}
 		return nil
 	}
-	return ls
+	return keys
 }
 
 func listAll(m metadata.Plugin, path types.Path) ([]types.Path, error) {
@@ -97,7 +97,7 @@ func listAll(m metadata.Plugin, path types.Path) ([]types.Path, error) {
 		return nil, fmt.Errorf("no plugin")
 	}
 	result := []types.Path{}
-	nodes, err := m.List(path)
+	nodes, err := m.Keys(path)
 	if err != nil {
 		return nil, err
 	}

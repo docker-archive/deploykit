@@ -75,7 +75,7 @@ func TestMetadataMultiPlugin(t *testing.T) {
 		func() (map[string]metadata.Plugin, error) {
 			return map[string]metadata.Plugin{
 				"aws": &testing_metadata.Plugin{
-					DoList: func(path types.Path) ([]string, error) {
+					DoKeys: func(path types.Path) ([]string, error) {
 						inputMetadataPathListActual1 <- path
 						return types.List(path, m), nil
 					},
@@ -85,7 +85,7 @@ func TestMetadataMultiPlugin(t *testing.T) {
 					},
 				},
 				"azure": &testing_metadata.Plugin{
-					DoList: func(path types.Path) ([]string, error) {
+					DoKeys: func(path types.Path) ([]string, error) {
 						inputMetadataPathListActual2 <- path
 						return nil, errors.New("azure-error")
 					},
@@ -108,14 +108,14 @@ func TestMetadataMultiPlugin(t *testing.T) {
 	require.Equal(t, []string{"aws", "azure"}, found)
 
 	require.Equal(t, []string{"region"}, first(must(NewClient(nameFromPath(socketPath, "aws"),
-		socketPath)).List(types.PathFromString("."))))
+		socketPath)).Keys(types.PathFromString("."))))
 	require.Equal(t, []string(nil), first(must(NewClient(nameFromPath(socketPath),
-		socketPath)).List(types.PathFromString("aws"))))
+		socketPath)).Keys(types.PathFromString("aws"))))
 	require.Error(t, second(must(NewClient(nameFromPath(socketPath, "azure"),
-		socketPath)).List(types.PathFromString("."))).(error))
+		socketPath)).Keys(types.PathFromString("."))).(error))
 
 	require.Equal(t, []string(nil),
-		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("/"))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).Keys(types.PathFromString("/"))))
 
 	require.Equal(t, []string{"."}, <-inputMetadataPathListActual1)
 	require.Equal(t, []string{"."}, <-inputMetadataPathListActual2)
@@ -154,7 +154,7 @@ func TestMetadataMultiPlugin2(t *testing.T) {
 		func() (map[string]metadata.Plugin, error) {
 			return map[string]metadata.Plugin{
 				"aws": &testing_metadata.Plugin{
-					DoList: func(path types.Path) ([]string, error) {
+					DoKeys: func(path types.Path) ([]string, error) {
 						res := types.List(path, m1)
 						return res, nil
 					},
@@ -163,7 +163,7 @@ func TestMetadataMultiPlugin2(t *testing.T) {
 					},
 				},
 				"azure": &testing_metadata.Plugin{
-					DoList: func(path types.Path) ([]string, error) {
+					DoKeys: func(path types.Path) ([]string, error) {
 						res := types.List(path, m2)
 						return res, nil
 					},
@@ -176,16 +176,16 @@ func TestMetadataMultiPlugin2(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []string(nil),
-		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString(""))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).Keys(types.PathFromString(""))))
 	require.Equal(t, []string{"region"},
-		first(must(NewClient(nameFromPath(socketPath, "aws"), socketPath)).List(types.PathFromString("."))))
+		first(must(NewClient(nameFromPath(socketPath, "aws"), socketPath)).Keys(types.PathFromString("."))))
 	require.Equal(t, []string{"us-1", "us-2"},
-		first(must(NewClient(nameFromPath(socketPath, "azure"), socketPath)).List(types.PathFromString("dc/"))))
+		first(must(NewClient(nameFromPath(socketPath, "azure"), socketPath)).Keys(types.PathFromString("dc/"))))
 	require.Equal(t, []string(nil),
-		first(must(NewClient(nameFromPath(socketPath, "gce"), socketPath)).List(types.PathFromString("."))))
+		first(must(NewClient(nameFromPath(socketPath, "gce"), socketPath)).Keys(types.PathFromString("."))))
 	require.Equal(t, []string{"network10", "network11"},
 		first(must(NewClient(nameFromPath(socketPath, "aws"),
-			socketPath)).List(types.PathFromString("region/us-west-1/vpc/vpc2/network"))))
+			socketPath)).Keys(types.PathFromString("region/us-west-1/vpc/vpc2/network"))))
 
 	require.Equal(t, "100",
 		firstAny(must(NewClient(nameFromPath(socketPath, "aws"),
@@ -227,7 +227,7 @@ func TestMetadataMultiPlugin3(t *testing.T) {
 		ServerWithNames(func() (map[string]metadata.Plugin, error) {
 			return map[string]metadata.Plugin{
 				".": &testing_metadata.Plugin{
-					DoList: func(path types.Path) ([]string, error) {
+					DoKeys: func(path types.Path) ([]string, error) {
 						res := types.List(path, m0)
 						return res, nil
 					},
@@ -236,7 +236,7 @@ func TestMetadataMultiPlugin3(t *testing.T) {
 					},
 				},
 				"aws": &testing_metadata.Plugin{
-					DoList: func(path types.Path) ([]string, error) {
+					DoKeys: func(path types.Path) ([]string, error) {
 						res := types.List(path, m1)
 						return res, nil
 					},
@@ -245,7 +245,7 @@ func TestMetadataMultiPlugin3(t *testing.T) {
 					},
 				},
 				"azure": &testing_metadata.Plugin{
-					DoList: func(path types.Path) ([]string, error) {
+					DoKeys: func(path types.Path) ([]string, error) {
 						res := types.List(path, m2)
 						return res, nil
 					},
@@ -258,18 +258,18 @@ func TestMetadataMultiPlugin3(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"metrics"},
-		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.Path([]string{}))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).Keys(types.Path([]string{}))))
 	require.Equal(t, []string{"metrics"},
-		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("/"))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).Keys(types.PathFromString("/"))))
 	require.Equal(t, []string{"region"},
-		first(must(NewClient(nameFromPath(socketPath, "aws"), socketPath)).List(types.PathFromString("."))))
+		first(must(NewClient(nameFromPath(socketPath, "aws"), socketPath)).Keys(types.PathFromString("."))))
 	require.Equal(t, []string{"dc"},
-		first(must(NewClient(nameFromPath(socketPath, "azure"), socketPath)).List(types.PathFromString("."))))
+		first(must(NewClient(nameFromPath(socketPath, "azure"), socketPath)).Keys(types.PathFromString("."))))
 	require.Equal(t, []string(nil),
-		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("gce"))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).Keys(types.PathFromString("gce"))))
 	require.Equal(t, []string{"network10", "network11"},
 		first(must(NewClient(nameFromPath(socketPath, "aws"),
-			socketPath)).List(types.PathFromString("region/us-west-1/vpc/vpc2/network"))))
+			socketPath)).Keys(types.PathFromString("region/us-west-1/vpc/vpc2/network"))))
 
 	require.Equal(t, "100",
 		firstAny(must(NewClient(nameFromPath(socketPath),
@@ -293,7 +293,7 @@ func TestMetadataMultiPlugin4(t *testing.T) {
 
 	server, err := rpc_server.StartPluginAtPath(socketPath,
 		Server(&testing_metadata.Plugin{
-			DoList: func(path types.Path) ([]string, error) {
+			DoKeys: func(path types.Path) ([]string, error) {
 				res := types.List(path, m0)
 				return res, nil
 			},
@@ -304,9 +304,9 @@ func TestMetadataMultiPlugin4(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"metrics"},
-		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString(""))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).Keys(types.PathFromString(""))))
 	require.Equal(t, []string{"instances", "managers", "networks", "workers"},
-		first(must(NewClient(nameFromPath(socketPath), socketPath)).List(types.PathFromString("metrics/"))))
+		first(must(NewClient(nameFromPath(socketPath), socketPath)).Keys(types.PathFromString("metrics/"))))
 
 	require.Equal(t, "100",
 		firstAny(must(NewClient(nameFromPath(socketPath),
