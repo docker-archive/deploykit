@@ -27,9 +27,9 @@ func MetadataFunc(discovery func() discovery.Plugins) func(string, ...interface{
 
 		switch len(optionalValue) {
 		case 0: // read
-			return doGetSet(plugins, path, optionalValue...)
+			return doBlockingGet(plugins, path, 0, 0)
 		case 1: // set
-			return doGetSet(plugins, path, optionalValue...)
+			return doSet(plugins, path, optionalValue[0])
 		case 2: // a retry time + timeout is specified for a read
 			retry, err := duration(optionalValue[0])
 			if err != nil {
@@ -85,26 +85,48 @@ func duration(v interface{}) (time.Duration, error) {
 	return 0, fmt.Errorf("cannot convert to duration: %v", v)
 }
 
-// blocking get from metadata. block the same go routine / thread until timeout or value is available
-func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout time.Duration) (interface{}, error) {
+// call is a struct that has all the information needed to evaluate a template metadata function
+type call struct {
+	plugin metadata.Plugin
+	name   plugin.Name
+	key    types.Path
+}
+
+func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*call, error) {
 
 	if plugins == nil {
-		return nil, fmt.Errorf("no plugin discovery:%s", path)
+		return nil, fmt.Errorf("no plugin discovery:%s", mpath.String())
 	}
 
-	mpath := types.PathFromString(path)
 	first := mpath.Index(0)
 	if first == nil {
-		return nil, fmt.Errorf("unknown plugin from path: %s", path)
+		return nil, fmt.Errorf("unknown plugin from path: %s", mpath.String())
 	}
 
 	lookup, err := plugins().List()
 	endpoint, has := lookup[*first]
 	if !has {
-		return false, nil // Don't return error.  Just return false for non-existence
+
+		return nil, nil // Don't return error.  Just return nil for non-existence
+
 	} else if mpath.Len() == 1 {
-		return true, nil // This is a test for availability of the plugin
+
+		// This is a test for availability of the plugin
+		name := plugin.Name(*first)
+		pl, err := metadata_rpc.NewClient(name, endpoint.Address)
+		if err != nil {
+			return nil, err
+		}
+
+		return &call{
+			name:   name,
+			plugin: pl,
+			key:    mpath.Shift(1),
+		}, nil
+
 	}
+
+	// Longer, full path lookup
 
 	handshaker, err := rpc_client.NewHandshaker(endpoint.Address)
 	if err != nil {
@@ -141,9 +163,52 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 	// now we have the plugin name -- try to get the interface
 	// note - that there are two different rpc interfaces
 	// TODO - consider eliminating and use only one
-	metadataPlugin, err := metadata_rpc.FromHandshaker(pluginName, handshaker)
+	pl, err := metadata_rpc.FromHandshaker(pluginName, handshaker)
 	if err != nil {
 		return nil, err
+	}
+	return &call{name: pluginName, key: key, plugin: pl}, nil
+}
+
+type errExpired string
+
+func (err errExpired) Error() string {
+	return fmt.Sprintf("expired key:%v", string(err))
+}
+
+// IsExpired returns true if the error is from wait expired / timeout
+func IsExpired(err error) bool {
+	_, is := err.(errExpired)
+	return is
+}
+
+type errReadonly string
+
+func (err errReadonly) Error() string {
+	return fmt.Sprintf("readonly:%v", string(err))
+}
+
+// IsReadonly returns true if the error is from wait expired / timeout
+func IsReadonly(err error) bool {
+	_, is := err.(errReadonly)
+	return is
+}
+
+// blocking get from metadata. block the same go routine / thread until timeout or value is available
+func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout time.Duration) (interface{}, error) {
+
+	call, err := metadataPlugin(plugins, types.PathFromString(path))
+	if err != nil {
+		return nil, err
+	}
+
+	if call == nil {
+		return nil, nil
+	}
+
+	// If the key is nil, the query (path) was for existence of the plugin itself
+	if types.NullPath.Equal(call.key) {
+		return true, nil
 	}
 
 	var value interface{}
@@ -151,7 +216,8 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 
 	for i := 0; ; i++ {
 
-		any, err := metadataPlugin.Get(key)
+		var any *types.Any
+		any, err = call.plugin.Get(call.key)
 		if err == nil && any != nil {
 			err = any.Decode(&value)
 			if err != nil {
@@ -161,74 +227,37 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 		}
 
 		if i > 0 && time.Now().After(expiry) {
+			err = errExpired(call.key.String())
 			break
 		}
 
 		if retry > 0 {
 			<-time.After(retry)
+		} else {
+			break
 		}
 	}
-	return value, fmt.Errorf("expired waiting")
+	return value, err
 }
 
-func doGetSet(plugins func() discovery.Plugins, path string, optionalValue ...interface{}) (interface{}, error) {
-	if plugins == nil {
-		return nil, fmt.Errorf("no plugin discovery:%s", path)
-	}
+func doSet(plugins func() discovery.Plugins, path string, newValue interface{}) (interface{}, error) {
 
-	mpath := types.PathFromString(path)
-	first := mpath.Index(0)
-	if first == nil {
-		return nil, fmt.Errorf("unknown plugin from path: %s", path)
-	}
-
-	lookup, err := plugins().List()
-	endpoint, has := lookup[*first]
-	if !has {
-		return false, nil // Don't return error.  Just return false for non-existence
-	} else if mpath.Len() == 1 {
-		return true, nil // This is a test for availability of the plugin
-	}
-
-	handshaker, err := rpc_client.NewHandshaker(endpoint.Address)
-	if err != nil {
-		return nil, err
-	}
-	// we need to get the subtypes
-	info, err := handshaker.Types()
+	call, err := metadataPlugin(plugins, types.PathFromString(path))
 	if err != nil {
 		return nil, err
 	}
 
-	// Need to derive the fully qualified plugin name from a long path
-	pluginName := plugin.Name(*first)
-	key := mpath.Shift(1)
-
-	for _, c := range []rpc.InterfaceSpec{
-		rpc.InterfaceSpec(metadata.UpdatableInterfaceSpec.Encode()),
-		rpc.InterfaceSpec(metadata.InterfaceSpec.Encode()),
-	} {
-		subs, has := info[c]
-		sub := mpath.Shift(1).Index(0)
-		if has && sub != nil {
-			for _, ss := range subs {
-				if *sub == ss {
-					pluginName = plugin.Name(gopath.Join(*first, *sub))
-					key = key.Shift(1)
-					break
-				}
-			}
-		}
+	if call == nil {
+		return nil, nil
 	}
 
-	metadataPlugin, err := metadata_rpc.NewClient(pluginName, endpoint.Address)
-	if err != nil {
-		return nil, err
+	// If the key is nil, the query (path) was for existence of the plugin itself
+	if types.NullPath.Equal(call.key) {
+		return true, nil
 	}
 
-	//key := mpath.Shift(1)
 	var value interface{}
-	any, err := metadataPlugin.Get(key)
+	any, err := call.plugin.Get(call.key)
 	if err != nil {
 		return nil, err
 	}
@@ -239,29 +268,21 @@ func doGetSet(plugins func() discovery.Plugins, path string, optionalValue ...in
 			return any.String(), err // note the type changed to string in error return
 		}
 	}
-
-	// Update case: return value is the version before this successful commit.
-	if len(optionalValue) == 1 {
-
-		any, err := types.AnyValue(optionalValue[0])
-		if err != nil {
-			return value, err
-		}
-
-		// update it
-		updatablePlugin, is := metadataPlugin.(metadata.Updatable)
-		if !is {
-			return value, fmt.Errorf("value is read-only")
-		}
-		_, proposed, cas, err := updatablePlugin.Changes([]metadata.Change{
-			{
-				Path:  key,
-				Value: any,
-			},
-		})
-		err = updatablePlugin.Commit(proposed, cas)
-		return template.VoidValue, err
+	any, err = types.AnyValue(newValue)
+	if err != nil {
+		return value, err
 	}
 
-	return value, err
+	updatablePlugin, is := call.plugin.(metadata.Updatable)
+	if !is {
+		return value, errReadonly(path)
+	}
+	_, proposed, cas, err := updatablePlugin.Changes([]metadata.Change{
+		{
+			Path:  call.key,
+			Value: any,
+		},
+	})
+	err = updatablePlugin.Commit(proposed, cas)
+	return template.VoidValue, err
 }
