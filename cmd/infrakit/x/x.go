@@ -25,6 +25,7 @@ func Command(scope scope.Scope) *cobra.Command {
 	experimental.AddCommand(
 		maxlifeCommand(scope),
 		remoteBootCommand(),
+		vmwscriptCommand(),
 	)
 
 	return experimental
