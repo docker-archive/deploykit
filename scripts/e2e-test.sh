@@ -100,6 +100,8 @@ expect_exact_output() {
     echo 'FAIL'
     echo "Expected output: $expected_output"
     echo "Actual output: $actual_output"
+    echo "infrakit -h"
+    infrakit -h
     exit 1
   fi
 }
@@ -118,6 +120,8 @@ expect_output_lines() {
     echo 'FAIL'
     echo "Expected line count: $expected_lines"
     echo "Actual line count: $actual_line_count"
+    echo "infrakit -h"
+    infrakit -h
     exit 1
   fi
 }
@@ -141,7 +145,17 @@ infrakit group/cattle free
 echo "Freed cattles; committing again"
 
 infrakit group commit scripts/cattle.json
+
+sleep 10
+
+if [[ $(infrakit -h | grep group/cattle) == "" ]]; then
+    echo "checking the CLI"
+    infrakit -h
+fi
+
 expect_exact_output "Should be watching one group" "infrakit group ls -q" "cattle"
+
+echo "Updating specs to scale group to 10"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
@@ -154,16 +168,19 @@ sleep 10
 
 expect_output_lines "10 instances should exist in group" "infrakit group/cattle describe -q" "10"
 
-# Terminate 3 instances.
+echo "Terminate 3 instances."
+
 pushd $INSTANCE_FILE_DIR
   rm $(ls | head -3)
 popd
 
 sleep 10
 
-expect_output_lines "10 instances should exist in group" "infrakit group describe cattle -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit group/cattle describe -q" "10"
 
 infrakit group/cattle destroy
+
+sleep 10
 expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
 
 echo 'ALL TESTS PASSED'
