@@ -1,7 +1,6 @@
 package ingress
 
 import (
-	"fmt"
 	gsync "sync"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
-	loadbalancer_rpc "github.com/docker/infrakit/pkg/rpc/loadbalancer"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -92,11 +89,7 @@ func (c *managed) groupPlugin(g ingress.Group) (group.Plugin, error) {
 
 	found, has := c.groupClients[g.Plugin()]
 	if !has {
-		endpoint, err := c.scope.Plugins().Find(g.Plugin())
-		if err != nil {
-			return nil, err
-		}
-		cl, err := group_rpc.NewClient(endpoint.Address)
+		cl, err := c.scope.Group(g.Plugin().String())
 		if err != nil {
 			return nil, err
 		}
@@ -108,16 +101,7 @@ func (c *managed) groupPlugin(g ingress.Group) (group.Plugin, error) {
 
 func (c *managed) l4Client(spec ingress.Spec) (loadbalancer.L4, error) {
 	log.Debug("Locating L4", "name", spec.L4Plugin)
-
-	if c.scope.Plugins == nil {
-		return nil, fmt.Errorf("no L4 plugin %v", spec.L4Plugin)
-	}
-
-	endpoint, err := c.scope.Plugins().Find(spec.L4Plugin)
-	if err != nil {
-		return nil, err
-	}
-	return loadbalancer_rpc.NewClient(spec.L4Plugin, endpoint.Address)
+	return c.scope.L4(spec.L4Plugin.String())
 }
 
 func (c *managed) started() bool {

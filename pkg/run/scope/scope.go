@@ -7,6 +7,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -46,6 +47,9 @@ type Scope struct {
 	// Flavor is for lookup up a flavor plugin
 	Flavor FlavorResolver
 
+	// L4 is for lookup up an L4 plugin
+	L4 L4Resolver
+
 	// Metadata is for resolving metadata / path related queries
 	Metadata MetadataResolver
 
@@ -67,6 +71,9 @@ type MetadataCall struct {
 // TemplateEngine returns a configured template engine for this scope
 type TemplateEngine func(url string, opts template.Options) (*template.Template, error)
 
+// L4Resolver resolves a string name to L4 plugin
+type L4Resolver func(n string) (loadbalancer.L4, error)
+
 // GroupResolver resolves a string name for the plugin to group plugin
 type GroupResolver func(n string) (group.Plugin, error)
 
@@ -87,6 +94,7 @@ func DefaultScope(plugins func() discovery.Plugins) Scope {
 		Metadata: DefaultMetadataResolver(plugins),
 		Instance: DefaultInstanceResolver(plugins),
 		Flavor:   DefaultFlavorResolver(plugins),
+		L4:       DefaultL4Resolver(plugins),
 	}
 
 	s.TemplateEngine = func(url string, opts template.Options) (*template.Template, error) {
