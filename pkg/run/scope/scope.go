@@ -56,5 +56,6 @@ func DefaultScope(plugins func() discovery.Plugins) Scope {
 	return Scope{
 		Plugins:  plugins,
 		Metadata: DefaultMetadataResolver(plugins),
+		Instance: DefaultInstanceResolver(plugins),
 	}
 }

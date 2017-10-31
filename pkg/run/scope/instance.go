@@ -1,0 +1,20 @@
+package scope
+
+import (
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
+	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/spi/instance"
+)
+
+// DefaultInstanceResolver returns a resolver
+func DefaultInstanceResolver(plugins func() discovery.Plugins) func(string) (instance.Plugin, error) {
+	return func(name string) (instance.Plugin, error) {
+		pn := plugin.Name(name)
+		endpoint, err := plugins().Find(pn)
+		if err != nil {
+			return nil, err
+		}
+		return instance_plugin.NewClient(pn, endpoint.Address)
+	}
+}

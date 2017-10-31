@@ -4,6 +4,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -14,14 +15,6 @@ import (
 	"strings"
 	"testing"
 )
-
-// func templ(tpl string) *template.Template {
-// 	t, err := template.NewTemplate("str://"+tpl, template.Options{})
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	return t
-// }
 
 func plugins() discovery.Plugins {
 	d, err := local.NewPluginDiscovery()
@@ -40,10 +33,10 @@ func TestValidate(t *testing.T) {
 	options := Options{
 		ConfigDir: curdir,
 	}
-	managerFlavor, err := NewManagerFlavor(plugins, options, managerStop)
+	managerFlavor, err := NewManagerFlavor(scope.DefaultScope(plugins), options, managerStop)
 	require.NoError(t, err)
 
-	workerFlavor, err := NewWorkerFlavor(plugins, options, workerStop)
+	workerFlavor, err := NewWorkerFlavor(scope.DefaultScope(plugins), options, workerStop)
 	require.NoError(t, err)
 
 	// Logical ID with multiple attachments is allowed.
@@ -90,7 +83,7 @@ func TestManager(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	managerFlavor, err := NewManagerFlavor(plugins, Options{ConfigDir: curdir}, managerStop)
+	managerFlavor, err := NewManagerFlavor(scope.DefaultScope(plugins), Options{ConfigDir: curdir}, managerStop)
 	require.NoError(t, err)
 
 	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
@@ -182,7 +175,7 @@ func TestWorker(t *testing.T) {
 		err = os.RemoveAll(cfdir)
 		require.NoError(t, err)
 	}
-	workerFlavor, err := NewWorkerFlavor(plugins, Options{ConfigDir: curdir}, workerStop)
+	workerFlavor, err := NewWorkerFlavor(scope.DefaultScope(plugins), Options{ConfigDir: curdir}, workerStop)
 	require.NoError(t, err)
 
 	index := group_types.Index{Group: group.ID("group"), Sequence: 0}

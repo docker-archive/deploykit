@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery/local"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -21,6 +22,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var scp = scope.DefaultScope(func() discovery.Plugins {
+	d, err := local.NewPluginDiscovery()
+	if err != nil {
+		panic(err)
+	}
+	return d
+})
+
 func templ(tpl string) *template.Template {
 	t, err := template.NewTemplate("str://"+tpl, template.Options{})
 	if err != nil {
@@ -29,24 +38,16 @@ func templ(tpl string) *template.Template {
 	return t
 }
 
-func plugins() discovery.Plugins {
-	d, err := local.NewPluginDiscovery()
-	if err != nil {
-		panic(err)
-	}
-	return d
-}
-
 func TestValidate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
-	managerFlavor := NewManagerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+	managerFlavor := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return mock_client.NewMockAPIClientCloser(ctrl), nil
 	}, templ(DefaultManagerInitScriptTemplate), managerStop)
-	workerFlavor := NewWorkerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+	workerFlavor := NewWorkerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return mock_client.NewMockAPIClientCloser(ctrl), nil
 	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
 
@@ -100,7 +101,7 @@ func TestWorker(t *testing.T) {
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
-	flavorImpl := NewWorkerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+	flavorImpl := NewWorkerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
 	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
 
@@ -173,7 +174,7 @@ func TestManager(t *testing.T) {
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
-	flavorImpl := NewManagerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
 	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
@@ -292,7 +293,7 @@ func TestTemplateFunctions(t *testing.T) {
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
-	flavorImpl := NewManagerFlavor(plugins, func(Spec) (docker.APIClientCloser, error) {
+	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
 	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
