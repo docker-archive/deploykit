@@ -15,6 +15,11 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+// Metadata implements resolution of path to metadata
+func (f fullScope) Metadata(path string) (*MetadataCall, error) {
+	return metadataPlugin(f, types.PathFromString(path))
+}
+
 // DefaultMetadataResolver returns a resolver
 func DefaultMetadataResolver(plugins func() discovery.Plugins) func(string) (*MetadataCall, error) {
 	return func(path string) (*MetadataCall, error) {
@@ -192,8 +197,10 @@ func IsReadonly(err error) bool {
 	return is
 }
 
+type metadataResolver func(p string) (*MetadataCall, error)
+
 // blocking get from metadata. block the same go routine / thread until timeout or value is available
-func doBlockingGet(resolver MetadataResolver, path string, retry, timeout time.Duration) (interface{}, error) {
+func doBlockingGet(resolver metadataResolver, path string, retry, timeout time.Duration) (interface{}, error) {
 
 	call, err := resolver(path)
 	if err != nil {
@@ -238,7 +245,7 @@ func doBlockingGet(resolver MetadataResolver, path string, retry, timeout time.D
 	return value, err
 }
 
-func doSet(resolver MetadataResolver, path string, newValue interface{}) (interface{}, error) {
+func doSet(resolver metadataResolver, path string, newValue interface{}) (interface{}, error) {
 
 	call, err := resolver(path)
 	if err != nil {

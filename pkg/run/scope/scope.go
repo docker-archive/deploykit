@@ -33,28 +33,28 @@ var Nil = DefaultScope(func() discovery.Plugins {
 // and involves lots of calls across process boundaries, yet it provides
 // lookup and scoping of services based on some business logical and locality
 // of code.
-type Scope struct {
+type Scope interface {
 
 	// Plugins returns the plugin lookup
-	Plugins func() discovery.Plugins
+	Plugins() discovery.Plugins
 
 	// Group is for looking up an group plugin
-	Group GroupResolver
+	Group(n string) (group.Plugin, error)
 
 	// Instance is for looking up an instance plugin
-	Instance InstanceResolver
+	Instance(n string) (instance.Plugin, error)
 
 	// Flavor is for lookup up a flavor plugin
-	Flavor FlavorResolver
+	Flavor(n string) (flavor.Plugin, error)
 
 	// L4 is for lookup up an L4 plugin
-	L4 L4Resolver
+	L4(n string) (loadbalancer.L4, error)
 
 	// Metadata is for resolving metadata / path related queries
-	Metadata MetadataResolver
+	Metadata(p string) (*MetadataCall, error)
 
 	// TemplateEngine creates a template engine for use.
-	TemplateEngine TemplateEngine
+	TemplateEngine(url string, opts template.Options) (*template.Template, error)
 }
 
 // Work is a unit of work that is executed in the scope of the plugins
@@ -68,80 +68,61 @@ type MetadataCall struct {
 	Key    types.Path
 }
 
-// TemplateEngine returns a configured template engine for this scope
-type TemplateEngine func(url string, opts template.Options) (*template.Template, error)
+type fullScope func() discovery.Plugins
 
-// L4Resolver resolves a string name to L4 plugin
-type L4Resolver func(n string) (loadbalancer.L4, error)
+// Plugins implements plugin lookup
+func (f fullScope) Plugins() discovery.Plugins {
+	return f()
+}
 
-// GroupResolver resolves a string name for the plugin to group plugin
-type GroupResolver func(n string) (group.Plugin, error)
+// TemplateEngine implmements factory for creating template engine
+func (f fullScope) TemplateEngine(url string, opts template.Options) (*template.Template, error) {
+	engine, err := template.NewTemplate(url, opts)
+	if err != nil {
+		return nil, err
+	}
 
-// InstanceResolver resolves a string name for the plugin to instance plugin
-type InstanceResolver func(n string) (instance.Plugin, error)
+	return engine.WithFunctions(func() []template.Function {
+		return []template.Function{
+			{
+				Name: "metadata",
+				Description: []string{
+					"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
+					"and calls GET on the plugin with the path \"path/to/data\".",
+					"It's identical to the CLI command infrakit metadata cat ...",
+				},
+				Func: MetadataFunc(f),
+			},
+			{
+				Name: "var",
+				Func: func(name string, optional ...interface{}) (interface{}, error) {
 
-// FlavorResolver resolves a string name for the plugin to flavor plugin
-type FlavorResolver func(n string) (flavor.Plugin, error)
+					if len(optional) > 0 {
+						return engine.Var(name, optional...), nil
+					}
 
-// MetadataResolver is a function that can resolve a path to a callable to access metadata
-type MetadataResolver func(p string) (*MetadataCall, error)
+					v := engine.Ref(name)
+					if v == nil {
+						// If not resolved, try to interpret the path as a path for metadata...
+						m, err := MetadataFunc(f)(name, optional...)
+						if err != nil {
+							return nil, err
+						}
+						v = m
+					}
+
+					if v == nil && engine.Options().MultiPass {
+						return engine.DeferVar(name), nil
+					}
+
+					return v, nil
+				},
+			},
+		}
+	}), nil
+}
 
 // DefaultScope returns the default scope
 func DefaultScope(plugins func() discovery.Plugins) Scope {
-	s := Scope{
-		Plugins:  plugins,
-		Group:    DefaultGroupResolver(plugins),
-		Metadata: DefaultMetadataResolver(plugins),
-		Instance: DefaultInstanceResolver(plugins),
-		Flavor:   DefaultFlavorResolver(plugins),
-		L4:       DefaultL4Resolver(plugins),
-	}
-
-	s.TemplateEngine = func(url string, opts template.Options) (*template.Template, error) {
-		engine, err := template.NewTemplate(url, opts)
-		if err != nil {
-			return nil, err
-		}
-
-		return engine.WithFunctions(func() []template.Function {
-			return []template.Function{
-				{
-					Name: "metadata",
-					Description: []string{
-						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-						"and calls GET on the plugin with the path \"path/to/data\".",
-						"It's identical to the CLI command infrakit metadata cat ...",
-					},
-					Func: MetadataFunc(s),
-				},
-				{
-					Name: "var",
-					Func: func(name string, optional ...interface{}) (interface{}, error) {
-
-						if len(optional) > 0 {
-							return engine.Var(name, optional...), nil
-						}
-
-						v := engine.Ref(name)
-						if v == nil {
-							// If not resolved, try to interpret the path as a path for metadata...
-							m, err := MetadataFunc(s)(name, optional...)
-							if err != nil {
-								return nil, err
-							}
-							v = m
-						}
-
-						if v == nil && engine.Options().MultiPass {
-							return engine.DeferVar(name), nil
-						}
-
-						return v, nil
-					},
-				},
-			}
-		}), nil
-	}
-
-	return s
+	return fullScope(plugins)
 }
