@@ -78,6 +78,7 @@ type ImportResource struct {
 	ResourceID           *string
 	ResourceType         *TResourceType
 	ResourceName         *TResourceName      // Name of resource in the instance spec
+	ExcludePropIDs       *[]string           // Property IDs that exist in the instance spec that should be excluded
 	ResourceProps        TResourceProperties // Populated via tf show
 	SpecProps            TResourceProperties // Parsed from instance spec
 	FinalProps           TResourceProperties // Properties for the tf.json.new file
@@ -1767,7 +1768,7 @@ func setFinalResourceAndFilename(resource *ImportResource, filename string, reso
 func determineFinalPropsForImport(res *ImportResource) {
 	log.Infof("Using spec for %v import: %v", string(*res.ResourceType), res.SpecProps)
 	finalProps := TResourceProperties{}
-	for k := range res.SpecProps {
+	for k, specVal := range res.SpecProps {
 		// Ignore certain keys in spec
 		if k == PropScope {
 			continue
@@ -1775,12 +1776,25 @@ func determineFinalPropsForImport(res *ImportResource) {
 		if k == PropHostnamePrefix {
 			k = "hostname"
 		}
-		v, has := res.ResourceProps[k]
-		if !has {
-			log.Warningf("Imported terraform resource missing '%s' property, not setting", k)
-			continue
+		if res.ExcludePropIDs != nil && len(*res.ExcludePropIDs) > 0 {
+			exclude := false
+			for _, propID := range *res.ExcludePropIDs {
+				if propID == k {
+					exclude = true
+					log.Infof("Excluding spec property '%s' for resource type %v", propID, string(*res.ResourceType))
+					break
+				}
+			}
+			if exclude {
+				continue
+			}
 		}
-		finalProps[k] = v
+		if v, has := res.ResourceProps[k]; has {
+			finalProps[k] = v
+		} else {
+			log.Warningf("Imported terraform resource missing '%s' property, using spec value: %v", k, specVal)
+			finalProps[k] = specVal
+		}
 	}
 	// Always keep the tags, even if the spec does not have them as a property
 	if _, has := finalProps["tags"]; !has {

@@ -49,6 +49,9 @@ type ImportResourceOptions struct {
 
 	// ID of the resource to import
 	ResourceID string
+
+	// IDs of the properties to exclude from the instance spec
+	ExcludePropIDs []string
 }
 
 // Options capture the options for starting up the plugin.
@@ -74,7 +77,7 @@ type Options struct {
 	// NewOption is an example... see the plugins.json file in this directory.
 	NewOption string
 
-	// Envs are the environemtn variables to include when invoking terraform
+	// Envs are the environment variables to include when invoking terraform
 	Envs types.Any
 }
 
@@ -121,10 +124,12 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		resType := terraform.TResourceType(importResource.ResourceType)
 		resName := terraform.TResourceName(importResource.ResourceName)
 		resID := importResource.ResourceID
+		excludePropIDs := importResource.ExcludePropIDs
 		res := terraform.ImportResource{
-			ResourceType: &resType,
-			ResourceName: &resName,
-			ResourceID:   &resID,
+			ResourceType:   &resType,
+			ResourceName:   &resName,
+			ResourceID:     &resID,
+			ExcludePropIDs: &excludePropIDs,
 		}
 		resources = append(resources, &res)
 	}
