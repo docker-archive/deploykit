@@ -6,7 +6,6 @@ import (
 	"github.com/docker/infrakit/pkg/cli/backend"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
@@ -56,23 +55,17 @@ func Commit(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) {
 		// Check the list of plugins
 		for _, gp := range groups {
 
-			endpoint, err := scope.Plugins().Find(gp.Plugin)
-			if err != nil {
-				return err
-			}
-
 			// unmarshal the group spec
 			spec := group.Spec{}
 			if gp.Properties != nil {
-				err = gp.Properties.Decode(&spec)
+				err := gp.Properties.Decode(&spec)
 				if err != nil {
 					return err
 				}
 			}
 
-			target, err := group_plugin.NewClient(endpoint.Address)
-
-			log.Debug("commit", "plugin", gp.Plugin, "address", endpoint.Address, "err", err, "spec", spec)
+			target, err := scope.Group(gp.Plugin.String())
+			log.Debug("commit", "plugin", gp.Plugin, "err", err, "spec", spec)
 
 			if err != nil {
 				return err

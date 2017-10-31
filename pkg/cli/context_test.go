@@ -5,6 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -23,6 +26,14 @@ func TestMissing(t *testing.T) {
 	require.True(t, Missing("bool", none))
 	require.False(t, Missing("bool", false))
 	require.False(t, Missing("bool", true))
+}
+
+func plugins() discovery.Plugins {
+	d, err := local.NewPluginDiscovery()
+	if err != nil {
+		panic(err)
+	}
+	return d
 }
 
 func TestContext(t *testing.T) {
@@ -63,6 +74,7 @@ func TestContext(t *testing.T) {
 			Use:   "test",
 			Short: "test",
 		},
+		scope: scope.DefaultScope(plugins),
 		src:   "str://" + script,
 		input: bytes.NewBufferString("username\n"),
 	}
@@ -109,6 +121,7 @@ done
 `
 
 	c := &Context{
+		scope: scope.DefaultScope(plugins),
 		cmd: &cobra.Command{
 			Use:   "test",
 			Short: "test",

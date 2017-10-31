@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/cli/backend"
-	"github.com/docker/infrakit/pkg/plugin"
-	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -36,13 +34,7 @@ func Provision(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) 
 
 	return func(script string) error {
 
-		// locate the plugin
-		endpoint, err := scope.Plugins().Find(plugin.Name(name))
-		if err != nil {
-			return err
-		}
-
-		plugin, err := instance_plugin.NewClient(plugin.Name(name), endpoint.Address)
+		plugin, err := scope.Instance(name)
 		if err != nil {
 			return err
 		}

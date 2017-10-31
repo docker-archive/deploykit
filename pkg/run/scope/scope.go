@@ -2,8 +2,10 @@ package scope
 
 import (
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
@@ -11,7 +13,13 @@ import (
 )
 
 // Nil is no scope
-var Nil = Scope{}
+var Nil = DefaultScope(func() discovery.Plugins {
+	d, err := local.NewPluginDiscovery()
+	if err != nil {
+		panic(err)
+	}
+	return d
+})
 
 // Scope provides an environment in which the necessary plugins are available
 // for doing a unit of work.  The scope can be local or remote, namespaced,
@@ -28,6 +36,9 @@ type Scope struct {
 
 	// Plugins returns the plugin lookup
 	Plugins func() discovery.Plugins
+
+	// Group is for looking up an group plugin
+	Group GroupResolver
 
 	// Instance is for looking up an instance plugin
 	Instance InstanceResolver
@@ -56,6 +67,9 @@ type MetadataCall struct {
 // TemplateEngine returns a configured template engine for this scope
 type TemplateEngine func(url string, opts template.Options) (*template.Template, error)
 
+// GroupResolver resolves a string name for the plugin to group plugin
+type GroupResolver func(n string) (group.Plugin, error)
+
 // InstanceResolver resolves a string name for the plugin to instance plugin
 type InstanceResolver func(n string) (instance.Plugin, error)
 
@@ -69,6 +83,7 @@ type MetadataResolver func(p string) (*MetadataCall, error)
 func DefaultScope(plugins func() discovery.Plugins) Scope {
 	s := Scope{
 		Plugins:  plugins,
+		Group:    DefaultGroupResolver(plugins),
 		Metadata: DefaultMetadataResolver(plugins),
 		Instance: DefaultInstanceResolver(plugins),
 		Flavor:   DefaultFlavorResolver(plugins),
