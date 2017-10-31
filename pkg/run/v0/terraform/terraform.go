@@ -193,6 +193,10 @@ func parseInstanceSpecFromGroup(groupSpecURL, groupID string) (*instance.Spec, e
 		}
 		tags["infrakit.group"] = groupID
 	}
+	// Use the first logical ID if set
+	if len(groupProps.Allocation.LogicalIDs) > 0 {
+		tags["LogicalID"] = string(groupProps.Allocation.LogicalIDs[0])
+	}
 
 	spec := instance.Spec{
 		Properties: groupProps.Instance.Properties,
