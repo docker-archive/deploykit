@@ -1,6 +1,6 @@
 # Flavor plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/flavor/* e27841cf1ead137533b608b3ccc90ab72596532a -->
+<!-- SOURCE-CHECKSUM pkg/spi/flavor/* 1f30ac75124d7d85397bd5a820a4f1382bd38769 -->
 
 ## API
 
