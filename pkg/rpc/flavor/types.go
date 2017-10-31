@@ -1,8 +1,8 @@
 package flavor
 
 import (
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -11,7 +11,7 @@ import (
 type ValidateRequest struct {
 	Type       string
 	Properties *types.Any
-	Allocation group_types.AllocationMethod
+	Allocation group.AllocationMethod
 }
 
 // ValidateResponse is the rpc wrapper for the results of Validate
@@ -25,8 +25,8 @@ type PrepareRequest struct {
 	Type       string
 	Properties *types.Any
 	Spec       instance.Spec
-	Allocation group_types.AllocationMethod
-	Index      group_types.Index
+	Allocation group.AllocationMethod
+	Index      group.Index
 }
 
 // PrepareResponse is the rpc wrapper of the result of Prepare

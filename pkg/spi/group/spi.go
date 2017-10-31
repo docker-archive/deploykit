@@ -12,6 +12,23 @@ var InterfaceSpec = spi.InterfaceSpec{
 	Version: "0.1.0",
 }
 
+// AllocationMethod defines the type of allocation and supervision needed by a flavor's Group.
+type AllocationMethod struct {
+	Size       uint
+	LogicalIDs []instance.LogicalID
+}
+
+// Index is the index of the instance's creation.  It provides a context for knowing
+// what is being created.
+type Index struct {
+
+	// Group is the name of the group
+	Group ID
+
+	// Sequence is a sequence number that's per instance.
+	Sequence uint
+}
+
 // Plugin defines the functions for a Group plugin.
 type Plugin interface {
 	CommitGroup(grp Spec, pretend bool) (string, error)

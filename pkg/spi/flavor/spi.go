@@ -1,8 +1,8 @@
 package flavor
 
 import (
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -31,14 +31,14 @@ const (
 type Plugin interface {
 
 	// Validate checks whether the helper can support a configuration.
-	Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error
+	Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error
 
 	// Prepare allows the Flavor to modify the provisioning instructions for an instance.  For example, a
 	// helper could be used to place additional tags on the machine, or generate a specialized Init command based on
 	// the flavor configuration.
 	Prepare(flavorProperties *types.Any, spec instance.Spec,
-		allocation group_types.AllocationMethod,
-		createContext group_types.Index) (instance.Spec, error)
+		allocation group.AllocationMethod,
+		createContext group.Index) (instance.Spec, error)
 
 	// Healthy determines the Health of this Flavor on an instance.
 	Healthy(flavorProperties *types.Any, inst instance.Description) (Health, error)

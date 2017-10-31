@@ -10,7 +10,6 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -53,22 +52,22 @@ func TestValidate(t *testing.T) {
 
 	require.NoError(t, workerFlavor.Validate(
 		types.AnyString(`{"Docker" : {"Host":"unix:///var/run/docker.sock"}}`),
-		group_types.AllocationMethod{Size: 5}))
+		group.AllocationMethod{Size: 5}))
 	require.NoError(t, managerFlavor.Validate(
 		types.AnyString(`{"Docker" : {"Host":"unix:///var/run/docker.sock"}}`),
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
 	// Logical ID with multiple attachments is allowed.
 	require.NoError(t, managerFlavor.Validate(
 		types.AnyString(`{
                         "Docker" : {"Host":"unix:///var/run/docker.sock"},
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`),
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 
 	// Logical ID used more than once.
 	err := managerFlavor.Validate(
 		types.AnyString(`{"Docker":{"Host":"unix:///var/run/docker.sock"}}`),
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.1", "127.0.0.2"}})
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.1", "127.0.0.2"}})
 	require.Error(t, err)
 	require.Equal(t, "LogicalID 127.0.0.1 specified more than once", err.Error())
 
@@ -77,7 +76,7 @@ func TestValidate(t *testing.T) {
 		types.AnyString(`{
                         "Docker" : {"Host":"unix:///var/run/docker.sock"},
 			"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}], "127.0.0.2": [{"ID": "a", "Type": "ebs"}]}}`),
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
 	require.Error(t, err)
 	require.Equal(t, "Attachment a specified more than once", err.Error())
 
@@ -86,7 +85,7 @@ func TestValidate(t *testing.T) {
 		types.AnyString(`{
                         "Docker" : {"Host":"unix:///var/run/docker.sock"},
 			"Attachments": {"*": [{"ID": "a", "Type": "NFSVolume"}]}}`),
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}})
 	require.NoError(t, err)
 
 	close(managerStop)
@@ -119,11 +118,11 @@ func TestWorker(t *testing.T) {
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
 	client.EXPECT().Close().AnyTimes()
 
-	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
+	index := group.Index{Group: group.ID("group"), Sequence: 0}
 	details, err := flavorImpl.Prepare(
 		types.AnyString(`{}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}},
-		group_types.AllocationMethod{Size: 5},
+		group.AllocationMethod{Size: 5},
 		index)
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
@@ -202,11 +201,11 @@ func TestManager(t *testing.T) {
 }
 `)
 
-	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
+	index := group.Index{Group: group.ID("group"), Sequence: 0}
 	id := instance.LogicalID("10.20.100.1")
 	details, err := flavorImpl.Prepare(flavorSpec,
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1"}},
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1"}},
 		index)
 	require.NoError(t, err)
 	require.Equal(t, "b", details.Tags["a"])
@@ -226,12 +225,12 @@ func TestManager(t *testing.T) {
 	require.Contains(t, details.Init, associationID)
 
 	// another instance -- note that this id is not the first in the allocation list of logical ids.
-	index = group_types.Index{Group: group.ID("group"), Sequence: 1}
+	index = group.Index{Group: group.ID("group"), Sequence: 1}
 	id = instance.LogicalID("172.200.100.2")
 	details, err = flavorImpl.Prepare(
 		types.AnyString(`{"Attachments": {"172.200.100.2": [{"ID": "a", "Type": "gpu"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"172.200.100.1", "172.200.100.2"}},
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"172.200.100.1", "172.200.100.2"}},
 		index)
 	require.NoError(t, err)
 
@@ -250,7 +249,7 @@ func TestManager(t *testing.T) {
 		details, err = flavorImpl.Prepare(
 			types.AnyString(`{"Attachments": {"*": [{"ID": "nfs", "Type": "NFSVolume"}]}}`),
 			instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-			group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
+			group.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
 			index)
 		require.NoError(t, err)
 		require.Equal(t, []instance.Attachment{{ID: "nfs", Type: "NFSVolume"}}, details.Attachments)
@@ -260,7 +259,7 @@ func TestManager(t *testing.T) {
 	details, err = flavorImpl.Prepare(
 		types.AnyString(`{"Attachments": {"*": [{"ID": "nfs", "Type": "NFSVolume"}]}}`),
 		instance.Spec{Tags: map[string]string{"a": "b"}},
-		group_types.AllocationMethod{Size: 10},
+		group.AllocationMethod{Size: 10},
 		index)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Attachment{{ID: "nfs", Type: "NFSVolume"}}, details.Attachments)
@@ -320,11 +319,11 @@ func TestTemplateFunctions(t *testing.T) {
 }
 `)
 
-	index := group_types.Index{Group: group.ID("group"), Sequence: 100}
+	index := group.Index{Group: group.ID("group"), Sequence: 100}
 	id := instance.LogicalID("10.20.100.1")
 	details, err := flavorImpl.Prepare(properties,
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1"}},
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1"}},
 		index)
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("%v,%v", index.Group, index.Sequence), details.Init)

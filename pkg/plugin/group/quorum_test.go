@@ -6,7 +6,7 @@ import (
 
 	mock_group "github.com/docker/infrakit/pkg/mock/plugin/group"
 	mock_instance "github.com/docker/infrakit/pkg/mock/spi/instance"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
@@ -109,8 +109,8 @@ func TestQuorumPlanUpdateNoChanges(t *testing.T) {
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
 	settings := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				LogicalIDs: []instance.LogicalID{
 					*a.LogicalID,
 				},
@@ -132,8 +132,8 @@ func TestQuorumPlanUpdateLogicalIDChange(t *testing.T) {
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
 	settingsOld := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				LogicalIDs: []instance.LogicalID{
 					*a.LogicalID,
 				},
@@ -142,8 +142,8 @@ func TestQuorumPlanUpdateLogicalIDChange(t *testing.T) {
 	}
 	settingsNew := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				LogicalIDs: []instance.LogicalID{
 					*b.LogicalID,
 				},
@@ -162,27 +162,27 @@ func TestQuorumPlanUpdateRollingUpdate(t *testing.T) {
 	groupID := group.ID("quorum")
 	scaled := mock_group.NewMockScaled(ctrl)
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
-	instanceOld := types.InstancePlugin{
+	instanceOld := group_types.InstancePlugin{
 		Plugin: "name-old",
 	}
-	instanceNew := types.InstancePlugin{
+	instanceNew := group_types.InstancePlugin{
 		Plugin: "name-new",
 	}
-	allocation := types.AllocationMethod{
+	allocation := group.AllocationMethod{
 		LogicalIDs: []instance.LogicalID{
 			*b.LogicalID,
 		},
 	}
 	settingsOld := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
+		config: group_types.Spec{
 			Allocation: allocation,
 			Instance:   instanceOld,
 		},
 	}
 	settingsNew := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
+		config: group_types.Spec{
 			Allocation: allocation,
 			Instance:   instanceNew,
 		},

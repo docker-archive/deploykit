@@ -3,7 +3,6 @@ package kubernetes
 import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -50,12 +49,12 @@ func TestValidate(t *testing.T) {
 				"Path" : "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"}],
 		"KubeClusterID" : "test",
 		"Attachments": {"127.0.0.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`),
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1"}}))
 	require.NoError(t, workerFlavor.Validate(
 		types.AnyString(`{"KubeJoinIP" : "127.0.0.1", 
 		"KubeBindPort" : 6443, 
 		"KubeClusterID" : "test"}`),
-		group_types.AllocationMethod{Size: 5}))
+		group.AllocationMethod{Size: 5}))
 
 	err = managerFlavor.Validate(
 		types.AnyString(`{"KubeJoinIP" : "127.0.0.1", 
@@ -66,7 +65,7 @@ func TestValidate(t *testing.T) {
 				"Type" : "network",
 				"Path" : "http://docs.projectcalico.org/v2.2/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml"}],
 		"KubeClusterID" : "test"}`),
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"127.0.0.1", "127.0.0.2", "127.0.0.3"}})
 	require.NoError(t, err)
 	close(managerStop)
 	close(workerStop)
@@ -86,7 +85,7 @@ func TestManager(t *testing.T) {
 	managerFlavor, err := NewManagerFlavor(scope.DefaultScope(plugins), Options{ConfigDir: curdir}, managerStop)
 	require.NoError(t, err)
 
-	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
+	index := group.Index{Group: group.ID("group"), Sequence: 0}
 	id := instance.LogicalID("10.20.100.1")
 	flavorSpec := types.AnyString(`{"KubeJoinIP" : "10.20.100.1", 
 		"KubeBindPort" : 6443, 
@@ -101,7 +100,7 @@ func TestManager(t *testing.T) {
 		"Attachments": {"10.20.100.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`)
 	details, err := managerFlavor.Prepare(flavorSpec,
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
 		index)
 	require.NoError(t, err)
 	_, err = os.Stat(cfdir)
@@ -117,10 +116,10 @@ func TestManager(t *testing.T) {
 
 	// Second node in manager group but it's not a control plane for kube
 	id = instance.LogicalID("10.20.100.2")
-	index = group_types.Index{Group: group.ID("group"), Sequence: 1}
+	index = group.Index{Group: group.ID("group"), Sequence: 1}
 	details, err = managerFlavor.Prepare(flavorSpec,
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
 		index)
 	require.NoError(t, err)
 	require.Equal(t, -1, strings.Index(details.Init, "kubeadm init --token "+string(d)))
@@ -128,10 +127,10 @@ func TestManager(t *testing.T) {
 
 	// Last node in manager group but it's not a control plane for kube
 	id = instance.LogicalID("10.20.100.3")
-	index = group_types.Index{Group: group.ID("group"), Sequence: 2}
+	index = group.Index{Group: group.ID("group"), Sequence: 2}
 	details, err = managerFlavor.Prepare(flavorSpec,
 		instance.Spec{Tags: map[string]string{"a": "b"}, LogicalID: &id},
-		group_types.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
+		group.AllocationMethod{LogicalIDs: []instance.LogicalID{"10.20.100.1", "10.20.100.2", "10.20.100.3"}},
 		index)
 	require.NoError(t, err)
 	require.Equal(t, -1, strings.Index(details.Init, "kubeadm init --token "+string(d)))
@@ -178,7 +177,7 @@ func TestWorker(t *testing.T) {
 	workerFlavor, err := NewWorkerFlavor(scope.DefaultScope(plugins), Options{ConfigDir: curdir}, workerStop)
 	require.NoError(t, err)
 
-	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
+	index := group.Index{Group: group.ID("group"), Sequence: 0}
 	flavorSpec := types.AnyString(`{"KubeJoinIP" : "10.20.100.1",
 		"KubeBindPort" : 6443,
 		"KubeClusterID" : "test",
@@ -186,7 +185,7 @@ func TestWorker(t *testing.T) {
 		"Attachments": {"10.20.100.1": [{"ID": "a", "Type": "ebs"}, {"ID": "b", "Type": "ebs"}]}}`)
 	_, err = workerFlavor.Prepare(flavorSpec,
 		instance.Spec{Tags: map[string]string{"a": "b"}},
-		group_types.AllocationMethod{Size: 5},
+		group.AllocationMethod{Size: 5},
 		index)
 	require.Error(t, err)
 	err = os.Mkdir(cfdir, 0777)
@@ -196,7 +195,7 @@ func TestWorker(t *testing.T) {
 	ioutil.WriteFile(cf, []byte(testtoken), 0666)
 	details, err := workerFlavor.Prepare(flavorSpec,
 		instance.Spec{Tags: map[string]string{"a": "b"}},
-		group_types.AllocationMethod{Size: 5},
+		group.AllocationMethod{Size: 5},
 		index)
 	require.NoError(t, err)
 	err = os.RemoveAll(cfdir)

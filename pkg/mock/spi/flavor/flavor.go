@@ -4,8 +4,8 @@
 package flavor
 
 import (
-	types0 "github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor "github.com/docker/infrakit/pkg/spi/flavor"
+	types0 "github.com/docker/infrakit/pkg/spi/group"
 	instance "github.com/docker/infrakit/pkg/spi/instance"
 	types "github.com/docker/infrakit/pkg/types"
 	gomock "github.com/golang/mock/gomock"

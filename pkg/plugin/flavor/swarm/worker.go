@@ -3,12 +3,11 @@ package swarm
 import (
 	"fmt"
 
-	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -33,8 +32,8 @@ type WorkerFlavor struct {
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
 func (s *WorkerFlavor) Prepare(flavorProperties *types.Any, instanceSpec instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 	return s.baseFlavor.prepare("worker", flavorProperties, instanceSpec, allocation, index)
 }
 
@@ -75,7 +74,7 @@ func (s *WorkerFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 		return nil
 
 	case len(nodes) == 1:
-		log.Debugln("Docker NodeRemove", nodes[0].ID)
+		log.Debug("Docker NodeRemove", "id", nodes[0].ID)
 		err := dockerClient.NodeRemove(
 			context.Background(),
 			nodes[0].ID,

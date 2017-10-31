@@ -216,7 +216,7 @@ func Command(scp scope.Scope) *cobra.Command {
 
 			instanceSpec, err = flavorPlugin.Prepare(groupSpec.Flavor.Properties, instanceSpec,
 				groupSpec.Allocation,
-				group_types.Index{Group: group.ID(*groupID), Sequence: *sequence})
+				group.Index{Group: group.ID(*groupID), Sequence: *sequence})
 
 			if err != nil {
 				log.Error("error preparing", "err", err, "spec", instanceSpec)

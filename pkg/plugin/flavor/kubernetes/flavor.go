@@ -10,10 +10,10 @@ import (
 	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/run/scope"
 	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
@@ -121,7 +121,7 @@ func checkKubeAPIServer(cfg kubeadmapi.NodeConfiguration, check chan error, clcf
 }
 
 // Validate checks the configuration of flavor plugin.
-func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	if flavorProperties == nil {
 		return fmt.Errorf("missing config")
 	}
@@ -224,8 +224,8 @@ func (s *baseFlavor) Get(path types.Path) (*types.Any, error) {
 }
 
 func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceSpec instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 	spec := Spec{}
 
 	log.Debug("prepare", "role", role, "properties", flavorProperties, "spec", instanceSpec, "alloc", allocation,
@@ -404,8 +404,8 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
 type templateContext struct {
 	flavorSpec   Spec
 	instanceSpec instance.Spec
-	allocation   group_types.AllocationMethod
-	index        group_types.Index
+	allocation   group.AllocationMethod
+	index        group.Index
 	link         types.Link
 	retries      int
 	poll         time.Duration

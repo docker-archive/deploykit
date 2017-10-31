@@ -9,7 +9,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	instance_types "github.com/docker/infrakit/pkg/provider/google/plugin/instance/types"
 	"github.com/docker/infrakit/pkg/spi"
@@ -18,7 +18,7 @@ import (
 )
 
 type settings struct {
-	spec               types.Spec
+	spec               group_types.Spec
 	groupSpec          group.Spec
 	instanceSpec       instance.Spec
 	instanceProperties instance_types.Properties
@@ -65,7 +65,7 @@ func (p *plugin) validate(groupSpec group.Spec) (settings, error) {
 		return noSettings, errors.New("Group ID must not be blank")
 	}
 
-	spec, err := types.ParseProperties(groupSpec)
+	spec, err := group_types.ParseProperties(groupSpec)
 	if err != nil {
 		return noSettings, err
 	}
@@ -98,7 +98,7 @@ func (p *plugin) validate(groupSpec group.Spec) (settings, error) {
 		return noSettings, err
 	}
 
-	index := types.Index{
+	index := group.Index{
 		Group:    groupSpec.ID,
 		Sequence: uint(len(instanceGroupInstances)),
 	}

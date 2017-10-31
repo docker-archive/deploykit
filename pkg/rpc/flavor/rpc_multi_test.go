@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	testing_flavor "github.com/docker/infrakit/pkg/testing/flavor"
 	"github.com/docker/infrakit/pkg/types"
@@ -35,13 +35,13 @@ func TestFlavorMultiPluginValidate(t *testing.T) {
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
 			"type1": &testing_flavor.Plugin{
-				DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+				DoValidate: func(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 					inputFlavorPropertiesActual1 <- flavorProperties
 					return nil
 				},
 			},
 			"type2": &testing_flavor.Plugin{
-				DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+				DoValidate: func(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 					inputFlavorPropertiesActual2 <- flavorProperties
 					return errors.New("something-went-wrong")
 				},
@@ -81,8 +81,8 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 		Tags:       map[string]string{"foo": "bar2"},
 	}
 
-	inputInstanceIndexActual1 := make(chan group_types.Index, 1)
-	inputInstanceIndexActual2 := make(chan group_types.Index, 1)
+	inputInstanceIndexActual1 := make(chan group.Index, 1)
+	inputInstanceIndexActual2 := make(chan group.Index, 1)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServerWithTypes(
 		map[string]flavor.Plugin{
@@ -90,8 +90,8 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 				DoPrepare: func(
 					flavorProperties *types.Any,
 					instanceSpec instance.Spec,
-					allocation group_types.AllocationMethod,
-					idx group_types.Index) (instance.Spec, error) {
+					allocation group.AllocationMethod,
+					idx group.Index) (instance.Spec, error) {
 
 					inputFlavorPropertiesActual1 <- flavorProperties
 					inputInstanceSpecActual1 <- instanceSpec
@@ -103,8 +103,8 @@ func TestFlavorMultiPluginPrepare(t *testing.T) {
 				DoPrepare: func(
 					flavorProperties *types.Any,
 					instanceSpec instance.Spec,
-					allocation group_types.AllocationMethod,
-					idx group_types.Index) (instance.Spec, error) {
+					allocation group.AllocationMethod,
+					idx group.Index) (instance.Spec, error) {
 
 					inputFlavorPropertiesActual2 <- flavorProperties
 					inputInstanceSpecActual2 <- instanceSpec

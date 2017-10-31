@@ -3,7 +3,7 @@ package scope
 import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
-	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
@@ -15,6 +15,6 @@ func DefaultInstanceResolver(plugins func() discovery.Plugins) func(string) (ins
 		if err != nil {
 			return nil, err
 		}
-		return instance_plugin.NewClient(pn, endpoint.Address)
+		return rpc.NewClient(pn, endpoint.Address)
 	}
 }

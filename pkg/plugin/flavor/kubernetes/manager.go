@@ -1,8 +1,8 @@
 package kubernetes
 
 import (
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -32,7 +32,7 @@ type ManagerFlavor struct {
 }
 
 // Validate checks whether the helper can support a configuration.
-func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 
 	if err := s.baseFlavor.Validate(flavorProperties, allocation); err != nil {
 		return err
@@ -66,7 +66,7 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the kubernetes to join.
 func (s *ManagerFlavor) Prepare(flavorProperties *types.Any,
-	instanceSpec instance.Spec, allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	instanceSpec instance.Spec, allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 	return s.baseFlavor.prepare("manager", flavorProperties, instanceSpec, allocation, index)
 }

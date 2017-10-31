@@ -11,7 +11,6 @@ import (
 	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -78,13 +77,13 @@ func Command(scp scope.Scope) *cobra.Command {
 			0,
 			"Group Size to use as the Allocation method")
 	}
-	allocationMethodFromFlags := func() group_types.AllocationMethod {
+	allocationMethodFromFlags := func() group.AllocationMethod {
 		ids := []instance.LogicalID{}
 		for _, id := range logicalIDs {
 			ids = append(ids, instance.LogicalID(id))
 		}
 
-		return group_types.AllocationMethod{
+		return group.AllocationMethod{
 			Size:       groupSize,
 			LogicalIDs: ids,
 		}
@@ -103,8 +102,8 @@ func Command(scp scope.Scope) *cobra.Command {
 			"Sequence number within the group")
 	}
 
-	indexFromFlags := func() group_types.Index {
-		return group_types.Index{Group: group.ID(groupID), Sequence: groupSequence}
+	indexFromFlags := func() group.Index {
+		return group.Index{Group: group.ID(groupID), Sequence: groupSequence}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////

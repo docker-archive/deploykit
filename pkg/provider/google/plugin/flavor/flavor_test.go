@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/group"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
 	mock_flavor "github.com/docker/infrakit/pkg/provider/google/mock/flavor"
 	mock_gcloud "github.com/docker/infrakit/pkg/provider/google/mock/gcloud"
 	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
@@ -32,7 +32,7 @@ var inst = instance.Spec{
 	Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}},
 }
 
-func pluginLookup(plugins map[string]flavor.Plugin) group.FlavorPluginLookup {
+func pluginLookup(plugins map[string]flavor.Plugin) group_plugin.FlavorPluginLookup {
 	return func(key plugin.Name) (flavor.Plugin, error) {
 		plugin, has := plugins[key.String()]
 		if has {
@@ -75,8 +75,8 @@ func TestMergeBehavior(t *testing.T) {
 	  ]
 	}`)
 
-	allocation := group_types.AllocationMethod{Size: 1}
-	index := group_types.Index{}
+	allocation := group.AllocationMethod{Size: 1}
+	index := group.Index{}
 	a.EXPECT().Prepare(types.AnyString(`{"a": "1"}`), inst, allocation, index).Return(instance.Spec{
 		Properties:  inst.Properties,
 		Tags:        map[string]string{"a": "1", "c": "4"},
@@ -93,7 +93,7 @@ func TestMergeBehavior(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
-	result, err := combo.Prepare(properties, inst, group_types.AllocationMethod{Size: 1}, index)
+	result, err := combo.Prepare(properties, inst, group.AllocationMethod{Size: 1}, index)
 	require.NoError(t, err)
 
 	expected := instance.Spec{
@@ -139,8 +139,8 @@ func TestMergeNoLogicalID(t *testing.T) {
 	  ]
 	}`)
 
-	allocation := group_types.AllocationMethod{Size: 1}
-	index := group_types.Index{}
+	allocation := group.AllocationMethod{Size: 1}
+	index := group.Index{}
 
 	a.EXPECT().Prepare(types.AnyString(`{"a": "1"}`), inst, allocation, index).Return(instance.Spec{
 		Properties:  inst.Properties,
@@ -158,7 +158,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
-	result, err := combo.Prepare(properties, inst, group_types.AllocationMethod{Size: 1}, index)
+	result, err := combo.Prepare(properties, inst, group.AllocationMethod{Size: 1}, index)
 	require.NoError(t, err)
 
 	expected := instance.Spec{

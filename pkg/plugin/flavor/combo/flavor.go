@@ -4,14 +4,15 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/plugin/group"
+	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
 
-// Spec is the model of the plugin Properties.
+// Spec icrs the model of the plugin Properties.
 type Spec []group_types.FlavorPlugin
 
 // Options is the static properties required for starting things up
@@ -22,15 +23,15 @@ type Options struct {
 var DefaultOptions = Options{}
 
 // NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.  Each flavor
-func NewPlugin(flavorPlugins group.FlavorPluginLookup, options Options) flavor.Plugin {
+func NewPlugin(flavorPlugins group_plugin.FlavorPluginLookup, options Options) flavor.Plugin {
 	return flavorCombo{flavorPlugins: flavorPlugins}
 }
 
 type flavorCombo struct {
-	flavorPlugins group.FlavorPluginLookup
+	flavorPlugins group_plugin.FlavorPluginLookup
 }
 
-func (f flavorCombo) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (f flavorCombo) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	s := Spec{}
 	return flavorProperties.Decode(&s)
 }
@@ -141,8 +142,8 @@ func mergeSpecs(initial instance.Spec, specs []instance.Spec) (instance.Spec, er
 
 func (f flavorCombo) Prepare(flavor *types.Any,
 	inst instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 
 	combo := Spec{}
 	err := flavor.Decode(&combo)

@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	logutil "github.com/docker/infrakit/pkg/log"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/run/scope"
 	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -50,7 +50,7 @@ type vanillaFlavor struct {
 	options template.Options
 }
 
-func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	spec := Spec{}
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
@@ -86,8 +86,8 @@ func (f vanillaFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 
 func (f vanillaFlavor) Prepare(flavor *types.Any,
 	instance instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 
 	s := Spec{}
 	err := flavor.Decode(&s)

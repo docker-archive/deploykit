@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/docker/infrakit/pkg/fsm"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -130,17 +129,8 @@ func templateEngine(url string,
 	}
 
 	t.WithFunctions(func() []template.Function {
-		return []template.Function{
-			{
-				Name: "metadata",
-				Description: []string{
-					"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-					"and calls GET on the plugin with the path \"path/to/data\".",
-					"It's identical to the CLI command infrakit metadata cat ...",
-				},
-				Func: metadata_template.MetadataFunc(scope),
-			},
-			{
+		return append(scope.TemplateFuncs,
+			template.Function{
 				Name: "var",
 				Description: []string{
 					"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
@@ -160,7 +150,7 @@ func templateEngine(url string,
 					return t.Var(n, optional...)
 				},
 			},
-		}
+		)
 	})
 
 	return t, nil

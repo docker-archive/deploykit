@@ -3,8 +3,10 @@ package scope
 import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -27,11 +29,16 @@ type Scope struct {
 	// Plugins returns the plugin lookup
 	Plugins func() discovery.Plugins
 
-	// InstanceResolver is for looking up an instance plugin
+	// Instance is for looking up an instance plugin
 	Instance InstanceResolver
+
+	// Flavor is for lookup up a flavor plugin
+	Flavor FlavorResolver
 
 	// Metadata is for resolving metadata / path related queries
 	Metadata MetadataResolver
+
+	TemplateFuncs []template.Function
 }
 
 // Work is a unit of work that is executed in the scope of the plugins
@@ -48,14 +55,31 @@ type MetadataCall struct {
 // InstanceResolver resolves a string name for the plugin to instance plugin
 type InstanceResolver func(n string) (instance.Plugin, error)
 
+// FlavorResolver resolves a string name for the plugin to flavor plugin
+type FlavorResolver func(n string) (flavor.Plugin, error)
+
 // MetadataResolver is a function that can resolve a path to a callable to access metadata
 type MetadataResolver func(p string) (*MetadataCall, error)
 
 // DefaultScope returns the default scope
 func DefaultScope(plugins func() discovery.Plugins) Scope {
-	return Scope{
+	s := Scope{
 		Plugins:  plugins,
 		Metadata: DefaultMetadataResolver(plugins),
 		Instance: DefaultInstanceResolver(plugins),
+		Flavor:   DefaultFlavorResolver(plugins),
 	}
+
+	s.TemplateFuncs = []template.Function{
+		{
+			Name: "metadata",
+			Description: []string{
+				"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
+				"and calls GET on the plugin with the path \"path/to/data\".",
+				"It's identical to the CLI command infrakit metadata cat ...",
+			},
+			Func: MetadataFunc(s),
+		},
+	}
+	return s
 }

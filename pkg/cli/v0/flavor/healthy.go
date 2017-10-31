@@ -34,7 +34,7 @@ func Healthy(name string, services *cli.Services) *cobra.Command {
 			os.Exit(1)
 		}
 
-		flavorPlugin, err := LoadPlugin(services.Scope.Plugins(), name)
+		flavorPlugin, err := services.Scope.Flavor(name)
 		if err != nil {
 			return nil
 		}

@@ -4,21 +4,26 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/go-connections/tlsconfig"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
 	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"golang.org/x/net/context"
+)
+
+var (
+	log    = logutil.New("module", "flavor/swarm")
+	debugV = logutil.V(300)
 )
 
 const (
@@ -105,7 +110,7 @@ func (s *baseFlavor) runMetadataSnapshot(stopSnapshot <-chan struct{}) chan func
 				}
 
 			case <-stopSnapshot:
-				log.Infoln("Snapshot updater stopped")
+				log.Info("Snapshot updater stopped")
 				return
 			}
 		}
@@ -136,7 +141,7 @@ func (s *baseFlavor) Funcs() []template.Function {
 }
 
 // Validate checks the configuration of flavor plugin.
-func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	if flavorProperties == nil {
 		return fmt.Errorf("missing config")
 	}
@@ -203,14 +208,14 @@ func (s *baseFlavor) Healthy(flavorProperties *types.Any, inst instance.Descript
 		return flavor.Healthy, nil
 
 	default:
-		log.Warnf("Expected at most one node with label %s, but found %s", link.Value(), nodes)
+		log.Warn("Found duplicates", "label", link.Value(), "nodes", nodes)
 		return flavor.Healthy, nil
 	}
 }
 
 func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceSpec instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 
 	spec := Spec{}
 
@@ -229,7 +234,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		}
 
 		initTemplate = t
-		log.Infoln("Using", spec.InitScriptTemplateURL, "for init script template")
+		log.Info("Init template", "url", spec.InitScriptTemplateURL)
 	}
 
 	var swarmID, initScript string
@@ -238,17 +243,17 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	var link *types.Link
 
 	for i := 0; ; i++ {
-		log.Debugln(role, ">>>", i, "Querying docker swarm")
+		log.Debug("query docker swarm", "role", role, "index", i)
 
 		dockerClient, err := s.getDockerClient(spec)
 		if err != nil {
-			log.Warningln("Cannot connect to Docker:", err)
+			log.Error("Cannot connect to Docker", "err", err)
 			continue
 		}
 
 		swarmStatus, node, err = swarmState(dockerClient)
 		if err != nil {
-			log.Warningln("Cannot prepare:", err)
+			log.Error("Cannot prepare", "err", err)
 		}
 
 		if dockerClient != nil {
@@ -272,22 +277,22 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		}
 
 		initScript, err = runtime.StdFunctions(initTemplate, s.scope).Render(context)
-		log.Debugln(role, ">>> context.retries =", context.retries, "err=", err, "i=", i)
+		log.Debug("retries", "role", role, "retries", context.retries, "err", err, "i", i)
 
 		if err == nil {
 			break
 		}
 
 		if context.retries == 0 || i == context.retries {
-			log.Warningln("Retries exceeded and error:", err)
+			log.Warn("Retries exceeded", "err", err)
 			return instanceSpec, err
 		}
 
-		log.Infoln("Going to wait for swarm to be ready. i=", i)
+		log.Info("Going to wait for swarm to be ready", "i", i)
 		time.Sleep(context.poll)
 	}
 
-	log.Debugln(role, "init script:", initScript)
+	log.Debug("init script", "role", role, "script", initScript, "V", debugV)
 
 	instanceSpec.Init = initScript
 
@@ -365,14 +370,14 @@ func swarmState(docker docker.APIClientCloser) (status *swarm.Swarm, node *swarm
 	ctx := context.Background()
 	info, err := docker.Info(ctx)
 	if err != nil {
-		log.Warningln("Err docker info:", err)
+		log.Error("Err docker info", "err", err)
 		status = nil
 		node = nil
 		return
 	}
 	n, _, err := docker.NodeInspectWithRaw(ctx, info.Swarm.NodeID)
 	if err != nil {
-		log.Warningln("Err node inspect:", err)
+		log.Error("Err node inspect", "err", err)
 		return
 	}
 
@@ -380,7 +385,7 @@ func swarmState(docker docker.APIClientCloser) (status *swarm.Swarm, node *swarm
 
 	s, err := docker.SwarmInspect(ctx)
 	if err != nil {
-		log.Warningln("Err swarm inspect:", err)
+		log.Error("Err swarm inspect", "err", err)
 		return
 	}
 	status = &s
@@ -390,8 +395,8 @@ func swarmState(docker docker.APIClientCloser) (status *swarm.Swarm, node *swarm
 type templateContext struct {
 	flavorSpec   Spec
 	instanceSpec instance.Spec
-	allocation   group_types.AllocationMethod
-	index        group_types.Index
+	allocation   group.AllocationMethod
+	index        group.Index
 	swarmStatus  *swarm.Swarm
 	nodeInfo     *swarm.Node
 	link         types.Link
