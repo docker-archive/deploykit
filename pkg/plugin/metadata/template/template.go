@@ -2,26 +2,13 @@ package template
 
 import (
 	"fmt"
-	gopath "path"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/rpc"
-	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
-	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
-
-// DefaultResolver returns a resolver
-func DefaultResolver(plugins func() discovery.Plugins) func(string) (*scope.MetadataCall, error) {
-	return func(path string) (*scope.MetadataCall, error) {
-		return metadataPlugin(plugins, types.PathFromString(path))
-	}
-}
 
 // MetadataFunc returns a template function to support metadata retrieval in templates.
 // The function allows an additional parameter to set the value, provided the metadata plugin
@@ -89,84 +76,6 @@ func duration(v interface{}) (time.Duration, error) {
 		return time.Duration(int64(v)), nil
 	}
 	return 0, fmt.Errorf("cannot convert to duration: %v", v)
-}
-
-func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*scope.MetadataCall, error) {
-
-	if plugins == nil {
-		return nil, fmt.Errorf("no plugin discovery:%s", mpath.String())
-	}
-
-	first := mpath.Index(0)
-	if first == nil {
-		return nil, fmt.Errorf("unknown plugin from path: %s", mpath.String())
-	}
-
-	lookup, err := plugins().List()
-	endpoint, has := lookup[*first]
-	if !has {
-
-		return nil, nil // Don't return error.  Just return nil for non-existence
-
-	} else if mpath.Len() == 1 {
-
-		// This is a test for availability of the plugin
-		name := plugin.Name(*first)
-		pl, err := metadata_rpc.NewClient(name, endpoint.Address)
-		if err != nil {
-			return nil, err
-		}
-
-		return &scope.MetadataCall{
-			Name:   name,
-			Plugin: pl,
-			Key:    mpath.Shift(1),
-		}, nil
-
-	}
-
-	// Longer, full path lookup
-
-	handshaker, err := rpc_client.NewHandshaker(endpoint.Address)
-	if err != nil {
-		return nil, err
-	}
-	// we need to get the subtypes
-	info, err := handshaker.Types()
-	if err != nil {
-		return nil, err
-	}
-
-	// Need to derive the fully qualified plugin name from a long path
-	pluginName := plugin.Name(*first)
-	key := mpath.Shift(1)
-
-	// There are two interfaces possible so we need to search for both
-	for _, c := range []rpc.InterfaceSpec{
-		rpc.InterfaceSpec(metadata.UpdatableInterfaceSpec.Encode()),
-		rpc.InterfaceSpec(metadata.InterfaceSpec.Encode()),
-	} {
-		subs, has := info[c]
-		sub := mpath.Shift(1).Index(0)
-		if has && sub != nil {
-			for _, ss := range subs {
-				if *sub == ss {
-					pluginName = plugin.Name(gopath.Join(*first, *sub))
-					key = key.Shift(1)
-				}
-			}
-		}
-
-	}
-
-	// now we have the plugin name -- try to get the interface
-	// note - that there are two different rpc interfaces
-	// TODO - consider eliminating and use only one
-	pl, err := metadata_rpc.FromHandshaker(pluginName, handshaker)
-	if err != nil {
-		return nil, err
-	}
-	return &scope.MetadataCall{Name: pluginName, Key: key, Plugin: pl}, nil
 }
 
 type errExpired string

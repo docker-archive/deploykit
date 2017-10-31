@@ -3,6 +3,7 @@ package scope
 import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -26,6 +27,9 @@ type Scope struct {
 	// Plugins returns the plugin lookup
 	Plugins func() discovery.Plugins
 
+	// InstanceResolver is for looking up an instance plugin
+	Instance InstanceResolver
+
 	// Metadata is for resolving metadata / path related queries
 	Metadata MetadataResolver
 }
@@ -41,5 +45,16 @@ type MetadataCall struct {
 	Key    types.Path
 }
 
+// InstanceResolver resolves a string name for the plugin to instance plugin
+type InstanceResolver func(n string) (instance.Plugin, error)
+
 // MetadataResolver is a function that can resolve a path to a callable to access metadata
 type MetadataResolver func(p string) (*MetadataCall, error)
+
+// DefaultScope returns the default scope
+func DefaultScope(plugins func() discovery.Plugins) Scope {
+	return Scope{
+		Plugins:  plugins,
+		Metadata: DefaultMetadataResolver(plugins),
+	}
+}

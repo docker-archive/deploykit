@@ -6,7 +6,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/flavor/swarm"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
@@ -69,10 +68,8 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
-	scope := scope.Scope{
-		Plugins:  plugins,
-		Metadata: metadata_template.DefaultResolver(plugins),
-	}
+	scope := scope.DefaultScope(plugins)
+
 	managerFlavor := swarm.NewManagerFlavor(scope, swarm.DockerClient, mt, managerStop)
 	workerFlavor := swarm.NewWorkerFlavor(scope, swarm.DockerClient, wt, workerStop)
 

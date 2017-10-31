@@ -15,7 +15,6 @@ import (
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
@@ -152,10 +151,7 @@ func main() {
 
 	cmd.AddCommand(cli.VersionCommand())
 
-	scope := scope.Scope{
-		Plugins:  f,
-		Metadata: metadata_template.DefaultResolver(f),
-	}
+	scope := scope.DefaultScope(f)
 
 	base.VisitModules(scope, func(c *cobra.Command) {
 		cmd.AddCommand(c)
