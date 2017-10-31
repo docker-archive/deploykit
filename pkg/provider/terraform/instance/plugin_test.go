@@ -3592,11 +3592,13 @@ func TestWriteTfJSONFilesForImportMultipleFiles(t *testing.T) {
 
 func TestDetermineFinalPropsForImport(t *testing.T) {
 	specProps := TResourceProperties{
-		PropHostnamePrefix: "some-prefix",
-		PropScope:          "some-scope",
-		"ssh-key-ids":      []interface{}{789},
-		"datacenter":       "some-datacenter",
-		"z-other":          "not-imported",
+		PropHostnamePrefix:      "some-prefix",
+		PropScope:               "some-scope",
+		"ssh-key-ids":           []interface{}{789},
+		"datacenter":            "some-datacenter",
+		"some-key-in-spec-only": "some-key-value",
+		"lifecycle":             map[string][]string{"ignore_changes": {"static-key"}},
+		"exclude-prop":          "exclude-val",
 	}
 	// Include tags
 	resourceProps := TResourceProperties{
@@ -3611,10 +3613,13 @@ func TestDetermineFinalPropsForImport(t *testing.T) {
 		"z-imported": "imported-but-not-in-spec",
 	}
 	resType := VMIBMCloud
+	// With excluded props
+	excludePropIDs := []string{"exclude-prop"}
 	res := ImportResource{
-		ResourceType:  &resType,
-		ResourceProps: resourceProps,
-		SpecProps:     specProps,
+		ResourceType:   &resType,
+		ExcludePropIDs: &excludePropIDs,
+		ResourceProps:  resourceProps,
+		SpecProps:      specProps,
 	}
 	determineFinalPropsForImport(&res)
 	expectedProps := TResourceProperties{
@@ -3625,17 +3630,41 @@ func TestDetermineFinalPropsForImport(t *testing.T) {
 			"actual-tag1:actual-val1",
 			"actual-tag2:actual-val2",
 		},
+		"some-key-in-spec-only": "some-key-value",
+		"lifecycle":             map[string][]string{"ignore_changes": {"static-key"}},
 	}
 	require.Equal(t, expectedProps, res.FinalProps)
 	// Without tags
 	delete(resourceProps, "tags")
 	res = ImportResource{
-		ResourceType:  &resType,
-		ResourceProps: resourceProps,
-		SpecProps:     specProps,
+		ResourceType:   &resType,
+		ExcludePropIDs: &excludePropIDs,
+		ResourceProps:  resourceProps,
+		SpecProps:      specProps,
 	}
 	determineFinalPropsForImport(&res)
 	delete(expectedProps, "tags")
+	require.Equal(t, expectedProps, res.FinalProps)
+	// Without excluded props
+	excludePropIDs = []string{}
+	res = ImportResource{
+		ResourceType:   &resType,
+		ExcludePropIDs: &excludePropIDs,
+		ResourceProps:  resourceProps,
+		SpecProps:      specProps,
+	}
+	determineFinalPropsForImport(&res)
+	expectedProps["exclude-prop"] = "exclude-val"
+	require.Equal(t, expectedProps, res.FinalProps)
+	// nil excluded props
+	res = ImportResource{
+		ResourceType:   &resType,
+		ExcludePropIDs: nil,
+		ResourceProps:  resourceProps,
+		SpecProps:      specProps,
+	}
+	determineFinalPropsForImport(&res)
+	expectedProps["exclude-prop"] = "exclude-val"
 	require.Equal(t, expectedProps, res.FinalProps)
 }
 
