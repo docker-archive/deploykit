@@ -36,7 +36,7 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			}
 		}
 
-		controller, err := Load(services.Plugins(), name)
+		controller, err := Load(services.Scope.Plugins(), name)
 		if err != nil {
 			return nil
 		}

@@ -79,7 +79,7 @@ func Info(name string, services *cli.Services) *cobra.Command {
 	cmd.AddCommand(api, templateFuncs)
 
 	api.RunE = func(cmd *cobra.Command, args []string) error {
-		endpoint, err := services.Plugins().Find(plugin.Name(name))
+		endpoint, err := services.Scope.Plugins().Find(plugin.Name(name))
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func Info(name string, services *cli.Services) *cobra.Command {
 	}
 
 	templateFuncs.RunE = func(cmd *cobra.Command, args []string) error {
-		endpoint, err := services.Plugins().Find(plugin.Name(name))
+		endpoint, err := services.Scope.Plugins().Find(plugin.Name(name))
 		if err != nil {
 			return err
 		}

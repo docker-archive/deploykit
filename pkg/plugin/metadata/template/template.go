@@ -10,26 +10,32 @@ import (
 	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
+// DefaultResolver returns a resolver
+func DefaultResolver(plugins func() discovery.Plugins) func(string) (*scope.MetadataCall, error) {
+	return func(path string) (*scope.MetadataCall, error) {
+		return metadataPlugin(plugins, types.PathFromString(path))
+	}
+}
+
 // MetadataFunc returns a template function to support metadata retrieval in templates.
 // The function allows an additional parameter to set the value, provided the metadata plugin
 // is not readonly (supports the metadata.Updatable spi).  In the case of an update, the returned value
 // is always an empty string, with error (can be nil).  The behavior is the same as var function.
-func MetadataFunc(discovery func() discovery.Plugins) func(string, ...interface{}) (interface{}, error) {
-
-	plugins := discovery
+func MetadataFunc(scope scope.Scope) func(string, ...interface{}) (interface{}, error) {
 
 	return func(path string, optionalValue ...interface{}) (interface{}, error) {
 
 		switch len(optionalValue) {
 		case 0: // read
-			return doBlockingGet(plugins, path, 0, 0)
+			return doBlockingGet(scope.Metadata, path, 0, 0)
 		case 1: // set
-			return doSet(plugins, path, optionalValue[0])
+			return doSet(scope.Metadata, path, optionalValue[0])
 		case 2: // a retry time + timeout is specified for a read
 			retry, err := duration(optionalValue[0])
 			if err != nil {
@@ -39,7 +45,7 @@ func MetadataFunc(discovery func() discovery.Plugins) func(string, ...interface{
 			if err != nil {
 				return nil, err
 			}
-			return doBlockingGet(plugins, path, retry, timeout)
+			return doBlockingGet(scope.Metadata, path, retry, timeout)
 		case 3: // a retry time + timeout is specified for a read + bool to return error
 			retry, err := duration(optionalValue[0])
 			if err != nil {
@@ -53,7 +59,7 @@ func MetadataFunc(discovery func() discovery.Plugins) func(string, ...interface{
 			if !is {
 				return nil, fmt.Errorf("must be boolean %v", optionalValue[2])
 			}
-			v, err := doBlockingGet(plugins, path, retry, timeout)
+			v, err := doBlockingGet(scope.Metadata, path, retry, timeout)
 			if errOnTimeout {
 				return v, err
 			}
@@ -85,14 +91,7 @@ func duration(v interface{}) (time.Duration, error) {
 	return 0, fmt.Errorf("cannot convert to duration: %v", v)
 }
 
-// call is a struct that has all the information needed to evaluate a template metadata function
-type call struct {
-	plugin metadata.Plugin
-	name   plugin.Name
-	key    types.Path
-}
-
-func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*call, error) {
+func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*scope.MetadataCall, error) {
 
 	if plugins == nil {
 		return nil, fmt.Errorf("no plugin discovery:%s", mpath.String())
@@ -118,10 +117,10 @@ func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*call, 
 			return nil, err
 		}
 
-		return &call{
-			name:   name,
-			plugin: pl,
-			key:    mpath.Shift(1),
+		return &scope.MetadataCall{
+			Name:   name,
+			Plugin: pl,
+			Key:    mpath.Shift(1),
 		}, nil
 
 	}
@@ -167,7 +166,7 @@ func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*call, 
 	if err != nil {
 		return nil, err
 	}
-	return &call{name: pluginName, key: key, plugin: pl}, nil
+	return &scope.MetadataCall{Name: pluginName, Key: key, Plugin: pl}, nil
 }
 
 type errExpired string
@@ -195,9 +194,9 @@ func IsReadonly(err error) bool {
 }
 
 // blocking get from metadata. block the same go routine / thread until timeout or value is available
-func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout time.Duration) (interface{}, error) {
+func doBlockingGet(resolver scope.MetadataResolver, path string, retry, timeout time.Duration) (interface{}, error) {
 
-	call, err := metadataPlugin(plugins, types.PathFromString(path))
+	call, err := resolver(path)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +206,7 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 	}
 
 	// If the key is nil, the query (path) was for existence of the plugin itself
-	if types.NullPath.Equal(call.key) {
+	if types.NullPath.Equal(call.Key) {
 		return true, nil
 	}
 
@@ -217,7 +216,7 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 	for i := 0; ; i++ {
 
 		var any *types.Any
-		any, err = call.plugin.Get(call.key)
+		any, err = call.Plugin.Get(call.Key)
 		if err == nil && any != nil {
 			err = any.Decode(&value)
 			if err != nil {
@@ -227,7 +226,7 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 		}
 
 		if i > 0 && time.Now().After(expiry) {
-			err = errExpired(call.key.String())
+			err = errExpired(call.Key.String())
 			break
 		}
 
@@ -240,9 +239,9 @@ func doBlockingGet(plugins func() discovery.Plugins, path string, retry, timeout
 	return value, err
 }
 
-func doSet(plugins func() discovery.Plugins, path string, newValue interface{}) (interface{}, error) {
+func doSet(resolver scope.MetadataResolver, path string, newValue interface{}) (interface{}, error) {
 
-	call, err := metadataPlugin(plugins, types.PathFromString(path))
+	call, err := resolver(path)
 	if err != nil {
 		return nil, err
 	}
@@ -252,12 +251,12 @@ func doSet(plugins func() discovery.Plugins, path string, newValue interface{}) 
 	}
 
 	// If the key is nil, the query (path) was for existence of the plugin itself
-	if types.NullPath.Equal(call.key) {
+	if types.NullPath.Equal(call.Key) {
 		return true, nil
 	}
 
 	var value interface{}
-	any, err := call.plugin.Get(call.key)
+	any, err := call.Plugin.Get(call.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -273,13 +272,13 @@ func doSet(plugins func() discovery.Plugins, path string, newValue interface{}) 
 		return value, err
 	}
 
-	updatablePlugin, is := call.plugin.(metadata.Updatable)
+	updatablePlugin, is := call.Plugin.(metadata.Updatable)
 	if !is {
 		return value, errReadonly(path)
 	}
 	_, proposed, cas, err := updatablePlugin.Changes([]metadata.Change{
 		{
-			Path:  call.key,
+			Path:  call.Key,
 			Value: any,
 		},
 	})

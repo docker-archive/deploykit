@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -59,9 +59,9 @@ func Dir() string {
 }
 
 type modules struct {
-	Dir     string
-	fs      afero.Fs
-	plugins func() discovery.Plugins
+	Dir   string
+	fs    afero.Fs
+	scope scope.Scope
 }
 
 type missingDir string
@@ -77,7 +77,7 @@ func IsMissingDir(e error) bool {
 }
 
 // NewModules returns an implementation of Modules using data found locally on disk
-func NewModules(plugins func() discovery.Plugins, dir string) (cli.Modules, error) {
+func NewModules(scope scope.Scope, dir string) (cli.Modules, error) {
 	log.Debug("Local modules", "dir", dir)
 
 	fs := afero.NewOsFs()
@@ -97,9 +97,9 @@ func NewModules(plugins func() discovery.Plugins, dir string) (cli.Modules, erro
 	}
 
 	return &modules{
-		Dir:     dir,
-		fs:      fs,
-		plugins: plugins,
+		Dir:   dir,
+		fs:    fs,
+		scope: scope,
 	}, nil
 }
 
@@ -124,7 +124,7 @@ func commandName(s string) string {
 	return strings.Replace(s, DefaultCLIExtension, "", -1)
 }
 
-func list(plugins func() discovery.Plugins, fs afero.Fs, dir string, parent *cobra.Command) ([]*cobra.Command, error) {
+func list(scope scope.Scope, fs afero.Fs, dir string, parent *cobra.Command) ([]*cobra.Command, error) {
 	entries, err := afero.ReadDir(fs, dir)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ entries:
 		}
 
 		if entry.IsDir() {
-			subs, err := list(plugins, fs, filepath.Join(dir, entry.Name()), cmd)
+			subs, err := list(scope, fs, filepath.Join(dir, entry.Name()), cmd)
 			if err != nil {
 				return nil, err
 			}
@@ -173,7 +173,7 @@ entries:
 		} else {
 
 			url := "file://" + filepath.Join(dir, entry.Name())
-			context := cli.NewContext(plugins, cmd, url, os.Stdin, template.Options{})
+			context := cli.NewContext(scope, cmd, url, os.Stdin, template.Options{})
 
 			cmd.RunE = func(c *cobra.Command, args []string) error {
 				log.Debug("Running", "command", entry.Name(), "url", url, "args", args)
@@ -192,5 +192,5 @@ entries:
 
 // List returns a list of commands defined locally
 func (m *modules) List() ([]*cobra.Command, error) {
-	return list(m.plugins, m.fs, m.Dir, nil)
+	return list(m.scope, m.fs, m.Dir, nil)
 }

@@ -7,9 +7,10 @@ import (
 	"sort"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
+
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +21,7 @@ func init() {
 }
 
 // Command is the entrypoint
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scope scope.Scope) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// remote

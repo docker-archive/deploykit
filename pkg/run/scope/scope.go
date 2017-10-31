@@ -2,7 +2,13 @@ package scope
 
 import (
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/types"
 )
+
+// Nil is no scope
+var Nil = Scope{}
 
 // Scope provides an environment in which the necessary plugins are available
 // for doing a unit of work.  The scope can be local or remote, namespaced,
@@ -19,8 +25,21 @@ type Scope struct {
 
 	// Plugins returns the plugin lookup
 	Plugins func() discovery.Plugins
+
+	// Metadata is for resolving metadata / path related queries
+	Metadata MetadataResolver
 }
 
 // Work is a unit of work that is executed in the scope of the plugins
 // running. When work completes, the plugins are shutdown.
 type Work func(Scope) error
+
+// MetadataCall is a struct that has all the information needed to evaluate a template metadata function
+type MetadataCall struct {
+	Plugin metadata.Plugin
+	Name   plugin.Name
+	Key    types.Path
+}
+
+// MetadataResolver is a function that can resolve a path to a callable to access metadata
+type MetadataResolver func(p string) (*MetadataCall, error)

@@ -6,9 +6,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -17,11 +17,11 @@ import (
 )
 
 // NewWorkerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewWorkerFlavor(plugins func() discovery.Plugins, connect func(Spec) (docker.APIClientCloser, error),
+func NewWorkerFlavor(scope scope.Scope, connect func(Spec) (docker.APIClientCloser, error),
 	templ *template.Template,
 	stop <-chan struct{}) *WorkerFlavor {
 
-	base := &baseFlavor{initScript: templ, getDockerClient: connect, plugins: plugins}
+	base := &baseFlavor{initScript: templ, getDockerClient: connect, scope: scope}
 	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
 	return &WorkerFlavor{baseFlavor: base}
 }

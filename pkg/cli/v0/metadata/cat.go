@@ -25,7 +25,7 @@ func Cat(name string, services *cli.Services) *cobra.Command {
 
 	cat.RunE = func(cmd *cobra.Command, args []string) error {
 
-		metadataFunc := metadata.MetadataFunc(services.Plugins)
+		metadataFunc := metadata.MetadataFunc(services.Scope)
 
 		for _, p := range args {
 

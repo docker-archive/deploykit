@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/run/scope"
 	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
@@ -31,14 +31,14 @@ type Context struct {
 	options  template.Options
 	run      func(string) error
 	script   string
-	plugins  func() discovery.Plugins
+	scope    scope.Scope
 }
 
 // NewContext creates a context
-func NewContext(plugins func() discovery.Plugins, cmd *cobra.Command, src string, input io.Reader,
+func NewContext(scope scope.Scope, cmd *cobra.Command, src string, input io.Reader,
 	options template.Options) *Context {
 	return &Context{
-		plugins: plugins,
+		scope:   scope,
 		cmd:     cmd,
 		src:     src,
 		input:   input,
@@ -462,7 +462,7 @@ func (c *Context) BuildFlags() (err error) {
 		return
 	}
 	t.SetOptions(c.options)
-	_, err = runtime.StdFunctions(t, c.plugins).Render(c)
+	_, err = runtime.StdFunctions(t, c.scope).Render(c)
 	return
 }
 
@@ -485,7 +485,7 @@ func (c *Context) Execute() (err error) {
 	// Process the input, render the template
 	t.SetOptions(opt)
 
-	script, err := runtime.StdFunctions(t, c.plugins).Render(c)
+	script, err := runtime.StdFunctions(t, c.scope).Render(c)
 	if err != nil {
 		return err
 	}

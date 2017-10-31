@@ -6,7 +6,9 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/flavor/vanilla"
+	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -46,8 +48,13 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	}
 
 	transport.Name = name
+
+	scope := scope.Scope{
+		Plugins:  plugins,
+		Metadata: metadata_template.DefaultResolver(plugins),
+	}
 	impls = map[run.PluginCode]interface{}{
-		run.Flavor: vanilla.NewPlugin(plugins, options.Options),
+		run.Flavor: vanilla.NewPlugin(scope, options.Options),
 	}
 	return
 }

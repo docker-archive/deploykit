@@ -10,7 +10,6 @@ import (
 	"github.com/docker/infrakit/cmd/infrakit/manager/schema"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -19,6 +18,7 @@ import (
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
@@ -32,7 +32,9 @@ func init() {
 }
 
 // Command is the entrypoint
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scope scope.Scope) *cobra.Command {
+
+	services := cli.NewServices(scope)
 
 	var groupPlugin group.Plugin
 	var groupPluginName string
@@ -49,7 +51,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			}
 
 			// Scan for a manager
-			pm, err := plugins().List()
+			pm, err := scope.Plugins().List()
 			if err != nil {
 				return err
 			}
@@ -92,8 +94,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	pretend := cmd.PersistentFlags().Bool("pretend", false, "Don't actually make changes; explain where appropriate")
 
-	templateFlags, toJSON, fromJSON, processTemplate := base.TemplateProcessor(plugins)
-
 	///////////////////////////////////////////////////////////////////////////////////
 	// commit
 	commit := &cobra.Command{
@@ -106,17 +106,17 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			view, err := base.ReadFromStdinIfElse(
+			view, err := services.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return processTemplate(args[0]) },
-				toJSON,
+				func() (string, error) { return services.ProcessTemplate(args[0]) },
+				services.ToJSON,
 			)
 			if err != nil {
 				return err
 			}
 
 			commitEachGroup := func(name plugin.Name, gid group.ID, gspec group_types.Spec) error {
-				endpoint, err := plugins().Find(name)
+				endpoint, err := scope.Plugins().Find(name)
 				if err != nil {
 					return err
 				}
@@ -147,7 +147,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return schema.ParseInputSpecs([]byte(view), commitEachGroup)
 		},
 	}
-	commit.Flags().AddFlagSet(templateFlags)
+	commit.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// inspect
@@ -171,7 +171,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				return err
 			}
 
-			buff, err := fromJSON(view.Bytes())
+			buff, err := services.FromJSON(view.Bytes())
 			if err != nil {
 				return err
 			}
@@ -181,7 +181,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		},
 	}
-	inspect.Flags().AddFlagSet(templateFlags)
+	inspect.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// leader
@@ -196,7 +196,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 			// Scan for a manager
-			pm, err := plugins().List()
+			pm, err := scope.Plugins().List()
 			if err != nil {
 				return err
 			}

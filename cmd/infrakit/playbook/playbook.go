@@ -11,11 +11,12 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
+
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/cli/local"
 	"github.com/docker/infrakit/pkg/cli/remote"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
@@ -114,7 +115,7 @@ func loadPlaybooks() (remote.Modules, error) {
 }
 
 // Command is the entrypoint
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scope scope.Scope) *cobra.Command {
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// playbook
@@ -169,7 +170,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				// templates are written to local cache
 
 				cacheDir = filepath.Join(template.Dir(), name)
-				test, err := remote.NewModules(plugins,
+				test, err := remote.NewModules(scope,
 					map[remote.Op]remote.SourceURL{
 						remote.Op(name): remote.SourceURL(source),
 					},
@@ -295,7 +296,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	mods := []*cobra.Command{}
 	// additional modules
 	if os.Getenv(cli.CliDirEnvVar) != "" {
-		modules, err := local.NewModules(plugins, local.Dir())
+		modules, err := local.NewModules(scope, local.Dir())
 		if err != nil {
 			log.Crit("error executing", "err", err)
 			os.Exit(1)
@@ -314,7 +315,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	if err != nil {
 		log.Warn("playbooks failed to load", "err", err)
 	} else {
-		if playbooks, err := remote.NewModules(plugins, pmod, os.Stdin, template.Options{}); err != nil {
+		if playbooks, err := remote.NewModules(scope, pmod, os.Stdin, template.Options{}); err != nil {
 			log.Warn("error loading playbooks", "err", err)
 		} else {
 			if more, err := playbooks.List(); err != nil {

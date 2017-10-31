@@ -10,11 +10,12 @@ import (
 	"text/template"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
+
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
@@ -27,7 +28,9 @@ func init() {
 }
 
 // Command is the entry point to this module
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scp scope.Scope) *cobra.Command {
+
+	services := cli.NewServices(scp)
 
 	var instancePlugin instance.Plugin
 
@@ -42,7 +45,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		endpoint, err := plugins().Find(plugin.Name(*name))
+		endpoint, err := scp.Plugins().Find(plugin.Name(*name))
 		if err != nil {
 			return err
 		}
@@ -57,8 +60,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return nil
 	}
 
-	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
-
 	///////////////////////////////////////////////////////////////////////////////////
 	// validate
 	validate := &cobra.Command{
@@ -71,10 +72,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			view, err := base.ReadFromStdinIfElse(
+			view, err := services.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return processTemplate(args[0]) },
-				toJSON,
+				func() (string, error) { return services.ProcessTemplate(args[0]) },
+				services.ToJSON,
 			)
 			if err != nil {
 				return err
@@ -87,7 +88,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	validate.Flags().AddFlagSet(templateFlags)
+	validate.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// provision
@@ -101,10 +102,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			view, err := base.ReadFromStdinIfElse(
+			view, err := services.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return processTemplate(args[0]) },
-				toJSON,
+				func() (string, error) { return services.ProcessTemplate(args[0]) },
+				services.ToJSON,
 			)
 			if err != nil {
 				return err
@@ -122,7 +123,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	provision.Flags().AddFlagSet(templateFlags)
+	provision.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// destroy

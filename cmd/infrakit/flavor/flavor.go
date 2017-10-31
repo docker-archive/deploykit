@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
+
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_plugin "github.com/docker/infrakit/pkg/rpc/flavor"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -27,7 +28,9 @@ func init() {
 }
 
 // Command is the entry point of this module
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scp scope.Scope) *cobra.Command {
+
+	services := cli.NewServices(scp)
 
 	var flavorPlugin flavor.Plugin
 
@@ -43,7 +46,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		endpoint, err := plugins().Find(plugin.Name(*name))
+		endpoint, err := scp.Plugins().Find(plugin.Name(*name))
 		if err != nil {
 			return err
 		}
@@ -104,8 +107,6 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 		return group_types.Index{Group: group.ID(groupID), Sequence: groupSequence}
 	}
 
-	templateFlags, toJSON, _, processTemplate := base.TemplateProcessor(plugins)
-
 	///////////////////////////////////////////////////////////////////////////////////
 	// validate
 	validate := &cobra.Command{
@@ -118,12 +119,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			view, err := processTemplate(*flavorPropertiesURL)
+			view, err := services.ProcessTemplate(*flavorPropertiesURL)
 			if err != nil {
 				return err
 			}
 
-			buff, err := toJSON([]byte(view))
+			buff, err := services.ToJSON([]byte(view))
 			if err != nil {
 				return err
 			}
@@ -131,7 +132,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return flavorPlugin.Validate(types.AnyBytes(buff), allocationMethodFromFlags())
 		},
 	}
-	validate.Flags().AddFlagSet(templateFlags)
+	validate.Flags().AddFlagSet(services.ProcessTemplateFlags)
 	addAllocationMethodFlags(validate)
 
 	///////////////////////////////////////////////////////////////////////////////////
@@ -146,15 +147,15 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 				os.Exit(1)
 			}
 
-			flavorProperties, err := processTemplate(*flavorPropertiesURL)
+			flavorProperties, err := services.ProcessTemplate(*flavorPropertiesURL)
 			if err != nil {
 				return err
 			}
 
-			view, err := base.ReadFromStdinIfElse(
+			view, err := services.ReadFromStdinIfElse(
 				func() bool { return args[0] == "-" },
-				func() (string, error) { return processTemplate(args[0]) },
-				toJSON,
+				func() (string, error) { return services.ProcessTemplate(args[0]) },
+				services.ToJSON,
 			)
 			if err != nil {
 				return err
@@ -181,7 +182,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		},
 	}
-	prepare.Flags().AddFlagSet(templateFlags)
+	prepare.Flags().AddFlagSet(services.ProcessTemplateFlags)
 	addAllocationMethodFlags(prepare)
 	indexFlags(prepare)
 
@@ -194,7 +195,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	tags := healthy.Flags().StringSlice("tags", []string{}, "Tags to filter")
 	id := healthy.Flags().String("id", "", "ID of resource")
 	logicalID := healthy.Flags().String("logical-id", "", "Logical ID of resource")
-	healthy.Flags().AddFlagSet(templateFlags)
+	healthy.Flags().AddFlagSet(services.ProcessTemplateFlags)
 	healthy.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 0 {
@@ -202,7 +203,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			os.Exit(1)
 		}
 
-		flavorProperties, err := processTemplate(*flavorPropertiesURL)
+		flavorProperties, err := services.ProcessTemplate(*flavorPropertiesURL)
 		if err != nil {
 			return err
 		}

@@ -8,8 +8,10 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/flavor/kubernetes"
+	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
@@ -69,13 +71,18 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 		close(workerStop)
 	}
 
-	managerFlavor, e := kubernetes.NewManagerFlavor(plugins, options, managerStop)
+	scope := scope.Scope{
+		Plugins:  plugins,
+		Metadata: metadata_template.DefaultResolver(plugins),
+	}
+
+	managerFlavor, e := kubernetes.NewManagerFlavor(scope, options, managerStop)
 	if e != nil {
 		err = e
 		return
 	}
 
-	workerFlavor, e := kubernetes.NewWorkerFlavor(plugins, options, workerStop)
+	workerFlavor, e := kubernetes.NewWorkerFlavor(scope, options, workerStop)
 	if e != nil {
 		err = e
 		return

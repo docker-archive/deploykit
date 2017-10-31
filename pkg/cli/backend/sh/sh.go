@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli/backend"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/util/exec"
 )
 
@@ -19,7 +20,7 @@ func init() {
 
 // Sh takes a list of optional parameters and returns an executable function that
 // executes the content as a shell script
-func Sh(plugins backend.Plugins, opt ...interface{}) (backend.ExecFunc, error) {
+func Sh(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) {
 
 	args := []string{}
 	for _, v := range opt {

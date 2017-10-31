@@ -2,10 +2,11 @@ package util
 
 import (
 	"github.com/docker/infrakit/cmd/infrakit/base"
+
 	init_cmd "github.com/docker/infrakit/cmd/infrakit/util/init"
 	"github.com/docker/infrakit/cmd/infrakit/util/mux"
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +17,7 @@ func init() {
 }
 
 // Command is the head of this module
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scp scope.Scope) *cobra.Command {
 
 	util := &cobra.Command{
 		Use:   "util",
@@ -24,10 +25,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	util.AddCommand(
-		mux.Command(plugins),
-		init_cmd.Command(plugins),
-		fileServerCommand(plugins),
-		trackCommand(plugins),
+		mux.Command(scp),
+		init_cmd.Command(scp),
+		fileServerCommand(scp),
+		trackCommand(scp),
 	)
 
 	return util

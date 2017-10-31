@@ -1,14 +1,14 @@
 package kubernetes
 
 import (
-	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a kubernetes.
-func NewManagerFlavor(plugins func() discovery.Plugins, options Options, stop <-chan struct{}) (*ManagerFlavor, error) {
+func NewManagerFlavor(scope scope.Scope, options Options, stop <-chan struct{}) (*ManagerFlavor, error) {
 
 	mt, err := getTemplate(options.DefaultManagerInitScriptTemplate,
 		DefaultManagerInitScriptTemplate, DefaultTemplateOptions)
@@ -19,7 +19,7 @@ func NewManagerFlavor(plugins func() discovery.Plugins, options Options, stop <-
 
 	base := &baseFlavor{
 		initScript: mt,
-		plugins:    plugins,
+		scope:      scope,
 		options:    options,
 	}
 	//	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))

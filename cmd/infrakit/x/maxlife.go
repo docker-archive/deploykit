@@ -8,12 +8,13 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/x/maxlife"
 	"github.com/spf13/cobra"
 )
 
-func maxlifeCommand(plugins func() discovery.Plugins) *cobra.Command {
+func maxlifeCommand(scope scope.Scope) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "maxlife <instance plugin name>...",
@@ -35,7 +36,7 @@ func maxlifeCommand(plugins func() discovery.Plugins) *cobra.Command {
 		tags := toTags(*flagTags)
 
 		// Now we have a list of instance plugins to maxlife
-		plugins, err := getInstancePlugins(plugins, args)
+		plugins, err := getInstancePlugins(scope.Plugins, args)
 		if err != nil {
 			return err
 		}

@@ -9,15 +9,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/run/scope"
 	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubediscovery "k8s.io/kubernetes/cmd/kubeadm/app/discovery"
@@ -95,7 +96,7 @@ type AddOnInfo struct {
 type baseFlavor struct {
 	initScript     *template.Template
 	metadataPlugin metadata.Plugin
-	plugins        func() discovery.Plugins
+	scope          scope.Scope
 	options        Options
 }
 
@@ -230,10 +231,6 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 	log.Debug("prepare", "role", role, "properties", flavorProperties, "spec", instanceSpec, "alloc", allocation,
 		"index", index)
 
-	if s.plugins == nil {
-		return instanceSpec, fmt.Errorf("no plugin discovery")
-	}
-
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return instanceSpec, err
@@ -352,7 +349,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		worker:       worker,
 	}
 
-	initScript, err = runtime.StdFunctions(initTemplate, s.plugins).Render(context)
+	initScript, err = runtime.StdFunctions(initTemplate, s.scope).Render(context)
 	instanceSpec.Init = initScript
 	log.Debug("Init script", "content", initScript)
 	return instanceSpec, nil

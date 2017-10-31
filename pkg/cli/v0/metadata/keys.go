@@ -23,7 +23,7 @@ func Keys(name string, services *cli.Services) *cobra.Command {
 
 	keys.RunE = func(cmd *cobra.Command, args []string) error {
 
-		metadataPlugin, err := loadPlugin(services.Plugins(), name)
+		metadataPlugin, err := loadPlugin(services.Scope.Plugins(), name)
 		if err != nil {
 			return nil
 		}

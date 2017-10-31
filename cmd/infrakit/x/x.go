@@ -2,8 +2,9 @@ package x
 
 import (
 	"github.com/docker/infrakit/cmd/infrakit/base"
-	"github.com/docker/infrakit/pkg/discovery"
+
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +15,7 @@ func init() {
 }
 
 // Command is the head of this module
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scope scope.Scope) *cobra.Command {
 
 	experimental := &cobra.Command{
 		Use:   "x",
@@ -22,7 +23,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	experimental.AddCommand(
-		maxlifeCommand(plugins),
+		maxlifeCommand(scope),
 		remoteBootCommand(),
 	)
 

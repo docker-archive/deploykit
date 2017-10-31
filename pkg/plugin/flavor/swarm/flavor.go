@@ -9,8 +9,8 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/go-connections/tlsconfig"
-	"github.com/docker/infrakit/pkg/discovery"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/run/scope"
 	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -68,7 +68,7 @@ type baseFlavor struct {
 	getDockerClient func(Spec) (docker.APIClientCloser, error)
 	initScript      *template.Template
 	metadataPlugin  metadata.Plugin
-	plugins         func() discovery.Plugins
+	scope           scope.Scope
 }
 
 // Runs a poller that periodically samples the swarm status and node info.
@@ -214,10 +214,6 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 	spec := Spec{}
 
-	if s.plugins == nil {
-		return instanceSpec, fmt.Errorf("no plugin discovery")
-	}
-
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
 		return instanceSpec, err
@@ -275,7 +271,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			link:         *link,
 		}
 
-		initScript, err = runtime.StdFunctions(initTemplate, s.plugins).Render(context)
+		initScript, err = runtime.StdFunctions(initTemplate, s.scope).Render(context)
 		log.Debugln(role, ">>> context.retries =", context.retries, "err=", err, "i=", i)
 
 		if err == nil {

@@ -13,6 +13,7 @@ import (
 	plugin_metadata "github.com/docker/infrakit/pkg/plugin/metadata"
 	rpc_metadata "github.com/docker/infrakit/pkg/rpc/metadata"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	testing_metadata "github.com/docker/infrakit/pkg/testing/metadata"
 	"github.com/docker/infrakit/pkg/types"
@@ -102,32 +103,37 @@ func TestMetadataFunc(t *testing.T) {
 
 	server, socket := runUpdatableServer(t, "vars", &m)
 
-	v, err := MetadataFunc(discoveryFromPath(socket))("vars/region/count")
+	scope := scope.Scope{
+		Plugins:  discoveryFromPath(socket),
+		Metadata: DefaultResolver(discoveryFromPath(socket)),
+	}
+
+	v, err := MetadataFunc(scope)("vars/region/count")
 	require.NoError(t, err)
 	require.Equal(t, float64(3), v)
 
-	_, err = MetadataFunc(discoveryFromPath(socket))("vars/region/count", 100)
+	_, err = MetadataFunc(scope)("vars/region/count", 100)
 	require.NoError(t, err)
 
-	v, err = MetadataFunc(discoveryFromPath(socket))("vars/region/count")
+	v, err = MetadataFunc(scope)("vars/region/count")
 	require.NoError(t, err)
 	require.Equal(t, float64(100), v)
 
-	v, err = MetadataFunc(discoveryFromPath(socket))("vars/region/count", "500ms", "2s")
+	v, err = MetadataFunc(scope)("vars/region/count", "500ms", "2s")
 	require.NoError(t, err)
 	require.Equal(t, float64(100), v)
 
 	now := time.Now()
-	v, err = MetadataFunc(discoveryFromPath(socket))("vars/region/count/no/exist", "500ms", "3s")
+	v, err = MetadataFunc(scope)("vars/region/count/no/exist", "500ms", "3s")
 	require.Error(t, err)
 	require.True(t, IsExpired(err))
 	require.True(t, 2*time.Second < time.Now().Sub(now)) // at least 2s have elapsed
 
-	v, err = MetadataFunc(discoveryFromPath(socket))("missing/region/count/no/exist", "500ms", "2s")
+	v, err = MetadataFunc(scope)("missing/region/count/no/exist", "500ms", "2s")
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	v, err = MetadataFunc(discoveryFromPath(socket))("missing")
+	v, err = MetadataFunc(scope)("missing")
 	require.NoError(t, err)
 	require.Nil(t, v)
 
@@ -140,14 +146,16 @@ func TestDoSet(t *testing.T) {
 
 	server, socket := runUpdatableServer(t, "vars", &m)
 
-	v, err := doBlockingGet(discoveryFromPath(socket), "vars/region/count", 0, 0)
+	resolver := DefaultResolver(discoveryFromPath(socket))
+
+	v, err := doBlockingGet(resolver, "vars/region/count", 0, 0)
 	require.NoError(t, err)
 	require.Equal(t, float64(3), v)
 
-	_, err = doSet(discoveryFromPath(socket), "vars/region/count", 100)
+	_, err = doSet(resolver, "vars/region/count", 100)
 	require.NoError(t, err)
 
-	v, err = doBlockingGet(discoveryFromPath(socket), "vars/region/count", 0, 0)
+	v, err = doBlockingGet(resolver, "vars/region/count", 0, 0)
 	require.NoError(t, err)
 	require.Equal(t, float64(100), v)
 
@@ -160,7 +168,9 @@ func TestDoSetReadonly(t *testing.T) {
 
 	server, socket := runServer(t, "set-vars", m)
 
-	_, err := doSet(discoveryFromPath(socket), "set-vars/aws/region/new/value", 100)
+	resolver := DefaultResolver(discoveryFromPath(socket))
+
+	_, err := doSet(resolver, "set-vars/aws/region/new/value", 100)
 	require.Error(t, err)
 	require.True(t, IsReadonly(err))
 
@@ -204,6 +214,8 @@ func TestDoBlockingGet(t *testing.T) {
 
 	server, socket := runServer(t, "test-vars", m)
 
+	resolver := DefaultResolver(discoveryFromPath(socket))
+
 	for l, check := range map[string]func(*testing.T, interface{}, error){
 		"test-vars/aws/region/count": func(t *testing.T, v interface{}, err error) {
 			require.NoError(t, err)
@@ -238,7 +250,7 @@ func TestDoBlockingGet(t *testing.T) {
 			require.Nil(t, v)
 		},
 	} {
-		c, err := doBlockingGet(discoveryFromPath(socket), l, 500*time.Millisecond, 1*time.Second)
+		c, err := doBlockingGet(resolver, l, 500*time.Millisecond, 1*time.Second)
 		check(t, c, err)
 	}
 
@@ -277,7 +289,7 @@ func TestDoBlockingGet(t *testing.T) {
 			require.Nil(t, v) // The object is missing
 		},
 	} {
-		c, err := doBlockingGet(discoveryFromPath(socket), l, 0, 0)
+		c, err := doBlockingGet(resolver, l, 0, 0)
 		check(t, c, err)
 	}
 	server.Stop()
@@ -295,46 +307,46 @@ func TestMetadataTemplateFunc(t *testing.T) {
 
 	server, socket := runServer(t, "test-vars", m)
 
-	for l, check := range map[string]func(*testing.T, *call, error){
-		"test-vars": func(t *testing.T, c *call, err error) {
+	for l, check := range map[string]func(*testing.T, *scope.MetadataCall, error){
+		"test-vars": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			require.Equal(t, types.NullPath, c.key)
+			require.Equal(t, types.NullPath, c.Key)
 		},
-		"test-vars/aws": func(t *testing.T, c *call, err error) {
+		"test-vars/aws": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			require.Equal(t, types.NullPath, c.key)
+			require.Equal(t, types.NullPath, c.Key)
 		},
-		"test-vars/aws/region/count": func(t *testing.T, c *call, err error) {
+		"test-vars/aws/region/count": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			require.Equal(t, types.PathFromString("region/count"), c.key)
+			require.Equal(t, types.PathFromString("region/count"), c.Key)
 		},
-		"test-vars/azure": func(t *testing.T, c *call, err error) {
+		"test-vars/azure": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			require.Equal(t, types.NullPath, c.key)
+			require.Equal(t, types.NullPath, c.Key)
 		},
-		"test-vars/none": func(t *testing.T, c *call, err error) {
+		"test-vars/none": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			require.Equal(t, types.PathFromString("none"), c.key) // Don't throw error because maybe later this can be resolved
+			require.Equal(t, types.PathFromString("none"), c.Key) // Don't throw error because maybe later this can be resolved
 		},
-		"test-vars/none/sub": func(t *testing.T, c *call, err error) {
+		"test-vars/none/sub": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			require.Equal(t, types.PathFromString("none/sub"), c.key)
+			require.Equal(t, types.PathFromString("none/sub"), c.Key)
 		},
-		"test": func(t *testing.T, c *call, err error) {
+		"test": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.Nil(t, c)
 		},
-		"test/aws": func(t *testing.T, c *call, err error) {
+		"test/aws": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.Nil(t, c)
 		},
-		"test/foo": func(t *testing.T, c *call, err error) {
+		"test/foo": func(t *testing.T, c *scope.MetadataCall, err error) {
 			require.NoError(t, err)
 			require.Nil(t, c)
 		},

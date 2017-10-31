@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/ghodss/yaml"
@@ -28,7 +28,7 @@ const helpTemplate = `{{with or .Long .Short }}{{. | trim}}
 type remote struct {
 	modules Modules
 	input   io.Reader
-	plugins func() discovery.Plugins
+	scope   scope.Scope
 	options template.Options
 }
 
@@ -42,13 +42,13 @@ type SourceURL string
 type Modules map[Op]SourceURL
 
 // NewModules returns an implementation of Modules using a file at given URL. The file is in YAML format
-func NewModules(plugins func() discovery.Plugins, modules Modules, input io.Reader,
+func NewModules(scope scope.Scope, modules Modules, input io.Reader,
 	options template.Options) (cli.Modules, error) {
 
 	return &remote{
 		modules: modules,
 		input:   input,
-		plugins: plugins,
+		scope:   scope,
 		options: options,
 	}, nil
 }
@@ -95,7 +95,7 @@ func dir(url SourceURL, options template.Options) (Modules, error) {
 	return m, err
 }
 
-func list(plugins func() discovery.Plugins, modules Modules, input io.Reader,
+func list(scope scope.Scope, modules Modules, input io.Reader,
 	parent *cobra.Command, parentURL *SourceURL, options template.Options) ([]*cobra.Command, error) {
 
 	found := []*cobra.Command{}
@@ -144,7 +144,7 @@ loop:
 		if err == nil {
 
 			copy := moduleURL
-			subs, err := list(plugins, mods, input, cmd, &copy, options)
+			subs, err := list(scope, mods, input, cmd, &copy, options)
 			if err != nil {
 				log.Debug("cannot list", "op", op, "url", moduleURL, "err", err)
 				continue loop
@@ -155,7 +155,7 @@ loop:
 
 		} else {
 
-			ctx := cli.NewContext(plugins, cmd, string(moduleURL), input, options)
+			ctx := cli.NewContext(scope, cmd, string(moduleURL), input, options)
 			cmd.RunE = func(c *cobra.Command, args []string) error {
 				log.Debug("Running", "command", op, "url", moduleURL, "args", args)
 				return ctx.Execute()
@@ -178,7 +178,7 @@ func (r *remote) List() ([]*cobra.Command, error) {
 	if err := resolved(r.modules); err != nil {
 		return nil, err
 	}
-	return list(r.plugins, r.modules, r.input, nil, nil, r.options)
+	return list(r.scope, r.modules, r.input, nil, nil, r.options)
 }
 
 func resolved(m Modules) error {

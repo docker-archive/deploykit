@@ -25,7 +25,7 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 	tail.Flags().StringVar(&templateURL, "view", templateURL, "URL for view template")
 	tail.RunE = func(cmd *cobra.Command, args []string) error {
 
-		eventPlugin, err := LoadPlugin(services.Plugins(), name)
+		eventPlugin, err := LoadPlugin(services.Scope.Plugins(), name)
 		if err != nil {
 			return nil
 		}
@@ -56,7 +56,7 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 						"and calls GET on the plugin with the path \"path/to/data\".",
 						"It's identical to the CLI command infrakit metadata cat ...",
 					},
-					Func: metadata_template.MetadataFunc(services.Plugins),
+					Func: metadata_template.MetadataFunc(services.Scope),
 				},
 			}
 		})

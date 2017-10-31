@@ -8,13 +8,13 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/core"
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	loadbalancer_rpc "github.com/docker/infrakit/pkg/rpc/loadbalancer"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -24,11 +24,11 @@ import (
 
 var log = logutil.New("module", "controller/ingress")
 
-func newManaged(plugins func() discovery.Plugins,
+func newManaged(scp scope.Scope,
 	leader manager.Leadership) *managed {
 	return &managed{
 		Leadership: leader,
-		plugins:    plugins,
+		scope:      scp,
 	}
 }
 
@@ -58,7 +58,7 @@ type managed struct {
 	spec       types.Spec
 	properties ingress.Properties
 
-	plugins func() discovery.Plugins
+	scope scope.Scope
 
 	// Finite state machine tracking
 	process      *core.Process
@@ -86,17 +86,13 @@ func (c *managed) groupPlugin(g ingress.Group) (group.Plugin, error) {
 	c.groupClientsLock.Lock()
 	defer c.groupClientsLock.Unlock()
 
-	if c.plugins == nil {
-		return nil, fmt.Errorf("no lookup")
-	}
-
 	if c.groupClients == nil {
 		c.groupClients = map[plugin.Name]group.Plugin{}
 	}
 
 	found, has := c.groupClients[g.Plugin()]
 	if !has {
-		endpoint, err := c.plugins().Find(g.Plugin())
+		endpoint, err := c.scope.Plugins().Find(g.Plugin())
 		if err != nil {
 			return nil, err
 		}
@@ -113,11 +109,11 @@ func (c *managed) groupPlugin(g ingress.Group) (group.Plugin, error) {
 func (c *managed) l4Client(spec ingress.Spec) (loadbalancer.L4, error) {
 	log.Debug("Locating L4", "name", spec.L4Plugin)
 
-	if c.plugins == nil {
+	if c.scope.Plugins == nil {
 		return nil, fmt.Errorf("no L4 plugin %v", spec.L4Plugin)
 	}
 
-	endpoint, err := c.plugins().Find(spec.L4Plugin)
+	endpoint, err := c.scope.Plugins().Find(spec.L4Plugin)
 	if err != nil {
 		return nil, err
 	}

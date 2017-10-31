@@ -8,9 +8,11 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
+	metadata "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 
 	// load the handlers for ingress con
@@ -81,7 +83,11 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: ingress.NewTypedControllers(plugins, leadership),
+		run.Controller: ingress.NewTypedControllers(
+			scope.Scope{
+				Plugins:  plugins,
+				Metadata: metadata.DefaultResolver(plugins),
+			}, leadership),
 	}
 
 	return

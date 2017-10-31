@@ -30,7 +30,7 @@ func Backends(name string, services *cli.Services) *cobra.Command {
 				os.Exit(1)
 			}
 
-			l4, err := Load(services.Plugins(), name)
+			l4, err := Load(services.Scope.Plugins(), name)
 			if err != nil {
 				return nil
 			}
@@ -56,7 +56,7 @@ func Backends(name string, services *cli.Services) *cobra.Command {
 				os.Exit(1)
 			}
 
-			l4, err := Load(services.Plugins(), name)
+			l4, err := Load(services.Scope.Plugins(), name)
 			if err != nil {
 				return nil
 			}
@@ -81,7 +81,7 @@ func Backends(name string, services *cli.Services) *cobra.Command {
 			os.Exit(1)
 		}
 
-		l4, err := Load(services.Plugins(), name)
+		l4, err := Load(services.Scope.Plugins(), name)
 		if err != nil {
 			return nil
 		}

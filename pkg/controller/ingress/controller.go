@@ -6,14 +6,14 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/controller/internal"
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/manager"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
 
 // NewController returns a controller implementation
-func NewController(plugins func() discovery.Plugins, leader manager.Leadership) controller.Controller {
+func NewController(scope scope.Scope, leader manager.Leadership) controller.Controller {
 	return internal.NewController(
 		leader,
 		// the constructor
@@ -30,14 +30,14 @@ func NewController(plugins func() discovery.Plugins, leader manager.Leadership) 
 }
 
 // NewTypedControllers return typed controllers
-func NewTypedControllers(plugins func() discovery.Plugins,
+func NewTypedControllers(scope scope.Scope,
 	leader manager.Leadership) func() (map[string]controller.Controller, error) {
 
 	return (internal.NewController(
 		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
-			return newManaged(plugins, leader), nil
+			return newManaged(scope, leader), nil
 		},
 		// the key function
 		func(metadata types.Metadata) string {

@@ -7,6 +7,7 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_plugin "github.com/docker/infrakit/pkg/rpc/group"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -20,7 +21,7 @@ func init() {
 // Commit requires two parameters, first is isYAML (bool) and second is pretend (bool)
 // It then returns an executable function based on that specification to call the manager's commit
 // method with the content
-func Commit(plugins backend.Plugins, opt ...interface{}) (backend.ExecFunc, error) {
+func Commit(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) {
 
 	if len(opt) != 2 {
 		return nil, fmt.Errorf("require params: isYAML (bool), pretend (bool)")
@@ -55,7 +56,7 @@ func Commit(plugins backend.Plugins, opt ...interface{}) (backend.ExecFunc, erro
 		// Check the list of plugins
 		for _, gp := range groups {
 
-			endpoint, err := plugins().Find(gp.Plugin)
+			endpoint, err := scope.Plugins().Find(gp.Plugin)
 			if err != nil {
 				return err
 			}

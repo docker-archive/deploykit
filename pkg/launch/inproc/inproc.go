@@ -10,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -99,11 +100,11 @@ const (
 
 // NewLauncher returns a Launcher that can install and start plugins.
 // The inproc launcher will start up the plugin in process.
-func NewLauncher(n string, plugins func() discovery.Plugins) (*Launcher, error) {
+func NewLauncher(n string, scope scope.Scope) (*Launcher, error) {
 	return &Launcher{
 		name:    n,
 		running: map[string]state{},
-		plugins: plugins,
+		scope:   scope,
 	}, nil
 }
 
@@ -117,7 +118,7 @@ type state struct {
 type Launcher struct {
 	name    string
 	running map[string]state
-	plugins func() discovery.Plugins
+	scope   scope.Scope
 }
 
 // Name returns the name of the launcher
@@ -163,7 +164,7 @@ func (l *Launcher) Exec(key string, pn plugin.Name,
 
 	log.Debug("about to run", "key", key, "name", name, "config", config, "options", inprocRule.Options)
 
-	transport, impls, onStop, err := builder.run(l.plugins, plugin.Name(name), inprocRule.Options)
+	transport, impls, onStop, err := builder.run(l.scope.Plugins, plugin.Name(name), inprocRule.Options)
 	if err != nil {
 		log.Warn("error executing inproc", "plugin", name, "config", inprocRule.Options, "err", err)
 		sc <- err

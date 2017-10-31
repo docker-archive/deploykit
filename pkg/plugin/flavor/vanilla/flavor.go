@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/run/scope"
 	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -38,15 +38,15 @@ type Spec struct {
 // identical (cattles) but can assume specific identities (via the LogicalIDs).  The
 // instances here are treated identically because we have constant Init that applies
 // to all instances
-func NewPlugin(plugins func() discovery.Plugins, opt template.Options) flavor.Plugin {
-	return vanillaFlavor{plugins: plugins, options: opt}
+func NewPlugin(scope scope.Scope, opt template.Options) flavor.Plugin {
+	return vanillaFlavor{scope: scope, options: opt}
 }
 
 // DefaultOptions contains the default settings.
 var DefaultOptions = template.Options{}
 
 type vanillaFlavor struct {
-	plugins func() discovery.Plugins
+	scope   scope.Scope
 	options template.Options
 }
 
@@ -65,7 +65,7 @@ func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group_ty
 		if err != nil {
 			return err
 		}
-		_, err = runtime.StdFunctions(template, f.plugins).Render(nil)
+		_, err = runtime.StdFunctions(template, f.scope).Render(nil)
 		if err != nil {
 			return err
 		}
@@ -106,7 +106,7 @@ func (f vanillaFlavor) Prepare(flavor *types.Any,
 		if err != nil {
 			return instance, err
 		}
-		initScript, err := runtime.StdFunctions(template, f.plugins).Render(nil)
+		initScript, err := runtime.StdFunctions(template, f.scope).Render(nil)
 		if err != nil {
 			return instance, err
 		}

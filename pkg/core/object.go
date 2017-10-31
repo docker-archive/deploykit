@@ -5,9 +5,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/fsm"
 	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -108,7 +108,7 @@ func resolveDepends(o *types.Object, objects Objects) (depends map[string]interf
 func templateEngine(url string,
 	object *types.Object,
 	depends map[string]interface{},
-	plugins func() discovery.Plugins) (*template.Template, error) {
+	scope scope.Scope) (*template.Template, error) {
 
 	t, err := template.NewTemplate(url, template.Options{})
 	if err != nil {
@@ -138,7 +138,7 @@ func templateEngine(url string,
 					"and calls GET on the plugin with the path \"path/to/data\".",
 					"It's identical to the CLI command infrakit metadata cat ...",
 				},
-				Func: metadata_template.MetadataFunc(plugins),
+				Func: metadata_template.MetadataFunc(scope),
 			},
 			{
 				Name: "var",
@@ -169,7 +169,7 @@ func templateEngine(url string,
 // renderProperties applies the template and the properties to produce the final properties
 func renderProperties(object *types.Object, id fsm.ID,
 	depends map[string]interface{},
-	plugins func() discovery.Plugins) (*types.Any, error) {
+	scope scope.Scope) (*types.Any, error) {
 
 	var properties interface{} // this will be serialized into any
 
@@ -178,7 +178,7 @@ func renderProperties(object *types.Object, id fsm.ID,
 	// If the spec has a Template and Properties, then render the template
 	if object.Spec.Template != nil {
 
-		t, err := templateEngine(object.Spec.Template.String(), object, depends, plugins)
+		t, err := templateEngine(object.Spec.Template.String(), object, depends, scope)
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +207,7 @@ func renderProperties(object *types.Object, id fsm.ID,
 
 		// unescape the quotes if they appear
 		body := strings.Replace(object.Spec.Properties.String(), `\"`, `"`, -1)
-		t, err := templateEngine("str://"+body, object, depends, plugins)
+		t, err := templateEngine("str://"+body, object, depends, scope)
 		if err != nil {
 			// Even if the Properties contains no template functions, we still expect it
 			// to be loaded as text correctly.  So an error here is an exception.

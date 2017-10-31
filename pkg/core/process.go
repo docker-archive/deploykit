@@ -3,9 +3,9 @@ package core
 import (
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -30,8 +30,8 @@ type Process struct {
 
 	Constructor fsm.Action
 
-	store   Objects
-	plugins func() discovery.Plugins
+	store Objects
+	scope scope.Scope
 
 	objects map[fsm.ID]*types.Object
 }
@@ -65,12 +65,12 @@ func check(input ProcessDefinition) ProcessDefinition {
 func NewProcess(model ModelDefinition,
 	input ProcessDefinition,
 	store Objects,
-	plugins func() discovery.Plugins) (*Process, error) {
+	scope scope.Scope) (*Process, error) {
 
 	proc := &Process{
 		ProcessDefinition: check(input),
 		store:             store,
-		plugins:           plugins,
+		scope:             scope,
 		objects:           map[fsm.ID]*types.Object{},
 	}
 
@@ -90,7 +90,7 @@ func NewProcess(model ModelDefinition,
 			return err
 		}
 
-		properties, err := renderProperties(obj, instance.ID(), depends, proc.plugins)
+		properties, err := renderProperties(obj, instance.ID(), depends, scope)
 		if err != nil {
 			return err
 		}

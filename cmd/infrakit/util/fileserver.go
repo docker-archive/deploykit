@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/spf13/cobra"
 )
 
-func fileServerCommand(plugins func() discovery.Plugins) *cobra.Command {
+func fileServerCommand(scp scope.Scope) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fileserver <path>",
 		Short: "Fileserver over http",

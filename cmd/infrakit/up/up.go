@@ -9,7 +9,6 @@ import (
 	"github.com/docker/infrakit/cmd/infrakit/manager/schema"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
@@ -28,9 +27,9 @@ func init() {
 }
 
 // Command is the entrypoint
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scp scope.Scope) *cobra.Command {
 
-	services := cli.NewServices(plugins)
+	services := cli.NewServices(scp)
 
 	up := &cobra.Command{
 		Use:   "up <url>",
@@ -46,15 +45,11 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	up.RunE = func(c *cobra.Command, args []string) error {
 
-		if plugins == nil {
-			panic("no plugins()")
-		}
-
 		if len(args) == 0 {
 			return fmt.Errorf("missing url arg")
 		}
 
-		pluginManager, err := cli.PluginManager(plugins, services, *configURL)
+		pluginManager, err := cli.PluginManager(scp, services, *configURL)
 		if err != nil {
 			return err
 		}
@@ -77,7 +72,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		if len(*metadatas) > 0 {
 			log.Info("Setting metadata entries")
-			mfunc := metadata_template.MetadataFunc(plugins)
+			mfunc := metadata_template.MetadataFunc(scp)
 			for _, md := range *metadatas {
 				// TODO -- this is not transactional.... we don't know
 				// the paths and there may be changes to multiple metadata
@@ -120,12 +115,12 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return err
 		}
 
-		return local.Execute(plugins, pluginManager,
+		return local.Execute(scp.Plugins, pluginManager,
 			func() ([]local.StartPlugin, error) {
 				log.Info("plugins to start", "targets", targets)
 				return targets, nil
 			},
-			func(scope scope.Scope) error {
+			func(_ scope.Scope) error {
 				// TODO - in here loop and commit periodically
 
 				pluginManager.WaitForAllShutdown()

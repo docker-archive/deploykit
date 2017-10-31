@@ -34,7 +34,7 @@ func Prepare(name string, services *cli.Services) *cobra.Command {
 			os.Exit(1)
 		}
 
-		flavorPlugin, err := LoadPlugin(services.Plugins(), name)
+		flavorPlugin, err := LoadPlugin(services.Scope.Plugins(), name)
 		if err != nil {
 			return nil
 		}
