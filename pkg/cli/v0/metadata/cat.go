@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/docker/infrakit/pkg/cli"
-	metadata "github.com/docker/infrakit/pkg/plugin/metadata/template"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -25,7 +25,7 @@ func Cat(name string, services *cli.Services) *cobra.Command {
 
 	cat.RunE = func(cmd *cobra.Command, args []string) error {
 
-		metadataFunc := metadata.MetadataFunc(services.Scope)
+		metadataFunc := scope.MetadataFunc(services.Scope)
 
 		for _, p := range args {
 

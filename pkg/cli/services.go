@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/run/scope"
-	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/pflag"
@@ -173,7 +172,7 @@ func templateProcessor(scope scope.Scope) (*pflag.FlagSet,
 			}
 
 			log.Debug("reading template", "url", url)
-			engine, err := template.NewTemplate(url, template.Options{MultiPass: !*singlePass})
+			engine, err := scope.TemplateEngine(url, template.Options{MultiPass: !*singlePass})
 			if err != nil {
 				return
 			}
@@ -198,8 +197,6 @@ func templateProcessor(scope scope.Scope) (*pflag.FlagSet,
 					}
 				}
 			}
-
-			runtime.StdFunctions(engine, scope)
 
 			contextObject := (interface{})(nil)
 			if len(ctx) == 1 {

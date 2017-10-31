@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/cli"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -32,7 +31,7 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 		cli.MustNotNil(eventPlugin, "event plugin not found", "name", name)
 
 		log.Debug("rendering view", "template=", templateURL)
-		engine, err := template.NewTemplate(templateURL, template.Options{})
+		engine, err := services.Scope.TemplateEngine(templateURL, template.Options{})
 		if err != nil {
 			return err
 		}
@@ -47,19 +46,6 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 				engine.Global(key, val)
 			}
 		}
-		engine.WithFunctions(func() []template.Function {
-			return []template.Function{
-				{
-					Name: "metadata",
-					Description: []string{
-						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-						"and calls GET on the plugin with the path \"path/to/data\".",
-						"It's identical to the CLI command infrakit metadata cat ...",
-					},
-					Func: metadata_template.MetadataFunc(services.Scope),
-				},
-			}
-		})
 
 		if len(args) == 0 {
 			args = []string{"."}

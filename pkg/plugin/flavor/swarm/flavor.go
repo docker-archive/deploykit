@@ -10,7 +10,6 @@ import (
 	"github.com/docker/go-connections/tlsconfig"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
-	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -228,7 +227,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 	if spec.InitScriptTemplateURL != "" {
 
-		t, err := template.NewTemplate(spec.InitScriptTemplateURL, defaultTemplateOptions)
+		t, err := s.scope.TemplateEngine(spec.InitScriptTemplateURL, defaultTemplateOptions)
 		if err != nil {
 			return instanceSpec, err
 		}
@@ -276,7 +275,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 			link:         *link,
 		}
 
-		initScript, err = runtime.StdFunctions(initTemplate, s.scope).Render(context)
+		initScript, err = initTemplate.Render(context)
 		log.Debug("retries", "role", role, "retries", context.retries, "err", err, "i", i)
 
 		if err == nil {

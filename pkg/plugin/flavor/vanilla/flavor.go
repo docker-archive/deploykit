@@ -6,7 +6,6 @@ import (
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
-	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -61,11 +60,11 @@ func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group.Al
 	}
 
 	if spec.InitScriptTemplateURL != "" {
-		template, err := template.NewTemplate(spec.InitScriptTemplateURL, f.options)
+		template, err := f.scope.TemplateEngine(spec.InitScriptTemplateURL, f.options)
 		if err != nil {
 			return err
 		}
-		_, err = runtime.StdFunctions(template, f.scope).Render(nil)
+		_, err = template.Render(nil)
 		if err != nil {
 			return err
 		}
@@ -102,11 +101,11 @@ func (f vanillaFlavor) Prepare(flavor *types.Any,
 		lines = append(lines, instance.Init)
 	}
 	if s.InitScriptTemplateURL != "" {
-		template, err := template.NewTemplate(s.InitScriptTemplateURL, f.options)
+		template, err := f.scope.TemplateEngine(s.InitScriptTemplateURL, f.options)
 		if err != nil {
 			return instance, err
 		}
-		initScript, err := runtime.StdFunctions(template, f.scope).Render(nil)
+		initScript, err := template.Render(nil)
 		if err != nil {
 			return instance, err
 		}

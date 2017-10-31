@@ -109,7 +109,7 @@ func templateEngine(url string,
 	depends map[string]interface{},
 	scope scope.Scope) (*template.Template, error) {
 
-	t, err := template.NewTemplate(url, template.Options{})
+	t, err := scope.TemplateEngine(url, template.Options{})
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +129,8 @@ func templateEngine(url string,
 	}
 
 	t.WithFunctions(func() []template.Function {
-		return append(scope.TemplateFuncs,
-			template.Function{
+		return []template.Function{
+			{
 				Name: "var",
 				Description: []string{
 					"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
@@ -150,7 +150,7 @@ func templateEngine(url string,
 					return t.Var(n, optional...)
 				},
 			},
-		)
+		}
 	})
 
 	return t, nil

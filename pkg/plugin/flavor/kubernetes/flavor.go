@@ -11,7 +11,6 @@ import (
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
-	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -327,7 +326,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 	if spec.InitScriptTemplateURL != "" {
 
-		t, err := template.NewTemplate(spec.InitScriptTemplateURL, DefaultTemplateOptions)
+		t, err := s.scope.TemplateEngine(spec.InitScriptTemplateURL, DefaultTemplateOptions)
 		if err != nil {
 			log.Error("error processing template", "template", spec.InitScriptTemplateURL, "err", err)
 			return instanceSpec, err
@@ -349,7 +348,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		worker:       worker,
 	}
 
-	initScript, err = runtime.StdFunctions(initTemplate, s.scope).Render(context)
+	initScript, err = initTemplate.Render(context)
 	instanceSpec.Init = initScript
 	log.Debug("Init script", "content", initScript)
 	return instanceSpec, nil

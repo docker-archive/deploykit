@@ -12,7 +12,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/run/scope/local"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -72,7 +71,7 @@ func Command(scp scope.Scope) *cobra.Command {
 
 		if len(*metadatas) > 0 {
 			log.Info("Setting metadata entries")
-			mfunc := metadata_template.MetadataFunc(scp)
+			mfunc := scope.MetadataFunc(scp)
 			for _, md := range *metadatas {
 				// TODO -- this is not transactional.... we don't know
 				// the paths and there may be changes to multiple metadata

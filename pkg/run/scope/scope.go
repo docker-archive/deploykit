@@ -38,7 +38,8 @@ type Scope struct {
 	// Metadata is for resolving metadata / path related queries
 	Metadata MetadataResolver
 
-	TemplateFuncs []template.Function
+	// TemplateEngine creates a template engine for use.
+	TemplateEngine TemplateEngine
 }
 
 // Work is a unit of work that is executed in the scope of the plugins
@@ -51,6 +52,9 @@ type MetadataCall struct {
 	Name   plugin.Name
 	Key    types.Path
 }
+
+// TemplateEngine returns a configured template engine for this scope
+type TemplateEngine func(url string, opts template.Options) (*template.Template, error)
 
 // InstanceResolver resolves a string name for the plugin to instance plugin
 type InstanceResolver func(n string) (instance.Plugin, error)
@@ -70,16 +74,51 @@ func DefaultScope(plugins func() discovery.Plugins) Scope {
 		Flavor:   DefaultFlavorResolver(plugins),
 	}
 
-	s.TemplateFuncs = []template.Function{
-		{
-			Name: "metadata",
-			Description: []string{
-				"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
-				"and calls GET on the plugin with the path \"path/to/data\".",
-				"It's identical to the CLI command infrakit metadata cat ...",
-			},
-			Func: MetadataFunc(s),
-		},
+	s.TemplateEngine = func(url string, opts template.Options) (*template.Template, error) {
+		engine, err := template.NewTemplate(url, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		return engine.WithFunctions(func() []template.Function {
+			return []template.Function{
+				{
+					Name: "metadata",
+					Description: []string{
+						"Metadata function takes a path of the form \"plugin_name/path/to/data\"",
+						"and calls GET on the plugin with the path \"path/to/data\".",
+						"It's identical to the CLI command infrakit metadata cat ...",
+					},
+					Func: MetadataFunc(s),
+				},
+				{
+					Name: "var",
+					Func: func(name string, optional ...interface{}) (interface{}, error) {
+
+						if len(optional) > 0 {
+							return engine.Var(name, optional...), nil
+						}
+
+						v := engine.Ref(name)
+						if v == nil {
+							// If not resolved, try to interpret the path as a path for metadata...
+							m, err := MetadataFunc(s)(name, optional...)
+							if err != nil {
+								return nil, err
+							}
+							v = m
+						}
+
+						if v == nil && engine.Options().MultiPass {
+							return engine.DeferVar(name), nil
+						}
+
+						return v, nil
+					},
+				},
+			}
+		}), nil
 	}
+
 	return s
 }

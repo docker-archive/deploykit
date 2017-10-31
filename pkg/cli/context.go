@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/run/scope"
-	runtime "github.com/docker/infrakit/pkg/run/template"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 )
@@ -444,7 +443,7 @@ func (c *Context) Funcs() []template.Function {
 
 func (c *Context) getTemplate() (*template.Template, error) {
 	if c.template == nil {
-		t, err := template.NewTemplate(c.src, c.options)
+		t, err := c.scope.TemplateEngine(c.src, c.options)
 		if err != nil {
 			return nil, err
 		}
@@ -462,7 +461,7 @@ func (c *Context) BuildFlags() (err error) {
 		return
 	}
 	t.SetOptions(c.options)
-	_, err = runtime.StdFunctions(t, c.scope).Render(c)
+	_, err = t.Render(c)
 	return
 }
 
@@ -485,7 +484,7 @@ func (c *Context) Execute() (err error) {
 	// Process the input, render the template
 	t.SetOptions(opt)
 
-	script, err := runtime.StdFunctions(t, c.scope).Render(c)
+	script, err := t.Render(c)
 	if err != nil {
 		return err
 	}
