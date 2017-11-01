@@ -4,16 +4,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
-	flavor_client "github.com/docker/infrakit/pkg/rpc/flavor"
-	instance_client "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -72,7 +70,7 @@ var DefaultOptions = Options{
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins, name plugin.Name,
+func Run(scope scope.Scope, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	log.Debug("Starting group", "name", name, "configs", config)
@@ -84,19 +82,11 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	}
 
 	instancePluginLookup := func(n plugin.Name) (instance.Plugin, error) {
-		endpoint, err := plugins().Find(n)
-		if err != nil {
-			return nil, err
-		}
-		return instance_client.NewClient(n, endpoint.Address)
+		return scope.Instance(n.String())
 	}
 
 	flavorPluginLookup := func(n plugin.Name) (flavor.Plugin, error) {
-		endpoint, err := plugins().Find(n)
-		if err != nil {
-			return nil, err
-		}
-		return flavor_client.NewClient(n, endpoint.Address)
+		return scope.Flavor(n.String())
 	}
 
 	groupPlugin := group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup,

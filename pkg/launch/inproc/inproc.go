@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -23,8 +22,8 @@ const (
 
 // PluginRunFunc is a function that takes the plugin lookup, a configuration blob and starts the plugin
 // and returns a stoppable, running channel (for optionally blocking), and error.
-type PluginRunFunc func(func() discovery.Plugins, plugin.Name,
-	*types.Any) (transport plugin.Transport, plugins map[run.PluginCode]interface{}, onStop func(), err error)
+type PluginRunFunc func(scope.Scope, plugin.Name, *types.Any) (transport plugin.Transport,
+	plugins map[run.PluginCode]interface{}, onStop func(), err error)
 
 type builder struct {
 	lookup  string
@@ -164,7 +163,7 @@ func (l *Launcher) Exec(key string, pn plugin.Name,
 
 	log.Debug("about to run", "key", key, "name", name, "config", config, "options", inprocRule.Options)
 
-	transport, impls, onStop, err := builder.run(l.scope.Plugins, plugin.Name(name), inprocRule.Options)
+	transport, impls, onStop, err := builder.run(l.scope, plugin.Name(name), inprocRule.Options)
 	if err != nil {
 		log.Warn("error executing inproc", "plugin", name, "config", inprocRule.Options, "err", err)
 		sc <- err

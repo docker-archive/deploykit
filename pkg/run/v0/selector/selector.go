@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -14,6 +13,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin/instance/selector/weighted"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -115,7 +115,7 @@ func tieredOptions() selector.Options {
 }
 
 // RunWeighted runs the plugin, blocking the current thread.  Error is returned immediately if start fails
-func RunWeighted(plugins func() discovery.Plugins, name plugin.Name,
+func RunWeighted(scope scope.Scope, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := selector.Options{}
@@ -127,14 +127,14 @@ func RunWeighted(plugins func() discovery.Plugins, name plugin.Name,
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: map[string]instance.Plugin{
-			"weighted": weighted.NewPlugin(plugins, options),
+			"weighted": weighted.NewPlugin(scope.Plugins, options),
 		},
 	}
 	return
 }
 
 // RunSpread runs the plugin, blocking the current thread.  Error is returned immediately if start fails
-func RunSpread(plugins func() discovery.Plugins, name plugin.Name,
+func RunSpread(scope scope.Scope, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := selector.Options{}
@@ -146,14 +146,14 @@ func RunSpread(plugins func() discovery.Plugins, name plugin.Name,
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: map[string]instance.Plugin{
-			"spread": spread.NewPlugin(plugins, options),
+			"spread": spread.NewPlugin(scope.Plugins, options),
 		},
 	}
 	return
 }
 
 // RunTiered runs the plugin, blocking the current thread.  Error is returned immediately if start fails
-func RunTiered(plugins func() discovery.Plugins, name plugin.Name,
+func RunTiered(scope scope.Scope, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
 	options := selector.Options{}
@@ -165,7 +165,7 @@ func RunTiered(plugins func() discovery.Plugins, name plugin.Name,
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: map[string]instance.Plugin{
-			"tiered": tiered.NewPlugin(plugins, options),
+			"tiered": tiered.NewPlugin(scope.Plugins, options),
 		},
 	}
 	return
