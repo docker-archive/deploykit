@@ -90,7 +90,7 @@ For those parameters, use `--metadata` followed by a `--persist` to ensure data 
 into the the backend that's configured.
 
 ```shell
-$INFRAKIT_VARS_TEMPLATE=file://$(pwd)/vars.json infrakit util init --group-id managers groups.json --metadata vars/config/root=file://$(pwd) --persist
+$ INFRAKIT_VARS_TEMPLATE=file://$(pwd)/vars.json infrakit util init --group-id managers groups.json --metadata vars/config/root=file://$(pwd) --persist
 ```
 
 This yields the same:
