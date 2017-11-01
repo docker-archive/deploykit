@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit/pkg/plugin/group"
+	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -21,12 +22,12 @@ type Spec struct {
 
 type flavorCombo struct {
 	API           gcloud.API
-	flavorPlugins group.FlavorPluginLookup
+	flavorPlugins group_plugin.FlavorPluginLookup
 	minAge        time.Duration
 }
 
 // NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.
-func NewPlugin(flavorPlugins group.FlavorPluginLookup, project, zone string, minAge time.Duration) flavor.Plugin {
+func NewPlugin(flavorPlugins group_plugin.FlavorPluginLookup, project, zone string, minAge time.Duration) flavor.Plugin {
 	api, err := gcloud.NewAPI(project, zone)
 	if err != nil {
 		log.Fatal(err)
@@ -39,7 +40,7 @@ func NewPlugin(flavorPlugins group.FlavorPluginLookup, project, zone string, min
 	}
 }
 
-func (f flavorCombo) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (f flavorCombo) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	s := Spec{}
 	return flavorProperties.Decode(&s)
 }
@@ -155,8 +156,8 @@ func mergeSpecs(initial instance.Spec, specs []instance.Spec) (instance.Spec, er
 	return result, nil
 }
 
-func (f flavorCombo) Prepare(flavor *types.Any, inst instance.Spec, allocation group_types.AllocationMethod,
-	context group_types.Index) (instance.Spec, error) {
+func (f flavorCombo) Prepare(flavor *types.Any, inst instance.Spec, allocation group.AllocationMethod,
+	context group.Index) (instance.Spec, error) {
 
 	combo := Spec{}
 	err := flavor.Decode(&combo)

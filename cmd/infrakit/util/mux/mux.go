@@ -8,6 +8,7 @@ import (
 	"github.com/docker/infrakit/pkg/leader"
 	"github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/rpc/mux"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,7 @@ type config struct {
 }
 
 // Command returns the cobra command
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scp scope.Scope) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "mux",
@@ -41,7 +42,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	config := &config{
 		location:     locateURL,
-		plugins:      plugins,
+		plugins:      scp.Plugins,
 		listen:       listen,
 		autoStop:     autoStop,
 		interval:     interval,

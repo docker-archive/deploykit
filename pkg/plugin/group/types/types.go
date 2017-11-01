@@ -10,7 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/group"
-	"github.com/docker/infrakit/pkg/spi/instance"
+	//	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -85,25 +85,25 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 type Spec struct {
 	Instance   InstancePlugin
 	Flavor     FlavorPlugin
-	Allocation AllocationMethod
+	Allocation group.AllocationMethod
 }
 
-// AllocationMethod defines the type of allocation and supervision needed by a flavor's Group.
-type AllocationMethod struct {
-	Size       uint
-	LogicalIDs []instance.LogicalID
-}
+// // AllocationMethod defines the type of allocation and supervision needed by a flavor's Group.
+// type AllocationMethod struct {
+// 	Size       uint
+// 	LogicalIDs []instance.LogicalID
+// }
 
-// Index is the index of the instance's creation.  It provides a context for knowing
-// what is being created.
-type Index struct {
+// // Index is the index of the instance's creation.  It provides a context for knowing
+// // what is being created.
+// type Index struct {
 
-	// Group is the name of the group
-	Group group.ID
+// 	// Group is the name of the group
+// 	Group group.ID
 
-	// Sequence is a sequence number that's per instance.
-	Sequence uint
-}
+// 	// Sequence is a sequence number that's per instance.
+// 	Sequence uint
+// }
 
 // InstancePlugin is the structure that describes an instance plugin.
 type InstancePlugin struct {

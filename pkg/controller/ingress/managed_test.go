@@ -7,6 +7,7 @@ import (
 
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,7 @@ func TestManagedStartStop(t *testing.T) {
 
 	doneWork := make(chan int, 1)
 	managedObject := &managed{
+		scope:        scope.Nil,
 		Leadership:   fakeLeadership(leader),
 		ticker:       ticker,
 		healthChecks: func() (map[ingress.Vhost][]loadbalancer.HealthCheck, error) { return nil, nil },

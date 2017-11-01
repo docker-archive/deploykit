@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/docker/infrakit/pkg/cli"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
@@ -26,7 +26,7 @@ func Validate(name string, services *cli.Services) *cobra.Command {
 				os.Exit(1)
 			}
 
-			flavorPlugin, err := LoadPlugin(services.Plugins(), name)
+			flavorPlugin, err := services.Scope.Flavor(name)
 			if err != nil {
 				return nil
 			}
@@ -64,13 +64,13 @@ func Validate(name string, services *cli.Services) *cobra.Command {
 	return validate
 }
 
-func allocationMethodFromFlags(logicalIDs *[]string, groupSize *uint) group_types.AllocationMethod {
+func allocationMethodFromFlags(logicalIDs *[]string, groupSize *uint) group.AllocationMethod {
 	ids := []instance.LogicalID{}
 	for _, id := range *logicalIDs {
 		ids = append(ids, instance.LogicalID(id))
 	}
 
-	return group_types.AllocationMethod{
+	return group.AllocationMethod{
 		Size:       *groupSize,
 		LogicalIDs: ids,
 	}

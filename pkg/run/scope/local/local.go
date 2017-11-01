@@ -107,9 +107,7 @@ func Execute(plugins func() discovery.Plugins,
 	<-time.After(options.StartWait.Duration())
 
 	log.Debug("Executing work in scope", "V", debugV)
-	err = do(scope.Scope{
-		Plugins: plugins, // Full access.  TODO -- scope this
-	})
+	err = do(scope.DefaultScope(plugins)) // full access
 	if err != nil {
 		log.Error("error processing in scope", "err", err)
 	}

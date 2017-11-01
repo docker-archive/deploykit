@@ -23,7 +23,7 @@ func Provision(name string, services *cli.Services) *cobra.Command {
 				os.Exit(1)
 			}
 
-			instancePlugin, err := LoadPlugin(services.Plugins(), name)
+			instancePlugin, err := services.Scope.Instance(name)
 			if err != nil {
 				return nil
 			}

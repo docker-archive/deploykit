@@ -1,8 +1,8 @@
 package flavor
 
 import (
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -11,11 +11,11 @@ import (
 type Plugin struct {
 
 	// DoValidate implements Validate via function
-	DoValidate func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error
+	DoValidate func(flavorProperties *types.Any, allocation group.AllocationMethod) error
 
 	// DoPrepare implements Prepare via function
 	DoPrepare func(flavorProperties *types.Any, spec instance.Spec,
-		allocation group_types.AllocationMethod, index group_types.Index) (instance.Spec, error)
+		allocation group.AllocationMethod, index group.Index) (instance.Spec, error)
 
 	// DoHealthy implements Healthy via function
 	DoHealthy func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error)
@@ -25,7 +25,7 @@ type Plugin struct {
 }
 
 // Validate checks whether the helper can support a configuration.
-func (t *Plugin) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (t *Plugin) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	return t.DoValidate(flavorProperties, allocation)
 }
 
@@ -34,8 +34,8 @@ func (t *Plugin) Validate(flavorProperties *types.Any, allocation group_types.Al
 // the flavor configuration.
 func (t *Plugin) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 
 	return t.DoPrepare(flavorProperties, spec, allocation, index)
 }

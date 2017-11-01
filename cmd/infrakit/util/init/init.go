@@ -9,12 +9,10 @@ import (
 	"github.com/docker/infrakit/cmd/infrakit/manager/schema"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	metadata_template "github.com/docker/infrakit/pkg/plugin/metadata/template"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/run/manager"
@@ -29,8 +27,7 @@ import (
 
 var log = logutil.New("module", "cmd/infrakit/util/init")
 
-func getPluginManager(plugins func() discovery.Plugins,
-	services *cli.Services, configURL string) (*manager.Manager, error) {
+func getPluginManager(scope scope.Scope, services *cli.Services, configURL string) (*manager.Manager, error) {
 
 	parsedRules := []launch.Rule{}
 
@@ -49,13 +46,13 @@ func getPluginManager(plugins func() discovery.Plugins,
 			return nil, err
 		}
 	}
-	return manager.ManagePlugins(parsedRules, plugins, true, 5*time.Second)
+	return manager.ManagePlugins(parsedRules, scope, true, 5*time.Second)
 }
 
 // Command returns the cobra command
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scp scope.Scope) *cobra.Command {
 
-	services := cli.NewServices(plugins)
+	services := cli.NewServices(scp)
 
 	cmd := &cobra.Command{
 		Use:   "init <groups template URL | - >",
@@ -94,7 +91,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		wait := types.MustParseDuration(*waitDuration)
 
-		pluginManager, err := cli.PluginManager(plugins, services, *configURL)
+		pluginManager, err := cli.PluginManager(scp, services, *configURL)
 		if err != nil {
 			return err
 		}
@@ -117,7 +114,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 		if len(*metadatas) > 0 {
 			log.Info("Setting metadata entries")
-			mfunc := metadata_template.MetadataFunc(plugins)
+			mfunc := scope.MetadataFunc(scp)
 			for _, md := range *metadatas {
 				// TODO -- this is not transactional.... we don't know
 				// the paths and there may be changes to multiple metadata
@@ -189,10 +186,10 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return
 		}
 
-		buildInit := func(scope scope.Scope) error {
+		buildInit := func(scp scope.Scope) error {
 
 			// Get the flavor properties and use that to call the prepare of the Flavor to generate the init
-			endpoint, err := scope.Plugins().Find(groupSpec.Flavor.Plugin)
+			endpoint, err := scp.Plugins().Find(groupSpec.Flavor.Plugin)
 			if err != nil {
 				log.Error("error looking up plugin", "plugin", groupSpec.Flavor.Plugin, "err", err)
 				return err
@@ -218,7 +215,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 			instanceSpec, err = flavorPlugin.Prepare(groupSpec.Flavor.Properties, instanceSpec,
 				groupSpec.Allocation,
-				group_types.Index{Group: group.ID(*groupID), Sequence: *sequence})
+				group.Index{Group: group.ID(*groupID), Sequence: *sequence})
 
 			if err != nil {
 				log.Error("error preparing", "err", err, "spec", instanceSpec)
@@ -240,7 +237,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			if *persist {
 				vars := plugin.Name("group/vars")
 				log.Info("Persisting data into the backend")
-				endpoint, err := scope.Plugins().Find(vars)
+				endpoint, err := scp.Plugins().Find(vars)
 				if err != nil {
 					return err
 				}
@@ -268,7 +265,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			return nil
 		}
 
-		return local.Execute(plugins, pluginManager,
+		return local.Execute(scp.Plugins, pluginManager,
 			pluginsToStart,
 			buildInit,
 			local.Options{

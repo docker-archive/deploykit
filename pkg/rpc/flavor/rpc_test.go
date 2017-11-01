@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -18,8 +17,8 @@ import (
 	"path"
 )
 
-var allocation = group_types.AllocationMethod{}
-var index = group_types.Index{Group: group.ID("group"), Sequence: 0}
+var allocation = group.AllocationMethod{}
+var index = group.Index{Group: group.ID("group"), Sequence: 0}
 
 func tempSocket() string {
 	dir, err := ioutil.TempDir("", "infrakit-test-")
@@ -38,7 +37,7 @@ func TestFlavorPluginValidate(t *testing.T) {
 	inputFlavorProperties := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
-		DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+		DoValidate: func(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
 			return nil
 		},
@@ -60,7 +59,7 @@ func TestFlavorPluginValidateError(t *testing.T) {
 	inputFlavorProperties := types.AnyString(`{"flavor":"zookeeper","role":"leader"}`)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
-		DoValidate: func(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+		DoValidate: func(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 			inputFlavorPropertiesActual <- flavorProperties
 			return errors.New("something-went-wrong")
 		},
@@ -86,14 +85,14 @@ func TestFlavorPluginPrepare(t *testing.T) {
 		Properties: inputFlavorProperties,
 		Tags:       map[string]string{"foo": "bar"},
 	}
-	inputInstanceIndexActual := make(chan group_types.Index, 1)
+	inputInstanceIndexActual := make(chan group.Index, 1)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoPrepare: func(
 			flavorProperties *types.Any,
 			instanceSpec instance.Spec,
-			allocation group_types.AllocationMethod,
-			idx group_types.Index) (instance.Spec, error) {
+			allocation group.AllocationMethod,
+			idx group.Index) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
 			inputInstanceSpecActual <- instanceSpec
@@ -129,14 +128,14 @@ func TestFlavorPluginPrepareError(t *testing.T) {
 		Properties: inputFlavorProperties,
 		Tags:       map[string]string{"foo": "bar"},
 	}
-	inputInstanceIndexActual := make(chan group_types.Index, 1)
+	inputInstanceIndexActual := make(chan group.Index, 1)
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, PluginServer(&testing_flavor.Plugin{
 		DoPrepare: func(
 			flavorProperties *types.Any,
 			instanceSpec instance.Spec,
-			allocation group_types.AllocationMethod,
-			idx group_types.Index) (instance.Spec, error) {
+			allocation group.AllocationMethod,
+			idx group.Index) (instance.Spec, error) {
 
 			inputFlavorPropertiesActual <- flavorProperties
 			inputInstanceSpecActual <- instanceSpec

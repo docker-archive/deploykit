@@ -62,7 +62,7 @@ func Scale(name string, services *cli.Services) *cobra.Command {
 				}
 			}
 
-			groupPlugin, err := LoadPlugin(services.Plugins(), name)
+			groupPlugin, err := LoadPlugin(services.Scope.Plugins(), name)
 			if err != nil {
 				return nil
 			}

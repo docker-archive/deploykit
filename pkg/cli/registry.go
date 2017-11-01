@@ -97,7 +97,7 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 	defer lock.Unlock()
 
 	// first discovery all the running plugins
-	running, err := services.Plugins().List()
+	running, err := services.Scope.Plugins().List()
 	if err != nil {
 		return nil, err
 	}

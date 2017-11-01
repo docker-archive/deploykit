@@ -15,6 +15,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 
@@ -150,14 +151,16 @@ func main() {
 
 	cmd.AddCommand(cli.VersionCommand())
 
-	base.VisitModules(f, func(c *cobra.Command) {
+	scope := scope.DefaultScope(f)
+
+	base.VisitModules(scope, func(c *cobra.Command) {
 		cmd.AddCommand(c)
 	})
 
 	// Set environment variable to disable this feature.
 	if os.Getenv("INFRAKIT_DYNAMIC_CLI") != "false" {
 		// Load dynamic plugin commands based on discovery
-		pluginCommands, err := cli.LoadAll(cli.NewServices(f))
+		pluginCommands, err := cli.LoadAll(cli.NewServices(scope))
 		if err != nil && err != errEmpty {
 			log.Debug("error loading", "cmd", cmd.Use, "err", err)
 			fmt.Println(err.Error())

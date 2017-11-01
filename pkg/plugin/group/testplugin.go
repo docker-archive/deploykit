@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/group/util"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -118,7 +118,7 @@ type flavorSchema struct {
 	Tags map[string]string
 }
 
-func (t testFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (t testFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 
 	s := flavorSchema{}
 	err := flavorProperties.Decode(&s)
@@ -144,8 +144,8 @@ func (t testFlavor) Validate(flavorProperties *types.Any, allocation group_types
 
 func (t testFlavor) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 
 	s := flavorSchema{}
 	err := flavorProperties.Decode(&s)

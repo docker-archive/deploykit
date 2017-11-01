@@ -7,7 +7,7 @@ import (
 
 	mock_group "github.com/docker/infrakit/pkg/mock/plugin/group"
 	mock_instance "github.com/docker/infrakit/pkg/mock/spi/instance"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	testutil "github.com/docker/infrakit/pkg/testing"
@@ -208,8 +208,8 @@ func TestScalerPlanUpdateNoChanges(t *testing.T) {
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
 	settings := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 1,
 			},
 		},
@@ -238,8 +238,8 @@ func TestScalerPlanUpdateRollingUpdate(t *testing.T) {
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
 	settings := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 1,
 			},
 		},
@@ -272,16 +272,16 @@ func TestScalerPlanUpdateScaleDown(t *testing.T) {
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
 	settingsOld := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 2,
 			},
 		},
 	}
 	settingsNew := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 1,
 			},
 		},
@@ -314,16 +314,16 @@ func TestScalerPlanUpdateScaleDownRollingUpdate(t *testing.T) {
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
 	settingsOld := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 2,
 			},
 		},
 	}
 	settingsNew := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 1,
 			},
 		},
@@ -356,16 +356,16 @@ func TestScalerPlanUpdateScaleUp(t *testing.T) {
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
 	settingsOld := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 1,
 			},
 		},
 	}
 	settingsNew := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 2,
 			},
 		},
@@ -398,16 +398,16 @@ func TestScalerPlanUpdateScaleUpRollingUpdate(t *testing.T) {
 	instancePlugin := mock_instance.NewMockPlugin(ctrl)
 	settingsOld := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 1,
 			},
 		},
 	}
 	settingsNew := groupSettings{
 		instancePlugin: instancePlugin,
-		config: types.Spec{
-			Allocation: types.AllocationMethod{
+		config: group_types.Spec{
+			Allocation: group.AllocationMethod{
 				Size: 2,
 			},
 		},

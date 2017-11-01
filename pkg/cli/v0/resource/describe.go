@@ -24,7 +24,7 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			os.Exit(1)
 		}
 
-		resourcePlugin, err := LoadPlugin(services.Plugins(), name)
+		resourcePlugin, err := LoadPlugin(services.Scope.Plugins(), name)
 		if err != nil {
 			return nil
 		}

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/fsm"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	. "github.com/docker/infrakit/pkg/testing"
 	"github.com/docker/infrakit/pkg/types"
@@ -91,14 +91,14 @@ func testGetRootURL(t *testing.T) string {
 	return "file://" + testdata
 }
 
-func testRenderProperties(t *testing.T, text string, depends map[string]interface{},
-	plugins func() discovery.Plugins, assert func(*types.Any)) {
+func testRenderProperties(t *testing.T, text string, depends map[string]interface{}, scope scope.Scope,
+	assert func(*types.Any)) {
 
 	url := testGetRootURL(t)
 	ordered, err := NormalizeSpecs(url+"/fake.yml", []byte(text))
 	require.NoError(t, err)
 
-	any, err := renderProperties(&types.Object{Spec: *ordered[0]}, fsm.ID(0), depends, plugins)
+	any, err := renderProperties(&types.Object{Spec: *ordered[0]}, fsm.ID(0), depends, scope)
 	require.NoError(t, err)
 
 	assert(any)
@@ -134,7 +134,7 @@ func TestRenderProperties(t *testing.T) {
 			"volumeId":   "vol-1234",
 			"instanceId": "uid-1234",
 		},
-		nil,
+		scope.Nil,
 		func(properties *types.Any) {
 
 			m := map[string]interface{}{}
@@ -171,7 +171,7 @@ func TestRenderProperties(t *testing.T) {
     stack:  test
 `,
 		map[string]interface{}{},
-		nil,
+		scope.Nil,
 		func(properties *types.Any) {
 
 			m := map[string]interface{}{}
@@ -206,7 +206,7 @@ func TestRenderProperties(t *testing.T) {
     stack:  test
 `,
 		map[string]interface{}{},
-		nil,
+		scope.Nil,
 		func(properties *types.Any) {
 
 			m := map[string]interface{}{}
@@ -309,7 +309,7 @@ func TestProcess(t *testing.T) {
 		},
 
 		store,
-		nil,
+		scope.Nil,
 	)
 
 	require.NoError(t, err)

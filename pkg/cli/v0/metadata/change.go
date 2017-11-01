@@ -36,7 +36,7 @@ func Change(name string, services *cli.Services) *cobra.Command {
 	printYAML := change.Flags().BoolP("yaml", "y", false, "Show diff in YAML")
 	commitChange := change.Flags().BoolP("commit", "c", false, "Commit changes")
 
-	updatablePlugin, err := loadPluginUpdatable(services.Plugins(), name)
+	updatablePlugin, err := loadPluginUpdatable(services.Scope.Plugins(), name)
 	if err != nil {
 		return nil
 	}

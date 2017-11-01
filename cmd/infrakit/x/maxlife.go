@@ -5,15 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/plugin"
-	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/x/maxlife"
 	"github.com/spf13/cobra"
 )
 
-func maxlifeCommand(plugins func() discovery.Plugins) *cobra.Command {
+func maxlifeCommand(scope scope.Scope) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "maxlife <instance plugin name>...",
@@ -35,7 +33,7 @@ func maxlifeCommand(plugins func() discovery.Plugins) *cobra.Command {
 		tags := toTags(*flagTags)
 
 		// Now we have a list of instance plugins to maxlife
-		plugins, err := getInstancePlugins(plugins, args)
+		plugins, err := getInstancePlugins(scope, args)
 		if err != nil {
 			return err
 		}
@@ -64,14 +62,10 @@ func maxlifeCommand(plugins func() discovery.Plugins) *cobra.Command {
 func ensureMaxlife(name string, plugin instance.Plugin, stop chan struct{}, poll, maxlife time.Duration,
 	tags map[string]string, initialCount int) {
 }
-func getInstancePlugins(plugins func() discovery.Plugins, names []string) (map[string]instance.Plugin, error) {
+func getInstancePlugins(scp scope.Scope, names []string) (map[string]instance.Plugin, error) {
 	targets := map[string]instance.Plugin{}
 	for _, target := range names {
-		endpoint, err := plugins().Find(plugin.Name(target))
-		if err != nil {
-			return nil, err
-		}
-		if p, err := instance_rpc.NewClient(plugin.Name(target), endpoint.Address); err == nil {
+		if p, err := scp.Instance(target); err == nil {
 			targets[target] = p
 		} else {
 			return nil, err

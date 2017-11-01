@@ -3,10 +3,9 @@ package swarm
 import (
 	"errors"
 
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/infrakit/pkg/discovery"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/plugin/metadata"
+	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -14,11 +13,11 @@ import (
 )
 
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
-func NewManagerFlavor(plugins func() discovery.Plugins, connect func(Spec) (docker.APIClientCloser, error),
+func NewManagerFlavor(scope scope.Scope, connect func(Spec) (docker.APIClientCloser, error),
 	templ *template.Template,
 	stop <-chan struct{}) *ManagerFlavor {
 
-	base := &baseFlavor{initScript: templ, getDockerClient: connect, plugins: plugins}
+	base := &baseFlavor{initScript: templ, getDockerClient: connect, scope: scope}
 	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
 	return &ManagerFlavor{baseFlavor: base}
 }
@@ -29,7 +28,7 @@ type ManagerFlavor struct {
 }
 
 // Validate checks whether the helper can support a configuration.
-func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 
 	if err := s.baseFlavor.Validate(flavorProperties, allocation); err != nil {
 		return err
@@ -47,7 +46,7 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 
 	for _, id := range allocation.LogicalIDs {
 		if att, exists := spec.Attachments[id]; !exists || len(att) == 0 {
-			log.Warnf("LogicalID %s has no attachments, which is needed for durability", id)
+			log.Warn("No attachments, which is needed for durability", "id", id)
 		}
 	}
 	return nil
@@ -55,7 +54,7 @@ func (s *ManagerFlavor) Validate(flavorProperties *types.Any, allocation group_t
 
 // Prepare sets up the provisioner / instance plugin's spec based on information about the swarm to join.
 func (s *ManagerFlavor) Prepare(flavorProperties *types.Any,
-	instanceSpec instance.Spec, allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	instanceSpec instance.Spec, allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 	return s.baseFlavor.prepare("manager", flavorProperties, instanceSpec, allocation, index)
 }

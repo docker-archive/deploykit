@@ -7,7 +7,6 @@ import (
 	mock_flavor "github.com/docker/infrakit/pkg/mock/spi/flavor"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -61,8 +60,8 @@ func TestMergeBehavior(t *testing.T) {
 	    }
 	  ]`)
 
-	allocation := group_types.AllocationMethod{Size: 1}
-	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
+	allocation := group.AllocationMethod{Size: 1}
+	index := group.Index{Group: group.ID("group"), Sequence: 0}
 	a.EXPECT().Prepare(types.AnyString(`{"a": "1"}`), inst, allocation, index).Return(instance.Spec{
 		Properties:  inst.Properties,
 		Tags:        map[string]string{"a": "1", "c": "4"},
@@ -79,7 +78,7 @@ func TestMergeBehavior(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
-	result, err := combo.Prepare(flavorProperties, inst, group_types.AllocationMethod{Size: 1}, index)
+	result, err := combo.Prepare(flavorProperties, inst, group.AllocationMethod{Size: 1}, index)
 	require.NoError(t, err)
 
 	expected := instance.Spec{
@@ -123,8 +122,8 @@ func TestMergeNoLogicalID(t *testing.T) {
 	    }
 	  ]`)
 
-	allocation := group_types.AllocationMethod{Size: 1}
-	index := group_types.Index{Group: group.ID("group"), Sequence: 0}
+	allocation := group.AllocationMethod{Size: 1}
+	index := group.Index{Group: group.ID("group"), Sequence: 0}
 	a.EXPECT().Prepare(types.AnyString(`{"a": "1"}`), inst, allocation, index).Return(instance.Spec{
 		Properties:  inst.Properties,
 		Tags:        map[string]string{"a": "1", "c": "4"},
@@ -141,7 +140,7 @@ func TestMergeNoLogicalID(t *testing.T) {
 		Attachments: []instance.Attachment{{ID: "b", Type: "gpu"}},
 	}, nil)
 
-	result, err := combo.Prepare(flavorProperties, inst, group_types.AllocationMethod{Size: 1}, index)
+	result, err := combo.Prepare(flavorProperties, inst, group.AllocationMethod{Size: 1}, index)
 	require.NoError(t, err)
 
 	expected := instance.Spec{

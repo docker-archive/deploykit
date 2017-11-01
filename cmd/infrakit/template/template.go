@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
-	"github.com/docker/infrakit/pkg/discovery"
+
+	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 )
@@ -20,9 +22,9 @@ func init() {
 }
 
 // Command is the entrypoint
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scope scope.Scope) *cobra.Command {
 
-	templateFlags, _, _, processTemplate := base.TemplateProcessor(plugins)
+	services := cli.NewServices(scope)
 
 	///////////////////////////////////////////////////////////////////////////////////
 	// template
@@ -32,7 +34,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 
 	outputFile := cmd.PersistentFlags().StringP("output", "o", "", "Output filename")
-	cmd.Flags().AddFlagSet(templateFlags)
+	cmd.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 
@@ -50,7 +52,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 			url = fmt.Sprintf("str://%s", string(buff))
 		}
 
-		view, err := processTemplate(url)
+		view, err := services.ProcessTemplate(url)
 		if err != nil {
 			return err
 		}

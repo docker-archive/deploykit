@@ -9,13 +9,13 @@ import (
 	"github.com/docker/infrakit/cmd/infrakit/base"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/run/manager"
+	"github.com/docker/infrakit/pkg/run/scope"
 	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
 	"github.com/spf13/cobra"
@@ -28,7 +28,7 @@ func init() {
 }
 
 // Command is the entrypoint
-func Command(plugins func() discovery.Plugins) *cobra.Command {
+func Command(scope scope.Scope) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "plugin",
@@ -41,7 +41,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	}
 	quiet := ls.Flags().BoolP("quiet", "q", false, "Print rows without column headers")
 	ls.RunE = func(c *cobra.Command, args []string) error {
-		entries, err := plugins().List()
+		entries, err := scope.Plugins().List()
 		if err != nil {
 			return err
 		}
@@ -141,17 +141,13 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 
 	configURL := start.Flags().String("config-url", "", "URL for the startup configs")
 
-	services := cli.NewServices(plugins)
+	services := cli.NewServices(scope)
 	start.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
 	start.RunE = func(c *cobra.Command, args []string) error {
 
-		if plugins == nil {
-			panic("no plugins()")
-		}
-
 		log.Info("config", "url", *configURL)
-		pluginManager, err := cli.PluginManager(plugins, services, *configURL)
+		pluginManager, err := cli.PluginManager(scope, services, *configURL)
 		if err != nil {
 			return err
 		}
@@ -228,7 +224,7 @@ func Command(plugins func() discovery.Plugins) *cobra.Command {
 	all := stop.Flags().Bool("all", false, "True to stop all running plugins")
 	stop.RunE = func(c *cobra.Command, args []string) error {
 
-		pluginManager, err := manager.ManagePlugins([]launch.Rule{}, plugins, false, 5*time.Second)
+		pluginManager, err := manager.ManagePlugins([]launch.Rule{}, scope, false, 5*time.Second)
 		if err != nil {
 			return err
 		}

@@ -3,11 +3,11 @@ package base
 import (
 	"sync"
 
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/spf13/cobra"
 )
 
-type module func(func() discovery.Plugins) *cobra.Command
+type module func(scope.Scope) *cobra.Command
 
 var (
 	lock sync.Mutex
@@ -25,12 +25,12 @@ func Register(f module) {
 }
 
 // VisitModules iterate through all the modules known
-func VisitModules(p func() discovery.Plugins, f func(*cobra.Command)) {
+func VisitModules(scope scope.Scope, f func(*cobra.Command)) {
 	lock.Lock()
 	defer lock.Unlock()
 
 	for _, m := range modules {
-		command := m(p)
+		command := m(scope)
 		f(command)
 	}
 }

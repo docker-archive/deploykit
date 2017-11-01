@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/run/scope"
 )
 
 func init() {
@@ -17,7 +18,7 @@ func init() {
 
 // HTTP takes a method parameter (string) and a URL (string) and then
 // performs the http operation with the rendered data
-func HTTP(plugins backend.Plugins, opt ...interface{}) (backend.ExecFunc, error) {
+func HTTP(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) {
 
 	if len(opt) < 2 {
 		return nil, fmt.Errorf("requires at least two parameters: first method (string), second url (string)")

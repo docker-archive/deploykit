@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -46,7 +47,7 @@ func TestLoadModules(t *testing.T) {
 
 	T(100).Infoln(m)
 
-	commands, err := list(nil, m, os.Stdin, nil, &root, options)
+	commands, err := list(scope.Nil, m, os.Stdin, nil, &root, options)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(commands))
 }
@@ -60,7 +61,7 @@ func TestLoadAll(t *testing.T) {
 		Op("testdata"): root,
 	}
 
-	modules, err := NewModules(nil, top, os.Stdin, template.Options{})
+	modules, err := NewModules(scope.Nil, top, os.Stdin, template.Options{})
 	require.NoError(t, err)
 
 	commands, err := modules.List()

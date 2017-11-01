@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/launch"
 	"github.com/docker/infrakit/pkg/launch/inproc"
@@ -17,6 +16,7 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -26,11 +26,10 @@ var (
 )
 
 // ManagePlugins returns a manager that can manage the start up and stopping of plugins.
-func ManagePlugins(rules []launch.Rule,
-	plugins func() discovery.Plugins, mustAll bool, scanInterval time.Duration) (*Manager, error) {
+func ManagePlugins(rules []launch.Rule, scope scope.Scope, mustAll bool, scanInterval time.Duration) (*Manager, error) {
 
 	m := &Manager{
-		plugins:      plugins,
+		scope:        scope,
 		mustAll:      mustAll,
 		scanInterval: scanInterval,
 		running:      []string{},
@@ -44,8 +43,8 @@ type Manager struct {
 	mustAll bool
 	// scanInterval is the interval for checking the plugin discovery
 	scanInterval time.Duration
-	// Plugins is a function that returns the plugins discovered.
-	plugins func() discovery.Plugins
+
+	scope scope.Scope
 
 	rules       []launch.Rule
 	monitor     *launch.Monitor
@@ -72,7 +71,7 @@ func (m *Manager) TerminateRunning() error {
 // all the plugins that run in that process.
 // TODO - selectively terminate inproc plugins without taking down the process.
 func (m *Manager) Terminate(lookup []string) error {
-	allPlugins, err := m.plugins().List()
+	allPlugins, err := m.scope.Plugins().List()
 	if err != nil {
 		return err
 	}
@@ -120,7 +119,7 @@ func (m *Manager) Terminate(lookup []string) error {
 
 // TerminateAll terminates all the plugins.
 func (m *Manager) TerminateAll() error {
-	allPlugins, err := m.plugins().List()
+	allPlugins, err := m.scope.Plugins().List()
 	if err != nil {
 		return err
 	}
@@ -146,7 +145,7 @@ func (m *Manager) Start(rules []launch.Rule) error {
 		return err
 	}
 	// launch inprocess plugins
-	inprocExec, err := inproc.NewLauncher(inproc.DefaultExecName, m.plugins)
+	inprocExec, err := inproc.NewLauncher(inproc.DefaultExecName, m.scope)
 	if err != nil {
 		return err
 	}
@@ -184,7 +183,7 @@ func (m *Manager) Launch(exec string, key string, name plugin.Name, options *typ
 	defer m.lock.RUnlock()
 
 	// check that the plugin is not currently running
-	running, err := m.plugins().List()
+	running, err := m.scope.Plugins().List()
 	if err != nil {
 		return err
 	}
@@ -248,7 +247,7 @@ func (m *Manager) WaitForAllShutdown() {
 
 		case <-checkNow:
 			log.Debug("Checking on targets", "targets", targets, "V", debugLoopV)
-			if m, err := m.plugins().List(); err == nil {
+			if m, err := m.scope.Plugins().List(); err == nil {
 				if countMatches(targets, m) == 0 {
 					log.Info("Scan found plugins not running now", "plugins", targets)
 					return

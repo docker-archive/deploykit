@@ -151,7 +151,7 @@ func (c *managed) init(in types.Spec) (err error) {
 			return []interface{}{o.Metadata.Name, o.Metadata.Identity.ID}
 		}),
 
-		c.plugins,
+		c.scope,
 	)
 
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/rpc/client"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 
 	// load the handlers for ingress con
@@ -59,12 +60,8 @@ var DefaultOptions = ingress_types.Options{
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins, name plugin.Name,
+func Run(scope scope.Scope, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
-
-	if plugins == nil {
-		panic("no plugins()")
-	}
 
 	options := DefaultOptions
 	err = config.Decode(&options)
@@ -74,14 +71,14 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 
 	log.Info("Decoded input", "config", options)
 
-	leadership, err := leadership(plugins)
+	leadership, err := leadership(scope.Plugins)
 	if err != nil {
 		return
 	}
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: ingress.NewTypedControllers(plugins, leadership),
+		run.Controller: ingress.NewTypedControllers(scope, leadership),
 	}
 
 	return

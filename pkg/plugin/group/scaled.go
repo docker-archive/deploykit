@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -74,7 +74,7 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 		Properties: types.AnyCopy(settings.config.Instance.Properties),
 	}
 
-	index := group_types.Index{
+	index := group.Index{
 		Group:    s.supervisor.ID(),
 		Sequence: s.supervisor.Size(),
 	}

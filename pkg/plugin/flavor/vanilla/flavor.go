@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	runtime "github.com/docker/infrakit/pkg/run/template"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -38,19 +37,19 @@ type Spec struct {
 // identical (cattles) but can assume specific identities (via the LogicalIDs).  The
 // instances here are treated identically because we have constant Init that applies
 // to all instances
-func NewPlugin(plugins func() discovery.Plugins, opt template.Options) flavor.Plugin {
-	return vanillaFlavor{plugins: plugins, options: opt}
+func NewPlugin(scope scope.Scope, opt template.Options) flavor.Plugin {
+	return vanillaFlavor{scope: scope, options: opt}
 }
 
 // DefaultOptions contains the default settings.
 var DefaultOptions = template.Options{}
 
 type vanillaFlavor struct {
-	plugins func() discovery.Plugins
+	scope   scope.Scope
 	options template.Options
 }
 
-func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	spec := Spec{}
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
@@ -61,11 +60,11 @@ func (f vanillaFlavor) Validate(flavorProperties *types.Any, allocation group_ty
 	}
 
 	if spec.InitScriptTemplateURL != "" {
-		template, err := template.NewTemplate(spec.InitScriptTemplateURL, f.options)
+		template, err := f.scope.TemplateEngine(spec.InitScriptTemplateURL, f.options)
 		if err != nil {
 			return err
 		}
-		_, err = runtime.StdFunctions(template, f.plugins).Render(nil)
+		_, err = template.Render(nil)
 		if err != nil {
 			return err
 		}
@@ -86,8 +85,8 @@ func (f vanillaFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 
 func (f vanillaFlavor) Prepare(flavor *types.Any,
 	instance instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 
 	s := Spec{}
 	err := flavor.Decode(&s)
@@ -102,11 +101,11 @@ func (f vanillaFlavor) Prepare(flavor *types.Any,
 		lines = append(lines, instance.Init)
 	}
 	if s.InitScriptTemplateURL != "" {
-		template, err := template.NewTemplate(s.InitScriptTemplateURL, f.options)
+		template, err := f.scope.TemplateEngine(s.InitScriptTemplateURL, f.options)
 		if err != nil {
 			return instance, err
 		}
-		initScript, err := runtime.StdFunctions(template, f.plugins).Render(nil)
+		initScript, err := template.Render(nil)
 		if err != nil {
 			return instance, err
 		}

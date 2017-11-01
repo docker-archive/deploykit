@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
-	runtime "github.com/docker/infrakit/pkg/run/template"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubediscovery "k8s.io/kubernetes/cmd/kubeadm/app/discovery"
@@ -95,7 +95,7 @@ type AddOnInfo struct {
 type baseFlavor struct {
 	initScript     *template.Template
 	metadataPlugin metadata.Plugin
-	plugins        func() discovery.Plugins
+	scope          scope.Scope
 	options        Options
 }
 
@@ -120,7 +120,7 @@ func checkKubeAPIServer(cfg kubeadmapi.NodeConfiguration, check chan error, clcf
 }
 
 // Validate checks the configuration of flavor plugin.
-func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (s *baseFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	if flavorProperties == nil {
 		return fmt.Errorf("missing config")
 	}
@@ -223,16 +223,12 @@ func (s *baseFlavor) Get(path types.Path) (*types.Any, error) {
 }
 
 func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceSpec instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 	spec := Spec{}
 
 	log.Debug("prepare", "role", role, "properties", flavorProperties, "spec", instanceSpec, "alloc", allocation,
 		"index", index)
-
-	if s.plugins == nil {
-		return instanceSpec, fmt.Errorf("no plugin discovery")
-	}
 
 	err := flavorProperties.Decode(&spec)
 	if err != nil {
@@ -330,7 +326,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 	if spec.InitScriptTemplateURL != "" {
 
-		t, err := template.NewTemplate(spec.InitScriptTemplateURL, DefaultTemplateOptions)
+		t, err := s.scope.TemplateEngine(spec.InitScriptTemplateURL, DefaultTemplateOptions)
 		if err != nil {
 			log.Error("error processing template", "template", spec.InitScriptTemplateURL, "err", err)
 			return instanceSpec, err
@@ -352,7 +348,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 		worker:       worker,
 	}
 
-	initScript, err = runtime.StdFunctions(initTemplate, s.plugins).Render(context)
+	initScript, err = initTemplate.Render(context)
 	instanceSpec.Init = initScript
 	log.Debug("Init script", "content", initScript)
 	return instanceSpec, nil
@@ -407,8 +403,8 @@ func validateIDsAndAttachments(logicalIDs []instance.LogicalID,
 type templateContext struct {
 	flavorSpec   Spec
 	instanceSpec instance.Spec
-	allocation   group_types.AllocationMethod
-	index        group_types.Index
+	allocation   group.AllocationMethod
+	index        group.Index
 	link         types.Link
 	retries      int
 	poll         time.Duration

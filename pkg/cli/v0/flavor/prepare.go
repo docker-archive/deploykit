@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/docker/infrakit/pkg/cli"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -34,7 +33,7 @@ func Prepare(name string, services *cli.Services) *cobra.Command {
 			os.Exit(1)
 		}
 
-		flavorPlugin, err := LoadPlugin(services.Plugins(), name)
+		flavorPlugin, err := services.Scope.Flavor(name)
 		if err != nil {
 			return nil
 		}
@@ -90,6 +89,6 @@ func Prepare(name string, services *cli.Services) *cobra.Command {
 	return prepare
 }
 
-func indexFromFlags(groupID *string, groupSequence *uint) group_types.Index {
-	return group_types.Index{Group: group.ID(*groupID), Sequence: *groupSequence}
+func indexFromFlags(groupID *string, groupSequence *uint) group.Index {
+	return group.Index{Group: group.ID(*groupID), Sequence: *groupSequence}
 }

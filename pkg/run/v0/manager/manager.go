@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/manager"
@@ -14,6 +13,7 @@ import (
 	rpc "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -127,12 +127,8 @@ func defaultOptions() (options Options) {
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
 // if the plugin cannot be started.
-func Run(plugins func() discovery.Plugins, name plugin.Name,
+func Run(scope scope.Scope, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
-
-	if plugins == nil {
-		panic("no plugins()")
-	}
 
 	options := defaultOptions()
 	err = config.Decode(&options)
@@ -144,7 +140,7 @@ func Run(plugins func() discovery.Plugins, name plugin.Name,
 	log.Info("Starting up", "backend", options.Backend)
 
 	options.Name = name
-	options.Plugins = plugins
+	options.Plugins = scope.Plugins
 
 	switch strings.ToLower(options.Backend) {
 	case "etcd":

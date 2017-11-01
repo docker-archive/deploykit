@@ -5,17 +5,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/event/instance"
 	event_rpc "github.com/docker/infrakit/pkg/rpc/event"
 	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/spf13/cobra"
 )
 
-func trackCommand(plugins func() discovery.Plugins) *cobra.Command {
+func trackCommand(scp scope.Scope) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "track",
 		Short: "Track instances",
@@ -52,7 +52,7 @@ func trackCommand(plugins func() discovery.Plugins) *cobra.Command {
 
 		for _, target := range *targets {
 
-			endpoint, err := plugins().Find(plugin.Name(target))
+			endpoint, err := scp.Plugins().Find(plugin.Name(target))
 			if err != nil {
 				return err
 			}

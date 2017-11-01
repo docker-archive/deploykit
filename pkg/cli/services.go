@@ -8,8 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/discovery"
-	runtime "github.com/docker/infrakit/pkg/run/template"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/pflag"
@@ -19,8 +18,8 @@ import (
 // For example, plugin lookup, metadata lookup, template engine
 type Services struct {
 
-	// Plugins provide a lookup for plugins
-	Plugins func() discovery.Plugins
+	// Scope is the scope this runs in
+	Scope scope.Scope
 
 	// ProcessTemplateFlags are common flags associated with the base services.  They should be added to subcommands
 	// if the subcommands make use of the services provided here.
@@ -43,11 +42,11 @@ type Services struct {
 }
 
 // NewServices creates an instance of common services for all commands
-func NewServices(plugins func() discovery.Plugins) *Services {
-	flags, toJSON, fromJSON, processTemplate := templateProcessor(plugins)
+func NewServices(scope scope.Scope) *Services {
+	flags, toJSON, fromJSON, processTemplate := templateProcessor(scope)
 	outputFlags, outputFunc := Output()
 	return &Services{
-		Plugins:              plugins,
+		Scope:                scope,
 		ProcessTemplateFlags: flags,
 		ProcessTemplate:      processTemplate,
 		ToJSON:               toJSON,
@@ -103,7 +102,8 @@ func (s *Services) ReadFromStdinIfElse(condition func() bool,
 }
 
 // templateProcessor returns a flagset and a function for processing template input.
-func templateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSONFunc, FromJSONFunc, ProcessTemplateFunc) {
+func templateProcessor(scope scope.Scope) (*pflag.FlagSet,
+	ToJSONFunc, FromJSONFunc, ProcessTemplateFunc) {
 
 	fs := pflag.NewFlagSet("template", pflag.ExitOnError)
 
@@ -172,7 +172,7 @@ func templateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 			}
 
 			log.Debug("reading template", "url", url)
-			engine, err := template.NewTemplate(url, template.Options{MultiPass: !*singlePass})
+			engine, err := scope.TemplateEngine(url, template.Options{MultiPass: !*singlePass})
 			if err != nil {
 				return
 			}
@@ -197,8 +197,6 @@ func templateProcessor(plugins func() discovery.Plugins) (*pflag.FlagSet, ToJSON
 					}
 				}
 			}
-
-			runtime.StdFunctions(engine, plugins)
 
 			contextObject := (interface{})(nil)
 			if len(ctx) == 1 {

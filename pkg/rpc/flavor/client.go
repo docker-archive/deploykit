@@ -2,9 +2,9 @@ package flavor
 
 import (
 	"github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -29,7 +29,7 @@ type client struct {
 }
 
 // Validate checks whether the helper can support a configuration.
-func (c client) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (c client) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	_, flavorType := c.name.GetLookupAndType()
 	req := ValidateRequest{Type: flavorType, Properties: flavorProperties, Allocation: allocation}
 	resp := ValidateResponse{}
@@ -40,7 +40,7 @@ func (c client) Validate(flavorProperties *types.Any, allocation group_types.All
 // helper could be used to place additional tags on the machine, or generate a specialized Init command based on
 // the flavor configuration.
 func (c client) Prepare(flavorProperties *types.Any, spec instance.Spec,
-	allocation group_types.AllocationMethod, index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod, index group.Index) (instance.Spec, error) {
 
 	_, flavorType := c.name.GetLookupAndType()
 	req := PrepareRequest{Type: flavorType, Properties: flavorProperties, Spec: spec, Allocation: allocation, Index: index}
