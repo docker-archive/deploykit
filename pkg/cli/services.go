@@ -107,7 +107,7 @@ func templateProcessor(scope scope.Scope) (*pflag.FlagSet,
 
 	fs := pflag.NewFlagSet("template", pflag.ExitOnError)
 
-	globals := fs.StringSlice("var", []string{}, "key=value pairs of globally scoped variagbles")
+	globals := fs.StringSlice("var", []string{}, "key=value pairs of globally scoped variables")
 	yamlDoc := fs.BoolP("yaml", "y", false, "True if input is in yaml format; json is the default")
 	dump := fs.BoolP("dump", "x", false, "True to dump to output instead of executing")
 	singlePass := fs.BoolP("final", "f", false, "True to render template as the final pass")
