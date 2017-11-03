@@ -122,38 +122,45 @@ along with the InfraKit manager:
 
 ```shell
 ~/projects/src/github.com/docker/infrakit$ examples/flavor/swarm/start-plugins.sh
-Starting up manager
-Starting up group-stateless
-INFO[0000] Waiting for manager to start: {
-                "Cmd" : "infrakit-manager --name group  --proxy-for-group group-stateless os --leader-file /Users/me/.infrakit/leader --store-dir /Users/me/.infrakit/configs > /Users/me/.infrakit/logs/manager.log 2>&1"
-            } 
-INFO[0000] OS launcher: Plugin manager setPgId= true starting infrakit-manager --name group  --proxy-for-group group-stateless os --leader-file /Users/me/.infrakit/leader --store-dir /Users/me/.infrakit/configs > /Users/me/.infrakit/logs/manager.log 2>&1 
-INFO[0000] Running /bin/sh /bin/sh -c infrakit-manager --name group  --proxy-for-group group-stateless os --leader-file /Users/me/.infrakit/leader --store-dir /Users/me/.infrakit/configs > /Users/me/.infrakit/logs/manager.log 2>&1 
-INFO[0000] Starting with <nil> sh= infrakit-manager --name group  --proxy-for-group group-stateless os --leader-file /Users/me/.infrakit/leader --store-dir /Users/me/.infrakit/configs > /Users/me/.infrakit/logs/manager.log 2>&1 
-INFO[0000] Waiting for group-stateless to start: {
-                "Cmd" : "infrakit-group-default --poll-interval 10s --name group-stateless --log 5 > /Users/me/.infrakit/logs/group-stateless.log 2>&1"
-            } 
-INFO[0000] OS launcher: Plugin group-stateless setPgId= true starting infrakit-group-default --poll-interval 10s --name group-stateless --log 5 > /Users/me/.infrakit/logs/group-stateless.log 2>&1 
-INFO[0000] Running /bin/sh /bin/sh -c infrakit-group-default --poll-interval 10s --name group-stateless --log 5 > /Users/me/.infrakit/logs/group-stateless.log 2>&1 
-manager started.
-Starting up flavor-swarm
-INFO[0000] Starting with <nil> sh= infrakit-group-default --poll-interval 10s --name group-stateless --log 5 > /Users/me/.infrakit/logs/group-stateless.log 2>&1 
-INFO[0000] Waiting for flavor-swarm to start: {
-                "Cmd" : "infrakit-flavor-swarm --log 5 > /Users/me/.infrakit/logs/flavor-swarm.log 2>&1"
-            } 
-INFO[0000] OS launcher: Plugin flavor-swarm setPgId= true starting infrakit-flavor-swarm --log 5 > /Users/me/.infrakit/logs/flavor-swarm.log 2>&1 
-INFO[0000] Running /bin/sh /bin/sh -c infrakit-flavor-swarm --log 5 > /Users/me/.infrakit/logs/flavor-swarm.log 2>&1 
-group-stateless started.
-Starting up instance-vagrant
-INFO[0000] Starting with <nil> sh= infrakit-flavor-swarm --log 5 > /Users/me/.infrakit/logs/flavor-swarm.log 2>&1 
-INFO[0000] Waiting for instance-vagrant to start: {
-                "Cmd" : "infrakit-instance-vagrant --log 5 > /Users/me/.infrakit/logs/instance-vagrant.log 2>&1"
-            } 
-INFO[0000] OS launcher: Plugin instance-vagrant setPgId= true starting infrakit-instance-vagrant --log 5 > /Users/me/.infrakit/logs/instance-vagrant.log 2>&1 
-INFO[0000] Running /bin/sh /bin/sh -c infrakit-instance-vagrant --log 5 > /Users/me/.infrakit/logs/instance-vagrant.log 2>&1 
-flavor-swarm started.
-INFO[0000] Starting with <nil> sh= infrakit-instance-vagrant --log 5 > /Users/me/.infrakit/logs/instance-vagrant.log 2>&1 
-instance-vagrant started.
+INFO[11-03|14:34:31] config                                   module=cli/plugin url=file:////Users/me/go/src/github.com/docker/infrakit/pkg/plugin/flavor/swarm/plugins.json fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-03|14:34:31] Launching                                module=cli/plugin kind=manager name=group fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-03|14:34:31] Launching                                module=cli/plugin kind=group name=group-stateless fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-03|14:34:31] Starting plugin                          module=core/launch executor=inproc key=manager name=group exec=inproc fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-03|14:34:31] Decoded input                            module=run/manager config="{Options:{Name: Group:group-stateless Metadata:vars Plugins:<nil> Leader:<nil> LeaderStore:<nil> SpecStore:<nil> MetadataStore:<nil> MetadataRefreshInterval:5000000000 LeaderCommitSpecsRetries:10 LeaderCommitSpecsRetryInterval:2000000000} Backend:file Settings:{\n\"PollInterval\": \"5s\",\n\"LeaderFile\": \"/Users/me/.infrakit/leader\",\n\"StoreDir\": \"/Users/me/.infrakit/configs\",\n\"ID\": \"manager1\"\n} Mux:0xc4204ca0a0 cleanUpFunc:<nil>}" fn=github.com/docker/infrakit/pkg/run/v0/manager.Run
+INFO[11-03|14:34:31] Starting up                              module=run/manager backend=file fn=github.com/docker/infrakit/pkg/run/v0/manager.Run
+INFO[11-03|14:34:31] starting up file backend                 module=run/manager options="{PollInterval:5000000000 LeaderFile:/Users/me/.infrakit/leader StoreDir:/Users/me/.infrakit/configs ID:manager1}" fn=github.com/docker/infrakit/pkg/run/v0/manager.Run
+INFO[11-03|14:34:31] file backend                             module=run/manager leader="&{pollInterval:5000000000 tick:0xc4203561e0 stop:<nil> pollFunc:0x1689b90 store:<nil> lock:{state:0 sema:0} receivers:[]}" store="&{dir:/Users/me/.infrakit/configs name:global.config}" cleanup=<nil> fn=github.com/docker/infrakit/pkg/run/v0/manager.Run
+INFO[11-03|14:34:31] Start manager                            module=run/manager m="&{Options:{Name:group Group:group-stateless Metadata:vars Plugins:0x16d71a0 Leader:0xc42008a190 LeaderStore:/Users/me/.infrakit/leader.loc SpecStore:0xc4204ca1e0 MetadataStore:0xc4204ca200 MetadataRefreshInterval:5000000000 LeaderCommitSpecsRetries:10 LeaderCommitSpecsRetryInterval:2000000000} Plugin:0xc42031a060 Updatable:0xc42031a0c0 isLeader:false lock:{state:0 sema:0} stop:<nil> running:<nil> Status:0xc4202ba680 doneStatusUpdates:0xc42007e240 backendOps:<nil>}" fn=github.com/docker/infrakit/pkg/run/v0/manager.Run
+INFO[11-03|14:34:31] Manager starting                         module=manager fn=github.com/docker/infrakit/pkg/manager.(*manager).Start
+INFO[11-03|14:34:31] Manager running                          module=run/manager fn=github.com/docker/infrakit/pkg/run/v0/manager.Run
+INFO[11-03|14:34:31] Starting mux server                      module=run/manager listen=:24864 advertise=localhost:24864 fn=github.com/docker/infrakit/pkg/run/v0/manager.Run
+INFO[11-03|14:34:31] written pid                              module=rpc/mux path=/Users/me/.infrakit/plugins/24864.pid fn=github.com/docker/infrakit/pkg/rpc/mux.SavePID
+INFO[11-03|14:34:31] Listening                                module=rpc/mux listen=:24864 fn=github.com/docker/infrakit/pkg/rpc/mux.NewServer
+INFO[11-03|14:34:31] exported objects                         module=run/manager fn=github.com/docker/infrakit/pkg/run/v0/manager.Run
+INFO[11-03|14:34:31] Object is an event producer              module=rpc/server object=&{keyed:0xc42017e208} discover=/Users/me/.infrakit/plugins/group fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-03|14:34:31] Listening                                module=rpc/server discover=/Users/me/.infrakit/plugins/group fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-03|14:34:31] Waiting for startup                      module=core/launch key=manager name=group config="{\n          \"Kind\": \"manager\",\n          \"Options\": {\n            \"Name\": \"\",\n            \"Group\": \"group-stateless\"\n          },\n\t  \"Settings\": {\n\t\t  \"LeaderFile\": \"/Users/me/.infrakit/leader\",\n\t\t  \"StoreDir\": \"/Users/me/.infrakit/configs\"\n\t  },\n          \"Backend\": \"file\"\n        }" as=group fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-03|14:34:31] Starting plugin                          module=core/launch executor=inproc key=group name=group-stateless exec=inproc fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-03|14:34:31] Launching                                module=cli/plugin kind=flavor-swarm name=flavor-swarm fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-03|14:34:31] PID file created                         module=run path=/Users/me/.infrakit/plugins/group.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:34:31] Server started                           module=run discovery=/Users/me/.infrakit/plugins/group fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:34:31] Object is an event producer              module=rpc/server object=&{keyed:0xc42017e720} discover=/Users/me/.infrakit/plugins/group-stateless fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-03|14:34:31] Listening                                module=rpc/server discover=/Users/me/.infrakit/plugins/group-stateless fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-03|14:34:31] Waiting for startup                      module=core/launch key=group name=group-stateless config="{\n\"Kind\": \"group\",\n\"Options\": {\n\"PollInterval\": \"10s\",\n\"MaxParallelNum\": 0,\n\"PollIntervalGroupSpec\": \"10s\",\n\"PollIntervalGroupDetail\": \"10s\"\n}\n}" as=group-stateless fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-03|14:34:31] Starting plugin                          module=core/launch executor=inproc key=flavor-swarm name=flavor-swarm exec=inproc fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-03|14:34:31] Launching                                module=cli/plugin kind=instance-vagrant name=instance-vagrant fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-03|14:34:31] PID file created                         module=run path=/Users/me/.infrakit/plugins/group-stateless.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:34:31] Server started                           module=run discovery=/Users/me/.infrakit/plugins/group-stateless fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:34:31] Listening                                module=rpc/server discover=/Users/me/.infrakit/plugins/flavor-swarm fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-03|14:34:31] Waiting for startup                      module=core/launch key=flavor-swarm name=flavor-swarm config="{\n          \"Kind\": \"swarm\"\n        }" as=flavor-swarm fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-03|14:34:31] Starting plugin                          module=core/launch executor=inproc key=instance-vagrant name=instance-vagrant exec=inproc fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-03|14:34:31] PID file created                         module=run path=/Users/me/.infrakit/plugins/flavor-swarm.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:34:31] Server started                           module=run discovery=/Users/me/.infrakit/plugins/flavor-swarm fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:34:31] Listening                                module=rpc/server discover=/Users/me/.infrakit/plugins/instance-vagrant fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-03|14:34:31] Waiting for startup                      module=core/launch key=instance-vagrant name=instance-vagrant config="{\n          \"Kind\": \"vagrant\",\n          \"Options\": {\n          }\n        }" as=instance-vagrant fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-03|14:34:31] Done waiting on plugin starts            module=cli/plugin fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-03|14:34:31] PID file created                         module=run path=/Users/me/.infrakit/plugins/instance-vagrant.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:34:31] Server started                           module=run discovery=/Users/me/.infrakit/plugins/instance-vagrant fn=github.com/docker/infrakit/pkg/run.run.func1
 Plugins started.
 Do something like: infrakit manager commit file:///Users/me/projects/src/github.com/docker/infrakit/examples/flavor/swarm/groups-fast.json
  
@@ -267,12 +274,27 @@ And stop all the plugins:
 
 ```
 ~/projects/src/github.com/docker/infrakit$ infrakit plugin stop --all
-INFO[0000] Stopping flavor-swarm at PID= 69525          
-INFO[0000] Process for flavor-swarm exited              
-INFO[0000] Stopping group at PID= 69522                 
-INFO[0000] Process for group exited                     
-INFO[0000] Stopping group-stateless at PID= 69524       
-INFO[0000] Process for group-stateless exited           
-INFO[0000] Stopping instance-vagrant at PID= 69527      
-INFO[0000] Process for instance-vagrant exited
+INFO[11-03|14:41:17] Stopping                                 module=run/manager name=group-stateless pid=7201 fn=github.com/docker/infrakit/pkg/run/manager.(*Manager).Terminate
+INFO[11-03|14:41:17] Process exited                           module=run/manager name=group-stateless fn=github.com/docker/infrakit/pkg/run/manager.(*Manager).Terminate
+INFO[11-03|14:41:17] Stopping                                 module=run/manager name=instance-vagrant pid=7201 fn=github.com/docker/infrakit/pkg/run/manager.(*Manager).Terminate
+INFO[11-03|14:41:17] Process exited                           module=run/manager name=instance-vagrant fn=github.com/docker/infrakit/pkg/run/manager.(*Manager).Terminate
+INFO[11-03|14:41:17] listener stopped                         module=rpc/mux fn=github.com/docker/infrakit/pkg/rpc/mux.NewServer.func2.1
+INFO[11-03|14:41:17] Stopping                                 module=run/manager name=flavor-swarm pid=7201 fn=github.com/docker/infrakit/pkg/run/manager.(*Manager).Terminate
+INFO[11-03|14:41:17] Process exited                           module=run/manager name=flavor-swarm fn=github.com/docker/infrakit/pkg/run/manager.(*Manager).Terminate
+INFO[11-03|14:41:17] Stopping                                 module=run/manager name=group pid=7201 fn=github.com/docker/infrakit/pkg/run/manager.(*Manager).Terminate
+INFO[11-03|14:41:17] Stop checking leadership                 module=rpc/mux fn=github.com/docker/infrakit/pkg/rpc/mux.NewServer.func1
+INFO[11-03|14:41:17] Stopping event relay                     module=rpc/server fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath.func1
+INFO[11-03|14:41:17] Stopping event relay                     module=rpc/server fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath.func1
+INFO[11-03|14:41:17] Process exited                           module=run/manager name=group fn=github.com/docker/infrakit/pkg/run/manager.(*Manager).Terminate
+INFO[11-03|14:41:17] Removed PID file                         module=run path=/Users/me/.infrakit/plugins/instance-vagrant.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:41:17] Removed discover file                    module=run path=/Users/me/.infrakit/plugins/instance-vagrant fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:41:17] Removed PID file                         module=run path=/Users/me/.infrakit/plugins/group-stateless.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:41:17] Removed discover file                    module=run path=/Users/me/.infrakit/plugins/group-stateless fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:41:17] Removed PID file                         module=run path=/Users/me/.infrakit/plugins/group.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:41:17] Removed PID file                         module=run path=/Users/me/.infrakit/plugins/flavor-swarm.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:41:17] Removed discover file                    module=run path=/Users/me/.infrakit/plugins/flavor-swarm fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:41:17] Snapshot updater stopped                 module=run/group fn=github.com/docker/infrakit/pkg/run/v0/group.Run.func3
+INFO[11-03|14:41:17] Snapshot updater stopped                 module=flavor/swarm fn=github.com/docker/infrakit/pkg/plugin/flavor/swarm.(*baseFlavor).runMetadataSnapshot.func1
+INFO[11-03|14:41:17] Removed discover file                    module=run path=/Users/me/.infrakit/plugins/group fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-03|14:41:17] Snapshot updater stopped                 module=flavor/swarm fn=github.com/docker/infrakit/pkg/plugin/flavor/swarm.(*baseFlavor).runMetadataSnapshot.func1
 ```

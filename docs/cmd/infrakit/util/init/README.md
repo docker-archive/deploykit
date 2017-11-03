@@ -29,7 +29,7 @@ of `init` works as follows:
   2. The CLI fetches this and evaluates it as a template.
     + The engine uses the `INFRAKIT_VARS_TEMPLATE` env to determine a variables JSON to
     initialize some variables.  These can be overridden by appropriately named `--var`
-    and `--metdata` flags in the command line.
+    and `--metadata` flags in the command line.
     + The engine uses the `--var` to set parameters in memory for the scope of *this*
     evaluation.  These are ephemeral and can override the defaults set in above.
     + The engine uses the `--metadata` to set parameters that will persist, as some
@@ -44,7 +44,7 @@ of `init` works as follows:
   renders a template.  Depending on the plugin implementation, values that are not known
   at this time may be deferred (as multipass = true -- see `swarm/flavor.go#31).
   7. The CLI renders the text blob from the `Init` field of the instance spec returned
-  by the `Prepare` method.  This will apply the same set of `--var` as varaibles.
+  by the `Prepare` method.  This will apply the same set of `--var` as variables.
   8. The CLI prints out the rendered init script
   9. If `--persist` is set, the CLI will commit the current state of the vars plugin
   (which was started in the beginning of this process).

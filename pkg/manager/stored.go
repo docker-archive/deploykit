@@ -15,7 +15,7 @@ type key struct {
 }
 
 type record struct {
-	// Handler is the actuall plugin used to process the input
+	// Handler is the actual plugin used to process the input
 	Handler plugin.Name
 
 	// Spec is a copy of the spec

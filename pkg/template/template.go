@@ -419,7 +419,7 @@ func (t *Template) Render(context interface{}) (string, error) {
 	return buff.String(), err
 }
 
-// converts a function of f(Context, ags...) to a regular template function
+// converts a function of f(Context, args...) to a regular template function
 func makeTemplateFunc(ctx Context, f interface{}) (interface{}, error) {
 
 	contextType := reflect.TypeOf((*Context)(nil)).Elem()
