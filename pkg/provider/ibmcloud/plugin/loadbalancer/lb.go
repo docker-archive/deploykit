@@ -18,9 +18,15 @@ import (
 var lbLogger = logutil.New("module", "ibmcloud/loadbalancer")
 
 const (
-	debugV           = logutil.V(100)
+	debugV = logutil.V(100)
+
+	// Number and delay for retries when calling a IBM Cloud LBaaS API
+	// and it returns an UPDATE_PENDING response.
 	updateRetryCount = 30
 	updateRetryTime  = 100 * time.Millisecond
+
+	// Hardcoded IBM Cloud endpoint
+	softLayerEndpointURL = "https://api.softlayer.com/rest/v3.1"
 )
 
 // Result string
@@ -47,24 +53,6 @@ type ibmcloudlb struct {
 
 	// Softlayer API Key
 	softlayerAPIKey string
-
-	// IAM endpoint
-	iamEndpoint string
-
-	// Softlayer end point URL
-	softLayerEndpointURL string
-
-	// SoftlayerXMLRPCEndpoint endpoint
-	softlayerXMLRPCEndpoint string
-
-	// retry count for API calls
-	// Unexposed in the schema at this point as they are used only during session creation for a few calls
-	// When sdk implements it we an expose them for expected behaviour
-	// https://github.com/softlayer/softlayer-go/issues/41
-	retryCount int
-
-	// Constant retry delay for API calls
-	retryDelay time.Duration
 
 	// Session
 	session *session.Session
@@ -95,17 +83,8 @@ func NewIBMCloudLBPlugin(username, apikey, lbName, lbUUID string) (loadbalancer.
 		uuid:              lbUUID,
 	}
 
-	// Hardcoded IBM Cloud endpoints
-	lb.iamEndpoint = "https://iam.ng.bluemix.net"
-	lb.softlayerXMLRPCEndpoint = "https://api.softlayer.com/xmlrpc/v3"
-	lb.softLayerEndpointURL = "https://api.softlayer.com/rest/v3.1"
-
-	// Hardcoded retry logic for the IBM Cloud calls
-	lb.retryCount = 10
-	lb.retryDelay = 20 * time.Millisecond
-
 	// Create the session object and get the services object once
-	lb.session = session.New(lb.softlayerUsername, lb.softlayerAPIKey, lb.softLayerEndpointURL)
+	lb.session = session.New(lb.softlayerUsername, lb.softlayerAPIKey, softLayerEndpointURL)
 	lb.lbService = services.GetNetworkLBaaSLoadBalancerService(lb.session)
 	lb.certService = services.GetSecurityCertificateService(lb.session)
 	lb.lbListenerService = services.GetNetworkLBaaSListenerService(lb.session)
@@ -247,6 +226,7 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 		}
 		// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 		if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
+			lbLogger.Info("Publish", "name", l.name, "V", debugV, "Update pending")
 			time.Sleep(updateRetryTime)
 		} else {
 			return nil, err
@@ -284,6 +264,7 @@ func (l *ibmcloudlb) Unpublish(extPort int) (loadbalancer.Result, error) {
 				}
 				// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 				if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
+					lbLogger.Info("Unpublish", "name", l.name, "V", debugV, "Update pending")
 					time.Sleep(updateRetryTime)
 				} else {
 					return nil, err
@@ -327,7 +308,19 @@ func (l *ibmcloudlb) ConfigureHealthCheck(hc loadbalancer.HealthCheck) (loadbala
 	return lbResult("healthcheck"), nil
 }
 
-// RegisterBackend registers instances identified by the IDs to the LB's backend pool
+// Note: The Backend API calls normally get instance IDs for the backends. Since the
+// IBM Cloud LBaaS APIs do not have a way to map instance IDs to IPs, we use a
+// SourceKeySelector in the ingress yaml:
+//
+// SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ $x.ipv4_address_private \}\}
+//
+// to have InfraKit give us the private ip address for the instance, and also use the ip
+// address to calculate what instances need to be added or removed.
+
+// RegisterBackend registers instances identified by the IDs to the LB's backend pool.
+// The instance.IDs passed into this code are IPv4 addresses used by the IBM Cloud LBaaS
+// APIs. This does require a SourceKeySelector in the ingress yaml file so the controller
+// uses the private IP address.
 func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
 	lbLogger.Debug("RegisterBackends", "name", l.name, "ids", ids, "V", debugV)
 	l.lock.Lock()
@@ -377,6 +370,7 @@ func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, e
 			}
 			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
+				lbLogger.Info("RegisterBackends", "name", l.name, "V", debugV, "Update pending")
 				time.Sleep(updateRetryTime)
 			} else {
 				return nil, err
@@ -388,7 +382,10 @@ func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, e
 	return lbResult("register"), nil
 }
 
-// DeregisterBackend removes the specified instances from the backend pool
+// DeregisterBackend removes the specified instances from the backend pool.
+// The instance.IDs passed into this code are IPv4 addresses used by the IBM Cloud LBaaS
+// APIs. This does require a SourceKeySelector in the ingress yaml file so the controller
+// uses the private IP address.
 func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
 	lbLogger.Debug("DeregisterBackends", "name", l.name, "ids", ids, "V", debugV)
 	l.lock.Lock()
@@ -430,6 +427,7 @@ func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result,
 			}
 			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
+				lbLogger.Info("DeregisterBackends", "name", l.name, "V", debugV, "Update pending")
 				time.Sleep(updateRetryTime)
 			} else {
 				return nil, err
@@ -442,6 +440,9 @@ func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result,
 }
 
 // Backends returns a list of backends
+// The instance.IDs passed into this code are IPv4 addresses used by the IBM Cloud LBaaS
+// APIs. This does require a SourceKeySelector in the ingress yaml file so the controller
+// uses the private IP address.
 func (l *ibmcloudlb) Backends() ([]instance.ID, error) {
 	lbLogger.Debug("Backends", "name", l.name, "V", debugV)
 	l.lock.Lock()

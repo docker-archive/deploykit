@@ -54,7 +54,7 @@ type LB struct {
 	// LBName is the name of the IBM Cloud loadbalancer
 	LBName string
 
-	// LBUUID is the UUID of the IBM cloud loadbalancer
+	// LBUUID is the UUID of the IBM Cloud loadbalancer
 	LBUUID string
 }
 
@@ -93,7 +93,7 @@ var DefaultOptions = Options{
 	LBs: getLBsFromEnv(),
 }
 
-// Run runs the plugin, blocking the current thread.  Error is returned immediately
+// Run runs the plugin, blocking the current thread. Error is returned immediately
 // if the plugin cannot be started.
 func Run(scope scope.Scope, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
@@ -102,10 +102,12 @@ func Run(scope scope.Scope, name plugin.Name,
 	options := Options{}
 	err = config.Decode(&options)
 	if err != nil {
+		log.Error("Error decoding options", "err", err)
 		return
 	}
 	if options.Username == "" || options.APIKey == "" {
 		err = fmt.Errorf("IBM Cloud username and APIKey required")
+		log.Error("Configuration error", "err", err)
 		return
 	}
 
@@ -119,6 +121,7 @@ func Run(scope scope.Scope, name plugin.Name,
 		var lbPlugin loadbalancer.L4
 		lbPlugin, err = ibmcloud_loadbalancer.NewIBMCloudLBPlugin(options.Username, options.APIKey, lb.LBName, lb.LBUUID)
 		if err != nil {
+			log.Error("Error creating new IBM Cloud LB", "err", err)
 			return
 		}
 		l4Map[lb.LBName] = lbPlugin
