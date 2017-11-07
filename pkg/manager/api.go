@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -40,15 +41,7 @@ type Leadership interface {
 // Manager is the interface for interacting locally or remotely with the manager
 type Manager interface {
 	Leadership
-
-	// Enforce enforces infrastructure state to match that of the specs
-	Enforce(specs []types.Spec) error
-
-	// Inspect returns the current state of the infrastructure
-	Inspect() ([]types.Object, error)
-
-	// Terminate destroys all resources associated with the specs
-	Terminate(specs []types.Spec) error
+	stack.Interface
 }
 
 // Backend is the admin / server interface

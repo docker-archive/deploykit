@@ -69,7 +69,7 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 			// We first update the user's desired state first
 			if !pretend {
 				if updateErr := m.updateConfig(grp); updateErr != nil {
-					log.Warn("Error updating", "err", updateErr)
+					log.Error("Error updating", "err", updateErr)
 					txnErr = updateErr
 					txnResp = "Cannot update spec. Abort"
 					return txnErr

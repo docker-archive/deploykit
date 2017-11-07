@@ -7,8 +7,8 @@ import (
 	"strings"
 	"text/template"
 
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -36,7 +36,7 @@ func parseSpec(flavorProperties *types.Any) (spec, error) {
 	return s, err
 }
 
-func (z zkFlavor) Validate(flavorProperties *types.Any, allocation group_types.AllocationMethod) error {
+func (z zkFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 	properties, err := parseSpec(flavorProperties)
 	if err != nil {
 		return err
@@ -159,8 +159,8 @@ func (z zkFlavor) Drain(flavorProperties *types.Any, inst instance.Description) 
 
 func (z zkFlavor) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
-	allocation group_types.AllocationMethod,
-	index group_types.Index) (instance.Spec, error) {
+	allocation group.AllocationMethod,
+	index group.Index) (instance.Spec, error) {
 
 	properties, err := parseSpec(flavorProperties)
 	if err != nil {

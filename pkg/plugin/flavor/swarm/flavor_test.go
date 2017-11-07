@@ -330,3 +330,38 @@ func TestTemplateFunctions(t *testing.T) {
 
 	close(managerStop)
 }
+
+func TestInitScriptMultipass(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	managerStop := make(chan struct{})
+
+	client := mock_client.NewMockAPIClientCloser(ctrl)
+
+	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
+		return client, nil
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
+
+	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarm.Swarm{}, nil).AnyTimes()
+	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()
+	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(swarm.Node{}, nil, nil).AnyTimes()
+	client.EXPECT().Close().AnyTimes()
+
+	// The `InitScriptTemplateURL` vars should not resolve since multiple is enabled
+	flavorSpec := types.AnyString(`
+	{
+	  "Attachments": {},
+	  "InitScriptTemplateURL": "str://init {{ var \"some-var\" }}"
+	}
+	`)
+
+	details, err := flavorImpl.Prepare(flavorSpec,
+		instance.Spec{},
+		group.AllocationMethod{},
+		group.Index{Group: group.ID("group"), Sequence: 100})
+	require.NoError(t, err)
+	require.Equal(t, "init {{ var `some-var` }}", details.Init)
+
+	close(managerStop)
+}

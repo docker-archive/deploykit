@@ -9,12 +9,7 @@ import (
 
 // Instance implements lookup for Instance plugin
 func (f fullScope) Instance(name string) (instance.Plugin, error) {
-	pn := plugin.Name(name)
-	endpoint, err := f().Find(pn)
-	if err != nil {
-		return nil, err
-	}
-	return rpc.NewClient(pn, endpoint.Address)
+	return DefaultInstanceResolver(f)(name)
 }
 
 // DefaultInstanceResolver returns a resolver
