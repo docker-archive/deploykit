@@ -1,0 +1,4 @@
+.proxy*.env
+*.log
+cover
+.dockerfile*

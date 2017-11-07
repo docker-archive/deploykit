@@ -28,11 +28,11 @@ echo group > $leaderfile
 
 export INFRAKIT_HOME=$INFRAKIT_HOME
 
-infrakit plugin start --config-url file:///$PWD/examples/flavor/swarm/plugins.json --exec os \
+infrakit plugin start --config-url file:///$PWD/plugin/flavor/swarm/plugins.json \
 	 manager \
-	 group-stateless \
+	 group \
 	 flavor-swarm \
-	 instance-vagrant
+	 instance-vagrant &
 
 sleep 5
 

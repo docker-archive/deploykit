@@ -48,7 +48,7 @@ func (c *Context) start() {
 		c.poll = 1 * time.Minute
 	}
 
-	log.Info("Staring", "context", c, "poll", c.poll)
+	log.Info("Starting", "context", c, "poll", c.poll)
 	update := make(chan func(map[string]interface{}))
 	tick := time.Tick(c.poll)
 
@@ -58,6 +58,14 @@ func (c *Context) start() {
 	go func() {
 
 		for {
+			select {
+			case <-tick:
+			case <-c.stop:
+				log.Info("Stopping aws metadata")
+				close(update)
+				return
+			}
+
 			log.Debug("Running template to export metadata", "url", c.templateURL, "V", debugV)
 
 			t, err := template.NewTemplate(c.templateURL, c.templateOptions)
@@ -66,8 +74,8 @@ func (c *Context) start() {
 				update <- func(view map[string]interface{}) {
 					view["err"] = err.Error()
 				}
+				continue
 			}
-
 			// Note the actual exporting of the values is done via the 'export' function
 			// that are invoked as part of processing the template.
 			_, err = t.Render(c)
@@ -80,14 +88,6 @@ func (c *Context) start() {
 				update <- func(view map[string]interface{}) {
 					delete(view, "err")
 				}
-			}
-
-			select {
-			case <-tick:
-			case <-c.stop:
-				log.Info("Stopping aws metadata")
-				close(update)
-				return
 			}
 		}
 

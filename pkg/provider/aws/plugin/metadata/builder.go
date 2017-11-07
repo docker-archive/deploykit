@@ -59,7 +59,7 @@ func NewPlugin(options Options, stop <-chan struct{}) (*Context, error) {
 		providers = append(providers, &staticCreds)
 	}
 
-	if options.Region == "" {
+	if options.Region == "" || options.Region == "auto" {
 		log.Warn("region not specified, attempting to discover from EC2 instance metadata")
 		region, err := instance.GetRegion()
 		if err != nil {

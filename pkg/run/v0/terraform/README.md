@@ -58,7 +58,7 @@ infrakit plugin start terraform:terraform=inproc
 ```
 
 where the launch system will look for `Key` of `terraform`, and use the `inproc` launcher which uses the
-embeded `terraform` Kind.  That then will look for the `Options` field and provide that to the code
+embedded `terraform` Kind.  That then will look for the `Options` field and provide that to the code
 that is in `terraform.go`.
 
 Once you have the new fields defined and updated your `plugins.json` file to reflect these new changes,

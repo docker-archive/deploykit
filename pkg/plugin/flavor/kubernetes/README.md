@@ -87,9 +87,9 @@ wget -qO- https://get.docker.com/ | sh
 ### A Word on Security
 
 Since Kubeadm use Token to authorize nodes, initializing
-the Kubernetes requires:
+Kubernetes requires:
 
-Docken socke API server exposes the remote API, but it is protected by TLS. Infrakit intends to make access to kubernetes manager from the side, but we can not send commands such as `get nodes` yet.
+Docker engine exposes its remote API, but it is protected by TLS. Infrakit intends to make access to kubernetes manager from the side, but we can not send commands such as `get nodes` yet.
 For installation, we use [kubeadm](https://kubernetes.io/docs/admin/kubeadm/) and build a secure cluster.
 
 
@@ -102,25 +102,26 @@ Building the binaries - do this from the top level project directory:
 make binaries
 ```
 
-Start required plugins.  We use the `infrakit plugin start` utility and a `plugins.json` to start up all the plugins,
-along with the InfraKit manager:
+Start required plugins.
+We can use the plugin utility to start up all the plugins along with the InfraKit manager:
 
 ```shell
-infrakit-group-default
-infrakit-instance-vagrant
-infrakit-flavor-kubernetes
+export INFRAKIT_LEADER_FILE=$HOME/.infrakit/leader
+echo "manager1" > $INFRAKIT_LEADER_FILE
+export PATH=$PWD/build:$PATH
+infrakit plugin start manager group vagrant kubernetes &
 ```
 
 Now start up the cluster comprised of a manager and a worker group.  In this case, see `groups-master.json` where we will create a manager group of one node and in `group-worker.json` create a worker group of 3 nodes. The topology in this is a single ensemble of infrakit running on your local machine that manages 4 vagrant vms running Kubernetes.  
 At Kubernetes flavor, you should run manager group first.
 Worker group will try to connect to manager before start.
-And as this flavor based on kubeadm, currently it support only one manager node.
+And as this flavor is based on kubeadm, it currently supports only one manager node.
 
 ```shell
 infrakit group commit groups-manager.json
 ```
-Wait for manager comes up.
-As it need to install docker and kubeadm, it take a little time...
+Wait for manager to come up.
+As it needs to install docker and kubeadm, it takes a little time...
 
 ```shell
 infrakit group commit groups-worker.json

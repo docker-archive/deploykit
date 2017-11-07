@@ -1,0 +1,3 @@
+.oneview*.env
+.proxy*.env
+.dockerfile*

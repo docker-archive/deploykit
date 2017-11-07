@@ -1,0 +1,29 @@
+#
+# ci-cd using drone
+# we use secrets project for variables, see http://readme.drone.io/build/secrets.html
+#
+build:
+  image: golang:1.6
+  environment:
+    - HTTP_PROXY=$$HTTP_PROXY
+    - HTTPS_PROXY=$$HTTPS_PROXY
+    - http_proxy=$$http_proxy
+    - https_proxy=$$https_proxy
+    - no_proxy=$$no_proxy
+    - NO_PROXY=$$NO_PROXY
+  commands:
+    - go get github.com/golang/lint/golint
+    - go get github.com/mattn/goveralls
+    - go get golang.org/x/tools/cover
+    - go get github.com/tools/godep
+    - go get github.com/aktau/github-release
+    - make test
+    - make build
+# notify:
+#   flowdock:
+#     source: DroneOneView
+#     token: {{FLOWDOCK_TOKEN}}
+#     tags: oneview-golang
+#     on_started: true
+#     on_success: true
+#     on_failure: true
