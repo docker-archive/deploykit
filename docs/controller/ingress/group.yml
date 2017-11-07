@@ -1,0 +1,30 @@
+#
+#  A group of workers
+#
+#  Start up -- plugin start should include manager, vanilla, simulator, and group
+#  Then commit
+#
+#  infrakit group controller commit -y docs/controller/enrollment/group.yml
+#
+kind: group
+metadata:
+    name: workers
+properties:
+    Allocation:
+      Size: 5
+    Flavor:
+      Plugin: vanilla
+      Properties:
+        Attachments:
+          - ID: attachid
+            Type: attachtype
+        Init:
+          - docker pull nginx:alpine
+          - docker run -d -p 80:80 nginx-alpine
+        Tags:
+          project: infrakit
+          tier: web
+    Instance:
+      Plugin: simulator/compute
+      Properties:
+        Note: custom field

@@ -99,7 +99,7 @@ func (c *managed) defaultBehaviors(spec types.Spec) {
 
 func (c *managed) init(in types.Spec) (err error) {
 	if c.process != nil {
-		return nil // no op
+		panic("this is not allowed")
 	}
 
 	c.spec = in
@@ -114,6 +114,7 @@ func (c *managed) init(in types.Spec) (err error) {
 	// work along with the work signal.
 	stateMachineSpec.SetAction(syncing, sync,
 		func(instance fsm.Instance) error {
+
 			log.Debug("syncing routes and backends")
 
 			err = c.syncRoutesL4()
@@ -180,6 +181,7 @@ func (c *managed) init(in types.Spec) (err error) {
 	// add the poller
 	c.poller = controller.Poll(
 		func() bool {
+
 			if mustTrue(c.IsLeader()) {
 				c.stateMachine.Signal(lead)
 				return true
@@ -188,7 +190,9 @@ func (c *managed) init(in types.Spec) (err error) {
 			return false
 		},
 		func() (err error) {
+
 			c.stateMachine.Signal(start)
+
 			return c.stateMachine.Signal(sync)
 		},
 		c.ticker,

@@ -1,6 +1,7 @@
 package scope
 
 import (
+	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -9,6 +10,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -38,8 +40,14 @@ type Scope interface {
 	// Plugins returns the plugin lookup
 	Plugins() discovery.Plugins
 
+	// Stack returns the stack that entails this scope
+	Stack() (stack.Interface, error)
+
 	// Group is for looking up an group plugin
 	Group(n string) (group.Plugin, error)
+
+	// Controller returns the controller by name
+	Controller(n string) (controller.Controller, error)
 
 	// Instance is for looking up an instance plugin
 	Instance(n string) (instance.Plugin, error)
@@ -73,6 +81,11 @@ type fullScope func() discovery.Plugins
 // Plugins implements plugin lookup
 func (f fullScope) Plugins() discovery.Plugins {
 	return f()
+}
+
+// Stack returns the stack
+func (f fullScope) Stack() (stack.Interface, error) {
+	return nil, nil
 }
 
 // TemplateEngine implmements factory for creating template engine

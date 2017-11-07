@@ -67,6 +67,7 @@ func NewManager(options Options) Backend {
 		// "base class" is the stateless backend group plugin
 		Plugin: group_plugin.LazyConnect(
 			func() (group.Plugin, error) {
+
 				endpoint, err := options.Plugins().Find(options.Group)
 				if err != nil {
 					return nil, err
@@ -158,29 +159,6 @@ func (m *manager) LeaderLocation() (*url.URL, error) {
 	}
 
 	return m.Options.LeaderStore.GetLocation()
-}
-
-// Enforce enforces infrastructure state to match that of the specs
-func (m *manager) Enforce(specs []types.Spec) error {
-
-	buff, err := types.AnyValueMust(specs).MarshalYAML()
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(string(buff))
-
-	return nil
-}
-
-// Inspect returns the current state of the infrastructure
-func (m *manager) Inspect() ([]types.Object, error) {
-	return nil, nil
-}
-
-// Terminate destroys all resources associated with the specs
-func (m *manager) Terminate(specs []types.Spec) error {
-	return fmt.Errorf("not implemented")
 }
 
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.
@@ -409,6 +387,7 @@ func (m *manager) loadMetadata() (err error) {
 		{Path: types.Dot, Value: any},
 	})
 	if e != nil {
+		log.Error("trying to update metadata", "err", e)
 		err = e
 		return
 	}
