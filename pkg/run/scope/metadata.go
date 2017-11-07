@@ -17,7 +17,7 @@ import (
 
 // Metadata implements resolution of path to metadata
 func (f fullScope) Metadata(path string) (*MetadataCall, error) {
-	return metadataPlugin(f, types.PathFromString(path))
+	return DefaultMetadataResolver(f)(path)
 }
 
 // DefaultMetadataResolver returns a resolver
