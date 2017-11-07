@@ -9,15 +9,23 @@ An InfraKit instance plugin is provided, which creates Amazon EC2 instances.
 ### Building and running
 
 To build the AWS Instance plugin, run `make binaries`.  The plugin binary will be located at
-`./build/infrakit-instance-aws`.
+`./build/infrakit plugin start aws --log 5`.
 
 At a minimum, the plugin requires the AWS region to use.  However, this can be inferred from instance metadata when the
 plugin is running within EC2.  In other cases, specify the `--region` argument:
 ```console
-$ build/infrakit-instance-aws --region us-west-2
-INFO[0000] Starting plugin
-INFO[0000] Listening on: unix:///run/infrakit/plugins/instance-vagrant.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-vagrant.sock err= <nil>
+$ INFRAKIT_AWS_REGION=us-west-2 build/infrakit plugin start aws --log 5
+INFO[11-06|16:56:32] config                                   module=cli/plugin url= fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:56:32] Launching                                module=cli/plugin kind=aws name=aws fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:56:32] Starting plugin                          module=core/launch executor=inproc key=aws name=aws exec=inproc fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-06|16:56:32] Starting                                 module=aws/metadata context="&{update:<nil> poll:60000000000 templateURL: templateOptions:{DelimLeft: DelimRight: CustomizeFetch:<nil> Stderr:<nil> MultiPass:false CacheDir:} stop:0xc42021c180 stackName: clients:{Cfn:0xc42000e8f0 Ec2:0xc42000e900 Asg:0xc42000e910} impl:<nil>}" poll=1m0s fn=github.com/docker/infrakit/pkg/provider/aws/plugin/metadata.(*Context).start
+INFO[11-06|16:56:32] Object is an event producer              module=rpc/server object="&{plugin:<nil> typedPlugins:map[ec2-instance:0xc42053a4c0]}" discover=/Users/infrakit/.infrakit/plugins/aws fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[0000] Start monitoring instances 0xc42021cb40
+INFO[11-06|16:56:32] Listening                                module=rpc/server discover=/Users/infrakit/.infrakit/plugins/aws fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-06|16:56:32] Waiting for startup                      module=core/launch key=aws name=aws config="{\n\"Kind\": \"aws\",\n\"Options\": {\n\"Namespace\": {},\n\"ELBNames\": [\n\"\"\n],\n\"Region\": \"ca-central-1\",\n\"AccessKeyID\": \"\",\n\"SecretAccessKey\": \"\",\n\"SessionToken\": \"\",\n\"Retries\": 0,\n\"Debug\": false,\n\"Template\": \"\",\n\"TemplateOptions\": {\n\"DelimLeft\": \"\",\n\"DelimRight\": \"\",\n\"MultiPass\": false,\n\"CacheDir\": \"\"\n},\n\"StackName\": \"\",\n\"PollInterval\": \"1m0s\"\n}\n}" as=aws fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-06|16:56:32] Done waiting on plugin starts            module=cli/plugin fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:56:32] PID file created                         module=run path=/Users/infrakit/.infrakit/plugins/aws.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-06|16:56:32] Server started                           module=run discovery=/Users/infrakit/.infrakit/plugins/aws fn=github.com/docker/infrakit/pkg/run.run.func1
 ```
 
 ### Example
@@ -25,20 +33,29 @@ INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/instance-vagrant.
 To continue with an example, we will use the [default](https://github.com/docker/infrakit/tree/master/cmd/group) Group
 plugin:
 ```console
-$ build/infrakit-group-default
-INFO[0000] Starting discovery
-INFO[0000] Starting plugin
-INFO[0000] Starting
-INFO[0000] Listening on: unix:///run/infrakit/plugins/group.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/group.sock err= <nil>
+$ build/infrakit plugin start group
+INFO[11-06|16:58:10] config                                   module=cli/plugin url= fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:58:10] Launching                                module=cli/plugin kind=group name=group-stateless fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:58:10] Starting plugin                          module=core/launch executor=inproc key=group name=group-stateless exec=inproc fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-06|16:58:10] Object is an event producer              module=rpc/server object=&{keyed:0xc4201862f8} discover=/Users/infrakit/.infrakit/plugins/group-stateless fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-06|16:58:10] Listening                                module=rpc/server discover=/Users/infrakit/.infrakit/plugins/group-stateless fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-06|16:58:10] Waiting for startup                      module=core/launch key=group name=group-stateless config="{\n\"Kind\": \"group\",\n\"Options\": {\n\"PollInterval\": \"10s\",\n\"MaxParallelNum\": 0,\n\"PollIntervalGroupSpec\": \"10s\",\n\"PollIntervalGroupDetail\": \"10s\"\n}\n}" as=group-stateless fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-06|16:58:10] Done waiting on plugin starts            module=cli/plugin fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:58:10] PID file created                         module=run path=/Users/infrakit/.infrakit/plugins/group-stateless.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-06|16:58:10] Server started                           module=run discovery=/Users/infrakit/.infrakit/plugins/group-stateless fn=github.com/docker/infrakit/pkg/run.run.func1
 ```
 
 and the [Vanilla](https://github.com/docker/infrakit/tree/master/pkg/example/flavor/vanilla) Flavor plugin:.
 ```console
-$ build/infrakit-flavor-vanilla
-INFO[0000] Starting plugin
-INFO[0000] Listening on: unix:///run/infrakit/plugins/flavor-vanilla.sock
-INFO[0000] listener protocol= unix addr= /run/infrakit/plugins/flavor-vanilla.sock err= <nil>
+$ build/infrakit plugin start vanilla
+INFO[11-06|16:59:01] config                                   module=cli/plugin url= fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:59:01] Launching                                module=cli/plugin kind=vanilla name=vanilla fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:59:01] Starting plugin                          module=core/launch executor=inproc key=vanilla name=vanilla exec=inproc fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-06|16:59:01] Listening                                module=rpc/server discover=/Users/infrakit/.infrakit/plugins/vanilla fn=github.com/docker/infrakit/pkg/rpc/server.startAtPath
+INFO[11-06|16:59:01] Waiting for startup                      module=core/launch key=vanilla name=vanilla config="{\n\"Kind\": \"vanilla\",\n\"Options\": {\n\"DelimLeft\": \"\",\n\"DelimRight\": \"\",\n\"MultiPass\": true,\n\"CacheDir\": \"\"\n}\n}" as=vanilla fn=github.com/docker/infrakit/pkg/launch.(*Monitor).Start.func1
+INFO[11-06|16:59:01] Done waiting on plugin starts            module=cli/plugin fn=github.com/docker/infrakit/cmd/infrakit/plugin.Command.func2
+INFO[11-06|16:59:01] PID file created                         module=run path=/Users/infrakit/.infrakit/plugins/vanilla.pid fn=github.com/docker/infrakit/pkg/run.run.func1
+INFO[11-06|16:59:01] Server started                           module=run discovery=/Users/infrakit/.infrakit/plugins/vanilla fn=github.com/docker/infrakit/pkg/run.run.func1
 ```
 
 We will use a basic configuration that creates a single instance:
@@ -51,11 +68,11 @@ $ cat << EOF > aws-vanilla.json
       "Size": 1
     },
     "Instance": {
-      "Plugin": "instance-aws/ec2-instance",
+      "Plugin": "aws/ec2-instance",
       "Properties": {
         "RunInstancesInput": {
           "ImageId": "ami-4926fd29",
-          "KeyName": "bill-laptop",
+          "KeyName": "my-laptop",
           "Placement": {
             "AvailabilityZone": "us-west-2a"
           },
@@ -67,7 +84,7 @@ $ cat << EOF > aws-vanilla.json
       }
     },
     "Flavor": {
-      "Plugin": "flavor-vanilla",
+      "Plugin": "vanilla",
       "Properties": {
         "Init": [
           "sh -c \"echo 'Hello, World!' > /hello\""
@@ -91,7 +108,7 @@ The instance type is set to `m1.small` by default. Note that you cannot use HVM 
 
 Finally, instruct the Group plugin to start watching the group:
 ```console
-$ build/infrakit group commit aws-vanilla.json
+$ build/infrakit group-stateless commit aws-vanilla.json
 Committed aws-example: Managing 1 instances
 ```
 
@@ -104,7 +121,7 @@ INFO[1219] Created instance i-ba0412a2 with tags map[infrakit.config_sha:dUBtWGm
 
 Additionally, the CLI will report the newly-created instance:
 ```console
-$ build/infrakit group inspect aws-example
+$ build/infrakit group-stateless inspect aws-example
 ID                             	LOGICAL                        	TAGS
 i-ba0412a2                     	172.31.41.13                   	Name=infrakit-example,infrakit.config_sha=dUBtWGmkptbGg29ecBgv1VJYzys=,infrakit.group=aws-example
 ```
