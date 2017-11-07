@@ -54,6 +54,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/maas"
 	_ "github.com/docker/infrakit/pkg/run/v0/manager"
 	_ "github.com/docker/infrakit/pkg/run/v0/oneview"
+	_ "github.com/docker/infrakit/pkg/run/v0/openstack"
 	_ "github.com/docker/infrakit/pkg/run/v0/oracle"
 	_ "github.com/docker/infrakit/pkg/run/v0/packet"
 	_ "github.com/docker/infrakit/pkg/run/v0/rackhd"
