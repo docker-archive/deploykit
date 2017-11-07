@@ -14,8 +14,8 @@ E2E_TESTS?=true
 #Source file target
 SRCS  := $(shell find . -type f -name '*.go')
 
-# Set the go build tags here.  By default we disable building of libvirt
-GO_BUILD_TAGS?=nolibvirt
+# Set the go build tags here.  By default we disable building of libvirt and ucs.  Must be space-separated.
+GO_BUILD_TAGS?='nolibvirt noucs'
 
 # Allow turning off function inlining and variable registerization
 ifeq (${DISABLE_OPTIMIZATION},true)
