@@ -9,12 +9,7 @@ import (
 
 // Flavor implements lookup for Flavor plugins
 func (f fullScope) Flavor(name string) (flavor.Plugin, error) {
-	pn := plugin.Name(name)
-	endpoint, err := f().Find(pn)
-	if err != nil {
-		return nil, err
-	}
-	return rpc.NewClient(pn, endpoint.Address)
+	return DefaultFlavorResolver(f)(name)
 }
 
 // DefaultFlavorResolver returns a resolver

@@ -9,12 +9,7 @@ import (
 
 // L4 implements the lookup for L4 loadbalancer
 func (f fullScope) L4(name string) (loadbalancer.L4, error) {
-	pn := plugin.Name(name)
-	endpoint, err := f().Find(pn)
-	if err != nil {
-		return nil, err
-	}
-	return rpc.NewClient(pn, endpoint.Address)
+	return DefaultL4Resolver(f)(name)
 }
 
 // DefaultL4Resolver returns a resolver

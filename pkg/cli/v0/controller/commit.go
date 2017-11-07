@@ -27,7 +27,7 @@ func Commit(name string, services *cli.Services) *cobra.Command {
 			os.Exit(1)
 		}
 
-		c, err := Load(services.Scope.Plugins(), name)
+		c, err := services.Scope.Controller(name)
 		if err != nil {
 			return nil
 		}
