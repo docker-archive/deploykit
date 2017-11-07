@@ -32,7 +32,12 @@
 #
 # FRONTEND PORT    PROTOCOL   BACKEND PORT  CERT
 # 80               http       8080  <-- from the static route
-
+#
+# Note that there are two loadbalancers configured in this example.  When you scale up / down the
+# shared group/workers, the backends of simulator/lb1 and simulator/lb2 should have the same backend nodes,
+# but the routes are different -- simulator/lb1 routes are driven by Docker swarm services, while the routes
+# for simulator/lb2 is static.
+#
 kind: ingress
 metadata:
   name: test.com
@@ -47,6 +52,10 @@ options:
 
 # properties block map to pkg/controller/ingress/types/Properties
 properties:
+  # Note that this section is missing a Vhost (so Vhost is '').  An empty Vhost entry will match all docker swarm
+  # services (since we have not defined the labeling convention for indicating the vhost of a service -- so all
+  # services match to ''.  This is in contrast to the Vhost of the next section, where we use a different vhost
+  # so that the routes for the L4 will not pick up those from Swarm services.
   - Backends:
       Groups:
         - group/workers # This is a group at socket(group), groupID(workers).
@@ -55,19 +64,20 @@ properties:
     # the default socket file name is 'simulator' and there's a default lb2 in the RPC object.
     L4Plugin: simulator/lb1
 
+    # Plus all the services in Swarm that have --publish <frontend-port>:<container_port>
+    RouteSources:
+      swarm:
+        Host: unix:///var/run/docker.sock
+  - Vhost: system
+    Backends:
+      Groups:
+        - group/workers # This is a group at socket(group), groupID(workers).
+
+    L4Plugin: simulator/lb2
+
     # Here we have a static route that is always present.
     Routes:
       - LoadBalancerPort: 80
         LoadBalancerProtocol: https
         Port: 8080
         Protocol: http
-
-    # Plus all the services in Swarm that have --publish <frontend-port>:<container_port>
-    RouteSources:
-      swarm:
-        Host: unix:///var/run/docker.sock
-    # This is the vhost corresponding to the public service endpoint.  Currently there is only
-    # one matcher in the system which matches all services in a swarm to all 'vhosts'.  Additional
-    # matchers can be implemented to take swarm service label and match services to different vhosts
-    # and therefore different loadbalancers.  Because it's match-all, it's ok to leave this field out.
-    #Vhost: test.com

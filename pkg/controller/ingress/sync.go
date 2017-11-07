@@ -30,13 +30,13 @@ func (c *managed) syncRoutesL4() error {
 		targets[elb] = append(targets[elb], routesByVhost[vhost]...)
 	}
 
-	log.Debug("expose l4", "targets", len(targets), "targets", targets)
+	log.Debug("expose l4", "targets", len(targets), "targets", targets, "meta", c.spec.Metadata)
 
 	for elb, routes := range targets {
 		log.Info("Configuring", "name", elb.Name(), "routes", routes)
 		err := configureL4(elb, routes, c.options)
 		if err != nil {
-			log.Warn("Cannot configure L4", "name", elb.Name(), "routes", routes)
+			log.Warn("Cannot configure L4", "name", elb.Name(), "routes", routes, "meta", c.spec.Metadata)
 			continue
 		}
 	}
@@ -62,7 +62,7 @@ func (c *managed) getSourceKeySelectorTemplate() (*template.Template, error) {
 
 func (c *managed) syncBackends() error {
 	groupsByVhost, err := c.groups()
-	log.Debug("groups by vhost", "groups", groupsByVhost)
+	log.Debug("Groups by vhost", "groups", groupsByVhost, "meta", c.spec.Metadata, "fsm", c.stateMachine.ID())
 
 	if err != nil {
 		return err
@@ -89,14 +89,14 @@ func (c *managed) syncBackends() error {
 		// we have backends and loadbalancers
 		registered := mapset.NewSet()
 		if backends, err := l4.Backends(); err != nil {
-			log.Warn("error getting backends", "err", err)
+			log.Warn("error getting backends", "err", err, "meta", c.spec.Metadata)
 			continue
 		} else {
 			for _, b := range backends {
 				registered.Add(b)
 			}
 		}
-		log.Info("Registered backends", "backends", registered)
+		log.Info("Registered backends", "backends", registered, "meta", c.spec.Metadata)
 
 		// all the nodes from all the groups and nodes
 		nodes := mapset.NewSet()
@@ -106,7 +106,7 @@ func (c *managed) syncBackends() error {
 			nodes.Add(id)
 		}
 
-		log.Debug("backend groups", "groups", groups)
+		log.Debug("backend groups", "groups", groups, "meta", c.spec.Metadata)
 		for _, g := range groups {
 
 			gid := g.ID()
@@ -117,11 +117,11 @@ func (c *managed) syncBackends() error {
 
 			desc, err := groupPlugin.DescribeGroup(gid)
 			if err != nil {
-				log.Warn("error describing group", "id", gid, "err", err)
+				log.Warn("error describing group", "id", gid, "err", err, "meta", c.spec.Metadata)
 				continue
 			}
 
-			log.Debug("found backends", "groupID", gid, "desc", desc, "vhost", vhost, "L4", l4.Name())
+			log.Debug("found backends", "groupID", gid, "desc", desc, "vhost", vhost, "L4", l4.Name(), "meta", c.spec.Metadata)
 
 			for _, inst := range desc.Instances {
 				t, err := c.getSourceKeySelectorTemplate()
@@ -133,7 +133,7 @@ func (c *managed) syncBackends() error {
 				} else {
 					view, err := t.Render(inst)
 					if err != nil {
-						log.Error("cannot index entry", "instance.Description", inst, "err", err)
+						log.Error("cannot index entry", "instance.Description", inst, "err", err, "meta", c.spec.Metadata)
 						continue
 					}
 					nodes.Add(instance.ID(view))
@@ -149,23 +149,23 @@ func (c *managed) syncBackends() error {
 			toRemove = append(toRemove, n.(instance.ID))
 		}
 
-		log.Info("De-register backends", "instances", toRemove, "vhost", vhost, "L4", l4.Name())
+		log.Info("De-register backends", "instances", toRemove, "vhost", vhost, "L4", l4.Name(), "meta", c.spec.Metadata)
 
 		if result, err := l4.DeregisterBackends(toRemove); err != nil {
-			log.Warn("error deregistering backends", "toRemove", toRemove, "err", err)
+			log.Warn("error deregistering backends", "toRemove", toRemove, "err", err, "meta", c.spec.Metadata)
 		} else {
-			log.Info("deregistered backends", "vhost", vhost, "result", result)
+			log.Info("deregistered backends", "vhost", vhost, "result", result, "meta", c.spec.Metadata)
 		}
 
 		toAdd := []instance.ID{}
 		for n := range nodes.Difference(registered).Iter() {
 			toAdd = append(toAdd, n.(instance.ID))
 		}
-		log.Info("Register backends", "instances", toAdd, "vhost", vhost, "L4", l4.Name())
+		log.Info("Register backends", "instances", toAdd, "vhost", vhost, "L4", l4.Name(), "meta", c.spec.Metadata)
 		if result, err := l4.RegisterBackends(toAdd); err != nil {
-			log.Warn("error registering backends", "toAdd", toAdd, "err", err)
+			log.Warn("error registering backends", "toAdd", toAdd, "err", err, "meta", c.spec.Metadata)
 		} else {
-			log.Info("registered backends", "vhost", vhost, "result", result)
+			log.Info("registered backends", "vhost", vhost, "result", result, "meta", c.spec.Metadata)
 		}
 
 	}
@@ -191,20 +191,20 @@ func (c *managed) syncHealthChecks() error {
 		targets[elb] = append(targets[elb], healthChecksByVhost[vhost]...)
 	}
 
-	log.Debug("configure healthchecks", "targets", targets)
+	log.Debug("configure healthchecks", "targets", targets, "meta", c.spec.Metadata)
 
 	for elb, healthChecks := range targets {
-		log.Info("Configuring healthcheck", "name", elb.Name())
+		log.Info("Configuring healthcheck", "name", elb.Name(), "meta", c.spec.Metadata)
 		for _, healthCheck := range healthChecks {
 			if healthCheck.BackendPort > 0 {
-				log.Info("HEALTH CHECK - Configuring the health check to ping", "port", healthCheck.BackendPort)
+				log.Info("HEALTH CHECK - Configuring the health check to ping", "port", healthCheck.BackendPort, "meta", c.spec.Metadata)
 				_, err := elb.ConfigureHealthCheck(healthCheck)
 
 				if err != nil {
 					log.Warn("err config health check", "err", err)
 					return err
 				}
-				log.Info("HEALTH CHECK CONFIGURED", "port", healthCheck.BackendPort, "config", healthCheck)
+				log.Info("HEALTH CHECK CONFIGURED", "port", healthCheck.BackendPort, "config", healthCheck, "meta", c.spec.Metadata)
 			}
 		}
 	}
