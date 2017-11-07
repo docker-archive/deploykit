@@ -9,12 +9,7 @@ import (
 
 // Group implements lookup for Group plugin
 func (f fullScope) Group(name string) (group.Plugin, error) {
-	pn := plugin.Name(name)
-	endpoint, err := f().Find(pn)
-	if err != nil {
-		return nil, err
-	}
-	return rpc.NewClient(endpoint.Address)
+	return DefaultGroupResolver(f)(name)
 }
 
 // DefaultGroupResolver returns a resolver
