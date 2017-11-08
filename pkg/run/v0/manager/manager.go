@@ -39,6 +39,9 @@ const (
 	// EnvMetadata is the metadata backend
 	EnvMetadata = "INFRAKIT_MANAGER_METADATA"
 
+	// EnvControllers is a list of comma-delimited controller names
+	EnvControllers = "INFRAKIT_MANAGER_CONTROLLERS"
+
 	// EnvMetadataUpdateInterval is the metadata backend update interval
 	// if > 0, this will allow non-leader updates of metadata to be synced
 	// to the leader. otherwise, a non-leader will not see the leader's updates
@@ -99,6 +102,7 @@ func defaultOptions() (options Options) {
 			MetadataRefreshInterval:        types.MustParseDuration(local.Getenv(EnvMetadataUpdateInterval, "5s")),
 			LeaderCommitSpecsRetries:       10,
 			LeaderCommitSpecsRetryInterval: types.MustParseDuration(local.Getenv(EnvLeaderCommitSpecsRetryInterval, "2s")),
+			Controllers:                    plugin.NamesFrom(strings.Split(local.Getenv(EnvControllers, ""), ",")),
 		},
 		Mux: &MuxConfig{
 			Listen:    local.Getenv(EnvMuxListen, ":24864"),

@@ -71,6 +71,9 @@ type Options struct {
 	// Name of the Metadata plugin. Must be pointing to Updatable
 	Metadata plugin.Name
 
+	// Controllers are the names of the controllers this manager manages
+	Controllers []plugin.Name
+
 	// Plugins for plugin lookup
 	Plugins func() discovery.Plugins `json:"-" yaml:"-"`
 

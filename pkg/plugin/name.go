@@ -6,6 +6,18 @@ import (
 	"strings"
 )
 
+// Names is a list of Names
+type Names []Name
+
+// NamesFrom returns a slice of Names from a string list
+func NamesFrom(list []string) Names {
+	n := []Name{}
+	for _, v := range list {
+		n = append(n, Name(v))
+	}
+	return Names(n)
+}
+
 // Name is a reference to the plugin.  Places where it appears include JSON files as type of field `Plugin`.
 type Name string
 
