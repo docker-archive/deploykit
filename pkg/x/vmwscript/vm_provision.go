@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/vmware/govmomi"
@@ -130,17 +131,20 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 
 	newNet, err := f.NetworkOrDefault(ctx, *vm.NetworkName)
 	if err != nil {
-		log.Crit("Network [%s], could not be found", *vm.NetworkName)
+		errorMessage := fmt.Sprintf("Network [%s], could not be found", *vm.NetworkName)
+		log.Crit(errorMessage)
 	}
 
 	backing, err := newNet.EthernetCardBackingInfo(ctx)
 	if err != nil {
-		log.Crit("Unable to determine vCenter network backend\n%v", err)
+		errorMessage := fmt.Sprintf("Unable to determine vCenter network backend\n%v", err)
+		log.Crit(errorMessage)
 	}
 
 	netDev, err := object.EthernetCardTypes().CreateEthernetCard("vmxnet3", backing)
 	if err != nil {
-		log.Crit("Unable to create vmxnet3 network interface\n%v", err)
+		errorMessage := fmt.Sprintf("Unable to create vmxnet3 network interface\n%v", err)
+		log.Crit(errorMessage)
 	}
 
 	newBacking := netDev.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
@@ -155,7 +159,7 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 		return nil, err
 	}
 
-	log.Info("New Virtual Machine has started with IP [%s]", guestIP)
+	log.Info("New Virtual Machine has started its networking", "IP Address", guestIP)
 	return clonedVM, nil
 }
 
@@ -167,13 +171,13 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 		task := NextDeployment()
 
 		if task != nil {
-			log.Info("Beginning Task [%s]: %s", task.Name, task.Note)
-
+			log.Info("Beginning Task", "Task:", task.Name, "Notes", task.Note)
 			newVM, err := Provision(ctx, client, *vm, task.Task.InputTemplate, task.Task.OutputName)
 
 			if err != nil {
 				log.Info("Provisioning has failed =>")
-				log.Crit("%v", err)
+				log.Crit(err.Error())
+				os.Exit(-1)
 			}
 
 			auth := &types.NamePasswordAuthentication{
@@ -188,12 +192,14 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 				err = newVM.ShutdownGuest(ctx)
 				if err != nil {
 					log.Info("Power Off task failed =>")
-					log.Crit("%v", err)
+					log.Crit(err.Error())
+					os.Exit(-1)
 				}
 				for i := 1; i <= 120; i++ {
 					state, err := newVM.PowerState(ctx)
 					if err != nil {
-						log.Crit("%v", err)
+						log.Crit(err.Error())
+						os.Exit(-1)
 					}
 					if state != types.VirtualMachinePowerStatePoweredOff {
 						fmt.Printf("\r\033[36mWaiting for\033[m %d Seconds for VM Shutdown", i)
@@ -206,7 +212,8 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 				err = newVM.MarkAsTemplate(ctx)
 				if err != nil {
 					log.Info("Marking as Template has failed =>")
-					log.Crit("%v", err)
+					log.Crit(err.Error())
+					os.Exit(-1)
 				}
 			}
 		}
@@ -215,39 +222,39 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 
 func runCommands(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, deployment *DeploymentTask) {
 	cmdCount := CommandCount(deployment)
-	log.Info("%d commands will be executed.", cmdCount)
+	log.Info(fmt.Sprintf("%d commands will be executed.", cmdCount))
 	for i := 0; i < cmdCount; i++ {
 		cmd := NextCommand(deployment)
 		// if cmd == nil then no more commands to run
 		if cmd != nil {
 			if cmd.CMDNote != "" { // If the command has a note, then print it out
-				log.Info("Task: %s", cmd.CMDNote)
+				log.Info(fmt.Sprintf("Task: %s", cmd.CMDNote))
 			}
 			switch cmd.CMDType {
 			case "execute":
 				var err error
 				var pid int64
 				if cmd.CMDkey != "" {
-					log.Info("Executing command from key [%s]", cmd.CMDkey)
+					log.Info(fmt.Sprintf("Executing command from key [%s]", cmd.CMDkey))
 					execKey := cmdResults[cmd.CMDkey]
 					pid, err = vmExec(ctx, client, vm, auth, execKey, cmd.CMDUser)
 				} else {
 					pid, err = vmExec(ctx, client, vm, auth, cmd.CMD, cmd.CMDUser)
 				}
 				if err != nil {
-					log.Crit("%v", err)
+					log.Error(err.Error())
 				}
 				if cmd.CMDIgnore == false {
 					err = watchPid(ctx, client, vm, auth, []int64{pid})
 					if err != nil {
-						log.Crit("%v", err)
+						log.Error(err.Error())
 					}
 				}
 			case "download":
 				err := vmDownloadFile(ctx, client, vm, auth, cmd.CMDFilePath, cmd.CMDresultKey, cmd.CMDDelete)
 				if err != nil {
 					fmt.Printf("Error\n")
-					log.Crit("%v", err)
+					log.Error(err.Error())
 				}
 			}
 			// Execute the command on the Virtual Machine
@@ -326,8 +333,8 @@ func vmDownloadFile(ctx context.Context, client *govmomi.Client, vm *object.Virt
 		cmdResults[key] = convertedString
 	}
 
-	log.Info("%d of file [%s] downloaded succesfully", fileDetails.Size, fileDetails.Url)
-	log.Info("Removing file [%s] from Virtual Machine", path)
+	log.Info(fmt.Sprintf("%d of file [%s] downloaded succesfully", fileDetails.Size, fileDetails.Url))
+	log.Info(fmt.Sprintf("Removing file [%s] from Virtual Machine", path))
 	if deleteonDownload == true {
 		err = fm.DeleteFile(ctx, auth, path)
 		if err != nil {
@@ -350,9 +357,9 @@ func watchPid(ctx context.Context, client *govmomi.Client, vm *object.VirtualMac
 		return err
 	}
 	if len(process) > 0 {
-		log.Info("Watching process [%d] cmd [%s]", process[0].Pid, process[0].CmdLine)
+		log.Info(fmt.Sprintf("Watching process [%d] cmd [%s]", process[0].Pid, process[0].CmdLine))
 	} else {
-		log.Crit("Process couldn't be found running")
+		log.Error("Process couldn't be found running")
 	}
 
 	// Counter if VMtools loses a previously watched process

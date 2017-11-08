@@ -35,7 +35,7 @@ func vmwscriptCommand() *cobra.Command {
 		}
 		err := vmwscript.OpenFile(args[0])
 		if err != nil {
-			log.Crit("Error opening file", err)
+			log.Crit("Error opening file", "Error", err)
 			os.Exit(-1)
 		}
 
