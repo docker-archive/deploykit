@@ -1,5 +1,5 @@
 {{/* Input to create instance using the GCP instance plugin */}}
-{{/* =% instanceProvision "gcp/compute" true  %= */}}
+{{/* =% instanceProvision "google/compute" true  %= */}}
 
 {{ $user := flag "user" "string" "owner" | prompt "Owner?" "string" (env "USER") nil }}
 {{ $image := flag "image-id" "string" "Image  ID" | prompt "Image to boot?" "string" "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1404-trusty-v20161205" }}
