@@ -10,7 +10,6 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
@@ -294,8 +293,6 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 		},
 	}
 	log.Debug("Creating instance", "instance", instance)
-	instanceYaml, _ := types.AnyValueMust(instance).MarshalJSON()
-	log.Debug("Creating disk", "disk", instanceYaml)
 
 	return g.doCall(g.service.Instances.Insert(g.project, g.zone, instance))
 }
