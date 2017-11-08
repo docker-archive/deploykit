@@ -218,7 +218,7 @@ func mergeTags(tagMaps ...map[string]string) ([]string, map[string]string) {
 	for _, tagMap := range tagMaps {
 		for k, v := range tagMap {
 			if _, exists := tags[k]; exists {
-				log.Warnf("Overwriting tag value for key %s", k)
+				log.Warn("Overwriting tag value for", "key", k)
 			} else {
 				keys = append(keys, k)
 			}
