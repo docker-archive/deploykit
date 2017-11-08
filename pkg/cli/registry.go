@@ -125,9 +125,11 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 			// 'info' subcommands map to the each interface the plugin implements
 			seen := map[string]*cobra.Command{}
 
-			list := []string{}
+			interfaces := map[string]struct{}{}
+
 			for _, spi := range spis {
-				list = append(list, spi.Encode())
+
+				interfaces[spi.Encode()] = struct{}{}
 
 				visitCommands(spi, func(buildCmd CmdBuilder) {
 
@@ -148,6 +150,11 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 					command.AddCommand(subcommand)
 					seen[verb] = subcommand
 				})
+			}
+
+			list := []string{}
+			for k := range interfaces {
+				list = append(list, k)
 			}
 
 			command.Short = fmt.Sprintf("Access object %s which implements %s",
