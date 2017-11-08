@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	instance_types "github.com/docker/infrakit/pkg/provider/google/plugin/instance/types"
 	"github.com/docker/infrakit/pkg/provider/google/plugin/instance/util"
@@ -21,12 +21,17 @@ type plugin struct {
 	namespace map[string]string
 }
 
+// Spec is just whatever that can be unmarshalled into a generic JSON map
+type Spec map[string]interface{}
+
+var log = logutil.New("module", "provider/google")
+
 // NewGCEInstancePlugin creates a new GCE instance plugin for a given project
 // and zone.
 func NewGCEInstancePlugin(project, zone string, namespace map[string]string) instance.Plugin {
 	api, err := gcloud.NewAPI(project, zone)
 	if err != nil {
-		log.Fatal(err)
+		log.Crit("Google API error", "error", err)
 	}
 
 	return &plugin{
@@ -35,6 +40,7 @@ func NewGCEInstancePlugin(project, zone string, namespace map[string]string) ins
 	}
 }
 
+// VendorInfo returns a vendor specific name and version
 func (p *plugin) VendorInfo() *spi.VendorInfo {
 	return &spi.VendorInfo{
 		InterfaceSpec: spi.InterfaceSpec{
@@ -45,19 +51,35 @@ func (p *plugin) VendorInfo() *spi.VendorInfo {
 	}
 }
 
+// ExampleProperties returns the properties / config of this plugin
+func (p *plugin) ExampleProperties() *types.Any {
+	any, err := types.AnyValue(Spec{
+		"exampleString": "a_string",
+		"exampleBool":   true,
+		"exampleInt":    1,
+	})
+	if err != nil {
+		return nil
+	}
+	return any
+}
+
+// Validate performs local checks to determine if the request is valid.
 func (p *plugin) Validate(req *types.Any) error {
-	log.Debugln("validate", req.String())
+	log.Debug("validate", "request", req.String())
 
 	parsed := instance_types.Properties{}
 	return req.Decode(&parsed)
 }
 
+// Label implements labeling the instances.
 func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 	metadata := gcloud.TagsToMetaData(labels)
 
 	return p.API.AddInstanceMetadata(string(instance), metadata)
 }
 
+// Provision creates a new instance based on the spec.
 func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	properties, err := instance_types.ParseProperties(spec.Properties)
 	if err != nil {
@@ -111,13 +133,13 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 func (p *plugin) Destroy(id instance.ID, ctx instance.Context) error {
 	err := p.API.DeleteInstance(string(id))
 
-	log.Debugln("destroy", id, "err=", err)
+	log.Debug("destroy", "id", id, "err", err)
 
 	return err
 }
 
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-	log.Debugln("describe-instances", tags)
+	log.Debug("describe-instances", "tags", tags)
 
 	// apply the scoping namespace to restrict what we search for
 	_, tags = mergeTags(tags, p.namespace)
@@ -127,7 +149,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		return nil, err
 	}
 
-	log.Debugln("total count:", len(instances))
+	log.Debug("total count:", "instances", len(instances))
 
 	result := []instance.Description{}
 
@@ -147,14 +169,14 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 			if any, err := types.AnyValue(inst); err == nil {
 				description.Properties = any
 			} else {
-				log.Warningln("error encoding instance properties:", err)
+				log.Warn("error encoding instance properties:", "error", err)
 			}
 		}
 
 		result = append(result, description)
 	}
 
-	log.Debugln("matching count:", len(result))
+	log.Debug("matching count:", "result", len(result))
 
 	return result, nil
 }
@@ -196,7 +218,7 @@ func mergeTags(tagMaps ...map[string]string) ([]string, map[string]string) {
 	for _, tagMap := range tagMaps {
 		for k, v := range tagMap {
 			if _, exists := tags[k]; exists {
-				log.Warnf("Overwriting tag value for key %s", k)
+				log.Warn("Overwriting tag value for", "key", k)
 			} else {
 				keys = append(keys, k)
 			}

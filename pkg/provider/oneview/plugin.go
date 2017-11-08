@@ -16,7 +16,7 @@ import (
 	"github.com/HewlettPackard/oneview-golang/ov"
 )
 
-var log = logutil.New("module", "cli/x")
+var log = logutil.New("module", "provider/oneview")
 
 // Options capture the config parameters required to create the plugin
 type Options struct {
@@ -69,7 +69,7 @@ func NewOneViewInstancePlugin(ovOptions Options) instance.Plugin {
 		os.Exit(-1)
 	}
 
-	log.Debug("Succesfully logged in with sessionID %s", session.ID)
+	log.Debug("Succesfully logged in with", "sessionID", session.ID)
 
 	return &plugin{
 		client: client,

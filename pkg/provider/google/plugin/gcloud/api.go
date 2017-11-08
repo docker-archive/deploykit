@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
@@ -112,10 +112,12 @@ type computeServiceWrapper struct {
 	service *compute.Service
 }
 
+var log = logutil.New("module", "provider/google")
+
 // NewAPI creates a new API instance.
 func NewAPI(project, zone string) (API, error) {
 	if project == "" {
-		log.Debugln("Project not passed on the command line")
+		log.Debug("Project not passed on the command line", "project", project)
 
 		project = findProject()
 		if project == "" {
@@ -124,7 +126,7 @@ func NewAPI(project, zone string) (API, error) {
 	}
 
 	if zone == "" {
-		log.Debugln("Zone not passed on the command line")
+		log.Debug("Zone not passed on the command line")
 
 		zone = findZone()
 		if zone == "" {
@@ -132,8 +134,8 @@ func NewAPI(project, zone string) (API, error) {
 		}
 	}
 
-	log.Debugln("Project:", project)
-	log.Debugln("Zone:", zone)
+	log.Debug("Project:", "project", project)
+	log.Debug("Zone:", "zone", zone)
 
 	serviceProvider := func() (*compute.Service, error) {
 		client, err := google.DefaultClient(context.TODO(), compute.ComputeScope)
@@ -159,7 +161,7 @@ func NewAPI(project, zone string) (API, error) {
 
 func findProject() string {
 	if metadata.OnGCE() {
-		log.Debugln("- Query the metadata server...")
+		log.Debug("- Query the metadata server...")
 
 		projectID, err := metadata.ProjectID()
 		if err == nil {
@@ -167,7 +169,7 @@ func findProject() string {
 		}
 	}
 
-	log.Debugln(" - Look for", EnvProject, "env variable...")
+	log.Debug(" - Look for env var", "project", EnvProject)
 
 	value, found := os.LookupEnv(EnvProject)
 	if found && value != "" {
@@ -179,7 +181,7 @@ func findProject() string {
 
 func findZone() string {
 	if metadata.OnGCE() {
-		log.Debugln("- Query the metadata server...")
+		log.Debug("- Query the metadata server...")
 
 		zone, err := metadata.Zone()
 		if err == nil {
@@ -187,7 +189,7 @@ func findZone() string {
 		}
 	}
 
-	log.Debugln(" - Look for", EnvZone, "env variable...")
+	log.Debug(" - Look for env var", "zone", EnvZone)
 
 	value, found := os.LookupEnv(EnvZone)
 	if found && value != "" {
@@ -290,6 +292,7 @@ func (g *computeServiceWrapper) CreateInstance(name string, settings *InstanceSe
 			Preemptible:       settings.Preemptible,
 		},
 	}
+	log.Debug("Creating instance", "instance", instance)
 
 	return g.doCall(g.service.Instances.Insert(g.project, g.zone, instance))
 }
@@ -325,18 +328,18 @@ func (g *computeServiceWrapper) attachedDisk(instanceName string, settings DiskS
 
 	var existingDisk *compute.Disk
 	if settings.ReuseExisting {
-		log.Debugln("Trying to reuse disk", diskName)
+		log.Debug("Trying to reuse disk", diskName)
 
 		disk, err := g.service.Disks.Get(g.project, g.zone, diskName).Do()
 		if err != nil || disk == nil {
-			log.Debugln("Couldn't find existing disk", diskName)
+			log.Debug("Couldn't find existing disk", diskName)
 		} else if disk.SourceImage != sourceImage {
-			log.Debugln("Found existing disk that uses a wrong image. Let's delete", diskName)
+			log.Debug("Found existing disk that uses a wrong image. Let's delete", diskName)
 			if err := g.doCall(g.service.Disks.Delete(g.project, g.zone, disk.Name)); err != nil {
 				return nil, err
 			}
 		} else {
-			log.Debugln("Found existing disk", diskName)
+			log.Debug("Found existing disk", diskName)
 			existingDisk = disk
 		}
 	}
@@ -344,7 +347,7 @@ func (g *computeServiceWrapper) attachedDisk(instanceName string, settings DiskS
 	if existingDisk != nil {
 		disk.Source = existingDisk.SelfLink
 	} else if settings.Image == "" {
-		log.Debugln("Creating standalone disk", diskName)
+		log.Debug("Creating standalone disk", diskName)
 
 		if err := g.doCall(g.service.Disks.Insert(g.project, g.zone, &compute.Disk{
 			Name:   diskName,
