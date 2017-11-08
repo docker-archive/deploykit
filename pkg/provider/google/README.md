@@ -111,6 +111,7 @@ $ cat << EOF > gcp-vanilla.json
     }
   }
 }
+EOF
 ```
 
 Finally, instruct the Group plugin to start watching the group:
@@ -118,6 +119,12 @@ Finally, instruct the Group plugin to start watching the group:
 ```bash
 $ build/infrakit group-stateless commit gcp-vanilla.json
 ```
+
+### Permissions
+If running on a GCP instance, please make sure that the instance has service accounts enabled:
+https://cloud.google.com/compute/docs/access/create-enable-service-accounts-for-instances
+
+You can check that the instance has the correct permissions via: `gcloud compute instances list`
 
 ## Group plugin
 
