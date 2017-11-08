@@ -20,8 +20,9 @@ echo "Starting GCP plugin"
 
 # Starting docker container for instance plugin
 docker run -d --volumes-from infrakit --name instance-gcp \
-       -v {{$gcpCredentials}} {{$gcpImage}} infrakit-instance-gcp  \
-       --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
-       --zone {{ $zone }} --log 5 --project {{ $project }}
+ -e INFRAKIT_GOOGLE_ZONE={{ $zone }} \
+ -e INFRAKIT_GOOGLE_PROJECT={{ $project }} \
+ -e INFRAKIT_GOOGLE_NAMESPACE_TAGS={{cat "infrakit.scope=" $project | nospace}} \
+ -v {{$gcpCredentials}} {{$gcpImage}} infrakit plugin start google --log 5
 
 {{ end }}

@@ -10,9 +10,10 @@
 {{ $gcpCredentials :=  (cat $credentials ":/infrakit/platforms/gcp/credentials.json" | nospace) }}
 
 echo "Starting daemon"
-infrakit-instance-gcp \
-       --namespace-tags {{cat "infrakit.scope=" $project | nospace}} \
-       --zone {{ $zone }} --log 5 --project {{ $project }} \
+INFRAKIT_GOOGLE_ZONE={{ $zone }} \
+  INFRAKIT_GOOGLE_PROJECT={{ $project }} \
+  INFRAKIT_GOOGLE_NAMESPACE_TAGS={{cat "infrakit.scope=" $project | nospace}} \
+  infrakit plugin start google --log 5 \
        > {{env "INFRAKIT_HOME"}}/logs/instance-gcp.log 2>&1  &
 
 echo "Tailing log"
