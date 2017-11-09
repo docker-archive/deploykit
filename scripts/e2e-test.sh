@@ -70,17 +70,18 @@ export INFRAKIT_GROUP_POLL_INTERVAL=500ms
 
 # note -- on exit, this won't clean up the plugins started by the cli since they will be in a separate process group
 infrakit plugin start --config-url file:///$PWD/scripts/e2e-test-plugins.json \
-	 manager group:group-stateless \
+	 manager:mystack \
+	 group \
 	 file:instance-file \
 	 vanilla:flavor-vanilla \
 	 mylogs:testlogs=inproc &
 
 starterpid=$!
-echo "plugin start pid=$starterpid"
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Plugin start pid=$starterpid"
 
 sleep 5
 
-found=$(infrakit -h | grep 'testlogs')
+found=$(infrakit local -h | grep 'testlogs')
 if [ "$found" = "" ]; then
     echo "tailer not started"
     exit 1
@@ -120,55 +121,55 @@ expect_output_lines() {
     echo 'FAIL'
     echo "Expected line count: $expected_lines"
     echo "Actual line count: $actual_line_count"
-    echo "infrakit -h"
+    echo "infrakit local -h"
     infrakit -h
     exit 1
   fi
 }
 
-echo "Starting test................................................................"
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Starting test"
 
-expect_output_lines "12 plugins should be discoverable" "infrakit plugin ls -q" "12"
-expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
+expect_output_lines "14 plugins should be discoverable" "infrakit plugin ls -q" "14"
+expect_output_lines "0 instances should exist" "infrakit local instance-file describe -q " "0"
 
-echo "Commiting"
-infrakit group commit scripts/cattle.json
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Commiting"
+infrakit local mystack/groups commit scripts/cattle.json
 
-echo 'Waiting for group to be provisioned'
+echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Waiting for group to be provisioned'
 sleep 10
 
-expect_output_lines "5 instances should exist in group" "infrakit group/cattle describe -q" "5"
-expect_output_lines "5 instances should exist" "infrakit instance-file describe -q " "5"
+expect_output_lines "5 instances should exist in group" "infrakit local mystack/cattle describe -q" "5"
+expect_output_lines "5 instances should exist" "infrakit local instance-file describe -q " "5"
 
-infrakit group/cattle free
+infrakit local mystack/cattle free
 
-echo "Freed cattles; committing again"
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Freed cattles; committing again"
 
-infrakit group commit scripts/cattle.json
+infrakit local mystack/groups commit scripts/cattle.json
 
 sleep 10
 
-if [[ $(infrakit -h | grep group/cattle) == "" ]]; then
+if [[ $(infrakit local -h | grep mystack/cattle) == "" ]]; then
     echo "checking the CLI"
-    infrakit -h
+    infrakit local -h
 fi
 
-expect_exact_output "Should be watching one group" "infrakit group ls -q" "cattle"
+expect_exact_output "Should be watching one group" "infrakit local mystack/groups ls -q" "cattle"
 
-echo "Updating specs to scale group to 10"
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Updating specs to scale group to 10"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
-  "infrakit group/cattle commit scripts/cattle2.json --pretend" \
+  "infrakit local mystack/cattle commit scripts/cattle2.json --pretend" \
   "Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10"
 
-infrakit group/cattle commit scripts/cattle2.json
+infrakit local mystack/cattle commit scripts/cattle2.json
 
 sleep 10
 
-expect_output_lines "10 instances should exist in group" "infrakit group/cattle describe -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle describe -q" "10"
 
-echo "Terminate 3 instances."
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Terminate 3 instances."
 
 pushd $INSTANCE_FILE_DIR
   rm $(ls | head -3)
@@ -176,14 +177,14 @@ popd
 
 sleep 10
 
-expect_output_lines "10 instances should exist in group" "infrakit group/cattle describe -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle describe -q" "10"
 
-infrakit group/cattle destroy
+infrakit local mystack/cattle destroy
 
 sleep 10
-expect_output_lines "0 instances should exist" "infrakit instance-file describe -q " "0"
+expect_output_lines "0 instances should exist" "infrakit local instance-file describe -q " "0"
 
-echo 'ALL TESTS PASSED'
+echo '**************************** ALL TESTS PASSED *******************************************************'
 
-echo "Stopping plugins"
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Stopping plugins"
 infrakit plugin stop --all
