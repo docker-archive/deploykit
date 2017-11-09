@@ -22,7 +22,7 @@ const (
 	Kind = "manager"
 
 	// LookupName is the name used to look up the object via discovery
-	LookupName = "group"
+	//LookupName = "group"
 
 	// EnvOptionsBackend is the environment variable to use to set the default value of Options.Backend
 	EnvOptionsBackend = "INFRAKIT_MANAGER_BACKEND"
@@ -41,14 +41,6 @@ const (
 
 	// EnvControllers is a list of comma-delimited controller names
 	EnvControllers = "INFRAKIT_MANAGER_CONTROLLERS"
-
-	// EnvMetadataUpdateInterval is the metadata backend update interval
-	// if > 0, this will allow non-leader updates of metadata to be synced
-	// to the leader. otherwise, a non-leader will not see the leader's updates
-	// until it becomes the leader.  This is because even though the data is
-	// persisted, it is not polled and read by the non-leaders on a regular basis
-	// (unless this is set).
-	EnvMetadataUpdateInterval = "INFRAKIT_MANAGER_METADATA_UPDATE_INTERVAL"
 
 	// EnvLeaderCommitSpecsRetryInterval is the interval to wait between retries when
 	// the manager becomes the leader and fails to commit the replicated specs.
@@ -97,9 +89,8 @@ func defaultOptions() (options Options) {
 
 	options = Options{
 		Options: manager.Options{
-			Group:                          plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
+			Group:                          plugin.Name(local.Getenv(EnvGroup, "group")),
 			Metadata:                       plugin.Name(local.Getenv(EnvMetadata, "vars")),
-			MetadataRefreshInterval:        types.MustParseDuration(local.Getenv(EnvMetadataUpdateInterval, "5s")),
 			LeaderCommitSpecsRetries:       10,
 			LeaderCommitSpecsRetryInterval: types.MustParseDuration(local.Getenv(EnvLeaderCommitSpecsRetryInterval, "2s")),
 			Controllers:                    plugin.NamesFrom(strings.Split(local.Getenv(EnvControllers, ""), ",")),

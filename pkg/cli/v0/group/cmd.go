@@ -2,10 +2,7 @@ package group
 
 import (
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/plugin"
-	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 )
@@ -46,13 +43,4 @@ func Group(name string, services *cli.Services) *cobra.Command {
 	)
 
 	return group
-}
-
-// LoadPlugin loads the typed plugin
-func LoadPlugin(plugins discovery.Plugins, name string) (group.Plugin, error) {
-	endpoint, err := plugins.Find(plugin.Name(name))
-	if err != nil {
-		return nil, err
-	}
-	return group_rpc.NewClient(endpoint.Address)
 }

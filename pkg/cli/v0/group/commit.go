@@ -28,7 +28,7 @@ func Commit(name string, services *cli.Services) *cobra.Command {
 			os.Exit(1)
 		}
 
-		groupPlugin, err := LoadPlugin(services.Scope.Plugins(), name)
+		groupPlugin, err := services.Scope.Group(name)
 		if err != nil {
 			return nil
 		}

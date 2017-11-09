@@ -16,8 +16,6 @@ import (
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/run/manager"
 	"github.com/docker/infrakit/pkg/run/scope"
-	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
-	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
 	"github.com/spf13/cobra"
 )
 
@@ -190,13 +188,6 @@ func Command(scope scope.Scope) *cobra.Command {
 			kind := pp[0]
 			name := plugin.Name(kind)
 
-			// This is some special case for the legacy setup (pre v0.6)
-			switch kind {
-			case manager_kind.Kind:
-				name = plugin.Name(manager_kind.LookupName)
-			case group_kind.Kind:
-				name = plugin.Name(group_kind.LookupName)
-			}
 			// customized by user as override
 			if len(pp) > 1 {
 				name = plugin.Name(pp[1])

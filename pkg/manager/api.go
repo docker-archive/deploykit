@@ -21,6 +21,7 @@ var (
 
 	debugV  = logutil.V(100)
 	debugV2 = logutil.V(500)
+	debugV3 = logutil.V(1000)
 
 	// InterfaceSpec is the current name and version of the Instance API.
 	InterfaceSpec = spi.InterfaceSpec{
@@ -88,9 +89,6 @@ type Options struct {
 
 	// MetadataStore persists var information
 	MetadataStore store.Snapshot `json:"-" yaml:"-"`
-
-	// MetadataRefreshInterval is the interval to check for updates to metadata
-	MetadataRefreshInterval types.Duration
 
 	// LeaderCommitSpecsRetries is how many times to retry commit specs when becomes leader
 	LeaderCommitSpecsRetries int

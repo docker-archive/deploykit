@@ -11,8 +11,11 @@ import (
 
 // GroupControllers returns a map of *scoped* group controllers by ID of the group.
 func (m *manager) Controllers() (map[string]controller.Controller, error) {
+
+	gcontroller := group.AsController(core.NewAddressable("group", m.Options.Name.LookupOnly(), ""), m)
 	controllers := map[string]controller.Controller{
-		".": group.AsController(core.NewAddressable("group", m.Options.Name.LookupOnly(), ""), m),
+		".":      gcontroller,
+		"groups": gcontroller,
 	}
 	all, err := m.Plugin.InspectGroups()
 	if err != nil {
@@ -28,6 +31,7 @@ func (m *manager) Controllers() (map[string]controller.Controller, error) {
 
 		pn := c
 		controllers[pn.String()] = controllerAdapter{
+			name:    c,
 			manager: m,
 			backend: controller.LazyConnect(
 				func() (controller.Controller, error) {

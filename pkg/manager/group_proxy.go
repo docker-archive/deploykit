@@ -12,7 +12,8 @@ import (
 // Groups returns a map of *scoped* group controllers by ID of the group.
 func (m *manager) Groups() (map[group.ID]group.Plugin, error) {
 	groups := map[group.ID]group.Plugin{
-		group.ID("."): m,
+		group.ID("."):      m,
+		group.ID("groups"): m,
 	}
 	all, err := m.Plugin.InspectGroups()
 	if err != nil {

@@ -87,14 +87,14 @@ func initUpdatable(options Options) metadata.Updatable {
 
 	writer := func(proposed *types.Any) error {
 		// write
-		log.Debug("updating", "proposed", proposed)
+		log.Debug("updating", "proposed", proposed, "V", debugV3)
 		if options.MetadataStore != nil {
 			var v interface{}
 			err := proposed.Decode(&v)
 			if err != nil {
 				return err
 			}
-			log.Debug("saving", "proposed", proposed)
+			log.Debug("saving", "proposed", proposed, "V", debugV3)
 			return options.MetadataStore.Save(v)
 		}
 		return proposed.Decode(&data)
@@ -171,32 +171,6 @@ func (m *manager) Start() (<-chan struct{}, error) {
 	}
 
 	log.Info("Manager starting")
-
-	// Refreshes metadata
-	metadataPoll := m.Options.MetadataRefreshInterval.Duration()
-	if metadataPoll > 0 {
-		metadataRefresh := time.Tick(metadataPoll)
-		go func() {
-			for {
-				// We load the metadata from the backend so
-				// that we have the latest. This is important
-				// in case that writes are performed on the same
-				// leader by another process.
-				// Note that we use optimistic concurrency of
-				// computing hashes from each change and each batch
-				// of changes require reading the entire data struct
-				// so this constant updating should not cause problem
-				// if writes are performed from another process on the
-				// same leader node.
-				err := m.loadMetadata()
-				if err != nil {
-					log.Debug("error loading metadata", "err", err)
-				}
-
-				<-metadataRefresh
-			}
-		}()
-	}
 
 	leaderChan, err := m.Options.Leader.Start()
 	if err != nil {
@@ -363,7 +337,7 @@ func (m *manager) loadMetadata() (err error) {
 		return nil
 	}
 
-	log.Debug("loading metadata and committing", "V", debugV2)
+	log.Debug("loading metadata and committing", "V", debugV3)
 
 	var saved interface{}
 	err = m.Options.MetadataStore.Load(&saved)
@@ -378,11 +352,11 @@ func (m *manager) loadMetadata() (err error) {
 	}
 
 	if any == nil {
-		log.Debug("no metadata stored", "V", debugV2)
+		log.Debug("no metadata stored", "V", debugV3)
 		return
 	}
 
-	log.Debug("loaded metadata", "data", any.String(), "V", debugV2)
+	log.Debug("loaded metadata", "data", any.String(), "V", debugV3)
 	_, proposed, cas, e := m.Updatable.Changes([]metadata.Change{
 		{Path: types.Dot, Value: any},
 	})
@@ -392,7 +366,7 @@ func (m *manager) loadMetadata() (err error) {
 		return
 	}
 
-	log.Debug("updating backend with stored metadata", "cas", cas, "proposed", proposed, "V", debugV2)
+	log.Debug("updating backend with stored metadata", "cas", cas, "proposed", proposed, "V", debugV3)
 	return m.Updatable.Commit(proposed, cas)
 }
 

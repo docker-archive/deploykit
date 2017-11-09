@@ -19,7 +19,7 @@ func Ls(name string, services *cli.Services) *cobra.Command {
 
 	ls.RunE = func(cmd *cobra.Command, args []string) error {
 
-		groupPlugin, err := LoadPlugin(services.Scope.Plugins(), name)
+		groupPlugin, err := services.Scope.Group(name)
 		if err != nil {
 			return nil
 		}

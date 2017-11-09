@@ -11,7 +11,7 @@ import (
 // Metadata returns a map of metadata plugins
 func (m *manager) Metadata() (map[string]metadata.Plugin, error) {
 	plugins := map[string]metadata.Plugin{
-		".":                         m,
+		//		".":                         m,
 		"status":                    m.Status,
 		m.Options.Metadata.Lookup(): m,
 	}

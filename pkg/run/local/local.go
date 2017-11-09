@@ -34,6 +34,14 @@ func InfrakitHome() string {
 	return os.TempDir()
 }
 
+// InfrakitHost returns the value of the INFRAKIT_HOST environment
+func InfrakitHost() string {
+	if h := os.Getenv("INFRAKIT_HOST"); h != "" {
+		return h
+	}
+	return "local"
+}
+
 // Getenv returns the value at the environment variable 'env'.  If the value is not found
 // then default value is returned
 func Getenv(env string, defaultValue string) string {

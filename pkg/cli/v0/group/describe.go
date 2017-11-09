@@ -26,11 +26,13 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 
 		pluginName := plugin.Name(name)
 		_, gid := pluginName.GetLookupAndType()
-		if gid == "" {
-			if len(args) < 1 {
-				cmd.Usage()
-				os.Exit(1)
-			}
+
+		if gid == "" && len(args) < 1 {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		if len(args) == 1 || gid == "" {
 			gid = args[0]
 			args = args[1:]
 		}
@@ -41,7 +43,7 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			return err
 		}
 
-		groupPlugin, err := LoadPlugin(services.Scope.Plugins(), name)
+		groupPlugin, err := services.Scope.Group(name)
 		if err != nil {
 			return nil
 		}
