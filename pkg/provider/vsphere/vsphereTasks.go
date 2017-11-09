@@ -12,8 +12,6 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 func cloneNewInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
@@ -64,7 +62,7 @@ func cloneNewInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
 	vmObj := object.NewVirtualMachine(p.vCenterInternals.client.Client, vmTemplate.Reference())
 	groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
 	if err != nil {
-		log.Debugf("%v", err)
+		log.Debug(err.Error())
 		groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags["infrakit.group"])
 		if err != nil {
 			if err.Error() == "ServerFaultCode: The operation is not supported on the object." {
@@ -74,7 +72,7 @@ func cloneNewInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
 				if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags["infrakit.group"]+"' already exists." {
 					return errors.New("A Virtual Machine exists with the same name as the InfraKit group")
 				}
-				log.Warnf("%v", err)
+				log.Warn(err.Error())
 			}
 		}
 	}
@@ -131,7 +129,7 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 
 	groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
 	if err != nil {
-		log.Debugf("%v", err)
+		log.Debug(err.Error())
 		groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags["infrakit.group"])
 		if err != nil {
 			if err.Error() == "ServerFaultCode: The operation is not supported on the object." {
@@ -141,7 +139,7 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 				if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags["infrakit.group"]+"' already exists." {
 					return errors.New("A Virtual Machine exists with the same name as the InfraKit group")
 				}
-				log.Warnf("%v", err)
+				log.Warn(err.Error())
 			}
 		}
 	}
@@ -161,17 +159,17 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 
 	err = addISO(p, *vm, newVM)
 	if err != nil {
-		log.Warnf("%v", err)
+		log.Warn(err.Error())
 	}
 
 	if *p.vC.networkName != "" {
 		err = findNetwork(p.vC, p.vCenterInternals)
 		if err != nil {
-			log.Warnf("%v", err)
+			log.Warn(err.Error())
 		} else {
 			err = addNIC(newVM, p.vCenterInternals.network)
 			if err != nil {
-				log.Warnf("%v", err)
+				log.Warn(err.Error())
 			}
 		}
 	}
@@ -179,12 +177,12 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 	if vm.persistentSz > 0 {
 		err = addVMDK(p, newVM, *vm)
 		if err != nil {
-			log.Warnf("%v", err)
+			log.Warn(err.Error())
 		}
 	}
 
 	if vm.poweron == true {
-		log.Infoln("Powering on provisioned Virtual Machine")
+		log.Info("Powering on provisioned Virtual Machine")
 		return setVMPowerOn(true, newVM)
 	}
 
@@ -306,7 +304,7 @@ func addNIC(vm *object.VirtualMachine, net object.NetworkReference) error {
 		return fmt.Errorf("Unable to create vmxnet3 network interface\n%v", err)
 	}
 
-	log.Infof("Adding VM Networking")
+	log.Info("Adding VM Networking")
 	var add []types.BaseVirtualDevice
 	add = append(add, netdev)
 
@@ -337,7 +335,7 @@ func addVMDK(p *plugin, vm *object.VirtualMachine, newVM vmInstance) error {
 	var add []types.BaseVirtualDevice
 	add = append(add, disk)
 
-	log.Infof("Adding a persistent disk to the Virtual Machine")
+	log.Info("Adding a persistent disk to the Virtual Machine")
 
 	if vm.AddDevice(ctx, add...); err != nil {
 		return fmt.Errorf("Unable to add new storage device to VM configuration\n%v", err)
@@ -367,7 +365,7 @@ func addISO(p *plugin, newInstance vmInstance, vm *object.VirtualMachine) error 
 	var add []types.BaseVirtualDevice
 	add = append(add, devices.InsertIso(cdrom, p.vCenterInternals.datastore.Path(fmt.Sprintf("%s", newInstance.isoPath))))
 
-	log.Debugln("Adding ISO to the Virtual Machine")
+	log.Debug("Adding ISO to the Virtual Machine")
 
 	if vm.AddDevice(ctx, add...); err != nil {
 		return fmt.Errorf("Unable to add new CD-ROM device to VM configuration\n%v", err)
@@ -410,7 +408,7 @@ func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, 
 			return vmList, err
 		}
 	} else {
-		log.Debugf("%v", err)
+		log.Debug(err.Error())
 	}
 	// Go through the VMs and find the correct ones from the groupname
 	foundVMs, err := findInstancesFromAnnotation(ctx, vmList, groupName)
@@ -426,7 +424,7 @@ func findInstancesFromAnnotation(ctx context.Context, vmList []*object.VirtualMa
 	for _, vmInstance := range vmList {
 		instanceGroup := returnDataFromVM(ctx, vmInstance, "group")
 		if instanceGroup == groupName {
-			log.Debugf("%s matches groupName %s\n", vmInstance.Name(), groupName)
+
 			foundVMS = append(foundVMS, vmInstance)
 		}
 	}
@@ -438,7 +436,7 @@ func returnDataFromVM(ctx context.Context, vmInstance *object.VirtualMachine, da
 	if dataType == "guestIP" {
 		err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"guest.ipAddress"}, &machineConfig)
 		if err != nil {
-			log.Errorf("%v", vmInstance)
+			log.Error(err.Error())
 		} else {
 			// Ensure that we're pointing to a Guest Config struct
 			if machineConfig.Guest != nil {
@@ -449,7 +447,7 @@ func returnDataFromVM(ctx context.Context, vmInstance *object.VirtualMachine, da
 	} else {
 		err := vmInstance.Properties(ctx, vmInstance.Reference(), []string{"config.annotation"}, &machineConfig)
 		if err != nil {
-			log.Errorf("%v", vmInstance)
+			log.Error(err.Error())
 		}
 		// Ensure that we're pointing to a Configuration struct
 		if machineConfig.Config != nil {

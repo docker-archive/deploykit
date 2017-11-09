@@ -9,8 +9,6 @@ import (
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 // Options capture the config parameters required to create the plugin
@@ -133,7 +131,7 @@ func parseParameters(properties map[string]interface{}, p *plugin) (vmInstance, 
 
 	var newInstance vmInstance
 
-	log.Debugf("Building vCenter specific parameters")
+	log.Debug("Building vCenter specific parameters")
 	if *p.vC.vCenterURL == "" {
 		if properties["vCenterURL"] == nil {
 			return newInstance, errors.New("Environment variable VCURL or .yml vCenterURL must be set")
@@ -142,7 +140,7 @@ func parseParameters(properties map[string]interface{}, p *plugin) (vmInstance, 
 	}
 
 	if properties["Datacenter"] == nil {
-		log.Warnf("The property 'Datacenter' hasn't been set the API will choose the default, which could cause errors in Linked-Mode")
+		log.Warn("The property 'Datacenter' hasn't been set the API will choose the default, which could cause errors in Linked-Mode")
 	} else {
 		*p.vC.dcName = properties["Datacenter"].(string)
 	}
@@ -151,7 +149,7 @@ func parseParameters(properties map[string]interface{}, p *plugin) (vmInstance, 
 		return newInstance, errors.New("Property 'Datastore' must be set")
 	}
 	*p.vC.dsName = properties["Datastore"].(string)
-	log.Debugf("Datastore set to %s", *p.vC.dsName)
+	log.Debug(fmt.Sprintf("Datastore set to %s", *p.vC.dsName))
 
 	if properties["Hostname"] == nil {
 		return newInstance, errors.New("Property 'Hostname' must be set")
@@ -159,7 +157,7 @@ func parseParameters(properties map[string]interface{}, p *plugin) (vmInstance, 
 	*p.vC.vSphereHost = properties["Hostname"].(string)
 
 	if properties["Network"] == nil {
-		log.Warnf("The property 'Network' hasn't been set, no networks will be attached to VM")
+		log.Warn("The property 'Network' hasn't been set, no networks will be attached to VM")
 	} else {
 		*p.vC.networkName = properties["Network"].(string)
 	}
@@ -175,7 +173,7 @@ func parseParameters(properties map[string]interface{}, p *plugin) (vmInstance, 
 	}
 
 	if properties["isoPath"] == nil {
-		log.Debugf("The property 'isoPath' hasn't been set, bootable ISO will not be added to the VM")
+		log.Debug("The property 'isoPath' hasn't been set, bootable ISO will not be added to the VM")
 	} else {
 		newInstance.isoPath = properties["isoPath"].(string)
 	}
