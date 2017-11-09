@@ -11,6 +11,8 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/manager"
 	"github.com/docker/infrakit/pkg/run/scope"
+	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
+	manager_kind "github.com/docker/infrakit/pkg/run/v0/manager"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -41,6 +43,13 @@ func (arg StartPlugin) Parse() (execName string, kind string, name plugin.Name, 
 	pp := strings.Split(p[0], ":")
 	kind = pp[0]
 	name = plugin.Name(kind)
+
+	switch kind {
+	case manager_kind.Kind:
+		name = plugin.Name(manager_kind.LookupName)
+	case group_kind.Kind:
+		name = plugin.Name(group_kind.LookupName)
+	}
 
 	// customized by user as override
 	if len(pp) > 1 {

@@ -22,7 +22,7 @@ const (
 	Kind = "manager"
 
 	// LookupName is the name used to look up the object via discovery
-	//LookupName = "group"
+	LookupName = "group"
 
 	// EnvOptionsBackend is the environment variable to use to set the default value of Options.Backend
 	EnvOptionsBackend = "INFRAKIT_MANAGER_BACKEND"
@@ -89,7 +89,7 @@ func defaultOptions() (options Options) {
 
 	options = Options{
 		Options: manager.Options{
-			Group:                          plugin.Name(local.Getenv(EnvGroup, "group")),
+			Group:                          plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
 			Metadata:                       plugin.Name(local.Getenv(EnvMetadata, "vars")),
 			LeaderCommitSpecsRetries:       10,
 			LeaderCommitSpecsRetryInterval: types.MustParseDuration(local.Getenv(EnvLeaderCommitSpecsRetryInterval, "2s")),

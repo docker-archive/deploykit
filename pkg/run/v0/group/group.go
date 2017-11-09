@@ -22,7 +22,7 @@ const (
 	Kind = "group"
 
 	// LookupName is the name used to look up the object via discovery
-	//LookupName = "group-stateless"
+	LookupName = "group-stateless"
 
 	// EnvPollInterval is the frequency for polling
 	EnvPollInterval = "INFRAKIT_GROUP_POLL_INTERVAL"
