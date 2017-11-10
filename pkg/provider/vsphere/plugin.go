@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"time"
 
 	"github.com/docker/infrakit/pkg/spi"
@@ -35,9 +34,9 @@ func init() {
 
 //miniFSM for managing the provisioning -> provisioned state
 type provisioningFSM struct {
-	countdown    int64             // ideally will be a counter of minutes / seconds
+	timer        time.Time         // ideally will be a counter of minutes / seconds
 	tags         map[string]string // tags that will be passed back per a describe function
-	instanceName string            // name that we will use as a lookup to the actual backend that is privisioning
+	instanceName string            // name that we will use as a lookup to the actual backend that is provisioning
 }
 
 // NewInstancePlugin will take the cmdline/env configuration
@@ -60,8 +59,7 @@ func NewVSphereInstancePlugin(vc *vCenter, ignoreOnDestroy bool) instance.Plugin
 	internals, err := vCenterConnect(vc)
 	if err != nil {
 		// Exit with an error if we can't connect to vCenter (no point continuing)
-		log.Crit("Error connecting to vCenter", "Response", err.Error)
-		os.Exit(-1)
+		log.Crit("vCenter connection failure", "response", err.Error())
 	}
 	return &plugin{
 		vC:               vc,
@@ -119,13 +117,13 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	newVM, err := parseParameters(properties, p)
 	if err != nil {
-		log.Error("Problems Whilst Parsting", "Error", err)
+		log.Error("Problems Whilst Parsting", "err", err)
 		return nil, err
 	}
 
 	err = setInternalStructures(p.vC, p.vCenterInternals)
 	if err != nil {
-		log.Error("Problem whilst setting Internal Config", "Error", err)
+		log.Error("Problem whilst setting Internal Config", "err", err)
 		return nil, err
 	}
 
@@ -136,11 +134,9 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// Use the VMware plugin data in order to provision a new VM server
 	vmName := instance.ID(fmt.Sprintf(newVM.vmPrefix+"-%d", rand.Int63()))
 	if spec.Tags != nil {
-		log.Info(fmt.Sprintf("Adding %s to Group %v", string(vmName), spec.Tags["infrakit.group"]))
-	}
-
-	if err != nil {
-		return nil, err
+		log.Info("Provisioning", "vm", string(vmName), "group", spec.Tags["infrakit.group"])
+	} else {
+		log.Info("Provisioning", "vm", string(vmName))
 	}
 
 	//  Spawn a goroutine to provision in the background
@@ -148,20 +144,20 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		newVM.vmName = string(vmName)
 		var newInstanceError error
 		if newVM.vmTemplate != "" {
-			log.Info(fmt.Sprintf("Cloning new instance from template: %s", newVM.vmTemplate))
+			log.Info("Cloning new instance", "template", newVM.vmTemplate)
 			newInstanceError = cloneNewInstance(p, &newVM, spec)
 		} else {
 			newInstanceError = createNewVMInstance(p, &newVM, spec)
 		}
 		if newInstanceError != nil {
-			log.Warn(fmt.Sprintf("Error adding %s", newVM.vmName))
-			log.Error(fmt.Sprintf("vSphere Error: %v", newInstanceError))
+			log.Warn("Error creating", "vm", newVM.vmName)
+			log.Error("vCenter problem", "err", newInstanceError)
 		}
 	}()
 
 	var newInstance provisioningFSM
-	newInstance.instanceName = string(newVM.vmName)
-	newInstance.countdown = 5 // FIXED 10 minute timeout (TODO)
+	newInstance.instanceName = string(vmName)
+	newInstance.timer = time.Now().Add(time.Minute * 10) // Ten Minute timeout
 
 	// duplicate the tags for the instance
 	newInstance.tags = make(map[string]string)
@@ -170,7 +166,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 	newInstance.tags["infrakit.state"] = "Provisioning"
 	p.fsm = append(p.fsm, newInstance)
-	log.Debug("New Instance added to state, count: %d", len(p.fsm))
+
+	log.Debug("FSM", "Count", len(p.fsm))
 
 	return &vmName, nil
 }
@@ -193,7 +190,7 @@ func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
 			err = deleteVM(p, string(instance))
 		}
 		if err != nil {
-			log.Error(fmt.Sprintf("%v", err))
+			log.Error("Destroying Instance failed", "err", err)
 		}
 	}()
 
@@ -208,12 +205,10 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	results := []instance.Description{}
 
 	groupName := tags["infrakit.group"]
+
 	instances, err := findGroupInstances(p, groupName)
 	if err != nil {
-		log.Error(err.Error())
-	}
-	if len(instances) == 0 {
-		log.Warn("No Instances found")
+		log.Error("Problems finding group instances", "err", err)
 	}
 
 	// Iterate through group instances and find the sha from their annotation field
@@ -238,7 +233,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 			Tags:      vmTags,
 		})
 	}
-	log.Debug("Modifying provisining state count:  %d", len(p.fsm))
+	log.Debug("Updating FSM", "Count", len(p.fsm))
 
 	// DIFF what the endpoint is saying as reported versus what we have in the FSM
 	var updatedFSM []provisioningFSM
@@ -255,8 +250,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 				provisioned = false
 			}
 		}
-		if provisioned == false && unprovisionedInstance.countdown != 0 && unprovisionedInstance.tags["infrakit.group"] == tags["infrakit.group"] {
-			unprovisionedInstance.countdown--
+		if provisioned == false && unprovisionedInstance.timer.After(time.Now()) && unprovisionedInstance.tags["infrakit.group"] == tags["infrakit.group"] {
 			updatedFSM = append(updatedFSM, unprovisionedInstance)
 		}
 	}
@@ -264,7 +258,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	p.fsm = make([]provisioningFSM, len(updatedFSM))
 	copy(p.fsm, updatedFSM)
 
-	log.Debug("Updated provisining state count: %d", len(p.fsm))
+	log.Debug("FSM Updated", "Count", len(p.fsm))
 	for _, unprovisionedInstances := range p.fsm {
 		results = append(results, instance.Description{
 			ID:        instance.ID(unprovisionedInstances.instanceName),
@@ -272,6 +266,8 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 			Tags:      unprovisionedInstances.tags,
 		})
 	}
-
+	if len(results) == 0 {
+		log.Info("No Instances found")
+	}
 	return results, nil
 }

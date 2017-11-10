@@ -80,7 +80,7 @@ func vCenterConnect(vc *vCenter) (vcInternal, error) {
 	// Connect and log in to ESX or vCenter
 	internals.client, err = govmomi.NewClient(ctx, u, true)
 	if err != nil {
-		return internals, fmt.Errorf("Error logging into vCenter, check address and credentials\nClient Error: %v", err)
+		return internals, err
 	}
 	return internals, nil
 }
@@ -149,7 +149,7 @@ func parseParameters(properties map[string]interface{}, p *plugin) (vmInstance, 
 		return newInstance, errors.New("Property 'Datastore' must be set")
 	}
 	*p.vC.dsName = properties["Datastore"].(string)
-	log.Debug(fmt.Sprintf("Datastore set to %s", *p.vC.dsName))
+	log.Debug("Setting datastore", "datastore", *p.vC.dsName)
 
 	if properties["Hostname"] == nil {
 		return newInstance, errors.New("Property 'Hostname' must be set")

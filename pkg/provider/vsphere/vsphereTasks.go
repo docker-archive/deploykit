@@ -60,24 +60,33 @@ func cloneNewInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
 	}
 
 	vmObj := object.NewVirtualMachine(p.vCenterInternals.client.Client, vmTemplate.Reference())
-	groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
-	if err != nil {
-		log.Debug(err.Error())
-		groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags["infrakit.group"])
+
+	var vmFolder *object.Folder
+
+	// Check that a group has been submitted
+	if vmSpec.Tags["infrakit.group"] == "" {
+		vmFolder, err = f.DefaultFolder(ctx)
+	} else {
+		groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
 		if err != nil {
-			if err.Error() == "ServerFaultCode: The operation is not supported on the object." {
-				baseFolder, _ := dc.Folders(ctx)
-				groupFolder = baseFolder.VmFolder
-			} else {
-				if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags["infrakit.group"]+"' already exists." {
-					return errors.New("A Virtual Machine exists with the same name as the InfraKit group")
+			log.Warn("Issues finding a group folder", "err", err)
+			groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags["infrakit.group"])
+			if err != nil {
+				if err.Error() == "ServerFaultCode: The operation is not supported on the object." {
+					baseFolder, _ := dc.Folders(ctx)
+					groupFolder = baseFolder.VmFolder
+				} else {
+					if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags["infrakit.group"]+"' already exists." {
+						return errors.New("A Virtual Machine exists with the same name as the InfraKit group")
+					}
+					log.Warn("Issues setting the group folder", "err", err)
 				}
-				log.Warn(err.Error())
 			}
 		}
+		vmFolder = groupFolder
 	}
 
-	task, err := vmObj.Clone(ctx, groupFolder, vm.vmName, cisp)
+	task, err := vmObj.Clone(ctx, vmFolder, vm.vmName, cisp)
 	if err != nil {
 		return errors.New("Creating new VM failed, more detail can be found in vCenter tasks")
 	}
@@ -129,7 +138,7 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 
 	groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
 	if err != nil {
-		log.Debug(err.Error())
+		log.Warn("Issues finding a group folder", "err", err)
 		groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags["infrakit.group"])
 		if err != nil {
 			if err.Error() == "ServerFaultCode: The operation is not supported on the object." {
@@ -139,7 +148,7 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 				if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags["infrakit.group"]+"' already exists." {
 					return errors.New("A Virtual Machine exists with the same name as the InfraKit group")
 				}
-				log.Warn(err.Error())
+				log.Warn("Issues setting the group folder", "err", err)
 			}
 		}
 	}
@@ -182,7 +191,7 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 	}
 
 	if vm.poweron == true {
-		log.Info("Powering on provisioned Virtual Machine")
+		log.Info("Powering on new Virtual Machine instance")
 		return setVMPowerOn(true, newVM)
 	}
 
@@ -373,8 +382,7 @@ func addISO(p *plugin, newInstance vmInstance, vm *object.VirtualMachine) error 
 	return nil
 }
 
-func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, error) {
-	// Without a groupName we have nothing to search for
+func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, error) { // Without a groupName we have nothing to search for
 	if groupName == "" {
 		return nil, errors.New("The tag infrakit.group was blank")
 	}
@@ -407,12 +415,10 @@ func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, 
 		if err != nil {
 			return vmList, err
 		}
-	} else {
-		log.Debug(err.Error())
 	}
+
 	// Go through the VMs and find the correct ones from the groupname
-	foundVMs, err := findInstancesFromAnnotation(ctx, vmList, groupName)
-	return foundVMs, err
+	return findInstancesFromAnnotation(ctx, vmList, groupName)
 }
 
 func findInstancesFromAnnotation(ctx context.Context, vmList []*object.VirtualMachine, groupName string) ([]*object.VirtualMachine, error) {

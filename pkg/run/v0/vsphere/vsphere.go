@@ -21,6 +21,9 @@ const (
 	// EnvNamespaceTags is the env to set for namespace tags. It's k=v,...
 	EnvNamespaceTags = "INFRAKIT_VSPHERE_NAMESPACE_TAGS"
 
+	// EnvVCAlias is an alias that is given to the plugin
+	EnvVCAlias = "INFRAKIT_VSPHERE_VCALIAS"
+
 	// EnvVCURL is the env for setting the VCenter URL to connect to
 	EnvVCURL = "INFRAKIT_VSPHERE_VCURL"
 
@@ -103,7 +106,9 @@ func Run(scope scope.Scope, name plugin.Name,
 	hypervisors := map[string]instance.Plugin{}
 
 	for _, vcenter := range options.VCenters {
-		hypervisors[vcenter.VSphereHost] = vsphere.NewInstancePlugin(vcenter)
+		// Assign either an alias or the initial vSphere hosts to differentiate the plugins
+		vcenterName := local.Getenv(EnvVCAlias, EnvVCHost)
+		hypervisors[vcenterName] = vsphere.NewInstancePlugin(vcenter)
 	}
 
 	transport.Name = name
