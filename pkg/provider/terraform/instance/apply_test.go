@@ -233,6 +233,43 @@ func TestHasRecentDelta(t *testing.T) {
 	require.True(t, hasDelta)
 }
 
+func TestHasRecentDeltaInFuture(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Write out a tf.json file
+	info := fileInfo{
+		ResInfo: []resInfo{
+			{
+				ResType: VMIBMCloud,
+				ResName: TResourceName("instance-12345"),
+			},
+		},
+		NewFile: false,
+		Plugin:  tf,
+	}
+	writeFile(info, t)
+
+	// Update the timestamp to 29 seconds in the future
+	path := filepath.Join(tf.Dir, "instance-12345.tf.json")
+	newTime := time.Now().Add(time.Duration(29) * time.Second)
+	err := tf.fs.Chtimes(path, newTime, newTime)
+	require.NoError(t, err)
+
+	// Since it's less than 30 seconds it will be a delta
+	hasDelta, err := tf.hasRecentDeltas(1)
+	require.NoError(t, err)
+	require.True(t, hasDelta)
+
+	// More than 30 seconds will be ignored
+	newTime = time.Now().Add(time.Duration(35) * time.Second)
+	err = tf.fs.Chtimes(path, newTime, newTime)
+	require.NoError(t, err)
+	hasDelta, err = tf.hasRecentDeltas(1)
+	require.NoError(t, err)
+	require.False(t, hasDelta)
+}
+
 func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
