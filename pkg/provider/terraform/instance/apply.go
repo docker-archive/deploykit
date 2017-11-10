@@ -2,6 +2,7 @@ package instance
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -60,6 +61,18 @@ func (p *plugin) terraformApply() error {
 				// that multiple .tf.json.new files have time to be created
 				if initial {
 					time.Sleep(time.Second * 5)
+					// And only run if there have been no file deltas in the last few seconds
+					for {
+						hasDelta, err := p.hasRecentDeltas(3)
+						if hasDelta {
+							time.Sleep(time.Second * 1)
+							continue
+						}
+						if err != nil {
+							log.Errorf("Failed to determine file deltas: %v", err)
+						}
+						break
+					}
 				}
 				if err := p.handleFiles(fns); err == nil {
 					if err = p.doTerraformApply(); err == nil {
@@ -134,6 +147,50 @@ func (p *plugin) shouldApply() bool {
 type tfFuncs struct {
 	tfRefresh   func() error
 	tfStateList func() (map[TResourceType]map[TResourceName]struct{}, error)
+}
+
+// hasRecentDeltas returns true if any tf.json[.new] files have been changed in
+// in the last "window" seconds
+func (p *plugin) hasRecentDeltas(window int) (bool, error) {
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
+
+	modTime := time.Time{}
+	fs := &afero.Afero{Fs: p.fs}
+	err := fs.Walk(p.Dir,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				log.Debugf("Ignoring file %s due to error: %s", path, err)
+				return nil
+			}
+			if m := tfFileRegex.FindStringSubmatch(info.Name()); len(m) == 3 {
+				if modTime.Before(info.ModTime()) {
+					modTime = info.ModTime()
+				}
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	if !modTime.IsZero() {
+		now := time.Now()
+		if modTime.After(now.Add(-(time.Duration(window) * time.Second))) {
+			log.Infof(fmt.Sprintf(
+				"Terraform file updates are within %v seconds (delta=%v)",
+				window,
+				now.Sub(modTime)),
+			)
+			return true, nil
+		}
+		log.Infof(fmt.Sprintf(
+			"Terraform file updates are outside of %v seconds (delta=%v)",
+			window,
+			now.Sub(modTime)),
+		)
+	}
+	return false, nil
 }
 
 // handleFiles handles resource pruning and new resources via:
