@@ -144,10 +144,7 @@ type tfFuncs struct {
 // Once these steps are done then "terraform apply" can execute without the
 // file system lock.
 func (p *plugin) handleFiles(fns tfFuncs) error {
-	if err := p.fsLock.TryLock(); err != nil {
-		log.Infof("In handleFiles, cannot acquire file lock")
-		return err
-	}
+	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
 
 	// Refresh resources and get updated resources names
