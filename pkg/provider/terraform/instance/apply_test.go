@@ -180,6 +180,96 @@ func TestHandleFilesNoFiles(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestHasRecentDelta(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// No files (so no deltas)
+	hasDelta, err := tf.hasRecentDeltas(60)
+	require.NoError(t, err)
+	require.False(t, hasDelta)
+
+	// Non tf.json[.new] file (should be ignored)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "foo.txt"), []byte("some-text"), 0644)
+	require.NoError(t, err)
+	hasDelta, err = tf.hasRecentDeltas(60)
+	require.NoError(t, err)
+	require.False(t, hasDelta)
+
+	// Write out a tf.json file
+	info := fileInfo{
+		ResInfo: []resInfo{
+			{
+				ResType: VMIBMCloud,
+				ResName: TResourceName("instance-12345"),
+			},
+		},
+		NewFile: false,
+		Plugin:  tf,
+	}
+	writeFile(info, t)
+
+	// File delta in the last 5 seconds
+	hasDelta, err = tf.hasRecentDeltas(5)
+	require.NoError(t, err)
+	require.True(t, hasDelta)
+
+	// Wait 2 seconds, now the file will not a delta in a 1 second window
+	time.Sleep(2 * time.Second)
+	hasDelta, err = tf.hasRecentDeltas(1)
+	require.NoError(t, err)
+	require.False(t, hasDelta)
+
+	// But not if we ask for deltas in a longer window
+	hasDelta, err = tf.hasRecentDeltas(60)
+	require.NoError(t, err)
+	require.True(t, hasDelta)
+
+	// Add another, should be a delta
+	info.ResInfo[0].ResName = TResourceName("instance-12346")
+	writeFile(info, t)
+	hasDelta, err = tf.hasRecentDeltas(1)
+	require.NoError(t, err)
+	require.True(t, hasDelta)
+}
+
+func TestHasRecentDeltaInFuture(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Write out a tf.json file
+	info := fileInfo{
+		ResInfo: []resInfo{
+			{
+				ResType: VMIBMCloud,
+				ResName: TResourceName("instance-12345"),
+			},
+		},
+		NewFile: false,
+		Plugin:  tf,
+	}
+	writeFile(info, t)
+
+	// Update the timestamp to 29 seconds in the future
+	path := filepath.Join(tf.Dir, "instance-12345.tf.json")
+	newTime := time.Now().Add(time.Duration(29) * time.Second)
+	err := tf.fs.Chtimes(path, newTime, newTime)
+	require.NoError(t, err)
+
+	// Since it's less than 30 seconds it will be a delta
+	hasDelta, err := tf.hasRecentDeltas(1)
+	require.NoError(t, err)
+	require.True(t, hasDelta)
+
+	// More than 30 seconds will be ignored
+	newTime = time.Now().Add(time.Duration(35) * time.Second)
+	err = tf.fs.Chtimes(path, newTime, newTime)
+	require.NoError(t, err)
+	hasDelta, err = tf.hasRecentDeltas(1)
+	require.NoError(t, err)
+	require.False(t, hasDelta)
+}
+
 func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
