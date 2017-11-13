@@ -15,7 +15,7 @@ func Commit(name string, services *cli.Services) *cobra.Command {
 
 	commit := &cobra.Command{
 		Use:   "commit <group configuration url>",
-		Short: "Commit a group configuration. Read from stdin if url is '-'",
+		Short: "Commit a group configuration in LEGACY schema. Read from stdin if url is '-'",
 	}
 
 	pretend := false

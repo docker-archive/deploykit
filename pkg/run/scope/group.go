@@ -20,6 +20,6 @@ func DefaultGroupResolver(plugins func() discovery.Plugins) func(string) (group.
 		if err != nil {
 			return nil, err
 		}
-		return rpc.NewClient(endpoint.Address)
+		return rpc.NewClient(pn, endpoint.Address)
 	}
 }

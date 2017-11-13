@@ -71,12 +71,13 @@ func Command(scope scope.Scope) *cobra.Command {
 					log.Debug("Found manager", "name", name, "leader", isLeader)
 					if isLeader {
 
-						groupPlugin = group_rpc.Adapt(rpcClient)
+						pn := plugin.Name(name)
+						groupPlugin = group_rpc.Adapt(pn, rpcClient)
 						groupPluginName = name
 
 						log.Debug("Found manager", "name", name, "addr", endpoint.Address)
 
-						updatablePlugin = metadata_rpc.AdaptUpdatable(plugin.Name(name), rpcClient)
+						updatablePlugin = metadata_rpc.AdaptUpdatable(pn, rpcClient)
 						updatablePluginName = name
 
 						log.Debug("Found updatable", "name", name, "addr", endpoint.Address)
@@ -120,7 +121,7 @@ func Command(scope scope.Scope) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				target, err := group_rpc.NewClient(endpoint.Address)
+				target, err := group_rpc.NewClient(name, endpoint.Address)
 				log.Debug("commit", "plugin", name, "address", endpoint.Address, "err", err, "gspec", gspec)
 
 				if err != nil {

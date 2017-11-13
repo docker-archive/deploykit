@@ -75,6 +75,7 @@ func (p *Group) Types() []string {
 // CommitGroup is the rpc method to commit a group
 func (p *Group) CommitGroup(_ *http.Request, req *CommitGroupRequest, resp *CommitGroupResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
+		resp.Name = req.Name
 		details, err := v.(group.Plugin).CommitGroup(req.Spec, req.Pretend)
 		if err != nil {
 			return err
@@ -88,7 +89,7 @@ func (p *Group) CommitGroup(_ *http.Request, req *CommitGroupRequest, resp *Comm
 // FreeGroup is the rpc method to free a group
 func (p *Group) FreeGroup(_ *http.Request, req *FreeGroupRequest, resp *FreeGroupResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
-
+		resp.Name = req.Name
 		err := v.(group.Plugin).FreeGroup(req.ID)
 		if err != nil {
 			return err
@@ -101,7 +102,7 @@ func (p *Group) FreeGroup(_ *http.Request, req *FreeGroupRequest, resp *FreeGrou
 // DescribeGroup is the rpc method to describe a group
 func (p *Group) DescribeGroup(_ *http.Request, req *DescribeGroupRequest, resp *DescribeGroupResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
-
+		resp.Name = req.Name
 		desc, err := v.(group.Plugin).DescribeGroup(req.ID)
 		if err != nil {
 			return err
@@ -115,7 +116,7 @@ func (p *Group) DescribeGroup(_ *http.Request, req *DescribeGroupRequest, resp *
 // DestroyGroup is the rpc method to destroy a group
 func (p *Group) DestroyGroup(_ *http.Request, req *DestroyGroupRequest, resp *DestroyGroupResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
-
+		resp.Name = req.Name
 		err := v.(group.Plugin).DestroyGroup(req.ID)
 		if err != nil {
 			return err
@@ -128,7 +129,7 @@ func (p *Group) DestroyGroup(_ *http.Request, req *DestroyGroupRequest, resp *De
 // InspectGroups is the rpc method to inspect groups
 func (p *Group) InspectGroups(_ *http.Request, req *InspectGroupsRequest, resp *InspectGroupsResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
-
+		resp.Name = req.Name
 		groups, err := v.(group.Plugin).InspectGroups()
 		if err != nil {
 			return err
@@ -141,6 +142,7 @@ func (p *Group) InspectGroups(_ *http.Request, req *InspectGroupsRequest, resp *
 // DestroyInstances is the rpc method to destroy specific instances
 func (p *Group) DestroyInstances(_ *http.Request, req *DestroyInstancesRequest, resp *DestroyInstancesResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
+		resp.Name = req.Name
 		err := v.(group.Plugin).DestroyInstances(req.ID, req.Instances)
 		if err != nil {
 			return err
@@ -153,7 +155,7 @@ func (p *Group) DestroyInstances(_ *http.Request, req *DestroyInstancesRequest, 
 // Size is the rpc method to get the group target size
 func (p *Group) Size(_ *http.Request, req *SizeRequest, resp *SizeResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
-
+		resp.Name = req.Name
 		size, err := v.(group.Plugin).Size(req.ID)
 		if err != nil {
 			return err
@@ -167,7 +169,7 @@ func (p *Group) Size(_ *http.Request, req *SizeRequest, resp *SizeResponse) erro
 // SetSize is the rpc method to set the group target size
 func (p *Group) SetSize(_ *http.Request, req *SetSizeRequest, resp *SetSizeResponse) error {
 	return p.keyed.Do(req, func(v interface{}) error {
-
+		resp.Name = req.Name
 		err := v.(group.Plugin).SetSize(req.ID, req.Size)
 		if err != nil {
 			return err

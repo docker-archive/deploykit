@@ -59,6 +59,11 @@ func (n Name) WithType(t interface{}) Name {
 	return Name(fmt.Sprintf("%v/%v", n.Lookup(), t))
 }
 
+// Sub is the same as WithType
+func (n Name) Sub(v string) Name {
+	return n.WithType(v)
+}
+
 // Equal returns true if the other name is the same
 func (n Name) Equal(other Name) bool {
 	return string(n) == string(other)

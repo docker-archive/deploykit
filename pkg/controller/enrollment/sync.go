@@ -269,7 +269,7 @@ func (l *enroller) connectGroupPlugin(name plugin.Name) (group.Plugin, error) {
 	if err != nil {
 		return nil, err
 	}
-	return group_rpc.NewClient(endpoint.Address)
+	return group_rpc.NewClient(name, endpoint.Address)
 }
 
 func (l *enroller) getInstancePlugin(name plugin.Name) (instance.Plugin, error) {

@@ -72,7 +72,7 @@ func NewManager(options Options) Backend {
 				if err != nil {
 					return nil, err
 				}
-				return group_rpc.NewClient(endpoint.Address)
+				return group_rpc.NewClient(options.Group, endpoint.Address)
 			}, defaultPluginPollInterval),
 		Updatable: initUpdatable(options),
 	}
@@ -494,7 +494,7 @@ func (m *manager) execPlugins(config globalSpec, work func(group.Plugin, group.S
 			return err
 		}
 
-		gp, err := group_rpc.NewClient(ep.Address)
+		gp, err := group_rpc.NewClient(r.Handler, ep.Address)
 		if err != nil {
 			log.Warn("Cannot contact group", "groupID", id, "plugin", r.Handler, "endpoint", ep.Address)
 			return err

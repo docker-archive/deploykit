@@ -1,72 +1,61 @@
 package group
 
 import (
+	"github.com/docker/infrakit/pkg/plugin"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
-func NewClient(socketPath string) (group.Plugin, error) {
+func NewClient(name plugin.Name, socketPath string) (group.Plugin, error) {
 	rpcClient, err := rpc_client.New(socketPath, group.InterfaceSpec)
 	if err != nil {
 		return nil, err
 	}
 
-	return Adapt(rpcClient), nil
+	return Adapt(name, rpcClient), nil
 }
 
 // Adapt returns a group Plugin implementation based on given rpc client.  Assumption here is that
 // the rpcClient has been verified to support the group plugin RPC interface.
-func Adapt(rpcClient rpc_client.Client) group.Plugin {
-	return &client{client: rpcClient}
+func Adapt(name plugin.Name, rpcClient rpc_client.Client) group.Plugin {
+	return &client{name: name, client: rpcClient}
 }
 
 type client struct {
+	name   plugin.Name
 	client rpc_client.Client
 }
 
 func (c client) CommitGroup(grp group.Spec, pretend bool) (string, error) {
-	req := CommitGroupRequest{Spec: grp, Pretend: pretend}
+	req := CommitGroupRequest{Name: c.name, Spec: grp, Pretend: pretend}
 	resp := CommitGroupResponse{}
 	err := c.client.Call("Group.CommitGroup", req, &resp)
-	if err != nil {
-		return resp.Details, err
-	}
-	return resp.Details, nil
+	return resp.Details, err
 }
 
 func (c client) FreeGroup(id group.ID) error {
-	req := FreeGroupRequest{ID: id}
+	req := FreeGroupRequest{Name: c.name, ID: id}
 	resp := FreeGroupResponse{}
-	err := c.client.Call("Group.FreeGroup", req, &resp)
-	if err != nil {
-		return err
-	}
-	resp.ID = id
-	return nil
+	return c.client.Call("Group.FreeGroup", req, &resp)
 }
 
 func (c client) DescribeGroup(id group.ID) (group.Description, error) {
-	req := DescribeGroupRequest{ID: id}
+	req := DescribeGroupRequest{Name: c.name, ID: id}
 	resp := DescribeGroupResponse{}
 	err := c.client.Call("Group.DescribeGroup", req, &resp)
 	return resp.Description, err
 }
 
 func (c client) DestroyGroup(id group.ID) error {
-	req := DestroyGroupRequest{ID: id}
+	req := DestroyGroupRequest{Name: c.name, ID: id}
 	resp := DestroyGroupResponse{}
-	err := c.client.Call("Group.DestroyGroup", req, &resp)
-	if err != nil {
-		return err
-	}
-	resp.ID = id
-	return nil
+	return c.client.Call("Group.DestroyGroup", req, &resp)
 }
 
 func (c client) InspectGroups() ([]group.Spec, error) {
-	req := InspectGroupsRequest{}
+	req := InspectGroupsRequest{Name: c.name}
 	resp := InspectGroupsResponse{}
 	err := c.client.Call("Group.InspectGroups", req, &resp)
 	return resp.Groups, err
@@ -74,6 +63,7 @@ func (c client) InspectGroups() ([]group.Spec, error) {
 
 func (c client) DestroyInstances(id group.ID, instances []instance.ID) error {
 	req := DestroyInstancesRequest{
+		Name:      c.name,
 		ID:        id,
 		Instances: instances,
 	}
@@ -83,7 +73,8 @@ func (c client) DestroyInstances(id group.ID, instances []instance.ID) error {
 
 func (c client) Size(id group.ID) (int, error) {
 	req := SizeRequest{
-		ID: id,
+		Name: c.name,
+		ID:   id,
 	}
 	resp := SizeResponse{}
 	err := c.client.Call("Group.Size", req, &resp)
@@ -92,11 +83,10 @@ func (c client) Size(id group.ID) (int, error) {
 
 func (c client) SetSize(id group.ID, size int) error {
 	req := SetSizeRequest{
+		Name: c.name,
 		ID:   id,
 		Size: size,
 	}
-	resp := SetSizeResponse{
-		ID: id,
-	}
+	resp := SetSizeResponse{}
 	return c.client.Call("Group.SetSize", req, &resp)
 }

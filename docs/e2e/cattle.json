@@ -1,0 +1,38 @@
+{{/*
+
+This is the old-style group.json -- soon to be replaced by the schema
+used by miner.yml.
+
+*/}}
+{
+    "ID": "cattle",
+    "Properties": {
+        "Allocation": {
+            "Size": 10
+        },
+        "Flavor": {
+            "Plugin" : "combo",
+            "Properties" : [
+                {
+                    "Plugin": "vanilla",
+                    "Properties": {
+                        "Init" : [
+                            "sudo apt-get install -y something",
+                            "./configure-something-else"
+                        ],
+                        "Tags": {
+                            "tier": "web",
+                            "project": "infrakit"
+                        }
+                    }
+                }
+            ]
+        },
+        "Instance": {
+            "Plugin" : "simulator/compute",
+            "Properties" : {
+                "CustomNotes" : "This is custom for cattle"
+            }
+        }
+    }
+}

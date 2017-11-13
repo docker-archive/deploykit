@@ -28,23 +28,23 @@ fi
 
 note "Starting test"
 
-expect_output_lines "14 plugins should be discoverable" "infrakit plugin ls -q" "14"
+expect_output_lines "12 plugins should be discoverable" "infrakit plugin ls -q" "12"
 expect_output_lines "0 instances should exist" "infrakit local instance-file describe -q " "0"
 
 note "Commiting"
-infrakit local mystack/groups commit scripts/cattle.json
+infrakit local mystack/groups commit-group scripts/cattle.json
 
 note 'Waiting for group to be provisioned'
 sleep 10
 
-expect_output_lines "5 instances should exist in group" "infrakit local mystack/cattle describe -q" "5"
+expect_output_lines "5 instances should exist in group" "infrakit local mystack/cattle describe-group -q" "5"
 expect_output_lines "5 instances should exist" "infrakit local instance-file describe -q " "5"
 
 infrakit local mystack/cattle free
 
 note "Freed cattles; committing again"
 
-infrakit local mystack/groups commit scripts/cattle.json
+infrakit local mystack/groups commit-group scripts/cattle.json
 
 sleep 10
 
@@ -59,14 +59,14 @@ note "Updating specs to scale group to 10"
 
 expect_exact_output \
   "Update should roll 5 and scale group to 10" \
-  "infrakit local mystack/cattle commit scripts/cattle2.json --pretend" \
+  "infrakit local mystack/cattle commit-group scripts/cattle2.json --pretend" \
   "Committing cattle would involve: Performing a rolling update on 5 instances, then adding 5 instances to increase the group size to 10"
 
-infrakit local mystack/cattle commit scripts/cattle2.json
+infrakit local mystack/cattle commit-group scripts/cattle2.json
 
 sleep 10
 
-expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle describe -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle describe-group -q" "10"
 
 note "Terminate 3 instances."
 
@@ -76,7 +76,7 @@ popd
 
 sleep 10
 
-expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle describe -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle describe-group -q" "10"
 
 infrakit local mystack/cattle destroy
 

@@ -12,9 +12,9 @@ var log = logutil.New("module", "cli/v0/controller")
 func init() {
 	cli.Register(controller.InterfaceSpec,
 		[]cli.CmdBuilder{
-			Controller,
-			// Describe,
-			// Commit,
+			//Controller,
+			Describe,
+			Commit,
 		})
 }
 

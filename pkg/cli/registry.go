@@ -6,9 +6,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 )
 
@@ -102,7 +104,13 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 		return nil, err
 	}
 
-	commands := []*cobra.Command{}
+	type object struct {
+		name    string
+		cmd     *cobra.Command
+		actions map[action]CmdBuilder
+	}
+
+	all := map[string]object{}
 
 	// Show the interfaces implemented by each plugin
 	for major, entry := range running {
@@ -112,57 +120,92 @@ func LoadAll(services *Services) ([]*cobra.Command, error) {
 			continue
 		}
 
-		objects := getPluginObjects(hs, major)
-
 		// for each object, we have a name and a list of interfaces.
-		for name, spis := range objects {
+		for name, spis := range getPluginObjects(hs, major) {
 
-			command := &cobra.Command{
-				Use: name,
+			all[name] = object{
+				name:    name,
+				cmd:     &cobra.Command{Use: name},
+				actions: map[action]CmdBuilder{},
 			}
 
-			// Prevents duplicate sub-commands. This can happen when multiple
-			// 'info' subcommands map to the each interface the plugin implements
-			seen := map[string]*cobra.Command{}
-
-			interfaces := map[string]struct{}{}
-
 			for _, spi := range spis {
-
-				interfaces[spi.Encode()] = struct{}{}
-
 				visitCommands(spi, func(buildCmd CmdBuilder) {
 
 					subcommand := buildCmd(name, services)
+					verb := strings.Split(subcommand.Use, " ")[0]
 
-					parts := strings.Split(subcommand.Use, " ")
-					verb := parts[0]
-
-					if _, has := seen[verb]; has {
-						if verb == "info" {
-							return // skip this
-						}
-						// splice the spi into the usage.. eg. describe-group
-						subcommand.Use = strings.Join(append(
-							[]string{verb + "-" + strings.ToLower(spi.Name)}, parts[1:]...), " ")
-					}
-
-					command.AddCommand(subcommand)
-					seen[verb] = subcommand
+					all[name].actions[action{spi: spi, verb: verb}] = buildCmd
 				})
 			}
-
-			list := []string{}
-			for k := range interfaces {
-				list = append(list, k)
-			}
-
-			command.Short = fmt.Sprintf("Access object %s which implements %s",
-				name, strings.Join(list, ","))
-
-			commands = append(commands, command)
 		}
 	}
 
+	// Build the final command hierarchy.
+	commands := []*cobra.Command{}
+
+	for name, object := range all {
+
+		interfaces := map[spi.InterfaceSpec]struct{}{}
+		verbs := map[string]struct{}{}
+
+		for action, builder := range object.actions {
+
+			interfaces[action.spi] = struct{}{}
+
+			cmd := builder(name, services)
+			cmd.Short = fmt.Sprintf("%s (%v)", cmd.Short, action.spi.Encode())
+
+			if _, has := overrides[action]; has {
+				// TODO - replace the line below with NOT adding the command
+				cmd.Use = strings.Join([]string{action.verb, strings.ToLower(action.spi.Name)}, "-")
+			}
+
+			if _, has := verbs[cmd.Use]; has {
+				cmd.Use = strings.Join([]string{action.verb, strings.ToLower(action.spi.Name)}, "-")
+			}
+
+			object.cmd.AddCommand(cmd)
+
+			verbs[cmd.Use] = struct{}{}
+		}
+
+		list := []string{}
+		for k := range interfaces {
+			list = append(list, k.Encode())
+		}
+		object.cmd.Short = fmt.Sprintf("Access object %s which implements %s", name, strings.Join(list, ", "))
+
+		commands = append(commands, object.cmd)
+	}
+
 	return commands, nil
+}
+
+type action struct {
+	spi  spi.InterfaceSpec
+	verb string
+}
+
+// Overrides contains the interface and verb that wins in the case
+// of same verb command appear from another interface.
+// This is a crude way to implement overriding of verbs by interfaces that are
+// proxies (e.g. manager or controller interfaces).
+var overrides = map[action]action{
+
+	{
+		spi:  group.InterfaceSpec,
+		verb: "commit",
+	}: {
+		spi:  controller.InterfaceSpec,
+		verb: "commit",
+	},
+
+	{
+		spi:  group.InterfaceSpec,
+		verb: "describe",
+	}: {
+		spi:  controller.InterfaceSpec,
+		verb: "describe",
+	},
 }

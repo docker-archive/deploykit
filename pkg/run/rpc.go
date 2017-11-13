@@ -245,7 +245,7 @@ func Call(plugins func() discovery.Plugins,
 				if !is {
 					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
 				}
-				v := group_rpc.Adapt(rpcClient)
+				v := group_rpc.Adapt(pn, rpcClient)
 				return do(v)
 			case instance.InterfaceSpec:
 				do, is := work.(func(instance.Plugin) error)

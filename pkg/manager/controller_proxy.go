@@ -14,7 +14,7 @@ func (m *manager) Controllers() (map[string]controller.Controller, error) {
 
 	gcontroller := group.AsController(core.NewAddressable("group", m.Options.Name.LookupOnly(), ""), m)
 	controllers := map[string]controller.Controller{
-		".":      gcontroller,
+		//		".":      gcontroller,
 		"groups": gcontroller,
 	}
 	all, err := m.Plugin.InspectGroups()

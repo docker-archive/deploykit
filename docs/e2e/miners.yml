@@ -1,0 +1,30 @@
+#
+#  A group of miners
+#
+#  Start up -- plugin start should include manager, vanilla, simulator, and group
+#  Then commit
+#
+#  infrakit group controller commit -y docs/controller/enrollment/group.yml
+#
+kind: group
+metadata:
+    name: miners
+    tags:
+      project: e2e
+      user: infrakit
+properties:
+    Allocation:
+      Size: 5
+    Flavor:
+      Plugin: vanilla
+      Properties:
+        Init:
+          - curl -sSL https://get.docker.com | sh
+          - docker run -d -p 80:80 stuff/miner
+        Tags:
+          project: infrakit
+          tier: miners
+    Instance:
+      Plugin: simulator/compute
+      Properties:
+        Note: custom field for miners

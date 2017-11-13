@@ -2,8 +2,10 @@ package group
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/plugin"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -30,6 +32,10 @@ func tempSocket() string {
 	return path.Join(dir, "group-impl-test")
 }
 
+func nameFromPath(p string) plugin.Name {
+	return plugin.Name(filepath.Base(p))
+}
+
 func TestGroupPluginCommitGroup(t *testing.T) {
 	socketPath := tempSocket()
 
@@ -47,7 +53,7 @@ func TestGroupPluginCommitGroup(t *testing.T) {
 	}))
 
 	// Make call
-	details, err := must(NewClient(socketPath)).CommitGroup(groupSpec, false)
+	details, err := must(NewClient(nameFromPath(socketPath), socketPath)).CommitGroup(groupSpec, false)
 	require.NoError(t, err)
 	require.Equal(t, "commit details", details)
 
@@ -79,7 +85,7 @@ func TestGroupNamedPluginCommitGroupDefault(t *testing.T) {
 			}))
 
 	// Make call
-	details, err := must(NewClient(socketPath)).CommitGroup(groupSpec, false)
+	details, err := must(NewClient(nameFromPath(socketPath), socketPath)).CommitGroup(groupSpec, false)
 	require.NoError(t, err)
 	require.Equal(t, "commit details", details)
 
@@ -116,7 +122,7 @@ func TestGroupNamedPluginCommitGroup(t *testing.T) {
 			}))
 
 	// Make call
-	details, err := must(NewClient(socketPath)).CommitGroup(groupSpec, false)
+	details, err := must(NewClient(nameFromPath(socketPath).Sub("group1"), socketPath)).CommitGroup(groupSpec, false)
 	require.NoError(t, err)
 	require.Equal(t, "commit details", details)
 
@@ -142,7 +148,7 @@ func TestGroupPluginCommitGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = must(NewClient(socketPath)).CommitGroup(groupSpec, false)
+	_, err = must(NewClient(nameFromPath(socketPath), socketPath)).CommitGroup(groupSpec, false)
 	require.Error(t, err)
 	require.Equal(t, "error", err.Error())
 
@@ -164,7 +170,7 @@ func TestGroupPluginFreeGroup(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = must(NewClient(socketPath)).FreeGroup(id)
+	err = must(NewClient(nameFromPath(socketPath), socketPath)).FreeGroup(id)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -184,7 +190,7 @@ func TestGroupPluginFreeGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = must(NewClient(socketPath)).FreeGroup(id)
+	err = must(NewClient(nameFromPath(socketPath), socketPath)).FreeGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -205,7 +211,7 @@ func TestGroupPluginDestroyGroup(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = must(NewClient(socketPath)).DestroyGroup(id)
+	err = must(NewClient(nameFromPath(socketPath), socketPath)).DestroyGroup(id)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -225,7 +231,7 @@ func TestGroupPluginDestroyGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	err = must(NewClient(socketPath)).DestroyGroup(id)
+	err = must(NewClient(nameFromPath(socketPath), socketPath)).DestroyGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -252,7 +258,7 @@ func TestGroupPluginInspectGroup(t *testing.T) {
 		},
 	}))
 
-	res, err := must(NewClient(socketPath)).DescribeGroup(id)
+	res, err := must(NewClient(nameFromPath(socketPath), socketPath)).DescribeGroup(id)
 	require.NoError(t, err)
 	require.Equal(t, desc, res)
 
@@ -279,7 +285,7 @@ func TestGroupPluginInspectGroupError(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = must(NewClient(socketPath)).DescribeGroup(id)
+	_, err = must(NewClient(nameFromPath(socketPath), socketPath)).DescribeGroup(id)
 	require.Error(t, err)
 	require.Equal(t, "no", err.Error())
 
@@ -315,7 +321,7 @@ func TestGroupNamedPluginDestroyInstances(t *testing.T) {
 	// Make call
 	gid := group.ID("group1")
 	ids := []instance.ID{instance.ID("foo"), instance.ID("bar")}
-	err = must(NewClient(socketPath)).DestroyInstances(gid, ids)
+	err = must(NewClient(nameFromPath(socketPath).WithType(gid), socketPath)).DestroyInstances(gid, ids)
 	require.NoError(t, err)
 
 	server.Stop()
@@ -358,11 +364,11 @@ func TestGroupNamedPluginSizeSetSize(t *testing.T) {
 	// Make call
 	gid := group.ID("group1")
 
-	size, err := must(NewClient(socketPath)).Size(gid)
+	size, err := must(NewClient(nameFromPath(socketPath).Sub("group1"), socketPath)).Size(gid)
 	require.NoError(t, err)
 	require.Equal(t, 100, size)
 
-	err = must(NewClient(socketPath)).SetSize(gid, 1001)
+	err = must(NewClient(nameFromPath(socketPath).WithType(gid), socketPath)).SetSize(gid, 1001)
 	require.NoError(t, err)
 	require.Equal(t, 100, size)
 
