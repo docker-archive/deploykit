@@ -23,7 +23,6 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/exec"
-	"github.com/nightlyone/lockfile"
 	"github.com/spf13/afero"
 )
 
@@ -63,7 +62,7 @@ var instNameRegex = regexp.MustCompile("(.*)(instance-[0-9]+)")
 type plugin struct {
 	Dir          string
 	fs           afero.Fs
-	fsLock       lockfile.Lockfile
+	fsLock       sync.Mutex
 	applying     bool
 	applyLock    sync.Mutex
 	pretend      bool // true to actually do terraform apply
@@ -98,14 +97,10 @@ type ImportOptions struct {
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
 func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool, envs []string, importOpts *ImportOptions) instance.Plugin {
 	log.Debugln("terraform instance plugin. dir=", dir)
-	fsLock, err := lockfile.New(filepath.Join(dir, "tf-apply.lck"))
-	if err != nil {
-		panic(err)
-	}
 
 	var pluginLookup func() discovery.Plugins
 	if !standalone {
-		if err = local.Setup(); err != nil {
+		if err := local.Setup(); err != nil {
 			panic(err)
 		}
 		plugins, err := local.NewPluginDiscovery()
@@ -119,7 +114,6 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 	p := plugin{
 		Dir:          dir,
 		fs:           afero.NewOsFs(),
-		fsLock:       fsLock,
 		pollInterval: pollInterval,
 		pluginLookup: pluginLookup,
 		envs:         envs,
@@ -952,16 +946,9 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// we simply look for vm instance and merge in the tags, and user init, etc.
 
 	// Hold the fs lock for the duration since the file is written at the end
-	var name string
-	for {
-		if err := p.fsLock.TryLock(); err == nil {
-			defer p.fsLock.Unlock()
-			name = ensureUniqueFile(p.Dir)
-			break
-		}
-		log.Infoln("Can't acquire fsLock on Provision, waiting")
-		time.Sleep(time.Second)
-	}
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
+	name := ensureUniqueFile(p.Dir)
 	id := instance.ID(name)
 
 	// Decode the given spec and find the VM resource
@@ -1003,14 +990,8 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 // Label labels the instance
 func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
-	// Acquire lock
-	for {
-		if err := p.fsLock.TryLock(); err == nil {
-			defer p.fsLock.Unlock()
-			break
-		}
-		time.Sleep(time.Second)
-	}
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
 
 	tf, filename, err := p.parseFileForInstanceID(instance)
 	if err != nil {
@@ -1041,27 +1022,21 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 
 // Destroy terminates an existing instance.
 func (p *plugin) Destroy(instID instance.ID, context instance.Context) error {
+	// Acquire Lock outside of recursive doDestroy function
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
+
 	processAttach := true
 	if context == instance.RollingUpdate {
 		// Do not destroy related resources since this instance will be re-provisioned
 		processAttach = false
 	}
-	err := p.doDestroy(instID, processAttach, true)
-	return err
+	return p.doDestroy(instID, processAttach, true)
 }
 
 // doDestroy terminates an existing instance and optionally terminates any related
 // resources
 func (p *plugin) doDestroy(inst instance.ID, processAttach, executeTfApply bool) error {
-	// Acquire lock
-	for {
-		if err := p.fsLock.TryLock(); err == nil {
-			defer p.fsLock.Unlock()
-			break
-		}
-		time.Sleep(time.Second)
-	}
-
 	tf, filename, err := p.parseFileForInstanceID(inst)
 	if err != nil {
 		return err
@@ -1159,13 +1134,8 @@ func parseAttachTag(tf *TFormat) ([]string, error) {
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	log.Debugln("describe-instances", tags)
 	// Acquire lock since we are reading all files and potentially running "terraform show"
-	for {
-		if err := p.fsLock.TryLock(); err == nil {
-			defer p.fsLock.Unlock()
-			break
-		}
-		time.Sleep(time.Second)
-	}
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
 
 	// localSpecs are what we told terraform to create - these are the generated files.
 	localSpecs, err := p.scanLocalFiles()
@@ -1309,16 +1279,9 @@ type importFns struct {
 // .tf.json.new file based on the given spec
 func (p *plugin) importResources(fns importFns, resources []*ImportResource, spec *instance.Spec) error {
 	// Acquire lock since we are creating a tf.json.new file and updating terraform state
-	var vmResName string
-	for {
-		if err := p.fsLock.TryLock(); err == nil {
-			defer p.fsLock.Unlock()
-			vmResName = ensureUniqueFile(p.Dir)
-			break
-		}
-		log.Infoln("Can't acquire fsLock on importResource, waiting")
-		time.Sleep(time.Second)
-	}
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
+	vmResName := ensureUniqueFile(p.Dir)
 
 	// Parse the instance spec
 	tf := TFormat{}

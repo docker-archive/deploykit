@@ -2,6 +2,7 @@ package instance
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -60,6 +61,21 @@ func (p *plugin) terraformApply() error {
 				// that multiple .tf.json.new files have time to be created
 				if initial {
 					time.Sleep(time.Second * 5)
+					// And only run if there have been no file deltas in the last few seconds, the delta
+					// processing ignores files that are more then 30 seconds in the future so this
+					// should never wait indefinately but, to be safe, only wait for no deltas for at most
+					// 30 seconds
+					for i := 0; i < 30; i++ {
+						hasDelta, err := p.hasRecentDeltas(3)
+						if hasDelta {
+							time.Sleep(time.Second * 1)
+							continue
+						}
+						if err != nil {
+							log.Errorf("Failed to determine file deltas: %v", err)
+						}
+						break
+					}
 				}
 				if err := p.handleFiles(fns); err == nil {
 					if err = p.doTerraformApply(); err == nil {
@@ -136,6 +152,64 @@ type tfFuncs struct {
 	tfStateList func() (map[TResourceType]map[TResourceName]struct{}, error)
 }
 
+// hasRecentDeltas returns true if any tf.json[.new] files have been changed in
+// in the last "window" seconds
+func (p *plugin) hasRecentDeltas(window int) (bool, error) {
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
+
+	now := time.Now()
+	modTime := time.Time{}
+	fs := &afero.Afero{Fs: p.fs}
+	err := fs.Walk(p.Dir,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				log.Debugf("Ignoring file %s due to error: %s", path, err)
+				return nil
+			}
+			if m := tfFileRegex.FindStringSubmatch(info.Name()); len(m) == 3 {
+				if info.ModTime().After(now) {
+					// The file timestamp is in the future, this is fine if we are within 30 seconds but
+					// it should be ignored if it's further out (if there is a file with a timestamp
+					// that's a full day ahead we'd never process terraform until the local time catches
+					// up -- this should never happen but we should handle it)
+					if info.ModTime().After(now.Add(time.Duration(30) * time.Second)) {
+						log.Errorf(fmt.Sprintf(
+							"Terraform file %v has been updated in the future, ignoring timestamp in delta check (delta=%v)",
+							info.Name(),
+							now.Sub(info.ModTime())),
+						)
+						return nil
+					}
+				}
+				if modTime.Before(info.ModTime()) {
+					modTime = info.ModTime()
+				}
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	if !modTime.IsZero() {
+		if modTime.After(now.Add(-(time.Duration(window) * time.Second))) {
+			log.Infof(fmt.Sprintf(
+				"Terraform file updates are within %v seconds (delta=%v)",
+				window,
+				now.Sub(modTime)),
+			)
+			return true, nil
+		}
+		log.Infof(fmt.Sprintf(
+			"Terraform file updates are outside of %v seconds (delta=%v)",
+			window,
+			now.Sub(modTime)),
+		)
+	}
+	return false, nil
+}
+
 // handleFiles handles resource pruning and new resources via:
 // 1. Acquire file system lock
 // 2. Execute "terraform refresh" to refresh state
@@ -144,10 +218,7 @@ type tfFuncs struct {
 // Once these steps are done then "terraform apply" can execute without the
 // file system lock.
 func (p *plugin) handleFiles(fns tfFuncs) error {
-	if err := p.fsLock.TryLock(); err != nil {
-		log.Infof("In handleFiles, cannot acquire file lock")
-		return err
-	}
+	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
 
 	// Refresh resources and get updated resources names
