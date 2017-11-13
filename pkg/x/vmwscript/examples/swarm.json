@@ -1,0 +1,79 @@
+{
+    "label":"Docker-CE-on-CentOS",
+    "version":"0.1",
+    "vmconfig" : {
+        "datacentre" : "",
+        "datastore":"",
+        "network" : "",
+        "host" : "",
+        "guestCredentials" : {
+            "guestUser" : "root",
+            "guestPass" :"password"
+        }
+    },
+    "deployment": [
+        {"name": "Swarm Manager",
+            "note": "Build Swarm leader from Template",
+            "task":{
+               "inputTemplate": "DockerTemplate",
+               "outputName": "manager001",
+               "outputType": "VM",
+               "import":"",
+               "commands": [
+                   {
+                       "type":"execute",                    
+                       "note":"Initialise Docker Swarm",            
+                       "cmd":"/usr/bin/docker swarm init",
+                       "sudoUser":"root"
+                   },
+                   {
+                       "type":"execute",                    
+                       "note":"Backing up swarm key for other nodes",            
+                       "cmd":"/usr/bin/docker swarm join-token worker | grep SWMTKN > /tmp/swm.tkn",
+                       "sudoUser":"root"
+                   },
+                   {
+                       "type":"download",
+                       "filePath":"/tmp/swm.tkn",
+                       "resultKey":"jointoken",
+                       "delAfterDownload": true
+                   }
+                ]
+            }
+        },
+        {"name": "Swarm Worker",
+            "note": "Add worker",
+            "task":{
+               "inputTemplate": "DockerTemplate",
+               "outputName": "worker001",
+               "outputType": "VM",
+               "import":"",
+               "commands": [
+                   {
+                       "type":"execute",                    
+                       "note":"Join Swarm",
+                       "execKey":"jointoken",
+                       "sudoUser":"root"
+                   }
+                ]
+            }
+        },
+        {"name": "Swarm Worker",
+            "note": "Add worker",
+            "task":{
+               "inputTemplate": "DockerTemplate",
+               "outputName": "worker002",
+               "outputType": "VM",
+               "import":"",
+               "commands": [
+                   {
+                       "type":"execute",                    
+                       "note":"Join Swarm",
+                       "execKey":"jointoken",
+                       "sudoUser":"root"
+                   }
+                ]
+            }
+        }
+    ]
+}
