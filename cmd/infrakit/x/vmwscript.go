@@ -107,12 +107,12 @@ func vmwscriptCommand() *cobra.Command {
 		return nil
 	}
 
-	vc = cmd.Flags().String("vcurl", os.Getenv("VCURL"), "VMware vCenter URL, format https://user:pass@address/sdk [REQD]")
-	dc = cmd.Flags().String("datacenter", os.Getenv("VCDATACENTER"), "The name of the Datacenter to host the VM [REQD]")
-	ds = cmd.Flags().String("datastore", os.Getenv("VCDATASTORE"), "The name of the DataStore to host the VM [REQD]")
-	nn = cmd.Flags().String("network", os.Getenv("VCNETWORK"), "The network label the VM will use [REQD]")
-	vh = cmd.Flags().String("hostname", os.Getenv("VCHOST"), "The server that will run the VM [REQD]")
-	gu = cmd.Flags().String("templateUser", os.Getenv("VMUSER"), "A created user inside of the VM template")
-	gp = cmd.Flags().String("templatePass", os.Getenv("VMPASS"), "The password for the specified user inside the VM template")
+	vc = cmd.Flags().String("vcurl", os.Getenv("INFRAKIT_VSPHERE_VCURL"), "VMware vCenter URL, format https://user:pass@address/sdk [REQD]")
+	dc = cmd.Flags().String("datacenter", os.Getenv("INFRAKIT_VSPHERE_VCDATACENTER"), "The name of the Datacenter to host the VM [REQD]")
+	ds = cmd.Flags().String("datastore", os.Getenv("INFRAKIT_VSPHERE_VCDATASTORE"), "The name of the DataStore to host the VM [REQD]")
+	nn = cmd.Flags().String("network", os.Getenv("INFRAKIT_VSPHERE_VCNETWORK"), "The network label the VM will use [REQD]")
+	vh = cmd.Flags().String("hostname", os.Getenv("INFRAKIT_VSPHERE_VCHOST"), "The server that will run the VM [REQD]")
+	gu = cmd.Flags().String("templateUser", os.Getenv("INFRAKIT_VSPHERE_VMUSER"), "A created user inside of the VM template")
+	gp = cmd.Flags().String("templatePass", os.Getenv("INFRAKIT_VSPHERE_VMPASS"), "The password for the specified user inside the VM template")
 	return cmd
 }
