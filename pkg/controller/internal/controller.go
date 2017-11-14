@@ -67,6 +67,9 @@ func (c *Controller) leaderGuard() error {
 }
 
 func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**Managed, error) {
+
+	log.Debug("getManaged", "search", search, "spec", spec, "V", debugV)
+
 	out := []**Managed{}
 	if search == nil {
 		// all managed objects
@@ -96,6 +99,8 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 	}
 	ptr := c.managed[key]
 	out = append(out, &ptr)
+
+	log.Debug("found managed", "search", search, "spec", spec, "found", out)
 	return out, nil
 }
 

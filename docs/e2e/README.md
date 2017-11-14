@@ -40,25 +40,25 @@ $ tail -f docs/e2e/infrakit.log
 The description of the `miners` group is in the new format:
 
 ```
-infrakit local group/groups controller commit -y ./miners.yml --log 5
+infrakit local mystack/groups commit -y ./miners.yml --log 5
 ```
 
 `describe-group` returns a list of instances in a group:
 
 ```
-infrakit local group/miners describe-group
+infrakit local mystack/miners describe-group
 ```
 
 Old format:
 
 ```
-infrakit local group/groups commit-group ./cattle.json --log 5
+infrakit local mystack/groups commit-group ./cattle.json --log 5
 ```
 
 ### Set Up Ingress
 
 ```
-infrakit local group/ingress controller commit -y ./ingress.yml
+infrakit local mystack/ingress commit -y ./ingress.yml
 ```
 
 ### Scale Up / Down Groups
@@ -66,15 +66,19 @@ infrakit local group/ingress controller commit -y ./ingress.yml
 Get the current size of the groups:
 
 ```
-infrakit local group/miners scale
-infrakit local group/cattle scale
+infrakit local mystack/miners scale
+infrakit local mystack/cattle scale
 ```
 
+Change the size of the groups:
+
 ```
-infrakit local group/miners scale 10
-infrakit local group/cattle scale 20
+infrakit local mystack/miners scale 10
+infrakit local mystack/cattle scale 20
 ```
 
+Because the ingress controller associates the different groups as backends of different load balancers,
+we should see changes to the backends of the various load balancers.
 
 Verify backends of various load balancers:
 
@@ -95,17 +99,20 @@ infrakit local simulator/lb3 routes ls
 
 ### Clean Up
 
+Destroy will terminate and remove resources, while Free frees the resources from management / monitoring.
+Once freed, a commit is required for Infrakit to resume monitoring.  Destroy is a terminal and irreversible operation.
+
 #### Destroy Instances and Groups
 
 ```
-infrakit local group/miners destroy-instace
-infrakit local group/miners destroy
+infrakit local mystack/miners destroy-instace
+infrakit local mystack/miners destroy
 ```
 
 Free the group from management:
 
 ```
-infrakit local group/cattle free
+infrakit local mystack/cattle free
 ```
 
 ## Design / Roadmap
@@ -176,7 +183,7 @@ type Plugin interface {
 }
 ```
 
-Controller's evoluation:
+Controller's will evolve to look like:
 
 ```
 type Controller interface {
@@ -209,7 +216,7 @@ type Controller interface {
 }
 ```
 
-Group evolution:
+Group will become a composition of Controller plus other model-specific methods:
 
 ```
 // Plugin defines the functions for a Group plugin.
@@ -231,7 +238,10 @@ type Plugin interface {
 	SetSize(ID, int) error
 }
 ```
-Decision / Discussion:
+
+These method names are then reflected in the CLI.
+
+### Decision / Discussion:
 
 The `Plugin` interface may evolve to embody a 'specific' group, rather than a 'manager' of groups:
   + `Size(ID)` should really become `Size()`

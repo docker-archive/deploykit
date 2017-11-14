@@ -14,7 +14,9 @@ var log = logutil.New("module", "cli/v1/manager")
 func init() {
 	cli.Register(manager.InterfaceSpec,
 		[]cli.CmdBuilder{
-			Commit,
+			Enforce,
+			Inspect,
+			Terminate,
 		})
 }
 

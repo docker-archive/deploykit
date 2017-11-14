@@ -12,7 +12,7 @@ rm -f $LOG
 
 export INFRAKIT_MANAGER_CONTROLLERS=ingress,enrollment
 infrakit plugin start \
-	 manager \
+	 manager:mystack \
 	 group \
 	 combo \
 	 vanilla \

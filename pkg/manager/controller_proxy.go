@@ -145,6 +145,8 @@ func (m controllerAdapter) Describe(search *types.Metadata) (found []types.Objec
 	<-m.queue("describe",
 		func() error {
 
+			log.Debug("describe", "search", search, "V", debugV2)
+
 			found, err = m.backend.Describe(search)
 			return err
 		})

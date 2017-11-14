@@ -12,7 +12,7 @@ metadata:
 # options block map to pkg/controller/ingress/types/Options
 options:
   # SyncInterval is how often to sync changes between the services and the LB
-  SyncInterval: 1s  # syntax is a string form of Go time.Duration
+  SyncInterval: 3s  # syntax is a string form of Go time.Duration
 
 # properties block map to pkg/controller/ingress/types/Properties
 properties:
@@ -22,7 +22,7 @@ properties:
   # so that the routes for the L4 will not pick up those from Swarm services.
   - Backends:
       Groups:
-        - group/miners # This is a group at socket(group), groupID(miners).
+        - mystack/miners # This is a group at socket(group), groupID(miners).
 
     # This is the plugin name of the L4 plugin. When you run `infrakit plugin start ... simulator`
     # the default socket file name is 'simulator' and there's a default lb2 in the RPC object.
@@ -38,7 +38,7 @@ properties:
   - Vhost: manager.internal  #
     Backends:
       Groups:
-        - group/miners # This is a group at socket(group), groupID(miners).
+        - mystack/miners # This is a group at socket(group), groupID(miners).
 
     L4Plugin: simulator/lb2
 
@@ -52,7 +52,7 @@ properties:
   - Vhost: cattle.internal
     Backends:
       Groups:
-        - group/cattle # This is a group at socket(group), groupID(miners).
+        - mystack/cattle # This is a group at socket(group), groupID(miners).
 
     L4Plugin: simulator/lb3
 
