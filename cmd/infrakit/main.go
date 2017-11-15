@@ -2,14 +2,13 @@ package main
 
 import (
 	"errors"
-	//	"flag"
 	"fmt"
 	"os"
 	"path"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/cli"
-	cli_local "github.com/docker/infrakit/pkg/cli/local"
+	"github.com/docker/infrakit/pkg/cli/playbook"
 	"github.com/docker/infrakit/pkg/discovery"
 	discovery_local "github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/discovery/remote"
@@ -87,6 +86,8 @@ func (e emptyPlugins) List() (map[string]*plugin.Endpoint, error) {
 var (
 	empty    = emptyPlugins{}
 	errEmpty = errors.New("no plugins")
+
+	log = logutil.New("module", "main")
 )
 
 // A generic client for infrakit
@@ -95,15 +96,9 @@ func main() {
 	if err := discovery_local.Setup(); err != nil {
 		panic(err)
 	}
-	if err := cli_local.Setup(); err != nil {
-		panic(err)
-	}
 	if err := template.Setup(); err != nil {
 		panic(err)
 	}
-
-	log := logutil.New("module", "main")
-
 	// Log setup
 	logOptions := &logutil.ProdDefaults
 	logFlags := cli.Flags(logOptions)
@@ -118,7 +113,6 @@ func main() {
 		},
 	}
 	cmd.PersistentFlags().AddFlagSet(logFlags)
-	//cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
 	// Don't print usage text for any error returned from a RunE function.
 	// Only print it when explicitly requested.
@@ -152,9 +146,19 @@ func main() {
 		return d
 	}
 
+	scope := scope.DefaultScope(f)
+
 	cmd.AddCommand(cli.VersionCommand())
 
-	scope := scope.DefaultScope(f)
+	// playbooks
+	pb, err := playbook.Load()
+	if err != nil {
+		log.Warn("Cannot load playbook file")
+	}
+
+	if !pb.Empty() {
+		cmd.AddCommand(useCommand(scope, pb))
+	}
 
 	base.VisitModules(scope, func(c *cobra.Command) {
 		cmd.AddCommand(c)
@@ -176,7 +180,7 @@ func main() {
 	if len(os.Args) > 2 && os.Args[1] == stackCommandName {
 		cmd.SetArgs(os.Args[1:2])
 	}
-	err := cmd.Execute()
+	err = cmd.Execute()
 	if err != nil {
 		log.Crit("error executing", "cmd", cmd.Use, "err", err)
 		fmt.Println(err.Error())
@@ -188,6 +192,60 @@ func main() {
 	if bashCompletionScript != "" {
 		cmd.GenBashCompletionFile(bashCompletionScript)
 	}
+}
+
+func useCommand(scope scope.Scope, pb *playbook.Playbooks) *cobra.Command {
+
+	// Log setup
+	logOptions := &logutil.ProdDefaults
+	logFlags := cli.Flags(logOptions)
+
+	use := "use"
+	description := "Use a playbook"
+
+	cmd := &cobra.Command{
+		Use:   use,
+		Short: description,
+
+		RunE: func(c *cobra.Command, args []string) error {
+
+			main := &cobra.Command{
+				Use: path.Base(os.Args[0]),
+				PersistentPreRunE: func(c *cobra.Command, args []string) error {
+					logutil.Configure(logOptions)
+					return nil
+				},
+			}
+			main.PersistentFlags().AddFlagSet(logFlags)
+
+			useCmd := &cobra.Command{
+				Use:   use,
+				Short: description,
+			}
+			main.AddCommand(useCmd)
+
+			// Commands from playbooks
+			playbookCommands := []*cobra.Command{}
+			if playbooks, err := playbook.NewModules(scope, pb.Modules(), os.Stdin, template.Options{}); err != nil {
+				log.Warn("error loading playbooks", "err", err)
+			} else {
+				if more, err := playbooks.List(); err != nil {
+					log.Warn("cannot list playbooks", "err", err)
+				} else {
+					playbookCommands = append(playbookCommands, more...)
+				}
+			}
+
+			for _, cc := range playbookCommands {
+				useCmd.AddCommand(cc)
+			}
+
+			main.SetArgs(os.Args[1:])
+			return main.Execute()
+		},
+	}
+
+	return cmd
 }
 
 const (
