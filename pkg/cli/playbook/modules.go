@@ -1,4 +1,4 @@
-package remote
+package playbook
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var log = logutil.New("module", "cli/remote")
+var log = logutil.New("module", "cli/playbook")
 
 // helpTemplate is for embedding content from README.md in the same directory.
 const helpTemplate = `{{with or .Long .Short }}{{. | trim}}
@@ -162,7 +162,7 @@ loop:
 			}
 			err := ctx.BuildFlags()
 			if err != nil {
-				log.Debug("cannot build flags", "op", op, "url", moduleURL, "err", err)
+				log.Warn("Cannot build flags", "operation", op, "url", moduleURL, "err", err)
 				continue loop
 			}
 
