@@ -4,19 +4,23 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 )
 
 const (
 	// EnvInfrakitHome is the environment variable for defining the top level working directory
 	// for infrakit.
 	EnvInfrakitHome = "INFRAKIT_HOME"
+
+	// EnvPlaybooks is the environment variable for storing the playbooks file
+	EnvPlaybooks = "INFRAKIT_PLAYBOOKS_FILE"
 )
 
 // InfrakitHome returns the directory of INFRAKIT_HOME if specified. Otherwise, it will return
 // the user's home directory.  If that cannot be determined, then it returns the current working
 // directory.  If that still cannot be determined, a temporary directory is returned.
 func InfrakitHome() string {
-	dir := os.Getenv("INFRAKIT_HOME")
+	dir := os.Getenv(EnvInfrakitHome)
 	if dir != "" {
 		return dir
 	}
@@ -32,6 +36,14 @@ func InfrakitHome() string {
 		return dir
 	}
 	return os.TempDir()
+}
+
+// Playbooks returns the path to the playbooks
+func Playbooks() string {
+	if playbooksFile := os.Getenv(EnvPlaybooks); playbooksFile != "" {
+		return playbooksFile
+	}
+	return filepath.Join(InfrakitHome(), "playbooks.yml")
 }
 
 // Getenv returns the value at the environment variable 'env'.  If the value is not found

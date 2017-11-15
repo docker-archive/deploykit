@@ -3,15 +3,9 @@ package playbook
 import (
 	"io/ioutil"
 	"os"
-	"os/user"
-	"path/filepath"
 
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/types"
-)
-
-const (
-	// PlaybooksFileEnvVar is the location of the playbooks file
-	PlaybooksFileEnvVar = "INFRAKIT_PLAYBOOKS_FILE"
 )
 
 // Playbook contains information about the source and a local cache.
@@ -81,7 +75,7 @@ func (pb *Playbooks) Modules() map[Op]SourceURL {
 
 // Save saves the playbooks
 func (pb *Playbooks) Save() error {
-	return pb.writeTo(defaultPlaybooksFile())
+	return pb.writeTo(local.Playbooks())
 }
 
 func (pb *Playbooks) writeTo(path string) error {
@@ -97,7 +91,7 @@ func (pb *Playbooks) writeTo(path string) error {
 }
 
 func (pb *Playbooks) loadFrom(path string) error {
-	buff, err := ioutil.ReadFile(defaultPlaybooksFile())
+	buff, err := ioutil.ReadFile(local.Playbooks())
 	if err != nil {
 		if !os.IsExist(err) {
 			return nil
@@ -111,26 +105,8 @@ func (pb *Playbooks) loadFrom(path string) error {
 	return yaml.Decode(pb)
 }
 
-func defaultPlaybooksFile() string {
-	if playbooksFile := os.Getenv(PlaybooksFileEnvVar); playbooksFile != "" {
-		return playbooksFile
-	}
-
-	// if there's INFRAKIT_HOME defined
-	home := os.Getenv("INFRAKIT_HOME")
-	if home != "" {
-		return filepath.Join(home, "playbooks.yml")
-	}
-
-	home = os.Getenv("HOME")
-	if usr, err := user.Current(); err == nil {
-		home = usr.HomeDir
-	}
-	return filepath.Join(home, ".infrakit/playbooks.yml")
-}
-
 // Load loads the playbook
 func Load() (*Playbooks, error) {
 	pb := &Playbooks{}
-	return pb, pb.loadFrom(defaultPlaybooksFile())
+	return pb, pb.loadFrom(local.Playbooks())
 }
