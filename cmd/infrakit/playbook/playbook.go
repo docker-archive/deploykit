@@ -191,37 +191,5 @@ func Command(scope scope.Scope) *cobra.Command {
 	list.Flags().AddFlagSet(rawOutputFlags)
 
 	cmd.AddCommand(add, remove, update, list)
-
-	// reserved := map[*cobra.Command]int{add: 1, remove: 1, list: 1}
-
-	// // Commands from playbooks
-	// playbookCommands := []*cobra.Command{}
-
-	// // playbooks
-	// pb, err := playbook.Load()
-	// if err != nil {
-	// 	log.Warn("playbooks failed to load", "err", err)
-	// }
-
-	// if playbooks, err := playbook.NewModules(scope, pb.Modules(), os.Stdin, template.Options{}); err != nil {
-	// 	log.Warn("error loading playbooks", "err", err)
-	// } else {
-	// 	if more, err := playbooks.List(); err != nil {
-	// 		log.Warn("cannot list playbooks", "err", err)
-	// 	} else {
-	// 		playbookCommands = append(playbookCommands, more...)
-	// 	}
-	// }
-
-	// for _, c := range playbookCommands {
-	// 	if _, has := reserved[c]; has {
-	// 		log.Warn("cannot override reserverd command; igored", "conflict", c.Use)
-	// 		continue
-	// 	}
-
-	// 	log.Warn("Adding", "module", c.Use)
-	// 	cmd.AddCommand(c)
-	// }
-
 	return cmd
 }
