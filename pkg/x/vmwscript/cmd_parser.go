@@ -39,13 +39,26 @@ type DeploymentTask struct {
 	Name string `json:"name"`
 	Note string `json:"note"`
 	Task struct {
-		InputTemplate string `json:"inputTemplate"`
-		OutputName    string `json:"outputName"`
-		OutputType    string `json:"outputType"`
-
-		Version  string              `json:"version"`
-		Commands []DeploymentCommand `json:"commands"`
+		InputTemplate string              `json:"inputTemplate"`
+		OutputName    string              `json:"outputName"`
+		OutputType    string              `json:"outputType"`
+		Network       *NetworkConfig      `json:"networkConfig,omitempty"`
+		Version       string              `json:"version"`
+		Commands      []DeploymentCommand `json:"commands"`
 	} `json:"task"`
+}
+
+// NetworkConfig - provides distro specific networking configuration
+type NetworkConfig struct {
+	Distro string `json:"distro"` // this is required so that we can apply logic to the config based upon the Linux distro used.
+
+	DeviceName string `json:"device"`
+
+	Address string `json:"address"`
+	Gateway string `json:"gateway"`
+	DNS     string `json:"dns,omitempty"`
+
+	Hostname string `json:"hostname"`
 }
 
 // DeploymentCommand - is passed to the vSphere API functions in order to be executed on a remote VM

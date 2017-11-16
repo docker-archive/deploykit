@@ -48,11 +48,11 @@ Flags:
 Below are the environment variables that can be used to authenticate when using the InfraKit vmwscript utility.
 
 ```
-export VCDATACENTER="Datacenter"
-export VCDATASTORE="datastore"
-export VCHOST="vsphere01.lab"
-export VCNETWORK="Internal Network (NAT)"
-export VCURL="https://user@vsphere.local:pass@vCenter.lab/sdk"
+export INFRAKIT_VSPHERE_VCDATACENTER="Datacenter"
+export INFRAKIT_VSPHERE_VCDATASTORE="datastore"
+export INFRAKIT_VSPHERE_VCHOST="vsphere01.lab"
+export INFRAKIT_VSPHERE_VCNETWORK="Internal Network (NAT)"
+export INFRAKIT_VSPHERE_VCURL="https://user@vsphere.local:pass@vCenter.lab/sdk"
 ```
 
 ### Deployment files
@@ -91,6 +91,14 @@ The `label` is what vmwscript will use when it logs out what the deployment plan
             "outputName": "DockerTemplate",
             "outputType": "Template",
             "import":"",
+            "networkConfig":{
+                    "distro":"centos",
+                    "device":"ens192",
+                    "address":"10.0.0.101/24",
+                    "gateway":"10.0.0.1",
+                    "dns":"8.8.8.8",
+                    "hostname":"manager01.local"
+                },
 ```
 
 The `deployment` is an array of deployments that can take place, each JSON object in that array will be a full set of deployment tasks that will be defined with a `name` and a `note`. 
@@ -101,7 +109,19 @@ Each task has some defined inputs and outputs:
 - `outputName` - The name of the VM output that will be created
 - `outputType` - Either `Template` or `VM`
 - `import` - **UNUSED** possibly for linking deployment plans together
-- `commands` - a JSON array of commands detailed below
+- `commands` - A JSON array of commands detailed below
+- `networkConfig` - A static configuration to be applied per each host
+
+**Network Config**
+
+- `distro` - Currently only `centos` has been created
+- `device` - This is the device that is used by Network Manager (typically `ens160` or `ens192`)
+- `address` - This should be the in the `address`/`subnet` format
+- `gateway` - The IP address of the gateway being used
+- `dns` - This can either be a single or multiple DNS servers e.g. `8.8.8.8 8.8.4.4`
+- `hostname` - This will set the instance to have a particular hostname that persists through reboots.
+
+The virtual machine will *REBOOT* once the networking changes have been applied.
 
 **Execute a simple command**
 
