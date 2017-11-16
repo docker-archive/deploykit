@@ -9,11 +9,14 @@ import (
 )
 
 func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
-	certLabel := "emptylabel"
+
+	certLabel := "cert.id"
+	certLookupID := "cert-uuid"
 
 	s := swarm.Service{}
 	s.Spec.Labels = map[string]string{
 		LabelExternalLoadBalancerSpec: "http://:8080",
+		certLabel:                     certLookupID,
 	}
 	s.Endpoint.Ports = []swarm.PortConfig{} // no exposed ports
 
@@ -48,14 +51,17 @@ func TestExternalLoadBalancerListenersFromService1(t *testing.T) {
 	require.Equal(t, HostNotSpecified, listener.host())
 	require.Equal(t, loadbalancer.HTTP, listener.protocol())
 	require.Equal(t, 8080, listener.extPort())
+	require.Equal(t, certLookupID, *listener.CertASN())
 }
 
 func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
-	certLabel := "emptylabel"
+	certLabel := "certLabel"
+	certID := "certID"
 
 	s := swarm.Service{}
 	s.Spec.Labels = map[string]string{
 		LabelExternalLoadBalancerSpec: "http://",
+		certLabel:                     certID,
 	}
 	s.Spec.Name = "web1"
 	s.Endpoint.Ports = []swarm.PortConfig{
@@ -82,6 +88,7 @@ func TestExternalLoadBalancerListenersFromService2(t *testing.T) {
 	require.Equal(t, HostNotSpecified, listener.host())
 	require.Equal(t, loadbalancer.HTTP, listener.protocol())
 	require.Equal(t, 80, listener.extPort())
+	require.Equal(t, certID, *listener.CertASN())
 }
 
 func TestExternalLoadBalancerListenersFromService3(t *testing.T) {

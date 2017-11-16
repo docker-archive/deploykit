@@ -255,7 +255,8 @@ properties:
       - LoadBalancerPort: 80
         LoadBalancerProtocol: https
         Port: 8080
-        Protocol: http
+        Protocol: https
+	Certificate: external-cert-id  # This is an id used to identify a cert in some external system
 ```
 
 Here we have two sections under `Properties`:
@@ -337,7 +338,7 @@ Checking on `simulator/lb2`, we should see one route that's statically defined i
 ```
 $ infrakit simulator/lb2 routes ls
 FRONTEND PORT    FRONTEND PROTOCOL      BACKEND PORT      BACKEND PROTOCOL        CERT
-80               https                  8080              http
+80               https                  8080              https                   external-cert-id
 $ infrakit simulator/lb2 backends ls
 INSTANCE ID
 1510037640974259504
@@ -350,7 +351,7 @@ INSTANCE ID
 Now let's add a Docker Swarm service:
 
 ```
-$ docker service create --network ingress --name t2 --publish 7777:80 nginx
+$ docker service create --network ingress --name t2 --publish 7777:80 --label lb-cert-label=lb-cert-external-id nginx
 q0fknd2anvzry8dd4ovhv19n2
 Since --detach=false was not specified, tasks will be created in the background.
 In a future release, --detach=false will become the default.
@@ -368,8 +369,9 @@ Consequently we see that the route is published to the L4, `simulator/lb1`:
 
 ```
 $ infrakit simulator/lb1 routes ls
+$ infrakit simulator/lb1 routes ls
 FRONTEND PORT    FRONTEND PROTOCOL      BACKEND PORT      BACKEND PROTOCOL        CERT
-7777             TCP                    7777              TCP
+7777             TCP                    7777              TCP                     lb-cert-external-id
 
 $ infrakit simulator/lb1 backends ls
 INSTANCE ID
@@ -392,7 +394,7 @@ After some time, verify:
 ```
 $ infrakit simulator/lb1 routes ls
 FRONTEND PORT    FRONTEND PROTOCOL      BACKEND PORT      BACKEND PROTOCOL        CERT
-7777             TCP                    7777              TCP
+7777             TCP                    7777              TCP                     lb-cert-external-id
 
 $ infrakit simulator/lb1 backends ls
 INSTANCE ID
@@ -426,7 +428,7 @@ INSTANCE ID
 
 $ infrakit simulator/lb2 routes ls
 FRONTEND PORT    FRONTEND PROTOCOL      BACKEND PORT      BACKEND PROTOCOL        CERT
-80               https                  8080              http
+80               https                  8080              https                   external-cert-id
 ```
 So we see that the ingress controller can manage and synchronize the routes and backends of two different
 loadbalancers.

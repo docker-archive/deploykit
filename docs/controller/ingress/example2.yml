@@ -68,6 +68,9 @@ properties:
     RouteSources:
       swarm:
         Host: unix:///var/run/docker.sock
+        # CertificateLabel is the swarm service label that has the certificate id.
+        CertificateLabel: lb-cert-label
+
   - Vhost: system
     Backends:
       Groups:
@@ -80,4 +83,5 @@ properties:
       - LoadBalancerPort: 80
         LoadBalancerProtocol: https
         Port: 8080
-        Protocol: http
+        Protocol: https
+        Certificate: external-cert-id

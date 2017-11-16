@@ -100,10 +100,18 @@ func (b *RoutesBuilder) SetOptions(options ingress.Options) *RoutesBuilder {
 	return b
 }
 
-// SetSpecLabels sets the label to look for for loadbalancer spec and certifcate spec
+// SetSpecLabels sets the label to look for loadbalancer spec and certifcate spec
 func (b *RoutesBuilder) SetSpecLabels(lbSpec, certSpec string) *RoutesBuilder {
 	b.lbSpecLabel = lbSpec
 	b.certSpecLabel = certSpec
+	return b
+}
+
+// SetCertLabel sets the label to look for the certifcate id
+func (b *RoutesBuilder) SetCertLabel(certLabel *string) *RoutesBuilder {
+	if certLabel != nil {
+		b.certSpecLabel = *certLabel
+	}
 	return b
 }
 

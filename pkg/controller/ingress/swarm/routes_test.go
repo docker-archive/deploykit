@@ -132,6 +132,9 @@ func TestRunRoutes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	certLabel := "certLabel"
+	certID := "certID"
+
 	services := []swarm.Service{
 		{
 			Spec: swarm.ServiceSpec{
@@ -139,6 +142,7 @@ func TestRunRoutes(t *testing.T) {
 					Name: "proxy",
 					Labels: map[string]string{
 						"docker.editions.proxy.port": "80/http",
+						certLabel:                    certID,
 					},
 				},
 			},
@@ -163,6 +167,7 @@ func TestRunRoutes(t *testing.T) {
 	stopRoutes := make(chan interface{})
 
 	routes, err := NewServiceRoutes(client).
+		SetCertLabel(&certLabel).
 		AddRule("proxy",
 
 			MatchSpecLabels(map[string]string{
@@ -175,15 +180,16 @@ func TestRunRoutes(t *testing.T) {
 				found = append(found, s[0])
 
 				close(stopRoutes)
-
-				return nil, nil
+				return nil, nil // returns no routes
 			}).
 		Build()
 
 	require.NoError(t, err)
 	require.NotNil(t, routes)
 
-	routes.List()
+	vhostRoutes, err := routes.List()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(vhostRoutes)) // because the matcher returns no routes
 
 	require.Equal(t, 1, len(found))
 	require.Equal(t, services[0], found[0])
