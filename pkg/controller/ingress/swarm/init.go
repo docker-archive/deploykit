@@ -35,6 +35,9 @@ type Docker docker.ConnectInfo
 type Spec struct {
 	// Docker holds the connection params to the Docker engine for join tokens, etc.
 	Docker `json:",inline" yaml:",inline"`
+
+	// CertificateLabel is the label on swarm services that we look for to get the certificate id.
+	CertificateLabel *string
 }
 
 type handler struct {
@@ -74,7 +77,10 @@ func (h *handler) Routes(properties *types.Any,
 	log.Info("Connected to Docker", "client", dockerClient)
 	h.dockerClient = dockerClient
 
-	routes, err := NewServiceRoutes(dockerClient).SetOptions(options).Build()
+	routes, err := NewServiceRoutes(dockerClient).
+		SetOptions(options).
+		SetCertLabel(spec.CertificateLabel).
+		Build()
 	if err != nil {
 		return nil, err
 	}
