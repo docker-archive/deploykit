@@ -12,6 +12,8 @@ import (
 
 func TestParseSpec(t *testing.T) {
 
+	certLabel := "certLabel"
+
 	properties := ingress.Properties{
 		{
 			Vhost:    ingress.Vhost("test.com"),
@@ -19,9 +21,10 @@ func TestParseSpec(t *testing.T) {
 			RouteSources: map[string]*types.Any{
 				"swarm": types.AnyValueMust(
 					Spec{
-						Docker(docker.ConnectInfo{
+						Docker: Docker(docker.ConnectInfo{
 							Host: "/var/run/docker.sock",
 						}),
+						CertificateLabel: &certLabel,
 					},
 				),
 			},
@@ -41,4 +44,5 @@ func TestParseSpec(t *testing.T) {
 	err = properties[0].RouteSources["swarm"].Decode(&spec)
 	require.NoError(t, err)
 	require.Equal(t, "/var/run/docker.sock", spec.Docker.Host)
+	require.Equal(t, certLabel, *spec.CertificateLabel)
 }

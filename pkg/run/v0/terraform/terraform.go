@@ -107,7 +107,7 @@ func Run(scope scope.Scope, name plugin.Name,
 		return
 	}
 
-	importInstSpec, err := parseInstanceSpecFromGroup(options.ImportGroupSpecURL, options.ImportGroupID)
+	importInstSpec, err := parseInstanceSpecFromGroup(scope, options.ImportGroupSpecURL, options.ImportGroupID)
 	if err != nil {
 		// If we cannot parse the group spec then we cannot import the resource, the plugin should
 		// not start since terraform is not managing the resource
@@ -162,22 +162,25 @@ func mustHaveTerraform() error {
 
 // parseInstanceSpecFromGroup parses the instance.Spec from the group.Spec and adds
 // in the tags that should be set on the imported instance
-func parseInstanceSpecFromGroup(groupSpecURL, groupID string) (*instance.Spec, error) {
+func parseInstanceSpecFromGroup(scope scope.Scope, groupSpecURL, groupID string) (*instance.Spec, error) {
 	// TODO: Support a URL to a manager config with multiple nested groups
 	if groupSpecURL == "" {
 		log.Info("No group spec URL specified for import")
 		return nil, nil
 	}
 	var groupSpec group.Spec
-	t, err := template.NewTemplate(groupSpecURL, template.Options{MultiPass: false})
+	t, err := scope.TemplateEngine(groupSpecURL, template.Options{MultiPass: false})
 	if err != nil {
+		log.Error("Failed to create template", "spec", groupSpecURL, "err", err)
 		return nil, err
 	}
 	template, err := t.Render(nil)
 	if err != nil {
+		log.Error("Failed to render template", "spec", groupSpecURL, "err", err)
 		return nil, err
 	}
 	if err = types.AnyString(template).Decode(&groupSpec); err != nil {
+		log.Error("Failed to decode template", "spec", groupSpecURL, "err", err)
 		return nil, err
 	}
 	// Get the instance properties we care about
