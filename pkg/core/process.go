@@ -216,11 +216,11 @@ func NormalizeSpecs(uri string, input []byte) ([]*types.Spec, error) {
 		}
 
 		specs = append(specs, member)
-		specs = append(specs, nested(member)...)
+		specs = append(specs, types.Flatten(member)...)
 	}
 
 	// compute ordering
-	ordered, err := OrderByDependency(specs)
+	ordered, err := types.OrderByDependency(specs)
 	if err != nil {
 		return nil, err
 	}

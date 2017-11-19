@@ -15,7 +15,7 @@ import (
 func DestroyInstances(name string, services *cli.Services) *cobra.Command {
 
 	destroy := &cobra.Command{
-		Use:   "destroy-instances <groupID> <instance ID>...",
+		Use:   "destroy-instance <instance ID>...",
 		Short: "Destroy a group's instances",
 		RunE: func(cmd *cobra.Command, args []string) error {
 

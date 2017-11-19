@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -27,7 +26,7 @@ var (
 type StartPlugin string
 
 // FromAddressable returns a StartPlugin encoded string
-func FromAddressable(addr core.Addressable) StartPlugin {
+func FromAddressable(addr plugin.Addressable) StartPlugin {
 	return StartPlugin(fmt.Sprintf("%v:%v", addr.Kind(), addr.Plugin().Lookup()))
 }
 

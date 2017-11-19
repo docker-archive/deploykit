@@ -4,6 +4,7 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -14,6 +15,8 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
+
+var log = logutil.New("module", "run/scope")
 
 // Nil is no scope
 var Nil = DefaultScope(func() discovery.Plugins {

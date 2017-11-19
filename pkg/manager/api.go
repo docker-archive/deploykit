@@ -4,7 +4,6 @@ import (
 	"net/url"
 
 	"github.com/docker/infrakit/pkg/controller"
-	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -76,7 +75,7 @@ type Options struct {
 	Controllers []plugin.Name
 
 	// Plugins for plugin lookup
-	Plugins func() discovery.Plugins `json:"-" yaml:"-"`
+	//Plugins func() discovery.Plugins `json:"-" yaml:"-"`
 
 	// Leader is the leader detector
 	Leader leader.Detector `json:"-" yaml:"-"`

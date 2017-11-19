@@ -3,18 +3,15 @@ package manager
 import (
 	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/controller/group"
-	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/plugin"
-	controller_rpc "github.com/docker/infrakit/pkg/rpc/controller"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // GroupControllers returns a map of *scoped* group controllers by ID of the group.
 func (m *manager) Controllers() (map[string]controller.Controller, error) {
 
-	gcontroller := group.AsController(core.NewAddressable("group", m.Options.Name.LookupOnly(), ""), m)
+	gcontroller := group.AsController(plugin.NewAddressable("group", m.Options.Name.LookupOnly(), ""), m)
 	controllers := map[string]controller.Controller{
-		//		".":      gcontroller,
 		"groups": gcontroller,
 	}
 	all, err := m.Plugin.InspectGroups()
@@ -24,26 +21,21 @@ func (m *manager) Controllers() (map[string]controller.Controller, error) {
 	for _, spec := range all {
 		gid := spec.ID
 		controllers[string(gid)] = group.AsController(
-			core.NewAddressable("group", m.Options.Name, string(gid)), m)
+			plugin.NewAddressable("group", m.Options.Name, string(gid)), m)
 	}
 
 	for _, c := range m.Options.Controllers {
 
 		pn := c
+		control, err := m.scope.Controller(pn.String())
+		if err != nil {
+			return nil, err
+		}
+
 		controllers[pn.String()] = controllerAdapter{
 			name:    c,
 			manager: m,
-			backend: controller.LazyConnect(
-				func() (controller.Controller, error) {
-
-					log.Debug("looking up controller backend", "name", pn)
-					endpoint, err := m.Options.Plugins().Find(pn)
-					if err != nil {
-						return nil, err
-					}
-					return controller_rpc.NewClient(pn, endpoint.Address)
-
-				}, defaultPluginPollInterval),
+			backend: control,
 		}
 	}
 	log.Debug("Controllers", "map", controllers, "V", debugV2)

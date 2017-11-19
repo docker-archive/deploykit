@@ -135,7 +135,6 @@ func Run(scope scope.Scope, name plugin.Name,
 	log.Info("Starting up", "backend", options.Backend)
 
 	options.Name = name
-	options.Plugins = scope.Plugins
 
 	switch strings.ToLower(options.Backend) {
 	case "etcd":
@@ -179,7 +178,7 @@ func Run(scope scope.Scope, name plugin.Name,
 		return
 	}
 
-	mgr := manager.NewManager(options.Options)
+	mgr := manager.NewManager(scope, options.Options)
 	log.Info("Start manager", "m", mgr)
 
 	_, err = mgr.Start()
@@ -203,7 +202,7 @@ func Run(scope scope.Scope, name plugin.Name,
 	if options.Mux != nil {
 
 		log.Info("Starting mux server", "listen", options.Mux.Listen, "advertise", options.Mux.Advertise)
-		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.Advertise, options.Plugins,
+		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.Advertise, scope.Plugins,
 			mux.Options{
 				Leadership: options.Leader.Receive(),
 				Registry:   options.LeaderStore,

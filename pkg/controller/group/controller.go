@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/controller"
-	"github.com/docker/infrakit/pkg/core"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // AsController returns a Controller, possibly with a scope of the group ID.
-func AsController(addr core.Addressable, g group.Plugin) controller.Controller {
+func AsController(addr plugin.Addressable, g group.Plugin) controller.Controller {
 	var scope *group.ID
 	if addr.Instance() != "" {
 		gid := group.ID(addr.Instance())
@@ -27,7 +27,7 @@ func AsController(addr core.Addressable, g group.Plugin) controller.Controller {
 // for a group.  When id is specified, the controller is scoped to the id.  When input is missing
 // id, it will be injected.  If input has mismatched id, requests will error.
 type gController struct {
-	core.Addressable
+	plugin.Addressable
 	scope  *group.ID
 	plugin group.Plugin
 }
@@ -37,7 +37,7 @@ func (c *gController) translateSpec(spec types.Spec) (group.Spec, error) {
 		Properties: spec.Properties,
 	}
 
-	addressable := core.AsAddressable(spec)
+	addressable := plugin.AsAddressable(spec)
 	if c.scope == nil {
 		if addressable.Instance() == "" {
 			return gSpec, fmt.Errorf("no group name")
@@ -178,7 +178,7 @@ func (c *gController) Describe(search *types.Metadata) (objects []types.Object, 
 		if search == nil {
 			return true
 		}
-		query := core.NewAddressableFromMetadata(c.Kind(), *search)
+		query := plugin.NewAddressableFromMetadata(c.Kind(), *search)
 		return query.Instance() == string(gid)
 	}
 
@@ -214,7 +214,7 @@ func (c *gController) Specs(search *types.Metadata) (specs []types.Spec, err err
 		if search == nil {
 			return true
 		}
-		query := core.NewAddressableFromMetadata(c.Kind(), *search)
+		query := plugin.NewAddressableFromMetadata(c.Kind(), *search)
 		return query.Instance() == string(gid)
 	}
 
@@ -233,7 +233,7 @@ func (c *gController) Free(search *types.Metadata) (objects []types.Object, err 
 		return
 	}
 	for _, object := range objects {
-		addr := core.AsAddressable(object.Spec)
+		addr := plugin.AsAddressable(object.Spec)
 		err = c.plugin.FreeGroup(group.ID(addr.Instance()))
 		if err != nil {
 			return
@@ -248,7 +248,7 @@ func (c *gController) Terminate(search *types.Metadata) (objects []types.Object,
 		return
 	}
 	for _, object := range objects {
-		addr := core.AsAddressable(object.Spec)
+		addr := plugin.AsAddressable(object.Spec)
 		err = c.plugin.DestroyGroup(group.ID(addr.Instance()))
 		if err != nil {
 			return
