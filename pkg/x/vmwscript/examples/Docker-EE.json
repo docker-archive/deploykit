@@ -20,11 +20,11 @@
             "outputType": "Template",
             "import":"",
             "commands": [
-		{
+                {
                     "type":"execute",
                     "note":"Remove TTY requirement for sudo (old RHEL issue)",
                     "cmd":"sed -i -e 's/Defaults    requiretty.*/ #Defaults    requiretty/g' /etc/sudoers"
-		},
+                },
                 {
                     "type":"execute",                    
                     "note":"Disable SELINUX (FirewallD bug)",
@@ -88,30 +88,31 @@
                 {
                     "type":"execute",                    
                     "note":"Set Swarm firewall rules",            
-                    "cmd":"/usr/bin/firewall-cmd --add-port=2376/tcp --permanent",
+                    "cmd":"/usr/bin/firewall-cmd --add-port=2376-2377/tcp --permanent",
                     "sudoUser":"root"
                 },
                 {
                     "type":"execute",                    
-                    "note":"Set Swarm firewall rules",            
-                    "cmd":"/usr/bin/firewall-cmd --add-port=2377/tcp --permanent",
-                    "sudoUser":"root"
-                },
-                {
-                    "type":"execute",                    
-                    "note":"Set Swarm firewall rules",            
+                    "note":"Set Gossip TCP firewall rules",            
                     "cmd":"/usr/bin/firewall-cmd --add-port=7946/tcp --permanent",
                     "sudoUser":"root"
                 },
                 {
                     "type":"execute",                    
-                    "note":"Set Swarm firewall rules",            
+                    "note":"Set Gossip UDP firewall rules",            
                     "cmd":"/usr/bin/firewall-cmd --add-port=7946/udp --permanent",
                     "sudoUser":"root"
                 },
                 {
                     "type":"execute",                    
-                    "note":"Set Swarm firewall rules",            
+                    "note":"Set TLS Proxy firewall rules",            
+                    "cmd":"/usr/bin/firewall-cmd --add-port=12376/tcp --permanent",
+                    "sudoUser":"root"
+                },
+
+                {
+                    "type":"execute",                    
+                    "note":"Set Overlay firewall rules",            
                     "cmd":"/usr/bin/firewall-cmd --add-port=4789/udp --permanent",
                     "sudoUser":"root"
                 },

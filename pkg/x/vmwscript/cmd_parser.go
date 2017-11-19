@@ -59,6 +59,8 @@ type NetworkConfig struct {
 	DNS     string `json:"dns,omitempty"`
 
 	Hostname string `json:"hostname"`
+
+	SudoUser string `json:"sudoUser,omitempty"`
 }
 
 // DeploymentCommand - is passed to the vSphere API functions in order to be executed on a remote VM

@@ -17,9 +17,6 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-//var log = logutil.New("module", "x/vmwscript")
-//var debugV = logutil.V(200) // 100-500 are for typical debug levels, > 500 for highly repetitive logs (e.g. from polling)
-
 // VCenterLogin - This function will use the VMware vCenter API to connect to a remote vCenter
 func VCenterLogin(ctx context.Context, vm VMConfig) (*govmomi.Client, error) {
 	// Parse URL from string
@@ -206,6 +203,7 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 							counter++
 						} else {
 							fmt.Printf("\r\033[32mVirtual Machine has succesfully restarted in\033[m %d Seconds\n", counter)
+							time.Sleep(time.Second * 2)
 							break
 						}
 					}
@@ -214,8 +212,10 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 					}
 				}
 			}
-
+			// Hand over to the funciton that will run through the array of commands
 			runCommands(ctx, client, newVM, auth, task)
+
+			// Once tasks have been ran, determine what to do with the finished vm
 			if task.Task.OutputType == "Template" {
 				log.Info("Provisioning tasks have completed, powering down Virtual Machine (120 second Timeout)")
 
@@ -446,7 +446,7 @@ func setCentosNetwork(ctx context.Context, client *govmomi.Client, vm *object.Vi
 
 	if netConfig.Address != "" {
 		log.Warn("Removing existing networking configuration", "device", netConfig.DeviceName)
-		pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection delete %s", netConfig.DeviceName), "")
+		pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection delete %s", netConfig.DeviceName), netConfig.SudoUser)
 
 		if err != nil {
 			log.Error("Setting Address failed", "err", err)
@@ -457,10 +457,10 @@ func setCentosNetwork(ctx context.Context, client *govmomi.Client, vm *object.Vi
 		}
 		if netConfig.Gateway != "" {
 			log.Info("Configuring network", "ip", netConfig.Address, "gateway", netConfig.Gateway)
-			pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection add type ethernet con-name InfraKit ifname %s ip4 %s gw4 %s", netConfig.DeviceName, netConfig.Address, netConfig.Gateway), "")
+			pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection add type ethernet con-name InfraKit ifname %s ip4 %s gw4 %s", netConfig.DeviceName, netConfig.Address, netConfig.Gateway), netConfig.SudoUser)
 		} else {
 			log.Info("Configuring network", "ip", netConfig.Address)
-			pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection add type ethernet con-name InfraKit ifname %s ip4 %s", netConfig.DeviceName, netConfig.Address), "")
+			pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection add type ethernet con-name InfraKit ifname %s ip4 %s", netConfig.DeviceName, netConfig.Address), netConfig.SudoUser)
 		}
 		if err != nil {
 			log.Error("Setting Address failed", "err", err)
@@ -473,23 +473,23 @@ func setCentosNetwork(ctx context.Context, client *govmomi.Client, vm *object.Vi
 
 	if netConfig.DNS != "" {
 		log.Info("Configuring network", "dns", netConfig.DNS)
-		_, err := vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit ipv4.dns '%s'", netConfig.DNS), "")
+		_, err := vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit ipv4.dns '%s'", netConfig.DNS), netConfig.SudoUser)
 		if err != nil {
 			log.Error("Setting DNS failed", "err", err)
 		}
 	}
 
-	_, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit ipv4.method manual"), "")
+	_, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit ipv4.method manual"), netConfig.SudoUser)
 	if err != nil {
 		log.Error("Setting network config failed", "err", err)
 	}
 
-	_, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit '%s' connection.autoconnect yes", netConfig.DeviceName), "")
+	_, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit '%s' connection.autoconnect yes", netConfig.DeviceName), netConfig.SudoUser)
 	if err != nil {
 		log.Error("Setting network config failed", "err", err)
 	}
 
-	pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con up InfraKit ifname '%s'", netConfig.DeviceName), "")
+	pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con up InfraKit ifname '%s'", netConfig.DeviceName), netConfig.SudoUser)
 	if err != nil {
 		log.Error("Setting network config failed", "err", err)
 	}
@@ -500,7 +500,7 @@ func setCentosNetwork(ctx context.Context, client *govmomi.Client, vm *object.Vi
 
 	if netConfig.Hostname != "" {
 		log.Info("Finalising networking configuration", "hostname", netConfig.Hostname)
-		pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli general hostname '%s'", netConfig.Hostname), "")
+		pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli general hostname '%s'", netConfig.Hostname), netConfig.SudoUser)
 		if err != nil {
 			log.Error("Setting Hostname failed", "err", err)
 		}
@@ -509,6 +509,5 @@ func setCentosNetwork(ctx context.Context, client *govmomi.Client, vm *object.Vi
 			log.Error("Setting Address failed", "err", err)
 		}
 	}
-
 	return nil
 }
