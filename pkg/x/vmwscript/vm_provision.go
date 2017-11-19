@@ -185,7 +185,8 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 			// Check if a networking configuration exists
 			if task.Task.Network != nil {
 				// Determine the distribution to configure the networking
-				if task.Task.Network.Distro == "centos" {
+				switch task.Task.Network.Distro {
+				case "centos": // Set up networking for the CentOS distribution
 					setCentosNetwork(ctx, client, newVM, auth, task.Task.Network)
 					log.Info("Restarting Virtual Machine, and waiting for tools")
 					newVM.RebootGuest(ctx)
@@ -203,14 +204,25 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 							counter++
 						} else {
 							fmt.Printf("\r\033[32mVirtual Machine has succesfully restarted in\033[m %d Seconds\n", counter)
-							time.Sleep(time.Second * 2)
+							time.Sleep(time.Second * 5) //TODO: This is here to allow Docker to start, a better method is needed
 							break
 						}
 					}
 					if err != nil {
 						log.Error("Error during networking configuration", "err", err)
 					}
+				case "rhel": // Set up networking for the RHEL distribution
+					log.Error("Unsupported Distribtion")
+				case "ubuntu": // Set up networking for the Ubuntu distribution
+					log.Error("Unsupported Distribtion")
+				case "debian": // Set up networking for the Debian distribution
+					log.Error("Unsupported Distribtion")
+				case "windows": // Set up networking for the Windows Operating System
+					log.Error("Unsupported OS")
+				default: // return some 'unsupported' error.
+					log.Error("Unsupported Distribtion")
 				}
+
 			}
 			// Hand over to the funciton that will run through the array of commands
 			runCommands(ctx, client, newVM, auth, task)
