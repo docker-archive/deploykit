@@ -17,9 +17,6 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-//var log = logutil.New("module", "x/vmwscript")
-//var debugV = logutil.V(200) // 100-500 are for typical debug levels, > 500 for highly repetitive logs (e.g. from polling)
-
 // VCenterLogin - This function will use the VMware vCenter API to connect to a remote vCenter
 func VCenterLogin(ctx context.Context, vm VMConfig) (*govmomi.Client, error) {
 	// Parse URL from string
@@ -31,7 +28,7 @@ func VCenterLogin(ctx context.Context, vm VMConfig) (*govmomi.Client, error) {
 	// Connect and log in to ESX or vCenter
 	client, err := govmomi.NewClient(ctx, u, true)
 	if err != nil {
-		return nil, fmt.Errorf("Error logging into vCenter, check address and credentials\nClient Error: %v", err)
+		return nil, err
 	}
 	return client, nil
 }
@@ -112,7 +109,7 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 
 	info, err := task.WaitForResult(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Creating new VM failed\n%v", err)
+		return nil, err
 	}
 
 	if info.Error != nil {
@@ -171,11 +168,11 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 		task := NextDeployment()
 
 		if task != nil {
-			log.Info("Beginning Task", "Task:", task.Name, "Notes", task.Note)
+			log.Info("Beginning deployment", "task", task.Name, "note", task.Note)
 			newVM, err := Provision(ctx, client, *vm, task.Task.InputTemplate, task.Task.OutputName)
 
 			if err != nil {
-				log.Info("Provisioning has failed =>")
+				log.Error("Provisioning new Virtual Machine has failed")
 				log.Crit(err.Error())
 				os.Exit(-1)
 			}
@@ -185,13 +182,58 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 				Password: *vm.VMTemplateAuth.Password,
 			}
 
+			// Check if a networking configuration exists
+			if task.Task.Network != nil {
+				// Determine the distribution to configure the networking
+				switch task.Task.Network.Distro {
+				case "centos": // Set up networking for the CentOS distribution
+					setCentosNetwork(ctx, client, newVM, auth, task.Task.Network)
+					log.Info("Restarting Virtual Machine, and waiting for tools")
+					newVM.RebootGuest(ctx)
+					time.Sleep(time.Second * 10)
+					var counter int
+					for {
+						time.Sleep(1 * time.Second)
+						tools, err := newVM.IsToolsRunning(ctx)
+						if err != nil {
+							log.Crit("VMware tools", "err", err)
+						}
+						// Watch Virtual Machine for tools to start
+						if tools == false {
+							fmt.Printf("\r\033[36mWaiting for VMware Tools to start \033[m%d Seconds", counter)
+							counter++
+						} else {
+							fmt.Printf("\r\033[32mVirtual Machine has succesfully restarted in\033[m %d Seconds\n", counter)
+							time.Sleep(time.Second * 5) //TODO: This is here to allow Docker to start, a better method is needed
+							break
+						}
+					}
+					if err != nil {
+						log.Error("Error during networking configuration", "err", err)
+					}
+				case "rhel": // Set up networking for the RHEL distribution
+					log.Error("Unsupported Distribtion")
+				case "ubuntu": // Set up networking for the Ubuntu distribution
+					log.Error("Unsupported Distribtion")
+				case "debian": // Set up networking for the Debian distribution
+					log.Error("Unsupported Distribtion")
+				case "windows": // Set up networking for the Windows Operating System
+					log.Error("Unsupported OS")
+				default: // return some 'unsupported' error.
+					log.Error("Unsupported Distribtion")
+				}
+
+			}
+			// Hand over to the funciton that will run through the array of commands
 			runCommands(ctx, client, newVM, auth, task)
+
+			// Once tasks have been ran, determine what to do with the finished vm
 			if task.Task.OutputType == "Template" {
 				log.Info("Provisioning tasks have completed, powering down Virtual Machine (120 second Timeout)")
 
 				err = newVM.ShutdownGuest(ctx)
 				if err != nil {
-					log.Info("Power Off task failed =>")
+					log.Error("Power Off task failed")
 					log.Crit(err.Error())
 					os.Exit(-1)
 				}
@@ -228,7 +270,7 @@ func runCommands(ctx context.Context, client *govmomi.Client, vm *object.Virtual
 		// if cmd == nil then no more commands to run
 		if cmd != nil {
 			if cmd.CMDNote != "" { // If the command has a note, then print it out
-				log.Info(fmt.Sprintf("Task: %s", cmd.CMDNote))
+				log.Info(fmt.Sprintf("Task: \033[35m%s\033[m", cmd.CMDNote))
 			}
 			switch cmd.CMDType {
 			case "execute":
@@ -242,12 +284,12 @@ func runCommands(ctx context.Context, client *govmomi.Client, vm *object.Virtual
 					pid, err = vmExec(ctx, client, vm, auth, cmd.CMD, cmd.CMDUser)
 				}
 				if err != nil {
-					log.Error(err.Error())
+					log.Error("Task failed", "err", err)
 				}
 				if cmd.CMDIgnore == false {
 					err = watchPid(ctx, client, vm, auth, []int64{pid})
 					if err != nil {
-						log.Error(err.Error())
+						log.Error("Watching Task failed", "err", err)
 					}
 				}
 			case "download":
@@ -267,18 +309,20 @@ func vmExec(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachi
 	o := guest.NewOperationsManager(client.Client, vm.Reference())
 	pm, _ := o.ProcessManager(ctx)
 
-	sudoPath := "/bin/sudo" //TODO: This should perhaps be configurable incase some Distro has sudo in a weird place.
+	var progPath string
 
-	// Add User to the built command
+	// As vmtoolds doesn't execute against a TTY, we do some clever cli work to emulate either sudo or su
 	var builtPath string
 	if user != "" {
+		progPath = "/bin/sudo" //TODO: This should perhaps be configurable incase some Distro has sudo in a weird place.
 		builtPath = fmt.Sprintf("-n -u %s %s", user, command)
 	} else {
-		builtPath = fmt.Sprintf("-n %s", command)
+		progPath = "/bin/su" //TODO: This should perhaps be configurable incase some Distro has su in a weird place.
+		builtPath = fmt.Sprintf("-c \"%s\"", command)
 	}
 
 	cmdSpec := types.GuestProgramSpec{
-		ProgramPath: sudoPath,
+		ProgramPath: progPath,
 		Arguments:   builtPath,
 	}
 
@@ -333,13 +377,13 @@ func vmDownloadFile(ctx context.Context, client *govmomi.Client, vm *object.Virt
 		cmdResults[key] = convertedString
 	}
 
-	log.Info(fmt.Sprintf("%d of file [%s] downloaded succesfully", fileDetails.Size, fileDetails.Url))
-	log.Info(fmt.Sprintf("Removing file [%s] from Virtual Machine", path))
+	log.Info("File download", "name", fileDetails.Url, "size", fileDetails.Size)
 	if deleteonDownload == true {
 		err = fm.DeleteFile(ctx, auth, path)
 		if err != nil {
 			return err
 		}
+		log.Info("Removed file", "name", path)
 	}
 	return nil
 }
@@ -357,7 +401,8 @@ func watchPid(ctx context.Context, client *govmomi.Client, vm *object.VirtualMac
 		return err
 	}
 	if len(process) > 0 {
-		log.Info(fmt.Sprintf("Watching process [%d] cmd [%s]", process[0].Pid, process[0].CmdLine))
+		// The command is hidden (may contain secure information)
+		log.Debug("Watching command", "cmd", process[0].CmdLine)
 	} else {
 		log.Error("Process couldn't be found running")
 	}
@@ -374,15 +419,15 @@ func watchPid(ctx context.Context, client *govmomi.Client, vm *object.VirtualMac
 		}
 		// Watch Process
 		if process[0].EndTime == nil {
-			fmt.Printf("\r\033[36mWatching for\033[m %d Seconds", counter)
+			fmt.Printf("\r\033[36mWatching pid\033[m %d \033[36mfor\033[m %d Seconds", process[0].Pid, counter)
 			counter++
 		} else {
 			if process[0].ExitCode != 0 {
 				fmt.Printf("\n")
-				log.Info("Return code was not zero, please investigate logs on the Virtual Machine")
+				log.Warn("Return code was not zero, please investigate logs on the Virtual Machine")
 				break
 			} else {
-				fmt.Printf("\r\033[32mTask completed in\033[m %d Seconds\n", counter)
+				fmt.Printf("\r\033[32mProcess completed successfully in\033[m %d Seconds\n", counter)
 				return nil
 			}
 		}
@@ -392,9 +437,88 @@ func watchPid(ctx context.Context, client *govmomi.Client, vm *object.VirtualMac
 			processTimeout++
 			if processTimeout == 12 { // 12x5 seconds == 60 second time out
 				fmt.Printf("\n")
-				log.Info("Process no longer watched, VMware Tools may have been restarted")
+				log.Warn("Process no longer watched, VMware Tools may have been restarted")
 				break
 			}
+		}
+	}
+	return nil
+}
+
+// setCentosNetwork - CentOS only networking
+func setCentosNetwork(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, netConfig *NetworkConfig) error {
+
+	if netConfig.DeviceName != "" {
+		log.Info("Configuring networking", "device", netConfig.DeviceName)
+	} else {
+		return fmt.Errorf("No Ethernet device to configure")
+	}
+	var pid int64
+	var err error
+
+	if netConfig.Address != "" {
+		log.Warn("Removing existing networking configuration", "device", netConfig.DeviceName)
+		pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection delete %s", netConfig.DeviceName), netConfig.SudoUser)
+
+		if err != nil {
+			log.Error("Setting Address failed", "err", err)
+		}
+		err = watchPid(ctx, client, vm, auth, []int64{pid})
+		if err != nil {
+			log.Error("Setting Address failed", "err", err)
+		}
+		if netConfig.Gateway != "" {
+			log.Info("Configuring network", "ip", netConfig.Address, "gateway", netConfig.Gateway)
+			pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection add type ethernet con-name InfraKit ifname %s ip4 %s gw4 %s", netConfig.DeviceName, netConfig.Address, netConfig.Gateway), netConfig.SudoUser)
+		} else {
+			log.Info("Configuring network", "ip", netConfig.Address)
+			pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli connection add type ethernet con-name InfraKit ifname %s ip4 %s", netConfig.DeviceName, netConfig.Address), netConfig.SudoUser)
+		}
+		if err != nil {
+			log.Error("Setting Address failed", "err", err)
+		}
+		err = watchPid(ctx, client, vm, auth, []int64{pid})
+		if err != nil {
+			log.Error("Setting Address failed", "err", err)
+		}
+	}
+
+	if netConfig.DNS != "" {
+		log.Info("Configuring network", "dns", netConfig.DNS)
+		_, err := vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit ipv4.dns '%s'", netConfig.DNS), netConfig.SudoUser)
+		if err != nil {
+			log.Error("Setting DNS failed", "err", err)
+		}
+	}
+
+	_, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit ipv4.method manual"), netConfig.SudoUser)
+	if err != nil {
+		log.Error("Setting network config failed", "err", err)
+	}
+
+	_, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con mod InfraKit '%s' connection.autoconnect yes", netConfig.DeviceName), netConfig.SudoUser)
+	if err != nil {
+		log.Error("Setting network config failed", "err", err)
+	}
+
+	pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli con up InfraKit ifname '%s'", netConfig.DeviceName), netConfig.SudoUser)
+	if err != nil {
+		log.Error("Setting network config failed", "err", err)
+	}
+	err = watchPid(ctx, client, vm, auth, []int64{pid})
+	if err != nil {
+		log.Error("Setting Address failed", "err", err)
+	}
+
+	if netConfig.Hostname != "" {
+		log.Info("Finalising networking configuration", "hostname", netConfig.Hostname)
+		pid, err = vmExec(ctx, client, vm, auth, fmt.Sprintf("nmcli general hostname '%s'", netConfig.Hostname), netConfig.SudoUser)
+		if err != nil {
+			log.Error("Setting Hostname failed", "err", err)
+		}
+		err = watchPid(ctx, client, vm, auth, []int64{pid})
+		if err != nil {
+			log.Error("Setting Address failed", "err", err)
 		}
 	}
 	return nil

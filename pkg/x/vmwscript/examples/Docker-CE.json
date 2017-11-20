@@ -16,10 +16,15 @@
          "note": "Build new template for CentOS",
          "task":{
             "inputTemplate": "Centos7-Template",
-            "outputName": "DockerTemplate",
+            "outputName": "DockerCETemplate",
             "outputType": "Template",
             "import":"",
             "commands": [
+                {
+                    "type":"execute",
+                    "note":"Remove TTY requirement for sudo (old RHEL issue)",
+                    "cmd":"sed -i -e 's/Defaults    requiretty.*/ #Defaults    requiretty/g' /etc/sudoers"
+                },
                 {
                     "type":"execute",                    
                     "note":"Disable SELINUX (FirewallD bug)",
@@ -124,8 +129,8 @@
                 },
                 {
                     "type":"execute",                    
-                    "note":"Download UCP 2.2",            
-                    "cmd":"/usr/bin/docker pull docker/ucp:2.2.0 >> /tmp/docker-pull.log",
+                    "note":"Download UCP 2.2.4",            
+                    "cmd":"/usr/bin/docker pull docker/ucp:2.2.4 >> /tmp/docker-pull.log",
                     "sudoUser":"root"
                 },
                 {

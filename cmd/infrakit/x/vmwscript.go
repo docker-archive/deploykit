@@ -97,7 +97,7 @@ func vmwscriptCommand() *cobra.Command {
 
 		client, err := vmwscript.VCenterLogin(ctx, *vm)
 		if err != nil {
-			log.Crit("%v", err)
+			log.Crit("Error connecting to vCenter", "err", err)
 			os.Exit(-1)
 		}
 		// Iterate through the deployments and tasks
