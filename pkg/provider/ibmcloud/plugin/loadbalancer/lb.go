@@ -145,7 +145,14 @@ func (l *ibmcloudlb) Routes() ([]loadbalancer.Route, error) {
 			if err != nil {
 				return out, err
 			}
-			certString = fmt.Sprintf("%s(%s)", *cert.CommonName, *cert.Notes)
+			var commonName, notes string
+			if cert.CommonName != nil {
+				commonName = *cert.CommonName
+			}
+			if cert.Notes != nil {
+				notes = *cert.Notes
+			}
+			certString = fmt.Sprintf("%s(%s)", commonName, notes)
 		}
 		r := loadbalancer.Route{
 			LoadBalancerPort:     *listener.ProtocolPort,
