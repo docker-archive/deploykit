@@ -13,11 +13,16 @@ var cmdResults = map[string]string{}
 var log = logutil.New("module", "x/vmwscript")
 var debugV = logutil.V(200) // 100-500 are for typical debug levels, > 500 for highly repetitive logs (e.g. from polling)
 
-type deploymentPlan struct {
+// DeploymentPlan is the top-level structure that holds the user's specification / plan
+// as well as runtime information as it executes.
+type DeploymentPlan struct {
 	Label      string           `json:"label"`
 	Version    string           `json:"version"`
 	Deployment []DeploymentTask `json:"deployment"`
 	VMWConfig  VMConfig         `json:"vmconfig,omitempty"`
+
+	deploymentCounter int //defaults to 0
+	commandCounter    int //defaults to 0
 }
 
 // VMConfig - This struct is used to hold all of the configuration settings that will be required to communicate with VMware
@@ -78,80 +83,124 @@ type DeploymentCommand struct {
 	CMDDelete   bool   `json:"delAfterDownload"` //remove the file once downloaded
 }
 
-var plan *deploymentPlan
-var deploymentCounter int //defaults to 0
-var commandCounter int    //defaults to 0
-
-// InitDeployment - Allocates barebones deployment plan
-func InitDeployment() {
-	plan = new(deploymentPlan)
-}
-
-//OpenFile - This will open a file, check file can be read and also checks the format
-func OpenFile(filePath string) error {
+//OpenFile opens a file, check file can be read and also checks the format and returns a parsed plan
+func OpenFile(filePath string) (*DeploymentPlan, error) {
 
 	// Attempt to open file
 	deploymentFile, err := os.Open(filePath)
 	defer deploymentFile.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Attempt to parse JSON
 	jsonParser := json.NewDecoder(deploymentFile)
-	if plan == nil {
-		log.Info("Code isn't initialising the Deployment Plan, intitialising automatically")
-		InitDeployment()
-	}
+
+	plan := DeploymentPlan{}
 	err = jsonParser.Decode(&plan)
 	if err != nil {
-		return fmt.Errorf("Error Parsing JSON: %v", err)
+		return nil, fmt.Errorf("Error Parsing JSON: %v", err)
 	}
 
 	log.Info(fmt.Sprintf("Finished parsing [%s], [%d] tasks will be deployed", plan.Label, len(plan.Deployment)))
-	return nil
+	return &plan, nil
 }
 
 // The following functions all provide the functionality to traverse through the list of commands
 // and provide a stable way of passing the commands to the VMware tools
 
-//NextDeployment - This will return the Command Path, the Arguments or an error
-func NextDeployment() *DeploymentTask {
-	if deploymentCounter > len(plan.Deployment) {
+// NextDeployment returns the Command Path, the Arguments or an error
+func (plan *DeploymentPlan) NextDeployment() *DeploymentTask {
+	if plan.deploymentCounter > len(plan.Deployment) {
 		return nil
 	}
 
-	defer func() { deploymentCounter++ }()
-	return &plan.Deployment[deploymentCounter]
+	defer func() { plan.deploymentCounter++ }()
+	return &plan.Deployment[plan.deploymentCounter]
 }
 
-// DeploymentCount - Returns the number of commands to be executed for use in a loop
-func DeploymentCount() int {
+// DeploymentCount returns the number of commands to be executed for use in a loop
+func (plan DeploymentPlan) DeploymentCount() int {
 	return len(plan.Deployment)
 }
 
-//NextCommand - This will return the Command Path, the Arguments or an error
-func NextCommand(deployment *DeploymentTask) *DeploymentCommand {
+//NextCommand returns the Command Path, the Arguments or an error
+func (plan *DeploymentPlan) NextCommand(deployment *DeploymentTask) *DeploymentCommand {
 
-	if commandCounter > len(deployment.Task.Commands) {
-		commandCounter = 0 // reset counter for next set of commands
+	if plan.commandCounter > len(deployment.Task.Commands) {
+		plan.commandCounter = 0 // reset counter for next set of commands
 		return nil
 	}
 
-	defer func() { commandCounter++ }()
-	return &deployment.Task.Commands[commandCounter]
+	defer func() { plan.commandCounter++ }()
+	return &deployment.Task.Commands[plan.commandCounter]
 }
 
-// ResetCounter - resets the counter back to zero
-func ResetCounter() {
-	commandCounter = 0
+// ResetCounter resets the counter back to zero
+func (plan *DeploymentPlan) ResetCounter() {
+	plan.commandCounter = 0
 }
 
-// CommandCount - Returns the number of commands to be executed for use in a loop
+// CommandCount returns the number of commands to be executed for use in a loop
 func CommandCount(deployment *DeploymentTask) int {
 	return len(deployment.Task.Commands)
 }
 
-//VMwareConfig -
-func VMwareConfig() *VMConfig {
-	return &plan.VMWConfig
+func checkRequired(v *string, message string, args ...interface{}) error {
+	if v == nil || *v == "" {
+		return fmt.Errorf(message, args...)
+	}
+	return nil
+}
+
+// Validate checks the setup and reports any errors
+func (plan *DeploymentPlan) Validate() error {
+
+	err := checkRequired(plan.VMWConfig.VCenterURL,
+		"VMware vCenter/vSphere credentials are missing")
+	if err != nil {
+		return err
+	}
+
+	err = checkRequired(plan.VMWConfig.DCName,
+		"No Datacenter was specified, will try to use the default (will cause errors with Linked-Mode)")
+	if err != nil {
+		return err
+	}
+
+	err = checkRequired(plan.VMWConfig.DSName,
+		"A VMware vCenter datastore is required for provisioning")
+	if err != nil {
+		return err
+	}
+
+	err = checkRequired(plan.VMWConfig.NetworkName,
+		"Specify a Network to connect to")
+	if err != nil {
+		return err
+	}
+
+	err = checkRequired(plan.VMWConfig.VSphereHost,
+		"A Host inside of vCenter/vSphere is required to provision on for VM capacity")
+	if err != nil {
+		return err
+	}
+
+	// Ideally these should be populated as they're needed for a lot of the tasks.
+	err = checkRequired(plan.VMWConfig.VMTemplateAuth.Username,
+		"No Username for inside of the Guest OS was specified, somethings may fail")
+	if err != nil {
+		return err
+	}
+
+	err = checkRequired(plan.VMWConfig.VMTemplateAuth.Password,
+		"No Password for inside of the Guest OS was specified, somethings may fail")
+	if err != nil {
+		return err
+	}
+
+	if *plan.VMWConfig.VCenterURL == "" || *plan.VMWConfig.DSName == "" || *plan.VMWConfig.VSphereHost == "" {
+		return fmt.Errorf("Missing VSphere host")
+	}
+
+	return nil
 }
