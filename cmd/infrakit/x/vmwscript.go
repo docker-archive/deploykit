@@ -24,19 +24,19 @@ func vmwscriptCommand() *cobra.Command {
 	}
 
 	plan := vmwscript.DeploymentPlan{}
-	cmd.Flags().StringVar(plan.VMWConfig.VCenterURL, "vcurl", os.Getenv("INFRAKIT_VSPHERE_VCURL"),
+	cmd.Flags().StringVar(&plan.VMWConfig.VCenterURL, "vcurl", os.Getenv("INFRAKIT_VSPHERE_VCURL"),
 		"VMware vCenter URL, format https://user:pass@address/sdk [REQD]")
-	cmd.Flags().StringVar(plan.VMWConfig.DCName, "datacenter", os.Getenv("INFRAKIT_VSPHERE_VCDATACENTER"),
+	cmd.Flags().StringVar(&plan.VMWConfig.DCName, "datacenter", os.Getenv("INFRAKIT_VSPHERE_VCDATACENTER"),
 		"The name of the Datacenter to host the VM [REQD]")
-	cmd.Flags().StringVar(plan.VMWConfig.DSName, "datastore", os.Getenv("INFRAKIT_VSPHERE_VCDATASTORE"),
+	cmd.Flags().StringVar(&plan.VMWConfig.DSName, "datastore", os.Getenv("INFRAKIT_VSPHERE_VCDATASTORE"),
 		"The name of the DataStore to host the VM [REQD]")
-	cmd.Flags().StringVar(plan.VMWConfig.NetworkName, "network", os.Getenv("INFRAKIT_VSPHERE_VCNETWORK"),
+	cmd.Flags().StringVar(&plan.VMWConfig.NetworkName, "network", os.Getenv("INFRAKIT_VSPHERE_VCNETWORK"),
 		"The network label the VM will use [REQD]")
-	cmd.Flags().StringVar(plan.VMWConfig.VSphereHost, "hostname", os.Getenv("INFRAKIT_VSPHERE_VCHOST"),
+	cmd.Flags().StringVar(&plan.VMWConfig.VSphereHost, "hostname", os.Getenv("INFRAKIT_VSPHERE_VCHOST"),
 		"The server that will run the VM [REQD]")
-	cmd.Flags().StringVar(plan.VMWConfig.VMTemplateAuth.Username, "templateUser", os.Getenv("INFRAKIT_VSPHERE_VMUSER"),
+	cmd.Flags().StringVar(&plan.VMWConfig.VMTemplateAuth.Username, "templateUser", os.Getenv("INFRAKIT_VSPHERE_VMUSER"),
 		"A created user inside of the VM template")
-	cmd.Flags().StringVar(plan.VMWConfig.VMTemplateAuth.Password, "templatePass", os.Getenv("INFRAKIT_VSPHERE_VMPASS"),
+	cmd.Flags().StringVar(&plan.VMWConfig.VMTemplateAuth.Password, "templatePass", os.Getenv("INFRAKIT_VSPHERE_VMPASS"),
 		"The password for the specified user inside the VM template")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {

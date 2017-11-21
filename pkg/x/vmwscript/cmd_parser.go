@@ -25,15 +25,15 @@ type DeploymentPlan struct {
 
 // VMConfig - This struct is used to hold all of the configuration settings that will be required to communicate with VMware
 type VMConfig struct {
-	VCenterURL     *string `json:"vcenterURL,omitempty"`
-	DCName         *string `json:"datacentre,omitempty"`
-	DSName         *string `json:"datastore,omitempty"`
-	NetworkName    *string `json:"network,omitempty"`
-	VSphereHost    *string `json:"host,omitempty"`
-	Template       *string `json:"template,omitempty"`
+	VCenterURL     string `json:"vcenterURL,omitempty"`
+	DCName         string `json:"datacentre,omitempty"`
+	DSName         string `json:"datastore,omitempty"`
+	NetworkName    string `json:"network,omitempty"`
+	VSphereHost    string `json:"host,omitempty"`
+	Template       string `json:"template,omitempty"`
 	VMTemplateAuth struct {
-		Username *string `json:"guestUser,omitempty"`
-		Password *string `json:"guestPass,omitempty"`
+		Username string `json:"guestUser,omitempty"`
+		Password string `json:"guestPass,omitempty"`
 	} `json:"guestCredentials,omitempty"`
 }
 
@@ -153,50 +153,50 @@ func checkRequired(v *string, message string, args ...interface{}) error {
 // Validate checks the setup and reports any errors
 func (plan *DeploymentPlan) Validate() error {
 
-	err := checkRequired(plan.VMWConfig.VCenterURL,
+	err := checkRequired(&plan.VMWConfig.VCenterURL,
 		"VMware vCenter/vSphere credentials are missing")
 	if err != nil {
 		return err
 	}
 
-	err = checkRequired(plan.VMWConfig.DCName,
+	err = checkRequired(&plan.VMWConfig.DCName,
 		"No Datacenter was specified, will try to use the default (will cause errors with Linked-Mode)")
 	if err != nil {
 		return err
 	}
 
-	err = checkRequired(plan.VMWConfig.DSName,
+	err = checkRequired(&plan.VMWConfig.DSName,
 		"A VMware vCenter datastore is required for provisioning")
 	if err != nil {
 		return err
 	}
 
-	err = checkRequired(plan.VMWConfig.NetworkName,
+	err = checkRequired(&plan.VMWConfig.NetworkName,
 		"Specify a Network to connect to")
 	if err != nil {
 		return err
 	}
 
-	err = checkRequired(plan.VMWConfig.VSphereHost,
+	err = checkRequired(&plan.VMWConfig.VSphereHost,
 		"A Host inside of vCenter/vSphere is required to provision on for VM capacity")
 	if err != nil {
 		return err
 	}
 
 	// Ideally these should be populated as they're needed for a lot of the tasks.
-	err = checkRequired(plan.VMWConfig.VMTemplateAuth.Username,
+	err = checkRequired(&plan.VMWConfig.VMTemplateAuth.Username,
 		"No Username for inside of the Guest OS was specified, somethings may fail")
 	if err != nil {
 		return err
 	}
 
-	err = checkRequired(plan.VMWConfig.VMTemplateAuth.Password,
+	err = checkRequired(&plan.VMWConfig.VMTemplateAuth.Password,
 		"No Password for inside of the Guest OS was specified, somethings may fail")
 	if err != nil {
 		return err
 	}
 
-	if *plan.VMWConfig.VCenterURL == "" || *plan.VMWConfig.DSName == "" || *plan.VMWConfig.VSphereHost == "" {
+	if plan.VMWConfig.VCenterURL == "" || plan.VMWConfig.DSName == "" || plan.VMWConfig.VSphereHost == "" {
 		return fmt.Errorf("Missing VSphere host")
 	}
 
