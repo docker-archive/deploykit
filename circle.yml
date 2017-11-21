@@ -51,6 +51,7 @@ deployment:
   release:
     branch: /release-.*/
     commands:
+      - make e2e-test
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=false DOCKER_TAG=$(echo $CIRCLE_BRANCH | awk -F - '{print $2}') DOCKER_BUILD_FLAGS="--rm=false" make build-docker
       # Install minio.io for S3 bucket uploads
@@ -63,6 +64,7 @@ deployment:
   docker:
     branch: master
     commands:
+      - make e2e-test
       - docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWD
       - DOCKER_PUSH=true DOCKER_TAG_LATEST=true DOCKER_TAG="master-$CIRCLE_BUILD_NUM" DOCKER_BUILD_FLAGS="--rm=false" make build-docker
       # Install minio.io for S3 bucket uploads
