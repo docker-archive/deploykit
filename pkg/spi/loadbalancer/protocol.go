@@ -28,21 +28,6 @@ var (
 	Invalid = Protocol("")
 )
 
-// MarshalJSON returns the json representation
-func (r Protocol) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + string(r) + "\""), nil
-}
-
-// UnmarshalJSON unmarshals the buffer to this struct
-func (r *Protocol) UnmarshalJSON(buff []byte) error {
-	parsed := ProtocolFromString(strings.Trim(string(buff), "\""))
-	if parsed == Invalid {
-		return fmt.Errorf("not valid protocol %v", string(buff))
-	}
-	*r = parsed
-	return nil
-}
-
 // ProtocolFromString gets the matching protocol for a string value.
 func ProtocolFromString(protocol string) Protocol {
 	for _, p := range []Protocol{HTTP, HTTPS, TCP, SSL, UDP} {
@@ -51,6 +36,21 @@ func ProtocolFromString(protocol string) Protocol {
 		}
 	}
 	return Invalid
+}
+
+// MarshalJSON returns the json representation
+func (p Protocol) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + string(p) + "\""), nil
+}
+
+// UnmarshalJSON unmarshals the buffer to this struct
+func (p *Protocol) UnmarshalJSON(buff []byte) error {
+	parsed := ProtocolFromString(strings.Trim(string(buff), "\""))
+	if parsed == Invalid {
+		return fmt.Errorf("not valid protocol %v", string(buff))
+	}
+	*p = parsed
+	return nil
 }
 
 // Valid tests whether a protocol is known and valid.
