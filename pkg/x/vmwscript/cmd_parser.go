@@ -1,9 +1,7 @@
 package vmwscript
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
 	logutil "github.com/docker/infrakit/pkg/log"
 )
@@ -83,27 +81,27 @@ type DeploymentCommand struct {
 	CMDDelete   bool   `json:"delAfterDownload"` //remove the file once downloaded
 }
 
-//OpenFile opens a file, check file can be read and also checks the format and returns a parsed plan
-func OpenFile(filePath string) (*DeploymentPlan, error) {
+// //OpenFile opens a file, check file can be read and also checks the format and returns a parsed plan
+// func OpenFile(filePath string) (*DeploymentPlan, error) {
 
-	// Attempt to open file
-	deploymentFile, err := os.Open(filePath)
-	defer deploymentFile.Close()
-	if err != nil {
-		return nil, err
-	}
-	// Attempt to parse JSON
-	jsonParser := json.NewDecoder(deploymentFile)
+// 	// Attempt to open file
+// 	deploymentFile, err := os.Open(filePath)
+// 	defer deploymentFile.Close()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	// Attempt to parse JSON
+// 	jsonParser := json.NewDecoder(deploymentFile)
 
-	plan := DeploymentPlan{}
-	err = jsonParser.Decode(&plan)
-	if err != nil {
-		return nil, fmt.Errorf("Error Parsing JSON: %v", err)
-	}
+// 	plan := DeploymentPlan{}
+// 	err = jsonParser.Decode(&plan)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("Error Parsing JSON: %v", err)
+// 	}
 
-	log.Info(fmt.Sprintf("Finished parsing [%s], [%d] tasks will be deployed", plan.Label, len(plan.Deployment)))
-	return &plan, nil
-}
+// 	log.Info(fmt.Sprintf("Finished parsing [%s], [%d] tasks will be deployed", plan.Label, len(plan.Deployment)))
+// 	return &plan, nil
+// }
 
 // The following functions all provide the functionality to traverse through the list of commands
 // and provide a stable way of passing the commands to the VMware tools
