@@ -59,6 +59,7 @@ properties:
     Routes:
       - LoadBalancerPort: 80
         LoadBalancerProtocol: https
+        Certificate: external-cert-id
         Port: 8080
         Protocol: http
 
