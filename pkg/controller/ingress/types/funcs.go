@@ -94,6 +94,10 @@ func (p Properties) Routes(options Options) (result map[Vhost][]loadbalancer.Rou
 	result = map[Vhost][]loadbalancer.Route{}
 	for _, spec := range p {
 
+		if err := spec.Validate(); err != nil {
+			return nil, err
+		}
+
 		result[spec.Vhost] = spec.Routes
 
 		for key, config := range spec.RouteSources {
