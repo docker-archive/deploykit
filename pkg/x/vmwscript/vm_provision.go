@@ -161,15 +161,15 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 }
 
 //RunTasks - This kicks of the running of VMware tasks
-func RunTasks(ctx context.Context, client *govmomi.Client) {
-	taskCount := DeploymentCount()
-	vm := VMwareConfig() //Pull VMware configuration from JSON
+func (plan *DeploymentPlan) RunTasks(ctx context.Context, client *govmomi.Client) {
+	taskCount := plan.DeploymentCount()
+	vm := plan.VMWConfig
 	for i := 0; i < taskCount; i++ {
-		task := NextDeployment()
+		task := plan.NextDeployment()
 
 		if task != nil {
 			log.Info("Beginning deployment", "task", task.Name, "note", task.Note)
-			newVM, err := Provision(ctx, client, *vm, task.Task.InputTemplate, task.Task.OutputName)
+			newVM, err := Provision(ctx, client, vm, task.Task.InputTemplate, task.Task.OutputName)
 
 			if err != nil {
 				log.Error("Provisioning new Virtual Machine has failed")
@@ -225,7 +225,7 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 
 			}
 			// Hand over to the funciton that will run through the array of commands
-			runCommands(ctx, client, newVM, auth, task)
+			plan.runCommands(ctx, client, newVM, auth, task)
 
 			// Once tasks have been ran, determine what to do with the finished vm
 			if task.Task.OutputType == "Template" {
@@ -262,11 +262,11 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 	}
 }
 
-func runCommands(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, deployment *DeploymentTask) {
+func (plan *DeploymentPlan) runCommands(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, deployment *DeploymentTask) {
 	cmdCount := CommandCount(deployment)
 	log.Info(fmt.Sprintf("%d commands will be executed.", cmdCount))
 	for i := 0; i < cmdCount; i++ {
-		cmd := NextCommand(deployment)
+		cmd := plan.NextCommand(deployment)
 		// if cmd == nil then no more commands to run
 		if cmd != nil {
 			if cmd.CMDNote != "" { // If the command has a note, then print it out
@@ -302,7 +302,7 @@ func runCommands(ctx context.Context, client *govmomi.Client, vm *object.Virtual
 			// Execute the command on the Virtual Machine
 		}
 	}
-	ResetCounter()
+	plan.ResetCounter()
 }
 
 func vmExec(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, command string, user string) (int64, error) {
