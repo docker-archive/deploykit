@@ -36,6 +36,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/cli/backend/manager"
 	_ "github.com/docker/infrakit/pkg/cli/backend/print"
 	_ "github.com/docker/infrakit/pkg/cli/backend/sh"
+	_ "github.com/docker/infrakit/pkg/cli/backend/vmwscript"
 
 	// Supported "kinds"
 	_ "github.com/docker/infrakit/pkg/run/v0/aws"
@@ -157,7 +158,13 @@ func main() {
 	}
 
 	if !pb.Empty() {
-		cmd.AddCommand(useCommand(scope, pb))
+		useCommandName := "use"
+		useCommandDescription := "Use a playbook"
+		cmd.AddCommand(useCommand(scope, useCommandName, useCommandDescription, pb))
+		if len(os.Args) > 2 && os.Args[1] == useCommandName {
+			cmd.SetArgs(os.Args[1:2])
+		}
+
 	}
 
 	base.VisitModules(scope, func(c *cobra.Command) {
@@ -196,14 +203,11 @@ func main() {
 	}
 }
 
-func useCommand(scope scope.Scope, pb *playbook.Playbooks) *cobra.Command {
+func useCommand(scope scope.Scope, use, description string, pb *playbook.Playbooks) *cobra.Command {
 
 	// Log setup
 	logOptions := &logutil.ProdDefaults
 	logFlags := cli.Flags(logOptions)
-
-	use := "use"
-	description := "Use a playbook"
 
 	cmd := &cobra.Command{
 		Use:   use,

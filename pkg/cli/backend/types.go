@@ -10,7 +10,7 @@ import (
 type ExecFunc func(script string) error
 
 // TemplateFunc is the type of function exported / available to the scripting template
-type TemplateFunc func(scope scope.Scope, opt ...interface{}) (ExecFunc, error)
+type TemplateFunc func(scope scope.Scope, trial bool, opt ...interface{}) (ExecFunc, error)
 
 var (
 	backends = map[string]TemplateFunc{}
