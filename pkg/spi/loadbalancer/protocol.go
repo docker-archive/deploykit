@@ -1,6 +1,7 @@
 package loadbalancer
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -26,6 +27,21 @@ var (
 	// Invalid - This is the 'nil' value
 	Invalid = Protocol("")
 )
+
+// MarshalJSON returns the json representation
+func (r Protocol) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + string(r) + "\""), nil
+}
+
+// UnmarshalJSON unmarshals the buffer to this struct
+func (r *Protocol) UnmarshalJSON(buff []byte) error {
+	parsed := ProtocolFromString(strings.Trim(string(buff), "\""))
+	if parsed == Invalid {
+		return fmt.Errorf("not valid protocol %v", string(buff))
+	}
+	*r = parsed
+	return nil
+}
 
 // ProtocolFromString gets the matching protocol for a string value.
 func ProtocolFromString(protocol string) Protocol {

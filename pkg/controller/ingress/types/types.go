@@ -65,6 +65,16 @@ type Spec struct {
 	HealthChecks []loadbalancer.HealthCheck
 }
 
+// Validate validates the struct and can mutate the fields as necessary.
+func (s *Spec) Validate() error {
+	for _, r := range s.Routes {
+		if err := r.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Group is a qualified plugin name. The 'type' field of the name is the group ID.
 type Group plugin.Name
 
