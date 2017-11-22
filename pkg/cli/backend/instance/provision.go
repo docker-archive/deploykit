@@ -16,7 +16,7 @@ func init() {
 // Provision backend requires the name of the plugin and a boolean to indicate if the content is yaml.
 // It then returns an executable function based on that specification to call the named instance plugin's provision
 // method.
-func Provision(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) {
+func Provision(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
 	if len(opt) != 2 {
 		return nil, fmt.Errorf("require params: pluginName (string) and isYAML (bool)")

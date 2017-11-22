@@ -22,15 +22,17 @@ const (
 
 // Context is the context for the running module
 type Context struct {
-	cmd      *cobra.Command
-	src      string
-	input    io.Reader
-	exec     bool
-	template *template.Template
-	options  template.Options
-	run      func(string) error
-	script   string
-	scope    scope.Scope
+	test      bool
+	printOnly bool
+	cmd       *cobra.Command
+	src       string
+	input     io.Reader
+	exec      bool
+	template  *template.Template
+	options   template.Options
+	run       func(string) error
+	script    string
+	scope     scope.Scope
 }
 
 // NewContext creates a context
@@ -454,14 +456,17 @@ func (c *Context) getTemplate() (*template.Template, error) {
 
 // BuildFlags from parsing the body which is a template
 func (c *Context) BuildFlags() (err error) {
-	var t *template.Template
+	c.cmd.Flags().BoolVar(&c.test, "test", false, "True to do a trial run")
+	c.cmd.Flags().BoolVar(&c.printOnly, "print-only", false, "True to print the rendered input")
 
+	var t *template.Template
 	t, err = c.getTemplate()
 	if err != nil {
 		return
 	}
 	t.SetOptions(c.options)
 	_, err = t.Render(c)
+
 	return
 }
 
@@ -489,6 +494,11 @@ func (c *Context) Execute() (err error) {
 		return err
 	}
 	c.script = script
+	if c.printOnly {
+		fmt.Print(c.script)
+		return nil
+	}
+
 	log.Debug("running", "script", script)
 
 	opt = c.options

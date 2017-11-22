@@ -20,7 +20,7 @@ func init() {
 // Commit requires two parameters, first is isYAML (bool) and second is pretend (bool)
 // It then returns an executable function based on that specification to call the manager's commit
 // method with the content
-func Commit(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) {
+func Commit(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
 	if len(opt) != 2 {
 		return nil, fmt.Errorf("require params: isYAML (bool), pretend (bool)")

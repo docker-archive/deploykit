@@ -14,7 +14,7 @@ func init() {
 
 // Print takes a list of optional parameters and returns an executable function that prints
 // arg0 is the prefix. it's optional
-func Print(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) {
+func Print(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
 	prefix := ""
 	if len(opt) > 0 {
