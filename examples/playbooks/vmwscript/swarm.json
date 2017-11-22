@@ -57,7 +57,7 @@
                    {
                     "type":"execute",                    
                     "note":"Installation of Docker Universal Control plane 2.2.4",            
-                    "cmd":"/usr/bin/docker container run --rm -t --name ucp -v /var/run/docker.sock:/var/run/docker.sock  docker/ucp:2.2.4 install --admin-password xK8dVA_Pnh --admin-username infrakit",
+                    "cmd":"/usr/bin/docker container run --rm -t --name ucp -v /var/run/docker.sock:/var/run/docker.sock  docker/ucp:2.2.4 install --admin-password {{ var `input/admin_pass`}} --admin-username {{ var `input/admin_user`}}",
                     "sudoUser":"root"
                    },
                    {
