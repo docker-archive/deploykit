@@ -8,9 +8,9 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
@@ -28,7 +28,7 @@ import (
 // could be implemented as a proxied instance plugin (using the
 // interceptor pattern).
 type enroller struct {
-	manager.Leadership
+	stack.Leadership
 
 	spec       types.Spec
 	properties enrollment.Properties
@@ -53,7 +53,7 @@ type enroller struct {
 }
 
 func newEnroller(plugins func() discovery.Plugins,
-	leader manager.Leadership, options enrollment.Options) *enroller {
+	leader stack.Leadership, options enrollment.Options) *enroller {
 	l := &enroller{
 		Leadership: leader,
 		plugins:    plugins,

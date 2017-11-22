@@ -6,8 +6,8 @@ import (
 	"path"
 	"testing"
 
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	testing_manager "github.com/docker/infrakit/pkg/testing/manager"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -22,7 +22,7 @@ func tempSocket() string {
 	return path.Join(dir, "manager-impl-test")
 }
 
-func must(m manager.Manager, err error) manager.Manager {
+func must(m stack.Interface, err error) stack.Interface {
 	if err != nil {
 		panic(err)
 	}

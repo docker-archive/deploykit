@@ -11,7 +11,6 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/rpc/client"
@@ -21,6 +20,7 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -58,7 +58,7 @@ func Command(scope scope.Scope) *cobra.Command {
 
 			for name, endpoint := range pm {
 
-				rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
+				rpcClient, err := client.New(endpoint.Address, stack.InterfaceSpec)
 				if err == nil {
 
 					m := manager_rpc.Adapt(rpcClient)
@@ -203,7 +203,7 @@ func Command(scope scope.Scope) *cobra.Command {
 			}
 
 			for _, endpoint := range pm {
-				rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
+				rpcClient, err := client.New(endpoint.Address, stack.InterfaceSpec)
 				if err == nil {
 
 					m := manager_rpc.Adapt(rpcClient)

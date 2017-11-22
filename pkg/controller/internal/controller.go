@@ -6,7 +6,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -37,12 +37,12 @@ type Controller struct {
 	alloc   func(types.Spec) (Managed, error)
 	keyfunc func(types.Metadata) string
 	managed map[string]*Managed
-	leader  manager.Leadership
+	leader  stack.Leadership
 	lock    sync.RWMutex
 }
 
 // NewController creates a controller injecting dependencies
-func NewController(l manager.Leadership,
+func NewController(l stack.Leadership,
 	alloc func(types.Spec) (Managed, error),
 	keyfunc func(types.Metadata) string) *Controller {
 

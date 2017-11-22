@@ -319,7 +319,7 @@ func (m *manager) loadAndCommitSpecs() error {
 		log.Warn("Error loading config", "err", err)
 		return err
 	}
-	return m.doCommitGroups(*config)
+	return m.doCommitAll(*config)
 }
 
 func (m *manager) loadMetadata() (err error) {
@@ -411,7 +411,7 @@ func (m *manager) onLostLeadership() error {
 	if err != nil {
 		return err
 	}
-	return m.doFreeGroups(config)
+	return m.doFreeAll(config)
 }
 
 func (m *manager) doCommit() error {
@@ -429,10 +429,10 @@ func (m *manager) doCommit() error {
 	if err != nil {
 		return err
 	}
-	return m.doCommitGroups(config)
+	return m.doCommitAll(config)
 }
 
-func (m *manager) doCommitGroups(config globalSpec) error {
+func (m *manager) doCommitAll(config globalSpec) error {
 	return m.execPlugins(config,
 		func(control controller.Controller, spec types.Spec) error {
 
@@ -450,12 +450,12 @@ func (m *manager) doCommitGroups(config globalSpec) error {
 		})
 }
 
-func (m *manager) doFreeGroups(config globalSpec) error {
+func (m *manager) doFreeAll(config globalSpec) error {
 	log.Info("Freeing groups")
 	return m.execPlugins(config,
 		func(controller controller.Controller, spec types.Spec) error {
 
-			log.Info("Committing spec", "spec", spec)
+			log.Info("Freeing spec", "spec", spec)
 
 			_, err := controller.Free(&spec.Metadata)
 			return err

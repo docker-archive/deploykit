@@ -1,13 +1,10 @@
 package manager
 
 import (
-	"net/url"
-
 	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/stack"
@@ -21,40 +18,16 @@ var (
 	debugV  = logutil.V(100)
 	debugV2 = logutil.V(500)
 	debugV3 = logutil.V(1000)
-
-	// InterfaceSpec is the current name and version of the Instance API.
-	InterfaceSpec = spi.InterfaceSpec{
-		Name:    "Manager",
-		Version: "0.1.0",
-	}
 )
-
-// Leadership is the interface for getting information about the current leader node
-type Leadership interface {
-	// IsLeader returns true only if for certain this is a leader. False if not or unknown.
-	IsLeader() (bool, error)
-
-	// LeaderLocation returns the location of the leader
-	LeaderLocation() (*url.URL, error)
-}
-
-// Manager is the interface for interacting locally or remotely with the manager
-type Manager interface {
-	Leadership
-	stack.Interface
-}
 
 // Backend is the admin / server interface
 type Backend interface {
-	// group.Plugin
-
-	// metadata.Updatable
+	stack.Interface
 
 	Controllers() (map[string]controller.Controller, error)
 	Groups() (map[group.ID]group.Plugin, error)
 	Metadata() (map[string]metadata.Plugin, error)
 
-	Manager
 	Start() (<-chan struct{}, error)
 	Stop()
 }
