@@ -1,0 +1,150 @@
+{
+    "label":"Wordpress",
+    "version":"0.1",
+    "vmconfig" : {
+        "vcenterURL" : "{{var `input/url`}}",
+        "datacentre" : "{{var `input/dc`}}",
+        "datastore":"{{var `input/ds`}}",
+        "network" : "{{var `input/nn`}}",
+        "host" : "{{var `input/host`}}",
+        "guestCredentials" : {
+            "guestUser" : "{{var `input/user`}}",
+            "guestPass" : "{{var `input/password`}}"
+        }
+    },
+    "deployment": [
+        {"name": "Wordpress Server",
+            "note": "Install/Configure Wordpress Server",
+            "task":{
+               "inputTemplate": "Centos7-Template",
+               "outputName": "wordpress001",
+               "outputType": "VM",
+               "import":"",
+               "networkConfig":{
+                    "distro":"centos",
+                    "device":"ens192",
+                    "address":"10.0.0.201/24",
+                    "gateway":"10.0.0.1",
+                    "dns":"8.8.8.8",
+                    "hostname":"wordpress001.local",
+                    "sudoUser":"root"
+                },
+               "commands": [
+                {
+                    "type":"execute",
+                    "note":"Remove TTY requirement for sudo (old RHEL issue)",
+                    "cmd":"sed -i -e 's/Defaults    requiretty.*/ #Defaults    requiretty/g' /etc/sudoers"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Disable SELINUX (FirewallD bug)",
+                    "cmd":"/usr/sbin/setenforce 0",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Upgrade all packages (except VMware Tools)",            
+                    "cmd":"/bin/yum upgrade --exclude=open-vm-tools -y > /tmp/ce-yum-upgrade.log",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Disable SELINUX (FirewallD bug)",
+                    "cmd":"/usr/sbin/setenforce 0",
+                    "sudoUser":"root"
+                },
+                   {
+                    "type":"execute",                    
+                    "note":"Set HTTP rules",            
+                    "cmd":"/usr/bin/firewall-cmd --permanent --zone=public --add-service=http",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Set UCP HTTPS rules",            
+                    "cmd":"/usr/bin/firewall-cmd --permanent --zone=public --add-service=https",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Reload firewall rules",            
+                    "cmd":"/usr/bin/firewall-cmd --reload",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Install web-server/mariadb/php packages",            
+                    "cmd":"/bin/yum -y install mariadb-server httpd php php-mysql",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Enable DB on Boot and start",            
+                    "cmd":"/usr/bin/systemctl enable mariadb.service; /usr/bin/systemctl start mariadb.service",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Configure Database",            
+                    "cmd":"echo 'CREATE DATABASE wordpress;' | mysql; echo \"GRANT ALL PRIVILEGES ON wordpress.* TO '{{ var `input/wp_user`}}'@'localhost' IDENTIFIED BY '{{ var `input/wp_pass`}}';\" | mysql; echo \"FLUSH PRIVILEGES;\" | mysql",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Download wordpress",            
+                    "cmd":"curl -O https://wordpress.org/latest.tar.gz",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Extracting Wordpress installation",            
+                    "cmd":"tar -C /var/www/html/ --strip-components=1 -zxvf latest.tar.gz && rm -f latest.tar.gz",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Creating directories and set directory permissions",            
+                    "cmd":"mkdir -p /var/www/html/wp-content{uploads,cache}; chown apache:apache /var/www/html/wp-content{uploads,cache}",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Create Wordpress configuration file and add configuration details",            
+                    "cmd":"cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php; sed -i 's@database_name_here@wordpress@' /var/www/html/wp-config.php; sed -i 's@username_here@{{ var `input/wp_user`}}@' /var/www/html/wp-config.php;sed -i 's@password_here@{{ var `input/wp_pass`}}@' /var/www/html/wp-config.php;",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Add wordpress api key to config",            
+                    "cmd":"curl https://api.wordpress.org/secret-key/1.1/salt/ >> /var/www/html/wp-config.php;",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Enable Mod-rewrite",            
+                    "cmd":"/usr/bin/echo -en '<IfModule mod_rewrite.c>\n     RewriteEngine On\n     RewriteBase /\n     RewriteRule ^index\\.php$ - [L]\n     RewriteCond %{REQUEST_FILENAME} !-f\n     RewriteCond %{REQUEST_FILENAME} !-d\n     RewriteRule . /index.php [L]\n</IfModule>' > /var/www/html/.htaccess",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Set .htaccess permissions",            
+                    "cmd":"chmod 666 /var/www/html/.htaccess",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Modify the httpd.conf",            
+                    "cmd":"sed -i '/^<Directory \"\/var\/www\/html\">/,/^<\/Directory>/{s/AllowOverride None/AllowOverride All/g}' /etc/httpd/conf/httpd.conf",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Enable and start web Server",            
+                    "cmd":"/usr/bin/systemctl enable httpd.service; /usr/bin/systemctl start httpd.service",
+                    "sudoUser":"root"
+                   }                  
+                ]
+            }
+        }
+    ]
+}
