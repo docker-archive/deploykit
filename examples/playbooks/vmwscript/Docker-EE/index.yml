@@ -1,0 +1,9 @@
+# An index file.
+# This file is in YAML format.  All it does is to map command line verbs to
+# more templates which are executed as commands.
+
+# Build Docker EE template
+build-dockerEE : Docker-EE.json
+
+# Launch swarm
+launch-swarm : swarm.pb

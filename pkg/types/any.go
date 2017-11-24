@@ -35,6 +35,22 @@ func AnyYAMLMust(y []byte) *Any {
 	return any
 }
 
+// Decode constructs an Any based on either YAML or JSON buffer then decodes into the second arg.
+// Since there is no content-type known with a simple buffer, it tries to parse the payload as JSON
+// first, then as YAML if that doesn't work.
+func Decode(b []byte, decoded interface{}) error {
+	err := AnyBytes(b).Decode(decoded)
+	if err == nil {
+		return nil
+	}
+	// try YAML -- yes it's because we are guessing the data format.
+	y, err := AnyYAML(b)
+	if err != nil {
+		return err
+	}
+	return y.Decode(decoded)
+}
+
 // AnyBytes returns an Any from the encoded message bytes
 func AnyBytes(data []byte) *Any {
 	any := &Any{}

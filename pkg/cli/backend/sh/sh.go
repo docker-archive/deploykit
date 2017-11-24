@@ -20,7 +20,7 @@ func init() {
 
 // Sh takes a list of optional parameters and returns an executable function that
 // executes the content as a shell script
-func Sh(scope scope.Scope, opt ...interface{}) (backend.ExecFunc, error) {
+func Sh(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
 	args := []string{}
 	for _, v := range opt {

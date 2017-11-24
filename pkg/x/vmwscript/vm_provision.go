@@ -20,7 +20,7 @@ import (
 // VCenterLogin - This function will use the VMware vCenter API to connect to a remote vCenter
 func VCenterLogin(ctx context.Context, vm VMConfig) (*govmomi.Client, error) {
 	// Parse URL from string
-	u, err := url.Parse(*vm.VCenterURL)
+	u, err := url.Parse(vm.VCenterURL)
 	if err != nil {
 		return nil, errors.New("URL can't be parsed, ensure it is https://username:password/<address>/sdk")
 	}
@@ -39,7 +39,7 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 	f := find.NewFinder(client.Client, true)
 
 	// Find one and only datacenter, not sure how VMware linked mode will work
-	dc, err := f.DatacenterOrDefault(ctx, *vm.DCName)
+	dc, err := f.DatacenterOrDefault(ctx, vm.DCName)
 	if err != nil {
 		return nil, fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
 	}
@@ -48,9 +48,9 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 	f.SetDatacenter(dc)
 
 	// Find Datastore/Network
-	datastore, err := f.DatastoreOrDefault(ctx, *vm.DSName)
+	datastore, err := f.DatastoreOrDefault(ctx, vm.DSName)
 	if err != nil {
-		return nil, fmt.Errorf("Datastore [%s], could not be found", *vm.DSName)
+		return nil, fmt.Errorf("Datastore [%s], could not be found", vm.DSName)
 	}
 
 	dcFolders, err := dc.Folders(ctx)
@@ -59,9 +59,9 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 	}
 
 	// Set the host that the VM will be created on
-	hostSystem, err := f.HostSystemOrDefault(ctx, *vm.VSphereHost)
+	hostSystem, err := f.HostSystemOrDefault(ctx, vm.VSphereHost)
 	if err != nil {
-		return nil, fmt.Errorf("vSphere host [%s], could not be found", *vm.VSphereHost)
+		return nil, fmt.Errorf("vSphere host [%s], could not be found", vm.VSphereHost)
 	}
 
 	// Find the resource pool attached to this host
@@ -126,9 +126,9 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 	}
 	currentBacking := net.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
 
-	newNet, err := f.NetworkOrDefault(ctx, *vm.NetworkName)
+	newNet, err := f.NetworkOrDefault(ctx, vm.NetworkName)
 	if err != nil {
-		errorMessage := fmt.Sprintf("Network [%s], could not be found", *vm.NetworkName)
+		errorMessage := fmt.Sprintf("Network [%s], could not be found", vm.NetworkName)
 		log.Crit(errorMessage)
 	}
 
@@ -161,15 +161,15 @@ func Provision(ctx context.Context, client *govmomi.Client, vm VMConfig, inputTe
 }
 
 //RunTasks - This kicks of the running of VMware tasks
-func RunTasks(ctx context.Context, client *govmomi.Client) {
-	taskCount := DeploymentCount()
-	vm := VMwareConfig() //Pull VMware configuration from JSON
+func (plan *DeploymentPlan) RunTasks(ctx context.Context, client *govmomi.Client) {
+	taskCount := plan.DeploymentCount()
+	vm := plan.VMWConfig
 	for i := 0; i < taskCount; i++ {
-		task := NextDeployment()
+		task := plan.NextDeployment()
 
 		if task != nil {
 			log.Info("Beginning deployment", "task", task.Name, "note", task.Note)
-			newVM, err := Provision(ctx, client, *vm, task.Task.InputTemplate, task.Task.OutputName)
+			newVM, err := Provision(ctx, client, vm, task.Task.InputTemplate, task.Task.OutputName)
 
 			if err != nil {
 				log.Error("Provisioning new Virtual Machine has failed")
@@ -178,8 +178,8 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 			}
 
 			auth := &types.NamePasswordAuthentication{
-				Username: *vm.VMTemplateAuth.Username,
-				Password: *vm.VMTemplateAuth.Password,
+				Username: vm.VMTemplateAuth.Username,
+				Password: vm.VMTemplateAuth.Password,
 			}
 
 			// Check if a networking configuration exists
@@ -225,7 +225,7 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 
 			}
 			// Hand over to the funciton that will run through the array of commands
-			runCommands(ctx, client, newVM, auth, task)
+			plan.runCommands(ctx, client, newVM, auth, task)
 
 			// Once tasks have been ran, determine what to do with the finished vm
 			if task.Task.OutputType == "Template" {
@@ -262,11 +262,11 @@ func RunTasks(ctx context.Context, client *govmomi.Client) {
 	}
 }
 
-func runCommands(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, deployment *DeploymentTask) {
+func (plan *DeploymentPlan) runCommands(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, deployment *DeploymentTask) {
 	cmdCount := CommandCount(deployment)
 	log.Info(fmt.Sprintf("%d commands will be executed.", cmdCount))
 	for i := 0; i < cmdCount; i++ {
-		cmd := NextCommand(deployment)
+		cmd := plan.NextCommand(deployment)
 		// if cmd == nil then no more commands to run
 		if cmd != nil {
 			if cmd.CMDNote != "" { // If the command has a note, then print it out
@@ -302,7 +302,7 @@ func runCommands(ctx context.Context, client *govmomi.Client, vm *object.Virtual
 			// Execute the command on the Virtual Machine
 		}
 	}
-	ResetCounter()
+	plan.ResetCounter()
 }
 
 func vmExec(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, command string, user string) (int64, error) {

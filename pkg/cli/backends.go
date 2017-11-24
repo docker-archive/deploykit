@@ -15,7 +15,7 @@ func (c *Context) loadBackends(t *template.Template) error {
 		func(funcName string, backend backend.TemplateFunc) {
 			t.AddFunc(funcName,
 				func(opt ...interface{}) error {
-					executor, err := backend(c.scope, opt...)
+					executor, err := backend(c.scope, c.test, opt...)
 					if err != nil {
 						return err
 					}

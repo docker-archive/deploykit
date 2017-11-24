@@ -32,6 +32,27 @@ type Route struct {
 	Certificate *string
 }
 
+// Validate validates the data herein. If necessary, some data values will be mutated as needed.
+func (r *Route) Validate() error {
+	if r.Port == 0 {
+		return fmt.Errorf("no port")
+	}
+	if r.LoadBalancerPort == 0 {
+		return fmt.Errorf("no loadbalancer port")
+	}
+	if !r.Protocol.Valid() {
+		return fmt.Errorf("bad protocol: %v", r.Protocol)
+	}
+	if !r.LoadBalancerProtocol.Valid() {
+		return fmt.Errorf("bad loadbalancer protocol: %v", r.LoadBalancerProtocol)
+	}
+	if r.LoadBalancerProtocol == HTTPS && r.Certificate == nil {
+		return fmt.Errorf("HTTPS but no certificate")
+	}
+
+	return nil
+}
+
 // HealthCheck models the a probe that checks against a given backend port at given
 // intervals and with timeout.
 type HealthCheck struct {

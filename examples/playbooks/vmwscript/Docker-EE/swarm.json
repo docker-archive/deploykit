@@ -1,0 +1,131 @@
+{
+    "label":"Docker-EE-on-CentOS",
+    "version":"0.1",
+    "vmconfig" : {
+	"vcenterURL" : "{{var `input/url`}}",
+        "datacentre" : "{{var `input/dc`}}",
+        "datastore":"{{var `input/ds`}}",
+        "network" : "{{var `input/nn`}}",
+        "host" : "{{var `input/host`}}",
+        "guestCredentials" : {
+            "guestUser" : "{{var `input/user`}}",
+            "guestPass" : "{{var `input/password`}}"
+        }
+    },
+    "deployment": [
+        {"name": "UCP Manager",
+            "note": "Build UCP Virtual machine",
+            "task":{
+               "inputTemplate": "DockerEETemplate",
+               "outputName": "{{ var `input/stack` }}-manager001",
+               "outputType": "VM",
+               "import":"",
+               "networkConfig":{
+                    "distro":"centos",
+                    "device":"ens192",
+                    "address":"10.0.0.101/24",
+                    "gateway":"10.0.0.1",
+                    "dns":"8.8.8.8",
+                    "hostname":"manager01.local",
+                    "sudoUser":"root"
+                },
+               "commands": [
+                {
+                    "type":"execute",                    
+                    "note":"Disable SELINUX (FirewallD bug)",
+                    "cmd":"/usr/sbin/setenforce 0",
+                    "sudoUser":"root"
+                },
+                   {
+                    "type":"execute",                    
+                    "note":"Set UCP firewall rules",            
+                    "cmd":"/usr/bin/firewall-cmd --add-port=12379-12387/tcp --permanent",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Set UCP HTTPs firewall rules",            
+                    "cmd":"/usr/bin/firewall-cmd --add-port=443/tcp --permanent",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Reload firewall rules",            
+                    "cmd":"/usr/bin/firewall-cmd --reload",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Installation of Docker Universal Control plane 2.2.4",            
+                    "cmd":"/usr/bin/docker container run --rm -t --name ucp -v /var/run/docker.sock:/var/run/docker.sock  docker/ucp:2.2.4 install --admin-password {{ var `input/admin_pass`}} --admin-username {{ var `input/admin_user`}}",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"execute",                    
+                    "note":"Backing up swarm key for other nodes",            
+                    "cmd":"/usr/bin/docker swarm join-token worker | grep SWMTKN > /tmp/swm.tkn",
+                    "sudoUser":"root"
+                   },
+                   {
+                    "type":"download",
+                    "filePath":"/tmp/swm.tkn",
+                    "resultKey":"jointoken",
+                    "delAfterDownload": false
+                   }
+                ]
+            }
+        },
+        {"name": "Swarm Worker",
+            "note": "Add worker",
+            "task":{
+               "inputTemplate": "DockerEETemplate",
+               "outputName": "{{ var `input/stack` }}-worker001",
+               "outputType": "VM",
+               "import":"",
+               "networkConfig":{
+                  "distro":"centos",
+                  "device":"ens192",
+                  "address":"10.0.0.102/24",
+                  "gateway":"10.0.0.1",
+                  "dns":"8.8.8.8",
+                  "hostname":"worker01.local",
+                  "sudoUser":"root"
+                },
+               "commands": [
+                   {
+                       "type":"execute",                    
+                       "note":"Join Swarm",
+                       "execKey":"jointoken",
+                       "sudoUser":"root"
+                   }
+                ]
+            }
+        },
+        {"name": "Swarm Worker",
+            "note": "Add worker",
+            "task":{
+               "inputTemplate": "DockerEETemplate",
+               "outputName": "{{ var `input/stack` }}-worker002",
+               "outputType": "VM",
+               "import":"",
+               "networkConfig":{
+                 "distro":"centos",
+                 "device":"ens192",
+                 "address":"10.0.0.103/24",
+                 "gateway":"10.0.0.1",
+                 "dns":"8.8.8.8",
+                 "hostname":"worker02.local",
+                 "sudoUser":"root"
+              },
+               "commands": [
+                   {
+                       "type":"execute",                    
+                       "note":"Join Swarm",
+                       "execKey":"jointoken",
+                       "sudoUser":"root"
+                   }
+                ]
+            }
+        }
+    ]
+}
