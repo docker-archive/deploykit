@@ -26,7 +26,7 @@ var (
 	// InterfaceSpec is the current name and version of the Instance API.
 	InterfaceSpec = spi.InterfaceSpec{
 		Name:    "Controller",
-		Version: "0.1.0",
+		Version: "0.1.1",
 	}
 )
 

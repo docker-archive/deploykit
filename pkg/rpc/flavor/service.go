@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/template"
@@ -112,8 +113,8 @@ func (p *Flavor) ImplementedInterface() spi.InterfaceSpec {
 	return flavor.InterfaceSpec
 }
 
-// Types returns the types exposed by this service (or kind/ category)
-func (p *Flavor) Types() []string {
+// Objects returns the objects exposed by this service (or kind/ category)
+func (p *Flavor) Objects() []rpc.Object {
 	types := []string{}
 	for k := range p.typedPlugins {
 		types = append(types, k)
@@ -122,7 +123,12 @@ func (p *Flavor) Types() []string {
 		types = append(types, ".")
 	}
 	sort.Strings(types)
-	return types
+
+	objects := []rpc.Object{}
+	for _, t := range types {
+		objects = append(objects, rpc.Object{Name: t})
+	}
+	return objects
 }
 
 func (p *Flavor) getPlugin(flavorType string) flavor.Plugin {

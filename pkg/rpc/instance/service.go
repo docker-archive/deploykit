@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
@@ -69,8 +70,8 @@ func (p *Instance) ImplementedInterface() spi.InterfaceSpec {
 	return instance.InterfaceSpec
 }
 
-// Types returns the types exposed by this service (or kind/ category)
-func (p *Instance) Types() []string {
+// Objects returns the objects exposed by this service (or kind/ category)
+func (p *Instance) Objects() []rpc.Object {
 	types := []string{}
 	for k := range p.typedPlugins {
 		types = append(types, k)
@@ -79,7 +80,11 @@ func (p *Instance) Types() []string {
 		types = append(types, ".")
 	}
 	sort.Strings(types)
-	return types
+	objects := []rpc.Object{}
+	for _, t := range types {
+		objects = append(objects, rpc.Object{Name: t})
+	}
+	return objects
 }
 
 func (p *Instance) getPlugin(instanceType string) instance.Plugin {

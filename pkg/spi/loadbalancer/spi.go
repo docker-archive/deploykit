@@ -11,7 +11,7 @@ import (
 // InterfaceSpec is the current name and version of the L4 API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "L4",
-	Version: "0.6.0",
+	Version: "0.6.1",
 }
 
 // Route is a description of a network target for a load balancer.

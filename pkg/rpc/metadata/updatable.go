@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/rpc/internal"
 	"github.com/docker/infrakit/pkg/spi"
@@ -57,9 +58,9 @@ func (u *Updatable) ImplementedInterface() spi.InterfaceSpec {
 	return metadata.UpdatableInterfaceSpec
 }
 
-// Types returns the types exposed by this kind of RPC service
-func (u *Updatable) Types() []string {
-	return u.keyed.Types()
+// Objects returns the objects exposed by this kind of RPC service
+func (u *Updatable) Objects() []rpc.Object {
+	return u.keyed.Objects()
 }
 
 // Keys returns a list of child nodes given a path.

@@ -44,13 +44,13 @@ func (c *handshakingClient) handshake() error {
 
 	if c.handshakeResult == nil {
 
-		apis, err := c.client.Implements()
+		objects, err := c.client.Hello()
 		if err != nil {
 			return err
 		}
 
 		err = fmt.Errorf("Plugin does not support interface %v", c.iface.Encode())
-		for _, iface := range apis {
+		for iface := range objects {
 			if iface.Name == c.iface.Name {
 				if iface.Version == c.iface.Version {
 					err = nil
