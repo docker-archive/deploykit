@@ -37,13 +37,13 @@ type Keyed struct {
 	listFunc func() (map[string]interface{}, error)
 }
 
-// Types returns the types exposed by this kind of RPC service
+// Objects returns the objects exposed by this kind of RPC service
 func (k *Keyed) Objects() []rpc.Object {
 	m, err := k.listFunc()
 	if err != nil {
 		return nil
 	}
-	log.Debug("Types", "map", m, "V", debugV)
+	log.Debug("Objects", "map", m, "V", debugV)
 	objs := []rpc.Object{}
 	for key := range m {
 		objs = append(objs, rpc.Object{Name: fmt.Sprintf("%v", key)})

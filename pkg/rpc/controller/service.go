@@ -69,7 +69,7 @@ func (c *Controller) ImplementedInterface() spi.InterfaceSpec {
 	return controller.InterfaceSpec
 }
 
-// Types returns the types exposed by this kind of RPC service
+// Objects returns the objects exposed by this kind of RPC service
 func (c *Controller) Objects() []rpc.Object {
 	return c.keyed.Objects()
 }
