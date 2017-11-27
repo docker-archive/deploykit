@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/internal"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -55,9 +56,9 @@ func (p *Metadata) ImplementedInterface() spi.InterfaceSpec {
 	return metadata.InterfaceSpec
 }
 
-// Types returns the types exposed by this kind of RPC service
-func (p *Metadata) Types() []string {
-	return p.keyed.Types()
+// Objects returns the objects exposed by this kind of RPC service
+func (p *Metadata) Objects() []rpc.Object {
+	return p.keyed.Objects()
 }
 
 // Keys returns a list of child nodes given a path.

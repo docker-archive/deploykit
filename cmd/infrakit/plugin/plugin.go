@@ -12,7 +12,6 @@ import (
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/run/manager"
 	"github.com/docker/infrakit/pkg/run/scope"
@@ -49,7 +48,7 @@ func Command(scope scope.Scope) *cobra.Command {
 		type ep struct {
 			name   string
 			listen string
-			spi    rpc.InterfaceSpec
+			spi    string
 		}
 
 		view := map[string]ep{} // table of name, listen, and spi
@@ -63,33 +62,9 @@ func Command(scope scope.Scope) *cobra.Command {
 				continue
 			}
 
-			typeMap, err := hs.Types()
+			typeMap, err := hs.Hello()
 			if err != nil {
 				log.Warn("cannot get types for this kind", "err", err, "addr", entry.Address)
-
-				// plugins that haven't been updated to the new types() call
-
-				// try the implements
-				if spis, err := hs.Implements(); err == nil {
-					for _, spi := range spis {
-						ep := ep{
-							name:   major,
-							listen: entry.Address,
-							spi:    rpc.InterfaceSpec(fmt.Sprintf("%s/%s", spi.Name, spi.Version)),
-						}
-
-						key := fmt.Sprintf("%s:%s", ep.name, ep.spi)
-						view[key] = ep
-						keys = append(keys, key)
-					}
-				} else {
-					ep := ep{
-						name:   major,
-						listen: entry.Address,
-					}
-					view[ep.name] = ep
-					keys = append(keys, ep.name)
-				}
 				continue
 			}
 
@@ -97,8 +72,9 @@ func Command(scope scope.Scope) *cobra.Command {
 
 				interfaceSpec := spi
 
-				for _, minor := range names {
+				for _, obj := range names {
 
+					minor := obj.Name
 					n := major
 
 					if minor != "." {
@@ -108,7 +84,7 @@ func Command(scope scope.Scope) *cobra.Command {
 					ep := ep{
 						name:   n,
 						listen: entry.Address,
-						spi:    interfaceSpec,
+						spi:    interfaceSpec.Encode(),
 					}
 
 					key := fmt.Sprintf("%s:%s", ep.name, ep.spi)

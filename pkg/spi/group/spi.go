@@ -9,7 +9,7 @@ import (
 // InterfaceSpec is the current name and version of the Group API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Group",
-	Version: "0.1.0",
+	Version: "0.1.1",
 }
 
 // AllocationMethod defines the type of allocation and supervision needed by a flavor's Group.

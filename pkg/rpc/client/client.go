@@ -133,24 +133,18 @@ func parseAddress(address string) (*url.URL, *http.Client, error) {
 	return nil, nil, fmt.Errorf("invalid address %v", address)
 }
 
-// Implements is the method from the Handshaker interface
-func (c client) Implements() ([]spi.InterfaceSpec, error) {
-	req := rpc.ImplementsRequest{}
-	resp := rpc.ImplementsResponse{}
-	if err := c.Call("Handshake.Implements", req, &resp); err != nil {
+// Hello implements the Handshaker interface
+func (c client) Hello() (map[spi.InterfaceSpec][]rpc.Object, error) {
+	req := rpc.HelloRequest{}
+	resp := rpc.HelloResponse{}
+	if err := c.Call("Handshake.Hello", req, &resp); err != nil {
 		return nil, err
 	}
-	return resp.APIs, nil
-}
-
-// Types returns a list of types exposed by this object
-func (c client) Types() (map[rpc.InterfaceSpec][]string, error) {
-	req := rpc.TypesRequest{}
-	resp := rpc.TypesResponse{}
-	if err := c.Call("Handshake.Types", req, &resp); err != nil {
-		return nil, err
+	objects := map[spi.InterfaceSpec][]rpc.Object{}
+	for k, o := range resp.Objects {
+		objects[spi.DecodeInterfaceSpec(k)] = o
 	}
-	return resp.Types, nil
+	return objects, nil
 }
 
 func (c client) Addr() string {

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -100,10 +99,13 @@ func TestMetadataMultiPlugin(t *testing.T) {
 
 	rpcClient, err := rpc_client.NewHandshaker(socketPath)
 	require.NoError(t, err)
-	subs, err := rpcClient.Types()
+	subs, err := rpcClient.Hello()
 	require.NoError(t, err)
 
-	found := subs[rpc.InterfaceSpec(metadata.InterfaceSpec.Encode())]
+	found := []string{}
+	for _, f := range subs[metadata.InterfaceSpec] {
+		found = append(found, f.Name)
+	}
 	sort.Strings(found)
 	require.Equal(t, []string{"aws", "azure"}, found)
 

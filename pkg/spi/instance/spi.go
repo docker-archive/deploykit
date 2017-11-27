@@ -8,7 +8,7 @@ import (
 // InterfaceSpec is the current name and version of the Instance API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Instance",
-	Version: "0.6.0",
+	Version: "0.6.1",
 }
 
 var (

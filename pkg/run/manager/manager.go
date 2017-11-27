@@ -268,12 +268,12 @@ func countMatches(list []string, found map[string]*plugin.Endpoint) int {
 				log.Error("Plugin not responding", "lookup", l, "endpoint", ep, "err", err)
 				continue
 			}
-			implements, err := hs.Implements()
+			objects, err := hs.Hello()
 			if err != nil {
 				log.Error("Bad handshake. Is this plugin running?", "lookup", l, "endpoint", ep)
 				continue
 			}
-			log.Debug("Scan found", "lookup", l, "endpoint", ep, "V", debugLoopV, "implements", implements)
+			log.Debug("Scan found", "lookup", l, "endpoint", ep, "V", debugLoopV, "implements", objects)
 			c++
 		}
 	}

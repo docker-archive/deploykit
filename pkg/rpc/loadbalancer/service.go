@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/internal"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -56,9 +57,9 @@ func (l4 *L4) ImplementedInterface() spi.InterfaceSpec {
 	return loadbalancer.InterfaceSpec
 }
 
-// Types returns the types exposed by this kind of RPC service
-func (l4 *L4) Types() []string {
-	return l4.keyed.Types()
+// Objects returns the objects exposed by this kind of RPC service
+func (l4 *L4) Objects() []rpc.Object {
+	return l4.keyed.Objects()
 }
 
 // Name returns the name of the load balancer

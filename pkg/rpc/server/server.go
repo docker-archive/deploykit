@@ -11,8 +11,8 @@ import (
 
 	broker "github.com/docker/infrakit/pkg/broker/server"
 	logutil "github.com/docker/infrakit/pkg/log"
+	rpc_base "github.com/docker/infrakit/pkg/rpc"
 	rpc_server "github.com/docker/infrakit/pkg/rpc"
-	//rpc_event "github.com/docker/infrakit/pkg/rpc/event"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/types"
@@ -86,8 +86,8 @@ func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 type VersionedInterface interface {
 	// ImplementedInterface returns the interface being provided.
 	ImplementedInterface() spi.InterfaceSpec
-	// Types returns the types in this category/ kind
-	Types() []string
+	// Objects returns the names of objects
+	Objects() []rpc_base.Object
 }
 
 // StartListenerAtPath starts an HTTP server listening on tcp port with discovery entry at specified path.
@@ -118,10 +118,10 @@ func startAtPath(listen []string, discoverPath string,
 
 	targets := append([]VersionedInterface{receiver}, more...)
 
-	interfaces := map[spi.InterfaceSpec]func() []string{}
+	objects := map[spi.InterfaceSpec]func() []rpc_base.Object{}
 	for _, t := range targets {
 
-		interfaces[t.ImplementedInterface()] = t.Types
+		objects[t.ImplementedInterface()] = t.Objects
 
 		if err := server.RegisterService(t, ""); err != nil {
 			return nil, err
@@ -141,7 +141,7 @@ func startAtPath(listen []string, discoverPath string,
 		// }
 	}
 	// handshake service that can exchange interface versions with client
-	if err := server.RegisterService(rpc_server.Handshake(interfaces), ""); err != nil {
+	if err := server.RegisterService(rpc_server.Handshake(objects), ""); err != nil {
 		return nil, err
 	}
 

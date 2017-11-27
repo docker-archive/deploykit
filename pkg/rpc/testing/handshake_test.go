@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi"
@@ -85,9 +86,9 @@ func (p *TestPlugin) ImplementedInterface() spi.InterfaceSpec {
 	return p.spec
 }
 
-// Types returns the types
-func (p *TestPlugin) Types() []string {
-	return []string{"."}
+// Objects returns the objects
+func (p *TestPlugin) Objects() []rpc.Object {
+	return []rpc.Object{{Name: "."}}
 }
 
 // EmptyMessage is an empty test message.

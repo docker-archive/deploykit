@@ -48,31 +48,20 @@ func getPluginObjects(hs rpc.Handshaker, major string) map[string][]spi.Interfac
 	objects := map[string][]spi.InterfaceSpec{}
 
 	// The spi this object implements (e.g. Instance/0.5.0)
-	spis, err := hs.Implements()
-	if err != nil {
-		log.Debug("error getting interface", "name", major, "err", err)
-		return objects
-	}
-
 	// For each spi, eg. Instance/0.5.0 a list of object names
-	typesBySpi, err := hs.Types()
+	typesBySpi, err := hs.Hello()
 	if err != nil {
 		log.Debug("error getting typed objects in this plugin", "name", major, "err", err)
 
-		// Here we assume there are no lower level objects
-		objects[major] = spis
 		return objects
 	}
 
-	for encodedSpi, names := range typesBySpi {
-
-		// the key is a string form of InterfaceSpec because yaml/ json don't handle
-		// objects as keys very well.
-
-		theSpi := spi.DecodeInterfaceSpec(string(encodedSpi))
+	for theSpi, objs := range typesBySpi {
 
 		objectName := major
-		for _, minor := range names {
+		for _, object := range objs {
+
+			minor := object.Name
 
 			if minor != "." {
 				objectName = path.Join(major, minor)
