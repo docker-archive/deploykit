@@ -32,13 +32,27 @@ func newListener(service string, swarmPort int, urlStr string, cert *string) (*l
 }
 
 func (l *listener) asRoute() loadbalancer.Route {
-	return loadbalancer.Route{
+	r := loadbalancer.Route{
 		Port:                 l.SwarmPort,
 		Protocol:             l.protocol(),
 		LoadBalancerPort:     l.extPort(),
 		LoadBalancerProtocol: l.loadbalancerProtocol(),
 		Certificate:          l.CertASN(),
 	}
+
+	// If Certificate is specified, the we make adjustments to the protocol. This makes no assumption
+	// of the validity of the certificate
+	if r.Certificate != nil {
+		switch r.LoadBalancerProtocol {
+		case loadbalancer.HTTP: // frontend lb protocol
+			r.LoadBalancerProtocol = loadbalancer.HTTPS
+			r.Protocol = loadbalancer.HTTP // backend
+		case loadbalancer.TCP: // frontend lb protocol
+			r.LoadBalancerProtocol = loadbalancer.SSL
+			r.Protocol = loadbalancer.TCP // backend
+		}
+	}
+	return r
 }
 
 // Get the ASN value from the service label
