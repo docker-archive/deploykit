@@ -71,6 +71,7 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.Equal(t, []int{443}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
+	require.Equal(t, loadbalancer.SSL, r.LoadBalancerProtocol)
 	require.Equal(t, &cert, r.Certificate)
 
 	// no cert so not SSL.
@@ -86,6 +87,7 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.Equal(t, []int{443}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
+	require.Equal(t, loadbalancer.TCP, r.LoadBalancerProtocol) // no cert
 	require.Equal(t, emptyCert, r.Certificate)
 }
 
@@ -109,6 +111,7 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, []int{443}, l.CertPorts())
 	r := l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
+	require.Equal(t, loadbalancer.SSL, r.LoadBalancerProtocol)
 	require.Equal(t, asn, *r.Certificate)
 
 	// has cert with port 442, this should be SSL.
@@ -191,6 +194,8 @@ func TestImpliedSwarmPortToUrl(t *testing.T) {
 	require.Equal(t, HostNotSpecified, l.host())
 	require.Equal(t, int(0), l.SwarmPort)
 	require.Equal(t, loadbalancer.HTTPS, l.protocol())
+	r := l.asRoute()
+	require.Equal(t, loadbalancer.HTTPS, r.LoadBalancerProtocol)
 
 	l, err = impliedSwarmPortToURL("foo", "http://myapp.domain.com")
 	require.NoError(t, err)
