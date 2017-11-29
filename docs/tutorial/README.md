@@ -275,7 +275,7 @@ tells Infrakit to interpet the input as YAML (because it accepts JSON by default
 Now list to see the instance:
 
 ```shell
-$ infrakit simulator/compute describe 
+$ infrakit simulator/compute describe
 ID                            	LOGICAL                       	TAGS
 1506515055431980898           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance
 ```
@@ -497,7 +497,7 @@ Available Commands:
 To show the instances in this group:
 
 ```shell
-$ infrakit group/workers describe workers
+$ infrakit group/workers describe
 ID                            	LOGICAL                       	TAGS
 1506521294112164848           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=oskdoyfaewtrrmwlychnja3ejwz574ue,infrakit.group=workers
 1506521294112934083           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=oskdoyfaewtrrmwlychnja3ejwz574ue,infrakit.group=workers
@@ -518,23 +518,23 @@ additional metadata via tags.
 We can look at the 'scale' or size of the group:
 
 ```shell
-$ infrakit group/workers size workers
+$ infrakit group/workers scale
 Group workers target size= 5
 ```
 
 Scaling up (adding more nodes):
 
 ```shell
-$ infrakit group/workers set-size workers 8
+$ infrakit group/workers scale 8
 Group workers at 5 instances, scale to 8
 ```
 
 After a short while, let's check:
 
 ```shell
-$ infrakit group/workers size
+$ infrakit group/workers scale
 Group workers at 8 instances
-$ infrakit group/workers describe workers
+$ infrakit group/workers describe
 ID                            	LOGICAL                       	TAGS
 1506521644119689998           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=oskdoyfaewtrrmwlychnja3ejwz574ue,infrakit.group=workers
 1506521644120385464           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=oskdoyfaewtrrmwlychnja3ejwz574ue,infrakit.group=workers
@@ -557,9 +557,9 @@ destroyed 1506521644120035107
 and see that the group controller will maintain the original specification:
 
 ```shell
-$ infrakit group/workers size
+$ infrakit group/workers scale
 Group workers at 8 instances
-$ infrakit group/workers describe workers
+$ infrakit group/workers describe
 ID                            	LOGICAL                       	TAGS
 1506521644119306272           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=oskdoyfaewtrrmwlychnja3ejwz574ue,infrakit.group=workers
 1506521644119689998           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=oskdoyfaewtrrmwlychnja3ejwz574ue,infrakit.group=workers
@@ -574,9 +574,9 @@ ID                            	LOGICAL                       	TAGS
 We can scale down the group:
 
 ```shell
-$ infrakit group/workers set-size workers 2
+$ infrakit group/workers scale 2
 Group workers at 8 instances, scale to 2
-$ infrakit group/workers describe workers
+$ infrakit group/workers describe
 ID                            	LOGICAL                       	TAGS
 1506521824108334555           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=oskdoyfaewtrrmwlychnja3ejwz574ue,infrakit.group=workers
 1506521824108717234           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=oskdoyfaewtrrmwlychnja3ejwz574ue,infrakit.group=workers
@@ -658,7 +658,7 @@ version: ""
 Let's check:
 
 ```shell
-$ infrakit group/workers describe workers
+$ infrakit group/workers describe
 ID                            	LOGICAL                       	TAGS
 1506522342940736322           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=d2m6ncxw5kprf7j35tpl32pcygskuegh,infrakit.group=workers
 1506522362939812225           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=d2m6ncxw5kprf7j35tpl32pcygskuegh,infrakit.group=workers
@@ -670,7 +670,7 @@ ID                            	LOGICAL                       	TAGS
 We see that we have come back to 5 instances in this group (as specified in `group2.yml`).
 In addition, the instances are actually different now, as indicated by a different
 SHA (`d2m6ncxw5kprf7j35tpl32pcygskuegh` compared to `oskdoyfaewtrrmwlychnja3ejwz574ue`).
-Also, the instances all have new ID's now.
+Also, the instances all have new IDs now.
 
 
 Finally, let's destroy the group:
@@ -702,7 +702,7 @@ Available Commands:
 And the group `workers` is no longer known to Infrakit:
 
 ```shell
-$ infrakit group/workers describe workers
+$ infrakit group/workers describe
 CRIT[09-27|07:20:25] error executing                          module=main cmd=infrakit err="Group 'workers' is not being watched" fn=main.main
 Group 'workers' is not being watched
 ```
@@ -777,4 +777,3 @@ Now that you have completed the tutorial, there are additional topics you can ex
   + Other controllers such as the Ingress controller for routing of traffic from
   the internet to the cluster, and the Enrollment controller that performs associations
   of instances in a group to instances of other resource types.
-
