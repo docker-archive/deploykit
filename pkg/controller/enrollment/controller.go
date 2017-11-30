@@ -16,7 +16,7 @@ var (
 )
 
 // NewController returns a controller implementation
-func NewController(plugins func() discovery.Plugins, leader manager.Leadership,
+func NewController(plugins func() discovery.Plugins, leader func() manager.Leadership,
 	options enrollment.Options) controller.Controller {
 	return internal.NewController(
 		leader,
@@ -32,7 +32,7 @@ func NewController(plugins func() discovery.Plugins, leader manager.Leadership,
 }
 
 // NewTypedControllers return typed controllers
-func NewTypedControllers(plugins func() discovery.Plugins, leader manager.Leadership,
+func NewTypedControllers(plugins func() discovery.Plugins, leader func() manager.Leadership,
 	options enrollment.Options) func() (map[string]controller.Controller, error) {
 
 	return (internal.NewController(

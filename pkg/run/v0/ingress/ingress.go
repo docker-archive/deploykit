@@ -37,20 +37,26 @@ func init() {
 	inproc.Register(Kind, Run, DefaultOptions)
 }
 
-func leadership(plugins func() discovery.Plugins) (manager.Leadership, error) {
+func leadership(plugins func() discovery.Plugins) manager.Leadership {
 	// Scan for a manager
 	pm, err := plugins().List()
 	if err != nil {
-		return nil, err
+		log.Error("Cannot list plugins", "err", err)
+		return nil
 	}
 
 	for _, endpoint := range pm {
 		rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
 		if err == nil {
-			return manager_rpc.Adapt(rpcClient), nil
+			return manager_rpc.Adapt(rpcClient)
+		}
+
+		if !client.IsErrInterfaceNotSupported(err) {
+			log.Error("Got error getting manager", "endpoint", endpoint, "err", err)
+			return nil
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 // DefaultOptions container options for default behavior
@@ -71,14 +77,14 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	log.Info("Decoded input", "config", options)
 
-	leadership, err := leadership(scope.Plugins)
-	if err != nil {
-		return
-	}
-
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: ingress.NewTypedControllers(scope, leadership),
+
+		// TODO - move leadership into scope lookup / stack
+		run.Controller: ingress.NewTypedControllers(scope,
+			func() manager.Leadership {
+				return leadership(scope.Plugins)
+			}),
 	}
 
 	return
