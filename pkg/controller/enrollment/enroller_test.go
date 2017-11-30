@@ -7,6 +7,7 @@ import (
 
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -16,13 +17,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type fakeLeader func() (bool, error)
-
-func (f fakeLeader) IsLeader() (bool, error) {
-	return f()
+func fakeLeader(v bool) func() manager.Leadership {
+	return func() manager.Leadership { return fakeLeaderT(v) }
 }
 
-func (f fakeLeader) LeaderLocation() (*url.URL, error) {
+type fakeLeaderT bool
+
+func (f fakeLeaderT) IsLeader() (bool, error) {
+	return bool(f), nil
+}
+
+func (f fakeLeaderT) LeaderLocation() (*url.URL, error) {
 	return nil, nil
 }
 
@@ -62,7 +67,7 @@ func TestEnroller(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		},
-		fakeLeader(func() (bool, error) { return false, nil }),
+		fakeLeader(false),
 		enrollment.Options{})
 	enroller.groupPlugin = &group_test.Plugin{
 		DoDescribeGroup: func(gid group.ID) (group.Description, error) {
@@ -169,7 +174,7 @@ func TestEnrollerNoTags(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		},
-		fakeLeader(func() (bool, error) { return false, nil }),
+		fakeLeader(false),
 		enrollment.Options{})
 	enroller.groupPlugin = &group_test.Plugin{
 		DoDescribeGroup: func(gid group.ID) (group.Description, error) {
@@ -280,7 +285,7 @@ func TestEnrollerMissingProps(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		},
-		fakeLeader(func() (bool, error) { return false, nil }),
+		fakeLeader(false),
 		enrollment.Options{})
 	enroller.groupPlugin = &group_test.Plugin{
 		DoDescribeGroup: func(gid group.ID) (group.Description, error) {

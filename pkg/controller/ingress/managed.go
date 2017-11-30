@@ -22,17 +22,17 @@ import (
 var log = logutil.New("module", "controller/ingress")
 
 func newManaged(scp scope.Scope,
-	leader manager.Leadership) *managed {
+	leader func() manager.Leadership) *managed {
 	return &managed{
-		Leadership: leader,
-		scope:      scp,
+		leader: leader,
+		scope:  scp,
 	}
 }
 
 // managed is the entity that reconciles desired routes with loadbalancers
 type managed struct {
 	// Leader controls whether this ingress is active or not
-	manager.Leadership
+	leader func() manager.Leadership
 
 	// l4s is a function that get retrieve a map of L4 loadbalancers by name
 	l4s func() (map[ingress.Vhost]loadbalancer.L4, error)

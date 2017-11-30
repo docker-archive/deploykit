@@ -7,6 +7,18 @@ import (
 	"sync"
 )
 
+// IsErrInterfaceNotSupported returns true if the error is because the interface is not supported.
+func IsErrInterfaceNotSupported(err error) bool {
+	_, is := err.(errNotSupported)
+	return is
+}
+
+type errNotSupported spi.InterfaceSpec
+
+func (e errNotSupported) Error() string {
+	return fmt.Sprintf("Plugin does not support interface %v", spi.InterfaceSpec(e).Encode())
+}
+
 type handshakingClient struct {
 	client *client
 	iface  spi.InterfaceSpec
@@ -49,7 +61,7 @@ func (c *handshakingClient) handshake() error {
 			return err
 		}
 
-		err = fmt.Errorf("Plugin does not support interface %v", c.iface.Encode())
+		err = errNotSupported(c.iface)
 		for iface := range objects {
 			if iface.Name == c.iface.Name {
 				if iface.Version == c.iface.Version {
