@@ -771,6 +771,99 @@ func TestProvisionUpdateDedicatedGlobal(t *testing.T) {
 	)
 }
 
+func TestProvisionDedicatedGlobalRenderVars(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	instSpec := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMIBMCloud: {
+			TResourceName("host"): {
+				"self-instid":    "{{ var `/self/instId` }}",
+				"self-logicalid": "{{ var `/self/logicalId` }}",
+				PropScope:        ValScopeDefault,
+			},
+		},
+		TResourceType("softlayer_file_storage"): {
+			TResourceName("worker_fs"): {
+				"nfs-vm-instid":    "{{ var `/self/instId` }}",
+				"nfs-vm-logicalid": "{{ var `/self/logicalId` }}",
+				PropScope:          ValScopeDedicated,
+			},
+		},
+		TResourceType("softlayer_block_storage"): {
+			TResourceName("worker_bs"): {
+				"bs-vm-instid":    "{{ var `/self/instId` }}",
+				"bs-vm-logicalid": "{{ var `/self/logicalId` }}",
+				PropScope:         "managers",
+			},
+		},
+	}
+	tformat := TFormat{Resource: instSpec}
+	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	// Provision, should get 3 files
+	logicalID := instance.LogicalID("LID1")
+	id1, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		LogicalID:  &logicalID,
+		Tags:       map[string]string{},
+	})
+	require.NoError(t, err)
+	files, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 3)
+	filenames := []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	require.Contains(t, filenames, fmt.Sprintf("%s.tf.json.new", string(*id1)))
+	// VM props
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, fmt.Sprintf("%s.tf.json.new", string(*id1))))
+	require.NoError(t, err)
+	tFormat := TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	// Verify the rendered props
+	props := tFormat.Resource[VMIBMCloud][TResourceName(string(*id1))]
+	require.Equal(t, string(*id1), props["self-instid"])
+	require.Equal(t, string(logicalID), props["self-logicalid"])
+	// Dedicated
+	require.Contains(t, filenames, "default_dedicated_LID1.tf.json.new")
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "default_dedicated_LID1.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_file_storage"): {
+				TResourceName("default-LID1-worker_fs"): {
+					"nfs-vm-instid":    string(*id1),
+					"nfs-vm-logicalid": string(logicalID),
+				},
+			},
+		},
+		tFormat.Resource,
+	)
+	// Global
+	require.Contains(t, filenames, "managers_global.tf.json.new")
+	buff, err = ioutil.ReadFile(filepath.Join(tf.Dir, "managers_global.tf.json.new"))
+	require.NoError(t, err)
+	tFormat = TFormat{}
+	err = types.AnyBytes(buff).Decode(&tFormat)
+	require.NoError(t, err)
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			TResourceType("softlayer_block_storage"): {
+				TResourceName("managers-worker_bs"): {
+					"bs-vm-instid":    string(*id1),
+					"bs-vm-logicalid": string(logicalID),
+				},
+			},
+		},
+		tFormat.Resource,
+	)
+}
+
 func TestRunValidateProvisionDescribe(t *testing.T) {
 	// Test a softlayer_virtual_guest with an @hostname_prefix
 	runValidateProvisionDescribe(t, "softlayer_virtual_guest", `
