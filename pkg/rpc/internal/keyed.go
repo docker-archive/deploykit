@@ -6,6 +6,7 @@ import (
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 )
 
 var log = logutil.New("module", "rpc/internal")
@@ -36,18 +37,18 @@ type Keyed struct {
 	listFunc func() (map[string]interface{}, error)
 }
 
-// Types returns the types exposed by this kind of RPC service
-func (k *Keyed) Types() []string {
+// Objects returns the objects exposed by this kind of RPC service
+func (k *Keyed) Objects() []rpc.Object {
 	m, err := k.listFunc()
 	if err != nil {
 		return nil
 	}
-	log.Debug("Types", "map", m, "V", debugV)
-	types := []string{}
+	log.Debug("Objects", "map", m, "V", debugV)
+	objs := []rpc.Object{}
 	for key := range m {
-		types = append(types, fmt.Sprintf("%v", key))
+		objs = append(objs, rpc.Object{Name: fmt.Sprintf("%v", key)})
 	}
-	return types
+	return objs
 }
 
 // Do performs work calling the work function once the request resolves to an object

@@ -8,7 +8,7 @@ import (
 // InterfaceSpec is the current name and version of the Flavor API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Event",
-	Version: "0.1.0",
+	Version: "0.1.1",
 }
 
 // Plugin must be implemented for the object to be able to publish events.

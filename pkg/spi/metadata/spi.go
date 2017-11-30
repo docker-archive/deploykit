@@ -9,13 +9,13 @@ var (
 	// InterfaceSpec is the current name and version of the Metadata API.
 	InterfaceSpec = spi.InterfaceSpec{
 		Name:    "Metadata",
-		Version: "0.1.0",
+		Version: "0.1.1",
 	}
 
 	// UpdatableInterfaceSpec is the current name and version of the Metadata API.
 	UpdatableInterfaceSpec = spi.InterfaceSpec{
 		Name:    "Updatable",
-		Version: "0.1.0",
+		Version: "0.1.1",
 	}
 )
 

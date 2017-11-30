@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/internal"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -67,9 +68,9 @@ func (p *Group) ImplementedInterface() spi.InterfaceSpec {
 
 }
 
-// Types returns the types exposed by this kind of RPC service
-func (p *Group) Types() []string {
-	return p.keyed.Types()
+// Objects returns the objects exposed by this kind of RPC service
+func (p *Group) Objects() []rpc.Object {
+	return p.keyed.Objects()
 }
 
 // CommitGroup is the rpc method to commit a group

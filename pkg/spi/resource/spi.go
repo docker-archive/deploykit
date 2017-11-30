@@ -8,7 +8,7 @@ import (
 // InterfaceSpec is the current name and version of the Resource API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Resource",
-	Version: "0.1.0",
+	Version: "0.1.1",
 }
 
 // ID is the unique identifier for a collection of resources.

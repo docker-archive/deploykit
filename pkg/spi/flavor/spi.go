@@ -10,7 +10,7 @@ import (
 // InterfaceSpec is the current name and version of the Flavor API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Flavor",
-	Version: "0.1.0",
+	Version: "0.1.1",
 }
 
 // Health is an indication of whether the Flavor is functioning properly.

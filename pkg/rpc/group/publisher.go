@@ -10,11 +10,11 @@ import (
 func (p *Group) List(topic types.Path) (child []string, err error) {
 	m := map[string]interface{}{}
 
-	subs := p.keyed.Types()
+	subs := p.keyed.Objects()
 	if len(subs) > 0 {
-		for _, t := range subs {
-			types.Put([]string{t, "commit"}, "", m)
-			types.Put([]string{t, "describe"}, "", m)
+		for _, o := range subs {
+			types.Put([]string{o.Name, "commit"}, "", m)
+			types.Put([]string{o.Name, "describe"}, "", m)
 		}
 	} else {
 		types.Put([]string{"commit"}, "", m)

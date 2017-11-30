@@ -10,7 +10,7 @@ import (
 // InterfaceSpec is the current name and version of the Instance API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Stack",
-	Version: "0.1.0",
+	Version: "0.1.1",
 }
 
 // Interface is a higher-level abstraction for all the groups, controllers, and plugins

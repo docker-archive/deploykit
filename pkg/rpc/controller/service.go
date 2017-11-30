@@ -6,6 +6,7 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/internal"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/types"
@@ -68,9 +69,9 @@ func (c *Controller) ImplementedInterface() spi.InterfaceSpec {
 	return controller.InterfaceSpec
 }
 
-// Types returns the types exposed by this kind of RPC service
-func (c *Controller) Types() []string {
-	return c.keyed.Types()
+// Objects returns the objects exposed by this kind of RPC service
+func (c *Controller) Objects() []rpc.Object {
+	return c.keyed.Objects()
 }
 
 // Plan is the rpc method for Plan

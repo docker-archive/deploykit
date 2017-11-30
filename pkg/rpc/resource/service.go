@@ -3,6 +3,7 @@ package resource
 import (
 	"net/http"
 
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/resource"
 	"github.com/docker/infrakit/pkg/types"
@@ -39,9 +40,9 @@ func (p *Resource) ImplementedInterface() spi.InterfaceSpec {
 	return resource.InterfaceSpec
 }
 
-// Types returns the types exposed by this service (or kind/ category)
-func (p *Resource) Types() []string {
-	return []string{"."}
+// Objects returns the objects exposed by this service (or kind/ category)
+func (p *Resource) Objects() []rpc.Object {
+	return []rpc.Object{{Name: "."}}
 }
 
 // Commit is the rpc method to commit resources.

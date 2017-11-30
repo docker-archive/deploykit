@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
@@ -24,9 +25,9 @@ func (p *Manager) ImplementedInterface() spi.InterfaceSpec {
 	return stack.InterfaceSpec
 }
 
-// Types returns the types exposed by this kind of RPC service
-func (p *Manager) Types() []string {
-	return []string{"."} // no types
+// Objects returns the objects exposed by this kind of RPC service
+func (p *Manager) Objects() []rpc.Object {
+	return []rpc.Object{{Name: "."}} // no objects
 }
 
 // IsLeaderRequest is the rpc request

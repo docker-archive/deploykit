@@ -7,9 +7,9 @@ import (
 
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -68,7 +68,7 @@ func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*Metada
 		return nil, err
 	}
 	// we need to get the subtypes
-	info, err := handshaker.Types()
+	info, err := handshaker.Hello()
 	if err != nil {
 		return nil, err
 	}
@@ -78,14 +78,15 @@ func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*Metada
 	key := mpath.Shift(1)
 
 	// There are two interfaces possible so we need to search for both
-	for _, c := range []rpc.InterfaceSpec{
-		rpc.InterfaceSpec(metadata.UpdatableInterfaceSpec.Encode()),
-		rpc.InterfaceSpec(metadata.InterfaceSpec.Encode()),
+	for _, c := range []spi.InterfaceSpec{
+		metadata.UpdatableInterfaceSpec,
+		metadata.InterfaceSpec,
 	} {
 		subs, has := info[c]
 		sub := mpath.Shift(1).Index(0)
 		if has && sub != nil {
-			for _, ss := range subs {
+			for _, o := range subs {
+				ss := o.Name
 				if *sub == ss {
 					pluginName = plugin.Name(gopath.Join(*first, *sub))
 					key = key.Shift(1)
