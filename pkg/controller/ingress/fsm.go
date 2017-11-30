@@ -1,6 +1,7 @@
 package ingress
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/docker/infrakit/pkg/controller"
@@ -97,6 +98,16 @@ func (c *managed) defaultBehaviors(spec types.Spec) {
 	}
 }
 
+func (c *managed) isLeader() (is bool, err error) {
+	check := c.leader()
+	if check == nil {
+		err = fmt.Errorf("cannot determine leader status")
+		return
+	}
+	is, err = check.IsLeader()
+	return
+}
+
 func (c *managed) init(in types.Spec) (err error) {
 	if c.process != nil {
 		panic("this is not allowed")
@@ -182,7 +193,7 @@ func (c *managed) init(in types.Spec) (err error) {
 	c.poller = controller.Poll(
 		func() bool {
 
-			if mustTrue(c.IsLeader()) {
+			if mustTrue(c.isLeader()) {
 				c.stateMachine.Signal(lead)
 				return true
 			}

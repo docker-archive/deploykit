@@ -37,12 +37,12 @@ type Controller struct {
 	alloc   func(types.Spec) (Managed, error)
 	keyfunc func(types.Metadata) string
 	managed map[string]*Managed
-	leader  manager.Leadership
+	leader  func() manager.Leadership
 	lock    sync.RWMutex
 }
 
 // NewController creates a controller injecting dependencies
-func NewController(l manager.Leadership,
+func NewController(l func() manager.Leadership,
 	alloc func(types.Spec) (Managed, error),
 	keyfunc func(types.Metadata) string) *Controller {
 
@@ -56,7 +56,12 @@ func NewController(l manager.Leadership,
 }
 
 func (c *Controller) leaderGuard() error {
-	is, err := c.leader.IsLeader()
+	check := c.leader()
+	if check == nil {
+		return fmt.Errorf("cannot determine leader status")
+	}
+
+	is, err := check.IsLeader()
 	if err != nil {
 		return err
 	}
