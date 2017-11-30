@@ -35,6 +35,10 @@ type VMConfig struct {
 		Username string `json:"guestUser,omitempty"`
 		Password string `json:"guestPass,omitempty"`
 	} `json:"guestCredentials,omitempty"`
+
+	// These are used for testing a command against a pre-existing virtual machine
+	Command string `json:"command,omitempty"`
+	VMName  string `json:"vmname,omitempty"`
 }
 
 // DeploymentTask - is passed to the vSphere API functions in order to be executed on a remote VM
