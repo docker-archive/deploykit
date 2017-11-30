@@ -23,6 +23,7 @@ func vmwscriptCommand() *cobra.Command {
 		Short: "This tool uses the native VMware APIs to automate Virtual Machines through the guest tools",
 	}
 
+	var sudoUser string
 	plan := vmwscript.DeploymentPlan{}
 	cmd.Flags().StringVar(&plan.VMWConfig.VCenterURL, "vcurl", os.Getenv("INFRAKIT_VSPHERE_VCURL"),
 		"VMware vCenter URL, format https://user:pass@address/sdk [REQD]")
@@ -39,11 +40,32 @@ func vmwscriptCommand() *cobra.Command {
 	cmd.Flags().StringVar(&plan.VMWConfig.VMTemplateAuth.Password, "templatePass", os.Getenv("INFRAKIT_VSPHERE_VMPASS"),
 		"The password for the specified user inside the VM template")
 
+	cmd.Flags().StringVar(&plan.VMWConfig.VMName, "vmname", "",
+		"The name of an existing virtual machine to run a command against")
+	cmd.Flags().StringVar(&plan.VMWConfig.Command, "vmcommand", "",
+		"A command passed as a string to be executed on the virtual machine specified with [--vmname]")
+	cmd.Flags().StringVar(&sudoUser, "vmsudouser", "",
+		"A sudo user that the command will be executed")
+
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		// Check that the argument (the json file exists)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		if plan.VMWConfig.VMName != "" && plan.VMWConfig.Command != "" {
+			client, err := vmwscript.VCenterLogin(ctx, plan.VMWConfig)
+			if err != nil {
+				log.Crit("Error connecting to vCenter", "err", err)
+				os.Exit(-1)
+			}
+			err = plan.RunCommand(ctx, client, sudoUser)
+			return err
+		}
+
 		if len(args) == 0 {
 			cmd.Usage()
-			log.Crit("Please specify the path to a configuration file")
+			log.Crit("Please specify the path to a configuration file, or specify both [--vmname / --vmcommand]")
 			os.Exit(-1)
 		}
 
@@ -65,9 +87,6 @@ func vmwscriptCommand() *cobra.Command {
 			log.Crit("Error validating input", "Error", err)
 			os.Exit(-1)
 		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
 		client, err := vmwscript.VCenterLogin(ctx, plan.VMWConfig)
 		if err != nil {
