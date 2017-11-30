@@ -41,6 +41,9 @@ Flags:
       --templatePass string   The password for the specified user inside the VM template
       --templateUser string   A created user inside of the VM template
       --vcurl string          VMware vCenter URL, format https://user:pass@address/sdk [REQD]
+      --vmcommand string      A command passed as a string to be executed on the virtual machine specified with [--vmname]
+      --vmname string         The name of an existing virtual machine to run a command against
+      --vmsudouser string     A sudo user that the command will be executed
 ```
 
 ### Environment variables
@@ -54,6 +57,14 @@ export INFRAKIT_VSPHERE_VCHOST="vsphere01.lab"
 export INFRAKIT_VSPHERE_VCNETWORK="Internal Network (NAT)"
 export INFRAKIT_VSPHERE_VCURL="https://user@vsphere.local:pass@vCenter.lab/sdk"
 ```
+
+### Standalone usage
+
+The `vmwscript` utility has the capability to run commands against an already created and running virtual machine.
+
+**Example**: restarting Apache to pick up a new configuration
+
+`./infrakit x vmwscript --vmname=web01 --vmsudouser=root --vmcommand="systemctl restart httpd"`
 
 ### Deployment files
 
