@@ -306,6 +306,14 @@ func (plan *DeploymentPlan) runCommands(ctx context.Context, client *govmomi.Cli
 }
 
 func vmExec(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, command string, user string) (int64, error) {
+
+	if auth.Username == "" {
+		return 0, fmt.Errorf("No VM Guest username set to run the VMTools")
+	}
+	if auth.Password == "" {
+		return 0, fmt.Errorf("No VM Guest password set to run the VMTools")
+	}
+
 	o := guest.NewOperationsManager(client.Client, vm.Reference())
 	pm, _ := o.ProcessManager(ctx)
 
@@ -390,8 +398,8 @@ func vmDownloadFile(ctx context.Context, client *govmomi.Client, vm *object.Virt
 
 func watchPid(ctx context.Context, client *govmomi.Client, vm *object.VirtualMachine, auth *types.NamePasswordAuthentication, pid []int64) error {
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
 
 	o := guest.NewOperationsManager(client.Client, vm.Reference())
 	pm, _ := o.ProcessManager(ctx)
@@ -521,5 +529,38 @@ func setCentosNetwork(ctx context.Context, client *govmomi.Client, vm *object.Vi
 			log.Error("Setting Address failed", "err", err)
 		}
 	}
+	return nil
+}
+
+// RunCommand - This will find a specified VM and run a single command
+func (plan *DeploymentPlan) RunCommand(ctx context.Context, client *govmomi.Client, sudoUser string) error {
+
+	f := find.NewFinder(client.Client, true)
+
+	// Find one and only datacenter, not sure how VMware linked mode will work
+	dc, err := f.DatacenterOrDefault(ctx, plan.VMWConfig.DCName)
+	if err != nil {
+		return fmt.Errorf("No Datacenter instance could be found inside of vCenter %v", err)
+	}
+
+	// Make future calls local to this datacenter
+	f.SetDatacenter(dc)
+
+	// Use finder for VM template
+	foundVM, err := f.VirtualMachine(ctx, plan.VMWConfig.VMName)
+	if err != nil {
+		return err
+	}
+
+	auth := &types.NamePasswordAuthentication{
+		Username: plan.VMWConfig.VMTemplateAuth.Username,
+		Password: plan.VMWConfig.VMTemplateAuth.Password,
+	}
+
+	_, err = vmExec(ctx, client, foundVM, auth, plan.VMWConfig.Command, sudoUser)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
