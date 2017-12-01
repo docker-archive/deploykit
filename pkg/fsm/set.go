@@ -97,7 +97,7 @@ func (s *Set) Signal(signal Signal, instance ID, optionalData ...interface{}) er
 		data = optionalData[0]
 	}
 
-	log.Info("Signal", "set", s.options.Name, "signal", signal, "instance", instance)
+	log.Debug("Signal", "set", s.options.Name, "signal", signal, "instance", instance)
 	s.events <- &event{instance: instance, signal: signal, data: data}
 	return nil
 }

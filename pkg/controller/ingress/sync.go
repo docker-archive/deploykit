@@ -33,7 +33,7 @@ func (c *managed) syncRoutesL4() error {
 	log.Debug("expose l4", "targets", len(targets), "targets", targets, "meta", c.spec.Metadata)
 
 	for elb, routes := range targets {
-		log.Info("Configuring", "name", elb.Name(), "routes", routes)
+		log.Debug("Configuring", "name", elb.Name(), "routes", routes)
 		err := configureL4(elb, routes, c.options)
 		if err != nil {
 			log.Warn("Cannot configure L4", "name", elb.Name(), "routes", routes, "meta", c.spec.Metadata)
@@ -96,7 +96,7 @@ func (c *managed) syncBackends() error {
 				registered.Add(b)
 			}
 		}
-		log.Info("Registered backends", "backends", registered, "meta", c.spec.Metadata)
+		log.Debug("Registered backends", "backends", registered, "meta", c.spec.Metadata)
 
 		// all the nodes from all the groups and nodes
 		nodes := mapset.NewSet()
@@ -141,7 +141,7 @@ func (c *managed) syncBackends() error {
 			}
 		}
 
-		log.Info("Group data", "nodes", nodes)
+		log.Debug("Group data", "nodes", nodes)
 
 		// compute the difference between registered and nodes
 		toRemove := []instance.ID{}
@@ -149,23 +149,34 @@ func (c *managed) syncBackends() error {
 			toRemove = append(toRemove, n.(instance.ID))
 		}
 
-		log.Info("De-register backends", "instances", toRemove, "vhost", vhost, "L4", l4.Name(), "meta", c.spec.Metadata)
+		// Use Info logging only when making deltas
+		logFn := log.Debug
+		if len(toRemove) > 0 {
+			logFn = log.Info
+		}
+		logFn("De-register backends", "instances", toRemove, "vhost", vhost, "L4", l4.Name(), "meta", c.spec.Metadata)
 
 		if result, err := l4.DeregisterBackends(toRemove); err != nil {
 			log.Warn("error deregistering backends", "toRemove", toRemove, "err", err, "meta", c.spec.Metadata)
 		} else {
-			log.Info("deregistered backends", "vhost", vhost, "result", result, "meta", c.spec.Metadata)
+			logFn("deregistered backends", "vhost", vhost, "result", result, "meta", c.spec.Metadata)
 		}
 
 		toAdd := []instance.ID{}
 		for n := range nodes.Difference(registered).Iter() {
 			toAdd = append(toAdd, n.(instance.ID))
 		}
-		log.Info("Register backends", "instances", toAdd, "vhost", vhost, "L4", l4.Name(), "meta", c.spec.Metadata)
+
+		logFn = log.Debug
+		if len(toAdd) > 0 {
+			logFn = log.Info
+		}
+
+		logFn("Register backends", "instances", toAdd, "vhost", vhost, "L4", l4.Name(), "meta", c.spec.Metadata)
 		if result, err := l4.RegisterBackends(toAdd); err != nil {
 			log.Warn("error registering backends", "toAdd", toAdd, "err", err, "meta", c.spec.Metadata)
 		} else {
-			log.Info("registered backends", "vhost", vhost, "result", result, "meta", c.spec.Metadata)
+			logFn("registered backends", "vhost", vhost, "result", result, "meta", c.spec.Metadata)
 		}
 
 	}
@@ -194,7 +205,7 @@ func (c *managed) syncHealthChecks() error {
 	log.Debug("configure healthchecks", "targets", targets, "meta", c.spec.Metadata)
 
 	for elb, healthChecks := range targets {
-		log.Info("Configuring healthcheck", "name", elb.Name(), "meta", c.spec.Metadata)
+		log.Debug("Configuring healthcheck", "name", elb.Name(), "meta", c.spec.Metadata)
 		for _, healthCheck := range healthChecks {
 			if healthCheck.BackendPort > 0 {
 				log.Info("HEALTH CHECK - Configuring the health check to ping", "port", healthCheck.BackendPort, "meta", c.spec.Metadata)
