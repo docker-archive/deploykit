@@ -974,9 +974,15 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Render any instance specific variables
-	if err = renderInstVars(&vmProps, id, spec.LogicalID, decomposedFiles.DedicatedAttachKey); err != nil {
-		return nil, err
+	// Render any instance specific variables in all of the decomposed files
+	for _, tf := range decomposedFiles.FileMap {
+		for _, resNameProps := range tf.Resource {
+			for _, resProps := range resNameProps {
+				if err = renderInstVars(&resProps, id, spec.LogicalID, decomposedFiles.DedicatedAttachKey); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 	// Handle any platform specific updates to the VM properties prior to writing out
 	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, vmProps)

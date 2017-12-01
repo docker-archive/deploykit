@@ -6,6 +6,7 @@ import (
 	"time"
 
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
+	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -13,13 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type fakeLeadership <-chan bool
+func fakeLeadership(c <-chan bool) func() manager.Leadership {
+	return func() manager.Leadership { return fakeLeadershipT(c) }
+}
 
-func (l fakeLeadership) IsLeader() (bool, error) {
+type fakeLeadershipT <-chan bool
+
+func (l fakeLeadershipT) IsLeader() (bool, error) {
 	return <-l, nil
 }
 
-func (l fakeLeadership) LeaderLocation() (*url.URL, error) {
+func (l fakeLeadershipT) LeaderLocation() (*url.URL, error) {
 	return nil, nil
 }
 
@@ -31,7 +36,7 @@ func TestManagedStartStop(t *testing.T) {
 	doneWork := make(chan int, 1)
 	managedObject := &managed{
 		scope:        scope.Nil,
-		Leadership:   fakeLeadership(leader),
+		leader:       fakeLeadership(leader),
 		ticker:       ticker,
 		healthChecks: func() (map[ingress.Vhost][]loadbalancer.HealthCheck, error) { return nil, nil },
 		groups:       func() (map[ingress.Vhost][]ingress.Group, error) { return nil, nil },

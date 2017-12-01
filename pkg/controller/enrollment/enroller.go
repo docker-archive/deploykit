@@ -28,12 +28,11 @@ import (
 // could be implemented as a proxied instance plugin (using the
 // interceptor pattern).
 type enroller struct {
-	manager.Leadership
-
 	spec       types.Spec
 	properties enrollment.Properties
 	options    enrollment.Options
 
+	leader  func() manager.Leadership
 	plugins func() discovery.Plugins
 
 	poller *controller.Poller
@@ -53,11 +52,11 @@ type enroller struct {
 }
 
 func newEnroller(plugins func() discovery.Plugins,
-	leader manager.Leadership, options enrollment.Options) *enroller {
+	leader func() manager.Leadership, options enrollment.Options) *enroller {
 	l := &enroller{
-		Leadership: leader,
-		plugins:    plugins,
-		options:    options,
+		leader:  leader,
+		plugins: plugins,
+		options: options,
 	}
 
 	interval := l.options.SyncInterval.Duration()
@@ -69,7 +68,7 @@ func newEnroller(plugins func() discovery.Plugins,
 	l.poller = controller.Poll(
 		// This determines if the action should be taken when time is up
 		func() bool {
-			if mustTrue(l.IsLeader()) {
+			if mustTrue(l.isLeader()) {
 				return true
 			}
 			return false
@@ -81,6 +80,16 @@ func newEnroller(plugins func() discovery.Plugins,
 		l.ticker)
 
 	return l
+}
+
+func (l *enroller) isLeader() (is bool, err error) {
+	check := l.leader()
+	if check == nil {
+		err = fmt.Errorf("cannot determine leader status")
+		return
+	}
+	is, err = check.IsLeader()
+	return
 }
 
 func mustTrue(v bool, e error) bool {
