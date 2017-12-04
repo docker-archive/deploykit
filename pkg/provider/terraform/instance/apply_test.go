@@ -102,6 +102,26 @@ func getFilenames(t *testing.T, p *plugin) (tfFiles []string, tfNewFiles []strin
 	return
 }
 
+func TestHandleFilesStateListBeforeFail(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	refreshInvoked := false
+	fns := tfFuncs{
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			return nil, fmt.Errorf("Custom state list error")
+		},
+		tfRefresh: func() error {
+			refreshInvoked = true
+			return nil
+		},
+	}
+	err := tf.handleFiles(fns)
+	require.Error(t, err)
+	require.Equal(t, "Custom state list error", err.Error())
+	require.False(t, refreshInvoked)
+}
+
 func TestHandleFilesRefreshFail(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
@@ -125,7 +145,12 @@ func TestHandleFilesRefreshFail(t *testing.T) {
 		writeFile(info, t)
 	}
 
+	stateListInvokedCount := 0
 	fns := tfFuncs{
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			stateListInvokedCount = stateListInvokedCount + 1
+			return map[TResourceType]map[TResourceName]struct{}{}, nil
+		},
 		tfRefresh: func() error {
 			return fmt.Errorf("Custom refresh error")
 		},
@@ -133,6 +158,7 @@ func TestHandleFilesRefreshFail(t *testing.T) {
 	err := tf.handleFiles(fns)
 	require.Error(t, err)
 	require.Equal(t, "Custom refresh error", err.Error())
+	require.Equal(t, 1, stateListInvokedCount)
 
 	// No files changed
 	tfFiles, tfFilesNew := getFilenames(t, tf)
@@ -146,24 +172,30 @@ func TestHandleFilesRefreshFail(t *testing.T) {
 	}
 }
 
-func TestHandleFilesStateListFail(t *testing.T) {
+func TestHandleFilesStateListAfterFail(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
+	stateListInvokedCount := 0
 	refreshInvoked := false
 	fns := tfFuncs{
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			stateListInvokedCount = stateListInvokedCount + 1
+			if stateListInvokedCount == 1 {
+				return map[TResourceType]map[TResourceName]struct{}{}, nil
+			}
+			return nil, fmt.Errorf("Custom state list error")
+		},
 		tfRefresh: func() error {
 			refreshInvoked = true
 			return nil
-		},
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			return nil, fmt.Errorf("Custom state list error")
 		},
 	}
 	err := tf.handleFiles(fns)
 	require.Error(t, err)
 	require.Equal(t, "Custom state list error", err.Error())
 	require.True(t, refreshInvoked)
+	require.Equal(t, 2, stateListInvokedCount)
 }
 
 func TestHandleFilesNoFiles(t *testing.T) {
@@ -507,7 +539,214 @@ func TestHandleFilesNoPruneWithNewFiles(t *testing.T) {
 	}
 }
 
-func TestHandleFilesPruneMultipleVMTypes(t *testing.T) {
+func TestHandleFilePruningNoPrunes(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	err := tf.handleFilePruning(tfFuncs{},
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{},
+		map[TResourceType]map[TResourceName]struct{}{})
+	require.NoError(t, err)
+}
+
+func TestHandleFilePruningPruneExistingResourceError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	fns := tfFuncs{
+		getExistingResource: func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
+			require.Equal(t, VMIBMCloud, resType)
+			require.Equal(t, TResourceName("instance-123"), resName)
+			require.Equal(t, TResourceProperties{"foo": "bar"}, props)
+			return nil, fmt.Errorf("Custom getExistingResource error")
+		},
+	}
+	err := tf.handleFilePruning(fns,
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{
+			VMIBMCloud: {
+				TResourceName("instance-123"): {
+					FileName:  "instance-123.tf.json",
+					FileProps: TResourceProperties{"foo": "bar"},
+				},
+			},
+		},
+		map[TResourceType]map[TResourceName]struct{}{})
+	require.Error(t, err)
+	require.Equal(t, "Custom getExistingResource error", err.Error())
+}
+
+func TestHandleFilePruningPruneImportError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	fns := tfFuncs{
+		getExistingResource: func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
+			id := "some-id"
+			return &id, nil
+		},
+		tfImport: func(resType TResourceType, resName, resID string) error {
+			require.Equal(t, VMIBMCloud, resType)
+			require.Equal(t, "instance-123", resName)
+			require.Equal(t, "some-id", resID)
+			return fmt.Errorf("Custom import error")
+		},
+	}
+	err := tf.handleFilePruning(fns,
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{
+			VMIBMCloud: {
+				TResourceName("instance-123"): {
+					FileName:  "instance-123.tf.json",
+					FileProps: TResourceProperties{"foo": "bar"},
+				},
+			},
+		},
+		map[TResourceType]map[TResourceName]struct{}{})
+	require.Error(t, err)
+	require.Equal(t, "Custom import error", err.Error())
+}
+
+func TestHandleFilePruningRemovedFromBackend(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Create file, should be removed since it is not in the backend
+	info := fileInfo{
+		ResInfo: []resInfo{{ResType: VMIBMCloud, ResName: TResourceName("instance-123")}},
+		NewFile: false,
+		Plugin:  tf,
+	}
+	writeFile(info, t)
+	// Random file, should not be removed
+	info = fileInfo{
+		ResInfo: []resInfo{{ResType: VMIBMCloud, ResName: TResourceName("instance-234")}},
+		NewFile: false,
+		Plugin:  tf,
+	}
+	writeFile(info, t)
+
+	fns := tfFuncs{
+		getExistingResource: func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
+			// Resource is not in the backend
+			return nil, nil
+		},
+	}
+	err := tf.handleFilePruning(fns,
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{
+			VMIBMCloud: {
+				TResourceName("instance-123"): {
+					FileName:  "instance-123.tf.json",
+					FileProps: TResourceProperties{"foo": "bar"},
+				},
+			},
+		},
+		map[TResourceType]map[TResourceName]struct{}{})
+	require.NoError(t, err)
+
+	tfFiles, tfFilesNew := getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	require.Len(t, tfFiles, 1)
+	require.Contains(t, tfFiles, "instance-234.tf.json")
+}
+
+func TestHandleFilePruningImportSuccess(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	fns := tfFuncs{
+		getExistingResource: func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
+			id := "some-id"
+			return &id, nil
+		},
+		tfImport: func(resType TResourceType, resName, resID string) error {
+			// Import is successful
+			return nil
+		},
+	}
+	err := tf.handleFilePruning(fns,
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{
+			VMIBMCloud: {
+				TResourceName("instance-123"): {
+					FileName:  "instance-123.tf.json",
+					FileProps: TResourceProperties{"foo": "bar"},
+				},
+			},
+		},
+		map[TResourceType]map[TResourceName]struct{}{})
+	require.NoError(t, err)
+}
+
+func TestGetExistingResourceNoVMs(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	id, err := tf.getExistingResource(TResourceType("storage"), TResourceName("name"), TResourceProperties{})
+	require.Nil(t, id)
+	require.NoError(t, err)
+}
+
+func TestGetExistingResourceUnsupportedType(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	id, err := tf.getExistingResource(VMAzure, TResourceName("name"), TResourceProperties{})
+	require.Nil(t, id)
+	require.NoError(t, err)
+}
+
+func TestGetExistingResourceIBMCloudNoTags(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	id, err := tf.getExistingResource(VMIBMCloud, TResourceName("name"), TResourceProperties{})
+	require.Nil(t, id)
+	require.NoError(t, err)
+}
+
+func TestGetExistingResourceIBMCloudWrongTagType(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	id, err := tf.getExistingResource(VMIBMCloud, TResourceName("name"), TResourceProperties{"tags": "string"})
+	require.Nil(t, id)
+	require.Error(t, err)
+	require.Equal(t, "Cannot process tags, unknown type: string", err.Error())
+}
+
+func TestGetExistingResourceIBMCloudWrongCreds(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	// User bogus creds, will always get an error
+	tf.envs = []string{
+		SoftlayerUsernameEnvVar + "=user",
+		SoftlayerAPIKeyEnvVar + "=pass",
+	}
+	os.Setenv(SoftlayerUsernameEnvVar, "")
+	os.Setenv(SoftlayerAPIKeyEnvVar, "")
+
+	id, err := tf.getExistingResource(VMIBMCloud, TResourceName("name"), TResourceProperties{"tags": []interface{}{"t1", "t2"}})
+	require.Nil(t, id)
+	require.Error(t, err)
+}
+
+const (
+	Prune1RemoveOutOfBand   = 1
+	Prune2ExistsInBackend   = 2
+	Prune3NoExistsInBackend = 3
+)
+
+func TestHandleFilesPruneMultipleVMTypes_OutOfBand(t *testing.T) {
+	internalTestHandleFilesPruneMultipleVMTypes(t, Prune1RemoveOutOfBand)
+}
+
+func TestHandleFilesPruneMultipleVMTypes_ExistsInBackend(t *testing.T) {
+	internalTestHandleFilesPruneMultipleVMTypes(t, Prune2ExistsInBackend)
+}
+
+func TestHandleFilesPruneMultipleVMTypes_NoExistsInBackend(t *testing.T) {
+	internalTestHandleFilesPruneMultipleVMTypes(t, Prune3NoExistsInBackend)
+}
+
+func internalTestHandleFilesPruneMultipleVMTypes(t *testing.T, pruneType int) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
@@ -537,11 +776,13 @@ func TestHandleFilesPruneMultipleVMTypes(t *testing.T) {
 	require.Len(t, tfFilesNew, 0)
 	require.Len(t, tfFiles, 9)
 
+	stateListInvokedCount := 0
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
 		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			// Return all of 1 type, 1 of another type, 0 of the last type
-			return map[TResourceType]map[TResourceName]struct{}{
+			stateListInvokedCount = stateListInvokedCount + 1
+			// Base resources that are not removed
+			result := map[TResourceType]map[TResourceName]struct{}{
 				VMIBMCloud: {
 					TResourceName("instance-100"): {},
 					TResourceName("instance-101"): {},
@@ -550,16 +791,73 @@ func TestHandleFilesPruneMultipleVMTypes(t *testing.T) {
 				VMAmazon: {
 					TResourceName("instance-103"): {},
 				},
-			}, nil
+			}
+			if stateListInvokedCount == 1 {
+				// Files are removed out-of-band, return them the first time but
+				// not the second time
+				if pruneType == Prune1RemoveOutOfBand {
+					result[VMAmazon][TResourceName("instance-104")] = struct{}{}
+					result[VMAmazon][TResourceName("instance-105")] = struct{}{}
+					result[VMGoogleCloud] = map[TResourceName]struct{}{
+						TResourceName("instance-106"): {},
+						TResourceName("instance-107"): {},
+						TResourceName("instance-108"): {},
+					}
+				}
+			}
+			// Return all of 1 type, 1 of another type, 0 of the last type
+			return result, nil
+		},
+		tfImport: func(resType TResourceType, resName, resID string) error {
+			// Should only invoked if the resources exist in the backend
+			if pruneType == Prune2ExistsInBackend {
+				if resType == VMAmazon && resName == "instance-105" {
+					require.Equal(t, "aws-instance-105", resID)
+					return nil
+				}
+				if resType == VMGoogleCloud && resName == "instance-108" {
+					require.Equal(t, "gcp-instance-108", resID)
+					return nil
+				}
+				return fmt.Errorf("tfImport type %v, name %v, id %v", resType, resName, resID)
+			}
+			return fmt.Errorf("tfImport should not be invoked for pruneType: %v", pruneType)
+		},
+		getExistingResource: func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
+			if pruneType == Prune1RemoveOutOfBand {
+				return nil, fmt.Errorf("tfImport should not be invoked for pruneType: Prune1RemoveOutOfBand")
+			}
+			if pruneType == Prune2ExistsInBackend {
+				if resType == VMAmazon && resName == TResourceName("instance-105") {
+					id := "aws-instance-105"
+					return &id, nil
+				}
+				if resType == VMGoogleCloud && resName == TResourceName("instance-108") {
+					id := "gcp-instance-108"
+					return &id, nil
+				}
+				return nil, nil
+			}
+			if pruneType == Prune3NoExistsInBackend {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("UNKNOWN PRUNE TYPE")
 		},
 	}
 	err := tf.handleFiles(fns)
 	require.NoError(t, err)
+	require.Equal(t, 2, stateListInvokedCount)
 
-	// New files renamed, instances 104+ removed
+	// New files renamed, instances 104+ removed if the resources are not in the backend
 	tfFiles, tfFilesNew = getFilenames(t, tf)
 	require.Len(t, tfFilesNew, 0)
-	require.Len(t, tfFiles, 4)
+	if pruneType == Prune2ExistsInBackend {
+		require.Len(t, tfFiles, 6)
+		require.Contains(t, tfFiles, "instance-105.tf.json")
+		require.Contains(t, tfFiles, "instance-108.tf.json")
+	} else {
+		require.Len(t, tfFiles, 4)
+	}
 	for i := 100; i < 104; i++ {
 		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
 	}
@@ -591,17 +889,30 @@ func TestHandleFilesPruneWithNewFiles(t *testing.T) {
 	require.Len(t, tfFilesNew, 5)
 	require.Len(t, tfFiles, 5)
 
+	stateListInvokedCount := 0
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
 		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			// Return only 3 of the five existing
-			result := map[TResourceName]struct{}{
-				TResourceName("instance-102"): {},
-				TResourceName("instance-103"): {},
-				TResourceName("instance-104"): {},
+			stateListInvokedCount = stateListInvokedCount + 1
+			// Return everything the first time
+			if stateListInvokedCount == 1 {
+				return map[TResourceType]map[TResourceName]struct{}{
+					VMIBMCloud: {
+						TResourceName("instance-100"): {},
+						TResourceName("instance-101"): {},
+						TResourceName("instance-102"): {},
+						TResourceName("instance-103"): {},
+						TResourceName("instance-104"): {},
+					},
+				}, nil
 			}
+			// Return only 3 of the five existing
 			return map[TResourceType]map[TResourceName]struct{}{
-				VMIBMCloud: result,
+				VMIBMCloud: {
+					TResourceName("instance-102"): {},
+					TResourceName("instance-103"): {},
+					TResourceName("instance-104"): {},
+				},
 			}, nil
 		},
 	}
@@ -929,20 +1240,22 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 		}
 	}
 
+	stateListInvokedCount := 0
 	fns := tfFuncs{
 		tfRefresh: func() error { return nil },
 		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			stateListInvokedCount = stateListInvokedCount + 1
 			// Return only existing instances (ie, only odd ones) EXCEPT 1 in each group
 			vms := map[TResourceName]struct{}{}
 			for i := 100; i < 115; i++ {
 				// 105 will not return for both the VM and NFS, 107 will not return for the VM only
-				if i%2 != 0 && i != 105 && i != 107 {
+				if i%2 != 0 && (stateListInvokedCount == 1 || (i != 105 && i != 107)) {
 					vms[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
 				}
 			}
 			defaultNFS := map[TResourceName]struct{}{}
 			for i := 105; i < 110; i++ {
-				if i%2 != 0 && i != 105 {
+				if i%2 != 0 && (stateListInvokedCount == 1 || i != 105) {
 					defaultNFS[TResourceName(fmt.Sprintf("default-nfs-instance-%v", i))] = struct{}{}
 				}
 			}
@@ -1069,4 +1382,79 @@ func TestHandleFilesDuplicates(t *testing.T) {
 			tFormat.Resource,
 		)
 	}
+}
+
+func TestAddToResTypeNamePropsMap(t *testing.T) {
+	m := make(map[TResourceType]map[TResourceName]TResourceFilenameProps)
+	addToResTypeNamePropsMap(m, TResourceType("t1"), TResourceName("n1"), "f1", TResourceProperties{"k1": "v1"})
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{
+			TResourceType("t1"): {
+				TResourceName("n1"): TResourceFilenameProps{
+					FileName:  "f1",
+					FileProps: TResourceProperties{"k1": "v1"},
+				},
+			},
+		},
+		m)
+
+	addToResTypeNamePropsMap(m, TResourceType("t1"), TResourceName("n2"), "f2", TResourceProperties{"k2": "v2"})
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{
+			TResourceType("t1"): {
+				TResourceName("n1"): TResourceFilenameProps{
+					FileName:  "f1",
+					FileProps: TResourceProperties{"k1": "v1"},
+				},
+				TResourceName("n2"): TResourceFilenameProps{
+					FileName:  "f2",
+					FileProps: TResourceProperties{"k2": "v2"},
+				},
+			},
+		},
+		m)
+
+	addToResTypeNamePropsMap(m, TResourceType("t2"), TResourceName("n1"), "f1", TResourceProperties{"k1": "v1"})
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{
+			TResourceType("t1"): {
+				TResourceName("n1"): TResourceFilenameProps{
+					FileName:  "f1",
+					FileProps: TResourceProperties{"k1": "v1"},
+				},
+				TResourceName("n2"): TResourceFilenameProps{
+					FileName:  "f2",
+					FileProps: TResourceProperties{"k2": "v2"},
+				},
+			},
+			TResourceType("t2"): {
+				TResourceName("n1"): TResourceFilenameProps{
+					FileName:  "f1",
+					FileProps: TResourceProperties{"k1": "v1"},
+				},
+			},
+		},
+		m)
+
+	addToResTypeNamePropsMap(m, TResourceType("t1"), TResourceName("n1"), "f1-new", TResourceProperties{"k3": "v3"})
+	require.Equal(t,
+		map[TResourceType]map[TResourceName]TResourceFilenameProps{
+			TResourceType("t1"): {
+				TResourceName("n1"): TResourceFilenameProps{
+					FileName:  "f1-new",
+					FileProps: TResourceProperties{"k3": "v3"},
+				},
+				TResourceName("n2"): TResourceFilenameProps{
+					FileName:  "f2",
+					FileProps: TResourceProperties{"k2": "v2"},
+				},
+			},
+			TResourceType("t2"): {
+				TResourceName("n1"): TResourceFilenameProps{
+					FileName:  "f1",
+					FileProps: TResourceProperties{"k1": "v1"},
+				},
+			},
+		},
+		m)
 }
