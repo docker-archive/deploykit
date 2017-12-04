@@ -48,8 +48,8 @@ func (l *listener) asRoute() loadbalancer.Route {
 			r.LoadBalancerProtocol = loadbalancer.HTTPS
 			r.Protocol = loadbalancer.HTTP // backend
 		case loadbalancer.TCP: // frontend lb protocol
-			r.LoadBalancerProtocol = loadbalancer.SSL
-			r.Protocol = loadbalancer.TCP // backend
+			r.LoadBalancerProtocol = loadbalancer.HTTPS
+			r.Protocol = loadbalancer.HTTP // backend
 		}
 	}
 	return r
