@@ -70,8 +70,8 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.Equal(t, &cert, l.CertASN())
 	require.Equal(t, []int{443}, l.CertPorts())
 	r = l.asRoute()
-	require.Equal(t, loadbalancer.TCP, r.Protocol)
-	require.Equal(t, loadbalancer.SSL, r.LoadBalancerProtocol)
+	require.Equal(t, loadbalancer.HTTP, r.Protocol)
+	require.Equal(t, loadbalancer.HTTPS, r.LoadBalancerProtocol)
 	require.Equal(t, &cert, r.Certificate)
 
 	// no cert so not SSL.
@@ -156,7 +156,8 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, &asn, l.CertASN())
 	require.Equal(t, []int{443}, l.CertPorts())
 	r = l.asRoute()
-	require.Equal(t, loadbalancer.TCP, r.Protocol)
+	// TCP with cert gets mapped to HTTP
+	require.Equal(t, loadbalancer.HTTP, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
 
 	// cert but no port, assume port 443
