@@ -15,11 +15,15 @@ import (
 )
 
 // For logging
-var lbLogger = logutil.New("module", "ibmcloud/loadbalancer")
+var (
+	logger = logutil.New("module", "ibmcloud/loadbalancer")
+
+	debugV1 = logutil.V(100)
+	debugV2 = logutil.V(500)
+	debugV3 = logutil.V(1000)
+)
 
 const (
-	debugV = logutil.V(100)
-
 	// Number and delay for retries when calling a IBM Cloud LBaaS API
 	// and it returns an UPDATE_PENDING response.
 	updateRetryCount = 30
@@ -75,7 +79,7 @@ type ibmcloudlb struct {
 
 // NewIBMCloudLBPlugin returns a L4 loadbalancer backed by the IBM cloud
 func NewIBMCloudLBPlugin(username, apikey, lbName, lbUUID string) (loadbalancer.L4, error) {
-	lbLogger.Debug("NewIBMCloudLBPlugin", "V", debugV, "Name", lbName)
+	logger.Info("NewIBMCloudLBPlugin", "Name", lbName)
 	lb := &ibmcloudlb{
 		softlayerUsername: username,
 		softlayerAPIKey:   apikey,
@@ -118,13 +122,13 @@ func max(x, y int) int {
 
 // Name is the name of the load balancer
 func (l *ibmcloudlb) Name() string {
-	lbLogger.Debug("Name", "V", debugV)
+	logger.Debug("Name", "V", debugV1)
 	return l.name
 }
 
 // Routes lists all known routes.
 func (l *ibmcloudlb) Routes() ([]loadbalancer.Route, error) {
-	lbLogger.Debug("Routes", "V", debugV)
+	logger.Debug("Routes", "V", debugV3)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -166,13 +170,13 @@ func (l *ibmcloudlb) Routes() ([]loadbalancer.Route, error) {
 		out = append(out, r)
 	}
 
-	lbLogger.Debug("Routes", "name", l.name, "V", debugV, "routes", out)
+	logger.Debug("Routes", "name", l.name, "routes", out, "V", debugV3)
 	return out, nil
 }
 
 // Publish publishes a route in the LB by adding a load balancing rule
 func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, error) {
-	lbLogger.Debug("Publish", "name", l.name, "route", route, "V", debugV)
+	logger.Info("Publish", "name", l.name, "route", route)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -187,7 +191,7 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 	for _, listener := range lb.Listeners {
 		if *listener.ProtocolPort == route.LoadBalancerPort {
 			// return lbResult(""), fmt.Errorf("duplicate port %v", route.LoadBalancerPort)
-			lbLogger.Error("Publish", "name", l.name, "route", route, "V", debugV, "Duplicate Port", route.LoadBalancerPort)
+			logger.Error("Publish", "name", l.name, "route", route, "Duplicate Port", route.LoadBalancerPort)
 			return lbResult("publish"), nil
 		}
 	}
@@ -235,7 +239,7 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 		}
 		// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 		if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-			lbLogger.Info("Publish", "name", l.name, "V", debugV, "Update pending")
+			logger.Info("Publish", "name", l.name, "state", "Update pending")
 			time.Sleep(updateRetryTime)
 		} else {
 			return nil, err
@@ -278,7 +282,7 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 			}
 			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-				lbLogger.Info("Publish", "name", l.name, "V", debugV, "Update pending")
+				logger.Info("Publish", "name", l.name, "state", "Update pending")
 				time.Sleep(updateRetryTime)
 			} else {
 				return nil, err
@@ -291,7 +295,7 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 
 // Unpublish dissociates the load balancer from the backend service at the given port.
 func (l *ibmcloudlb) Unpublish(extPort int) (loadbalancer.Result, error) {
-	lbLogger.Debug("Unpublish", "name", l.name, "extPort", extPort, "V", debugV)
+	logger.Info("Unpublish", "name", l.name, "extPort", extPort)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -317,7 +321,7 @@ func (l *ibmcloudlb) Unpublish(extPort int) (loadbalancer.Result, error) {
 				}
 				// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 				if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-					lbLogger.Info("Unpublish", "name", l.name, "V", debugV, "Update pending")
+					logger.Info("Unpublish", "name", l.name, "state", "Update pending")
 					time.Sleep(updateRetryTime)
 				} else {
 					return nil, err
@@ -328,7 +332,7 @@ func (l *ibmcloudlb) Unpublish(extPort int) (loadbalancer.Result, error) {
 
 	// Listener was not found,so return an error
 	if listenerFound == false {
-		lbLogger.Error("unpublish", "name", l.name, "V", debugV, "listener not found", extPort)
+		logger.Error("unpublish", "name", l.name, "listener not found", extPort)
 		return lbResult(""), fmt.Errorf("unknown port %v", extPort)
 	}
 
@@ -340,7 +344,7 @@ func (l *ibmcloudlb) Unpublish(extPort int) (loadbalancer.Result, error) {
 // mark a backend instance as healthy or unhealthy. The ping occurs on the backendPort parameter and
 // at the interval specified.
 func (l *ibmcloudlb) ConfigureHealthCheck(hc loadbalancer.HealthCheck) (loadbalancer.Result, error) {
-	lbLogger.Debug("ConfigureHealthCheck", "name", l.name, "heathCheck", hc, "V", debugV)
+	logger.Debug("ConfigureHealthCheck", "name", l.name, "heathCheck", hc, "V", debugV3)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -375,7 +379,7 @@ func (l *ibmcloudlb) ConfigureHealthCheck(hc loadbalancer.HealthCheck) (loadbala
 // APIs. This does require a SourceKeySelector in the ingress yaml file so the controller
 // uses the private IP address.
 func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
-	lbLogger.Debug("RegisterBackends", "name", l.name, "ids", ids, "V", debugV)
+	logger.Debug("RegisterBackends", "name", l.name, "ids", ids, "V", debugV2)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -399,7 +403,7 @@ func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, e
 		for _, member := range lb.Members {
 			if *member.Address == ip {
 				ipFound = true
-				lbLogger.Error("RegisterBackends", "name", l.name, "V", debugV, "backend already exists", ip)
+				logger.Error("RegisterBackends", "name", l.name, "backend already exists", ip)
 				break
 			}
 		}
@@ -423,7 +427,7 @@ func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, e
 			}
 			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-				lbLogger.Info("RegisterBackends", "name", l.name, "V", debugV, "Update pending")
+				logger.Info("RegisterBackends", "name", l.name, "state", "Update pending")
 				time.Sleep(updateRetryTime)
 			} else {
 				return nil, err
@@ -431,7 +435,7 @@ func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, e
 		}
 	}
 
-	lbLogger.Debug("RegisterBackends", "name", l.name, "V", debugV, "backends", membersToAdd)
+	logger.Debug("RegisterBackends", "name", l.name, "backends", membersToAdd, "V", debugV2)
 	return lbResult("register"), nil
 }
 
@@ -440,7 +444,7 @@ func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, e
 // APIs. This does require a SourceKeySelector in the ingress yaml file so the controller
 // uses the private IP address.
 func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result, error) {
-	lbLogger.Debug("DeregisterBackends", "name", l.name, "ids", ids, "V", debugV)
+	logger.Debug("DeregisterBackends", "name", l.name, "ids", ids, "V", debugV2)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -466,7 +470,7 @@ func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result,
 			}
 		}
 		if ipFound == false {
-			lbLogger.Error("DeregisterBackends", "name", l.name, "V", debugV, "backend not found", ip)
+			logger.Error("DeregisterBackends", "name", l.name, "backend not found", ip)
 		}
 	}
 	// If there are any members to remove, remove them.
@@ -480,7 +484,7 @@ func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result,
 			}
 			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-				lbLogger.Info("DeregisterBackends", "name", l.name, "V", debugV, "Update pending")
+				logger.Info("DeregisterBackends", "name", l.name, "state", "Update pending")
 				time.Sleep(updateRetryTime)
 			} else {
 				return nil, err
@@ -488,7 +492,7 @@ func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result,
 		}
 	}
 
-	lbLogger.Debug("DeregisterBackends", "name", l.name, "V", debugV, "backends", membersToRemove)
+	logger.Debug("DeregisterBackends", "name", l.name, "backends", membersToRemove, "V", debugV2)
 	return lbResult("deregister"), nil
 }
 
@@ -497,7 +501,7 @@ func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result,
 // APIs. This does require a SourceKeySelector in the ingress yaml file so the controller
 // uses the private IP address.
 func (l *ibmcloudlb) Backends() ([]instance.ID, error) {
-	lbLogger.Debug("Backends", "name", l.name, "V", debugV)
+	logger.Debug("Backends", "name", l.name, "V", debugV3)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -515,6 +519,6 @@ func (l *ibmcloudlb) Backends() ([]instance.ID, error) {
 		out = append(out, instance.ID(*member.Address))
 	}
 
-	lbLogger.Debug("Backends", "name", l.name, "V", debugV, "backends", out)
+	logger.Debug("Backends", "name", l.name, "backends", out, "V", debugV3)
 	return out, nil
 }
