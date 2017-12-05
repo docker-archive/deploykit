@@ -7,18 +7,18 @@ import (
 
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	group_test "github.com/docker/infrakit/pkg/testing/group"
 	instance_test "github.com/docker/infrakit/pkg/testing/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
-func fakeLeader(v bool) func() manager.Leadership {
-	return func() manager.Leadership { return fakeLeaderT(v) }
+func fakeLeader(v bool) func() stack.Leadership {
+	return func() stack.Leadership { return fakeLeaderT(v) }
 }
 
 type fakeLeaderT bool
