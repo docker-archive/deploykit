@@ -17,6 +17,7 @@ import (
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -153,32 +154,18 @@ func Command(scope scope.Scope) *cobra.Command {
 	///////////////////////////////////////////////////////////////////////////////////
 	// inspect
 	inspect := &cobra.Command{
-		Use:   "inspect",
-		Short: "Inspect returns the plugin configurations known by the manager",
+		Use: "inspect",
+		Short: "DEPRECATED - Please use `infrakit " + local.InfrakitHost() +
+			" <stackname> specs` to show the global specs enforced by the stack (manager)",
+
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if len(args) != 0 {
-				cmd.Usage()
-				os.Exit(1)
-			}
+			fmt.Println("**** DEPRECATED ****")
+			fmt.Println("Please use `infrakit " + local.InfrakitHost() +
+				" <stackname> specs` to show the global specs enforced by the stack (manager)")
 
-			out, err := getGlobalConfig(groupPlugin, groupPluginName)
-			if err != nil {
-				return err
-			}
-
-			view, err := types.AnyValue(out)
-			if err != nil {
-				return err
-			}
-
-			buff, err := services.FromJSON(view.Bytes())
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(string(buff))
-
+			cmd.Usage()
+			os.Exit(1)
 			return nil
 		},
 	}

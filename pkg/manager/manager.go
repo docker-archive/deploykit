@@ -32,12 +32,13 @@ type manager struct {
 	metadata.Updatable
 
 	isLeader bool
-	lock     sync.Mutex
+	lock     sync.RWMutex
 	stop     chan struct{}
 	running  chan struct{}
 
 	// Status is the status metadata (readonly)
 	Status            metadata.Plugin
+	refreshStatus     chan struct{}
 	doneStatusUpdates chan struct{}
 
 	// queued operations
@@ -63,12 +64,14 @@ func NewManager(scope scope.Scope, options Options) Backend {
 	}
 
 	gp, _ := scope.Group(options.Group.String())
+	refreshStatus := make(chan struct{})
 
 	impl := &manager{
-		scope:     scope,
-		Options:   options,
-		Plugin:    gp, // the stateless backend group plugin
-		Updatable: initUpdatable(scope, options),
+		scope:         scope,
+		Options:       options,
+		Plugin:        gp, // the stateless backend group plugin
+		Updatable:     initUpdatable(scope, options),
+		refreshStatus: refreshStatus,
 	}
 
 	impl.Status = initStatusMetadata(impl)
@@ -139,11 +142,16 @@ func (m *manager) initRunning() bool {
 
 // IsLeader returns leader status.  False if not or unknown.
 func (m *manager) IsLeader() (bool, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	return m.isLeader, nil
 }
 
 // LeaderLocation returns the location of the leader
 func (m *manager) LeaderLocation() (*url.URL, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	if m.Options.LeaderStore == nil {
 		return nil, fmt.Errorf("cannot locate leader")
 	}
@@ -363,7 +371,10 @@ func (m *manager) loadMetadata() (err error) {
 func (m *manager) onAssumeLeadership() (err error) {
 	log.Info("Assuming leadership")
 
-	defer log.Info("Running as leader")
+	defer func() {
+		log.Info("Running as leader")
+		m.metadataChanged()
+	}()
 
 	err = m.loadMetadata()
 	if err != nil {
@@ -405,8 +416,17 @@ func (m *manager) onAssumeLeadership() (err error) {
 	return err
 }
 
+// call this function when internal state changed so we can update the metadata
+// of this manager
+func (m *manager) metadataChanged() {
+	m.refreshStatus <- struct{}{}
+}
+
 func (m *manager) onLostLeadership() error {
 	log.Info("Lost leadership")
+
+	defer m.metadataChanged()
+
 	config, err := m.getCurrentState()
 	if err != nil {
 		return err
@@ -415,6 +435,8 @@ func (m *manager) onLostLeadership() error {
 }
 
 func (m *manager) doCommit() error {
+
+	defer m.metadataChanged()
 
 	// load the config
 	config := globalSpec{}
@@ -451,6 +473,9 @@ func (m *manager) doCommitAll(config globalSpec) error {
 }
 
 func (m *manager) doFreeAll(config globalSpec) error {
+
+	defer m.metadataChanged()
+
 	log.Info("Freeing groups")
 	return m.execPlugins(config,
 		func(controller controller.Controller, spec types.Spec) error {
