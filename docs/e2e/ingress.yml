@@ -34,6 +34,7 @@ properties:
         LoadBalancerProtocol: https
         Port: 80
         Protocol: http
+        Certificate: external-cer-id1
 
   - Vhost: manager.internal  #
     Backends:
@@ -48,6 +49,7 @@ properties:
         LoadBalancerProtocol: https
         Port: 8080
         Protocol: http
+        Certificate: external-cer-id2
 
   - Vhost: cattle.internal
     Backends:
@@ -62,3 +64,4 @@ properties:
         LoadBalancerProtocol: https
         Port: 8888
         Protocol: http
+        Certificate: external-cer-id3

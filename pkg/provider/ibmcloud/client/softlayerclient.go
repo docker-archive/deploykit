@@ -1,14 +1,14 @@
 package client
 
 import (
+	"github.com/softlayer/softlayer-go/datatypes"
 	"github.com/softlayer/softlayer-go/services"
 	"github.com/softlayer/softlayer-go/session"
 )
 
 // SoftlayerClient for all SL API calls
 type SoftlayerClient struct {
-	sess    *session.Session
-	account services.Account
+	sess *session.Session
 }
 
 // GetClient returns a SoftlayerClient instance
@@ -16,7 +16,6 @@ func GetClient(user, apiKey string) *SoftlayerClient {
 	client := &SoftlayerClient{
 		sess: session.New(user, apiKey),
 	}
-	client.account = services.GetAccountService(client.sess)
 	return client
 }
 
@@ -45,4 +44,13 @@ func (c *SoftlayerClient) GetAllowedStorageVirtualGuests(storageID int) ([]int, 
 		result = append(result, *r.Id)
 	}
 	return result, nil
+}
+
+// GetVirtualGuests gets all VMs
+func (c *SoftlayerClient) GetVirtualGuests(username, apiKey string, mask *string) (resp []datatypes.Virtual_Guest, err error) {
+	acct := services.GetAccountService(c.sess)
+	if mask != nil {
+		acct = acct.Mask(*mask)
+	}
+	return acct.GetVirtualGuests()
 }

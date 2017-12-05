@@ -18,7 +18,8 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 	}
 	log.Debug("describe L4", "routes", routes)
 
-	log.Info("Listeners to sync with L4:", "desired", desired)
+	log.Debug("Listeners to sync with L4", "desired", desired)
+
 	toCreate := []loadbalancer.Route{}
 	toChange := []loadbalancer.Route{}
 	toRemove := []loadbalancer.Route{}
@@ -58,13 +59,17 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 				Certificate:          cert,
 			})
 		} else {
-			log.Info("keeping", "protocol", lbProtocol, "instanceProtocol", instanceProtocol, "port", lbPort, "instancePort", instancePort)
+			log.Debug("keeping", "protocol", lbProtocol, "instanceProtocol", instanceProtocol, "port", lbPort, "instancePort", instancePort)
 		}
 	}
 
-	log.Info("listeners to create:", "list", toCreate)
-	log.Info("listeners to change:", "list", toChange)
-	log.Info("listeners to remove:", "list", toRemove)
+	logFn := log.Debug
+	if len(toCreate) > 0 || len(toChange) > 0 || len(toRemove) > 0 {
+		logFn = log.Info
+	}
+	logFn("listeners to create:", "list", toCreate)
+	logFn("listeners to change:", "list", toChange)
+	logFn("listeners to remove:", "list", toRemove)
 
 	// Now we have a list of targets to create
 	for _, l := range toCreate {

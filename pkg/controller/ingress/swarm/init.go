@@ -74,7 +74,7 @@ func (h *handler) Routes(properties *types.Any,
 		return nil, err
 	}
 
-	log.Info("Connected to Docker", "client", dockerClient)
+	log.Debug("Connected to Docker", "client", dockerClient)
 	h.dockerClient = dockerClient
 
 	routes, err := NewServiceRoutes(dockerClient).

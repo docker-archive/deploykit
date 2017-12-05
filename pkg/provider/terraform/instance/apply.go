@@ -7,15 +7,25 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/deckarep/golang-set"
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/afero"
 )
+
+// TResourceFilenameProps contains the filename and the associated properties
+// for a specific resource
+type TResourceFilenameProps struct {
+	FileName  string
+	FileProps TResourceProperties
+}
 
 // terraformApply starts a goroutine that executes "terraform apply" at the
 // configured freqency; if the goroutine is already running then the sleeping
@@ -55,7 +65,9 @@ func (p *plugin) terraformApply() error {
 						}
 						return command.Wait()
 					},
-					tfStateList: p.doTerraformStateList,
+					tfStateList:         p.doTerraformStateList,
+					tfImport:            p.doTerraformImport,
+					getExistingResource: p.getExistingResource,
 				}
 				// The trigger for an apply is typically from a group commit, sleep for a few seconds so
 				// that multiple .tf.json.new files have time to be created
@@ -148,8 +160,10 @@ func (p *plugin) shouldApply() bool {
 
 // External functions to use during when pruning files; broken out for testing
 type tfFuncs struct {
-	tfRefresh   func() error
-	tfStateList func() (map[TResourceType]map[TResourceName]struct{}, error)
+	tfRefresh           func() error
+	tfStateList         func() (map[TResourceType]map[TResourceName]struct{}, error)
+	tfImport            func(resType TResourceType, resName, resID string) error
+	getExistingResource func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error)
 }
 
 // hasRecentDeltas returns true if any tf.json[.new] files have been changed in
@@ -212,32 +226,49 @@ func (p *plugin) hasRecentDeltas(window int) (bool, error) {
 
 // handleFiles handles resource pruning and new resources via:
 // 1. Acquire file system lock
-// 2. Execute "terraform refresh" to refresh state
-// 3. Identity and remove ".tf.json" files that are in the terraform state
-// 4. Remove all "tf.json.new" files to "tf.json"
+// 2. Cache resource types/names from terraform state file
+// 3. Execute "terraform refresh" to refresh state
+// 4. Identity ".tf.json" files that are not in the terraform state and, for each:
+// 4.1 If the resource was previously in the state file (from #2) then prune
+// 4.2 Else, query the backend cloud to see if the resource exists and was missing from the
+//     state file (this can happen if a manager failover occurs during a provision) and either
+//     import (if found) or prune
+// 5. Remove all "tf.json.new" files to "tf.json"
+//
 // Once these steps are done then "terraform apply" can execute without the
 // file system lock.
 func (p *plugin) handleFiles(fns tfFuncs) error {
 	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
 
-	// Refresh resources and get updated resources names
-	if err := fns.tfRefresh(); err != nil {
-		return err
-	}
-	tfStateResources, err := fns.tfStateList()
+	// TODO(kaufers): If it possible that not all of the .new files were moved to
+	//  .tf.json files (NFS connection could be lost) and this could make the refresh
+	//  always fail due to references that are not valid. Update this flow to still
+	//  rename .new files even if the refresh fails (but do not prune or apply since
+	//  we need valid refresh'd data) and then let the next iteration attempt to
+	//  reconsile things.
+
+	// Get the current resources, this must happen before a refresh so that we can
+	// identity orphans from an incomplete "apply"
+	tfStateResourcesBefore, err := fns.tfStateList()
 	if err != nil {
-		// TODO(kaufers): If it possible that not all of the .new files were moved to
-		//  .tf.json files (NFS connection could be lost) and this could make the refresh
-		//  always fail due to references that are not valid. Update this flow to still
-		//  rename .new files even if the refresh fails (but do not prune or apply since
-		//  we need valid refresh'd data) and then let the next iteration attempt to
-		//  reconsile things.
 		return err
 	}
 
-	// Get all instance files and all new files
-	tfInstFiles := map[TResourceType]map[TResourceName]string{}
+	// Refresh all resources, anything deleted from the backend will be removed
+	// from the state file
+	if err = fns.tfRefresh(); err != nil {
+		return err
+	}
+
+	// And now get the updated resources
+	tfStateResourcesAfter, err := fns.tfStateList()
+	if err != nil {
+		return err
+	}
+
+	// Load all instance files and all new files from disk
+	tfInstFiles := map[TResourceType]map[TResourceName]TResourceFilenameProps{}
 	tfNewFiles := map[string]struct{}{}
 	fs := &afero.Afero{Fs: p.fs}
 	err = fs.Walk(p.Dir,
@@ -260,11 +291,11 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 					return err
 				}
 				for resType, resNameProps := range tf.Resource {
-					for resName := range resNameProps {
+					for resName, resProps := range resNameProps {
 						if _, has := tfInstFiles[resType]; !has {
-							tfInstFiles[resType] = map[TResourceName]string{}
+							tfInstFiles[resType] = map[TResourceName]TResourceFilenameProps{}
 						}
-						tfInstFiles[resType][resName] = info.Name()
+						addToResTypeNamePropsMap(tfInstFiles, resType, resName, info.Name(), resProps)
 						log.Debugf("File %s contains resource %s.%s", info.Name(), resType, resName)
 					}
 				}
@@ -278,38 +309,31 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 		return err
 	}
 
-	// Determine files to prune, since multiple resource types can exist per file we want to
-	// track unique filenames
-	prunes := make(map[string]struct{})
-	for resType, resNameFilenameMap := range tfInstFiles {
-		log.Infof("Detected %v tf.json files for resource type %v", len(resNameFilenameMap), resType)
-		if tfStateResNames, has := tfStateResources[resType]; has {
+	// Handle orphan resources and file pruning
+	prunes := make(map[TResourceType]map[TResourceName]TResourceFilenameProps)
+	for resType, resNameFilenamePropsMap := range tfInstFiles {
+		log.Infof("Detected %v tf.json files for resource type %v", len(resNameFilenamePropsMap), resType)
+		if tfStateResName, has := tfStateResourcesAfter[resType]; has {
 			// State files have instances of this type, check each resource name
-			for resName, filename := range resNameFilenameMap {
-				if _, has = tfStateResNames[resName]; has {
+			for resName, propsFilename := range resNameFilenamePropsMap {
+				if _, has = tfStateResName[resName]; has {
 					log.Infof("Instance %v.%v exists in terraform state", resType, resName)
 				} else {
-					log.Infof("Detected instance %v.%v to prune at file: %v", resType, resName, filename)
-					prunes[filename] = struct{}{}
+					log.Infof("Detected candidate instance %v.%v to prune at file: %v", resType, resName, propsFilename.FileName)
+					addToResTypeNamePropsMap(prunes, resType, resName, propsFilename.FileName, propsFilename.FileProps)
 				}
 			}
 		} else {
 			// No instances of this type in the state file, all should be removed
-			log.Infof("State files has no resources of type %v, pruning all %v instances ...", resType, len(resNameFilenameMap))
-			for resName, filename := range resNameFilenameMap {
-				log.Infof("Detected instance %v.%v to prune at file: %v", resType, resName, filename)
-				prunes[filename] = struct{}{}
+			log.Infof("State files has no resources of type %v, pruning all %v instances ...", resType, len(resNameFilenamePropsMap))
+			for resName, propsFilename := range resNameFilenamePropsMap {
+				log.Infof("Detected candidate instance %v.%v to prune at file: %v", resType, resName, propsFilename.FileName)
+				addToResTypeNamePropsMap(prunes, resType, resName, propsFilename.FileName, propsFilename.FileProps)
 			}
 		}
 	}
-
-	log.Infof("Pruning %v tf.json files", len(prunes))
-	for filename := range prunes {
-		path := filepath.Join(p.Dir, filename)
-		err = p.fs.Remove(path)
-		if err != nil {
-			return err
-		}
+	if err = p.handleFilePruning(fns, prunes, tfStateResourcesBefore); err != nil {
+		return err
 	}
 
 	// Move any tf.json.new files
@@ -327,6 +351,146 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	}
 
 	return nil
+}
+
+// addToResTypeNamePropsMap is a utility function to populate the given map with
+// the given data
+func addToResTypeNamePropsMap(
+	m map[TResourceType]map[TResourceName]TResourceFilenameProps,
+	resType TResourceType,
+	resName TResourceName,
+	filename string,
+	props TResourceProperties,
+) {
+	resNameFileProps, has := m[resType]
+	if !has {
+		resNameFileProps = make(map[TResourceName]TResourceFilenameProps)
+		m[resType] = resNameFileProps
+	}
+	resNameFileProps[resName] = TResourceFilenameProps{
+		FileName:  filename,
+		FileProps: props,
+	}
+}
+
+// handleFilePruning processes the prune file that are no longer associated with resources
+// in terraform. If the resource was not in terraform state before the refresh then
+// the backend cloud is queried in order to determine if it still exists; if it does then
+// it is imported and, if it does not, then the file is pruned.
+func (p *plugin) handleFilePruning(
+	fns tfFuncs,
+	prunes map[TResourceType]map[TResourceName]TResourceFilenameProps,
+	tfStateBeforeRefresh map[TResourceType]map[TResourceName]struct{},
+) error {
+	// Determine files to prune, since multiple resource types can exist per file we want to
+	// track unique filenames
+	pruneFiles := make(map[string]struct{})
+	// If the resource was removed out-of-band then it had a previous entry in the state file
+	// and can be pruned; if there is no entry then query the backend to determine if the
+	// resource still exists
+	for resType, resNameFilenameProps := range prunes {
+		var tfResTypeNameProps map[TResourceName]struct{}
+		tfResTypeNameProps, has := tfStateBeforeRefresh[resType]
+		if !has {
+			tfResTypeNameProps = make(map[TResourceName]struct{})
+		}
+		for resName, resFilenameProps := range resNameFilenameProps {
+			if _, has := tfResTypeNameProps[resName]; has {
+				log.Infof("Pruning %v file, resource %v.%v previously existed in terraform",
+					resFilenameProps.FileName,
+					resType,
+					resName)
+				pruneFiles[resFilenameProps.FileName] = struct{}{}
+			} else {
+				// Find resource type in backend
+				importID, err := fns.getExistingResource(resType, resName, resFilenameProps.FileProps)
+				if err != nil {
+					return err
+				}
+				// No ID returned, prune file
+				if importID == nil {
+					log.Infof("Pruning %v file, resource %v.%v was not found in backend",
+						resFilenameProps.FileName,
+						resType,
+						resName)
+					pruneFiles[resFilenameProps.FileName] = struct{}{}
+				} else {
+					// Import resource
+					log.Infof("Importing %v %v into terraform as resource %v ...",
+						string(resType),
+						*importID,
+						string(resName))
+					if err = fns.tfImport(resType, string(resName), *importID); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	log.Infof("Pruning %v tf.json files", len(prunes))
+	for file := range pruneFiles {
+		path := filepath.Join(p.Dir, file)
+		log.Infof("Pruning file: %v", file)
+		err := p.fs.Remove(path)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// getExistingResource queries the backend cloud to get the ID of the resource associated
+// with the given type, name, and properties
+func (p *plugin) getExistingResource(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
+	// Ony VMs retrival is supported
+	supportedVMs := mapset.NewSetFromSlice(VMTypes)
+	if !supportedVMs.Contains(resType) {
+		return nil, nil
+	}
+	switch resType {
+	case VMSoftLayer, VMIBMCloud:
+		tagsProp, has := props["tags"]
+		if !has {
+			return nil, nil
+		}
+		// Convert tags to String
+		tagsInterface, ok := tagsProp.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("Cannot process tags, unknown type: %v", reflect.TypeOf(tagsProp))
+		}
+		tags := make([]string, len(tagsInterface))
+		for i, t := range tagsInterface {
+			tags[i] = fmt.Sprintf("%v", t)
+		}
+		// Creds either in env vars or in the plugin Env slice
+		username := os.Getenv(SoftlayerUsernameEnvVar)
+		apiKey := os.Getenv(SoftlayerAPIKeyEnvVar)
+		if username == "" || apiKey == "" {
+			for _, env := range p.envs {
+				if !strings.Contains(env, "=") {
+					continue
+				}
+				split := strings.Split(env, "=")
+				switch split[0] {
+				case SoftlayerUsernameEnvVar:
+					username = split[1]
+				case SoftlayerAPIKeyEnvVar:
+					apiKey = split[1]
+				}
+			}
+		}
+		id, err := GetIBMCloudVMByTag(username, apiKey, tags)
+		if err != nil {
+			return nil, err
+		}
+		if id == nil {
+			return nil, nil
+		}
+		idString := strconv.Itoa(*id)
+		return &idString, nil
+	}
+	log.Warningf("Unsupported VM type for backend retrival: %v", resType)
+	return nil, nil
 }
 
 // doTerraformStateList shells out to run `terraform state list` and parses the result

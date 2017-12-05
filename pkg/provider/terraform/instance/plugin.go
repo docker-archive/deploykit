@@ -161,17 +161,8 @@ func (p *plugin) processImport(importOpts *ImportOptions) error {
 
 	// Define the functions for import and import the VM
 	fns := importFns{
-		tfShow: p.doTerraformShow,
-		tfImport: func(resType TResourceType, resName, id string) error {
-			command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", resType, resName, id)).
-				InheritEnvs(true).
-				WithEnvs(p.envs...).
-				WithDir(p.Dir)
-			if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
-				return err
-			}
-			return command.Wait()
-		},
+		tfShow:     p.doTerraformShow,
+		tfImport:   p.doTerraformImport,
 		tfShowInst: p.doTerraformShowForInstance,
 		tfClean:    p.cleanupFailedImport,
 	}
@@ -974,9 +965,15 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Render any instance specific variables
-	if err = renderInstVars(&vmProps, id, spec.LogicalID, decomposedFiles.DedicatedAttachKey); err != nil {
-		return nil, err
+	// Render any instance specific variables in all of the decomposed files
+	for _, tf := range decomposedFiles.FileMap {
+		for _, resNameProps := range tf.Resource {
+			for _, resProps := range resNameProps {
+				if err = renderInstVars(&resProps, id, spec.LogicalID, decomposedFiles.DedicatedAttachKey); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 	// Handle any platform specific updates to the VM properties prior to writing out
 	platformSpecificUpdates(vmType, TResourceName(name), spec.LogicalID, vmProps)
@@ -1766,4 +1763,16 @@ func determineFinalPropsForImport(res *ImportResource) {
 		}
 	}
 	res.FinalProps = finalProps
+}
+
+// doTerraformImport shells out to run `terraform import`
+func (p *plugin) doTerraformImport(resType TResourceType, resName, id string) error {
+	command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", resType, resName, id)).
+		InheritEnvs(true).
+		WithEnvs(p.envs...).
+		WithDir(p.Dir)
+	if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
+		return err
+	}
+	return command.Wait()
 }

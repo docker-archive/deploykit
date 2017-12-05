@@ -34,20 +34,26 @@ var DefaultOptions = enrollment.Options{
 	DestroyOnTerminate: false,
 }
 
-func leadership(plugins func() discovery.Plugins) (stack.Leadership, error) {
+func leadership(plugins func() discovery.Plugins) stack.Leadership {
 	// Scan for a manager
 	pm, err := plugins().List()
 	if err != nil {
-		return nil, err
+		log.Error("Cannot list plugins", "err", err)
+		return nil
 	}
 
 	for _, endpoint := range pm {
 		rpcClient, err := client.New(endpoint.Address, stack.InterfaceSpec)
 		if err == nil {
-			return manager_rpc.Adapt(rpcClient), nil
+			return manager_rpc.Adapt(rpcClient)
+		}
+
+		if !client.IsErrInterfaceNotSupported(err) {
+			log.Error("Got error getting manager", "endpoint", endpoint, "err", err)
+			return nil
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
@@ -63,14 +69,12 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	log.Info("Decoded input", "config", options)
 
-	leader, err := leadership(scope.Plugins)
-	if err != nil {
-		return
-	}
-
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: enrollment_controller.NewTypedControllers(scope.Plugins, leader, options),
+		run.Controller: enrollment_controller.NewTypedControllers(scope.Plugins,
+			func() stack.Leadership {
+				return leadership(scope.Plugins)
+			}, options),
 	}
 
 	return

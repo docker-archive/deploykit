@@ -13,13 +13,13 @@ import (
 )
 
 // NewController returns a controller implementation
-func NewController(scope scope.Scope, leader stack.Leadership) controller.Controller {
+func NewController(scope scope.Scope, leader func() stack.Leadership) controller.Controller {
 	return internal.NewController(
 		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
 			return &managed{
-				Leadership: leader,
+				leader: leader,
 			}, nil
 		},
 		// the key function
@@ -31,7 +31,7 @@ func NewController(scope scope.Scope, leader stack.Leadership) controller.Contro
 
 // NewTypedControllers return typed controllers
 func NewTypedControllers(scope scope.Scope,
-	leader stack.Leadership) func() (map[string]controller.Controller, error) {
+	leader func() stack.Leadership) func() (map[string]controller.Controller, error) {
 
 	return (internal.NewController(
 		leader,

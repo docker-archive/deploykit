@@ -165,7 +165,12 @@ func (l *enroller) sync() error {
 		instance.Descriptions(enrolled), enrolledKeyFunc,
 	)
 
-	log.Info("Computed delta", "add", add, "remove", remove)
+	// Use Info logging only when making deltas
+	logFn := log.Debug
+	if len(add) > 0 || len(remove) > 0 {
+		logFn = log.Info
+	}
+	logFn("Computed delta", "add", add, "remove", remove)
 
 	instancePlugin, err := l.getInstancePlugin(l.properties.Instance.Plugin)
 	if err != nil {

@@ -171,7 +171,7 @@ func (p *Routes) RoutesFromServices(services []swarm.Service) (map[ingress.Vhost
 // List will return all the known routes for this Docker swarm of matching services.
 func (p *Routes) List() (map[ingress.Vhost][]loadbalancer.Route, error) {
 
-	log.Info("Listing services from swarm")
+	log.Debug("Listing services from swarm")
 
 	ctx := context.Background()
 	services, err := p.client.ServiceList(ctx, types.ServiceListOptions{})
