@@ -38,7 +38,7 @@ func (m *manager) Controllers() (map[string]controller.Controller, error) {
 			backend: control,
 		}
 	}
-	log.Debug("Controllers", "map", controllers, "V", debugV2)
+	log.Debug("Controllers", "map", controllers, "V", debugV3)
 	return controllers, nil
 }
 

@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -17,7 +16,7 @@ func (m *manager) Enforce(specs []types.Spec) error {
 
 	fmt.Println(string(buff))
 
-	return nil
+	return fmt.Errorf("not implemented -- commit to individual plugins")
 }
 
 // Specs returns the specs that are being enforced
@@ -33,26 +32,17 @@ func (m *manager) Specs() ([]types.Spec, error) {
 		return nil, err
 	}
 
-	specs := types.Specs{}
-	for _, p := range config.data {
-		specs = append(specs, p.Record.Spec)
-	}
-
-	sort.Sort(specs)
-
-	return specs, nil
+	return config.toSpecs(), nil
 }
 
 // Inspect returns the current state of the infrastructure
 func (m *manager) Inspect() ([]types.Object, error) {
 	log.Debug("stack.Inspect")
-	fmt.Println(">>> INSPECT")
-	return nil, nil
+	return nil, fmt.Errorf("not implemented -- coming soon")
 }
 
 // Terminate destroys all resources associated with the specs
 func (m *manager) Terminate(specs []types.Spec) error {
 	log.Debug("stack.Terminate", "specs", specs)
-
-	return fmt.Errorf("not implemented")
+	return fmt.Errorf("not implemented -- destroy via direct calls to plugins")
 }

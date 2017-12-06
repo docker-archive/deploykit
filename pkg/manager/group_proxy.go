@@ -22,7 +22,8 @@ func (m *manager) Groups() (map[group.ID]group.Plugin, error) {
 		gid := spec.ID
 		groups[gid] = m
 	}
-	log.Debug("Groups", "map", groups, "V", debugV2)
+
+	log.Debug("Groups", "map", groups, "V", debugV3)
 	return groups, nil
 }
 
