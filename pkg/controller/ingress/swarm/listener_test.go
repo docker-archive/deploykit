@@ -67,12 +67,12 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
-	require.Equal(t, &cert, l.CertASN())
+	require.Equal(t, (*string)(nil), l.CertASN())
 	require.Equal(t, map[int]string{443: "SSL"}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
 	require.Equal(t, loadbalancer.TCP, r.LoadBalancerProtocol)
-	require.Equal(t, &cert, r.Certificate)
+	require.Equal(t, (*string)(nil), r.Certificate)
 
 	// no cert so not SSL.
 	l, err = newListener("foo", 30000, "tcp://:443", emptyCert)
@@ -155,11 +155,11 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
-	require.Equal(t, &asn, l.CertASN())
+	require.Equal(t, (*string)(nil), l.CertASN())
 	require.Equal(t, map[int]string{443: "SSL"}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
-	require.Equal(t, asn, *r.Certificate)
+	require.Equal(t, (*string)(nil), r.Certificate)
 
 	// cert but no port, assume port 443
 	l, err = newListener("foo", 30000, "tcp://:443", &certEmptyPorts)
@@ -217,11 +217,11 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
-	require.Equal(t, &asn, l.CertASN())
+	require.Equal(t, (*string)(nil), l.CertASN())
 	require.Equal(t, map[int]string{443: "HTTPS", 444: "SSL"}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
-	require.Equal(t, asn, *r.Certificate)
+	require.Equal(t, (*string)(nil), r.Certificate)
 }
 
 func TestImpliedSwarmPortToUrl(t *testing.T) {

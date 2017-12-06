@@ -50,7 +50,8 @@ func (l *listener) CertASN() *string {
 		return nil
 	}
 	asn := strings.Split(*l.Certificate, "@")[0]
-	if asn != "" {
+	// Verify the certificate specifies this particular port.
+	if l.CertPorts()[l.extPort()] != "" {
 		return &asn
 	}
 	return nil
