@@ -39,19 +39,6 @@ func (l *listener) asRoute() loadbalancer.Route {
 		LoadBalancerProtocol: l.loadbalancerProtocol(),
 		Certificate:          l.CertASN(),
 	}
-
-	// If Certificate is specified, the we make adjustments to the protocol. This makes no assumption
-	// of the validity of the certificate
-	if r.Certificate != nil {
-		switch r.LoadBalancerProtocol {
-		case loadbalancer.HTTP: // frontend lb protocol
-			r.LoadBalancerProtocol = loadbalancer.HTTPS
-			r.Protocol = loadbalancer.HTTP // backend
-		case loadbalancer.TCP: // frontend lb protocol
-			r.LoadBalancerProtocol = loadbalancer.HTTPS
-			r.Protocol = loadbalancer.HTTP // backend
-		}
-	}
 	return r
 }
 
@@ -69,15 +56,19 @@ func (l *listener) CertASN() *string {
 	return nil
 }
 
-// Get the ports that are associated with the certificate from the service label
-func (l *listener) CertPorts() []int {
+// Get the ports that are associated with the certificate from the service label.
+// Returns a map of schemas per port since the AWS documentation has [schema:]port.
+// The default is SSL on port 443 if nothing is specified. The schema defaults to SSL
+// unless a valid schema is specified (only HTTPS is allowed today).
+func (l *listener) CertPorts() map[int]string {
+	portSchemaMap := make(map[int]string)
 	if l.Certificate == nil {
 		// if we have not Certificate then return 443
-		return []int{443}
+		portSchemaMap[443] = "SSL"
+		return portSchemaMap
 	}
 	parts := strings.Split(*l.Certificate, "@")
 	if len(parts) > 1 {
-		var finalPorts = []int{}
 		ports := strings.Split(parts[1], ",")
 		log.Debug("ports", "ports ", ports)
 		if len(ports) > 0 {
@@ -85,26 +76,38 @@ func (l *listener) CertPorts() []int {
 			for _, port := range ports {
 				log.Debug("port", "port: ", port, "V", debugV)
 				if port != "" {
-					j, err := strconv.ParseUint(port, 10, 32)
+					pieces := strings.Split(port, ":")
+					schema := "SSL"
+					portPiece := 0
+					if len(pieces) > 1 {
+						portPiece = 1
+						// We only change scheme from SSL if a recognized schema
+						if strings.ToUpper(pieces[0]) == "HTTPS" {
+							schema = "HTTPS"
+						}
+					}
+					j, err := strconv.ParseUint(pieces[portPiece], 10, 32)
 					if err != nil {
 						log.Error("Can't convert to int: ", "port", port, "err", err)
+					} else {
+						portSchemaMap[int(j)] = schema
 					}
-					finalPorts = append(finalPorts, int(j))
 				}
 			}
 		}
-		log.Debug("final ports", "ports", finalPorts)
-		if len(finalPorts) == 0 {
+		log.Debug("portSchemaMap", "portSchemaMap", portSchemaMap)
+		if len(portSchemaMap) == 0 {
 			// this would happen if there was an ASN like this
 			// asn:blah@
 			// an at symbol but no ports after, if that is the case
 			// default to 443.
-			finalPorts = append(finalPorts, int(443))
+			portSchemaMap[443] = "SSL"
 		}
-		return finalPorts
+		return portSchemaMap
 	}
 	// if there is no port, default to 443
-	return []int{443}
+	portSchemaMap[443] = "SSL"
+	return portSchemaMap
 }
 
 // String value of the listener, good for log statements.
@@ -161,9 +164,9 @@ func (l *listener) loadbalancerProtocol() loadbalancer.Protocol {
 	}
 
 	// check if this should be SSL because it has a certificate.
-	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
+	if l.Certificate != nil && l.CertPorts()[l.extPort()] != "" {
 		log.Debug("external port is in cert ports", "extPort", l.extPort(), "certPorts", l.CertPorts())
-		scheme = string(loadbalancer.SSL)
+		scheme = l.CertPorts()[l.extPort()]
 	} else {
 		log.Debug("cert is nil, or port is not in cert ports", "exPort", l.extPort(), "certPorts", l.CertPorts())
 	}
@@ -179,9 +182,13 @@ func (l *listener) protocol() loadbalancer.Protocol {
 	}
 
 	// check if this should be SSL because it has a certificate.
-	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
+	if l.Certificate != nil && l.CertPorts()[l.extPort()] != "" {
 		log.Debug("ext port is in cert ports", "extPort", l.extPort(), "certPorts", l.CertPorts())
-		scheme = string(loadbalancer.SSL)
+		scheme = l.CertPorts()[l.extPort()]
+		// Need to change HTTPS to HTTP
+		if loadbalancer.ProtocolFromString(scheme) == loadbalancer.HTTPS {
+			scheme = string(loadbalancer.HTTP)
+		}
 	} else {
 		log.Debug("cert is nil, or port is not in cert ports ", "extPort", l.extPort(), "certPorts", l.CertPorts())
 	}
