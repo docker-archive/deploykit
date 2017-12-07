@@ -30,6 +30,9 @@ type Route struct {
 
 	// Certificate is the certificate used by the load balancer.
 	Certificate *string
+
+	// HealthMonitorPath is the url path used by the route health monitor
+	HealthMonitorPath *string
 }
 
 // Validate validates the data herein. If necessary, some data values will be mutated as needed.

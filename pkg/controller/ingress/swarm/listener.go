@@ -11,23 +11,25 @@ import (
 )
 
 type listener struct {
-	Service       string
-	URL           *url.URL
-	SwarmPort     int
-	SwarmProtocol loadbalancer.Protocol
-	Certificate   *string
+	Service           string
+	URL               *url.URL
+	SwarmPort         int
+	SwarmProtocol     loadbalancer.Protocol
+	Certificate       *string
+	HealthMonitorPath *string
 }
 
-func newListener(service string, swarmPort int, urlStr string, cert *string) (*listener, error) {
+func newListener(service string, swarmPort int, urlStr string, cert, healthPath *string) (*listener, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
 	return &listener{
-		Service:     service,
-		URL:         u,
-		SwarmPort:   swarmPort,
-		Certificate: cert,
+		Service:           service,
+		URL:               u,
+		SwarmPort:         swarmPort,
+		Certificate:       cert,
+		HealthMonitorPath: healthPath,
 	}, nil
 }
 
@@ -38,6 +40,7 @@ func (l *listener) asRoute() loadbalancer.Route {
 		LoadBalancerPort:     l.extPort(),
 		LoadBalancerProtocol: l.loadbalancerProtocol(),
 		Certificate:          l.CertASN(),
+		HealthMonitorPath:    l.GetHealthMonitorPath(),
 	}
 	return r
 }
@@ -55,6 +58,70 @@ func (l *listener) CertASN() *string {
 		return &asn
 	}
 	return nil
+}
+
+// Get the health monitor path from the service label
+func (l *listener) GetHealthMonitorPath() *string {
+	if l.HealthMonitorPath == nil {
+		return nil
+	}
+	// Verify the label specifies this particular port
+	healthPath := l.HealthMonitorPorts()[l.extPort()]
+	if healthPath != "" {
+		return &healthPath
+	}
+
+	return nil
+}
+
+// Get the ports that are associated with the health monitor path from the service label.
+// Returns a map of paths per port.
+// Example path:
+//    /health1@444,/health2@222,333
+// should return:
+//   [222]health2
+//   [333]health2
+//   [444]health1
+func (l *listener) HealthMonitorPorts() map[int]string {
+	portList := make(map[int]string)
+	if l.HealthMonitorPath == nil {
+		return portList
+	}
+
+	parts := strings.Split(*l.HealthMonitorPath, ",")
+	var currentPath string
+	for _, part := range parts {
+		healthParts := strings.Split(part, "@")
+		if len(healthParts) > 1 {
+			currentPath = healthParts[0]
+			if healthParts[1] == "" {
+				// Nothing after the @
+				continue
+			}
+			port, err := strconv.ParseUint(healthParts[1], 10, 32)
+			if err != nil {
+				log.Error("Can't convert to int: ", "port", healthParts[1], "err", err)
+			} else {
+				portList[int(port)] = currentPath
+			}
+			continue
+		}
+		if len(healthParts) == 1 {
+			if currentPath == "" {
+				// This means there was no @PORT
+				continue
+			}
+			port, err := strconv.ParseUint(healthParts[0], 10, 32)
+			if err != nil {
+				log.Error("Can't convert to int: ", "port", healthParts[0], "err", err)
+			} else {
+				portList[int(port)] = currentPath
+			}
+			continue
+		}
+	}
+
+	return portList
 }
 
 // Get the ports that are associated with the certificate from the service label.
@@ -227,7 +294,8 @@ func impliedSwarmPortToURL(service, spec string) (*listener, error) {
 		return nil, err
 	}
 	var cert *string
-	return newListener(service, int(0), serviceURL.String(), cert)
+	var healthPath *string
+	return newListener(service, int(0), serviceURL.String(), cert, healthPath)
 }
 
 func serviceCert(service swarm.Service, certLabel string) *string {
@@ -244,6 +312,18 @@ func serviceCert(service swarm.Service, certLabel string) *string {
 	}
 	return cert
 
+}
+
+func serviceHealthMonitorPath(service swarm.Service, healthLabel string) *string {
+	var healthPath *string
+	if healthLabel == "" {
+		return healthPath
+	}
+	labelHealth, hasPath := service.Spec.Labels[healthLabel]
+	if hasPath {
+		healthPath = &labelHealth
+	}
+	return healthPath
 }
 
 func addListenerToHostMap(m map[string][]*listener, l *listener) {
@@ -264,7 +344,7 @@ func intInSlice(a int, list []int) bool {
 }
 
 // listenersFromExposedPorts generates a list of listeners, where the URL is defaulted to the swarm port and default ELB
-func listenersFromExposedPorts(service swarm.Service, certLabel string) []*listener {
+func listenersFromExposedPorts(service swarm.Service, certLabel, healthLabel string) []*listener {
 
 	// Rule on publishing ports
 	// If the user specified -p X:Y, then we publish the port to the ELB.  If the port
@@ -289,11 +369,12 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 		log.Debug("Exposed port", "exposed", exposed, "V", debugV)
 		if intInSlice(int(exposed.PublishedPort), requestedPublishPorts[int(exposed.TargetPort)]) {
 			cert := serviceCert(service, certLabel)
+			healthPath := serviceHealthMonitorPath(service, healthLabel)
 
 			log.Debug("Found cert", "cert", cert, "V", debugV)
 			urlString := fmt.Sprintf("%v://:%d", strings.ToLower(string(exposed.Protocol)), exposed.PublishedPort)
 			log.Debug("urlString", "urlString", urlString, "V", debugV)
-			if listener, err := newListener(service.Spec.Name, int(exposed.PublishedPort), urlString, cert); err == nil {
+			if listener, err := newListener(service.Spec.Name, int(exposed.PublishedPort), urlString, cert, healthPath); err == nil {
 				listeners = append(listeners, listener)
 			} else {
 				log.Error("Error creating listener for exposed port", "exposed", exposed, "err", err)
@@ -308,7 +389,7 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 
 // listenersFromLabel generates a list of listeners based on what's specified in the label.  The listeners
 // are then matched against the exposed ports in the service.
-func listenersFromLabel(service swarm.Service, label string, certLabel string) []*listener {
+func listenersFromLabel(service swarm.Service, label string, certLabel string, healthLabel string) []*listener {
 	// get all the specs -- the label determines what elb listeners are to be created.
 	labelValue, has := service.Spec.Labels[label]
 	if !has || labelValue == "" {
@@ -337,6 +418,7 @@ func listenersFromLabel(service swarm.Service, label string, certLabel string) [
 		// need to add the certificate after it is parsed since service isn't available
 		// inside of specParser.
 		listener.Certificate = serviceCert(service, certLabel)
+		listener.HealthMonitorPath = serviceHealthMonitorPath(service, healthLabel)
 
 		listenersToPublish = append(listenersToPublish, listener)
 	}
