@@ -32,7 +32,7 @@ func toVhostRoutes(listeners map[string][]*listener) map[ingress.Vhost][]loadbal
 }
 
 func externalLoadBalancerListenersFromServices(services []swarm.Service,
-	matchByLabels bool, lbSpecLabel, certLabel string) map[string][]*listener {
+	matchByLabels bool, lbSpecLabel, certLabel, healthLabel string) map[string][]*listener {
 
 	// group the listeners by hostname.  hostname maps to a ELB somewhere else.
 	listeners := map[string][]*listener{}
@@ -47,7 +47,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service,
 
 		if matchByLabels {
 			// Now go through the list that we need to publish and match up the exposed ports
-			for _, publish := range listenersFromLabel(s, lbSpecLabel, certLabel) {
+			for _, publish := range listenersFromLabel(s, lbSpecLabel, certLabel, healthLabel) {
 
 				if sp, has := exposedPorts[int(publish.SwarmPort)]; has {
 
@@ -79,7 +79,7 @@ func externalLoadBalancerListenersFromServices(services []swarm.Service,
 		}
 
 		// Publish all exposed is always on
-		for _, l := range listenersFromExposedPorts(s, certLabel) {
+		for _, l := range listenersFromExposedPorts(s, certLabel, healthLabel) {
 			addListenerToHostMap(listeners, l)
 		}
 

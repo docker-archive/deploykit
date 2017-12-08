@@ -227,7 +227,9 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 	attempt := 0
 	for {
 		attempt++
-		_, err = l.lbListenerService.UpdateLoadBalancerProtocols(&l.uuid, lbRouteArray)
+		lb, err = l.lbListenerService.
+			Mask("listeners.defaultPool.healthMonitor").
+			UpdateLoadBalancerProtocols(&l.uuid, lbRouteArray)
 		if err == nil {
 			break
 		}
@@ -237,6 +239,50 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 			time.Sleep(updateRetryTime)
 		} else {
 			return nil, err
+		}
+	}
+
+	// The backend protocol needs to be HTTP and the monitor url path set before we make the call to update
+	if strings.ToUpper(string(route.Protocol)) == "HTTP" && route.HealthMonitorPath != nil && *route.HealthMonitorPath != "" {
+		// The route has been successfully added.  Now update the health monitor path.
+		var hmArray []datatypes.Network_LBaaS_LoadBalancerHealthMonitorConfiguration
+		for _, lbListener := range lb.Listeners {
+			if lbListener.DefaultPool == nil ||
+				lbListener.DefaultPool.HealthMonitor == nil ||
+				lbListener.DefaultPool.ProtocolPort == nil {
+				continue
+			}
+			// Find the pool that corresponds to the specified backend port
+			if *lbListener.DefaultPool.ProtocolPort == route.Port {
+				hmConfig := datatypes.Network_LBaaS_LoadBalancerHealthMonitorConfiguration{
+					BackendPort:       &route.Port,
+					HealthMonitorUuid: lbListener.DefaultPool.HealthMonitor.Uuid,
+					BackendProtocol:   lbListener.DefaultPool.HealthMonitor.MonitorType,
+					MaxRetries:        lbListener.DefaultPool.HealthMonitor.MaxRetries,
+					Interval:          lbListener.DefaultPool.HealthMonitor.Interval,
+					Timeout:           lbListener.DefaultPool.HealthMonitor.Timeout,
+					UrlPath:           route.HealthMonitorPath,
+				}
+				hmArray = append(hmArray, hmConfig)
+				break
+			}
+		}
+
+		// Make the call to update the health monitor
+		attempt = 0
+		for {
+			attempt++
+			_, err = l.lbHealthMonitorService.UpdateLoadBalancerHealthMonitors(&l.uuid, hmArray)
+			if err == nil {
+				break
+			}
+			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
+			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
+				lbLogger.Info("Publish", "name", l.name, "V", debugV, "Update pending")
+				time.Sleep(updateRetryTime)
+			} else {
+				return nil, err
+			}
 		}
 	}
 

@@ -13,6 +13,7 @@ import (
 func TestParseSpec(t *testing.T) {
 
 	certLabel := "certLabel"
+	healthPathLabel := "healthLabel"
 
 	properties := ingress.Properties{
 		{
@@ -24,7 +25,8 @@ func TestParseSpec(t *testing.T) {
 						Docker: Docker(docker.ConnectInfo{
 							Host: "/var/run/docker.sock",
 						}),
-						CertificateLabel: &certLabel,
+						CertificateLabel:       &certLabel,
+						HealthMonitorPathLabel: &healthPathLabel,
 					},
 				),
 			},
@@ -45,4 +47,5 @@ func TestParseSpec(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "/var/run/docker.sock", spec.Docker.Host)
 	require.Equal(t, certLabel, *spec.CertificateLabel)
+	require.Equal(t, healthPathLabel, *spec.HealthMonitorPathLabel)
 }

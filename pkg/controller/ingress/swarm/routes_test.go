@@ -134,6 +134,8 @@ func TestRunRoutes(t *testing.T) {
 
 	certLabel := "certLabel"
 	certID := "certID"
+	healthLabel := "certLabel"
+	healthPath := "healthPath"
 
 	services := []swarm.Service{
 		{
@@ -143,6 +145,7 @@ func TestRunRoutes(t *testing.T) {
 					Labels: map[string]string{
 						"docker.editions.proxy.port": "80/http",
 						certLabel:                    certID,
+						healthLabel:                  healthPath,
 					},
 				},
 			},
@@ -168,6 +171,7 @@ func TestRunRoutes(t *testing.T) {
 
 	routes, err := NewServiceRoutes(client).
 		SetCertLabel(&certLabel).
+		SetHealthMonitorPathLabel(&healthLabel).
 		AddRule("proxy",
 
 			MatchSpecLabels(map[string]string{
