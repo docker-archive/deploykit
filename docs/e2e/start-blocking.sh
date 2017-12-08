@@ -4,9 +4,6 @@ HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 INFRAKIT_HOME=${INFRAKIT_HOME:-$HOME/.infrakit}
 
-echo "Clean up local environment"
-rm -f $INFRAKIT_HOME/configs/*
-
 LOG=$HERE/infrakit.log
 rm -f $LOG
 
@@ -20,4 +17,7 @@ infrakit plugin start \
 	 enrollment \
 	 ingress \
 	 group \
-	 --log 5 --log-debug-V 500 --log-stack 2>$LOG &
+	 --log 5 --log-debug-V 500 --log-stack \
+	 --log-debug-match module=controller/internal \
+	 --log-debug-match module=manager \
+	 --log-debug-match-exclude=false \
