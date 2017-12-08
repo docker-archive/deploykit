@@ -9,8 +9,8 @@ import (
 )
 
 func TestListener(t *testing.T) {
-	var emptyCert *string
-	l, err := newListener("foo", 30000, "http://:80", emptyCert)
+	var emptyCert, emptyHealthPath *string
+	l, err := newListener("foo", 30000, "http://:80", emptyCert, emptyHealthPath)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
@@ -19,7 +19,7 @@ func TestListener(t *testing.T) {
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
 
-	l, err = newListener("foo", 30000, "http://", emptyCert)
+	l, err = newListener("foo", 30000, "http://", emptyCert, emptyHealthPath)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
@@ -28,7 +28,7 @@ func TestListener(t *testing.T) {
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
 
-	l, err = newListener("foo", 30000, "http://localswarm:8080", emptyCert)
+	l, err = newListener("foo", 30000, "http://localswarm:8080", emptyCert, emptyHealthPath)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.HTTP, l.protocol())
@@ -41,9 +41,11 @@ func TestListener(t *testing.T) {
 func TestListenerSSLCertNoPort(t *testing.T) {
 	var emptyCert *string
 	cert := "asn:blah"
+	healthPath := "/health"
+	healthPathPort := "/health@443"
 
 	// has cert and port is 443, so it should be SSL.
-	l, err := newListener("foo", 30000, "tcp://:443", &cert)
+	l, err := newListener("foo", 30000, "tcp://:443", &cert, &healthPathPort)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
@@ -52,14 +54,15 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
 	require.Equal(t, &cert, l.CertASN())
-	require.Equal(t, []int{443}, l.CertPorts())
+	require.Equal(t, map[int]string{443: "SSL"}, l.CertPorts())
 	r := l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, &cert, r.Certificate)
+	require.Equal(t, &healthPath, r.HealthMonitorPath)
 
 	// has cert but since port wasn't specified, it defaults to 443
 	// since port isn't 443, then this is not SSL.
-	l, err = newListener("foo", 30000, "tcp://:444", &cert)
+	l, err = newListener("foo", 30000, "tcp://:444", &cert, &healthPathPort)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.TCP, l.protocol())
@@ -67,15 +70,16 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
-	require.Equal(t, &cert, l.CertASN())
-	require.Equal(t, []int{443}, l.CertPorts())
+	require.Equal(t, (*string)(nil), l.CertASN())
+	require.Equal(t, map[int]string{443: "SSL"}, l.CertPorts())
 	r = l.asRoute()
-	require.Equal(t, loadbalancer.HTTP, r.Protocol)
-	require.Equal(t, loadbalancer.HTTPS, r.LoadBalancerProtocol)
-	require.Equal(t, &cert, r.Certificate)
+	require.Equal(t, loadbalancer.TCP, r.Protocol)
+	require.Equal(t, loadbalancer.TCP, r.LoadBalancerProtocol)
+	require.Equal(t, (*string)(nil), r.Certificate)
+	require.Equal(t, (*string)(nil), r.HealthMonitorPath)
 
 	// no cert so not SSL.
-	l, err = newListener("foo", 30000, "tcp://:443", emptyCert)
+	l, err = newListener("foo", 30000, "tcp://:443", emptyCert, &healthPathPort)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.TCP, l.protocol())
@@ -84,11 +88,12 @@ func TestListenerSSLCertNoPort(t *testing.T) {
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
 	require.Equal(t, emptyCert, l.CertASN())
-	require.Equal(t, []int{443}, l.CertPorts())
+	require.Equal(t, map[int]string{443: "SSL"}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.TCP, r.Protocol)
 	require.Equal(t, loadbalancer.TCP, r.LoadBalancerProtocol) // no cert
 	require.Equal(t, emptyCert, r.Certificate)
+	require.Equal(t, &healthPath, r.HealthMonitorPath)
 }
 
 func TestListenerSSLCertWithPorts(t *testing.T) {
@@ -97,9 +102,17 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	certOnePort2 := asn + "@442"
 	certTwoPorts := asn + "@443,442"
 	certEmptyPorts := asn + "@"
+	certHTTPSPort := asn + "@HTTPS:443"
+	certHTTPSPortSSLPORT := asn + "@HTTPS:443,444"
+	healthPath := "/health"
+	healthPathPort1 := healthPath + "@443"
+	healthPathPort2 := healthPath + "@442"
+	healthPathPort3 := healthPath + "@444"
+	healthPathTwoPorts := healthPath + "@443,442"
+	healthPathEmptyPorts := healthPath + "@"
 
 	// has cert and port is 443, so it should be SSL.
-	l, err := newListener("foo", 30000, "tcp://:443", &certOnePort)
+	l, err := newListener("foo", 30000, "tcp://:443", &certOnePort, &healthPathPort1)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
@@ -108,14 +121,16 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []int{443}, l.CertPorts())
+	require.Equal(t, map[int]string{443: "SSL"}, l.CertPorts())
 	r := l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, loadbalancer.SSL, r.LoadBalancerProtocol)
 	require.Equal(t, asn, *r.Certificate)
+	// Health port matches actual
+	require.Equal(t, &healthPath, r.HealthMonitorPath)
 
 	// has cert with port 442, this should be SSL.
-	l, err = newListener("foo", 30000, "tcp://:442", &certOnePort2)
+	l, err = newListener("foo", 30000, "tcp://:442", &certOnePort2, &healthPathPort2)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
@@ -124,13 +139,15 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []int{442}, l.CertPorts())
+	require.Equal(t, map[int]string{442: "SSL"}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
+	// Health port matches actual
+	require.Equal(t, &healthPath, r.HealthMonitorPath)
 
 	// cert has 2 ports, 442 is one of them, assume SSL
-	l, err = newListener("foo", 30000, "tcp://:442", &certTwoPorts)
+	l, err = newListener("foo", 30000, "tcp://:442", &certTwoPorts, &healthPathTwoPorts)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
@@ -139,13 +156,15 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []int{443, 442}, l.CertPorts())
+	require.Equal(t, map[int]string{443: "SSL", 442: "SSL"}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
+	// Health port matches one of the ports
+	require.Equal(t, &healthPath, r.HealthMonitorPath)
 
 	// cert but no port, assume port 443, this is 442 so loadbalancer.TCP not SSL
-	l, err = newListener("foo", 30000, "tcp://:442", &certEmptyPorts)
+	l, err = newListener("foo", 30000, "tcp://:442", &certEmptyPorts, &healthPathEmptyPorts)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.TCP, l.protocol())
@@ -153,15 +172,16 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, int(30000), l.SwarmPort)
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
-	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []int{443}, l.CertPorts())
+	require.Equal(t, (*string)(nil), l.CertASN())
+	require.Equal(t, map[int]string{443: "SSL"}, l.CertPorts())
 	r = l.asRoute()
-	// TCP with cert gets mapped to HTTP
-	require.Equal(t, loadbalancer.HTTP, r.Protocol)
-	require.Equal(t, asn, *r.Certificate)
+	require.Equal(t, loadbalancer.TCP, r.Protocol)
+	require.Equal(t, (*string)(nil), r.Certificate)
+	// Health port makes no assumptions, if no matches returns nothing
+	require.Equal(t, (*string)(nil), r.HealthMonitorPath)
 
 	// cert but no port, assume port 443
-	l, err = newListener("foo", 30000, "tcp://:443", &certEmptyPorts)
+	l, err = newListener("foo", 30000, "tcp://:443", &certEmptyPorts, &healthPathEmptyPorts)
 	require.NoError(t, err)
 
 	require.Equal(t, loadbalancer.SSL, l.protocol())
@@ -170,10 +190,62 @@ func TestListenerSSLCertWithPorts(t *testing.T) {
 	require.Equal(t, "foo", l.Service)
 	require.Equal(t, HostNotSpecified, l.host())
 	require.Equal(t, &asn, l.CertASN())
-	require.Equal(t, []int{443}, l.CertPorts())
+	require.Equal(t, map[int]string{443: "SSL"}, l.CertPorts())
 	r = l.asRoute()
 	require.Equal(t, loadbalancer.SSL, r.Protocol)
 	require.Equal(t, asn, *r.Certificate)
+	// Health port makes no assumptions, if no matches returns nothing
+	require.Equal(t, (*string)(nil), r.HealthMonitorPath)
+
+	// cert but HTTPS port, verify it
+	l, err = newListener("foo", 30000, "tcp://:443", &certHTTPSPort, &healthPathPort1)
+	require.NoError(t, err)
+
+	require.Equal(t, loadbalancer.HTTP, l.protocol())
+	require.Equal(t, loadbalancer.HTTPS, l.loadbalancerProtocol())
+	require.Equal(t, int(443), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
+	require.Equal(t, "foo", l.Service)
+	require.Equal(t, HostNotSpecified, l.host())
+	require.Equal(t, &asn, l.CertASN())
+	require.Equal(t, map[int]string{443: "HTTPS"}, l.CertPorts())
+	r = l.asRoute()
+	require.Equal(t, loadbalancer.HTTP, r.Protocol)
+	require.Equal(t, loadbalancer.HTTPS, r.LoadBalancerProtocol)
+	require.Equal(t, asn, *r.Certificate)
+	require.Equal(t, &healthPath, r.HealthMonitorPath)
+
+	// cert but HTTPS port and SSL port (no schema specified), verify SSL
+	l, err = newListener("foo", 30000, "tcp://:444", &certHTTPSPortSSLPORT, &healthPathPort3)
+	require.NoError(t, err)
+
+	require.Equal(t, loadbalancer.SSL, l.protocol())
+	require.Equal(t, int(444), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
+	require.Equal(t, "foo", l.Service)
+	require.Equal(t, HostNotSpecified, l.host())
+	require.Equal(t, &asn, l.CertASN())
+	require.Equal(t, map[int]string{443: "HTTPS", 444: "SSL"}, l.CertPorts())
+	r = l.asRoute()
+	require.Equal(t, loadbalancer.SSL, r.Protocol)
+	require.Equal(t, asn, *r.Certificate)
+	require.Equal(t, &healthPath, r.HealthMonitorPath)
+
+	// cert but HTTPS port and SSL port (no schema specified), verify unspecified port is TCP
+	l, err = newListener("foo", 30000, "tcp://:8080", &certHTTPSPortSSLPORT, &healthPathPort1)
+	require.NoError(t, err)
+
+	require.Equal(t, loadbalancer.TCP, l.protocol())
+	require.Equal(t, int(8080), l.extPort())
+	require.Equal(t, int(30000), l.SwarmPort)
+	require.Equal(t, "foo", l.Service)
+	require.Equal(t, HostNotSpecified, l.host())
+	require.Equal(t, (*string)(nil), l.CertASN())
+	require.Equal(t, map[int]string{443: "HTTPS", 444: "SSL"}, l.CertPorts())
+	r = l.asRoute()
+	require.Equal(t, loadbalancer.TCP, r.Protocol)
+	require.Equal(t, (*string)(nil), r.Certificate)
+	require.Equal(t, (*string)(nil), r.HealthMonitorPath)
 }
 
 func TestImpliedSwarmPortToUrl(t *testing.T) {
@@ -299,7 +371,7 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 	s := swarm.Service{}
 	s.Spec.Name = "web1"
 
-	l := listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l := listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.Equal(t, 0, len(l))
 	require.NotNil(t, l)
 
@@ -307,7 +379,7 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 		LabelExternalLoadBalancerSpec: "http://:8080",
 	}
 	s.Endpoint.Ports = []swarm.PortConfig{} // no exposed ports
-	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.NotNil(t, l)
 	require.Equal(t, 1, len(l))
 	require.Equal(t, "web1", l[0].Service)
@@ -322,7 +394,7 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 		LabelExternalLoadBalancerSpec: "http://",
 	}
 	s.Endpoint.Ports = []swarm.PortConfig{} // no exposed ports
-	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.NotNil(t, l)
 	require.Equal(t, 1, len(l))
 	require.Equal(t, "web1", l[0].Service)
@@ -337,7 +409,7 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 		LabelExternalLoadBalancerSpec: "https://app1.domain.com",
 	}
 	s.Endpoint.Ports = []swarm.PortConfig{} // no exposed ports
-	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.NotNil(t, l)
 	require.Equal(t, 1, len(l))
 	require.Equal(t, "web1", l[0].Service)
@@ -352,7 +424,7 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 		LabelExternalLoadBalancerSpec: "tcp://app1.domain.com:2375",
 	}
 	s.Endpoint.Ports = []swarm.PortConfig{} // no exposed ports
-	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.NotNil(t, l)
 	require.Equal(t, 1, len(l))
 	require.Equal(t, "web1", l[0].Service)
@@ -367,7 +439,7 @@ func TestListenersToPublishImplicitMapping(t *testing.T) {
 		LabelExternalLoadBalancerSpec: "tcp://app1.domain.com:2375, https://",
 	}
 	s.Endpoint.Ports = []swarm.PortConfig{} // no exposed ports
-	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.NotNil(t, l)
 	require.Equal(t, 2, len(l))
 	require.Equal(t, "web1", l[0].Service)
@@ -388,14 +460,14 @@ func TestListenersToPublishExplicitMapping(t *testing.T) {
 	s := swarm.Service{}
 	s.Spec.Name = "web1"
 
-	l := listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l := listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.Equal(t, 0, len(l))
 	require.NotNil(t, l)
 
 	s.Spec.Labels = map[string]string{
 		LabelExternalLoadBalancerSpec: "30000=http://:8080",
 	}
-	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.NotNil(t, l)
 	require.Equal(t, 1, len(l))
 	require.Equal(t, "web1", l[0].Service)
@@ -408,7 +480,7 @@ func TestListenersToPublishExplicitMapping(t *testing.T) {
 	s.Spec.Labels = map[string]string{
 		LabelExternalLoadBalancerSpec: "30000=https://, 4040=tcp://foo.com:4040",
 	}
-	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "")
+	l = listenersFromLabel(s, LabelExternalLoadBalancerSpec, "", "")
 	require.NotNil(t, l)
 	require.Equal(t, 2, len(l))
 	require.Equal(t, "web1", l[0].Service)
@@ -430,7 +502,7 @@ func TestListenersFromExposedPorts(t *testing.T) {
 	s := swarm.Service{}
 	s.Spec.Name = "web1"
 
-	l := listenersFromExposedPorts(s, "emptyLabel")
+	l := listenersFromExposedPorts(s, "emptyLabel", "emptyLabel")
 	require.Equal(t, 0, len(l))
 	require.NotNil(t, l)
 
@@ -459,7 +531,7 @@ func TestListenersFromExposedPorts(t *testing.T) {
 		},
 	}
 
-	l = listenersFromExposedPorts(s, "emptyLabel")
+	l = listenersFromExposedPorts(s, "emptyLabel", "emptyLabel")
 	require.Equal(t, 0, len(l))
 	require.NotNil(t, l)
 
@@ -492,7 +564,7 @@ func TestListenersFromExposedPorts(t *testing.T) {
 		},
 	}
 
-	l = listenersFromExposedPorts(s, "emptyLabel")
+	l = listenersFromExposedPorts(s, "emptyLabel", "emptyLabel")
 	require.Equal(t, 1, len(l))
 	require.NotNil(t, l)
 

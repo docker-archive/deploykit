@@ -11,23 +11,25 @@ import (
 )
 
 type listener struct {
-	Service       string
-	URL           *url.URL
-	SwarmPort     int
-	SwarmProtocol loadbalancer.Protocol
-	Certificate   *string
+	Service           string
+	URL               *url.URL
+	SwarmPort         int
+	SwarmProtocol     loadbalancer.Protocol
+	Certificate       *string
+	HealthMonitorPath *string
 }
 
-func newListener(service string, swarmPort int, urlStr string, cert *string) (*listener, error) {
+func newListener(service string, swarmPort int, urlStr string, cert, healthPath *string) (*listener, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
 	return &listener{
-		Service:     service,
-		URL:         u,
-		SwarmPort:   swarmPort,
-		Certificate: cert,
+		Service:           service,
+		URL:               u,
+		SwarmPort:         swarmPort,
+		Certificate:       cert,
+		HealthMonitorPath: healthPath,
 	}, nil
 }
 
@@ -38,19 +40,7 @@ func (l *listener) asRoute() loadbalancer.Route {
 		LoadBalancerPort:     l.extPort(),
 		LoadBalancerProtocol: l.loadbalancerProtocol(),
 		Certificate:          l.CertASN(),
-	}
-
-	// If Certificate is specified, the we make adjustments to the protocol. This makes no assumption
-	// of the validity of the certificate
-	if r.Certificate != nil {
-		switch r.LoadBalancerProtocol {
-		case loadbalancer.HTTP: // frontend lb protocol
-			r.LoadBalancerProtocol = loadbalancer.HTTPS
-			r.Protocol = loadbalancer.HTTP // backend
-		case loadbalancer.TCP: // frontend lb protocol
-			r.LoadBalancerProtocol = loadbalancer.HTTPS
-			r.Protocol = loadbalancer.HTTP // backend
-		}
+		HealthMonitorPath:    l.GetHealthMonitorPath(),
 	}
 	return r
 }
@@ -63,21 +53,90 @@ func (l *listener) CertASN() *string {
 		return nil
 	}
 	asn := strings.Split(*l.Certificate, "@")[0]
-	if asn != "" {
+	// Verify the certificate specifies this particular port.
+	if l.CertPorts()[l.extPort()] != "" {
 		return &asn
 	}
 	return nil
 }
 
-// Get the ports that are associated with the certificate from the service label
-func (l *listener) CertPorts() []int {
+// Get the health monitor path from the service label
+func (l *listener) GetHealthMonitorPath() *string {
+	if l.HealthMonitorPath == nil {
+		return nil
+	}
+	// Verify the label specifies this particular port
+	healthPath := l.HealthMonitorPorts()[l.extPort()]
+	if healthPath != "" {
+		return &healthPath
+	}
+
+	return nil
+}
+
+// Get the ports that are associated with the health monitor path from the service label.
+// Returns a map of paths per port.
+// Example path:
+//    /health1@444,/health2@222,333
+// should return:
+//   [222]health2
+//   [333]health2
+//   [444]health1
+func (l *listener) HealthMonitorPorts() map[int]string {
+	portList := make(map[int]string)
+	if l.HealthMonitorPath == nil {
+		return portList
+	}
+
+	parts := strings.Split(*l.HealthMonitorPath, ",")
+	var currentPath string
+	for _, part := range parts {
+		healthParts := strings.Split(part, "@")
+		if len(healthParts) > 1 {
+			currentPath = healthParts[0]
+			if healthParts[1] == "" {
+				// Nothing after the @
+				continue
+			}
+			port, err := strconv.ParseUint(healthParts[1], 10, 32)
+			if err != nil {
+				log.Error("Can't convert to int: ", "port", healthParts[1], "err", err)
+			} else {
+				portList[int(port)] = currentPath
+			}
+			continue
+		}
+		if len(healthParts) == 1 {
+			if currentPath == "" {
+				// This means there was no @PORT
+				continue
+			}
+			port, err := strconv.ParseUint(healthParts[0], 10, 32)
+			if err != nil {
+				log.Error("Can't convert to int: ", "port", healthParts[0], "err", err)
+			} else {
+				portList[int(port)] = currentPath
+			}
+			continue
+		}
+	}
+
+	return portList
+}
+
+// Get the ports that are associated with the certificate from the service label.
+// Returns a map of schemas per port since the AWS documentation has [schema:]port.
+// The default is SSL on port 443 if nothing is specified. The schema defaults to SSL
+// unless a valid schema is specified (only HTTPS is allowed today).
+func (l *listener) CertPorts() map[int]string {
+	portSchemaMap := make(map[int]string)
 	if l.Certificate == nil {
 		// if we have not Certificate then return 443
-		return []int{443}
+		portSchemaMap[443] = "SSL"
+		return portSchemaMap
 	}
 	parts := strings.Split(*l.Certificate, "@")
 	if len(parts) > 1 {
-		var finalPorts = []int{}
 		ports := strings.Split(parts[1], ",")
 		log.Debug("ports", "ports ", ports)
 		if len(ports) > 0 {
@@ -85,26 +144,38 @@ func (l *listener) CertPorts() []int {
 			for _, port := range ports {
 				log.Debug("port", "port: ", port, "V", debugV)
 				if port != "" {
-					j, err := strconv.ParseUint(port, 10, 32)
+					pieces := strings.Split(port, ":")
+					schema := "SSL"
+					portPiece := 0
+					if len(pieces) > 1 {
+						portPiece = 1
+						// We only change scheme from SSL if a recognized schema
+						if strings.ToUpper(pieces[0]) == "HTTPS" {
+							schema = "HTTPS"
+						}
+					}
+					j, err := strconv.ParseUint(pieces[portPiece], 10, 32)
 					if err != nil {
 						log.Error("Can't convert to int: ", "port", port, "err", err)
+					} else {
+						portSchemaMap[int(j)] = schema
 					}
-					finalPorts = append(finalPorts, int(j))
 				}
 			}
 		}
-		log.Debug("final ports", "ports", finalPorts)
-		if len(finalPorts) == 0 {
+		log.Debug("portSchemaMap", "portSchemaMap", portSchemaMap)
+		if len(portSchemaMap) == 0 {
 			// this would happen if there was an ASN like this
 			// asn:blah@
 			// an at symbol but no ports after, if that is the case
 			// default to 443.
-			finalPorts = append(finalPorts, int(443))
+			portSchemaMap[443] = "SSL"
 		}
-		return finalPorts
+		return portSchemaMap
 	}
 	// if there is no port, default to 443
-	return []int{443}
+	portSchemaMap[443] = "SSL"
+	return portSchemaMap
 }
 
 // String value of the listener, good for log statements.
@@ -161,9 +232,9 @@ func (l *listener) loadbalancerProtocol() loadbalancer.Protocol {
 	}
 
 	// check if this should be SSL because it has a certificate.
-	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
+	if l.Certificate != nil && l.CertPorts()[l.extPort()] != "" {
 		log.Debug("external port is in cert ports", "extPort", l.extPort(), "certPorts", l.CertPorts())
-		scheme = string(loadbalancer.SSL)
+		scheme = l.CertPorts()[l.extPort()]
 	} else {
 		log.Debug("cert is nil, or port is not in cert ports", "exPort", l.extPort(), "certPorts", l.CertPorts())
 	}
@@ -179,9 +250,13 @@ func (l *listener) protocol() loadbalancer.Protocol {
 	}
 
 	// check if this should be SSL because it has a certificate.
-	if l.Certificate != nil && intInSlice(l.extPort(), l.CertPorts()) {
+	if l.Certificate != nil && l.CertPorts()[l.extPort()] != "" {
 		log.Debug("ext port is in cert ports", "extPort", l.extPort(), "certPorts", l.CertPorts())
-		scheme = string(loadbalancer.SSL)
+		scheme = l.CertPorts()[l.extPort()]
+		// Need to change HTTPS to HTTP
+		if loadbalancer.ProtocolFromString(scheme) == loadbalancer.HTTPS {
+			scheme = string(loadbalancer.HTTP)
+		}
 	} else {
 		log.Debug("cert is nil, or port is not in cert ports ", "extPort", l.extPort(), "certPorts", l.CertPorts())
 	}
@@ -219,7 +294,8 @@ func impliedSwarmPortToURL(service, spec string) (*listener, error) {
 		return nil, err
 	}
 	var cert *string
-	return newListener(service, int(0), serviceURL.String(), cert)
+	var healthPath *string
+	return newListener(service, int(0), serviceURL.String(), cert, healthPath)
 }
 
 func serviceCert(service swarm.Service, certLabel string) *string {
@@ -236,6 +312,18 @@ func serviceCert(service swarm.Service, certLabel string) *string {
 	}
 	return cert
 
+}
+
+func serviceHealthMonitorPath(service swarm.Service, healthLabel string) *string {
+	var healthPath *string
+	if healthLabel == "" {
+		return healthPath
+	}
+	labelHealth, hasPath := service.Spec.Labels[healthLabel]
+	if hasPath {
+		healthPath = &labelHealth
+	}
+	return healthPath
 }
 
 func addListenerToHostMap(m map[string][]*listener, l *listener) {
@@ -256,7 +344,7 @@ func intInSlice(a int, list []int) bool {
 }
 
 // listenersFromExposedPorts generates a list of listeners, where the URL is defaulted to the swarm port and default ELB
-func listenersFromExposedPorts(service swarm.Service, certLabel string) []*listener {
+func listenersFromExposedPorts(service swarm.Service, certLabel, healthLabel string) []*listener {
 
 	// Rule on publishing ports
 	// If the user specified -p X:Y, then we publish the port to the ELB.  If the port
@@ -281,11 +369,12 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 		log.Debug("Exposed port", "exposed", exposed, "V", debugV)
 		if intInSlice(int(exposed.PublishedPort), requestedPublishPorts[int(exposed.TargetPort)]) {
 			cert := serviceCert(service, certLabel)
+			healthPath := serviceHealthMonitorPath(service, healthLabel)
 
 			log.Debug("Found cert", "cert", cert, "V", debugV)
 			urlString := fmt.Sprintf("%v://:%d", strings.ToLower(string(exposed.Protocol)), exposed.PublishedPort)
 			log.Debug("urlString", "urlString", urlString, "V", debugV)
-			if listener, err := newListener(service.Spec.Name, int(exposed.PublishedPort), urlString, cert); err == nil {
+			if listener, err := newListener(service.Spec.Name, int(exposed.PublishedPort), urlString, cert, healthPath); err == nil {
 				listeners = append(listeners, listener)
 			} else {
 				log.Error("Error creating listener for exposed port", "exposed", exposed, "err", err)
@@ -300,7 +389,7 @@ func listenersFromExposedPorts(service swarm.Service, certLabel string) []*liste
 
 // listenersFromLabel generates a list of listeners based on what's specified in the label.  The listeners
 // are then matched against the exposed ports in the service.
-func listenersFromLabel(service swarm.Service, label string, certLabel string) []*listener {
+func listenersFromLabel(service swarm.Service, label string, certLabel string, healthLabel string) []*listener {
 	// get all the specs -- the label determines what elb listeners are to be created.
 	labelValue, has := service.Spec.Labels[label]
 	if !has || labelValue == "" {
@@ -329,6 +418,7 @@ func listenersFromLabel(service swarm.Service, label string, certLabel string) [
 		// need to add the certificate after it is parsed since service isn't available
 		// inside of specParser.
 		listener.Certificate = serviceCert(service, certLabel)
+		listener.HealthMonitorPath = serviceHealthMonitorPath(service, healthLabel)
 
 		listenersToPublish = append(listenersToPublish, listener)
 	}

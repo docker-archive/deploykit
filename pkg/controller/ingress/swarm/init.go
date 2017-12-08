@@ -38,6 +38,9 @@ type Spec struct {
 
 	// CertificateLabel is the label on swarm services that we look for to get the certificate id.
 	CertificateLabel *string
+
+	// HealthMonitorPathLabel is the label on swarm services that we look for to get the url path for a health monitor.
+	HealthMonitorPathLabel *string
 }
 
 type handler struct {
@@ -80,6 +83,7 @@ func (h *handler) Routes(properties *types.Any,
 	routes, err := NewServiceRoutes(dockerClient).
 		SetOptions(options).
 		SetCertLabel(spec.CertificateLabel).
+		SetHealthMonitorPathLabel(spec.HealthMonitorPathLabel).
 		Build()
 	if err != nil {
 		return nil, err

@@ -60,14 +60,15 @@ type matcher struct {
 
 // RoutesBuilder simplifies creation of a routes.
 type RoutesBuilder struct {
-	options       ingress.Options
-	client        docker.APIClientCloser
-	err           error
-	matchers      []*matcher
-	hardSync      bool
-	lbSpecLabel   string
-	certSpecLabel string
-	lock          sync.Mutex
+	options         ingress.Options
+	client          docker.APIClientCloser
+	err             error
+	matchers        []*matcher
+	hardSync        bool
+	lbSpecLabel     string
+	certSpecLabel   string
+	healthSpecLabel string
+	lock            sync.Mutex
 }
 
 // Routes can derive a list of routes based on Docker services
@@ -80,6 +81,7 @@ type Routes struct {
 	lastKnownByMatcher map[string][]swarm.Service
 	lbSpecLabel        string
 	certSpecLabel      string
+	healthSpecLabel    string
 }
 
 // NewServiceRoutes creates a routes.
@@ -100,10 +102,11 @@ func (b *RoutesBuilder) SetOptions(options ingress.Options) *RoutesBuilder {
 	return b
 }
 
-// SetSpecLabels sets the label to look for loadbalancer spec and certifcate spec
-func (b *RoutesBuilder) SetSpecLabels(lbSpec, certSpec string) *RoutesBuilder {
+// SetSpecLabels sets the label to look for loadbalancer spec, certifcate spec, and health path spec
+func (b *RoutesBuilder) SetSpecLabels(lbSpec, certSpec, healthSpec string) *RoutesBuilder {
 	b.lbSpecLabel = lbSpec
 	b.certSpecLabel = certSpec
+	b.healthSpecLabel = healthSpec
 	return b
 }
 
@@ -111,6 +114,14 @@ func (b *RoutesBuilder) SetSpecLabels(lbSpec, certSpec string) *RoutesBuilder {
 func (b *RoutesBuilder) SetCertLabel(certLabel *string) *RoutesBuilder {
 	if certLabel != nil {
 		b.certSpecLabel = *certLabel
+	}
+	return b
+}
+
+// SetHealthMonitorPathLabel sets the label to look for the certifcate id
+func (b *RoutesBuilder) SetHealthMonitorPathLabel(healthLabel *string) *RoutesBuilder {
+	if healthLabel != nil {
+		b.healthSpecLabel = *healthLabel
 	}
 	return b
 }
@@ -141,6 +152,7 @@ func (b *RoutesBuilder) Build() (*Routes, error) {
 		matchers:           b.matchers,
 		lbSpecLabel:        b.lbSpecLabel,
 		certSpecLabel:      b.certSpecLabel,
+		healthSpecLabel:    b.healthSpecLabel,
 		lastKnownByMatcher: map[string][]swarm.Service{},
 	}
 
@@ -165,6 +177,7 @@ func (p *Routes) RoutesFromServices(services []swarm.Service) (map[ingress.Vhost
 		p.options.MatchByLabels,
 		p.lbSpecLabel,
 		p.certSpecLabel,
+		p.healthSpecLabel,
 	)), nil
 }
 
