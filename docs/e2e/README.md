@@ -7,6 +7,8 @@ This demo shows the following:
 
    + Manage groups -- covering the legacy and new specification formats.
    + Ingress -- loadbalancer routing traffic to the groups
+   + Enrollment -- we want to authorize nfs access for each new node spun up.
+   Remove  nfs authorization if node goes away.
 
 There are two groups: `miners` and `cattle` and 3 loadbalancers:
 
@@ -18,6 +20,10 @@ There are two groups: `miners` and `cattle` and 3 loadbalancers:
 
 The configuration `miners.yml` follows the new schema, while `cattle.json` is a JSON in the legacy format.
 The file `ingress.yml` follows the new schema.
+
+Other plugins include an enrollment controller running with the name `nfs` (see `start.sh`), while another simulator
+instance runs with the name `nfs-auth`. These are controller and plugin that perform simulated nfs-auth each time
+and new node comes up or goes away.
 
 ### Initial
 
@@ -35,30 +41,88 @@ You can tail the log at
 $ tail -f docs/e2e/infrakit.log
 ```
 
+### What's Running
+
+Because you haven't set the environment variable `INFRAKIT_HOST`, you will have a subcommand `local`.
+Type this to see what's discovered of the plugins that are running:
+
+```
+infrakit local
+```
+
+If you are connecting to a remote cluster and set your `INFRAKIT_HOST` to `foo` (which must be
+a valid name of a remote in `infrakit remote`), you will have a subcommand `foo` instead.
+
+
 ### Manage Groups
 
 The description of the `miners` group is in the new format:
 
 ```
-infrakit local mystack/groups commit -y ./miners.yml --log 5
-```
-
-`describe-group` returns a list of instances in a group:
-
-```
-infrakit local mystack/miners describe-group
+infrakit local mystack/groups commit -y ./miners.yml
 ```
 
 Old format:
 
 ```
-infrakit local mystack/groups commit-group ./cattle.json --log 5
+infrakit local mystack/groups commit-group ./cattle.json
+```
+
+### List group members
+`ls` returns a list of instances in a group:
+
+```
+infrakit local mystack/miners ls
+infrakit local mystack/cattle ls
 ```
 
 ### Set Up Ingress
 
+Ingress brings traffic from a loadbalancer (see `simulator/lb1`, `simulator/lb2`, and `simulator/lb3`) to the
+nodes in the different groups.  The ingress controller synchronizes the routes and backends as groups scale
+up and down.
+
 ```
 infrakit local mystack/ingress commit -y ./ingress.yml
+```
+
+Because we've set up ingress to send L4 traffic to the group members, show the routes
+and backends:
+
+Because the ingress controller associates the different groups as backends of different load balancers,
+we should see changes to the backends of the various load balancers.
+
+Verify backends of various load balancers:
+
+```
+infrakit local simulator/lb1 backends ls
+infrakit local simulator/lb1 routes ls
+```
+
+```
+infrakit local simulator/lb2 backends ls
+infrakit local simulator/lb2 routes ls
+```
+
+```
+infrakit local simulator/lb3 backends ls
+infrakit local simulator/lb3 routes ls
+```
+
+### Set up Enrollment for NFS Auth
+
+Enrollment controller can watch group membership and add/remove resources accordingly.  In this example
+we are simulating adding and removing of NFS volume / host authorizations as groups of nodes (`miners` and `cattle`)
+scale up and down.
+
+```
+infrakit local mystack/nfs commit -y ./enrollment.yml
+```
+
+See the nfs authorizations:
+
+```
+infrakit local nfs-auth/disk describe
 ```
 
 ### Scale Up / Down Groups
@@ -96,6 +160,13 @@ infrakit local simulator/lb2 routes ls
 infrakit local simulator/lb3 backends ls
 infrakit local simulator/lb3 routes ls
 ```
+
+See the NFS authorizations change (for `cattle` group only):
+
+```
+infrakit local nfs-auth/disk describe
+```
+
 
 ### Clean Up
 

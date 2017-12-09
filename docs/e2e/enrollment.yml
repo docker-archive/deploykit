@@ -1,0 +1,38 @@
+#
+#
+#  Example for enrollment controller
+#
+#  Enrollment controller makes sure the instances in the source group (specified
+#  by the List field) are in sync with entries in the downstream instance plugin
+#  specified by Instance field.
+#
+
+
+kind: enrollment
+metadata:
+  name: cattle-nfs  # socket file = nfs and the name of control loop is 'workers'
+properties:
+  List: mystack/cattle  # socket file = group and group id is 'cattle'
+  Instance:
+
+    # the name of a plugin that has disk as subtype.
+    Plugin: nfs-auth/disk
+
+    # the entire Properties block here will be rendered and included as the downstream
+    # instance plugin's instance.Spec when Provision() is called.
+    Properties:
+
+       # You can include template expressions in this block; however, you need to
+       # escape the braces.
+       host: \{\{.ID\}\}
+       iops: 10
+options:
+  # This expression is a template used to select the key from each source entry
+  # of instance.Description.  Note here we escape the template tags
+  # so that template expressions don't get clobbered by infrakit template when
+  # using that as a preprocessor prior to committing.
+  SourceKeySelector: \{\{.ID\}\}
+
+  # How often to run the sync.  The string value here is in the format of Go's time.Duration.
+  # For example, 1m means 1 minute.
+  SyncInterval: 5s  # seconds

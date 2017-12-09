@@ -10,14 +10,6 @@ rm -f $INFRAKIT_HOME/configs/*
 LOG=$HERE/infrakit.log
 rm -f $LOG
 
-export INFRAKIT_MANAGER_CONTROLLERS=ingress,enrollment
-infrakit plugin start \
-	 manager:mystack \
-	 vars \
-	 combo \
-	 vanilla \
-	 simulator \
-	 enrollment \
-	 ingress \
-	 group \
-	 --log 5 --log-debug-V 500 --log-stack 2>$LOG &
+nohup ${HERE}/start-blocking.sh &
+
+
