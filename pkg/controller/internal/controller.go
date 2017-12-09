@@ -6,7 +6,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -37,12 +37,12 @@ type Controller struct {
 	alloc   func(types.Spec) (Managed, error)
 	keyfunc func(types.Metadata) string
 	managed map[string]*Managed
-	leader  func() manager.Leadership
+	leader  func() stack.Leadership
 	lock    sync.RWMutex
 }
 
 // NewController creates a controller injecting dependencies
-func NewController(l func() manager.Leadership,
+func NewController(l func() stack.Leadership,
 	alloc func(types.Spec) (Managed, error),
 	keyfunc func(types.Metadata) string) *Controller {
 
@@ -72,6 +72,9 @@ func (c *Controller) leaderGuard() error {
 }
 
 func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**Managed, error) {
+
+	log.Debug("getManaged", "search", search, "spec", spec, "V", debugV)
+
 	out := []**Managed{}
 	if search == nil {
 		// all managed objects
@@ -101,6 +104,8 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 	}
 	ptr := c.managed[key]
 	out = append(out, &ptr)
+
+	log.Debug("found managed", "search", search, "spec", spec, "found", out)
 	return out, nil
 }
 

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/pkg/controller"
-	"github.com/docker/infrakit/pkg/core"
 	group_mock "github.com/docker/infrakit/pkg/mock/spi/group"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -70,7 +69,7 @@ properties:
 			return "ok", nil
 		}).Return("ok", nil)
 
-	c := AsController(core.NewAddressable("group", plugin.Name("group-stateless/"), ""), g)
+	c := AsController(plugin.NewAddressable("group", plugin.Name("group-stateless/"), ""), g)
 
 	c.Plan(controller.Enforce, spec)
 }
@@ -140,7 +139,7 @@ properties:
 			return "ok", nil
 		}).Return("ok", nil)
 
-	c := AsController(core.NewAddressable("group", plugin.Name("group-stateless/"), ""), g)
+	c := AsController(plugin.NewAddressable("group", plugin.Name("group-stateless/"), ""), g)
 
 	c.Commit(controller.Enforce, spec)
 }
@@ -198,7 +197,7 @@ properties:
 			return gDescription, nil
 		}).AnyTimes().Return(gDescription, nil)
 
-	c := AsController(core.NewAddressable("group", plugin.Name("group-stateless/"), ""), g)
+	c := AsController(plugin.NewAddressable("group", plugin.Name("group-stateless/"), ""), g)
 
 	objects, err := c.Describe(nil)
 	require.NoError(t, err)
@@ -276,7 +275,7 @@ properties:
 			return nil
 		}).AnyTimes().Return(nil)
 
-	c := AsController(core.NewAddressable("group", plugin.Name("group-stateless/"), ""), g)
+	c := AsController(plugin.NewAddressable("group", plugin.Name("group-stateless/"), ""), g)
 
 	objects, err := c.Free(nil)
 	require.NoError(t, err)

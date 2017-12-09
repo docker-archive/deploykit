@@ -2,9 +2,9 @@ package discovery
 
 import (
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
+	"github.com/docker/infrakit/pkg/spi/stack"
 )
 
 type errNotFound string
@@ -20,7 +20,7 @@ func IsNotFound(e error) bool {
 }
 
 // Locate looks for the plugin that implements the Manager interface and returns a client.
-func Locate(plugins func() discovery.Plugins) (manager.Manager, error) {
+func Locate(plugins func() discovery.Plugins) (stack.Interface, error) {
 	// Scan for a manager
 	pm, err := plugins().List()
 	if err != nil {
@@ -28,7 +28,7 @@ func Locate(plugins func() discovery.Plugins) (manager.Manager, error) {
 	}
 
 	for _, endpoint := range pm {
-		rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
+		rpcClient, err := client.New(endpoint.Address, stack.InterfaceSpec)
 		if err == nil {
 			return manager_rpc.Adapt(rpcClient), nil
 		}

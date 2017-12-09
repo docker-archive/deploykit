@@ -6,16 +6,16 @@ import (
 	"time"
 
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
-func fakeLeadership(c <-chan bool) func() manager.Leadership {
-	return func() manager.Leadership { return fakeLeadershipT(c) }
+func fakeLeadership(c <-chan bool) func() stack.Leadership {
+	return func() stack.Leadership { return fakeLeadershipT(c) }
 }
 
 type fakeLeadershipT <-chan bool

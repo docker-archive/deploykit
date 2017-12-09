@@ -8,7 +8,6 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	controller_rpc "github.com/docker/infrakit/pkg/rpc/controller"
@@ -29,6 +28,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/resource"
+	"github.com/docker/infrakit/pkg/spi/stack"
 )
 
 var log = logutil.New("module", "run")
@@ -77,7 +77,7 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 
 		case Manager:
 			log.Debug("manager_rpc.PluginServer", "p", p)
-			plugins = append(plugins, manager_rpc.PluginServer(p.(manager.Manager)))
+			plugins = append(plugins, manager_rpc.PluginServer(p.(stack.Interface)))
 		case Controller:
 			switch pp := p.(type) {
 			case func() (map[string]controller.Controller, error):
@@ -226,8 +226,8 @@ func Call(plugins func() discovery.Plugins,
 				pn = *name
 			}
 			switch interfaceSpec {
-			case manager.InterfaceSpec:
-				do, is := work.(func(manager.Manager) error)
+			case stack.InterfaceSpec:
+				do, is := work.(func(stack.Interface) error)
 				if !is {
 					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
 				}
@@ -245,7 +245,7 @@ func Call(plugins func() discovery.Plugins,
 				if !is {
 					return fmt.Errorf("wrong function prototype for %v", interfaceSpec)
 				}
-				v := group_rpc.Adapt(rpcClient)
+				v := group_rpc.Adapt(pn, rpcClient)
 				return do(v)
 			case instance.InterfaceSpec:
 				do, is := work.(func(instance.Plugin) error)

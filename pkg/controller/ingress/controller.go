@@ -6,14 +6,14 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/controller/internal"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
 
 // NewController returns a controller implementation
-func NewController(scope scope.Scope, leader func() manager.Leadership) controller.Controller {
+func NewController(scope scope.Scope, leader func() stack.Leadership) controller.Controller {
 	return internal.NewController(
 		leader,
 		// the constructor
@@ -31,7 +31,7 @@ func NewController(scope scope.Scope, leader func() manager.Leadership) controll
 
 // NewTypedControllers return typed controllers
 func NewTypedControllers(scope scope.Scope,
-	leader func() manager.Leadership) func() (map[string]controller.Controller, error) {
+	leader func() stack.Leadership) func() (map[string]controller.Controller, error) {
 
 	return (internal.NewController(
 		leader,

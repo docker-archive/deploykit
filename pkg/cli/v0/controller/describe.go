@@ -24,31 +24,20 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 
 		pluginName := plugin.Name(name)
-		_, objectName := pluginName.GetLookupAndType()
-		if objectName == "" {
-			if len(args) < 1 {
-				objectName = ""
-				// cmd.Usage()
-				// os.Exit(1)
 
-			} else {
-				objectName = args[0]
-			}
-		}
-
-		controller, err := services.Scope.Controller(name)
+		controller, err := services.Scope.Controller(pluginName.String())
 		if err != nil {
 			return nil
 		}
 		cli.MustNotNil(controller, "controller not found", "name", name)
 
-		search := (types.Metadata{
-			Name: objectName,
-		}).AddTagsFromStringSlice(*tags)
+		var q *types.Metadata
 
-		q := &search
-		if q.Name == "" {
-			q = nil // select all if nil
+		if len(args) == 1 {
+			s := (types.Metadata{
+				Name: args[0],
+			}).AddTagsFromStringSlice(*tags)
+			q = &s
 		}
 
 		objects, err := controller.Describe(q)

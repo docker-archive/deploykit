@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -151,4 +152,13 @@ func (g *globalSpec) updateGroupSpec(gspec group.Spec, handler plugin.Name) {
 	record.Spec.Properties = gspec.Properties
 
 	g.index[key] = record
+}
+
+func (g *globalSpec) toSpecs() types.Specs {
+	specs := types.Specs{}
+	for _, p := range g.data {
+		specs = append(specs, p.Record.Spec)
+	}
+	sort.Sort(specs)
+	return specs
 }

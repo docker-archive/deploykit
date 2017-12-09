@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -15,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
@@ -102,6 +102,7 @@ func main() {
 	}
 	// Log setup
 	logOptions := &logutil.ProdDefaults
+	logFlags := cli.Flags(logOptions)
 
 	program := path.Base(os.Args[0])
 	cmd := &cobra.Command{
@@ -112,8 +113,7 @@ func main() {
 			return nil
 		},
 	}
-	cmd.PersistentFlags().AddFlagSet(cli.Flags(logOptions))
-	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+	cmd.PersistentFlags().AddFlagSet(logFlags)
 
 	// Don't print usage text for any error returned from a RunE function.
 	// Only print it when explicitly requested.
@@ -171,24 +171,22 @@ func main() {
 		cmd.AddCommand(c)
 	})
 
-	// Set environment variable to disable this feature.
-	if os.Getenv("INFRAKIT_DYNAMIC_CLI") != "false" {
-		// Load dynamic plugin commands based on discovery
-		pluginCommands, err := cli.LoadAll(cli.NewServices(scope))
-		if err != nil && err != errEmpty {
-			log.Debug("error loading", "cmd", cmd.Use, "err", err)
-			fmt.Println(err.Error())
-			os.Exit(1)
-		}
-		for _, c := range pluginCommands {
-			cmd.AddCommand(c)
-		}
-	}
-
 	// Help template includes the usage string, which is configure below
 	cmd.SetHelpTemplate(helpTemplate)
 	cmd.SetUsageTemplate(usageTemplate)
 
+	// The 'stack' subcommand has its Use (verb) that is set to the
+	// value of the INFRAKIT_HOST env variable.  This allows us to
+	// discover the remote services and generate the dynamic commands only
+	// when the user has typed
+	stackCommandName := local.InfrakitHost()
+	stackCommand := stackCommand(scope, stackCommandName)
+
+	cmd.AddCommand(stackCommand)
+
+	if len(os.Args) > 2 && os.Args[1] == stackCommandName {
+		cmd.SetArgs(os.Args[1:2])
+	}
 	err = cmd.Execute()
 	if err != nil {
 		log.Crit("error executing", "cmd", cmd.Use, "err", err)
@@ -288,3 +286,48 @@ Additional help topics:{{range .Commands}}{{if .IsHelpCommand}}
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
 )
+
+func stackCommand(scope scope.Scope, stackCommandName string) *cobra.Command {
+
+	// Log setup
+	logOptions := &logutil.ProdDefaults
+	logFlags := cli.Flags(logOptions)
+
+	description := fmt.Sprintf("Access %v", stackCommandName)
+	cmd := &cobra.Command{
+		Use:   stackCommandName,
+		Short: description,
+
+		RunE: func(c *cobra.Command, args []string) error {
+
+			main := &cobra.Command{
+				Use: path.Base(os.Args[0]),
+				PersistentPreRunE: func(c *cobra.Command, args []string) error {
+					logutil.Configure(logOptions)
+					return nil
+				},
+			}
+			main.PersistentFlags().AddFlagSet(logFlags)
+
+			stack := &cobra.Command{
+				Use:   stackCommandName,
+				Short: description,
+			}
+			main.AddCommand(stack)
+			// Load dynamic plugin commands based on discovery
+			pluginCommands, err := cli.LoadAll(cli.NewServices(scope))
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+			for _, cc := range pluginCommands {
+				stack.AddCommand(cc)
+			}
+
+			main.SetArgs(os.Args[1:])
+			return main.Execute()
+		},
+	}
+
+	return cmd
+}

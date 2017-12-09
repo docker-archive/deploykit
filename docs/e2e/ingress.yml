@@ -1,0 +1,67 @@
+# Example ingress configuration with multiple loadbalancers
+
+{{/* Template comments are allowed here too */}}
+
+kind: ingress
+metadata:
+  name: test.com
+  tags:
+    project: e2e
+    user: infrakit
+
+# options block map to pkg/controller/ingress/types/Options
+options:
+  # SyncInterval is how often to sync changes between the services and the LB
+  SyncInterval: 3s  # syntax is a string form of Go time.Duration
+
+# properties block map to pkg/controller/ingress/types/Properties
+properties:
+  # Note that this section is missing a Vhost (so Vhost is '').  An empty Vhost entry will match all docker swarm
+  # services (since we have not defined the labeling convention for indicating the vhost of a service -- so all
+  # services match to ''.  This is in contrast to the Vhost of the next section, where we use a different vhost
+  # so that the routes for the L4 will not pick up those from Swarm services.
+  - Backends:
+      Groups:
+        - mystack/miners # This is a group at socket(group), groupID(miners).
+
+    # This is the plugin name of the L4 plugin. When you run `infrakit plugin start ... simulator`
+    # the default socket file name is 'simulator' and there's a default lb2 in the RPC object.
+    L4Plugin: simulator/lb1
+
+    # Routes are the paths for traffic to come into the group specified
+    Routes:
+      - LoadBalancerPort: 80
+        LoadBalancerProtocol: https
+        Port: 80
+        Protocol: http
+        Certificate: external-cer-id1
+
+  - Vhost: manager.internal  #
+    Backends:
+      Groups:
+        - mystack/miners # This is a group at socket(group), groupID(miners).
+
+    L4Plugin: simulator/lb2
+
+    # Here we have a static route that is always present.
+    Routes:
+      - LoadBalancerPort: 8080
+        LoadBalancerProtocol: https
+        Port: 8080
+        Protocol: http
+        Certificate: external-cer-id2
+
+  - Vhost: cattle.internal
+    Backends:
+      Groups:
+        - mystack/cattle # This is a group at socket(group), groupID(miners).
+
+    L4Plugin: simulator/lb3
+
+    # Here we have a static route that is always present.
+    Routes:
+      - LoadBalancerPort: 8888
+        LoadBalancerProtocol: https
+        Port: 8888
+        Protocol: http
+        Certificate: external-cer-id3

@@ -173,6 +173,7 @@ func Command(scope scope.Scope) *cobra.Command {
 			case group_kind.Kind:
 				name = plugin.Name(group_kind.LookupName)
 			}
+
 			// customized by user as override
 			if len(pp) > 1 {
 				name = plugin.Name(pp[1])

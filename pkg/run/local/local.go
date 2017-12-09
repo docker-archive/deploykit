@@ -38,6 +38,14 @@ func InfrakitHome() string {
 	return os.TempDir()
 }
 
+// InfrakitHost returns the value of the INFRAKIT_HOST environment
+func InfrakitHost() string {
+	if h := os.Getenv("INFRAKIT_HOST"); h != "" {
+		return h
+	}
+	return "local"
+}
+
 // Playbooks returns the path to the playbooks
 func Playbooks() string {
 	if playbooksFile := os.Getenv(EnvPlaybooks); playbooksFile != "" {

@@ -4,25 +4,25 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // PluginServer returns a Manager that conforms to the net/rpc rpc call convention.
-func PluginServer(p manager.Manager) *Manager {
+func PluginServer(p stack.Interface) *Manager {
 	return &Manager{manager: p}
 }
 
 // Manager is the exported type for json-rpc
 type Manager struct {
-	manager manager.Manager
+	manager stack.Interface
 }
 
 // ImplementedInterface returns the interface implemented by this RPC service.
 func (p *Manager) ImplementedInterface() spi.InterfaceSpec {
-	return manager.InterfaceSpec
+	return stack.InterfaceSpec
 }
 
 // Objects returns the objects exposed by this kind of RPC service
@@ -78,6 +78,25 @@ type EnforceResponse struct {
 // Enforce is the rpc method for Manager.Enforce
 func (p *Manager) Enforce(_ *http.Request, req *EnforceRequest, resp *EnforceResponse) error {
 	return p.manager.Enforce(req.Specs)
+}
+
+// SpecsRequest is the rpc request
+type SpecsRequest struct {
+}
+
+// SpecsResponse is the rpc response
+type SpecsResponse struct {
+	Specs []types.Spec
+}
+
+// Specs is the rpc method for Manager.Specs
+func (p *Manager) Specs(_ *http.Request, req *SpecsRequest, resp *SpecsResponse) error {
+	specs, err := p.manager.Specs()
+	if err != nil {
+		return err
+	}
+	resp.Specs = specs
+	return nil
 }
 
 // InspectRequest is the rpc request

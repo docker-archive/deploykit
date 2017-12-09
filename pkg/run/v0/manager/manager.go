@@ -39,13 +39,8 @@ const (
 	// EnvMetadata is the metadata backend
 	EnvMetadata = "INFRAKIT_MANAGER_METADATA"
 
-	// EnvMetadataUpdateInterval is the metadata backend update interval
-	// if > 0, this will allow non-leader updates of metadata to be synced
-	// to the leader. otherwise, a non-leader will not see the leader's updates
-	// until it becomes the leader.  This is because even though the data is
-	// persisted, it is not polled and read by the non-leaders on a regular basis
-	// (unless this is set).
-	EnvMetadataUpdateInterval = "INFRAKIT_MANAGER_METADATA_UPDATE_INTERVAL"
+	// EnvControllers is a list of comma-delimited controller names
+	EnvControllers = "INFRAKIT_MANAGER_CONTROLLERS"
 
 	// EnvLeaderCommitSpecsRetryInterval is the interval to wait between retries when
 	// the manager becomes the leader and fails to commit the replicated specs.
@@ -96,9 +91,9 @@ func defaultOptions() (options Options) {
 		Options: manager.Options{
 			Group:                          plugin.Name(local.Getenv(EnvGroup, "group-stateless")),
 			Metadata:                       plugin.Name(local.Getenv(EnvMetadata, "vars")),
-			MetadataRefreshInterval:        types.MustParseDuration(local.Getenv(EnvMetadataUpdateInterval, "5s")),
 			LeaderCommitSpecsRetries:       10,
 			LeaderCommitSpecsRetryInterval: types.MustParseDuration(local.Getenv(EnvLeaderCommitSpecsRetryInterval, "2s")),
+			Controllers:                    plugin.NamesFrom(strings.Split(local.Getenv(EnvControllers, ""), ",")),
 		},
 		Mux: &MuxConfig{
 			Listen:    local.Getenv(EnvMuxListen, ":24864"),
@@ -140,7 +135,6 @@ func Run(scope scope.Scope, name plugin.Name,
 	log.Info("Starting up", "backend", options.Backend)
 
 	options.Name = name
-	options.Plugins = scope.Plugins
 
 	switch strings.ToLower(options.Backend) {
 	case "etcd":
@@ -184,7 +178,7 @@ func Run(scope scope.Scope, name plugin.Name,
 		return
 	}
 
-	mgr := manager.NewManager(options.Options)
+	mgr := manager.NewManager(scope, options.Options)
 	log.Info("Start manager", "m", mgr)
 
 	_, err = mgr.Start()
@@ -208,7 +202,7 @@ func Run(scope scope.Scope, name plugin.Name,
 	if options.Mux != nil {
 
 		log.Info("Starting mux server", "listen", options.Mux.Listen, "advertise", options.Mux.Advertise)
-		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.Advertise, options.Plugins,
+		muxServer, err = mux.NewServer(options.Mux.Listen, options.Mux.Advertise, scope.Plugins,
 			mux.Options{
 				Leadership: options.Leader.Receive(),
 				Registry:   options.LeaderStore,

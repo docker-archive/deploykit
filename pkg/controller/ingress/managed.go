@@ -9,12 +9,12 @@ import (
 	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -22,7 +22,7 @@ import (
 var log = logutil.New("module", "controller/ingress")
 
 func newManaged(scp scope.Scope,
-	leader func() manager.Leadership) *managed {
+	leader func() stack.Leadership) *managed {
 	return &managed{
 		leader: leader,
 		scope:  scp,
@@ -32,7 +32,7 @@ func newManaged(scp scope.Scope,
 // managed is the entity that reconciles desired routes with loadbalancers
 type managed struct {
 	// Leader controls whether this ingress is active or not
-	leader func() manager.Leadership
+	leader func() stack.Leadership
 
 	// l4s is a function that get retrieve a map of L4 loadbalancers by name
 	l4s func() (map[ingress.Vhost]loadbalancer.L4, error)

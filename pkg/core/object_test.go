@@ -204,11 +204,11 @@ func TestObjectNested(t *testing.T) {
 		return []interface{}{o.Spec.Kind, o.Spec.Metadata.Name}
 	})
 
-	all := AllSpecs(specs) // all including nested
+	all := types.AllSpecs(specs) // all including nested
 	require.Equal(t, 6, len(all))
 
 	// dependency order
-	ordered, err := OrderByDependency(all)
+	ordered, err := types.OrderByDependency(all)
 	require.NoError(t, err)
 
 	found := []string{}

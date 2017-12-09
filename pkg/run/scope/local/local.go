@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -27,7 +26,7 @@ var (
 type StartPlugin string
 
 // FromAddressable returns a StartPlugin encoded string
-func FromAddressable(addr core.Addressable) StartPlugin {
+func FromAddressable(addr plugin.Addressable) StartPlugin {
 	return StartPlugin(fmt.Sprintf("%v:%v", addr.Kind(), addr.Plugin().Lookup()))
 }
 
@@ -44,13 +43,13 @@ func (arg StartPlugin) Parse() (execName string, kind string, name plugin.Name, 
 	kind = pp[0]
 	name = plugin.Name(kind)
 
-	// This is some special case for the legacy setup (pre v0.6)
 	switch kind {
 	case manager_kind.Kind:
 		name = plugin.Name(manager_kind.LookupName)
 	case group_kind.Kind:
 		name = plugin.Name(group_kind.LookupName)
 	}
+
 	// customized by user as override
 	if len(pp) > 1 {
 		name = plugin.Name(pp[1])

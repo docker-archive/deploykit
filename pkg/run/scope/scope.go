@@ -4,6 +4,7 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -14,6 +15,8 @@ import (
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
+
+var log = logutil.New("module", "run/scope")
 
 // Nil is no scope
 var Nil = DefaultScope(func() discovery.Plugins {
@@ -41,7 +44,7 @@ type Scope interface {
 	Plugins() discovery.Plugins
 
 	// Stack returns the stack that entails this scope
-	Stack() (stack.Interface, error)
+	Stack(n string) (stack.Interface, error)
 
 	// Group is for looking up an group plugin
 	Group(n string) (group.Plugin, error)
@@ -81,11 +84,6 @@ type fullScope func() discovery.Plugins
 // Plugins implements plugin lookup
 func (f fullScope) Plugins() discovery.Plugins {
 	return f()
-}
-
-// Stack returns the stack
-func (f fullScope) Stack() (stack.Interface, error) {
-	return nil, nil
 }
 
 // TemplateEngine implmements factory for creating template engine

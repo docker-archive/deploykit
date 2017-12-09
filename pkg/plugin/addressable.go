@@ -1,10 +1,9 @@
-package core
+package plugin
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -28,7 +27,7 @@ type Addressable interface {
 	// Kind corresponds to the packages under pkg/run/v0
 	Kind() string
 	// Plugin returns the address of the rpc (endpoint)
-	Plugin() plugin.Name
+	Plugin() Name
 	// Instance is the instance identifier
 	Instance() string
 	// String returns the string representation for debugging
@@ -36,7 +35,7 @@ type Addressable interface {
 }
 
 // NewAddressableFromPluginMetadata returns an Addressable from the plugin metadata
-func NewAddressableFromPluginMetadata(meta plugin.Metadata) Addressable {
+func NewAddressableFromPluginMetadata(meta Metadata) Addressable {
 	return NewAddressable(meta.Kind, meta.Name, meta.Instance)
 }
 
@@ -46,17 +45,17 @@ func NewAddressableFromMetadata(kind string, metadata types.Metadata) Addressabl
 	if metadata.Identity != nil {
 		instance = metadata.Identity.ID
 	}
-	return NewAddressable(kind, plugin.Name(metadata.Name), instance)
+	return NewAddressable(kind, Name(metadata.Name), instance)
 }
 
 // NewAddressableFromPluginName returns a generic addressable object from just the plugin name.
 // The kind is assume to be the same as the lookup.
-func NewAddressableFromPluginName(pn plugin.Name) Addressable {
+func NewAddressableFromPluginName(pn Name) Addressable {
 	return NewAddressable(pn.Lookup(), pn, "")
 }
 
 // NewAddressable returns a generic addressable object
-func NewAddressable(kind string, pn plugin.Name, instance string) Addressable {
+func NewAddressable(kind string, pn Name, instance string) Addressable {
 	n := string(pn)
 	endsWithSlash := n[len(n)-1] == '/'
 
@@ -67,11 +66,11 @@ func NewAddressable(kind string, pn plugin.Name, instance string) Addressable {
 	name := pn
 	if sub != instance {
 		// Use the a different name only when we changed the subtype
-		name = plugin.NameFrom(lookup, sub)
+		name = NameFrom(lookup, sub)
 	}
 	if endsWithSlash && instance != "" {
 		// If the name ended with / but instance is specified, then qualify it
-		name = plugin.NameFrom(lookup, instance)
+		name = NameFrom(lookup, instance)
 	}
 
 	spec := types.Spec{
@@ -105,7 +104,7 @@ func (ps specQuery) Kind() string {
 }
 
 // Plugin derives a plugin name from the record
-func (ps *specQuery) Plugin() plugin.Name {
+func (ps *specQuery) Plugin() Name {
 	typeName := ""
 	kind := strings.Split(ps.Spec.Kind, "/")
 	if len(kind) > 1 {
@@ -115,16 +114,16 @@ func (ps *specQuery) Plugin() plugin.Name {
 	if len(parts) > 1 {
 		ps.instance = parts[1]
 		if typeName != "" {
-			return plugin.NameFrom(parts[0], typeName)
+			return NameFrom(parts[0], typeName)
 		}
-		return plugin.NameFrom(parts[0], parts[1])
+		return NameFrom(parts[0], parts[1])
 	}
 	ps.instance = parts[0]
 
 	if typeName != "" {
-		return plugin.NameFrom(ps.Kind(), typeName)
+		return NameFrom(ps.Kind(), typeName)
 	}
-	return plugin.NameFrom(ps.Kind(), parts[0])
+	return NameFrom(ps.Kind(), parts[0])
 }
 
 // Instance implements Addressable.Instance

@@ -1,8 +1,6 @@
 package manager
 
 import (
-	"time"
-
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
@@ -11,7 +9,7 @@ import (
 // Metadata returns a map of metadata plugins
 func (m *manager) Metadata() (map[string]metadata.Plugin, error) {
 	plugins := map[string]metadata.Plugin{
-		".":                         m,
+		//		".":                         m,
 		"status":                    m.Status,
 		m.Options.Metadata.Lookup(): m,
 	}
@@ -40,10 +38,10 @@ func (m *manager) status() (chan func(map[string]interface{}), chan struct{}) {
 	model := make(chan func(map[string]interface{}))
 	stop := make(chan struct{})
 	go func() {
-		tick := time.Tick(1 * time.Second)
 		for {
 			select {
-			case <-tick:
+			case <-m.refreshStatus:
+
 				// update leadership
 				if isLeader, err := m.IsLeader(); err == nil {
 					model <- func(view map[string]interface{}) {

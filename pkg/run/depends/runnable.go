@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // Runnable models an addressable object that can also be started.
 type Runnable interface {
-	core.Addressable
+	plugin.Addressable
 	// Options returns the options needed to start the plugin
 	Options() *types.Any
 	// Dependents return all the plugins this runnable depends on
@@ -26,7 +25,7 @@ type Runnables []Runnable
 func RunnableFrom(name plugin.Name) Runnable {
 	kind := name.Lookup()
 	return specQuery{
-		Addressable: core.NewAddressable(kind, name, ""),
+		Addressable: plugin.NewAddressable(kind, name, ""),
 		spec: types.Spec{
 			Kind: kind,
 			Metadata: types.Metadata{
@@ -39,13 +38,13 @@ func RunnableFrom(name plugin.Name) Runnable {
 // AsRunnable returns the Runnable from a spec.
 func AsRunnable(spec types.Spec) Runnable {
 	return &specQuery{
-		Addressable: core.AsAddressable(spec),
+		Addressable: plugin.AsAddressable(spec),
 		spec:        spec,
 	}
 }
 
 type specQuery struct {
-	core.Addressable
+	plugin.Addressable
 	spec types.Spec
 }
 
@@ -83,7 +82,7 @@ func (ps specQuery) Dependents() (Runnables, error) {
 // RunnablesFrom returns the Runnables from given slice of specs
 func RunnablesFrom(specs []types.Spec) (Runnables, error) {
 
-	key := func(addr core.Addressable) string {
+	key := func(addr plugin.Addressable) string {
 		return fmt.Sprintf("%v::%v", addr.Kind(), addr.Plugin().Lookup())
 	}
 

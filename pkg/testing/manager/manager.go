@@ -18,6 +18,9 @@ type Plugin struct {
 	// DoEnforce enforces infrastructure state to match that of the specs
 	DoEnforce func(specs []types.Spec) error
 
+	// DoSpecs returns the current state of the infrastructure
+	DoSpecs func() ([]types.Spec, error)
+
 	// DoInspect returns the current state of the infrastructure
 	DoInspect func() ([]types.Object, error)
 
@@ -38,6 +41,11 @@ func (t *Plugin) LeaderLocation() (*url.URL, error) {
 // Enforce enforces infrastructure state to match that of the specs
 func (t *Plugin) Enforce(specs []types.Spec) error {
 	return t.DoEnforce(specs)
+}
+
+// Specs returns the current specs being enforced
+func (t *Plugin) Specs() ([]types.Spec, error) {
+	return t.DoSpecs()
 }
 
 // Inspect returns the current state of the infrastructure

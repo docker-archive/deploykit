@@ -11,16 +11,17 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -58,7 +59,7 @@ func Command(scope scope.Scope) *cobra.Command {
 
 			for name, endpoint := range pm {
 
-				rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
+				rpcClient, err := client.New(endpoint.Address, stack.InterfaceSpec)
 				if err == nil {
 
 					m := manager_rpc.Adapt(rpcClient)
@@ -71,12 +72,13 @@ func Command(scope scope.Scope) *cobra.Command {
 					log.Debug("Found manager", "name", name, "leader", isLeader)
 					if isLeader {
 
-						groupPlugin = group_rpc.Adapt(rpcClient)
+						pn := plugin.Name(name)
+						groupPlugin = group_rpc.Adapt(pn, rpcClient)
 						groupPluginName = name
 
 						log.Debug("Found manager", "name", name, "addr", endpoint.Address)
 
-						updatablePlugin = metadata_rpc.AdaptUpdatable(plugin.Name(name), rpcClient)
+						updatablePlugin = metadata_rpc.AdaptUpdatable(pn, rpcClient)
 						updatablePluginName = name
 
 						log.Debug("Found updatable", "name", name, "addr", endpoint.Address)
@@ -120,7 +122,7 @@ func Command(scope scope.Scope) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				target, err := group_rpc.NewClient(endpoint.Address)
+				target, err := group_rpc.NewClient(name, endpoint.Address)
 				log.Debug("commit", "plugin", name, "address", endpoint.Address, "err", err, "gspec", gspec)
 
 				if err != nil {
@@ -152,32 +154,18 @@ func Command(scope scope.Scope) *cobra.Command {
 	///////////////////////////////////////////////////////////////////////////////////
 	// inspect
 	inspect := &cobra.Command{
-		Use:   "inspect",
-		Short: "Inspect returns the plugin configurations known by the manager",
+		Use: "inspect",
+		Short: "DEPRECATED - Please use `infrakit " + local.InfrakitHost() +
+			" <stackname> specs` to show the global specs enforced by the stack (manager)",
+
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if len(args) != 0 {
-				cmd.Usage()
-				os.Exit(1)
-			}
+			fmt.Println("**** DEPRECATED ****")
+			fmt.Println("Please use `infrakit " + local.InfrakitHost() +
+				" <stackname> specs` to show the global specs enforced by the stack (manager)")
 
-			out, err := getGlobalConfig(groupPlugin, groupPluginName)
-			if err != nil {
-				return err
-			}
-
-			view, err := types.AnyValue(out)
-			if err != nil {
-				return err
-			}
-
-			buff, err := services.FromJSON(view.Bytes())
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(string(buff))
-
+			cmd.Usage()
+			os.Exit(1)
 			return nil
 		},
 	}
@@ -202,7 +190,7 @@ func Command(scope scope.Scope) *cobra.Command {
 			}
 
 			for _, endpoint := range pm {
-				rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
+				rpcClient, err := client.New(endpoint.Address, stack.InterfaceSpec)
 				if err == nil {
 
 					m := manager_rpc.Adapt(rpcClient)

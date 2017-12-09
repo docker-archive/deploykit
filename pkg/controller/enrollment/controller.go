@@ -4,9 +4,9 @@ import (
 	"github.com/docker/infrakit/pkg/controller"
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/controller/internal"
-	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
+	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -16,13 +16,13 @@ var (
 )
 
 // NewController returns a controller implementation
-func NewController(plugins func() discovery.Plugins, leader func() manager.Leadership,
+func NewController(scope scope.Scope, leader func() stack.Leadership,
 	options enrollment.Options) controller.Controller {
 	return internal.NewController(
 		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
-			return newEnroller(plugins, leader, options), nil
+			return newEnroller(scope, leader, options), nil
 		},
 		// the key function
 		func(metadata types.Metadata) string {
@@ -32,7 +32,7 @@ func NewController(plugins func() discovery.Plugins, leader func() manager.Leade
 }
 
 // NewTypedControllers return typed controllers
-func NewTypedControllers(plugins func() discovery.Plugins, leader func() manager.Leadership,
+func NewTypedControllers(scope scope.Scope, leader func() stack.Leadership,
 	options enrollment.Options) func() (map[string]controller.Controller, error) {
 
 	return (internal.NewController(
@@ -40,7 +40,7 @@ func NewTypedControllers(plugins func() discovery.Plugins, leader func() manager
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
 			log.Debug("Creating managed object", "spec", spec)
-			return newEnroller(plugins, leader, options), nil
+			return newEnroller(scope, leader, options), nil
 		},
 		// the key function
 		func(metadata types.Metadata) string {

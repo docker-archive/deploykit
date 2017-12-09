@@ -5,8 +5,6 @@ import (
 
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
-	instance_rpc "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
@@ -22,15 +20,14 @@ func (l *enroller) getSourceInstances() ([]instance.Description, error) {
 			return nil, fmt.Errorf("no list source specified")
 		}
 
-		// we have a plugin name. -- eg. us-east/workers
-		lookup, gid := pn.GetLookupAndType()
-
-		gp, err := l.getGroupPlugin(plugin.Name(lookup))
+		log.Debug("no instances specified statically. querying group", "pluginName", pn)
+		gp, err := l.getGroupPlugin(pn)
 		if err != nil {
+			log.Error("cannot contact group", "group", pn)
 			return nil, fmt.Errorf("cannot connect to group %v", pn)
 		}
 
-		desc, err := gp.DescribeGroup(group.ID(gid))
+		desc, err := gp.DescribeGroup(group.ID(pn.Type()))
 		if err != nil {
 			return nil, err
 		}
@@ -43,6 +40,7 @@ func (l *enroller) getSourceInstances() ([]instance.Description, error) {
 func (l *enroller) getEnrolledInstances() ([]instance.Description, error) {
 	instancePlugin, err := l.getInstancePlugin(l.properties.Instance.Plugin)
 	if err != nil {
+		log.Error("cannot contact instance", "instance", l.properties.Instance.Plugin)
 		return nil, err
 	}
 
@@ -264,32 +262,12 @@ func (l *enroller) getGroupPlugin(name plugin.Name) (group.Plugin, error) {
 	if l.groupPlugin != nil {
 		return l.groupPlugin, nil
 	}
-	return l.connectGroupPlugin(name)
-}
-
-func (l *enroller) connectGroupPlugin(name plugin.Name) (group.Plugin, error) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	endpoint, err := l.plugins().Find(name)
-	if err != nil {
-		return nil, err
-	}
-	return group_rpc.NewClient(endpoint.Address)
+	return l.scope.Group(name.String())
 }
 
 func (l *enroller) getInstancePlugin(name plugin.Name) (instance.Plugin, error) {
 	if l.instancePlugin != nil {
 		return l.instancePlugin, nil
 	}
-	return l.connectInstancePlugin(name)
-}
-
-func (l *enroller) connectInstancePlugin(name plugin.Name) (instance.Plugin, error) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	endpoint, err := l.plugins().Find(name)
-	if err != nil {
-		return nil, err
-	}
-	return instance_rpc.NewClient(name, endpoint.Address)
+	return l.scope.Instance(name.String())
 }

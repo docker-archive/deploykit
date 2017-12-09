@@ -15,6 +15,7 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	group_rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/golang/mock/gomock"
@@ -84,13 +85,13 @@ func testEnsemble(t *testing.T,
 	st, err := server.StartPluginAtPath(filepath.Join(dir, "group-stateless"), gs)
 	require.NoError(t, err)
 
-	m := NewManager(Options{
-		Name:      plugin.Name("group"),
-		Plugins:   func() discovery.Plugins { return disc },
-		Leader:    detector,
-		SpecStore: snap,
-		Group:     plugin.Name("group-stateless"),
-	})
+	m := NewManager(scope.DefaultScope(func() discovery.Plugins { return disc }),
+		Options{
+			Name:      plugin.Name("group"),
+			Leader:    detector,
+			SpecStore: snap,
+			Group:     plugin.Name("group-stateless"),
+		})
 
 	return m, st
 }

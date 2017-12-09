@@ -15,9 +15,8 @@ import (
 func Commit(name string, services *cli.Services) *cobra.Command {
 	commit := &cobra.Command{
 		Use:   "commit <group configuration url>",
-		Short: "Commit a group configuration. Read from stdin if url is '-'",
+		Short: "Commit a group configuration in v1 schema. Read from stdin if url is '-'",
 	}
-	//	commit.Flags().AddFlagSet(services.OutputFlags)
 	commit.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
 	commit.RunE = func(cmd *cobra.Command, args []string) error {

@@ -6,6 +6,18 @@ import (
 	"strings"
 )
 
+// Names is a list of Names
+type Names []Name
+
+// NamesFrom returns a slice of Names from a string list
+func NamesFrom(list []string) Names {
+	n := []Name{}
+	for _, v := range list {
+		n = append(n, Name(v))
+	}
+	return Names(n)
+}
+
 // Name is a reference to the plugin.  Places where it appears include JSON files as type of field `Plugin`.
 type Name string
 
@@ -47,6 +59,11 @@ func (n Name) WithType(t interface{}) Name {
 	return Name(fmt.Sprintf("%v/%v", n.Lookup(), t))
 }
 
+// Sub is the same as WithType
+func (n Name) Sub(v string) Name {
+	return n.WithType(v)
+}
+
 // Equal returns true if the other name is the same
 func (n Name) Equal(other Name) bool {
 	return string(n) == string(other)
@@ -56,6 +73,12 @@ func (n Name) Equal(other Name) bool {
 func (n Name) HasType() bool {
 	_, s := n.GetLookupAndType()
 	return s != ""
+}
+
+// Type returns the second portion of the name 'ec2-instance' in 'aws/ec2-instance'
+func (n Name) Type() string {
+	_, t := n.GetLookupAndType()
+	return t
 }
 
 // IsEmpty returns true if the name is an empty string

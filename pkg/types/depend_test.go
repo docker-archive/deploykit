@@ -1,10 +1,9 @@
-package core
+package types
 
 import (
 	"sort"
 	"testing"
 
-	"github.com/docker/infrakit/pkg/types"
 	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/require"
 
@@ -21,7 +20,7 @@ metadata:
 properties:
   field1: value1
 `
-	s := types.Spec{}
+	s := Spec{}
 	require.NoError(t, yaml.Unmarshal([]byte(spec), &s))
 
 	found := []string{}
@@ -52,7 +51,7 @@ properties:
     metadata:
       name: nest2
 `
-	s := types.Spec{}
+	s := Spec{}
 	require.NoError(t, yaml.Unmarshal([]byte(spec), &s))
 
 	found := []string{}
@@ -94,7 +93,7 @@ properties:
       metadata:
         name: nest4
 `
-	s := types.Spec{}
+	s := Spec{}
 	require.NoError(t, yaml.Unmarshal([]byte(spec), &s))
 
 	found := []string{}
@@ -149,7 +148,7 @@ properties:
       metadata:
         name: nest4
 `
-	s := types.Spec{}
+	s := Spec{}
 	require.NoError(t, yaml.Unmarshal([]byte(spec), &s))
 
 	found := []string{}
@@ -163,7 +162,7 @@ properties:
 }
 
 func testDependency(t *testing.T, input string, expFound, expOrdered []string) {
-	specs := []*types.Spec{}
+	specs := []*Spec{}
 	require.NoError(t, yaml.Unmarshal([]byte(input), &specs))
 	T(100).Infoln(specs)
 
@@ -384,7 +383,7 @@ func TestDepedencyOrder1(t *testing.T) {
 }
 
 func testDependencyCycles(t *testing.T, input string, expFound []string) {
-	specs := []*types.Spec{}
+	specs := []*Spec{}
 	require.NoError(t, yaml.Unmarshal([]byte(input), &specs))
 	T(100).Infoln(specs)
 

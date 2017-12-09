@@ -6,12 +6,12 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/manager"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 
 	// load the handlers for ingress con
@@ -37,7 +37,7 @@ func init() {
 	inproc.Register(Kind, Run, DefaultOptions)
 }
 
-func leadership(plugins func() discovery.Plugins) manager.Leadership {
+func leadership(plugins func() discovery.Plugins) stack.Leadership {
 	// Scan for a manager
 	pm, err := plugins().List()
 	if err != nil {
@@ -46,7 +46,7 @@ func leadership(plugins func() discovery.Plugins) manager.Leadership {
 	}
 
 	for _, endpoint := range pm {
-		rpcClient, err := client.New(endpoint.Address, manager.InterfaceSpec)
+		rpcClient, err := client.New(endpoint.Address, stack.InterfaceSpec)
 		if err == nil {
 			return manager_rpc.Adapt(rpcClient)
 		}
@@ -82,7 +82,7 @@ func Run(scope scope.Scope, name plugin.Name,
 
 		// TODO - move leadership into scope lookup / stack
 		run.Controller: ingress.NewTypedControllers(scope,
-			func() manager.Leadership {
+			func() stack.Leadership {
 				return leadership(scope.Plugins)
 			}),
 	}

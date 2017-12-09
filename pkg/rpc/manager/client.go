@@ -3,22 +3,22 @@ package manager
 import (
 	"net/url"
 
-	"github.com/docker/infrakit/pkg/manager"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
+	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
-func NewClient(socketPath string) (manager.Manager, error) {
-	rpcClient, err := rpc_client.New(socketPath, manager.InterfaceSpec)
+func NewClient(socketPath string) (stack.Interface, error) {
+	rpcClient, err := rpc_client.New(socketPath, stack.InterfaceSpec)
 	if err != nil {
 		return nil, err
 	}
 	return Adapt(rpcClient), nil
 }
 
-// Adapt converts a rpc client to a Manager object
-func Adapt(rpcClient rpc_client.Client) manager.Manager {
+// Adapt converts a rpc client to a Stack object
+func Adapt(rpcClient rpc_client.Client) stack.Interface {
 	return &client{client: rpcClient}
 }
 
@@ -50,6 +50,14 @@ func (c client) Enforce(specs []types.Spec) error {
 	resp := EnforceResponse{}
 	err := c.client.Call("Manager.Enforce", req, &resp)
 	return err
+}
+
+// Specs returns the specs currently being enforced
+func (c client) Specs() ([]types.Spec, error) {
+	req := SpecsRequest{}
+	resp := SpecsResponse{}
+	err := c.client.Call("Manager.Specs", req, &resp)
+	return resp.Specs, err
 }
 
 // Inspect returns the current state of the infrastructure
