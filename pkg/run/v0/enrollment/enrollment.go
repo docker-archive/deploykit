@@ -71,7 +71,7 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: enrollment_controller.NewTypedControllers(scope.Plugins,
+		run.Controller: enrollment_controller.NewTypedControllers(scope,
 			func() stack.Leadership {
 				return leadership(scope.Plugins)
 			}, options),

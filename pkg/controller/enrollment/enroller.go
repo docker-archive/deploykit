@@ -7,7 +7,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/controller"
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
-	"github.com/docker/infrakit/pkg/discovery"
+	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/stack"
@@ -33,8 +33,8 @@ type enroller struct {
 	properties enrollment.Properties
 	options    enrollment.Options
 
-	leader  func() stack.Leadership
-	plugins func() discovery.Plugins
+	leader func() stack.Leadership
+	scope  scope.Scope
 
 	poller *controller.Poller
 	ticker <-chan time.Time
@@ -52,12 +52,11 @@ type enroller struct {
 	enrollmentPropertiesTemplate *template.Template
 }
 
-func newEnroller(plugins func() discovery.Plugins,
-	leader func() stack.Leadership, options enrollment.Options) *enroller {
+func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enrollment.Options) *enroller {
 
 	l := &enroller{
 		leader:  leader,
-		plugins: plugins,
+		scope:   scope,
 		options: options,
 	}
 

@@ -75,6 +75,12 @@ func (n Name) HasType() bool {
 	return s != ""
 }
 
+// Type returns the second portion of the name 'ec2-instance' in 'aws/ec2-instance'
+func (n Name) Type() string {
+	_, t := n.GetLookupAndType()
+	return t
+}
+
 // IsEmpty returns true if the name is an empty string
 func (n Name) IsEmpty() bool {
 	return string(n) == ""
