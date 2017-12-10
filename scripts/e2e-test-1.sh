@@ -37,23 +37,8 @@ infrakit local mystack/groups commit-group scripts/cattle.json
 note 'Waiting for group to be provisioned'
 sleep 10
 
-expect_output_lines "5 instances should exist in group" "infrakit local mystack/cattle describe-group -q" "5"
+expect_output_lines "5 instances should exist in group" "infrakit local mystack/cattle ls -q" "5"
 expect_output_lines "5 instances should exist" "infrakit local instance-file describe -q " "5"
-
-infrakit local mystack/cattle free
-
-note "Freed cattles; committing again"
-
-infrakit local mystack/groups commit-group scripts/cattle.json
-
-sleep 10
-
-if [[ $(infrakit local -h | grep mystack/cattle) == "" ]]; then
-    echo "checking the CLI"
-    infrakit local -h
-fi
-
-expect_exact_output "Should be watching one group" "infrakit local mystack/groups ls -q" "cattle"
 
 note "Updating specs to scale group to 10"
 
@@ -66,7 +51,7 @@ infrakit local mystack/cattle commit-group scripts/cattle2.json
 
 sleep 10
 
-expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle describe-group -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle ls -q" "10"
 
 note "Terminate 3 instances."
 
@@ -76,10 +61,31 @@ popd
 
 sleep 10
 
-expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle describe-group -q" "10"
+expect_output_lines "10 instances should exist in group" "infrakit local mystack/cattle ls -q" "10"
 
+note "Scale down to 5 instances"
+expect_exact_output "Scale to 5 instances" \
+		    "infrakit local mystack/cattle scale 5" \
+		    "Group cattle at 10 instances, scale to 5"
+
+sleep 10
+
+note "Freeing and re-committing cattle"
+infrakit local mystack/cattle free
+sleep 5
+infrakit local mystack/groups commit-group scripts/cattle.json
+
+sleep 10
+
+if [[ $(infrakit local -h | grep mystack/cattle) == "" ]]; then
+    echo "checking the CLI"
+    infrakit local -h
+fi
+expect_output_lines "Should be watching one group" "infrakit local mystack/cattle ls -q" "5"
+
+note "Destroying group"
+sleep 5
 infrakit local mystack/cattle destroy
-
 sleep 10
 expect_output_lines "0 instances should exist" "infrakit local instance-file describe -q " "0"
 
@@ -90,3 +96,4 @@ sleep 2
 
 echo ""
 echo '**************************** ALL TESTS PASSED *******************************************************'
+
