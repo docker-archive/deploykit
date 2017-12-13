@@ -22,6 +22,7 @@ type Supervisor interface {
 }
 
 type groupSettings struct {
+	self           *instance.LogicalID
 	instancePlugin instance.Plugin
 	flavorPlugin   flavor.Plugin
 	config         types.Spec
