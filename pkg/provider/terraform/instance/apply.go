@@ -225,9 +225,9 @@ func (p *plugin) hasRecentDeltas(window int) (bool, error) {
 }
 
 // handleFiles handles resource pruning and new resources via:
-// 1. Acquire file system lock
-// 2. Cache resource types/names from terraform state file
-// 3. Execute "terraform refresh" to refresh state
+// 1. Cache resource types/names from terraform state file
+// 2. Execute "terraform refresh" to refresh state
+// 3. Acquire file system lock
 // 4. Identity ".tf.json" files that are not in the terraform state and, for each:
 // 4.1 If the resource was previously in the state file (from #2) then prune
 // 4.2 Else, query the backend cloud to see if the resource exists and was missing from the
@@ -238,15 +238,12 @@ func (p *plugin) hasRecentDeltas(window int) (bool, error) {
 // Once these steps are done then "terraform apply" can execute without the
 // file system lock.
 func (p *plugin) handleFiles(fns tfFuncs) error {
-	p.fsLock.Lock()
-	defer p.fsLock.Unlock()
-
 	// TODO(kaufers): If it possible that not all of the .new files were moved to
 	//  .tf.json files (NFS connection could be lost) and this could make the refresh
 	//  always fail due to references that are not valid. Update this flow to still
 	//  rename .new files even if the refresh fails (but do not prune or apply since
 	//  we need valid refresh'd data) and then let the next iteration attempt to
-	//  reconsile things.
+	//  reconcile things.
 
 	// Get the current resources, this must happen before a refresh so that we can
 	// identity orphans from an incomplete "apply"
@@ -266,6 +263,11 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	if err != nil {
 		return err
 	}
+
+	// Once we have the update resources we need to lock out any new files (from Provision)
+	// and the listing of the files (from Describe) while we reconcile orphans and rename
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
 
 	// Load all instance files and all new files from disk
 	tfInstFiles := map[TResourceType]map[TResourceName]TResourceFilenameProps{}
