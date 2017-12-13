@@ -10,12 +10,31 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/group"
-	//	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 )
 
 func init() {
 	depends.Register("group", types.InterfaceSpec(group.InterfaceSpec), ResolveDependencies)
+}
+
+// Options capture the options for starting up the group controller.
+type Options struct {
+
+	// Self is set when the controller is part of a group that can be updated.
+	Self *instance.LogicalID
+
+	// PollInterval is the frequency for syncing the state
+	PollInterval types.Duration
+
+	// MaxParallelNum is the max number of parallel instance operation. Default =0 (no limit)
+	MaxParallelNum uint
+
+	// PollIntervalGroupSpec polls for group spec at this interval to update the metadata paths
+	PollIntervalGroupSpec types.Duration
+
+	// PollIntervalGroupDetail polls for group details at this interval to update the metadata paths
+	PollIntervalGroupDetail types.Duration
 }
 
 // ResolveDependencies returns a list of dependencies by parsing the opaque Properties blob.

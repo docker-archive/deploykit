@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	groupTag  = "infrakit.group"
-	configTag = "infrakit.config_sha"
+	groupTag     = "infrakit.group"
+	configTag    = "infrakit.config_sha"
+	logicalIDTag = "infrakit.logical_id"
 
 	debugV = logutil.V(300)
 )
@@ -32,22 +33,28 @@ type InstancePluginLookup func(plugin_base.Name) (instance.Plugin, error)
 type FlavorPluginLookup func(plugin_base.Name) (flavor.Plugin, error)
 
 // NewGroupPlugin creates a new group plugin.
+// The LogicalID is optional.  It is set when we want to make sure a self-managing cluster manager
+// that is running this group plugin doesn't end up terminating itself during a rolling update.
 func NewGroupPlugin(
 	instancePlugins InstancePluginLookup,
 	flavorPlugins FlavorPluginLookup,
-	pollInterval time.Duration,
-	maxParallelNum uint) group.Plugin {
+	options group_types.Options) group.Plugin {
 
 	return &plugin{
 		instancePlugins: instancePlugins,
 		flavorPlugins:   flavorPlugins,
-		pollInterval:    pollInterval,
-		maxParallelNum:  maxParallelNum,
+		options:         options,
+		pollInterval:    options.PollInterval.Duration(),
+		maxParallelNum:  options.MaxParallelNum,
 		groups:          groups{byID: map[group.ID]*groupContext{}},
+		self:            options.Self,
 	}
 }
 
 type plugin struct {
+	options group_types.Options
+
+	self            *instance.LogicalID
 	instancePlugins InstancePluginLookup
 	flavorPlugins   FlavorPluginLookup
 	pollInterval    time.Duration
@@ -64,6 +71,8 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	settings.self = p.self // need this logicalID of the running node to prevent destroying self.
 
 	log.Info("Committing", "groupID", config.ID, "pretend", pretend)
 
