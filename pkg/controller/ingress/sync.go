@@ -117,8 +117,9 @@ func (c *managed) syncBackends() error {
 
 			desc, err := groupPlugin.DescribeGroup(gid)
 			if err != nil {
-				log.Warn("error describing group", "id", gid, "err", err, "meta", c.spec.Metadata)
-				continue
+				// Failed to describe the group, since we do not know the members we do not want to proceed
+				log.Warn("error describing group, not syncing backends", "id", gid, "err", err, "meta", c.spec.Metadata)
+				return err
 			}
 
 			log.Debug("found backends", "groupID", gid, "desc", desc, "vhost", vhost, "L4", l4.Name(), "meta", c.spec.Metadata)

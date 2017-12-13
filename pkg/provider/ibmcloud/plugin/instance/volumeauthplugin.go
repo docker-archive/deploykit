@@ -3,10 +3,17 @@ package instance
 import (
 	"strconv"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/provider/ibmcloud/client"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
+)
+
+// For logging
+var (
+	logger = logutil.New("module", "ibmcloud/volumeauth")
+
+	debugV = logutil.V(500)
 )
 
 type plugin struct {
@@ -21,7 +28,7 @@ type propertyID struct {
 
 // NewVolumeAuthPlugin creates a new plugin that manages VM authorizations to the given volume
 func NewVolumeAuthPlugin(username, apiKey string, volumeID int) instance.Plugin {
-	log.Infof("NewVolumeAuthPlugin, volumeID: %v", volumeID)
+	logger.Info("NewVolumeAuthPlugin", "volumeID", volumeID)
 	return &plugin{
 		SoftlayerClient: client.GetClient(username, apiKey),
 		VolumeID:        volumeID,
@@ -45,7 +52,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("Authorizing volume %v to instance %v", p.VolumeID, props.ID)
+	logger.Info("Authorizing instance", "volume", p.VolumeID, "instance", props.ID)
 	vmID, err := strconv.Atoi(props.ID)
 	if err != nil {
 		return nil, err
@@ -55,7 +62,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 }
 
 func (p *plugin) Destroy(id instance.ID, ctx instance.Context) error {
-	log.Infof("Deauthorizing volume %v from instance %v", p.VolumeID, string(id))
+	logger.Info("Deauthorizing instance", "volume", p.VolumeID, "instance", string(id))
 	vmID, err := strconv.Atoi(string(id))
 	if err != nil {
 		return nil
@@ -64,7 +71,7 @@ func (p *plugin) Destroy(id instance.ID, ctx instance.Context) error {
 }
 
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-	log.Infof("Describing authorized VMs for volume %v with tags %v", p.VolumeID, tags)
+	logger.Debug("Describing authorized VMs", "volume", p.VolumeID, "tags", tags, "V", debugV)
 	vmIDs, err := p.SoftlayerClient.GetAllowedStorageVirtualGuests(p.VolumeID)
 	if err != nil {
 		return []instance.Description{}, nil
@@ -77,6 +84,6 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 			},
 		)
 	}
-	log.Infof("%v authorized VMs for volume %v: %v", len(result), p.VolumeID, result)
+	logger.Debug("Authorized VMs", "volume", p.VolumeID, "VM-count", len(result), "VMs", result, "V", debugV)
 	return result, nil
 }

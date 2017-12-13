@@ -1,13 +1,13 @@
 package group
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/group"
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
@@ -29,6 +29,10 @@ const (
 
 	// EnvMaxParallelNum sets the max parallelism for creating instances
 	EnvMaxParallelNum = "INFRAKIT_GROUP_MAX_PARALLEL_NUM"
+
+	// EnvSelfLogicalID sets the self id of this controller. This will avoid
+	// the self node to be updated.
+	EnvSelfLogicalID = "INFRAKIT_GROUP_SELF_LOGICAL_ID"
 )
 
 var log = logutil.New("module", "run/group")
@@ -37,33 +41,19 @@ func init() {
 	inproc.Register(Kind, Run, DefaultOptions)
 }
 
-// Options capture the options for starting up the group controller.
-type Options struct {
-	// PollInterval is the frequency for syncing the state
-	PollInterval types.Duration
-
-	// MaxParallelNum is the max number of parallel instance operation. Default =0 (no limit)
-	MaxParallelNum uint
-
-	// PollIntervalGroupSpec polls for group spec at this interval to update the metadata paths
-	PollIntervalGroupSpec types.Duration
-
-	// PollIntervalGroupDetail polls for group details at this interval to update the metadata paths
-	PollIntervalGroupDetail types.Duration
-}
-
-func mustParseUint(s string) uint {
-	v, err := strconv.Atoi(s)
-	if err != nil {
-		panic(err)
+func nilLogicalIDIfEmptyString(s string) *instance.LogicalID {
+	if s == "" {
+		return nil
 	}
-	return uint(v)
+	id := instance.LogicalID(s)
+	return &id
 }
 
 // DefaultOptions return an Options with default values filled in.
-var DefaultOptions = Options{
+var DefaultOptions = group_types.Options{
+	Self:                    nilLogicalIDIfEmptyString(local.Getenv(EnvSelfLogicalID, "")),
 	PollInterval:            types.MustParseDuration(local.Getenv(EnvPollInterval, "10s")),
-	MaxParallelNum:          mustParseUint(local.Getenv(EnvMaxParallelNum, "0")),
+	MaxParallelNum:          types.MustParseUint(local.Getenv(EnvMaxParallelNum, "0")),
 	PollIntervalGroupSpec:   types.MustParseDuration(local.Getenv(EnvPollInterval, "10s")),
 	PollIntervalGroupDetail: types.MustParseDuration(local.Getenv(EnvPollInterval, "10s")),
 }
@@ -81,16 +71,14 @@ func Run(scope scope.Scope, name plugin.Name,
 		return
 	}
 
-	instancePluginLookup := func(n plugin.Name) (instance.Plugin, error) {
-		return scope.Instance(n.String())
-	}
-
-	flavorPluginLookup := func(n plugin.Name) (flavor.Plugin, error) {
-		return scope.Flavor(n.String())
-	}
-
-	groupPlugin := group.NewGroupPlugin(instancePluginLookup, flavorPluginLookup,
-		options.PollInterval.Duration(), options.MaxParallelNum)
+	groupPlugin := group.NewGroupPlugin(
+		func(n plugin.Name) (instance.Plugin, error) {
+			return scope.Instance(n.String())
+		},
+		func(n plugin.Name) (flavor.Plugin, error) {
+			return scope.Flavor(n.String())
+		},
+		options)
 
 	// Start a poller to load the snapshot and make that available as metadata
 	updateSnapshot := make(chan func(map[string]interface{}))

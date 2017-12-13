@@ -97,7 +97,10 @@ func pluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLooku
 
 func TestInvalidGroupCalls(t *testing.T) {
 	plugin := newTestInstancePlugin()
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	require.Error(t, grp.DestroyGroup(id))
 	_, err := grp.DescribeGroup(id)
@@ -109,10 +112,13 @@ func memberTags(id group.ID) map[string]string {
 	return map[string]string{groupTag: string(id)}
 }
 
-func provisionTags(config group.Spec) map[string]string {
+func provisionTags(config group.Spec, logicalID *instance.LogicalID) map[string]string {
 	tags := memberTags(config.ID)
 	tags[configTag] = group_types.MustParse(group_types.ParseProperties(config)).InstanceHash()
 
+	if logicalID != nil {
+		tags[logicalIDTag] = string(*logicalID)
+	}
 	return tags
 }
 
@@ -120,13 +126,13 @@ func newFakeInstance(config group.Spec, logicalID *instance.LogicalID) instance.
 	// Inject another tag to simulate instances being tagged out-of-band.  Our implementation should ignore tags
 	// we did not create.
 	tags := map[string]string{"other": "ignored"}
-	for k, v := range provisionTags(config) {
+	for k, v := range provisionTags(config, logicalID) {
 		tags[k] = v
 	}
 
 	return instance.Spec{
 		LogicalID: logicalID,
-		Tags:      provisionTags(config),
+		Tags:      provisionTags(config, logicalID),
 	}
 }
 
@@ -136,7 +142,10 @@ func TestNoopUpdate(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -190,7 +199,10 @@ func TestRollingUpdate(t *testing.T) {
 		return &flavorPlugin, nil
 	}
 
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
@@ -210,7 +222,133 @@ func TestRollingUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated), i.Tags)
+		require.Equal(t, provisionTags(updated, nil), i.Tags)
+	}
+
+	require.NoError(t, grp.FreeGroup(id))
+}
+
+func TestLeaderSelfRollingUpdate(t *testing.T) {
+
+	// This is the case where the controller coordinating the rolling update
+	// is part of the group that is being updated
+	self := &leaderIDs[0]
+
+	// leader self rolling update should not destroy the running leader itself
+	plugin := newTestInstancePlugin(
+		newFakeInstance(leaders, &leaderIDs[0]),
+		newFakeInstance(leaders, &leaderIDs[1]),
+		newFakeInstance(leaders, &leaderIDs[2]),
+	)
+
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			return flavor.Healthy, nil
+		},
+	}
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+			Self:         self,
+		})
+	_, err := grp.CommitGroup(leaders, false)
+	require.NoError(t, err)
+
+	instances, err := plugin.DescribeInstances(memberTags(leaders.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+
+	updated := group.Spec{ID: id, Properties: leaderProperties(leaderIDs, "data2")}
+
+	desc, err := grp.CommitGroup(updated, true) // pretend only
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	desc, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	awaitGroupConvergence(t, grp)
+
+	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+
+	// Because the group controller is started with the logical ID of instances[0],
+	// it must not be updated.
+	for i := 0; i < len(instances); i++ {
+		if instances[i].LogicalID == self {
+			require.NotEqual(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+		} else {
+			require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+		}
+	}
+
+	require.NoError(t, grp.FreeGroup(id))
+}
+
+func TestExternalManagedRollingUpdate(t *testing.T) {
+
+	// This is the case where the controller coordinating the rolling update
+	// is a node that's not part of the leader group
+	other := instance.LogicalID("other")
+	self := &other
+
+	plugin := newTestInstancePlugin(
+		newFakeInstance(leaders, &leaderIDs[0]),
+		newFakeInstance(leaders, &leaderIDs[1]),
+		newFakeInstance(leaders, &leaderIDs[2]),
+	)
+
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			return flavor.Healthy, nil
+		},
+	}
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+			Self:         self,
+		})
+
+	_, err := grp.CommitGroup(leaders, false)
+	require.NoError(t, err)
+
+	instances, err := plugin.DescribeInstances(memberTags(leaders.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+
+	updated := group.Spec{ID: id, Properties: leaderProperties(leaderIDs, "data2")}
+
+	desc, err := grp.CommitGroup(updated, true) // pretend only
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	desc, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	awaitGroupConvergence(t, grp)
+
+	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+
+	for i := 0; i < len(instances); i++ {
+
+		if instances[i].LogicalID == self {
+			require.NotEqual(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+		} else {
+			require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+		}
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -222,7 +360,10 @@ func TestRollAndAdjustScale(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -248,7 +389,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 	// quiesced.
 	require.True(t, len(instances) >= 3)
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated), i.Tags)
+		require.Equal(t, provisionTags(updated, nil), i.Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -260,7 +401,10 @@ func TestScaleIncrease(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -281,7 +425,7 @@ func TestScaleIncrease(t *testing.T) {
 	// quiesced.
 	require.True(t, len(instances) >= 3)
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated), i.Tags)
+		require.Equal(t, provisionTags(updated, nil), i.Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -293,7 +437,10 @@ func TestScaleDecrease(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -314,7 +461,7 @@ func TestScaleDecrease(t *testing.T) {
 	// quiesced.
 	require.True(t, len(instances) <= 3)
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated), i.Tags)
+		require.Equal(t, provisionTags(updated, nil), i.Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -326,7 +473,10 @@ func TestFreeGroup(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -340,7 +490,10 @@ func TestDestroyGroup(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -358,7 +511,10 @@ func TestSuperviseQuorum(t *testing.T) {
 		newFakeInstance(leaders, &leaderIDs[1]),
 		newFakeInstance(leaders, &leaderIDs[2]),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(leaders, false)
 	require.NoError(t, err)
@@ -380,7 +536,13 @@ func TestSuperviseQuorum(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated), i.Tags)
+
+		expectTags := provisionTags(updated, i.LogicalID)
+		if i.LogicalID != nil {
+			// expect to also have a label with logical ID
+			expectTags[logicalIDTag] = string(*i.LogicalID)
+		}
+		require.Equal(t, expectTags, i.Tags)
 	}
 
 	// TODO(wfarner): Validate logical IDs in created instances.
@@ -392,7 +554,10 @@ func TestUpdateCompletes(t *testing.T) {
 	// Tests that a completed update clears the 'update in progress state', allowing another update to commence.
 
 	plugin := newTestInstancePlugin()
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -416,7 +581,10 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -452,7 +620,10 @@ func TestFlavorChange(t *testing.T) {
 		newFakeInstance(minions, nil),
 		newFakeInstance(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -497,7 +668,10 @@ func TestFreeGroupWhileConverging(t *testing.T) {
 		return &flavorPlugin, nil
 	}
 
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -538,7 +712,10 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 		return &flavorPlugin, nil
 	}
 
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
@@ -566,7 +743,10 @@ func TestNoSideEffectsFromPretendCommit(t *testing.T) {
 	// Tests that internal state is not modified by a GroupCommit with Pretend=true.
 
 	plugin := newTestInstancePlugin()
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup, 1*time.Millisecond, 0)
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
 
 	desc, err := grp.CommitGroup(minions, true)
 	require.NoError(t, err)

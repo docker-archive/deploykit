@@ -17,15 +17,39 @@ func minInt(a, b int) int {
 	return b
 }
 
+func isSelf(inst instance.Description, settings groupSettings) bool {
+	if settings.self != nil {
+		if inst.LogicalID != nil && *inst.LogicalID == *settings.self {
+			return true
+		}
+		if v, has := inst.Tags[logicalIDTag]; has {
+			return string(*settings.self) == v
+		}
+	}
+	return false
+}
+
 func desiredAndUndesiredInstances(
 	instances []instance.Description, settings groupSettings) ([]instance.Description, []instance.Description) {
 
 	desiredHash := settings.config.InstanceHash()
 	desired := []instance.Description{}
 	undesired := []instance.Description{}
+
+	self := false
+
 	for _, inst := range instances {
+
+		// We need to guarantee that each update will execute cleaningly and not terminating mid-flight.
+		// This will involve transferring this responsiblity to a newly updated manager node that is
+		// annointed the new leader.
+		// To do this, we always consider the self node 'desired' even though it is clearly not updated.
+		// Then once this node thinks the rolling update has been completed, we trigger a leadership change
+		// where the new leader will see that there's a discrepancy and update *this* node.
+		self = isSelf(inst, settings)
+
 		actualConfig, specified := inst.Tags[configTag]
-		if specified && actualConfig == desiredHash {
+		if specified && actualConfig == desiredHash || self {
 			desired = append(desired, inst)
 		} else {
 			undesired = append(undesired, inst)
