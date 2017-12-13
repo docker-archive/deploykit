@@ -7,8 +7,6 @@ import (
 	"github.com/docker/infrakit/pkg/provider/ibmcloud/client"
 	"github.com/softlayer/softlayer-go/datatypes"
 	"github.com/softlayer/softlayer-go/filter"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -65,7 +63,7 @@ func GetIBMCloudVMByTag(username, apiKey string, tags []string) (*int, error) {
 	for _, tag := range tags {
 		if strings.HasPrefix(tag, "swarm-id:") {
 			f := filter.New(filter.Path("virtualGuests.tagReferences.tag.name").Eq(tag)).Build()
-			log.Infof("Querying IBM Cloud for VMs with tag filter: %v", f)
+			logger.Info("GetIBMCloudVMByTag", "msg", fmt.Sprintf("Querying IBM Cloud for VMs with tag filter: %v", f))
 			filters = &f
 		}
 	}
@@ -82,7 +80,7 @@ func getUniqueVMByTags(vms []datatypes.Virtual_Guest, tags []string) (*int, erro
 	filterVMsByTags(&vms, tags)
 	// No match
 	if len(vms) == 0 {
-		log.Infof("Detected 0 existing VMs with tags: %v", tags)
+		logger.Info("getUniqueVMByTags", "msg", fmt.Sprintf("Detected 0 existing VMs with tags: %v", tags))
 		return nil, nil
 	}
 	// Exactly 1 match
@@ -94,7 +92,7 @@ func getUniqueVMByTags(vms []datatypes.Virtual_Guest, tags []string) (*int, erro
 		if vms[0].Id == nil {
 			return nil, fmt.Errorf("VM '%v' missing ID", name)
 		}
-		log.Infof("Existing VM %v with ID %v matches tags: %v", name, *vms[0].Id, tags)
+		logger.Info("getUniqueVMByTags", "msg", fmt.Sprintf("Existing VM %v with ID %v matches tags: %v", name, *vms[0].Id, tags))
 		return vms[0].Id, nil
 	}
 	// More than 1 match

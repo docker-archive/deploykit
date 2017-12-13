@@ -15,15 +15,24 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/deckarep/golang-set"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/afero"
+)
+
+// For logging
+var (
+	logger = logutil.New("module", "provider/terraform/instance")
+
+	debugV1 = logutil.V(100)
+	debugV2 = logutil.V(500)
+	debugV3 = logutil.V(1000)
 )
 
 // This example uses terraform as the instance plugin.
@@ -96,7 +105,7 @@ type ImportOptions struct {
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
 func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool, envs []string, importOpts *ImportOptions) instance.Plugin {
-	log.Debugln("terraform instance plugin. dir=", dir)
+	logger.Info("NewTerraformInstancePlugin", "dir", dir)
 
 	var pluginLookup func() discovery.Plugins
 	if !standalone {
@@ -148,14 +157,14 @@ func (p *plugin) processImport(importOpts *ImportOptions) error {
 	}
 	for _, res := range importOpts.Resources {
 		if res.ResourceName == nil {
-			log.Infof("Processing import for resource: %v:%v",
-				string(*res.ResourceType),
-				string(*res.ResourceID))
+			logger.Info("processImport",
+				"ResourceType", string(*res.ResourceType),
+				"ResourceID", string(*res.ResourceID))
 		} else {
-			log.Infof("Processing import for resource: %v:%v:%v",
-				string(*res.ResourceType),
-				string(*res.ResourceName),
-				string(*res.ResourceID))
+			logger.Info("processImport",
+				"ResourceType", string(*res.ResourceType),
+				"ResourceName", string(*res.ResourceName),
+				"ResourceID", string(*res.ResourceID))
 		}
 	}
 
@@ -168,7 +177,7 @@ func (p *plugin) processImport(importOpts *ImportOptions) error {
 	}
 	err := p.importResources(fns, importOpts.Resources, importOpts.InstanceSpec)
 	if err != nil {
-		log.Errorf("Failed to import instances, error: %v", err)
+		logger.Error("processImport", "msg", "Failed to import instances", "error", err)
 		return err
 	}
 	return nil
@@ -336,7 +345,7 @@ func FindVM(tf *TFormat) (vmType TResourceType, vmName TResourceName, properties
 
 // Validate performs local validation on a provision request.
 func (p *plugin) Validate(req *types.Any) error {
-	log.Debugln("validate", req.String())
+	logger.Debug("validate", "req", req.String(), "V", debugV1)
 
 	tf := TFormat{}
 	err := req.Decode(&tf)
@@ -368,7 +377,7 @@ func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResource
 	err := fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				log.Debugf("Ignoring file %s due to error: %s", path, err)
+				logger.Debug("scanLocalFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
 				return nil
 			}
 			matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
@@ -376,7 +385,7 @@ func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResource
 			if len(matches) == 4 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
-					log.Warningln("Cannot parse:", err)
+					logger.Warn("scanLocalFiles", "msg", fmt.Sprintf("Cannot parse file %s", path), "error", err)
 					return err
 				}
 				tf := TFormat{}
@@ -428,7 +437,7 @@ func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID
 		}
 		// Delete hostnamePrefix so it will not be written in the *.tf.json file
 		delete(properties, PropHostnamePrefix)
-		log.Debugln("Adding hostname to properties: hostname=", properties["hostname"])
+		logger.Debug("platformSpecificUpdates", "msg", "Adding hostname to properties", "hostname", properties["hostname"], "V", debugV1)
 	case VMAmazon:
 		if p, exists := properties["private_ip"]; exists {
 			if p == "INSTANCE_LOGICAL_ID" {
@@ -556,7 +565,7 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 				tagsMap[k] = v
 			}
 		} else {
-			log.Errorf("mergeTagsIntoVMProps: invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"]))
+			logger.Error("mergeTagsIntoVMProps", "msg", fmt.Sprintf("invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"])))
 		}
 	case VMSoftLayer, VMIBMCloud:
 		if _, has := vmProperties["tags"]; !has {
@@ -566,7 +575,7 @@ func mergeTagsIntoVMProps(vmType TResourceType, vmProperties TResourceProperties
 			// softlayer uses a list of tags, instead of a map of tags
 			vmProperties["tags"] = mergeLabelsIntoTagSlice(tagsArray, tags)
 		} else {
-			log.Errorf("mergeTagsIntoVMProps: invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"]))
+			logger.Error("mergeTagsIntoVMProps", "msg", fmt.Sprintf("invalid %v props tags value: %v", vmType, reflect.TypeOf(vmProperties["tags"])))
 		}
 		// All tags on Softlayer must be lower-case
 		tagsLower := []interface{}{}
@@ -673,7 +682,8 @@ func (p *plugin) decompose(logicalID *instance.LogicalID, generatedName string, 
 							}
 						}
 						key = strconv.Itoa(index)
-						log.Infof("No orphaned attachment with prefix '%v-%s', using current name: %s", identifier, scopeDedicated, key)
+						logger.Info("decompose",
+							"msg", fmt.Sprintf("No orphaned attachment with prefix '%v-%s', using current name: %s", identifier, scopeDedicated, key))
 					} else {
 						// At least 1 orphaned file exists, pick the index with the lowest index
 						key = getLowestDedicatedOrphanIndex(orphanKeys)
@@ -681,7 +691,8 @@ func (p *plugin) decompose(logicalID *instance.LogicalID, generatedName string, 
 							key = instID
 							break
 						}
-						log.Infof("Using orphaned attachment '%s' for prefix '%s-%s'", key, identifier, scopeDedicated)
+						logger.Info("decompose",
+							"msg", fmt.Sprintf("Using orphaned attachment '%s' for prefix '%s-%s'", key, identifier, scopeDedicated))
 					}
 				} else {
 					key = string(*logicalID)
@@ -787,11 +798,12 @@ func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles m
 		var path string
 		if _, has := currentFiles[filename+".tf.json"]; has {
 			path = filepath.Join(p.Dir, filename+".tf.json")
-			log.Infof("Overriding data in file: %v", path)
+			logger.Info("writeTerraformFiles", "msg", fmt.Sprintf("Overriding data in file: %v", path))
 		} else {
 			path = filepath.Join(p.Dir, filename+".tf.json.new")
 		}
-		log.Debugln("writeTerraformFiles", path, "data=", string(buff))
+		logger.Info("writeTerraformFiles", "file", path)
+		logger.Debug("writeTerraformFiles", "file", path, "data", string(buff), "V", debugV1)
 		paths = append(paths, path)
 		err := afero.WriteFile(p.fs, path, buff, 0644)
 		if err != nil {
@@ -810,14 +822,14 @@ func (p *plugin) listCurrentTfFiles() (map[string]map[TResourceType]map[TResourc
 	err := fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				log.Debugf("Ignoring file %s due to error: %s", path, err)
+				logger.Debug("listCurrentTfFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
 				return nil
 			}
 			matches := tfFileRegex.FindStringSubmatch(info.Name())
 			if len(matches) == 3 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
-					log.Warningln("Cannot parse:", err)
+					logger.Warn("listCurrentTfFiles", "msg", fmt.Sprintf("Cannot parse file %s", path), "error", err)
 					return err
 				}
 				tf := TFormat{}
@@ -860,16 +872,16 @@ func findDedicatedAttachmentKeys(currentFiles map[string]map[TResourceType]map[T
 			continue
 		}
 		if matches[1] != scopeID {
-			log.Debugf("Ignoring file '%s', scope ID '%s' does not match", filename, scopeID)
+			logger.Debug("findDedicatedAttachmentKeys", "msg", fmt.Sprintf("Ignoring file '%s', scope ID '%s' does not match", filename, scopeID), "V", debugV1)
 			continue
 		}
-		log.Infof("Found candidate file '%s' for scope ID '%s'", filename, scopeID)
+		logger.Info("findDedicatedAttachmentKeys", "msg", fmt.Sprintf("Found candidate file '%s' for scope ID '%s'", filename, scopeID))
 		fileKey := strings.Split(filename, ".")[0]
 		allFilesMap[fileKey] = matches[2]
 		orphanedFilesMap[fileKey] = matches[2]
 	}
 	if len(allFilesMap) == 0 {
-		log.Infof("No candidate attchment files for scope ID '%s'", scopeID)
+		logger.Info("findDedicatedAttachmentKeys", "msg", fmt.Sprintf("No candidate attchment files for scope ID '%s'", scopeID))
 		return []string{}, []string{}
 	}
 	// Prune the candidate files that already have attachments
@@ -891,7 +903,7 @@ func findDedicatedAttachmentKeys(currentFiles map[string]map[TResourceType]map[T
 				}
 				for _, tag := range strings.Split(attachTag, ",") {
 					if _, contains := allFilesMap[tag]; contains {
-						log.Infof("Attachment '%s' is used in %s for scope ID '%s'", tag, filename, scopeID)
+						logger.Info("findDedicatedAttachmentKeys", "msg", fmt.Sprintf("Attachment '%s' is used in %s for scope ID '%s'", tag, filename, scopeID))
 						delete(orphanedFilesMap, tag)
 					}
 				}
@@ -906,11 +918,13 @@ func findDedicatedAttachmentKeys(currentFiles map[string]map[TResourceType]map[T
 	for _, v := range orphanedFilesMap {
 		orphans = append(orphans, v)
 	}
-	log.Infof("Detected %v matching files and %v orphan attachments for scope ID '%v': %v",
-		len(allMatches),
-		len(orphans),
-		scopeID,
-		orphans)
+	logger.Info("findDedicatedAttachmentKeys",
+		"msg",
+		fmt.Sprintf("Detected %v matching files and %v orphan attachments for scope ID '%v': %v",
+			len(allMatches),
+			len(orphans),
+			scopeID,
+			orphans))
 	return allMatches, orphans
 }
 
@@ -941,6 +955,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	defer p.fsLock.Unlock()
 	name := ensureUniqueFile(p.Dir)
 	id := instance.ID(name)
+	logger.Info("Provision", "instance-id", name)
 
 	// Decode the given spec and find the VM resource
 	tf := TFormat{}
@@ -1039,7 +1054,7 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach, executeTfApply bool)
 		return err
 	}
 
-	log.Debugf("Destroying instance %v, processAttach: %v", filename, processAttach)
+	logger.Info("doDestroy", "instance", filename, "processAttach", processAttach)
 
 	// Optionally destroy the related resources
 	if processAttach {
@@ -1059,7 +1074,7 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach, executeTfApply bool)
 			err = fs.Walk(p.Dir,
 				func(path string, info os.FileInfo, err error) error {
 					if err != nil {
-						log.Debugf("Ignoring file %s due to error: %s", path, err)
+						logger.Debug("doDestroy", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
 						return nil
 					}
 					matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
@@ -1081,10 +1096,9 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach, executeTfApply bool)
 						}
 						for _, id := range ids {
 							if _, has := idsToDestroy[id]; has {
-								log.Infof(
-									"Not destroying related resource %s, %s references it",
-									id,
-									info.Name())
+								logger.Info("doDestroy",
+									"msg",
+									fmt.Sprintf("Not destroying related resource %s, %s references it", id, info.Name()))
 								delete(idsToDestroy, id)
 							}
 						}
@@ -1129,7 +1143,7 @@ func parseAttachTag(tf *TFormat) ([]string, error) {
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-	log.Debugln("describe-instances", tags)
+	logger.Debug("DescribeInstances", "tags", tags, "V", debugV1)
 	// Acquire lock since we are reading all files and potentially running "terraform show"
 	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
@@ -1149,7 +1163,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 				terraformShowResult = result
 			} else {
 				// Don't blow up... just do best and show what we can find.
-				log.Warnln("cannot terraform show:", err)
+				logger.Warn("DescribeInstances", "terraform show error", err)
 			}
 		}
 	}
@@ -1194,9 +1208,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		}
 
 	}
-
-	log.Debugln("describe-instances result=", result)
-
+	logger.Debug("DescribeInstances", "result", result, "V", debugV1)
 	return result, nil
 }
 
@@ -1210,7 +1222,9 @@ func parseTerraformTags(vmType TResourceType, m TResourceProperties) map[string]
 				tags[k] = fmt.Sprintf("%v", v)
 			}
 		} else {
-			log.Errorf("parseTerraformTags: invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"]))
+			logger.Error("parseTerraformTags",
+				"msg",
+				fmt.Sprintf("invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"])))
 		}
 	case VMSoftLayer, VMIBMCloud:
 		if tagsSlice, ok := m["tags"].([]interface{}); ok {
@@ -1231,10 +1245,12 @@ func parseTerraformTags(vmType TResourceType, m TResourceProperties) map[string]
 				}
 			}
 		} else {
-			log.Errorln("parseTerraformTags: invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"]))
+			logger.Error("parseTerraformTags",
+				"msg",
+				fmt.Sprintf("invalid %v tags value: %v", vmType, reflect.TypeOf(m["tags"])))
 		}
 	}
-	log.Debugln("parseTerraformTags return tags", tags)
+	logger.Debug("parseTerraformTags", "tags", tags, "V", debugV1)
 	return tags
 }
 
@@ -1325,12 +1341,12 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	}
 	for _, r := range resources {
 		if resNameProps, has := existingResources[*r.ResourceType]; has {
-			log.Infof("Terraform is managing %v resources of type %v", len(resNameProps), string(*r.ResourceType))
+			logger.Info("importResources", "msg", fmt.Sprintf("Terraform is managing %v resources of type %v", len(resNameProps), string(*r.ResourceType)))
 			for name, props := range resNameProps {
 				if idVal, has := props["id"]; has {
 					idStr := fmt.Sprintf("%v", idVal)
 					if idStr == *r.ResourceID {
-						log.Infof("Resource %v with ID %v is already managed by terraform", name, idStr)
+						logger.Info("importResources", "msg", fmt.Sprintf("Resource %v with ID %v is already managed by terraform", name, idStr))
 						r.AlreadyImported = true
 						// The filename for the instance needs to be updated with the actual
 						// instance timestamp that corresponds to when it was imported
@@ -1340,14 +1356,14 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 							vmResName = string(name)
 						}
 					} else {
-						log.Debugf("Resource with ID '%s' does not match '%s'", idStr, *r.ResourceID)
+						logger.Debug("importResources", "msg", fmt.Sprintf("Resource with ID '%s' does not match '%s'", idStr, *r.ResourceID), "V", debugV1)
 					}
 				} else {
-					log.Warnf("Resource %v is missing 'id' prop", name)
+					logger.Warn("importResources", "msg", fmt.Sprintf("Resource %v is missing 'id' prop", name))
 				}
 			}
 		} else {
-			log.Infof("Terraform is managing 0 resources of type %v", string(*r.ResourceType))
+			logger.Info("importResources", "msg", fmt.Sprintf("Terraform is managing 0 resources of type %v", string(*r.ResourceType)))
 		}
 	}
 
@@ -1375,13 +1391,13 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 			for _, suffix := range []string{".tf.json", ".tf.json.new"} {
 				filename := r.FinalFilename + suffix
 				if _, has := fileMap[filename]; has {
-					log.Infof("File exists for imported resource: %v", filename)
+					logger.Info("importResources", "msg", fmt.Sprintf("File exists for imported resource: %v", filename))
 					match = true
 					break
 				}
 			}
 			if !match {
-				log.Infof("tf.json file with prefix '%v' does not exist for imported resource: %v", r.FinalFilename)
+				logger.Info("importResources", "msg", fmt.Sprintf("tf.json file with prefix '%v' does not exist for imported resource", r.FinalFilename))
 				allFilesExist = false
 				break
 			}
@@ -1399,7 +1415,9 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 		if r.AlreadyImported {
 			continue
 		}
-		log.Infof("Importing %v %v into terraform as resource %v ...", string(*r.ResourceType), string(*r.ResourceID), string(r.FinalResourceName))
+		logger.Info("importResources",
+			"msg",
+			fmt.Sprintf("Importing %v %v into terraform as resource %v ...", string(*r.ResourceType), string(*r.ResourceID), string(r.FinalResourceName)))
 		r.SuccessfullyImported = true
 		if err = fns.tfImport(*r.ResourceType, string(r.FinalResourceName), *r.ResourceID); err != nil {
 			errorToThrow = err
@@ -1457,9 +1475,9 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 		}
 		for _, path := range paths {
 			if err = p.fs.Remove(path); err == nil {
-				log.Info("Successfully removed file created by import: %v", path)
+				logger.Info("importResources", "msg", fmt.Sprintf("Successfully removed file created by import: %v", path))
 			} else {
-				log.Info("Failed to remove file %v created by import: %v", path, err)
+				logger.Info("importResources", "msg", fmt.Sprintf("Failed to remove file %v created by import", path), "error", err)
 			}
 		}
 		return errorToThrow
@@ -1562,12 +1580,12 @@ func mergeProp(source, dest TResourceProperties, key string) {
 			}
 			dest[key] = destDataSlice
 		} else {
-			log.Errorf(
-				"mergeProp: invalid '%v' prop value on spec, expected %v, actual %v",
-				key,
-				reflect.TypeOf(sourceData),
-				reflect.TypeOf(destDataSlice),
-			)
+			logger.Error("mergeProp",
+				"msg",
+				fmt.Sprintf("mergeProp: invalid '%v' prop value on spec, expected %v, actual %v",
+					key,
+					reflect.TypeOf(sourceData),
+					reflect.TypeOf(destDataSlice)))
 			dest[key] = sourceData
 		}
 	} else if sourceDataMap, ok := sourceData.(map[string]interface{}); ok {
@@ -1577,12 +1595,12 @@ func mergeProp(source, dest TResourceProperties, key string) {
 				destDataMap[k] = v
 			}
 		} else {
-			log.Errorf(
-				"mergeProp: invalid '%v' prop value on spec, expected %v, actual %v",
-				key,
-				reflect.TypeOf(sourceData),
-				reflect.TypeOf(destDataMap),
-			)
+			logger.Error("mergeProp",
+				"msg",
+				fmt.Sprintf("mergeProp: invalid '%v' prop value on spec, expected %v, actual %v",
+					key,
+					reflect.TypeOf(sourceData),
+					reflect.TypeOf(destDataMap)))
 			dest[key] = sourceData
 		}
 	} else {
@@ -1726,7 +1744,9 @@ func setFinalResourceAndFilename(resource *ImportResource, filename string, reso
 // should be contained in the tf.json file for an imported resource. The property keys
 // are those from the spec and the values are current values (from tf show).
 func determineFinalPropsForImport(res *ImportResource) {
-	log.Infof("Using spec for %v import: %v", string(*res.ResourceType), res.SpecProps)
+	logger.Info("determineFinalPropsForImport",
+		"msg",
+		fmt.Sprintf("Using spec for %v import: %v", string(*res.ResourceType), res.SpecProps))
 	finalProps := TResourceProperties{}
 	for k, specVal := range res.SpecProps {
 		// Ignore certain keys in spec
@@ -1741,7 +1761,9 @@ func determineFinalPropsForImport(res *ImportResource) {
 			for _, propID := range *res.ExcludePropIDs {
 				if propID == k {
 					exclude = true
-					log.Infof("Excluding spec property '%s' for resource type %v", propID, string(*res.ResourceType))
+					logger.Info("determineFinalPropsForImport",
+						"msg",
+						fmt.Sprintf("Excluding spec property '%s' for resource type %v", propID, string(*res.ResourceType)))
 					break
 				}
 			}
@@ -1752,7 +1774,9 @@ func determineFinalPropsForImport(res *ImportResource) {
 		if v, has := res.ResourceProps[k]; has {
 			finalProps[k] = v
 		} else {
-			log.Warningf("Imported terraform resource missing '%s' property, using spec value: %v", k, specVal)
+			logger.Warn("determineFinalPropsForImport",
+				"msg",
+				fmt.Sprintf("Imported terraform resource missing '%s' property, using spec value: %v", k, specVal))
 			finalProps[k] = specVal
 		}
 	}
