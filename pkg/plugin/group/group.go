@@ -36,8 +36,8 @@ type FlavorPluginLookup func(plugin_base.Name) (flavor.Plugin, error)
 // The LogicalID is optional.  It is set when we want to make sure a self-managing cluster manager
 // that is running this group plugin doesn't end up terminating itself during a rolling update.
 func NewGroupPlugin(
-	instancePlugins func(n plugin_base.Name) (instance.Plugin, error),
-	flavorPlugins func(n plugin_base.Name) (flavor.Plugin, error),
+	instancePlugins InstancePluginLookup,
+	flavorPlugins FlavorPluginLookup,
 	options group_types.Options) group.Plugin {
 
 	return &plugin{
