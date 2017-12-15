@@ -10,6 +10,7 @@ import (
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 
@@ -146,7 +147,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	// Build a custom Description to allow InfraKit to identify new Instances
-	profileTemplate.Description = spec.Tags["infrakit.group"] + "|" + spec.Tags["infrakit.config_sha"]
+	profileTemplate.Description = spec.Tags[group.GroupTag] + "|" + spec.Tags[group.ConfigSHATag]
 
 	err = p.createProfileFromTemplate(string(instanceName), profileTemplate, availHW, spec)
 	if err != nil {
@@ -154,7 +155,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	if spec.Tags != nil {
-		log.Info("Adding %s to Group %v", string(instanceName), spec.Tags["infrakit.group"])
+		log.Info("Adding %s to Group %v", string(instanceName), spec.Tags[group.GroupTag])
 	}
 
 	var newInstance provisioningFSM
@@ -208,15 +209,15 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		tagSlice := strings.Split(profile.Description, "|")
 		// If it exists, grab the group name
 		if len(tagSlice) > 0 {
-			instanceTags["infrakit.group"] = tagSlice[0]
+			instanceTags[group.GroupTag] = tagSlice[0]
 		}
 		// If it exists, grab the sha
 		if len(tagSlice) > 1 {
-			instanceTags["infrakit.config_sha"] = tagSlice[1]
+			instanceTags[group.ConfigSHATag] = tagSlice[1]
 		}
 
 		// We're only wanting to return instances from a specific group
-		if val, ok := tags["infrakit.group"]; ok {
+		if val, ok := tags[group.GroupTag]; ok {
 			// Check that we can get the group from the profile
 			if len(tagSlice) > 0 {
 				// Does this group match, if so add it to the results
@@ -255,7 +256,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 				provisioned = false
 			}
 		}
-		if provisioned == false && unprovisionedInstance.countdown != 0 && unprovisionedInstance.tags["infrakit.group"] == tags["infrakit.group"] {
+		if provisioned == false && unprovisionedInstance.countdown != 0 && unprovisionedInstance.tags[group.GroupTag] == tags[group.GroupTag] {
 			unprovisionedInstance.countdown--
 			updatedFSM = append(updatedFSM, unprovisionedInstance)
 		}
@@ -298,7 +299,7 @@ func (p *plugin) createProfileFromTemplate(name string, template ov.ServerProfil
 	}
 	newTemplate.ServerHardwareURI = blade.URI
 	// HPE OneView doesn't carry any concept of tags, we place all details needed in the Description field
-	newTemplate.Description = spec.Tags["infrakit.group"] + "|" + spec.Tags["infrakit.config_sha"]
+	newTemplate.Description = spec.Tags[group.GroupTag] + "|" + spec.Tags[group.ConfigSHATag]
 	newTemplate.Name = name
 
 	t, err := p.client.SubmitNewProfile(newTemplate)
