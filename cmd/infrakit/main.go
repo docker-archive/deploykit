@@ -14,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery/remote"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	rpc "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
@@ -325,7 +326,51 @@ func stackCommand(scope scope.Scope, stackCommandName string) *cobra.Command {
 			}
 
 			main.SetArgs(os.Args[1:])
-			return main.Execute()
+
+			pluginName := ""
+			main.SetHelpFunc(func(cc *cobra.Command, args []string) {
+				cc.Usage()
+				if len(args) > 1 {
+					pluginName = args[1]
+				}
+			})
+
+			err = main.Execute()
+
+			// We want to detect the case when the user typed a plugin that actually doesn't
+			// exist and return a non-zero error code to the shell.  This means we have to
+			// actually try to lookup the plugin and the object therein.
+			if pluginName != "" {
+				pn := plugin.Name(pluginName)
+				ep, err := scope.Plugins().Find(pn)
+				if err != nil {
+					os.Exit(1)
+				}
+				// if endpoint exists, then check if the subtype/object exists
+				hk, err := rpc.NewHandshaker(ep.Address)
+				if err != nil {
+					os.Exit(1)
+				}
+				hello, err := hk.Hello()
+				if err != nil {
+					os.Exit(1)
+				}
+
+				foundObject := false
+				for _, objs := range hello {
+					for _, obj := range objs {
+						if pn.Type() == obj.Name {
+							foundObject = true
+							break
+						}
+					}
+				}
+
+				if !foundObject {
+					os.Exit(1)
+				}
+			}
+			return err
 		},
 	}
 
