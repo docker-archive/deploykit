@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 )
 
@@ -48,7 +49,7 @@ func desiredAndUndesiredInstances(
 		// where the new leader will see that there's a discrepancy and update *this* node.
 		self = isSelf(inst, settings)
 
-		actualConfig, specified := inst.Tags[configTag]
+		actualConfig, specified := inst.Tags[group.ConfigSHATag]
 		if specified && actualConfig == desiredHash || self {
 			desired = append(desired, inst)
 		} else {

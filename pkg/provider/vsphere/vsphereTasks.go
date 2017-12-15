@@ -49,7 +49,7 @@ func cloneNewInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
 
 	// The only change we make to the Template Spec, is the config sha and group name
 	spec := types.VirtualMachineConfigSpec{
-		Annotation: vmSpec.Tags[group.GroupTag] + "\n" + vmSpec.Tags["infrakit.config_sha"] + "\n" + vm.annotation,
+		Annotation: vmSpec.Tags[group.GroupTag] + "\n" + vmSpec.Tags[group.ConfigSHATag] + "\n" + vm.annotation,
 	}
 
 	// Changes can be to spec or relocateSpec
@@ -124,7 +124,7 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 		Files:      &types.VirtualMachineFileInfo{VmPathName: fmt.Sprintf("[%s]", p.vCenterInternals.datastore.Name())},
 		NumCPUs:    int32(vm.vCpus),
 		MemoryMB:   int64(vm.mem),
-		Annotation: vmSpec.Tags[group.GroupTag] + "\n" + vmSpec.Tags["infrakit.config_sha"] + "\n" + vm.annotation,
+		Annotation: vmSpec.Tags[group.GroupTag] + "\n" + vmSpec.Tags[group.ConfigSHATag] + "\n" + vm.annotation,
 	}
 
 	scsi, err := object.SCSIControllerTypes().CreateSCSIController("pvscsi")

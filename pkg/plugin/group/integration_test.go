@@ -114,7 +114,7 @@ func memberTags(id group.ID) map[string]string {
 
 func provisionTags(config group.Spec, logicalID *instance.LogicalID) map[string]string {
 	tags := memberTags(config.ID)
-	tags[configTag] = group_types.MustParse(group_types.ParseProperties(config)).InstanceHash()
+	tags[group.ConfigSHATag] = group_types.MustParse(group_types.ParseProperties(config)).InstanceHash()
 
 	if logicalID != nil {
 		tags[logicalIDTag] = string(*logicalID)

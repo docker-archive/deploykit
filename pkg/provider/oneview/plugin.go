@@ -147,7 +147,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	// Build a custom Description to allow InfraKit to identify new Instances
-	profileTemplate.Description = spec.Tags[group.GroupTag] + "|" + spec.Tags["infrakit.config_sha"]
+	profileTemplate.Description = spec.Tags[group.GroupTag] + "|" + spec.Tags[group.ConfigSHATag]
 
 	err = p.createProfileFromTemplate(string(instanceName), profileTemplate, availHW, spec)
 	if err != nil {
@@ -213,7 +213,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		}
 		// If it exists, grab the sha
 		if len(tagSlice) > 1 {
-			instanceTags["infrakit.config_sha"] = tagSlice[1]
+			instanceTags[group.ConfigSHATag] = tagSlice[1]
 		}
 
 		// We're only wanting to return instances from a specific group
@@ -299,7 +299,7 @@ func (p *plugin) createProfileFromTemplate(name string, template ov.ServerProfil
 	}
 	newTemplate.ServerHardwareURI = blade.URI
 	// HPE OneView doesn't carry any concept of tags, we place all details needed in the Description field
-	newTemplate.Description = spec.Tags[group.GroupTag] + "|" + spec.Tags["infrakit.config_sha"]
+	newTemplate.Description = spec.Tags[group.GroupTag] + "|" + spec.Tags[group.ConfigSHATag]
 	newTemplate.Name = name
 
 	t, err := p.client.SubmitNewProfile(newTemplate)

@@ -226,7 +226,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 			vmTags[k] = v
 		}
 
-		vmTags["infrakit.config_sha"] = configSHA
+		vmTags[group.ConfigSHATag] = configSHA
 		vmTags["guestIP"] = guestIP
 		results = append(results, instance.Description{
 			ID:        instance.ID(vmInstance.Name()),

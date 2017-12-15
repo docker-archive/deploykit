@@ -5,6 +5,7 @@ import (
 
 	mock_instance "github.com/docker/infrakit/pkg/mock/spi/instance"
 	"github.com/docker/infrakit/pkg/plugin/group/types"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
@@ -82,15 +83,15 @@ func TestLabelAllLabelled(t *testing.T) {
 			{
 				ID: instance.ID("labbeled1"),
 				Tags: map[string]string{
-					"key":     "value",
-					configTag: "SHA",
+					"key":              "value",
+					group.ConfigSHATag: "SHA",
 				},
 			},
 			{
 				ID: instance.ID("labbeled2"),
 				Tags: map[string]string{
-					"key":     "value",
-					configTag: "SHA",
+					"key":              "value",
+					group.ConfigSHATag: "SHA",
 				},
 			},
 		}, nil),
@@ -124,21 +125,21 @@ func TestLabelOneUnlabelled(t *testing.T) {
 			{
 				ID: instance.ID("labbeled"),
 				Tags: map[string]string{
-					"key":     "value",
-					configTag: config.InstanceHash(),
+					"key":              "value",
+					group.ConfigSHATag: config.InstanceHash(),
 				},
 			},
 			{
 				ID: instance.ID("unlabelled"),
 				Tags: map[string]string{
-					"key":     "value",
-					configTag: bootstrapConfigTag,
+					"key":              "value",
+					group.ConfigSHATag: bootstrapConfigTag,
 				},
 			},
 		}, nil),
 		instancePlugin.EXPECT().Label(instance.ID("unlabelled"), map[string]string{
-			"key":     "value",
-			configTag: config.InstanceHash(),
+			"key":              "value",
+			group.ConfigSHATag: config.InstanceHash(),
 		}).Return(nil),
 	)
 
@@ -170,21 +171,21 @@ func TestUnableToLabel(t *testing.T) {
 			{
 				ID: instance.ID("labbeled"),
 				Tags: map[string]string{
-					"key":     "value",
-					configTag: config.InstanceHash(),
+					"key":              "value",
+					group.ConfigSHATag: config.InstanceHash(),
 				},
 			},
 			{
 				ID: instance.ID("unlabelled"),
 				Tags: map[string]string{
-					"key":     "value",
-					configTag: bootstrapConfigTag,
+					"key":              "value",
+					group.ConfigSHATag: bootstrapConfigTag,
 				},
 			},
 		}, nil),
 		instancePlugin.EXPECT().Label(instance.ID("unlabelled"), map[string]string{
-			"key":     "value",
-			configTag: config.InstanceHash(),
+			"key":              "value",
+			group.ConfigSHATag: config.InstanceHash(),
 		}).Return(errors.New("BUG")),
 	)
 

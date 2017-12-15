@@ -518,7 +518,7 @@ func TestTerraformShowParseResultTagsList(t *testing.T) {
 		"ssh_key_ids":      []interface{}{123456},
 		"tags": []interface{}{
 			group.GroupTag + ":workers",
-			"infrakit.config_sha:tubmesopo6lrsfnl5otajlpvwd23v46j",
+			group.ConfigSHATag + ":tubmesopo6lrsfnl5otajlpvwd23v46j",
 			"name:instance-1499827079",
 			"infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker",
 			"swarm-id:c80s4c4kq0kgjs64ojxzvsdjz",
@@ -555,7 +555,7 @@ func TestTerraformShowParseResultTagsListWithFilters(t *testing.T) {
 		"cores": 1,
 		"tags": []interface{}{
 			group.GroupTag + ":workers",
-			"infrakit.config_sha:tubmesopo6lrsfnl5otajlpvwd23v46j",
+			group.ConfigSHATag + ":tubmesopo6lrsfnl5otajlpvwd23v46j",
 			"name:instance-1499827079",
 			"infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker",
 			"swarm-id:c80s4c4kq0kgjs64ojxzvsdjz",

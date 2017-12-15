@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	configTag    = "infrakit.config_sha"
 	logicalIDTag = "infrakit.logical_id"
 
 	debugV = logutil.V(300)
