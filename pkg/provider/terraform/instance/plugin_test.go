@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/afero"
@@ -4040,8 +4041,8 @@ func TestImportResourceTagMap(t *testing.T) {
 	}
 	spec := instance.Spec{
 		Tags: map[string]string{
-			"infrakit.group":      "managers",
-			"infrakit.config_sha": "bootstrap",
+			group.GroupTag:     "managers",
+			group.ConfigSHATag: "bootstrap",
 		},
 		Properties: types.AnyString(`
 {
@@ -4079,10 +4080,10 @@ func TestImportResourceTagMap(t *testing.T) {
 						"hostname": "actual-hostname",
 						"spec-key": "actual-val",
 						"tags": map[string]interface{}{
-							"imported-tag1":       "val1",
-							"t1":                  "v1",
-							"infrakit.group":      "managers",
-							"infrakit.config_sha": "bootstrap",
+							"imported-tag1":    "val1",
+							"t1":               "v1",
+							group.GroupTag:     "managers",
+							group.ConfigSHATag: "bootstrap",
 						},
 					},
 				},
@@ -4132,8 +4133,8 @@ func TestImportResourceTagSlice(t *testing.T) {
 	}
 	spec := instance.Spec{
 		Tags: map[string]string{
-			"infrakit.group":      "managers",
-			"infrakit.config_sha": "bootstrap",
+			group.GroupTag:     "managers",
+			group.ConfigSHATag: "bootstrap",
 		},
 		Properties: types.AnyString(`
 {
@@ -4172,8 +4173,8 @@ func TestImportResourceTagSlice(t *testing.T) {
 	delete(props, "tags")
 	require.Len(t, tags, 3)
 	require.Contains(t, tags, "t1:v1")
-	require.Contains(t, tags, "infrakit.group:managers")
-	require.Contains(t, tags, "infrakit.config_sha:bootstrap")
+	require.Contains(t, tags, group.GroupTag+":managers")
+	require.Contains(t, tags, group.ConfigSHATag+":bootstrap")
 	// Compare everythine else
 	require.Equal(t,
 		TResourceProperties{
@@ -4363,9 +4364,9 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 	}
 	spec := instance.Spec{
 		Tags: map[string]string{
-			"infrakit.group":      "managers",
-			"infrakit.config_sha": "bootstrap",
-			"LogicalID":           "mgr1",
+			group.GroupTag:     "managers",
+			group.ConfigSHATag: "bootstrap",
+			"LogicalID":        "mgr1",
 		},
 		Properties: types.AnyString(`
 {
@@ -4461,8 +4462,8 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 		delete(props, "tags")
 		require.Len(t, tags, 4)
 		require.Contains(t, tags, "logicalid:mgr1")
-		require.Contains(t, tags, "infrakit.group:managers")
-		require.Contains(t, tags, "infrakit.config_sha:bootstrap")
+		require.Contains(t, tags, group.GroupTag+":managers")
+		require.Contains(t, tags, group.ConfigSHATag+":bootstrap")
 		require.Contains(t, tags, "infrakit.attach:managers_dedicated_mgr1 managers_global")
 		// Compare everythine else
 		require.Equal(t,

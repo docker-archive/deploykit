@@ -8,6 +8,7 @@ import (
 
 	"github.com/digitalocean/godo"
 	itypes "github.com/docker/infrakit/pkg/provider/digitalocean/plugin/instance/types"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -299,7 +300,7 @@ func TestDescribeInstancesNone(t *testing.T) {
 			},
 		},
 	}
-	descriptions, err := plugin.DescribeInstances(map[string]string{"infrakit.group": "foo"}, false)
+	descriptions, err := plugin.DescribeInstances(map[string]string{group.GroupTag: "foo"}, false)
 
 	require.NoError(t, err)
 	assert.Len(t, descriptions, 0)
@@ -310,14 +311,14 @@ func TestDescribeInstances(t *testing.T) {
 		droplets: &fakeDropletsServices{
 			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
 				return []godo.Droplet{
-					godoDroplet(tags("infrakit.group:foo")),
-					godoDroplet(tags("infrakit.group:bar")),
-					godoDroplet(tags("infrakit.group:foo")),
+					godoDroplet(tags(group.GroupTag + ":foo")),
+					godoDroplet(tags(group.GroupTag + ":bar")),
+					godoDroplet(tags(group.GroupTag + ":foo")),
 				}, godoResponse(), nil
 			},
 		},
 	}
-	descriptions, err := plugin.DescribeInstances(map[string]string{"infrakit.group": "foo"}, true)
+	descriptions, err := plugin.DescribeInstances(map[string]string{group.GroupTag: "foo"}, true)
 
 	require.NoError(t, err)
 	assert.Len(t, descriptions, 2)
@@ -332,14 +333,14 @@ func TestDescribeInstancesHandlesPages(t *testing.T) {
 					resp = godoResponse()
 				}
 				return []godo.Droplet{
-					godoDroplet(tags("infrakit.group:foo")),
-					godoDroplet(tags("infrakit.group:bar")),
-					godoDroplet(tags("infrakit.group:foo")),
+					godoDroplet(tags(group.GroupTag + ":foo")),
+					godoDroplet(tags(group.GroupTag + ":bar")),
+					godoDroplet(tags(group.GroupTag + ":foo")),
 				}, resp, nil
 			},
 		},
 	}
-	descriptions, err := plugin.DescribeInstances(map[string]string{"infrakit.group": "foo"}, true)
+	descriptions, err := plugin.DescribeInstances(map[string]string{group.GroupTag: "foo"}, true)
 
 	require.NoError(t, err)
 	assert.Len(t, descriptions, 4)

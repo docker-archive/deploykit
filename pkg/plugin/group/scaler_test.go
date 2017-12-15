@@ -23,7 +23,7 @@ var (
 	withoutLabel = instance.Description{
 		ID: instance.ID("withoutLabel"),
 		Tags: map[string]string{
-			"infrakit.config_sha": "bootstrap",
+			group.ConfigSHATag: "bootstrap",
 		},
 	}
 )
@@ -218,7 +218,7 @@ func TestScalerPlanUpdateNoChanges(t *testing.T) {
 	existingInst := instance.Description{
 		ID: instance.ID("id1"),
 		Tags: map[string]string{
-			"infrakit.config_sha": settings.config.InstanceHash(),
+			group.ConfigSHATag: settings.config.InstanceHash(),
 		},
 	}
 	gomock.InOrder(
@@ -248,7 +248,7 @@ func TestScalerPlanUpdateRollingUpdate(t *testing.T) {
 	existingInst := instance.Description{
 		ID: instance.ID("id1"),
 		Tags: map[string]string{
-			"infrakit.config_sha": "different-hash",
+			group.ConfigSHATag: "different-hash",
 		},
 	}
 	gomock.InOrder(
@@ -290,7 +290,7 @@ func TestScalerPlanUpdateScaleDown(t *testing.T) {
 	existingInst := instance.Description{
 		ID: instance.ID("id1"),
 		Tags: map[string]string{
-			"infrakit.config_sha": settingsOld.config.InstanceHash(),
+			group.ConfigSHATag: settingsOld.config.InstanceHash(),
 		},
 	}
 	gomock.InOrder(
@@ -332,7 +332,7 @@ func TestScalerPlanUpdateScaleDownRollingUpdate(t *testing.T) {
 	existingInst := instance.Description{
 		ID: instance.ID("id1"),
 		Tags: map[string]string{
-			"infrakit.config_sha": "different-hash",
+			group.ConfigSHATag: "different-hash",
 		},
 	}
 	gomock.InOrder(
@@ -374,7 +374,7 @@ func TestScalerPlanUpdateScaleUp(t *testing.T) {
 	existingInst := instance.Description{
 		ID: instance.ID("id1"),
 		Tags: map[string]string{
-			"infrakit.config_sha": settingsOld.config.InstanceHash(),
+			group.ConfigSHATag: settingsOld.config.InstanceHash(),
 		},
 	}
 	gomock.InOrder(
@@ -416,7 +416,7 @@ func TestScalerPlanUpdateScaleUpRollingUpdate(t *testing.T) {
 	existingInst := instance.Description{
 		ID: instance.ID("id1"),
 		Tags: map[string]string{
-			"infrakit.config_sha": "different-hash",
+			group.ConfigSHATag: "different-hash",
 		},
 	}
 	gomock.InOrder(

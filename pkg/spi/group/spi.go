@@ -6,6 +6,13 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+const (
+	// GroupTag is the name of the tag that contains the group name
+	GroupTag = "infrakit.group"
+	// ConfigSHATag is the name of the tag that contains the group SHA hash
+	ConfigSHATag = "infrakit.config_sha"
+)
+
 // InterfaceSpec is the current name and version of the Group API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Group",
