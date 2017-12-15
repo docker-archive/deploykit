@@ -367,7 +367,8 @@ func stackCommand(scope scope.Scope, stackCommandName string) *cobra.Command {
 				}
 
 				if !foundObject {
-					os.Exit(1)
+					// http://tldp.org/LDP/abs/html/exitcodes.html
+					os.Exit(127)
 				}
 			}
 			return err
