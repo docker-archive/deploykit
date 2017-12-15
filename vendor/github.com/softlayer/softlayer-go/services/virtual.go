@@ -2097,6 +2097,12 @@ func (r Virtual_Guest_Block_Device_Template_Group) Offset(offset int) Virtual_Gu
 	return r
 }
 
+// This method allows you to mark this image template as customer managed software license (BYOL)
+func (r Virtual_Guest_Block_Device_Template_Group) AddByolAttribute() (resp bool, err error) {
+	err = r.Session.DoRequest("SoftLayer_Virtual_Guest_Block_Device_Template_Group", "addByolAttribute", nil, &r.Options, &resp)
+	return
+}
+
 // This method allows you to mark this image template as cloud init
 func (r Virtual_Guest_Block_Device_Template_Group) AddCloudInitAttribute() (resp bool, err error) {
 	err = r.Session.DoRequest("SoftLayer_Virtual_Guest_Block_Device_Template_Group", "addCloudInitAttribute", nil, &r.Options, &resp)
@@ -2139,6 +2145,12 @@ func (r Virtual_Guest_Block_Device_Template_Group) CreatePublicArchiveTransactio
 		locations,
 	}
 	err = r.Session.DoRequest("SoftLayer_Virtual_Guest_Block_Device_Template_Group", "createPublicArchiveTransaction", params, &r.Options, &resp)
+	return
+}
+
+// This method allows you to remove BYOL attribute for a given image template.
+func (r Virtual_Guest_Block_Device_Template_Group) DeleteByolAttribute() (resp bool, err error) {
+	err = r.Session.DoRequest("SoftLayer_Virtual_Guest_Block_Device_Template_Group", "deleteByolAttribute", nil, &r.Options, &resp)
 	return
 }
 
@@ -2205,6 +2217,12 @@ func (r Virtual_Guest_Block_Device_Template_Group) GetBlockDevicesDiskSpaceTotal
 // This method returns the boot mode, if any, set on a given image template.
 func (r Virtual_Guest_Block_Device_Template_Group) GetBootMode() (resp string, err error) {
 	err = r.Session.DoRequest("SoftLayer_Virtual_Guest_Block_Device_Template_Group", "getBootMode", nil, &r.Options, &resp)
+	return
+}
+
+// Retrieve A flag indicating that customer is providing the software licenses.
+func (r Virtual_Guest_Block_Device_Template_Group) GetByolFlag() (resp bool, err error) {
+	err = r.Session.DoRequest("SoftLayer_Virtual_Guest_Block_Device_Template_Group", "getByolFlag", nil, &r.Options, &resp)
 	return
 }
 
@@ -2313,6 +2331,12 @@ func (r Virtual_Guest_Block_Device_Template_Group) GetTransaction() (resp dataty
 // Returns an array of SoftLayer_Software_Description that are supported for VHD imports.
 func (r Virtual_Guest_Block_Device_Template_Group) GetVhdImportSoftwareDescriptions() (resp []datatypes.Software_Description, err error) {
 	err = r.Session.DoRequest("SoftLayer_Virtual_Guest_Block_Device_Template_Group", "getVhdImportSoftwareDescriptions", nil, &r.Options, &resp)
+	return
+}
+
+// This method indicates whether or not this image is a customer supplied license image.
+func (r Virtual_Guest_Block_Device_Template_Group) IsByol() (resp bool, err error) {
+	err = r.Session.DoRequest("SoftLayer_Virtual_Guest_Block_Device_Template_Group", "isByol", nil, &r.Options, &resp)
 	return
 }
 

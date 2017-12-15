@@ -386,6 +386,20 @@ type Ticket_Attachment_Manual_Payment struct {
 }
 
 // no documentation yet
+type Ticket_Attachment_Network_Storage_Mass_Data_Migration struct {
+	Ticket_Attachment
+
+	// The Mass Data Migration request that is attached to a ticket.
+	Request *Network_Storage_MassDataMigration_Request `json:"request,omitempty" xmlrpc:"request,omitempty"`
+
+	// no documentation yet
+	RequestId *int `json:"requestId,omitempty" xmlrpc:"requestId,omitempty"`
+
+	// The Mass Data Migration request that is attached to a ticket.
+	Resource *Network_Storage_MassDataMigration_Request `json:"resource,omitempty" xmlrpc:"resource,omitempty"`
+}
+
+// no documentation yet
 type Ticket_Attachment_Scheduled_Action struct {
 	Ticket_Attachment
 
@@ -394,6 +408,9 @@ type Ticket_Attachment_Scheduled_Action struct {
 
 	// The internal identifier of a scheduled action transaction that is attached to a ticket.
 	RunDate *Time `json:"runDate,omitempty" xmlrpc:"runDate,omitempty"`
+
+	// no documentation yet
+	ScheduledAction *Provisioning_Version1_Transaction `json:"scheduledAction,omitempty" xmlrpc:"scheduledAction,omitempty"`
 
 	// no documentation yet
 	Transaction *Provisioning_Version1_Transaction `json:"transaction,omitempty" xmlrpc:"transaction,omitempty"`
