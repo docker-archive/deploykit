@@ -119,9 +119,9 @@ func testBuildGroupSpec(groupID, properties string) group.Spec {
 func testBuildGlobalSpec(t *testing.T, gs group.Spec) globalSpec {
 	global := globalSpec{}
 	global.updateGroupSpec(gs, plugin.Name("group-stateless"))
-	global.data = []persisted{}
+	global.data = []entry{}
 	for k, r := range global.index {
-		global.data = append(global.data, persisted{Key: k, Record: r})
+		global.data = append(global.data, entry{Key: k, Record: r})
 	}
 	return global
 }
@@ -195,10 +195,10 @@ func TestStartOneLeader(t *testing.T) {
 
 	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &[]persisted{}
+			empty := &[]entry{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*[]persisted)
+					p, is := o.(*[]entry)
 					require.True(t, is)
 					*p = global.data
 					return nil
@@ -263,10 +263,10 @@ func TestChangeLeadership(t *testing.T) {
 
 	manager1, stoppable1 := testEnsemble(t, testDiscoveryDir(t), "m1", leaderChans[0], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &[]persisted{}
+			empty := &[]entry{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*[]persisted)
+					p, is := o.(*[]entry)
 					require.True(t, is)
 					*p = global.data
 					return nil
@@ -303,10 +303,10 @@ func TestChangeLeadership(t *testing.T) {
 		})
 	manager2, stoppable2 := testEnsemble(t, testDiscoveryDir(t), "m2", leaderChans[1], ctrl,
 		func(s *store_mock.MockSnapshot) {
-			empty := &[]persisted{}
+			empty := &[]entry{}
 			s.EXPECT().Load(gomock.Eq(empty)).Do(
 				func(o interface{}) error {
-					p, is := o.(*[]persisted)
+					p, is := o.(*[]entry)
 					require.True(t, is)
 					*p = global.data
 					return nil
