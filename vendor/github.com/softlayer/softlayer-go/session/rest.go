@@ -60,6 +60,10 @@ func (r *RestTransport) DoRequest(sess *Session, service string, method string, 
 		options)
 
 	if err != nil {
+		//Preserve the original sl error
+		if _, ok := err.(sl.Error); ok {
+			return err
+		}
 		return sl.Error{Wrapped: err, StatusCode: code}
 	}
 
