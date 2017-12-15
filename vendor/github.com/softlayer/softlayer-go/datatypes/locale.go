@@ -64,6 +64,9 @@ type Locale_Country struct {
 
 	// States that belong to this country.
 	States []Locale_StateProvince `json:"states,omitempty" xmlrpc:"states,omitempty"`
+
+	// no documentation yet
+	VatIdRegex *string `json:"vatIdRegex,omitempty" xmlrpc:"vatIdRegex,omitempty"`
 }
 
 // This object represents a state or province for a country.

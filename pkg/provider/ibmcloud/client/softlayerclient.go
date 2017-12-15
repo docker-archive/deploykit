@@ -14,7 +14,7 @@ type SoftlayerClient struct {
 // GetClient returns a SoftlayerClient instance
 func GetClient(user, apiKey string) *SoftlayerClient {
 	client := &SoftlayerClient{
-		sess: session.New(user, apiKey),
+		sess: session.New(user, apiKey).SetRetries(3),
 	}
 	return client
 }
