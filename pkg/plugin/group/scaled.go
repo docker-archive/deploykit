@@ -66,7 +66,7 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 	}
 
 	if logicalID != nil {
-		tags[logicalIDTag] = string(*logicalID)
+		tags[instance.LogicalIDTag] = string(*logicalID)
 	}
 
 	// Instances are tagged with a SHA of the entire instance configuration to support change detection.
@@ -149,7 +149,7 @@ func (s *scaledGroup) List() ([]instance.Description, error) {
 	for _, d := range found {
 
 		// Is there a tag for the logical ID and the logicalID field is not set?
-		if logicalIDString, has := d.Tags[logicalIDTag]; has && d.LogicalID == nil {
+		if logicalIDString, has := d.Tags[instance.LogicalIDTag]; has && d.LogicalID == nil {
 			logicalID := instance.LogicalID(logicalIDString)
 			d.LogicalID = &logicalID
 		}

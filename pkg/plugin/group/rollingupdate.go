@@ -23,7 +23,7 @@ func isSelf(inst instance.Description, settings groupSettings) bool {
 		if inst.LogicalID != nil && *inst.LogicalID == *settings.self {
 			return true
 		}
-		if v, has := inst.Tags[logicalIDTag]; has {
+		if v, has := inst.Tags[instance.LogicalIDTag]; has {
 			return string(*settings.self) == v
 		}
 	}

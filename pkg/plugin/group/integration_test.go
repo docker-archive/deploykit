@@ -117,7 +117,7 @@ func provisionTags(config group.Spec, logicalID *instance.LogicalID) map[string]
 	tags[group.ConfigSHATag] = group_types.MustParse(group_types.ParseProperties(config)).InstanceHash()
 
 	if logicalID != nil {
-		tags[logicalIDTag] = string(*logicalID)
+		tags[instance.LogicalIDTag] = string(*logicalID)
 	}
 	return tags
 }
@@ -540,7 +540,7 @@ func TestSuperviseQuorum(t *testing.T) {
 		expectTags := provisionTags(updated, i.LogicalID)
 		if i.LogicalID != nil {
 			// expect to also have a label with logical ID
-			expectTags[logicalIDTag] = string(*i.LogicalID)
+			expectTags[instance.LogicalIDTag] = string(*i.LogicalID)
 		}
 		require.Equal(t, expectTags, i.Tags)
 	}

@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	logicalIDTag = "infrakit.logical_id"
-
 	debugV = logutil.V(300)
 )
 
