@@ -6,6 +6,11 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+const (
+	// GroupTag is the name of the tag that contains the group name
+	GroupTag = "infrakit.group"
+)
+
 // InterfaceSpec is the current name and version of the Group API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Group",

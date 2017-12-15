@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	groupTag     = "infrakit.group"
 	configTag    = "infrakit.config_sha"
 	logicalIDTag = "infrakit.logical_id"
 
@@ -111,7 +110,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 
 	scaled := &scaledGroup{
 		settings:   settings,
-		memberTags: map[string]string{groupTag: string(config.ID)},
+		memberTags: map[string]string{group.GroupTag: string(config.ID)},
 	}
 
 	var supervisor Supervisor

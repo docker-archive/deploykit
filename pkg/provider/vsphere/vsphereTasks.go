@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 
 	"github.com/vmware/govmomi/find"
@@ -48,7 +49,7 @@ func cloneNewInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
 
 	// The only change we make to the Template Spec, is the config sha and group name
 	spec := types.VirtualMachineConfigSpec{
-		Annotation: vmSpec.Tags["infrakit.group"] + "\n" + vmSpec.Tags["infrakit.config_sha"] + "\n" + vm.annotation,
+		Annotation: vmSpec.Tags[group.GroupTag] + "\n" + vmSpec.Tags["infrakit.config_sha"] + "\n" + vm.annotation,
 	}
 
 	// Changes can be to spec or relocateSpec
@@ -64,19 +65,19 @@ func cloneNewInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error {
 	var vmFolder *object.Folder
 
 	// Check that a group has been submitted
-	if vmSpec.Tags["infrakit.group"] == "" {
+	if vmSpec.Tags[group.GroupTag] == "" {
 		vmFolder, err = f.DefaultFolder(ctx)
 	} else {
-		groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
+		groupFolder, err := f.Folder(ctx, vmSpec.Tags[group.GroupTag])
 		if err != nil {
 			log.Warn("Issues finding a group folder", "err", err)
-			groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags["infrakit.group"])
+			groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags[group.GroupTag])
 			if err != nil {
 				if err.Error() == "ServerFaultCode: The operation is not supported on the object." {
 					baseFolder, _ := dc.Folders(ctx)
 					groupFolder = baseFolder.VmFolder
 				} else {
-					if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags["infrakit.group"]+"' already exists." {
+					if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags[group.GroupTag]+"' already exists." {
 						return errors.New("A Virtual Machine exists with the same name as the InfraKit group")
 					}
 					log.Warn("Issues setting the group folder", "err", err)
@@ -123,7 +124,7 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 		Files:      &types.VirtualMachineFileInfo{VmPathName: fmt.Sprintf("[%s]", p.vCenterInternals.datastore.Name())},
 		NumCPUs:    int32(vm.vCpus),
 		MemoryMB:   int64(vm.mem),
-		Annotation: vmSpec.Tags["infrakit.group"] + "\n" + vmSpec.Tags["infrakit.config_sha"] + "\n" + vm.annotation,
+		Annotation: vmSpec.Tags[group.GroupTag] + "\n" + vmSpec.Tags["infrakit.config_sha"] + "\n" + vm.annotation,
 	}
 
 	scsi, err := object.SCSIControllerTypes().CreateSCSIController("pvscsi")
@@ -136,16 +137,16 @@ func createNewVMInstance(p *plugin, vm *vmInstance, vmSpec instance.Spec) error 
 		Device:    scsi,
 	})
 
-	groupFolder, err := f.Folder(ctx, vmSpec.Tags["infrakit.group"])
+	groupFolder, err := f.Folder(ctx, vmSpec.Tags[group.GroupTag])
 	if err != nil {
 		log.Warn("Issues finding a group folder", "err", err)
-		groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags["infrakit.group"])
+		groupFolder, err = p.vCenterInternals.dcFolders.VmFolder.CreateFolder(ctx, vmSpec.Tags[group.GroupTag])
 		if err != nil {
 			if err.Error() == "ServerFaultCode: The operation is not supported on the object." {
 				baseFolder, _ := dc.Folders(ctx)
 				groupFolder = baseFolder.VmFolder
 			} else {
-				if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags["infrakit.group"]+"' already exists." {
+				if err.Error() == "ServerFaultCode: The name '"+vmSpec.Tags[group.GroupTag]+"' already exists." {
 					return errors.New("A Virtual Machine exists with the same name as the InfraKit group")
 				}
 				log.Warn("Issues setting the group folder", "err", err)
@@ -384,7 +385,7 @@ func addISO(p *plugin, newInstance vmInstance, vm *object.VirtualMachine) error 
 
 func findGroupInstances(p *plugin, groupName string) ([]*object.VirtualMachine, error) { // Without a groupName we have nothing to search for
 	if groupName == "" {
-		return nil, errors.New("The tag infrakit.group was blank")
+		return nil, fmt.Errorf("The tag %s was blank", group.GroupTag)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

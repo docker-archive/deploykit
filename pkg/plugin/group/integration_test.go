@@ -109,7 +109,7 @@ func TestInvalidGroupCalls(t *testing.T) {
 }
 
 func memberTags(id group.ID) map[string]string {
-	return map[string]string{groupTag: string(id)}
+	return map[string]string{group.GroupTag: string(id)}
 }
 
 func provisionTags(config group.Spec, logicalID *instance.LogicalID) map[string]string {

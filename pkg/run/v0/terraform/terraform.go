@@ -199,7 +199,7 @@ func parseInstanceSpecFromGroup(scope scope.Scope, groupSpecURL, groupID string)
 			return nil, fmt.Errorf("Given spec ID '%v' does not match given group ID '%v'",
 				string(groupSpec.ID), groupID)
 		}
-		tags["infrakit.group"] = groupID
+		tags[group.GroupTag] = groupID
 	}
 	// Use the first logical ID if set
 	if len(groupProps.Allocation.LogicalIDs) > 0 {

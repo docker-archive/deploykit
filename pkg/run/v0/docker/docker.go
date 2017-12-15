@@ -14,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
 )
@@ -89,7 +90,7 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	// filter on containers managed by InfraKit
 	filter := filters.NewArgs()
-	filter.Add("label", "infrakit.group")
+	filter.Add("label", group.GroupTag)
 	listOptions := apitypes.ContainerListOptions{Filters: filter}
 	go func() {
 		tick := time.Tick(2 * time.Second)

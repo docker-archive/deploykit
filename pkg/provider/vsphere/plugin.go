@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 
@@ -134,7 +135,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	// Use the VMware plugin data in order to provision a new VM server
 	vmName := instance.ID(fmt.Sprintf(newVM.vmPrefix+"-%d", rand.Int63()))
 	if spec.Tags != nil {
-		log.Info("Provisioning", "vm", string(vmName), "group", spec.Tags["infrakit.group"])
+		log.Info("Provisioning", "vm", string(vmName), "group", spec.Tags[group.GroupTag])
 	} else {
 		log.Info("Provisioning", "vm", string(vmName))
 	}
@@ -204,7 +205,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	log.Debug(fmt.Sprintf("describe-instances: %v", tags))
 	results := []instance.Description{}
 
-	groupName := tags["infrakit.group"]
+	groupName := tags[group.GroupTag]
 
 	instances, err := findGroupInstances(p, groupName)
 	if err != nil {
@@ -250,7 +251,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 				provisioned = false
 			}
 		}
-		if provisioned == false && unprovisionedInstance.timer.After(time.Now()) && unprovisionedInstance.tags["infrakit.group"] == tags["infrakit.group"] {
+		if provisioned == false && unprovisionedInstance.timer.After(time.Now()) && unprovisionedInstance.tags[group.GroupTag] == tags[group.GroupTag] {
 			updatedFSM = append(updatedFSM, unprovisionedInstance)
 		}
 	}

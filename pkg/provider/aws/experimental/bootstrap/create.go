@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"text/template"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
@@ -14,9 +18,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
-	"strings"
-	"text/template"
-	"time"
 )
 
 func createEBSVolumes(config client.ConfigProvider, spec clusterSpec) error {
@@ -514,7 +515,7 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 
 	return ProvisionManager(
 		provisioner,
-		map[string]string{"infrakit.group": string(managerGroup.Name)},
+		map[string]string{group.GroupTag: string(managerGroup.Name)},
 		rawConfig,
 		spec.ManagerIPs[0])
 }
