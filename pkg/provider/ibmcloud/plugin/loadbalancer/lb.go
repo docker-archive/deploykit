@@ -88,7 +88,7 @@ func NewIBMCloudLBPlugin(username, apikey, lbName, lbUUID string) (loadbalancer.
 	}
 
 	// Create the session object and get the services object once
-	lb.session = session.New(lb.softlayerUsername, lb.softlayerAPIKey, softLayerEndpointURL)
+	lb.session = session.New(lb.softlayerUsername, lb.softlayerAPIKey, softLayerEndpointURL).SetRetries(3)
 	lb.lbService = services.GetNetworkLBaaSLoadBalancerService(lb.session)
 	lb.certService = services.GetSecurityCertificateService(lb.session)
 	lb.lbListenerService = services.GetNetworkLBaaSListenerService(lb.session)

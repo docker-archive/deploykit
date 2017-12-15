@@ -402,6 +402,12 @@ func (r Product_Item_Price) GetCategories() (resp []datatypes.Product_Item_Categ
 	return
 }
 
+// Retrieve Signifies pricing that is only available on a dedicated host virtual server order.
+func (r Product_Item_Price) GetDedicatedHostInstanceFlag() (resp bool, err error) {
+	err = r.Session.DoRequest("SoftLayer_Product_Item_Price", "getDedicatedHostInstanceFlag", nil, &r.Options, &resp)
+	return
+}
+
 // Retrieve Whether this price defines a software license for its product item.
 func (r Product_Item_Price) GetDefinedSoftwareLicenseFlag() (resp bool, err error) {
 	err = r.Session.DoRequest("SoftLayer_Product_Item_Price", "getDefinedSoftwareLicenseFlag", nil, &r.Options, &resp)
@@ -447,6 +453,12 @@ func (r Product_Item_Price) GetPackages() (resp []datatypes.Product_Package, err
 // Retrieve A list of preset configurations this price is used in.'
 func (r Product_Item_Price) GetPresetConfigurations() (resp []datatypes.Product_Package_Preset_Configuration, err error) {
 	err = r.Session.DoRequest("SoftLayer_Product_Item_Price", "getPresetConfigurations", nil, &r.Options, &resp)
+	return
+}
+
+// Retrieve The type keyname of this price which can be STANDARD or TIERED.
+func (r Product_Item_Price) GetPriceType() (resp string, err error) {
+	err = r.Session.DoRequest("SoftLayer_Product_Item_Price", "getPriceType", nil, &r.Options, &resp)
 	return
 }
 
@@ -1187,6 +1199,12 @@ func (r Product_Package) Limit(limit int) Product_Package {
 func (r Product_Package) Offset(offset int) Product_Package {
 	r.Options.Offset = &offset
 	return r
+}
+
+// Retrieve The preset configurations available only for the authenticated account and this package.
+func (r Product_Package) GetAccountRestrictedActivePresets() (resp []datatypes.Product_Package_Preset, err error) {
+	err = r.Session.DoRequest("SoftLayer_Product_Package", "getAccountRestrictedActivePresets", nil, &r.Options, &resp)
+	return
 }
 
 // Retrieve The results from this call are similar to [[SoftLayer_Product_Package/getCategories|getCategories]], but these ONLY include account-restricted prices. Not all accounts have restricted pricing.

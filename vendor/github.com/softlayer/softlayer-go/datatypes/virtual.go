@@ -829,6 +829,9 @@ type Virtual_Guest_Block_Device_Template_Group struct {
 	// The total disk space of all images in a image template group.
 	BlockDevicesDiskSpaceTotal *Float64 `json:"blockDevicesDiskSpaceTotal,omitempty" xmlrpc:"blockDevicesDiskSpaceTotal,omitempty"`
 
+	// A flag indicating that customer is providing the software licenses.
+	ByolFlag *bool `json:"byolFlag,omitempty" xmlrpc:"byolFlag,omitempty"`
+
 	// The image template groups that are clones of an image template group.
 	Children []Virtual_Guest_Block_Device_Template_Group `json:"children,omitempty" xmlrpc:"children,omitempty"`
 
@@ -1145,14 +1148,14 @@ type Virtual_Guest_Status struct {
 type Virtual_Guest_SupplementalCreateObjectOptions struct {
 	Entity
 
+	// When set the startCpus and maxMemory are defined by the flavor. If the flavor includes local storage blockDevice 0 is also defined by the flavor. When startCpus, maxMemory, or blockDevice 0 are also provided on the template object they are validated against the flavor provided.
+	FlavorKeyName *string `json:"flavorKeyName,omitempty" xmlrpc:"flavorKeyName,omitempty"`
+
 	// When explicitly set to true, createObject(s) will fail unless the order is started automatically. This can be used by automated systems to fail an order that might otherwise require manual approval. For multi-guest orders via [[SoftLayer_Virtual_Guest/createObjects|createObjects]], this value must be the exact same for every item.
 	ImmediateApprovalOnlyFlag *bool `json:"immediateApprovalOnlyFlag,omitempty" xmlrpc:"immediateApprovalOnlyFlag,omitempty"`
 
 	// URI of the script to be downloaded and executed after installation is complete. This can be different for each virtual guest when multiple are sent to [[SoftLayer_Virtual_Guest/createObjects|createObjects]].
 	PostInstallScriptUri *string `json:"postInstallScriptUri,omitempty" xmlrpc:"postInstallScriptUri,omitempty"`
-
-	// When set the configuration defined by this preset overrides the related options set on the template.
-	PresetConfigurationKeyName *string `json:"presetConfigurationKeyName,omitempty" xmlrpc:"presetConfigurationKeyName,omitempty"`
 }
 
 // SoftLayer_Virtual_Guest_Type models the type of a [[SoftLayer_Virtual_Guest]] (PUBLIC | DEDICATED | PRIVATE)
