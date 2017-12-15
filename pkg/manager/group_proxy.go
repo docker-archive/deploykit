@@ -73,7 +73,7 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 
 	m.backendOps <- backendOp{
 		name: "commit",
-		operation: func() error {
+		operation: func() (bool, error) {
 			log.Debug("Manager CommitGroup", "spec", grp, "V", debugV)
 
 			var txnResp string
@@ -90,12 +90,12 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 					log.Error("Error updating", "err", updateErr)
 					txnErr = updateErr
 					txnResp = "Cannot update spec. Abort"
-					return txnErr
+					return false, txnErr
 				}
 			}
 
 			txnResp, txnErr = m.Plugin.CommitGroup(grp, pretend)
-			return txnErr
+			return false, txnErr
 		},
 	}
 
@@ -116,7 +116,7 @@ func (m *manager) DescribeGroup(id group.ID) (desc group.Description, err error)
 
 	m.backendOps <- backendOp{
 		name: "describe",
-		operation: func() error {
+		operation: func() (bool, error) {
 			log.Debug("Manager DescribeGroup", "id", id, "V", debugV)
 
 			var txnResp group.Description
@@ -128,7 +128,7 @@ func (m *manager) DescribeGroup(id group.ID) (desc group.Description, err error)
 			}()
 
 			txnResp, txnErr = m.Plugin.DescribeGroup(id)
-			return txnErr
+			return false, txnErr
 		},
 	}
 
@@ -149,7 +149,7 @@ func (m *manager) DestroyGroup(id group.ID) (err error) {
 
 	m.backendOps <- backendOp{
 		name: "destroy",
-		operation: func() error {
+		operation: func() (bool, error) {
 			log.Debug("Manager DestroyGroup", "groupID", id, "V", debugV)
 
 			var txnErr error
@@ -163,11 +163,11 @@ func (m *manager) DestroyGroup(id group.ID) (err error) {
 			if removeErr := m.removeConfig(id); removeErr != nil {
 				log.Warn("Error updating/ remove", "err", removeErr)
 				txnErr = removeErr
-				return txnErr
+				return false, txnErr
 			}
 
 			txnErr = m.Plugin.DestroyGroup(id)
-			return txnErr
+			return false, txnErr
 		},
 	}
 
@@ -185,7 +185,7 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 
 	m.backendOps <- backendOp{
 		name: "free",
-		operation: func() error {
+		operation: func() (bool, error) {
 			log.Debug("Manager FreeGroup", "groupID", id, "V", debugV)
 
 			var txnErr error
@@ -199,11 +199,11 @@ func (m *manager) FreeGroup(id group.ID) (err error) {
 			if removeErr := m.removeConfig(id); removeErr != nil {
 				log.Warn("Error updating / remove", "err", removeErr)
 				txnErr = removeErr
-				return txnErr
+				return false, txnErr
 			}
 
 			txnErr = m.Plugin.FreeGroup(id)
-			return txnErr
+			return false, txnErr
 		},
 	}
 
@@ -221,7 +221,7 @@ func (m *manager) DestroyInstances(id group.ID, instances []instance.ID) (err er
 
 	m.backendOps <- backendOp{
 		name: "destroyInstances",
-		operation: func() error {
+		operation: func() (bool, error) {
 			log.Debug("Manager DestroyInstances", "groupID", id, "instances", instances, "V", debugV)
 
 			var txnErr error
@@ -232,7 +232,7 @@ func (m *manager) DestroyInstances(id group.ID, instances []instance.ID) (err er
 			}()
 
 			txnErr = m.Plugin.DestroyInstances(id, instances)
-			return txnErr
+			return false, txnErr
 		},
 	}
 

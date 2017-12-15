@@ -19,5 +19,5 @@ infrakit plugin start \
 	 simulator:nfs-auth \
 	 enrollment:nfs \
 	 --log 5 --log-debug-V 500 --log-stack \
-	 --log-debug-match module=controller/enrollment \
+	 --log-debug-match module=manager \
 	 --log-debug-match-exclude=false \

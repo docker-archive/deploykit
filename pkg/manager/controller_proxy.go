@@ -91,10 +91,10 @@ func (m controllerAdapter) queue(name string, work func() error) <-chan struct{}
 	wait := make(chan struct{})
 	m.manager.backendOps <- backendOp{
 		name: name,
-		operation: func() error {
+		operation: func() (bool, error) {
 			err := work()
 			close(wait)
-			return err
+			return false, err
 		},
 	}
 	return wait
