@@ -19,7 +19,7 @@ note "Plugin start pid=$starterpid"
 
 sleep 5
 
-found=$(infrakit local -h | grep 'testlogs')
+found=$(infrakit plugin ls | grep 'testlogs')
 if [ "$found" = "" ]; then
     echo "tailer not started"
     exit 1
@@ -77,9 +77,9 @@ infrakit local mystack/groups commit-group scripts/cattle.json
 
 sleep 10
 
-if [[ $(infrakit local -h | grep mystack/cattle) == "" ]]; then
+if [[ $(infrakit local | grep mystack/cattle) == "" ]]; then
     echo "checking the CLI"
-    infrakit local -h
+    infrakit local
 fi
 expect_output_lines "Should be watching one group" "infrakit local mystack/cattle ls -q" "5"
 
