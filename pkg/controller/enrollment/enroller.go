@@ -69,10 +69,9 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 	l.poller = controller.Poll(
 		// This determines if the action should be taken when time is up
 		func() bool {
-			if mustTrue(l.isLeader()) {
-				return true
-			}
-			return false
+			isLeader := mustTrue(l.isLeader())
+			log.Debug("polling", "isLeader", isLeader, "V", debugV2)
+			return isLeader
 		},
 		// This does the work
 		func() (err error) {
