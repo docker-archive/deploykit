@@ -26,6 +26,80 @@ func (f fakeSnapshot) Load(obj interface{}) error {
 	return f.LoadFunc(obj)
 }
 
+func TestSortRecords(t *testing.T) {
+
+	rank := kindRank["simulator"]
+	require.Equal(t, 0, rank)
+
+	require.True(t, kindRank["group"] < kindRank["ingress"])
+
+	g := globalSpec{}
+
+	s0 := types.Spec{
+		Kind: "group",
+		Metadata: types.Metadata{
+			Name: "workers",
+		},
+		Properties: types.AnyValueMust(map[string]interface{}{"size": 10}),
+	}
+	g.updateSpec(s0, plugin.Name("group-stateless"))
+
+	s1 := types.Spec{
+		Kind: "group",
+		Metadata: types.Metadata{
+			Name: "managers",
+		},
+		Properties: types.AnyValueMust(map[string]interface{}{"size": 3}),
+	}
+	g.updateSpec(s1, plugin.Name("group-stateless"))
+
+	s2 := types.Spec{
+		Kind: "enrollment",
+		Metadata: types.Metadata{
+			Name: "nfs/workers",
+		},
+		Properties: types.AnyValueMust(map[string]interface{}{"shared": true}),
+	}
+	g.updateSpec(s2, plugin.Name("enrollment"))
+
+	s3 := types.Spec{
+		Kind: "ingress",
+		Metadata: types.Metadata{
+			Name: "workers/ingress",
+		},
+		Properties: types.AnyValueMust(map[string]interface{}{"routes": 10}),
+	}
+	g.updateSpec(s3, plugin.Name("ingress"))
+
+	ordered := []key{
+		{
+			Kind: s1.Kind,
+			Name: s1.Metadata.Name,
+		},
+		{
+			Kind: s0.Kind,
+			Name: s0.Metadata.Name,
+		},
+		{
+			Kind: s3.Kind,
+			Name: s3.Metadata.Name,
+		},
+		{
+			Kind: s2.Kind,
+			Name: s2.Metadata.Name,
+		},
+	}
+	require.Equal(t, ordered, g.orderedKeys())
+
+	visited := []key{}
+	err := g.visit(func(k key, r record) error {
+		visited = append(visited, k)
+		return nil
+	})
+	require.Equal(t, ordered, visited)
+	require.NoError(t, err)
+}
+
 func TestStoredRecords(t *testing.T) {
 
 	g := globalSpec{}
@@ -73,11 +147,11 @@ func TestStoredRecords(t *testing.T) {
 
 	g.updateGroupSpec(group.Spec{ID: group.ID("managers"), Properties: s.Properties}, plugin.Name("group-stateless"))
 
-	called := make(chan []persisted, 1)
+	called := make(chan []entry, 1)
 
 	store := fakeSnapshot{
 		SaveFunc: func(o interface{}) error {
-			if v, is := o.([]persisted); is {
+			if v, is := o.([]entry); is {
 				called <- v
 				close(called)
 			}
@@ -88,7 +162,7 @@ func TestStoredRecords(t *testing.T) {
 	require.NoError(t, g.store(store))
 
 	v := <-called
-	require.EqualValues(t, []persisted{
+	require.EqualValues(t, []entry{
 		{
 			Key: key{Kind: "group", Name: "managers"},
 			Record: record{Handler: plugin.Name("group-stateless"),
