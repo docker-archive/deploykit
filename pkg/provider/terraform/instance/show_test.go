@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/stretchr/testify/require"
 
 	. "github.com/docker/infrakit/pkg/testing"
@@ -516,8 +517,8 @@ func TestTerraformShowParseResultTagsList(t *testing.T) {
 		"memory":           2048,
 		"ssh_key_ids":      []interface{}{123456},
 		"tags": []interface{}{
-			"infrakit.group:workers",
-			"infrakit.config_sha:tubmesopo6lrsfnl5otajlpvwd23v46j",
+			group.GroupTag + ":workers",
+			group.ConfigSHATag + ":tubmesopo6lrsfnl5otajlpvwd23v46j",
 			"name:instance-1499827079",
 			"infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker",
 			"swarm-id:c80s4c4kq0kgjs64ojxzvsdjz",
@@ -553,8 +554,8 @@ func TestTerraformShowParseResultTagsListWithFilters(t *testing.T) {
 		"id":    36147555,
 		"cores": 1,
 		"tags": []interface{}{
-			"infrakit.group:workers",
-			"infrakit.config_sha:tubmesopo6lrsfnl5otajlpvwd23v46j",
+			group.GroupTag + ":workers",
+			group.ConfigSHATag + ":tubmesopo6lrsfnl5otajlpvwd23v46j",
 			"name:instance-1499827079",
 			"infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker",
 			"swarm-id:c80s4c4kq0kgjs64ojxzvsdjz",

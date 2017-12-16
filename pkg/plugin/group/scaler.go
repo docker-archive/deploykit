@@ -244,7 +244,7 @@ func (s *scaler) converge() {
 
 	case actualSize > desiredSize:
 		remove := actualSize - desiredSize
-		log.Info("Removing instances", "remove", remove, "desired", desiredSize)
+		log.Info("Removing instances", "actualSize", actualSize, "remove", remove, "desired", desiredSize)
 
 		sorted := make([]instance.Description, len(descriptions))
 		copy(sorted, descriptions)
@@ -266,7 +266,7 @@ func (s *scaler) converge() {
 
 	case actualSize < desiredSize:
 		add := desiredSize - actualSize
-		log.Info("Adding instances to group", "add", add, "desired", desiredSize)
+		log.Info("Adding instances to group", "actualSize", actualSize, "add", add, "desired", desiredSize)
 
 		for i := 0; i < int(add); i++ {
 			grp.Add(1)

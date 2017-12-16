@@ -111,11 +111,17 @@ type Product_Item struct {
 	// An item's special billing type, if applicable.
 	BillingType *string `json:"billingType,omitempty" xmlrpc:"billingType,omitempty"`
 
-	// An item's included products. Some items have other items included in them that we specifically detail. They are here called Bundled Items. An example is Plesk unlimited. It as a bundled item labeled 'SiteBuilder'. These are the SoftLayer_Product_Item_Bundles objects.
+	// An item's included product item references. Some items have other items included in them that we specifically detail. They are here called Bundled Items. An example is Plesk unlimited. It as a bundled item labeled 'SiteBuilder'. These are the SoftLayer_Product_Item_Bundles objects. See the SoftLayer_Product_Item::bundleItems property for bundle of SoftLayer_Product_Item of objects.
 	Bundle []Product_Item_Bundles `json:"bundle,omitempty" xmlrpc:"bundle,omitempty"`
 
-	// A count of an item's included products. Some items have other items included in them that we specifically detail. They are here called Bundled Items. An example is Plesk unlimited. It as a bundled item labeled 'SiteBuilder'. These are the SoftLayer_Product_Item_Bundles objects.
+	// A count of an item's included product item references. Some items have other items included in them that we specifically detail. They are here called Bundled Items. An example is Plesk unlimited. It as a bundled item labeled 'SiteBuilder'. These are the SoftLayer_Product_Item_Bundles objects. See the SoftLayer_Product_Item::bundleItems property for bundle of SoftLayer_Product_Item of objects.
 	BundleCount *uint `json:"bundleCount,omitempty" xmlrpc:"bundleCount,omitempty"`
+
+	// A count of an item's included products. Some items have other items included in them that we specifically detail. They are here called Bundled Items. An example is Plesk unlimited. It as a bundled item labeled 'SiteBuilder'. These are the SoftLayer_Product_Item objects.
+	BundleItemCount *uint `json:"bundleItemCount,omitempty" xmlrpc:"bundleItemCount,omitempty"`
+
+	// An item's included products. Some items have other items included in them that we specifically detail. They are here called Bundled Items. An example is Plesk unlimited. It as a bundled item labeled 'SiteBuilder'. These are the SoftLayer_Product_Item objects.
+	BundleItems []Product_Item `json:"bundleItems,omitempty" xmlrpc:"bundleItems,omitempty"`
 
 	// Some Product Items have capacity information such as RAM and bandwidth, and others. This provides the numerical representation of the capacity given in the description of this product item.
 	Capacity *Float64 `json:"capacity,omitempty" xmlrpc:"capacity,omitempty"`
@@ -601,6 +607,9 @@ type Product_Item_Price struct {
 	// This flag is used by the [[SoftLayer_Hardware::getUpgradeItems|getUpgradeItems]] method to indicate if a product price is used for the current billing item.
 	CurrentPriceFlag *bool `json:"currentPriceFlag,omitempty" xmlrpc:"currentPriceFlag,omitempty"`
 
+	// Signifies pricing that is only available on a dedicated host virtual server order.
+	DedicatedHostInstanceFlag *bool `json:"dedicatedHostInstanceFlag,omitempty" xmlrpc:"dedicatedHostInstanceFlag,omitempty"`
+
 	// Whether this price defines a software license for its product item.
 	DefinedSoftwareLicenseFlag *bool `json:"definedSoftwareLicenseFlag,omitempty" xmlrpc:"definedSoftwareLicenseFlag,omitempty"`
 
@@ -666,6 +675,9 @@ type Product_Item_Price struct {
 	// A list of preset configurations this price is used in.'
 	PresetConfigurations []Product_Package_Preset_Configuration `json:"presetConfigurations,omitempty" xmlrpc:"presetConfigurations,omitempty"`
 
+	// The type keyname of this price which can be STANDARD or TIERED.
+	PriceType *string `json:"priceType,omitempty" xmlrpc:"priceType,omitempty"`
+
 	// The pricing location group that this price is applicable for. Prices that have a pricing location group will only be available for ordering with the locations specified on the location group.
 	PricingLocationGroup *Location_Group_Pricing `json:"pricingLocationGroup,omitempty" xmlrpc:"pricingLocationGroup,omitempty"`
 
@@ -692,6 +704,9 @@ type Product_Item_Price struct {
 
 	// Used for ordering items on sales orders.
 	Sort *int `json:"sort,omitempty" xmlrpc:"sort,omitempty"`
+
+	// The minimum threshold for which this tiered usage price begins to apply.  The unit for the price is defined by the item to which this belongs, see [[SoftLayer_Product_Item::$units]].
+	TierMinimumThreshold *int `json:"tierMinimumThreshold,omitempty" xmlrpc:"tierMinimumThreshold,omitempty"`
 
 	// The rate for a usage based item
 	UsageRate *Float64 `json:"usageRate,omitempty" xmlrpc:"usageRate,omitempty"`
@@ -1008,6 +1023,12 @@ type Product_Order struct {
 // The SoftLayer_Product_Package data type contains information about packages from which orders can be generated. Packages contain general information regarding what is in them, where they are currently sold, availability, and pricing.
 type Product_Package struct {
 	Entity
+
+	// A count of the preset configurations available only for the authenticated account and this package.
+	AccountRestrictedActivePresetCount *uint `json:"accountRestrictedActivePresetCount,omitempty" xmlrpc:"accountRestrictedActivePresetCount,omitempty"`
+
+	// The preset configurations available only for the authenticated account and this package.
+	AccountRestrictedActivePresets []Product_Package_Preset `json:"accountRestrictedActivePresets,omitempty" xmlrpc:"accountRestrictedActivePresets,omitempty"`
 
 	// The results from this call are similar to [[SoftLayer_Product_Package/getCategories|getCategories]], but these ONLY include account-restricted prices. Not all accounts have restricted pricing.
 	AccountRestrictedCategories []Product_Item_Category `json:"accountRestrictedCategories,omitempty" xmlrpc:"accountRestrictedCategories,omitempty"`

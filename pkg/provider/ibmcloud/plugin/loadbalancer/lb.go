@@ -88,7 +88,7 @@ func NewIBMCloudLBPlugin(username, apikey, lbName, lbUUID string) (loadbalancer.
 	}
 
 	// Create the session object and get the services object once
-	lb.session = session.New(lb.softlayerUsername, lb.softlayerAPIKey, softLayerEndpointURL)
+	lb.session = session.New(lb.softlayerUsername, lb.softlayerAPIKey, softLayerEndpointURL).SetRetries(3)
 	lb.lbService = services.GetNetworkLBaaSLoadBalancerService(lb.session)
 	lb.certService = services.GetSecurityCertificateService(lb.session)
 	lb.lbListenerService = services.GetNetworkLBaaSListenerService(lb.session)
@@ -239,7 +239,7 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 		}
 		// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 		if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-			logger.Info("Publish", "name", l.name, "state", "Update pending")
+			logger.Debug("Publish", "name", l.name, "state", "Update pending", "V", debugV1)
 			time.Sleep(updateRetryTime)
 		} else {
 			return nil, err
@@ -282,7 +282,7 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 			}
 			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-				logger.Info("Publish", "name", l.name, "state", "Update pending")
+				logger.Debug("Publish", "name", l.name, "state", "Update pending", "V", debugV1)
 				time.Sleep(updateRetryTime)
 			} else {
 				return nil, err
@@ -321,7 +321,7 @@ func (l *ibmcloudlb) Unpublish(extPort int) (loadbalancer.Result, error) {
 				}
 				// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 				if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-					logger.Info("Unpublish", "name", l.name, "state", "Update pending")
+					logger.Debug("Unpublish", "name", l.name, "state", "Update pending", "V", debugV1)
 					time.Sleep(updateRetryTime)
 				} else {
 					return nil, err
@@ -427,7 +427,7 @@ func (l *ibmcloudlb) RegisterBackends(ids []instance.ID) (loadbalancer.Result, e
 			}
 			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-				logger.Info("RegisterBackends", "name", l.name, "state", "Update pending")
+				logger.Debug("RegisterBackends", "name", l.name, "state", "Update pending", "V", debugV1)
 				time.Sleep(updateRetryTime)
 			} else {
 				return nil, err
@@ -484,7 +484,7 @@ func (l *ibmcloudlb) DeregisterBackends(ids []instance.ID) (loadbalancer.Result,
 			}
 			// Check for the lb is in state UPDATE_PENDING. (HTTP 500)
 			if strings.Contains(err.Error(), "UPDATE_PENDING") && attempt <= updateRetryCount {
-				logger.Info("DeregisterBackends", "name", l.name, "state", "Update pending")
+				logger.Debug("DeregisterBackends", "name", l.name, "state", "Update pending", "V", debugV1)
 				time.Sleep(updateRetryTime)
 			} else {
 				return nil, err

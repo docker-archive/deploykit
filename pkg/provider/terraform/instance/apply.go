@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/deckarep/golang-set"
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	"github.com/docker/infrakit/pkg/types"
@@ -41,9 +40,9 @@ func (p *plugin) terraformApply() error {
 	if p.applying {
 		select {
 		case p.pollChannel <- true:
-			log.Infoln("Successfully interrupted terraform apply goroutine")
+			logger.Info("terraformApply", "msg", "Successfully interrupted terraform apply goroutine")
 		default:
-			log.Infoln("Polling channel is full, not interrupting")
+			logger.Info("terraformApply", "msg", "Polling channel is full, not interrupting")
 		}
 		return nil
 	}
@@ -84,7 +83,7 @@ func (p *plugin) terraformApply() error {
 							continue
 						}
 						if err != nil {
-							log.Errorf("Failed to determine file deltas: %v", err)
+							logger.Error("terraformApply", "msg", "Failed to determine file deltas", "error", err)
 						}
 						break
 					}
@@ -93,13 +92,13 @@ func (p *plugin) terraformApply() error {
 					if err = p.doTerraformApply(); err == nil {
 						initial = false
 					} else {
-						log.Errorf("Failed to execute 'terraform apply': %v", err)
+						logger.Error("terraformApply", "msg", "Failed to execute 'terraform apply'", "error", err)
 					}
 				} else {
-					log.Errorf("Not executing 'terraform apply' due to error: %v", err)
+					logger.Error("terraformApply", "msg", "Not executing 'terraform apply'", "error", err)
 				}
 			} else {
-				log.Infof("Not applying terraform, checking again in %v seconds", p.pollInterval)
+				logger.Info("terraformApply", "msg", fmt.Sprintf("Not applying terraform, checking again in %v", p.pollInterval))
 			}
 
 			select {
@@ -120,7 +119,7 @@ func (p *plugin) terraformApply() error {
 
 // doTerraformApply executes "terraform apply"
 func (p *plugin) doTerraformApply() error {
-	log.Infoln("Applying plan")
+	logger.Info("doTerraformApply", "msg", "Applying plan")
 	command := exec.Command("terraform apply -refresh=false").
 		InheritEnvs(true).
 		WithEnvs(p.envs...).
@@ -142,19 +141,19 @@ func (p *plugin) shouldApply() bool {
 	}
 	manager, err := manager_discovery.Locate(p.pluginLookup)
 	if err != nil {
-		log.Errorf("Failed to locate manager plugin: %v", err)
+		logger.Error("shouldApply", "msg", "Failed to locate manager plugin", "error", err)
 		return false
 	}
 	isLeader, err := manager.IsLeader()
 	if err != nil {
-		log.Errorf("Failed to determine manager leadership: %v", err)
+		logger.Error("shouldApply", "msg", "Failed to determine manager leadership", "error", err)
 		return false
 	}
 	if isLeader {
-		log.Debugf("Running on leader manager, applying terraform")
+		logger.Debug("shouldApply", "msg", "Running on leader manager, applying terraform", "V", debugV1)
 		return true
 	}
-	log.Infof("Not running on leader manager, not applying terraform")
+	logger.Info("shouldApply", "msg", "Not running on leader manager, not applying terraform")
 	return false
 }
 
@@ -178,7 +177,7 @@ func (p *plugin) hasRecentDeltas(window int) (bool, error) {
 	err := fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				log.Debugf("Ignoring file %s due to error: %s", path, err)
+				logger.Debug("hasRecentDeltas", "msg", fmt.Sprintf("Ignoring file %s due to error", path), "error", err, "V", debugV3)
 				return nil
 			}
 			if m := tfFileRegex.FindStringSubmatch(info.Name()); len(m) == 3 {
@@ -188,11 +187,11 @@ func (p *plugin) hasRecentDeltas(window int) (bool, error) {
 					// that's a full day ahead we'd never process terraform until the local time catches
 					// up -- this should never happen but we should handle it)
 					if info.ModTime().After(now.Add(time.Duration(30) * time.Second)) {
-						log.Errorf(fmt.Sprintf(
-							"Terraform file %v has been updated in the future, ignoring timestamp in delta check (delta=%v)",
-							info.Name(),
-							now.Sub(info.ModTime())),
-						)
+						logger.Error("hasRecentDeltas",
+							"msg",
+							fmt.Sprintf("Terraform file %v has been updated in the future, ignoring timestamp in delta check (delta=%v)",
+								info.Name(),
+								now.Sub(info.ModTime())))
 						return nil
 					}
 				}
@@ -208,18 +207,14 @@ func (p *plugin) hasRecentDeltas(window int) (bool, error) {
 	}
 	if !modTime.IsZero() {
 		if modTime.After(now.Add(-(time.Duration(window) * time.Second))) {
-			log.Infof(fmt.Sprintf(
-				"Terraform file updates are within %v seconds (delta=%v)",
-				window,
-				now.Sub(modTime)),
-			)
+			logger.Info("hasRecentDeltas",
+				"msg",
+				fmt.Sprintf("Terraform file updates are within %v seconds (delta=%v)", window, now.Sub(modTime)))
 			return true, nil
 		}
-		log.Infof(fmt.Sprintf(
-			"Terraform file updates are outside of %v seconds (delta=%v)",
-			window,
-			now.Sub(modTime)),
-		)
+		logger.Info("hasRecentDeltas",
+			"msg",
+			fmt.Sprintf("Terraform file updates are within %v seconds (delta=%v)", window, now.Sub(modTime)))
 	}
 	return false, nil
 }
@@ -276,7 +271,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	err = fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				log.Debugf("Ignoring file %s due to error: %s", path, err)
+				logger.Debug("handleFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
 				return nil
 			}
 			// Only the VM files are valid for pruning; once pruned then the group controller polling will
@@ -285,7 +280,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 			if m := instanceTfFileRegex.FindStringSubmatch(info.Name()); len(m) == 4 && m[3] == "" {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
-					log.Warningln("Cannot parse:", err)
+					logger.Warn("handleFiles", "msg", fmt.Sprintf("Cannot parse file %s", path), "error", err)
 					return err
 				}
 				tf := TFormat{}
@@ -298,7 +293,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 							tfInstFiles[resType] = map[TResourceName]TResourceFilenameProps{}
 						}
 						addToResTypeNamePropsMap(tfInstFiles, resType, resName, info.Name(), resProps)
-						log.Debugf("File %s contains resource %s.%s", info.Name(), resType, resName)
+						logger.Debug("handleFiles", "msg", fmt.Sprintf("File %s contains resource %s.%s", info.Name(), resType, resName), "V", debugV1)
 					}
 				}
 			} else if m := tfFileRegex.FindStringSubmatch(info.Name()); len(m) == 3 && m[2] == ".new" {
@@ -314,22 +309,22 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	// Handle orphan resources and file pruning
 	prunes := make(map[TResourceType]map[TResourceName]TResourceFilenameProps)
 	for resType, resNameFilenamePropsMap := range tfInstFiles {
-		log.Infof("Detected %v tf.json files for resource type %v", len(resNameFilenamePropsMap), resType)
+		logger.Info("handleFiles", "msg", fmt.Sprintf("Detected %v tf.json files for resource type %v", len(resNameFilenamePropsMap), resType))
 		if tfStateResName, has := tfStateResourcesAfter[resType]; has {
 			// State files have instances of this type, check each resource name
 			for resName, propsFilename := range resNameFilenamePropsMap {
 				if _, has = tfStateResName[resName]; has {
-					log.Infof("Instance %v.%v exists in terraform state", resType, resName)
+					logger.Info("handleFiles", "msg", fmt.Sprintf("Instance %v.%v exists in terraform state", resType, resName))
 				} else {
-					log.Infof("Detected candidate instance %v.%v to prune at file: %v", resType, resName, propsFilename.FileName)
+					logger.Info("handleFiles", "msg", fmt.Sprintf("Detected candidate instance %v.%v to prune at file: %v", resType, resName, propsFilename.FileName))
 					addToResTypeNamePropsMap(prunes, resType, resName, propsFilename.FileName, propsFilename.FileProps)
 				}
 			}
 		} else {
 			// No instances of this type in the state file, all should be removed
-			log.Infof("State files has no resources of type %v, pruning all %v instances ...", resType, len(resNameFilenamePropsMap))
+			logger.Info("handleFiles", "msg", fmt.Sprintf("State files has no resources of type %v, pruning all %v instances ...", resType, len(resNameFilenamePropsMap)))
 			for resName, propsFilename := range resNameFilenamePropsMap {
-				log.Infof("Detected candidate instance %v.%v to prune at file: %v", resType, resName, propsFilename.FileName)
+				logger.Info("handleFiles", "msg", fmt.Sprintf("Detected candidate instance %v.%v to prune at file: %v", resType, resName, propsFilename.FileName))
 				addToResTypeNamePropsMap(prunes, resType, resName, propsFilename.FileName, propsFilename.FileProps)
 			}
 		}
@@ -340,11 +335,11 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 
 	// Move any tf.json.new files
 	if len(tfNewFiles) == 0 {
-		log.Infof("No tf.json.new files to move")
+		logger.Info("handleFiles", "msg", "No tf.json.new files to move")
 	} else {
 		for file := range tfNewFiles {
 			path := filepath.Join(p.Dir, file)
-			log.Infof("Removing .new suffix from file: %v", path)
+			logger.Info("handleFiles", "msg", fmt.Sprintf("Removing .new suffix from file: %v", path))
 			err = p.fs.Rename(path, strings.Replace(path, "tf.json.new", "tf.json", -1))
 			if err != nil {
 				return err
@@ -398,10 +393,12 @@ func (p *plugin) handleFilePruning(
 		}
 		for resName, resFilenameProps := range resNameFilenameProps {
 			if _, has := tfResTypeNameProps[resName]; has {
-				log.Infof("Pruning %v file, resource %v.%v previously existed in terraform",
-					resFilenameProps.FileName,
-					resType,
-					resName)
+				logger.Info("handleFilePruning",
+					"msg",
+					fmt.Sprintf("Pruning %v file, resource %v.%v previously existed in terraform",
+						resFilenameProps.FileName,
+						resType,
+						resName))
 				pruneFiles[resFilenameProps.FileName] = struct{}{}
 			} else {
 				// Find resource type in backend
@@ -411,17 +408,21 @@ func (p *plugin) handleFilePruning(
 				}
 				// No ID returned, prune file
 				if importID == nil {
-					log.Infof("Pruning %v file, resource %v.%v was not found in backend",
-						resFilenameProps.FileName,
-						resType,
-						resName)
+					logger.Info("handleFilePruning",
+						"msg",
+						fmt.Sprintf("Pruning %v file, resource %v.%v was not found in backend",
+							resFilenameProps.FileName,
+							resType,
+							resName))
 					pruneFiles[resFilenameProps.FileName] = struct{}{}
 				} else {
 					// Import resource
-					log.Infof("Importing %v %v into terraform as resource %v ...",
-						string(resType),
-						*importID,
-						string(resName))
+					logger.Info("handleFilePruning",
+						"msg",
+						fmt.Sprintf("Importing %v %v into terraform as resource %v ...",
+							string(resType),
+							*importID,
+							string(resName)))
 					if err = fns.tfImport(resType, string(resName), *importID); err != nil {
 						return err
 					}
@@ -429,10 +430,10 @@ func (p *plugin) handleFilePruning(
 			}
 		}
 	}
-	log.Infof("Pruning %v tf.json files", len(prunes))
+	logger.Info("handleFilePruning", "msg", fmt.Sprintf("Pruning %v tf.json files", len(pruneFiles)))
 	for file := range pruneFiles {
 		path := filepath.Join(p.Dir, file)
-		log.Infof("Pruning file: %v", file)
+		logger.Info("handleFilePruning", "msg", fmt.Sprintf("Pruning file: %v", file))
 		err := p.fs.Remove(path)
 		if err != nil {
 			return err
@@ -491,7 +492,7 @@ func (p *plugin) getExistingResource(resType TResourceType, resName TResourceNam
 		idString := strconv.Itoa(*id)
 		return &idString, nil
 	}
-	log.Warningf("Unsupported VM type for backend retrival: %v", resType)
+	logger.Warn("getExistingResource", "msg", fmt.Sprintf("Unsupported VM type for backend retrival: %v", resType))
 	return nil, nil
 }
 
@@ -512,10 +513,10 @@ func (p *plugin) doTerraformStateList() (map[TResourceType]map[TResourceName]str
 					break
 				}
 				line := string(lineBytes)
-				log.Debugf("'terraform state list' output: %v", line)
+				logger.Debug("doTerraformStateList", "output", line, "V", debugV3)
 				// Every line should have <resource-type>.<resource-name>
 				if !strings.Contains(line, ".") {
-					log.Errorf("Invalid line from 'terraform state list': %v", line)
+					logger.Error("doTerraformStateList", "msg", "Invalid line from 'terraform state list'", "line", line)
 					continue
 				}
 				split := strings.Split(strings.TrimSpace(line), ".")
