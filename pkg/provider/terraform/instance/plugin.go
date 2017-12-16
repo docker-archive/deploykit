@@ -537,10 +537,6 @@ func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceTyp
 			spec.Tags["Name"] = string(id)
 		}
 	}
-	// Use tag to store the logical id
-	if spec.LogicalID != nil {
-		spec.Tags["LogicalID"] = string(*spec.LogicalID)
-	}
 
 	// Merge any spec tags into the VM properties
 	mergeTagsIntoVMProps(vmType, vmProperties, spec.Tags)
@@ -1254,13 +1250,12 @@ func parseTerraformTags(vmType TResourceType, m TResourceProperties) map[string]
 	return tags
 }
 
-// terraformLogicalID parses the LogicalID (case insensitive key check) from
-// either the map of tags or the list of tags
+// terraformLogicalID parses the LogicalID from either the map of tags or the list of tags
 func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 	if propsTag, ok := props["tags"]; ok {
 		if tagsMap, ok := propsTag.(map[string]interface{}); ok {
 			for key, val := range tagsMap {
-				if strings.ToLower(key) == "logicalid" {
+				if key == instance.LogicalIDTag {
 					id := instance.LogicalID(fmt.Sprintf("%v", val))
 					return &id
 				}
@@ -1268,7 +1263,7 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 		} else if tagsList, ok := propsTag.([]interface{}); ok {
 			for _, tag := range tagsList {
 				if tagString, ok := tag.(string); ok {
-					if strings.HasPrefix(strings.ToLower(tagString), "logicalid:") {
+					if strings.HasPrefix(tagString, instance.LogicalIDTag+":") {
 						logicalID := strings.SplitN(strings.ToLower(tagString), ":", 2)[1]
 						id := instance.LogicalID(fmt.Sprintf("%v", logicalID))
 						return &id
@@ -1313,7 +1308,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	// Map resources to import with resources in the spec
 	var specLogicalID instance.LogicalID
 	if spec.Tags != nil {
-		if logicalID, has := spec.Tags["LogicalID"]; has {
+		if logicalID, has := spec.Tags[instance.LogicalIDTag]; has {
 			specLogicalID = instance.LogicalID(logicalID)
 		}
 	}

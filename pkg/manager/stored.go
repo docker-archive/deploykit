@@ -15,6 +15,38 @@ type key struct {
 	Name string
 }
 
+// Ideally we calculate a DAG from the entire set of specs, but
+// for now, we just capture simple dependency ordering using a rank.
+// If any kind isn't in this map then it's defaulted to 0
+var kindRank = map[string]int{
+	"group":      100,
+	"ingress":    200,
+	"enrollment": 300,
+}
+
+type keys []key
+
+// Len is part of sort.Interface.
+func (keys keys) Len() int {
+	return len(keys)
+}
+
+// Swap is part of sort.Interface.
+func (keys keys) Swap(i, j int) {
+	keys[i], keys[j] = keys[j], keys[i]
+}
+
+// Less is part of sort.Interface.
+func (keys keys) Less(i, j int) bool {
+	ranki := kindRank[keys[i].Kind]
+	rankj := kindRank[keys[j].Kind]
+	diff := ranki - rankj
+	if diff == 0 {
+		return keys[i].Name < keys[j].Name
+	}
+	return diff < 0
+}
+
 type record struct {
 	// Handler is the actual plugin used to process the input
 	Handler plugin.Name
@@ -23,18 +55,30 @@ type record struct {
 	Spec types.Spec
 }
 
-type persisted struct {
+type entry struct {
 	Key    key
 	Record record
 }
 
 type globalSpec struct {
-	data  []persisted
+	data  []entry
 	index map[key]record
 }
 
+// returns the keys in sorted order based on dependencies of kinds
+func (g *globalSpec) orderedKeys() []key {
+	all := keys{}
+	for k := range g.index {
+		all = append(all, k)
+	}
+	sort.Sort(all)
+	return all
+}
+
 func (g *globalSpec) visit(f func(key, record) error) error {
-	for k, v := range g.index {
+	keys := g.orderedKeys()
+	for _, k := range keys {
+		v := g.index[k]
 		if err := f(k, v); err != nil {
 			return err
 		}
@@ -43,16 +87,16 @@ func (g *globalSpec) visit(f func(key, record) error) error {
 }
 
 func (g *globalSpec) store(store store.Snapshot) error {
-	data := []persisted{}
+	data := []entry{}
 	for k, v := range g.index {
-		data = append(data, persisted{Key: k, Record: v})
+		data = append(data, entry{Key: k, Record: v})
 	}
 	g.data = data
 	return store.Save(g.data)
 }
 
 func (g *globalSpec) load(store store.Snapshot) error {
-	g.data = []persisted{}
+	g.data = []entry{}
 	err := store.Load(&g.data)
 	if err != nil {
 		return err

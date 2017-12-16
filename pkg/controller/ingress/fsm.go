@@ -194,6 +194,7 @@ func (c *managed) init(in types.Spec) (err error) {
 		func() bool {
 
 			if mustTrue(c.isLeader()) {
+				log.Debug("polling", "isLeader", true, "V", debugV)
 				c.stateMachine.Signal(lead)
 				return true
 			}
