@@ -5,6 +5,11 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+const (
+	// LogicalIDTag is the name of the tag that contains the logical ID of the instance
+	LogicalIDTag = "infrakit.logical_id"
+)
+
 // InterfaceSpec is the current name and version of the Instance API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Instance",

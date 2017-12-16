@@ -270,7 +270,7 @@ func countMatches(list []string, found map[string]*plugin.Endpoint) int {
 			}
 			objects, err := hs.Hello()
 			if err != nil {
-				log.Error("Bad handshake. Is this plugin running?", "lookup", l, "endpoint", ep)
+				log.Error("Bad handshake. Is this plugin running?", "lookup", l, "endpoint", ep, "err", err)
 				continue
 			}
 			log.Debug("Scan found", "lookup", l, "endpoint", ep, "V", debugLoopV, "implements", objects)

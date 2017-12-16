@@ -3,6 +3,7 @@ package instance
 import (
 	"strings"
 
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/go-openapi/runtime"
@@ -108,8 +109,8 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 					Expect(len(descriptions)).To(Equal(1))
 					Expect(descriptions[0].ID).To(Equal(instanceID))
 					// Expect(descriptions[0].LogicalID).To(Exist())
-					Expect(descriptions[0].Tags["infrakit.config_sha"]).To(Equal("006438mMXW8gXeYtUxgf9Zbg94Y"))
-					Expect(descriptions[0].Tags["infrakit.group"]).To(Equal("cattle"))
+					Expect(descriptions[0].Tags[group.ConfigSHATag]).To(Equal("006438mMXW8gXeYtUxgf9Zbg94Y"))
+					Expect(descriptions[0].Tags[group.GroupTag]).To(Equal("cattle"))
 					Expect(descriptions[0].Tags["project"]).To(Equal("infrakit"))
 					Expect(descriptions[0].Tags["tier"]).To(Equal("web"))
 					Expect(err).To(BeNil())
@@ -147,8 +148,8 @@ var _ = Describe("Infrakit.Rackhd.Plugin.Instance", func() {
 
 			It("should tag a node during a label operation", func() {
 				labels := make(map[string]string)
-				labels["infrakit.config_sha"] = "006438mMXW8gXeYtUxgf9Zbg94Y"
-				labels["infrakit.group"] = "cattle"
+				labels[group.ConfigSHATag] = "006438mMXW8gXeYtUxgf9Zbg94Y"
+				labels[group.GroupTag] = "cattle"
 				labels["project"] = "infrakit"
 				labels["tier"] = "web"
 				err := pluginImpl.Label(instanceID, labels)
@@ -201,12 +202,12 @@ func _Nodes(provisioned bool) []*models.Node20Node {
 	var tags1 []string
 	var tags2 []string
 	if provisioned {
-		tags1 = append(tags1, "infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y")
-		tags1 = append(tags1, "infrakit.group=cattle")
+		tags1 = append(tags1, group.ConfigSHATag+"=006438mMXW8gXeYtUxgf9Zbg94Y")
+		tags1 = append(tags1, group.GroupTag+"=cattle")
 		tags1 = append(tags1, "project=infrakit")
 		tags1 = append(tags1, "tier=web")
-		tags2 = append(tags1, "infrakit.config_sha=007429nMYW5gWExtUxfG8AcaF2Z")
-		tags2 = append(tags1, "infrakit.group=cattle")
+		tags2 = append(tags1, group.ConfigSHATag+"=007429nMYW5gWExtUxfG8AcaF2Z")
+		tags2 = append(tags1, group.GroupTag+"=cattle")
 		tags2 = append(tags1, "project=infrakit")
 		tags2 = append(tags1, "tier=app")
 	}
@@ -244,12 +245,12 @@ func _SkuNodes(provisioned bool) []*models.Node20SkuNode {
 	var tags1 []string
 	var tags2 []string
 	if provisioned {
-		tags1 = append(tags1, "infrakit.config_sha=006438mMXW8gXeYtUxgf9Zbg94Y")
-		tags1 = append(tags1, "infrakit.group=cattle")
+		tags1 = append(tags1, group.ConfigSHATag+"=006438mMXW8gXeYtUxgf9Zbg94Y")
+		tags1 = append(tags1, group.GroupTag+"=cattle")
 		tags1 = append(tags1, "project=infrakit")
 		tags1 = append(tags1, "tier=web")
-		tags2 = append(tags1, "infrakit.config_sha=007429nMYW5gWExtUxfG8AcaF2Z")
-		tags2 = append(tags1, "infrakit.group=cattle")
+		tags2 = append(tags1, group.ConfigSHATag+"=007429nMYW5gWExtUxfG8AcaF2Z")
+		tags2 = append(tags1, group.GroupTag+"=cattle")
 		tags2 = append(tags1, "project=infrakit")
 		tags2 = append(tags1, "tier=app")
 	}

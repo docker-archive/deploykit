@@ -124,6 +124,12 @@ func (r Locale_Country) Offset(offset int) Locale_Country {
 	return r
 }
 
+// This method is to get the collection of VAT country codes and VAT ID Regexes.
+func (r Locale_Country) GetAllVatCountryCodesAndVatIdRegexes() (resp []datatypes.Container_Collection_Locale_VatCountryCodeAndFormat, err error) {
+	err = r.Session.DoRequest("SoftLayer_Locale_Country", "getAllVatCountryCodesAndVatIdRegexes", nil, &r.Options, &resp)
+	return
+}
+
 // Use this method to retrieve a list of countries and locale information available to the current user.
 func (r Locale_Country) GetAvailableCountries() (resp []datatypes.Locale_Country, err error) {
 	err = r.Session.DoRequest("SoftLayer_Locale_Country", "getAvailableCountries", nil, &r.Options, &resp)

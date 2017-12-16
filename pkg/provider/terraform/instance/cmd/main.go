@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/cli"
+	logutil "github.com/docker/infrakit/pkg/log"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	terraform "github.com/docker/infrakit/pkg/provider/terraform/instance"
@@ -21,10 +21,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// For logging
+var (
+	logger = logutil.New("module", "provider/terraform/instance/cmd")
+)
+
 func mustHaveTerraform() {
 	// check if terraform exists
 	if _, err := exec.LookPath("terraform"); err != nil {
-		log.Error("Cannot find terraform.  Please install at https://www.terraform.io/downloads.html")
+		logger.Error("mustHaveTerraform", "Cannot find terraform.  Please install at https://www.terraform.io/downloads.html")
 		os.Exit(1)
 	}
 }
@@ -59,7 +64,7 @@ func main() {
 		if err != nil {
 			// If we cannot parse the group spec then we cannot import the resource, the plugin should
 			// not start since terraform is not managing the resource
-			log.Error(err)
+			logger.Error("main", "error", err)
 			panic(err)
 		}
 		resources := []*terraform.ImportResource{}
@@ -67,7 +72,7 @@ func main() {
 			split := strings.Split(resourceString, ":")
 			if len(split) < 2 || len(split) > 3 {
 				err := fmt.Errorf("Imported resource value is not valid: %v", resourceString)
-				log.Error(err)
+				logger.Error("main", "error", err)
 				panic(err)
 			}
 			resType := terraform.TResourceType(split[0])
@@ -103,7 +108,7 @@ func main() {
 
 	err := cmd.Execute()
 	if err != nil {
-		log.Error(err)
+		logger.Error("main", "error", err)
 		os.Exit(1)
 	}
 }
@@ -113,7 +118,7 @@ func main() {
 func parseInstanceSpecFromGroup(groupSpecURL, groupID string) (*instance.Spec, error) {
 	// TODO: Support a URL to a manager config with multiple nested groups
 	if groupSpecURL == "" {
-		log.Infof("No group spec URL specified for import")
+		logger.Info("parseInstanceSpecFromGroup", "msg", "No group spec URL specified for import")
 		return nil, nil
 	}
 	var groupSpec group.Spec
@@ -155,9 +160,8 @@ func parseInstanceSpecFromGroup(groupSpecURL, groupID string) (*instance.Spec, e
 		Properties: groupProps.Instance.Properties,
 		Tags:       tags,
 	}
-	log.Infof("Successfully processed instance spec from group '%v': %v",
-		string(groupSpec.ID),
-		spec,
-	)
+	logger.Info("parseInstanceSpecFromGroup",
+		"msg",
+		fmt.Sprintf("Successfully processed instance spec from group '%v': %v", string(groupSpec.ID), spec))
 	return &spec, nil
 }

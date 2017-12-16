@@ -245,8 +245,8 @@ type Account struct {
 	// Private template group objects (parent and children) and the shared template group objects (parent only) for an account.
 	BlockDeviceTemplateGroups []Virtual_Guest_Block_Device_Template_Group `json:"blockDeviceTemplateGroups,omitempty" xmlrpc:"blockDeviceTemplateGroups,omitempty"`
 
-	// This field is deprecated and should not be used.
-	BlueIdAuthenticationRequiredFlag *bool `json:"blueIdAuthenticationRequiredFlag,omitempty" xmlrpc:"blueIdAuthenticationRequiredFlag,omitempty"`
+	// The Bluemix account link associated with this SoftLayer account, if one exists.
+	BluemixAccountLink *Account_Link_Bluemix `json:"bluemixAccountLink,omitempty" xmlrpc:"bluemixAccountLink,omitempty"`
 
 	// Returns true if this account is linked to IBM Bluemix, false if not.
 	BluemixLinkedFlag *bool `json:"bluemixLinkedFlag,omitempty" xmlrpc:"bluemixLinkedFlag,omitempty"`
@@ -262,6 +262,9 @@ type Account struct {
 
 	// The brand keyName.
 	BrandKeyName *string `json:"brandKeyName,omitempty" xmlrpc:"brandKeyName,omitempty"`
+
+	// The Business Partner details for the account. Country Enterprise Code, Channel ID, and Segment ID.
+	BusinessPartner *Account_Partner_Business `json:"businessPartner,omitempty" xmlrpc:"businessPartner,omitempty"`
 
 	// Indicating whether this account can order additional Vlans.
 	CanOrderAdditionalVlansFlag *bool `json:"canOrderAdditionalVlansFlag,omitempty" xmlrpc:"canOrderAdditionalVlansFlag,omitempty"`
@@ -1091,6 +1094,9 @@ type Account struct {
 	// Indicates whether newly created users under this account will be associated with IBMid via an email requiring a response, or not.
 	RequireSilentIBMidUserCreation *bool `json:"requireSilentIBMidUserCreation,omitempty" xmlrpc:"requireSilentIBMidUserCreation,omitempty"`
 
+	// The Reseller level of the account.
+	ResellerLevel *int `json:"resellerLevel,omitempty" xmlrpc:"resellerLevel,omitempty"`
+
 	// A count of an account's associated top-level resource groups.
 	ResourceGroupCount *uint `json:"resourceGroupCount,omitempty" xmlrpc:"resourceGroupCount,omitempty"`
 
@@ -1888,6 +1894,11 @@ type Account_Historical_Report struct {
 }
 
 // no documentation yet
+type Account_Internal_Ibm struct {
+	Entity
+}
+
+// no documentation yet
 type Account_Link struct {
 	Entity
 
@@ -2310,6 +2321,23 @@ type Account_Note_Type struct {
 
 	// no documentation yet
 	ValueExpression *string `json:"valueExpression,omitempty" xmlrpc:"valueExpression,omitempty"`
+}
+
+// The SoftLayer_Account_Partner_Business data type contains specific information concerning an Account's relationship with Business Partner Data, in the form of the Account's Country Experience Identifier (CEID), Channel ID, and Segment ID.
+type Account_Partner_Business struct {
+	Entity
+
+	// The SoftLayer customer account associated with this business partner data.
+	Account *Account `json:"account,omitempty" xmlrpc:"account,omitempty"`
+
+	// The Channel ID associated with the Account.
+	ChannelId *int `json:"channelId,omitempty" xmlrpc:"channelId,omitempty"`
+
+	// The Country Enterprise Code associated with the Account.
+	CountryEnterpriseCode *string `json:"countryEnterpriseCode,omitempty" xmlrpc:"countryEnterpriseCode,omitempty"`
+
+	// The Segment ID associated with the Account.
+	SegmentId *int `json:"segmentId,omitempty" xmlrpc:"segmentId,omitempty"`
 }
 
 // no documentation yet

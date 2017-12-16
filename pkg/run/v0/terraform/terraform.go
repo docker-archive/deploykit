@@ -191,7 +191,7 @@ func parseInstanceSpecFromGroup(scope scope.Scope, groupSpecURL, groupID string)
 
 	// Add in the bootstrap tag and (if set) the group ID
 	tags := map[string]string{
-		"infrakit.config_sha": "bootstrap",
+		group.ConfigSHATag: "bootstrap",
 	}
 	// The group ID should match the spec
 	if groupID != "" {
@@ -199,7 +199,7 @@ func parseInstanceSpecFromGroup(scope scope.Scope, groupSpecURL, groupID string)
 			return nil, fmt.Errorf("Given spec ID '%v' does not match given group ID '%v'",
 				string(groupSpec.ID), groupID)
 		}
-		tags["infrakit.group"] = groupID
+		tags[group.GroupTag] = groupID
 	}
 	// Use the first logical ID if set
 	if len(groupProps.Allocation.LogicalIDs) > 0 {

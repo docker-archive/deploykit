@@ -278,6 +278,16 @@ import "github.com/softlayer/softlayer-go/session"
 session.Logger = log.New(os.Stderr, "[CUSTOMIZED] ", log.LstdFlags)
 ```
 
+You can also tell the session to retry the api requests if there is a timeout error:
+
+```go
+// Specify how many times to retry the request, the request timeout, and how much time to wait
+// between retries.
+services.GetVirtualGuestService(
+	sess.SetTimeout(900).SetRetries(2).SetRetryWait(3)
+).GetObject(...)
+```
+
 ### Password-based authentication
 
 Password-based authentication (via requesting a token from the API) is
