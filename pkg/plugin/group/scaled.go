@@ -66,11 +66,11 @@ func (s *scaledGroup) CreateOne(logicalID *instance.LogicalID) {
 	}
 
 	if logicalID != nil {
-		tags[logicalIDTag] = string(*logicalID)
+		tags[instance.LogicalIDTag] = string(*logicalID)
 	}
 
 	// Instances are tagged with a SHA of the entire instance configuration to support change detection.
-	tags[configTag] = settings.config.InstanceHash()
+	tags[group.ConfigSHATag] = settings.config.InstanceHash()
 
 	spec := instance.Spec{
 		Tags:       tags,
@@ -149,7 +149,7 @@ func (s *scaledGroup) List() ([]instance.Description, error) {
 	for _, d := range found {
 
 		// Is there a tag for the logical ID and the logicalID field is not set?
-		if logicalIDString, has := d.Tags[logicalIDTag]; has && d.LogicalID == nil {
+		if logicalIDString, has := d.Tags[instance.LogicalIDTag]; has && d.LogicalID == nil {
 			logicalID := instance.LogicalID(logicalIDString)
 			d.LogicalID = &logicalID
 		}
@@ -171,7 +171,7 @@ func (s *scaledGroup) Label() error {
 	for k, v := range s.memberTags {
 		tagsWithConfigSha[k] = v
 	}
-	tagsWithConfigSha[configTag] = settings.config.InstanceHash()
+	tagsWithConfigSha[group.ConfigSHATag] = settings.config.InstanceHash()
 
 	for _, inst := range instances {
 		if instanceNeedsLabel(inst) {
@@ -214,5 +214,5 @@ func needsLabel(instances []instance.Description) bool {
 }
 
 func instanceNeedsLabel(instance instance.Description) bool {
-	return instance.Tags[configTag] == bootstrapConfigTag
+	return instance.Tags[group.ConfigSHATag] == bootstrapConfigTag
 }

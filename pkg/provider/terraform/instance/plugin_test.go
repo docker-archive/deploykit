@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/afero"
@@ -75,15 +76,9 @@ func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
 		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags := props["tags"]
-			require.Len(t, tags, 2)
-			// Note that tags are all lowercase
-			require.Contains(t, tags, "logicalid:logical-id-1")
-			require.Contains(t, tags, "name:instance-1234")
+			require.Equal(t, tags, []interface{}{"name:instance-1234"})
 		} else {
-			expectedTags := map[string]interface{}{
-				"LogicalID": "logical-id-1",
-				"Name":      "instance-1234",
-			}
+			expectedTags := map[string]interface{}{"Name": "instance-1234"}
 			require.Equal(t, expectedTags, props["tags"])
 		}
 	}
@@ -118,8 +113,9 @@ func TestHandleProvisionTagsWithTagsLogicalID(t *testing.T) {
 	spec := instance.Spec{
 		Properties: nil,
 		Tags: map[string]string{
-			"name": "existing-name",
-			"foo":  "bar"},
+			instance.LogicalIDTag: "logical-id-1",
+			"name":                "existing-name",
+			"foo":                 "bar"},
 		Init:        "",
 		Attachments: []instance.Attachment{},
 		LogicalID:   &logicalID,
@@ -132,13 +128,13 @@ func TestHandleProvisionTagsWithTagsLogicalID(t *testing.T) {
 			require.Len(t, tags, 3)
 			// Note that tags are all lowercase
 			require.Contains(t, tags, "foo:bar")
-			require.Contains(t, tags, "logicalid:logical-id-1")
+			require.Contains(t, tags, instance.LogicalIDTag+":logical-id-1")
 			require.Contains(t, tags, "name:existing-name")
 		} else {
 			expectedTags := map[string]interface{}{
-				"LogicalID": "logical-id-1",
-				"name":      "existing-name",
-				"foo":       "bar",
+				instance.LogicalIDTag: "logical-id-1",
+				"name":                "existing-name",
+				"foo":                 "bar",
 			}
 			require.Equal(t, expectedTags, props["tags"])
 		}
@@ -478,14 +474,20 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 	id1, err := tf.Provision(instance.Spec{
 		Properties: types.AnyBytes(buff),
 		LogicalID:  &logicalID1,
-		Tags:       map[string]string{"tag1": "val1"},
+		Tags: map[string]string{
+			instance.LogicalIDTag: "mgr1",
+			"tag1":                "val1",
+		},
 	})
 	require.NoError(t, err)
 	logicalID2 := instance.LogicalID("mgr2")
 	id2, err := tf.Provision(instance.Spec{
 		Properties: types.AnyBytes(buff),
 		LogicalID:  &logicalID2,
-		Tags:       map[string]string{"tag1": "val1"},
+		Tags: map[string]string{
+			instance.LogicalIDTag: "mgr2",
+			"tag1":                "val1",
+		},
 	})
 	require.NoError(t, err)
 	results, err := tf.DescribeInstances(
@@ -500,10 +502,10 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 		instance.Description{
 			ID: *id1,
 			Tags: map[string]string{
-				attachTag:   strings.Join(expectedAttach1, ","),
-				"Name":      string(*id1),
-				"tag1":      "val1",
-				"LogicalID": "mgr1",
+				attachTag:             strings.Join(expectedAttach1, ","),
+				"Name":                string(*id1),
+				"tag1":                "val1",
+				instance.LogicalIDTag: "mgr1",
 			},
 			LogicalID: &logicalID1,
 		})
@@ -513,10 +515,10 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 		instance.Description{
 			ID: *id2,
 			Tags: map[string]string{
-				attachTag:   strings.Join(expectedAttach2, ","),
-				"Name":      string(*id2),
-				"tag1":      "val1",
-				"LogicalID": "mgr2",
+				attachTag:             strings.Join(expectedAttach2, ","),
+				"Name":                string(*id2),
+				"tag1":                "val1",
+				instance.LogicalIDTag: "mgr2",
 			},
 			LogicalID: &logicalID2,
 		})
@@ -1031,9 +1033,10 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	instanceSpec1 := instance.Spec{
 		Properties: config,
 		Tags: map[string]string{
-			"label1": "value1",
-			"label2": "value2",
-			"LABEL3": "VALUE3",
+			"label1":              "value1",
+			"label2":              "value2",
+			"LABEL3":              "VALUE3",
+			instance.LogicalIDTag: "logical.id-1",
 		},
 		Init:        "",
 		Attachments: []instance.Attachment{},
@@ -1050,8 +1053,9 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	instanceSpec2 := instance.Spec{
 		Properties: config,
 		Tags: map[string]string{
-			"label1": "value1",
-			"label2": "value2",
+			"label1":              "value1",
+			"label2":              "value2",
+			instance.LogicalIDTag: "logical:id-2",
 		},
 		Init: "apt-get update -y\n\napt-get install -y software",
 		Attachments: []instance.Attachment{
@@ -1100,7 +1104,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"label1:value1",
 				"label2:value2",
 				"name:" + string(*id2),
-				"logicalid:logical:id-2",
+				instance.LogicalIDTag + ":logical:id-2",
 			}), conv(props["tags"].([]interface{})))
 			require.Equal(t, expectedUserData2, props["user_metadata"])
 
@@ -1117,11 +1121,11 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 
 		case VMAmazon:
 			require.Equal(t, map[string]interface{}{
-				"InstancePlugin": "terraform",
-				"label1":         "value1",
-				"label2":         "value2",
-				"Name":           string(*id2),
-				"LogicalID":      "logical:id-2",
+				"InstancePlugin":      "terraform",
+				"label1":              "value1",
+				"label2":              "value2",
+				"Name":                string(*id2),
+				instance.LogicalIDTag: "logical:id-2",
 			}, props["tags"])
 			require.Equal(t, base64.StdEncoding.EncodeToString([]byte(expectedUserData2)), props["user_data"])
 
@@ -1157,7 +1161,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"label2":                      "value2",
 				"label3":                      "value3",
 				"name":                        string(*id1),
-				"logicalid":                   "logical.id-1",
+				instance.LogicalIDTag:         "logical.id-1",
 			},
 			LogicalID: &logicalID1,
 		}
@@ -1168,7 +1172,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"label1":                      "value1",
 				"label2":                      "value2",
 				"name":                        string(*id2),
-				"logicalid":                   "logical:id-2",
+				instance.LogicalIDTag:         "logical:id-2",
 			},
 			LogicalID: &logicalID2,
 		}
@@ -1176,23 +1180,23 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 		inst1 = instance.Description{
 			ID: *id1,
 			Tags: map[string]string{
-				"InstancePlugin": "terraform",
-				"label1":         "value1",
-				"label2":         "value2",
-				"LABEL3":         "VALUE3",
-				"Name":           string(*id1),
-				"LogicalID":      "logical.id-1",
+				"InstancePlugin":      "terraform",
+				"label1":              "value1",
+				"label2":              "value2",
+				"LABEL3":              "VALUE3",
+				"Name":                string(*id1),
+				instance.LogicalIDTag: "logical.id-1",
 			},
 			LogicalID: &logicalID1,
 		}
 		inst2 = instance.Description{
 			ID: *id2,
 			Tags: map[string]string{
-				"InstancePlugin": "terraform",
-				"label1":         "value1",
-				"label2":         "value2",
-				"Name":           string(*id2),
-				"LogicalID":      "logical:id-2",
+				"InstancePlugin":      "terraform",
+				"label1":              "value1",
+				"label2":              "value2",
+				"Name":                string(*id2),
+				instance.LogicalIDTag: "logical:id-2",
 			},
 			LogicalID: &logicalID2,
 		}
@@ -1230,16 +1234,16 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 			"label2:value2",
 			"label3:value3",
 			"name:" + string(*id2),
-			"logicalid:logical:id-2",
+			instance.LogicalIDTag + ":logical:id-2",
 		}), conv(props["tags"].([]interface{})))
 	case VMAmazon:
 		require.Equal(t, map[string]interface{}{
-			"InstancePlugin": "terraform",
-			"label1":         "changed1",
-			"label2":         "value2",
-			"label3":         "value3",
-			"Name":           string(*id2),
-			"LogicalID":      "logical:id-2",
+			"InstancePlugin":      "terraform",
+			"label1":              "changed1",
+			"label2":              "value2",
+			"label3":              "value3",
+			"Name":                string(*id2),
+			instance.LogicalIDTag: "logical:id-2",
 		}, props["tags"])
 	}
 
@@ -2692,8 +2696,8 @@ func TestTerraformLogicalIDNoID(t *testing.T) {
 func TestTerraformLogicalIDFromMap(t *testing.T) {
 	props := TResourceProperties{
 		"tags": map[string]interface{}{
-			"foo":       "bar",
-			"lOGiCALid": "logical-id",
+			"foo": "bar",
+			instance.LogicalIDTag: "logical-id",
 		},
 	}
 	id := terraformLogicalID(props)
@@ -2704,7 +2708,7 @@ func TestTerraformLogicalIDFromList(t *testing.T) {
 	props := TResourceProperties{
 		"tags": []interface{}{
 			"foo:bar",
-			"lOGiCALid:logical-id:val",
+			instance.LogicalIDTag + ":logical-id:val",
 		},
 	}
 	id := terraformLogicalID(props)
@@ -2795,7 +2799,7 @@ func TestDestroyRollingUpdateLogicalID(t *testing.T) {
 	logicalID := instance.LogicalID("mgr1")
 	id1, err := tf.Provision(instance.Spec{
 		Properties: types.AnyBytes(instanceSpecBuff),
-		Tags:       map[string]string{"tag1": "val1"},
+		Tags:       map[string]string{"tag1": "val1", instance.LogicalIDTag: "mgr1"},
 		LogicalID:  &logicalID,
 		Init:       "ID={{ var `/self/instId` }} LogicalID={{ var `/self/logicalId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
 	})
@@ -2832,10 +2836,10 @@ func TestDestroyRollingUpdateLogicalID(t *testing.T) {
 			VMAmazon: {
 				TResourceName(string(*id1)): {
 					"tags": map[string]interface{}{
-						"tag1":      "val1",
-						attachTag:   fmt.Sprintf("default_dedicated_%s", logicalID),
-						"LogicalID": string(logicalID),
-						"Name":      string(*id1),
+						"tag1":                "val1",
+						attachTag:             fmt.Sprintf("default_dedicated_%s", logicalID),
+						instance.LogicalIDTag: string(logicalID),
+						"Name":                string(*id1),
 					},
 				},
 			},
@@ -2863,7 +2867,7 @@ func TestDestroyRollingUpdateLogicalID(t *testing.T) {
 	time.Sleep(time.Second)
 	id2, err := tf.Provision(instance.Spec{
 		Properties: types.AnyBytes(instanceSpecBuff),
-		Tags:       map[string]string{"tag1": "val1"},
+		Tags:       map[string]string{"tag1": "val1", instance.LogicalIDTag: "mgr1"},
 		LogicalID:  &logicalID,
 		Init:       "ID={{ var `/self/instId` }} LogicalID={{ var `/self/logicalId` }} DedicatedAttachId={{ var `/self/dedicated/attachId` }}",
 	})
@@ -2900,10 +2904,10 @@ func TestDestroyRollingUpdateLogicalID(t *testing.T) {
 			VMAmazon: {
 				TResourceName(string(*id2)): {
 					"tags": map[string]interface{}{
-						"tag1":      "val1",
-						attachTag:   fmt.Sprintf("default_dedicated_%s", logicalID),
-						"LogicalID": string(logicalID),
-						"Name":      string(*id2),
+						"tag1":                "val1",
+						attachTag:             fmt.Sprintf("default_dedicated_%s", logicalID),
+						instance.LogicalIDTag: string(logicalID),
+						"Name":                string(*id2),
 					},
 				},
 			},
@@ -4040,8 +4044,8 @@ func TestImportResourceTagMap(t *testing.T) {
 	}
 	spec := instance.Spec{
 		Tags: map[string]string{
-			"infrakit.group":      "managers",
-			"infrakit.config_sha": "bootstrap",
+			group.GroupTag:     "managers",
+			group.ConfigSHATag: "bootstrap",
 		},
 		Properties: types.AnyString(`
 {
@@ -4079,10 +4083,10 @@ func TestImportResourceTagMap(t *testing.T) {
 						"hostname": "actual-hostname",
 						"spec-key": "actual-val",
 						"tags": map[string]interface{}{
-							"imported-tag1":       "val1",
-							"t1":                  "v1",
-							"infrakit.group":      "managers",
-							"infrakit.config_sha": "bootstrap",
+							"imported-tag1":    "val1",
+							"t1":               "v1",
+							group.GroupTag:     "managers",
+							group.ConfigSHATag: "bootstrap",
 						},
 					},
 				},
@@ -4132,8 +4136,8 @@ func TestImportResourceTagSlice(t *testing.T) {
 	}
 	spec := instance.Spec{
 		Tags: map[string]string{
-			"infrakit.group":      "managers",
-			"infrakit.config_sha": "bootstrap",
+			group.GroupTag:     "managers",
+			group.ConfigSHATag: "bootstrap",
 		},
 		Properties: types.AnyString(`
 {
@@ -4172,8 +4176,8 @@ func TestImportResourceTagSlice(t *testing.T) {
 	delete(props, "tags")
 	require.Len(t, tags, 3)
 	require.Contains(t, tags, "t1:v1")
-	require.Contains(t, tags, "infrakit.group:managers")
-	require.Contains(t, tags, "infrakit.config_sha:bootstrap")
+	require.Contains(t, tags, group.GroupTag+":managers")
+	require.Contains(t, tags, group.ConfigSHATag+":bootstrap")
 	// Compare everythine else
 	require.Equal(t,
 		TResourceProperties{
@@ -4363,9 +4367,9 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 	}
 	spec := instance.Spec{
 		Tags: map[string]string{
-			"infrakit.group":      "managers",
-			"infrakit.config_sha": "bootstrap",
-			"LogicalID":           "mgr1",
+			group.GroupTag:        "managers",
+			group.ConfigSHATag:    "bootstrap",
+			instance.LogicalIDTag: "mgr1",
 		},
 		Properties: types.AnyString(`
 {
@@ -4460,9 +4464,9 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 		tags := props["tags"]
 		delete(props, "tags")
 		require.Len(t, tags, 4)
-		require.Contains(t, tags, "logicalid:mgr1")
-		require.Contains(t, tags, "infrakit.group:managers")
-		require.Contains(t, tags, "infrakit.config_sha:bootstrap")
+		require.Contains(t, tags, instance.LogicalIDTag+":mgr1")
+		require.Contains(t, tags, group.GroupTag+":managers")
+		require.Contains(t, tags, group.ConfigSHATag+":bootstrap")
 		require.Contains(t, tags, "infrakit.attach:managers_dedicated_mgr1 managers_global")
 		// Compare everythine else
 		require.Equal(t,

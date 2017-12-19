@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	log    = logutil.New("module", "controller/enrollment")
-	debugV = logutil.V(200)
+	log     = logutil.New("module", "controller/enrollment")
+	debugV  = logutil.V(200)
+	debugV2 = logutil.V(500)
 )
 
 // NewController returns a controller implementation

@@ -114,10 +114,6 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 func (c *Controller) Plan(operation controller.Operation,
 	spec types.Spec) (object types.Object, plan controller.Plan, err error) {
 
-	if err = c.leaderGuard(); err != nil {
-		return
-	}
-
 	m := []**Managed{}
 	copy := spec
 	m, err = c.getManaged(&spec.Metadata, &copy)
@@ -147,9 +143,6 @@ func (c *Controller) Plan(operation controller.Operation,
 // the spec.  When operation is Destroy, only Metadata portion of the spec is needed to identify
 // the object to be destroyed.
 func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (object types.Object, err error) {
-	if err = c.leaderGuard(); err != nil {
-		return
-	}
 
 	c.lock.Lock()
 	defer c.lock.Unlock()

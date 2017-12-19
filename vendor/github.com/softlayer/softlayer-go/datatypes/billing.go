@@ -1375,11 +1375,17 @@ type Billing_Item_Network_Firewall struct {
 // The SoftLayer_Billing_Item_Network_Firewall_Module_Context data type describes the billing items related to VLAN Firewalls.
 type Billing_Item_Network_Firewall_Module_Context struct {
 	Billing_Item
+
+	// The total public outbound bandwidth for this firewall for the current billing cycle.
+	BillingCyclePublicUsageOut *Float64 `json:"billingCyclePublicUsageOut,omitempty" xmlrpc:"billingCyclePublicUsageOut,omitempty"`
 }
 
 // A SoftLayer_Billing_Item_Network_Interconnect represents the [[SoftLayer_Billing_Item|billing item]] related to a network interconnect instance.
 type Billing_Item_Network_Interconnect struct {
 	Billing_Item
+
+	// The interconnect tenant that the billing item is associated with.
+	Resource *Network_Interconnect_Tenant `json:"resource,omitempty" xmlrpc:"resource,omitempty"`
 }
 
 // A SoftLayer_Billing_Item_Network_LoadBalancer represents the [[SoftLayer_Billing_Item|billing item]] related to a single [[SoftLayer_Network_LoadBalancer|load balancer]] instance.
@@ -1989,6 +1995,9 @@ type Billing_Order_Item struct {
 
 	// no documentation yet
 	ParentId *int `json:"parentId,omitempty" xmlrpc:"parentId,omitempty"`
+
+	// The SoftLayer_Product_Package_Preset related to this order item.
+	Preset *Product_Package_Preset `json:"preset,omitempty" xmlrpc:"preset,omitempty"`
 
 	// The id for the preset configuration ordered.
 	PresetId *int `json:"presetId,omitempty" xmlrpc:"presetId,omitempty"`

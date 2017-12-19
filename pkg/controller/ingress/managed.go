@@ -19,7 +19,10 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
-var log = logutil.New("module", "controller/ingress")
+var (
+	log    = logutil.New("module", "controller/ingress")
+	debugV = logutil.V(500)
+)
 
 func newManaged(scp scope.Scope,
 	leader func() stack.Leadership) *managed {

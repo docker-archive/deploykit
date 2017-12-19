@@ -654,6 +654,9 @@ type User_Customer_Invitation struct {
 	ExpirationDate *Time `json:"expirationDate,omitempty" xmlrpc:"expirationDate,omitempty"`
 
 	// no documentation yet
+	IbmIdUsername *string `json:"ibmIdUsername,omitempty" xmlrpc:"ibmIdUsername,omitempty"`
+
+	// no documentation yet
 	Id *int `json:"id,omitempty" xmlrpc:"id,omitempty"`
 
 	// no documentation yet

@@ -186,6 +186,80 @@ type Container_Account_Historical_Summary_Uptime struct {
 	Container_Account_Historical_Summary
 }
 
+// Contains data required to both request a new IaaS account for active IBM employees and review pending requests. Fields used exclusively in the review process are scrubbed of user input.
+type Container_Account_Internal_Ibm_Request struct {
+	Entity
+
+	// Purpose of the internal IBM account chosen from the list of available
+	AccountType *string `json:"accountType,omitempty" xmlrpc:"accountType,omitempty"`
+
+	// If no address information is available in BluePages, will use this
+	Address1 *string `json:"address1,omitempty" xmlrpc:"address1,omitempty"`
+
+	// If no address information is available in BluePages, will use this
+	Address2 *string `json:"address2,omitempty" xmlrpc:"address2,omitempty"`
+
+	// If no address information is available in BluePages, will use this
+	City *string `json:"city,omitempty" xmlrpc:"city,omitempty"`
+
+	// Name of the company displayed on the IaaS account
+	CompanyName *string `json:"companyName,omitempty" xmlrpc:"companyName,omitempty"`
+
+	// If no address information is available in BluePages, will use this
+	Country *string `json:"country,omitempty" xmlrpc:"country,omitempty"`
+
+	// True if the request has been denied by either the IaaS team or the
+	DeniedFlag *bool `json:"deniedFlag,omitempty" xmlrpc:"deniedFlag,omitempty"`
+
+	// Department within the division which will be changed during cost recovery.
+	DepartmentCode *string `json:"departmentCode,omitempty" xmlrpc:"departmentCode,omitempty"`
+
+	// Division code used for cost recovery. This field is populated
+	DivisionCode *string `json:"divisionCode,omitempty" xmlrpc:"divisionCode,omitempty"`
+
+	// Country assigned to the division for cost recovery. This field is populated
+	DivisionCountry *string `json:"divisionCountry,omitempty" xmlrpc:"divisionCountry,omitempty"`
+
+	// Account owner's IBM email address. Must be a discoverable email
+	EmailAddress *string `json:"emailAddress,omitempty" xmlrpc:"emailAddress,omitempty"`
+
+	// Applicant's first name, as provided by IBM BluePages API.
+	FirstName *string `json:"firstName,omitempty" xmlrpc:"firstName,omitempty"`
+
+	// Applicant's last name, as provided by IBM BluePages API.
+	LastName *string `json:"lastName,omitempty" xmlrpc:"lastName,omitempty"`
+
+	// APPROVED if the request has been approved by the first-line manager,
+	ManagerApprovalStatus *string `json:"managerApprovalStatus,omitempty" xmlrpc:"managerApprovalStatus,omitempty"`
+
+	// True for accounts intended to be multi-tenant and false otherwise
+	MultiTenantFlag *bool `json:"multiTenantFlag,omitempty" xmlrpc:"multiTenantFlag,omitempty"`
+
+	// Account owner's primary phone number. If no phone number is available
+	OfficePhone *string `json:"officePhone,omitempty" xmlrpc:"officePhone,omitempty"`
+
+	// Bluemix PaaS 32 digit hexadecimal account id being automatically linked
+	PaasAccountId *string `json:"paasAccountId,omitempty" xmlrpc:"paasAccountId,omitempty"`
+
+	// If no address information is available in BluePages, will use this
+	PostalCode *string `json:"postalCode,omitempty" xmlrpc:"postalCode,omitempty"`
+
+	// Stated purpose of the new account this request would create
+	Purpose *string `json:"purpose,omitempty" xmlrpc:"purpose,omitempty"`
+
+	// Division's security SME's email address, if available
+	SecuritySubjectMatterExpertEmail *string `json:"securitySubjectMatterExpertEmail,omitempty" xmlrpc:"securitySubjectMatterExpertEmail,omitempty"`
+
+	// Division's security SME's name, if available
+	SecuritySubjectMatterExpertName *string `json:"securitySubjectMatterExpertName,omitempty" xmlrpc:"securitySubjectMatterExpertName,omitempty"`
+
+	// Division's security SME's phone, if available
+	SecuritySubjectMatterExpertPhone *string `json:"securitySubjectMatterExpertPhone,omitempty" xmlrpc:"securitySubjectMatterExpertPhone,omitempty"`
+
+	// If no address information is available in BluePages, will use this
+	State *string `json:"state,omitempty" xmlrpc:"state,omitempty"`
+}
+
 // no documentation yet
 type Container_Account_Payment_Method_CreditCard struct {
 	Entity
@@ -750,6 +824,17 @@ type Container_Collection_Locale_StateCode struct {
 	ShortName *string `json:"shortName,omitempty" xmlrpc:"shortName,omitempty"`
 }
 
+// This container is used to hold VAT information.
+type Container_Collection_Locale_VatCountryCodeAndFormat struct {
+	Entity
+
+	// no documentation yet
+	CountryCode *string `json:"countryCode,omitempty" xmlrpc:"countryCode,omitempty"`
+
+	// no documentation yet
+	Regex *string `json:"regex,omitempty" xmlrpc:"regex,omitempty"`
+}
+
 // no documentation yet
 type Container_Disk_Image_Capture_Template struct {
 	Entity
@@ -1234,6 +1319,12 @@ type Container_Hardware_Pool_Details struct {
 	Entity
 
 	// no documentation yet
+	PendingOrders *int `json:"pendingOrders,omitempty" xmlrpc:"pendingOrders,omitempty"`
+
+	// no documentation yet
+	PendingTransactions *int `json:"pendingTransactions,omitempty" xmlrpc:"pendingTransactions,omitempty"`
+
+	// no documentation yet
 	PoolDescription *string `json:"poolDescription,omitempty" xmlrpc:"poolDescription,omitempty"`
 
 	// no documentation yet
@@ -1264,6 +1355,9 @@ type Container_Hardware_Pool_Details struct {
 // no documentation yet
 type Container_Hardware_Pool_Details_Router struct {
 	Entity
+
+	// no documentation yet
+	PoolThreshold *int `json:"poolThreshold,omitempty" xmlrpc:"poolThreshold,omitempty"`
 
 	// no documentation yet
 	RouterId *int `json:"routerId,omitempty" xmlrpc:"routerId,omitempty"`
@@ -1600,6 +1694,9 @@ type Container_Network_CdnMarketplace_Configuration_Input struct {
 	BucketName *string `json:"bucketName,omitempty" xmlrpc:"bucketName,omitempty"`
 
 	// no documentation yet
+	CacheKeyQueryRule *string `json:"cacheKeyQueryRule,omitempty" xmlrpc:"cacheKeyQueryRule,omitempty"`
+
+	// no documentation yet
 	CertificateType *string `json:"certificateType,omitempty" xmlrpc:"certificateType,omitempty"`
 
 	// no documentation yet
@@ -1662,6 +1759,9 @@ type Container_Network_CdnMarketplace_Configuration_Mapping struct {
 	BucketName *string `json:"bucketName,omitempty" xmlrpc:"bucketName,omitempty"`
 
 	// no documentation yet
+	CacheKeyQueryRule *string `json:"cacheKeyQueryRule,omitempty" xmlrpc:"cacheKeyQueryRule,omitempty"`
+
+	// no documentation yet
 	CertificateType *string `json:"certificateType,omitempty" xmlrpc:"certificateType,omitempty"`
 
 	// no documentation yet
@@ -1721,7 +1821,13 @@ type Container_Network_CdnMarketplace_Configuration_Mapping_Path struct {
 	BucketName *string `json:"bucketName,omitempty" xmlrpc:"bucketName,omitempty"`
 
 	// no documentation yet
+	CacheKeyQueryRule *string `json:"cacheKeyQueryRule,omitempty" xmlrpc:"cacheKeyQueryRule,omitempty"`
+
+	// no documentation yet
 	FileExtension *string `json:"fileExtension,omitempty" xmlrpc:"fileExtension,omitempty"`
+
+	// no documentation yet
+	Header *string `json:"header,omitempty" xmlrpc:"header,omitempty"`
 
 	// no documentation yet
 	HttpPort *int `json:"httpPort,omitempty" xmlrpc:"httpPort,omitempty"`
@@ -1730,7 +1836,7 @@ type Container_Network_CdnMarketplace_Configuration_Mapping_Path struct {
 	HttpsPort *int `json:"httpsPort,omitempty" xmlrpc:"httpsPort,omitempty"`
 
 	// no documentation yet
-	MappingUniqueId *int `json:"mappingUniqueId,omitempty" xmlrpc:"mappingUniqueId,omitempty"`
+	MappingUniqueId *string `json:"mappingUniqueId,omitempty" xmlrpc:"mappingUniqueId,omitempty"`
 
 	// no documentation yet
 	Origin *string `json:"origin,omitempty" xmlrpc:"origin,omitempty"`
@@ -3054,7 +3160,7 @@ type Container_Product_Order struct {
 	// The URL to which PayPal redirects browser after checkout has been canceled before completion of a payment.
 	CancelUrl *string `json:"cancelUrl,omitempty" xmlrpc:"cancelUrl,omitempty"`
 
-	// Added by Gopherlayer. This hints to the API what kind of product order this is.
+	// Added by softlayer-go. This hints to the API what kind of product order this is.
 	ComplexType *string `json:"complexType,omitempty" xmlrpc:"complexType,omitempty"`
 
 	// User-specified description to identify a particular order container. This is useful if you have a multi-configuration order (multiple <code>orderContainers</code>) and you want to be able to easily determine one from another. Populating this value may be helpful if an exception is thrown when placing an order and it's tied to a specific order container.
@@ -3539,6 +3645,28 @@ type Container_Product_Order_Network_ContentDelivery_Account_Upgrade struct {
 	CdnAccountId *string `json:"cdnAccountId,omitempty" xmlrpc:"cdnAccountId,omitempty"`
 }
 
+// This is the datatype that needs to be populated and sent to SoftLayer_Product_Order::placeOrder. This datatype has everything required to place a CDN Service order with SoftLayer.
+type Container_Product_Order_Network_ContentDelivery_Service struct {
+	Container_Product_Order
+}
+
+// This is the datatype that needs to be populated and sent to SoftLayer_Product_Order::placeOrder when purchasing a Network Interconnect.
+type Container_Product_Order_Network_Interconnect struct {
+	Container_Product_Order
+
+	// The BGP ASN.
+	BgpAsn *string `json:"bgpAsn,omitempty" xmlrpc:"bgpAsn,omitempty"`
+
+	// The [[SoftLayer_Network_DirectLink_Location]] for this order, ID must be provided.
+	InterconnectLocation *Network_DirectLink_Location `json:"interconnectLocation,omitempty" xmlrpc:"interconnectLocation,omitempty"`
+
+	// A name to identify this Direct Link resource.
+	Name *string `json:"name,omitempty" xmlrpc:"name,omitempty"`
+
+	// Optional network identifier for this link.
+	NetworkIdentifier *string `json:"networkIdentifier,omitempty" xmlrpc:"networkIdentifier,omitempty"`
+}
+
 // This is the default container type for network load balancer orders.
 type Container_Product_Order_Network_LoadBalancer struct {
 	Container_Product_Order
@@ -3565,6 +3693,9 @@ type Container_Product_Order_Network_LoadBalancer_AsAService struct {
 
 	// The [[SoftLayer_Network_Subnet]]s where this Load Balancer will be provisioned.
 	Subnets []Network_Subnet `json:"subnets,omitempty" xmlrpc:"subnets,omitempty"`
+
+	// Specify if this load balancer uses system IP pool (true, default) or customer's (null|false) public subnet to allocate IP addresses.
+	UseSystemPublicIpPool *bool `json:"useSystemPublicIpPool,omitempty" xmlrpc:"useSystemPublicIpPool,omitempty"`
 }
 
 // This is the datatype that needs to be populated and sent to SoftLayer_Product_Order::placeOrder. This datatype has everything required to place a global load balancer order with SoftLayer.
@@ -3635,6 +3766,14 @@ type Container_Product_Order_Network_Protection_Firewall_Dedicated struct {
 
 	// generic properties.
 	VlanId *int `json:"vlanId,omitempty" xmlrpc:"vlanId,omitempty"`
+}
+
+// This is the datatype that needs to be populated and sent to SoftLayer_Product_Order::placeOrder. This datatype has everything required to place an order with SoftLayer.
+type Container_Product_Order_Network_Protection_Firewall_Dedicated_Upgrade struct {
+	Container_Product_Order_Network_Protection_Firewall_Dedicated
+
+	// no documentation yet
+	FirewallId *int `json:"firewallId,omitempty" xmlrpc:"firewallId,omitempty"`
 }
 
 // This is the datatype that needs to be populated and sent to SoftLayer_Product_Order::placeOrder. This datatype has everything required to place an order for Storage as a Service.
@@ -3753,19 +3892,28 @@ type Container_Product_Order_Network_Storage_MassDataMigration_Request struct {
 	// The shipping address city
 	City *string `json:"city,omitempty" xmlrpc:"city,omitempty"`
 
+	// Name of the company device is being shipped to
+	CompanyName *string `json:"companyName,omitempty" xmlrpc:"companyName,omitempty"`
+
 	// Cloud Object Storage Account ID for the data offload destination
 	CosAccountId *string `json:"cosAccountId,omitempty" xmlrpc:"cosAccountId,omitempty"`
 
 	// Cloud Object Storage Bucket for the data offload destination
 	CosBucketName *string `json:"cosBucketName,omitempty" xmlrpc:"cosBucketName,omitempty"`
 
-	// Default Gateway used for pre-provisioning the Eth3 port on the MDMS device
-	Eth3DefaultGateway *string `json:"eth3DefaultGateway,omitempty" xmlrpc:"eth3DefaultGateway,omitempty"`
+	// Default Gateway used for preconfiguring the Eth1 port on the MDMS device to access the user interface
+	Eth1DefaultGateway *string `json:"eth1DefaultGateway,omitempty" xmlrpc:"eth1DefaultGateway,omitempty"`
 
-	// Netmask used for pre-provisioning the Eth3 port on the MDMS device
+	// Netmask used for preconfiguring the Eth1 port on the MDMS device to access the user interface
+	Eth1Netmask *string `json:"eth1Netmask,omitempty" xmlrpc:"eth1Netmask,omitempty"`
+
+	// Static IP Address used for preconfiguring the Eth1 port on the MDMS device to access the user interface
+	Eth1StaticIp *string `json:"eth1StaticIp,omitempty" xmlrpc:"eth1StaticIp,omitempty"`
+
+	// Netmask used for preconfiguring the Eth3 port on the MDMS device to enable data transfer
 	Eth3Netmask *string `json:"eth3Netmask,omitempty" xmlrpc:"eth3Netmask,omitempty"`
 
-	// Static IP Address used for pre-provisioning the Eth3 port on the MDMS device
+	// Static IP Address used for preconfiguring the Eth3 port on the MDMS device to enable data transfer
 	Eth3StaticIp *string `json:"eth3StaticIp,omitempty" xmlrpc:"eth3StaticIp,omitempty"`
 
 	// The e-mails of the MDMS key contacts
@@ -3776,6 +3924,9 @@ type Container_Product_Order_Network_Storage_MassDataMigration_Request struct {
 
 	// The phone numbers of the MDMS key contacts
 	KeyContactPhoneNumbers []string `json:"keyContactPhoneNumbers,omitempty" xmlrpc:"keyContactPhoneNumbers,omitempty"`
+
+	// The roles of the MDMS key contacts
+	KeyContactRoles []string `json:"keyContactRoles,omitempty" xmlrpc:"keyContactRoles,omitempty"`
 
 	// The shipping address postal code
 	PostalCode *string `json:"postalCode,omitempty" xmlrpc:"postalCode,omitempty"`
@@ -4562,6 +4713,9 @@ type Container_User_Customer_External_Binding struct {
 	// The unique token that is created by an external authentication request.
 	AuthenticationToken *string `json:"authenticationToken,omitempty" xmlrpc:"authenticationToken,omitempty"`
 
+	// Added by softlayer-go. This hints to the API what kind of binding this is.
+	ComplexType *string `json:"complexType,omitempty" xmlrpc:"complexType,omitempty"`
+
 	// The OpenID Connect access token which provides access to a resource by the OpenID Connect provider.
 	OpenIdConnectAccessToken *string `json:"openIdConnectAccessToken,omitempty" xmlrpc:"openIdConnectAccessToken,omitempty"`
 
@@ -4573,6 +4727,12 @@ type Container_User_Customer_External_Binding struct {
 
 	// Your SoftLayer customer portal user's portal password.
 	Password *string `json:"password,omitempty" xmlrpc:"password,omitempty"`
+
+	// A second security code that is only required if your credential has become unsynchronized.
+	SecondSecurityCode *string `json:"secondSecurityCode,omitempty" xmlrpc:"secondSecurityCode,omitempty"`
+
+	// The security code used to validate a VeriSign credential.
+	SecurityCode *string `json:"securityCode,omitempty" xmlrpc:"securityCode,omitempty"`
 
 	// The answer to your security question.
 	SecurityQuestionAnswer *string `json:"securityQuestionAnswer,omitempty" xmlrpc:"securityQuestionAnswer,omitempty"`
@@ -5036,6 +5196,20 @@ type Container_Virtual_Guest_Configuration struct {
 
 	//
 	// <div style="width: 200%">
+	//
+	//
+	// Available flavor options.
+	//
+	//
+	// The <code>supplementalCreateObjectOptions.flavorKeyName</code> value in the template is an identifier for a particular core, ram, and primary disk configuration.
+	//
+	//
+	// When providing a <code>supplementalCreateObjectOptions.flavorKeyName</code> option the core, ram, and primary disk options are not needed. If those options are provided they are validated against the flavor.
+	// </div>
+	Flavors []Container_Virtual_Guest_Configuration_Option `json:"flavors,omitempty" xmlrpc:"flavors,omitempty"`
+
+	//
+	// <div style="width: 200%">
 	// Available memory options.
 	//
 	//
@@ -5078,18 +5252,6 @@ type Container_Virtual_Guest_Configuration struct {
 
 	//
 	// <div style="width: 200%">
-	// Available pre-defined configuration options.
-	//
-	//
-	// The <code>supplementalCreateObjectOptions.presetConfigurationKeyName</code> value in the template is an identifier for a particular pre-defined configuration. When provided exactly as shown in the template, that pre-defined configuration will be used.
-	//
-	//
-	// When providing a <code>supplementalCreateObjectOptions.presetConfigurationKeyName</code> option the other options relating to the configuration are still required and should be set according to the related pre-defined option.
-	// </div>
-	PresetConfigurations []Container_Virtual_Guest_Configuration_Option `json:"presetConfigurations,omitempty" xmlrpc:"presetConfigurations,omitempty"`
-
-	//
-	// <div style="width: 200%">
 	// Available processor options.
 	//
 	//
@@ -5104,12 +5266,12 @@ type Container_Virtual_Guest_Configuration_Option struct {
 	Entity
 
 	//
-	// Provides hourly and monthly costs (if either are applicable), and a description of the option.
-	ItemPrice *Product_Item_Price `json:"itemPrice,omitempty" xmlrpc:"itemPrice,omitempty"`
+	// Provides a description of a pre-defined configuration with monthly and hourly costs.
+	Flavor *Product_Package_Preset `json:"flavor,omitempty" xmlrpc:"flavor,omitempty"`
 
 	//
-	// Provides a description of a pre-defined configuration with monthly and hourly costs.
-	PresetConfiguration *Product_Package_Preset `json:"presetConfiguration,omitempty" xmlrpc:"presetConfiguration,omitempty"`
+	// Provides hourly and monthly costs (if either are applicable), and a description of the option.
+	ItemPrice *Product_Item_Price `json:"itemPrice,omitempty" xmlrpc:"itemPrice,omitempty"`
 
 	//
 	// Provides a fragment of the request with the properties and values that must be sent when creating a computing instance with the option.
