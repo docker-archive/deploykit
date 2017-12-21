@@ -33,7 +33,7 @@ type groupContext struct {
 	supervisor Supervisor
 	scaled     *scaledGroup
 	update     updatePlan
-	lock       sync.Mutex
+	lock       sync.RWMutex
 }
 
 func (c *groupContext) setUpdate(plan updatePlan) {
@@ -44,8 +44,8 @@ func (c *groupContext) setUpdate(plan updatePlan) {
 }
 
 func (c *groupContext) updating() bool {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	return c.update != nil
 }
@@ -70,7 +70,7 @@ func (c *groupContext) changeSettings(settings groupSettings) {
 
 type groups struct {
 	byID map[group.ID]*groupContext
-	lock sync.Mutex
+	lock sync.RWMutex
 }
 
 func (g *groups) del(id group.ID) {
@@ -81,8 +81,8 @@ func (g *groups) del(id group.ID) {
 }
 
 func (g *groups) get(id group.ID) (*groupContext, bool) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 
 	logical, exists := g.byID[id]
 	return logical, exists
@@ -101,8 +101,8 @@ func (g *groups) put(id group.ID, context *groupContext) {
 }
 
 func (g *groups) forEach(fn func(group.ID, *groupContext) error) error {
-	g.lock.Lock()
-	defer g.lock.Unlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 	for id, ctx := range g.byID {
 		if err := fn(id, ctx); err != nil {
 			return err
