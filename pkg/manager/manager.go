@@ -458,16 +458,16 @@ func (m *manager) doCommitAll(config globalSpec) error {
 	return m.execPlugins(config,
 		func(control controller.Controller, spec types.Spec) error {
 
-			log.Info("Committing spec", "spec", spec)
-
 			_, err := control.Commit(controller.Enforce, spec)
+			log.Info("Committed spec", "spec", spec, "err", err)
+
 			return err
 		},
 		func(plugin group.Plugin, spec group.Spec) error {
 
-			log.Info("Committing group", "groupID", spec.ID, "spec", spec)
-
 			_, err := plugin.CommitGroup(spec, false)
+			log.Info("Committing group", "groupID", spec.ID, "spec", spec, "err", err)
+
 			return err
 		})
 }

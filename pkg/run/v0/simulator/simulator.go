@@ -3,6 +3,7 @@ package simulator
 import (
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -31,6 +32,15 @@ const (
 	// EnvL4Names is the env var to set for the L4 name
 	EnvL4Names = "INFRAKIT_SIMULATOR_L4_NAMES"
 
+	// EnvStartDelay is the delay to simulate slow start up
+	EnvStartDelay = "INFRAKIT_SIMULATOR_START_DELAY"
+
+	// EnvDescribeDelay is the delay to simulate delay of describe
+	EnvDescribeDelay = "INFRAKIT_SIMULATOR_DESCRIBE_DELAY"
+
+	// EnvProvisionDelay is the delay to simulate provision an instance
+	EnvProvisionDelay = "INFRAKIT_SIMULATOR_PROVISION_DELAY"
+
 	// StoreMem is the value for using memory store
 	StoreMem = "mem"
 
@@ -48,18 +58,24 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
-	Store         string
-	Dir           string
-	InstanceTypes []string
-	L4Names       []string
+	Store          string
+	Dir            string
+	InstanceTypes  []string
+	L4Names        []string
+	StartDelay     time.Duration
+	DescribeDelay  time.Duration
+	ProvisionDelay time.Duration
 }
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Store:         local.Getenv(EnvStore, "mem"),
-	Dir:           local.Getenv(EnvDir, filepath.Join(local.InfrakitHome(), "simulator")),
-	InstanceTypes: strings.Split(local.Getenv(EnvInstanceTypes, "compute,net,disk"), ","),
-	L4Names:       strings.Split(local.Getenv(EnvL4Names, "lb1,lb2,lb3"), ","),
+	Store:          local.Getenv(EnvStore, "mem"),
+	Dir:            local.Getenv(EnvDir, filepath.Join(local.InfrakitHome(), "simulator")),
+	InstanceTypes:  strings.Split(local.Getenv(EnvInstanceTypes, "compute,net,disk"), ","),
+	L4Names:        strings.Split(local.Getenv(EnvL4Names, "lb1,lb2,lb3"), ","),
+	StartDelay:     types.MustParseDuration(local.Getenv(EnvStartDelay, "0s")).Duration(),
+	DescribeDelay:  types.MustParseDuration(local.Getenv(EnvDescribeDelay, "0s")).Duration(),
+	ProvisionDelay: types.MustParseDuration(local.Getenv(EnvProvisionDelay, "0s")).Duration(),
 }
 
 // Run runs the plugin, blocking the current thread.  Error is returned immediately
