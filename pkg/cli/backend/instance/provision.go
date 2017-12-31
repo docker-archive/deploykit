@@ -7,10 +7,11 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/spf13/cobra"
 )
 
 func init() {
-	backend.Register("instanceProvision", Provision)
+	backend.Register("instanceProvision", Provision, nil)
 }
 
 // Provision backend requires the name of the plugin and a boolean to indicate if the content is yaml.
@@ -32,7 +33,7 @@ func Provision(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFu
 		return nil, fmt.Errorf("second param (isYAML) must be a bool")
 	}
 
-	return func(script string) error {
+	return func(script string, cmd *cobra.Command, args []string) error {
 
 		plugin, err := scope.Instance(name)
 		if err != nil {

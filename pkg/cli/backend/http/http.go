@@ -10,10 +10,11 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/spf13/cobra"
 )
 
 func init() {
-	backend.Register("http", HTTP)
+	backend.Register("http", HTTP, nil)
 }
 
 // HTTP takes a method parameter (string) and a URL (string) and then
@@ -50,7 +51,7 @@ func HTTP(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, e
 		}
 	}
 
-	return func(script string) error {
+	return func(script string, cmd *cobra.Command, args []string) error {
 
 		body := bytes.NewBufferString(script)
 		client := &http.Client{}
