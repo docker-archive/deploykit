@@ -6,10 +6,11 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/spf13/cobra"
 )
 
 func init() {
-	backend.Register("print", Print)
+	backend.Register("print", Print, nil)
 }
 
 // Print takes a list of optional parameters and returns an executable function that prints
@@ -20,7 +21,7 @@ func Print(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, 
 	if len(opt) > 0 {
 		prefix = fmt.Sprintf("%v", opt[0])
 	}
-	return func(script string) error {
+	return func(script string, cmd *cobra.Command, args []string) error {
 		if prefix == "" {
 			fmt.Println(script)
 			return nil

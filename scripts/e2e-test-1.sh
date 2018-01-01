@@ -77,6 +77,7 @@ infrakit local mystack/groups commit-group scripts/cattle.json
 
 sleep 10
 
+
 if [[ $(infrakit local | grep mystack/cattle) == "" ]]; then
     echo "checking the CLI"
     infrakit local

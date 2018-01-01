@@ -9,12 +9,13 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/spf13/cobra"
 )
 
 var log = logutil.New("module", "cli/backend/manager")
 
 func init() {
-	backend.Register("managerCommit", Commit)
+	backend.Register("managerCommit", Commit, nil)
 }
 
 // Commit requires two parameters, first is isYAML (bool) and second is pretend (bool)
@@ -36,7 +37,7 @@ func Commit(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc,
 		return nil, fmt.Errorf("second param (pretend) must be a bool")
 	}
 
-	return func(script string) error {
+	return func(script string, cmd *cobra.Command, args []string) error {
 		groups := []plugin.Spec{}
 		if isYAML {
 			y, err := types.AnyYAML([]byte(script))

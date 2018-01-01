@@ -1,0 +1,13 @@
+{{/* Render this document and then execute via ssh backend */}}
+{{/* Add this as a playbook command via infrakit playbook add test url-to-this-file */}}
+
+{{ var `message` (flag "message" "string" "" | prompt "message?" "string" "") }}
+
+{{/* =% ssh  %= */}}
+
+#!/bin/sh
+
+echo "The message is {{ var `message` }}"
+
+# Do something here
+echo "I am $(whoami) running on $(hostname)"
