@@ -19,7 +19,7 @@ import (
 var log = logutil.New("module", "cli/backend/ssh")
 
 func init() {
-	backend.Register("ssh", Ssh, func(flags *pflag.FlagSet) {
+	backend.Register("ssh", Script, func(flags *pflag.FlagSet) {
 		flags.StringSlice("hostport", []string{}, "Host:port eg. localhost:22")
 		flags.String("user", "", "username")
 		flags.String("password", "", "password")
@@ -27,11 +27,11 @@ func init() {
 	})
 }
 
-// Ssh takes a list of optional parameters and returns an executable function that
+// Script takes a list of optional parameters and returns an executable function that
 // executes the content as a shell script over ssh
 // The args are user@host:port[,user@host:port] <auth> [password or keyfile]
 // where auth = [ password | key | agent ]
-func Ssh(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
+func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
 	return func(script string, cmd *cobra.Command, args []string) error {
 
@@ -87,20 +87,22 @@ func Ssh(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, er
 
 		for _, hostport := range hostports {
 
+			cl := base
+			cl.Remote = ssh.HostPort(hostport)
+
+			log.Debug("running", "remote", cl.Remote)
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 
-				cl := base
-				cl.Remote = ssh.HostPort(hostport)
-
 				exec, err := cl.Exec()
 				if err != nil {
-					log.Error("cannot connect", "remote", hostport, "err", err)
+					log.Error("cannot connect", "remote", cl.Remote, "err", err)
 					return
 				}
 				if err := execScript(exec, script, args); err != nil {
-					log.Error("error", "remote", hostport, "err", err)
+					log.Error("error", "remote", cl.Remote, "err", err)
 					return
 				}
 			}()

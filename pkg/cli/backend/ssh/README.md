@@ -124,9 +124,33 @@ Since container at 2223 can also authenticate via password (`root`), we can exec
 the script against both 2222 and 2223:
 
 ```
-$ infrakit use ssh-test --user root --password root --message MULTIPLE --hostport localhost:2222 --hostport localhost:2223
+$ infrakit use ssh-test --user root --password root --message MULTIPLE --hostport localhost:2222 --hostport localhost:2223 --log 5
+DBUG[12-31|16:13:14] Running                                  module=cli/playbook command=ssh-test url=file:///Users/davidchung/project6/src/github.com/docker/infrakit/pkg/cli/backend/ssh/test.ikt args=[] fn=github.com/docker/infrakit/pkg/cli/playbook.list.func1
+DBUG[12-31|16:13:14] running                                  module=cli/core script="\n\n\n\n\n\n\n#!/bin/sh\n\necho \"The message is MULTIPLE\"\n\n# Do something here\necho \"I am $(whoami) running on $(hostname)\"\n" fn=github.com/docker/infrakit/pkg/cli.(*Context).Execute
+DBUG[12-31|16:13:14] using password auth                      module=cli/backend/ssh user=root fn=github.com/docker/infrakit/pkg/cli/backend/ssh.Script.func1
+DBUG[12-31|16:13:14] running                                  module=cli/backend/ssh remote=localhost:2222 fn=github.com/docker/infrakit/pkg/cli/backend/ssh.Script.func1
+DBUG[12-31|16:13:14] running                                  module=cli/backend/ssh remote=localhost:2223 fn=github.com/docker/infrakit/pkg/cli/backend/ssh.Script.func1
+DBUG[12-31|16:13:14] connect                                  module=util/ssh conn="&{client:<nil> Remote:localhost:2223 Config:0xc4201ec240}" V=300 fn=github.com/docker/infrakit/pkg/util/ssh.(*Conn).connect
+DBUG[12-31|16:13:14] connect                                  module=util/ssh conn="&{client:<nil> Remote:localhost:2222 Config:0xc4201ec240}" V=300 fn=github.com/docker/infrakit/pkg/util/ssh.(*Conn).connect
+DBUG[12-31|16:13:14] sh                                       module=cli/backend/ssh cmd=/bin/sh fn=github.com/docker/infrakit/pkg/cli/backend/ssh.execScript
+DBUG[12-31|16:13:14] exec                                     module=util/exec command=[/bin/sh] fn=github.com/docker/infrakit/pkg/util/exec.(*Builder).Prepare
 The message is MULTIPLE
 I am root running on 578e5ab2478d
+DBUG[12-31|16:13:14] sh                                       module=cli/backend/ssh cmd=/bin/sh fn=github.com/docker/infrakit/pkg/cli/backend/ssh.execScript
+DBUG[12-31|16:13:14] exec                                     module=util/exec command=[/bin/sh] fn=github.com/docker/infrakit/pkg/util/exec.(*Builder).Prepare
+The message is MULTIPLE
+I am root running on 23a4b5b69e6a
+```
+
+Verify that indeed the scripts ran on the two different containers -- the hostnames are the container ids.
+
+```
+$ docker ps -a | grep 22/tcp
+578e5ab2478d        sickp/alpine-sshd:7.5   "/entrypoint.sh"         5 hours ago         Up 5 hours                  0.0.0.0:2223->22/tcp   reverent_poincare
+23a4b5b69e6a        sickp/alpine-sshd:7.5   "/entrypoint.sh"         5 hours ago         Up 5 hours                  0.0.0.0:2222->22/tcp   upbeat_morse
+$ infrakit use ssh-test --user root --password root --message MULTIPLE --hostport localhost:2222 --hostport localhost:2223
+The message is MULTIPLE
+I am root running on 23a4b5b69e6a
 The message is MULTIPLE
 I am root running on 578e5ab2478d
 ```
