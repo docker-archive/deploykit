@@ -5076,3 +5076,135 @@ func TestListCurrentTfFiles(t *testing.T) {
 		data,
 	)
 }
+
+func TestDoDescribeInstancesEmpty(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	result, err := tf.doDescribeInstances(describeFns{}, map[string]string{}, false)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, result)
+
+	result, err = tf.doDescribeInstances(describeFns{}, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, result)
+}
+
+func TestDoDescribeInstancesShowError(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Write single file
+	id := "instance-1"
+	tags := []string{"tag1:val1"}
+	inst := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMIBMCloud: map[TResourceName]TResourceProperties{
+			TResourceName(id): TResourceProperties{"k1": "v1", "tags": tags},
+		},
+	}
+	buff, err := json.MarshalIndent(TFormat{Resource: inst}, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id)), buff, 0644)
+	require.NoError(t, err)
+
+	fns := describeFns{
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, []TResourceType{VMIBMCloud}, types)
+			require.Nil(t, propFilter)
+			return nil, fmt.Errorf("Custom show error")
+		},
+	}
+
+	_, err = tf.doDescribeInstances(fns, map[string]string{}, true)
+	require.Error(t, err)
+	require.Equal(t, "Custom show error", err.Error())
+}
+
+func TestDoDescribeInstancesProperties(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Write files without all properties, the properties will be returned
+	// from terraform
+	id1 := "instance-1"
+	id2 := "instance-2"
+	tag1 := []string{"common:val", "tag1:val1"}
+	tag2 := []string{"common:val", "tag2:val2"}
+	inst1 := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMIBMCloud: map[TResourceName]TResourceProperties{
+			TResourceName(id1): TResourceProperties{"tags": tag1},
+		},
+	}
+	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id1)), buff, 0644)
+	require.NoError(t, err)
+	inst2 := map[TResourceType]map[TResourceName]TResourceProperties{
+		VMIBMCloud: map[TResourceName]TResourceProperties{
+			TResourceName(id2): TResourceProperties{"tags": tag2},
+		},
+	}
+	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id2)), buff, 0644)
+	require.NoError(t, err)
+
+	fns := describeFns{
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, []TResourceType{VMIBMCloud}, types)
+			require.Nil(t, propFilter)
+			result := map[TResourceType]map[TResourceName]TResourceProperties{
+				VMIBMCloud: {
+					TResourceName(id1): TResourceProperties{"k1": "v1", "tags": tag1},
+					TResourceName(id2): TResourceProperties{"k2": "v2", "tags": tag2},
+				},
+			}
+			return result, nil
+		},
+	}
+
+	// Expected results
+	props1, err := types.AnyValue(TResourceProperties{"k1": "v1", "tags": tag1})
+	require.NoError(t, err)
+	props2, err := types.AnyValue(TResourceProperties{"k2": "v2", "tags": tag2})
+	require.NoError(t, err)
+	instDesc1 := instance.Description{
+		Tags:       map[string]string{"common": "val", "tag1": "val1"},
+		ID:         instance.ID(id1),
+		Properties: props1,
+	}
+	instDesc2 := instance.Description{
+		Tags:       map[string]string{"common": "val", "tag2": "val2"},
+		ID:         instance.ID(id2),
+		Properties: props2,
+	}
+
+	// No tag filter
+	result, err := tf.doDescribeInstances(fns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Contains(t, result, instDesc1)
+	require.Contains(t, result, instDesc2)
+
+	// Common tag filter
+	result, err = tf.doDescribeInstances(fns, map[string]string{"common": "val"}, true)
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Contains(t, result, instDesc1)
+	require.Contains(t, result, instDesc2)
+
+	// Tag1 only filter
+	result, err = tf.doDescribeInstances(fns, map[string]string{"tag1": "val1"}, true)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{instDesc1}, result)
+
+	// Tag2 only filter
+	result, err = tf.doDescribeInstances(fns, map[string]string{"tag2": "val2"}, true)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{instDesc2}, result)
+
+	// No matching tags
+	result, err = tf.doDescribeInstances(fns, map[string]string{"tag1": "bogus"}, true)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, result)
+}

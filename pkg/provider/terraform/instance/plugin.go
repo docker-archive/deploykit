@@ -1172,9 +1172,22 @@ func parseAttachTag(tf *TFormat) ([]string, error) {
 	return []string{}, nil
 }
 
+// External functions using during describe; broken out for testing
+type describeFns struct {
+	tfShow func(resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
+}
+
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-	logger.Debug("DescribeInstances", "tags", tags, "V", debugV1)
+	fns := describeFns{
+		tfShow: p.doTerraformShow,
+	}
+	return p.doDescribeInstances(fns, tags, properties)
+}
+
+// doDescribeInstances returns descriptions of all instances matching all of the provided tags.
+func (p *plugin) doDescribeInstances(fns describeFns, tags map[string]string, properties bool) ([]instance.Description, error) {
+	logger.Debug("doDescribeInstances", "tags", tags, "V", debugV1)
 	// Acquire lock since we are reading all files and potentially running "terraform show"
 	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
@@ -1190,10 +1203,10 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		// TODO - not the most efficient, but here we assume we're usually just one vm type
 		for vmResourceType := range localSpecs {
 
-			if result, err := p.doTerraformShow([]TResourceType{vmResourceType}, nil); err == nil {
+			if result, err := fns.tfShow([]TResourceType{vmResourceType}, nil); err == nil {
 				terraformShowResult = result
 			} else {
-				logger.Warn("DescribeInstances", "terraform show error", err)
+				logger.Warn("doDescribeInstances", "terraform show error", err)
 				return nil, err
 			}
 		}
@@ -1239,7 +1252,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		}
 
 	}
-	logger.Debug("DescribeInstances", "result", result, "V", debugV1)
+	logger.Debug("doDescribeInstances", "result", result, "V", debugV1)
 	return result, nil
 }
 
