@@ -369,23 +369,34 @@ func (p *plugin) Validate(req *types.Any) error {
 
 // scanLocalFiles reads the filesystem and loads all tf.json and tf.json.new files
 func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-
+	// Ensure that the target directory exists
+	if _, err := os.Stat(p.Dir); err != nil {
+		logger.Warn("scanLocalFiles", "dir", p.Dir, "error", err)
+		return nil, err
+	}
 	vms := map[TResourceType]map[TResourceName]TResourceProperties{}
-
 	fs := &afero.Afero{Fs: p.fs}
 	// just scan the directory for the instance-*.tf.json files
 	err := fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				logger.Debug("scanLocalFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
-				return nil
+				if os.IsNotExist(err) {
+					// If the file has been removed just ignore it
+					logger.Debug("scanLocalFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
+					return nil
+				}
+				logger.Error("scanLocalFiles", "msg", fmt.Sprintf("Failed to process file %s", path), "error", err)
+				return err
 			}
 			matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
-
 			if len(matches) == 4 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
-					logger.Warn("scanLocalFiles", "msg", fmt.Sprintf("Cannot parse file %s", path), "error", err)
+					if os.IsNotExist(err) {
+						logger.Debug("scanLocalFiles", "msg", fmt.Sprintf("Ignoring removed file %s", path), "error", err)
+						return nil
+					}
+					logger.Warn("scanLocalFiles", "msg", fmt.Sprintf("Cannot read file %s", path))
 					return err
 				}
 				tf := TFormat{}
@@ -813,19 +824,33 @@ func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles m
 func (p *plugin) listCurrentTfFiles() (map[string]map[TResourceType]map[TResourceName]TResourceProperties, error) {
 	// TODO(kaufers): Replace scanLocalFiles with this function once this plugin is updated
 	//                to handle any resource type instead of only VMs
+	// Ensure that the target directory exists
+	if _, err := os.Stat(p.Dir); err != nil {
+		logger.Warn("listCurrentTfFiles", "dir", p.Dir, "error", err)
+		return nil, err
+	}
 	result := make(map[string]map[TResourceType]map[TResourceName]TResourceProperties)
 	fs := &afero.Afero{Fs: p.fs}
 	err := fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				logger.Debug("listCurrentTfFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
-				return nil
+				if os.IsNotExist(err) {
+					// If the file has been removed just ignore it
+					logger.Debug("listCurrentTfFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
+					return nil
+				}
+				logger.Error("listCurrentTfFiles", "msg", fmt.Sprintf("Failed to process file %s", path), "error", err)
+				return err
 			}
 			matches := tfFileRegex.FindStringSubmatch(info.Name())
 			if len(matches) == 3 {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
-					logger.Warn("listCurrentTfFiles", "msg", fmt.Sprintf("Cannot parse file %s", path), "error", err)
+					if os.IsNotExist(err) {
+						logger.Debug("listCurrentTfFiles", "msg", fmt.Sprintf("Ignoring removed file %s", path), "error", err)
+						return nil
+					}
+					logger.Warn("listCurrentTfFiles", "msg", fmt.Sprintf("Cannot read file %s", path))
 					return err
 				}
 				tf := TFormat{}
@@ -1070,8 +1095,13 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach, executeTfApply bool)
 			err = fs.Walk(p.Dir,
 				func(path string, info os.FileInfo, err error) error {
 					if err != nil {
-						logger.Debug("doDestroy", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
-						return nil
+						if os.IsNotExist(err) {
+							// If the file has been removed just ignore it
+							logger.Debug("doDestroy", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
+							return nil
+						}
+						logger.Error("doDestroy", "msg", fmt.Sprintf("Failed to process file %s", path), "error", err)
+						return err
 					}
 					matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
 					// Note that the current instance (being destroyed) still exists; filter
@@ -1080,6 +1110,11 @@ func (p *plugin) doDestroy(inst instance.ID, processAttach, executeTfApply bool)
 						// Load this file
 						buff, err := afero.ReadFile(p.fs, filepath.Join(p.Dir, info.Name()))
 						if err != nil {
+							if os.IsNotExist(err) {
+								logger.Debug("doDestroy", "msg", fmt.Sprintf("Ignoring removed file %s", path), "error", err)
+								return nil
+							}
+							logger.Warn("doDestroy", "msg", fmt.Sprintf("Cannot read file %s", path))
 							return err
 						}
 						tFormat := TFormat{}
