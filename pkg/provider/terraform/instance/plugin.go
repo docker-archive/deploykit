@@ -1306,13 +1306,14 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	}
 
 	// Map resources to import with resources in the spec
-	var specLogicalID instance.LogicalID
+	var specLogicalID *instance.LogicalID
 	if spec.Tags != nil {
 		if logicalID, has := spec.Tags[instance.LogicalIDTag]; has {
-			specLogicalID = instance.LogicalID(logicalID)
+			logicalID := instance.LogicalID(logicalID)
+			specLogicalID = &logicalID
 		}
 	}
-	decomposedFiles, err := p.decompose(&specLogicalID, vmResName, &tf, specVMType, specVMProps)
+	decomposedFiles, err := p.decompose(specLogicalID, vmResName, &tf, specVMType, specVMProps)
 	if err != nil {
 		return err
 	}
