@@ -1158,8 +1158,8 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 			if result, err := p.doTerraformShow([]TResourceType{vmResourceType}, nil); err == nil {
 				terraformShowResult = result
 			} else {
-				// Don't blow up... just do best and show what we can find.
 				logger.Warn("DescribeInstances", "terraform show error", err)
+				return nil, err
 			}
 		}
 	}
