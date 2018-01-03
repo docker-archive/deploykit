@@ -27,6 +27,19 @@ func (m *manager) Groups() (map[group.ID]group.Plugin, error) {
 	return groups, nil
 }
 
+func (m *manager) loadGroupSpec(id group.ID) (group.Spec, error) {
+	// load the config
+	config := globalSpec{}
+
+	// load the latest version -- assumption here is that it's been persisted already.
+	err := config.load(m.Options.SpecStore)
+	if err != nil {
+		log.Warn("Error loading config", "err", err)
+		return group.Spec{}, err
+	}
+	return config.getGroupSpec(id)
+}
+
 func (m *manager) updateConfig(spec group.Spec) error {
 	log.Debug("Updating config", "spec", spec)
 	m.lock.Lock()
@@ -66,198 +79,147 @@ func (m *manager) removeConfig(id group.ID) error {
 	return stored.store(m.Options.SpecStore)
 }
 
+func (m *manager) queue(name string, work func() (retry bool, err error)) <-chan struct{} {
+	wait := make(chan struct{})
+	m.backendOps <- backendOp{
+		name: name,
+		operation: func() (bool, error) {
+			retry, err := work()
+			close(wait)
+			return retry, err
+		},
+	}
+	return wait
+}
+
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err error) {
 
-	resultChan := make(chan []interface{})
+	if is, errLeader := m.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
 
-	m.backendOps <- backendOp{
-		name: "commit",
-		operation: func() error {
+	retry := true
+	<-m.queue("commit",
+		func() (bool, error) {
 			log.Debug("Manager CommitGroup", "spec", grp, "V", debugV)
-
-			var txnResp string
-			var txnErr error
-
-			// Always send a response so we don't block forever
-			defer func() {
-				resultChan <- []interface{}{txnResp, txnErr}
-			}()
 
 			// We first update the user's desired state first
 			if !pretend {
 				if updateErr := m.updateConfig(grp); updateErr != nil {
 					log.Error("Error updating", "err", updateErr)
-					txnErr = updateErr
-					txnResp = "Cannot update spec. Abort"
-					return txnErr
+					resp = "Cannot update spec. Abort"
+					err = updateErr
+					return false, updateErr
 				}
 			}
 
-			txnResp, txnErr = m.Plugin.CommitGroup(grp, pretend)
-			return txnErr
-		},
-	}
+			resp, err = m.Plugin.CommitGroup(grp, pretend)
+			return retry, err
+		})
 
-	r := <-resultChan
-	if v, has := r[0].(string); has {
-		resp = v
-	}
-	if v, has := r[1].(error); has && v != nil {
-		err = v
-	}
 	return
 }
 
 // Serialized describe group
 func (m *manager) DescribeGroup(id group.ID) (desc group.Description, err error) {
-	log.Debug("Describe group", "id", id, "V", debugV)
-	resultChan := make(chan []interface{})
 
-	m.backendOps <- backendOp{
-		name: "describe",
-		operation: func() error {
+	if is, errLeader := m.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
+
+	retry := false
+	<-m.queue("describe",
+		func() (bool, error) {
 			log.Debug("Manager DescribeGroup", "id", id, "V", debugV)
-
-			var txnResp group.Description
-			var txnErr error
-
-			// Always send a response so we don't block forever
-			defer func() {
-				resultChan <- []interface{}{txnResp, txnErr}
-			}()
-
-			txnResp, txnErr = m.Plugin.DescribeGroup(id)
-			return txnErr
-		},
-	}
-
-	r := <-resultChan
-	if v, has := r[0].(group.Description); has {
-		desc = v
-	}
-	if v, has := r[1].(error); has && v != nil {
-		err = v
-	}
+			desc, err = m.Plugin.DescribeGroup(id)
+			return retry, err
+		})
 	return
 }
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) DestroyGroup(id group.ID) (err error) {
 
-	resultChan := make(chan []interface{})
+	if is, errLeader := m.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
 
-	m.backendOps <- backendOp{
-		name: "destroy",
-		operation: func() error {
+	retry := false
+	<-m.queue("destroy",
+		func() (bool, error) {
 			log.Debug("Manager DestroyGroup", "groupID", id, "V", debugV)
-
-			var txnErr error
-
-			// Always send a response so we don't block forever
-			defer func() {
-				resultChan <- []interface{}{txnErr}
-			}()
 
 			// We first update the user's desired state first
 			if removeErr := m.removeConfig(id); removeErr != nil {
 				log.Warn("Error updating/ remove", "err", removeErr)
-				txnErr = removeErr
-				return txnErr
+				err = removeErr
+				return retry, err
 			}
 
-			txnErr = m.Plugin.DestroyGroup(id)
-			return txnErr
-		},
-	}
-
-	r := <-resultChan
-	if v, has := r[0].(error); has && v != nil {
-		err = v
-	}
+			err = m.Plugin.DestroyGroup(id)
+			return retry, err
+		})
 	return
 }
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) FreeGroup(id group.ID) (err error) {
 
-	resultChan := make(chan []interface{})
+	if is, errLeader := m.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
 
-	m.backendOps <- backendOp{
-		name: "free",
-		operation: func() error {
+	retry := false
+	<-m.queue("free",
+		func() (bool, error) {
 			log.Debug("Manager FreeGroup", "groupID", id, "V", debugV)
-
-			var txnErr error
-
-			// Always send a response so we don't block forever
-			defer func() {
-				resultChan <- []interface{}{txnErr}
-			}()
 
 			// We first update the user's desired state first
 			if removeErr := m.removeConfig(id); removeErr != nil {
 				log.Warn("Error updating / remove", "err", removeErr)
-				txnErr = removeErr
-				return txnErr
+				err = removeErr
+				return retry, err
 			}
 
-			txnErr = m.Plugin.FreeGroup(id)
-			return txnErr
-		},
-	}
+			err = m.Plugin.FreeGroup(id)
+			return retry, err
+		})
 
-	r := <-resultChan
-	if v, has := r[0].(error); has && v != nil {
-		err = v
-	}
 	return
 }
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) DestroyInstances(id group.ID, instances []instance.ID) (err error) {
-	log.Debug("manager.DestroyInstances", "id", id, "instances", instances, "V", debugV)
-	resultChan := make(chan []interface{})
 
-	m.backendOps <- backendOp{
-		name: "destroyInstances",
-		operation: func() error {
+	if is, errLeader := m.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
+
+	retry := false
+	<-m.queue("destroyInstances",
+		func() (bool, error) {
 			log.Debug("Manager DestroyInstances", "groupID", id, "instances", instances, "V", debugV)
 
-			var txnErr error
+			err = m.Plugin.DestroyInstances(id, instances)
+			return retry, err
+		})
 
-			// Always send a response so we don't block forever
-			defer func() {
-				resultChan <- []interface{}{txnErr}
-			}()
-
-			txnErr = m.Plugin.DestroyInstances(id, instances)
-			return txnErr
-		},
-	}
-
-	r := <-resultChan
-	if v, has := r[0].(error); has && v != nil {
-		err = v
-	}
 	return
-}
-
-func (m *manager) loadGroupSpec(id group.ID) (group.Spec, error) {
-	// load the config
-	config := globalSpec{}
-
-	// load the latest version -- assumption here is that it's been persisted already.
-	err := config.load(m.Options.SpecStore)
-	if err != nil {
-		log.Warn("Error loading config", "err", err)
-		return group.Spec{}, err
-	}
-	return config.getGroupSpec(id)
 }
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) SetSize(id group.ID, size int) error {
+
+	if is, errLeader := m.IsLeader(); errLeader != nil || !is {
+		return errNotLeader
+	}
+
 	spec, err := m.loadGroupSpec(id)
 	if err != nil {
 		return err
@@ -277,6 +239,12 @@ func (m *manager) SetSize(id group.ID, size int) error {
 
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) Size(id group.ID) (size int, err error) {
+
+	if is, errLeader := m.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
+
 	spec, err := m.loadGroupSpec(id)
 	if err != nil {
 		return 0, err

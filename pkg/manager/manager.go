@@ -8,7 +8,6 @@ import (
 
 	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/leader"
-	logutil "github.com/docker/infrakit/pkg/log"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -52,7 +51,7 @@ const (
 
 type backendOp struct {
 	name      string
-	operation func() error
+	operation func() (retry bool, err error)
 }
 
 // NewManager returns the manager which depends on other services to coordinate and manage
@@ -140,6 +139,10 @@ func (m *manager) initRunning() bool {
 	return false
 }
 
+var (
+	errNotLeader = fmt.Errorf("not a leader")
+)
+
 // IsLeader returns leader status.  False if not or unknown.
 func (m *manager) IsLeader() (bool, error) {
 	m.lock.RLock()
@@ -180,7 +183,7 @@ func (m *manager) Start() (<-chan struct{}, error) {
 	stopWorkQueue := make(chan struct{})
 
 	// proxied backend needs to have its operations serialized with respect to leadership calls, etc.
-	backendOps := make(chan backendOp)
+	backendOps := make(chan backendOp, 100)
 	m.backendOps = backendOps
 
 	// This goroutine here serializes work so that we don't have concurrent commits or unwatches / updates / etc.
@@ -190,9 +193,16 @@ func (m *manager) Start() (<-chan struct{}, error) {
 			select {
 
 			case op := <-backendOps:
+
 				log.Debug("Backend operation", "op", op, "V", debugV)
-				if m.isLeader {
-					op.operation()
+				retry, err := op.operation()
+				if err != nil {
+					log.Error("backend operation error", "name", op.name, "err", err, "retry", retry)
+					// TODO - implement cancelation later
+					if retry {
+						backendOps <- op
+						log.Warn("requeued backend operation", "name", op.name)
+					}
 				}
 
 			case <-stopWorkQueue:
@@ -456,19 +466,21 @@ func (m *manager) doCommit() error {
 
 func (m *manager) doCommitAll(config globalSpec) error {
 	return m.execPlugins(config,
-		func(control controller.Controller, spec types.Spec) error {
+		func(control controller.Controller, spec types.Spec) (bool, error) {
 
 			_, err := control.Commit(controller.Enforce, spec)
-			log.Info("Committed spec", "spec", spec, "err", err)
-
-			return err
+			if err != nil {
+				log.Error("Cannot commit", "spec", spec, "err", err)
+			}
+			return true, err
 		},
-		func(plugin group.Plugin, spec group.Spec) error {
+		func(plugin group.Plugin, spec group.Spec) (bool, error) {
 
 			_, err := plugin.CommitGroup(spec, false)
-			log.Info("Committing group", "groupID", spec.ID, "spec", spec, "err", err)
-
-			return err
+			if err != nil {
+				log.Error("Cannot commit group", "spec", spec, "err", err)
+			}
+			return true, err
 		})
 }
 
@@ -478,23 +490,23 @@ func (m *manager) doFreeAll(config globalSpec) error {
 
 	log.Info("Freeing groups")
 	return m.execPlugins(config,
-		func(controller controller.Controller, spec types.Spec) error {
+		func(controller controller.Controller, spec types.Spec) (bool, error) {
 
 			log.Info("Freeing spec", "spec", spec)
 
 			_, err := controller.Free(&spec.Metadata)
-			return err
+			return true, err
 		},
-		func(plugin group.Plugin, spec group.Spec) error {
+		func(plugin group.Plugin, spec group.Spec) (bool, error) {
 
 			log.Info("Freeing group", "groupID", spec.ID)
-			return plugin.FreeGroup(spec.ID)
+			return true, plugin.FreeGroup(spec.ID)
 		})
 }
 
 func (m *manager) execPlugins(config globalSpec,
-	controllerWork func(controller.Controller, types.Spec) error,
-	groupWork func(group.Plugin, group.Spec) error) (err error) {
+	controllerWork func(controller.Controller, types.Spec) (bool, error),
+	groupWork func(group.Plugin, group.Spec) (bool, error)) (err error) {
 
 	return config.visit(func(k key, r record) error {
 
@@ -508,7 +520,14 @@ func (m *manager) execPlugins(config globalSpec,
 				break
 			}
 
-			err = controllerWork(cp, r.Spec)
+			// queue up the work
+			m.backendOps <- backendOp{
+				name: k.Kind,
+				operation: func() (bool, error) {
+					return controllerWork(cp, r.Spec)
+				},
+			}
+			log.Debug("queued operation for ingress/enrollment", "key", k, "record", r, "V", debugV)
 
 		case "group": // not ideal to use string here.
 			id := group.ID(k.Name)
@@ -518,7 +537,7 @@ func (m *manager) execPlugins(config globalSpec,
 				break
 			}
 
-			log.Debug("exec on group", "groupID", id, "plugin", r.Handler, "V", logutil.V(100))
+			log.Debug("exec on group", "groupID", id, "plugin", r.Handler, "V", debugV)
 
 			// spec is store in the properties
 			if r.Spec.Properties == nil {
@@ -531,7 +550,13 @@ func (m *manager) execPlugins(config globalSpec,
 				Properties: r.Spec.Properties,
 			}
 
-			err = groupWork(gp, spec)
+			m.backendOps <- backendOp{
+				name: k.Kind,
+				operation: func() (bool, error) {
+					return groupWork(gp, spec)
+				},
+			}
+			log.Debug("queued operation for group", "key", k, "record", r, "V", debugV)
 
 		default:
 			log.Warn("not execing on for record", "record", r, "key", k)

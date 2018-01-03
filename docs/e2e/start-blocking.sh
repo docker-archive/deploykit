@@ -23,6 +23,4 @@ infrakit plugin start \
 	 enrollment:nfs \
 	 --log 5 --log-debug-V 500 --log-stack \
 	 --log-debug-match module=manager \
-	 --log-debug-match module=plugin/group \
-	 --log-debug-match module=simulator/instance \
 	 --log-debug-match-exclude=false \
