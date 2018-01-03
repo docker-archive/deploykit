@@ -61,6 +61,39 @@ func getPlugin(t *testing.T) (*plugin, string) {
 	return p, dir
 }
 
+// getPluginDirNotExists returns the terraform instance plugin to use for testing where the
+// assocated directory does not exist
+func getPluginDirNotExists(t *testing.T) (*plugin, string) {
+	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
+	require.NoError(t, err)
+	// A directory that does not exist
+	dir = dir + "/should/not/exist"
+	_, err = os.Stat(dir)
+	require.Error(t, err)
+	require.True(t, os.IsNotExist(err), fmt.Sprintf("Incorrect error, expected NotExist, got %v", err))
+	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, []string{}, nil)
+	tf.(*plugin).pretend = true
+	p, is := tf.(*plugin)
+	require.True(t, is)
+	return p, dir
+}
+
+// getPlugin returns the terraform instance plugin to use for testing where we do
+// not have permissions to the assocated directory
+func getPluginDirNoPerms(t *testing.T) (*plugin, string) {
+	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
+	require.NoError(t, err)
+	// Nested directory without read access
+	dir = dir + "/noperm"
+	os.Mkdir(dir, 0200)
+	require.NoError(t, err)
+	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, []string{}, nil)
+	tf.(*plugin).pretend = true
+	p, is := tf.(*plugin)
+	require.True(t, is)
+	return p, dir
+}
+
 func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
 	logicalID := instance.LogicalID("logical-id-1")
 	// Spec with logical ID
@@ -2035,6 +2068,22 @@ func TestFindOrphanedDedicatedAttachmentKeys(t *testing.T) {
 	require.Contains(t, allKeys, "mgr2")
 	require.Contains(t, allKeys, "mgr3")
 	require.Equal(t, []string{"mgr3"}, orphanKeys)
+}
+
+func TestScanLocalFilesNoDir(t *testing.T) {
+	tf, dir := getPluginDirNotExists(t)
+	defer os.RemoveAll(dir)
+	_, err := tf.scanLocalFiles()
+	require.Error(t, err)
+	require.True(t, os.IsNotExist(err), fmt.Sprintf("Incorrect error, expected NotExist, got %v", err))
+}
+
+func TestScanLocalFilesNoPermissions(t *testing.T) {
+	tf, dir := getPluginDirNoPerms(t)
+	defer os.RemoveAll(dir)
+	_, err := tf.scanLocalFiles()
+	require.Error(t, err)
+	require.True(t, os.IsPermission(err), fmt.Sprintf("Incorrect error, expected permission, got %v", err))
 }
 
 func TestScanLocalFilesNoFiles(t *testing.T) {
@@ -4912,6 +4961,22 @@ func TestListCurrentTfFilesNoFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fileMap)
 	require.Equal(t, 0, len(fileMap))
+}
+
+func TestListCurrentTfFilesNoDir(t *testing.T) {
+	tf, dir := getPluginDirNotExists(t)
+	defer os.RemoveAll(dir)
+	_, err := tf.listCurrentTfFiles()
+	require.Error(t, err)
+	require.True(t, os.IsNotExist(err), fmt.Sprintf("Incorrect error, expected NotExist, got %v", err))
+}
+
+func TestListCurrentTfFilesNoPermissions(t *testing.T) {
+	tf, dir := getPluginDirNoPerms(t)
+	defer os.RemoveAll(dir)
+	_, err := tf.listCurrentTfFiles()
+	require.Error(t, err)
+	require.True(t, os.IsPermission(err), fmt.Sprintf("Incorrect error, expected permission, got %v", err))
 }
 
 func TestListCurrentTfFiles(t *testing.T) {

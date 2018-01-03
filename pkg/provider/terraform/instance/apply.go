@@ -177,8 +177,13 @@ func (p *plugin) hasRecentDeltas(window int) (bool, error) {
 	err := fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				logger.Debug("hasRecentDeltas", "msg", fmt.Sprintf("Ignoring file %s due to error", path), "error", err, "V", debugV3)
-				return nil
+				if os.IsNotExist(err) {
+					// If the file has been removed just ignore it
+					logger.Debug("hasRecentDeltas", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
+					return nil
+				}
+				logger.Error("hasRecentDeltas", "msg", fmt.Sprintf("Failed to process file %s", path), "error", err)
+				return err
 			}
 			if m := tfFileRegex.FindStringSubmatch(info.Name()); len(m) == 3 {
 				if info.ModTime().After(now) {
@@ -271,8 +276,13 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	err = fs.Walk(p.Dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				logger.Debug("handleFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
-				return nil
+				if os.IsNotExist(err) {
+					// If the file has been removed just ignore it
+					logger.Debug("handleFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
+					return nil
+				}
+				logger.Error("handleFiles", "msg", fmt.Sprintf("Failed to process file %s", path), "error", err)
+				return err
 			}
 			// Only the VM files are valid for pruning; once pruned then the group controller polling will
 			// ensure that a replacement is created. There is no mechanism that ensures consistency for
@@ -280,7 +290,11 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 			if m := instanceTfFileRegex.FindStringSubmatch(info.Name()); len(m) == 4 && m[3] == "" {
 				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
 				if err != nil {
-					logger.Warn("handleFiles", "msg", fmt.Sprintf("Cannot parse file %s", path), "error", err)
+					if os.IsNotExist(err) {
+						logger.Debug("handleFiles", "msg", fmt.Sprintf("Ignoring removed file %s", path), "error", err)
+						return nil
+					}
+					logger.Warn("handleFiles", "msg", fmt.Sprintf("Cannot read file %s", path))
 					return err
 				}
 				tf := TFormat{}
