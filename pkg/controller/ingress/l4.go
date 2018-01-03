@@ -1,10 +1,16 @@
 package ingress
 
 import (
-	"fmt"
-
 	"github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+)
+
+type operation int
+
+const (
+	createOp operation = iota
+	changeOp
+	noop
 )
 
 // configureL4 configures a L4 loadbalancer with the desired routes and given options
@@ -22,54 +28,25 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 
 	toCreate := []loadbalancer.Route{}
 	toChange := []loadbalancer.Route{}
-	toRemove := []loadbalancer.Route{}
-
-	// Index the listener set up
-	listenerIndex := map[string]loadbalancer.Route{}
-	listenerIndexKey := func(p, lp loadbalancer.Protocol, extPort, instancePort int) string {
-		return fmt.Sprintf("%v/%v/%5d/%5d", p, lp, extPort, instancePort)
-	}
 
 	for _, l := range desired {
-		instancePort, hasListener := findRoutePort(routes, l.LoadBalancerPort, l.Protocol, l.LoadBalancerProtocol)
+		op := getRouteOperation(&routes, l)
 
-		if !hasListener {
+		switch op {
+		case createOp:
 			toCreate = append(toCreate, l)
-		} else if instancePort != l.Port {
+		case changeOp:
 			toChange = append(toChange, l)
-		}
-
-		listenerIndex[listenerIndexKey(l.LoadBalancerProtocol, l.Protocol, l.LoadBalancerPort, instancePort)] = l
-	}
-	log.Debug("Listener", "index", listenerIndex)
-
-	for _, route := range routes {
-		instanceProtocol := route.Protocol
-		lbProtocol := route.LoadBalancerProtocol
-		lbPort := route.LoadBalancerPort
-		instancePort := route.Port
-		cert := route.Certificate
-
-		if _, has := listenerIndex[listenerIndexKey(lbProtocol, instanceProtocol, lbPort, instancePort)]; !has {
-			toRemove = append(toRemove, loadbalancer.Route{
-				Port:                 instancePort,
-				Protocol:             instanceProtocol,
-				LoadBalancerPort:     lbPort,
-				LoadBalancerProtocol: lbProtocol,
-				Certificate:          cert,
-			})
-		} else {
-			log.Debug("keeping", "protocol", lbProtocol, "instanceProtocol", instanceProtocol, "port", lbPort, "instancePort", instancePort)
 		}
 	}
 
 	logFn := log.Debug
-	if len(toCreate) > 0 || len(toChange) > 0 || len(toRemove) > 0 {
+	if len(toCreate) > 0 || len(toChange) > 0 || len(routes) > 0 {
 		logFn = log.Info
 	}
 	logFn("listeners to create:", "list", toCreate)
 	logFn("listeners to change:", "list", toChange)
-	logFn("listeners to remove:", "list", toRemove)
+	logFn("listeners to remove:", "list", routes)
 
 	// Now we have a list of targets to create
 	for _, l := range toCreate {
@@ -97,7 +74,8 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 		}
 		log.Info("CHANGED", "name", elb.Name(), "listener", l)
 	}
-	for _, l := range toRemove {
+	// Anything left in the routes list should be removed
+	for _, l := range routes {
 
 		log.Info("REMOVE", "name", elb.Name(), "listener", l)
 		_, err := elb.Unpublish(l.LoadBalancerPort)
@@ -110,13 +88,32 @@ func configureL4(elb loadbalancer.L4, desired []loadbalancer.Route, options type
 	return nil
 }
 
-func findRoutePort(routes []loadbalancer.Route, loadbalancerPort int,
-	protocol, loadbalancerProtocol loadbalancer.Protocol) (int, bool) {
-
-	for _, route := range routes {
-		if route.LoadBalancerPort == loadbalancerPort && route.Protocol == protocol && route.LoadBalancerProtocol == loadbalancerProtocol {
-			return route.Port, true
+func getRouteOperation(routes *[]loadbalancer.Route, desired loadbalancer.Route) operation {
+	var desiredCert, desiredHmPath string
+	if desired.Certificate != nil {
+		desiredCert = *desired.Certificate
+	}
+	if desired.HealthMonitorPath != nil {
+		desiredHmPath = *desired.HealthMonitorPath
+	}
+	for index, route := range *routes {
+		var routeHmPath, routeCert string
+		if route.Certificate != nil {
+			routeCert = *route.Certificate
+		}
+		if route.HealthMonitorPath != nil {
+			routeHmPath = *route.HealthMonitorPath
+		}
+		if route.LoadBalancerPort == desired.LoadBalancerPort &&
+			route.Protocol == desired.Protocol &&
+			route.LoadBalancerProtocol == desired.LoadBalancerProtocol {
+			// Found a match, remove from the list
+			*routes = append((*routes)[:index], (*routes)[index+1:]...)
+			if route.Port != desired.Port || routeCert != desiredCert || routeHmPath != desiredHmPath {
+				return changeOp
+			}
+			return noop
 		}
 	}
-	return 0, false
+	return createOp
 }

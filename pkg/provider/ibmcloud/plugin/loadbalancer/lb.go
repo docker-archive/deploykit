@@ -136,36 +136,27 @@ func (l *ibmcloudlb) Routes() ([]loadbalancer.Route, error) {
 	out := []loadbalancer.Route{}
 
 	// Get the listeners for the loadbalancer
-	lb, err := l.lbService.Mask("listeners;listeners.defaultPool").GetLoadBalancer(&l.uuid)
+	lb, err := l.lbService.Mask("listeners;listeners.defaultPool;listeners.defaultPool.healthMonitor").GetLoadBalancer(&l.uuid)
 	if err != nil {
 		return out, err
 	}
 
 	// Iterate over the listeners filling the output array
 	for _, listener := range lb.Listeners {
-		var certString string
+		var cert datatypes.Security_Certificate
 		if listener.TlsCertificateId != nil {
-			cert, err := l.certService.Id(*listener.TlsCertificateId).GetObject()
+			cert, err = l.certService.Id(*listener.TlsCertificateId).GetObject()
 			if err != nil {
 				return out, err
 			}
-			var commonName, notes string
-			if cert.CommonName != nil {
-				commonName = *cert.CommonName
-			}
-			if cert.Notes != nil {
-				notes = *cert.Notes
-			}
-			certString = fmt.Sprintf("%s(%s)", commonName, notes)
 		}
 		r := loadbalancer.Route{
 			LoadBalancerPort:     *listener.ProtocolPort,
 			LoadBalancerProtocol: loadbalancer.ProtocolFromString(*listener.Protocol),
 			Port:                 *listener.DefaultPool.ProtocolPort,
 			Protocol:             loadbalancer.ProtocolFromString(*listener.DefaultPool.Protocol),
-		}
-		if certString != "" {
-			r.Certificate = &certString
+			Certificate:          cert.CommonName,
+			HealthMonitorPath:    listener.DefaultPool.HealthMonitor.UrlPath,
 		}
 		out = append(out, r)
 	}
@@ -189,8 +180,7 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 	// Iterate over the listeners to see is the specified port is already in use.
 	// Log Info message if there is.
 	for _, listener := range lb.Listeners {
-		if *listener.ProtocolPort == route.LoadBalancerPort {
-			// return lbResult(""), fmt.Errorf("duplicate port %v", route.LoadBalancerPort)
+		if *listener.ProtocolPort == route.LoadBalancerPort && *listener.ProvisioningStatus != "DELETE_PENDING" {
 			logger.Error("Publish", "name", l.name, "route", route, "Duplicate Port", route.LoadBalancerPort)
 			return lbResult("publish"), nil
 		}
