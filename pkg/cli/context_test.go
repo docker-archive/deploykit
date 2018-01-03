@@ -90,7 +90,7 @@ func TestContext(t *testing.T) {
 	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --tags dev,infrakit --commit true --size 20 --instance-type large", " "))
 	require.NoError(t, err)
 
-	err = c.Execute()
+	err = c.Execute(c.cmd, nil)
 	require.NoError(t, err)
 
 	m := map[string]interface{}{}
@@ -136,7 +136,7 @@ done
 	err = c.cmd.Flags().Parse(strings.Split("--lines 3", " "))
 	require.NoError(t, err)
 
-	err = c.Execute()
+	err = c.Execute(c.cmd, nil)
 	require.NoError(t, err)
 
 }

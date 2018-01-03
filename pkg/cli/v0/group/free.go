@@ -14,7 +14,7 @@ import (
 func Free(name string, services *cli.Services) *cobra.Command {
 
 	free := &cobra.Command{
-		Use:   "free <group ID>",
+		Use:   "free-group <group ID>",
 		Short: "Free a group nonedestructively from active monitoring",
 		RunE: func(cmd *cobra.Command, args []string) error {
 

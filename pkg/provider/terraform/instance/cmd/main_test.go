@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -41,8 +42,8 @@ func TestParseInstanceSpecFromGroup(t *testing.T) {
 		instance.Spec{
 			Properties: types.AnyString(`{"resource": {"aws_instance": {}}}`),
 			Tags: map[string]string{
-				"infrakit.config_sha": "bootstrap",
-				"infrakit.group":      groupID,
+				group.ConfigSHATag: "bootstrap",
+				group.GroupTag:     groupID,
 			},
 		},
 		*instSpec)
@@ -68,9 +69,9 @@ func TestParseInstanceSpecFromGroupLogicalID(t *testing.T) {
 		instance.Spec{
 			Properties: types.AnyString(`{"resource": {"aws_instance": {}}}`),
 			Tags: map[string]string{
-				"infrakit.config_sha": "bootstrap",
-				"infrakit.group":      groupID,
-				"LogicalID":           "mgr1",
+				group.ConfigSHATag:    "bootstrap",
+				group.GroupTag:        groupID,
+				instance.LogicalIDTag: "mgr1",
 			},
 		},
 		*instSpec)
@@ -92,7 +93,7 @@ func TestParseInstanceSpecFromGroupNoGroupIDSpecified(t *testing.T) {
 		instance.Spec{
 			Properties: types.AnyString(`{"resource": {"aws_instance": {}}}`),
 			Tags: map[string]string{
-				"infrakit.config_sha": "bootstrap",
+				group.ConfigSHATag: "bootstrap",
 			},
 		},
 		*instSpec)

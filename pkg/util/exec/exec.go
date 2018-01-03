@@ -14,6 +14,33 @@ import (
 
 var log = logutil.New("module", "util/exec")
 
+// Interface captures the methods of something executable
+type Interface interface {
+	SetCmd([]string)
+	SetEnv([]string)
+	SetDir(string)
+	SetStdout(io.Writer)
+	SetStderr(io.Writer)
+	SetStdin(io.Reader)
+	StdinPipe() (io.WriteCloser, error)
+	StdoutPipe() (io.ReadCloser, error)
+	StderrPipe() (io.ReadCloser, error)
+	Start() error
+	Wait() error
+	Output() ([]byte, error)
+}
+
+type defaultInterfaceImpl struct {
+	*exec.Cmd
+}
+
+func (c *defaultInterfaceImpl) SetCmd(_ []string)     {}
+func (c *defaultInterfaceImpl) SetEnv(v []string)     { c.Env = v }
+func (c *defaultInterfaceImpl) SetDir(v string)       { c.Dir = v }
+func (c *defaultInterfaceImpl) SetStdout(v io.Writer) { c.Stdout = v }
+func (c *defaultInterfaceImpl) SetStderr(v io.Writer) { c.Stderr = v }
+func (c *defaultInterfaceImpl) SetStdin(v io.Reader)  { c.Stdin = v }
+
 // Command returns a fluent builder for running a command where the command string
 // can have template functions and arguments
 func Command(s string) *Builder {
@@ -34,12 +61,19 @@ type Builder struct {
 	funcs       map[string]interface{}
 	args        map[interface{}]interface{}
 	context     interface{}
-	rendered    string // rendered command string
-	cmd         *exec.Cmd
+	rendered    string    // rendered command string
+	cmd         Interface //*exec.Cmd
 	stdout      io.Writer
 	stderr      io.Writer
 	stdin       io.Reader
 	wg          sync.WaitGroup
+}
+
+// WithExec sets the exec implementation to use.  If not specified,
+// the exec defaults exec'ing in the local shell (os.Exec)
+func (b *Builder) WithExec(impl Interface) *Builder {
+	b.cmd = impl
+	return b
 }
 
 // WithStdin sets the stdin reader
@@ -260,27 +294,39 @@ func (b *Builder) Prepare(args ...interface{}) error {
 		return err
 	}
 	log.Debug("exec", "command", command)
-	b.cmd = exec.Command(command[0], command[1:]...)
+
+	if b.cmd == nil {
+		b.cmd = &defaultInterfaceImpl{exec.Command(command[0], command[1:]...)}
+	} else {
+		b.cmd.SetCmd(command)
+	}
+
 	if b.inheritEnvs {
-		b.cmd.Env = append(os.Environ(), b.envs...)
+		b.cmd.SetEnv(append(os.Environ(), b.envs...))
 	}
 	if b.dir != "" {
-		b.cmd.Dir = b.dir
+		b.cmd.SetDir(b.dir)
 	}
 	if b.stdin != nil {
-		b.cmd.Stdin = b.stdin
+		b.cmd.SetStdin(b.stdin)
 	}
 	if b.stdout != nil {
-		b.cmd.Stdout = b.stdout
+		b.cmd.SetStdout(b.stdout)
 	}
 	if b.stderr != nil {
-		b.cmd.Stderr = b.stderr
+		b.cmd.SetStderr(b.stderr)
 	}
 	return nil
 }
 
 // Stdin takes the input from the writer
 func (b *Builder) Stdin(f func(w io.Writer) error) error {
+	if b.cmd == nil {
+		err := b.Prepare()
+		if err != nil {
+			return err
+		}
+	}
 	input, err := b.cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -291,12 +337,24 @@ func (b *Builder) Stdin(f func(w io.Writer) error) error {
 
 // StdoutTo connects the stdout of this to the next stage
 func (b *Builder) StdoutTo(next *Builder) {
+	if b.cmd == nil {
+		err := b.Prepare()
+		if err != nil {
+			panic(err)
+		}
+	}
 	r, w := io.Pipe()
-	b.cmd.Stdout = w
-	next.cmd.Stdin = r
+	b.cmd.SetStdout(w)
+	next.cmd.SetStdin(r)
 }
 
 // Stdout sets the stdout
 func (b *Builder) Stdout(w io.Writer) {
-	b.cmd.Stdout = w
+	if b.cmd == nil {
+		err := b.Prepare()
+		if err != nil {
+			panic(err)
+		}
+	}
+	b.cmd.SetStdout(w)
 }

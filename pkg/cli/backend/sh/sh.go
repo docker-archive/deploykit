@@ -1,7 +1,6 @@
 package sh
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -10,24 +9,20 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/util/exec"
+	"github.com/spf13/cobra"
 )
 
 var log = logutil.New("module", "cli/backend/sh")
 
 func init() {
-	backend.Register("sh", Sh)
+	backend.Register("sh", Sh, nil)
 }
 
 // Sh takes a list of optional parameters and returns an executable function that
 // executes the content as a shell script
 func Sh(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
-	args := []string{}
-	for _, v := range opt {
-		args = append(args, fmt.Sprintf("%v", v))
-	}
-
-	return func(script string) error {
+	return func(script string, ccmd *cobra.Command, args []string) error {
 
 		cmd := strings.Join(append([]string{"/bin/sh"}, args...), " ")
 		log.Debug("sh", "cmd", cmd)

@@ -22,7 +22,8 @@ const (
 // NewInstance returns a typed instance plugin
 func NewInstance(name string, options Options) instance.Plugin {
 	l := &instanceSimulator{
-		name: name,
+		name:    name,
+		options: options,
 	}
 
 	switch options.Store {
@@ -31,6 +32,27 @@ func NewInstance(name string, options Options) instance.Plugin {
 	case StoreMem:
 		l.instances = mem.NewStore(name)
 	}
+
+	log.Info("Simulator starting", "delay", options.StartDelay, "name", name)
+	go func() {
+		// Intentionally hold the lock for the duration of
+		// the delay to make the plugin unavailable
+
+		l.lock.Lock()
+		defer l.lock.Unlock()
+
+		delay := time.After(options.StartDelay)
+		for {
+			select {
+			case <-delay:
+				log.Info("Delay done. Continue", "name", name)
+				return
+			case <-time.Tick(1 * time.Second):
+				log.Info("Simulator starting up.", "name", name)
+			}
+		}
+	}()
+
 	return l
 }
 
@@ -38,6 +60,7 @@ type instanceSimulator struct {
 	name      string
 	instances store.KV
 	lock      sync.Mutex
+	options   Options
 }
 
 // Validate performs local validation on a provision request.
@@ -51,6 +74,8 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 	instanceLogger.Debug("Provision", "name", s.name, "spec", spec, "V", debugV)
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	<-time.After(s.options.ProvisionDelay)
 
 	// simulator feature....
 	control := struct {
@@ -85,6 +110,7 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 // Label labels the instance
 func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) error {
 	instanceLogger.Debug("Label", "name", s.name, "instance", key, "labels", labels, "V", debugV)
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -124,6 +150,7 @@ func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) err
 // Destroy terminates an existing instance.
 func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Context) error {
 	instanceLogger.Debug("Destroy", "name", s.name, "instance", instance, "context", context, "V", debugV)
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -142,6 +169,12 @@ func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Conte
 func (s *instanceSimulator) DescribeInstances(labels map[string]string,
 	properties bool) ([]instance.Description, error) {
 	instanceLogger.Debug("DescribeInstances", "name", s.name, "labels", labels, "V", debugV)
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	<-time.After(s.options.DescribeDelay)
+
 	matches := []instance.Description{}
 
 	err := store.Visit(s.instances,

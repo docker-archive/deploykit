@@ -5,11 +5,9 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"os"
 	"time"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 )
 
 func init() {
@@ -97,12 +95,4 @@ func (tunnel *Tunnel) forward(localConn net.Conn) {
 
 	go copyConn(localConn, remoteConn)
 	go copyConn(remoteConn, localConn)
-}
-
-// Agent returns the auth method using SSH agent
-func Agent() ssh.AuthMethod {
-	if sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
-		return ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
-	}
-	return nil
 }

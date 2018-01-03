@@ -55,7 +55,7 @@ type plugin struct {
 	flavorPlugins   FlavorPluginLookup
 	pollInterval    time.Duration
 	maxParallelNum  uint
-	lock            sync.Mutex
+	lock            sync.RWMutex
 	groups          groups
 }
 
@@ -151,11 +151,11 @@ func (p *plugin) FreeGroup(id group.ID) error {
 }
 
 func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
 	// TODO(wfarner): Include details about any in-flight updates.
 
+	// The groups.get will do a read lock on the list of groups.
+	// We don't want to lock the entire controller for a describe group
+	// when the describe may take a long time.
 	context, exists := p.groups.get(id)
 	if !exists {
 		return group.Description{}, fmt.Errorf("Group '%s' is not being watched", id)
@@ -294,8 +294,8 @@ func (p *plugin) DestroyInstances(gid group.ID, toDestroy []instance.ID) error {
 }
 
 func (p *plugin) InspectGroups() ([]group.Spec, error) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 	var specs []group.Spec
 	err := p.groups.forEach(func(id group.ID, ctx *groupContext) error {
 		if ctx != nil {

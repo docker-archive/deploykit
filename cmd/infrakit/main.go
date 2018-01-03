@@ -37,6 +37,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/cli/backend/manager"
 	_ "github.com/docker/infrakit/pkg/cli/backend/print"
 	_ "github.com/docker/infrakit/pkg/cli/backend/sh"
+	_ "github.com/docker/infrakit/pkg/cli/backend/ssh"
 	_ "github.com/docker/infrakit/pkg/cli/backend/vmwscript"
 
 	// Supported "kinds"

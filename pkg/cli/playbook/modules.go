@@ -158,7 +158,7 @@ loop:
 			ctx := cli.NewContext(scope, cmd, string(moduleURL), input, options)
 			cmd.RunE = func(c *cobra.Command, args []string) error {
 				log.Debug("Running", "command", op, "url", moduleURL, "args", args)
-				return ctx.Execute()
+				return ctx.Execute(cmd, args)
 			}
 			err := ctx.BuildFlags()
 			if err != nil {

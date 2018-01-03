@@ -206,8 +206,10 @@ func (l *ibmcloudlb) Publish(route loadbalancer.Route) (loadbalancer.Result, err
 		}
 		if len(cert) == 1 {
 			certID = *cert[0].Id
+		} else if len(cert) == 0 {
+			return nil, fmt.Errorf("No certificate found with common name '%s'", *route.Certificate)
 		} else {
-			return nil, fmt.Errorf("Cannot identify an unique certificate with common name '%s'", *route.Certificate)
+			return nil, fmt.Errorf("Cannot identify an unique certificate with common name '%s' (%d certificates found)", *route.Certificate, len(cert))
 		}
 	}
 

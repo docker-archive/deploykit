@@ -87,34 +87,36 @@ type controllerAdapter struct {
 	backend controller.Controller
 }
 
-func (m controllerAdapter) queue(name string, work func() error) <-chan struct{} {
-	wait := make(chan struct{})
-	m.manager.backendOps <- backendOp{
-		name: name,
-		operation: func() (bool, error) {
-			err := work()
-			close(wait)
-			return false, err
-		},
-	}
-	return wait
-}
-
 // Plan implements Controller.Plan
-func (m controllerAdapter) Plan(op controller.Operation, spec types.Spec) (o types.Object, p controller.Plan, e error) {
-	<-m.queue("plan",
-		func() error {
+func (m controllerAdapter) Plan(op controller.Operation,
+	spec types.Spec) (object types.Object, plan controller.Plan, err error) {
 
-			o, p, e = m.backend.Plan(op, spec)
-			return e
+	if is, errLeader := m.manager.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
+
+	retry := false
+	<-m.manager.queue("plan",
+		func() (bool, error) {
+
+			object, plan, err = m.backend.Plan(op, spec)
+			return retry, err
 		})
 	return
 }
 
 // Commit implements Controller.Commit
-func (m controllerAdapter) Commit(op controller.Operation, spec types.Spec) (obj types.Object, err error) {
-	<-m.queue("commit",
-		func() error {
+func (m controllerAdapter) Commit(op controller.Operation, spec types.Spec) (object types.Object, err error) {
+
+	if is, errLeader := m.manager.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
+
+	retry := true
+	<-m.manager.queue("commit",
+		func() (bool, error) {
 
 			switch op {
 			case controller.Enforce:
@@ -123,35 +125,49 @@ func (m controllerAdapter) Commit(op controller.Operation, spec types.Spec) (obj
 				err = m.manager.removeSpec(spec)
 			}
 			if err != nil {
-				return err
+				return retry, err
 			}
 
-			obj, err = m.backend.Commit(op, spec)
-			return err
+			object, err = m.backend.Commit(op, spec)
+			return retry, err
 		})
 	return
 }
 
 // Describe implements Controller.Describe
 func (m controllerAdapter) Describe(search *types.Metadata) (found []types.Object, err error) {
-	<-m.queue("describe",
-		func() error {
+
+	if is, errLeader := m.manager.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
+
+	retry := false
+	<-m.manager.queue("describe",
+		func() (bool, error) {
 
 			log.Debug("describe", "search", search, "V", debugV2)
 
 			found, err = m.backend.Describe(search)
-			return err
+			return retry, err
 		})
 	return
 }
 
 // Free implements Controller.Free
 func (m controllerAdapter) Free(search *types.Metadata) (found []types.Object, err error) {
-	<-m.queue("free",
-		func() error {
+
+	if is, errLeader := m.manager.IsLeader(); errLeader != nil || !is {
+		err = errNotLeader
+		return
+	}
+
+	retry := false
+	<-m.manager.queue("free",
+		func() (bool, error) {
 
 			found, err = m.backend.Free(search)
-			return err
+			return retry, err
 		})
 	return
 }

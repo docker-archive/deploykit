@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/infrakit/pkg/cli/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
@@ -30,7 +31,7 @@ type Context struct {
 	exec      bool
 	template  *template.Template
 	options   template.Options
-	run       func(string) error
+	run       func(string, *cobra.Command, []string) error
 	script    string
 	scope     scope.Scope
 }
@@ -464,14 +465,41 @@ func (c *Context) BuildFlags() (err error) {
 	if err != nil {
 		return
 	}
+
 	t.SetOptions(c.options)
 	_, err = t.Render(c)
+
+	// add the backend-defined flags. These are flags that are
+	// applied as the backend is chosen.  The delimiter here is =% %=
+	opt := c.options
+	opt.DelimLeft = "=%"
+	opt.DelimRight = "%="
+	// Determine the backends
+	t.SetOptions(opt)
+	added := []string{}
+	backend.VisitFlags(
+		func(funcName string, buildFlags backend.FlagsFunc) {
+			t.AddFunc(funcName,
+				func(opt ...interface{}) error {
+					if buildFlags == nil {
+						return nil
+					}
+
+					buildFlags(c.cmd.Flags())
+					return nil
+				})
+			added = append(added, funcName)
+		})
+	_, err = t.Render(c)
+	// clean up after we rendered...  remove the functions named
+	// after the backends.  Later on we will rebind the actual backends
+	t.RemoveFunc(added...)
 
 	return
 }
 
 // Execute runs the command
-func (c *Context) Execute() (err error) {
+func (c *Context) Execute(cmd *cobra.Command, args []string) (err error) {
 
 	c.exec = true
 
@@ -512,7 +540,7 @@ func (c *Context) Execute() (err error) {
 	}
 
 	if c.run != nil {
-		return c.run(script)
+		return c.run(script, cmd, args)
 	}
 	return nil
 }

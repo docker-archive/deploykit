@@ -245,7 +245,7 @@ func TestStartOneLeader(t *testing.T) {
 	testCloseAll(leaderChans)
 }
 
-func _TestChangeLeadership(t *testing.T) {
+func TestChangeLeadership(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

@@ -9,19 +9,20 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/x/vmwscript"
+	"github.com/spf13/cobra"
 )
 
 var log = logutil.New("module", "playbook/vmwscript")
 
 func init() {
-	backend.Register("vmwscript", Script)
+	backend.Register("vmwscript", Script, nil)
 }
 
 // Script takes a list of optional parameters and returns an executable function that
 // executes the payload using the VMWScript engine for automating VMWare
 func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
-	return func(script string) error {
+	return func(script string, cmd *cobra.Command, args []string) error {
 
 		plan := vmwscript.DeploymentPlan{}
 

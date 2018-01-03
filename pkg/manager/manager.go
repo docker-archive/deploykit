@@ -139,6 +139,10 @@ func (m *manager) initRunning() bool {
 	return false
 }
 
+var (
+	errNotLeader = fmt.Errorf("not a leader")
+)
+
 // IsLeader returns leader status.  False if not or unknown.
 func (m *manager) IsLeader() (bool, error) {
 	m.lock.RLock()
@@ -189,15 +193,15 @@ func (m *manager) Start() (<-chan struct{}, error) {
 			select {
 
 			case op := <-backendOps:
+
 				log.Debug("Backend operation", "op", op, "V", debugV)
-				if m.isLeader {
-					retry, err := op.operation()
-					if err != nil {
-						log.Error("backend operation error", "name", op.name, "err", err, "retry", retry)
-						if retry {
-							backendOps <- op
-							log.Warn("requeued backend operation", "name", op.name)
-						}
+				retry, err := op.operation()
+				if err != nil {
+					log.Error("backend operation error", "name", op.name, "err", err, "retry", retry)
+					// TODO - implement cancelation later
+					if retry {
+						backendOps <- op
+						log.Warn("requeued backend operation", "name", op.name)
 					}
 				}
 
@@ -464,8 +468,6 @@ func (m *manager) doCommitAll(config globalSpec) error {
 	return m.execPlugins(config,
 		func(control controller.Controller, spec types.Spec) (bool, error) {
 
-			log.Info("Committing spec", "spec", spec)
-
 			_, err := control.Commit(controller.Enforce, spec)
 			if err != nil {
 				log.Error("Cannot commit", "spec", spec, "err", err)
@@ -473,8 +475,6 @@ func (m *manager) doCommitAll(config globalSpec) error {
 			return true, err
 		},
 		func(plugin group.Plugin, spec group.Spec) (bool, error) {
-
-			log.Info("Committing group", "groupID", spec.ID, "spec", spec)
 
 			_, err := plugin.CommitGroup(spec, false)
 			if err != nil {
@@ -495,16 +495,14 @@ func (m *manager) doFreeAll(config globalSpec) error {
 			log.Info("Freeing spec", "spec", spec)
 
 			_, err := controller.Free(&spec.Metadata)
-			return false, err
+			return true, err
 		},
 		func(plugin group.Plugin, spec group.Spec) (bool, error) {
 
 			log.Info("Freeing group", "groupID", spec.ID)
-			return false, plugin.FreeGroup(spec.ID)
+			return true, plugin.FreeGroup(spec.ID)
 		})
 }
-
-const queuePluginCalls = true
 
 func (m *manager) execPlugins(config globalSpec,
 	controllerWork func(controller.Controller, types.Spec) (bool, error),
@@ -521,24 +519,15 @@ func (m *manager) execPlugins(config globalSpec,
 				log.Error("Error getting controller", "plugin", r.Handler, "err", err)
 				break
 			}
-			fmt.Println(">>>>> queue enrollment")
 
-			if queuePluginCalls {
-				fmt.Println(">>>>> queue")
-				// queue up the work
-				m.backendOps <- backendOp{
-					name: k.Kind,
-					operation: func() (bool, error) {
-						return controllerWork(cp, r.Spec)
-					},
-				}
-				fmt.Println(">>>>> queue done")
-				log.Debug("queued operation for ingress/enrollment", "key", k, "record", r, "V", debugV)
-
-			} else {
-				_, err = controllerWork(cp, r.Spec)
-				return err
+			// queue up the work
+			m.backendOps <- backendOp{
+				name: k.Kind,
+				operation: func() (bool, error) {
+					return controllerWork(cp, r.Spec)
+				},
 			}
+			log.Debug("queued operation for ingress/enrollment", "key", k, "record", r, "V", debugV)
 
 		case "group": // not ideal to use string here.
 			id := group.ID(k.Name)
@@ -561,22 +550,13 @@ func (m *manager) execPlugins(config globalSpec,
 				Properties: r.Spec.Properties,
 			}
 
-			fmt.Println(">>>>> queue group")
-			if queuePluginCalls {
-				fmt.Println(">>>>> queue")
-				m.backendOps <- backendOp{
-					name: k.Kind,
-					operation: func() (bool, error) {
-						return groupWork(gp, spec)
-					},
-				}
-				fmt.Println(">>>>> queue done group")
-				log.Debug("queued operation for group", "key", k, "record", r, "V", debugV)
-
-			} else {
-				_, err = groupWork(gp, spec)
-				return err
+			m.backendOps <- backendOp{
+				name: k.Kind,
+				operation: func() (bool, error) {
+					return groupWork(gp, spec)
+				},
 			}
+			log.Debug("queued operation for group", "key", k, "record", r, "V", debugV)
 
 		default:
 			log.Warn("not execing on for record", "record", r, "key", k)
