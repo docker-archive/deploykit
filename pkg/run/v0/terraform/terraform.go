@@ -203,7 +203,7 @@ func parseInstanceSpecFromGroup(scope scope.Scope, groupSpecURL, groupID string)
 	}
 	// Use the first logical ID if set
 	if len(groupProps.Allocation.LogicalIDs) > 0 {
-		tags["LogicalID"] = string(groupProps.Allocation.LogicalIDs[0])
+		tags[instance.LogicalIDTag] = string(groupProps.Allocation.LogicalIDs[0])
 	}
 
 	spec := instance.Spec{
