@@ -123,8 +123,11 @@ type Options struct {
 	DestroyOnTerminate bool
 }
 
-// TemplateFrom returns a template after it has un-escapes any escape sequences
+// TemplateFrom returns a template after it has un-escaped any escape sequences
 func TemplateFrom(source []byte) (*template.Template, error) {
 	buff := template.Unescape(source)
-	return template.NewTemplate("str://"+string(buff), template.Options{MultiPass: false})
+	return template.NewTemplate(
+		"str://"+string(buff),
+		template.Options{MultiPass: false, MissingKey: template.MissingKeyError},
+	)
 }

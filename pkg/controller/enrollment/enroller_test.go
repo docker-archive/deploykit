@@ -263,22 +263,24 @@ options:
 
 func TestEnrollerMissingProps(t *testing.T) {
 
-	// Group members: 1, 2, 3 (no props), 4
+	// Group members: 1, 2, 3 (no props), 4, 5 (empty props)
 	source := []instance.Description{
 		{ID: instance.ID("instance-1"), Properties: types.AnyString(`{"backend_id":"1"}`)},
 		{ID: instance.ID("instance-2"), Properties: types.AnyString(`{"backend_id":"2"}`)},
 		{ID: instance.ID("instance-3")},
 		{ID: instance.ID("instance-4"), Properties: types.AnyString(`{"backend_id":"4"}`)},
+		{ID: instance.ID("instance-5"), Properties: types.AnyString(`{}`)},
 	}
 
-	// Currently enrolled: 1, 2, 5
+	// Currently enrolled: 1, 2, 6
 	enrolled := []instance.Description{
 		{ID: instance.ID("1")},
 		{ID: instance.ID("2")},
-		{ID: instance.ID("5")},
+		{ID: instance.ID("6")},
 	}
 
-	seen := make(chan []interface{}, 10)
+	seenProvision := make(chan []interface{}, 10)
+	seenDestroy := make(chan []interface{}, 10)
 
 	enroller := newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
@@ -300,12 +302,12 @@ func TestEnrollerMissingProps(t *testing.T) {
 		},
 		DoProvision: func(spec instance.Spec) (*instance.ID, error) {
 
-			seen <- []interface{}{spec, "Provision"}
+			seenProvision <- []interface{}{spec, "Provision"}
 			return nil, nil
 		},
 		DoDestroy: func(id instance.ID, ctx instance.Context) error {
 
-			seen <- []interface{}{id, ctx, "Destroy"}
+			seenDestroy <- []interface{}{id, ctx, "Destroy"}
 			return nil
 		},
 	}
@@ -352,8 +354,9 @@ options:
 
 	require.NoError(t, enroller.sync())
 
-	// check the provision and destroy calls, instance 3 should be added, instance
-	// 4 should be ignored (cannot be indexed), and 5 should be removed
+	// check the provision and destroy calls, instance 3 should be added, instances
+	// 4/5 should be ignored (cannot be indexed), and 6 should be removed
+	require.Len(t, seenProvision, 1)
 	require.Equal(t, []interface{}{
 		instance.Spec{
 			Properties: types.AnyString(`{"backend_id":"4"}`),
@@ -363,11 +366,14 @@ options:
 			},
 		},
 		"Provision",
-	}, <-seen)
+	}, <-seenProvision)
+	require.Len(t, seenProvision, 0)
+
+	require.Len(t, seenDestroy, 1)
 	require.Equal(t, []interface{}{
-		instance.ID("5"),
+		instance.ID("6"),
 		instance.Termination,
 		"Destroy",
-	}, <-seen)
-	require.Len(t, seen, 0)
+	}, <-seenDestroy)
+	require.Len(t, seenDestroy, 0)
 }

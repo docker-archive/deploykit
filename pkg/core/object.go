@@ -137,7 +137,7 @@ func templateEngine(url string,
 					"and calls GET on the plugin with the path \"path/to/data\".",
 					"It's identical to the CLI command infrakit metadata cat ...",
 				},
-				Func: func(n string, optional ...interface{}) interface{} {
+				Func: func(n string, optional ...interface{}) (interface{}, error) {
 
 					// It's chained -- first we try to get value from the object itself
 					// then we try the default template var
@@ -145,7 +145,7 @@ func templateEngine(url string,
 
 					v := types.Get(p, objectView)
 					if v != nil {
-						return v
+						return v, nil
 					}
 					return t.Var(n, optional...)
 				},

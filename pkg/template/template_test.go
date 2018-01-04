@@ -140,6 +140,38 @@ func TestVarAndGlobalMultiPass(t *testing.T) {
 
 }
 
+func TestMissingKey(t *testing.T) {
+	str := `{{ $x := "{}" | jsonDecode }}{{ $x.key }}`
+	// Default behavior
+	tpl, err := NewTemplate("str://"+str, Options{})
+	require.NoError(t, err)
+	view, err := tpl.Render("")
+	require.NoError(t, err)
+	expected := "<no value>"
+	require.Equal(t, expected, view)
+	// Raise an error
+	tpl, err = NewTemplate("str://"+str, Options{MissingKey: MissingKeyError})
+	require.NoError(t, err)
+	_, err = tpl.Render("")
+	require.Error(t, err)
+}
+
+func TestMissingKeyVar(t *testing.T) {
+	str := `{{ var "foo" }}`
+	// Default behavior
+	tpl, err := NewTemplate("str://"+str, Options{})
+	require.NoError(t, err)
+	view, err := tpl.Render("")
+	require.NoError(t, err)
+	expected := "<no value>"
+	require.Equal(t, expected, view)
+	// Raise an error
+	tpl, err = NewTemplate("str://"+str, Options{MissingKey: MissingKeyError})
+	require.NoError(t, err)
+	_, err = tpl.Render("")
+	require.Error(t, err)
+}
+
 type context struct {
 	Count  int
 	Bool   bool

@@ -17,6 +17,12 @@ import (
 
 var log = logutil.New("module", "core/template")
 
+const (
+	// MissingKeyError is the value for the MissingKey template option, an error
+	// is raised if a key does not exist
+	MissingKeyError = "error"
+)
+
 // Function contains the description of an exported template function
 type Function struct {
 
@@ -75,6 +81,11 @@ type Options struct {
 
 	// CacheDir is the location of the cache
 	CacheDir string
+
+	// MissingKey is used to handle when a key value not set; the default value
+	// of "default" yields a "<no value>" template output. Specifying "error" yields
+	// an error if the key value is not set.
+	MissingKey string
 }
 
 // Template is the templating engine
@@ -264,17 +275,20 @@ func (t *Template) DeferVar(name string) string {
 // in multiple passes where some var cannot be resolved to values in the first pass.
 // In this case, if the MultiplePass flag is set, the var function will just echo back
 // the same template expression in case of no value.
-func (t *Template) Var(name string, optional ...interface{}) interface{} {
+func (t *Template) Var(name string, optional ...interface{}) (interface{}, error) {
 	base := t.doVar(name, optional...)
 
 	if !t.options.MultiPass {
-		return base
+		if base == nil && t.options.MissingKey == MissingKeyError {
+			return nil, fmt.Errorf("Missing variable %s", name)
+		}
+		return base, nil
 	}
 
 	if base != nil {
-		return base
+		return base, nil
 	}
-	return t.DeferVar(name)
+	return t.DeferVar(name), nil
 }
 
 // var implements the var function. It's a combination of global and ref
@@ -378,6 +392,9 @@ func (t *Template) build(context Context) error {
 	tt := template.New(t.url).Funcs(fm)
 	if t.options.DelimLeft != "" && t.options.DelimRight != "" {
 		tt.Delims(t.options.DelimLeft, t.options.DelimRight)
+	}
+	if t.options.MissingKey != "" {
+		tt.Option(fmt.Sprintf("missingkey=%s", t.options.MissingKey))
 	}
 
 	parsed, err := tt.Parse(string(t.body))

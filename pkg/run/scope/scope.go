@@ -109,7 +109,7 @@ func (f fullScope) TemplateEngine(url string, opts template.Options) (*template.
 				Func: func(name string, optional ...interface{}) (interface{}, error) {
 
 					if len(optional) > 0 {
-						return engine.Var(name, optional...), nil
+						return engine.Var(name, optional...)
 					}
 
 					v := engine.Ref(name)
