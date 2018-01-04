@@ -103,26 +103,20 @@ func initUpdatable(scope scope.Scope, options Options) metadata.Updatable {
 
 			log.Debug("looking up metadata backend", "name", options.Metadata)
 
-			var p metadata.Plugin
 			if options.Metadata.IsEmpty() {
 				// in-memory only
-				p = metadata_plugin.NewUpdatablePlugin(metadata_plugin.NewPluginFromData(data), writer)
-
 				log.Info("backend metadata is in memory only")
-
-			} else {
-
-				metadataCall, err := scope.Metadata(options.Metadata.String())
-				if err != nil {
-					return nil, err
-				}
-				p = metadataCall.Plugin
-
-				_, is := p.(metadata.Updatable)
-				log.Info("backend metadata", "name", options.Metadata, "plugin", p, "updatable", is)
-
+				return metadata_plugin.NewUpdatablePlugin(metadata_plugin.NewPluginFromData(data), writer), nil
 			}
-			return metadata_plugin.NewUpdatablePlugin(p, writer), nil
+
+			metadataCall, err := scope.Metadata(options.Metadata.String())
+			if err != nil {
+				return nil, err
+			}
+			if metadataCall == nil {
+				return nil, fmt.Errorf("not running %v", options.Metadata.String())
+			}
+			return metadata_plugin.NewUpdatablePlugin(metadataCall.Plugin, writer), nil
 		}, defaultPluginPollInterval)
 
 }

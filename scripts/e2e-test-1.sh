@@ -71,7 +71,7 @@ expect_exact_output "Scale to 5 instances" \
 sleep 10
 
 note "Freeing and re-committing cattle"
-infrakit local mystack/cattle free
+infrakit local mystack/cattle free-group
 sleep 5
 infrakit local mystack/groups commit-group scripts/cattle.json
 
