@@ -275,17 +275,20 @@ func (t *Template) DeferVar(name string) string {
 // in multiple passes where some var cannot be resolved to values in the first pass.
 // In this case, if the MultiplePass flag is set, the var function will just echo back
 // the same template expression in case of no value.
-func (t *Template) Var(name string, optional ...interface{}) interface{} {
+func (t *Template) Var(name string, optional ...interface{}) (interface{}, error) {
 	base := t.doVar(name, optional...)
 
 	if !t.options.MultiPass {
-		return base
+		if base == nil && t.options.MissingKey == MissingKeyError {
+			return nil, fmt.Errorf("Missing variable %s", name)
+		}
+		return base, nil
 	}
 
 	if base != nil {
-		return base
+		return base, nil
 	}
-	return t.DeferVar(name)
+	return t.DeferVar(name), nil
 }
 
 // var implements the var function. It's a combination of global and ref
