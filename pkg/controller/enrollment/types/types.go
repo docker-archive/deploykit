@@ -9,6 +9,30 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+const (
+	// SourceParseErrorEnableDestroy means that the Destroy operation is enabled
+	// even if a source instance fails to parse; therefore, a currently enrolled
+	// instance will be removed if the associated source instance fails to parse.
+	// This is a the default operation on a source instance parse error.
+	SourceParseErrorEnableDestroy = "EnableDestroy"
+
+	// SourceParseErrorDisableDestroy means that the Destroy operation is disabled
+	// whenever any source instance fails to parse; therefore, no enrolled instances
+	// will be removed if any source instance fails to parse.
+	SourceParseErrorDisableDestroy = "DisableDestroy"
+
+	// EnrolledParseErrorEnableProvision means that the Provision operation is enabled
+	// even if an enrolled instance fails to parse; therefore, an instance may be enrolled
+	// multiple times.
+	// This is a the default operation on a enrolled instance parse error.
+	EnrolledParseErrorEnableProvision = "EnableProvision"
+
+	// EnrolledParseErrorDisableProvision means that the Provision operation is disabled
+	// whenever any enrolled instance fails to parse; therefore, no source instances will
+	// be added if any of the currently enrolled instances fails to parse.
+	EnrolledParseErrorDisableProvision = "DisableProvision"
+)
+
 func init() {
 	depends.Register("enroll", types.InterfaceSpec(controller.InterfaceSpec), ResolveDependencies)
 }
@@ -101,9 +125,17 @@ type Options struct {
 	// SourceKeySelector: \{\{ .ID \}\}  # selects the ID field.
 	SourceKeySelector string
 
+	// SourceParseErrOp defines the behavior when the source item cannot
+	// be indexed, value values are "EnableDestroy" and "DisableDestroy
+	SourceParseErrOp string
+
 	// SourceKeySelector is a string template for selecting the join key from
 	// a enrollment plugin's instance.Description.
 	EnrollmentKeySelector string
+
+	// EnrollmentParseErrOp defines the behavior when the enrolled item cannot
+	// be indexed, value values are "EnableProvision" and "DisableProvision"
+	EnrollmentParseErrOp string
 
 	// SyncInterval is the time interval between reconciliation. Syntax
 	// is go's time.Duration string representation (e.g. 1m, 30s)

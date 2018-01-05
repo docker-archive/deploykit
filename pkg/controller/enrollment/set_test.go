@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/stretchr/testify/require"
 )
@@ -30,30 +31,39 @@ func TestSet(t *testing.T) {
 		return string(i.ID), nil
 	}
 
-	diff, err := Difference(a, keyFunc, b, keyFunc)
-	require.NoError(t, err)
+	diff := Difference(a, keyFunc, b, keyFunc)
 	require.Equal(t, instance.Descriptions{
 		{ID: instance.ID("1")},
 		{ID: instance.ID("4")},
 	}, diff)
 
-	diff2, err := Difference(b, keyFunc, a, keyFunc)
-	require.NoError(t, err)
+	diff2 := Difference(b, keyFunc, a, keyFunc)
 	require.Equal(t, instance.Descriptions{
 		{ID: instance.ID("6")},
 	}, diff2)
 
-	add, remove := Delta(instance.Descriptions(a), keyFunc,
-		instance.Descriptions(b), keyFunc)
+	add, remove := Delta(
+		instance.Descriptions(a), keyFunc, types.SourceParseErrorEnableDestroy,
+		instance.Descriptions(b), keyFunc, types.EnrolledParseErrorEnableProvision,
+	)
 	require.Equal(t, instance.Descriptions{a[0], a[3]}, add)
 	require.Equal(t, instance.Descriptions{b[3]}, remove)
 }
 
 func TestDifferenceError(t *testing.T) {
-	aValid := instance.Descriptions{{ID: instance.ID("1")}}
-	aError := instance.Descriptions{{ID: instance.ID("error-a")}}
-	bValid := instance.Descriptions{{ID: instance.ID("2")}}
-	bError := instance.Descriptions{{ID: instance.ID("error-b")}}
+	common := instance.Description{ID: instance.ID("common")}
+
+	a1 := instance.Description{ID: instance.ID("a1")}
+	a2 := instance.Description{ID: instance.ID("a2")}
+	aError := instance.Description{ID: instance.ID("error-a")}
+	aValid := instance.Descriptions{common, a1, a2}
+	aParseError := instance.Descriptions{common, a1, a2, aError}
+
+	b1 := instance.Description{ID: instance.ID("b1")}
+	b2 := instance.Description{ID: instance.ID("b2")}
+	bError := instance.Description{ID: instance.ID("error-b")}
+	bValid := instance.Descriptions{common, b1, b2}
+	bParseError := instance.Descriptions{common, b1, b2, bError}
 
 	keyFunc := func(i instance.Description) (string, error) {
 		if strings.HasPrefix(string(i.ID), "error") {
@@ -62,41 +72,87 @@ func TestDifferenceError(t *testing.T) {
 		return string(i.ID), nil
 	}
 
-	// Baseline, should pass
-	diff, err := Difference(aValid, keyFunc, bValid, keyFunc)
-	require.NoError(t, err)
-	require.Equal(t, instance.Descriptions{aValid[0]}, diff)
-	add, remove := Delta(instance.Descriptions(aValid), keyFunc,
-		instance.Descriptions(bValid), keyFunc)
-	require.Equal(t, instance.Descriptions{aValid[0]}, add)
-	require.Equal(t, instance.Descriptions{bValid[0]}, remove)
+	// No errors, should be the same with any operation (even invalid ones)
+	diff := Difference(aValid, keyFunc, bValid, keyFunc)
+	require.Equal(t, instance.Descriptions{a1, a2}, diff)
+	for _, op1 := range []string{types.SourceParseErrorEnableDestroy, types.SourceParseErrorDisableDestroy, "bogus"} {
+		for _, op2 := range []string{types.EnrolledParseErrorEnableProvision, types.EnrolledParseErrorDisableProvision, "bogus"} {
+			add, remove := Delta(
+				instance.Descriptions(aValid), keyFunc, op1,
+				instance.Descriptions(bValid), keyFunc, op2,
+			)
+			require.Equal(t, instance.Descriptions{a1, a2}, add)
+			require.Equal(t, instance.Descriptions{b1, b2}, remove)
+		}
+	}
 
-	// Source fails, nothing to add/remove
-	diff, err = Difference(aError, keyFunc, bValid, keyFunc)
-	require.Error(t, err)
-	require.Equal(t, instance.Descriptions{}, diff)
-	add, remove = Delta(instance.Descriptions(aError), keyFunc,
-		instance.Descriptions(bValid), keyFunc)
+	// Source fails
+	diff = Difference(aParseError, keyFunc, bValid, keyFunc)
+	require.Equal(t, instance.Descriptions{a1, a2}, diff)
+	// Source failed to parse, disable destroy
+	add, remove := Delta(
+		instance.Descriptions(aParseError), keyFunc, types.SourceParseErrorDisableDestroy,
+		instance.Descriptions(bValid), keyFunc, "",
+	)
+	require.Equal(t, instance.Descriptions{a1, a2}, add)
+	require.Equal(t, instance.Descriptions{}, remove)
+	// Source failed to parse, enable the destroy
+	add, remove = Delta(
+		instance.Descriptions(aParseError), keyFunc, types.SourceParseErrorEnableDestroy,
+		instance.Descriptions(bValid), keyFunc, "",
+	)
+	require.Equal(t, instance.Descriptions{a1, a2}, add)
+	require.Equal(t, instance.Descriptions{b1, b2}, remove)
+
+	// Enrollment failed
+	diff = Difference(aValid, keyFunc, bParseError, keyFunc)
+	require.Equal(t, instance.Descriptions{a1, a2}, diff)
+	// Enrolled failed to parse, disable the provision
+	add, remove = Delta(
+		instance.Descriptions(aValid), keyFunc, "",
+		instance.Descriptions(bParseError), keyFunc, types.EnrolledParseErrorDisableProvision,
+	)
+	require.Equal(t, instance.Descriptions{}, add)
+	require.Equal(t, instance.Descriptions{b1, b2}, remove)
+	// Enrolled failed to parse, enable the provision
+	add, remove = Delta(
+		instance.Descriptions(aValid), keyFunc, "",
+		instance.Descriptions(bParseError), keyFunc, types.EnrolledParseErrorEnableProvision,
+	)
+	require.Equal(t, instance.Descriptions{a1, a2}, add)
+	require.Equal(t, instance.Descriptions{b1, b2}, remove)
+
+	// Both fail
+	diff = Difference(aParseError, keyFunc, bParseError, keyFunc)
+	require.Equal(t, instance.Descriptions{a1, a2}, diff)
+	// Disable provision and destroy, nothing should be changed
+	add, remove = Delta(
+		instance.Descriptions(aParseError), keyFunc, types.SourceParseErrorDisableDestroy,
+		instance.Descriptions(bParseError), keyFunc, types.EnrolledParseErrorDisableProvision,
+	)
 	require.Equal(t, instance.Descriptions{}, add)
 	require.Equal(t, instance.Descriptions{}, remove)
-
-	// Current set fails, we can add but nothing to remove
-	diff, err = Difference(aValid, keyFunc, bError, keyFunc)
-	require.Error(t, err)
-	require.Equal(t, instance.Descriptions{aValid[0]}, diff)
-	add, remove = Delta(instance.Descriptions(aValid), keyFunc,
-		instance.Descriptions(bError), keyFunc)
-	require.Equal(t, instance.Descriptions{aValid[0]}, add)
-	require.Equal(t, instance.Descriptions{}, remove)
-
-	// Both fail, nothing to add remove
-	diff, err = Difference(aError, keyFunc, bError, keyFunc)
-	require.Error(t, err)
-	require.Equal(t, instance.Descriptions{}, diff)
-	add, remove = Delta(instance.Descriptions(aError), keyFunc,
-		instance.Descriptions(bValid), keyFunc)
+	// Enable destroy only
+	add, remove = Delta(
+		instance.Descriptions(aParseError), keyFunc, types.SourceParseErrorEnableDestroy,
+		instance.Descriptions(bParseError), keyFunc, types.EnrolledParseErrorDisableProvision,
+	)
 	require.Equal(t, instance.Descriptions{}, add)
+	require.Equal(t, instance.Descriptions{b1, b2}, remove)
+	// Enable provision only
+	add, remove = Delta(
+		instance.Descriptions(aParseError), keyFunc, types.SourceParseErrorDisableDestroy,
+		instance.Descriptions(bParseError), keyFunc, types.EnrolledParseErrorEnableProvision,
+	)
+	require.Equal(t, instance.Descriptions{a1, a2}, add)
 	require.Equal(t, instance.Descriptions{}, remove)
+	// Enable provision and destroy
+	add, remove = Delta(
+		instance.Descriptions(aParseError), keyFunc, types.SourceParseErrorEnableDestroy,
+		instance.Descriptions(bParseError), keyFunc, types.EnrolledParseErrorEnableProvision,
+	)
+	require.Equal(t, instance.Descriptions{a1, a2}, add)
+	require.Equal(t, instance.Descriptions{b1, b2}, remove)
 }
 
 func logicalID(s string) *instance.LogicalID {
@@ -129,16 +185,16 @@ func TestSetKeyFuncs(t *testing.T) {
 		return string(i.ID), nil
 	}
 
-	diff, err := Difference(a, aKeyFunc, b, bKeyFunc)
-	require.NoError(t, err)
+	diff := Difference(a, aKeyFunc, b, bKeyFunc)
 	require.Equal(t, instance.Descriptions{a[1], a[4]}, diff)
 
-	diff2, err := Difference(b, bKeyFunc, a, aKeyFunc)
-	require.NoError(t, err)
+	diff2 := Difference(b, bKeyFunc, a, aKeyFunc)
 	require.Equal(t, instance.Descriptions{b[3], b[4]}, diff2)
 
-	add, remove := Delta(instance.Descriptions(a), aKeyFunc,
-		instance.Descriptions(b), bKeyFunc)
+	add, remove := Delta(
+		instance.Descriptions(a), aKeyFunc, types.SourceParseErrorDisableDestroy,
+		instance.Descriptions(b), bKeyFunc, types.EnrolledParseErrorDisableProvision,
+	)
 	require.Equal(t, instance.Descriptions{a[1], a[4]}, add)
 	require.Equal(t, instance.Descriptions{b[3], b[4]}, remove)
 }

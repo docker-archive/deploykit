@@ -60,12 +60,37 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 		options: options,
 	}
 
-	if l.options.SyncInterval.Duration() == 0 {
-		return nil, fmt.Errorf("sync interval cannot be 0")
+	// Verify operation for source and enroller parse errors
+	srcParseErrorOp := l.options.SourceParseErrOp
+	switch srcParseErrorOp {
+	case enrollment.SourceParseErrorEnableDestroy:
+		// Default value, Debug logging
+		log.Debug("validateParseErrorOptions", "SourceParseErrOp", srcParseErrorOp, "V", debugV)
+	case enrollment.SourceParseErrorDisableDestroy:
+		log.Info("validateParseErrorOptions", "SourceParseErrOp", srcParseErrorOp)
+	default:
+		return nil, fmt.Errorf("SourceParseErrOp value '%s' is not supported, valid values: %v",
+			srcParseErrorOp,
+			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy})
+	}
+	enrolledParseErrorOp := l.options.EnrollmentParseErrOp
+	switch enrolledParseErrorOp {
+	case enrollment.EnrolledParseErrorEnableProvision:
+		// Default value, Debug logging
+		log.Debug("validateParseErrorOptions", "EnrollmentParseErrOp", enrolledParseErrorOp, "V", debugV)
+	case enrollment.EnrolledParseErrorDisableProvision:
+		log.Info("validateParseErrorOptions", "EnrollmentParseErrOp", enrolledParseErrorOp)
+	default:
+		return nil, fmt.Errorf("EnrollmentParseErrOp value '%s' is not supported, valid values: %v",
+			enrolledParseErrorOp,
+			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision})
 	}
 
+	// Handle ticker poll inverval
+	if l.options.SyncInterval.Duration() <= 0 {
+		return nil, fmt.Errorf("SyncInterval must be greater than 0")
+	}
 	l.ticker = time.Tick(l.options.SyncInterval.Duration())
-
 	l.poller = controller.Poll(
 		// This determines if the action should be taken when time is up
 		func() bool {

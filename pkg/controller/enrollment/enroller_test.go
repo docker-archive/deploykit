@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
+	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/scope"
@@ -43,6 +45,88 @@ func (f fakePlugins) Find(name plugin.Name) (*plugin.Endpoint, error) {
 
 func (f fakePlugins) List() (map[string]*plugin.Endpoint, error) {
 	return (map[string]*plugin.Endpoint)(f), nil
+}
+
+func TestEnrollerOptions(t *testing.T) {
+	// Verify defaults
+	e, err := newEnroller(
+		scope.DefaultScope(func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		}),
+		fakeLeader(false),
+		DefaultOptions)
+	require.NoError(t, err)
+	require.Equal(t, types.FromDuration(time.Duration(5*time.Second)), e.options.SyncInterval)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, e.options.SourceParseErrOp)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, e.options.EnrollmentParseErrOp)
+	// Override options, still valid
+	e, err = newEnroller(
+		scope.DefaultScope(func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		}),
+		fakeLeader(false),
+		enrollment.Options{
+			SyncInterval:         types.FromDuration(time.Duration(10 * time.Second)),
+			SourceParseErrOp:     enrollment.SourceParseErrorDisableDestroy,
+			EnrollmentParseErrOp: enrollment.EnrolledParseErrorDisableProvision,
+		})
+	require.NoError(t, err)
+	require.Equal(t, types.FromDuration(time.Duration(10*time.Second)), e.options.SyncInterval)
+	require.Equal(t, enrollment.SourceParseErrorDisableDestroy, e.options.SourceParseErrOp)
+	require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, e.options.EnrollmentParseErrOp)
+	// Invalid values, should error out
+	e, err = newEnroller(
+		scope.DefaultScope(func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		}),
+		fakeLeader(false),
+		enrollment.Options{
+			SyncInterval:         types.FromDuration(time.Duration(-1 * time.Second)),
+			SourceParseErrOp:     DefaultOptions.SourceParseErrOp,
+			EnrollmentParseErrOp: DefaultOptions.EnrollmentParseErrOp,
+		})
+	require.Error(t, err)
+	require.Equal(t, fmt.Errorf("SyncInterval must be greater than 0"), err)
+	e, err = newEnroller(
+		scope.DefaultScope(func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		}),
+		fakeLeader(false),
+		enrollment.Options{
+			SyncInterval:         DefaultOptions.SyncInterval,
+			SourceParseErrOp:     "bogus-SourceParseErrOp",
+			EnrollmentParseErrOp: DefaultOptions.EnrollmentParseErrOp,
+		})
+	require.Error(t, err)
+	require.Equal(t,
+		fmt.Errorf("SourceParseErrOp value 'bogus-SourceParseErrOp' is not supported, valid values: %v",
+			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy}),
+		err)
+	e, err = newEnroller(
+		scope.DefaultScope(func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		}),
+		fakeLeader(false),
+		enrollment.Options{
+			SyncInterval:         DefaultOptions.SyncInterval,
+			SourceParseErrOp:     DefaultOptions.SourceParseErrOp,
+			EnrollmentParseErrOp: "bogus-EnrollmentParseErrOp",
+		})
+	require.Error(t, err)
+	require.Equal(t,
+		fmt.Errorf("EnrollmentParseErrOp value 'bogus-EnrollmentParseErrOp' is not supported, valid values: %v",
+			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision}),
+		err)
 }
 
 func TestEnroller(t *testing.T) {
@@ -120,6 +204,10 @@ options:
 	et, err := enroller.getEnrollmentPropertiesTemplate()
 	require.NoError(t, err)
 	require.NotNil(t, et)
+
+	// Should use the defaults
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
 
 	require.NoError(t, err)
 
@@ -268,7 +356,7 @@ options:
 	require.Len(t, seen, 0)
 }
 
-func TestEnrollerMissingProps(t *testing.T) {
+func TestEnrollerSourceParseError(t *testing.T) {
 
 	// Group members: 1, 2 (no props), 3 (empty props)
 	source := []instance.Description{
@@ -277,8 +365,8 @@ func TestEnrollerMissingProps(t *testing.T) {
 		{ID: instance.ID("instance-3"), Properties: types.AnyString(`{}`)},
 	}
 
-	// Currently enrolled. Missing 1 (should be added) and includes 4 (since
-	// 2 and 3 failed to index then it should not be removed)
+	// Currently enrolled. Missing 1 (should be added). 2/3/4 should be removed only if
+	// source parsing errors are ignored.
 	enrolled := []instance.Description{
 		{ID: instance.ID("2")},
 		{ID: instance.ID("3")},
@@ -321,10 +409,15 @@ func TestEnrollerMissingProps(t *testing.T) {
 
 	require.False(t, enroller.Running())
 
-	// Build a spec that uses the "backend_id" as the key for the source and just
-	// the "ID" for the enrolled
-	spec := types.Spec{}
-	require.NoError(t, types.AnyYAMLMust([]byte(`
+	// Verify the various options for the SourceParseError
+	for _, srcParseError := range []string{"", "foo",
+		enrollment.SourceParseErrorDisableDestroy,
+		enrollment.SourceParseErrorEnableDestroy} {
+
+		// Build a spec that uses the "backend_id" as the key for the source and just
+		// the "ID" for the enrolled
+		spec := types.Spec{}
+		require.NoError(t, types.AnyYAMLMust([]byte(fmt.Sprintf(`
 kind: enrollment
 metadata:
   name: nfs
@@ -336,44 +429,204 @@ properties:
        backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
 options:
   SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+  SourceParseErrOp: %s
   EnrollmentKeySelector: \{\{.ID\}\}
-`)).Decode(&spec))
+`, srcParseError))).Decode(&spec))
 
-	require.NoError(t, enroller.updateSpec(spec))
+		require.NoError(t, enroller.updateSpec(spec))
 
-	st, err := enroller.getSourceKeySelectorTemplate()
-	require.NoError(t, err)
-	require.NotNil(t, st)
+		st, err := enroller.getSourceKeySelectorTemplate()
+		require.NoError(t, err)
+		require.NotNil(t, st)
 
-	et, err := enroller.getEnrollmentPropertiesTemplate()
-	require.NoError(t, err)
-	require.NotNil(t, et)
+		et, err := enroller.getEnrollmentPropertiesTemplate()
+		require.NoError(t, err)
+		require.NotNil(t, et)
 
-	require.NoError(t, err)
+		s, err := enroller.getSourceInstances()
+		require.NoError(t, err)
+		require.Equal(t, source, s)
 
-	s, err := enroller.getSourceInstances()
-	require.NoError(t, err)
-	require.Equal(t, source, s)
+		found, err := enroller.getEnrolledInstances()
+		require.NoError(t, err)
+		require.Equal(t, enrolled, found)
 
-	found, err := enroller.getEnrolledInstances()
-	require.NoError(t, err)
-	require.Equal(t, enrolled, found)
+		// Sync the enroller
+		require.NoError(t, enroller.sync())
 
-	require.NoError(t, enroller.sync())
+		// Verify the destroy, which is dependent on the source parse error option
+		if srcParseError == enrollment.SourceParseErrorDisableDestroy {
+			// Not enabling destroy, should always be 0
+			require.Len(t,
+				seenDestroy, 0,
+				fmt.Sprintf("seenDestroy length should be 0, actual is %v, srcParseError is '%s'", len(seenDestroy), srcParseError))
+		} else {
+			// Enabling the destroy, should be 3 since parsing errors are ignored
+			require.Len(t,
+				seenDestroy, 3,
+				fmt.Sprintf("seenDestroy length should be 3, actual is %v, srcParseError is '%s'", len(seenDestroy), srcParseError))
+			for _, id := range []string{"2", "3", "4"} {
+				require.Equal(t, []interface{}{
+					instance.ID(id),
+					instance.Context{Reason: "terminate"},
+					"Destroy",
+				}, <-seenDestroy)
+			}
+			require.Len(t, seenDestroy, 0)
+		}
 
-	// check the provision and destroy calls, instance 1 should be added but nothing
-	// should be removed
-	require.Len(t, seenProvision, 1)
-	require.Equal(t, []interface{}{
-		instance.Spec{
-			Properties: types.AnyString(`{"backend_id":"1"}`),
-			Tags: map[string]string{
-				"infrakit.enrollment.sourceID": "instance-1",
-				"infrakit.enrollment.name":     "nfs",
+		// Provision is constant since there are no enrolled parsing errors, 1 should always be added
+		require.Len(t,
+			seenProvision, 1,
+			fmt.Sprintf("seenProvision length should be 3, actual is %v, srcParseError is '%s'", len(seenProvision), srcParseError))
+		require.Equal(t, []interface{}{
+			instance.Spec{
+				Properties: types.AnyString(`{"backend_id":"1"}`),
+				Tags: map[string]string{
+					"infrakit.enrollment.sourceID": "instance-1",
+					"infrakit.enrollment.name":     "nfs",
+				},
 			},
+			"Provision",
+		}, <-seenProvision)
+		require.Len(t, seenProvision, 0)
+	}
+}
+
+func TestEnrollerEnrolledParseError(t *testing.T) {
+
+	// Group members: 1, 2, 3
+	source := []instance.Description{
+		{ID: instance.ID("instance-1"), Properties: types.AnyString(`{"backend_id":"1"}`)},
+		{ID: instance.ID("instance-2"), Properties: types.AnyString(`{"backend_id":"2"}`)},
+		{ID: instance.ID("instance-3"), Properties: types.AnyString(`{"backend_id":"3"}`)},
+	}
+
+	// Currently enrolled. 1 is enrolled. 2/3 should be added only if parsing errors are ignored and 4
+	// should always be removed.
+	enrolled := []instance.Description{
+		{ID: instance.ID("instance-1"), Properties: types.AnyString(`{"ID":"1"}`)},
+		{ID: instance.ID("instance-2"), Properties: types.AnyString("{}")},
+		{ID: instance.ID("instance-3")},
+		{ID: instance.ID("instance-4"), Properties: types.AnyString(`{"ID":"4"}`)},
+	}
+
+	seenProvision := make(chan []interface{}, 10)
+	seenDestroy := make(chan []interface{}, 10)
+
+	enroller, err := newEnroller(
+		scope.DefaultScope(func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		}),
+		fakeLeader(false),
+		DefaultOptions)
+	require.NoError(t, err)
+	enroller.groupPlugin = &group_test.Plugin{
+		DoDescribeGroup: func(gid group.ID) (group.Description, error) {
+			result := group.Description{Instances: source}
+			return result, nil
 		},
-		"Provision",
-	}, <-seenProvision)
-	require.Len(t, seenProvision, 0)
-	require.Len(t, seenDestroy, 0)
+	}
+	enroller.instancePlugin = &instance_test.Plugin{
+		DoDescribeInstances: func(t map[string]string, p bool) ([]instance.Description, error) {
+			return enrolled, nil
+		},
+		DoProvision: func(spec instance.Spec) (*instance.ID, error) {
+
+			seenProvision <- []interface{}{spec, "Provision"}
+			return nil, nil
+		},
+		DoDestroy: func(id instance.ID, ctx instance.Context) error {
+
+			seenDestroy <- []interface{}{id, ctx, "Destroy"}
+			return nil
+		},
+	}
+
+	require.False(t, enroller.Running())
+
+	// Verify the various options for the EnrollmentParseErrOp
+	for _, enrolledParseError := range []string{"", "foo",
+		enrollment.EnrolledParseErrorEnableProvision,
+		enrollment.EnrolledParseErrorDisableProvision} {
+
+		// Build a spec that uses the "backend_id" as the key for the source and just
+		// the "ID" for the enrolled
+		spec := types.Spec{}
+		require.NoError(t, types.AnyYAMLMust([]byte(fmt.Sprintf(`
+kind: enrollment
+metadata:
+  name: nfs
+properties:
+  List: group/workers
+  Instance:
+    Plugin: nfs/authorization
+    Properties:
+       backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+options:
+  SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+  EnrollmentKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.ID \}\}
+  EnrollmentParseErrOp: %s
+`, enrolledParseError))).Decode(&spec))
+
+		require.NoError(t, enroller.updateSpec(spec))
+
+		st, err := enroller.getSourceKeySelectorTemplate()
+		require.NoError(t, err)
+		require.NotNil(t, st)
+
+		et, err := enroller.getEnrollmentPropertiesTemplate()
+		require.NoError(t, err)
+		require.NotNil(t, et)
+
+		s, err := enroller.getSourceInstances()
+		require.NoError(t, err)
+		require.Equal(t, source, s)
+
+		found, err := enroller.getEnrolledInstances()
+		require.NoError(t, err)
+		require.Equal(t, enrolled, found)
+
+		// Sync the enroller
+		require.NoError(t, enroller.sync())
+
+		// Verify the provision, which is dependent on the enrolled parse error option
+		if enrolledParseError == enrollment.EnrolledParseErrorDisableProvision {
+			// Not enabling provision, should always be 0
+			require.Len(t,
+				seenProvision, 0,
+				fmt.Sprintf("seenProvision length should be 0, actual is %v, enrolledParseError is '%s'", len(seenProvision), enrolledParseError))
+		} else {
+			// Enabling the Provision, should be 2 since parsing errors are ignored
+			require.Len(t,
+				seenProvision, 2,
+				fmt.Sprintf("seenProvision length should be 3, actual is %v, enrolledParseError is '%s'", len(seenProvision), enrolledParseError))
+			for _, id := range []string{"2", "3"} {
+				require.Equal(t, []interface{}{
+					instance.Spec{
+						Properties: types.AnyString(fmt.Sprintf(`{"backend_id":"%s"}`, id)),
+						Tags: map[string]string{
+							"infrakit.enrollment.sourceID": fmt.Sprintf("instance-%s", id),
+							"infrakit.enrollment.name":     "nfs",
+						},
+					},
+					"Provision",
+				}, <-seenProvision)
+			}
+			require.Len(t, seenProvision, 0)
+		}
+
+		//Destroy is constant since there are no source parsing errors, 1 should always be removed
+		require.Len(t,
+			seenDestroy, 1,
+			fmt.Sprintf("seenDestroy length should be 1, actual is %v, enrolledParseError is '%s'", len(seenDestroy), enrolledParseError))
+		require.Equal(t, []interface{}{
+			instance.ID("instance-4"),
+			instance.Context{Reason: "terminate"},
+			"Destroy",
+		}, <-seenDestroy)
+		require.Len(t, seenDestroy, 0)
+	}
 }
