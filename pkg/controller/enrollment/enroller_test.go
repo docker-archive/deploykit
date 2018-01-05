@@ -270,20 +270,19 @@ options:
 
 func TestEnrollerMissingProps(t *testing.T) {
 
-	// Group members: 1, 2, 3 (no props), 4, 5 (empty props)
+	// Group members: 1, 2 (no props), 3 (empty props)
 	source := []instance.Description{
 		{ID: instance.ID("instance-1"), Properties: types.AnyString(`{"backend_id":"1"}`)},
-		{ID: instance.ID("instance-2"), Properties: types.AnyString(`{"backend_id":"2"}`)},
-		{ID: instance.ID("instance-3")},
-		{ID: instance.ID("instance-4"), Properties: types.AnyString(`{"backend_id":"4"}`)},
-		{ID: instance.ID("instance-5"), Properties: types.AnyString(`{}`)},
+		{ID: instance.ID("instance-2")},
+		{ID: instance.ID("instance-3"), Properties: types.AnyString(`{}`)},
 	}
 
-	// Currently enrolled: 1, 2, 6
+	// Currently enrolled. Missing 1 (should be added) and includes 4 (since
+	// 2 and 3 failed to index then it should not be removed)
 	enrolled := []instance.Description{
-		{ID: instance.ID("1")},
 		{ID: instance.ID("2")},
-		{ID: instance.ID("6")},
+		{ID: instance.ID("3")},
+		{ID: instance.ID("4")},
 	}
 
 	seenProvision := make(chan []interface{}, 10)
@@ -362,26 +361,19 @@ options:
 
 	require.NoError(t, enroller.sync())
 
-	// check the provision and destroy calls, instance 3 should be added, instances
-	// 4/5 should be ignored (cannot be indexed), and 6 should be removed
+	// check the provision and destroy calls, instance 1 should be added but nothing
+	// should be removed
 	require.Len(t, seenProvision, 1)
 	require.Equal(t, []interface{}{
 		instance.Spec{
-			Properties: types.AnyString(`{"backend_id":"4"}`),
+			Properties: types.AnyString(`{"backend_id":"1"}`),
 			Tags: map[string]string{
-				"infrakit.enrollment.sourceID": "instance-4",
+				"infrakit.enrollment.sourceID": "instance-1",
 				"infrakit.enrollment.name":     "nfs",
 			},
 		},
 		"Provision",
 	}, <-seenProvision)
 	require.Len(t, seenProvision, 0)
-
-	require.Len(t, seenDestroy, 1)
-	require.Equal(t, []interface{}{
-		instance.ID("6"),
-		instance.Termination,
-		"Destroy",
-	}, <-seenDestroy)
 	require.Len(t, seenDestroy, 0)
 }

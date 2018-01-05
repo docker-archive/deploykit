@@ -1,6 +1,8 @@
 package enrollment
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -28,21 +30,73 @@ func TestSet(t *testing.T) {
 		return string(i.ID), nil
 	}
 
-	diff := Difference(a, keyFunc, b, keyFunc)
+	diff, err := Difference(a, keyFunc, b, keyFunc)
+	require.NoError(t, err)
 	require.Equal(t, instance.Descriptions{
 		{ID: instance.ID("1")},
 		{ID: instance.ID("4")},
 	}, diff)
 
-	diff2 := Difference(b, keyFunc, a, keyFunc)
+	diff2, err := Difference(b, keyFunc, a, keyFunc)
+	require.NoError(t, err)
 	require.Equal(t, instance.Descriptions{
 		{ID: instance.ID("6")},
 	}, diff2)
 
-	add, remove, _ := Delta(instance.Descriptions(a), keyFunc,
+	add, remove := Delta(instance.Descriptions(a), keyFunc,
 		instance.Descriptions(b), keyFunc)
 	require.Equal(t, instance.Descriptions{a[0], a[3]}, add)
 	require.Equal(t, instance.Descriptions{b[3]}, remove)
+}
+
+func TestDifferenceError(t *testing.T) {
+	aValid := instance.Descriptions{{ID: instance.ID("1")}}
+	aError := instance.Descriptions{{ID: instance.ID("error-a")}}
+	bValid := instance.Descriptions{{ID: instance.ID("2")}}
+	bError := instance.Descriptions{{ID: instance.ID("error-b")}}
+
+	keyFunc := func(i instance.Description) (string, error) {
+		if strings.HasPrefix(string(i.ID), "error") {
+			return "", fmt.Errorf("ID-error")
+		}
+		return string(i.ID), nil
+	}
+
+	// Baseline, should pass
+	diff, err := Difference(aValid, keyFunc, bValid, keyFunc)
+	require.NoError(t, err)
+	require.Equal(t, instance.Descriptions{aValid[0]}, diff)
+	add, remove := Delta(instance.Descriptions(aValid), keyFunc,
+		instance.Descriptions(bValid), keyFunc)
+	require.Equal(t, instance.Descriptions{aValid[0]}, add)
+	require.Equal(t, instance.Descriptions{bValid[0]}, remove)
+
+	// Source fails, nothing to add/remove
+	diff, err = Difference(aError, keyFunc, bValid, keyFunc)
+	require.Error(t, err)
+	require.Equal(t, instance.Descriptions{}, diff)
+	add, remove = Delta(instance.Descriptions(aError), keyFunc,
+		instance.Descriptions(bValid), keyFunc)
+	require.Equal(t, instance.Descriptions{}, add)
+	require.Equal(t, instance.Descriptions{}, remove)
+
+	// Current set fails, we can add but nothing to remove
+	diff, err = Difference(aValid, keyFunc, bError, keyFunc)
+	require.Error(t, err)
+	require.Equal(t, instance.Descriptions{aValid[0]}, diff)
+	add, remove = Delta(instance.Descriptions(aValid), keyFunc,
+		instance.Descriptions(bError), keyFunc)
+	require.Equal(t, instance.Descriptions{aValid[0]}, add)
+	require.Equal(t, instance.Descriptions{}, remove)
+
+	// Both fail, nothing to add remove
+	diff, err = Difference(aError, keyFunc, bError, keyFunc)
+	require.Error(t, err)
+	require.Equal(t, instance.Descriptions{}, diff)
+	add, remove = Delta(instance.Descriptions(aError), keyFunc,
+		instance.Descriptions(bValid), keyFunc)
+	require.Equal(t, instance.Descriptions{}, add)
+	require.Equal(t, instance.Descriptions{}, remove)
 }
 
 func logicalID(s string) *instance.LogicalID {
@@ -75,15 +129,16 @@ func TestSetKeyFuncs(t *testing.T) {
 		return string(i.ID), nil
 	}
 
-	diff := Difference(a, aKeyFunc, b, bKeyFunc)
+	diff, err := Difference(a, aKeyFunc, b, bKeyFunc)
+	require.NoError(t, err)
 	require.Equal(t, instance.Descriptions{a[1], a[4]}, diff)
 
-	diff2 := Difference(b, bKeyFunc, a, aKeyFunc)
+	diff2, err := Difference(b, bKeyFunc, a, aKeyFunc)
+	require.NoError(t, err)
 	require.Equal(t, instance.Descriptions{b[3], b[4]}, diff2)
 
-	add, remove, change := Delta(instance.Descriptions(a), aKeyFunc,
+	add, remove := Delta(instance.Descriptions(a), aKeyFunc,
 		instance.Descriptions(b), bKeyFunc)
 	require.Equal(t, instance.Descriptions{a[1], a[4]}, add)
 	require.Equal(t, instance.Descriptions{b[3], b[4]}, remove)
-	require.Equal(t, 3, len(change))
 }
