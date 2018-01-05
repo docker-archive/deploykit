@@ -2070,55 +2070,7 @@ func TestFindOrphanedDedicatedAttachmentKeys(t *testing.T) {
 	require.Equal(t, []string{"mgr3"}, orphanKeys)
 }
 
-func TestScanLocalFilesNoDir(t *testing.T) {
-	tf, dir := getPluginDirNotExists(t)
-	defer os.RemoveAll(dir)
-	_, err := tf.scanLocalFiles()
-	require.Error(t, err)
-	require.True(t, os.IsNotExist(err), fmt.Sprintf("Incorrect error, expected NotExist, got %v", err))
-}
-
-func TestScanLocalFilesNoPermissions(t *testing.T) {
-	tf, dir := getPluginDirNoPerms(t)
-	defer os.RemoveAll(dir)
-	_, err := tf.scanLocalFiles()
-	require.Error(t, err)
-	require.True(t, os.IsPermission(err), fmt.Sprintf("Incorrect error, expected permission, got %v", err))
-}
-
-func TestScanLocalFilesNoFiles(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	vms, err := tf.scanLocalFiles()
-	require.NoError(t, err)
-	require.Empty(t, vms)
-}
-
-func TestScanLocalFilesInvalidFile(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12345.tf.json"), []byte("not-json"), 0644)
-	require.NoError(t, err)
-	_, err = tf.scanLocalFiles()
-	require.Error(t, err)
-}
-
-func TestScanLocalFilesNoVms(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-	// Create a valid file without a VM type
-	m := make(map[TResourceType]map[TResourceName]TResourceProperties)
-	tformat := TFormat{Resource: m}
-	buff, err := json.Marshal(tformat)
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12345.tf.json"), buff, 0644)
-	require.NoError(t, err)
-	_, err = tf.scanLocalFiles()
-	require.Error(t, err)
-	require.Equal(t, "not found", err.Error())
-}
-
-func TestScanLocalFiles(t *testing.T) {
+func TestScanLocalFilesVMOnly(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
@@ -2154,27 +2106,40 @@ func TestScanLocalFiles(t *testing.T) {
 	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-56.tf.json"), buff, 0644)
 	require.NoError(t, err)
 
-	// Should get 2 different resource types, 2 VMs for softlayer and 1 for AWS
-	vms, err := tf.scanLocalFiles()
+	// Should get 3 files, 2 VMs for softlayer and 1 for AWS
+	files, err := tf.listCurrentTfFiles()
 	require.NoError(t, err)
-	require.Equal(t, 2, len(vms))
-	softlayerVMs, contains := vms[VMSoftLayer]
-	require.True(t, contains)
-	require.Equal(t, 2, len(softlayerVMs))
+	require.Len(t, files, 3)
+
+	require.Contains(t, files, "instance-12.tf.json")
+	data := files["instance-12.tf.json"]
 	require.Equal(t,
-		softlayerVMs[TResourceName("instance-12")],
-		TResourceProperties{"key1": "val1"},
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("instance-12"): {"key1": "val1"},
+			},
+		},
+		data,
 	)
+	require.Contains(t, files, "instance-34.tf.json")
+	data = files["instance-34.tf.json"]
 	require.Equal(t,
-		softlayerVMs[TResourceName("instance-34")],
-		TResourceProperties{"key2": "val2"},
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMSoftLayer: {
+				TResourceName("instance-34"): {"key2": "val2"},
+			},
+		},
+		data,
 	)
-	awsVMs, contains := vms[VMAmazon]
-	require.True(t, contains)
-	require.Equal(t, 1, len(awsVMs))
+	require.Contains(t, files, "instance-56.tf.json")
+	data = files["instance-56.tf.json"]
 	require.Equal(t,
-		awsVMs[TResourceName("instance-56")],
-		TResourceProperties{"key3": "val3"},
+		map[TResourceType]map[TResourceName]TResourceProperties{
+			VMAmazon: {
+				TResourceName("instance-56"): {"key3": "val3"},
+			},
+		},
+		data,
 	)
 }
 
@@ -3223,6 +3188,21 @@ func TestDescribeNoFiles(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	results, err := tf.DescribeInstances(map[string]string{}, false)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, results)
+}
+
+func TestDescribeNoVMs(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	// Create a valid file without a VM type
+	m := make(map[TResourceType]map[TResourceName]TResourceProperties)
+	tformat := TFormat{Resource: m}
+	buff, err := json.Marshal(tformat)
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12345.tf.json"), buff, 0644)
+	require.NoError(t, err)
+	results, err := tf.DescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, results)
 }
@@ -4979,6 +4959,15 @@ func TestListCurrentTfFilesNoPermissions(t *testing.T) {
 	require.True(t, os.IsPermission(err), fmt.Sprintf("Incorrect error, expected permission, got %v", err))
 }
 
+func TestListCurrentTfFilesInvalidFile(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12345.tf.json"), []byte("not-json"), 0644)
+	require.NoError(t, err)
+	_, err = tf.listCurrentTfFiles()
+	require.Error(t, err)
+}
+
 func TestListCurrentTfFiles(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
@@ -5098,8 +5087,8 @@ func TestDoDescribeInstancesShowError(t *testing.T) {
 	id := "instance-1"
 	tags := []string{"tag1:val1"}
 	inst := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMIBMCloud: map[TResourceName]TResourceProperties{
-			TResourceName(id): TResourceProperties{"k1": "v1", "tags": tags},
+		VMIBMCloud: {
+			TResourceName(id): {"k1": "v1", "tags": tags},
 		},
 	}
 	buff, err := json.MarshalIndent(TFormat{Resource: inst}, " ", " ")
@@ -5131,8 +5120,8 @@ func TestDoDescribeInstancesProperties(t *testing.T) {
 	tag1 := []string{"common:val", "tag1:val1"}
 	tag2 := []string{"common:val", "tag2:val2"}
 	inst1 := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMIBMCloud: map[TResourceName]TResourceProperties{
-			TResourceName(id1): TResourceProperties{"tags": tag1},
+		VMIBMCloud: {
+			TResourceName(id1): {"tags": tag1},
 		},
 	}
 	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
@@ -5140,8 +5129,8 @@ func TestDoDescribeInstancesProperties(t *testing.T) {
 	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id1)), buff, 0644)
 	require.NoError(t, err)
 	inst2 := map[TResourceType]map[TResourceName]TResourceProperties{
-		VMIBMCloud: map[TResourceName]TResourceProperties{
-			TResourceName(id2): TResourceProperties{"tags": tag2},
+		VMIBMCloud: {
+			TResourceName(id2): {"tags": tag2},
 		},
 	}
 	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")

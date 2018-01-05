@@ -367,57 +367,6 @@ func (p *plugin) Validate(req *types.Any) error {
 	return nil
 }
 
-// scanLocalFiles reads the filesystem and loads all tf.json and tf.json.new files
-func (p *plugin) scanLocalFiles() (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-	// Ensure that the target directory exists
-	if _, err := os.Stat(p.Dir); err != nil {
-		logger.Warn("scanLocalFiles", "dir", p.Dir, "error", err)
-		return nil, err
-	}
-	vms := map[TResourceType]map[TResourceName]TResourceProperties{}
-	fs := &afero.Afero{Fs: p.fs}
-	// just scan the directory for the instance-*.tf.json files
-	err := fs.Walk(p.Dir,
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				if os.IsNotExist(err) {
-					// If the file has been removed just ignore it
-					logger.Debug("scanLocalFiles", "msg", fmt.Sprintf("Ignoring file %s", path), "error", err, "V", debugV3)
-					return nil
-				}
-				logger.Error("scanLocalFiles", "msg", fmt.Sprintf("Failed to process file %s", path), "error", err)
-				return err
-			}
-			matches := instanceTfFileRegex.FindStringSubmatch(info.Name())
-			if len(matches) == 4 {
-				buff, err := ioutil.ReadFile(filepath.Join(p.Dir, info.Name()))
-				if err != nil {
-					if os.IsNotExist(err) {
-						logger.Debug("scanLocalFiles", "msg", fmt.Sprintf("Ignoring removed file %s", path), "error", err)
-						return nil
-					}
-					logger.Warn("scanLocalFiles", "msg", fmt.Sprintf("Cannot read file %s", path))
-					return err
-				}
-				tf := TFormat{}
-				if err = types.AnyBytes(buff).Decode(&tf); err != nil {
-					return err
-				}
-				vmType, vmName, props, err := FindVM(&tf)
-				if err != nil {
-					return err
-				}
-
-				if _, has := vms[vmType]; !has {
-					vms[vmType] = map[TResourceName]TResourceProperties{}
-				}
-				vms[vmType][vmName] = props
-			}
-			return nil
-		})
-	return vms, err
-}
-
 // platformSpecificUpdates handles unique platform specific logic
 func platformSpecificUpdates(vmType TResourceType, name TResourceName, logicalID *instance.LogicalID, properties TResourceProperties) {
 	if properties == nil {
@@ -822,8 +771,6 @@ func (p *plugin) writeTerraformFiles(fileMap map[string]*TFormat, currentFiles m
 
 // listCurrentTfFiles populates the map with the names of all tf.json and tf.json.new files
 func (p *plugin) listCurrentTfFiles() (map[string]map[TResourceType]map[TResourceName]TResourceProperties, error) {
-	// TODO(kaufers): Replace scanLocalFiles with this function once this plugin is updated
-	//                to handle any resource type instead of only VMs
 	// Ensure that the target directory exists
 	if _, err := os.Stat(p.Dir); err != nil {
 		logger.Warn("listCurrentTfFiles", "dir", p.Dir, "error", err)
@@ -1192,18 +1139,32 @@ func (p *plugin) doDescribeInstances(fns describeFns, tags map[string]string, pr
 	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
 
-	// localSpecs are what we told terraform to create - these are the generated files.
-	localSpecs, err := p.scanLocalFiles()
+	// currentFileData are what we told terraform to create - these are the generated files.
+	currentFileData, err := p.listCurrentTfFiles()
 	if err != nil {
 		return nil, err
 	}
 
 	terraformShowResult := map[TResourceType]map[TResourceName]TResourceProperties{}
 	if properties {
-		// TODO - not the most efficient, but here we assume we're usually just one vm type
-		for vmResourceType := range localSpecs {
-
-			if result, err := fns.tfShow([]TResourceType{vmResourceType}, nil); err == nil {
+		// Not all properties are in the file data, we need to parse the "terraform show"
+		// output to retrieve all properties. Since we only care about VM instances, we
+		// need to filter the tf show output to VM resource types only
+		supported := mapset.NewSetFromSlice(VMTypes)
+		resFilterMap := map[TResourceType]struct{}{}
+		for _, resTypeMap := range currentFileData {
+			for resType := range resTypeMap {
+				if supported.Contains(resType) {
+					resFilterMap[resType] = struct{}{}
+				}
+			}
+		}
+		resFilter := []TResourceType{}
+		for resType := range resFilterMap {
+			resFilter = append(resFilter, resType)
+		}
+		if len(resFilter) > 0 {
+			if result, err := fns.tfShow(resFilter, nil); err == nil {
 				terraformShowResult = result
 			} else {
 				logger.Warn("doDescribeInstances", "terraform show error", err)
@@ -1214,23 +1175,25 @@ func (p *plugin) doDescribeInstances(fns describeFns, tags map[string]string, pr
 
 	result := []instance.Description{}
 	// now we scan for <instance_type.instance-<timestamp>> as keys
-	for vmType, vm := range localSpecs {
-	scan:
-		for vmName, vmProps := range vm {
-			// Only process valid instance-xxxx resources
-			matches := instNameRegex.FindStringSubmatch(string(vmName))
-			if len(matches) == 3 {
+	for _, resTypeMap := range currentFileData {
+		for resType, resNamePropsMap := range resTypeMap {
+		scan:
+			for resName, resProps := range resNamePropsMap {
+				// Only process valid instance-xxxx resources
+				matches := instNameRegex.FindStringSubmatch(string(resName))
+				if len(matches) != 3 {
+					continue
+				}
 				id := matches[2]
-
 				inst := instance.Description{
-					Tags:      parseTerraformTags(vmType, vmProps),
+					Tags:      parseTerraformTags(resType, resProps),
 					ID:        instance.ID(id),
-					LogicalID: terraformLogicalID(vmProps),
+					LogicalID: terraformLogicalID(resProps),
 				}
 
 				if properties {
-					if vms, has := terraformShowResult[vmType]; has {
-						if details, has := vms[vmName]; has {
+					if vms, has := terraformShowResult[resType]; has {
+						if details, has := vms[resName]; has {
 							if encoded, err := types.AnyValue(details); err == nil {
 								inst.Properties = encoded
 							}
@@ -1250,7 +1213,6 @@ func (p *plugin) doDescribeInstances(fns describeFns, tags map[string]string, pr
 				}
 			}
 		}
-
 	}
 	logger.Debug("doDescribeInstances", "result", result, "V", debugV1)
 	return result, nil
