@@ -210,15 +210,14 @@ func (b *Builder) StartWithHandlers(stdinFunc func(io.Writer) error,
 		b.wg.Add(1)
 	}
 
-	if err := b.cmd.Start(); err != nil {
-		return err
-	}
+	err := b.cmd.Start()
 
+	// To avoid deadlock, run the I/O handlers even if the command fails to start.
 	go handleStdout()
 	go handleStderr()
 	go handleInput()
 
-	return nil
+	return err
 }
 
 // Start does a Cmd.Start on the command
