@@ -18,8 +18,9 @@ const (
 // list of known instances, and report anything it hasn't seen before, or
 // if anything that disappeared.
 type Monitor struct {
-	stop   chan struct{}
-	topics map[string]interface{}
+	PollInterval time.Duration
+	stop         chan struct{}
+	topics       map[string]interface{}
 
 	// Plugin is the instance plugin to use
 	Plugin instance.Plugin
@@ -64,7 +65,10 @@ func (m *Monitor) PublishOn(c chan<- *event.Event) {
 
 		log.Infoln("Start monitoring instances", c)
 
-		ticker := time.Tick(2 * time.Second)
+		ticker := time.Tick(5 * time.Second)
+		if m.PollInterval > 0 {
+			ticker = time.Tick(m.PollInterval)
+		}
 
 		instances := map[instance.ID]instance.Description{}
 		last := mapset.NewSet()

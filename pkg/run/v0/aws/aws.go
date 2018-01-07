@@ -2,6 +2,7 @@ package aws
 
 import (
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -34,13 +35,16 @@ const (
 	EnvRegion = "INFRAKIT_AWS_REGION"
 
 	// EnvStackName is the env for stack name
-	EnvStackName = "INFRAKIT_AWS_STACKNAME"
+	EnvStackName = "INFRAKIT_AWS_STACK_NAME"
 
 	// EnvMetadataTemplateURL is the location of the template for Metadata plugin
 	EnvMetadataTemplateURL = "INFRAKIT_AWS_METADATA_TEMPLATE_URL"
 
 	// EnvMetadataPollInterval is the env to set fo polling for metadata updates
 	EnvMetadataPollInterval = "INFRAKIT_AWS_METADATA_POLL_INTERVAL"
+
+	// EnvMonitorPollInterval is the env to set fo polling for instance changes
+	EnvMonitorPollInterval = "INFRAKIT_AWS_MONITOR_POLL_INTERVAL"
 
 	// EnvNamespaceTags is the env to set for namespace tags. It's k=v,...
 	EnvNamespaceTags = "INFRAKIT_AWS_NAMESPACE_TAGS"
@@ -59,11 +63,15 @@ func init() {
 
 // Options capture the options for starting up the plugin.
 type Options struct {
+
 	// Namespace is a set of kv pairs for tags that namespaces the resource instances
 	Namespace map[string]string
 
 	// ELBNames is a list of names for ELB instances to start the L4 plugins
 	ELBNames []string
+
+	// MonitorPollInterval is the interval for the polling to observe instance new/delete events
+	MonitorPollInterval time.Duration
 
 	aws_metadata.Options `json:",inline" yaml:",inline"`
 }
@@ -82,13 +90,16 @@ func defaultNamespace() map[string]string {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Namespace: defaultNamespace(),
-	ELBNames:  strings.Split(local.Getenv(EnvELBNames, ""), ","),
+	Namespace:           defaultNamespace(),
+	ELBNames:            strings.Split(local.Getenv(EnvELBNames, ""), ","),
+	MonitorPollInterval: types.MustParseDuration(local.Getenv(EnvMonitorPollInterval, "0s")).Duration(),
 	Options: aws_metadata.Options{
 		Template:  local.Getenv(EnvMetadataTemplateURL, ""),
 		StackName: local.Getenv(EnvStackName, ""),
 		Options: aws_instance.Options{
-			Region: local.Getenv(EnvRegion, ""), // empty string trigger auto-detect
+			Region:          local.Getenv(EnvRegion, ""), // empty string trigger auto-detect
+			AccessKeyID:     local.Getenv("AWS_ACCESS_KEY_ID", ""),
+			SecretAccessKey: local.Getenv("AWS_SECRET_ACCESS_KEY", ""),
 		},
 		PollInterval: types.MustParseDuration(local.Getenv(EnvMetadataPollInterval, "60s")),
 	},
@@ -105,25 +116,11 @@ func Run(scope scope.Scope, name plugin.Name,
 		return
 	}
 
-	var metadataPlugin metadata.Plugin
-	stopMetadataPlugin := make(chan struct{})
-	metadataPlugin, err = aws_metadata.NewPlugin(options.Options, stopMetadataPlugin)
-	if err != nil {
-		return
-	}
-
 	var instancePlugin instance.Plugin
 	builder := aws_instance.Builder{Options: options.Options.Options}
 	instancePlugin, err = builder.BuildInstancePlugin(options.Namespace)
 	if err != nil {
 		return
-	}
-
-	monitor := &aws_instance.Monitor{Plugin: instancePlugin}
-
-	onStop = func() {
-		close(stopMetadataPlugin)
-		monitor.Stop()
 	}
 
 	autoscalingClient := autoscaling.New(builder.Config)
@@ -136,10 +133,6 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Event: map[string]event.Plugin{
-			"ec2-instance": monitor.Init(),
-		},
-		run.Metadata: metadataPlugin,
 		run.Instance: map[string]instance.Plugin{
 			"autoscaling-autoscalinggroup":    aws_instance.NewAutoScalingGroupPlugin(autoscalingClient, options.Namespace),
 			"autoscaling-launchconfiguration": aws_instance.NewLaunchConfigurationPlugin(autoscalingClient, options.Namespace),
@@ -173,6 +166,38 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	if len(l4Map) > 0 {
 		impls[run.L4] = func() (map[string]loadbalancer.L4, error) { return l4Map, nil }
+	}
+
+	if options.MonitorPollInterval > 0 {
+		log.Info("run the event source for watching instance add/removes", "poll", options.MonitorPollInterval)
+		monitor := &aws_instance.Monitor{Plugin: instancePlugin}
+		impls[run.Event] = map[string]event.Plugin{
+			"ec2-instance": monitor.Init(),
+		}
+		onStop = func() {
+			monitor.Stop()
+		}
+	}
+
+	if u := local.Getenv(EnvMetadataTemplateURL, ""); u != "" {
+
+		log.Info("Include metadata plugin", "url", u)
+
+		var metadataPlugin metadata.Plugin
+		stopMetadataPlugin := make(chan struct{})
+		metadataPlugin, err = aws_metadata.NewPlugin(options.Options, stopMetadataPlugin)
+		if err != nil {
+			return
+		}
+		impls[run.Metadata] = metadataPlugin
+
+		cleanup := onStop
+		onStop = func() {
+			close(stopMetadataPlugin)
+			if cleanup != nil {
+				cleanup()
+			}
+		}
 	}
 
 	return
