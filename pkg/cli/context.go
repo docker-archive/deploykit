@@ -195,16 +195,15 @@ func Prompt(in io.Reader, prompt, ftype string, acceptDefaults bool, optional ..
 		}
 	}
 
-	var text string // user input
+	text := def
+	if !acceptDefaults {
 
-	if def != "" && acceptDefaults {
-		text = def
-	} else {
 		// TODO(chungers) - something fancier so we can support reading of passwords without echoing to screen
 		input := bufio.NewReader(in)
 		fmt.Fprintf(os.Stderr, "%s %s: ", prompt, label)
-		text, _ := input.ReadString('\n')
-		text = strings.Trim(text, " \t\n")
+		str, _ := input.ReadString('\n')
+		text = strings.Trim(str, " \t\n")
+
 		if len(text) == 0 {
 			text = def
 		}
