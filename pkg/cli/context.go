@@ -23,17 +23,18 @@ const (
 
 // Context is the context for the running module
 type Context struct {
-	test      bool
-	printOnly bool
-	cmd       *cobra.Command
-	src       string
-	input     io.Reader
-	exec      bool
-	template  *template.Template
-	options   template.Options
-	run       func(string, *cobra.Command, []string) error
-	script    string
-	scope     scope.Scope
+	test           bool
+	printOnly      bool
+	acceptDefaults bool
+	cmd            *cobra.Command
+	src            string
+	input          io.Reader
+	exec           bool
+	template       *template.Template
+	options        template.Options
+	run            func(string, *cobra.Command, []string) error
+	script         string
+	scope          scope.Scope
 }
 
 // NewContext creates a context
@@ -185,7 +186,7 @@ func parseBool(text string) (bool, error) {
 }
 
 // Prompt handles prompting the user using the given prompt message, type string and optional values.
-func Prompt(in io.Reader, prompt, ftype string, optional ...interface{}) (interface{}, error) {
+func Prompt(in io.Reader, prompt, ftype string, acceptDefaults bool, optional ...interface{}) (interface{}, error) {
 	def, label := "", ""
 	if len(optional) > 0 {
 		def = fmt.Sprintf("%v", optional[0])
@@ -194,12 +195,19 @@ func Prompt(in io.Reader, prompt, ftype string, optional ...interface{}) (interf
 		}
 	}
 
-	input := bufio.NewReader(in)
-	fmt.Fprintf(os.Stderr, "%s %s: ", prompt, label)
-	text, _ := input.ReadString('\n')
-	text = strings.Trim(text, " \t\n")
-	if len(text) == 0 {
+	var text string // user input
+
+	if def != "" && acceptDefaults {
 		text = def
+	} else {
+		// TODO(chungers) - something fancier so we can support reading of passwords without echoing to screen
+		input := bufio.NewReader(in)
+		fmt.Fprintf(os.Stderr, "%s %s: ", prompt, label)
+		text, _ := input.ReadString('\n')
+		text = strings.Trim(text, " \t\n")
+		if len(text) == 0 {
+			text = def
+		}
 	}
 
 	switch ftype {
@@ -378,6 +386,8 @@ func (c *Context) Funcs() []template.Function {
 
 					end := optional[len(optional)-1]
 
+					// if the last argument is actually a function that is generated
+					// by the 'cond' function
 					if cond, is := end.(func() (bool, interface{})); is {
 						ok, last := cond()
 						if !ok {
@@ -397,7 +407,8 @@ func (c *Context) Funcs() []template.Function {
 					}
 
 				}
-				return Prompt(c.input, prompt, ftype, optional...)
+
+				return Prompt(c.input, prompt, ftype, c.acceptDefaults, optional...)
 			},
 		},
 		{
@@ -436,7 +447,7 @@ func (c *Context) Funcs() []template.Function {
 					}
 
 				}
-				p, err := Prompt(c.input, prompt, ftype, optional...)
+				p, err := Prompt(c.input, prompt, ftype, c.acceptDefaults, optional...)
 				pl = strings.Split(p.(string), ",")
 				return pl, err
 			},
@@ -459,6 +470,7 @@ func (c *Context) getTemplate() (*template.Template, error) {
 func (c *Context) BuildFlags() (err error) {
 	c.cmd.Flags().BoolVar(&c.test, "test", false, "True to do a trial run")
 	c.cmd.Flags().BoolVar(&c.printOnly, "print-only", false, "True to print the rendered input")
+	c.cmd.Flags().BoolVar(&c.acceptDefaults, "accept-defaults", false, "True to accept defaults of prompts and flags")
 
 	var t *template.Template
 	t, err = c.getTemplate()
