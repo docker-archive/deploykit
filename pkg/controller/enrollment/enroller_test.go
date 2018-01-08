@@ -410,9 +410,7 @@ func TestEnrollerSourceParseError(t *testing.T) {
 	require.False(t, enroller.Running())
 
 	// Verify the various options for the SourceParseError
-	for _, srcParseError := range []string{"", "foo",
-		enrollment.SourceParseErrorDisableDestroy,
-		enrollment.SourceParseErrorEnableDestroy} {
+	for _, srcParseError := range []string{enrollment.SourceParseErrorDisableDestroy, enrollment.SourceParseErrorEnableDestroy} {
 
 		// Build a spec that uses the "backend_id" as the key for the source and just
 		// the "ID" for the enrolled
@@ -548,9 +546,7 @@ func TestEnrollerEnrolledParseError(t *testing.T) {
 	require.False(t, enroller.Running())
 
 	// Verify the various options for the EnrollmentParseErrOp
-	for _, enrolledParseError := range []string{"", "foo",
-		enrollment.EnrolledParseErrorEnableProvision,
-		enrollment.EnrolledParseErrorDisableProvision} {
+	for _, enrolledParseError := range []string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision} {
 
 		// Build a spec that uses the "backend_id" as the key for the source and just
 		// the "ID" for the enrolled
@@ -629,4 +625,139 @@ options:
 		}, <-seenDestroy)
 		require.Len(t, seenDestroy, 0)
 	}
+}
+
+func TestEnrollerOptionParsing(t *testing.T) {
+	// Parse error Options not set
+	enroller, err := newEnroller(
+		scope.DefaultScope(func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		}),
+		fakeLeader(false),
+		DefaultOptions)
+	require.NoError(t, err)
+	require.Equal(t, types.FromDuration(time.Duration(5*time.Second)), enroller.options.SyncInterval)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+
+	for _, srcParseErrorOp := range []string{enrollment.SourceParseErrorDisableDestroy, enrollment.SourceParseErrorDisableDestroy} {
+		for _, enrolledParseErrorOp := range []string{enrollment.EnrolledParseErrorDisableProvision, enrollment.EnrolledParseErrorEnableProvision} {
+			enroller, err = newEnroller(
+				scope.DefaultScope(func() discovery.Plugins {
+					return fakePlugins{
+						"test": &plugin.Endpoint{},
+					}
+				}),
+				fakeLeader(false),
+				enrollment.Options{
+					SyncInterval:         DefaultOptions.SyncInterval,
+					SourceParseErrOp:     srcParseErrorOp,
+					EnrollmentParseErrOp: enrolledParseErrorOp,
+				})
+			require.NoError(t, err)
+			if srcParseErrorOp == enrollment.SourceParseErrorDisableDestroy {
+				require.Equal(t, enrollment.SourceParseErrorDisableDestroy, enroller.options.SourceParseErrOp)
+			} else {
+				require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
+			}
+			if enrolledParseErrorOp == enrollment.EnrolledParseErrorDisableProvision {
+				require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, enroller.options.EnrollmentParseErrOp)
+			} else {
+				require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+			}
+		}
+	}
+}
+
+func TestEnrollerUpdateSpecOptionParsing(t *testing.T) {
+	// Controller values, use default
+	enroller, err := newEnroller(
+		scope.DefaultScope(func() discovery.Plugins {
+			return fakePlugins{
+				"test": &plugin.Endpoint{},
+			}
+		}),
+		fakeLeader(false),
+		DefaultOptions)
+	require.NoError(t, err)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+
+	// Should override with an updated spec, first try an invalid valid for SourceParseErrOp
+	spec := types.Spec{}
+	require.NoError(t, types.AnyYAMLMust([]byte(`
+kind: enrollment
+metadata:
+  name: nfs
+properties:
+  List: group/workers
+  Instance:
+    Plugin: nfs/authorization
+    Properties:
+       backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+options:
+  SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+  SourceParseErrOp: foo
+  EnrollmentKeySelector: \{\{.ID\}\}
+  EnrollmentParseErrOp: DisableProvision
+`)).Decode(&spec))
+	err = enroller.updateSpec(spec)
+	require.Error(t, err)
+	require.Equal(t,
+		fmt.Errorf("SourceParseErrOp value 'foo' is not supported, valid values: %v",
+			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy}),
+		err)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+
+	// Should override with an updated spec, and an invalid valid for EnrollmentParseErrOp
+	spec = types.Spec{}
+	require.NoError(t, types.AnyYAMLMust([]byte(`
+kind: enrollment
+metadata:
+  name: nfs
+properties:
+  List: group/workers
+  Instance:
+    Plugin: nfs/authorization
+    Properties:
+       backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+options:
+  SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+  SourceParseErrOp: DisableDestroy
+  EnrollmentKeySelector: \{\{.ID\}\}
+  EnrollmentParseErrOp: foo
+`)).Decode(&spec))
+	err = enroller.updateSpec(spec)
+	require.Error(t, err)
+	require.Equal(t,
+		fmt.Errorf("EnrollmentParseErrOp value 'foo' is not supported, valid values: %v",
+			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision}),
+		err)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+
+	// Then with a valid valid for both
+	spec = types.Spec{}
+	require.NoError(t, types.AnyYAMLMust([]byte(`
+kind: enrollment
+metadata:
+  name: nfs
+properties:
+  List: group/workers
+  Instance:
+    Plugin: nfs/authorization
+    Properties:
+       backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+options:
+  SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
+  SourceParseErrOp: DisableDestroy
+  EnrollmentKeySelector: \{\{.ID\}\}
+  EnrollmentParseErrOp: DisableProvision
+`)).Decode(&spec))
+	require.NoError(t, enroller.updateSpec(spec))
+	require.Equal(t, enrollment.SourceParseErrorDisableDestroy, enroller.options.SourceParseErrOp)
+	require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, enroller.options.EnrollmentParseErrOp)
 }

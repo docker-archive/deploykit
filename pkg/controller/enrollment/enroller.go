@@ -53,44 +53,22 @@ type enroller struct {
 }
 
 func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enrollment.Options) (*enroller, error) {
-
 	l := &enroller{
 		leader:  leader,
 		scope:   scope,
 		options: options,
 	}
-
-	// Verify operation for source and enroller parse errors
-	srcParseErrorOp := l.options.SourceParseErrOp
-	switch srcParseErrorOp {
-	case enrollment.SourceParseErrorEnableDestroy:
-		// Default value, Debug logging
-		log.Debug("validateParseErrorOptions", "SourceParseErrOp", srcParseErrorOp, "V", debugV)
-	case enrollment.SourceParseErrorDisableDestroy:
-		log.Info("validateParseErrorOptions", "SourceParseErrOp", srcParseErrorOp)
-	default:
-		return nil, fmt.Errorf("SourceParseErrOp value '%s' is not supported, valid values: %v",
-			srcParseErrorOp,
-			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy})
+	if err := validateParseErrorOptions(l.options); err != nil {
+		return nil, err
 	}
-	enrolledParseErrorOp := l.options.EnrollmentParseErrOp
-	switch enrolledParseErrorOp {
-	case enrollment.EnrolledParseErrorEnableProvision:
-		// Default value, Debug logging
-		log.Debug("validateParseErrorOptions", "EnrollmentParseErrOp", enrolledParseErrorOp, "V", debugV)
-	case enrollment.EnrolledParseErrorDisableProvision:
-		log.Info("validateParseErrorOptions", "EnrollmentParseErrOp", enrolledParseErrorOp)
-	default:
-		return nil, fmt.Errorf("EnrollmentParseErrOp value '%s' is not supported, valid values: %v",
-			enrolledParseErrorOp,
-			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision})
-	}
-
-	// Handle ticker poll inverval
+	// Note that the sync interval is valided in the constructor only since it cannot
+	// be modified after the enroller has started (ie, it cannot be changed on a spec
+	// update).
 	if l.options.SyncInterval.Duration() <= 0 {
 		return nil, fmt.Errorf("SyncInterval must be greater than 0")
 	}
 	l.ticker = time.Tick(l.options.SyncInterval.Duration())
+
 	l.poller = controller.Poll(
 		// This determines if the action should be taken when time is up
 		func() bool {
@@ -105,6 +83,36 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 		l.ticker)
 
 	return l, nil
+}
+
+// validateParseErrorOptions ensures that source and enrolled parse error
+// operation values are valid in the given options
+func validateParseErrorOptions(opts enrollment.Options) error {
+	srcParseErrorOp := opts.SourceParseErrOp
+	switch srcParseErrorOp {
+	case enrollment.SourceParseErrorEnableDestroy:
+		// Default value, Debug logging
+		log.Debug("validateParseErrorOptions", "SourceParseErrOp", srcParseErrorOp, "V", debugV)
+	case enrollment.SourceParseErrorDisableDestroy:
+		log.Info("validateParseErrorOptions", "SourceParseErrOp", srcParseErrorOp)
+	default:
+		return fmt.Errorf("SourceParseErrOp value '%s' is not supported, valid values: %v",
+			srcParseErrorOp,
+			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy})
+	}
+	enrolledParseErrorOp := opts.EnrollmentParseErrOp
+	switch enrolledParseErrorOp {
+	case enrollment.EnrolledParseErrorEnableProvision:
+		// Default value, Debug logging
+		log.Debug("validateParseErrorOptions", "EnrollmentParseErrOp", enrolledParseErrorOp, "V", debugV)
+	case enrollment.EnrolledParseErrorDisableProvision:
+		log.Info("validateParseErrorOptions", "EnrollmentParseErrOp", enrolledParseErrorOp)
+	default:
+		return fmt.Errorf("EnrollmentParseErrOp value '%s' is not supported, valid values: %v",
+			enrolledParseErrorOp,
+			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision})
+	}
+	return nil
 }
 
 func (l *enroller) isLeader() (is bool, err error) {
@@ -169,6 +177,9 @@ func (l *enroller) updateSpec(spec types.Spec) error {
 		// starting point to parse the input.
 		options := l.options // a copy
 		if err := spec.Options.Decode(&options); err != nil {
+			return err
+		}
+		if err := validateParseErrorOptions(options); err != nil {
 			return err
 		}
 		l.options = options
