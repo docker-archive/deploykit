@@ -5,6 +5,9 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"time"
+
+	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
@@ -14,7 +17,15 @@ const (
 
 	// EnvPlaybooks is the environment variable for storing the playbooks file
 	EnvPlaybooks = "INFRAKIT_PLAYBOOKS_FILE"
+
+	// EnvClientTimeout is the timeout used by the rpc client
+	EnvClientTimeout = "INFRAKIT_CLIENT_TIMEOUT"
 )
+
+// ClientTimeout returns the client timeout
+func ClientTimeout() time.Duration {
+	return types.MustParseDuration(Getenv(EnvClientTimeout, "15s")).Duration()
+}
 
 // InfrakitHome returns the directory of INFRAKIT_HOME if specified. Otherwise, it will return
 // the user's home directory.  If that cannot be determined, then it returns the current working
