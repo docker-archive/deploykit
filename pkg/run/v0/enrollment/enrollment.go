@@ -31,6 +31,8 @@ var (
 	EnvDestroyOnTerminate = "INFRAKIT_ENROLLMENT_DESTROY_ON_TERMINATE"
 
 	log = logutil.New("module", "run/v0/enrollment")
+
+	defaultOptions = enrollment.DefaultOptions
 )
 
 func init() {
@@ -39,7 +41,6 @@ func init() {
 	// the default values.  These default options are then overridden
 	// after the plugin started if the user provides options in the spec
 	// to override them.
-	defaultOptions := enrollment.DefaultOptions
 	if d := types.MustParseDuration(local.Getenv(EnvSyncInterval, "0s")); d > 0 {
 		defaultOptions.SyncInterval = d
 	}
@@ -79,7 +80,7 @@ func leadership(plugins func() discovery.Plugins) stack.Leadership {
 func Run(scope scope.Scope, name plugin.Name,
 	config *types.Any) (transport plugin.Transport, impls map[run.PluginCode]interface{}, onStop func(), err error) {
 
-	options := enrollment.DefaultOptions
+	options := defaultOptions // decode into a copy of the updated defaults
 	err = config.Decode(&options)
 	if err != nil {
 		return
