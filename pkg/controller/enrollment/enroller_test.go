@@ -47,7 +47,7 @@ func (f fakePlugins) List() (map[string]*plugin.Endpoint, error) {
 	return (map[string]*plugin.Endpoint)(f), nil
 }
 
-func TestEnrollerOptions(t *testing.T) {
+func TestEnrollerInitOptions(t *testing.T) {
 	// Verify defaults
 	e, err := newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
@@ -78,7 +78,7 @@ func TestEnrollerOptions(t *testing.T) {
 	require.Equal(t, types.FromDuration(time.Duration(10*time.Second)), e.options.SyncInterval)
 	require.Equal(t, enrollment.SourceParseErrorDisableDestroy, e.options.SourceParseErrPolicy)
 	require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, e.options.EnrollmentParseErrPolicy)
-	// Invalid values, should error out
+	// Invalid sync interval, should error out
 	e, err = newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
 			return fakePlugins{
@@ -93,6 +93,7 @@ func TestEnrollerOptions(t *testing.T) {
 		})
 	require.Error(t, err)
 	require.Equal(t, fmt.Errorf("SyncInterval must be greater than 0"), err)
+	// Another invalid option
 	e, err = newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
 			return fakePlugins{
@@ -109,23 +110,6 @@ func TestEnrollerOptions(t *testing.T) {
 	require.Equal(t,
 		fmt.Errorf("SourceParseErrPolicy value 'bogus-SourceParseErrPolicy' is not supported, valid values: %v",
 			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy}),
-		err)
-	e, err = newEnroller(
-		scope.DefaultScope(func() discovery.Plugins {
-			return fakePlugins{
-				"test": &plugin.Endpoint{},
-			}
-		}),
-		fakeLeader(false),
-		enrollment.Options{
-			SyncInterval:             DefaultOptions.SyncInterval,
-			SourceParseErrPolicy:     DefaultOptions.SourceParseErrPolicy,
-			EnrollmentParseErrPolicy: "bogus-EnrollmentParseErrPolicy",
-		})
-	require.Error(t, err)
-	require.Equal(t,
-		fmt.Errorf("EnrollmentParseErrPolicy value 'bogus-EnrollmentParseErrPolicy' is not supported, valid values: %v",
-			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision}),
 		err)
 }
 

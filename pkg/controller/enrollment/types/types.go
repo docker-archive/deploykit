@@ -1,13 +1,19 @@
 package types
 
 import (
+	"fmt"
+
 	"github.com/docker/infrakit/pkg/controller"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
+
+// PluginPhase defines the enroller lifecycle
+type PluginPhase int
 
 const (
 	// SourceParseErrorEnableDestroy means that the Destroy operation is enabled
@@ -31,6 +37,16 @@ const (
 	// whenever any enrolled instance fails to parse; therefore, no source instances will
 	// be added if any of the currently enrolled instances fails to parse.
 	EnrolledParseErrorDisableProvision = "DisableProvision"
+
+	// PluginInit is the phase when the enroller is created, used when validating options
+	PluginInit = iota
+	// PluginCommit is the phase when the spec is commited, used when validating options
+	PluginCommit
+)
+
+var (
+	log    = logutil.New("module", "controller/enrollment/types")
+	debugV = logutil.V(200)
 )
 
 func init() {
@@ -155,4 +171,40 @@ func TemplateFrom(source []byte) (*template.Template, error) {
 		"str://"+string(buff),
 		template.Options{MultiPass: false, MissingKey: template.MissingKeyError},
 	)
+}
+
+// Validate ensures that source and enrolled parse error
+// operation values are valid in the given options
+func (o Options) Validate(phase PluginPhase) error {
+	// SyncInterval is validated in the init phase only
+	if phase == PluginInit {
+		if o.SyncInterval.Duration() <= 0 {
+			return fmt.Errorf("SyncInterval must be greater than 0")
+		}
+	}
+	srcParseErrorPolicy := o.SourceParseErrPolicy
+	switch srcParseErrorPolicy {
+	case SourceParseErrorEnableDestroy:
+		// Default value, Debug logging
+		log.Debug("validateParseErrorOptions", "SourceParseErrPolicy", srcParseErrorPolicy, "V", debugV)
+	case SourceParseErrorDisableDestroy:
+		log.Info("validateParseErrorOptions", "SourceParseErrPolicy", srcParseErrorPolicy)
+	default:
+		return fmt.Errorf("SourceParseErrPolicy value '%s' is not supported, valid values: %v",
+			srcParseErrorPolicy,
+			[]string{SourceParseErrorEnableDestroy, SourceParseErrorDisableDestroy})
+	}
+	enrolledParseErrorPolicy := o.EnrollmentParseErrPolicy
+	switch enrolledParseErrorPolicy {
+	case EnrolledParseErrorEnableProvision:
+		// Default value, Debug logging
+		log.Debug("validateParseErrorOptions", "EnrollmentParseErrPolicy", enrolledParseErrorPolicy, "V", debugV)
+	case EnrolledParseErrorDisableProvision:
+		log.Info("validateParseErrorOptions", "EnrollmentParseErrPolicy", enrolledParseErrorPolicy)
+	default:
+		return fmt.Errorf("EnrollmentParseErrPolicy value '%s' is not supported, valid values: %v",
+			enrolledParseErrorPolicy,
+			[]string{EnrolledParseErrorEnableProvision, EnrolledParseErrorDisableProvision})
+	}
+	return nil
 }

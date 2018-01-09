@@ -58,14 +58,8 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 		scope:   scope,
 		options: options,
 	}
-	if err := validateParseErrorOptions(l.options); err != nil {
+	if err := l.options.Validate(enrollment.PluginInit); err != nil {
 		return nil, err
-	}
-	// Note that the sync interval is valided in the constructor only since it cannot
-	// be modified after the enroller has started (ie, it cannot be changed on a spec
-	// update).
-	if l.options.SyncInterval.Duration() <= 0 {
-		return nil, fmt.Errorf("SyncInterval must be greater than 0")
 	}
 	l.ticker = time.Tick(l.options.SyncInterval.Duration())
 
@@ -83,36 +77,6 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 		l.ticker)
 
 	return l, nil
-}
-
-// validateParseErrorOptions ensures that source and enrolled parse error
-// operation values are valid in the given options
-func validateParseErrorOptions(opts enrollment.Options) error {
-	srcParseErrorPolicy := opts.SourceParseErrPolicy
-	switch srcParseErrorPolicy {
-	case enrollment.SourceParseErrorEnableDestroy:
-		// Default value, Debug logging
-		log.Debug("validateParseErrorOptions", "SourceParseErrPolicy", srcParseErrorPolicy, "V", debugV)
-	case enrollment.SourceParseErrorDisableDestroy:
-		log.Info("validateParseErrorOptions", "SourceParseErrPolicy", srcParseErrorPolicy)
-	default:
-		return fmt.Errorf("SourceParseErrPolicy value '%s' is not supported, valid values: %v",
-			srcParseErrorPolicy,
-			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy})
-	}
-	enrolledParseErrorPolicy := opts.EnrollmentParseErrPolicy
-	switch enrolledParseErrorPolicy {
-	case enrollment.EnrolledParseErrorEnableProvision:
-		// Default value, Debug logging
-		log.Debug("validateParseErrorOptions", "EnrollmentParseErrPolicy", enrolledParseErrorPolicy, "V", debugV)
-	case enrollment.EnrolledParseErrorDisableProvision:
-		log.Info("validateParseErrorOptions", "EnrollmentParseErrPolicy", enrolledParseErrorPolicy)
-	default:
-		return fmt.Errorf("EnrollmentParseErrPolicy value '%s' is not supported, valid values: %v",
-			enrolledParseErrorPolicy,
-			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision})
-	}
-	return nil
 }
 
 func (l *enroller) isLeader() (is bool, err error) {
@@ -179,7 +143,7 @@ func (l *enroller) updateSpec(spec types.Spec) error {
 		if err := spec.Options.Decode(&options); err != nil {
 			return err
 		}
-		if err := validateParseErrorOptions(options); err != nil {
+		if err := options.Validate(enrollment.PluginCommit); err != nil {
 			return err
 		}
 		l.options = options
