@@ -94,6 +94,20 @@ func getPluginDirNoPerms(t *testing.T) (*plugin, string) {
 	return p, dir
 }
 
+// writeFile is a utility to write the formatted data to a file
+func writeFile(p *plugin, filename string, tf TFormat) error {
+	buff, err := json.MarshalIndent(tf, " ", " ")
+	if err != nil {
+		return err
+	}
+	return writeFileRaw(p, filename, buff)
+}
+
+// writeFile is a utility to write the raw bytes to a file
+func writeFileRaw(p *plugin, filename string, buff []byte) error {
+	return afero.WriteFile(p.fs, filepath.Join(p.Dir, filename), buff, 0644)
+}
+
 func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
 	logicalID := instance.LogicalID("logical-id-1")
 	// Spec with logical ID
@@ -1492,7 +1506,7 @@ func TestWriteTerraformFilesSingleOverride(t *testing.T) {
 	fileMap["instance-1234"] = &tFormat
 	// Indicate that the file already exists as .tf.json file, create it with
 	// garbage (it should be overriden)
-	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-1234.tf.json"), []byte("not-json"), 0644)
+	err := writeFileRaw(tf, "instance-1234.tf.json", []byte("not-json"))
 	require.NoError(t, err)
 	paths, err := tf.writeTerraformFiles(
 		fileMap,
@@ -2079,20 +2093,14 @@ func TestScanLocalFilesVMOnly(t *testing.T) {
 	inst1[VMSoftLayer] = map[TResourceName]TResourceProperties{
 		"instance-12": {"key1": "val1"},
 	}
-	tformat := TFormat{Resource: inst1}
-	buff, err := json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12.tf.json"), buff, 0644)
+	err := writeFile(tf, "instance-12.tf.json", TFormat{Resource: inst1})
 	require.NoError(t, err)
 
 	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
 	inst2[VMSoftLayer] = map[TResourceName]TResourceProperties{
 		"instance-34": {"key2": "val2"},
 	}
-	tformat = TFormat{Resource: inst2}
-	buff, err = json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-34.tf.json"), buff, 0644)
+	err = writeFile(tf, "instance-34.tf.json", TFormat{Resource: inst2})
 	require.NoError(t, err)
 
 	// And another type
@@ -2100,10 +2108,7 @@ func TestScanLocalFilesVMOnly(t *testing.T) {
 	inst3[VMAmazon] = map[TResourceName]TResourceProperties{
 		"instance-56": {"key3": "val3"},
 	}
-	tformat = TFormat{Resource: inst3}
-	buff, err = json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-56.tf.json"), buff, 0644)
+	err = writeFile(tf, "instance-56.tf.json", TFormat{Resource: inst3})
 	require.NoError(t, err)
 
 	// Should get 3 files, 2 VMs for softlayer and 1 for AWS
@@ -2431,7 +2436,7 @@ func TestLabelInvalidFile(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	id := "instance-1234"
-	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), []byte("not-json"), 0644)
+	err := writeFileRaw(tf, fmt.Sprintf("%v.tf.json", id), []byte("not-json"))
 	require.NoError(t, err)
 	err = tf.Label(instance.ID(id), nil)
 	require.Error(t, err)
@@ -2443,10 +2448,7 @@ func TestLabelNoVM(t *testing.T) {
 	id := "instance-1234"
 	// No VM data in instance definition
 	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
-	tformat := TFormat{Resource: inst}
-	buff, err := json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json", id), TFormat{Resource: inst})
 	require.NoError(t, err)
 	err = tf.Label(instance.ID(id), nil)
 	require.Error(t, err)
@@ -2460,10 +2462,7 @@ func TestLabelNoProperties(t *testing.T) {
 	// Resource does not have any properties
 	inst := make(map[TResourceType]map[TResourceName]TResourceProperties)
 	inst[VMSoftLayer] = map[TResourceName]TResourceProperties{"instance-1234": {}}
-	tformat := TFormat{Resource: inst}
-	buff, err := json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json", id), TFormat{Resource: inst})
 	require.NoError(t, err)
 	err = tf.Label(instance.ID(id), nil)
 	require.Error(t, err)
@@ -2484,10 +2483,7 @@ func TestLabelCreateNewTags(t *testing.T) {
 				fmt.Sprintf("key-%v", index): fmt.Sprintf("val-%v", index),
 			},
 		}
-		tformat := TFormat{Resource: inst}
-		buff, err := json.MarshalIndent(tformat, " ", " ")
-		require.NoError(t, err)
-		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+		err := writeFile(tf, fmt.Sprintf("%v.tf.json", id), TFormat{Resource: inst})
 		require.NoError(t, err)
 	}
 
@@ -2556,10 +2552,7 @@ func TestLabelMergeTags(t *testing.T) {
 				"tags": tags,
 			},
 		}
-		tformat := TFormat{Resource: inst}
-		buff, err := json.MarshalIndent(tformat, " ", " ")
-		require.NoError(t, err)
-		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+		err := writeFile(tf, fmt.Sprintf("%v.tf.json", id), TFormat{Resource: inst})
 		require.NoError(t, err)
 	}
 
@@ -2747,9 +2740,7 @@ func TestDestroy(t *testing.T) {
 			},
 		},
 	}
-	buff, err := json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id)), buff, 0644)
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json", id), tformat)
 	require.NoError(t, err)
 	err = tf.Destroy(instance.ID(id), instance.Termination)
 	require.Nil(t, err)
@@ -3197,10 +3188,7 @@ func TestDescribeNoVMs(t *testing.T) {
 	defer os.RemoveAll(dir)
 	// Create a valid file without a VM type
 	m := make(map[TResourceType]map[TResourceName]TResourceProperties)
-	tformat := TFormat{Resource: m}
-	buff, err := json.Marshal(tformat)
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12345.tf.json"), buff, 0644)
+	err := writeFile(tf, "instance-12345.tf.json", TFormat{Resource: m})
 	require.NoError(t, err)
 	results, err := tf.DescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
@@ -3218,9 +3206,7 @@ func TestDescribeWithNewFile(t *testing.T) {
 	inst1[VMSoftLayer] = map[TResourceName]TResourceProperties{
 		TResourceName(id1): {"tags": tags1},
 	}
-	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id1)), buff, 0644)
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json", id1), TFormat{Resource: inst1})
 	require.NoError(t, err)
 	// Instance1, unique tag and shared tag
 	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -3229,9 +3215,7 @@ func TestDescribeWithNewFile(t *testing.T) {
 	inst2[VMAzure] = map[TResourceName]TResourceProperties{
 		TResourceName(id2): {"tags": tags2},
 	}
-	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id2)), buff, 0644)
+	err = writeFile(tf, fmt.Sprintf("%v.tf.json", id2), TFormat{Resource: inst2})
 	require.NoError(t, err)
 	// Instance1, unique tag only
 	inst3 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -3240,9 +3224,7 @@ func TestDescribeWithNewFile(t *testing.T) {
 	inst3[VMAmazon] = map[TResourceName]TResourceProperties{
 		TResourceName(id3): {"tags": tags3},
 	}
-	buff, err = json.MarshalIndent(TFormat{Resource: inst3}, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id3)), buff, 0644)
+	err = writeFile(tf, fmt.Sprintf("%v.tf.json", id3), TFormat{Resource: inst3})
 	require.NoError(t, err)
 
 	// First instance matches
@@ -3320,9 +3302,7 @@ func TestDescribeAttachTag(t *testing.T) {
 			},
 		},
 	}
-	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id1)), buff, 0644)
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json", id1), TFormat{Resource: inst1})
 	require.NoError(t, err)
 
 	inst2 := make(map[TResourceType]map[TResourceName]TResourceProperties)
@@ -3336,9 +3316,7 @@ func TestDescribeAttachTag(t *testing.T) {
 			},
 		},
 	}
-	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", id2)), buff, 0644)
+	err = writeFile(tf, fmt.Sprintf("%v.tf.json", id2), TFormat{Resource: inst2})
 	require.NoError(t, err)
 
 	// Get both instances
@@ -3920,11 +3898,7 @@ func TestImportAlreadyExists(t *testing.T) {
 		ResourceType: &resType,
 	}
 	// Ensure that a tf.json file exists
-	err := afero.WriteFile(
-		tf.fs,
-		filepath.Join(dir, "instance-123.tf.json"),
-		[]byte("random-content"),
-		0644)
+	err := writeFileRaw(tf, "instance-123.tf.json", []byte("random-content"))
 	require.NoError(t, err)
 	err = tf.importResources(fns, []*ImportResource{&res}, &spec)
 	require.NoError(t, err)
@@ -4359,9 +4333,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 				},
 			},
 		}
-		buff, err := json.MarshalIndent(tFormat, "  ", "  ")
-		require.NoError(t, err)
-		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json", existingVMName)), buff, 0644)
+		err := writeFile(tf, fmt.Sprintf("%v.tf.json", existingVMName), tFormat)
 		require.NoError(t, err)
 	}
 	if options.FileExistsGlobal {
@@ -4374,9 +4346,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 				},
 			},
 		}
-		buff, err := json.MarshalIndent(tFormat, "  ", "  ")
-		require.NoError(t, err)
-		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "managers_global.tf.json"), buff, 0644)
+		err := writeFile(tf, "managers_global.tf.json", tFormat)
 		require.NoError(t, err)
 	}
 	if options.FileExistsDedicated {
@@ -4389,9 +4359,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 				},
 			},
 		}
-		buff, err := json.MarshalIndent(tFormat, "  ", "  ")
-		require.NoError(t, err)
-		err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "managers_dedicated_mgr1.tf.json"), buff, 0644)
+		err := writeFile(tf, "managers_dedicated_mgr1.tf.json", tFormat)
 		require.NoError(t, err)
 	}
 	spec := instance.Spec{
@@ -4881,23 +4849,17 @@ func TestParseFileForInstanceID(t *testing.T) {
 	tformat := TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
 		VMIBMCloud: {"instance-1234": {}}},
 	}
-	buff, err := json.MarshalIndent(tformat, "  ", "  ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-1234.tf.json.new"), buff, 0644)
+	err := writeFile(tf, "instance-1234.tf.json.new", tformat)
 	require.NoError(t, err)
 	tformat = TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
 		VMSoftLayer: {"instance-2345": {}}},
 	}
-	buff, err = json.MarshalIndent(tformat, "  ", "  ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-2345.tf.json.new"), buff, 0644)
+	err = writeFile(tf, "instance-2345.tf.json.new", tformat)
 	require.NoError(t, err)
 	tformat = TFormat{Resource: map[TResourceType]map[TResourceName]TResourceProperties{
 		VMAmazon: {"instance-3456": {}}},
 	}
-	buff, err = json.MarshalIndent(tformat, "  ", "  ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-3456.tf.json"), buff, 0644)
+	err = writeFile(tf, "instance-3456.tf.json", tformat)
 	require.NoError(t, err)
 
 	tFormat, filename, err := tf.parseFileForInstanceID(instance.ID("instance-1234"))
@@ -4962,7 +4924,7 @@ func TestListCurrentTfFilesNoPermissions(t *testing.T) {
 func TestListCurrentTfFilesInvalidFile(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	err := afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12345.tf.json"), []byte("not-json"), 0644)
+	err := writeFileRaw(tf, "instance-1234.tf.json", []byte("not-json"))
 	require.NoError(t, err)
 	_, err = tf.listCurrentTfFiles()
 	require.Error(t, err)
@@ -4980,40 +4942,28 @@ func TestListCurrentTfFiles(t *testing.T) {
 	resources[TResourceType("nfs")] = map[TResourceName]TResourceProperties{
 		"instance-12-default-nfs": {"nfs-k1": "nfs-v1"},
 	}
-	tformat := TFormat{Resource: resources}
-	buff, err := json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-12.tf.json.new"), buff, 0644)
+	err := writeFile(tf, "instance-12.tf.json.new", TFormat{Resource: resources})
 	require.NoError(t, err)
 	// File with only a VM
 	resources = make(map[TResourceType]map[TResourceName]TResourceProperties)
 	resources[VMSoftLayer] = map[TResourceName]TResourceProperties{
 		"instance-34": {"key2": "val2"},
 	}
-	tformat = TFormat{Resource: resources}
-	buff, err = json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-34.tf.json"), buff, 0644)
+	err = writeFile(tf, "instance-34.tf.json", TFormat{Resource: resources})
 	require.NoError(t, err)
 	// And a dedicated resource
 	resources = make(map[TResourceType]map[TResourceName]TResourceProperties)
 	resources[TResourceType("nfs")] = map[TResourceName]TResourceProperties{
 		"instance-34-dedicated-nfs": {"nfs-k2": "nfs-v2"},
 	}
-	tformat = TFormat{Resource: resources}
-	buff, err = json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "default-dedicated-instance-34.tf.json"), buff, 0644)
+	err = writeFile(tf, "default-dedicated-instance-34.tf.json", TFormat{Resource: resources})
 	require.NoError(t, err)
 	// And a global type
 	resources = make(map[TResourceType]map[TResourceName]TResourceProperties)
 	resources[TResourceType("nfs")] = map[TResourceName]TResourceProperties{
 		"global-nfs": {"nfs-k3": "nfs-v3"},
 	}
-	tformat = TFormat{Resource: resources}
-	buff, err = json.MarshalIndent(tformat, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "scope_global.tf.json"), buff, 0644)
+	err = writeFile(tf, "scope_global.tf.json", TFormat{Resource: resources})
 	require.NoError(t, err)
 
 	// Should get 4 files
@@ -5091,9 +5041,7 @@ func TestDoDescribeInstancesShowError(t *testing.T) {
 			TResourceName(id): {"k1": "v1", "tags": tags},
 		},
 	}
-	buff, err := json.MarshalIndent(TFormat{Resource: inst}, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id)), buff, 0644)
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json.new", id), TFormat{Resource: inst})
 	require.NoError(t, err)
 
 	fns := describeFns{
@@ -5124,18 +5072,14 @@ func TestDoDescribeInstancesProperties(t *testing.T) {
 			TResourceName(id1): {"tags": tag1},
 		},
 	}
-	buff, err := json.MarshalIndent(TFormat{Resource: inst1}, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id1)), buff, 0644)
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json.new", id1), TFormat{Resource: inst1})
 	require.NoError(t, err)
 	inst2 := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMIBMCloud: {
 			TResourceName(id2): {"tags": tag2},
 		},
 	}
-	buff, err = json.MarshalIndent(TFormat{Resource: inst2}, " ", " ")
-	require.NoError(t, err)
-	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, fmt.Sprintf("%v.tf.json.new", id2)), buff, 0644)
+	err = writeFile(tf, fmt.Sprintf("%v.tf.json.new", id2), TFormat{Resource: inst2})
 	require.NoError(t, err)
 
 	fns := describeFns{
