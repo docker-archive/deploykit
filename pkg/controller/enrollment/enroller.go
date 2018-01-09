@@ -53,17 +53,14 @@ type enroller struct {
 }
 
 func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enrollment.Options) (*enroller, error) {
-
 	l := &enroller{
 		leader:  leader,
 		scope:   scope,
 		options: options,
 	}
-
-	if l.options.SyncInterval.Duration() == 0 {
-		return nil, fmt.Errorf("sync interval cannot be 0")
+	if err := l.options.Validate(enrollment.PluginInit); err != nil {
+		return nil, err
 	}
-
 	l.ticker = time.Tick(l.options.SyncInterval.Duration())
 
 	l.poller = controller.Poll(
@@ -144,6 +141,9 @@ func (l *enroller) updateSpec(spec types.Spec) error {
 		// starting point to parse the input.
 		options := l.options // a copy
 		if err := spec.Options.Decode(&options); err != nil {
+			return err
+		}
+		if err := options.Validate(enrollment.PluginCommit); err != nil {
 			return err
 		}
 		l.options = options

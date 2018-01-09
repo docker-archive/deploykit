@@ -19,8 +19,10 @@ var (
 
 	// DefaultOptions return an Options with default values filled in.
 	DefaultOptions = enrollment.Options{
-		SyncInterval:       types.Duration(5 * time.Second),
-		DestroyOnTerminate: false,
+		SyncInterval:             types.Duration(5 * time.Second),
+		DestroyOnTerminate:       false,
+		SourceParseErrPolicy:     enrollment.SourceParseErrorEnableDestroy,
+		EnrollmentParseErrPolicy: enrollment.EnrolledParseErrorEnableProvision,
 	}
 )
 
