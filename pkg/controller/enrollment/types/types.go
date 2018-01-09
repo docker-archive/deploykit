@@ -125,17 +125,17 @@ type Options struct {
 	// SourceKeySelector: \{\{ .ID \}\}  # selects the ID field.
 	SourceKeySelector string
 
-	// SourceParseErrOp defines the behavior when the source item cannot
+	// SourceParseErrPolicy defines the behavior when the source item cannot
 	// be indexed, value values are "EnableDestroy" and "DisableDestroy
-	SourceParseErrOp string
+	SourceParseErrPolicy string
 
 	// SourceKeySelector is a string template for selecting the join key from
 	// a enrollment plugin's instance.Description.
 	EnrollmentKeySelector string
 
-	// EnrollmentParseErrOp defines the behavior when the enrolled item cannot
+	// EnrollmentParseErrPolicy defines the behavior when the enrolled item cannot
 	// be indexed, value values are "EnableProvision" and "DisableProvision"
-	EnrollmentParseErrOp string
+	EnrollmentParseErrPolicy string
 
 	// SyncInterval is the time interval between reconciliation. Syntax
 	// is go's time.Duration string representation (e.g. 1m, 30s)

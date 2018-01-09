@@ -88,28 +88,28 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 // validateParseErrorOptions ensures that source and enrolled parse error
 // operation values are valid in the given options
 func validateParseErrorOptions(opts enrollment.Options) error {
-	srcParseErrorOp := opts.SourceParseErrOp
-	switch srcParseErrorOp {
+	srcParseErrorPolicy := opts.SourceParseErrPolicy
+	switch srcParseErrorPolicy {
 	case enrollment.SourceParseErrorEnableDestroy:
 		// Default value, Debug logging
-		log.Debug("validateParseErrorOptions", "SourceParseErrOp", srcParseErrorOp, "V", debugV)
+		log.Debug("validateParseErrorOptions", "SourceParseErrPolicy", srcParseErrorPolicy, "V", debugV)
 	case enrollment.SourceParseErrorDisableDestroy:
-		log.Info("validateParseErrorOptions", "SourceParseErrOp", srcParseErrorOp)
+		log.Info("validateParseErrorOptions", "SourceParseErrPolicy", srcParseErrorPolicy)
 	default:
-		return fmt.Errorf("SourceParseErrOp value '%s' is not supported, valid values: %v",
-			srcParseErrorOp,
+		return fmt.Errorf("SourceParseErrPolicy value '%s' is not supported, valid values: %v",
+			srcParseErrorPolicy,
 			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy})
 	}
-	enrolledParseErrorOp := opts.EnrollmentParseErrOp
-	switch enrolledParseErrorOp {
+	enrolledParseErrorPolicy := opts.EnrollmentParseErrPolicy
+	switch enrolledParseErrorPolicy {
 	case enrollment.EnrolledParseErrorEnableProvision:
 		// Default value, Debug logging
-		log.Debug("validateParseErrorOptions", "EnrollmentParseErrOp", enrolledParseErrorOp, "V", debugV)
+		log.Debug("validateParseErrorOptions", "EnrollmentParseErrPolicy", enrolledParseErrorPolicy, "V", debugV)
 	case enrollment.EnrolledParseErrorDisableProvision:
-		log.Info("validateParseErrorOptions", "EnrollmentParseErrOp", enrolledParseErrorOp)
+		log.Info("validateParseErrorOptions", "EnrollmentParseErrPolicy", enrolledParseErrorPolicy)
 	default:
-		return fmt.Errorf("EnrollmentParseErrOp value '%s' is not supported, valid values: %v",
-			enrolledParseErrorOp,
+		return fmt.Errorf("EnrollmentParseErrPolicy value '%s' is not supported, valid values: %v",
+			enrolledParseErrorPolicy,
 			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision})
 	}
 	return nil

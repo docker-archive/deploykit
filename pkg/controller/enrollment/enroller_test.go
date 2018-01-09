@@ -59,8 +59,8 @@ func TestEnrollerOptions(t *testing.T) {
 		DefaultOptions)
 	require.NoError(t, err)
 	require.Equal(t, types.FromDuration(time.Duration(5*time.Second)), e.options.SyncInterval)
-	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, e.options.SourceParseErrOp)
-	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, e.options.EnrollmentParseErrOp)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, e.options.SourceParseErrPolicy)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, e.options.EnrollmentParseErrPolicy)
 	// Override options, still valid
 	e, err = newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
@@ -70,14 +70,14 @@ func TestEnrollerOptions(t *testing.T) {
 		}),
 		fakeLeader(false),
 		enrollment.Options{
-			SyncInterval:         types.FromDuration(time.Duration(10 * time.Second)),
-			SourceParseErrOp:     enrollment.SourceParseErrorDisableDestroy,
-			EnrollmentParseErrOp: enrollment.EnrolledParseErrorDisableProvision,
+			SyncInterval:             types.FromDuration(time.Duration(10 * time.Second)),
+			SourceParseErrPolicy:     enrollment.SourceParseErrorDisableDestroy,
+			EnrollmentParseErrPolicy: enrollment.EnrolledParseErrorDisableProvision,
 		})
 	require.NoError(t, err)
 	require.Equal(t, types.FromDuration(time.Duration(10*time.Second)), e.options.SyncInterval)
-	require.Equal(t, enrollment.SourceParseErrorDisableDestroy, e.options.SourceParseErrOp)
-	require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, e.options.EnrollmentParseErrOp)
+	require.Equal(t, enrollment.SourceParseErrorDisableDestroy, e.options.SourceParseErrPolicy)
+	require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, e.options.EnrollmentParseErrPolicy)
 	// Invalid values, should error out
 	e, err = newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
@@ -87,9 +87,9 @@ func TestEnrollerOptions(t *testing.T) {
 		}),
 		fakeLeader(false),
 		enrollment.Options{
-			SyncInterval:         types.FromDuration(time.Duration(-1 * time.Second)),
-			SourceParseErrOp:     DefaultOptions.SourceParseErrOp,
-			EnrollmentParseErrOp: DefaultOptions.EnrollmentParseErrOp,
+			SyncInterval:             types.FromDuration(time.Duration(-1 * time.Second)),
+			SourceParseErrPolicy:     DefaultOptions.SourceParseErrPolicy,
+			EnrollmentParseErrPolicy: DefaultOptions.EnrollmentParseErrPolicy,
 		})
 	require.Error(t, err)
 	require.Equal(t, fmt.Errorf("SyncInterval must be greater than 0"), err)
@@ -101,13 +101,13 @@ func TestEnrollerOptions(t *testing.T) {
 		}),
 		fakeLeader(false),
 		enrollment.Options{
-			SyncInterval:         DefaultOptions.SyncInterval,
-			SourceParseErrOp:     "bogus-SourceParseErrOp",
-			EnrollmentParseErrOp: DefaultOptions.EnrollmentParseErrOp,
+			SyncInterval:             DefaultOptions.SyncInterval,
+			SourceParseErrPolicy:     "bogus-SourceParseErrPolicy",
+			EnrollmentParseErrPolicy: DefaultOptions.EnrollmentParseErrPolicy,
 		})
 	require.Error(t, err)
 	require.Equal(t,
-		fmt.Errorf("SourceParseErrOp value 'bogus-SourceParseErrOp' is not supported, valid values: %v",
+		fmt.Errorf("SourceParseErrPolicy value 'bogus-SourceParseErrPolicy' is not supported, valid values: %v",
 			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy}),
 		err)
 	e, err = newEnroller(
@@ -118,13 +118,13 @@ func TestEnrollerOptions(t *testing.T) {
 		}),
 		fakeLeader(false),
 		enrollment.Options{
-			SyncInterval:         DefaultOptions.SyncInterval,
-			SourceParseErrOp:     DefaultOptions.SourceParseErrOp,
-			EnrollmentParseErrOp: "bogus-EnrollmentParseErrOp",
+			SyncInterval:             DefaultOptions.SyncInterval,
+			SourceParseErrPolicy:     DefaultOptions.SourceParseErrPolicy,
+			EnrollmentParseErrPolicy: "bogus-EnrollmentParseErrPolicy",
 		})
 	require.Error(t, err)
 	require.Equal(t,
-		fmt.Errorf("EnrollmentParseErrOp value 'bogus-EnrollmentParseErrOp' is not supported, valid values: %v",
+		fmt.Errorf("EnrollmentParseErrPolicy value 'bogus-EnrollmentParseErrPolicy' is not supported, valid values: %v",
 			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision}),
 		err)
 }
@@ -206,8 +206,8 @@ options:
 	require.NotNil(t, et)
 
 	// Should use the defaults
-	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
-	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrPolicy)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrPolicy)
 
 	require.NoError(t, err)
 
@@ -427,7 +427,7 @@ properties:
        backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
 options:
   SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
-  SourceParseErrOp: %s
+  SourceParseErrPolicy: %s
   EnrollmentKeySelector: \{\{.ID\}\}
 `, srcParseError))).Decode(&spec))
 
@@ -545,7 +545,7 @@ func TestEnrollerEnrolledParseError(t *testing.T) {
 
 	require.False(t, enroller.Running())
 
-	// Verify the various options for the EnrollmentParseErrOp
+	// Verify the various options for the EnrollmentParseErrPolicy
 	for _, enrolledParseError := range []string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision} {
 
 		// Build a spec that uses the "backend_id" as the key for the source and just
@@ -564,7 +564,7 @@ properties:
 options:
   SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
   EnrollmentKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.ID \}\}
-  EnrollmentParseErrOp: %s
+  EnrollmentParseErrPolicy: %s
 `, enrolledParseError))).Decode(&spec))
 
 		require.NoError(t, enroller.updateSpec(spec))
@@ -639,8 +639,8 @@ func TestEnrollerOptionParsing(t *testing.T) {
 		DefaultOptions)
 	require.NoError(t, err)
 	require.Equal(t, types.FromDuration(time.Duration(5*time.Second)), enroller.options.SyncInterval)
-	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
-	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrPolicy)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrPolicy)
 
 	for _, srcParseErrorOp := range []string{enrollment.SourceParseErrorDisableDestroy, enrollment.SourceParseErrorDisableDestroy} {
 		for _, enrolledParseErrorOp := range []string{enrollment.EnrolledParseErrorDisableProvision, enrollment.EnrolledParseErrorEnableProvision} {
@@ -652,20 +652,20 @@ func TestEnrollerOptionParsing(t *testing.T) {
 				}),
 				fakeLeader(false),
 				enrollment.Options{
-					SyncInterval:         DefaultOptions.SyncInterval,
-					SourceParseErrOp:     srcParseErrorOp,
-					EnrollmentParseErrOp: enrolledParseErrorOp,
+					SyncInterval:             DefaultOptions.SyncInterval,
+					SourceParseErrPolicy:     srcParseErrorOp,
+					EnrollmentParseErrPolicy: enrolledParseErrorOp,
 				})
 			require.NoError(t, err)
 			if srcParseErrorOp == enrollment.SourceParseErrorDisableDestroy {
-				require.Equal(t, enrollment.SourceParseErrorDisableDestroy, enroller.options.SourceParseErrOp)
+				require.Equal(t, enrollment.SourceParseErrorDisableDestroy, enroller.options.SourceParseErrPolicy)
 			} else {
-				require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
+				require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrPolicy)
 			}
 			if enrolledParseErrorOp == enrollment.EnrolledParseErrorDisableProvision {
-				require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, enroller.options.EnrollmentParseErrOp)
+				require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, enroller.options.EnrollmentParseErrPolicy)
 			} else {
-				require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+				require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrPolicy)
 			}
 		}
 	}
@@ -682,10 +682,10 @@ func TestEnrollerUpdateSpecOptionParsing(t *testing.T) {
 		fakeLeader(false),
 		DefaultOptions)
 	require.NoError(t, err)
-	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
-	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrPolicy)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrPolicy)
 
-	// Should override with an updated spec, first try an invalid valid for SourceParseErrOp
+	// Should override with an updated spec, first try an invalid valid for SourceParseErrPolicy
 	spec := types.Spec{}
 	require.NoError(t, types.AnyYAMLMust([]byte(`
 kind: enrollment
@@ -699,20 +699,20 @@ properties:
        backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
 options:
   SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
-  SourceParseErrOp: foo
+  SourceParseErrPolicy: foo
   EnrollmentKeySelector: \{\{.ID\}\}
-  EnrollmentParseErrOp: DisableProvision
+  EnrollmentParseErrPolicy: DisableProvision
 `)).Decode(&spec))
 	err = enroller.updateSpec(spec)
 	require.Error(t, err)
 	require.Equal(t,
-		fmt.Errorf("SourceParseErrOp value 'foo' is not supported, valid values: %v",
+		fmt.Errorf("SourceParseErrPolicy value 'foo' is not supported, valid values: %v",
 			[]string{enrollment.SourceParseErrorEnableDestroy, enrollment.SourceParseErrorDisableDestroy}),
 		err)
-	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
-	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrPolicy)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrPolicy)
 
-	// Should override with an updated spec, and an invalid valid for EnrollmentParseErrOp
+	// Should override with an updated spec, and an invalid valid for EnrollmentParseErrPolicy
 	spec = types.Spec{}
 	require.NoError(t, types.AnyYAMLMust([]byte(`
 kind: enrollment
@@ -726,18 +726,18 @@ properties:
        backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
 options:
   SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
-  SourceParseErrOp: DisableDestroy
+  SourceParseErrPolicy: DisableDestroy
   EnrollmentKeySelector: \{\{.ID\}\}
-  EnrollmentParseErrOp: foo
+  EnrollmentParseErrPolicy: foo
 `)).Decode(&spec))
 	err = enroller.updateSpec(spec)
 	require.Error(t, err)
 	require.Equal(t,
-		fmt.Errorf("EnrollmentParseErrOp value 'foo' is not supported, valid values: %v",
+		fmt.Errorf("EnrollmentParseErrPolicy value 'foo' is not supported, valid values: %v",
 			[]string{enrollment.EnrolledParseErrorEnableProvision, enrollment.EnrolledParseErrorDisableProvision}),
 		err)
-	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrOp)
-	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrOp)
+	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrPolicy)
+	require.Equal(t, enrollment.EnrolledParseErrorEnableProvision, enroller.options.EnrollmentParseErrPolicy)
 
 	// Then with a valid valid for both
 	spec = types.Spec{}
@@ -753,11 +753,11 @@ properties:
        backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
 options:
   SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
-  SourceParseErrOp: DisableDestroy
+  SourceParseErrPolicy: DisableDestroy
   EnrollmentKeySelector: \{\{.ID\}\}
-  EnrollmentParseErrOp: DisableProvision
+  EnrollmentParseErrPolicy: DisableProvision
 `)).Decode(&spec))
 	require.NoError(t, enroller.updateSpec(spec))
-	require.Equal(t, enrollment.SourceParseErrorDisableDestroy, enroller.options.SourceParseErrOp)
-	require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, enroller.options.EnrollmentParseErrOp)
+	require.Equal(t, enrollment.SourceParseErrorDisableDestroy, enroller.options.SourceParseErrPolicy)
+	require.Equal(t, enrollment.EnrolledParseErrorDisableProvision, enroller.options.EnrollmentParseErrPolicy)
 }
