@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"testing"
 
-	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/scope"
@@ -62,14 +61,15 @@ func TestEnroller(t *testing.T) {
 
 	seen := make(chan []interface{}, 10)
 
-	enroller := newEnroller(
+	enroller, err := newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
 			return fakePlugins{
 				"test": &plugin.Endpoint{},
 			}
 		}),
 		fakeLeader(false),
-		enrollment.Options{})
+		DefaultOptions)
+	require.NoError(t, err)
 	enroller.groupPlugin = &group_test.Plugin{
 		DoDescribeGroup: func(gid group.ID) (group.Description, error) {
 			result := group.Description{Instances: source}
@@ -169,14 +169,15 @@ func TestEnrollerNoTags(t *testing.T) {
 
 	seen := make(chan []interface{}, 10)
 
-	enroller := newEnroller(
+	enroller, err := newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
 			return fakePlugins{
 				"test": &plugin.Endpoint{},
 			}
 		}),
 		fakeLeader(false),
-		enrollment.Options{})
+		DefaultOptions)
+	require.NoError(t, err)
 	enroller.groupPlugin = &group_test.Plugin{
 		DoDescribeGroup: func(gid group.ID) (group.Description, error) {
 			result := group.Description{Instances: source}
@@ -200,6 +201,7 @@ func TestEnrollerNoTags(t *testing.T) {
 	}
 
 	require.False(t, enroller.Running())
+	require.False(t, enroller.options.DestroyOnTerminate)
 
 	// Build a spec that uses the "backend_id" as the key for the source and just
 	// the "ID" for the enrolled
@@ -215,11 +217,16 @@ properties:
     Properties:
        backend_id: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
 options:
+  DestroyOnTerminate: true
   SourceKeySelector: \{\{ $x := .Properties | jsonDecode \}\}\{\{ int $x.backend_id \}\}
   EnrollmentKeySelector: \{\{.ID\}\}
 `)).Decode(&spec))
 
 	require.NoError(t, enroller.updateSpec(spec))
+
+	// Should see an overridden value to true since the input
+	// yml has an options section with DestroyOnTerminate override to true
+	require.True(t, enroller.options.DestroyOnTerminate)
 
 	st, err := enroller.getSourceKeySelectorTemplate()
 	require.NoError(t, err)
@@ -282,14 +289,15 @@ func TestEnrollerMissingProps(t *testing.T) {
 	seenProvision := make(chan []interface{}, 10)
 	seenDestroy := make(chan []interface{}, 10)
 
-	enroller := newEnroller(
+	enroller, err := newEnroller(
 		scope.DefaultScope(func() discovery.Plugins {
 			return fakePlugins{
 				"test": &plugin.Endpoint{},
 			}
 		}),
 		fakeLeader(false),
-		enrollment.Options{})
+		DefaultOptions)
+	require.NoError(t, err)
 	enroller.groupPlugin = &group_test.Plugin{
 		DoDescribeGroup: func(gid group.ID) (group.Description, error) {
 			result := group.Description{Instances: source}
