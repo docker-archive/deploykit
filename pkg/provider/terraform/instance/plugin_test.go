@@ -19,6 +19,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	emptyTfShowFns = describeFns{
+		tfShow: func(resTypes []TResourceType, propFilter []string) (result map[TResourceType]map[TResourceName]TResourceProperties, err error) {
+			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
+		},
+	}
+)
+
 func TestProcessImportOptions(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
@@ -105,7 +113,12 @@ func writeFile(p *plugin, filename string, tf TFormat) error {
 
 // writeFile is a utility to write the raw bytes to a file
 func writeFileRaw(p *plugin, filename string, buff []byte) error {
-	return afero.WriteFile(p.fs, filepath.Join(p.Dir, filename), buff, 0644)
+	if err := afero.WriteFile(p.fs, filepath.Join(p.Dir, filename), buff, 0644); err != nil {
+		return err
+	}
+	// Now that the file is written out we need to clear the cache
+	p.clearCachedInstances()
+	return nil
 }
 
 func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
@@ -410,7 +423,8 @@ func TestProvisionDescribeDestroyScopeWithoutLogicalID(t *testing.T) {
 		Tags:       map[string]string{"tag1": "val1"},
 	})
 	require.NoError(t, err)
-	results, err := tf.DescribeInstances(
+	results, err := tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"tag1": "val1"},
 		false,
 	)
@@ -426,6 +440,7 @@ func TestProvisionDescribeDestroyScopeWithoutLogicalID(t *testing.T) {
 				"Name":    string(*id1),
 				"tag1":    "val1",
 			},
+			Properties: types.AnyString("{}"),
 		})
 	expectedAttach2 := []string{"default_dedicated_2", "managers_global"}
 	require.Contains(t,
@@ -437,6 +452,7 @@ func TestProvisionDescribeDestroyScopeWithoutLogicalID(t *testing.T) {
 				"Name":    string(*id2),
 				"tag1":    "val1",
 			},
+			Properties: types.AnyString("{}"),
 		})
 	// Should be files for:
 	// 2 VMs
@@ -537,7 +553,8 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	results, err := tf.DescribeInstances(
+	results, err := tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"tag1": "val1"},
 		false,
 	)
@@ -554,7 +571,8 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 				"tag1":                "val1",
 				instance.LogicalIDTag: "mgr1",
 			},
-			LogicalID: &logicalID1,
+			LogicalID:  &logicalID1,
+			Properties: types.AnyString("{}"),
 		})
 	expectedAttach2 := []string{"default_dedicated_" + string(logicalID2), "managers_global"}
 	require.Contains(t,
@@ -567,7 +585,8 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 				"tag1":                "val1",
 				instance.LogicalIDTag: "mgr2",
 			},
-			LogicalID: &logicalID2,
+			LogicalID:  &logicalID2,
+			Properties: types.AnyString("{}"),
 		})
 	// Should be files for:
 	// 2 VMs
@@ -1210,7 +1229,8 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"name":                        string(*id1),
 				instance.LogicalIDTag:         "logical.id-1",
 			},
-			LogicalID: &logicalID1,
+			LogicalID:  &logicalID1,
+			Properties: types.AnyString("{}"),
 		}
 		inst2 = instance.Description{
 			ID: *id2,
@@ -1221,7 +1241,8 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"name":                        string(*id2),
 				instance.LogicalIDTag:         "logical:id-2",
 			},
-			LogicalID: &logicalID2,
+			LogicalID:  &logicalID2,
+			Properties: types.AnyString("{}"),
 		}
 	case VMAmazon:
 		inst1 = instance.Description{
@@ -1234,7 +1255,8 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"Name":                string(*id1),
 				instance.LogicalIDTag: "logical.id-1",
 			},
-			LogicalID: &logicalID1,
+			LogicalID:  &logicalID1,
+			Properties: types.AnyString("{}"),
 		}
 		inst2 = instance.Description{
 			ID: *id2,
@@ -1245,12 +1267,16 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"Name":                string(*id2),
 				instance.LogicalIDTag: "logical:id-2",
 			},
-			LogicalID: &logicalID2,
+			LogicalID:  &logicalID2,
+			Properties: types.AnyString("{}"),
 		}
 	}
 
 	// Both instances match: label=value1
-	list, err := tf.DescribeInstances(map[string]string{"label1": "value1"}, false)
+	list, err := tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{"label1": "value1"},
+		false)
 	require.NoError(t, err)
 	require.Contains(t, list, inst1)
 	require.Contains(t, list, inst2)
@@ -1299,17 +1325,25 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	inst2.Tags["label3"] = "value3"
 
 	// Only a single match: label1=changed1
-	list, err = tf.DescribeInstances(map[string]string{"label1": "changed1"}, false)
+	list, err = tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{"label1": "changed1"},
+		false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{inst2}, list)
 
 	// Only a single match: label1=value1
-	list, err = tf.DescribeInstances(map[string]string{"label1": "value1"}, false)
+	list, err = tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{"label1": "value1"},
+		false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{inst1}, list)
 
 	// No matches: label1=foo
-	list, err = tf.DescribeInstances(map[string]string{"label1": "foo"}, false)
+	list, err = tf.doDescribeInstances(emptyTfShowFns,
+		map[string]string{"label1": "foo"},
+		false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
 
@@ -1321,7 +1355,10 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	require.Len(t, files, 1)
 	require.Equal(t, filepath.Base(tfPath1), files[0].Name())
 
-	list, err = tf.DescribeInstances(map[string]string{"label1": "changed1"}, false)
+	list, err = tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{"label1": "changed1"},
+		false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, list)
 
@@ -3178,7 +3215,10 @@ func TestParseAttachTagSlice(t *testing.T) {
 func TestDescribeNoFiles(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
-	results, err := tf.DescribeInstances(map[string]string{}, false)
+	results, err := tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{},
+		false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, results)
 }
@@ -3190,7 +3230,10 @@ func TestDescribeNoVMs(t *testing.T) {
 	m := make(map[TResourceType]map[TResourceName]TResourceProperties)
 	err := writeFile(tf, "instance-12345.tf.json", TFormat{Resource: m})
 	require.NoError(t, err)
-	results, err := tf.DescribeInstances(map[string]string{}, true)
+	results, err := tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{},
+		true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, results)
 }
@@ -3228,13 +3271,15 @@ func TestDescribeWithNewFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// First instance matches
-	results, err := tf.DescribeInstances(
+	results, err := tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"tag1": "val1"},
 		false)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(results))
 	require.Equal(t, instance.ID(id1), results[0].ID)
-	results, err = tf.DescribeInstances(
+	results, err = tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"tag1": "val1", "tagShared": "valShared"},
 		false)
 	require.NoError(t, err)
@@ -3242,7 +3287,8 @@ func TestDescribeWithNewFile(t *testing.T) {
 	require.Equal(t, instance.ID(id1), results[0].ID)
 
 	// Second instance matches
-	results, err = tf.DescribeInstances(
+	results, err = tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"tag2": "val2"},
 		false)
 	require.NoError(t, err)
@@ -3250,7 +3296,8 @@ func TestDescribeWithNewFile(t *testing.T) {
 	require.Equal(t, instance.ID(id2), results[0].ID)
 
 	// Both instances matches
-	results, err = tf.DescribeInstances(
+	results, err = tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"tagShared": "valShared"},
 		false)
 	require.NoError(t, err)
@@ -3263,19 +3310,24 @@ func TestDescribeWithNewFile(t *testing.T) {
 	require.Contains(t, ids, instance.ID(id2))
 
 	// No instances match
-	results, err = tf.DescribeInstances(
+	results, err = tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"tag1": "val1", "tagShared": "valShared", "foo": "bar"},
 		false)
 	require.NoError(t, err)
 	require.Empty(t, results)
-	results, err = tf.DescribeInstances(
+	results, err = tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"TAG2": "val2"},
 		false)
 	require.NoError(t, err)
 	require.Empty(t, results)
 
 	// All instances match (no tags passed)
-	results, err = tf.DescribeInstances(map[string]string{}, false)
+	results, err = tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{},
+		false)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(results))
 	ids = []instance.ID{}
@@ -3320,7 +3372,8 @@ func TestDescribeAttachTag(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get both instances
-	results, err := tf.DescribeInstances(
+	results, err := tf.doDescribeInstances(
+		emptyTfShowFns,
 		map[string]string{"key": "val"},
 		false)
 	require.NoError(t, err)
@@ -3333,6 +3386,7 @@ func TestDescribeAttachTag(t *testing.T) {
 				"key":     "val",
 				attachTag: "attach1-1,attach1-2",
 			},
+			Properties: types.AnyString("{}"),
 		},
 	)
 	require.Contains(t,
@@ -3343,6 +3397,7 @@ func TestDescribeAttachTag(t *testing.T) {
 				"key":     "val",
 				attachTag: "attach2-1,attach2-2",
 			},
+			Properties: types.AnyString("{}"),
 		},
 	)
 }
@@ -5020,11 +5075,17 @@ func TestDoDescribeInstancesEmpty(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
-	result, err := tf.doDescribeInstances(describeFns{}, map[string]string{}, false)
+	result, err := tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{},
+		false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, result)
 
-	result, err = tf.doDescribeInstances(describeFns{}, map[string]string{}, true)
+	result, err = tf.doDescribeInstances(
+		emptyTfShowFns,
+		map[string]string{},
+		true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, result)
 }
@@ -5054,7 +5115,9 @@ func TestDoDescribeInstancesShowError(t *testing.T) {
 
 	_, err = tf.doDescribeInstances(fns, map[string]string{}, true)
 	require.Error(t, err)
-	require.Equal(t, "Custom show error", err.Error())
+	// The "show" is used to populate the cache, if it failed then the cache
+	// does not exist.
+	require.Equal(t, "Unable to retrieve instances", err.Error())
 }
 
 func TestDoDescribeInstancesProperties(t *testing.T) {
@@ -5106,14 +5169,38 @@ func TestDoDescribeInstancesProperties(t *testing.T) {
 		ID:         instance.ID(id1),
 		Properties: props1,
 	}
+	instDesc1NoProps := instance.Description{
+		Tags:       map[string]string{"common": "val", "tag1": "val1"},
+		ID:         instance.ID(id1),
+		Properties: types.AnyString("{}"),
+	}
 	instDesc2 := instance.Description{
 		Tags:       map[string]string{"common": "val", "tag2": "val2"},
 		ID:         instance.ID(id2),
 		Properties: props2,
 	}
+	instDesc2NoProps := instance.Description{
+		Tags:       map[string]string{"common": "val", "tag2": "val2"},
+		ID:         instance.ID(id2),
+		Properties: types.AnyString("{}"),
+	}
 
-	// No tag filter
+	// No tag filter, all props
 	result, err := tf.doDescribeInstances(fns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Contains(t, result, instDesc1)
+	require.Contains(t, result, instDesc2)
+
+	// No tag filter, no props
+	result, err = tf.doDescribeInstances(fns, map[string]string{}, false)
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Contains(t, result, instDesc1NoProps)
+	require.Contains(t, result, instDesc2NoProps)
+
+	// Ensure that the cache was not changed, get all again
+	result, err = tf.doDescribeInstances(fns, map[string]string{}, true)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 	require.Contains(t, result, instDesc1)
@@ -5140,4 +5227,118 @@ func TestDoDescribeInstancesProperties(t *testing.T) {
 	result, err = tf.doDescribeInstances(fns, map[string]string{"tag1": "bogus"}, true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, result)
+}
+
+func TestCacheClearAndPopulate(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Cache should be non-nil but empty
+	require.Equal(t, []instance.Description{}, *tf.cachedInstances)
+
+	// Create an instance on the filesystem
+	id1 := "instance-1"
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json.new", id1), TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMIBMCloud: {
+				TResourceName(id1): {"fileProp1": "fp1"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	// A describe will return this instance
+	results, err := tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, instance.ID(id1), results[0].ID)
+
+	// Should match the cache
+	require.Equal(t, results, *tf.cachedInstances)
+
+	// Issue a provision, should clear the cache
+	tformat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMIBMCloud: {
+				TResourceName("resource"): {"fileProp2": "fp2"},
+			},
+		},
+	}
+	buff, err := json.MarshalIndent(tformat, "  ", "  ")
+	require.NoError(t, err)
+	id2, err := tf.Provision(instance.Spec{
+		Properties: types.AnyBytes(buff),
+		Tags:       map[string]string{},
+	})
+	require.NoError(t, err)
+	require.Nil(t, tf.cachedInstances)
+
+	// Describe will re-populate it
+	results, err = tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	ids := []instance.ID{}
+	for _, r := range results {
+		ids = append(ids, r.ID)
+	}
+	require.Contains(t, ids, instance.ID(id1))
+	require.Contains(t, ids, *id2)
+
+	// Should match the cache
+	require.Equal(t, results, *tf.cachedInstances)
+
+	// Label inst2, should clear the cache
+	err = tf.Label(*id2, map[string]string{"label1": "new"})
+	require.NoError(t, err)
+	require.Nil(t, tf.cachedInstances)
+
+	// Describe will re-populate it
+	results, err = tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	ids = []instance.ID{}
+	for _, r := range results {
+		ids = append(ids, r.ID)
+	}
+	require.Contains(t, ids, instance.ID(id1))
+	require.Contains(t, ids, *id2)
+
+	// Should match the cache
+	require.Equal(t, results, *tf.cachedInstances)
+
+	// Destroy inst2, should clear the cache
+	err = tf.Destroy(*id2, instance.Termination)
+	require.NoError(t, err)
+	require.Nil(t, tf.cachedInstances)
+
+	// Describe will re-populate it
+	results, err = tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, instance.ID(id1), results[0].ID)
+
+	// Should match the cache
+	require.Equal(t, results, *tf.cachedInstances)
+
+	// handleFiles should also clear the cache
+	fns := tfFuncs{
+		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			return map[TResourceType]map[TResourceName]struct{}{}, nil
+		},
+		tfRefresh: func() error {
+			return nil
+		},
+	}
+	err = tf.handleFiles(fns)
+	require.NoError(t, err)
+	require.Nil(t, tf.cachedInstances)
+
+	// Describe will re-populate it
+	results, err = tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, instance.ID(id1), results[0].ID)
+
+	// Should match the cache
+	require.Equal(t, results, *tf.cachedInstances)
 }

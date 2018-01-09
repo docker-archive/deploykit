@@ -90,7 +90,14 @@ func (p *plugin) terraformApply() error {
 				}
 				if err := p.handleFiles(fns); err == nil {
 					if err = p.doTerraformApply(); err == nil {
-						initial = false
+						// Goroutine was interrupted, this likely means that there was a file change; now that
+						// apply is finished we want to clear the cache since we expect a delta
+						if initial {
+							p.fsLock.RLock()
+							p.clearCachedInstances()
+							p.fsLock.RUnlock()
+							initial = false
+						}
 					} else {
 						logger.Error("terraformApply", "msg", "Failed to execute 'terraform apply'", "error", err)
 					}
@@ -168,8 +175,8 @@ type tfFuncs struct {
 // hasRecentDeltas returns true if any tf.json[.new] files have been changed in
 // in the last "window" seconds
 func (p *plugin) hasRecentDeltas(window int) (bool, error) {
-	p.fsLock.Lock()
-	defer p.fsLock.Unlock()
+	p.fsLock.RLock()
+	defer p.fsLock.RUnlock()
 
 	now := time.Now()
 	modTime := time.Time{}
@@ -268,6 +275,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 	// and the listing of the files (from Describe) while we reconcile orphans and rename
 	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
+	defer p.clearCachedInstances()
 
 	// Load all instance files and all new files from disk
 	tfInstFiles := map[TResourceType]map[TResourceName]TResourceFilenameProps{}
