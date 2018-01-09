@@ -1,19 +1,12 @@
 package types
 
 import (
-	"time"
-
 	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
-)
-
-const (
-	// DefaultSyncInterval is the default interval for syncing enrollments
-	DefaultSyncInterval = 5 * time.Second
 )
 
 func init() {
