@@ -926,8 +926,10 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 
 	// Hold the fs lock for the duration since the file is written at the end
 	p.fsLock.Lock()
-	defer p.fsLock.Unlock()
-	defer p.clearCachedInstances()
+	defer func() {
+		p.clearCachedInstances()
+		p.fsLock.Unlock()
+	}()
 	name := ensureUniqueFile(p.Dir)
 	id := instance.ID(name)
 	logger.Info("Provision", "instance-id", name)
@@ -978,8 +980,10 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 // Label labels the instance
 func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 	p.fsLock.Lock()
-	defer p.fsLock.Unlock()
-	defer p.clearCachedInstances()
+	defer func() {
+		p.clearCachedInstances()
+		p.fsLock.Unlock()
+	}()
 
 	tf, filename, err := p.parseFileForInstanceID(instance)
 	if err != nil {
@@ -1012,8 +1016,10 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 func (p *plugin) Destroy(instID instance.ID, context instance.Context) error {
 	// Acquire Lock outside of recursive doDestroy function
 	p.fsLock.Lock()
-	defer p.fsLock.Unlock()
-	defer p.clearCachedInstances()
+	defer func() {
+		p.clearCachedInstances()
+		p.fsLock.Unlock()
+	}()
 
 	processAttach := true
 	if context == instance.RollingUpdate {
