@@ -328,7 +328,7 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 			// State files have instances of this type, check each resource name
 			for resName, propsFilename := range resNameFilenamePropsMap {
 				if _, has = tfStateResName[resName]; has {
-					logger.Info("handleFiles", "msg", fmt.Sprintf("Instance %v.%v exists in terraform state", resType, resName))
+					logger.Debug("handleFiles", "msg", fmt.Sprintf("Instance %v.%v exists in terraform state", resType, resName), "V", debugV1)
 				} else {
 					logger.Info("handleFiles", "msg", fmt.Sprintf("Detected candidate instance %v.%v to prune at file: %v", resType, resName, propsFilename.FileName))
 					addToResTypeNamePropsMap(prunes, resType, resName, propsFilename.FileName, propsFilename.FileProps)
@@ -444,13 +444,15 @@ func (p *plugin) handleFilePruning(
 			}
 		}
 	}
-	logger.Info("handleFilePruning", "msg", fmt.Sprintf("Pruning %v tf.json files", len(pruneFiles)))
-	for file := range pruneFiles {
-		path := filepath.Join(p.Dir, file)
-		logger.Info("handleFilePruning", "msg", fmt.Sprintf("Pruning file: %v", file))
-		err := p.fs.Remove(path)
-		if err != nil {
-			return err
+	if len(pruneFiles) > 0 {
+		logger.Info("handleFilePruning", "msg", fmt.Sprintf("Pruning %v tf.json files", len(pruneFiles)))
+		for file := range pruneFiles {
+			path := filepath.Join(p.Dir, file)
+			logger.Info("handleFilePruning", "msg", fmt.Sprintf("Pruning file: %v", file))
+			err := p.fs.Remove(path)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
