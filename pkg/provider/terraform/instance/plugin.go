@@ -135,7 +135,7 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 	fns := describeFns{
 		tfShow: p.doTerraformShow,
 	}
-	p.refreshCachedInstances(fns)
+	p.refreshNilInstanceCache(fns)
 	// Ensure that tha apply goroutine is always running; it will only run "terraform apply"
 	// if the current node is the leader. However, when leadership changes, a Provision is
 	// not guaranteed to be executed so we need to create the goroutine now.
@@ -1150,27 +1150,17 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 // doDescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) doDescribeInstances(fns describeFns, tags map[string]string, properties bool) ([]instance.Description, error) {
 	logger.Debug("DescribeInstances", "tags", tags, "V", debugV1)
-	// Get the read lock and then check if the cache is populated
+	// The cache may have been nil-ified, check and refresh
+	if p.isCacheNil() {
+		p.refreshNilInstanceCache(fns)
+	}
+	// Should have a cache, acquire read lock
 	p.fsLock.RLock()
+	defer p.fsLock.RUnlock()
 
+	// If the refresh failed then we may not have instances
 	if p.cachedInstances == nil {
-		// Cache is not populated, now we need the write lock (after releasing the read lock) and
-		// then we can attempt to populate and use the cache
-		p.fsLock.RUnlock()
-		p.fsLock.Lock()
-		defer p.fsLock.Unlock()
-		// Now that we have the write lock the data might be there, only re-populate the cache if the
-		// instances are still not populated
-		if p.cachedInstances == nil {
-			p.refreshCachedInstances(fns)
-			if p.cachedInstances == nil {
-				return nil, fmt.Errorf("Unable to retrieve instances")
-			}
-		}
-	} else {
-		// Since we have a cache then we only need to release the read lock that we
-		// are still holding
-		defer p.fsLock.RUnlock()
+		return nil, fmt.Errorf("Unable to retrieve instances")
 	}
 
 	result := []instance.Description{}
@@ -1194,19 +1184,30 @@ scan:
 	return result, nil
 }
 
+// isCacheNil returns true if the instance cache is nil
+func (p *plugin) isCacheNil() bool {
+	p.fsLock.RLock()
+	defer p.fsLock.RUnlock()
+	return p.cachedInstances == nil
+}
+
 // clearCachedInstances clears the instance cache
 func (p *plugin) clearCachedInstances() {
 	p.cachedInstances = nil
 }
 
-// refreshCachedInstances clears the instance cache and re-populates it
-func (p *plugin) refreshCachedInstances(fns describeFns) {
-	p.clearCachedInstances()
+// refreshNilInstanceCache re-populates the cache if it is nil
+func (p *plugin) refreshNilInstanceCache(fns describeFns) {
+	p.fsLock.Lock()
+	defer p.fsLock.Unlock()
+	if p.cachedInstances != nil {
+		return
+	}
 
 	// currentFileData are what we told terraform to create - these are the generated files.
 	currentFileData, err := p.listCurrentTfFiles()
 	if err != nil {
-		logger.Warn("doRefreshFileCache", "error", err)
+		logger.Warn("refreshCachedInstances", "error", err)
 		return
 	}
 
@@ -1231,7 +1232,7 @@ func (p *plugin) refreshCachedInstances(fns describeFns) {
 		if result, err := fns.tfShow(resFilter, nil); err == nil {
 			terraformShowResult = result
 		} else {
-			logger.Warn("doRefreshFileCache", "terraform show error", err)
+			logger.Warn("refreshCachedInstances", "terraform show error", err)
 			return
 		}
 	}
@@ -1273,7 +1274,7 @@ func (p *plugin) refreshCachedInstances(fns describeFns) {
 		}
 	}
 	p.cachedInstances = &result
-	logger.Info("doRefreshFileCache", "cache-size", len(*p.cachedInstances))
+	logger.Info("refreshCachedInstances", "cache-size", len(*p.cachedInstances))
 }
 
 // parseTerraformTags parses the platform-specific tags into a generic map

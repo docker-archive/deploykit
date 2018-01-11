@@ -5342,3 +5342,73 @@ func TestCacheClearAndPopulate(t *testing.T) {
 	// Should match the cache
 	require.Equal(t, results, *tf.cachedInstances)
 }
+
+func TestCache(t *testing.T) {
+	tf, dir := getPlugin(t)
+	defer os.RemoveAll(dir)
+
+	// Cache should be non-nil but empty
+	require.Equal(t, []instance.Description{}, *tf.cachedInstances)
+	require.False(t, tf.isCacheNil())
+
+	// nil-ify the cache
+	tf.cachedInstances = nil
+	require.True(t, tf.isCacheNil())
+
+	// Create an instance on the filesystem
+	id1 := "instance-1"
+	tFormat := TFormat{
+		Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+			VMIBMCloud: {
+				TResourceName(id1): {"fileProp1": "fp1"},
+			},
+		},
+	}
+	buff, err := json.MarshalIndent(tFormat, " ", " ")
+	require.NoError(t, err)
+	err = afero.WriteFile(tf.fs, filepath.Join(tf.Dir, "instance-1.tf.json.new"), buff, 0644)
+	require.NoError(t, err)
+
+	// Refresh should pick it up
+	expectedProps, err := types.AnyValue(TResourceProperties{"fileProp1": "fp1"})
+	require.NoError(t, err)
+	expectedInstDesc := instance.Description{
+		ID:         instance.ID(id1),
+		Tags:       map[string]string{},
+		Properties: expectedProps,
+	}
+	tf.refreshNilInstanceCache(emptyTfShowFns)
+	require.Equal(t, []instance.Description{expectedInstDesc}, *tf.cachedInstances)
+
+	// Now that it's cached we can remove the file
+	err = tf.fs.Remove(filepath.Join(tf.Dir, "instance-1.tf.json.new"))
+	require.NoError(t, err)
+
+	// A refresh shouldn't change the cache since it is not nil
+	require.False(t, tf.isCacheNil())
+	tf.refreshNilInstanceCache(emptyTfShowFns)
+	require.Equal(t, []instance.Description{expectedInstDesc}, *tf.cachedInstances)
+
+	// And describe should use the cache
+	fns := describeFns{
+		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+			require.Fail(t, "Should not be invoked")
+			return nil, nil
+		},
+	}
+	insts, err := tf.doDescribeInstances(fns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{expectedInstDesc}, insts)
+
+	// Now clear it
+	tf.clearCachedInstances()
+	require.True(t, tf.isCacheNil())
+
+	// Refresh, no files
+	tf.refreshNilInstanceCache(emptyTfShowFns)
+	require.False(t, tf.isCacheNil())
+	require.Equal(t, []instance.Description{}, *tf.cachedInstances)
+	insts, err = tf.doDescribeInstances(fns, map[string]string{}, true)
+	require.NoError(t, err)
+	require.Equal(t, []instance.Description{}, insts)
+}
