@@ -21,7 +21,7 @@ func index(list instance.Descriptions, getKey keyFunc) (map[string]instance.Desc
 	for _, n := range list {
 		key, err := getKey(n)
 		if err != nil {
-			log.Error("cannot index entry", "instance.Description", n, "err", err)
+			log.Error("cannot index entry", "instance.ID", n.ID, "instance.tags", n.Tags, "err", err)
 			e = err
 			continue
 		}
