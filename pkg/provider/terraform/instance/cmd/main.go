@@ -12,12 +12,14 @@ import (
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
 	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	terraform "github.com/docker/infrakit/pkg/provider/terraform/instance"
+	terraform_types "github.com/docker/infrakit/pkg/provider/terraform/instance/types"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/machine/libmachine/log"
 	"github.com/spf13/cobra"
 )
 
@@ -71,7 +73,7 @@ func main() {
 		for _, resourceString := range *importResources {
 			split := strings.Split(resourceString, ":")
 			if len(split) < 2 || len(split) > 3 {
-				err := fmt.Errorf("Imported resource value is not valid: %v", resourceString)
+				err = fmt.Errorf("Imported resource value is not valid: %v", resourceString)
 				logger.Error("main", "error", err)
 				panic(err)
 			}
@@ -94,14 +96,23 @@ func main() {
 			}
 			resources = append(resources, &res)
 		}
-		importOpts := terraform.ImportOptions{
-			InstanceSpec: importInstSpec,
-			Resources:    resources,
+		options := terraform_types.Options{
+			Dir:          *dir,
+			PollInterval: types.FromDuration(*pollInterval),
+			Standalone:   *standalone,
 		}
 		cli.SetLogLevel(*logLevel)
-		run.Plugin(plugin_base.DefaultTransport(*name), instance_plugin.PluginServer(
-			terraform.NewTerraformInstancePlugin(*dir, *pollInterval, *standalone, []string{}, &importOpts)),
+		plugin, err := terraform.NewTerraformInstancePlugin(options,
+			&terraform.ImportOptions{
+				InstanceSpec: importInstSpec,
+				Resources:    resources,
+			},
 		)
+		if err != nil {
+			log.Error("error initializing pluing", "err", err)
+			panic(err)
+		}
+		run.Plugin(plugin_base.DefaultTransport(*name), instance_plugin.PluginServer(plugin))
 	}
 
 	cmd.AddCommand(cli.VersionCommand())
