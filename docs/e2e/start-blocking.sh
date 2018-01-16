@@ -14,13 +14,14 @@ export INFRAKIT_MANAGER_CONTROLLERS=ingress,nfs
 infrakit plugin start \
 	 manager:mystack \
 	 group \
-	 vars \
 	 combo \
 	 vanilla \
 	 simulator \
 	 ingress \
 	 simulator:nfs-auth \
 	 enrollment:nfs \
+	 vars \
+	 time \
 	 --log 5 --log-debug-V 500 --log-stack \
 	 --log-debug-match module=manager \
 	 --log-debug-match-exclude=false \
