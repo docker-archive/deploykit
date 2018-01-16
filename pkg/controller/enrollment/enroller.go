@@ -52,19 +52,16 @@ type enroller struct {
 	enrollmentPropertiesTemplate *template.Template
 }
 
-func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enrollment.Options) *enroller {
-
+func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enrollment.Options) (*enroller, error) {
 	l := &enroller{
 		leader:  leader,
 		scope:   scope,
 		options: options,
 	}
-
-	interval := l.options.SyncInterval.Duration()
-	if interval == 0 {
-		interval = enrollment.DefaultSyncInterval
+	if err := l.options.Validate(enrollment.PluginInit); err != nil {
+		return nil, err
 	}
-	l.ticker = time.Tick(interval)
+	l.ticker = time.Tick(l.options.SyncInterval.Duration())
 
 	l.poller = controller.Poll(
 		// This determines if the action should be taken when time is up
@@ -79,7 +76,7 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 		},
 		l.ticker)
 
-	return l
+	return l, nil
 }
 
 func (l *enroller) isLeader() (is bool, err error) {
@@ -138,8 +135,15 @@ func (l *enroller) updateSpec(spec types.Spec) error {
 	defer l.lock.Unlock()
 
 	if spec.Options != nil {
-		options := enrollment.Options{}
+		// At runtime, the user can provide overrides to the set of
+		// Options used at start up of the plugin.
+		// Here we use the options the plugin initialized with as a
+		// starting point to parse the input.
+		options := l.options // a copy
 		if err := spec.Options.Decode(&options); err != nil {
+			return err
+		}
+		if err := options.Validate(enrollment.PluginCommit); err != nil {
 			return err
 		}
 		l.options = options

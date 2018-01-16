@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
+	//	"os"
 	"path"
 	"sync"
 	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/rpc"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/gorilla/rpc/v2/json2"
 )
@@ -74,17 +75,6 @@ func New(address string, api spi.InterfaceSpec) (Client, error) {
 	return cl, nil
 }
 
-// ClientTimeoutEnv environment variable for the client timeout (in time.Duration)
-const ClientTimeoutEnv = "INFRAKIT_CLIENT_TIMEOUT"
-
-// timeout returns the client rpc http timeout
-func timeout() time.Duration {
-	if parsed, err := time.ParseDuration(os.Getenv(ClientTimeoutEnv)); err == nil {
-		return parsed
-	}
-	return time.Duration(1 * time.Second)
-}
-
 func parseAddress(address string) (*url.URL, *http.Client, error) {
 	if path.Ext(address) == ".listen" {
 		buff, err := ioutil.ReadFile(address)
@@ -105,7 +95,7 @@ func parseAddress(address string) (*url.URL, *http.Client, error) {
 		u.Host = "h"
 		u.Path = "" // clear it since it's a file path and we are using it to connect.
 		return u, &http.Client{
-			Timeout: timeout(),
+			Timeout: local.ClientTimeout(),
 			Transport: &http.Transport{
 				// TODO(chungers) - fix this deprecation
 				Dial: func(proto, addr string) (conn net.Conn, err error) {
@@ -122,9 +112,9 @@ func parseAddress(address string) (*url.URL, *http.Client, error) {
 	case "http", "https":
 		transport := &http.Transport{
 			Dial: (&net.Dialer{
-				Timeout: timeout(),
+				Timeout: local.ClientTimeout(),
 			}).Dial,
-			TLSHandshakeTimeout: timeout(),
+			TLSHandshakeTimeout: local.ClientTimeout(),
 		}
 		return u, &http.Client{Transport: transport}, nil
 

@@ -158,9 +158,9 @@ func (l *enroller) sync() error {
 	}
 
 	// compute the delta required to make enrolled look like source
-	add, remove, _ := Delta(
-		instance.Descriptions(source), sourceKeyFunc,
-		instance.Descriptions(enrolled), enrolledKeyFunc,
+	add, remove := Delta(
+		instance.Descriptions(source), sourceKeyFunc, l.options.SourceParseErrPolicy,
+		instance.Descriptions(enrolled), enrolledKeyFunc, l.options.EnrollmentParseErrPolicy,
 	)
 
 	// Use Info logging only when making deltas

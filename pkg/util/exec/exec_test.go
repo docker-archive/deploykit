@@ -55,6 +55,28 @@ func TestBuilder(t *testing.T) {
 
 }
 
+func TestStartWithHandlersError(t *testing.T) {
+	// Testing command that fails to start, and makes sure Wait() doesn't deadlock
+	command := Command("pwd").InheritEnvs(true).
+		WithDir("/impossibledir*&$%#")
+	err := command.StartWithHandlers(
+		nil,
+		func(stdout io.Reader) error {
+			T(100).Info("reading from stdout")
+			return nil
+		},
+		func(stderr io.Reader) error {
+			T(100).Info("reading from stderr")
+			return nil
+		})
+	// Bad directory error
+	require.Error(t, err)
+
+	// Command not started error
+	err = command.Wait()
+	require.Error(t, err)
+}
+
 func TestRunDocker(t *testing.T) {
 
 	if SkipTests("docker") {

@@ -1,7 +1,9 @@
 package types
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -163,4 +165,52 @@ properties:
 	require.NoError(t, err)
 	require.NoError(t, types.AnyString(view).Decode(&pp))
 	require.Equal(t, "hello", pp.Instance.Properties.ID)
+}
+
+func TestValidate(t *testing.T) {
+	// Valid Options
+	o := Options{
+		SyncInterval:             types.FromDuration(time.Duration(10 * time.Second)),
+		SourceParseErrPolicy:     SourceParseErrorDisableDestroy,
+		EnrollmentParseErrPolicy: EnrolledParseErrorDisableProvision,
+	}
+	require.NoError(t, o.Validate(PluginInit))
+	require.NoError(t, o.Validate(PluginCommit))
+	// Invalid SyncInterval, only an error for init
+	o = Options{
+		SyncInterval:             types.FromDuration(time.Duration(-1 * time.Second)),
+		SourceParseErrPolicy:     SourceParseErrorDisableDestroy,
+		EnrollmentParseErrPolicy: EnrolledParseErrorDisableProvision,
+	}
+	err := o.Validate(PluginInit)
+	require.Equal(t, fmt.Errorf("SyncInterval must be greater than 0"), err)
+	require.NoError(t, o.Validate(PluginCommit))
+	// Invalid SourceParseErrPolicy
+	o = Options{
+		SyncInterval:             types.FromDuration(time.Duration(10 * time.Second)),
+		SourceParseErrPolicy:     "bogus-SourceParseErrPolicy",
+		EnrollmentParseErrPolicy: EnrolledParseErrorDisableProvision,
+	}
+	for _, phase := range []PluginPhase{PluginInit, PluginCommit} {
+		err := o.Validate(phase)
+		require.Error(t, err)
+		require.Equal(t,
+			fmt.Errorf("SourceParseErrPolicy value 'bogus-SourceParseErrPolicy' is not supported, valid values: %v",
+				[]string{SourceParseErrorEnableDestroy, SourceParseErrorDisableDestroy}),
+			err)
+	}
+	// Invalid EnrollmentParseErrPolicy
+	o = Options{
+		SyncInterval:             types.FromDuration(time.Duration(10 * time.Second)),
+		SourceParseErrPolicy:     SourceParseErrorDisableDestroy,
+		EnrollmentParseErrPolicy: "bogus-EnrollmentParseErrPolicy",
+	}
+	for _, phase := range []PluginPhase{PluginInit, PluginCommit} {
+		err := o.Validate(phase)
+		require.Error(t, err)
+		require.Equal(t,
+			fmt.Errorf("EnrollmentParseErrPolicy value 'bogus-EnrollmentParseErrPolicy' is not supported, valid values: %v",
+				[]string{EnrolledParseErrorEnableProvision, EnrolledParseErrorDisableProvision}),
+			err)
+	}
 }

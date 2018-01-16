@@ -134,7 +134,7 @@ func (c *managed) syncBackends() error {
 				} else {
 					view, err := t.Render(inst)
 					if err != nil {
-						log.Error("cannot index entry", "instance.Description", inst, "err", err, "meta", c.spec.Metadata)
+						log.Error("cannot index entry", "instance.ID", inst.ID, "instance.tags", inst.Tags, "err", err, "meta", c.spec.Metadata)
 						continue
 					}
 					nodes.Add(instance.ID(view))

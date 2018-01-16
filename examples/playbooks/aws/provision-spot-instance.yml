@@ -1,0 +1,49 @@
+{{/* Input to create a spot instance using the AWS instance plugin */}}
+{{/* =% instanceProvision `aws/ec2-spot-instance` %= */}}
+
+{{ $user := flag "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
+{{ $project := flag "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+{{ $imageId := flag "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
+{{ $instanceType := flag "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
+{{ $privateIp := flag "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" "172.31.20.100" }}
+{{ $spotPrice := flag "spot-price" "string" "Spot price" | prompt "Spot price?" "string" "0.03" }}
+
+{{ $keyName := flag "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
+{{ $az := flag "az" "string" "availability zone" | prompt "Availability zone?" "string" "eu-central-1b"}}
+{{ $subnetId := flag "subnet" "string" "subnet id" | prompt "Subnet ID?" "string" "subnet-11b8376a" }}
+{{ $securityGroupId := flag "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" "sg-975500fe" }}
+
+Tags:
+  infrakit.scope: {{ $project }}
+  infrakit.created: {{ now | htmlDate }}
+  infrakit.user: {{ $user }}
+
+Init: |
+  #!/bin/bash
+  sudo add-apt-repository ppa:gophers/archive
+  sudo apt-get update -y
+  sudo apt-get install -y wget curl git golang-1.9-go
+  wget -qO- https://get.docker.com | sh
+  ln -s /usr/lib/go-1.9/bin/go /usr/local/bin/go
+
+Properties:
+  RequestSpotInstancesInput:
+    LaunchSpecification:
+      ImageId: {{ $imageId }}
+      InstanceType: {{ $instanceType }}
+      KeyName: infrakit
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: true
+        DeleteOnTermination: true
+        DeviceIndex: 0
+        Groups:
+        - {{ $securityGroupId }}
+        NetworkInterfaceId: null
+        PrivateIpAddress: {{ $privateIp  }}
+        PrivateIpAddresses: null
+        SecondaryPrivateIpAddressCount: null
+        SubnetId: {{ $subnetId }}
+      Placement:
+        AvailabilityZone: {{ $az }}
+    SpotPrice: "{{ $spotPrice }}"
+    Type: one-time
