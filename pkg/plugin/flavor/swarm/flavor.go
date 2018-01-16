@@ -314,7 +314,7 @@ func (s *baseFlavor) prepare(role string, flavorProperties *types.Any, instanceS
 
 	// TODO(wfarner): Use the cluster UUID to scope instances for this swarm separately from instances in another
 	// swarm.  This will require plumbing back to Scaled (membership tags).
-	instanceSpec.Tags["swarm-id"] = swarmID
+	instanceSpec.Tags[flavor.SwarmIDTag] = swarmID
 	link.WriteMap(instanceSpec.Tags)
 
 	return instanceSpec, nil

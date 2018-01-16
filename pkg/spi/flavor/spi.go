@@ -7,6 +7,11 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+const (
+	// SwarmIDTag is the name of the tag that contains the swarm ID
+	SwarmIDTag = "swarm-id"
+)
+
 // InterfaceSpec is the current name and version of the Flavor API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Flavor",

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/docker/infrakit/pkg/provider/ibmcloud/client"
+	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/softlayer/softlayer-go/datatypes"
 	"github.com/softlayer/softlayer-go/filter"
 )
@@ -61,7 +62,7 @@ func GetIBMCloudVMByTag(username, apiKey string, tags []string) (*int, error) {
 	// Use the swarm ID as the filter
 	var filters *string
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "swarm-id:") {
+		if strings.HasPrefix(tag, fmt.Sprintf("%s:", flavor.SwarmIDTag)) {
 			f := filter.New(filter.Path("virtualGuests.tagReferences.tag.name").Eq(tag)).Build()
 			logger.Info("GetIBMCloudVMByTag", "msg", fmt.Sprintf("Querying IBM Cloud for VMs with tag filter: %v", f))
 			filters = &f
