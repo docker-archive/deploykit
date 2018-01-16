@@ -19,8 +19,8 @@ var (
 	logger = logutil.New("module", "provider/terraform/instance/types")
 )
 
-// ImportResourceOptions defines a resource to import
-type ImportResourceOptions struct {
+// Resource defines a resource to import
+type Resource struct {
 	// Terraform resource type
 	ResourceType string
 
@@ -49,7 +49,7 @@ type Options struct {
 	ImportGroupSpecURL string
 
 	// ImportResources defines the instances to import
-	ImportResources []ImportResourceOptions
+	ImportResources []Resource
 
 	// ImportGroupID defines the group ID to import the resource into (optional)
 	ImportGroupID string
