@@ -54,7 +54,7 @@ const (
 	scopeGlobal = "global"
 
 	// NameTag is the name of the tag that contains the instance name
-	NameTag = "instance.name"
+	NameTag = "infrakit.instance.name"
 )
 
 // tfFileRegex is used to determine the all terraform files; files with a ".new" suffix
@@ -216,7 +216,7 @@ An example of this looks like:
 				"vpc_security_group_ids": ["${aws_security_group.default.id}"],
 				"subnet_id": "${aws_subnet.default.id}",
 				"tags":  {
-					"instance.name": "web4",
+					"infrakit.instance.name": "web4",
 					"InstancePlugin": "terraform"
 				},
 				"connection": {
@@ -249,7 +249,7 @@ The block above is essentially embedded inside the `Properties` field of the ins
 					"vpc_security_group_ids": ["${aws_security_group.default.id}"],
 					"subnet_id": "${aws_subnet.default.id}",
 					"tags":  {
-						"instance.name": "web4",
+						"infrakit.instance.name": "web4",
 						"InstancePlugin": "terraform"
 					},
 					"connection": {

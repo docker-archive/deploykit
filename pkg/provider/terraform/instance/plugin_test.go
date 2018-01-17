@@ -1099,7 +1099,7 @@ func TestRunValidateProvisionDescribe(t *testing.T) {
 				"subnet_id": "${aws_subnet.default.id}",
 				"private_ip": "INSTANCE_LOGICAL_ID",
 				"tags" :  {
-					"instance.name" : "web4",
+					"infrakit.instance.name" : "web4",
 					"InstancePlugin" : "terraform"
 				},
 				"connection" : {
