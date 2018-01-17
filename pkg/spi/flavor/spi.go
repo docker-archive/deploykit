@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	// SwarmIDTag is the name of the tag that contains the swarm ID
-	SwarmIDTag = "swarm-id"
+	// ClusterIDTag is the name of the tag that contains unique ID for the cluster
+	ClusterIDTag = "infrakit.cluster.id"
 )
 
 // InterfaceSpec is the current name and version of the Flavor API.
