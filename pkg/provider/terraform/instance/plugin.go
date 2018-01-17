@@ -19,6 +19,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	logutil "github.com/docker/infrakit/pkg/log"
+	terraform_types "github.com/docker/infrakit/pkg/provider/terraform/instance/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -105,11 +106,11 @@ type ImportOptions struct {
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalone bool, envs []string, importOpts *ImportOptions) instance.Plugin {
-	logger.Info("NewTerraformInstancePlugin", "dir", dir)
+func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *ImportOptions) (instance.Plugin, error) {
+	logger.Info("NewTerraformInstancePlugin", "dir", options.Dir)
 
 	var pluginLookup func() discovery.Plugins
-	if !standalone {
+	if !options.Standalone {
 		if err := local.Setup(); err != nil {
 			panic(err)
 		}
@@ -121,10 +122,18 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 			return plugins
 		}
 	}
+	// // Environment varables to include when invoking terraform
+	envs, err := options.ParseOptionsEnvs()
+	if err != nil {
+		logger.Error("NewTerraformInstancePlugin",
+			"msg", "error parsing configuration Env Options",
+			"err", err)
+		return nil, err
+	}
 	p := plugin{
-		Dir:          dir,
+		Dir:          options.Dir,
 		fs:           afero.NewOsFs(),
-		pollInterval: pollInterval,
+		pollInterval: options.PollInterval.Duration(),
 		pluginLookup: pluginLookup,
 		envs:         envs,
 	}
@@ -140,7 +149,7 @@ func NewTerraformInstancePlugin(dir string, pollInterval time.Duration, standalo
 	// if the current node is the leader. However, when leadership changes, a Provision is
 	// not guaranteed to be executed so we need to create the goroutine now.
 	p.terraformApply()
-	return &p
+	return &p, nil
 }
 
 // processImport imports the resource with the given ID based on the instance Spec;

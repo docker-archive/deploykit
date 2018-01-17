@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	terraform_types "github.com/docker/infrakit/pkg/provider/terraform/instance/types"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +27,12 @@ func TestRunTerraformApply(t *testing.T) {
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	dir = path.Join(dir, "aws-two-tier")
-	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, false, []string{}, nil)
+	options := terraform_types.Options{
+		Dir:          dir,
+		PollInterval: types.FromDuration(2 * time.Minute),
+	}
+	terraform, err := NewTerraformInstancePlugin(options, nil)
+	require.NoError(t, err)
 	p, _ := terraform.(*plugin)
 	err = p.doTerraformApply()
 	require.NoError(t, err)
@@ -36,7 +42,13 @@ func TestContinuePollingStandalone(t *testing.T) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
-	terraform := NewTerraformInstancePlugin(dir, 1*time.Second, true, []string{}, nil)
+	options := terraform_types.Options{
+		Dir:          dir,
+		Standalone:   true,
+		PollInterval: types.FromDuration(2 * time.Minute),
+	}
+	terraform, err := NewTerraformInstancePlugin(options, nil)
+	require.NoError(t, err)
 	p, _ := terraform.(*plugin)
 	shoudApply := p.shouldApply()
 	require.True(t, shoudApply)

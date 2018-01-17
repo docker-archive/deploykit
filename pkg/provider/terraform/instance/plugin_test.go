@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	terraform_types "github.com/docker/infrakit/pkg/provider/terraform/instance/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
@@ -57,12 +58,47 @@ func TestProcessImportOptions(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestEnvs(t *testing.T) {
+	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
+	require.NoError(t, err)
+	options := terraform_types.Options{
+		Dir:          dir,
+		PollInterval: types.FromDuration(2 * time.Minute),
+		Envs:         *types.AnyString(`["k1=v1", "keyval"]`),
+	}
+	_, err = NewTerraformInstancePlugin(options, nil)
+	require.Error(t, err)
+
+	options.Envs = *types.AnyString(`["k1=v1", "k2=v2"]`)
+	tf, err := NewTerraformInstancePlugin(options, nil)
+	require.NoError(t, err)
+	p, _ := tf.(*plugin)
+	require.Equal(t, []string{"k1=v1", "k2=v2"}, p.envs)
+
+	options.Envs = *types.AnyString("")
+	tf, err = NewTerraformInstancePlugin(options, nil)
+	require.NoError(t, err)
+	p, _ = tf.(*plugin)
+	require.Equal(t, []string{}, p.envs)
+
+	options.Envs = nil
+	tf, err = NewTerraformInstancePlugin(options, nil)
+	require.NoError(t, err)
+	p, _ = tf.(*plugin)
+	require.Equal(t, []string{}, p.envs)
+}
+
 // getPlugin returns the terraform instance plugin to use for testing and the
 // directory where the .tf.json files should be stored
 func getPlugin(t *testing.T) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, []string{}, nil)
+	options := terraform_types.Options{
+		Dir:          dir,
+		PollInterval: types.FromDuration(2 * time.Minute),
+	}
+	tf, err := NewTerraformInstancePlugin(options, nil)
+	require.NoError(t, err)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)
@@ -79,7 +115,12 @@ func getPluginDirNotExists(t *testing.T) (*plugin, string) {
 	_, err = os.Stat(dir)
 	require.Error(t, err)
 	require.True(t, os.IsNotExist(err), fmt.Sprintf("Incorrect error, expected NotExist, got %v", err))
-	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, []string{}, nil)
+	options := terraform_types.Options{
+		Dir:          dir,
+		PollInterval: types.FromDuration(2 * time.Minute),
+	}
+	tf, err := NewTerraformInstancePlugin(options, nil)
+	require.NoError(t, err)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)
@@ -95,7 +136,12 @@ func getPluginDirNoPerms(t *testing.T) (*plugin, string) {
 	dir = dir + "/noperm"
 	os.Mkdir(dir, 0200)
 	require.NoError(t, err)
-	tf := NewTerraformInstancePlugin(dir, 120*time.Second, false, []string{}, nil)
+	options := terraform_types.Options{
+		Dir:          dir,
+		PollInterval: types.FromDuration(2 * time.Minute),
+	}
+	tf, err := NewTerraformInstancePlugin(options, nil)
+	require.NoError(t, err)
 	tf.(*plugin).pretend = true
 	p, is := tf.(*plugin)
 	require.True(t, is)
