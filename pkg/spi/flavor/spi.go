@@ -7,6 +7,11 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+const (
+	// ClusterIDTag is the name of the tag that contains unique ID for the cluster
+	ClusterIDTag = "infrakit.cluster.id"
+)
+
 // InterfaceSpec is the current name and version of the Flavor API.
 var InterfaceSpec = spi.InterfaceSpec{
 	Name:    "Flavor",
