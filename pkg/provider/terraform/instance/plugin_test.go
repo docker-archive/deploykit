@@ -182,9 +182,9 @@ func TestHandleProvisionTagsEmptyTagsLogicalID(t *testing.T) {
 		handleProvisionTags(spec, instance.ID("instance-1234"), vmType.(TResourceType), props)
 		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			tags := props["tags"]
-			require.Equal(t, tags, []interface{}{"name:instance-1234"})
+			require.Equal(t, tags, []interface{}{NameTag + ":instance-1234"})
 		} else {
-			expectedTags := map[string]interface{}{"Name": "instance-1234"}
+			expectedTags := map[string]interface{}{NameTag: "instance-1234"}
 			require.Equal(t, expectedTags, props["tags"])
 		}
 	}
@@ -205,9 +205,9 @@ func TestHandleProvisionTagsEmptyTagsNoLogicalID(t *testing.T) {
 		tags := props["tags"]
 		var expectedTags interface{}
 		if vmType == VMSoftLayer || vmType == VMIBMCloud {
-			expectedTags = []interface{}{"name:instance-1234"}
+			expectedTags = []interface{}{NameTag + ":instance-1234"}
 		} else {
-			expectedTags = map[string]interface{}{"Name": "instance-1234"}
+			expectedTags = map[string]interface{}{NameTag: "instance-1234"}
 		}
 		require.Equal(t, expectedTags, tags)
 	}
@@ -220,7 +220,7 @@ func TestHandleProvisionTagsWithTagsLogicalID(t *testing.T) {
 		Properties: nil,
 		Tags: map[string]string{
 			instance.LogicalIDTag: "logical-id-1",
-			"name":                "existing-name",
+			NameTag:               "existing-name",
 			"foo":                 "bar"},
 		Init:        "",
 		Attachments: []instance.Attachment{},
@@ -235,11 +235,11 @@ func TestHandleProvisionTagsWithTagsLogicalID(t *testing.T) {
 			// Note that tags are all lowercase
 			require.Contains(t, tags, "foo:bar")
 			require.Contains(t, tags, instance.LogicalIDTag+":logical-id-1")
-			require.Contains(t, tags, "name:existing-name")
+			require.Contains(t, tags, NameTag+":existing-name")
 		} else {
 			expectedTags := map[string]interface{}{
 				instance.LogicalIDTag: "logical-id-1",
-				"name":                "existing-name",
+				NameTag:               "existing-name",
 				"foo":                 "bar",
 			}
 			require.Equal(t, expectedTags, props["tags"])
@@ -252,8 +252,8 @@ func TestHandleProvisionTagsWithTagsNoLogicalID(t *testing.T) {
 	spec := instance.Spec{
 		Properties: nil,
 		Tags: map[string]string{
-			"Name": "existing-name",
-			"foo":  "bar"},
+			NameTag: "existing-name",
+			"foo":   "bar"},
 		Init:        "",
 		Attachments: []instance.Attachment{},
 		LogicalID:   nil,
@@ -265,11 +265,11 @@ func TestHandleProvisionTagsWithTagsNoLogicalID(t *testing.T) {
 			tags := props["tags"]
 			require.Len(t, tags, 2)
 			require.Contains(t, tags, "foo:bar")
-			require.Contains(t, tags, "name:existing-name")
+			require.Contains(t, tags, NameTag+":existing-name")
 		} else {
 			expectedTags := map[string]interface{}{
-				"Name": "existing-name",
-				"foo":  "bar",
+				NameTag: "existing-name",
+				"foo":   "bar",
 			}
 			require.Equal(t, expectedTags, props["tags"])
 		}
@@ -483,7 +483,7 @@ func TestProvisionDescribeDestroyScopeWithoutLogicalID(t *testing.T) {
 			ID: *id1,
 			Tags: map[string]string{
 				attachTag: strings.Join(expectedAttach1, ","),
-				"Name":    string(*id1),
+				NameTag:   string(*id1),
 				"tag1":    "val1",
 			},
 			Properties: types.AnyString("{}"),
@@ -495,7 +495,7 @@ func TestProvisionDescribeDestroyScopeWithoutLogicalID(t *testing.T) {
 			ID: *id2,
 			Tags: map[string]string{
 				attachTag: strings.Join(expectedAttach2, ","),
-				"Name":    string(*id2),
+				NameTag:   string(*id2),
 				"tag1":    "val1",
 			},
 			Properties: types.AnyString("{}"),
@@ -613,7 +613,7 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 			ID: *id1,
 			Tags: map[string]string{
 				attachTag:             strings.Join(expectedAttach1, ","),
-				"Name":                string(*id1),
+				NameTag:               string(*id1),
 				"tag1":                "val1",
 				instance.LogicalIDTag: "mgr1",
 			},
@@ -627,7 +627,7 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 			ID: *id2,
 			Tags: map[string]string{
 				attachTag:             strings.Join(expectedAttach2, ","),
-				"Name":                string(*id2),
+				NameTag:               string(*id2),
 				"tag1":                "val1",
 				instance.LogicalIDTag: "mgr2",
 			},
@@ -739,7 +739,7 @@ func TestProvisionUpdateDedicatedGlobal(t *testing.T) {
 				TResourceName(string(*id1)): {
 					"tags": map[string]interface{}{
 						attachTag: "default_dedicated_1,managers_global",
-						"Name":    string(*id1),
+						NameTag:   string(*id1),
 						"tag1":    "val1",
 					},
 					"vmp1": "vmv1",
@@ -840,7 +840,7 @@ func TestProvisionUpdateDedicatedGlobal(t *testing.T) {
 				TResourceName(string(*id2)): {
 					"tags": map[string]interface{}{
 						attachTag: "default_dedicated_1,managers_global",
-						"Name":    string(*id2),
+						NameTag:   string(*id2),
 						"tag1":    "val1",
 					},
 					"vmp1": "vmv1",
@@ -1099,7 +1099,7 @@ func TestRunValidateProvisionDescribe(t *testing.T) {
 				"subnet_id": "${aws_subnet.default.id}",
 				"private_ip": "INSTANCE_LOGICAL_ID",
 				"tags" :  {
-					"Name" : "web4",
+					"infrakit.instance.name" : "web4",
 					"InstancePlugin" : "terraform"
 				},
 				"connection" : {
@@ -1215,7 +1215,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"terraform_demo_swarm_mgr_sl",
 				"label1:value1",
 				"label2:value2",
-				"name:" + string(*id2),
+				NameTag + ":" + string(*id2),
 				instance.LogicalIDTag + ":logical:id-2",
 			}), conv(props["tags"].([]interface{})))
 			require.Equal(t, expectedUserData2, props["user_metadata"])
@@ -1236,7 +1236,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"InstancePlugin":      "terraform",
 				"label1":              "value1",
 				"label2":              "value2",
-				"Name":                string(*id2),
+				NameTag:               string(*id2),
 				instance.LogicalIDTag: "logical:id-2",
 			}, props["tags"])
 			require.Equal(t, base64.StdEncoding.EncodeToString([]byte(expectedUserData2)), props["user_data"])
@@ -1272,7 +1272,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"label1":                      "value1",
 				"label2":                      "value2",
 				"label3":                      "value3",
-				"name":                        string(*id1),
+				NameTag:                       string(*id1),
 				instance.LogicalIDTag:         "logical.id-1",
 			},
 			LogicalID:  &logicalID1,
@@ -1284,7 +1284,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"terraform_demo_swarm_mgr_sl": "",
 				"label1":                      "value1",
 				"label2":                      "value2",
-				"name":                        string(*id2),
+				NameTag:                       string(*id2),
 				instance.LogicalIDTag:         "logical:id-2",
 			},
 			LogicalID:  &logicalID2,
@@ -1298,7 +1298,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"label1":              "value1",
 				"label2":              "value2",
 				"LABEL3":              "VALUE3",
-				"Name":                string(*id1),
+				NameTag:               string(*id1),
 				instance.LogicalIDTag: "logical.id-1",
 			},
 			LogicalID:  &logicalID1,
@@ -1310,7 +1310,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 				"InstancePlugin":      "terraform",
 				"label1":              "value1",
 				"label2":              "value2",
-				"Name":                string(*id2),
+				NameTag:               string(*id2),
 				instance.LogicalIDTag: "logical:id-2",
 			},
 			LogicalID:  &logicalID2,
@@ -1352,7 +1352,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 			"label1:changed1",
 			"label2:value2",
 			"label3:value3",
-			"name:" + string(*id2),
+			NameTag + ":" + string(*id2),
 			instance.LogicalIDTag + ":logical:id-2",
 		}), conv(props["tags"].([]interface{})))
 	case VMAmazon:
@@ -1361,7 +1361,7 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 			"label1":              "changed1",
 			"label2":              "value2",
 			"label3":              "value3",
-			"Name":                string(*id2),
+			NameTag:               string(*id2),
 			instance.LogicalIDTag: "logical:id-2",
 		}, props["tags"])
 	}
@@ -2358,15 +2358,15 @@ func TestMergeTagsIntoVMPropsNoExtraTags(t *testing.T) {
 		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			props = TResourceProperties{
 				"tags": []interface{}{
-					"Name:instance-1234",
+					NameTag + ":instance-1234",
 					"foo:BaR",
 				},
 			}
 		} else {
 			props = TResourceProperties{
 				"tags": map[string]interface{}{
-					"Name": "instance-1234",
-					"foo":  "BaR",
+					NameTag: "instance-1234",
+					"foo":   "BaR",
 				},
 			}
 		}
@@ -2376,11 +2376,11 @@ func TestMergeTagsIntoVMPropsNoExtraTags(t *testing.T) {
 			require.Len(t, tags, 2)
 			// Note that tags are all lowercase
 			require.Contains(t, tags, "foo:bar")
-			require.Contains(t, tags, "name:instance-1234")
+			require.Contains(t, tags, NameTag+":instance-1234")
 		} else {
 			expectedTags := map[string]interface{}{
-				"Name": "instance-1234",
-				"foo":  "BaR",
+				NameTag: "instance-1234",
+				"foo":   "BaR",
 			}
 			require.Equal(t, expectedTags, props["tags"])
 		}
@@ -2391,8 +2391,8 @@ func TestMergeTagsIntoVMPropsNoExtraTags(t *testing.T) {
 func TestMergeTagsIntoVMPropsNoVMTags(t *testing.T) {
 	for _, vmType := range VMTypes {
 		tags := map[string]string{
-			"Name": "instance-1234",
-			"foo":  "BaR",
+			NameTag: "instance-1234",
+			"foo":   "BaR",
 		}
 		props := TResourceProperties{}
 		mergeTagsIntoVMProps(vmType.(TResourceType), props, tags)
@@ -2401,11 +2401,11 @@ func TestMergeTagsIntoVMPropsNoVMTags(t *testing.T) {
 			require.Len(t, tags, 2)
 			// Note that tags are all lowercase
 			require.Contains(t, tags, "foo:bar")
-			require.Contains(t, tags, "name:instance-1234")
+			require.Contains(t, tags, NameTag+":instance-1234")
 		} else {
 			expectedTags := map[string]interface{}{
-				"Name": "instance-1234",
-				"foo":  "BaR",
+				NameTag: "instance-1234",
+				"foo":   "BaR",
 			}
 			require.Equal(t, expectedTags, props["tags"])
 		}
@@ -2418,21 +2418,21 @@ func TestMergeTagsIntoVMProps(t *testing.T) {
 		if vmType == VMSoftLayer || vmType == VMIBMCloud {
 			props = TResourceProperties{
 				"tags": []interface{}{
-					"Name:instance-1234",
+					NameTag + ":instance-1234",
 					"key:original",
 				},
 			}
 		} else {
 			props = TResourceProperties{
 				"tags": map[string]interface{}{
-					"Name": "instance-1234",
-					"key":  "original",
+					NameTag: "instance-1234",
+					"key":   "original",
 				},
 			}
 		}
 		tags := map[string]string{
-			"Name": "instance-1234",
-			"key":  "override::val",
+			NameTag: "instance-1234",
+			"key":   "override::val",
 			// Input tag is comma separated
 			attachTag: fmt.Sprintf("%s,%s", "attach1", "attach2"),
 		}
@@ -2441,7 +2441,7 @@ func TestMergeTagsIntoVMProps(t *testing.T) {
 			tags := props["tags"]
 			require.Len(t, tags, 3)
 			require.Contains(t, tags, "key:override::val")
-			require.Contains(t, tags, "name:instance-1234")
+			require.Contains(t, tags, NameTag+":instance-1234")
 			// Changed to space separated
 			require.Contains(t,
 				tags,
@@ -2449,7 +2449,7 @@ func TestMergeTagsIntoVMProps(t *testing.T) {
 			)
 		} else {
 			expectedTags := map[string]interface{}{
-				"Name":    "instance-1234",
+				NameTag:   "instance-1234",
 				"key":     "override::val",
 				attachTag: fmt.Sprintf("%s,%s", "attach1", "attach2"),
 			}
@@ -2927,7 +2927,7 @@ func TestDestroyRollingUpdateLogicalID(t *testing.T) {
 						"tag1":                "val1",
 						attachTag:             fmt.Sprintf("default_dedicated_%s", logicalID),
 						instance.LogicalIDTag: string(logicalID),
-						"Name":                string(*id1),
+						NameTag:               string(*id1),
 					},
 				},
 			},
@@ -2995,7 +2995,7 @@ func TestDestroyRollingUpdateLogicalID(t *testing.T) {
 						"tag1":                "val1",
 						attachTag:             fmt.Sprintf("default_dedicated_%s", logicalID),
 						instance.LogicalIDTag: string(logicalID),
-						"Name":                string(*id2),
+						NameTag:               string(*id2),
 					},
 				},
 			},
@@ -3086,7 +3086,7 @@ func TestDestroyRollingUpdateWithoutLogicalID(t *testing.T) {
 						"tags": map[string]interface{}{
 							fmt.Sprintf("tag%v", index+1): fmt.Sprintf("val%v", index+1),
 							attachTag:                     fmt.Sprintf("default_dedicated_%v", index+1),
-							"Name":                        id,
+							NameTag:                       id,
 						},
 					},
 				},
@@ -3176,7 +3176,7 @@ func TestDestroyRollingUpdateWithoutLogicalID(t *testing.T) {
 						"tags": map[string]interface{}{
 							fmt.Sprintf("tag%v", index+1): fmt.Sprintf("val%v", index+1),
 							attachTag:                     fmt.Sprintf("default_dedicated_%v", index+1),
-							"Name":                        id,
+							NameTag:                       id,
 						},
 					},
 				},

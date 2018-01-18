@@ -52,6 +52,9 @@ const (
 
 	// scopeGlobal is the scope key for global resources
 	scopeGlobal = "global"
+
+	// NameTag is the name of the tag that contains the instance name
+	NameTag = "infrakit.instance.name"
 )
 
 // tfFileRegex is used to determine the all terraform files; files with a ".new" suffix
@@ -213,7 +216,7 @@ An example of this looks like:
 				"vpc_security_group_ids": ["${aws_security_group.default.id}"],
 				"subnet_id": "${aws_subnet.default.id}",
 				"tags":  {
-					"Name": "web4",
+					"infrakit.instance.name": "web4",
 					"InstancePlugin": "terraform"
 				},
 				"connection": {
@@ -246,7 +249,7 @@ The block above is essentially embedded inside the `Properties` field of the ins
 					"vpc_security_group_ids": ["${aws_security_group.default.id}"],
 					"subnet_id": "${aws_subnet.default.id}",
 					"tags":  {
-						"Name": "web4",
+						"infrakit.instance.name": "web4",
 						"InstancePlugin": "terraform"
 					},
 					"connection": {
@@ -498,18 +501,17 @@ func renderInstVars(props *TResourceProperties, id instance.ID, logicalID *insta
 
 // handleProvisionTags sets the Infrakit-specific tags and merges with the user-defined in the instance spec
 func handleProvisionTags(spec instance.Spec, id instance.ID, vmType TResourceType, vmProperties TResourceProperties) {
-	// Add the name to the tags if it does not exist, issue case-insensitive
-	// check for the "name" key
+	// Add the name to the tags if it does not exist
 	if spec.Tags != nil {
 		match := false
 		for key := range spec.Tags {
-			if strings.ToLower(key) == "name" {
+			if key == NameTag {
 				match = true
 				break
 			}
 		}
 		if !match {
-			spec.Tags["Name"] = string(id)
+			spec.Tags[NameTag] = string(id)
 		}
 	}
 
