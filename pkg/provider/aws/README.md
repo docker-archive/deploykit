@@ -114,16 +114,16 @@ Committed aws-example: Managing 1 instances
 
 In the console running the Group plugin, we will see input like the following:
 ```
-INFO[1219] Committing group aws-example (pretend=false) 
+INFO[1219] Committing group aws-example (pretend=false)
 INFO[1219] Adding 1 instances to group to reach desired 1
-INFO[1219] Created instance i-ba0412a2 with tags map[infrakit.config_sha:dUBtWGmkptbGg29ecBgv1VJYzys= infrakit.group:aws-example]
+INFO[1219] Created instance i-ba0412a2 with tags map[infrakit.config.hash:dUBtWGmkptbGg29ecBgv1VJYzys= infrakit.group:aws-example]
 ```
 
 Additionally, the CLI will report the newly-created instance:
 ```console
 $ build/infrakit group-stateless inspect aws-example
 ID                             	LOGICAL                        	TAGS
-i-ba0412a2                     	172.31.41.13                   	Name=infrakit-example,infrakit.config_sha=dUBtWGmkptbGg29ecBgv1VJYzys=,infrakit.group=aws-example
+i-ba0412a2                     	172.31.41.13                   	Name=infrakit-example,infrakit.config.hash=dUBtWGmkptbGg29ecBgv1VJYzys=,infrakit.group=aws-example
 ```
 
 Retrieve the IP address of the host from the AWS console, and use SSH to verify that our shell code ran:

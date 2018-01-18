@@ -84,7 +84,7 @@ Additionally, the CLI will report the newly-created instance:
 ```console
 $ build/infrakit group describe docker-example
 ID                             	LOGICAL                        	TAGS
-90e6f3de4918                   	elusive_leaky                  	Name=infrakit-example,infrakit.config_sha=dUBtWGmkptbGg29ecBgv1VJYzys=,infrakit.group=docker-example
+90e6f3de4918                   	elusive_leaky                  	Name=infrakit-example,infrakit.config.hash=dUBtWGmkptbGg29ecBgv1VJYzys=,infrakit.group=docker-example
 ```
 
 Retrieve the name of the container and connect to it with an exec

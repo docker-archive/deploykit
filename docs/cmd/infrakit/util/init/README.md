@@ -67,7 +67,7 @@ echo "The cluster size is 5"
 The output will be the shell script that the first node of the group `managers` should
 execute.  You can pipe this to `sh` and the node that runs this script will become
 the first node of the cluster.  Note that there are other requirements on the first node
-in terms of its configuration and labels (must have a label `infrakit.config_sha=bootstrap`)
+in terms of its configuration and labels (must have a label `infrakit.config.hash=bootstrap`)
 such that it's not possible to run this on your mac and expect it to be the first node of
 a cluster in AWS.  This is meant to be for bootstrapping in the cloud environment where the
 cluster will be.
