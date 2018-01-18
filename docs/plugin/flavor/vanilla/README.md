@@ -163,7 +163,7 @@ ID
 vanilla
 $ build/infrakit group describe vanilla
 ID                            	LOGICAL                       	TAGS
-1505889013394060520           	  -                           	infrakit.config_sha=rvhmljoz72va6rrmbypwsxahwkb6g6sq,infrakit.group=vanilla,project=infrakit,tier=web
+1505889013394060520           	  -                           	infrakit.config.hash=rvhmljoz72va6rrmbypwsxahwkb6g6sq,infrakit.group=vanilla,project=infrakit,tier=web
 ```
 
 Checking on the actual instance:
@@ -182,12 +182,12 @@ $ build/infrakit simulator/compute describe -pry
     Properties:
       Note: custom field
     Tags:
-      infrakit.config_sha: rvhmljoz72va6rrmbypwsxahwkb6g6sq
+      infrakit.config.hash: rvhmljoz72va6rrmbypwsxahwkb6g6sq
       infrakit.group: vanilla
       project: infrakit
       tier: web
   Tags:
-    infrakit.config_sha: rvhmljoz72va6rrmbypwsxahwkb6g6sq
+    infrakit.config.hash: rvhmljoz72va6rrmbypwsxahwkb6g6sq
     infrakit.group: vanilla
     project: infrakit
     tier: web

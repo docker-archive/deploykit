@@ -10,7 +10,7 @@ const (
 	// GroupTag is the name of the tag that contains the group name
 	GroupTag = "infrakit.group"
 	// ConfigSHATag is the name of the tag that contains the group SHA hash
-	ConfigSHATag = "infrakit.config_sha"
+	ConfigSHATag = "infrakit.config.hash"
 )
 
 // InterfaceSpec is the current name and version of the Group API.

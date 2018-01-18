@@ -347,9 +347,9 @@ ID
 mygroup
 Davids-MacBook-Pro-4:~ davidchung$ infrakit group describe mygroup
 ID                            	LOGICAL                       	TAGS
-47605058                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
-47605059                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
-47605060                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47605058                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47605059                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47605060                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
 ```
 
 You can kill a node and see the group recover:
@@ -359,16 +359,16 @@ $ infrakit instance-digitalocean destroy 47605058
 destroyed 47605058
 $ infrakit group describe mygroup
 ID                            	LOGICAL                       	TAGS
-47605059                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
-47605060                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47605059                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47605060                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
 
 # .... after 10-20 seconds
 
 $ infrakit group describe mygroup
 ID                            	LOGICAL                       	TAGS
-47605059                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
-47605060                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
-47606009                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47605059                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47605060                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47606009                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
 ```
 
 ## Scale up/down the group
@@ -433,10 +433,10 @@ After a bit, check the group:
 ```shell
 $ infrakit group describe mygroup
 ID                            	LOGICAL                       	TAGS
-47605060                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
-47606009                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
-47606041                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
-47606318                      	  -                           	infrakit-do-version=1,infrakit.config_sha=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47605060                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47606009                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47606041                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
+47606318                      	  -                           	infrakit-do-version=1,infrakit.config.hash=aclsbhfuk3pwoh42y55xqd7ulan6pfq4,infrakit.group=mygroup,infrakit.scope=testproject,mygroup=,project=tutorial
 ```
 
 ## Destroy the Group

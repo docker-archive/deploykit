@@ -83,18 +83,18 @@ $ build/infrakit group commit example/instance/terraform/aws-two-tier/group.json
 Committed terraform_demo
 ```
 The group plugin starts to create new instances to match the specification.
-In the AWS console using `infrakit-terraform-demo` as tag filter, we find 
+In the AWS console using `infrakit-terraform-demo` as tag filter, we find
 these instances ![instances](images/1.png)
 
 ## 5. List members
 ```shell
 $ build/infrakit group describe terraform_demo
 ID                              LOGICAL                         TAGS
-instance-1475601644               -                             Name=instance-1475601644,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475601645               -                             Name=instance-1475601645,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475601634               -                             Name=instance-1475601634,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475601635               -                             Name=instance-1475601635,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475601636               -                             Name=instance-1475601636,Tier=web,infrakit.config_sha=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475601644               -                             Name=instance-1475601644,Tier=web,infrakit.config.hash=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475601645               -                             Name=instance-1475601645,Tier=web,infrakit.config.hash=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475601634               -                             Name=instance-1475601634,Tier=web,infrakit.config.hash=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475601635               -                             Name=instance-1475601635,Tier=web,infrakit.config.hash=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475601636               -                             Name=instance-1475601636,Tier=web,infrakit.config.hash=BmjtnDnrqBvGHm05Nin3Vb66NaA=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
 ```
 
 ## 6. Update the config
@@ -120,14 +120,14 @@ The commit will proceed in the background, and after a short period the group wi
 ```shell
 $ build/infrakit group describe terraform_demo
 ID                              LOGICAL                         TAGS
-instance-1475602365               -                             Name=instance-1475602365,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475602374               -                             Name=instance-1475602374,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475602314               -                             Name=instance-1475602314,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475602324               -                             Name=instance-1475602324,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475602334               -                             Name=instance-1475602334,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475602344               -                             Name=instance-1475602344,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475602354               -                             Name=instance-1475602354,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
-instance-1475602364               -                             Name=instance-1475602364,Tier=web,infrakit.config_sha=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475602365               -                             Name=instance-1475602365,Tier=web,infrakit.config.hash=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475602374               -                             Name=instance-1475602374,Tier=web,infrakit.config.hash=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475602314               -                             Name=instance-1475602314,Tier=web,infrakit.config.hash=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475602324               -                             Name=instance-1475602324,Tier=web,infrakit.config.hash=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475602334               -                             Name=instance-1475602334,Tier=web,infrakit.config.hash=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475602344               -                             Name=instance-1475602344,Tier=web,infrakit.config.hash=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475602354               -                             Name=instance-1475602354,Tier=web,infrakit.config.hash=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
+instance-1475602364               -                             Name=instance-1475602364,Tier=web,infrakit.config.hash=NP0kIk4bVoojdRZsRGC0XKTrrUs=,infrakit.group=terraform_demo,provisioner=infrakit-terraform-demo
 ```
 Note the new SHA of the instances.
 

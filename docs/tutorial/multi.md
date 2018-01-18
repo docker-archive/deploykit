@@ -143,16 +143,16 @@ Now we have a new group `group/workers`:
 ```shell
 $ infrakit group/workers describe
 ID                            	LOGICAL                       	TAGS
-1506528402034960841           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402036560109           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402038196749           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402039391770           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402041415151           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402042777184           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402044321191           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402045768137           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402049931166           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402051590289           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402034960841           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402036560109           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402038196749           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402039391770           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402041415151           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402042777184           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402044321191           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402045768137           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402049931166           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402051590289           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
 ```
 
 And we can see that they are from different zones:
@@ -160,11 +160,11 @@ And we can see that they are from different zones:
 ```shell
 $ infrakit us-east-1a/compute describe
 ID                            	LOGICAL                       	TAGS
-1506528402034960841           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402038196749           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402039391770           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402044321191           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402045768137           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402034960841           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402038196749           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402039391770           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402044321191           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402045768137           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
 ```
 
 and in `us-east-1b`:
@@ -172,11 +172,11 @@ and in `us-east-1b`:
 ```shell
 $ infrakit us-east-1b/compute describe
 ID                            	LOGICAL                       	TAGS
-1506528402036560109           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402041415151           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402042777184           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402049931166           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402051590289           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402036560109           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402041415151           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402042777184           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402049931166           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402051590289           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
 ```
 
 Scaling down the group will remove the instances evenly:
@@ -186,12 +186,12 @@ $ infrakit group/workers scale 4
 Group workers at 10 instances, scale to 4
 $ infrakit us-east-1b/compute describe
 ID                            	LOGICAL                       	TAGS
-1506528402051590289           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402049931166           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402051590289           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402049931166           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
 $ infrakit us-east-1a/compute describe
 ID                            	LOGICAL                       	TAGS
-1506528402044321191           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
-1506528402045768137           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402044321191           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
+1506528402045768137           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=6ukklp23vulgg343jobm4as6ndyo4a5r,infrakit.group=workers
 ```
 
 Destroying the group will remove all instances across the two zones:
@@ -349,11 +349,11 @@ Now checkt the group:
 ```shell
 $ infrakit group/workers describe
 ID                            	LOGICAL                       	TAGS
-1506529768374681221           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768376553466           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768377518027           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768383265310           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768385038942           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768374681221           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768376553466           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768377518027           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768383265310           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768385038942           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
 ```
 
 And from the different instance plugins:
@@ -361,9 +361,9 @@ And from the different instance plugins:
 ```shell
 $ infrakit spot/compute describe
 ID                            	LOGICAL                       	TAGS
-1506529768374681221           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768376553466           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768377518027           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768374681221           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768376553466           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768377518027           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
 ```
 
 and ondemand instances
@@ -371,8 +371,8 @@ and ondemand instances
 ```shell
 $ infrakit ondemand/compute describe
 ID                            	LOGICAL                       	TAGS
-1506529768383265310           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768385038942           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768383265310           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768385038942           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
 ```
 
 So we see that the first 3 instances were provisioned with spot instances which will
@@ -391,9 +391,9 @@ We see that 3 spot instances remain:
 ```shell
 $ infrakit spot/compute describe
 ID                            	LOGICAL                       	TAGS
-1506529768374681221           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768376553466           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768377518027           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768374681221           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768376553466           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768377518027           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
 ```
 
 while more on-demand instances are found:
@@ -401,13 +401,13 @@ while more on-demand instances are found:
 ```shell
 $ infrakit ondemand/compute describe
 ID                            	LOGICAL                       	TAGS
-1506529768385038942           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529988381197479           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529988381729041           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529988382941302           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529988384036924           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529988384666030           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529768383265310           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768385038942           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988381197479           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988381729041           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988382941302           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988384036924           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988384666030           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529768383265310           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
 ```
 
 Now scaling down:
@@ -417,10 +417,10 @@ $ infrakit group/workers scale 4
 Group workers at 10 instances, scale to 4
 $ infrakit ondemand/compute describe
 ID                            	LOGICAL                       	TAGS
-1506529988381729041           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529988382941302           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529988384036924           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
-1506529988384666030           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config_sha=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988381729041           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988382941302           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988384036924           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
+1506529988384666030           	  -                           	custom.tag1=tutorial,custom.tag2=single-instance,custom.tag3=by-group,infrakit.config.hash=kyexlihytvcnhjgod4ebi4mf3prsuebu,infrakit.group=workers
 $ infrakit spot/compute describe
 ID                            	LOGICAL                       	TAGS
 ```

@@ -164,11 +164,11 @@ Available Commands:
 ```
 $ infrakit group/workers describe
 ID                            	LOGICAL                       	TAGS
-1509939754854003011           	  -                           	infrakit.config_sha=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
-1509939754854379446           	  -                           	infrakit.config_sha=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
-1509939754854683999           	  -                           	infrakit.config_sha=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
-1509939754853268194           	  -                           	infrakit.config_sha=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
-1509939754853647059           	  -                           	infrakit.config_sha=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
+1509939754854003011           	  -                           	infrakit.config.hash=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
+1509939754854379446           	  -                           	infrakit.config.hash=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
+1509939754854683999           	  -                           	infrakit.config.hash=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
+1509939754853268194           	  -                           	infrakit.config.hash=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
+1509939754853647059           	  -                           	infrakit.config.hash=ruf47dnc2pc5p7c7ed7vzybrfmxnb3rc,infrakit.group=workers,project=infrakit,tier=web
 
 ```
 

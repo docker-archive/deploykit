@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/stretchr/testify/require"
 
@@ -475,10 +476,10 @@ ibm_compute_vm_instance.instance-1499827079:
   ssh_key_ids.0 = 123456
   tags.# = 5
   tags.1516831048 = infrakit.group:workers
-  tags.3434794676 = infrakit.config_sha:tubmesopo6lrsfnl5otajlpvwd23v46j
+  tags.3434794676 = infrakit.config.hash:tubmesopo6lrsfnl5otajlpvwd23v46j
   tags.356689043 = name:instance-1499827079
   tags.3639269190 = infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker
-  tags.838324444 = swarm-id:c80s4c4kq0kgjs64ojxzvsdjz
+  tags.838324444 = infrakit.cluster.id:c80s4c4kq0kgjs64ojxzvsdjz
   user_metadata = set -o errexit
 set -o nounset
 set -o xtrace
@@ -521,7 +522,7 @@ func TestTerraformShowParseResultTagsList(t *testing.T) {
 			group.ConfigSHATag + ":tubmesopo6lrsfnl5otajlpvwd23v46j",
 			"name:instance-1499827079",
 			"infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker",
-			"swarm-id:c80s4c4kq0kgjs64ojxzvsdjz",
+			flavor.ClusterIDTag + ":c80s4c4kq0kgjs64ojxzvsdjz",
 		},
 		"user_metadata": "set -o errexit\nset -o nounset\nset -o xtrace\napt-get -y update\nFOO=BAR\necho $FOO",
 		"z_prop":        "z_val",
@@ -558,7 +559,7 @@ func TestTerraformShowParseResultTagsListWithFilters(t *testing.T) {
 			group.ConfigSHATag + ":tubmesopo6lrsfnl5otajlpvwd23v46j",
 			"name:instance-1499827079",
 			"infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker",
-			"swarm-id:c80s4c4kq0kgjs64ojxzvsdjz",
+			flavor.ClusterIDTag + ":c80s4c4kq0kgjs64ojxzvsdjz",
 		},
 	}
 	require.Equal(t, expected, found[TResourceType("ibm_compute_vm_instance")][TResourceName("instance-1499827079")])

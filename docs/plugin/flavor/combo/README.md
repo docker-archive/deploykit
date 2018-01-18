@@ -94,8 +94,8 @@ ID
 combo
 $ build/infrakit group describe combo
 ID                            	LOGICAL                       	TAGS
-1505887656884092558           	  -                           	infrakit.config_sha=k4kacxuwykbyba6ydi36w6tjwj2c3plw,infrakit.group=combo,v1=tag one,v2=tag two
-1505887656884528218           	  -                           	infrakit.config_sha=k4kacxuwykbyba6ydi36w6tjwj2c3plw,infrakit.group=combo,v1=tag one,v2=tag two
+1505887656884092558           	  -                           	infrakit.config.hash=k4kacxuwykbyba6ydi36w6tjwj2c3plw,infrakit.group=combo,v1=tag one,v2=tag two
+1505887656884528218           	  -                           	infrakit.config.hash=k4kacxuwykbyba6ydi36w6tjwj2c3plw,infrakit.group=combo,v1=tag one,v2=tag two
 ```
 
 Note that now two instances are created and each instance has the tags from
@@ -116,12 +116,12 @@ $ build/infrakit simulator/compute  describe -pry
     Properties:
       Note: custom field
     Tags:
-      infrakit.config_sha: k4kacxuwykbyba6ydi36w6tjwj2c3plw
+      infrakit.config.hash: k4kacxuwykbyba6ydi36w6tjwj2c3plw
       infrakit.group: combo
       v1: tag one
       v2: tag two
   Tags:
-    infrakit.config_sha: k4kacxuwykbyba6ydi36w6tjwj2c3plw
+    infrakit.config.hash: k4kacxuwykbyba6ydi36w6tjwj2c3plw
     infrakit.group: combo
     v1: tag one
     v2: tag two
@@ -136,12 +136,12 @@ $ build/infrakit simulator/compute  describe -pry
     Properties:
       Note: custom field
     Tags:
-      infrakit.config_sha: k4kacxuwykbyba6ydi36w6tjwj2c3plw
+      infrakit.config.hash: k4kacxuwykbyba6ydi36w6tjwj2c3plw
       infrakit.group: combo
       v1: tag one
       v2: tag two
   Tags:
-    infrakit.config_sha: k4kacxuwykbyba6ydi36w6tjwj2c3plw
+    infrakit.config.hash: k4kacxuwykbyba6ydi36w6tjwj2c3plw
     infrakit.group: combo
     v1: tag one
     v2: tag two
@@ -161,12 +161,12 @@ Note that the `Init` are also chained together in sequence:
     Properties:
       Note: custom field
     Tags:
-      infrakit.config_sha: k4kacxuwykbyba6ydi36w6tjwj2c3plw
+      infrakit.config.hash: k4kacxuwykbyba6ydi36w6tjwj2c3plw
       infrakit.group: combo
       v1: tag one
       v2: tag two
   Tags:
-    infrakit.config_sha: k4kacxuwykbyba6ydi36w6tjwj2c3plw
+    infrakit.config.hash: k4kacxuwykbyba6ydi36w6tjwj2c3plw
     infrakit.group: combo
     v1: tag one
     v2: tag two
