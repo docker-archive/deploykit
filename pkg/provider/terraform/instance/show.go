@@ -74,7 +74,7 @@ var mapRegex = regexp.MustCompile("^([^.]+)\\.%")
 //   tags.3434794676 = infrakit.config.hash:tubmesopo6lrsfnl5otajlpvwd23v46j
 //   tags.356689043 = name:instance-1499827079
 //   tags.3639269190 = infrakit-link-context:swarm::c80s4c4kq0kgjs64ojxzvsdjz::worker
-//   tags.838324444 = swarm-id:c80s4c4kq0kgjs64ojxzvsdjz
+//   tags.838324444 = infrakit.cluster.id:c80s4c4kq0kgjs64ojxzvsdjz
 //   user_metadata = set -o errexit
 // set -o nounset
 // set -o xtrace
