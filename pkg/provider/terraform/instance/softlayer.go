@@ -56,8 +56,7 @@ func mergeLabelsIntoTagSlice(tags []interface{}, labels map[string]string) []str
 
 // GetIBMCloudVMByTag queries Softlayer for VMs that match all of the given tags. Returns
 // the single VM ID that matches or nil if there are no matches.
-func GetIBMCloudVMByTag(username, apiKey string, tags []string) (*int, error) {
-	c := client.GetClient(username, apiKey)
+func GetIBMCloudVMByTag(c client.API, tags []string) (*int, error) {
 	mask := "id,hostname,tagReferences[id,tag[name]]"
 	// Use the swarm ID as the filter
 	var filters *string
@@ -68,7 +67,7 @@ func GetIBMCloudVMByTag(username, apiKey string, tags []string) (*int, error) {
 			filters = &f
 		}
 	}
-	vms, err := c.GetVirtualGuests(username, apiKey, &mask, filters)
+	vms, err := c.GetVirtualGuests(&mask, filters)
 	if err != nil {
 		return nil, err
 	}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/deckarep/golang-set"
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
+	ibmcloud_client "github.com/docker/infrakit/pkg/provider/ibmcloud/client"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/afero"
@@ -508,7 +509,7 @@ func (p *plugin) getExistingResource(resType TResourceType, resName TResourceNam
 				}
 			}
 		}
-		id, err := GetIBMCloudVMByTag(username, apiKey, tags)
+		id, err := GetIBMCloudVMByTag(ibmcloud_client.GetClient(username, apiKey), tags)
 		if err != nil {
 			return nil, err
 		}

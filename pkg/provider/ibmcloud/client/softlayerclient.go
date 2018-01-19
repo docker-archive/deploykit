@@ -11,6 +11,14 @@ type SoftlayerClient struct {
 	sess *session.Session
 }
 
+// API is the Softlayer client API
+type API interface {
+	AuthorizeToStorage(storageID, guestID int) error
+	DeauthorizeFromStorage(storageID, guestID int) error
+	GetAllowedStorageVirtualGuests(storageID int) ([]int, error)
+	GetVirtualGuests(mask, filters *string) (resp []datatypes.Virtual_Guest, err error)
+}
+
 // GetClient returns a SoftlayerClient instance
 func GetClient(user, apiKey string) *SoftlayerClient {
 	client := &SoftlayerClient{
@@ -47,7 +55,7 @@ func (c *SoftlayerClient) GetAllowedStorageVirtualGuests(storageID int) ([]int, 
 }
 
 // GetVirtualGuests gets all VMs
-func (c *SoftlayerClient) GetVirtualGuests(username, apiKey string, mask, filters *string) (resp []datatypes.Virtual_Guest, err error) {
+func (c *SoftlayerClient) GetVirtualGuests(mask, filters *string) (resp []datatypes.Virtual_Guest, err error) {
 	acct := services.GetAccountService(c.sess)
 	if mask != nil {
 		acct = acct.Mask(*mask)
