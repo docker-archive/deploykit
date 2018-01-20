@@ -69,6 +69,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 	}
 
 	settings.self = p.self // need this logicalID of the running node to prevent destroying self.
+	settings.options = p.options
 
 	log.Info("Committing", "groupID", config.ID, "pretend", pretend)
 

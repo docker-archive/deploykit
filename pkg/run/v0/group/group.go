@@ -33,6 +33,10 @@ const (
 	// EnvSelfLogicalID sets the self id of this controller. This will avoid
 	// the self node to be updated.
 	EnvSelfLogicalID = "INFRAKIT_GROUP_SELF_LOGICAL_ID"
+
+	// EnvPolicyLeaderSelfUpdate is either 'last' or 'never' which determines
+	// if the leader ever destroys itself, or lastly, in a rolling update.
+	EnvPolicyLeaderSelfUpdate = "INFRAKIT_GROUP_POLICY_LEADER_SELF_UPDATE"
 )
 
 var log = logutil.New("module", "run/group")
@@ -49,9 +53,21 @@ func nilLogicalIDIfEmptyString(s string) *instance.LogicalID {
 	return &id
 }
 
+func leaderSelfUpdatePolicy(v string) *group_types.PolicyLeaderSelfUpdate {
+	switch v {
+	case "never":
+		return &group_types.PolicyLeaderSelfUpdateNever
+	case "last":
+		return &group_types.PolicyLeaderSelfUpdateLast
+	default:
+		panic("invalid policy:" + v)
+	}
+}
+
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = group_types.Options{
-	Self:                    nilLogicalIDIfEmptyString(local.Getenv(EnvSelfLogicalID, "")),
+	Self: nilLogicalIDIfEmptyString(local.Getenv(EnvSelfLogicalID, "")),
+	PolicyLeaderSelfUpdate:  leaderSelfUpdatePolicy(local.Getenv(EnvPolicyLeaderSelfUpdate, "last")),
 	PollInterval:            types.MustParseDuration(local.Getenv(EnvPollInterval, "10s")),
 	MaxParallelNum:          types.MustParseUint(local.Getenv(EnvMaxParallelNum, "0")),
 	PollIntervalGroupSpec:   types.MustParseDuration(local.Getenv(EnvPollInterval, "10s")),

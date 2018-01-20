@@ -22,6 +22,7 @@ type Supervisor interface {
 }
 
 type groupSettings struct {
+	options        types.Options
 	self           *instance.LogicalID
 	instancePlugin instance.Plugin
 	flavorPlugin   flavor.Plugin
@@ -111,16 +112,28 @@ func (g *groups) forEach(fn func(group.ID, *groupContext) error) error {
 	return nil
 }
 
-type sortByID []instance.Description
+type sortByID struct {
+	list     []instance.Description
+	settings *groupSettings
+}
 
 func (n sortByID) Len() int {
-	return len(n)
+	return len(n.list)
 }
 
 func (n sortByID) Swap(i, j int) {
-	n[i], n[j] = n[j], n[i]
+	n.list[i], n.list[j] = n.list[j], n.list[i]
 }
 
 func (n sortByID) Less(i, j int) bool {
-	return n[i].ID < n[j].ID
+	if n.settings != nil && n.settings.options.PolicyLeaderSelfUpdate != nil &&
+		*n.settings.options.PolicyLeaderSelfUpdate == types.PolicyLeaderSelfUpdateLast {
+		if isSelf(n.list[i], *n.settings) {
+			return false
+		}
+		if isSelf(n.list[j], *n.settings) {
+			return true
+		}
+	}
+	return n.list[i].ID < n.list[j].ID
 }

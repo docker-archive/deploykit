@@ -228,7 +228,7 @@ func TestRollingUpdate(t *testing.T) {
 	require.NoError(t, grp.FreeGroup(id))
 }
 
-func TestLeaderSelfRollingUpdate(t *testing.T) {
+func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
 
 	// This is the case where the controller coordinating the rolling update
 	// is part of the group that is being updated
@@ -252,8 +252,74 @@ func TestLeaderSelfRollingUpdate(t *testing.T) {
 
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
 		group_types.Options{
-			PollInterval: types.FromDuration(1 * time.Millisecond),
-			Self:         self,
+			PolicyLeaderSelfUpdate: &group_types.PolicyLeaderSelfUpdateLast,
+			PollInterval:           types.FromDuration(1 * time.Millisecond),
+			Self:                   self,
+		})
+	_, err := grp.CommitGroup(leaders, false)
+	require.NoError(t, err)
+
+	instances, err := plugin.DescribeInstances(memberTags(leaders.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+
+	updated := group.Spec{ID: id, Properties: leaderProperties(leaderIDs, "data2")}
+
+	desc, err := grp.CommitGroup(updated, true) // pretend only
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	desc, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	awaitGroupConvergence(t, grp)
+
+	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+
+	// all instances should have been updated
+	for i := 0; i < len(instances); i++ {
+		require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+	}
+
+	var last instance.LogicalID
+	for _, destroyed := range plugin.destroyed {
+		last = *destroyed.LogicalID
+	}
+	require.Equal(t, *self, last) // the self node (leader) should be the last to be destroyed
+
+	require.NoError(t, grp.FreeGroup(id))
+}
+
+func TestLeaderSelfRollingUpdatePolicyNever(t *testing.T) {
+
+	// This is the case where the controller coordinating the rolling update
+	// is part of the group that is being updated
+	self := &leaderIDs[0]
+
+	// leader self rolling update should not destroy the running leader itself
+	plugin := newTestInstancePlugin(
+		newFakeInstance(leaders, &leaderIDs[0]),
+		newFakeInstance(leaders, &leaderIDs[1]),
+		newFakeInstance(leaders, &leaderIDs[2]),
+	)
+
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			return flavor.Healthy, nil
+		},
+	}
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PolicyLeaderSelfUpdate: &group_types.PolicyLeaderSelfUpdateNever,
+			PollInterval:           types.FromDuration(1 * time.Millisecond),
+			Self:                   self,
 		})
 	_, err := grp.CommitGroup(leaders, false)
 	require.NoError(t, err)
@@ -281,11 +347,15 @@ func TestLeaderSelfRollingUpdate(t *testing.T) {
 	// Because the group controller is started with the logical ID of instances[0],
 	// it must not be updated.
 	for i := 0; i < len(instances); i++ {
-		if instances[i].LogicalID == self {
+		if *instances[i].LogicalID == *self {
 			require.NotEqual(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
 		} else {
 			require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
 		}
+	}
+	// make sure the leader was never destroyed
+	for _, destroyed := range plugin.destroyed {
+		require.NotEqual(t, *self, *destroyed.LogicalID)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -344,11 +414,11 @@ func TestExternalManagedRollingUpdate(t *testing.T) {
 
 	for i := 0; i < len(instances); i++ {
 
-		if instances[i].LogicalID == self {
-			require.NotEqual(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
-		} else {
-			require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
-		}
+		// since this is an external manager, not part of the group being updated,
+		require.NotEqual(t, *instances[i].LogicalID, *self)
+
+		// we require every node to have been updated
+		require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))

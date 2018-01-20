@@ -35,6 +35,10 @@ type Options struct {
 
 	// PollIntervalGroupDetail polls for group details at this interval to update the metadata paths
 	PollIntervalGroupDetail types.Duration
+
+	// PolicyLeaderSelfUpdate sets the policy for updating self when the node is the leader.
+	// If not specified, it defaults to 'last'
+	PolicyLeaderSelfUpdate *PolicyLeaderSelfUpdate
 }
 
 // ResolveDependencies returns a list of dependencies by parsing the opaque Properties blob.
@@ -203,4 +207,45 @@ func (c Spec) InstanceHash() string {
 	// Remove extra padding
 	encoded = strings.TrimRight(encoded, "=")
 	return encoded
+}
+
+// PolicyLeaderSelfUpdate is the policy for leader updating self during a rolling update.
+// Two values are possible: never or last
+type PolicyLeaderSelfUpdate string
+
+var (
+	// PolicyLeaderSelfUpdateNever is the policy that the leader never destroy itself
+	// during a rolling update
+	PolicyLeaderSelfUpdateNever = PolicyLeaderSelfUpdate("never")
+
+	// PolicyLeaderSelfUpdateLast is the policy that the leader will destroy itself
+	// only after all the nodes in the group have been updated
+	PolicyLeaderSelfUpdateLast = PolicyLeaderSelfUpdate("last")
+)
+
+// MarshalJSON returns the json representation
+func (p PolicyLeaderSelfUpdate) MarshalJSON() ([]byte, error) {
+	v := string(p)
+	if _, has := map[string]int{"never": 1, "last": 1}[v]; !has {
+		return nil, fmt.Errorf("invalid value %v", p)
+	}
+
+	if v == "" {
+		v = "last"
+	}
+	return []byte("\"" + v + "\""), nil
+}
+
+// UnmarshalJSON unmarshals the buffer to this struct
+func (p *PolicyLeaderSelfUpdate) UnmarshalJSON(buff []byte) error {
+	parsed := strings.Trim(string(buff), "\"")
+	switch parsed {
+	case "never":
+		*p = PolicyLeaderSelfUpdateNever
+		return nil
+	case "last":
+		*p = PolicyLeaderSelfUpdateLast
+		return nil
+	}
+	return fmt.Errorf("not valid: %v", *p)
 }
