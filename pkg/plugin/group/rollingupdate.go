@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -30,6 +31,17 @@ func isSelf(inst instance.Description, settings groupSettings) bool {
 	return false
 }
 
+func doNotDestroySelf(inst instance.Description, settings groupSettings) bool {
+	if !isSelf(inst, settings) {
+		return false
+	}
+	if settings.options.PolicyLeaderSelfUpdate == nil {
+		return false
+	}
+
+	return *settings.options.PolicyLeaderSelfUpdate == group_types.PolicyLeaderSelfUpdateNever
+}
+
 func desiredAndUndesiredInstances(
 	instances []instance.Description, settings groupSettings) ([]instance.Description, []instance.Description) {
 
@@ -37,20 +49,10 @@ func desiredAndUndesiredInstances(
 	desired := []instance.Description{}
 	undesired := []instance.Description{}
 
-	self := false
-
 	for _, inst := range instances {
 
-		// We need to guarantee that each update will execute cleaningly and not terminating mid-flight.
-		// This will involve transferring this responsiblity to a newly updated manager node that is
-		// annointed the new leader.
-		// To do this, we always consider the self node 'desired' even though it is clearly not updated.
-		// Then once this node thinks the rolling update has been completed, we trigger a leadership change
-		// where the new leader will see that there's a discrepancy and update *this* node.
-		self = isSelf(inst, settings)
-
 		actualConfig, specified := inst.Tags[group.ConfigSHATag]
-		if specified && actualConfig == desiredHash || self {
+		if specified && actualConfig == desiredHash || doNotDestroySelf(inst, settings) {
 			desired = append(desired, inst)
 		} else {
 			undesired = append(undesired, inst)
@@ -61,10 +63,11 @@ func desiredAndUndesiredInstances(
 }
 
 type rollingupdate struct {
-	desc       string
-	scaled     Scaled
-	updatingTo groupSettings
-	stop       chan bool
+	desc         string
+	scaled       Scaled
+	updatingFrom groupSettings
+	updatingTo   groupSettings
+	stop         chan bool
 }
 
 func (r rollingupdate) Explain() string {
@@ -172,7 +175,7 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		log.Info("Found undesired instances", "count", len(undesiredInstances))
 
 		// Sort instances first to ensure predictable destroy order.
-		sort.Sort(sortByID(undesiredInstances))
+		sort.Sort(sortByID{list: undesiredInstances, settings: &r.updatingFrom})
 
 		// TODO(wfarner): Make the 'batch size' configurable.
 		r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate)
