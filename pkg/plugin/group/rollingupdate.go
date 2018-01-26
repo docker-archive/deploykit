@@ -178,7 +178,10 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		sort.Sort(sortByID{list: undesiredInstances, settings: &r.updatingFrom})
 
 		// TODO(wfarner): Make the 'batch size' configurable.
-		r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate)
+		if !isSelf(undesiredInstances[0], r.updatingFrom) {
+			// we do not self-destruct in any cases.
+			r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate)
+		}
 
 		expectedNewInstances++
 	}
