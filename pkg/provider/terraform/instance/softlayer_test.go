@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/provider/ibmcloud/client"
+	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/softlayer/softlayer-go/datatypes"
+	"github.com/softlayer/softlayer-go/filter"
 	"github.com/stretchr/testify/require"
 )
 
@@ -178,4 +181,55 @@ func TestFilterVMsByTags(t *testing.T) {
 	vms = getVMs()
 	filterVMsByTags(&vms, []string{"tag1", "foo"})
 	require.Len(t, vms, 0)
+}
+
+func TestGetIBMCloudVMByTagAPIError(t *testing.T) {
+	fake := client.FakeSoftlayer{
+		GetVirtualGuestsStub: func(mask, filters *string) (resp []datatypes.Virtual_Guest, err error) {
+			return []datatypes.Virtual_Guest{}, fmt.Errorf("Custom error")
+		},
+	}
+	b, err := GetIBMCloudVMByTag(&fake, nil)
+	require.Error(t, err)
+	require.Equal(t, "Custom error", err.Error())
+	require.Empty(t, b)
+}
+
+func TestGetIBMCloudVMByTagNoVMs(t *testing.T) {
+	vmID1 := 1
+	vmID2 := 2
+	tag1Val := "tag1:val1"
+	tag1 := datatypes.Tag{Name: &tag1Val}
+	tagClusterIDVal := flavor.ClusterIDTag + ":my-cluster-id"
+	tag2 := datatypes.Tag{Name: &tagClusterIDVal}
+	tag3Val := "tag1:no-match"
+	tag3 := datatypes.Tag{Name: &tag3Val}
+	fake := client.FakeSoftlayer{
+		GetVirtualGuestsStub: func(mask, filters *string) (resp []datatypes.Virtual_Guest, err error) {
+			return []datatypes.Virtual_Guest{
+				{
+					TagReferences: []datatypes.Tag_Reference{{Tag: &tag1}, {Tag: &tag2}},
+					Id:            &vmID1,
+				},
+				{
+					TagReferences: []datatypes.Tag_Reference{{Tag: &tag2}, {Tag: &tag3}},
+					Id:            &vmID2,
+				},
+			}, nil
+		},
+	}
+	tags := []string{"tag1:val1", flavor.ClusterIDTag + ":my-cluster-id"}
+	id, err := GetIBMCloudVMByTag(&fake, tags)
+	require.NoError(t, err)
+	require.Equal(t, vmID1, *id)
+
+	// Verify args
+	expectedMask := "id,hostname,tagReferences[id,tag[name]]"
+	expectedFilter := filter.New(filter.Path("virtualGuests.tagReferences.tag.name").Eq(flavor.ClusterIDTag + ":my-cluster-id")).Build()
+	require.Equal(t,
+		[]struct {
+			Mask    *string
+			Filters *string
+		}{{&expectedMask, &expectedFilter}},
+		fake.GetVirtualGuestsArgs)
 }

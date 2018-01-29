@@ -17,7 +17,7 @@ var (
 )
 
 type plugin struct {
-	SoftlayerClient *client.SoftlayerClient
+	SoftlayerClient client.API
 	VolumeID        int
 }
 
@@ -49,9 +49,6 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 	logger.Info("Authorizing instance", "volume", p.VolumeID, "instance", props.ID)
 	vmID, err := strconv.Atoi(props.ID)
 	if err != nil {
@@ -65,7 +62,7 @@ func (p *plugin) Destroy(id instance.ID, ctx instance.Context) error {
 	logger.Info("Deauthorizing instance", "volume", p.VolumeID, "instance", string(id))
 	vmID, err := strconv.Atoi(string(id))
 	if err != nil {
-		return nil
+		return err
 	}
 	return p.SoftlayerClient.DeauthorizeFromStorage(p.VolumeID, vmID)
 }
@@ -74,7 +71,7 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	logger.Debug("Describing authorized VMs", "volume", p.VolumeID, "tags", tags, "V", debugV)
 	vmIDs, err := p.SoftlayerClient.GetAllowedStorageVirtualGuests(p.VolumeID)
 	if err != nil {
-		return []instance.Description{}, nil
+		return []instance.Description{}, err
 	}
 	result := []instance.Description{}
 	for _, vmID := range vmIDs {
