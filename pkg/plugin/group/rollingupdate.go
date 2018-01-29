@@ -78,7 +78,8 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 	// Block until the expected number of instances in the desired state are ready.  Updates are unconcerned with
 	// the health of instances in the undesired state.  This allows a user to dig out of a hole where the original
 	// state of the group is bad, and instances are not reporting as healthy.
-
+	log.Info("waitUntilQuiesced", "expectedNewInstances", expectedNewInstances)
+	// TODO: start processing right away instead of waiting for first tick
 	ticker := time.NewTicker(pollInterval)
 	for {
 		select {
@@ -99,6 +100,7 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 			// especially if the previous state of the group is unhealthy and the update is attempting to
 			// restore health.
 			matching, _ := desiredAndUndesiredInstances(instances, r.updatingTo)
+			log.Info("waitUntilQuiesced", "totalInstances", len(instances), "matchingInstances", len(matching))
 
 			// Now that we have isolated the instances with the new configuration, check if they are all
 			// healthy.  We do not consider an update successful until the target number of instances are
@@ -120,17 +122,27 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 				// the group, and/or documenting the expectations for plugin implementations.
 				switch r.scaled.Health(inst) {
 				case flavor.Healthy:
+					log.Info("waitUntilQuiesced", "health", "heathy", "nodeID", inst.ID)
 					numHealthy++
 				case flavor.Unhealthy:
+					log.Error("waitUntilQuiesced", "health", "unheathy", "nodeID", inst.ID)
 					return fmt.Errorf("Instance %s is unhealthy", inst.ID)
+				case flavor.Unknown:
+					log.Info("waitUntilQuiesced", "health", "unknown", "nodeID", inst.ID)
 				}
 			}
 
 			if numHealthy >= int(expectedNewInstances) {
+				log.Info("waitUntilQuiesced",
+					"msg", "Scaler has quiesced, terminating loop",
+					"numHealthy", numHealthy,
+					"expectedNewInstances", expectedNewInstances)
 				return nil
 			}
-
-			log.Info("Waiting for scaler to quiesce")
+			log.Info("waitUntilQuiesced",
+				"msg", "Waiting for scaler to quiesce",
+				"numHealthy", numHealthy,
+				"expectedNewInstances", expectedNewInstances)
 
 		case <-r.stop:
 			ticker.Stop()
@@ -149,30 +161,33 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		return err
 	}
 
+	// First determine if any new instances should be created
 	desired, _ := desiredAndUndesiredInstances(instances, r.updatingTo)
 	expectedNewInstances := len(desired)
+	log.Info("RollingUpdate-Run", "expectedNewInstances", expectedNewInstances)
 
 	for {
-		err := r.waitUntilQuiesced(
-			pollInterval,
-			minInt(expectedNewInstances, int(r.updatingTo.config.Allocation.Size)))
+		// Wait until any new nodes are healthy
+		desiredSize := len(r.updatingTo.config.Allocation.LogicalIDs)
+		if desiredSize == 0 {
+			desiredSize = int(r.updatingTo.config.Allocation.Size)
+		}
+		err := r.waitUntilQuiesced(pollInterval, minInt(expectedNewInstances, desiredSize))
 		if err != nil {
 			return err
 		}
-		log.Info("Scaler has quiesced")
 
 		instances, err := labelAndList(r.scaled)
 		if err != nil {
 			return err
 		}
 
+		// Now check if we have instances that do not match the hash
 		_, undesiredInstances := desiredAndUndesiredInstances(instances, r.updatingTo)
-
+		log.Info("RollingUpdate-Run", "undesiredInstances", len(undesiredInstances))
 		if len(undesiredInstances) == 0 {
 			break
 		}
-
-		log.Info("Found undesired instances", "count", len(undesiredInstances))
 
 		// Sort instances first to ensure predictable destroy order.
 		sort.Sort(sortByID{list: undesiredInstances, settings: &r.updatingFrom})
@@ -180,6 +195,7 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		// TODO(wfarner): Make the 'batch size' configurable.
 		r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate)
 
+		// Increment new instance count to replace the node that was just destroyed
 		expectedNewInstances++
 	}
 
