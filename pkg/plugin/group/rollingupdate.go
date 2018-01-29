@@ -67,7 +67,6 @@ type rollingupdate struct {
 	scaled       Scaled
 	updatingFrom groupSettings
 	updatingTo   groupSettings
-	desiredSize  int
 	stop         chan bool
 }
 
@@ -123,13 +122,13 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 				// the group, and/or documenting the expectations for plugin implementations.
 				switch r.scaled.Health(inst) {
 				case flavor.Healthy:
-					log.Info("waitUntilQuiesced", "msg", fmt.Sprintf("Node %s is Healthy", inst.ID))
+					log.Info("waitUntilQuiesced", "health", "heathy", "nodeID", inst.ID)
 					numHealthy++
 				case flavor.Unhealthy:
-					log.Warn("waitUntilQuiesced", "msg", fmt.Sprintf("Node %s is Unhealthy", inst.ID))
+					log.Error("waitUntilQuiesced", "health", "unheathy", "nodeID", inst.ID)
 					return fmt.Errorf("Instance %s is unhealthy", inst.ID)
 				case flavor.Unknown:
-					log.Info("waitUntilQuiesced", "msg", fmt.Sprintf("Node %s has Unknown health", inst.ID))
+					log.Info("waitUntilQuiesced", "health", "unknown", "nodeID", inst.ID)
 				}
 			}
 
@@ -169,7 +168,11 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 
 	for {
 		// Wait until any new nodes are healthy
-		err := r.waitUntilQuiesced(pollInterval, minInt(expectedNewInstances, r.desiredSize))
+		desiredSize := len(r.updatingTo.config.Allocation.LogicalIDs)
+		if desiredSize == 0 {
+			desiredSize = int(r.updatingTo.config.Allocation.Size)
+		}
+		err := r.waitUntilQuiesced(pollInterval, minInt(expectedNewInstances, desiredSize))
 		if err != nil {
 			return err
 		}

@@ -49,7 +49,6 @@ func (q *quorum) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 		scaled:       scaled,
 		updatingFrom: settings,
 		updatingTo:   newSettings,
-		desiredSize:  len(settings.config.Allocation.LogicalIDs),
 		stop:         make(chan bool),
 	}, nil
 }

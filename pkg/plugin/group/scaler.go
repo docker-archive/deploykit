@@ -118,7 +118,6 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 		scaled:       scaled,
 		updatingFrom: settings,
 		updatingTo:   newSettings,
-		desiredSize:  int(settings.config.Allocation.Size),
 		stop:         make(chan bool),
 	}
 
