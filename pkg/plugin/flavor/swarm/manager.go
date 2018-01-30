@@ -106,10 +106,11 @@ func (s *ManagerFlavor) Drain(flavorProperties *types.Any, inst instance.Descrip
 
 	switch {
 	case len(nodes) == 0:
-		log.Warn("Unable to drain - not found in swarm", "id", inst.ID)
-		return nil
+		return fmt.Errorf("not found %v", inst.ID)
 
 	case len(nodes) == 1:
+
+		// Do a swarm leave if and only if this is a manager
 
 		nodeID := nodes[0].ID
 
@@ -147,6 +148,7 @@ func (s *ManagerFlavor) Drain(flavorProperties *types.Any, inst instance.Descrip
 		// If running on the same node (self), then do docker swarm leave
 		// otherwise, remove the node
 		if s.isSelf(inst) {
+
 			log.Debug("Docker SwarmLeave", "id", nodeID)
 
 			err := dockerClient.SwarmLeave(ctx, true)
