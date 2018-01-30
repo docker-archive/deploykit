@@ -126,8 +126,7 @@ func (n sortByID) Swap(i, j int) {
 }
 
 func (n sortByID) Less(i, j int) bool {
-	if n.settings != nil && n.settings.options.PolicyLeaderSelfUpdate != nil &&
-		*n.settings.options.PolicyLeaderSelfUpdate == types.PolicyLeaderSelfUpdateLast {
+	if n.settings != nil && selfUpdatePolicy(*n.settings) == types.PolicyLeaderSelfUpdateLast {
 		if isSelf(n.list[i], *n.settings) {
 			return false
 		}
