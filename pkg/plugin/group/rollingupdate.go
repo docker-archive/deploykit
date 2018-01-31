@@ -19,6 +19,13 @@ func minInt(a, b int) int {
 	return b
 }
 
+func selfUpdatePolicy(settings groupSettings) group_types.PolicyLeaderSelfUpdate {
+	if settings.options.PolicyLeaderSelfUpdate == nil {
+		return group_types.PolicyLeaderSelfUpdateLast // default policy
+	}
+	return *settings.options.PolicyLeaderSelfUpdate
+}
+
 func isSelf(inst instance.Description, settings groupSettings) bool {
 	if settings.self != nil {
 		if inst.LogicalID != nil && *inst.LogicalID == *settings.self {
@@ -31,15 +38,13 @@ func isSelf(inst instance.Description, settings groupSettings) bool {
 	return false
 }
 
-func doNotDestroySelf(inst instance.Description, settings groupSettings) bool {
+func canDestroy(inst instance.Description, settings groupSettings) bool {
 	if !isSelf(inst, settings) {
-		return false
+		// not running on the same node, so ok to destroy
+		return true
 	}
-	if settings.options.PolicyLeaderSelfUpdate == nil {
-		return false
-	}
-
-	return *settings.options.PolicyLeaderSelfUpdate == group_types.PolicyLeaderSelfUpdateNever
+	// self update - never - means we'd never update the self node.
+	return selfUpdatePolicy(settings) != group_types.PolicyLeaderSelfUpdateNever
 }
 
 func desiredAndUndesiredInstances(
@@ -52,9 +57,9 @@ func desiredAndUndesiredInstances(
 	for _, inst := range instances {
 
 		actualConfig, specified := inst.Tags[group.ConfigSHATag]
-		if specified && actualConfig == desiredHash || doNotDestroySelf(inst, settings) {
+		if specified && actualConfig == desiredHash {
 			desired = append(desired, inst)
-		} else {
+		} else if canDestroy(inst, settings) {
 			undesired = append(undesired, inst)
 		}
 	}
@@ -193,7 +198,10 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		sort.Sort(sortByID{list: undesiredInstances, settings: &r.updatingFrom})
 
 		// TODO(wfarner): Make the 'batch size' configurable.
-		r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate)
+		if canDestroy(undesiredInstances[0], r.updatingFrom) {
+			// we do not self-destruct in any cases.
+			r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate)
+		}
 
 		// Increment new instance count to replace the node that was just destroyed
 		expectedNewInstances++

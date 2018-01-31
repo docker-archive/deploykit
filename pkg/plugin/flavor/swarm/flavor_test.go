@@ -43,9 +43,10 @@ func TestValidate(t *testing.T) {
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
+	self := instance.LogicalID("172.164.100.101")
 	managerFlavor := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return mock_client.NewMockAPIClientCloser(ctrl), nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
 	workerFlavor := NewWorkerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return mock_client.NewMockAPIClientCloser(ctrl), nil
 	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
@@ -169,13 +170,15 @@ func TestManager(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	selfAddr := "1.2.3.4"
+	self := instance.LogicalID(selfAddr)
 	managerStop := make(chan struct{})
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -187,7 +190,7 @@ func TestManager(t *testing.T) {
 
 	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarmInfo, nil).AnyTimes()
 	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()
-	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
+	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: selfAddr}}
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
 	client.EXPECT().Close().AnyTimes()
 
@@ -288,13 +291,16 @@ func TestTemplateFunctions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	selfAddr := "1.2.3.4"
+	self := instance.LogicalID(selfAddr)
+
 	managerStop := make(chan struct{})
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -306,7 +312,7 @@ func TestTemplateFunctions(t *testing.T) {
 
 	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarmInfo, nil).AnyTimes()
 	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()
-	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: "1.2.3.4"}}
+	nodeInfo := swarm.Node{ManagerStatus: &swarm.ManagerStatus{Addr: selfAddr}}
 	client.EXPECT().NodeInspectWithRaw(gomock.Any(), nodeID).Return(nodeInfo, nil, nil).AnyTimes()
 	client.EXPECT().Close().AnyTimes()
 
@@ -341,7 +347,7 @@ func TestInitScriptMultipass(t *testing.T) {
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop, nil)
 
 	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarm.Swarm{}, nil).AnyTimes()
 	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()

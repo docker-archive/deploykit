@@ -6,8 +6,10 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/flavor/swarm"
 	"github.com/docker/infrakit/pkg/run"
+	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -16,6 +18,10 @@ import (
 const (
 	// Kind is the canonical name of the plugin and also key used to locate the plugin in discovery
 	Kind = "swarm"
+
+	// EnvSelfLogicalID sets the self id of this controller. This will avoid
+	// the self node to be updated.
+	EnvSelfLogicalID = "INFRAKIT_GROUP_SELF_LOGICAL_ID"
 )
 
 var log = logutil.New("module", "run/v0/swarm")
@@ -35,10 +41,22 @@ type Options struct {
 	// WorkerInitScriptTemplate is the URL of the template for worker init script
 	// This is overridden by the value provided in the spec.
 	WorkerInitScriptTemplate string
+
+	// Self is the logical ID of the node running this code.
+	Self *instance.LogicalID
+}
+
+func nilLogicalIDIfEmptyString(s string) *instance.LogicalID {
+	if s == "" {
+		return nil
+	}
+	id := instance.LogicalID(s)
+	return &id
 }
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
+	Self: nilLogicalIDIfEmptyString(local.Getenv(EnvSelfLogicalID, "")),
 	Options: template.Options{
 		MultiPass: true,
 	},
@@ -67,7 +85,7 @@ func Run(scope scope.Scope, name plugin.Name,
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
-	managerFlavor := swarm.NewManagerFlavor(scope, swarm.DockerClient, mt, managerStop)
+	managerFlavor := swarm.NewManagerFlavor(scope, swarm.DockerClient, mt, managerStop, options.Self)
 	workerFlavor := swarm.NewWorkerFlavor(scope, swarm.DockerClient, wt, workerStop)
 
 	transport.Name = name
