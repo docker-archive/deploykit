@@ -1,19 +1,18 @@
 package stack
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/types"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func init() {
 	backend.Register("stackEnforce", Enforce,
-		func(flags *pflag.FlagSet) {
-			flags.String("stack", "", "Name of stack")
+		func(params backend.Parameters) {
+			params.String("stack", "", "Name of stack")
 		})
 }
 
@@ -22,7 +21,7 @@ func init() {
 // method.
 func Enforce(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
-	return func(script string, cmd *cobra.Command, args []string) error {
+	return func(ctx context.Context, script string, parameters backend.Parameters, args []string) error {
 
 		var name string
 
@@ -34,7 +33,7 @@ func Enforce(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc
 			}
 			name = n
 		}
-		name, err := cmd.Flags().GetString("stack")
+		name, err := parameters.GetString("stack")
 		if err != nil {
 			return err
 		}

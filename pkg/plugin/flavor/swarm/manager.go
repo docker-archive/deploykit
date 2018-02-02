@@ -113,20 +113,12 @@ func (s *ManagerFlavor) Drain(flavorProperties *types.Any, inst instance.Descrip
 		// Do a swarm leave if and only if this is a manager
 
 		nodeID := nodes[0].ID
-
-		// first read the swarm version which is needed to update node
-		sw, err := dockerClient.SwarmInspect(ctx)
-		if err != nil {
-			return err
-		}
-
-		version := sw.ClusterInfo.Meta.Version
-
-		// then read the state of the node
+		// read the state of the node, getting the current version
 		nodeInfo, _, err := dockerClient.NodeInspectWithRaw(ctx, nodeID)
 		if err != nil {
 			return err
 		}
+		version := nodeInfo.Version
 
 		if nodeInfo.Spec.Role != swarm.NodeRoleManager {
 			return fmt.Errorf("not a manager: %v", nodeID)

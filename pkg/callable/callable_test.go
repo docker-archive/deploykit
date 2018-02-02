@@ -1,7 +1,8 @@
-package cli
+package callable
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
@@ -12,10 +13,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/docker/infrakit/pkg/cli/backend/http"
-	_ "github.com/docker/infrakit/pkg/cli/backend/instance"
-	_ "github.com/docker/infrakit/pkg/cli/backend/print"
-	_ "github.com/docker/infrakit/pkg/cli/backend/sh"
+	_ "github.com/docker/infrakit/pkg/callable/backend/http"
+	_ "github.com/docker/infrakit/pkg/callable/backend/instance"
+	_ "github.com/docker/infrakit/pkg/callable/backend/print"
+	_ "github.com/docker/infrakit/pkg/callable/backend/sh"
 )
 
 func TestMissing(t *testing.T) {
@@ -35,7 +36,7 @@ func plugins() discovery.Plugins {
 	return d
 }
 
-func TestContext(t *testing.T) {
+func TestCallable(t *testing.T) {
 
 	// A template file containing flags and prompts will be parsed and used to configure
 	// the cobra command
@@ -68,28 +69,32 @@ func TestContext(t *testing.T) {
 }
 `
 
-	c := &Context{
-		cmd: &cobra.Command{
-			Use:   "test",
-			Short: "test",
+	cmd := &cobra.Command{
+		Use:   "test",
+		Short: "test",
+	}
+	c := &Callable{
+		scope:      scope.DefaultScope(plugins),
+		src:        "str://" + script,
+		Parameters: ParametersFromFlags(cmd.Flags()),
+		Options: Options{
+			Prompter: PrompterFromReader(bytes.NewBufferString("username\n")),
 		},
-		scope: scope.DefaultScope(plugins),
-		src:   "str://" + script,
-		input: bytes.NewBufferString("username\n"),
 	}
 
 	c.exec = false
-	err := c.BuildFlags()
+
+	err := c.DefineParameters()
 	require.NoError(t, err)
 
 	for _, n := range []string{"commit", "cluster-name", "size", "instance-type", "param"} {
-		require.NotNil(t, c.cmd.Flag(n))
+		require.NotNil(t, cmd.Flag(n))
 	}
 
-	err = c.cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --tags dev,infrakit --commit true --size 20 --instance-type large", " "))
+	err = cmd.Flags().Parse(strings.Split("--param 75.0 --cluster-name swarm1 --tags dev,infrakit --commit true --size 20 --instance-type large", " "))
 	require.NoError(t, err)
 
-	err = c.Execute(c.cmd, nil)
+	err = c.Execute(context.Background(), nil, nil)
 	require.NoError(t, err)
 
 	m := map[string]interface{}{}
@@ -108,7 +113,7 @@ func TestContext(t *testing.T) {
 	}).String(), types.AnyValueMust(m).String())
 }
 
-func TestContextRunShell(t *testing.T) {
+func TestCallableRunShell(t *testing.T) {
 
 	script := `#!/bin/bash
 {{/* The directive here tells infrakit to run this script with sh:  =% sh "-s" "--"  %=  */}}
@@ -119,23 +124,26 @@ echo line $i
 done
 `
 
-	c := &Context{
-		scope: scope.DefaultScope(plugins),
-		cmd: &cobra.Command{
-			Use:   "test",
-			Short: "test",
-		},
-		src: "str://" + script,
+	cmd := &cobra.Command{
+		Use:   "test",
+		Short: "test",
+	}
+	c := &Callable{
+		scope:      scope.DefaultScope(plugins),
+		Options:    Options{},
+		Parameters: ParametersFromFlags(cmd.Flags()),
+		src:        "str://" + script,
 	}
 
 	c.exec = false
-	err := c.BuildFlags()
+
+	err := c.DefineParameters()
 	require.NoError(t, err)
 
-	err = c.cmd.Flags().Parse(strings.Split("--lines 3", " "))
+	err = cmd.Flags().Parse(strings.Split("--lines 3", " "))
 	require.NoError(t, err)
 
-	err = c.Execute(c.cmd, nil)
+	err = c.Execute(context.Background(), nil, nil)
 	require.NoError(t, err)
 
 }

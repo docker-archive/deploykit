@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -69,7 +70,7 @@ loop_connect:
 		}
 	}
 
-	err = execScript(impl, "ls -al /bin", nil)
+	err = execScript(impl, "ls -al /bin", nil, os.Stdout)
 	require.NoError(t, err)
 
 	err = stopContainer(containerName)
