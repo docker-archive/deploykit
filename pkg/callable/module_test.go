@@ -66,7 +66,7 @@ func linesFunc(t *testing.T, wg *sync.WaitGroup, c *Callable, header string, cou
 
 func TestModule(t *testing.T) {
 
-	if testutil.SkipTests("timeout") {
+	if testutil.SkipTests("callable") {
 		t.SkipNow()
 	}
 

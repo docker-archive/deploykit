@@ -4,10 +4,15 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/pkg/callable/backend"
+	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDefineParameters(t *testing.T) {
+
+	if testutil.SkipTests("callable") {
+		t.SkipNow()
+	}
 
 	p := &Parameters{}
 
