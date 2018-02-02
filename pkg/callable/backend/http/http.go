@@ -2,15 +2,14 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
-	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -51,7 +50,7 @@ func HTTP(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, e
 		}
 	}
 
-	return func(script string, cmd *cobra.Command, args []string) error {
+	return func(ctx context.Context, script string, parameters backend.Parameters, args []string) error {
 
 		body := bytes.NewBufferString(script)
 		client := &http.Client{}
@@ -76,7 +75,7 @@ func HTTP(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, e
 		}
 
 		defer resp.Body.Close()
-		_, err = io.Copy(os.Stdout, resp.Body)
+		_, err = io.Copy(backend.GetWriter(ctx), resp.Body)
 		return err
 	}, nil
 }

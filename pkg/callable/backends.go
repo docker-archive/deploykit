@@ -1,21 +1,21 @@
-package cli
+package callable
 
 import (
-	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	"github.com/docker/infrakit/pkg/template"
 )
 
 // loadBackend determines the backend to use for executing the rendered template text (e.g. run in shell).
 // During this phase, the template delimiters are changed to =% %= so put this in the comment {{/* */}}
-func (c *Context) loadBackends(t *template.Template) error {
+func (c *Callable) loadBackends(t *template.Template) error {
 
 	added := []string{}
 
-	backend.Visit(
-		func(funcName string, backend backend.TemplateFunc) {
+	backend.VisitBackends(
+		func(funcName string, backend backend.ExecFuncBuilder) {
 			t.AddFunc(funcName,
 				func(opt ...interface{}) error {
-					executor, err := backend(c.scope, c.test, opt...)
+					executor, err := backend(c.scope, *c.test, opt...)
 					if err != nil {
 						return err
 					}

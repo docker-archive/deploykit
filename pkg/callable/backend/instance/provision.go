@@ -1,20 +1,19 @@
 package instance
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func init() {
 	backend.Register("instanceProvision", Provision,
-		func(flags *pflag.FlagSet) {
-			flags.String("plugin", "", "plugin")
+		func(params backend.Parameters) {
+			params.String("plugin", "", "plugin")
 		})
 }
 
@@ -23,7 +22,7 @@ func init() {
 // in the command line.
 func Provision(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
-	return func(script string, cmd *cobra.Command, args []string) error {
+	return func(ctx context.Context, script string, parameters backend.Parameters, args []string) error {
 
 		var name string
 
@@ -35,7 +34,7 @@ func Provision(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFu
 			}
 			name = s
 		}
-		if n, err := cmd.Flags().GetString("plugin"); err != nil {
+		if n, err := parameters.GetString("plugin"); err != nil {
 			return err
 		} else if n != "" {
 			name = n
@@ -55,7 +54,9 @@ func Provision(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFu
 		if err != nil {
 			return err
 		}
-		fmt.Println(*id)
+
+		out := backend.GetWriter(ctx)
+		fmt.Fprintln(out, *id)
 		return nil
 	}, nil
 }

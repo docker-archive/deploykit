@@ -1,15 +1,15 @@
 package sh
 
 import (
+	"context"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/util/exec"
-	"github.com/spf13/cobra"
 )
 
 var log = logutil.New("module", "cli/backend/sh")
@@ -22,7 +22,7 @@ func init() {
 // executes the content as a shell script
 func Sh(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
-	return func(script string, ccmd *cobra.Command, args []string) error {
+	return func(ctx context.Context, script string, params backend.Parameters, args []string) error {
 
 		cmd := strings.Join(append([]string{"/bin/sh"}, args...), " ")
 		log.Debug("sh", "cmd", cmd)
@@ -34,7 +34,7 @@ func Sh(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, err
 				return err
 			},
 			func(stdout io.Reader) error {
-				_, err := io.Copy(os.Stdout, stdout)
+				_, err := io.Copy(backend.GetWriter(ctx), stdout)
 				return err
 			},
 			func(stderr io.Reader) error {

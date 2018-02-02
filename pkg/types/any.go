@@ -90,6 +90,20 @@ func (c *Any) Decode(typed interface{}) error {
 	if c == nil || len([]byte(*c)) == 0 {
 		return nil // no effect on typed
 	}
+
+	data := c.Bytes()
+	// if the data is actually a quoted string then try to unescape the string
+	if data[0] == '"' && data[len(data)-1] == '"' {
+		data = data[1 : len(data)-1]
+		// un-escape json here
+		data = bytes.Replace(data, []byte(`\n`), []byte{'\n'}, -1)
+		data = bytes.Replace(data, []byte(`\t`), []byte{'\t'}, -1)
+		data = bytes.Replace(data, []byte(`\r`), []byte{'\r'}, -1)
+		data = bytes.Replace(data, []byte(`\"`), []byte{'"'}, -1)
+
+		return json.Unmarshal(data, typed)
+	}
+
 	return json.Unmarshal([]byte(*c), typed)
 }
 
@@ -153,12 +167,19 @@ func (c *Any) UnmarshalYAML(data []byte) error {
 func Fingerprint(m ...*Any) string {
 	h := md5.New()
 	for _, mm := range m {
+
 		buff := mm.Bytes()
-		buff = bytes.Replace(buff, []byte(": "), []byte(":"), -1) // not really proud of this.
-		buff = bytes.Replace(buff, []byte(":"), []byte(":"), -1)  // not really proud of this.
-		buff = bytes.Replace(buff, []byte("\n"), nil, -1)
-		buff = bytes.Replace(buff, []byte("\t"), nil, -1)
-		h.Write(buff)
+		var compacted bytes.Buffer
+		if err := json.Compact(&compacted, buff); err != nil {
+			h.Write(compacted.Bytes())
+		} else {
+			buff = bytes.Replace(buff, []byte(": "), []byte(":"), -1) // not really proud of this.
+			buff = bytes.Replace(buff, []byte(":"), []byte(":"), -1)  // not really proud of this.
+			buff = bytes.Replace(buff, []byte("\n"), nil, -1)
+			buff = bytes.Replace(buff, []byte("\t"), nil, -1)
+			h.Write(buff)
+		}
+
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
