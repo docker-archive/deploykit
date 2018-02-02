@@ -31,14 +31,14 @@ import (
 	_ "github.com/docker/infrakit/cmd/infrakit/x"
 	_ "github.com/docker/infrakit/pkg/cli/v0"
 
-	// CLI backends
-	_ "github.com/docker/infrakit/pkg/cli/backend/http"
-	_ "github.com/docker/infrakit/pkg/cli/backend/instance"
-	_ "github.com/docker/infrakit/pkg/cli/backend/print"
-	_ "github.com/docker/infrakit/pkg/cli/backend/sh"
-	_ "github.com/docker/infrakit/pkg/cli/backend/ssh"
-	_ "github.com/docker/infrakit/pkg/cli/backend/stack"
-	_ "github.com/docker/infrakit/pkg/cli/backend/vmwscript"
+	// Callable backends via playbook or via lib
+	_ "github.com/docker/infrakit/pkg/callable/backend/http"
+	_ "github.com/docker/infrakit/pkg/callable/backend/instance"
+	_ "github.com/docker/infrakit/pkg/callable/backend/print"
+	_ "github.com/docker/infrakit/pkg/callable/backend/sh"
+	_ "github.com/docker/infrakit/pkg/callable/backend/ssh"
+	_ "github.com/docker/infrakit/pkg/callable/backend/stack"
+	_ "github.com/docker/infrakit/pkg/callable/backend/vmwscript"
 
 	// Supported "kinds"
 	_ "github.com/docker/infrakit/pkg/run/v0/aws"

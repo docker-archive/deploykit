@@ -1,18 +1,21 @@
-package cli
+package callable
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
-	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -21,37 +24,79 @@ const (
 	none = -1
 )
 
-// Context is the context for the running module
-type Context struct {
-	test           bool
-	printOnly      bool
-	acceptDefaults bool
-	cmd            *cobra.Command
-	src            string
-	input          io.Reader
-	exec           bool
-	template       *template.Template
-	options        template.Options
-	run            func(string, *cobra.Command, []string) error
-	script         string
-	scope          scope.Scope
+// Options has optional settings for a call.  It can be in a CLI (where Parameters are implemented by flags) or
+// programmatic, where Parameters are implemented as maps that can be set in a golang program.
+type Options struct {
+	// Output is the writer used by the backend to write the result.  Typically it's stdout
+	OutputFunc func() io.Writer
+
+	// ErrOutputFunc returns a writer for writing errors. Defaults to stderr if not specified
+	ErrOutputFunc func() io.Writer
+
+	// Prompter simply prompts the user in some way to retrieve a value of interest.  In the case of CLI,
+	// this is would just ask the user and get value from stdin (see PrompterFromReader())
+	Prompter func(prompt, ftype string, acceptDefaults bool, optional ...interface{}) (interface{}, error)
+
+	// TemplateOptions has options for processing template
+	TemplateOptions template.Options
 }
 
-// NewContext creates a context
-func NewContext(scope scope.Scope, cmd *cobra.Command, src string, input io.Reader,
-	options template.Options) *Context {
-	return &Context{
-		scope:   scope,
-		cmd:     cmd,
-		src:     src,
-		input:   input,
-		options: options,
+// Clone returns another copy, having defined the parameters
+func (c *Callable) Clone(parameters backend.Parameters) (*Callable, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	cc := NewCallable(c.scope, c.src, parameters, c.Options)
+	err := cc.DefineParameters()
+	return cc, err
+}
+
+// Callable is a template that defines parameters and can be executed against
+// a supported backend.  The parameters are not thread safe.
+type Callable struct {
+	backend.Parameters // has methods of Parameters
+
+	Options Options
+
+	*template.Template // has methods of Template
+
+	test           *bool
+	printOnly      *bool
+	acceptDefaults *bool
+	src            string
+	exec           bool
+
+	run    func(context.Context, string, backend.Parameters, []string) error
+	script string
+	scope  scope.Scope
+
+	lock sync.RWMutex
+}
+
+// TemplateFunc is a function that returns the template
+type TemplateFunc func(url string, opts template.Options) (*template.Template, error)
+
+// NewCallable creates a callable
+func NewCallable(scope scope.Scope, src string, parameters backend.Parameters, options Options) *Callable {
+
+	// Note that because Callable embeds Parameters and implements the methods in Parameters, a Callable
+	// can be nested inside another callable..
+	return &Callable{
+		scope:      scope,
+		src:        src,
+		Parameters: parameters,
+		Options:    options,
 	}
 }
 
 // name, type, description of the flag, and a default value, which can be nil
 // the returned value if the nil value
-func (c *Context) defineFlag(name, ftype, desc string, def interface{}) (interface{}, error) {
+func (c *Callable) defineParameter(name, ftype, desc string, def interface{}) (interface{}, error) {
+
+	parameters := c.Parameters
+	if parameters == nil {
+		return nil, nil
+	}
+
 	switch ftype {
 
 	case "string":
@@ -63,7 +108,7 @@ func (c *Context) defineFlag(name, ftype, desc string, def interface{}) (interfa
 				return nil, fmt.Errorf("default value not a string: %s", name)
 			}
 		}
-		c.cmd.Flags().String(name, defaultValue, desc)
+		parameters.String(name, defaultValue, desc)
 		return defaultValue, nil
 
 	case "int":
@@ -75,11 +120,11 @@ func (c *Context) defineFlag(name, ftype, desc string, def interface{}) (interfa
 				return nil, fmt.Errorf("default value not an int: %s", name)
 			}
 		}
-		c.cmd.Flags().Int(name, defaultValue, desc)
+		parameters.Int(name, defaultValue, desc)
 		return defaultValue, nil
 
 	case "float":
-		defaultValue := 0.
+		defaultValue := float64(0.)
 		if def != nil {
 			if v, ok := def.(float64); ok {
 				defaultValue = v
@@ -87,7 +132,31 @@ func (c *Context) defineFlag(name, ftype, desc string, def interface{}) (interfa
 				return nil, fmt.Errorf("default value not a float64: %s", name)
 			}
 		}
-		c.cmd.Flags().Float64(name, defaultValue, desc)
+		parameters.Float64(name, defaultValue, desc)
+		return defaultValue, nil
+
+	case "ip":
+		var defaultValue net.IP
+		if def != nil {
+			if v, ok := def.(net.IP); ok {
+				defaultValue = v
+			} else {
+				return nil, fmt.Errorf("default value not an ip: %s", name)
+			}
+		}
+		parameters.IP(name, defaultValue, desc)
+		return defaultValue, nil
+
+	case "duration":
+		var defaultValue time.Duration
+		if def != nil {
+			if v, ok := def.(time.Duration); ok {
+				defaultValue = v
+			} else {
+				return nil, fmt.Errorf("default value not a duration: %s", name)
+			}
+		}
+		parameters.Duration(name, defaultValue, desc)
 		return defaultValue, nil
 
 	case "bool":
@@ -109,36 +178,47 @@ func (c *Context) defineFlag(name, ftype, desc string, def interface{}) (interfa
 				}
 				defaultValue = b
 			}
-			c.cmd.Flags().Bool(name, defaultValue, desc)
+			parameters.Bool(name, defaultValue, desc)
 			return defaultValue, nil
 		}
 		// At definition time, there is no default value, so we use string
 		// to model three states: true, false, none
-		c.cmd.Flags().Int(name, none, desc)
+		parameters.Int(name, none, desc)
 		return none, nil
 	}
 	return nil, fmt.Errorf("unknown type %v", ftype)
 }
 
 // name, type, description, and default value that can be nil
-func (c *Context) getFromFlag(name, ftype, desc string, def interface{}) (interface{}, error) {
+func (c *Callable) getParameter(name, ftype, desc string, def interface{}) (interface{}, error) {
+
+	parameters := c.Parameters
+	if parameters == nil {
+		return nil, nil
+	}
 
 	switch ftype {
 
 	case "string":
-		return c.cmd.Flags().GetString(name)
+		return parameters.GetString(name)
 
 	case "int":
-		return c.cmd.Flags().GetInt(name)
+		return parameters.GetInt(name)
 
 	case "float":
-		return c.cmd.Flags().GetFloat64(name)
+		return parameters.GetFloat64(name)
+
+	case "ip":
+		return parameters.GetIP(name)
+
+	case "duration":
+		return parameters.GetDuration(name)
 
 	case "bool":
 		if def == nil {
 			// If default v is not specified, then we assume the flag was defined
 			// using a string to handle the none case
-			v, err := c.cmd.Flags().GetInt(name)
+			v, err := parameters.GetInt(name)
 			if err != nil {
 				return none, err
 			}
@@ -147,7 +227,7 @@ func (c *Context) getFromFlag(name, ftype, desc string, def interface{}) (interf
 			}
 			return v > 0, nil
 		}
-		return c.cmd.Flags().GetBool(name)
+		return parameters.GetBool(name)
 	}
 
 	return nil, nil
@@ -185,8 +265,15 @@ func parseBool(text string) (bool, error) {
 	return v > 0, err
 }
 
-// Prompt handles prompting the user using the given prompt message, type string and optional values.
-func Prompt(in io.Reader, prompt, ftype string, acceptDefaults bool, optional ...interface{}) (interface{}, error) {
+// PrompterFromReader returns a Prompter that gets a value from a io.Reader (which is usually stdin in the case of CLI)
+func PrompterFromReader(in io.Reader) func(prompt, ftype string, acceptDefaults bool, optional ...interface{}) (interface{}, error) {
+	return func(prompt, ftype string, acceptDefaults bool, optional ...interface{}) (interface{}, error) {
+		return doPrompt(in, prompt, ftype, acceptDefaults, optional...)
+	}
+}
+
+// doPrompt handles prompting the user using the given prompt message, type string and optional values.
+func doPrompt(in io.Reader, prompt, ftype string, acceptDefaults bool, optional ...interface{}) (interface{}, error) {
 	def, label := "", ""
 	if len(optional) > 0 {
 		def = fmt.Sprintf("%v", optional[0])
@@ -237,50 +324,69 @@ func Prompt(in io.Reader, prompt, ftype string, acceptDefaults bool, optional ..
 	return nil, nil // don't err, just pass through
 }
 
+func (c *Callable) defineOrGetParameter(n, ftype, desc string, optional ...interface{}) (interface{}, error) {
+
+	if ftype == "" {
+		return nil, fmt.Errorf("missing type for variable %v", n)
+	}
+	var defaultValue interface{}
+	if len(optional) > 0 {
+		defaultValue = optional[0]
+	}
+	if c.exec {
+		return c.getParameter(n, ftype, desc, defaultValue)
+	}
+
+	// Defining a flag never returns a printable value that can mess up the template rendering
+	return c.defineParameter(n, ftype, desc, defaultValue)
+}
+
+func (c *Callable) defineOrGetParameterList(n, ftype, desc string, optional ...interface{}) ([]string, error) {
+
+	parameters := c.Parameters
+	if parameters == nil {
+		return nil, nil
+	}
+
+	if ftype == "" {
+		return nil, fmt.Errorf("missing type for variable %v", n)
+	}
+	if ftype != "string" {
+		return nil, fmt.Errorf("list flag only support string %v", n)
+	}
+	var defaultValue interface{}
+	if len(optional) > 0 {
+		defaultValue = optional[0]
+	}
+	if c.exec {
+		d, err := parameters.GetString(n)
+		return strings.Split(d, ","), err
+	}
+
+	// Defining a flag never returns a printable value that can mess up the template rendering
+	d, err := c.defineParameter(n, ftype, desc, defaultValue)
+	dl := strings.Split(d.(string), ",")
+	return dl, err
+}
+
 // Funcs returns the template functions
-func (c *Context) Funcs() []template.Function {
+func (c *Callable) Funcs() []template.Function {
 	return []template.Function{
 		{
 			Name: "flag",
-			Func: func(n, ftype, desc string, optional ...interface{}) (interface{}, error) {
-				if ftype == "" {
-					return nil, fmt.Errorf("missing type for variable %v", n)
-				}
-				var defaultValue interface{}
-				if len(optional) > 0 {
-					defaultValue = optional[0]
-				}
-				if c.exec {
-					return c.getFromFlag(n, ftype, desc, defaultValue)
-				}
-
-				// Defining a flag never returns a printable value that can mess up the template rendering
-				return c.defineFlag(n, ftype, desc, defaultValue)
-			},
+			Func: c.defineOrGetParameter,
 		},
 		{
 			Name: "listflag",
-			Func: func(n, ftype, desc string, optional ...interface{}) ([]string, error) {
-				if ftype == "" {
-					return nil, fmt.Errorf("missing type for variable %v", n)
-				}
-				if ftype != "string" {
-					return nil, fmt.Errorf("list flag only support string %v", n)
-				}
-				var defaultValue interface{}
-				if len(optional) > 0 {
-					defaultValue = optional[0]
-				}
-				if c.exec {
-					d, err := c.cmd.Flags().GetString(n)
-					return strings.Split(d, ","), err
-				}
-
-				// Defining a flag never returns a printable value that can mess up the template rendering
-				d, err := c.defineFlag(n, ftype, desc, defaultValue)
-				dl := strings.Split(d.(string), ",")
-				return dl, err
-			},
+			Func: c.defineOrGetParameterList,
+		},
+		{
+			Name: "param",
+			Func: c.defineOrGetParameter,
+		},
+		{
+			Name: "listparam",
+			Func: c.defineOrGetParameterList,
 		},
 		{
 			Name: "fetch",
@@ -291,12 +397,29 @@ func (c *Context) Funcs() []template.Function {
 				// paths are computed from some flags.  Use 'source' for including
 				// sibling templates that also include other flag definitions.
 				if c.exec {
-					content, err := c.template.Fetch(p, opt...)
+					content, err := c.Template.Fetch(p, opt...)
 					if err == nil {
 						return content, nil
 					}
 				}
 				return "", nil
+			},
+		},
+		{
+			Name: "include",
+			Func: func(p string, opt ...interface{}) (string, error) {
+				// Overrides the base 'include' to account for the fact that
+				// some variables in the flag building phase are not set and would
+				// cause errors.  In general, use include for loading files whose
+				// paths are computed from some flags.  Use 'source' for including
+				// sibling templates that also include other flag definitions.
+				if c.exec {
+					content, err := c.Template.Include(p, opt...)
+					if err == nil {
+						return content, nil
+					}
+				}
+				return "{}", nil
 			},
 		},
 		{
@@ -315,23 +438,6 @@ func (c *Context) Funcs() []template.Function {
 					return "", ioutil.WriteFile(p, buff, 0644)
 				}
 				return "", nil
-			},
-		},
-		{
-			Name: "include",
-			Func: func(p string, opt ...interface{}) (string, error) {
-				// Overrides the base 'include' to account for the fact that
-				// some variables in the flag building phase are not set and would
-				// cause errors.  In general, use include for loading files whose
-				// paths are computed from some flags.  Use 'source' for including
-				// sibling templates that also include other flag definitions.
-				if c.exec {
-					content, err := c.template.Include(p, opt...)
-					if err == nil {
-						return content, nil
-					}
-				}
-				return "{}", nil
 			},
 		},
 		{
@@ -407,7 +513,7 @@ func (c *Context) Funcs() []template.Function {
 
 				}
 
-				return Prompt(c.input, prompt, ftype, c.acceptDefaults, optional...)
+				return c.Options.Prompter(prompt, ftype, *c.acceptDefaults, optional...)
 			},
 		},
 		{
@@ -446,7 +552,7 @@ func (c *Context) Funcs() []template.Function {
 					}
 
 				}
-				p, err := Prompt(c.input, prompt, ftype, c.acceptDefaults, optional...)
+				p, err := c.Options.Prompter(prompt, ftype, *c.acceptDefaults, optional...)
 				pl = strings.Split(p.(string), ",")
 				return pl, err
 			},
@@ -454,49 +560,55 @@ func (c *Context) Funcs() []template.Function {
 	}
 }
 
-func (c *Context) getTemplate() (*template.Template, error) {
-	if c.template == nil {
-		t, err := c.scope.TemplateEngine(c.src, c.options)
+func (c *Callable) getTemplate() (*template.Template, error) {
+	if c.Template == nil {
+		t, err := c.scope.TemplateEngine(c.src, c.Options.TemplateOptions)
 		if err != nil {
 			return nil, err
 		}
-		c.template = t
+		c.Template = t
 	}
-	return c.template, nil
+	return c.Template, nil
 }
 
-// BuildFlags from parsing the body which is a template
-func (c *Context) BuildFlags() (err error) {
-	c.cmd.Flags().BoolVar(&c.test, "test", false, "True to do a trial run")
-	c.cmd.Flags().BoolVar(&c.printOnly, "print-only", false, "True to print the rendered input")
-	c.cmd.Flags().BoolVar(&c.acceptDefaults, "accept-defaults", false, "True to accept defaults of prompts and flags")
+// DefineParameters defines the parameters as specified in the template.
+func (c *Callable) DefineParameters() (err error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
-	var t *template.Template
-	t, err = c.getTemplate()
+	if c.Parameters == nil {
+		return fmt.Errorf("not initialized")
+	}
+
+	c.test = c.Bool("test", false, "True to do a trial run")
+	c.printOnly = c.Bool("print-only", false, "True to print the rendered input")
+	c.acceptDefaults = c.Bool("accept-defaults", false, "True to accept defaults of prompts and flags")
+
+	t, err := c.getTemplate()
 	if err != nil {
 		return
 	}
 
-	t.SetOptions(c.options)
+	t.SetOptions(c.Options.TemplateOptions)
 	_, err = t.Render(c)
 
 	// add the backend-defined flags. These are flags that are
 	// applied as the backend is chosen.  The delimiter here is =% %=
-	opt := c.options
+	opt := c.Options.TemplateOptions
 	opt.DelimLeft = "=%"
 	opt.DelimRight = "%="
 	// Determine the backends
 	t.SetOptions(opt)
 	added := []string{}
-	backend.VisitFlags(
-		func(funcName string, buildFlags backend.FlagsFunc) {
+	backend.DefineSharedParameters(
+		func(funcName string, defineParams backend.DefineParamsFunc) {
 			t.AddFunc(funcName,
 				func(opt ...interface{}) error {
-					if buildFlags == nil {
+					if defineParams == nil {
 						return nil
 					}
 
-					buildFlags(c.cmd.Flags())
+					defineParams(c.Parameters)
 					return nil
 				})
 			added = append(added, funcName)
@@ -510,7 +622,13 @@ func (c *Context) BuildFlags() (err error) {
 }
 
 // Execute runs the command
-func (c *Context) Execute(cmd *cobra.Command, args []string) (err error) {
+func (c *Callable) Execute(ctx context.Context, args []string, out io.Writer) (err error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.Parameters == nil {
+		return fmt.Errorf("not initialized")
+	}
 
 	c.exec = true
 
@@ -521,10 +639,14 @@ func (c *Context) Execute(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	c.template = t
+	opt := c.Options.TemplateOptions
 
-	opt := c.options
-	opt.Stderr = func() io.Writer { return os.Stderr }
+	if c.Options.ErrOutputFunc != nil {
+		opt.Stderr = c.Options.ErrOutputFunc
+	} else {
+		opt.Stderr = func() io.Writer { return os.Stderr }
+	}
+
 	// Process the input, render the template
 	t.SetOptions(opt)
 
@@ -533,14 +655,14 @@ func (c *Context) Execute(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 	c.script = script
-	if c.printOnly {
+	if *c.printOnly {
 		fmt.Print(c.script)
 		return nil
 	}
 
 	log.Debug("running", "script", script)
 
-	opt = c.options
+	opt = c.Options.TemplateOptions
 	opt.DelimLeft = "=%"
 	opt.DelimRight = "%="
 	// Determine the backends
@@ -551,7 +673,14 @@ func (c *Context) Execute(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if c.run != nil {
-		return c.run(script, cmd, args)
+
+		switch {
+		case out != nil:
+			ctx = backend.SetWriter(ctx, out)
+		case c.Options.OutputFunc != nil:
+			ctx = backend.SetWriter(ctx, c.Options.OutputFunc())
+		}
+		return c.run(ctx, script, c, args)
 	}
 	return nil
 }

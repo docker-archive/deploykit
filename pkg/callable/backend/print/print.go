@@ -1,12 +1,12 @@
 package print
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
-	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -21,14 +21,17 @@ func Print(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, 
 	if len(opt) > 0 {
 		prefix = fmt.Sprintf("%v", opt[0])
 	}
-	return func(script string, cmd *cobra.Command, args []string) error {
+	return func(ctx context.Context, script string, parameters backend.Parameters, args []string) error {
+
+		out := backend.GetWriter(ctx)
+
 		if prefix == "" {
-			fmt.Println(script)
+			fmt.Fprintln(out, script)
 			return nil
 		}
 
 		lines := strings.Split(script, "\n")
-		fmt.Println(prefix + strings.Join(lines, "\n"+prefix))
+		fmt.Fprintln(out, prefix+strings.Join(lines, "\n"+prefix))
 		return nil
 	}, nil
 }

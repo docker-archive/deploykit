@@ -1,6 +1,7 @@
 package playbook
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -47,7 +48,7 @@ func TestLoadModules(t *testing.T) {
 
 	T(100).Infoln(m)
 
-	commands, err := list(scope.Nil, m, os.Stdin, nil, &root, options)
+	commands, err := list(context.Background(), scope.Nil, m, os.Stdin, nil, &root, options)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(commands))
 }

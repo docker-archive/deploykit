@@ -1,29 +1,28 @@
 package ssh
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"sync"
 
-	"github.com/docker/infrakit/pkg/cli/backend"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/docker/infrakit/pkg/util/ssh"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 var log = logutil.New("module", "cli/backend/ssh")
 
 func init() {
-	backend.Register("ssh", Script, func(flags *pflag.FlagSet) {
-		flags.StringSlice("hostport", []string{}, "Host:port eg. localhost:22")
-		flags.String("user", "", "username")
-		flags.String("password", "", "password")
-		flags.String("keyfile", "", "keyfile e.g. $HOME/.ssh/id_rsa")
+	backend.Register("ssh", Script, func(params backend.Parameters) {
+		params.StringSlice("hostport", []string{}, "Host:port eg. localhost:22")
+		params.String("user", "", "username")
+		params.String("password", "", "password")
+		params.String("keyfile", "", "keyfile e.g. $HOME/.ssh/id_rsa")
 	})
 }
 
@@ -33,41 +32,43 @@ func init() {
 // where auth = [ password | key | agent ]
 func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc, error) {
 
-	return func(script string, cmd *cobra.Command, args []string) error {
+	return func(ctx context.Context, script string, parameters backend.Parameters, args []string) error {
 
-		hostports, err := cmd.Flags().GetStringSlice("hostport")
+		hostports, err := parameters.GetStringSlice("hostport")
 		if err != nil {
 			return err
 		}
-		user, err := cmd.Flags().GetString("user")
+		user, err := parameters.GetString("user")
 		if err != nil {
 			return err
 		}
-		password, err := cmd.Flags().GetString("password")
+		password, err := parameters.GetString("password")
 		if err != nil {
 			return err
 		}
-		keyfile, err := cmd.Flags().GetString("keyfile")
+		keyfile, err := parameters.GetString("keyfile")
 		if err != nil {
 			return err
 		}
+
+		out := backend.GetWriter(ctx)
 
 		if test {
-			fmt.Println("script options")
+			fmt.Fprintln(out, "script options")
 			for i, o := range opt {
-				fmt.Printf("opt[%v] = %v\n", i, o)
+				fmt.Fprintf(out, "opt[%v] = %v\n", i, o)
 			}
-			fmt.Println("runtime cli flags")
-			fmt.Printf("--hostport %v\n", hostports)
-			fmt.Printf("--user %v\n", user)
-			fmt.Printf("--password %v\n", password)
-			fmt.Printf("--keyfile %v\n", keyfile)
-			fmt.Println("runtime cli args")
+			fmt.Fprintln(out, "runtime cli flags")
+			fmt.Fprintf(out, "--hostport %v\n", hostports)
+			fmt.Fprintf(out, "--user %v\n", user)
+			fmt.Fprintf(out, "--password %v\n", password)
+			fmt.Fprintf(out, "--keyfile %v\n", keyfile)
+			fmt.Fprintln(out, "runtime cli args")
 			for i, a := range args {
-				fmt.Printf("argv[%v] = %v\n", i, a)
+				fmt.Fprintf(out, "argv[%v] = %v\n", i, a)
 			}
-			fmt.Println("script")
-			fmt.Print(script)
+			fmt.Fprintln(out, "script")
+			fmt.Fprint(out, script)
 			return nil
 		}
 
@@ -101,7 +102,7 @@ func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc,
 					log.Error("cannot connect", "remote", cl.Remote, "err", err)
 					return
 				}
-				if err := execScript(exec, script, args); err != nil {
+				if err := execScript(exec, script, args, out); err != nil {
 					log.Error("error", "remote", cl.Remote, "err", err)
 					return
 				}
@@ -113,7 +114,7 @@ func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc,
 	}, nil
 }
 
-func execScript(impl exec.Interface, script string, args []string) error {
+func execScript(impl exec.Interface, script string, args []string, out io.Writer) error {
 	cmd := strings.Join(append([]string{"/bin/sh"}, args...), " ")
 	log.Debug("sh", "cmd", cmd)
 
@@ -124,7 +125,7 @@ func execScript(impl exec.Interface, script string, args []string) error {
 			return err
 		},
 		func(stdout io.Reader) error {
-			_, err := io.Copy(os.Stdout, stdout)
+			_, err := io.Copy(out, stdout)
 			return err
 		},
 		func(stderr io.Reader) error {

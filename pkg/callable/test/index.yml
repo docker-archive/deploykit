@@ -1,0 +1,12 @@
+
+# Start infrakit
+start : start.sh
+
+# Create a single instance
+ondemand : provision-instance.yml
+
+# Create a spot instance
+spot : provision-spot-instance.yml
+
+# print some lines
+lines: lines.sh

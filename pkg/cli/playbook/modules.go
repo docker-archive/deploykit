@@ -1,12 +1,16 @@
 package playbook
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 
+	"github.com/docker/infrakit/pkg/callable"
+	"github.com/docker/infrakit/pkg/callable/backend"
 	"github.com/docker/infrakit/pkg/cli"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
@@ -95,7 +99,7 @@ func dir(url SourceURL, options template.Options) (Modules, error) {
 	return m, err
 }
 
-func list(scope scope.Scope, modules Modules, input io.Reader,
+func list(context context.Context, scope scope.Scope, modules Modules, input io.Reader,
 	parent *cobra.Command, parentURL *SourceURL, options template.Options) ([]*cobra.Command, error) {
 
 	found := []*cobra.Command{}
@@ -144,7 +148,7 @@ loop:
 		if err == nil {
 
 			copy := moduleURL
-			subs, err := list(scope, mods, input, cmd, &copy, options)
+			subs, err := list(context, scope, mods, input, cmd, &copy, options)
 			if err != nil {
 				log.Debug("cannot list", "op", op, "url", moduleURL, "err", err)
 				continue loop
@@ -155,15 +159,19 @@ loop:
 
 		} else {
 
-			ctx := cli.NewContext(scope, cmd, string(moduleURL), input, options)
-			cmd.RunE = func(c *cobra.Command, args []string) error {
-				log.Debug("Running", "command", op, "url", moduleURL, "args", args)
-				return ctx.Execute(cmd, args)
-			}
-			err := ctx.BuildFlags()
+			callable := callable.NewCallable(scope, string(moduleURL),
+				callable.ParametersFromFlags(cmd.Flags()),
+				callable.Options{
+					Prompter: callable.PrompterFromReader(input),
+				})
+			err := callable.DefineParameters()
 			if err != nil {
 				log.Warn("Cannot build flags", "operation", op, "url", moduleURL, "err", err)
 				continue loop
+			}
+			cmd.RunE = func(c *cobra.Command, args []string) error {
+				log.Debug("Running", "command", op, "url", moduleURL, "args", args)
+				return callable.Execute(context, args, nil)
 			}
 
 		}
@@ -178,7 +186,9 @@ func (r *remote) List() ([]*cobra.Command, error) {
 	if err := resolved(r.modules); err != nil {
 		return nil, err
 	}
-	return list(r.scope, r.modules, r.input, nil, nil, r.options)
+
+	ctx := backend.SetWriter(context.Background(), os.Stdout)
+	return list(ctx, r.scope, r.modules, r.input, nil, nil, r.options)
 }
 
 func resolved(m Modules) error {
