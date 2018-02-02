@@ -39,7 +39,7 @@ ifeq ($(OS),Windows_NT)
 endif
 
 # Package list
-PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor | grep -v /callable/backend)
+PKGS_AND_MOCKS := $(shell go list ./... | grep -v /vendor | grep -v /pkg/callable)
 ifeq ($(OS),Windows_NT)
 	# skip libvirt instance plugin on Windows (does not compile)
 	PKGS_AND_MOCKS := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep -v libvirt)
