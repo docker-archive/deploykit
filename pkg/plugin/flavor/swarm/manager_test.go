@@ -30,12 +30,11 @@ func TestManagerDrain(t *testing.T) {
 		return client, nil
 	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
 
-	version := swarm.Version{Index: uint64(9999)}
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{
 			ID: "ClusterUUID",
 			Meta: swarm.Meta{
-				Version: version,
+				Version: swarm.Version{Index: uint64(9999)},
 			},
 		},
 		JoinTokens: swarm.JoinTokens{
@@ -79,6 +78,7 @@ func TestManagerDrain(t *testing.T) {
 
 	// Do a drain
 	swarmNodeID := "swarm-id-1"
+	swarmNodeVersion := swarm.Version{Index: uint64(1234)}
 	client.EXPECT().NodeList(gomock.Any(),
 		docker_types.NodeListOptions{Filters: filter}).Return(
 		[]swarm.Node{
@@ -89,11 +89,12 @@ func TestManagerDrain(t *testing.T) {
 		swarm.Node{
 			ID:   swarmNodeID,
 			Spec: swarm.NodeSpec{Role: swarm.NodeRoleManager},
+			Meta: swarm.Meta{Version: swarmNodeVersion},
 		},
 		nil,
 		nil,
 	)
-	client.EXPECT().NodeUpdate(gomock.Any(), swarmNodeID, version, swarm.NodeSpec{Role: swarm.NodeRoleWorker}).Return(nil)
+	client.EXPECT().NodeUpdate(gomock.Any(), swarmNodeID, swarmNodeVersion, swarm.NodeSpec{Role: swarm.NodeRoleWorker}).Return(nil)
 
 	// Because this is the self node....
 	client.EXPECT().SwarmLeave(gomock.Any(), true)
