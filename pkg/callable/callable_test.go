@@ -9,7 +9,6 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/run/scope"
-	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -38,10 +37,6 @@ func plugins() discovery.Plugins {
 }
 
 func TestCallable(t *testing.T) {
-
-	if testutil.SkipTests("callable") {
-		t.SkipNow()
-	}
 
 	// A template file containing flags and prompts will be parsed and used to configure
 	// the cobra command
@@ -119,10 +114,6 @@ func TestCallable(t *testing.T) {
 }
 
 func TestCallableRunShell(t *testing.T) {
-
-	if testutil.SkipTests("callable") {
-		t.SkipNow()
-	}
 
 	script := `#!/bin/bash
 {{/* The directive here tells infrakit to run this script with sh:  =% sh "-s" "--"  %=  */}}
