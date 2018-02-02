@@ -14,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/run/scope"
+	testutil "github.com/docker/infrakit/pkg/testing"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/docker/infrakit/pkg/callable/backend/sh"
@@ -64,6 +65,10 @@ func linesFunc(t *testing.T, wg *sync.WaitGroup, c *Callable, header string, cou
 }
 
 func TestModule(t *testing.T) {
+
+	if testutil.SkipTests("timeout") {
+		t.SkipNow()
+	}
 
 	var defaultOutput bytes.Buffer
 
