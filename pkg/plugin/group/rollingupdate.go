@@ -84,76 +84,90 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 	// the health of instances in the undesired state.  This allows a user to dig out of a hole where the original
 	// state of the group is bad, and instances are not reporting as healthy.
 	log.Info("waitUntilQuiesced", "expectedNewInstances", expectedNewInstances)
-	// TODO: start processing right away instead of waiting for first tick
+	// If already quiesced then return
+	if has, err := r.hasQuiesced(expectedNewInstances); err != nil {
+		return err
+	} else if has {
+		return nil
+	}
+	// Else poll and wait
 	ticker := time.NewTicker(pollInterval)
 	for {
 		select {
 		case <-ticker.C:
-			// Gather instances in the scaler with the desired state
-			// Check:
-			//   - that the scaler has the expected number of instances
-			//   - instances with the desired config are healthy
-
-			// TODO(wfarner): Get this information from the scaler to reduce redundant network calls.
-			instances, err := labelAndList(r.scaled)
-			if err != nil {
+			if has, err := r.hasQuiesced(expectedNewInstances); err != nil {
 				return err
-			}
-
-			// The update is only concerned with instances being created in the course of the update.
-			// The health of instances in any other state is irrelevant.  This behavior is important
-			// especially if the previous state of the group is unhealthy and the update is attempting to
-			// restore health.
-			matching, _ := desiredAndUndesiredInstances(instances, r.updatingTo)
-			log.Info("waitUntilQuiesced", "totalInstances", len(instances), "matchingInstances", len(matching))
-
-			// Now that we have isolated the instances with the new configuration, check if they are all
-			// healthy.  We do not consider an update successful until the target number of instances are
-			// confirmed healthy.
-			// The following design choices are currently implemented:
-			//
-			//   - the update will continue indefinitely if one or more instances are in the
-			//     flavor.UnknownHealth state.  Operators must stop the update and diagnose the cause.
-			//
-			//   - the update is stopped immediately if any instance enters the flavor.Unhealthy state.
-			//
-			//   - the update will proceed with other instances immediately when the currently-expected
-			//     number of instances are observed in the flavor.Healthy state.
-			//
-			numHealthy := 0
-			for _, inst := range matching {
-				// TODO(wfarner): More careful thought is needed with respect to blocking and timeouts
-				// here.  This might mean formalizing timeout behavior for different types of RPCs in
-				// the group, and/or documenting the expectations for plugin implementations.
-				switch r.scaled.Health(inst) {
-				case flavor.Healthy:
-					log.Info("waitUntilQuiesced", "health", "heathy", "nodeID", inst.ID)
-					numHealthy++
-				case flavor.Unhealthy:
-					log.Error("waitUntilQuiesced", "health", "unheathy", "nodeID", inst.ID)
-					return fmt.Errorf("Instance %s is unhealthy", inst.ID)
-				case flavor.Unknown:
-					log.Info("waitUntilQuiesced", "health", "unknown", "nodeID", inst.ID)
-				}
-			}
-
-			if numHealthy >= int(expectedNewInstances) {
-				log.Info("waitUntilQuiesced",
-					"msg", "Scaler has quiesced, terminating loop",
-					"numHealthy", numHealthy,
-					"expectedNewInstances", expectedNewInstances)
+			} else if has {
 				return nil
 			}
-			log.Info("waitUntilQuiesced",
-				"msg", "Waiting for scaler to quiesce",
-				"numHealthy", numHealthy,
-				"expectedNewInstances", expectedNewInstances)
-
 		case <-r.stop:
 			ticker.Stop()
 			return errors.New("Update halted by user")
 		}
 	}
+}
+
+func (r *rollingupdate) hasQuiesced(expectedNewInstances int) (bool, error) {
+	// Gather instances in the scaler with the desired state
+	// Check:
+	//   - that the scaler has the expected number of instances
+	//   - instances with the desired config are healthy
+
+	// TODO(wfarner): Get this information from the scaler to reduce redundant network calls.
+	instances, err := labelAndList(r.scaled)
+	if err != nil {
+		return false, err
+	}
+
+	// The update is only concerned with instances being created in the course of the update.
+	// The health of instances in any other state is irrelevant.  This behavior is important
+	// especially if the previous state of the group is unhealthy and the update is attempting to
+	// restore health.
+	matching, _ := desiredAndUndesiredInstances(instances, r.updatingTo)
+	log.Info("hasQuiesced", "totalInstances", len(instances), "matchingInstances", len(matching))
+
+	// Now that we have isolated the instances with the new configuration, check if they are all
+	// healthy.  We do not consider an update successful until the target number of instances are
+	// confirmed healthy.
+	// The following design choices are currently implemented:
+	//
+	//   - the update will continue indefinitely if one or more instances are in the
+	//     flavor.UnknownHealth state.  Operators must stop the update and diagnose the cause.
+	//
+	//   - the update is stopped immediately if any instance enters the flavor.Unhealthy state.
+	//
+	//   - the update will proceed with other instances immediately when the currently-expected
+	//     number of instances are observed in the flavor.Healthy state.
+	//
+	numHealthy := 0
+	for _, inst := range matching {
+		// TODO(wfarner): More careful thought is needed with respect to blocking and timeouts
+		// here.  This might mean formalizing timeout behavior for different types of RPCs in
+		// the group, and/or documenting the expectations for plugin implementations.
+		switch r.scaled.Health(inst) {
+		case flavor.Healthy:
+			log.Info("hasQuiesced", "health", "heathy", "nodeID", inst.ID)
+			numHealthy++
+		case flavor.Unhealthy:
+			log.Error("hasQuiesced", "health", "unheathy", "nodeID", inst.ID)
+			return false, fmt.Errorf("Instance %s is unhealthy", inst.ID)
+		case flavor.Unknown:
+			log.Info("hasQuiesced", "health", "unknown", "nodeID", inst.ID)
+		}
+	}
+
+	if numHealthy >= int(expectedNewInstances) {
+		log.Info("hasQuiesced",
+			"msg", "Scaler has quiesced",
+			"numHealthy", numHealthy,
+			"expectedNewInstances", expectedNewInstances)
+		return true, nil
+	}
+	log.Info("hasQuiesced",
+		"msg", "Still waiting for scaler to quiesce",
+		"numHealthy", numHealthy,
+		"expectedNewInstances", expectedNewInstances)
+	return false, nil
 }
 
 // Run identifies instances not matching the desired state and destroys them one at a time until all instances in the
