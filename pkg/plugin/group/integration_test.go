@@ -42,22 +42,22 @@ func flavorPluginLookup(_ plugin_base.Name) (flavor.Plugin, error) {
 
 func minionProperties(instances int, instanceData string, flavorInit string) *types.Any {
 	return types.AnyString(fmt.Sprintf(`{
-	  "Allocation": {
-	    "Size": %d
-	  },
-	  "Instance" : {
-              "Plugin": "test",
-	      "Properties": {
-	          "OpaqueValue": "%s"
-	      }
-          },
-	  "Flavor" : {
-              "Plugin" : "test",
-	      "Properties": {
-	          "Type": "minion",
-	          "Init": "%s"
-	      }
-          }
+    "Allocation": {
+      "Size": %d
+    },
+    "Instance" : {
+      "Plugin": "test",
+      "Properties": {
+        "OpaqueValue": "%s"
+      }
+    },
+    "Flavor" : {
+      "Plugin" : "test",
+      "Properties": {
+        "Type": "minion",
+        "Init": "%s"
+      }
+    }
 	}`, instances, instanceData, flavorInit))
 }
 
@@ -68,21 +68,21 @@ func leaderProperties(logicalIDs []instance.LogicalID, data string) *types.Any {
 	}
 
 	return types.AnyString(fmt.Sprintf(`{
-	  "Allocation": {
-	    "LogicalIDs": %s
-	  },
-	  "Instance" : {
-              "Plugin": "test",
-	      "Properties": {
-	          "OpaqueValue": "%s"
-	      }
-          },
-	  "Flavor" : {
-              "Plugin": "test",
-	      "Properties": {
-	         "Type": "leader"
-	      }
-          }
+    "Allocation": {
+      "LogicalIDs": %s
+    },
+    "Instance" : {
+      "Plugin": "test",
+      "Properties": {
+        "OpaqueValue": "%s"
+      }
+    },
+    "Flavor" : {
+      "Plugin": "test",
+      "Properties": {
+        "Type": "leader"
+      }
+    }
 	}`, idsValue, data))
 }
 
@@ -108,39 +108,60 @@ func TestInvalidGroupCalls(t *testing.T) {
 	require.Error(t, grp.FreeGroup(id))
 }
 
+// memberTags returns the tags with the group ID
 func memberTags(id group.ID) map[string]string {
 	return map[string]string{group.GroupTag: string(id)}
 }
 
-func provisionTags(config group.Spec, logicalID *instance.LogicalID) map[string]string {
+// provisionTagsDefault returns default tag values
+func provisionTagsDefault(config group.Spec, logicalID *instance.LogicalID) map[string]string {
+	return provisionTags(config, logicalID, map[string]string{})
+}
+
+// provisionTagsDestroyErr returns default tag values with the unique tag that reflects that
+// the instance should error out on destroy
+func provisionTagsDestroyErr(config group.Spec, logicalID *instance.LogicalID) map[string]string {
+	return provisionTags(config, logicalID, map[string]string{"DestroyError": "true"})
+}
+
+// provisionTags returns tag values with the additional tags inserted
+func provisionTags(config group.Spec, logicalID *instance.LogicalID, additional map[string]string) map[string]string {
 	tags := memberTags(config.ID)
 	tags[group.ConfigSHATag] = group_types.MustParse(group_types.ParseProperties(config)).InstanceHash()
 
 	if logicalID != nil {
 		tags[instance.LogicalIDTag] = string(*logicalID)
 	}
+	for k, v := range additional {
+		tags[k] = v
+	}
 	return tags
 }
 
-func newFakeInstance(config group.Spec, logicalID *instance.LogicalID) instance.Spec {
-	// Inject another tag to simulate instances being tagged out-of-band.  Our implementation should ignore tags
-	// we did not create.
-	tags := map[string]string{"other": "ignored"}
-	for k, v := range provisionTags(config, logicalID) {
-		tags[k] = v
-	}
+// newFakeInstanceDefault returns an instance.Spec with the default tags
+func newFakeInstanceDefault(config group.Spec, logicalID *instance.LogicalID) instance.Spec {
+	return newFakeInstance(config, logicalID, provisionTagsDefault(config, logicalID))
+}
 
+// Creates an instance.Spec with a tag that denotes that the instance should return
+// an error when Destroyed
+func newFakeDestroyErrInstance(config group.Spec, logicalID *instance.LogicalID) instance.Spec {
+	return newFakeInstance(config, logicalID, provisionTagsDestroyErr(config, logicalID))
+}
+
+// newFakeInstanceDefault returns an instance.Spec with the default tags
+func newFakeInstance(config group.Spec, logicalID *instance.LogicalID, provisionTags map[string]string) instance.Spec {
 	return instance.Spec{
 		LogicalID: logicalID,
-		Tags:      provisionTags(config, logicalID),
+		Tags:      provisionTags,
 	}
 }
 
 func TestNoopUpdate(t *testing.T) {
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -161,7 +182,7 @@ func TestNoopUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
-		require.Equal(t, newFakeInstance(minions, nil).Tags, i.Tags)
+		require.Equal(t, newFakeInstanceDefault(minions, nil).Tags, i.Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -180,9 +201,9 @@ func awaitGroupConvergence(t *testing.T, grp group.Plugin) {
 
 func TestRollingUpdate(t *testing.T) {
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 
 	flavorPlugin := testFlavor{
@@ -222,7 +243,71 @@ func TestRollingUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated, nil), i.Tags)
+		require.Equal(t, provisionTagsDefault(updated, nil), i.Tags)
+	}
+
+	require.NoError(t, grp.FreeGroup(id))
+}
+
+func TestRollingUpdateDestroyError(t *testing.T) {
+	// The 2nd instance will error out on Destroy, causing the 3rd instance to not be updated.
+	plugin := newTestInstancePlugin(
+		newFakeInstanceDefault(minions, nil),
+		newFakeDestroyErrInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+	)
+
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			if strings.Contains(flavorProperties.String(), "flavor2") {
+				return flavor.Healthy, nil
+			}
+
+			// The update should be unaffected by an 'old' instance that is unhealthy.
+			return flavor.Unhealthy, nil
+		},
+	}
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
+
+	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "flavor2")}
+
+	desc, err := grp.CommitGroup(updated, true)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	desc, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	awaitGroupConvergence(t, grp)
+
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+	// 1st instance was destroyed and provisioned (given a new ID)
+	instID := instance.ID(fmt.Sprintf("%s-%d", plugin.idPrefix, 4))
+	inst1, has := plugin.instances[instID]
+	require.True(t, has, fmt.Sprintf("Missing instance ID %s", instID))
+	require.Equal(t, provisionTagsDefault(updated, nil), inst1.Tags)
+	// 2nd instance failed to destroy which caused the 3rd instance to not be processed
+	for _, idSuffix := range []int{2, 3} {
+		instID := instance.ID(fmt.Sprintf("%s-%d", plugin.idPrefix, idSuffix))
+		inst, has := plugin.instances[instID]
+		require.True(t, has, fmt.Sprintf("Missing instance ID %s", instID))
+		if idSuffix == 2 {
+			require.Equal(t, provisionTagsDestroyErr(minions, nil), inst.Tags)
+		} else {
+			require.Equal(t, provisionTagsDefault(minions, nil), inst.Tags)
+		}
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -236,9 +321,9 @@ func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
 
 	// leader self rolling update should not destroy the running leader itself
 	plugin := newTestInstancePlugin(
-		newFakeInstance(leaders, &leaderIDs[0]),
-		newFakeInstance(leaders, &leaderIDs[1]),
-		newFakeInstance(leaders, &leaderIDs[2]),
+		newFakeInstanceDefault(leaders, &leaderIDs[0]),
+		newFakeInstanceDefault(leaders, &leaderIDs[1]),
+		newFakeInstanceDefault(leaders, &leaderIDs[2]),
 	)
 
 	flavorPlugin := testFlavor{
@@ -281,7 +366,7 @@ func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
 
 	// all instances should have been updated
 	for i := 0; i < len(instances); i++ {
-		require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+		require.Equal(t, provisionTagsDefault(updated, instances[i].LogicalID), instances[i].Tags)
 	}
 
 	var last instance.LogicalID
@@ -301,9 +386,9 @@ func TestLeaderSelfRollingUpdatePolicyNever(t *testing.T) {
 
 	// leader self rolling update should not destroy the running leader itself
 	plugin := newTestInstancePlugin(
-		newFakeInstance(leaders, &leaderIDs[0]),
-		newFakeInstance(leaders, &leaderIDs[1]),
-		newFakeInstance(leaders, &leaderIDs[2]),
+		newFakeInstanceDefault(leaders, &leaderIDs[0]),
+		newFakeInstanceDefault(leaders, &leaderIDs[1]),
+		newFakeInstanceDefault(leaders, &leaderIDs[2]),
 	)
 
 	flavorPlugin := testFlavor{
@@ -348,9 +433,9 @@ func TestLeaderSelfRollingUpdatePolicyNever(t *testing.T) {
 	// it must not be updated.
 	for i := 0; i < len(instances); i++ {
 		if *instances[i].LogicalID == *self {
-			require.NotEqual(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+			require.NotEqual(t, provisionTagsDefault(updated, instances[i].LogicalID), instances[i].Tags)
 		} else {
-			require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+			require.Equal(t, provisionTagsDefault(updated, instances[i].LogicalID), instances[i].Tags)
 		}
 	}
 	// make sure the leader was never destroyed
@@ -369,9 +454,9 @@ func TestExternalManagedRollingUpdate(t *testing.T) {
 	self := &other
 
 	plugin := newTestInstancePlugin(
-		newFakeInstance(leaders, &leaderIDs[0]),
-		newFakeInstance(leaders, &leaderIDs[1]),
-		newFakeInstance(leaders, &leaderIDs[2]),
+		newFakeInstanceDefault(leaders, &leaderIDs[0]),
+		newFakeInstanceDefault(leaders, &leaderIDs[1]),
+		newFakeInstanceDefault(leaders, &leaderIDs[2]),
 	)
 
 	flavorPlugin := testFlavor{
@@ -418,7 +503,7 @@ func TestExternalManagedRollingUpdate(t *testing.T) {
 		require.NotEqual(t, *instances[i].LogicalID, *self)
 
 		// we require every node to have been updated
-		require.Equal(t, provisionTags(updated, instances[i].LogicalID), instances[i].Tags)
+		require.Equal(t, provisionTagsDefault(updated, instances[i].LogicalID), instances[i].Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -426,9 +511,9 @@ func TestExternalManagedRollingUpdate(t *testing.T) {
 
 func TestRollAndAdjustScale(t *testing.T) {
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -459,7 +544,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 	// quiesced.
 	require.True(t, len(instances) >= 3)
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated, nil), i.Tags)
+		require.Equal(t, provisionTagsDefault(updated, nil), i.Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -467,9 +552,9 @@ func TestRollAndAdjustScale(t *testing.T) {
 
 func TestScaleIncrease(t *testing.T) {
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -495,7 +580,7 @@ func TestScaleIncrease(t *testing.T) {
 	// quiesced.
 	require.True(t, len(instances) >= 3)
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated, nil), i.Tags)
+		require.Equal(t, provisionTagsDefault(updated, nil), i.Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -503,9 +588,9 @@ func TestScaleIncrease(t *testing.T) {
 
 func TestScaleDecrease(t *testing.T) {
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -531,7 +616,7 @@ func TestScaleDecrease(t *testing.T) {
 	// quiesced.
 	require.True(t, len(instances) <= 3)
 	for _, i := range instances {
-		require.Equal(t, provisionTags(updated, nil), i.Tags)
+		require.Equal(t, provisionTagsDefault(updated, nil), i.Tags)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -539,9 +624,9 @@ func TestScaleDecrease(t *testing.T) {
 
 func TestFreeGroup(t *testing.T) {
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -556,9 +641,9 @@ func TestFreeGroup(t *testing.T) {
 
 func TestDestroyGroup(t *testing.T) {
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -577,9 +662,9 @@ func TestDestroyGroup(t *testing.T) {
 
 func TestSuperviseQuorum(t *testing.T) {
 	plugin := newTestInstancePlugin(
-		newFakeInstance(leaders, &leaderIDs[0]),
-		newFakeInstance(leaders, &leaderIDs[1]),
-		newFakeInstance(leaders, &leaderIDs[2]),
+		newFakeInstanceDefault(leaders, &leaderIDs[0]),
+		newFakeInstanceDefault(leaders, &leaderIDs[1]),
+		newFakeInstanceDefault(leaders, &leaderIDs[2]),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -607,7 +692,7 @@ func TestSuperviseQuorum(t *testing.T) {
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
 
-		expectTags := provisionTags(updated, i.LogicalID)
+		expectTags := provisionTagsDefault(updated, i.LogicalID)
 		if i.LogicalID != nil {
 			// expect to also have a label with logical ID
 			expectTags[instance.LogicalIDTag] = string(*i.LogicalID)
@@ -647,9 +732,9 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 	// Tests that a change to the flavor configuration triggers an update.
 
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -686,9 +771,9 @@ func TestFlavorChange(t *testing.T) {
 	// Tests that a change to the flavor configuration triggers an update.
 
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
 		group_types.Options{
@@ -712,9 +797,9 @@ func TestFreeGroupWhileConverging(t *testing.T) {
 	// Ensures that the group can be ignored while a commit is converging.
 
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 
 	var once sync.Once
@@ -765,9 +850,9 @@ func TestFreeGroupWhileConverging(t *testing.T) {
 func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 
 	plugin := newTestInstancePlugin(
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
-		newFakeInstance(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
 	)
 
 	flavorPlugin := testFlavor{
