@@ -200,7 +200,10 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		// TODO(wfarner): Make the 'batch size' configurable.
 		if canDestroy(undesiredInstances[0], r.updatingFrom) {
 			// we do not self-destruct in any cases.
-			r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate)
+			if err := r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate); err != nil {
+				log.Warn("Failed to destroy instance during rolling update", "ID", undesiredInstances[0].ID, "err", err)
+				return err
+			}
 		}
 
 		// Increment new instance count to replace the node that was just destroyed

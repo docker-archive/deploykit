@@ -74,7 +74,9 @@ func (d *testplugin) Destroy(id instance.ID, ctx instance.Context) error {
 	if !exists {
 		return errors.New("Instance does not exist")
 	}
-
+	if _, has := spec.Tags["DestroyError"]; has {
+		return errors.New("DestroyError")
+	}
 	delete(d.instances, id)
 
 	d.destroyed = append(d.destroyed, spec)
