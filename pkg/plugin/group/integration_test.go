@@ -319,7 +319,7 @@ func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
 	// is part of the group that is being updated
 	self := &leaderIDs[0]
 
-	// leader self rolling update should not destroy the running leader itself
+	// leader self rolling update should destroy itself (last)
 	plugin := newTestInstancePlugin(
 		newFakeInstanceDefault(leaders, &leaderIDs[0]),
 		newFakeInstanceDefault(leaders, &leaderIDs[1]),
@@ -417,11 +417,12 @@ func TestLeaderSelfRollingUpdatePolicyNever(t *testing.T) {
 
 	desc, err := grp.CommitGroup(updated, true) // pretend only
 	require.NoError(t, err)
-	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+	// Only on 2 instances since we cannot update self
+	require.Equal(t, "Performing a rolling update on 2 instances", desc)
 
 	desc, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
-	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+	require.Equal(t, "Performing a rolling update on 2 instances", desc)
 
 	awaitGroupConvergence(t, grp)
 

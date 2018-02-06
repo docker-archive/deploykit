@@ -37,7 +37,13 @@ func (q *quorum) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 		return nil, errors.New("Logical ID changes to a quorum is not currently supported")
 	}
 
-	if settings.config.InstanceHash() == newSettings.config.InstanceHash() {
+	// Determine how many instances are not at the desired instance configuration
+	instances, err := labelAndList(q.scaled)
+	if err != nil {
+		return nil, err
+	}
+	_, undesired := desiredAndUndesiredInstances(instances, newSettings)
+	if len(undesired) == 0 {
 		// This is a no-op update because the instance configuration is unchanged
 		return &noopUpdate{}, nil
 	}
@@ -45,7 +51,7 @@ func (q *quorum) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 	return &rollingupdate{
 		desc: fmt.Sprintf(
 			"Performing a rolling update on %d instances",
-			len(settings.config.Allocation.LogicalIDs)),
+			len(undesired)),
 		scaled:       scaled,
 		updatingFrom: settings,
 		updatingTo:   newSettings,

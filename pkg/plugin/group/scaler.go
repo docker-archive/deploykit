@@ -55,25 +55,14 @@ func (s *scaler) PlanUpdate(scaled Scaled, settings groupSettings, newSettings g
 	switch {
 	case sizeChange == 0:
 		rollCount := len(undesired)
-
 		if rollCount == 0 {
-			if settings.config.InstanceHash() == newSettings.config.InstanceHash() {
-
-				// This is a no-op update because:
-				//  - the instance configuration is unchanged
-				//  - the group contains no instances with an undesired state
-				//  - the group size is unchanged
-				return &noopUpdate{}, nil
-			}
-
-			// This case likely occurs because a group was created in a way that no instances are being
-			// created. We proceed with the update here, which will likely only change the target
-			// configuration in the scaler.
-
-			plan.desc = "Adjusting the instance configuration, no restarts necessary"
-			return &plan, nil
+			// This is a no-op update because:
+			//  - the instance configuration is unchanged
+			//  - the group contains no instances with an undesired state
+			//  - the group size is unchanged
+			return &noopUpdate{}, nil
 		}
-
+		// Perform a rolling update on the instances that do not match the desired
 		plan.desc = fmt.Sprintf("Performing a rolling update on %d instances", rollCount)
 
 	case sizeChange < 0:
