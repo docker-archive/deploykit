@@ -51,6 +51,13 @@ func (t *Clock) Tick() {
 	t.c <- Tick(1)
 }
 
+// Ticks makes multiple ticks
+func (t *Clock) Ticks(ticks int) {
+	for i := 0; i < ticks; i++ {
+		t.Tick()
+	}
+}
+
 func (t *Clock) run() *Clock {
 	if t.driver != nil {
 		go t.driver()
