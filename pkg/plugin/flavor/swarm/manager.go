@@ -106,7 +106,8 @@ func (s *ManagerFlavor) Drain(flavorProperties *types.Any, inst instance.Descrip
 
 	switch {
 	case len(nodes) == 0:
-		return fmt.Errorf("not found %v", inst.ID)
+		log.Warn("Unable to drain - not found in swarm", "id", inst.ID)
+		return nil
 
 	case len(nodes) == 1:
 
@@ -120,14 +121,21 @@ func (s *ManagerFlavor) Drain(flavorProperties *types.Any, inst instance.Descrip
 		}
 		version := nodeInfo.Version
 
+		// If the node is not a manager then remove it from the swarm (it is possible that the node
+		// was demoted but then failed to be removed and Destroyed)
 		if nodeInfo.Spec.Role != swarm.NodeRoleManager {
-			return fmt.Errorf("not a manager: %v", nodeID)
+			log.Warn("Node is not a manager, attempting to leave swarm", "hostname", nodeInfo.Description.Hostname, "id", nodeID)
+			err = dockerClient.SwarmLeave(ctx, true)
+			if err != nil {
+				return err
+			}
+			return nil
 		}
 
 		// change to worker
 		nodeInfo.Spec.Role = swarm.NodeRoleWorker
 
-		log.Debug("Docker NodeDemote", "id", nodeID)
+		log.Debug("Docker NodeDemote", "hostname", nodeInfo.Description.Hostname, "id", nodeID)
 		err = dockerClient.NodeUpdate(
 			ctx,
 			nodeID,
@@ -140,17 +148,13 @@ func (s *ManagerFlavor) Drain(flavorProperties *types.Any, inst instance.Descrip
 		// If running on the same node (self), then do docker swarm leave
 		// otherwise, remove the node
 		if s.isSelf(inst) {
-
-			log.Debug("Docker SwarmLeave", "id", nodeID)
-
+			log.Debug("Docker SwarmLeave", "hostname", nodeInfo.Description.Hostname, "id", nodeID)
 			err := dockerClient.SwarmLeave(ctx, true)
 			if err != nil {
 				return err
 			}
-
 		} else {
-			log.Debug("Docker NodeRemote", "id", nodeID)
-
+			log.Debug("Docker NodeRemote", "hostname", nodeInfo.Description.Hostname, "id", nodeID)
 			err := dockerClient.NodeRemove(
 				ctx,
 				nodeID,

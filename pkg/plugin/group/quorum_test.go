@@ -117,6 +117,13 @@ func TestQuorumPlanUpdateNoChanges(t *testing.T) {
 			},
 		},
 	}
+	// The same instance hash
+	scaled.EXPECT().List().Return([]instance.Description{{
+		ID: instance.ID("inst-1"),
+		Tags: map[string]string{
+			group.ConfigSHATag: settings.config.InstanceHash(),
+		},
+	}}, nil).Times(1)
 	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
 	plan, err := quorum.PlanUpdate(scaled, settings, settings)
 	require.NoError(t, err)
@@ -153,6 +160,7 @@ func TestQuorumPlanUpdateLogicalIDChange(t *testing.T) {
 	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
 	_, err := quorum.PlanUpdate(scaled, settingsOld, settingsNew)
 	require.Error(t, err)
+	require.EqualError(t, err, "Logical ID changes to a quorum is not currently supported")
 }
 
 func TestQuorumPlanUpdateRollingUpdate(t *testing.T) {
@@ -187,8 +195,27 @@ func TestQuorumPlanUpdateRollingUpdate(t *testing.T) {
 			Instance:   instanceNew,
 		},
 	}
+	// At least 1 has a different instance has
+	scaled.EXPECT().List().Return([]instance.Description{
+		{
+			ID: instance.ID("inst-1"),
+			Tags: map[string]string{
+				group.ConfigSHATag: settingsNew.config.InstanceHash(),
+			},
+		}, {
+			ID: instance.ID("inst-2"),
+			Tags: map[string]string{
+				group.ConfigSHATag: settingsOld.config.InstanceHash(),
+			},
+		},
+	}, nil).Times(1)
 	quorum := NewQuorum(groupID, scaled, logicalIDs, 1*time.Millisecond)
 	plan, err := quorum.PlanUpdate(scaled, settingsOld, settingsNew)
 	require.NoError(t, err)
 	require.IsType(t, &rollingupdate{}, plan)
+	r, _ := plan.(*rollingupdate)
+	require.Equal(t, "Performing a rolling update on 1 instances", r.desc)
+	require.Equal(t, settingsNew, r.updatingTo)
+	require.Equal(t, settingsOld, r.updatingFrom)
+	require.Equal(t, scaled, r.scaled)
 }
