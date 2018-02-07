@@ -78,11 +78,19 @@ func (r rollingupdate) Explain() string {
 	return r.desc
 }
 
-func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNewInstances int) error {
+// Tracks the progress of the update
+type updatingCount struct {
+	healthyTs    *time.Time
+	healthyCount *int
+}
+
+func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, updating group_types.Updating, expectedNewInstances int) error {
 	// Block until the expected number of instances in the desired state are ready.  Updates are unconcerned with
 	// the health of instances in the undesired state.  This allows a user to dig out of a hole where the original
 	// state of the group is bad, and instances are not reporting as healthy.
 	log.Info("waitUntilQuiesced", "expectedNewInstances", expectedNewInstances)
+	// Track when the expected new instance count is healthy
+	counts := updatingCount{}
 	// TODO: start processing right away instead of waiting for first tick
 	ticker := time.NewTicker(pollInterval)
 	for {
@@ -136,16 +144,20 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 			}
 
 			if numHealthy >= int(expectedNewInstances) {
+				if exceedsHealthyThreshold(updating, expectedNewInstances, &counts) {
+					log.Info("waitUntilQuiesced",
+						"msg", "Scaler has quiesced, terminating loop",
+						"expectedNewInstances", expectedNewInstances)
+					return nil
+				}
+			} else {
+				// Reset any count data since we have unhealthy nodes
+				counts = updatingCount{}
 				log.Info("waitUntilQuiesced",
-					"msg", "Scaler has quiesced, terminating loop",
+					"msg", "Waiting for scaler to quiesce",
 					"numHealthy", numHealthy,
 					"expectedNewInstances", expectedNewInstances)
-				return nil
 			}
-			log.Info("waitUntilQuiesced",
-				"msg", "Waiting for scaler to quiesce",
-				"numHealthy", numHealthy,
-				"expectedNewInstances", expectedNewInstances)
 
 		case <-r.stop:
 			ticker.Stop()
@@ -154,10 +166,54 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 	}
 }
 
+// exceedsHealthyThreshold returns true for the Updating threshold is exceeded
+func exceedsHealthyThreshold(updating group_types.Updating, expectedNewInstances int, counts *updatingCount) bool {
+	// No reason to wait if we are not expecting new instances
+	if expectedNewInstances <= 0 {
+		return true
+	}
+	// If a non-zero count is specified then check the number of healthy counts
+	if updating.Count > 0 {
+		count := 1
+		if counts.healthyCount != nil {
+			count = *counts.healthyCount + 1
+		}
+		counts.healthyCount = &count
+		if count < updating.Count {
+			log.Warn("Scaler is not healthy for required count",
+				"healthyCount", count,
+				"numHealthy", count,
+				"expectedNewInstances", expectedNewInstances)
+			return false
+		}
+		return true
+	}
+	// If a non-zero Duration is specfied then check the healthy Duration
+	if updating.Duration.Duration() > time.Duration(0) {
+		delta := time.Duration(0)
+		if counts.healthyTs == nil {
+			ts := time.Now()
+			counts.healthyTs = &ts
+		} else {
+			delta = time.Now().Sub(*counts.healthyTs)
+			if delta >= updating.Duration.Duration() {
+				return true
+			}
+		}
+		log.Warn("Scaler is not healthy for required duration",
+			"duration", updating.Duration.Duration(),
+			"healthyTime", delta,
+			"expectedNewInstances", expectedNewInstances)
+		return false
+	}
+	// Count and duration both 0
+	return true
+}
+
 // Run identifies instances not matching the desired state and destroys them one at a time until all instances in the
 // group match the desired state, with the desired number of instances.
 // TODO(wfarner): Make this routine more resilient to transient errors.
-func (r *rollingupdate) Run(pollInterval time.Duration) error {
+func (r *rollingupdate) Run(pollInterval time.Duration, updating group_types.Updating) error {
 
 	instances, err := labelAndList(r.scaled)
 	if err != nil {
@@ -175,7 +231,7 @@ func (r *rollingupdate) Run(pollInterval time.Duration) error {
 		if desiredSize == 0 {
 			desiredSize = int(r.updatingTo.config.Allocation.Size)
 		}
-		err := r.waitUntilQuiesced(pollInterval, minInt(expectedNewInstances, desiredSize))
+		err := r.waitUntilQuiesced(pollInterval, updating, minInt(expectedNewInstances, desiredSize))
 		if err != nil {
 			return err
 		}
