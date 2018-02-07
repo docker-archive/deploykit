@@ -7,12 +7,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
+	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/swarm"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/util/docker"
 	"golang.org/x/net/context"
+)
+
+var (
+	log = logutil.New("module", "store/swarm")
 )
 
 type snapshot struct {
@@ -65,7 +71,7 @@ func readSwarm(client docker.APIClientCloser, key string) (string, error) {
 
 	if info.ClusterInfo.Spec.Annotations.Labels != nil {
 		if l, has := info.ClusterInfo.Spec.Annotations.Labels[key]; has {
-			log.Debugln("config=", l)
+			log.Debug("readSwarm", "config", l)
 			return l, nil
 		}
 	}
@@ -73,16 +79,43 @@ func readSwarm(client docker.APIClientCloser, key string) (string, error) {
 }
 
 func writeSwarm(client docker.APIClientCloser, key, value string) error {
-	info, err := client.SwarmInspect(context.Background())
-	if err != nil {
+	attempt := 0
+	maxAttempts := 10
+	for {
+		info, err := client.SwarmInspect(context.Background())
+		if err != nil {
+			log.Error("Failed to inspect swarm", "err", err)
+			return err
+		}
+		if info.ClusterInfo.Spec.Annotations.Labels == nil {
+			info.ClusterInfo.Spec.Annotations.Labels = map[string]string{}
+		}
+		info.ClusterInfo.Spec.Annotations.Labels[key] = value
+		log.Debug("Updating swarm data",
+			"version", info.ClusterInfo.Meta.Version.Index,
+			"attempt", attempt)
+		err = client.SwarmUpdate(
+			context.Background(),
+			info.ClusterInfo.Meta.Version,
+			info.ClusterInfo.Spec,
+			swarm.UpdateFlags{})
+		if err == nil {
+			break
+		}
+		attempt++
+		// Sleep and retry when the version is out of sequence
+		if attempt < maxAttempts && strings.Contains(err.Error(), "update out of sequence") {
+			log.Info("Unable to update swarm data due to version conflict, will retry",
+				"version", info.ClusterInfo.Meta.Version.Index,
+				"attempt", attempt,
+				"err", err)
+			time.Sleep(time.Second * time.Duration(attempt))
+			continue
+		}
+		log.Error("Failed to update swarm data", "err", err)
 		return err
 	}
-	if info.ClusterInfo.Spec.Annotations.Labels == nil {
-		info.ClusterInfo.Spec.Annotations.Labels = map[string]string{}
-	}
-	info.ClusterInfo.Spec.Annotations.Labels[key] = value
-	return client.SwarmUpdate(context.Background(), info.ClusterInfo.Meta.Version, info.ClusterInfo.Spec,
-		swarm.UpdateFlags{})
+	return nil
 }
 
 func encode(obj interface{}) (string, error) {
