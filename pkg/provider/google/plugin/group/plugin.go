@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	group_controller "github.com/docker/infrakit/pkg/controller/group"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	instance_types "github.com/docker/infrakit/pkg/provider/google/plugin/instance/types"
 	"github.com/docker/infrakit/pkg/spi"
@@ -28,14 +28,14 @@ type settings struct {
 
 type plugin struct {
 	API           gcloud.API
-	flavorPlugins group_plugin.FlavorPluginLookup
+	flavorPlugins group_controller.FlavorPluginLookup
 	groups        map[group.ID]settings
 	lock          sync.Mutex
 }
 
 // NewGCEGroupPlugin creates a new GCE group plugin for a given project
 // and zone.
-func NewGCEGroupPlugin(project, zone string, flavorPlugins group_plugin.FlavorPluginLookup) group.Plugin {
+func NewGCEGroupPlugin(project, zone string, flavorPlugins group_controller.FlavorPluginLookup) group.Plugin {
 	api, err := gcloud.NewAPI(project, zone)
 	if err != nil {
 		log.Fatal(err)

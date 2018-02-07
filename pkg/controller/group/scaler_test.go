@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	mock_group "github.com/docker/infrakit/pkg/mock/plugin/group"
 	mock_instance "github.com/docker/infrakit/pkg/mock/spi/instance"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	testutil "github.com/docker/infrakit/pkg/testing"

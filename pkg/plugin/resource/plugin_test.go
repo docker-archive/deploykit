@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/docker/infrakit/pkg/controller/group/util"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/group/util"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/resource"
 	"github.com/docker/infrakit/pkg/template"

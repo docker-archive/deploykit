@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	group_controller "github.com/docker/infrakit/pkg/controller/group"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
@@ -22,12 +22,12 @@ type Spec struct {
 
 type flavorCombo struct {
 	API           gcloud.API
-	flavorPlugins group_plugin.FlavorPluginLookup
+	flavorPlugins group_controller.FlavorPluginLookup
 	minAge        time.Duration
 }
 
 // NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.
-func NewPlugin(flavorPlugins group_plugin.FlavorPluginLookup, project, zone string, minAge time.Duration) flavor.Plugin {
+func NewPlugin(flavorPlugins group_controller.FlavorPluginLookup, project, zone string, minAge time.Duration) flavor.Plugin {
 	api, err := gcloud.NewAPI(project, zone)
 	if err != nil {
 		log.Fatal(err)

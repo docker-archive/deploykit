@@ -9,10 +9,10 @@ import (
 	"github.com/docker/infrakit/cmd/infrakit/manager/schema"
 
 	"github.com/docker/infrakit/pkg/cli"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/launch"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	flavor_rpc "github.com/docker/infrakit/pkg/rpc/flavor"
 	metadata_rpc "github.com/docker/infrakit/pkg/rpc/metadata"
 	"github.com/docker/infrakit/pkg/run/manager"

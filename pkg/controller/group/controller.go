@@ -16,7 +16,7 @@ func AsController(addr plugin.Addressable, g group.Plugin) controller.Controller
 		gid := group.ID(addr.Instance())
 		scope = &gid
 	}
-	return &gController{
+	return &adapter{
 		Addressable: addr, // address of the plugin backend
 		scope:       scope,
 		plugin:      g,
@@ -26,13 +26,13 @@ func AsController(addr plugin.Addressable, g group.Plugin) controller.Controller
 // This controller is used to implement a generic controller *as well as* a named controller
 // for a group.  When id is specified, the controller is scoped to the id.  When input is missing
 // id, it will be injected.  If input has mismatched id, requests will error.
-type gController struct {
+type adapter struct {
 	plugin.Addressable
 	scope  *group.ID
 	plugin group.Plugin
 }
 
-func (c *gController) translateSpec(spec types.Spec) (group.Spec, error) {
+func (c *adapter) translateSpec(spec types.Spec) (group.Spec, error) {
 	gSpec := group.Spec{
 		Properties: spec.Properties,
 	}
@@ -64,7 +64,7 @@ func buildObject(spec types.Spec, desc group.Description) (types.Object, error) 
 	}, nil
 }
 
-func (c *gController) fromGroupSpec(gspec group.Spec) types.Spec {
+func (c *adapter) fromGroupSpec(gspec group.Spec) types.Spec {
 	return types.Spec{
 		Kind:    c.Kind(),
 		Version: group.InterfaceSpec.Encode(),
@@ -77,7 +77,7 @@ func (c *gController) fromGroupSpec(gspec group.Spec) types.Spec {
 	}
 }
 
-func (c *gController) helpFind(search *types.Metadata) (gspecs map[group.ID]group.Spec, err error) {
+func (c *adapter) helpFind(search *types.Metadata) (gspecs map[group.ID]group.Spec, err error) {
 	gspecs = map[group.ID]group.Spec{}
 
 	all := []group.Spec{}
@@ -95,7 +95,7 @@ func (c *gController) helpFind(search *types.Metadata) (gspecs map[group.ID]grou
 	return
 }
 
-func (c *gController) Plan(operation controller.Operation,
+func (c *adapter) Plan(operation controller.Operation,
 	spec types.Spec) (object types.Object, plan controller.Plan, err error) {
 
 	gSpec, e := c.translateSpec(spec)
@@ -133,7 +133,7 @@ func (c *gController) Plan(operation controller.Operation,
 	return
 }
 
-func (c *gController) Commit(operation controller.Operation, spec types.Spec) (object types.Object, err error) {
+func (c *adapter) Commit(operation controller.Operation, spec types.Spec) (object types.Object, err error) {
 	gSpec, e := c.translateSpec(spec)
 	if e != nil {
 		err = e
@@ -167,7 +167,7 @@ func (c *gController) Commit(operation controller.Operation, spec types.Spec) (o
 	return
 }
 
-func (c *gController) Describe(search *types.Metadata) (objects []types.Object, err error) {
+func (c *adapter) Describe(search *types.Metadata) (objects []types.Object, err error) {
 	var gspecs map[group.ID]group.Spec
 	gspecs, err = c.helpFind(search)
 	if err != nil {
@@ -203,7 +203,7 @@ func (c *gController) Describe(search *types.Metadata) (objects []types.Object, 
 	return
 }
 
-func (c *gController) Specs(search *types.Metadata) (specs []types.Spec, err error) {
+func (c *adapter) Specs(search *types.Metadata) (specs []types.Spec, err error) {
 	var gspecs map[group.ID]group.Spec
 	gspecs, err = c.helpFind(search)
 	if err != nil {
@@ -227,7 +227,7 @@ func (c *gController) Specs(search *types.Metadata) (specs []types.Spec, err err
 	return
 }
 
-func (c *gController) Free(search *types.Metadata) (objects []types.Object, err error) {
+func (c *adapter) Free(search *types.Metadata) (objects []types.Object, err error) {
 	objects, err = c.Describe(search)
 	if err != nil {
 		return
@@ -242,7 +242,7 @@ func (c *gController) Free(search *types.Metadata) (objects []types.Object, err 
 	return
 }
 
-func (c *gController) Terminate(search *types.Metadata) (objects []types.Object, err error) {
+func (c *adapter) Terminate(search *types.Metadata) (objects []types.Object, err error) {
 	objects, err = c.Describe(search)
 	if err != nil {
 		return

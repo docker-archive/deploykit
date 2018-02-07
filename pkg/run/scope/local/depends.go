@@ -1,36 +1,13 @@
 package local
 
 import (
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/run/depends"
 	group_kind "github.com/docker/infrakit/pkg/run/v0/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/types"
 )
-
-// // ParseInputSpecs parses the input bytes which is the groups.json, and calls
-// // each time a group spec is found.
-// func ParseInputSpecs(input []byte, foundGroupSpec func(group.ID, group_types.Spec)) error {
-// 	// TODO - update the schema soon. This is the Plugin/Properties schema
-// 	type spec struct {
-// 		Plugin     plugin.Name
-// 		Properties struct {
-// 			ID         group.ID
-// 			Properties group_types.Spec
-// 		}
-// 	}
-
-// 	specs := []spec{}
-// 	err := types.AnyBytes(input).Decode(&specs)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for _, s := range specs {
-// 		foundGroupSpec(s.Properties.ID, s.Properties.Properties)
-// 	}
-// 	return nil
-// }
 
 // Plugins returns a list of startPlugin directives from the input.
 // This will recurse into any composable plugins.

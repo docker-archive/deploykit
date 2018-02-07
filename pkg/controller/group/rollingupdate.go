@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"

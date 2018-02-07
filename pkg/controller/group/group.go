@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	logutil "github.com/docker/infrakit/pkg/log"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -36,7 +36,7 @@ func NewGroupPlugin(
 	flavorPlugins FlavorPluginLookup,
 	options group_types.Options) group.Plugin {
 
-	return &plugin{
+	return &gController{
 		instancePlugins: instancePlugins,
 		flavorPlugins:   flavorPlugins,
 		options:         options,
@@ -47,7 +47,7 @@ func NewGroupPlugin(
 	}
 }
 
-type plugin struct {
+type gController struct {
 	options group_types.Options
 
 	self            *instance.LogicalID
@@ -59,7 +59,7 @@ type plugin struct {
 	groups          groups
 }
 
-func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
+func (p *gController) CommitGroup(config group.Spec, pretend bool) (string, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -129,7 +129,7 @@ func (p *plugin) CommitGroup(config group.Spec, pretend bool) (string, error) {
 	return fmt.Sprintf("Managing %d instances", supervisor.Size()), nil
 }
 
-func (p *plugin) doFree(id group.ID) (*groupContext, error) {
+func (p *gController) doFree(id group.ID) (*groupContext, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -146,16 +146,16 @@ func (p *plugin) doFree(id group.ID) (*groupContext, error) {
 	return grp, nil
 }
 
-func (p *plugin) FreeGroup(id group.ID) error {
+func (p *gController) FreeGroup(id group.ID) error {
 	_, err := p.doFree(id)
 	return err
 }
 
-func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
+func (p *gController) DescribeGroup(id group.ID) (group.Description, error) {
 	// TODO(wfarner): Include details about any in-flight updates.
 
 	// The groups.get will do a read lock on the list of groups.
-	// We don't want to lock the entire controller for a describe group
+	// We don't want to lock the entire gController for a describe group
 	// when the describe may take a long time.
 	context, exists := p.groups.get(id)
 	if !exists {
@@ -170,7 +170,7 @@ func (p *plugin) DescribeGroup(id group.ID) (group.Description, error) {
 	return group.Description{Instances: instances, Converged: !context.updating()}, nil
 }
 
-func (p *plugin) DestroyGroup(gid group.ID) error {
+func (p *gController) DestroyGroup(gid group.ID) error {
 	context, err := p.doFree(gid)
 
 	if context != nil {
@@ -187,7 +187,7 @@ func (p *plugin) DestroyGroup(gid group.ID) error {
 	return err
 }
 
-func (p *plugin) Size(gid group.ID) (size int, err error) {
+func (p *gController) Size(gid group.ID) (size int, err error) {
 	var all []group.Spec
 	all, err = p.InspectGroups()
 	if err != nil {
@@ -210,7 +210,7 @@ func (p *plugin) Size(gid group.ID) (size int, err error) {
 	return
 }
 
-func (p *plugin) SetSize(gid group.ID, size int) (err error) {
+func (p *gController) SetSize(gid group.ID, size int) (err error) {
 	if size < 0 {
 		return fmt.Errorf("size cannot be negative")
 	}
@@ -245,7 +245,7 @@ func (e instancesErr) Error() string {
 	return strings.Join(e, ",")
 }
 
-func (p *plugin) DestroyInstances(gid group.ID, toDestroy []instance.ID) error {
+func (p *gController) DestroyInstances(gid group.ID, toDestroy []instance.ID) error {
 	log.Debug("Destorying instances", "gid", gid, "targets", toDestroy)
 
 	context, exists := p.groups.get(gid)
@@ -294,7 +294,7 @@ func (p *plugin) DestroyInstances(gid group.ID, toDestroy []instance.ID) error {
 	return p.SetSize(gid, sizeSpec-len(toDestroy)) // this will commit the change and watch again
 }
 
-func (p *plugin) InspectGroups() ([]group.Spec, error) {
+func (p *gController) InspectGroups() ([]group.Spec, error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	var specs []group.Spec
@@ -331,7 +331,7 @@ func (n noopUpdate) Run(_ time.Duration) error {
 func (n noopUpdate) Stop() {
 }
 
-func (p *plugin) validate(config group.Spec) (groupSettings, error) {
+func (p *gController) validate(config group.Spec) (groupSettings, error) {
 
 	noSettings := groupSettings{}
 

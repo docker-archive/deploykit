@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/stretchr/testify/require"
 )

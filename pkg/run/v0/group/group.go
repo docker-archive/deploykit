@@ -3,11 +3,11 @@ package group
 import (
 	"time"
 
+	"github.com/docker/infrakit/pkg/controller/group"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	"github.com/docker/infrakit/pkg/plugin/group"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"

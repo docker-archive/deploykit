@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
