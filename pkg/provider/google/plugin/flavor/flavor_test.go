@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	group_controller "github.com/docker/infrakit/pkg/controller/group"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
 	mock_flavor "github.com/docker/infrakit/pkg/provider/google/mock/flavor"
 	mock_gcloud "github.com/docker/infrakit/pkg/provider/google/mock/gcloud"
 	"github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
@@ -32,7 +32,7 @@ var inst = instance.Spec{
 	Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}},
 }
 
-func pluginLookup(plugins map[string]flavor.Plugin) group_plugin.FlavorPluginLookup {
+func pluginLookup(plugins map[string]flavor.Plugin) group_controller.FlavorPluginLookup {
 	return func(key plugin.Name) (flavor.Plugin, error) {
 		plugin, has := plugins[key.String()]
 		if has {

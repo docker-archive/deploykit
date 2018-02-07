@@ -2,8 +2,8 @@ package group
 
 import (
 	"fmt"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
-	"github.com/docker/infrakit/pkg/plugin/group/util"
+	"github.com/docker/infrakit/pkg/controller/group/types"
+	"github.com/docker/infrakit/pkg/controller/group/util"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
