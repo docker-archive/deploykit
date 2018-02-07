@@ -1,5 +1,9 @@
 package fsm
 
+import (
+	"sync"
+)
+
 // ID is the id of the instance in a given set.  It's unique in that set.
 type ID uint64
 
@@ -33,43 +37,68 @@ type instance struct {
 	deadline Time
 	index    int // index used in the deadlines queue
 	visits   map[Index]int
+
+	lock sync.RWMutex
 }
 
 // ID returns the ID of the fsm instance
-func (i instance) ID() ID {
+func (i *instance) ID() ID {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
 	return i.id
 }
 
 // Data returns a customer data value attached to this instance
-func (i instance) Data() interface{} {
+func (i *instance) Data() interface{} {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
 	return i.data
 }
 
+const invalidState Index = -99999
+
+// IsInvalidState returns true if the index is invalid
+func IsInvalidState(s Index) bool {
+	return s == invalidState
+}
+
 // State returns the state of the fsm instance
-func (i instance) State() Index {
-	result := make(chan Index)
-	defer close(result)
-	// we have to ask the set which actually holds the instance (this was returned by copy)
+func (i *instance) State() (result Index) {
+	done := make(chan struct{})
+
+	result = invalidState
+
+	// queue this so that the read is consistent
 	i.parent.reads <- func(view Set) {
-		if instance, has := view.members[i.id]; has {
-			result <- instance.state
+		defer close(done)
+
+		instance, has := view.members[i.id]
+		if has {
+			result = instance.state
 		}
+		i.lock.Lock()
+		defer i.lock.Unlock()
+		i.state = result // update self
 	}
-	return <-result
+	<-done // finish waiting
+	return
 }
 
 // Valid returns true if current state can receive the given signal
-func (i instance) CanReceive(s Signal) bool {
+func (i *instance) CanReceive(s Signal) bool {
 	_, _, err := i.parent.spec.transition(i.State(), s)
 	return err == nil
 }
 
 // Signal sends a signal to the instance
-func (i instance) Signal(s Signal, optionalData ...interface{}) (err error) {
+func (i *instance) Signal(s Signal, optionalData ...interface{}) (err error) {
 	return i.parent.Signal(s, i.id, optionalData...)
 }
 
 func (i *instance) update(next Index, now Time, ttl Tick) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
 	i.visits[next] = i.visits[next] + 1
 	i.state = next
 	i.start = now

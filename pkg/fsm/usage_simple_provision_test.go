@@ -294,10 +294,12 @@ func TestSimpleProvisionFlow(t *testing.T) {
 
 	t.Log("make sure everyone is associated with an instance id from the infrastructure")
 
+	all := 0
 	for i := range myCluster.zones {
 		az := myCluster.zones[i]
 		az.ForEachInstanceInState(allocated,
 			func(id ID, s Index, d interface{}) bool {
+				all++
 				require.NotNil(t, d)
 				return true
 			},
@@ -305,4 +307,5 @@ func TestSimpleProvisionFlow(t *testing.T) {
 	}
 
 	// Now all instance are provisioned, in allocated state.
+	require.Equal(t, 30, all)
 }

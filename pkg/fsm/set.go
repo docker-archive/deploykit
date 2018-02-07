@@ -89,16 +89,11 @@ type Set struct {
 // Signal sends a signal to the instance
 func (s *Set) Signal(signal Signal, instance ID, optionalData ...interface{}) error {
 	if _, has := s.spec.signals[signal]; !has {
-		return unknownSignal(signal)
-	}
-
-	var data interface{}
-	if len(optionalData) > 0 {
-		data = optionalData[0]
+		return unknownSignal{signal: signal}
 	}
 
 	log.Debug("Signal", "set", s.options.Name, "signal", signal, "instance", instance)
-	s.events <- &event{instance: instance, signal: signal, data: data}
+	s.events <- &event{instance: instance, signal: signal, data: optionalData}
 	return nil
 }
 
@@ -192,11 +187,11 @@ func (s *Set) Stop() {
 type event struct {
 	instance ID
 	signal   Signal
-	data     interface{}
+	data     []interface{}
 }
 
 func (s *Set) handleError(tid int64, err error, ctx interface{}) {
-	log.Warn("error", "tid", tid, "err", err, "context", ctx)
+	log.Error("error", "tid", tid, "err", err, "context", ctx)
 	select {
 	case s.errors <- err:
 	default:
@@ -284,6 +279,7 @@ func (s *Set) handleClockTick(tid int64) error {
 		// check > 0 here because we could have already raised the signal
 		// when a real event came in.
 		if instance.deadline > 0 {
+
 			// raise the signal
 			if ttl, err := s.spec.expiry(instance.state); err != nil {
 
@@ -291,7 +287,7 @@ func (s *Set) handleClockTick(tid int64) error {
 
 			} else if ttl != nil {
 
-				log.Warn("deadline exceeded", "name", s.options.Name, "tid", tid, "id", instance.id, "raise", ttl.Raise)
+				log.Debug("deadline exceeded", "name", s.options.Name, "tid", tid, "id", instance.id, "raise", ttl.Raise)
 
 				s.raise(tid, instance.id, ttl.Raise, instance.state)
 			}
@@ -369,7 +365,7 @@ func (s *Set) raise(tid int64, id ID, signal Signal, current Index) (err error) 
 	}()
 
 	if _, has := s.spec.signals[signal]; !has {
-		err = unknownSignal(signal)
+		err = unknownSignal{signal: signal}
 		return
 	}
 
@@ -410,7 +406,7 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 
 		if flaps >= limit.Count {
 
-			log.Warn("Flapping", "tid", tid, "flaps", flaps,
+			log.Debug("Flapping", "tid", tid, "flaps", flaps,
 				"instance", instance.id, "state", instance.state, "raise", limit.Raise)
 			s.raise(tid, instance.id, limit.Raise, instance.state)
 
@@ -423,12 +419,12 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 		instance.data = event.data
 	}
 
-	log.Debug("Transtion", "action", action)
+	log.Debug("Transtion", "action", action, "next", next)
 	// call action before transitiion
 	if action != nil {
 		if err := action(instance); err != nil {
 
-			log.Warn("Error transition", "err", err)
+			log.Debug("Error transition", "err", err)
 
 			if alternate, err := s.spec.error(current, event.signal); err != nil {
 
@@ -436,7 +432,7 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 
 			} else {
 
-				log.Warn("Err executing action", "tid", tid, "instance", instance.id,
+				log.Debug("Err executing action", "tid", tid, "instance", instance.id,
 					"state", current, "signal", event.signal, "alternate", alternate, "next", next)
 
 				next = alternate
@@ -469,6 +465,7 @@ type txn struct {
 func (s *Set) run() {
 
 	stopTransactions := make(chan struct{})
+
 	// Core processing
 	go func() {
 		defer func() {
@@ -493,26 +490,8 @@ func (s *Set) run() {
 		}
 	}()
 
-	stopTimer := make(chan struct{})
-	// timer
-	go func() {
-		for {
-			select {
-			case <-stopTimer:
-				return
-
-			case <-s.clock.C:
-				s.transactions <- &txn{
-					tid: s.tid(),
-					Func: func(tid int64) (interface{}, error) {
-						return nil, s.handleClockTick(tid)
-					},
-				}
-			}
-		}
-	}()
-
 	// Input events
+
 	go func() {
 
 	loop:
@@ -523,8 +502,15 @@ func (s *Set) run() {
 
 			select {
 
+			case <-s.clock.C:
+				tx = &txn{
+					tid: s.tid(),
+					Func: func(tid int64) (interface{}, error) {
+						return nil, s.handleClockTick(tid)
+					},
+				}
+
 			case <-s.stop:
-				close(stopTimer)
 				break loop
 
 			case initial, ok := <-s.add:
@@ -574,8 +560,7 @@ func (s *Set) run() {
 					tid: tid,
 					Func: func(tid int64) (interface{}, error) {
 						// For reads on the Set itself.  All the reads are serialized.
-						view := *s // a copy (not quite deep copy) of the set
-						reader(view)
+						reader(*s)
 						return nil, nil
 					},
 				}

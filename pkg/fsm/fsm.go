@@ -115,7 +115,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		for signal, action := range s.Actions {
 			if _, has := s.Transitions[signal]; !has {
 				log.Warn("actions has signal that's not in state's transitions", "state", s.Index, "signal", signal)
-				return nil, unknownTransition(signal)
+				return nil, unknownTransition{signal: signal, state: s.Index}
 			}
 
 			if action == nil {
@@ -123,7 +123,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 			}
 
 			if _, has := signals[signal]; !has {
-				return nil, unknownSignal(signal)
+				return nil, unknownSignal{signal: signal, state: s.Index}
 			}
 		}
 	}
@@ -134,7 +134,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		if s.TTL.TTL > 0 {
 			if _, has := s.Transitions[s.TTL.Raise]; !has {
 				log.Warn("expiry raises signal that's not in state's transitions", "state", s.Index, "TTL", s.TTL)
-				return nil, unknownSignal(s.TTL.Raise)
+				return nil, unknownSignal{signal: s.TTL.Raise, state: s.Index}
 			}
 
 			// register as valid signal
@@ -144,7 +144,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		if s.Visit.Value > 0 {
 			if _, has := s.Transitions[s.Visit.Raise]; !has {
 				log.Warn("visit limit raises signal that's not in state's transitions", "state", s.Index, "visit", s.Visit)
-				return nil, unknownSignal(s.Visit.Raise)
+				return nil, unknownSignal{signal: s.Visit.Raise, state: s.Index}
 			}
 
 			// register as valid signal
@@ -221,13 +221,13 @@ func (s *Spec) error(current Index, signal Signal) (next Index, err error) {
 
 	_, has = s.signals[signal]
 	if !has {
-		err = unknownSignal(signal)
+		err = unknownSignal{signal: signal, state: current}
 		return
 	}
 
 	v, has := state.Errors[signal]
 	if !has {
-		err = unknownTransition(signal)
+		err = unknownTransition{signal: signal, state: current}
 		return
 	}
 	next = v
@@ -254,13 +254,13 @@ func (s *Spec) transition(current Index, signal Signal) (next Index, action Acti
 
 	_, has = s.signals[signal]
 	if !has {
-		err = unknownSignal(signal)
+		err = unknownSignal{signal: signal}
 		return
 	}
 
 	n, has := state.Transitions[signal]
 	if !has {
-		err = unknownTransition(signal)
+		err = unknownTransition{signal: signal, state: state.Index}
 		return
 	}
 	next = n

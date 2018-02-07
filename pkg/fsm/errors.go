@@ -16,16 +16,22 @@ func (e unknownState) Error() string {
 	return fmt.Sprintf("unknown state index: %d", e)
 }
 
-type unknownTransition Signal
-
-func (e unknownTransition) Error() string {
-	return fmt.Sprintf("no transition defined for signal %d", e)
+type unknownTransition struct {
+	signal Signal
+	state  Index
 }
 
-type unknownSignal Signal
+func (e unknownTransition) Error() string {
+	return fmt.Sprintf("state %d - no transition defined for signal %d", e.state, e.signal)
+}
+
+type unknownSignal struct {
+	signal Signal
+	state  Index
+}
 
 func (e unknownSignal) Error() string {
-	return fmt.Sprintf("signal in action not found in transitions %d", e)
+	return fmt.Sprintf("state %d - signal in action not found in transitions %d", e.state, e.signal)
 }
 
 type unknownInstance ID
