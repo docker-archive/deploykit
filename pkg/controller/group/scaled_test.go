@@ -3,8 +3,8 @@ package group
 import (
 	"testing"
 
+	"github.com/docker/infrakit/pkg/controller/group/types"
 	mock_instance "github.com/docker/infrakit/pkg/mock/spi/instance"
-	"github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/golang/mock/gomock"

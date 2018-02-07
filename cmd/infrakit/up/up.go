@@ -9,9 +9,9 @@ import (
 	"github.com/docker/infrakit/cmd/infrakit/manager/schema"
 
 	"github.com/docker/infrakit/pkg/cli"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/run/scope/local"
 	"github.com/docker/infrakit/pkg/spi/group"

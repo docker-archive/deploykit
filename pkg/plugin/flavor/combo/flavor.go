@@ -4,8 +4,8 @@ import (
 	"errors"
 	"strings"
 
-	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
+	group_controller "github.com/docker/infrakit/pkg/controller/group"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -23,12 +23,12 @@ type Options struct {
 var DefaultOptions = Options{}
 
 // NewPlugin creates a Flavor Combo plugin that chains multiple flavors in a sequence.  Each flavor
-func NewPlugin(flavorPlugins group_plugin.FlavorPluginLookup, options Options) flavor.Plugin {
+func NewPlugin(flavorPlugins group_controller.FlavorPluginLookup, options Options) flavor.Plugin {
 	return flavorCombo{flavorPlugins: flavorPlugins}
 }
 
 type flavorCombo struct {
-	flavorPlugins group_plugin.FlavorPluginLookup
+	flavorPlugins group_controller.FlavorPluginLookup
 }
 
 func (f flavorCombo) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {

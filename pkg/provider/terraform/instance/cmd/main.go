@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/cli"
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	logutil "github.com/docker/infrakit/pkg/log"
 	plugin_base "github.com/docker/infrakit/pkg/plugin"
-	group_types "github.com/docker/infrakit/pkg/plugin/group/types"
 	terraform "github.com/docker/infrakit/pkg/provider/terraform/instance"
 	terraform_types "github.com/docker/infrakit/pkg/provider/terraform/instance/types"
 	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"

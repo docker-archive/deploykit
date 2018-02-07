@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	group_controller "github.com/docker/infrakit/pkg/controller/group"
 	mock_flavor "github.com/docker/infrakit/pkg/mock/spi/flavor"
 	"github.com/docker/infrakit/pkg/plugin"
-	group_plugin "github.com/docker/infrakit/pkg/plugin/group"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -28,7 +28,7 @@ var inst = instance.Spec{
 	Attachments: []instance.Attachment{{ID: "att1", Type: "nic"}},
 }
 
-func pluginLookup(plugins map[string]flavor.Plugin) group_plugin.FlavorPluginLookup {
+func pluginLookup(plugins map[string]flavor.Plugin) group_controller.FlavorPluginLookup {
 	return func(key plugin.Name) (flavor.Plugin, error) {
 		plugin, has := plugins[key.String()]
 		if has {
