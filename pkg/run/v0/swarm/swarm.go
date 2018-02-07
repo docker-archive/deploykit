@@ -13,6 +13,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/docker/infrakit/pkg/util/docker"
 )
 
 const (
@@ -44,6 +45,9 @@ type Options struct {
 
 	// Self is the logical ID of the node running this code.
 	Self *instance.LogicalID
+
+	// Docker is the connection info for the Docker client
+	Docker docker.ConnectInfo
 }
 
 func nilLogicalIDIfEmptyString(s string) *instance.LogicalID {
@@ -59,6 +63,9 @@ var DefaultOptions = Options{
 	Self: nilLogicalIDIfEmptyString(local.Getenv(EnvSelfLogicalID, "")),
 	Options: template.Options{
 		MultiPass: true,
+	},
+	Docker: docker.ConnectInfo{
+		Host: "unix:///var/run/docker.sock",
 	},
 }
 
@@ -87,6 +94,7 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	managerFlavor := swarm.NewManagerFlavor(scope, swarm.DockerClient, mt, managerStop, options.Self)
 	workerFlavor := swarm.NewWorkerFlavor(scope, swarm.DockerClient, wt, workerStop)
+	instancePlugin := swarm.NewInstancePlugin(swarm.DockerClient, options.Docker)
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
@@ -100,6 +108,8 @@ func Run(scope scope.Scope, name plugin.Name,
 				"worker":  workerFlavor,
 			}, nil
 		},
+		run.Group:    swarm.NewGroupPlugin(instancePlugin),
+		run.Instance: instancePlugin,
 	}
 	onStop = func() {
 		close(workerStop)
