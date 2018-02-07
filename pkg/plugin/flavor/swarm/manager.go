@@ -110,8 +110,7 @@ func (s *ManagerFlavor) Drain(flavorProperties *types.Any, inst instance.Descrip
 		return nil
 
 	case len(nodes) == 1:
-
-		// Do a swarm leave if and only if this is a manager
+		// Do a swarm demote for managers
 
 		nodeID := nodes[0].ID
 		// read the state of the node, getting the current version
@@ -121,50 +120,25 @@ func (s *ManagerFlavor) Drain(flavorProperties *types.Any, inst instance.Descrip
 		}
 		version := nodeInfo.Version
 
-		// If the node is not a manager then remove it from the swarm (it is possible that the node
-		// was demoted but then failed to be removed and Destroyed)
+		// If the node is not a manager then just return (it is possible that the node
+		// was demoted but then failed to be Destroyed)
 		if nodeInfo.Spec.Role != swarm.NodeRoleManager {
-			log.Warn("Node is not a manager, attempting to leave swarm", "hostname", nodeInfo.Description.Hostname, "id", nodeID)
-			err = dockerClient.SwarmLeave(ctx, true)
-			if err != nil {
-				return err
-			}
+			log.Warn("Node is not a manager, nothing to demote",
+				"hostname", nodeInfo.Description.Hostname,
+				"id", nodeID)
 			return nil
 		}
 
 		// change to worker
 		nodeInfo.Spec.Role = swarm.NodeRoleWorker
-
-		log.Debug("Docker NodeDemote", "hostname", nodeInfo.Description.Hostname, "id", nodeID)
-		err = dockerClient.NodeUpdate(
+		log.Info("Docker NodeDemote",
+			"hostname", nodeInfo.Description.Hostname,
+			"id", nodeID)
+		return dockerClient.NodeUpdate(
 			ctx,
 			nodeID,
 			version,
 			nodeInfo.Spec)
-		if err != nil {
-			return err
-		}
-
-		// If running on the same node (self), then do docker swarm leave
-		// otherwise, remove the node
-		if s.isSelf(inst) {
-			log.Debug("Docker SwarmLeave", "hostname", nodeInfo.Description.Hostname, "id", nodeID)
-			err := dockerClient.SwarmLeave(ctx, true)
-			if err != nil {
-				return err
-			}
-		} else {
-			log.Debug("Docker NodeRemote", "hostname", nodeInfo.Description.Hostname, "id", nodeID)
-			err := dockerClient.NodeRemove(
-				ctx,
-				nodeID,
-				docker_types.NodeRemoveOptions{Force: true})
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
 
 	default:
 		return fmt.Errorf("Expected at most one node with label %s, but found %v", link.Value(), nodes)
