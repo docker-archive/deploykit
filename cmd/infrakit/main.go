@@ -42,6 +42,7 @@ import (
 
 	// Supported "kinds"
 	_ "github.com/docker/infrakit/pkg/run/v0/aws"
+	_ "github.com/docker/infrakit/pkg/run/v0/azure"
 	_ "github.com/docker/infrakit/pkg/run/v0/combo"
 	_ "github.com/docker/infrakit/pkg/run/v0/digitalocean"
 	_ "github.com/docker/infrakit/pkg/run/v0/docker"
