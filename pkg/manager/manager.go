@@ -439,9 +439,6 @@ func (m *manager) onLostLeadership() error {
 }
 
 func (m *manager) doCommitAll(config globalSpec) error {
-	// Exec the plugins with groupReQueue=true since the initial group commit
-	// only defines the group. Once all groups are defined then issue another
-	// commit to handle any updates that have not completed
 	return m.execPlugins(config,
 		func(control controller.Controller, spec types.Spec) (bool, error) {
 
@@ -459,7 +456,10 @@ func (m *manager) doCommitAll(config globalSpec) error {
 			}
 			return true, err
 		},
-		true)
+		true) // Exec the plugins with groupRequeue=true since the initial group
+	// commit only defines the group. Once all groups are defined then issue
+	// another commit to handle any updates that have not completed (occurs
+	// if there in a update and leadership changes)
 }
 
 func (m *manager) doFreeAll(config globalSpec) error {
