@@ -2,7 +2,6 @@ package group
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 	"time"
 
@@ -130,8 +129,7 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, expectedNe
 					log.Info("waitUntilQuiesced", "health", "heathy", "nodeID", inst.ID)
 					numHealthy++
 				case flavor.Unhealthy:
-					log.Error("waitUntilQuiesced", "health", "unheathy", "nodeID", inst.ID)
-					return fmt.Errorf("Instance %s is unhealthy", inst.ID)
+					log.Warn("waitUntilQuiesced", "health", "unheathy", "nodeID", inst.ID)
 				case flavor.Unknown:
 					log.Info("waitUntilQuiesced", "health", "unknown", "nodeID", inst.ID)
 				}
