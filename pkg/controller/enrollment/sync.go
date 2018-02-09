@@ -163,12 +163,27 @@ func (l *enroller) sync() error {
 		instance.Descriptions(enrolled), enrolledKeyFunc, l.options.EnrollmentParseErrPolicy,
 	)
 
-	// Use Info logging only when making deltas
-	logFn := log.Debug
+	log.Debug("Computed delta", "add", add, "remove", remove, "debug", debugV)
+	// Use Info logging only when making deltas, log the ID:LogicalID for each delta
 	if len(add) > 0 || len(remove) > 0 {
-		logFn = log.Info
+		addIDs := []string{}
+		removeIDS := []string{}
+		for _, a := range add {
+			val := string(a.ID)
+			if a.LogicalID != nil {
+				val = fmt.Sprintf("%s:%s", val, string(*a.LogicalID))
+			}
+			addIDs = append(addIDs, val)
+		}
+		for _, r := range remove {
+			val := string(r.ID)
+			if r.LogicalID != nil {
+				val = fmt.Sprintf("%s:%s", val, string(*r.LogicalID))
+			}
+			removeIDS = append(removeIDS, val)
+		}
+		log.Info("Computed delta", "add", addIDs, "remove", removeIDS)
 	}
-	logFn("Computed delta", "add", add, "remove", remove)
 
 	instancePlugin, err := l.getInstancePlugin(l.properties.Instance.Plugin)
 	if err != nil {
