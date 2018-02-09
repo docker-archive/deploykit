@@ -78,12 +78,6 @@ func (r rollingupdate) Explain() string {
 	return r.desc
 }
 
-// Tracks the progress of the update
-type updatingCount struct {
-	healthyTs    *time.Time
-	healthyCount *int
-}
-
 func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, updating group_types.Updating, expectedNewInstances int) error {
 	// Block until the expected number of instances in the desired state are ready.  Updates are unconcerned with
 	// the health of instances in the undesired state.  This allows a user to dig out of a hole where the original
@@ -144,7 +138,7 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, updating g
 			}
 
 			if numHealthy >= int(expectedNewInstances) {
-				if exceedsHealthyThreshold(updating, expectedNewInstances, &counts) {
+				if counts.exceedsHealthyThreshold(updating, expectedNewInstances) {
 					log.Info("waitUntilQuiesced",
 						"msg", "Scaler has quiesced, terminating loop",
 						"expectedNewInstances", expectedNewInstances)
@@ -166,8 +160,14 @@ func (r *rollingupdate) waitUntilQuiesced(pollInterval time.Duration, updating g
 	}
 }
 
-// exceedsHealthyThreshold returns true for the Updating threshold is exceeded
-func exceedsHealthyThreshold(updating group_types.Updating, expectedNewInstances int, counts *updatingCount) bool {
+// Tracks the progress of the update
+type updatingCount struct {
+	healthyTs    *time.Time
+	healthyCount *int
+}
+
+// exceedsHealthyThreshold returns true if the Updating threshold is exceeded
+func (counts *updatingCount) exceedsHealthyThreshold(updating group_types.Updating, expectedNewInstances int) bool {
 	// No reason to wait if we are not expecting new instances
 	if expectedNewInstances <= 0 {
 		return true
