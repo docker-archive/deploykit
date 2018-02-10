@@ -94,9 +94,9 @@ func (p *plugin) terraformApply() error {
 						// Goroutine was interrupted, this likely means that there was a file change; now that
 						// apply is finished we want to clear the cache since we expect a delta
 						if initial {
-							p.fsLock.RLock()
+							p.fsLock.Lock()
 							p.clearCachedInstances()
-							p.fsLock.RUnlock()
+							p.fsLock.Unlock()
 							initial = false
 						}
 					} else {
@@ -107,6 +107,11 @@ func (p *plugin) terraformApply() error {
 				}
 			} else {
 				logger.Info("terraformApply", "msg", fmt.Sprintf("Not applying terraform, checking again in %v", p.pollInterval))
+				// Either not running on the leader or failed to determine leader, clear
+				// cache since another leader may be altering the instances
+				p.fsLock.Lock()
+				p.clearCachedInstances()
+				p.fsLock.Unlock()
 			}
 
 			select {
