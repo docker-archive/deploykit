@@ -232,7 +232,7 @@ func (p *plugin) hasRecentDeltas(window int) (bool, error) {
 		}
 		logger.Info("hasRecentDeltas",
 			"msg",
-			fmt.Sprintf("Terraform file updates are within %v seconds (delta=%v)", window, now.Sub(modTime)))
+			fmt.Sprintf("Terraform file updates are outside %v seconds (delta=%v)", window, now.Sub(modTime)))
 	}
 	return false, nil
 }
