@@ -163,7 +163,9 @@ func writeFileRaw(p *plugin, filename string, buff []byte) error {
 		return err
 	}
 	// Now that the file is written out we need to clear the cache
+	p.fsLock.Lock()
 	p.clearCachedInstances()
+	defer p.fsLock.Unlock()
 	return nil
 }
 
@@ -5447,7 +5449,9 @@ func TestCache(t *testing.T) {
 	require.Equal(t, []instance.Description{expectedInstDesc}, insts)
 
 	// Now clear it
+	tf.fsLock.Lock()
 	tf.clearCachedInstances()
+	tf.fsLock.Unlock()
 	require.True(t, tf.isCacheNil())
 
 	// Refresh, no files
