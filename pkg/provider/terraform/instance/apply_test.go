@@ -31,8 +31,9 @@ func TestRunTerraformApply(t *testing.T) {
 		Dir:          dir,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	terraform, err := NewTerraformInstancePlugin(options, nil)
+	terraform, err := NewTerraformInstancePlugin(options, nil, false)
 	require.NoError(t, err)
+	require.False(t, terraform.(*plugin).pretend)
 	p, _ := terraform.(*plugin)
 	err = p.doTerraformApply()
 	require.NoError(t, err)
@@ -47,7 +48,7 @@ func TestContinuePollingStandalone(t *testing.T) {
 		Standalone:   true,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	terraform, err := NewTerraformInstancePlugin(options, nil)
+	terraform, err := NewTerraformInstancePlugin(options, nil, false)
 	require.NoError(t, err)
 	p, _ := terraform.(*plugin)
 	shoudApply := p.shouldApply()
