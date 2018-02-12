@@ -145,7 +145,7 @@ type Options struct {
 	// be indexed, value values are "EnableDestroy" and "DisableDestroy
 	SourceParseErrPolicy string
 
-	// SourceKeySelector is a string template for selecting the join key from
+	// EnrollmentKeySelector is a string template for selecting the join key from
 	// a enrollment plugin's instance.Description.
 	EnrollmentKeySelector string
 
