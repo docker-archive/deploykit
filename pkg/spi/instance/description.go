@@ -1,6 +1,9 @@
 package instance
 
 import (
+	"sort"
+
+	"github.com/deckarep/golang-set"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -36,4 +39,59 @@ func (list Descriptions) Swap(i, j int) {
 // Less is part of sort.Interface. It is implemented by calling the "by" closure in the sorter.
 func (list Descriptions) Less(i, j int) bool {
 	return list[i].Compare(list[j]) < 0
+}
+
+// KeyFunc is a function that extracts the key from the description
+type KeyFunc func(Description) (string, error)
+
+// DescriptionIndex is a struct containing the keys and values
+type DescriptionIndex struct {
+	Keys mapset.Set
+	Map  map[string]Description
+}
+
+// Select returns a slice of Descriptions matching the keys in the given set. Output is sorted
+func (i *DescriptionIndex) Select(keys mapset.Set) Descriptions {
+	out := Descriptions{}
+	for n := range keys.Iter() {
+		out = append(out, i.Map[n.(string)])
+	}
+	sort.Sort(out)
+	return out
+}
+
+// Descriptions returns a slice of Descriptions. Output is sorted
+func (i *DescriptionIndex) Descriptions() Descriptions {
+	return i.Select(i.Keys)
+}
+
+// Index indexes the descriptions
+func (list Descriptions) Index(getKey KeyFunc) (*DescriptionIndex, error) {
+	// Track errors and return what could be indexed
+	var e error
+	index := map[string]Description{}
+	this := mapset.NewSet()
+	for _, n := range list {
+		key, err := getKey(n)
+		if err != nil {
+			e = err
+			continue
+		}
+		this.Add(key)
+		index[key] = n
+	}
+	return &DescriptionIndex{
+		Map:  index,
+		Keys: this,
+	}, e
+}
+
+// Difference returns a list of specs that is not in the receiver.
+func Difference(list Descriptions, listKeyFunc KeyFunc,
+	other Descriptions, otherKeyFunc KeyFunc) Descriptions {
+
+	thisIndex, _ := list.Index(listKeyFunc)
+	thatIndex, _ := other.Index(otherKeyFunc)
+
+	return thisIndex.Select(thisIndex.Keys.Difference(thatIndex.Keys))
 }

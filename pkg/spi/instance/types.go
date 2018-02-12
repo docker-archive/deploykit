@@ -21,6 +21,12 @@ type Description struct {
 // LogicalID is the logical identifier to associate with an instance.
 type LogicalID string
 
+// LogicalIDFromString returns a logical id from its string form
+func LogicalIDFromString(s string) *LogicalID {
+	id := LogicalID(s)
+	return &id
+}
+
 // Attachment is an identifier for a resource to attach to an instance.
 type Attachment struct {
 	// ID is the unique identifier for the attachment.
