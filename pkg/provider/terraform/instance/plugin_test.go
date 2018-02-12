@@ -66,23 +66,23 @@ func TestEnvs(t *testing.T) {
 		PollInterval: types.FromDuration(2 * time.Minute),
 		Envs:         *types.AnyString(`["k1=v1", "keyval"]`),
 	}
-	_, err = NewTerraformInstancePlugin(options, nil)
+	_, err = NewTerraformInstancePlugin(options, nil, true)
 	require.Error(t, err)
 
 	options.Envs = *types.AnyString(`["k1=v1", "k2=v2"]`)
-	tf, err := NewTerraformInstancePlugin(options, nil)
+	tf, err := NewTerraformInstancePlugin(options, nil, true)
 	require.NoError(t, err)
 	p, _ := tf.(*plugin)
 	require.Equal(t, []string{"k1=v1", "k2=v2"}, p.envs)
 
 	options.Envs = *types.AnyString("")
-	tf, err = NewTerraformInstancePlugin(options, nil)
+	tf, err = NewTerraformInstancePlugin(options, nil, true)
 	require.NoError(t, err)
 	p, _ = tf.(*plugin)
 	require.Equal(t, []string{}, p.envs)
 
 	options.Envs = nil
-	tf, err = NewTerraformInstancePlugin(options, nil)
+	tf, err = NewTerraformInstancePlugin(options, nil, true)
 	require.NoError(t, err)
 	p, _ = tf.(*plugin)
 	require.Equal(t, []string{}, p.envs)
@@ -97,9 +97,9 @@ func getPlugin(t *testing.T) (*plugin, string) {
 		Dir:          dir,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	tf, err := NewTerraformInstancePlugin(options, nil)
+	tf, err := NewTerraformInstancePlugin(options, nil, true)
 	require.NoError(t, err)
-	tf.(*plugin).pretend = true
+	require.True(t, tf.(*plugin).pretend)
 	p, is := tf.(*plugin)
 	require.True(t, is)
 	return p, dir
@@ -119,9 +119,9 @@ func getPluginDirNotExists(t *testing.T) (*plugin, string) {
 		Dir:          dir,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	tf, err := NewTerraformInstancePlugin(options, nil)
+	tf, err := NewTerraformInstancePlugin(options, nil, true)
 	require.NoError(t, err)
-	tf.(*plugin).pretend = true
+	require.True(t, tf.(*plugin).pretend)
 	p, is := tf.(*plugin)
 	require.True(t, is)
 	return p, dir
@@ -140,9 +140,9 @@ func getPluginDirNoPerms(t *testing.T) (*plugin, string) {
 		Dir:          dir,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	tf, err := NewTerraformInstancePlugin(options, nil)
+	tf, err := NewTerraformInstancePlugin(options, nil, true)
 	require.NoError(t, err)
-	tf.(*plugin).pretend = true
+	require.True(t, tf.(*plugin).pretend)
 	p, is := tf.(*plugin)
 	require.True(t, is)
 	return p, dir

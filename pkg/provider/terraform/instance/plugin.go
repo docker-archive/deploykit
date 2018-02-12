@@ -109,7 +109,7 @@ type ImportOptions struct {
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *ImportOptions) (instance.Plugin, error) {
+func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *ImportOptions, pretend bool) (instance.Plugin, error) {
 	logger.Info("NewTerraformInstancePlugin", "dir", options.Dir)
 
 	var pluginLookup func() discovery.Plugins
@@ -139,6 +139,7 @@ func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *Imp
 		pollInterval: options.PollInterval.Duration(),
 		pluginLookup: pluginLookup,
 		envs:         envs,
+		pretend:      pretend,
 	}
 	if err := p.processImport(importOpts); err != nil {
 		panic(err)
