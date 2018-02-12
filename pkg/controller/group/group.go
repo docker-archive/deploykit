@@ -93,8 +93,11 @@ func (p *gController) CommitGroup(config group.Spec, pretend bool) (string, erro
 			context.setUpdate(updatePlan)
 			context.changeSettings(settings)
 			go func() {
-				log.Info("Executing update plan", "groupID", config.ID, "plan", updatePlan.Explain())
-				if err := updatePlan.Run(p.pollInterval); err != nil {
+				log.Info("Executing update plan",
+					"groupID", config.ID,
+					"updating", settings.config.Updating,
+					"plan", updatePlan.Explain())
+				if err := updatePlan.Run(p.pollInterval, settings.config.Updating); err != nil {
 					log.Error("Update failed", "groupID", config.ID, "err", err)
 				} else {
 					log.Info("Convergence", "groupID", config.ID)
@@ -313,7 +316,7 @@ func (p *gController) InspectGroups() ([]group.Spec, error) {
 
 type updatePlan interface {
 	Explain() string
-	Run(pollInterval time.Duration) error
+	Run(pollInterval time.Duration, updating group_types.Updating) error
 	Stop()
 }
 
@@ -324,7 +327,7 @@ func (n noopUpdate) Explain() string {
 	return "Noop"
 }
 
-func (n noopUpdate) Run(_ time.Duration) error {
+func (n noopUpdate) Run(_ time.Duration, _ group_types.Updating) error {
 	return nil
 }
 
@@ -344,31 +347,35 @@ func (p *gController) validate(config group.Spec) (groupSettings, error) {
 		return noSettings, err
 	}
 
+	// Validate Allocation
 	if parsed.Allocation.Size == 0 &&
 		(parsed.Allocation.LogicalIDs == nil || len(parsed.Allocation.LogicalIDs) == 0) {
 
 		return noSettings, errors.New("Allocation must not be blank")
 	}
-
 	if parsed.Allocation.Size > 0 && parsed.Allocation.LogicalIDs != nil && len(parsed.Allocation.LogicalIDs) > 0 {
-
 		return noSettings, errors.New("Only one Allocation method may be used")
 	}
 
+	// Validate Updating
+	if parsed.Updating.Count > 0 && parsed.Updating.Duration.Duration() > time.Duration(0) {
+		return noSettings, errors.New("Only one Updating method may be used")
+	}
+
+	// Validate Flavor plugin
 	flavorPlugin, err := p.flavorPlugins(parsed.Flavor.Plugin)
 	if err != nil {
 		return noSettings, fmt.Errorf("Failed to find Flavor plugin '%s':%v", parsed.Flavor.Plugin, err)
 	}
-
 	if err := flavorPlugin.Validate(parsed.Flavor.Properties, parsed.Allocation); err != nil {
 		return noSettings, err
 	}
 
+	// Validate instance plugin
 	instancePlugin, err := p.instancePlugins(parsed.Instance.Plugin)
 	if err != nil {
 		return noSettings, fmt.Errorf("Failed to find Instance plugin '%s':%v", parsed.Instance.Plugin, err)
 	}
-
 	if err := instancePlugin.Validate(parsed.Instance.Properties); err != nil {
 		return noSettings, err
 	}
