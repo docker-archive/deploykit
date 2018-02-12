@@ -3,6 +3,7 @@ package group
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -181,18 +182,10 @@ func (p *gController) DestroyGroup(gid group.ID) error {
 		if err != nil {
 			return err
 		}
-		// Destroy self last
-		selfIndex := -1
-		for index, desc := range descriptions {
-			if isSelf(desc, context.settings) {
-				selfIndex = index
-				continue
-			}
+		// Ensure that the current node is last
+		sort.Sort(sortByID{list: descriptions, settings: &context.settings})
+		for _, desc := range descriptions {
 			context.scaled.Destroy(desc, instance.Termination)
-		}
-		if selfIndex != -1 {
-			log.Info("DestroyGroup, destroying self last", "self", *context.settings.options.Self)
-			context.scaled.Destroy(descriptions[selfIndex], instance.Termination)
 		}
 	}
 
