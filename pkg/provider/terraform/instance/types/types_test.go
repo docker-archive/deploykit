@@ -103,8 +103,7 @@ func TestParseInstanceSpecFromGroup(t *testing.T) {
 		instance.Spec{
 			Properties: types.AnyString(`{"resource": {"aws_instance": {}}}`),
 			Tags: map[string]string{
-				group.ConfigSHATag: "bootstrap",
-				group.GroupTag:     groupID,
+				group.GroupTag: groupID,
 			},
 		},
 		*instSpec)
@@ -134,7 +133,6 @@ func TestParseInstanceSpecFromGroupLogicalID(t *testing.T) {
 		instance.Spec{
 			Properties: types.AnyString(`{"resource": {"aws_instance": {}}}`),
 			Tags: map[string]string{
-				group.ConfigSHATag:    "bootstrap",
 				group.GroupTag:        groupID,
 				instance.LogicalIDTag: "mgr1",
 			},
@@ -161,9 +159,7 @@ func TestParseInstanceSpecFromGroupNoGroupIDSpecified(t *testing.T) {
 	require.Equal(t,
 		instance.Spec{
 			Properties: types.AnyString(`{"resource": {"aws_instance": {}}}`),
-			Tags: map[string]string{
-				group.ConfigSHATag: "bootstrap",
-			},
+			Tags:       map[string]string{},
 		},
 		*instSpec)
 }
