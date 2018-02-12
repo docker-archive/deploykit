@@ -109,6 +109,17 @@ type Spec struct {
 	Instance   InstancePlugin
 	Flavor     FlavorPlugin
 	Allocation group.AllocationMethod
+	Updating   Updating
+}
+
+// Updating is the configuration schema using on a rolling update and defines how long
+// a node must be healthy before the next node is updated. If Duration is set then the
+// node must be healthy for at least the specified time. If Count is set then the
+// node must be healthy for specified number of poll intervals. Both Duration and Count
+// cannot be non 0.
+type Updating struct {
+	Duration types.Duration
+	Count    int
 }
 
 // // AllocationMethod defines the type of allocation and supervision needed by a flavor's Group.

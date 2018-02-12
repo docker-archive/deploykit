@@ -125,7 +125,7 @@ func (s scalerUpdatePlan) Explain() string {
 	return s.desc
 }
 
-func (s scalerUpdatePlan) Run(pollInterval time.Duration) error {
+func (s scalerUpdatePlan) Run(pollInterval time.Duration, updating group_types.Updating) error {
 
 	// If the number of instances is being decreased, first lower the group size.  This eliminates
 	// instances that would otherwise be rolled first, avoiding unnecessary work.
@@ -135,7 +135,7 @@ func (s scalerUpdatePlan) Run(pollInterval time.Duration) error {
 		s.scaler.SetSize(s.newSize)
 	}
 
-	if err := s.rollingPlan.Run(pollInterval); err != nil {
+	if err := s.rollingPlan.Run(pollInterval, updating); err != nil {
 		return err
 	}
 

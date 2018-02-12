@@ -3,6 +3,7 @@ package group
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -23,9 +24,11 @@ const (
 )
 
 var (
+	emptyUpdating = group_types.Updating{}
+
 	minions = group.Spec{
 		ID:         id,
-		Properties: minionProperties(3, "data", "init"),
+		Properties: minionProperties(3, emptyUpdating, "data", "init"),
 	}
 
 	leaders = group.Spec{
@@ -40,25 +43,27 @@ func flavorPluginLookup(_ plugin_base.Name) (flavor.Plugin, error) {
 	return &testFlavor{}, nil
 }
 
-func minionProperties(instances int, instanceData string, flavorInit string) *types.Any {
+func minionProperties(instances uint, updating group_types.Updating, instanceData string, flavorInit string) *types.Any {
+	updatingStr, _ := json.Marshal(updating)
 	return types.AnyString(fmt.Sprintf(`{
-    "Allocation": {
-      "Size": %d
-    },
-    "Instance" : {
-      "Plugin": "test",
-      "Properties": {
-        "OpaqueValue": "%s"
-      }
-    },
-    "Flavor" : {
-      "Plugin" : "test",
-      "Properties": {
-        "Type": "minion",
-        "Init": "%s"
-      }
-    }
-	}`, instances, instanceData, flavorInit))
+	  "Allocation": {
+	    "Size": %d
+	  },
+	  "Updating": %s,
+	  "Instance" : {
+	    "Plugin": "test",
+	    "Properties": {
+	      "OpaqueValue": "%s"
+	    }
+	  },
+	  "Flavor" : {
+	    "Plugin" : "test",
+	    "Properties": {
+	      "Type": "minion",
+	      "Init": "%s"
+	    }
+	  }
+	}`, instances, updatingStr, instanceData, flavorInit))
 }
 
 func leaderProperties(logicalIDs []instance.LogicalID, data string) *types.Any {
@@ -93,6 +98,87 @@ func pluginLookup(pluginName string, plugin instance.Plugin) InstancePluginLooku
 		}
 		return nil, nil
 	}
+}
+
+func TestValidateNoGroupID(t *testing.T) {
+	plugin := newTestInstancePlugin()
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
+	p, is := grp.(*gController)
+	require.True(t, is)
+	settings, err := p.validate(group.Spec{})
+	require.Error(t, err)
+	require.EqualError(t, err, "Group ID must not be blank")
+	require.Equal(t, groupSettings{}, settings)
+}
+
+func TestValidateNoAllocations(t *testing.T) {
+	plugin := newTestInstancePlugin()
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
+	p, is := grp.(*gController)
+	require.True(t, is)
+	settings, err := p.validate(group.Spec{ID: group.ID("id")})
+	require.Error(t, err)
+	require.EqualError(t, err, "Allocation must not be blank")
+	require.Equal(t, groupSettings{}, settings)
+}
+
+func TestValidateMultipleAllocations(t *testing.T) {
+	plugin := newTestInstancePlugin()
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
+	p, is := grp.(*gController)
+	require.True(t, is)
+	spec := group_types.Spec{
+		Allocation: group.AllocationMethod{
+			Size:       1,
+			LogicalIDs: []instance.LogicalID{instance.LogicalID("id1")},
+		},
+	}
+	props, err := types.AnyValue(spec)
+	require.NoError(t, err)
+	settings, err := p.validate(group.Spec{
+		ID:         group.ID("id"),
+		Properties: props,
+	})
+	require.Error(t, err)
+	require.EqualError(t, err, "Only one Allocation method may be used")
+	require.Equal(t, groupSettings{}, settings)
+}
+
+func TestValidateMultipleUpdating(t *testing.T) {
+	plugin := newTestInstancePlugin()
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
+	p, is := grp.(*gController)
+	require.True(t, is)
+	spec := group_types.Spec{
+		Allocation: group.AllocationMethod{
+			Size: 1,
+		},
+		Updating: group_types.Updating{
+			Count:    1,
+			Duration: types.MustParseDuration("1s"),
+		},
+	}
+	props, err := types.AnyValue(spec)
+	require.NoError(t, err)
+	settings, err := p.validate(group.Spec{
+		ID:         group.ID("id"),
+		Properties: props,
+	})
+	require.Error(t, err)
+	require.EqualError(t, err, "Only one Updating method may be used")
+	require.Equal(t, groupSettings{}, settings)
 }
 
 func TestInvalidGroupCalls(t *testing.T) {
@@ -227,7 +313,7 @@ func TestRollingUpdate(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "flavor2")}
+	updated := group.Spec{ID: id, Properties: minionProperties(3, emptyUpdating, "data2", "flavor2")}
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
@@ -244,6 +330,179 @@ func TestRollingUpdate(t *testing.T) {
 	require.Equal(t, 3, len(instances))
 	for _, i := range instances {
 		require.Equal(t, provisionTagsDefault(updated, nil), i.Tags)
+	}
+
+	require.NoError(t, grp.FreeGroup(id))
+}
+
+func TestRollingUpdateUpdatingCount(t *testing.T) {
+	plugin := newTestInstancePlugin(
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+	)
+
+	// Healthy should be invoked on each instance at least 2 times
+	mutex := sync.Mutex{}
+	healthyExecs := map[instance.ID]int{}
+
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			if strings.Contains(flavorProperties.String(), "flavor2") {
+				if data, has := healthyExecs[inst.ID]; has {
+					healthyExecs[inst.ID] = data + 1
+					// If we have 3 instances then return Unhealthy after the first
+					// Healthy, this will cause the count to be reset
+					if len(healthyExecs) == 3 && data == 1 {
+						return flavor.Unhealthy, nil
+					}
+				} else {
+					healthyExecs[inst.ID] = 1
+				}
+				return flavor.Healthy, nil
+			}
+
+			// The update should be unaffected by an 'old' instance that is unhealthy.
+			return flavor.Unhealthy, nil
+		},
+	}
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(100 * time.Millisecond),
+		})
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
+
+	// Update and require 2 healthy counts per node
+	updated := group.Spec{
+		ID:         id,
+		Properties: minionProperties(3, group_types.Updating{Count: 2}, "data2", "flavor2"),
+	}
+
+	desc, err := grp.CommitGroup(updated, true)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	desc, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	awaitGroupConvergence(t, grp)
+
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+	for _, i := range instances {
+		require.Equal(t, provisionTagsDefault(updated, nil), i.Tags)
+	}
+	// Since the rolling update is sequential, the first health is invoked 6 times,
+	// the second 4 times, and the last only 2 times. However, since the last one
+	// returned Unhealthy on the 2nd query then all are queried again so the
+	// expected counts are 8, 6, 4
+	require.Len(t, healthyExecs, 3)
+	keys := []string{}
+	for _, k := range instances {
+		keys = append(keys, string(k.ID))
+	}
+	sort.Strings(keys)
+	sorted := []instance.Description{}
+	for _, k := range keys {
+		for _, i := range instances {
+			if string(i.ID) == k {
+				sorted = append(sorted, i)
+				break
+			}
+		}
+	}
+	for index, inst := range sorted {
+		data, has := healthyExecs[inst.ID]
+		require.True(t, has, fmt.Sprintf("Missing instance ID: %s", inst.ID))
+		expectedCount := []int{8, 6, 4}[index]
+		require.Equal(t, expectedCount, data,
+			fmt.Sprintf("Data for ID %s is not %d: %v", inst.ID, expectedCount, healthyExecs))
+	}
+
+	require.NoError(t, grp.FreeGroup(id))
+}
+
+func TestRollingUpdateUpdatingDuration(t *testing.T) {
+	plugin := newTestInstancePlugin(
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+		newFakeInstanceDefault(minions, nil),
+	)
+
+	// Healthy should be invoked on each instance at least 2 times
+	mutex := sync.Mutex{}
+	healthyExecs := map[instance.ID]int{}
+
+	flavorPlugin := testFlavor{
+		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			if strings.Contains(flavorProperties.String(), "flavor2") {
+				if data, has := healthyExecs[inst.ID]; has {
+					healthyExecs[inst.ID] = data + 1
+				} else {
+					healthyExecs[inst.ID] = 1
+				}
+				return flavor.Healthy, nil
+			}
+
+			// The update should be unaffected by an 'old' instance that is unhealthy.
+			return flavor.Unhealthy, nil
+		},
+	}
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(2 * time.Millisecond),
+		})
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
+
+	// Update and require a 20ms duration (plugin polls every 2ms)
+	updated := group.Spec{
+		ID: id,
+		Properties: minionProperties(3,
+			group_types.Updating{Duration: types.FromDuration(20 * time.Millisecond)},
+			"data2",
+			"flavor2"),
+	}
+
+	desc, err := grp.CommitGroup(updated, true)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	desc, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	awaitGroupConvergence(t, grp)
+
+	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+	for _, i := range instances {
+		require.Equal(t, provisionTagsDefault(updated, nil), i.Tags)
+	}
+	// Each instance should be checked for health at least 2 times since the
+	// duration is 10x the poll interval
+	for _, inst := range instances {
+		data, has := healthyExecs[inst.ID]
+		require.True(t, has, fmt.Sprintf("Missing instance ID: %s", inst.ID))
+		require.True(t,
+			data >= 2,
+			fmt.Sprintf("Data for ID %s is less than 2: %v", inst.ID, healthyExecs))
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
@@ -278,7 +537,7 @@ func TestRollingUpdateDestroyError(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "flavor2")}
+	updated := group.Spec{ID: id, Properties: minionProperties(3, emptyUpdating, "data2", "flavor2")}
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
@@ -524,7 +783,7 @@ func TestRollAndAdjustScale(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(8, "data2", "flavor2")}
+	updated := group.Spec{ID: id, Properties: minionProperties(8, emptyUpdating, "data2", "flavor2")}
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
@@ -565,7 +824,7 @@ func TestScaleIncrease(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(8, "data", "init")}
+	updated := group.Spec{ID: id, Properties: minionProperties(8, emptyUpdating, "data", "init")}
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
@@ -601,7 +860,7 @@ func TestScaleDecrease(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(1, "data", "init")}
+	updated := group.Spec{ID: id, Properties: minionProperties(1, emptyUpdating, "data", "init")}
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
@@ -718,11 +977,11 @@ func TestUpdateCompletes(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(8, "data", "init")}
+	updated := group.Spec{ID: id, Properties: minionProperties(8, emptyUpdating, "data", "init")}
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
-	updated = group.Spec{ID: id, Properties: minionProperties(5, "data", "init")}
+	updated = group.Spec{ID: id, Properties: minionProperties(5, emptyUpdating, "data", "init")}
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
@@ -745,7 +1004,7 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(3, "data2", "updated init")}
+	updated := group.Spec{ID: id, Properties: minionProperties(3, emptyUpdating, "data2", "updated init")}
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
@@ -784,7 +1043,7 @@ func TestFlavorChange(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "updated init")}
+	updated := group.Spec{ID: id, Properties: minionProperties(3, emptyUpdating, "data", "updated init")}
 
 	desc, err := grp.CommitGroup(updated, true)
 	require.NoError(t, err)
@@ -837,7 +1096,7 @@ func TestFreeGroupWhileConverging(t *testing.T) {
 	// Since we expect only a single write to healthChecksStarted, it's important to use only one instance here.
 	// This prevents flaky behavior where another health check is performed before StopUpdate() is called, leading
 	// to a deadlock.
-	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "flavor2")}
+	updated := group.Spec{ID: id, Properties: minionProperties(3, emptyUpdating, "data", "flavor2")}
 
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
@@ -880,7 +1139,7 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	updated := group.Spec{ID: id, Properties: minionProperties(3, "data", "bad update")}
+	updated := group.Spec{ID: id, Properties: minionProperties(3, emptyUpdating, "data", "bad update")}
 
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
