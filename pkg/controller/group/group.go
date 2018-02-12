@@ -181,9 +181,18 @@ func (p *gController) DestroyGroup(gid group.ID) error {
 		if err != nil {
 			return err
 		}
-
-		for _, desc := range descriptions {
+		// Destroy self last
+		selfIndex := -1
+		for index, desc := range descriptions {
+			if isSelf(desc, context.settings) {
+				selfIndex = index
+				continue
+			}
 			context.scaled.Destroy(desc, instance.Termination)
+		}
+		if selfIndex != -1 {
+			log.Info("DestroyGroup, destroying self last", "self", *context.settings.options.Self)
+			context.scaled.Destroy(descriptions[selfIndex], instance.Termination)
 		}
 	}
 
