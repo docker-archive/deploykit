@@ -31,13 +31,13 @@ func TestSet(t *testing.T) {
 		return string(i.ID), nil
 	}
 
-	diff := Difference(a, keyFunc, b, keyFunc)
+	diff := instance.Difference(a, keyFunc, b, keyFunc)
 	require.Equal(t, instance.Descriptions{
 		{ID: instance.ID("1")},
 		{ID: instance.ID("4")},
 	}, diff)
 
-	diff2 := Difference(b, keyFunc, a, keyFunc)
+	diff2 := instance.Difference(b, keyFunc, a, keyFunc)
 	require.Equal(t, instance.Descriptions{
 		{ID: instance.ID("6")},
 	}, diff2)
@@ -73,7 +73,7 @@ func TestDifferenceError(t *testing.T) {
 	}
 
 	// No errors, should be the same with any operation (even invalid ones)
-	diff := Difference(aValid, keyFunc, bValid, keyFunc)
+	diff := instance.Difference(aValid, keyFunc, bValid, keyFunc)
 	require.Equal(t, instance.Descriptions{a1, a2}, diff)
 	for _, op1 := range []string{types.SourceParseErrorEnableDestroy, types.SourceParseErrorDisableDestroy, "bogus"} {
 		for _, op2 := range []string{types.EnrolledParseErrorEnableProvision, types.EnrolledParseErrorDisableProvision, "bogus"} {
@@ -87,7 +87,7 @@ func TestDifferenceError(t *testing.T) {
 	}
 
 	// Source fails
-	diff = Difference(aParseError, keyFunc, bValid, keyFunc)
+	diff = instance.Difference(aParseError, keyFunc, bValid, keyFunc)
 	require.Equal(t, instance.Descriptions{a1, a2}, diff)
 	// Source failed to parse, disable destroy
 	add, remove := Delta(
@@ -105,7 +105,7 @@ func TestDifferenceError(t *testing.T) {
 	require.Equal(t, instance.Descriptions{b1, b2}, remove)
 
 	// Enrollment failed
-	diff = Difference(aValid, keyFunc, bParseError, keyFunc)
+	diff = instance.Difference(aValid, keyFunc, bParseError, keyFunc)
 	require.Equal(t, instance.Descriptions{a1, a2}, diff)
 	// Enrolled failed to parse, disable the provision
 	add, remove = Delta(
@@ -123,7 +123,7 @@ func TestDifferenceError(t *testing.T) {
 	require.Equal(t, instance.Descriptions{b1, b2}, remove)
 
 	// Both fail
-	diff = Difference(aParseError, keyFunc, bParseError, keyFunc)
+	diff = instance.Difference(aParseError, keyFunc, bParseError, keyFunc)
 	require.Equal(t, instance.Descriptions{a1, a2}, diff)
 	// Disable provision and destroy, nothing should be changed
 	add, remove = Delta(
@@ -185,10 +185,10 @@ func TestSetKeyFuncs(t *testing.T) {
 		return string(i.ID), nil
 	}
 
-	diff := Difference(a, aKeyFunc, b, bKeyFunc)
+	diff := instance.Difference(a, aKeyFunc, b, bKeyFunc)
 	require.Equal(t, instance.Descriptions{a[1], a[4]}, diff)
 
-	diff2 := Difference(b, bKeyFunc, a, aKeyFunc)
+	diff2 := instance.Difference(b, bKeyFunc, a, aKeyFunc)
 	require.Equal(t, instance.Descriptions{b[3], b[4]}, diff2)
 
 	add, remove := Delta(
