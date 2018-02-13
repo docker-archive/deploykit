@@ -920,6 +920,36 @@ func TestDestroyGroup(t *testing.T) {
 	require.Equal(t, 0, len(instances))
 }
 
+func TestDestroyGroupSelfLast(t *testing.T) {
+	self := &leaderIDs[1]
+
+	// leader self should destroy itself last
+	plugin := newTestInstancePlugin(
+		newFakeInstanceDefault(leaders, &leaderIDs[0]),
+		newFakeInstanceDefault(leaders, &leaderIDs[1]),
+		newFakeInstanceDefault(leaders, &leaderIDs[2]),
+	)
+
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+			Self:         self,
+		})
+
+	_, err := grp.CommitGroup(minions, false)
+	require.NoError(t, err)
+
+	require.NoError(t, grp.DestroyGroup(minions.ID))
+
+	instances, err := plugin.DescribeInstances(memberTags(minions.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(instances))
+
+	// Self should be last
+	require.Len(t, plugin.destroyed, 3)
+	require.Equal(t, *self, *plugin.destroyed[2].LogicalID)
+}
+
 func TestSuperviseQuorum(t *testing.T) {
 	plugin := newTestInstancePlugin(
 		newFakeInstanceDefault(leaders, &leaderIDs[0]),

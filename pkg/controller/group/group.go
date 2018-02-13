@@ -3,6 +3,7 @@ package group
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -181,7 +182,8 @@ func (p *gController) DestroyGroup(gid group.ID) error {
 		if err != nil {
 			return err
 		}
-
+		// Ensure that the current node is last
+		sort.Sort(sortByID{list: descriptions, settings: &context.settings})
 		for _, desc := range descriptions {
 			context.scaled.Destroy(desc, instance.Termination)
 		}
