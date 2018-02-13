@@ -18,18 +18,6 @@ func minInt(a, b int) int {
 	return b
 }
 
-func isSelf(inst instance.Description, settings groupSettings) bool {
-	if settings.self != nil {
-		if inst.LogicalID != nil && *inst.LogicalID == *settings.self {
-			return true
-		}
-		if v, has := inst.Tags[instance.LogicalIDTag]; has {
-			return string(*settings.self) == v
-		}
-	}
-	return false
-}
-
 func desiredAndUndesiredInstances(
 	instances []instance.Description, settings groupSettings) ([]instance.Description, []instance.Description) {
 
