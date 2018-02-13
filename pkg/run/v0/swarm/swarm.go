@@ -6,10 +6,8 @@ import (
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/plugin/flavor/swarm"
 	"github.com/docker/infrakit/pkg/run"
-	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/flavor"
-	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -43,24 +41,12 @@ type Options struct {
 	// This is overridden by the value provided in the spec.
 	WorkerInitScriptTemplate string
 
-	// Self is the logical ID of the node running this code.
-	Self *instance.LogicalID
-
 	// Docker is the connection info for the Docker client
 	Docker docker.ConnectInfo
 }
 
-func nilLogicalIDIfEmptyString(s string) *instance.LogicalID {
-	if s == "" {
-		return nil
-	}
-	id := instance.LogicalID(s)
-	return &id
-}
-
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Self: nilLogicalIDIfEmptyString(local.Getenv(EnvSelfLogicalID, "")),
 	Options: template.Options{
 		MultiPass: true,
 	},
@@ -92,7 +78,7 @@ func Run(scope scope.Scope, name plugin.Name,
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
-	managerFlavor := swarm.NewManagerFlavor(scope, swarm.DockerClient, mt, managerStop, options.Self)
+	managerFlavor := swarm.NewManagerFlavor(scope, swarm.DockerClient, mt, managerStop)
 	workerFlavor := swarm.NewWorkerFlavor(scope, swarm.DockerClient, wt, workerStop)
 	instancePlugin := swarm.NewInstancePlugin(swarm.DockerClient, options.Docker)
 

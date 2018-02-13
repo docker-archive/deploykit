@@ -28,7 +28,7 @@ func TestManagerDrain(t *testing.T) {
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{
@@ -111,7 +111,7 @@ func TestManagerDrainNotInSwarm(t *testing.T) {
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{
@@ -178,7 +178,7 @@ func TestManagerDrainNotManager(t *testing.T) {
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{

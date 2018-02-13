@@ -69,24 +69,10 @@ func DockerClient(spec Spec) (docker.APIClientCloser, error) {
 
 // baseFlavor is the base implementation.  The manager / worker implementations will provide override.
 type baseFlavor struct {
-	self            *instance.LogicalID
 	getDockerClient func(Spec) (docker.APIClientCloser, error)
 	initScript      *template.Template
 	metadataPlugin  metadata.Plugin
 	scope           scope.Scope
-}
-
-// isSelf determines if the code is being executed on the given instance
-func (s *baseFlavor) isSelf(inst instance.Description) bool {
-	if s.self != nil {
-		if inst.LogicalID != nil && *inst.LogicalID == *s.self {
-			return true
-		}
-		if v, has := inst.Tags[instance.LogicalIDTag]; has {
-			return string(*s.self) == v
-		}
-	}
-	return false
 }
 
 // Runs a poller that periodically samples the swarm status and node info.
