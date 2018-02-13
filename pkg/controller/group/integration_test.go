@@ -249,7 +249,9 @@ func TestNoopUpdate(t *testing.T) {
 		newFakeInstanceDefault(minions, nil),
 		newFakeInstanceDefault(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+	flavorPlugin := testFlavor{}
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin),
+		func(_ plugin_base.Name) (flavor.Plugin, error) { return &flavorPlugin, nil },
 		group_types.Options{
 			PollInterval: types.FromDuration(1 * time.Millisecond),
 		})
@@ -264,6 +266,10 @@ func TestNoopUpdate(t *testing.T) {
 	_, err = grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
+	// Nothing drained or destroyed
+	require.Empty(t, plugin.destroyed)
+	require.Empty(t, flavorPlugin.drained)
+
 	instances, err := plugin.DescribeInstances(memberTags(minions.ID), false)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
@@ -272,14 +278,19 @@ func TestNoopUpdate(t *testing.T) {
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
+
 }
 
-func awaitGroupConvergence(t *testing.T, grp group.Plugin) {
+func awaitGroupConvergence(t *testing.T, grp group.Plugin) error {
+	start := time.Now()
 	for {
 		desc, err := grp.DescribeGroup(id)
 		require.NoError(t, err)
 		if desc.Converged {
-			break
+			return nil
+		}
+		if time.Now().Sub(start) >= (time.Second * 2) {
+			return fmt.Errorf("Has not converged in 2s")
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -323,7 +334,11 @@ func TestRollingUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
@@ -393,7 +408,11 @@ func TestRollingUpdateUpdatingCount(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
@@ -487,7 +506,11 @@ func TestRollingUpdateUpdatingDuration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
@@ -547,13 +570,20 @@ func TestRollingUpdateDestroyError(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Only the first instance was successfully destroyed
+	require.Len(t, plugin.destroyed, 1)
+	// And the first 2 were drained
+	require.Len(t, flavorPlugin.drained, 2)
+	require.Equal(t, instance.ID(fmt.Sprintf("%s-1", plugin.idPrefix)), flavorPlugin.drained[0].ID)
+	require.Equal(t, instance.ID(fmt.Sprintf("%s-2", plugin.idPrefix)), flavorPlugin.drained[1].ID)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 	// 1st instance was destroyed and provisioned (given a new ID)
-	instID := instance.ID(fmt.Sprintf("%s-%d", plugin.idPrefix, 4))
+	instID := instance.ID(fmt.Sprintf("%s-4", plugin.idPrefix))
 	inst1, has := plugin.instances[instID]
 	require.True(t, has, fmt.Sprintf("Missing instance ID %s", instID))
 	require.Equal(t, provisionTagsDefault(updated, nil), inst1.Tags)
@@ -617,7 +647,11 @@ func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 
 	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
@@ -683,7 +717,11 @@ func TestLeaderSelfRollingUpdatePolicyNever(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Performing a rolling update on 2 instances", desc)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything but self drained and destroyed
+	require.Len(t, flavorPlugin.drained, 2)
+	require.Len(t, plugin.destroyed, 2)
 
 	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
@@ -751,7 +789,11 @@ func TestExternalManagedRollingUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Performing a rolling update on 3 instances", desc)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 
 	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
@@ -775,7 +817,9 @@ func TestRollAndAdjustScale(t *testing.T) {
 		newFakeInstanceDefault(minions, nil),
 		newFakeInstanceDefault(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+	flavorPlugin := testFlavor{}
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin),
+		func(_ plugin_base.Name) (flavor.Plugin, error) { return &flavorPlugin, nil },
 		group_types.Options{
 			PollInterval: types.FromDuration(1 * time.Millisecond),
 		})
@@ -795,7 +839,11 @@ func TestRollAndAdjustScale(t *testing.T) {
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
@@ -905,7 +953,9 @@ func TestDestroyGroup(t *testing.T) {
 		newFakeInstanceDefault(minions, nil),
 		newFakeInstanceDefault(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+	flavorPlugin := testFlavor{}
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin),
+		func(_ plugin_base.Name) (flavor.Plugin, error) { return &flavorPlugin, nil },
 		group_types.Options{
 			PollInterval: types.FromDuration(1 * time.Millisecond),
 		})
@@ -918,6 +968,10 @@ func TestDestroyGroup(t *testing.T) {
 	instances, err := plugin.DescribeInstances(memberTags(minions.ID), false)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(instances))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 }
 
 func TestDestroyGroupSelfLast(t *testing.T) {
@@ -929,8 +983,9 @@ func TestDestroyGroupSelfLast(t *testing.T) {
 		newFakeInstanceDefault(leaders, &leaderIDs[1]),
 		newFakeInstanceDefault(leaders, &leaderIDs[2]),
 	)
-
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+	flavorPlugin := testFlavor{}
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin),
+		func(_ plugin_base.Name) (flavor.Plugin, error) { return &flavorPlugin, nil },
 		group_types.Options{
 			PollInterval: types.FromDuration(1 * time.Millisecond),
 			Self:         self,
@@ -945,7 +1000,9 @@ func TestDestroyGroupSelfLast(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, len(instances))
 
-	// Self should be last
+	// Everything drained
+	require.Len(t, flavorPlugin.drained, 3)
+	// Self should be destroyed last
 	require.Len(t, plugin.destroyed, 3)
 	require.Equal(t, *self, *plugin.destroyed[2].LogicalID)
 }
@@ -956,7 +1013,9 @@ func TestSuperviseQuorum(t *testing.T) {
 		newFakeInstanceDefault(leaders, &leaderIDs[1]),
 		newFakeInstanceDefault(leaders, &leaderIDs[2]),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+	flavorPlugin := testFlavor{}
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin),
+		func(_ plugin_base.Name) (flavor.Plugin, error) { return &flavorPlugin, nil },
 		group_types.Options{
 			PollInterval: types.FromDuration(1 * time.Millisecond),
 		})
@@ -975,7 +1034,11 @@ func TestSuperviseQuorum(t *testing.T) {
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 
 	instances, err := plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
@@ -1026,7 +1089,9 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 		newFakeInstanceDefault(minions, nil),
 		newFakeInstanceDefault(minions, nil),
 	)
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorPluginLookup,
+	flavorPlugin := testFlavor{}
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin),
+		func(_ plugin_base.Name) (flavor.Plugin, error) { return &flavorPlugin, nil },
 		group_types.Options{
 			PollInterval: types.FromDuration(1 * time.Millisecond),
 		})
@@ -1043,7 +1108,11 @@ func TestInstanceAndFlavorChange(t *testing.T) {
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Everything drained and destroyed
+	require.Len(t, flavorPlugin.drained, 3)
+	require.Len(t, plugin.destroyed, 3)
 
 	for _, inst := range plugin.instancesCopy() {
 		require.Equal(t, "updated init", inst.Init)
@@ -1121,7 +1190,7 @@ func TestFreeGroupWhileConverging(t *testing.T) {
 	_, err := grp.CommitGroup(minions, false)
 	require.NoError(t, err)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
 
 	// Since we expect only a single write to healthChecksStarted, it's important to use only one instance here.
 	// This prevents flaky behavior where another health check is performed before StopUpdate() is called, leading
@@ -1174,7 +1243,7 @@ func TestUpdateFailsWhenInstanceIsUnhealthy(t *testing.T) {
 	_, err = grp.CommitGroup(updated, false)
 	require.NoError(t, err)
 
-	awaitGroupConvergence(t, grp)
+	require.NoError(t, awaitGroupConvergence(t, grp))
 
 	// All instances should have been updated.
 	badUpdateInstanaces := 0
