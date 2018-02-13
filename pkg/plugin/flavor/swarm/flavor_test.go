@@ -43,10 +43,9 @@ func TestValidate(t *testing.T) {
 	managerStop := make(chan struct{})
 	workerStop := make(chan struct{})
 
-	self := instance.LogicalID("172.164.100.101")
 	managerFlavor := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return mock_client.NewMockAPIClientCloser(ctrl), nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 	workerFlavor := NewWorkerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return mock_client.NewMockAPIClientCloser(ctrl), nil
 	}, templ(DefaultWorkerInitScriptTemplate), workerStop)
@@ -202,14 +201,13 @@ func TestManager(t *testing.T) {
 	defer ctrl.Finish()
 
 	selfAddr := "1.2.3.4"
-	self := instance.LogicalID(selfAddr)
 	managerStop := make(chan struct{})
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -373,15 +371,13 @@ func TestTemplateFunctions(t *testing.T) {
 	defer ctrl.Finish()
 
 	selfAddr := "1.2.3.4"
-	self := instance.LogicalID(selfAddr)
-
 	managerStop := make(chan struct{})
 
 	client := mock_client.NewMockAPIClientCloser(ctrl)
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop, &self)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
 	swarmInfo := swarm.Swarm{
 		ClusterInfo: swarm.ClusterInfo{ID: "ClusterUUID"},
@@ -428,7 +424,7 @@ func TestInitScriptMultipass(t *testing.T) {
 
 	flavorImpl := NewManagerFlavor(scp, func(Spec) (docker.APIClientCloser, error) {
 		return client, nil
-	}, templ(DefaultManagerInitScriptTemplate), managerStop, nil)
+	}, templ(DefaultManagerInitScriptTemplate), managerStop)
 
 	client.EXPECT().SwarmInspect(gomock.Any()).Return(swarm.Swarm{}, nil).AnyTimes()
 	client.EXPECT().Info(gomock.Any()).Return(infoResponse, nil).AnyTimes()
