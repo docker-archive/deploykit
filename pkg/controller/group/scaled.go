@@ -126,6 +126,11 @@ func (s *scaledGroup) Destroy(inst instance.Description, ctx instance.Context) e
 		return err
 	}
 
+	// Do not destroy the current VM
+	if isSelf(inst, s.settings) {
+		log.Info("Not destroying self", "LogicalID", *inst.LogicalID)
+		return nil
+	}
 	log.Info("Destroying instance", "id", inst.ID)
 	if err := settings.instancePlugin.Destroy(inst.ID, ctx); err != nil {
 		log.Error("Failed to destroy instance", "id", inst.ID, "err", err)

@@ -649,24 +649,35 @@ func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
 
 	require.NoError(t, awaitGroupConvergence(t, grp))
 
-	// Everything drained and destroyed
+	// Everything drained and self not destroyed
 	require.Len(t, flavorPlugin.drained, 3)
-	require.Len(t, plugin.destroyed, 3)
+	require.Len(t, plugin.destroyed, 2)
 
 	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(instances))
 
-	// all instances should have been updated
-	for i := 0; i < len(instances); i++ {
-		require.Equal(t, provisionTagsDefault(updated, instances[i].LogicalID), instances[i].Tags)
+	// Non-self instances are updated
+	selfCount, nonSelfCount := 0, 0
+	for _, inst := range instances {
+		if self == inst.LogicalID {
+			require.Equal(t, provisionTagsDefault(leaders, inst.LogicalID), inst.Tags)
+			selfCount++
+		} else {
+			require.Equal(t, provisionTagsDefault(updated, inst.LogicalID), inst.Tags)
+			nonSelfCount++
+		}
 	}
+	require.Equal(t, 1, selfCount)
+	require.Equal(t, 2, nonSelfCount)
 
-	var last instance.LogicalID
+	// All instances are drained
+	require.Len(t, flavorPlugin.drained, 3)
+	// Non-self instances destroyed
+	require.Len(t, plugin.destroyed, 2)
 	for _, destroyed := range plugin.destroyed {
-		last = *destroyed.LogicalID
+		require.NotEqual(t, self, destroyed.LogicalID)
 	}
-	require.Equal(t, *self, last) // the self node (leader) should be the last to be destroyed
 
 	require.NoError(t, grp.FreeGroup(id))
 }
@@ -996,15 +1007,21 @@ func TestDestroyGroupSelfLast(t *testing.T) {
 
 	require.NoError(t, grp.DestroyGroup(minions.ID))
 
+	// 2 of the 3 should have been removed
 	instances, err := plugin.DescribeInstances(memberTags(minions.ID), false)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(instances))
+	require.Equal(t, 1, len(instances))
+	require.Equal(t, *self, *instances[0].LogicalID)
 
-	// Everything drained
+	// Everything drained but self should not have been destroyed
 	require.Len(t, flavorPlugin.drained, 3)
-	// Self should be destroyed last
-	require.Len(t, plugin.destroyed, 3)
-	require.Equal(t, *self, *plugin.destroyed[2].LogicalID)
+	require.Len(t, plugin.destroyed, 2)
+
+	// Self should not have been removed
+	require.Len(t, plugin.destroyed, 2)
+	for _, d := range plugin.destroyed {
+		require.NotEqual(t, *self, *d.LogicalID)
+	}
 }
 
 func TestSuperviseQuorum(t *testing.T) {

@@ -253,10 +253,16 @@ func (r *rollingupdate) Run(pollInterval time.Duration, updating group_types.Upd
 
 		// TODO(wfarner): Make the 'batch size' configurable.
 		if canDestroy(undesiredInstances[0], r.updatingFrom) {
-			// we do not self-destruct in any cases.
 			if err := r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate); err != nil {
 				log.Warn("Failed to destroy instance during rolling update", "ID", undesiredInstances[0].ID, "err", err)
 				return err
+			}
+			// We never invoke the instance Destroy on the "self", the group Destroy only
+			// invokes the flavor Drain. Since we will never get a replacement VM for "self"
+			// we need to exit the loop.
+			if isSelf(undesiredInstances[0], r.updatingFrom) {
+				log.Info("RollingUpdate-Run", "Terminating after Destroy self", "self", *undesiredInstances[0].LogicalID)
+				return nil
 			}
 		}
 
