@@ -933,21 +933,17 @@ func TestDestroyGroupSelfLast(t *testing.T) {
 
 	require.NoError(t, grp.DestroyGroup(minions.ID))
 
-	// 2 of the 3 should have been removed
+	// All instance should have been removed (since this is a group destroy)
 	instances, err := plugin.DescribeInstances(memberTags(minions.ID), false)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(instances))
-	require.Equal(t, *self, *instances[0].LogicalID)
+	require.Equal(t, 0, len(instances))
 
-	// Everything drained but self should not have been destroyed
+	// Everything drained and destroyed
 	require.Len(t, flavorPlugin.drained, 3)
-	require.Len(t, plugin.destroyed, 2)
+	require.Len(t, plugin.destroyed, 3)
 
-	// Self should not have been removed
-	require.Len(t, plugin.destroyed, 2)
-	for _, d := range plugin.destroyed {
-		require.NotEqual(t, *self, *d.LogicalID)
-	}
+	// Self should have been removed last
+	require.Equal(t, *self, *plugin.destroyed[2].LogicalID)
 }
 
 func TestSuperviseQuorum(t *testing.T) {
