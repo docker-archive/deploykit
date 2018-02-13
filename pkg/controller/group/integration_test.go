@@ -602,7 +602,7 @@ func TestRollingUpdateDestroyError(t *testing.T) {
 	require.NoError(t, grp.FreeGroup(id))
 }
 
-func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
+func TestLeaderSelfRollingUpdate(t *testing.T) {
 
 	// This is the case where the controller coordinating the rolling update
 	// is part of the group that is being updated
@@ -626,9 +626,8 @@ func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
 
 	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
 		group_types.Options{
-			PolicyLeaderSelfUpdate: &group_types.PolicyLeaderSelfUpdateLast,
-			PollInterval:           types.FromDuration(1 * time.Millisecond),
-			Self:                   self,
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+			Self:         self,
 		})
 	_, err := grp.CommitGroup(leaders, false)
 	require.NoError(t, err)
@@ -677,79 +676,6 @@ func TestLeaderSelfRollingUpdatePolicyLast(t *testing.T) {
 	require.Len(t, plugin.destroyed, 2)
 	for _, destroyed := range plugin.destroyed {
 		require.NotEqual(t, self, destroyed.LogicalID)
-	}
-
-	require.NoError(t, grp.FreeGroup(id))
-}
-
-func TestLeaderSelfRollingUpdatePolicyNever(t *testing.T) {
-
-	// This is the case where the controller coordinating the rolling update
-	// is part of the group that is being updated
-	self := &leaderIDs[0]
-
-	// leader self rolling update should not destroy the running leader itself
-	plugin := newTestInstancePlugin(
-		newFakeInstanceDefault(leaders, &leaderIDs[0]),
-		newFakeInstanceDefault(leaders, &leaderIDs[1]),
-		newFakeInstanceDefault(leaders, &leaderIDs[2]),
-	)
-
-	flavorPlugin := testFlavor{
-		healthy: func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
-			return flavor.Healthy, nil
-		},
-	}
-	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
-		return &flavorPlugin, nil
-	}
-
-	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
-		group_types.Options{
-			PolicyLeaderSelfUpdate: &group_types.PolicyLeaderSelfUpdateNever,
-			PollInterval:           types.FromDuration(1 * time.Millisecond),
-			Self:                   self,
-		})
-	_, err := grp.CommitGroup(leaders, false)
-	require.NoError(t, err)
-
-	instances, err := plugin.DescribeInstances(memberTags(leaders.ID), false)
-	require.NoError(t, err)
-	require.Equal(t, 3, len(instances))
-
-	updated := group.Spec{ID: id, Properties: leaderProperties(leaderIDs, "data2")}
-
-	desc, err := grp.CommitGroup(updated, true) // pretend only
-	require.NoError(t, err)
-	// Only on 2 instances since we cannot update self
-	require.Equal(t, "Performing a rolling update on 2 instances", desc)
-
-	desc, err = grp.CommitGroup(updated, false)
-	require.NoError(t, err)
-	require.Equal(t, "Performing a rolling update on 2 instances", desc)
-
-	require.NoError(t, awaitGroupConvergence(t, grp))
-
-	// Everything but self drained and destroyed
-	require.Len(t, flavorPlugin.drained, 2)
-	require.Len(t, plugin.destroyed, 2)
-
-	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
-	require.NoError(t, err)
-	require.Equal(t, 3, len(instances))
-
-	// Because the group controller is started with the logical ID of instances[0],
-	// it must not be updated.
-	for i := 0; i < len(instances); i++ {
-		if *instances[i].LogicalID == *self {
-			require.NotEqual(t, provisionTagsDefault(updated, instances[i].LogicalID), instances[i].Tags)
-		} else {
-			require.Equal(t, provisionTagsDefault(updated, instances[i].LogicalID), instances[i].Tags)
-		}
-	}
-	// make sure the leader was never destroyed
-	for _, destroyed := range plugin.destroyed {
-		require.NotEqual(t, *self, *destroyed.LogicalID)
 	}
 
 	require.NoError(t, grp.FreeGroup(id))

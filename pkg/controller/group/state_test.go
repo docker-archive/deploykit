@@ -41,10 +41,8 @@ func TestSortByID(t *testing.T) {
 
 		sort.Sort(sortByID{list: list,
 			settings: &groupSettings{
-				self: logicalID("1"),
-				options: group_types.Options{
-					PolicyLeaderSelfUpdate: &group_types.PolicyLeaderSelfUpdateLast,
-				}}})
+				self:    logicalID("1"),
+				options: group_types.Options{}}})
 
 		require.Equal(t,
 			[]instance.Description{
@@ -66,10 +64,8 @@ func TestSortByID(t *testing.T) {
 
 		sort.Sort(sortByID{list: list,
 			settings: &groupSettings{
-				self: logicalID("3"),
-				options: group_types.Options{
-					PolicyLeaderSelfUpdate: &group_types.PolicyLeaderSelfUpdateLast,
-				}}})
+				self:    logicalID("3"),
+				options: group_types.Options{}}})
 
 		require.Equal(t,
 			[]instance.Description{
@@ -97,10 +93,8 @@ func TestSortByID(t *testing.T) {
 
 		sort.Sort(sortByID{list: list,
 			settings: &groupSettings{
-				self: logicalID("1"),
-				options: group_types.Options{
-					PolicyLeaderSelfUpdate: &group_types.PolicyLeaderSelfUpdateLast,
-				}}})
+				self:    logicalID("1"),
+				options: group_types.Options{}}})
 
 		require.Equal(t,
 			[]instance.Description{
