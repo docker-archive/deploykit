@@ -232,7 +232,7 @@ func (r *rollingupdate) Run(pollInterval time.Duration, updating group_types.Upd
 		// Never invoke the instance Destroy on "self", the group Destroy only invokes the flavor
 		// Drain. Since we will never get a replacement VM for "self" we need to exit the loop.
 		if isSelf(undesiredInstances[0], r.updatingFrom) {
-			log.Info("RollingUpdate-Run", "Terminating after Destroy self", "self", *undesiredInstances[0].LogicalID)
+			log.Info("Terminating update, current instance is all that remains", "self", *undesiredInstances[0].LogicalID)
 			return nil
 		}
 
