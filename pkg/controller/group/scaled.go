@@ -122,10 +122,19 @@ func (s *scaledGroup) Destroy(inst instance.Description, ctx instance.Context) e
 
 	flavorProperties := types.AnyCopy(settings.config.Flavor.Properties)
 	if err := settings.flavorPlugin.Drain(flavorProperties, inst); err != nil {
-		log.Error("Failed to drain", "id", inst.ID, "err", err)
-		return err
+		// Only error out on a rolling update
+		if ctx == instance.RollingUpdate {
+			log.Error("Failed to drain", "id", inst.ID, "err", err)
+			return err
+		}
+		log.Warn("Failed to drain, processing with termination", "id", inst.ID, "err", err)
 	}
 
+	// Do not destroy the current VM during a rolling update
+	if ctx == instance.RollingUpdate && isSelf(inst, s.settings) {
+		log.Info("Not destroying self", "LogicalID", *inst.LogicalID)
+		return nil
+	}
 	log.Info("Destroying instance", "id", inst.ID)
 	if err := settings.instancePlugin.Destroy(inst.ID, ctx); err != nil {
 		log.Error("Failed to destroy instance", "id", inst.ID, "err", err)

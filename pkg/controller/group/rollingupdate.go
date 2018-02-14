@@ -18,34 +18,6 @@ func minInt(a, b int) int {
 	return b
 }
 
-func selfUpdatePolicy(settings groupSettings) group_types.PolicyLeaderSelfUpdate {
-	if settings.options.PolicyLeaderSelfUpdate == nil {
-		return group_types.PolicyLeaderSelfUpdateLast // default policy
-	}
-	return *settings.options.PolicyLeaderSelfUpdate
-}
-
-func isSelf(inst instance.Description, settings groupSettings) bool {
-	if settings.self != nil {
-		if inst.LogicalID != nil && *inst.LogicalID == *settings.self {
-			return true
-		}
-		if v, has := inst.Tags[instance.LogicalIDTag]; has {
-			return string(*settings.self) == v
-		}
-	}
-	return false
-}
-
-func canDestroy(inst instance.Description, settings groupSettings) bool {
-	if !isSelf(inst, settings) {
-		// not running on the same node, so ok to destroy
-		return true
-	}
-	// self update - never - means we'd never update the self node.
-	return selfUpdatePolicy(settings) != group_types.PolicyLeaderSelfUpdateNever
-}
-
 func desiredAndUndesiredInstances(
 	instances []instance.Description, settings groupSettings) ([]instance.Description, []instance.Description) {
 
@@ -58,7 +30,7 @@ func desiredAndUndesiredInstances(
 		actualConfig, specified := inst.Tags[group.ConfigSHATag]
 		if specified && actualConfig == desiredHash {
 			desired = append(desired, inst)
-		} else if canDestroy(inst, settings) {
+		} else {
 			undesired = append(undesired, inst)
 		}
 	}
@@ -248,16 +220,20 @@ func (r *rollingupdate) Run(pollInterval time.Duration, updating group_types.Upd
 			break
 		}
 
-		// Sort instances first to ensure predictable destroy order.
+		// Sort instances first to ensure predictable destroy order (if "self" is set then it
+		// is always sorted last)
 		sort.Sort(sortByID{list: undesiredInstances, settings: &r.updatingFrom})
 
 		// TODO(wfarner): Make the 'batch size' configurable.
-		if canDestroy(undesiredInstances[0], r.updatingFrom) {
-			// we do not self-destruct in any cases.
-			if err := r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate); err != nil {
-				log.Warn("Failed to destroy instance during rolling update", "ID", undesiredInstances[0].ID, "err", err)
-				return err
-			}
+		if err := r.scaled.Destroy(undesiredInstances[0], instance.RollingUpdate); err != nil {
+			log.Warn("Failed to destroy instance during rolling update", "ID", undesiredInstances[0].ID, "err", err)
+			return err
+		}
+		// Never invoke the instance Destroy on "self", the group Destroy only invokes the flavor
+		// Drain. Since we will never get a replacement VM for "self" we need to exit the loop.
+		if isSelf(undesiredInstances[0], r.updatingFrom) {
+			log.Info("Terminating update, current instance is all that remains", "self", *undesiredInstances[0].LogicalID)
+			return nil
 		}
 
 		// Increment new instance count to replace the node that was just destroyed

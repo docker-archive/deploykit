@@ -116,6 +116,9 @@ const (
 type testFlavor struct {
 	healthy func(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error)
 	drain   func(flavorProperties *types.Any, inst instance.Description) error
+
+	lock    sync.Mutex
+	drained []instance.Description
 }
 
 type flavorSchema struct {
@@ -124,7 +127,7 @@ type flavorSchema struct {
 	Tags map[string]string
 }
 
-func (t testFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
+func (t *testFlavor) Validate(flavorProperties *types.Any, allocation group.AllocationMethod) error {
 
 	s := flavorSchema{}
 	err := flavorProperties.Decode(&s)
@@ -148,7 +151,7 @@ func (t testFlavor) Validate(flavorProperties *types.Any, allocation group.Alloc
 	}
 }
 
-func (t testFlavor) Prepare(flavorProperties *types.Any,
+func (t *testFlavor) Prepare(flavorProperties *types.Any,
 	spec instance.Spec,
 	allocation group.AllocationMethod,
 	index group.Index) (instance.Spec, error) {
@@ -166,7 +169,7 @@ func (t testFlavor) Prepare(flavorProperties *types.Any,
 	return spec, nil
 }
 
-func (t testFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
+func (t *testFlavor) Healthy(flavorProperties *types.Any, inst instance.Description) (flavor.Health, error) {
 	if t.healthy != nil {
 		return t.healthy(flavorProperties, inst)
 	}
@@ -174,7 +177,11 @@ func (t testFlavor) Healthy(flavorProperties *types.Any, inst instance.Descripti
 	return flavor.Healthy, nil
 }
 
-func (t testFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
+func (t *testFlavor) Drain(flavorProperties *types.Any, inst instance.Description) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.drained = append(t.drained, inst)
 	if t.drain != nil {
 		return t.drain(flavorProperties, inst)
 	}
