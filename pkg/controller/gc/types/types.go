@@ -36,17 +36,17 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	return depends.Runnables{
 		depends.AsRunnable(
 			types.Spec{
-				Kind: properties.Instance.Plugin.Lookup(),
+				Kind: properties.InstanceSource.Plugin.Lookup(),
 				Metadata: types.Metadata{
-					Name: properties.Instance.Plugin.String(),
+					Name: properties.InstanceSource.Plugin.String(),
 				},
 			},
 		),
 		depends.AsRunnable(
 			types.Spec{
-				Kind: properties.Node.Plugin.Lookup(),
+				Kind: properties.NodeSource.Plugin.Lookup(),
 				Metadata: types.Metadata{
-					Name: properties.Node.Plugin.String(),
+					Name: properties.NodeSource.Plugin.String(),
 				},
 			},
 		),
@@ -71,10 +71,13 @@ type Properties struct {
 	// Model is the workflow model to use
 	Model string
 
-	// Instance is the name of the instance plugin which will receive the
+	// ModelProperties contains model-specific configurations
+	ModelProperties *types.Any
+
+	// InstanceSource is the name of the instance plugin which will receive the
 	// synchronization messages of provision / destroy based on the
 	// changes in the List
-	Instance PluginSpec
+	InstanceSource PluginSpec
 
 	// InstanceKeySelector is a string template for selecting the join key from
 	// an instance's instance.Description. This selector template should use escapes
@@ -82,9 +85,9 @@ type Properties struct {
 	// SourceKeySelector: \{\{ .ID \}\}  # selects the ID field.
 	InstanceKeySelector string
 
-	// Node is the name of the instance plugin which will get info on the cluster 'nodes' such
+	// NodeSource is the name of the instance plugin which will get info on the cluster 'nodes' such
 	// as swarm engine or k8s kublets.
-	Node PluginSpec
+	NodeSource PluginSpec
 
 	// NodeKeySelector is a string template for selecting the join key from
 	// a node's instance.Description.
@@ -98,6 +101,9 @@ func (p Properties) Validate(ctx context.Context) error {
 
 // Options is the controller options that is used at start up of the process.  It's one-time
 type Options struct {
+
+	// PluginRetryInterval is the interval for retrying to connect to the plugins
+	PluginRetryInterval types.Duration
 
 	// GCInterval is the polling interval for checking nodes and instances
 	GCInterval types.Duration

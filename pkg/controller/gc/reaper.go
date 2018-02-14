@@ -10,6 +10,7 @@ import (
 	gc "github.com/docker/infrakit/pkg/controller/gc/types"
 	"github.com/docker/infrakit/pkg/controller/internal"
 	"github.com/docker/infrakit/pkg/fsm"
+	instance_plugin "github.com/docker/infrakit/pkg/plugin/instance"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/stack"
@@ -102,14 +103,14 @@ func newReaper(scope scope.Scope, leader func() stack.Leadership, options gc.Opt
 }
 
 // object returns the state
-func (l *reaper) state() (*types.Object, error) {
-	snapshot, err := l.snapshot()
+func (r *reaper) state() (*types.Object, error) {
+	snapshot, err := r.snapshot()
 	if err != nil {
 		return nil, err
 	}
 
 	object := types.Object{
-		Spec:  l.spec,
+		Spec:  r.spec,
 		State: snapshot,
 	}
 	return &object, nil
@@ -123,6 +124,7 @@ func (r *reaper) Start() {
 	if r.poller != nil {
 		ctx := context.Background()
 		go r.poller.Run(ctx)
+		go r.gc(ctx)
 		r.running = true
 	}
 }
@@ -162,6 +164,8 @@ func (r *reaper) Enforce(spec types.Spec) (*types.Object, error) {
 		return nil, err
 	}
 
+	r.properties = properties
+
 	ctx := context.Background()
 	if err := properties.Validate(ctx); err != nil {
 		return nil, err
@@ -170,10 +174,21 @@ func (r *reaper) Enforce(spec types.Spec) (*types.Object, error) {
 	r.nodeKeyExtractor = gc.KeyExtractor(properties.NodeKeySelector)
 	r.instanceKeyExtractor = gc.KeyExtractor(properties.InstanceKeySelector)
 
-	model, err := model(properties.Model)
+	model, err := model(properties.Model, properties.ModelProperties)
 	if err != nil {
 		return nil, err
 	}
+
+	r.nodeSource = instance_plugin.LazyConnect(
+		func() (instance.Plugin, error) {
+			return r.scope.Instance(properties.NodeSource.Plugin.String())
+		},
+		r.options.PluginRetryInterval.Duration())
+	r.instanceSource = instance_plugin.LazyConnect(
+		func() (instance.Plugin, error) {
+			return r.scope.Instance(properties.InstanceSource.Plugin.String())
+		},
+		r.options.PluginRetryInterval.Duration())
 
 	r.model = model
 	r.model.Start()
@@ -216,7 +231,59 @@ func (r *reaper) snapshot() (*types.Any, error) {
 func (r *reaper) observe(ctx context.Context) (nodes []instance.Description,
 	instances []instance.Description, err error) {
 
-	return nil, nil, nil
+	nodes, err = r.nodeSource.DescribeInstances(r.properties.NodeSource.Labels, true)
+	if err == nil {
+		instances, err = r.instanceSource.DescribeInstances(r.properties.InstanceSource.Labels, true)
+	}
+
+	return
+}
+
+func (r *reaper) getNodeDescription(i fsm.Instance) *instance.Description {
+	return nil
+}
+
+func (r *reaper) getInstanceDescription(i fsm.Instance) *instance.Description {
+	return nil
+}
+
+func (r *reaper) gc(ctx context.Context) {
+
+	nodeInput := r.model.GCNode()
+	instanceInput := r.model.GCInstance()
+
+	for {
+		select {
+
+		case m, ok := <-nodeInput:
+			if !ok {
+				log.Info("NodeChan shutting down")
+				return
+			}
+
+			t := r.getNodeDescription(m)
+			if t != nil {
+				err := r.nodeSource.Destroy(t.ID, instance.Termination)
+				if err != nil {
+					log.Error("error destroying node", "err", err, "id", t.ID)
+				}
+			}
+
+		case m, ok := <-instanceInput:
+			if !ok {
+				log.Info("InstanceChan shutting down")
+				return
+			}
+
+			t := r.getInstanceDescription(m)
+			if t != nil {
+				err := r.instanceSource.Destroy(t.ID, instance.Termination)
+				if err != nil {
+					log.Error("error destroying instance", "err", err, "id", t.ID)
+				}
+			}
+		}
+	}
 }
 
 func (r *reaper) pollAndSignal(ctx context.Context) error {
@@ -227,6 +294,12 @@ func (r *reaper) pollAndSignal(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// update the observations for the next poll
+	defer func() {
+		r.instances = instances
+		r.nodes = nodes
+	}()
 
 	for _, instance := range instances {
 		key, err := r.instanceKeyExtractor(instance)
@@ -287,6 +360,7 @@ func (r *reaper) pollAndSignal(ctx context.Context) error {
 	}
 
 	if len(r.instances) > 0 {
+
 		diff := instance.Difference(
 			instance.Descriptions(r.instances), r.instanceKeyExtractor,
 			instance.Descriptions(instances), r.instanceKeyExtractor)
@@ -305,10 +379,6 @@ func (r *reaper) pollAndSignal(ctx context.Context) error {
 			}
 		}
 	}
-
-	// update the observations for the next poll
-	r.instances = instances
-	r.nodes = nodes
 
 	return nil
 }
