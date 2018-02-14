@@ -74,7 +74,7 @@ func (s *WorkerFlavor) Drain(flavorProperties *types.Any, inst instance.Descript
 		return nil
 
 	case len(nodes) == 1:
-		log.Debug("Docker NodeRemove", "id", nodes[0].ID)
+		log.Info("Docker NodeRemove", "id", nodes[0].ID, "hostname", nodes[0].Description.Hostname)
 		err := dockerClient.NodeRemove(
 			context.Background(),
 			nodes[0].ID,

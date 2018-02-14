@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	group_types "github.com/docker/infrakit/pkg/controller/group/types"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -120,14 +121,19 @@ func (s *scaledGroup) Health(inst instance.Description) flavor.Health {
 func (s *scaledGroup) Destroy(inst instance.Description, ctx instance.Context) error {
 	settings := s.latestSettings()
 
-	flavorProperties := types.AnyCopy(settings.config.Flavor.Properties)
-	if err := settings.flavorPlugin.Drain(flavorProperties, inst); err != nil {
-		// Only error out on a rolling update
-		if ctx == instance.RollingUpdate {
-			log.Error("Failed to drain", "id", inst.ID, "err", err)
-			return err
+	if ctx == instance.RollingUpdate && s.isSkipDrain() {
+		log.Info("Skipping drain before instance destroy", "id", inst.ID)
+	} else {
+		flavorProperties := types.AnyCopy(settings.config.Flavor.Properties)
+		log.Info("Draining instance", "id", inst.ID)
+		if err := settings.flavorPlugin.Drain(flavorProperties, inst); err != nil {
+			// Only error out on a rolling update
+			if ctx == instance.RollingUpdate {
+				log.Error("Failed to drain", "id", inst.ID, "err", err)
+				return err
+			}
+			log.Warn("Failed to drain, processing with termination", "id", inst.ID, "err", err)
 		}
-		log.Warn("Failed to drain, processing with termination", "id", inst.ID, "err", err)
 	}
 
 	// Do not destroy the current VM during a rolling update
@@ -141,6 +147,15 @@ func (s *scaledGroup) Destroy(inst instance.Description, ctx instance.Context) e
 		return err
 	}
 	return nil
+}
+
+// returns true if the config is set to skip Drain prior to instance Destroy during
+// a rolling update
+func (s *scaledGroup) isSkipDrain() bool {
+	if s.settings.config.Updating.SkipBeforeInstanceDestroy == nil {
+		return false
+	}
+	return group_types.SkipBeforeInstanceDestroyDrain == *s.settings.config.Updating.SkipBeforeInstanceDestroy
 }
 
 func (s *scaledGroup) List() ([]instance.Description, error) {
