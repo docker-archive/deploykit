@@ -68,6 +68,9 @@ type PluginSpec struct {
 // Properties is the schema of the configuration in the types.Spec.Properties
 type Properties struct {
 
+	// ObserveInterval is the polling interval for checking nodes and instances
+	ObserveInterval types.Duration
+
 	// Model is the workflow model to use
 	Model string
 
@@ -104,9 +107,6 @@ type Options struct {
 
 	// PluginRetryInterval is the interval for retrying to connect to the plugins
 	PluginRetryInterval types.Duration
-
-	// GCInterval is the polling interval for checking nodes and instances
-	GCInterval types.Duration
 }
 
 // Validate validates the controller's options

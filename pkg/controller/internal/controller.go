@@ -175,7 +175,13 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 
 			log.Debug("creating new object to replace running instance.")
 
-			// Create a new object
+			// Create a new object, update default identity
+			if spec.Metadata.Identity == nil {
+				spec.Metadata.Identity = &types.Identity{
+					ID: spec.Metadata.Name,
+				}
+			}
+
 			newManaged, err := c.alloc(spec)
 			if err != nil {
 				log.Error("cannot allocate a new managed object", "spec", spec, "err", err)

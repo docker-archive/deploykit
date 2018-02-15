@@ -19,7 +19,7 @@ var (
 
 	// DefaultOptions return an Options with default values filled in.
 	DefaultOptions = gc.Options{
-		GCInterval: types.Duration(5 * time.Second),
+		PluginRetryInterval: types.Duration(1 * time.Second),
 	}
 )
 

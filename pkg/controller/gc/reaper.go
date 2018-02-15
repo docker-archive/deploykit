@@ -43,6 +43,7 @@ type reaper struct {
 	properties gc.Properties
 	options    gc.Options
 	items      map[string]*item
+	stop       chan struct{}
 
 	leader func() stack.Leadership
 	scope  scope.Scope
@@ -71,39 +72,13 @@ func newReaper(scope scope.Scope, leader func() stack.Leadership, options gc.Opt
 		scope:   scope,
 		options: options,
 		items:   map[string]*item{},
+		stop:    make(chan struct{}),
 	}
-	r.ticker = time.Tick(r.options.GCInterval.Duration())
-	r.poller = controller.Poll(
-		// This determines if the action should be taken when time is up
-		func() bool {
-			isLeader := false
-			if r.leader != nil {
-				v, err := r.leader().IsLeader()
-				if err == nil {
-					isLeader = v
-				}
-			}
-			log.Debug("polling", "isLeader", isLeader, "V", debugV2)
-
-			r.lock.RLock()
-			defer r.lock.RUnlock()
-			return isLeader && !r.freed
-		},
-		// This does the work
-		func() (err error) {
-			r.lock.Lock()
-			defer r.lock.Unlock()
-			r.running = true
-
-			ctx := context.Background()
-			return r.pollAndSignal(ctx)
-		},
-		r.ticker)
 	return r, nil
 }
 
 // object returns the state
-func (r *reaper) state() (*types.Object, error) {
+func (r *reaper) object() (*types.Object, error) {
 	snapshot, err := r.snapshot()
 	if err != nil {
 		return nil, err
@@ -123,8 +98,13 @@ func (r *reaper) Start() {
 
 	if r.poller != nil {
 		ctx := context.Background()
+
+		r.model.Start()
+		log.Info("model started")
+
 		go r.poller.Run(ctx)
 		go r.gc(ctx)
+
 		r.running = true
 	}
 }
@@ -148,35 +128,63 @@ func (r *reaper) Stop() error {
 }
 
 func (r *reaper) Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error) {
-	o, err := r.state()
+	o, err := r.object()
 	return o, nil, err
 }
 
 func (r *reaper) Enforce(spec types.Spec) (*types.Object, error) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	log.Debug("Enforce", "spec", spec, "V", debugV)
 
+	if err := r.updateSpec(spec); err != nil {
+		return nil, err
+	}
+	r.Start()
+	return r.object()
+}
+
+func (r *reaper) Inspect() (*types.Object, error) {
+	v, err := r.object()
+	log.Info("Inspect", "object", *v, "err", err)
+	return v, err
+}
+
+func (r *reaper) Pause() (*types.Object, error) {
+	if r.Running() {
+		r.Stop()
+	}
+	return r.Inspect()
+}
+
+func (r *reaper) Free() (*types.Object, error) {
+	return r.Pause()
+}
+
+func (r *reaper) Terminate() (*types.Object, error) {
+	return nil, fmt.Errorf("not supported")
+}
+
+func (r *reaper) updateSpec(spec types.Spec) error {
 	// parse input, then select the model to use
 	properties := gc.Properties{}
 
 	err := spec.Properties.Decode(&properties)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	r.properties = properties
 
 	ctx := context.Background()
 	if err := properties.Validate(ctx); err != nil {
-		return nil, err
+		return err
 	}
 
 	r.nodeKeyExtractor = gc.KeyExtractor(properties.NodeKeySelector)
 	r.instanceKeyExtractor = gc.KeyExtractor(properties.InstanceKeySelector)
 
-	model, err := model(properties.Model, properties.ModelProperties)
+	model, err := model(properties)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	r.nodeSource = instance_plugin.LazyConnect(
@@ -190,39 +198,48 @@ func (r *reaper) Enforce(spec types.Spec) (*types.Object, error) {
 		},
 		r.options.PluginRetryInterval.Duration())
 
+	r.spec = spec
+	// set identity
+	r.spec.Metadata.Identity = &types.Identity{
+		ID: r.spec.Metadata.Name,
+	}
+
+	r.ticker = time.Tick(properties.ObserveInterval.Duration())
+	r.poller = controller.Poll(
+		// This determines if the action should be taken when time is up
+		func() bool {
+			log.Debug("checking before poll", "V", debugV2)
+			isLeader := false
+			if r.leader != nil {
+				v, err := r.leader().IsLeader()
+				if err == nil {
+					isLeader = v
+				}
+			}
+			log.Debug("polling", "isLeader", isLeader, "V", debugV2, "freed", r.freed)
+			return isLeader && !r.freed
+		},
+		// This does the work
+		func() (err error) {
+			ctx := context.Background()
+			return r.pollAndSignal(ctx)
+		},
+		r.ticker)
+
+	log.Info("poller", "poll", r.properties.ObserveInterval.Duration())
+
 	r.model = model
-	r.model.Start()
 
 	r.freed = false
-	return r.state()
-}
-
-func (r *reaper) Inspect() (*types.Object, error) {
-	return r.state()
-}
-
-func (r *reaper) Free() (*types.Object, error) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	r.freed = true
-
-	r.model.Stop()
-
-	return r.state()
-}
-
-func (r *reaper) Terminate() (*types.Object, error) {
-	return nil, fmt.Errorf("not supported")
+	return nil
 }
 
 func (r *reaper) snapshot() (*types.Any, error) {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-
 	view := []item{}
 
 	for _, item := range r.items {
-		view = append(view, *item)
+		obj := *item
+		view = append(view, obj)
 	}
 
 	return types.AnyValue(view)
@@ -231,19 +248,42 @@ func (r *reaper) snapshot() (*types.Any, error) {
 func (r *reaper) observe(ctx context.Context) (nodes []instance.Description,
 	instances []instance.Description, err error) {
 
+	log.Debug("observe start", "V", debugV)
+
 	nodes, err = r.nodeSource.DescribeInstances(r.properties.NodeSource.Labels, true)
-	if err == nil {
-		instances, err = r.instanceSource.DescribeInstances(r.properties.InstanceSource.Labels, true)
+	if err != nil {
+		return
 	}
 
+	instances, err = r.instanceSource.DescribeInstances(r.properties.InstanceSource.Labels, true)
+
+	log.Debug("observe", "V", debugV, "nodes", nodes, "instances", instances)
 	return
 }
 
 func (r *reaper) getNodeDescription(i fsm.Instance) *instance.Description {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	for _, item := range r.items {
+		if item.fsm.ID() == i.ID() {
+			desc := item.node
+			return &desc
+		}
+	}
 	return nil
 }
 
 func (r *reaper) getInstanceDescription(i fsm.Instance) *instance.Description {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	for _, item := range r.items {
+		if item.fsm.ID() == i.ID() {
+			desc := item.instance
+			return &desc
+		}
+	}
 	return nil
 }
 
@@ -255,6 +295,10 @@ func (r *reaper) gc(ctx context.Context) {
 	for {
 		select {
 
+		case <-r.stop:
+			log.Info("Stop")
+			return
+
 		case m, ok := <-nodeInput:
 			if !ok {
 				log.Info("NodeChan shutting down")
@@ -264,6 +308,9 @@ func (r *reaper) gc(ctx context.Context) {
 			t := r.getNodeDescription(m)
 			if t != nil {
 				err := r.nodeSource.Destroy(t.ID, instance.Termination)
+
+				log.Debug("nodeDestroy", "id", t.ID, "node", t, "V", debugV)
+
 				if err != nil {
 					log.Error("error destroying node", "err", err, "id", t.ID)
 				}
@@ -278,6 +325,9 @@ func (r *reaper) gc(ctx context.Context) {
 			t := r.getInstanceDescription(m)
 			if t != nil {
 				err := r.instanceSource.Destroy(t.ID, instance.Termination)
+
+				log.Debug("instanceDestroy", "id", t.ID, "instance", t, "V", debugV)
+
 				if err != nil {
 					log.Error("error destroying instance", "err", err, "id", t.ID)
 				}
@@ -287,8 +337,7 @@ func (r *reaper) gc(ctx context.Context) {
 }
 
 func (r *reaper) pollAndSignal(ctx context.Context) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	log.Debug("polling starts", "V", debugV)
 
 	nodes, instances, err := r.observe(ctx)
 	if err != nil {
@@ -316,6 +365,8 @@ func (r *reaper) pollAndSignal(ctx context.Context) error {
 		} else {
 			r.model.FoundInstance(found.fsm, instance)
 			found.instance = instance
+
+			log.Debug("foundInstance", "instance", instance, "V", debugV)
 		}
 	}
 
@@ -334,6 +385,8 @@ func (r *reaper) pollAndSignal(ctx context.Context) error {
 		} else {
 			r.model.FoundNode(found.fsm, node)
 			found.node = node
+
+			log.Debug("foundNode", "node", node, "V", debugV)
 		}
 	}
 
@@ -355,6 +408,8 @@ func (r *reaper) pollAndSignal(ctx context.Context) error {
 			if has {
 				r.model.LostNode(item.fsm)
 				delete(r.items, key)
+
+				log.Debug("lostNode", "node", lost, "key", key, "V", debugV)
 			}
 		}
 	}
@@ -376,6 +431,8 @@ func (r *reaper) pollAndSignal(ctx context.Context) error {
 			if has {
 				r.model.LostInstance(item.fsm)
 				delete(r.items, key)
+
+				log.Debug("lostInstance", "instance", lost, "key", key, "V", debugV)
 			}
 		}
 	}

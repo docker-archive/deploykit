@@ -4,34 +4,33 @@ import (
 	"fmt"
 	"sync"
 
+	gc "github.com/docker/infrakit/pkg/controller/gc/types"
 	"github.com/docker/infrakit/pkg/fsm"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/types"
 )
 
 var (
-	models = map[string]func(*types.Any) (Model, error){}
+	models = map[string]func(gc.Properties) (Model, error){}
 	lock   sync.RWMutex
 )
 
 // Register registers an available model
-func Register(key string, builder func(*types.Any) (Model, error)) {
+func Register(key string, builder func(gc.Properties) (Model, error)) {
 	lock.Lock()
 	defer lock.Unlock()
 
 	models[key] = builder
 }
 
-func model(key string, modelProperties *types.Any) (Model, error) {
+func model(properties gc.Properties) (Model, error) {
 	lock.RLock()
 	defer lock.RUnlock()
 
-	f, has := models[key]
-
+	f, has := models[properties.Model]
 	if !has {
-		return nil, fmt.Errorf("unknow model %v", key)
+		return nil, fmt.Errorf("unknow model %v", properties.Model)
 	}
-	return f(modelProperties)
+	return f(properties)
 }
 
 // Model is the interface offered by the workflow model.  In general, we consider two sides:

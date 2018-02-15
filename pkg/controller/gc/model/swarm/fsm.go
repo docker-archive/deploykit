@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/infrakit/pkg/controller/gc"
+	gc_types "github.com/docker/infrakit/pkg/controller/gc/types"
 	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -54,7 +55,7 @@ const (
 )
 
 type options struct {
-	PollInterval              time.Duration
+	TickUnit                  types.Duration
 	NoData                    fsm.Tick
 	DockerNodeJoin            fsm.Tick
 	WaitDescribeInstances     fsm.Tick
@@ -64,7 +65,7 @@ type options struct {
 }
 
 var defaultOptions = options{
-	PollInterval:              1 * time.Second,
+	TickUnit:                  types.FromDuration(1 * time.Second),
 	NoData:                    fsm.Tick(10),
 	DockerNodeJoin:            fsm.Tick(5),
 	WaitDescribeInstances:     fsm.Tick(5),
@@ -74,10 +75,11 @@ var defaultOptions = options{
 }
 
 type model struct {
-	spec    *fsm.Spec
-	set     *fsm.Set
-	clock   *fsm.Clock
-	options options
+	spec       *fsm.Spec
+	set        *fsm.Set
+	clock      *fsm.Clock
+	properties gc_types.Properties
+	options    options
 
 	dockerNodeRmChan    chan fsm.Instance
 	instanceDestroyChan chan fsm.Instance
@@ -147,7 +149,12 @@ func (m *model) Start() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.clock = fsm.Wall(time.Tick(m.options.PollInterval))
+	// Take the longer of the 2 intervals so that the fsm operates on a slower clock.
+	d := m.options.TickUnit.Duration()
+	if d < m.properties.ObserveInterval.Duration() {
+		d = m.properties.ObserveInterval.Duration()
+	}
+	m.clock = fsm.Wall(time.Tick(d))
 	m.clock.Start()
 
 	m.set = fsm.NewSet(m.spec, m.clock, fsm.DefaultOptions("swarm"))
@@ -183,7 +190,9 @@ func (m *model) dockerNodeRm(i fsm.Instance) error {
 }
 
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
-func BuildModel(modelProperties *types.Any) (gc.Model, error) {
+func BuildModel(properties gc_types.Properties) (gc.Model, error) {
+
+	modelProperties := properties.ModelProperties
 
 	options := defaultOptions
 	if modelProperties != nil {
@@ -193,6 +202,7 @@ func BuildModel(modelProperties *types.Any) (gc.Model, error) {
 	}
 
 	model := &model{
+		properties:          properties,
 		options:             options,
 		dockerNodeRmChan:    make(chan fsm.Instance, 10),
 		instanceDestroyChan: make(chan fsm.Instance, 10),

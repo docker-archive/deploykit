@@ -1,0 +1,26 @@
+kind: gc
+metadata:
+  name: swarm-gc  # socket file = nfs and the name of control loop is 'workers'
+properties:
+
+  ObserveInterval: 1s
+  Model: swarm # only workflow implemented at the moment
+
+  ModelProperties:
+    TickUnit:                  5s
+    NoData:                    20
+    DockerNodeJoin:            10
+    WaitDescribeInstances:     10
+    WaitBeforeInstanceDestroy: 3
+    WaitBeforeReprovision:     5
+    WaitBeforeCleanup:         5
+
+  # plugin that gives membership of known instances
+  InstanceSource:
+    plugin: vm/compute
+  InstanceKeySelector: \{\{.Tags.link\}\}
+
+  # plugin that gives membership of known instances
+  NodeSource:
+    plugin: docker/compute
+  NodeKeySelector: \{\{.Tags.link\}\}

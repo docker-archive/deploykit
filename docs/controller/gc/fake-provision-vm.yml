@@ -1,0 +1,13 @@
+{{/* Input to create instance in the simulator */}}
+{{/* =% instanceProvision `vm/compute` %= */}}
+
+{{ $joinKey := flag "join-key" "string" "Join key" | prompt "Join key to tag the instance:" "string" }}
+
+Tags:
+  link : {{ $joinKey }}  # note that this will be used as the join key in the gc.yml's InstanceKeySelector
+  created: {{ now | htmlDate }}
+  user: {{ env `USER` }}
+  type: vm
+
+Properties:
+  vm_type: xlarge

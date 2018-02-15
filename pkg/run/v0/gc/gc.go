@@ -9,10 +9,11 @@ import (
 	"github.com/docker/infrakit/pkg/rpc/client"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/run"
-	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
+
+	_ "github.com/docker/infrakit/pkg/controller/gc/model/swarm"
 )
 
 const (
@@ -21,23 +22,12 @@ const (
 )
 
 var (
-	// EnvGCInterval sets the gc interval
-	EnvGCInterval = "INFRAKIT_GC_SYNC_INTERVAL"
-
 	log = logutil.New("module", "run/v0/gc")
 
 	defaultOptions = gc.DefaultOptions
 )
 
 func init() {
-
-	// We let the user set some environment variables to override
-	// the default values.  These default options are then overridden
-	// after the plugin started if the user provides options in the spec
-	// to override them.
-	if d := types.MustParseDuration(local.Getenv(EnvGCInterval, "0s")); d > 0 {
-		defaultOptions.GCInterval = d
-	}
 
 	inproc.Register(Kind, Run, defaultOptions)
 }
