@@ -44,7 +44,11 @@ func flavorPluginLookup(_ plugin_base.Name) (flavor.Plugin, error) {
 }
 
 func minionProperties(instances uint, updating group_types.Updating, instanceData string, flavorInit string) *types.Any {
-	updatingStr, _ := json.Marshal(updating)
+	updatingStr, err := json.Marshal(updating)
+	if err != nil {
+		panic(err)
+	}
+
 	return types.AnyString(fmt.Sprintf(`{
 	  "Allocation": {
 	    "Size": %d
@@ -746,6 +750,67 @@ func TestExternalManagedRollingUpdate(t *testing.T) {
 	}
 
 	require.NoError(t, grp.FreeGroup(id))
+}
+
+func TestRollingUpdateNoDrain(t *testing.T) {
+	spec := group.Spec{
+		ID: id,
+		Properties: minionProperties(3,
+			group_types.Updating{SkipBeforeInstanceDestroy: &group_types.SkipBeforeInstanceDestroyDrain},
+			"data",
+			"init"),
+	}
+	plugin := newTestInstancePlugin(
+		newFakeInstanceDefault(spec, nil),
+		newFakeInstanceDefault(spec, nil),
+		newFakeInstanceDefault(spec, nil),
+	)
+	flavorPlugin := testFlavor{
+		drain: func(flavorProperties *types.Any, inst instance.Description) error {
+			require.Fail(t, "Drain should not be invoked")
+			return fmt.Errorf("Should not be invoked")
+		},
+	}
+	flavorLookup := func(_ plugin_base.Name) (flavor.Plugin, error) {
+		return &flavorPlugin, nil
+	}
+	grp := NewGroupPlugin(pluginLookup(pluginName, plugin), flavorLookup,
+		group_types.Options{
+			PollInterval: types.FromDuration(1 * time.Millisecond),
+		})
+
+	_, err := grp.CommitGroup(spec, false)
+	require.NoError(t, err)
+
+	instances, err := plugin.DescribeInstances(memberTags(spec.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
+
+	updated := group.Spec{
+		ID: id,
+		Properties: minionProperties(3,
+			group_types.Updating{SkipBeforeInstanceDestroy: &group_types.SkipBeforeInstanceDestroyDrain},
+			"data2",
+			"init"),
+	}
+
+	desc, err := grp.CommitGroup(updated, true) // pretend only
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	desc, err = grp.CommitGroup(updated, false)
+	require.NoError(t, err)
+	require.Equal(t, "Performing a rolling update on 3 instances", desc)
+
+	require.NoError(t, awaitGroupConvergence(t, grp))
+
+	// Nothing drained and everything destroyed
+	require.Len(t, flavorPlugin.drained, 0)
+	require.Len(t, plugin.destroyed, 3)
+
+	instances, err = plugin.DescribeInstances(memberTags(updated.ID), false)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(instances))
 }
 
 func TestRollAndAdjustScale(t *testing.T) {
