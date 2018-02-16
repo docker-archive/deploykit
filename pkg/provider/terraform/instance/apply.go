@@ -1,9 +1,7 @@
 package instance
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -16,7 +14,6 @@ import (
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	ibmcloud_client "github.com/docker/infrakit/pkg/provider/ibmcloud/client"
 	"github.com/docker/infrakit/pkg/types"
-	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/afero"
 )
 
@@ -55,16 +52,7 @@ func (p *plugin) terraformApply() error {
 			// Conditionally apply terraform
 			if p.shouldApply() {
 				fns := tfFuncs{
-					tfRefresh: func() error {
-						command := exec.Command("terraform refresh").
-							InheritEnvs(true).
-							WithEnvs(p.envs...).
-							WithDir(p.Dir)
-						if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
-							return err
-						}
-						return command.Wait()
-					},
+					tfRefresh:           p.doTerraformRefresh,
 					tfStateList:         p.doTerraformStateList,
 					tfImport:            p.doTerraformImport,
 					getExistingResource: p.getExistingResource,
@@ -128,20 +116,6 @@ func (p *plugin) terraformApply() error {
 
 	p.applying = true
 	return nil
-}
-
-// doTerraformApply executes "terraform apply"
-func (p *plugin) doTerraformApply() error {
-	logger.Info("doTerraformApply", "msg", "Applying plan")
-	command := exec.Command("terraform apply -refresh=false").
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start()
-	if err == nil {
-		return command.Wait()
-	}
-	return err
 }
 
 // shouldApply returns true if "terraform apply" should execute; this happens if
@@ -526,44 +500,4 @@ func (p *plugin) getExistingResource(resType TResourceType, resName TResourceNam
 	}
 	logger.Warn("getExistingResource", "msg", fmt.Sprintf("Unsupported VM type for backend retrival: %v", resType))
 	return nil, nil
-}
-
-// doTerraformStateList shells out to run `terraform state list` and parses the result
-func (p *plugin) doTerraformStateList() (map[TResourceType]map[TResourceName]struct{}, error) {
-	result := map[TResourceType]map[TResourceName]struct{}{}
-	command := exec.Command("terraform state list -no-color").
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	command.StartWithHandlers(
-		nil,
-		func(r io.Reader) error {
-			reader := bufio.NewReader(r)
-			for {
-				lineBytes, _, err := reader.ReadLine()
-				if err != nil {
-					break
-				}
-				line := string(lineBytes)
-				logger.Debug("doTerraformStateList", "output", line, "V", debugV3)
-				// Every line should have <resource-type>.<resource-name>
-				if !strings.Contains(line, ".") {
-					logger.Error("doTerraformStateList", "msg", "Invalid line from 'terraform state list'", "line", line)
-					continue
-				}
-				split := strings.Split(strings.TrimSpace(line), ".")
-				resType := TResourceType(split[0])
-				resName := TResourceName(split[1])
-				if resourceMap, has := result[resType]; has {
-					resourceMap[resName] = struct{}{}
-				} else {
-					result[resType] = map[TResourceName]struct{}{resName: {}}
-				}
-			}
-			return nil
-		},
-		nil)
-
-	err := command.Wait()
-	return result, err
 }

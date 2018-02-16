@@ -4024,10 +4024,11 @@ func TestImportTfImportError(t *testing.T) {
 			require.Equal(t, "123", id)
 			return fmt.Errorf("Custom import error")
 		},
-		tfClean: func(resType TResourceType, name string) {
+		tfClean: func(resType TResourceType, name string) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(name, "instance-"))
 			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
+			return nil
 		},
 	}
 	spec := instance.Spec{
@@ -4078,10 +4079,11 @@ func TestImportTfShowInstError(t *testing.T) {
 		tfShowInst: func(id string) (TResourceProperties, error) {
 			return nil, fmt.Errorf("Custom show inst error")
 		},
-		tfClean: func(resType TResourceType, name string) {
+		tfClean: func(resType TResourceType, name string) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(name, "instance-"))
 			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
+			return nil
 		},
 	}
 	spec := instance.Spec{
@@ -4144,8 +4146,9 @@ func TestImportResourceTagMap(t *testing.T) {
 			}
 			return props, nil
 		},
-		tfClean: func(vmType TResourceType, vmName string) {
+		tfClean: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
+			return nil
 		},
 	}
 	spec := instance.Spec{
@@ -4236,8 +4239,9 @@ func TestImportResourceTagSlice(t *testing.T) {
 			}
 			return props, nil
 		},
-		tfClean: func(vmType TResourceType, vmName string) {
+		tfClean: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
+			return nil
 		},
 	}
 	spec := instance.Spec{
@@ -4421,8 +4425,9 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 			}
 			return nil, fmt.Errorf("Unknown show ID: %v", id)
 		},
-		tfClean: func(vmType TResourceType, vmName string) {
+		tfClean: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
+			return nil
 		},
 	}
 	// Conditionally create existing files

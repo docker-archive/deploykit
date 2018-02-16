@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/docker/infrakit/pkg/util/exec"
 )
 
 // title matches a line like: "aws_security_group.default:"
@@ -275,45 +273,4 @@ func convertToType(val string) interface{} {
 		return boolVar
 	}
 	return val
-}
-
-// doTerraformShow shells out to run `terraform show` and parses the result
-func (p *plugin) doTerraformShow(resTypes []TResourceType,
-	propFilter []string) (result map[TResourceType]map[TResourceName]TResourceProperties, err error) {
-
-	command := exec.Command("terraform show -no-color").
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	command.StartWithHandlers(
-		nil,
-		func(r io.Reader) error {
-			found, err := parseTerraformShowOutput(resTypes, propFilter, r)
-			result = found
-			return err
-		},
-		nil)
-
-	err = command.Wait()
-	return
-}
-
-// doTerraformShowForInstance shells out to run `terraform state show <instance>` and parses the result
-func (p *plugin) doTerraformShowForInstance(instance string) (result TResourceProperties, err error) {
-
-	command := exec.Command(fmt.Sprintf("terraform state show %v -no-color", instance)).
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	command.StartWithHandlers(
-		nil,
-		func(r io.Reader) error {
-			props, err := parseTerraformShowForInstanceOutput(r)
-			result = props
-			return err
-		},
-		nil)
-
-	err = command.Wait()
-	return
 }

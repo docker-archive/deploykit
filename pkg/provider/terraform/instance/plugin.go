@@ -23,7 +23,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
-	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/afero"
 )
 
@@ -1361,7 +1360,7 @@ type importFns struct {
 	tfShow     func(resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
 	tfImport   func(resType TResourceType, filename, resID string) error
 	tfShowInst func(id string) (TResourceProperties, error)
-	tfClean    func(resType TResourceType, resName string)
+	tfClean    func(resType TResourceType, resName string) error
 }
 
 // importResource imports the resource with the given ID into terraform and creates a
@@ -1561,18 +1560,6 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	}
 
 	return p.terraformApply()
-}
-
-// cleanupFailedImport removes the resource from the terraform state file
-func (p *plugin) cleanupFailedImport(vmType TResourceType, vmName string) {
-	command := exec.Command(fmt.Sprintf("terraform state rm %v.%v", vmType, vmName)).
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start()
-	if err == nil {
-		command.Wait()
-	}
 }
 
 // writeTfJSONFilesForImport writes out the final tf.json[.new] file by grouping all
@@ -1864,16 +1851,4 @@ func determineFinalPropsForImport(res *ImportResource) {
 		}
 	}
 	res.FinalProps = finalProps
-}
-
-// doTerraformImport shells out to run `terraform import`
-func (p *plugin) doTerraformImport(resType TResourceType, resName, id string) error {
-	command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", resType, resName, id)).
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
-		return err
-	}
-	return command.Wait()
 }
