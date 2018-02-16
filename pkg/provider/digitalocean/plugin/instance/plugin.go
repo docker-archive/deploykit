@@ -212,8 +212,9 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 		}
 
 		description := instance.Description{
-			ID:   instance.ID(fmt.Sprintf("%d", droplet.ID)),
-			Tags: instTags,
+			ID:        instance.ID(fmt.Sprintf("%d", droplet.ID)),
+			LogicalID: logicalID(instTags),
+			Tags:      instTags,
 		}
 
 		if properties {
@@ -228,6 +229,16 @@ func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]i
 	}
 
 	return result, nil
+}
+
+func logicalID(tags map[string]string) *instance.LogicalID {
+	logicalID, present := tags[instance_types.InfrakitLogicalID]
+	if present {
+		id := instance.LogicalID(logicalID)
+		return &id
+	}
+
+	return nil
 }
 
 func (p *plugin) listDroplets() ([]godo.Droplet, error) {

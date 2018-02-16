@@ -78,3 +78,13 @@ func TestDifference2(t *testing.T) {
 	require.Equal(t, Descriptions{a[1], a[4]}, aIndex.Select(aIndex.Keys.Difference(bIndex.Keys)))
 	require.Equal(t, Descriptions{b[3], b[4]}, bIndex.Select(bIndex.Keys.Difference(aIndex.Keys)))
 }
+
+func TestCompare(t *testing.T) {
+
+	a := Description{ID: ID("1")}
+	b := Description{ID: ID("2")}
+
+	require.Equal(t, 0, a.Compare(a))
+	require.Equal(t, -1, a.Compare(b))
+	require.Equal(t, 1, b.Compare(a))
+}
