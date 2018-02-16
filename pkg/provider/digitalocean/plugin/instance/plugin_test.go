@@ -324,6 +324,42 @@ func TestDescribeInstances(t *testing.T) {
 	assert.Len(t, descriptions, 2)
 }
 
+func TestDescribeInstancesHandlesLogicalIDTag(t *testing.T) {
+	plugin := &plugin{
+		droplets: &fakeDropletsServices{
+			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
+				return []godo.Droplet{
+					godoDroplet(tags(itypes.InfrakitLogicalID + ":foo")),
+				}, godoResponse(), nil
+			},
+		},
+	}
+	descriptions, err := plugin.DescribeInstances(nil, true)
+
+	require.NoError(t, err)
+	assert.Len(t, descriptions, 1)
+	if assert.NotNil(t, descriptions[0].LogicalID) {
+		assert.Equal(t, instance.LogicalID("foo"), *descriptions[0].LogicalID)
+	}
+}
+
+func TestDescribeInstancesHandlesMissingLogicalIDTag(t *testing.T) {
+	plugin := &plugin{
+		droplets: &fakeDropletsServices{
+			listfunc: func(context.Context, *godo.ListOptions) ([]godo.Droplet, *godo.Response, error) {
+				return []godo.Droplet{
+					godoDroplet(tags("foo" + ":bar")),
+				}, godoResponse(), nil
+			},
+		},
+	}
+	descriptions, err := plugin.DescribeInstances(nil, true)
+
+	require.NoError(t, err)
+	assert.Len(t, descriptions, 1)
+	assert.Nil(t, descriptions[0].LogicalID)
+}
+
 func TestDescribeInstancesHandlesPages(t *testing.T) {
 	plugin := &plugin{
 		droplets: &fakeDropletsServices{
