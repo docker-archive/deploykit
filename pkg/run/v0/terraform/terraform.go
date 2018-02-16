@@ -91,7 +91,6 @@ func Run(scope scope.Scope, name plugin.Name,
 			InstanceSpec: importInstSpec,
 			Resources:    resources,
 		},
-		false,
 	)
 	if err != nil {
 		log.Error("error initializing pluing", "err", err)

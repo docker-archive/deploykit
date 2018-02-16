@@ -108,8 +108,14 @@ type ImportOptions struct {
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *ImportOptions, pretend bool) (instance.Plugin, error) {
-	logger.Info("NewTerraformInstancePlugin", "dir", options.Dir)
+func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *ImportOptions) (instance.Plugin, error) {
+	return newPlugin(options, importOpts, false)
+}
+
+// newPlugin is the internal function that returns an instance plugin backed by disk files. This function
+// allows us to override the pretend flag for testing.
+func newPlugin(options terraform_types.Options, importOpts *ImportOptions, pretend bool) (instance.Plugin, error) {
+	logger.Info("newPlugin", "dir", options.Dir)
 
 	var pluginLookup func() discovery.Plugins
 	if !options.Standalone {
