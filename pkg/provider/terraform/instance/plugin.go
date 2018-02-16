@@ -191,7 +191,7 @@ func (p *plugin) processImport(importOpts *ImportOptions) error {
 		tfShow:     p.doTerraformShow,
 		tfImport:   p.doTerraformImport,
 		tfShowInst: p.doTerraformShowForInstance,
-		tfClean:    p.cleanupFailedImport,
+		tfStateRm:  p.doTerraformStateRemove,
 	}
 	err := p.importResources(fns, importOpts.Resources, importOpts.InstanceSpec)
 	if err != nil {
@@ -1360,7 +1360,7 @@ type importFns struct {
 	tfShow     func(resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
 	tfImport   func(resType TResourceType, filename, resID string) error
 	tfShowInst func(id string) (TResourceProperties, error)
-	tfClean    func(resType TResourceType, resName string) error
+	tfStateRm  func(resType TResourceType, resName string) error
 }
 
 // importResource imports the resource with the given ID into terraform and creates a
@@ -1546,7 +1546,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	if errorToThrow != nil {
 		for _, r := range resources {
 			if r.SuccessfullyImported {
-				fns.tfClean(*r.ResourceType, string(r.FinalResourceName))
+				fns.tfStateRm(*r.ResourceType, string(r.FinalResourceName))
 			}
 		}
 		for _, path := range paths {

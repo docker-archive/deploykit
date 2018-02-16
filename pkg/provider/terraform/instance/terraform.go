@@ -129,8 +129,8 @@ func (p *plugin) doTerraformImport(resType TResourceType, resName, id string) er
 	return command.Wait()
 }
 
-// cleanupFailedImport removes the resource from the terraform state file
-func (p *plugin) cleanupFailedImport(vmType TResourceType, vmName string) error {
+// doTerraformStateRemove removes the resource from the terraform state file
+func (p *plugin) doTerraformStateRemove(vmType TResourceType, vmName string) error {
 	command := exec.Command(fmt.Sprintf("terraform state rm %v.%v", vmType, vmName)).
 		InheritEnvs(true).
 		WithEnvs(p.envs...).

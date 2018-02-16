@@ -4024,7 +4024,7 @@ func TestImportTfImportError(t *testing.T) {
 			require.Equal(t, "123", id)
 			return fmt.Errorf("Custom import error")
 		},
-		tfClean: func(resType TResourceType, name string) error {
+		tfStateRm: func(resType TResourceType, name string) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(name, "instance-"))
 			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
@@ -4079,7 +4079,7 @@ func TestImportTfShowInstError(t *testing.T) {
 		tfShowInst: func(id string) (TResourceProperties, error) {
 			return nil, fmt.Errorf("Custom show inst error")
 		},
-		tfClean: func(resType TResourceType, name string) error {
+		tfStateRm: func(resType TResourceType, name string) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(name, "instance-"))
 			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
@@ -4146,7 +4146,7 @@ func TestImportResourceTagMap(t *testing.T) {
 			}
 			return props, nil
 		},
-		tfClean: func(vmType TResourceType, vmName string) error {
+		tfStateRm: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
 			return nil
 		},
@@ -4239,7 +4239,7 @@ func TestImportResourceTagSlice(t *testing.T) {
 			}
 			return props, nil
 		},
-		tfClean: func(vmType TResourceType, vmName string) error {
+		tfStateRm: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
 			return nil
 		},
@@ -4425,7 +4425,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 			}
 			return nil, fmt.Errorf("Unknown show ID: %v", id)
 		},
-		tfClean: func(vmType TResourceType, vmName string) error {
+		tfStateRm: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
 			return nil
 		},
