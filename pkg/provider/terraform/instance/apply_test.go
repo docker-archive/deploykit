@@ -35,7 +35,7 @@ func TestRunTerraformApply(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, terraform.(*plugin).pretend)
 	p, _ := terraform.(*plugin)
-	err = p.doTerraformApply()
+	err = p.terraform.doTerraformApply()
 	require.NoError(t, err)
 }
 
@@ -48,7 +48,8 @@ func TestContinuePollingStandalone(t *testing.T) {
 		Standalone:   true,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	terraform, err := NewTerraformInstancePlugin(options, nil)
+
+	terraform, err := newPlugin(options, nil, false, getTfLookup(&FakeTerraform{}, nil))
 	require.NoError(t, err)
 	p, _ := terraform.(*plugin)
 	shoudApply := p.shouldApply()
@@ -116,27 +117,37 @@ func getFilenames(t *testing.T, p *plugin) (tfFiles []string, tfNewFiles []strin
 }
 
 func TestHandleFilesStateListBeforeFail(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
 	refreshInvoked := false
-	fns := tfFuncs{
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			return nil, fmt.Errorf("Custom state list error")
-		},
-		tfRefresh: func() error {
+	fake := FakeTerraform{
+		doTerraformRefreshStub: func() error {
 			refreshInvoked = true
 			return nil
 		},
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			return nil, fmt.Errorf("Custom state list error")
+		},
 	}
-	err := tf.handleFiles(fns)
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
+	err := tf.handleFiles(tfFuncs{})
 	require.Error(t, err)
 	require.Equal(t, "Custom state list error", err.Error())
 	require.False(t, refreshInvoked)
 }
 
 func TestHandleFilesRefreshFail(t *testing.T) {
-	tf, dir := getPlugin(t)
+	stateListInvokedCount := 0
+	fake := FakeTerraform{
+		doTerraformRefreshStub: func() error {
+			return fmt.Errorf("Custom refresh error")
+		},
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			stateListInvokedCount = stateListInvokedCount + 1
+			return map[TResourceType]map[TResourceName]struct{}{}, nil
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Write out 10 files, should not be changed since refresh failed
@@ -158,17 +169,7 @@ func TestHandleFilesRefreshFail(t *testing.T) {
 		writeFileInfo(info, t)
 	}
 
-	stateListInvokedCount := 0
-	fns := tfFuncs{
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			stateListInvokedCount = stateListInvokedCount + 1
-			return map[TResourceType]map[TResourceName]struct{}{}, nil
-		},
-		tfRefresh: func() error {
-			return fmt.Errorf("Custom refresh error")
-		},
-	}
-	err := tf.handleFiles(fns)
+	err := tf.handleFiles(tfFuncs{})
 	require.Error(t, err)
 	require.Equal(t, "Custom refresh error", err.Error())
 	require.Equal(t, 1, stateListInvokedCount)
@@ -186,25 +187,25 @@ func TestHandleFilesRefreshFail(t *testing.T) {
 }
 
 func TestHandleFilesStateListAfterFail(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
 	stateListInvokedCount := 0
 	refreshInvoked := false
-	fns := tfFuncs{
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+	fake := FakeTerraform{
+		doTerraformRefreshStub: func() error {
+			refreshInvoked = true
+			return nil
+		},
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			stateListInvokedCount = stateListInvokedCount + 1
 			if stateListInvokedCount == 1 {
 				return map[TResourceType]map[TResourceName]struct{}{}, nil
 			}
 			return nil, fmt.Errorf("Custom state list error")
 		},
-		tfRefresh: func() error {
-			refreshInvoked = true
-			return nil
-		},
 	}
-	err := tf.handleFiles(fns)
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
+	err := tf.handleFiles(tfFuncs{})
 	require.Error(t, err)
 	require.Equal(t, "Custom state list error", err.Error())
 	require.True(t, refreshInvoked)
@@ -215,13 +216,7 @@ func TestHandleFilesNoFiles(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			return map[TResourceType]map[TResourceName]struct{}{}, nil
-		},
-	}
-	err := tf.handleFiles(fns)
+	err := tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 }
 
@@ -316,7 +311,22 @@ func TestHasRecentDeltaInFuture(t *testing.T) {
 }
 
 func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
-	tf, dir := getPlugin(t)
+	fake := FakeTerraform{
+		doTerraformRefreshStub: func() error {
+			return nil
+		},
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			// Return 5 files
+			result := map[TResourceName]struct{}{}
+			for i := 100; i < 105; i++ {
+				result[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
+			}
+			return map[TResourceType]map[TResourceName]struct{}{
+				VMIBMCloud: result,
+			}, nil
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Write out 5 files
@@ -337,20 +347,7 @@ func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
 	require.Len(t, tfFilesNew, 0)
 	require.Len(t, tfFiles, 5)
 
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			// Return 5 files
-			result := map[TResourceName]struct{}{}
-			for i := 100; i < 105; i++ {
-				result[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
-			}
-			return map[TResourceType]map[TResourceName]struct{}{
-				VMIBMCloud: result,
-			}, nil
-		},
-	}
-	err := tf.handleFiles(fns)
+	err := tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 
 	// No files removed
@@ -363,7 +360,40 @@ func TestHandleFilesNoPruneNoNewFiles(t *testing.T) {
 }
 
 func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
-	tf, dir := getPlugin(t)
+	fake := FakeTerraform{
+		doTerraformRefreshStub: func() error {
+			return nil
+		},
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			// Return all VMs
+			vms := map[TResourceName]struct{}{}
+			for i := 100; i < 115; i++ {
+				vms[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
+			}
+			// The default NFS
+			defaultNFS := map[TResourceName]struct{}{}
+			for i := 105; i < 110; i++ {
+				defaultNFS[TResourceName(fmt.Sprintf("default-nfs-instance-%v", i))] = struct{}{}
+			}
+			// The dedicated NFS
+			dedicatedNFS := map[TResourceName]struct{}{}
+			for i := 110; i < 115; i++ {
+				dedicatedNFS[TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i))] = struct{}{}
+			}
+			// And the global
+			globalNFS := map[TResourceName]struct{}{}
+			for i := 115; i < 117; i++ {
+				globalNFS[TResourceName(fmt.Sprintf("global-nfs-instance-%v", i))] = struct{}{}
+			}
+			return map[TResourceType]map[TResourceName]struct{}{
+				VMIBMCloud:                     vms,
+				TResourceType("default-nfs"):   defaultNFS,
+				TResourceType("dedicated-nfs"): dedicatedNFS,
+				TResourceType("global-nfs"):    globalNFS,
+			}, nil
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Write out 5 files with VMs, 5 with VMs and a default, 5 with VMs
@@ -452,38 +482,7 @@ func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
 		require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
 	}
 
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			// Return all VMs
-			vms := map[TResourceName]struct{}{}
-			for i := 100; i < 115; i++ {
-				vms[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
-			}
-			// The default NFS
-			defaultNFS := map[TResourceName]struct{}{}
-			for i := 105; i < 110; i++ {
-				defaultNFS[TResourceName(fmt.Sprintf("default-nfs-instance-%v", i))] = struct{}{}
-			}
-			// The dedicated NFS
-			dedicatedNFS := map[TResourceName]struct{}{}
-			for i := 110; i < 115; i++ {
-				dedicatedNFS[TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i))] = struct{}{}
-			}
-			// And the global
-			globalNFS := map[TResourceName]struct{}{}
-			for i := 115; i < 117; i++ {
-				globalNFS[TResourceName(fmt.Sprintf("global-nfs-instance-%v", i))] = struct{}{}
-			}
-			return map[TResourceType]map[TResourceName]struct{}{
-				VMIBMCloud:                     vms,
-				TResourceType("default-nfs"):   defaultNFS,
-				TResourceType("dedicated-nfs"): dedicatedNFS,
-				TResourceType("global-nfs"):    globalNFS,
-			}, nil
-		},
-	}
-	err := tf.handleFiles(fns)
+	err := tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 
 	// No files removed
@@ -502,7 +501,19 @@ func TestHandleFilesDedicatedGlobalNoPruneNoNewFiles(t *testing.T) {
 }
 
 func TestHandleFilesNoPruneWithNewFiles(t *testing.T) {
-	tf, dir := getPlugin(t)
+	fake := FakeTerraform{
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			// Return the 5 existing instances
+			result := map[TResourceName]struct{}{}
+			for i := 100; i < 105; i++ {
+				result[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
+			}
+			return map[TResourceType]map[TResourceName]struct{}{
+				VMIBMCloud: result,
+			}, nil
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Write out 10 files, 5 existing and 5 new
@@ -527,20 +538,7 @@ func TestHandleFilesNoPruneWithNewFiles(t *testing.T) {
 	require.Len(t, tfFilesNew, 5)
 	require.Len(t, tfFiles, 5)
 
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			// Return the 5 existing instances
-			result := map[TResourceName]struct{}{}
-			for i := 100; i < 105; i++ {
-				result[TResourceName(fmt.Sprintf("instance-%v", i))] = struct{}{}
-			}
-			return map[TResourceType]map[TResourceName]struct{}{
-				VMIBMCloud: result,
-			}, nil
-		},
-	}
-	err := tf.handleFiles(fns)
+	err := tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 
 	// New files renamed, nothing removed
@@ -589,19 +587,21 @@ func TestHandleFilePruningPruneExistingResourceError(t *testing.T) {
 }
 
 func TestHandleFilePruningPruneImportError(t *testing.T) {
-	tf, dir := getPlugin(t)
+	fake := FakeTerraform{
+		doTerraformImportStub: func(resType TResourceType, resName, resID string) error {
+			require.Equal(t, VMIBMCloud, resType)
+			require.Equal(t, "instance-123", resName)
+			require.Equal(t, "some-id", resID)
+			return fmt.Errorf("Custom import error")
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	fns := tfFuncs{
 		getExistingResource: func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
 			id := "some-id"
 			return &id, nil
-		},
-		tfImport: func(resType TResourceType, resName, resID string) error {
-			require.Equal(t, VMIBMCloud, resType)
-			require.Equal(t, "instance-123", resName)
-			require.Equal(t, "some-id", resID)
-			return fmt.Errorf("Custom import error")
 		},
 	}
 	err := tf.handleFilePruning(fns,
@@ -662,17 +662,19 @@ func TestHandleFilePruningRemovedFromBackend(t *testing.T) {
 }
 
 func TestHandleFilePruningImportSuccess(t *testing.T) {
-	tf, dir := getPlugin(t)
+	fake := FakeTerraform{
+		doTerraformImportStub: func(resType TResourceType, resName, resID string) error {
+			// Import is successful
+			return nil
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	fns := tfFuncs{
 		getExistingResource: func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
 			id := "some-id"
 			return &id, nil
-		},
-		tfImport: func(resType TResourceType, resName, resID string) error {
-			// Import is successful
-			return nil
 		},
 	}
 	err := tf.handleFilePruning(fns,
@@ -760,39 +762,12 @@ func TestHandleFilesPruneMultipleVMTypes_NoExistsInBackend(t *testing.T) {
 }
 
 func internalTestHandleFilesPruneMultipleVMTypes(t *testing.T, pruneType int) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
-	// Write out 9 files, 3 different VM types
-	for i := 100; i < 109; i++ {
-		var resType TResourceType
-		if i < 103 {
-			resType = VMIBMCloud
-		} else if i < 106 {
-			resType = VMAmazon
-		} else {
-			resType = VMGoogleCloud
-		}
-		info := fileInfo{
-			ResInfo: []resInfo{
-				{
-					ResType: resType,
-					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
-				},
-			},
-			NewFile: false,
-			Plugin:  tf,
-		}
-		writeFileInfo(info, t)
-	}
-	tfFiles, tfFilesNew := getFilenames(t, tf)
-	require.Len(t, tfFilesNew, 0)
-	require.Len(t, tfFiles, 9)
-
 	stateListInvokedCount := 0
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+	fake := FakeTerraform{
+		doTerraformRefreshStub: func() error {
+			return nil
+		},
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			stateListInvokedCount = stateListInvokedCount + 1
 			// Base resources that are not removed
 			result := map[TResourceType]map[TResourceName]struct{}{
@@ -821,7 +796,7 @@ func internalTestHandleFilesPruneMultipleVMTypes(t *testing.T, pruneType int) {
 			// Return all of 1 type, 1 of another type, 0 of the last type
 			return result, nil
 		},
-		tfImport: func(resType TResourceType, resName, resID string) error {
+		doTerraformImportStub: func(resType TResourceType, resName, resID string) error {
 			// Should only invoked if the resources exist in the backend
 			if pruneType == Prune2ExistsInBackend {
 				if resType == VMAmazon && resName == "instance-105" {
@@ -836,6 +811,37 @@ func internalTestHandleFilesPruneMultipleVMTypes(t *testing.T, pruneType int) {
 			}
 			return fmt.Errorf("tfImport should not be invoked for pruneType: %v", pruneType)
 		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
+	// Write out 9 files, 3 different VM types
+	for i := 100; i < 109; i++ {
+		var resType TResourceType
+		if i < 103 {
+			resType = VMIBMCloud
+		} else if i < 106 {
+			resType = VMAmazon
+		} else {
+			resType = VMGoogleCloud
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: resType,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: false,
+			Plugin:  tf,
+		}
+		writeFileInfo(info, t)
+	}
+	tfFiles, tfFilesNew := getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	require.Len(t, tfFiles, 9)
+
+	fns := tfFuncs{
 		getExistingResource: func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error) {
 			if pruneType == Prune1RemoveOutOfBand {
 				return nil, fmt.Errorf("tfImport should not be invoked for pruneType: Prune1RemoveOutOfBand")
@@ -877,7 +883,33 @@ func internalTestHandleFilesPruneMultipleVMTypes(t *testing.T, pruneType int) {
 }
 
 func TestHandleFilesPruneWithNewFiles(t *testing.T) {
-	tf, dir := getPlugin(t)
+	stateListInvokedCount := 0
+	fake := FakeTerraform{
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			stateListInvokedCount = stateListInvokedCount + 1
+			// Return everything the first time
+			if stateListInvokedCount == 1 {
+				return map[TResourceType]map[TResourceName]struct{}{
+					VMIBMCloud: {
+						TResourceName("instance-100"): {},
+						TResourceName("instance-101"): {},
+						TResourceName("instance-102"): {},
+						TResourceName("instance-103"): {},
+						TResourceName("instance-104"): {},
+					},
+				}, nil
+			}
+			// Return only 3 of the five existing
+			return map[TResourceType]map[TResourceName]struct{}{
+				VMIBMCloud: {
+					TResourceName("instance-102"): {},
+					TResourceName("instance-103"): {},
+					TResourceName("instance-104"): {},
+				},
+			}, nil
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Write out 10 files, 5 existing and 5 new
@@ -902,34 +934,7 @@ func TestHandleFilesPruneWithNewFiles(t *testing.T) {
 	require.Len(t, tfFilesNew, 5)
 	require.Len(t, tfFiles, 5)
 
-	stateListInvokedCount := 0
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			stateListInvokedCount = stateListInvokedCount + 1
-			// Return everything the first time
-			if stateListInvokedCount == 1 {
-				return map[TResourceType]map[TResourceName]struct{}{
-					VMIBMCloud: {
-						TResourceName("instance-100"): {},
-						TResourceName("instance-101"): {},
-						TResourceName("instance-102"): {},
-						TResourceName("instance-103"): {},
-						TResourceName("instance-104"): {},
-					},
-				}, nil
-			}
-			// Return only 3 of the five existing
-			return map[TResourceType]map[TResourceName]struct{}{
-				VMIBMCloud: {
-					TResourceName("instance-102"): {},
-					TResourceName("instance-103"): {},
-					TResourceName("instance-104"): {},
-				},
-			}, nil
-		},
-	}
-	err := tf.handleFiles(fns)
+	err := tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 
 	// New files renamed, instances 100, 101 remvoed
@@ -942,137 +947,8 @@ func TestHandleFilesPruneWithNewFiles(t *testing.T) {
 }
 
 func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
-	// Write out 5 files with VMs, 5 with VMs and a default, 5 with VMs
-	// and dedicated, and a global. Every even file is new.
-	for i := 100; i < 105; i++ {
-		newFile := false
-		if i%2 == 0 {
-			newFile = true
-		}
-		info := fileInfo{
-			ResInfo: []resInfo{
-				{
-					ResType: VMIBMCloud,
-					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
-				},
-			},
-			NewFile: newFile,
-			Plugin:  tf,
-		}
-		writeFileInfo(info, t)
-	}
-	for i := 105; i < 110; i++ {
-		newFile := false
-		if i%2 == 0 {
-			newFile = true
-		}
-		info := fileInfo{
-			ResInfo: []resInfo{
-				{
-					ResType: VMIBMCloud,
-					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
-				},
-				{
-					ResType: TResourceType("default-nfs"),
-					ResName: TResourceName(fmt.Sprintf("default-nfs-instance-%v", i)),
-				},
-			},
-			NewFile: newFile,
-			Plugin:  tf,
-		}
-		writeFileInfo(info, t)
-	}
-	for i := 110; i < 115; i++ {
-		newFile := false
-		if i%2 == 0 {
-			newFile = true
-		}
-		info := fileInfo{
-			ResInfo: []resInfo{
-				{
-					ResType: VMIBMCloud,
-					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
-				},
-			},
-			NewFile: newFile,
-			Plugin:  tf,
-		}
-		writeFileInfo(info, t)
-		// Dedicated
-		info = fileInfo{
-			ResInfo: []resInfo{
-				{
-					ResType: TResourceType("dedicated-nfs"),
-					ResName: TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
-				},
-			},
-			FilePrefix: fmt.Sprintf("dedicated-nfs-instance-%v", i),
-			NewFile:    newFile,
-			Plugin:     tf,
-		}
-		writeFileInfo(info, t)
-	}
-	for i := 115; i < 117; i++ {
-		newFile := false
-		if i%2 == 0 {
-			newFile = true
-		}
-		// Global
-		info := fileInfo{
-			ResInfo: []resInfo{
-				{
-					ResType: TResourceType("global-nfs"),
-					ResName: TResourceName(fmt.Sprintf("global-nfs-instance-%v", i)),
-				},
-			},
-			NewFile: newFile,
-			Plugin:  tf,
-		}
-		writeFileInfo(info, t)
-	}
-	tfFiles, tfFilesNew := getFilenames(t, tf)
-	// 100, 102, 104, 106, 108, 110, 112, 114 VMs
-	// 110, 112, 114 dedicated
-	// 116 global
-	require.Len(t, tfFilesNew, 8+3+1)
-	for i := 100; i < 115; i++ {
-		if i%2 == 0 {
-			require.Contains(t, tfFilesNew, fmt.Sprintf("instance-%v.tf.json.new", i))
-		}
-	}
-	for i := 110; i < 115; i++ {
-		if i%2 == 0 {
-			require.Contains(t, tfFilesNew, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json.new", i))
-		}
-	}
-	for i := 115; i < 117; i++ {
-		if i%2 == 0 {
-			require.Contains(t, tfFilesNew, fmt.Sprintf("global-nfs-instance-%v.tf.json.new", i))
-		}
-	}
-	require.Len(t, tfFiles, 22-(8+3+1))
-	for i := 100; i < 115; i++ {
-		if i%2 != 0 {
-			require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
-		}
-	}
-	for i := 110; i < 115; i++ {
-		if i%2 != 0 {
-			require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
-		}
-	}
-	for i := 115; i < 117; i++ {
-		if i%2 != 0 {
-			require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
-		}
-	}
-
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+	fake := FakeTerraform{
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			// Return only existing instances (ie, only odd ones)
 			vms := map[TResourceName]struct{}{}
 			for i := 100; i < 115; i++ {
@@ -1106,26 +982,7 @@ func TestHandleFilesDedicatedGlobalNoPruneWithNewFiles(t *testing.T) {
 			}, nil
 		},
 	}
-	err := tf.handleFiles(fns)
-	require.NoError(t, err)
-
-	// No files removed
-	tfFiles, tfFilesNew = getFilenames(t, tf)
-	require.Len(t, tfFilesNew, 0)
-	require.Len(t, tfFiles, 15+5+2)
-	for i := 100; i < 115; i++ {
-		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
-	}
-	for i := 110; i < 115; i++ {
-		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
-	}
-	for i := 115; i < 117; i++ {
-		require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
-	}
-}
-
-func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
-	tf, dir := getPlugin(t)
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Write out 5 files with VMs, 5 with VMs and a default, 5 with VMs
@@ -1253,10 +1110,28 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 		}
 	}
 
+	err := tf.handleFiles(tfFuncs{})
+	require.NoError(t, err)
+
+	// No files removed
+	tfFiles, tfFilesNew = getFilenames(t, tf)
+	require.Len(t, tfFilesNew, 0)
+	require.Len(t, tfFiles, 15+5+2)
+	for i := 100; i < 115; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+	}
+	for i := 110; i < 115; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+	}
+	for i := 115; i < 117; i++ {
+		require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
+	}
+}
+
+func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 	stateListInvokedCount := 0
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+	fake := FakeTerraform{
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
 			stateListInvokedCount = stateListInvokedCount + 1
 			// Return only existing instances (ie, only odd ones) EXCEPT 1 in each group
 			vms := map[TResourceName]struct{}{}
@@ -1279,7 +1154,135 @@ func TestHandleFilesDedicatedGlobalPruneWithNewFiles(t *testing.T) {
 			}, nil
 		},
 	}
-	err := tf.handleFiles(fns)
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
+	// Write out 5 files with VMs, 5 with VMs and a default, 5 with VMs
+	// and dedicated, and a global. Every even file is new.
+	for i := 100; i < 105; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFileInfo(info, t)
+	}
+	for i := 105; i < 110; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+				{
+					ResType: TResourceType("default-nfs"),
+					ResName: TResourceName(fmt.Sprintf("default-nfs-instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFileInfo(info, t)
+	}
+	for i := 110; i < 115; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: VMIBMCloud,
+					ResName: TResourceName(fmt.Sprintf("instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFileInfo(info, t)
+		// Dedicated
+		info = fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: TResourceType("dedicated-nfs"),
+					ResName: TResourceName(fmt.Sprintf("dedicated-nfs-instance-%v", i)),
+				},
+			},
+			FilePrefix: fmt.Sprintf("dedicated-nfs-instance-%v", i),
+			NewFile:    newFile,
+			Plugin:     tf,
+		}
+		writeFileInfo(info, t)
+	}
+	for i := 115; i < 117; i++ {
+		newFile := false
+		if i%2 == 0 {
+			newFile = true
+		}
+		// Global
+		info := fileInfo{
+			ResInfo: []resInfo{
+				{
+					ResType: TResourceType("global-nfs"),
+					ResName: TResourceName(fmt.Sprintf("global-nfs-instance-%v", i)),
+				},
+			},
+			NewFile: newFile,
+			Plugin:  tf,
+		}
+		writeFileInfo(info, t)
+	}
+	tfFiles, tfFilesNew := getFilenames(t, tf)
+	// 100, 102, 104, 106, 108, 110, 112, 114 VMs
+	// 110, 112, 114 dedicated
+	// 116 global
+	require.Len(t, tfFilesNew, 8+3+1)
+	for i := 100; i < 115; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("instance-%v.tf.json.new", i))
+		}
+	}
+	for i := 110; i < 115; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json.new", i))
+		}
+	}
+	for i := 115; i < 117; i++ {
+		if i%2 == 0 {
+			require.Contains(t, tfFilesNew, fmt.Sprintf("global-nfs-instance-%v.tf.json.new", i))
+		}
+	}
+	require.Len(t, tfFiles, 22-(8+3+1))
+	for i := 100; i < 115; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("instance-%v.tf.json", i))
+		}
+	}
+	for i := 110; i < 115; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("dedicated-nfs-instance-%v.tf.json", i))
+		}
+	}
+	for i := 115; i < 117; i++ {
+		if i%2 != 0 {
+			require.Contains(t, tfFiles, fmt.Sprintf("global-nfs-instance-%v.tf.json", i))
+		}
+	}
+
+	err := tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 
 	// No files removed
@@ -1322,13 +1325,7 @@ func TestHandleFilesDuplicates(t *testing.T) {
 		writeFileInfo(info, t)
 	}
 
-	fns := tfFuncs{
-		tfRefresh: func() error { return nil },
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			return map[TResourceType]map[TResourceName]struct{}{}, nil
-		},
-	}
-	err := tf.handleFiles(fns)
+	err := tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 
 	tfFiles, tfFilesNew := getFilenames(t, tf)
@@ -1369,7 +1366,7 @@ func TestHandleFilesDuplicates(t *testing.T) {
 		}
 		writeFileInfo(info, t)
 	}
-	err = tf.handleFiles(fns)
+	err = tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 
 	tfFiles, tfFilesNew = getFilenames(t, tf)

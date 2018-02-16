@@ -52,9 +52,6 @@ func (p *plugin) terraformApply() error {
 			// Conditionally apply terraform
 			if p.shouldApply() {
 				fns := tfFuncs{
-					tfRefresh:           p.doTerraformRefresh,
-					tfStateList:         p.doTerraformStateList,
-					tfImport:            p.doTerraformImport,
 					getExistingResource: p.getExistingResource,
 				}
 				// The trigger for an apply is typically from a group commit, sleep for a few seconds so
@@ -78,7 +75,7 @@ func (p *plugin) terraformApply() error {
 					}
 				}
 				if err := p.handleFiles(fns); err == nil {
-					if err = p.doTerraformApply(); err == nil {
+					if err = p.terraform.doTerraformApply(); err == nil {
 						// Goroutine was interrupted, this likely means that there was a file change; now that
 						// apply is finished we want to clear the cache since we expect a delta
 						if initial {
@@ -146,9 +143,6 @@ func (p *plugin) shouldApply() bool {
 
 // External functions to use during when pruning files; broken out for testing
 type tfFuncs struct {
-	tfRefresh           func() error
-	tfStateList         func() (map[TResourceType]map[TResourceName]struct{}, error)
-	tfImport            func(resType TResourceType, resName, resID string) error
 	getExistingResource func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error)
 }
 
@@ -234,19 +228,19 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 
 	// Get the current resources, this must happen before a refresh so that we can
 	// identity orphans from an incomplete "apply"
-	tfStateResourcesBefore, err := fns.tfStateList()
+	tfStateResourcesBefore, err := p.terraform.doTerraformStateList()
 	if err != nil {
 		return err
 	}
 
 	// Refresh all resources, anything deleted from the backend will be removed
 	// from the state file
-	if err = fns.tfRefresh(); err != nil {
+	if err = p.terraform.doTerraformRefresh(); err != nil {
 		return err
 	}
 
 	// And now get the updated resources
-	tfStateResourcesAfter, err := fns.tfStateList()
+	tfStateResourcesAfter, err := p.terraform.doTerraformStateList()
 	if err != nil {
 		return err
 	}
@@ -427,7 +421,7 @@ func (p *plugin) handleFilePruning(
 							string(resType),
 							*importID,
 							string(resName)))
-					if err = fns.tfImport(resType, string(resName), *importID); err != nil {
+					if err = p.terraform.doTerraformImport(resType, string(resName), *importID); err != nil {
 						return err
 					}
 				}

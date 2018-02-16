@@ -694,7 +694,7 @@ func TestRunTerraformShow(t *testing.T) {
 	defer os.RemoveAll(dir)
 	dir = path.Join(dir, "aws-two-tier")
 
-	found, err := tf.doTerraformShow([]TResourceType{TResourceType("aws_vpc")}, nil)
+	found, err := tf.terraform.doTerraformShow([]TResourceType{TResourceType("aws_vpc")}, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(found))
 	T(100).Infoln(found)

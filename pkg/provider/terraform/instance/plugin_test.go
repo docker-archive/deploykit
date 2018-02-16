@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,13 +21,125 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	emptyTfShowFns = describeFns{
-		tfShow: func(resTypes []TResourceType, propFilter []string) (result map[TResourceType]map[TResourceName]TResourceProperties, err error) {
-			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
-		},
+// FakeTerraform is used for testing
+type FakeTerraform struct {
+	doTerraformStateListStub  func() (map[TResourceType]map[TResourceName]struct{}, error)
+	doTerraformStateListMutex sync.RWMutex
+
+	doTerraformRefreshStub  func() error
+	doTerraformRefreshMutex sync.RWMutex
+
+	doTerraformApplyStub  func() error
+	doTerraformApplyMutex sync.RWMutex
+
+	doTerraformShowStub  func([]TResourceType, []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
+	doTerraformShowMutex sync.RWMutex
+	doTerraformShowArgs  []struct {
+		ResTypes   []TResourceType
+		PropFilter []string
 	}
-)
+
+	doTerraformShowForInstanceStub  func(string) (result TResourceProperties, err error)
+	doTerraformShowForInstanceMutex sync.RWMutex
+	doTerraformShowForInstanceArgs  []struct {
+		Instance string
+	}
+
+	doTerraformImportStub  func(TResourceType, string, string) error
+	doTerraformImportMutex sync.RWMutex
+	doTerraformImportArgs  []struct {
+		ResType TResourceType
+		ResName string
+		ID      string
+	}
+
+	doTerraformStateRemoveStub  func(TResourceType, string) error
+	doTerraformStateRemoveMutex sync.RWMutex
+	doTerraformStateRemoveArgs  []struct {
+		ResType TResourceType
+		ResName string
+	}
+}
+
+func (fake *FakeTerraform) doTerraformStateList() (map[TResourceType]map[TResourceName]struct{}, error) {
+	fake.doTerraformStateListMutex.Lock()
+	defer fake.doTerraformStateListMutex.Unlock()
+	if fake.doTerraformStateListStub != nil {
+		return fake.doTerraformStateListStub()
+	}
+	return map[TResourceType]map[TResourceName]struct{}{}, nil
+}
+
+func (fake *FakeTerraform) doTerraformRefresh() error {
+	fake.doTerraformRefreshMutex.Lock()
+	defer fake.doTerraformRefreshMutex.Unlock()
+	if fake.doTerraformRefreshStub != nil {
+		return fake.doTerraformRefreshStub()
+	}
+	return nil
+}
+
+func (fake *FakeTerraform) doTerraformApply() error {
+	fake.doTerraformApplyMutex.Lock()
+	defer fake.doTerraformApplyMutex.Unlock()
+	if fake.doTerraformApplyStub != nil {
+		return fake.doTerraformApplyStub()
+	}
+	return nil
+}
+
+func (fake *FakeTerraform) doTerraformShow(resTypes []TResourceType, propFilter []string) (result map[TResourceType]map[TResourceName]TResourceProperties, err error) {
+	fake.doTerraformApplyMutex.Lock()
+	defer fake.doTerraformApplyMutex.Unlock()
+	fake.doTerraformShowArgs = append(fake.doTerraformShowArgs, struct {
+		ResTypes   []TResourceType
+		PropFilter []string
+	}{resTypes, propFilter})
+	if fake.doTerraformShowStub != nil {
+		return fake.doTerraformShowStub(resTypes, propFilter)
+	}
+	return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
+}
+
+func (fake *FakeTerraform) doTerraformShowForInstance(instance string) (result TResourceProperties, err error) {
+	fake.doTerraformShowForInstanceMutex.Lock()
+	defer fake.doTerraformShowForInstanceMutex.Unlock()
+	fake.doTerraformShowForInstanceArgs = append(fake.doTerraformShowForInstanceArgs, struct {
+		Instance string
+	}{instance})
+	if fake.doTerraformShowForInstanceStub != nil {
+		return fake.doTerraformShowForInstanceStub(instance)
+	}
+	return TResourceProperties{}, nil
+}
+
+func (fake *FakeTerraform) doTerraformImport(resType TResourceType, resName, id string) error {
+	fake.doTerraformImportMutex.Lock()
+	defer fake.doTerraformImportMutex.Unlock()
+	fake.doTerraformImportArgs = append(fake.doTerraformImportArgs, struct {
+		ResType TResourceType
+		ResName string
+		ID      string
+	}{resType, resName, id})
+	if fake.doTerraformImportStub != nil {
+		return fake.doTerraformImportStub(resType, resName, id)
+	}
+	return nil
+}
+
+func (fake *FakeTerraform) doTerraformStateRemove(vmType TResourceType, vmName string) error {
+	fake.doTerraformStateRemoveMutex.Lock()
+	defer fake.doTerraformStateRemoveMutex.Unlock()
+	fake.doTerraformStateRemoveArgs = append(fake.doTerraformStateRemoveArgs, struct {
+		ResType TResourceType
+		ResName string
+	}{vmType, vmName})
+	return fake.doTerraformStateRemoveStub(vmType, vmName)
+}
+
+func getTfLookup(fake *FakeTerraform, err error) func(string, []string) (tf, error) {
+	return func(string, []string) (tf, error) { return fake, err }
+}
 
 func TestProcessImportOptions(t *testing.T) {
 	tf, dir := getPlugin(t)
@@ -66,23 +179,23 @@ func TestEnvs(t *testing.T) {
 		PollInterval: types.FromDuration(2 * time.Minute),
 		Envs:         *types.AnyString(`["k1=v1", "keyval"]`),
 	}
-	_, err = newPlugin(options, nil, true)
+	_, err = newPlugin(options, nil, true, getTfLookup(&FakeTerraform{}, nil))
 	require.Error(t, err)
 
 	options.Envs = *types.AnyString(`["k1=v1", "k2=v2"]`)
-	tf, err := newPlugin(options, nil, true)
+	tf, err := newPlugin(options, nil, true, getTfLookup(&FakeTerraform{}, nil))
 	require.NoError(t, err)
 	p, _ := tf.(*plugin)
 	require.Equal(t, []string{"k1=v1", "k2=v2"}, p.envs)
 
 	options.Envs = *types.AnyString("")
-	tf, err = newPlugin(options, nil, true)
+	tf, err = newPlugin(options, nil, true, getTfLookup(&FakeTerraform{}, nil))
 	require.NoError(t, err)
 	p, _ = tf.(*plugin)
 	require.Equal(t, []string{}, p.envs)
 
 	options.Envs = nil
-	tf, err = newPlugin(options, nil, true)
+	tf, err = newPlugin(options, nil, true, getTfLookup(&FakeTerraform{}, nil))
 	require.NoError(t, err)
 	p, _ = tf.(*plugin)
 	require.Equal(t, []string{}, p.envs)
@@ -91,13 +204,20 @@ func TestEnvs(t *testing.T) {
 // getPlugin returns the terraform instance plugin to use for testing and the
 // directory where the .tf.json files should be stored
 func getPlugin(t *testing.T) (*plugin, string) {
+	return getPluginWithFakeTerraform(t, &FakeTerraform{})
+}
+
+// getPlugin returns the terraform instance plugin to use for testing and the
+// directory where the .tf.json files should be stored
+func getPluginWithFakeTerraform(t *testing.T, fake *FakeTerraform) (*plugin, string) {
 	dir, err := ioutil.TempDir("", "infrakit-instance-terraform")
 	require.NoError(t, err)
 	options := terraform_types.Options{
 		Dir:          dir,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	tf, err := newPlugin(options, nil, true)
+
+	tf, err := newPlugin(options, nil, true, getTfLookup(fake, nil))
 	require.NoError(t, err)
 	require.True(t, tf.(*plugin).pretend)
 	p, is := tf.(*plugin)
@@ -119,7 +239,7 @@ func getPluginDirNotExists(t *testing.T) (*plugin, string) {
 		Dir:          dir,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	tf, err := newPlugin(options, nil, true)
+	tf, err := newPlugin(options, nil, true, getTfLookup(&FakeTerraform{}, nil))
 	require.NoError(t, err)
 	require.True(t, tf.(*plugin).pretend)
 	p, is := tf.(*plugin)
@@ -140,7 +260,7 @@ func getPluginDirNoPerms(t *testing.T) (*plugin, string) {
 		Dir:          dir,
 		PollInterval: types.FromDuration(2 * time.Minute),
 	}
-	tf, err := newPlugin(options, nil, true)
+	tf, err := newPlugin(options, nil, true, getTfLookup(&FakeTerraform{}, nil))
 	require.NoError(t, err)
 	require.True(t, tf.(*plugin).pretend)
 	p, is := tf.(*plugin)
@@ -472,7 +592,6 @@ func TestProvisionDescribeDestroyScopeWithoutLogicalID(t *testing.T) {
 	})
 	require.NoError(t, err)
 	results, err := tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"tag1": "val1"},
 		false,
 	)
@@ -602,7 +721,6 @@ func TestProvisionDescribeDestroyScopeLogicalID(t *testing.T) {
 	})
 	require.NoError(t, err)
 	results, err := tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"tag1": "val1"},
 		false,
 	)
@@ -1322,7 +1440,6 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 
 	// Both instances match: label=value1
 	list, err := tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"label1": "value1"},
 		false)
 	require.NoError(t, err)
@@ -1374,7 +1491,6 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 
 	// Only a single match: label1=changed1
 	list, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"label1": "changed1"},
 		false)
 	require.NoError(t, err)
@@ -1382,14 +1498,13 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 
 	// Only a single match: label1=value1
 	list, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"label1": "value1"},
 		false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{inst1}, list)
 
 	// No matches: label1=foo
-	list, err = tf.doDescribeInstances(emptyTfShowFns,
+	list, err = tf.doDescribeInstances(
 		map[string]string{"label1": "foo"},
 		false)
 	require.NoError(t, err)
@@ -1404,7 +1519,6 @@ func runValidateProvisionDescribe(t *testing.T, resourceType, properties string)
 	require.Equal(t, filepath.Base(tfPath1), files[0].Name())
 
 	list, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"label1": "changed1"},
 		false)
 	require.NoError(t, err)
@@ -3264,7 +3378,6 @@ func TestDescribeNoFiles(t *testing.T) {
 	tf, dir := getPlugin(t)
 	defer os.RemoveAll(dir)
 	results, err := tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{},
 		false)
 	require.NoError(t, err)
@@ -3279,7 +3392,6 @@ func TestDescribeNoVMs(t *testing.T) {
 	err := writeFile(tf, "instance-12345.tf.json", TFormat{Resource: m})
 	require.NoError(t, err)
 	results, err := tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{},
 		true)
 	require.NoError(t, err)
@@ -3320,14 +3432,12 @@ func TestDescribeWithNewFile(t *testing.T) {
 
 	// First instance matches
 	results, err := tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"tag1": "val1"},
 		false)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(results))
 	require.Equal(t, instance.ID(id1), results[0].ID)
 	results, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"tag1": "val1", "tagShared": "valShared"},
 		false)
 	require.NoError(t, err)
@@ -3336,7 +3446,6 @@ func TestDescribeWithNewFile(t *testing.T) {
 
 	// Second instance matches
 	results, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"tag2": "val2"},
 		false)
 	require.NoError(t, err)
@@ -3345,7 +3454,6 @@ func TestDescribeWithNewFile(t *testing.T) {
 
 	// Both instances matches
 	results, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"tagShared": "valShared"},
 		false)
 	require.NoError(t, err)
@@ -3359,13 +3467,11 @@ func TestDescribeWithNewFile(t *testing.T) {
 
 	// No instances match
 	results, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"tag1": "val1", "tagShared": "valShared", "foo": "bar"},
 		false)
 	require.NoError(t, err)
 	require.Empty(t, results)
 	results, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"TAG2": "val2"},
 		false)
 	require.NoError(t, err)
@@ -3373,7 +3479,6 @@ func TestDescribeWithNewFile(t *testing.T) {
 
 	// All instances match (no tags passed)
 	results, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{},
 		false)
 	require.NoError(t, err)
@@ -3421,7 +3526,6 @@ func TestDescribeAttachTag(t *testing.T) {
 
 	// Get both instances
 	results, err := tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{"key": "val"},
 		false)
 	require.NoError(t, err)
@@ -3882,7 +3986,7 @@ func TestImportNoVm(t *testing.T) {
 	spec := instance.Spec{
 		Properties: types.AnyString("{}"),
 	}
-	err := tf.importResources(importFns{}, []*ImportResource{}, &spec)
+	err := tf.importResources([]*ImportResource{}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "no resource section", err.Error())
 }
@@ -3898,7 +4002,7 @@ func TestImportNoVmProps(t *testing.T) {
     "aws_instance": {}
   }
 }`)}
-	err := tf.importResources(importFns{}, []*ImportResource{}, &spec)
+	err := tf.importResources([]*ImportResource{}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "Missing resource properties", err.Error())
 }
@@ -3924,7 +4028,7 @@ func TestImportTypeNotInSpec(t *testing.T) {
 		ResourceID:   &resID,
 		ResourceType: &resType,
 	}
-	err := tf.importResources(importFns{}, []*ImportResource{&res}, &spec)
+	err := tf.importResources([]*ImportResource{&res}, &spec)
 	require.Error(t, err)
 	require.Equal(t,
 		fmt.Sprintf("Unable to determine import resource in spec for: %v", VMIBMCloud),
@@ -3933,16 +4037,16 @@ func TestImportTypeNotInSpec(t *testing.T) {
 }
 
 func TestImportTfShowError(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
-	fns := importFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return nil, fmt.Errorf("Custom show error")
 		},
 	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
 	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
@@ -3960,17 +4064,14 @@ func TestImportTfShowError(t *testing.T) {
 		ResourceID:   &resID,
 		ResourceType: &resType,
 	}
-	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
+	err := tf.importResources([]*ImportResource{&res}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom show error", err.Error())
 }
 
 func TestImportAlreadyExists(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
-	fns := importFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{
@@ -3983,6 +4084,9 @@ func TestImportAlreadyExists(t *testing.T) {
 			}, nil
 		},
 	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
 	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
@@ -4003,34 +4107,34 @@ func TestImportAlreadyExists(t *testing.T) {
 	// Ensure that a tf.json file exists
 	err := writeFileRaw(tf, "instance-123.tf.json", []byte("random-content"))
 	require.NoError(t, err)
-	err = tf.importResources(fns, []*ImportResource{&res}, &spec)
+	err = tf.importResources([]*ImportResource{&res}, &spec)
 	require.NoError(t, err)
 }
 
 func TestImportTfImportError(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
 	cleanVals := []string{}
-	fns := importFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
 		},
-		tfImport: func(resType TResourceType, resName, id string) error {
-			require.Equal(t, VMAmazon, resType)
-			require.True(t, strings.HasPrefix(resName, "instance-"))
-			require.Equal(t, "123", id)
-			return fmt.Errorf("Custom import error")
-		},
-		tfStateRm: func(resType TResourceType, name string) error {
+		doTerraformStateRemoveStub: func(resType TResourceType, name string) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(name, "instance-"))
 			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
 			return nil
 		},
+		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+			require.Equal(t, VMAmazon, resType)
+			require.True(t, strings.HasPrefix(resName, "instance-"))
+			require.Equal(t, "123", id)
+			return fmt.Errorf("Custom import error")
+		},
 	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
 	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
@@ -4048,7 +4152,7 @@ func TestImportTfImportError(t *testing.T) {
 		ResourceID:   &resID,
 		ResourceType: &resType,
 	}
-	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
+	err := tf.importResources([]*ImportResource{&res}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom import error", err.Error())
 	require.Len(t, cleanVals, 1)
@@ -4060,32 +4164,32 @@ func TestImportTfImportError(t *testing.T) {
 }
 
 func TestImportTfShowInstError(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
 	cleanVals := []string{}
-	fns := importFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
 		},
-		tfImport: func(resType TResourceType, resName, id string) error {
-			require.Equal(t, VMAmazon, resType)
-			require.True(t, strings.HasPrefix(resName, "instance-"))
-			require.Equal(t, "123", id)
-			return nil
-		},
-		tfShowInst: func(id string) (TResourceProperties, error) {
+		doTerraformShowForInstanceStub: func(id string) (TResourceProperties, error) {
 			return nil, fmt.Errorf("Custom show inst error")
 		},
-		tfStateRm: func(resType TResourceType, name string) error {
+		doTerraformStateRemoveStub: func(resType TResourceType, name string) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(name, "instance-"))
 			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
 			return nil
 		},
+		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+			require.Equal(t, VMAmazon, resType)
+			require.True(t, strings.HasPrefix(resName, "instance-"))
+			require.Equal(t, "123", id)
+			return nil
+		},
 	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
 	spec := instance.Spec{
 		Properties: types.AnyString(`
 {
@@ -4103,7 +4207,7 @@ func TestImportTfShowInstError(t *testing.T) {
 		ResourceID:   &resID,
 		ResourceType: &resType,
 	}
-	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
+	err := tf.importResources([]*ImportResource{&res}, &spec)
 	require.Error(t, err)
 	require.Equal(t, "Custom show inst error", err.Error())
 	require.Len(t, cleanVals, 1)
@@ -4115,25 +4219,15 @@ func TestImportTfShowInstError(t *testing.T) {
 }
 
 func TestImportResourceTagMap(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
-	cleanInvoked := false
 	resourceName := ""
-	fns := importFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	cleanInvoked := false
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMAmazon}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{}, nil
 		},
-		tfImport: func(resType TResourceType, resName, id string) error {
-			require.Equal(t, VMAmazon, resType)
-			require.True(t, strings.HasPrefix(resName, "instance-"))
-			resourceName = resName
-			require.Equal(t, "123", id)
-			return nil
-		},
-		tfShowInst: func(id string) (TResourceProperties, error) {
+		doTerraformShowForInstanceStub: func(id string) (TResourceProperties, error) {
 			prefix := "aws_instance.instance-"
 			require.True(t, strings.HasPrefix(id, prefix), fmt.Sprintf("'%v' should have prefix '%v'", id, prefix))
 			props := TResourceProperties{
@@ -4146,11 +4240,21 @@ func TestImportResourceTagMap(t *testing.T) {
 			}
 			return props, nil
 		},
-		tfStateRm: func(vmType TResourceType, vmName string) error {
+		doTerraformStateRemoveStub: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
 			return nil
 		},
+		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+			require.Equal(t, VMAmazon, resType)
+			require.True(t, strings.HasPrefix(resName, "instance-"))
+			resourceName = resName
+			require.Equal(t, "123", id)
+			return nil
+		},
 	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
 	spec := instance.Spec{
 		Tags: map[string]string{
 			group.GroupTag:     "managers",
@@ -4174,7 +4278,7 @@ func TestImportResourceTagMap(t *testing.T) {
 		ResourceID:   &resID,
 		ResourceType: &resType,
 	}
-	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
+	err := tf.importResources([]*ImportResource{&res}, &spec)
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
 	require.NotEmpty(t, resourceName)
@@ -4206,13 +4310,10 @@ func TestImportResourceTagMap(t *testing.T) {
 }
 
 func TestImportResourceTagSlice(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
 	cleanInvoked := false
 	resourceName := ""
-	fns := importFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMIBMCloud}, types)
 			require.Equal(t, []string{"id"}, propFilter)
 			return map[TResourceType]map[TResourceName]TResourceProperties{
@@ -4223,14 +4324,7 @@ func TestImportResourceTagSlice(t *testing.T) {
 				},
 			}, nil
 		},
-		tfImport: func(resType TResourceType, resName, id string) error {
-			require.Equal(t, VMIBMCloud, resType)
-			require.True(t, strings.HasPrefix(resName, "instance-"))
-			resourceName = resName
-			require.Equal(t, "123", id)
-			return nil
-		},
-		tfShowInst: func(id string) (TResourceProperties, error) {
+		doTerraformShowForInstanceStub: func(id string) (TResourceProperties, error) {
 			require.True(t, strings.HasPrefix(id, "ibm_compute_vm_instance.instance-"))
 			props := TResourceProperties{
 				"hostname": "actual-hostname",
@@ -4239,11 +4333,21 @@ func TestImportResourceTagSlice(t *testing.T) {
 			}
 			return props, nil
 		},
-		tfStateRm: func(vmType TResourceType, vmName string) error {
+		doTerraformStateRemoveStub: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
 			return nil
 		},
+		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+			require.Equal(t, VMIBMCloud, resType)
+			require.True(t, strings.HasPrefix(resName, "instance-"))
+			resourceName = resName
+			require.Equal(t, "123", id)
+			return nil
+		},
 	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
 	spec := instance.Spec{
 		Tags: map[string]string{
 			group.GroupTag:     "managers",
@@ -4267,7 +4371,7 @@ func TestImportResourceTagSlice(t *testing.T) {
 		ResourceID:   &resID,
 		ResourceType: &resType,
 	}
-	err := tf.importResources(fns, []*ImportResource{&res}, &spec)
+	err := tf.importResources([]*ImportResource{&res}, &spec)
 	require.NoError(t, err)
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
@@ -4359,14 +4463,11 @@ func TestImportResourceDedicatedGlobalSomeInTf(t *testing.T) {
 }
 
 func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptions) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
-	existingVMName := "instance-12345678"
 	cleanInvoked := false
+	existingVMName := "instance-12345678"
 	imports := []string{}
-	fns := importFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Len(t, types, 3)
 			require.Contains(t, types, VMIBMCloud)
 			require.Contains(t, types, TResourceType("ibm_storage_file"))
@@ -4396,11 +4497,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 			}
 			return result, nil
 		},
-		tfImport: func(resType TResourceType, resName, id string) error {
-			imports = append(imports, fmt.Sprintf("%v.%v.%v", resType, resName, id))
-			return nil
-		},
-		tfShowInst: func(id string) (TResourceProperties, error) {
+		doTerraformShowForInstanceStub: func(id string) (TResourceProperties, error) {
 			if strings.HasPrefix(id, "ibm_compute_vm_instance.instance-") {
 				props := TResourceProperties{
 					"hostname": "actual-hostname",
@@ -4425,11 +4522,18 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 			}
 			return nil, fmt.Errorf("Unknown show ID: %v", id)
 		},
-		tfStateRm: func(vmType TResourceType, vmName string) error {
+		doTerraformStateRemoveStub: func(vmType TResourceType, vmName string) error {
 			cleanInvoked = true
 			return nil
 		},
+		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+			imports = append(imports, fmt.Sprintf("%v.%v.%v", resType, resName, id))
+			return nil
+		},
 	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
 	// Conditionally create existing files
 	if options.FileExistsVM {
 		tFormat := TFormat{
@@ -4517,7 +4621,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 		ResourceID:   &blockResID,
 		ResourceType: &blockResType,
 	}
-	err := tf.importResources(fns, []*ImportResource{&vmImportRes, &nfsImportRes, &blockImportRes}, &spec)
+	err := tf.importResources([]*ImportResource{&vmImportRes, &nfsImportRes, &blockImportRes}, &spec)
 	require.NoError(t, err)
 	require.False(t, cleanInvoked)
 
@@ -5129,14 +5233,12 @@ func TestDoDescribeInstancesEmpty(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	result, err := tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{},
 		false)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, result)
 
 	result, err = tf.doDescribeInstances(
-		emptyTfShowFns,
 		map[string]string{},
 		true)
 	require.NoError(t, err)
@@ -5144,7 +5246,14 @@ func TestDoDescribeInstancesEmpty(t *testing.T) {
 }
 
 func TestDoDescribeInstancesShowError(t *testing.T) {
-	tf, dir := getPlugin(t)
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+			require.Equal(t, []TResourceType{VMIBMCloud}, types)
+			require.Nil(t, propFilter)
+			return nil, fmt.Errorf("Custom show error")
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Write single file
@@ -5158,15 +5267,7 @@ func TestDoDescribeInstancesShowError(t *testing.T) {
 	err := writeFile(tf, fmt.Sprintf("%v.tf.json.new", id), TFormat{Resource: inst})
 	require.NoError(t, err)
 
-	fns := describeFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Equal(t, []TResourceType{VMIBMCloud}, types)
-			require.Nil(t, propFilter)
-			return nil, fmt.Errorf("Custom show error")
-		},
-	}
-
-	_, err = tf.doDescribeInstances(fns, map[string]string{}, true)
+	_, err = tf.doDescribeInstances(map[string]string{}, true)
 	require.Error(t, err)
 	// The "show" is used to populate the cache, if it failed then the cache
 	// does not exist.
@@ -5174,9 +5275,6 @@ func TestDoDescribeInstancesShowError(t *testing.T) {
 }
 
 func TestDoDescribeInstancesProperties(t *testing.T) {
-	tf, dir := getPlugin(t)
-	defer os.RemoveAll(dir)
-
 	// Write files without all properties, the properties will be returned
 	// from terraform
 	id1 := "instance-1"
@@ -5188,18 +5286,14 @@ func TestDoDescribeInstancesProperties(t *testing.T) {
 			TResourceName(id1): {"tags": tag1},
 		},
 	}
-	err := writeFile(tf, fmt.Sprintf("%v.tf.json.new", id1), TFormat{Resource: inst1})
-	require.NoError(t, err)
 	inst2 := map[TResourceType]map[TResourceName]TResourceProperties{
 		VMIBMCloud: {
 			TResourceName(id2): {"tags": tag2},
 		},
 	}
-	err = writeFile(tf, fmt.Sprintf("%v.tf.json.new", id2), TFormat{Resource: inst2})
-	require.NoError(t, err)
 
-	fns := describeFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
+	fake := FakeTerraform{
+		doTerraformShowStub: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
 			require.Equal(t, []TResourceType{VMIBMCloud}, types)
 			require.Nil(t, propFilter)
 			result := map[TResourceType]map[TResourceName]TResourceProperties{
@@ -5211,6 +5305,13 @@ func TestDoDescribeInstancesProperties(t *testing.T) {
 			return result, nil
 		},
 	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
+	defer os.RemoveAll(dir)
+
+	err := writeFile(tf, fmt.Sprintf("%v.tf.json.new", id1), TFormat{Resource: inst1})
+	require.NoError(t, err)
+	err = writeFile(tf, fmt.Sprintf("%v.tf.json.new", id2), TFormat{Resource: inst2})
+	require.NoError(t, err)
 
 	// Expected results
 	props1, err := types.AnyValue(TResourceProperties{"k1": "v1", "tags": tag1})
@@ -5239,51 +5340,56 @@ func TestDoDescribeInstancesProperties(t *testing.T) {
 	}
 
 	// No tag filter, all props
-	result, err := tf.doDescribeInstances(fns, map[string]string{}, true)
+	result, err := tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 	require.Contains(t, result, instDesc1)
 	require.Contains(t, result, instDesc2)
 
 	// No tag filter, no props
-	result, err = tf.doDescribeInstances(fns, map[string]string{}, false)
+	result, err = tf.doDescribeInstances(map[string]string{}, false)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 	require.Contains(t, result, instDesc1NoProps)
 	require.Contains(t, result, instDesc2NoProps)
 
 	// Ensure that the cache was not changed, get all again
-	result, err = tf.doDescribeInstances(fns, map[string]string{}, true)
+	result, err = tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 	require.Contains(t, result, instDesc1)
 	require.Contains(t, result, instDesc2)
 
 	// Common tag filter
-	result, err = tf.doDescribeInstances(fns, map[string]string{"common": "val"}, true)
+	result, err = tf.doDescribeInstances(map[string]string{"common": "val"}, true)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 	require.Contains(t, result, instDesc1)
 	require.Contains(t, result, instDesc2)
 
 	// Tag1 only filter
-	result, err = tf.doDescribeInstances(fns, map[string]string{"tag1": "val1"}, true)
+	result, err = tf.doDescribeInstances(map[string]string{"tag1": "val1"}, true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{instDesc1}, result)
 
 	// Tag2 only filter
-	result, err = tf.doDescribeInstances(fns, map[string]string{"tag2": "val2"}, true)
+	result, err = tf.doDescribeInstances(map[string]string{"tag2": "val2"}, true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{instDesc2}, result)
 
 	// No matching tags
-	result, err = tf.doDescribeInstances(fns, map[string]string{"tag1": "bogus"}, true)
+	result, err = tf.doDescribeInstances(map[string]string{"tag1": "bogus"}, true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, result)
 }
 
 func TestCacheClearAndPopulate(t *testing.T) {
-	tf, dir := getPlugin(t)
+	fake := FakeTerraform{
+		doTerraformStateListStub: func() (map[TResourceType]map[TResourceName]struct{}, error) {
+			return map[TResourceType]map[TResourceName]struct{}{}, nil
+		},
+	}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Cache should be non-nil but empty
@@ -5301,7 +5407,7 @@ func TestCacheClearAndPopulate(t *testing.T) {
 	require.NoError(t, err)
 
 	// A describe will return this instance
-	results, err := tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	results, err := tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Equal(t, instance.ID(id1), results[0].ID)
@@ -5327,7 +5433,7 @@ func TestCacheClearAndPopulate(t *testing.T) {
 	require.Nil(t, tf.cachedInstances)
 
 	// Describe will re-populate it
-	results, err = tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	results, err = tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	ids := []instance.ID{}
@@ -5346,7 +5452,7 @@ func TestCacheClearAndPopulate(t *testing.T) {
 	require.Nil(t, tf.cachedInstances)
 
 	// Describe will re-populate it
-	results, err = tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	results, err = tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	ids = []instance.ID{}
@@ -5365,7 +5471,7 @@ func TestCacheClearAndPopulate(t *testing.T) {
 	require.Nil(t, tf.cachedInstances)
 
 	// Describe will re-populate it
-	results, err = tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	results, err = tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Equal(t, instance.ID(id1), results[0].ID)
@@ -5374,20 +5480,12 @@ func TestCacheClearAndPopulate(t *testing.T) {
 	require.Equal(t, results, *tf.cachedInstances)
 
 	// handleFiles should also clear the cache
-	fns := tfFuncs{
-		tfStateList: func() (map[TResourceType]map[TResourceName]struct{}, error) {
-			return map[TResourceType]map[TResourceName]struct{}{}, nil
-		},
-		tfRefresh: func() error {
-			return nil
-		},
-	}
-	err = tf.handleFiles(fns)
+	err = tf.handleFiles(tfFuncs{})
 	require.NoError(t, err)
 	require.Nil(t, tf.cachedInstances)
 
 	// Describe will re-populate it
-	results, err = tf.doDescribeInstances(emptyTfShowFns, map[string]string{}, true)
+	results, err = tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Equal(t, instance.ID(id1), results[0].ID)
@@ -5397,7 +5495,8 @@ func TestCacheClearAndPopulate(t *testing.T) {
 }
 
 func TestCache(t *testing.T) {
-	tf, dir := getPlugin(t)
+	fake := FakeTerraform{}
+	tf, dir := getPluginWithFakeTerraform(t, &fake)
 	defer os.RemoveAll(dir)
 
 	// Cache should be non-nil but empty
@@ -5430,8 +5529,11 @@ func TestCache(t *testing.T) {
 		Tags:       map[string]string{},
 		Properties: expectedProps,
 	}
-	tf.refreshNilInstanceCache(emptyTfShowFns)
+	require.Len(t, fake.doTerraformShowArgs, 0)
+	tf.refreshNilInstanceCache()
 	require.Equal(t, []instance.Description{expectedInstDesc}, *tf.cachedInstances)
+	// Refresh invokes show when populating the cache
+	require.Len(t, fake.doTerraformShowArgs, 1)
 
 	// Now that it's cached we can remove the file
 	err = tf.fs.Remove(filepath.Join(tf.Dir, "instance-1.tf.json.new"))
@@ -5439,17 +5541,13 @@ func TestCache(t *testing.T) {
 
 	// A refresh shouldn't change the cache since it is not nil
 	require.False(t, tf.isCacheNil())
-	tf.refreshNilInstanceCache(emptyTfShowFns)
+	tf.refreshNilInstanceCache()
 	require.Equal(t, []instance.Description{expectedInstDesc}, *tf.cachedInstances)
+	// Show not invoked again
+	require.Len(t, fake.doTerraformShowArgs, 1)
 
 	// And describe should use the cache
-	fns := describeFns{
-		tfShow: func(types []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error) {
-			require.Fail(t, "Should not be invoked")
-			return nil, nil
-		},
-	}
-	insts, err := tf.doDescribeInstances(fns, map[string]string{}, true)
+	insts, err := tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{expectedInstDesc}, insts)
 
@@ -5460,10 +5558,12 @@ func TestCache(t *testing.T) {
 	require.True(t, tf.isCacheNil())
 
 	// Refresh, no files
-	tf.refreshNilInstanceCache(emptyTfShowFns)
+	tf.refreshNilInstanceCache()
 	require.False(t, tf.isCacheNil())
 	require.Equal(t, []instance.Description{}, *tf.cachedInstances)
-	insts, err = tf.doDescribeInstances(fns, map[string]string{}, true)
+	insts, err = tf.doDescribeInstances(map[string]string{}, true)
 	require.NoError(t, err)
 	require.Equal(t, []instance.Description{}, insts)
+	// Show not invoked again
+	require.Len(t, fake.doTerraformShowArgs, 1)
 }
