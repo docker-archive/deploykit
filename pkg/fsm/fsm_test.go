@@ -83,12 +83,12 @@ func TestSimple(t *testing.T) {
 	)
 
 	saidHi := make(chan struct{})
-	var sayHi Action = func(Instance) error {
+	var sayHi Action = func(FSM) error {
 		close(saidHi)
 		return nil
 	}
 	saidBye := make(chan struct{})
-	var sayBye Action = func(Instance) error {
+	var sayBye Action = func(FSM) error {
 		close(saidBye)
 		return nil
 	}
@@ -167,23 +167,23 @@ func TestFsmUsage(t *testing.T) {
 		decommissioned
 	)
 
-	createInstance := func(Instance) error {
+	createFSM := func(FSM) error {
 		t.Log("creating instance")
 		return nil
 	}
-	deleteInstance := func(Instance) error {
+	deleteFSM := func(FSM) error {
 		t.Log("delete instance")
 		return nil
 	}
-	cleanup := func(Instance) error {
+	cleanup := func(FSM) error {
 		t.Log("cleanup")
 		return nil
 	}
-	recordFlapping := func(Instance) error {
+	recordFlapping := func(FSM) error {
 		t.Log("flap is if this happens more than multiples of 2 calls")
 		return nil
 	}
-	sendAlert := func(Instance) error {
+	sendAlert := func(FSM) error {
 		t.Log("alert")
 		return nil
 	}
@@ -198,7 +198,7 @@ func TestFsmUsage(t *testing.T) {
 				signalUnhealthy: down,
 			},
 			Actions: map[Signal]Action{
-				signalCreate: createInstance,
+				signalCreate: createFSM,
 			},
 			TTL: Expiry{1000, signalCreate},
 		},
@@ -244,7 +244,7 @@ func TestFsmUsage(t *testing.T) {
 			},
 			Actions: map[Signal]Action{
 				signalUnhealthy: sendAlert,
-				signalStop:      deleteInstance,
+				signalStop:      deleteFSM,
 			},
 		},
 		State{
@@ -253,6 +253,23 @@ func TestFsmUsage(t *testing.T) {
 	)
 
 	require.NoError(t, err)
+
+	fsm.SetStateNames(map[Index]string{
+		specified:      "specified",
+		creating:       "creating",
+		up:             "up",
+		running:        "running",
+		down:           "down",
+		decommissioned: "decommissioned",
+	}).SetSignalNames(map[Signal]string{
+		signalSpecified: "specified",
+		signalCreate:    "create",
+		signalFound:     "found",
+		signalHealthy:   "healthy",
+		signalUnhealthy: "unhealthy",
+		signalStartOver: "start_over",
+		signalStop:      "stop",
+	})
 
 	clock := Wall(time.Tick(1 * time.Second))
 

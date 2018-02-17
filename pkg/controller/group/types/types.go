@@ -114,8 +114,9 @@ type Spec struct {
 // node must be healthy for specified number of poll intervals. Both Duration and Count
 // cannot be non 0.
 type Updating struct {
-	Duration types.Duration
-	Count    int
+	Duration                  types.Duration
+	Count                     int
+	SkipBeforeInstanceDestroy *SkipBeforeInstanceDestroy
 }
 
 // // AllocationMethod defines the type of allocation and supervision needed by a flavor's Group.
@@ -214,4 +215,34 @@ func (c Spec) InstanceHash() string {
 	// Remove extra padding
 	encoded = strings.TrimRight(encoded, "=")
 	return encoded
+}
+
+// SkipBeforeInstanceDestroy defines the action that should be skipped prior
+// destroying the instance.
+type SkipBeforeInstanceDestroy string
+
+var (
+	// SkipBeforeInstanceDestroyDrain is the policy that the node is not be
+	// drained before the instance is destroyed
+	SkipBeforeInstanceDestroyDrain = SkipBeforeInstanceDestroy("drain")
+)
+
+// MarshalJSON returns the json representation
+func (s SkipBeforeInstanceDestroy) MarshalJSON() ([]byte, error) {
+	v := string(s)
+	if _, has := map[string]int{"drain": 1}[v]; !has {
+		return nil, fmt.Errorf("invalid value %v", s)
+	}
+	return []byte("\"" + v + "\""), nil
+}
+
+// UnmarshalJSON unmarshals the buffer to this struct
+func (s *SkipBeforeInstanceDestroy) UnmarshalJSON(buff []byte) error {
+	parsed := strings.Trim(string(buff), "\"")
+	switch parsed {
+	case "drain":
+		*s = SkipBeforeInstanceDestroyDrain
+		return nil
+	}
+	return nil
 }
