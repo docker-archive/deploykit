@@ -62,7 +62,7 @@ type managed struct {
 
 	// Finite state machine tracking
 	process      *core.Process
-	stateMachine fsm.Instance
+	stateMachine fsm.FSM
 
 	// polling
 	ticker <-chan time.Time

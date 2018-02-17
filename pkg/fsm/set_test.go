@@ -24,7 +24,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 	)
 
 	started := 0
-	startAction := func(Instance) error {
+	startAction := func(FSM) error {
 		started++
 		return nil
 	}
@@ -47,6 +47,13 @@ func TestSetDeadlineTransition(t *testing.T) {
 
 	require.NoError(t, err)
 
+	spec.SetStateNames(map[Index]string{
+		running: "running",
+		wait:    "wait",
+	}).SetSignalNames(map[Signal]string{
+		start: "start",
+	})
+
 	clock := NewClock()
 
 	// set is a collection of fsm intances that follow the same rules.
@@ -57,7 +64,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 	// add a few instances
 	ids := []ID{}
 	states := []Index{}
-	instances := []Instance{}
+	instances := []FSM{}
 
 	for i := 0; i < 100; i++ {
 		instances = append(instances, set.Add(wait))
@@ -69,7 +76,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 	require.Equal(t, 100, set.deadlines.Len())
 
 	// view the instances
-	set.ForEachInstance(
+	set.ForEach(
 		func(id ID, state Index, data interface{}) bool {
 			states = append(states, state)
 			return false
@@ -83,7 +90,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 	// scan again for all entries
 	// view the instances
 	waiting := 0
-	set.ForEachInstance(
+	set.ForEach(
 		func(id ID, state Index, data interface{}) bool {
 			if state == wait {
 				waiting++
@@ -97,7 +104,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 	// get the instances
 	instances = nil
 	for _, id := range ids {
-		instances = append(instances, set.Instance(id))
+		instances = append(instances, set.Get(id))
 	}
 
 	for i, id := range ids {
@@ -119,7 +126,7 @@ func TestSetDeadlineTransition(t *testing.T) {
 	// transition a few instances
 	for i := 10; i < 20; i++ {
 
-		instance := set.Instance(ID(i))
+		instance := set.Get(ID(i))
 
 		if state := instance.State(); state == wait {
 			require.NoError(t, instance.Signal(start))
@@ -212,7 +219,11 @@ func TestSetFlapping(t *testing.T) {
 	clock := NewClock()
 
 	// set is a collection of fsm intances that follow the same rules.
-	set := NewSet(spec, clock)
+	set := NewSet(spec, clock, Options{
+		IgnoreUndefinedStates:      true,
+		IgnoreUndefinedSignals:     true,
+		IgnoreUndefinedTransitions: true,
+	})
 	defer set.Stop()
 
 	// Add an instance
@@ -329,6 +340,22 @@ func TestMaxVisits(t *testing.T) {
 
 	require.NoError(t, err)
 
+	spec.SetSignalNames(map[Signal]string{
+		startup:  "start_up",
+		shutdown: "shut_down",
+	})
+
+	require.Equal(t, "start_up", spec.SignalName(startup))
+	require.Equal(t, "2", spec.SignalName(error))
+
+	spec.SetStateNames(map[Index]string{
+		up:   "UP",
+		down: "DOWN",
+	})
+
+	require.Equal(t, "UP", spec.StateName(up))
+	require.Equal(t, "2", spec.StateName(unavailable))
+
 	clock := Wall(time.Tick(1 * time.Second))
 
 	// set is a collection of fsm intances that follow the same rules.
@@ -384,7 +411,7 @@ func TestActionErrors(t *testing.T) {
 				cordon:  unavailable,
 			},
 			Actions: map[Signal]Action{
-				startup: func(Instance) error {
+				startup: func(FSM) error {
 					return fmt.Errorf("error")
 				},
 			},
@@ -401,7 +428,7 @@ func TestActionErrors(t *testing.T) {
 				cordon:  unavailable,
 			},
 			Actions: map[Signal]Action{
-				startup: func(Instance) error {
+				startup: func(FSM) error {
 					return fmt.Errorf("error- retrying")
 				},
 			},
@@ -414,13 +441,26 @@ func TestActionErrors(t *testing.T) {
 			Index: unavailable,
 		},
 	)
-
 	require.NoError(t, err)
+
+	spec.SetStateNames(map[Index]string{
+		up:          "up",
+		retrying:    "retrying",
+		down:        "down",
+		unavailable: "unavailable",
+	}).SetSignalNames(map[Signal]string{
+		startup:  "start_up",
+		shutdown: "shut_down",
+		warn:     "warn",
+		cordon:   "cordon",
+	})
 
 	clock := Wall(time.Tick(1 * time.Second))
 
 	// set is a collection of fsm intances that follow the same rules.
-	set := NewSet(spec, clock)
+	set := NewSet(spec, clock, Options{
+		IgnoreUndefinedTransitions: true,
+	})
 
 	defer set.Stop()
 

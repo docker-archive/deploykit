@@ -4,28 +4,7 @@ import (
 	"sync"
 )
 
-// ID is the id of the instance in a given set.  It's unique in that set.
-type ID uint64
-
-// Instance is the interface that returns ID and state of the fsm instance safely.
-type Instance interface {
-
-	// ID returns the ID of the instance
-	ID() ID
-
-	// State returns the state of the instance. This is an expensive call to be submitted to queue to view
-	State() Index
-
-	// Data returns the custom data attached to the instance.  It's set via the optional arg in Signal
-	Data() interface{}
-
-	// Signal signals the instance with optional custom data
-	Signal(Signal, ...interface{}) error
-
-	// CanReceive returns true if the current state of the instance can receive the given signal
-	CanReceive(Signal) bool
-}
-
+// implements FSM interface
 type instance struct {
 	id       ID
 	state    Index
