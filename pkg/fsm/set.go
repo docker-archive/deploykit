@@ -187,10 +187,11 @@ func (s *Set) handleError(tid int64, err error, ctx interface{}) {
 			s.spec.StateName(Index(err.State)), s.spec.SignalName(Signal(err.Signal)))
 
 	case ErrDuplicateState:
-		message = fmt.Sprintf("%s: %v", s.spec.StateName(Index(err)))
+		message = fmt.Sprintf("%s: %v", err.Error(),
+			s.spec.StateName(Index(err)))
 
 	case ErrUnknownFSM:
-		message = fmt.Sprintf("%s: %v", err)
+		message = fmt.Sprintf("%s: %v", err.Error(), err)
 	}
 
 	defer log.Error("error", "tid", tid, "err", message, "context", ctx)

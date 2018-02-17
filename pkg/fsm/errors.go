@@ -18,7 +18,7 @@ func (e ErrUnknownState) Error() string {
 	return fmt.Sprintf("unknown state")
 }
 
-// ErrUnknowTransition indicates an unknown signal while in given state is raised
+// ErrUnknownTransition indicates an unknown signal while in given state is raised
 type ErrUnknownTransition struct {
 	Signal Signal
 	State  Index
@@ -42,7 +42,7 @@ func (e ErrUnknownSignal) Error() string {
 type ErrUnknownFSM ID
 
 func (e ErrUnknownFSM) Error() string {
-	return fmt.Sprintf("unknown instance", e)
+	return fmt.Sprintf("unknown instance")
 }
 
 // ErrNilAction is raised when an action is nil
