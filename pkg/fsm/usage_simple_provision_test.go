@@ -118,21 +118,21 @@ func (c *cluster) countCreated() int {
 	return c.created
 }
 
-func (c *cluster) create(Instance) error {
+func (c *cluster) create(FSM) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.created++
 	return nil
 }
-func (c *cluster) cordon(Instance) error {
+func (c *cluster) cordon(FSM) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.cordoned++
 	return nil
 }
-func (c *cluster) terminate(Instance) error {
+func (c *cluster) terminate(FSM) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -215,7 +215,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 
 		total := len(described[i]) // the discovered instances in this zone
 		j := 0
-		az.ForEachInstanceInState(specified,
+		az.ForEachInState(specified,
 			func(id ID, state Index, data interface{}) bool {
 
 				require.NoError(t, az.Signal(found, id, described[i][j]))
@@ -264,7 +264,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 	associated, unassociated := 0, 0
 	for i := range myCluster.zones {
 		az := myCluster.zones[i]
-		az.ForEachInstance(
+		az.ForEach(
 			func(id ID, s Index, d interface{}) bool {
 				switch {
 				case s == allocated && d != nil:
@@ -297,7 +297,7 @@ func TestSimpleProvisionFlow(t *testing.T) {
 	all := 0
 	for i := range myCluster.zones {
 		az := myCluster.zones[i]
-		az.ForEachInstanceInState(allocated,
+		az.ForEachInState(allocated,
 			func(id ID, s Index, d interface{}) bool {
 				all++
 				require.NotNil(t, d)

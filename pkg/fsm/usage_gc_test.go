@@ -31,11 +31,11 @@ const (
 )
 
 type gc struct {
-	ch chan Instance
+	ch chan FSM
 	op string
 }
 
-func (gc gc) do(i Instance) error {
+func (gc gc) do(i FSM) error {
 	fmt.Println(gc.op, i)
 	gc.ch <- i
 	return nil
@@ -54,12 +54,12 @@ func TestSwarmEntities(t *testing.T) {
 
 	// actions
 	dockerNodeRm := &gc{
-		ch: make(chan Instance, 1),
+		ch: make(chan FSM, 1),
 		op: "dockerNodeRm",
 	}
 
 	instanceDestroy := &gc{
-		ch: make(chan Instance, 1),
+		ch: make(chan FSM, 1),
 		op: "instanceDestroy",
 	}
 
@@ -156,6 +156,26 @@ func TestSwarmEntities(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	model.SetStateNames(map[Index]string{
+		start:                  "START",
+		matchedInstance:        "FOUND_INSTANCE",
+		matchedDockerNode:      "FOUND_DOCKER_NODE",
+		swarmNode:              "SWARM_NODE",
+		swarmNodeReady:         "READY",
+		swarmNodeDown:          "DOWN",
+		pendingInstanceDestroy: "PENDING_INSTNACE_DESTROY",
+		removedInstance:        "REMOVED_INSTANCE",
+		done:                   "DONE",
+	}).SetSignalNames(map[Signal]string{
+		dockerNodeReady: "docker-node-ready",
+		dockerNodeDown:  "docker-node-down",
+		dockerNodeGone:  "docker-node-gone",
+		instanceOK:      "instance-ok",
+		instanceGone:    "instance-gone",
+		timeout:         "timeout",
+		reap:            "reap",
+	})
+
 	clock := Wall(time.Tick(pollInterval))
 	clock.Start()
 
@@ -167,7 +187,7 @@ func TestSwarmEntities(t *testing.T) {
 		clock.Stop()
 	}()
 
-	group := map[string]Instance{
+	group := map[string]FSM{
 		"case1": set.Add(start),
 	}
 

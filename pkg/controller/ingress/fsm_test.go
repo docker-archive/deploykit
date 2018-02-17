@@ -16,7 +16,7 @@ func TestProcessSpecFSMUsage(t *testing.T) {
 	clock := fsm.NewClock()
 
 	runSync := make(chan interface{})
-	stateMachineSpec.SetAction(syncing, sync, func(i fsm.Instance) error {
+	stateMachineSpec.SetAction(syncing, sync, func(i fsm.FSM) error {
 		close(runSync)
 		return nil
 	})

@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -33,7 +34,7 @@ func NewSet(spec *Spec, clock *Clock, optional ...Options) *Set {
 		errors:       make(chan error),
 		events:       make(chan *event),
 		transactions: make(chan *txn, options.BufferSize),
-		new:          make(chan Instance),
+		new:          make(chan FSM),
 		deadlines:    newQueue(),
 	}
 
@@ -46,50 +47,10 @@ func NewSet(spec *Spec, clock *Clock, optional ...Options) *Set {
 	return set
 }
 
-// DefaultOptions returns default values
-func DefaultOptions(name string) Options {
-	return Options{
-		Name:       name,
-		BufferSize: defaultBufferSize,
-	}
-}
-
-// Options contains options for the set
-type Options struct {
-	// Name is the name of the set
-	Name string
-
-	// BufferSize is the size of transaction queue/buffered channel
-	BufferSize int
-}
-
-// Set is a collection of fsm instances that follow a given spec.  This is
-// the primary interface to manipulate the instances... by sending signals to it via channels.
-type Set struct {
-	options      Options
-	spec         Spec
-	now          Time
-	next         ID
-	clock        *Clock
-	members      map[ID]*instance
-	bystate      map[Index]map[ID]*instance
-	reads        chan func(Set) // given a view which is a copy of the Set
-	stop         chan struct{}
-	add          chan Index // add an instance with initial state
-	new          chan Instance
-	delete       chan ID // delete an instance with id
-	errors       chan error
-	events       chan *event
-	transactions chan *txn
-	deadlines    *queue
-	name         string
-	running      bool
-}
-
 // Signal sends a signal to the instance
 func (s *Set) Signal(signal Signal, instance ID, optionalData ...interface{}) error {
 	if _, has := s.spec.signals[signal]; !has {
-		return unknownSignal{signal: signal}
+		return ErrUnknownSignal{Signal: signal}
 	}
 
 	log.Debug("Signal", "set", s.options.Name, "signal", signal, "instance", instance)
@@ -117,8 +78,8 @@ func (s *Set) CountByState(state Index) int {
 	return <-total
 }
 
-// ForEachInstance iterates through the set and provides a consistent view of the instances
-func (s *Set) ForEachInstance(view func(ID, Index, interface{}) bool) {
+// ForEach iterates through the set and provides a consistent view of the instances
+func (s *Set) ForEach(view func(ID, Index, interface{}) bool) {
 	blocker := make(chan struct{})
 	s.reads <- func(set Set) {
 		defer close(blocker)
@@ -133,8 +94,8 @@ func (s *Set) ForEachInstance(view func(ID, Index, interface{}) bool) {
 	<-blocker
 }
 
-// ForEachInstanceInState iterates through the set and provides a consistent view of the instances
-func (s *Set) ForEachInstanceInState(check Index, view func(ID, Index, interface{}) bool) {
+// ForEachInState iterates through the set and provides a consistent view of the instances
+func (s *Set) ForEachInState(check Index, view func(ID, Index, interface{}) bool) {
 	blocker := make(chan struct{})
 	s.reads <- func(set Set) {
 		defer close(blocker)
@@ -154,9 +115,14 @@ func (s *Set) ForEachInstanceInState(check Index, view func(ID, Index, interface
 	<-blocker
 }
 
-// Instance returns the instance by id
-func (s *Set) Instance(id ID) Instance {
-	blocker := make(chan Instance, 1)
+// Name returns the name of the set
+func (s *Set) Name() string {
+	return s.options.Name
+}
+
+// Get returns the instance by id. Nil if no id matched
+func (s *Set) Get(id ID) FSM {
+	blocker := make(chan FSM, 1)
 	s.reads <- func(set Set) {
 		defer close(blocker)
 		blocker <- set.members[id]
@@ -165,13 +131,13 @@ func (s *Set) Instance(id ID) Instance {
 }
 
 // Add adds an instance given initial state
-func (s *Set) Add(initial Index) Instance {
+func (s *Set) Add(initial Index) FSM {
 	s.add <- initial
 	return <-s.new
 }
 
 // Delete deletes an instance
-func (s *Set) Delete(instance Instance) {
+func (s *Set) Delete(instance FSM) {
 	s.delete <- instance.ID()
 }
 
@@ -184,6 +150,11 @@ func (s *Set) Stop() {
 	}
 }
 
+// Errors returns the errors encountered during async processing of events
+func (s *Set) Errors() <-chan error {
+	return s.errors
+}
+
 type event struct {
 	instance ID
 	signal   Signal
@@ -191,13 +162,44 @@ type event struct {
 }
 
 func (s *Set) handleError(tid int64, err error, ctx interface{}) {
-	log.Error("error", "tid", tid, "err", err, "context", ctx)
+
+	message := err.Error()
+	switch err := err.(type) {
+	case ErrUnknownState:
+		if s.options.IgnoreUndefinedStates {
+			return
+		}
+		message = fmt.Sprintf("%s: %v", err.Error(),
+			s.spec.StateName(Index(err)))
+
+	case ErrUnknownTransition:
+		if s.options.IgnoreUndefinedTransitions {
+			return
+		}
+		message = fmt.Sprintf("%s: state(%v) on signal(%v)", err.Error(),
+			s.spec.StateName(err.State), s.spec.SignalName(err.Signal))
+
+	case ErrUnknownSignal:
+		if s.options.IgnoreUndefinedSignals {
+			return
+		}
+		message = fmt.Sprintf("%s: state(%v) on signal(%v)", err.Error(),
+			s.spec.StateName(Index(err.State)), s.spec.SignalName(Signal(err.Signal)))
+
+	case ErrDuplicateState:
+		message = fmt.Sprintf("%s: %v", err.Error(),
+			s.spec.StateName(Index(err)))
+
+	case ErrUnknownFSM:
+		message = fmt.Sprintf("%s: %v", err.Error(), err)
+	}
+
+	defer log.Error("error", "tid", tid, "err", message, "context", ctx)
 	select {
-	case s.errors <- err:
+	case s.errors <- err: // non-blocking send
 	default:
 	}
 }
-
 func (s *Set) handleAdd(tid int64, initial Index) error {
 	// add a new instance
 	id := s.next
@@ -235,7 +237,7 @@ func (s *Set) handleAdd(tid int64, initial Index) error {
 func (s *Set) handleDelete(tid int64, id ID) error {
 	instance, has := s.members[id]
 	if !has {
-		return unknownInstance(id)
+		return ErrUnknownFSM(id)
 	}
 	// delete an instance and update index
 	delete(s.members, id)
@@ -261,7 +263,7 @@ func (s *Set) handleClockTick(tid int64) error {
 	s.tick()
 	now := s.ct()
 
-	log.Debug("Clock tick", "name", s.options.Name, "tid", tid, "now", now)
+	log.Debug("Clock tick", "name", s.options.Name, "tid", tid, "now", now, "V", debugV2)
 
 	for s.deadlines.Len() > 0 {
 
@@ -365,7 +367,7 @@ func (s *Set) raise(tid int64, id ID, signal Signal, current Index) (err error) 
 	}()
 
 	if _, has := s.spec.signals[signal]; !has {
-		err = unknownSignal{signal: signal}
+		err = ErrUnknownSignal{Signal: signal}
 		return
 	}
 
@@ -384,7 +386,7 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 
 	instance, has := s.members[event.instance]
 	if !has {
-		return unknownInstance(event.instance)
+		return ErrUnknownFSM(event.instance)
 	}
 
 	current := instance.state

@@ -46,17 +46,17 @@ type Constructor func(spec types.Spec, properties *types.Any) (identity *types.I
 type Destructor func(*types.Object) error
 
 // ConstructorSuccess is the callback when construction succeeds
-type ConstructorSuccess func(*types.Object, fsm.Instance) error
+type ConstructorSuccess func(*types.Object, fsm.FSM) error
 
 // ConstructorError is the callback when the destruction succeeds
-type ConstructorError func(error, *types.Any, fsm.Instance) error
+type ConstructorError func(error, *types.Any, fsm.FSM) error
 
 func check(input ProcessDefinition) ProcessDefinition {
 	if input.ConstructorError == nil {
-		input.ConstructorError = func(err error, properties *types.Any, instance fsm.Instance) error { return err } // noop
+		input.ConstructorError = func(err error, properties *types.Any, instance fsm.FSM) error { return err } // noop
 	}
 	if input.ConstructorSuccess == nil {
-		input.ConstructorSuccess = func(*types.Object, fsm.Instance) error { return nil } // noop
+		input.ConstructorSuccess = func(*types.Object, fsm.FSM) error { return nil } // noop
 	}
 	return input
 }
@@ -74,7 +74,7 @@ func NewProcess(model ModelDefinition,
 		objects:           map[fsm.ID]*types.Object{},
 	}
 
-	proc.Constructor = func(instance fsm.Instance) error {
+	proc.Constructor = func(instance fsm.FSM) error {
 		if proc.ProcessDefinition.Constructor == nil {
 			return fmt.Errorf("no constructor %s %s", input.Spec.Kind, input.Spec.Metadata.Name)
 		}
@@ -139,7 +139,7 @@ func (p *Process) Start(clock *fsm.Clock) error {
 }
 
 // NewInstance creates an instance of the object in the initial state, calling the process constructor
-func (p *Process) NewInstance(initialState fsm.Index) (fsm.Instance, error) {
+func (p *Process) NewInstance(initialState fsm.Index) (fsm.FSM, error) {
 	newObject := p.instances.Add(initialState)
 	return newObject, p.Constructor(newObject)
 }
@@ -150,15 +150,15 @@ func (p *Process) Instances() *fsm.Set {
 }
 
 // Object returns the Object reference given an instance
-func (p *Process) Object(instance fsm.Instance) *types.Object {
+func (p *Process) Object(instance fsm.FSM) *types.Object {
 	return p.objects[instance.ID()]
 }
 
 // Instance returns an fsm instance given the Object reference
-func (p *Process) Instance(object *types.Object) fsm.Instance {
+func (p *Process) Instance(object *types.Object) fsm.FSM {
 	for k, v := range p.objects {
 		if v == object {
-			return p.instances.Instance(k)
+			return p.instances.Get(k)
 		}
 	}
 	return nil

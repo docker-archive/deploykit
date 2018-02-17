@@ -124,7 +124,7 @@ func (c *managed) init(in types.Spec) (err error) {
 	// Once the state is in the syncing state, we advance the fsm from syncing to waiting by executing
 	// work along with the work signal.
 	stateMachineSpec.SetAction(syncing, sync,
-		func(instance fsm.Instance) error {
+		func(instance fsm.FSM) error {
 
 			log.Debug("syncing routes and backends")
 

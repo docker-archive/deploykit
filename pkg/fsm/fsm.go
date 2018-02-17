@@ -4,64 +4,6 @@ import (
 	"fmt"
 )
 
-// Index is the index of the state in a FSM
-type Index int
-
-// Action is the action to take when a signal is received, prior to transition
-// to the next state.  The error returned by the function is an exception which
-// will put the state machine in an error state.  This error state is not the same
-// as some application-specific error state which is a state defined to correspond
-// to some external event indicating a real-world error event (as opposed to a
-// programming error here).
-type Action func(Instance) error
-
-// Tick is a unit of time. Time is in relative terms and synchronized with an actual
-// timer that's provided by the client.
-type Tick int64
-
-// Time is a unit of time not corresponding to wall time
-type Time int64
-
-// Expiry specifies the rule for TTL..  A state can have TTL / deadline that when it
-// expires a signal can be raised.
-type Expiry struct {
-	TTL   Tick
-	Raise Signal
-}
-
-// Limit is a struct that captures the limit and what signal to raise
-type Limit struct {
-	Value int
-	Raise Signal
-}
-
-// Signal is a signal that can drive the state machine to transfer from one state to next.
-type Signal int
-
-// State encapsulates all the possible transitions and actions to perform during the
-// state transition.  A state can have a TTL so that it is allowed to be in that
-// state for a given TTL.  On expiration, a signal is raised.
-type State struct {
-
-	// Index is a unique key of the state
-	Index Index
-
-	// Transitions fully specifies all the possible transitions from this state, by the way of signals.
-	Transitions map[Signal]Index
-
-	// Actions specify for each signal, what code / action is to be executed as the fsm transits from one state to next.
-	Actions map[Signal]Action
-
-	// Errors specifies the handling of errors when executing action.  On action error, the mapped state is transitioned.
-	Errors map[Signal]Index
-
-	// TTL specifies how long this state can last before a signal is raised.
-	TTL Expiry
-
-	// Visit specifies a limit on the number of times the fsm can visit this state before raising a signal.
-	Visit Limit
-}
-
 // Define performs basic validation, consistency checks and returns a compiled spec.
 func Define(s State, more ...State) (spec *Spec, err error) {
 
@@ -73,7 +15,7 @@ func Define(s State, more ...State) (spec *Spec, err error) {
 
 	for _, s := range more {
 		if _, has := states[s.Index]; has {
-			err = errDuplicateState(s.Index)
+			err = ErrDuplicateState(s.Index)
 			return
 		}
 		states[s.Index] = s
@@ -101,7 +43,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		} {
 			for signal, next := range transfer {
 				if _, has := m[next]; !has {
-					return nil, unknownState(next)
+					return nil, ErrUnknownState(next)
 				}
 				signals[signal] = signal
 			}
@@ -115,15 +57,15 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		for signal, action := range s.Actions {
 			if _, has := s.Transitions[signal]; !has {
 				log.Warn("actions has signal that's not in state's transitions", "state", s.Index, "signal", signal)
-				return nil, unknownTransition{signal: signal, state: s.Index}
+				return nil, ErrUnknownTransition{Signal: signal, State: s.Index}
 			}
 
 			if action == nil {
-				return nil, nilAction(signal)
+				return nil, ErrNilAction(signal)
 			}
 
 			if _, has := signals[signal]; !has {
-				return nil, unknownSignal{signal: signal, state: s.Index}
+				return nil, ErrUnknownSignal{Signal: signal, State: s.Index}
 			}
 		}
 	}
@@ -134,7 +76,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		if s.TTL.TTL > 0 {
 			if _, has := s.Transitions[s.TTL.Raise]; !has {
 				log.Warn("expiry raises signal that's not in state's transitions", "state", s.Index, "TTL", s.TTL)
-				return nil, unknownSignal{signal: s.TTL.Raise, state: s.Index}
+				return nil, ErrUnknownSignal{Signal: s.TTL.Raise, State: s.Index}
 			}
 
 			// register as valid signal
@@ -144,7 +86,7 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 		if s.Visit.Value > 0 {
 			if _, has := s.Transitions[s.Visit.Raise]; !has {
 				log.Warn("visit limit raises signal that's not in state's transitions", "state", s.Index, "visit", s.Visit)
-				return nil, unknownSignal{signal: s.Visit.Raise, state: s.Index}
+				return nil, ErrUnknownSignal{Signal: s.Visit.Raise, State: s.Index}
 			}
 
 			// register as valid signal
@@ -160,6 +102,9 @@ type Spec struct {
 	states  map[Index]State
 	signals map[Signal]Signal
 	flaps   map[[2]Index]*Flap
+
+	stateNames  map[Index]string  // optional
+	signalNames map[Signal]string // optional
 }
 
 func newSpec() *Spec {
@@ -168,6 +113,42 @@ func newSpec() *Spec {
 		signals: map[Signal]Signal{},
 		flaps:   map[[2]Index]*Flap{},
 	}
+}
+
+// SetStateNames sets the friendly names for the states
+func (s *Spec) SetStateNames(v map[Index]string) *Spec {
+	s.stateNames = v
+	return s
+}
+
+// SetSignalNames sets the friendly names for the signals
+func (s *Spec) SetSignalNames(v map[Signal]string) *Spec {
+	s.signalNames = v
+	return s
+}
+
+// StateName returns the friendly name of the state, if defined
+func (s *Spec) StateName(i Index) (name string) {
+	name = fmt.Sprintf("%v", i)
+	if s.stateNames == nil {
+		return
+	}
+	if v, has := s.stateNames[i]; has {
+		name = v
+	}
+	return
+}
+
+// SignalName returns the friendly name of the signal, if defined
+func (s *Spec) SignalName(signal Signal) (name string) {
+	name = fmt.Sprintf("%v", signal)
+	if s.signalNames == nil {
+		return
+	}
+	if v, has := s.signalNames[signal]; has {
+		name = v
+	}
+	return
 }
 
 // SetAction sets the action associated with a signal in a given state
@@ -188,7 +169,7 @@ func (s *Spec) SetAction(state Index, signal Signal, action Action) error {
 func (s *Spec) expiry(current Index) (expiry *Expiry, err error) {
 	state, has := s.states[current]
 	if !has {
-		err = unknownState(current)
+		err = ErrUnknownState(current)
 		return
 	}
 	if state.TTL.TTL > 0 {
@@ -201,7 +182,7 @@ func (s *Spec) expiry(current Index) (expiry *Expiry, err error) {
 func (s *Spec) visit(next Index) (limit *Limit, err error) {
 	state, has := s.states[next]
 	if !has {
-		err = unknownState(next)
+		err = ErrUnknownState(next)
 		return
 	}
 
@@ -215,19 +196,19 @@ func (s *Spec) visit(next Index) (limit *Limit, err error) {
 func (s *Spec) error(current Index, signal Signal) (next Index, err error) {
 	state, has := s.states[current]
 	if !has {
-		err = unknownState(current)
+		err = ErrUnknownState(current)
 		return
 	}
 
 	_, has = s.signals[signal]
 	if !has {
-		err = unknownSignal{signal: signal, state: current}
+		err = ErrUnknownSignal{Signal: signal, State: current}
 		return
 	}
 
 	v, has := state.Errors[signal]
 	if !has {
-		err = unknownTransition{signal: signal, state: current}
+		err = ErrUnknownTransition{Signal: signal, State: current}
 		return
 	}
 	next = v
@@ -243,24 +224,24 @@ func (s *Spec) transition(current Index, signal Signal) (next Index, action Acti
 
 	state, has := s.states[current]
 	if !has {
-		err = unknownState(current)
+		err = ErrUnknownState(current)
 		return
 	}
 
 	if len(state.Transitions) == 0 {
-		err = noTransitions(*s)
+		err = ErrNoTransitions(*s)
 		return
 	}
 
 	_, has = s.signals[signal]
 	if !has {
-		err = unknownSignal{signal: signal}
+		err = ErrUnknownSignal{Signal: signal}
 		return
 	}
 
 	n, has := state.Transitions[signal]
 	if !has {
-		err = unknownTransition{signal: signal, state: state.Index}
+		err = ErrUnknownTransition{Signal: signal, State: state.Index}
 		return
 	}
 	next = n
@@ -270,59 +251,4 @@ func (s *Spec) transition(current Index, signal Signal) (next Index, action Acti
 	}
 
 	return
-}
-
-// Flap is oscillation between two adjacent states.  For example, a->b followed by b->a is
-// counted as 1 flap.  Similarly, b->a followed by a->b is another flap.
-type Flap struct {
-	States [2]Index
-	Count  int
-	Raise  Signal
-}
-
-func (s *Spec) flap(a, b Index) *Flap {
-	key := [2]Index{a, b}
-	if a > b {
-		key = [2]Index{b, a}
-	}
-	if f, has := s.flaps[key]; has {
-		return f
-	}
-	return nil
-}
-
-// CheckFlappingMust is a Must version (will panic if err) of CheckFlapping
-func (s *Spec) CheckFlappingMust(checks []Flap) *Spec {
-	_, err := s.CheckFlapping(checks)
-	if err != nil {
-		panic(err)
-	}
-	return s
-}
-
-// CheckFlapping - Limit is the maximum of a->b b->a transitions allowable.  For detecting
-// oscillations between two adjacent states (no hops)
-func (s *Spec) CheckFlapping(checks []Flap) (*Spec, error) {
-	flaps := map[[2]Index]*Flap{}
-	for _, check := range checks {
-
-		// check the state
-		for _, state := range check.States {
-			if _, has := s.states[state]; !has {
-				return nil, unknownState(state)
-			}
-		}
-
-		key := [2]Index{check.States[0], check.States[1]}
-		if check.States[0] > check.States[1] {
-			key = [2]Index{check.States[1], check.States[0]}
-		}
-
-		copy := check
-		flaps[key] = &copy
-	}
-
-	s.flaps = flaps
-
-	return s, nil
 }
