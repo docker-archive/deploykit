@@ -3,6 +3,7 @@ package group
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -181,7 +182,8 @@ func (p *gController) DestroyGroup(gid group.ID) error {
 		if err != nil {
 			return err
 		}
-
+		// Ensure that the current node is last
+		sort.Sort(sortByID{list: descriptions, settings: &context.settings})
 		for _, desc := range descriptions {
 			context.scaled.Destroy(desc, instance.Termination)
 		}
@@ -385,4 +387,18 @@ func (p *gController) validate(config group.Spec) (groupSettings, error) {
 		flavorPlugin:   flavorPlugin,
 		config:         parsed,
 	}, nil
+}
+
+// isSelf returns true if the configured "self" LogicalID Option matches the
+// either the given instance's LogicalID or the associated logical ID tag
+func isSelf(inst instance.Description, settings groupSettings) bool {
+	if settings.self != nil {
+		if inst.LogicalID != nil && *inst.LogicalID == *settings.self {
+			return true
+		}
+		if v, has := inst.Tags[instance.LogicalIDTag]; has {
+			return string(*settings.self) == v
+		}
+	}
+	return false
 }

@@ -20,9 +20,9 @@ import (
 // NewManagerFlavor creates a flavor.Plugin that creates manager and worker nodes connected in a swarm.
 func NewManagerFlavor(scope scope.Scope, connect func(Spec) (docker.APIClientCloser, error),
 	templ *template.Template,
-	stop <-chan struct{}, self *instance.LogicalID) *ManagerFlavor {
+	stop <-chan struct{}) *ManagerFlavor {
 
-	base := &baseFlavor{initScript: templ, getDockerClient: connect, scope: scope, self: self}
+	base := &baseFlavor{initScript: templ, getDockerClient: connect, scope: scope}
 	base.metadataPlugin = metadata.NewPluginFromChannel(base.runMetadataSnapshot(stop))
 	return &ManagerFlavor{baseFlavor: base}
 }

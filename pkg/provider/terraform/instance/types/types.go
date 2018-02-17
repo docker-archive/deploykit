@@ -117,10 +117,7 @@ func (o Options) ParseInstanceSpecFromGroup(scope scope.Scope) (*instance.Spec, 
 		return nil, err
 	}
 
-	// Add in the bootstrap tag and (if set) the group ID
-	tags := map[string]string{
-		group.ConfigSHATag: "bootstrap",
-	}
+	tags := map[string]string{}
 	// The group ID should match the spec
 	if o.ImportGroupID != "" {
 		if string(groupSpec.ID) != o.ImportGroupID {
