@@ -1489,7 +1489,7 @@ func (p *plugin) importResources(resources []*ImportResource, spec *instance.Spe
 			"msg",
 			fmt.Sprintf("Importing %v %v into terraform as resource %v ...", string(*r.ResourceType), string(*r.ResourceID), string(r.FinalResourceName)))
 		r.SuccessfullyImported = true
-		if err = p.terraform.doTerraformImport(*r.ResourceType, string(r.FinalResourceName), *r.ResourceID); err != nil {
+		if err = p.terraform.doTerraformImport(p.fs, *r.ResourceType, string(r.FinalResourceName), *r.ResourceID, true); err != nil {
 			errorToThrow = err
 			break
 		}

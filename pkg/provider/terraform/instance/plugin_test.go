@@ -45,12 +45,14 @@ type FakeTerraform struct {
 		Instance string
 	}
 
-	doTerraformImportStub  func(TResourceType, string, string) error
+	doTerraformImportStub  func(afero.Fs, TResourceType, string, string, bool) error
 	doTerraformImportMutex sync.RWMutex
 	doTerraformImportArgs  []struct {
-		ResType TResourceType
-		ResName string
-		ID      string
+		Fs              afero.Fs
+		ResType         TResourceType
+		ResName         string
+		ID              string
+		CreateDummyFile bool
 	}
 
 	doTerraformStateRemoveStub  func(TResourceType, string) error
@@ -113,16 +115,18 @@ func (fake *FakeTerraform) doTerraformShowForInstance(instance string) (result T
 	return TResourceProperties{}, nil
 }
 
-func (fake *FakeTerraform) doTerraformImport(resType TResourceType, resName, id string) error {
+func (fake *FakeTerraform) doTerraformImport(fs afero.Fs, resType TResourceType, resName, id string, createDummyFile bool) error {
 	fake.doTerraformImportMutex.Lock()
 	defer fake.doTerraformImportMutex.Unlock()
 	fake.doTerraformImportArgs = append(fake.doTerraformImportArgs, struct {
-		ResType TResourceType
-		ResName string
-		ID      string
-	}{resType, resName, id})
+		Fs              afero.Fs
+		ResType         TResourceType
+		ResName         string
+		ID              string
+		CreateDummyFile bool
+	}{fs, resType, resName, id, createDummyFile})
 	if fake.doTerraformImportStub != nil {
-		return fake.doTerraformImportStub(resType, resName, id)
+		return fake.doTerraformImportStub(fs, resType, resName, id, createDummyFile)
 	}
 	return nil
 }
@@ -4125,10 +4129,11 @@ func TestImportTfImportError(t *testing.T) {
 			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
 			return nil
 		},
-		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+		doTerraformImportStub: func(fs afero.Fs, resType TResourceType, resName, id string, createDummyFile bool) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(resName, "instance-"))
 			require.Equal(t, "123", id)
+			require.True(t, createDummyFile)
 			return fmt.Errorf("Custom import error")
 		},
 	}
@@ -4180,10 +4185,11 @@ func TestImportTfShowInstError(t *testing.T) {
 			cleanVals = append(cleanVals, fmt.Sprintf("%s.%s", resType, name))
 			return nil
 		},
-		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+		doTerraformImportStub: func(fs afero.Fs, resType TResourceType, resName, id string, createDummyFile bool) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(resName, "instance-"))
 			require.Equal(t, "123", id)
+			require.True(t, createDummyFile)
 			return nil
 		},
 	}
@@ -4244,11 +4250,12 @@ func TestImportResourceTagMap(t *testing.T) {
 			cleanInvoked = true
 			return nil
 		},
-		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+		doTerraformImportStub: func(fs afero.Fs, resType TResourceType, resName, id string, createDummyFile bool) error {
 			require.Equal(t, VMAmazon, resType)
 			require.True(t, strings.HasPrefix(resName, "instance-"))
 			resourceName = resName
 			require.Equal(t, "123", id)
+			require.True(t, createDummyFile)
 			return nil
 		},
 	}
@@ -4337,11 +4344,12 @@ func TestImportResourceTagSlice(t *testing.T) {
 			cleanInvoked = true
 			return nil
 		},
-		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+		doTerraformImportStub: func(fs afero.Fs, resType TResourceType, resName, id string, createDummyFile bool) error {
 			require.Equal(t, VMIBMCloud, resType)
 			require.True(t, strings.HasPrefix(resName, "instance-"))
 			resourceName = resName
 			require.Equal(t, "123", id)
+			require.True(t, createDummyFile)
 			return nil
 		},
 	}
@@ -4526,7 +4534,7 @@ func internalTestImportResourceDedicatedGlobal(t *testing.T, options importOptio
 			cleanInvoked = true
 			return nil
 		},
-		doTerraformImportStub: func(resType TResourceType, resName, id string) error {
+		doTerraformImportStub: func(fs afero.Fs, resType TResourceType, resName, id string, createDummyFile bool) error {
 			imports = append(imports, fmt.Sprintf("%v.%v.%v", resType, resName, id))
 			return nil
 		},

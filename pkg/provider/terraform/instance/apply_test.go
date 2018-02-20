@@ -588,10 +588,11 @@ func TestHandleFilePruningPruneExistingResourceError(t *testing.T) {
 
 func TestHandleFilePruningPruneImportError(t *testing.T) {
 	fake := FakeTerraform{
-		doTerraformImportStub: func(resType TResourceType, resName, resID string) error {
+		doTerraformImportStub: func(fs afero.Fs, resType TResourceType, resName, resID string, createDummyFile bool) error {
 			require.Equal(t, VMIBMCloud, resType)
 			require.Equal(t, "instance-123", resName)
 			require.Equal(t, "some-id", resID)
+			require.False(t, createDummyFile)
 			return fmt.Errorf("Custom import error")
 		},
 	}
@@ -663,8 +664,9 @@ func TestHandleFilePruningRemovedFromBackend(t *testing.T) {
 
 func TestHandleFilePruningImportSuccess(t *testing.T) {
 	fake := FakeTerraform{
-		doTerraformImportStub: func(resType TResourceType, resName, resID string) error {
+		doTerraformImportStub: func(fs afero.Fs, resType TResourceType, resName, resID string, createDummyFile bool) error {
 			// Import is successful
+			require.False(t, createDummyFile)
 			return nil
 		},
 	}
@@ -796,7 +798,7 @@ func internalTestHandleFilesPruneMultipleVMTypes(t *testing.T, pruneType int) {
 			// Return all of 1 type, 1 of another type, 0 of the last type
 			return result, nil
 		},
-		doTerraformImportStub: func(resType TResourceType, resName, resID string) error {
+		doTerraformImportStub: func(fs afero.Fs, resType TResourceType, resName, resID string, createDummyFile bool) error {
 			// Should only invoked if the resources exist in the backend
 			if pruneType == Prune2ExistsInBackend {
 				if resType == VMAmazon && resName == "instance-105" {

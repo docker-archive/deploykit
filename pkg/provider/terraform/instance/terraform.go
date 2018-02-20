@@ -2,6 +2,7 @@ package instance
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/docker/infrakit/pkg/util/exec"
+	"github.com/spf13/afero"
 )
 
 type tf interface {
@@ -20,7 +22,7 @@ type tf interface {
 	doTerraformApply() error
 	doTerraformShow([]TResourceType, []string) (result map[TResourceType]map[TResourceName]TResourceProperties, err error)
 	doTerraformShowForInstance(string) (result TResourceProperties, err error)
-	doTerraformImport(TResourceType, string, string) error
+	doTerraformImport(afero.Fs, TResourceType, string, string, bool) error
 	doTerraformStateRemove(TResourceType, string) error
 }
 
@@ -225,11 +227,48 @@ func (tf *terraformBase) doTerraformShowForInstance(instance string) (result TRe
 }
 
 // doTerraformImport shells out to run `terraform import`
-func (tf *terraformBase) doTerraformImport(resType TResourceType, resName, id string) error {
+// Version 0.9.x does not require the input resource file to be created prior to the import.
+func (tf *terraformBase) doTerraformImport(fs afero.Fs, resType TResourceType, resName, id string, createDummyFile bool) error {
+	return internalTerraformImport(tf.envs, tf.dir, resType, resName, id)
+}
+
+// doTerraformImport shells out to run `terraform import`
+// Version 0.10.+ requires the input resource file to be created prior to the import.
+func (tf *terraformV10) doTerraformImport(fs afero.Fs, resType TResourceType, resName, id string, createDummyFile bool) error {
+	// The resource file does not need the actual properties, so just create a dummy file
+	// with the minimum data. This file can be immediately removed post-import.
+	if createDummyFile {
+		tFormat := TFormat{
+			Resource: map[TResourceType]map[TResourceName]TResourceProperties{
+				resType: {
+					TResourceName(resName): {},
+				},
+			},
+		}
+		buff, err := json.MarshalIndent(tFormat, "  ", "  ")
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(tf.dir, "import-resource.tf.json")
+		err = afero.WriteFile(fs, path, buff, 0644)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			fs.Remove(path)
+		}()
+	}
+	tf.doTerraformInit()
+	return internalTerraformImport(tf.envs, tf.dir, resType, resName, id)
+}
+
+// internalTerraformImport shells out to run `terraform import`
+func internalTerraformImport(envs []string, dir string, resType TResourceType, resName, id string) error {
+	logger.Info("internalTerraformImport")
 	command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", resType, resName, id)).
 		InheritEnvs(true).
-		WithEnvs(tf.envs...).
-		WithDir(tf.dir)
+		WithEnvs(envs...).
+		WithDir(dir)
 	if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
 		return err
 	}

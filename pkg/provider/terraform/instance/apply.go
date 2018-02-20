@@ -414,14 +414,14 @@ func (p *plugin) handleFilePruning(
 							resName))
 					pruneFiles[resFilenameProps.FileName] = struct{}{}
 				} else {
-					// Import resource
+					// Import resource. Note that the input tf.json file is already on disk.
 					logger.Info("handleFilePruning",
 						"msg",
 						fmt.Sprintf("Importing %v %v into terraform as resource %v ...",
 							string(resType),
 							*importID,
 							string(resName)))
-					if err = p.terraform.doTerraformImport(resType, string(resName), *importID); err != nil {
+					if err = p.terraform.doTerraformImport(p.fs, resType, string(resName), *importID, false); err != nil {
 						return err
 					}
 				}
