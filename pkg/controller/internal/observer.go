@@ -66,7 +66,7 @@ func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadershi
 		retry = 5 * time.Second
 	}
 
-	o.extractKey = keyExtractor(o.KeySelector)
+	o.extractKey = KeyExtractor(o.KeySelector)
 
 	instancePlugin := instance_plugin.LazyConnect(
 		func() (instance.Plugin, error) {
@@ -172,8 +172,8 @@ func templateFrom(source []byte) (*template.Template, error) {
 	)
 }
 
-// keyExtractor returns a function that can extract the link key from an instance description
-func keyExtractor(text string) func(instance.Description) (string, error) {
+// KeyExtractor returns a function that can extract the link key from an instance description
+func KeyExtractor(text string) func(instance.Description) (string, error) {
 	if text != "" {
 		t, err := templateFrom([]byte(text))
 		if err == nil {
