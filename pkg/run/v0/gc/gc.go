@@ -13,6 +13,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 
+	// builtin models for gc
 	_ "github.com/docker/infrakit/pkg/controller/gc/model/swarm"
 )
 

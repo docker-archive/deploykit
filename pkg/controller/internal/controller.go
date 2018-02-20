@@ -10,9 +10,11 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
-var log = logutil.New("module", "controller/internal")
-
-const debugV = logutil.V(500)
+var (
+	log     = logutil.New("module", "controller/internal")
+	debugV  = logutil.V(500)
+	debugV2 = logutil.V(900)
+)
 
 // ControlLoop gives status and means to stop the object
 type ControlLoop interface {

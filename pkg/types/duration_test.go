@@ -12,6 +12,11 @@ func TestDuration(t *testing.T) {
 	d := FromDuration(5 * time.Second)
 	require.Equal(t, 5*time.Second, d.Duration())
 
+	require.Equal(t, 2*time.Second, d.AtMost(2*time.Second))
+	require.Equal(t, 5*time.Second, d.AtMost(10*time.Second))
+	require.Equal(t, 10*time.Second, d.AtLeast(10*time.Second))
+	require.Equal(t, 5*time.Second, d.AtLeast(1*time.Second))
+
 	d2 := FromDuration(1 * time.Minute)
 	require.Equal(t, 1*time.Minute, d2.Duration())
 

@@ -42,11 +42,11 @@ type Model interface {
 	Start()
 	Stop()
 	Spec() *fsm.Spec
-	New() fsm.Instance
-	FoundNode(fsm.Instance, instance.Description) error
-	LostNode(fsm.Instance)
-	FoundInstance(fsm.Instance, instance.Description) error
-	LostInstance(fsm.Instance)
-	GCNode() <-chan fsm.Instance
-	GCInstance() <-chan fsm.Instance
+	New() fsm.FSM
+	FoundNode(fsm.FSM, instance.Description) error
+	LostNode(fsm.FSM)
+	FoundInstance(fsm.FSM, instance.Description) error
+	LostInstance(fsm.FSM)
+	GCNode() <-chan fsm.FSM
+	GCInstance() <-chan fsm.FSM
 }

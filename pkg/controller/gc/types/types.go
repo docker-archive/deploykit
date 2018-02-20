@@ -7,8 +7,6 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
-	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -112,36 +110,4 @@ type Options struct {
 // Validate validates the controller's options
 func (p Options) Validate(ctx context.Context) error {
 	return nil
-}
-
-// templateFrom returns a template after it has un-escaped any escape sequences
-func templateFrom(source []byte) (*template.Template, error) {
-	buff := template.Unescape(source)
-	return template.NewTemplate(
-		"str://"+string(buff),
-		template.Options{MultiPass: false, MissingKey: template.MissingKeyError},
-	)
-}
-
-// KeyExtractor returns a function that can extract the link key from an instance description
-func KeyExtractor(text string) func(instance.Description) (string, error) {
-	if text != "" {
-		t, err := templateFrom([]byte(text))
-		if err == nil {
-			return func(i instance.Description) (string, error) {
-				view, err := t.Render(i)
-				if err != nil {
-					return "", err
-				}
-				return view, nil
-			}
-		}
-	}
-
-	return func(i instance.Description) (string, error) {
-		if i.LogicalID != nil {
-			return string(*i.LogicalID), nil
-		}
-		return string(i.ID), nil
-	}
 }

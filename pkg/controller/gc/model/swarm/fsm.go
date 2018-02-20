@@ -81,25 +81,25 @@ type model struct {
 	properties gc_types.Properties
 	options    options
 
-	dockerNodeRmChan    chan fsm.Instance
-	instanceDestroyChan chan fsm.Instance
+	dockerNodeRmChan    chan fsm.FSM
+	instanceDestroyChan chan fsm.FSM
 
 	lock sync.RWMutex
 }
 
-func (m *model) GCNode() <-chan fsm.Instance {
+func (m *model) GCNode() <-chan fsm.FSM {
 	return m.dockerNodeRmChan
 }
 
-func (m *model) GCInstance() <-chan fsm.Instance {
+func (m *model) GCInstance() <-chan fsm.FSM {
 	return m.instanceDestroyChan
 }
 
-func (m *model) New() fsm.Instance {
+func (m *model) New() fsm.FSM {
 	return m.set.Add(start)
 }
 
-func (m *model) FoundNode(fsm fsm.Instance, desc instance.Description) error {
+func (m *model) FoundNode(fsm fsm.FSM, desc instance.Description) error {
 	// look at node's status - down, ready, etc.
 	node, err := NodeFromDescription(desc)
 	if err != nil {
@@ -125,16 +125,16 @@ func (m *model) FoundNode(fsm fsm.Instance, desc instance.Description) error {
 	return fmt.Errorf("unknown state in node %v, no signals triggered", node)
 }
 
-func (m *model) LostNode(fsm fsm.Instance) {
+func (m *model) LostNode(fsm fsm.FSM) {
 	fsm.Signal(dockerNodeGone)
 }
 
-func (m *model) FoundInstance(fsm fsm.Instance, desc instance.Description) error {
+func (m *model) FoundInstance(fsm fsm.FSM, desc instance.Description) error {
 	fsm.Signal(instanceOK)
 	return nil
 }
 
-func (m *model) LostInstance(fsm fsm.Instance) {
+func (m *model) LostInstance(fsm fsm.FSM) {
 	fsm.Signal(instanceGone)
 }
 
@@ -157,7 +157,8 @@ func (m *model) Start() {
 	m.clock = fsm.Wall(time.Tick(d))
 	m.clock.Start()
 
-	m.set = fsm.NewSet(m.spec, m.clock, fsm.DefaultOptions("swarm"))
+	m.set = fsm.NewSet(m.spec, m.clock,
+		fsm.DefaultOptions("swarm"))
 }
 
 func (m *model) Stop() {
@@ -171,7 +172,7 @@ func (m *model) Stop() {
 	close(m.instanceDestroyChan)
 }
 
-func (m *model) instanceDestroy(i fsm.Instance) error {
+func (m *model) instanceDestroy(i fsm.FSM) error {
 	if m.instanceDestroyChan == nil {
 		return fmt.Errorf("not initialized")
 	}
@@ -180,7 +181,7 @@ func (m *model) instanceDestroy(i fsm.Instance) error {
 	return nil
 }
 
-func (m *model) dockerNodeRm(i fsm.Instance) error {
+func (m *model) dockerNodeRm(i fsm.FSM) error {
 	if m.dockerNodeRmChan == nil {
 		return fmt.Errorf("not initialized")
 	}
@@ -204,8 +205,8 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 	model := &model{
 		properties:          properties,
 		options:             options,
-		dockerNodeRmChan:    make(chan fsm.Instance, 10),
-		instanceDestroyChan: make(chan fsm.Instance, 10),
+		dockerNodeRmChan:    make(chan fsm.FSM, 10),
+		instanceDestroyChan: make(chan fsm.FSM, 10),
 	}
 
 	spec, err := fsm.Define(
@@ -304,6 +305,25 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 		return nil, err
 	}
 
+	spec.SetStateNames(map[fsm.Index]string{
+		start:                  "START",
+		matchedInstance:        "FOUND_INSTANCE",
+		matchedDockerNode:      "FOUND_DOCKER_NODE",
+		swarmNode:              "SWARM_NODE",
+		swarmNodeReady:         "SWARM_NODE_READY",
+		swarmNodeDown:          "SWARM_NODE_DOWN",
+		pendingInstanceDestroy: "PEDNING_INSTANCE_DESTROY",
+		removedInstance:        "INSTANCE_REMOVED",
+		done:                   "DONE",
+	}).SetSignalNames(map[fsm.Signal]string{
+		dockerNodeReady: "docker_node_ready",
+		dockerNodeDown:  "docker_node_down",
+		dockerNodeGone:  "docker_node_gone",
+		instanceOK:      "instance_ok",
+		instanceGone:    "instance_gone",
+		timeout:         "timeout",
+		reap:            "reap",
+	})
 	model.spec = spec
 	return model, nil
 }

@@ -18,7 +18,7 @@ import (
 )
 
 type stateMachine struct {
-	fsm.Instance
+	fsm.FSM
 }
 
 func (f stateMachine) MarshalJSON() ([]byte, error) {
@@ -179,8 +179,8 @@ func (r *reaper) updateSpec(spec types.Spec) error {
 		return err
 	}
 
-	r.nodeKeyExtractor = gc.KeyExtractor(properties.NodeKeySelector)
-	r.instanceKeyExtractor = gc.KeyExtractor(properties.InstanceKeySelector)
+	r.nodeKeyExtractor = internal.KeyExtractor(properties.NodeKeySelector)
+	r.instanceKeyExtractor = internal.KeyExtractor(properties.InstanceKeySelector)
 
 	model, err := model(properties)
 	if err != nil {
@@ -261,7 +261,7 @@ func (r *reaper) observe(ctx context.Context) (nodes []instance.Description,
 	return
 }
 
-func (r *reaper) getNodeDescription(i fsm.Instance) *instance.Description {
+func (r *reaper) getNodeDescription(i fsm.FSM) *instance.Description {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
@@ -274,7 +274,7 @@ func (r *reaper) getNodeDescription(i fsm.Instance) *instance.Description {
 	return nil
 }
 
-func (r *reaper) getInstanceDescription(i fsm.Instance) *instance.Description {
+func (r *reaper) getInstanceDescription(i fsm.FSM) *instance.Description {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 

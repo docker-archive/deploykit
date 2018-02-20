@@ -83,8 +83,11 @@ type State struct {
 // DefaultOptions returns default values
 func DefaultOptions(name string) Options {
 	return Options{
-		Name:       name,
-		BufferSize: defaultBufferSize,
+		Name:                       name,
+		BufferSize:                 defaultBufferSize,
+		IgnoreUndefinedTransitions: true,
+		IgnoreUndefinedSignals:     true,
+		IgnoreUndefinedStates:      true,
 	}
 }
 
