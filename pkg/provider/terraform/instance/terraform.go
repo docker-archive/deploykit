@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/docker/infrakit/pkg/util/exec"
 )
@@ -73,8 +75,17 @@ func terraformLookup(dir string, envs []string) (tf, error) {
 	if major != 0 {
 		return nil, fmt.Errorf("Unsupported major version: %d", major)
 	}
-	if minor >= 9 {
+	// Version 0.9.x
+	if minor == 9 {
 		return &terraformBase{dir: dir, envs: envs}, nil
+	}
+	// Version 0.10.x and above
+	if minor >= 10 {
+		return &terraformV10{
+			terraformBase: terraformBase{dir: dir, envs: envs},
+			initLock:      sync.Mutex{},
+			initCompleted: false,
+		}, nil
 	}
 	return nil, fmt.Errorf("Unsupported minor version: %d", minor)
 }
@@ -83,6 +94,13 @@ func terraformLookup(dir string, envs []string) (tf, error) {
 type terraformBase struct {
 	envs []string
 	dir  string
+}
+
+// terraformV10 is the implementation that is compatible with terraform v.0.10.x+
+type terraformV10 struct {
+	terraformBase
+	initLock      sync.Mutex
+	initCompleted bool
 }
 
 // doTerraformStateList shells out to run `terraform state list` and parses the result
@@ -125,7 +143,7 @@ func (tf *terraformBase) doTerraformStateList() (map[TResourceType]map[TResource
 	return result, err
 }
 
-// doTerraformApply executes "terraform refresh"
+// doTerraformRefresh executes "terraform refresh"
 func (tf *terraformBase) doTerraformRefresh() error {
 	logger.Info("doTerraformRefresh")
 	command := exec.Command("terraform refresh").
@@ -138,13 +156,28 @@ func (tf *terraformBase) doTerraformRefresh() error {
 	return command.Wait()
 }
 
-// doTerraformApply executes "terraform apply"
+// doTerraformApply executes "terraform apply".
+// Version 0.9.x does not not require additional CLI options.
 func (tf *terraformBase) doTerraformApply() error {
+	return internalTerraformApply(tf.envs, tf.dir)
+}
+
+// doTerraformApply executes "terraform apply"
+// Version 0.10.+ requires the -auto-approve=true CLI option.
+func (tf *terraformV10) doTerraformApply() error {
+	tf.doTerraformInit()
+	return internalTerraformApply(tf.envs, tf.dir, "-auto-approve=true")
+}
+
+// internalTerraformApply executes terraform apply with the given additional parameters
+func internalTerraformApply(envs []string, dir string, params ...string) error {
 	logger.Info("doTerraformApply", "msg", "Applying plan")
-	command := exec.Command("terraform apply -refresh=false").
+	c := []string{"terraform", "apply", "-refresh=false", "-input=false"}
+	c = append(c, params...)
+	command := exec.Command(strings.Join(c, " ")).
 		InheritEnvs(true).
-		WithEnvs(tf.envs...).
-		WithDir(tf.dir)
+		WithEnvs(envs...).
+		WithDir(dir)
 	if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
 		return err
 	}
@@ -213,4 +246,42 @@ func (tf *terraformBase) doTerraformStateRemove(vmType TResourceType, vmName str
 		return err
 	}
 	return command.Wait()
+}
+
+// doTerraformInit executes "terraform init" and, if the .terraform directory has been created in
+// the working directory, tracks that the initialization has completed
+func (tf *terraformV10) doTerraformInit() error {
+	// Only execute init once
+	if tf.initCompleted {
+		return nil
+	}
+	tf.initLock.Lock()
+	defer tf.initLock.Unlock()
+	if tf.initCompleted {
+		return nil
+	}
+	logger.Info("doTerraformInit")
+	command := exec.Command("terraform init -input=false").
+		InheritEnvs(true).
+		WithEnvs(tf.envs...).
+		WithDir(tf.dir)
+	if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
+		return err
+	}
+	err := command.Wait()
+	if err != nil {
+		return err
+	}
+	// If there are no config files then nothign was initialized, only mark that init
+	// compelte if the .terraform direction was created
+	path := filepath.Join(tf.terraformBase.dir, ".terraform")
+	_, err = os.Stat(path)
+	if err == nil {
+		tf.initCompleted = true
+		return nil
+	}
+	logger.Warn("Failed to initalize terraform, .terraform directory was not created",
+		"path", path,
+		"error", err)
+	return nil
 }
