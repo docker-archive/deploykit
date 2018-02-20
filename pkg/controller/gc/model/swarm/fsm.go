@@ -54,7 +54,7 @@ const (
 	done                             // terminal
 )
 
-type options struct {
+type modelProperties struct {
 	TickUnit                  types.Duration
 	NoData                    fsm.Tick
 	DockerNodeJoin            fsm.Tick
@@ -62,9 +62,11 @@ type options struct {
 	WaitBeforeInstanceDestroy fsm.Tick
 	WaitBeforeReprovision     fsm.Tick
 	WaitBeforeCleanup         fsm.Tick
+	RmNodeBufferSize          int
+	RmInstanceBufferSize      int
 }
 
-var defaultOptions = options{
+var defaultModelProperties = modelProperties{
 	TickUnit:                  types.FromDuration(1 * time.Second),
 	NoData:                    fsm.Tick(10),
 	DockerNodeJoin:            fsm.Tick(5),
@@ -72,14 +74,18 @@ var defaultOptions = options{
 	WaitBeforeInstanceDestroy: fsm.Tick(3),
 	WaitBeforeReprovision:     fsm.Tick(10), // wait before we reprovision a new instance to fix a Down node
 	WaitBeforeCleanup:         fsm.Tick(10),
+	RmNodeBufferSize:          10,
+	RmInstanceBufferSize:      10,
 }
 
 type model struct {
-	spec       *fsm.Spec
-	set        *fsm.Set
-	clock      *fsm.Clock
-	properties gc_types.Properties
-	options    options
+	spec     *fsm.Spec
+	set      *fsm.Set
+	clock    *fsm.Clock
+	tickSize time.Duration
+
+	gc_types.Properties
+	modelProperties
 
 	dockerNodeRmChan    chan fsm.FSM
 	instanceDestroyChan chan fsm.FSM
@@ -149,16 +155,8 @@ func (m *model) Start() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	// Take the longer of the 2 intervals so that the fsm operates on a slower clock.
-	d := m.options.TickUnit.Duration()
-	if d < m.properties.ObserveInterval.Duration() {
-		d = m.properties.ObserveInterval.Duration()
-	}
-	m.clock = fsm.Wall(time.Tick(d))
 	m.clock.Start()
-
-	m.set = fsm.NewSet(m.spec, m.clock,
-		fsm.DefaultOptions("swarm"))
+	m.set = fsm.NewSet(m.spec, m.clock, fsm.DefaultOptions("swarm"))
 }
 
 func (m *model) Stop() {
@@ -193,26 +191,32 @@ func (m *model) dockerNodeRm(i fsm.FSM) error {
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
 func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 
-	modelProperties := properties.ModelProperties
-
-	options := defaultOptions
-	if modelProperties != nil {
-		if err := modelProperties.Decode(&options); err != nil {
+	modelProperties := defaultModelProperties
+	if properties.ModelProperties != nil {
+		if err := properties.ModelProperties.Decode(&modelProperties); err != nil {
 			return nil, err
 		}
 	}
 
 	model := &model{
-		properties:          properties,
-		options:             options,
-		dockerNodeRmChan:    make(chan fsm.FSM, 10),
-		instanceDestroyChan: make(chan fsm.FSM, 10),
+		Properties:          properties,
+		modelProperties:     modelProperties,
+		dockerNodeRmChan:    make(chan fsm.FSM, modelProperties.RmNodeBufferSize),
+		instanceDestroyChan: make(chan fsm.FSM, modelProperties.RmInstanceBufferSize),
 	}
+
+	// Take the longer of the 2 intervals so that the fsm operates on a slower clock.
+	d := model.modelProperties.TickUnit.Duration()
+	if d < model.ObserveInterval.Duration() {
+		d = model.ObserveInterval.Duration()
+	}
+	model.tickSize = d
+	model.clock = fsm.Wall(time.Tick(d))
 
 	spec, err := fsm.Define(
 		fsm.State{
 			Index: start,
-			TTL:   fsm.Expiry{options.NoData, timeout},
+			TTL:   fsm.Expiry{modelProperties.NoData, timeout},
 			Transitions: map[fsm.Signal]fsm.Index{
 				dockerNodeReady: matchedDockerNode,
 				dockerNodeDown:  matchedDockerNode,
@@ -222,7 +226,7 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 		},
 		fsm.State{
 			Index: matchedInstance,
-			TTL:   fsm.Expiry{options.DockerNodeJoin, dockerNodeGone},
+			TTL:   fsm.Expiry{modelProperties.DockerNodeJoin, dockerNodeGone},
 			Transitions: map[fsm.Signal]fsm.Index{
 				dockerNodeReady: swarmNode,
 				dockerNodeDown:  swarmNode,
@@ -235,7 +239,7 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 		},
 		fsm.State{
 			Index: pendingInstanceDestroy,
-			TTL:   fsm.Expiry{options.WaitBeforeInstanceDestroy, reap},
+			TTL:   fsm.Expiry{modelProperties.WaitBeforeInstanceDestroy, reap},
 			Transitions: map[fsm.Signal]fsm.Index{
 				dockerNodeReady: swarmNode, // late joiner
 				dockerNodeDown:  swarmNode,
@@ -249,7 +253,7 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 		},
 		fsm.State{
 			Index: matchedDockerNode,
-			TTL:   fsm.Expiry{options.WaitDescribeInstances, instanceGone},
+			TTL:   fsm.Expiry{modelProperties.WaitDescribeInstances, instanceGone},
 			Transitions: map[fsm.Signal]fsm.Index{
 				instanceOK:     swarmNode,
 				instanceGone:   removedInstance,
@@ -278,7 +282,7 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 		},
 		fsm.State{
 			Index: swarmNodeDown,
-			TTL:   fsm.Expiry{options.WaitBeforeReprovision, dockerNodeGone},
+			TTL:   fsm.Expiry{modelProperties.WaitBeforeReprovision, dockerNodeGone},
 			Transitions: map[fsm.Signal]fsm.Index{
 				dockerNodeReady: swarmNodeReady,
 				dockerNodeGone:  pendingInstanceDestroy,
@@ -287,7 +291,7 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 		},
 		fsm.State{
 			Index: removedInstance, // after we removed the instance, we can still have unmatched node
-			TTL:   fsm.Expiry{options.WaitBeforeCleanup, timeout},
+			TTL:   fsm.Expiry{modelProperties.WaitBeforeCleanup, timeout},
 			Transitions: map[fsm.Signal]fsm.Index{
 				dockerNodeDown: done,
 				timeout:        done,
