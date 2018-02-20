@@ -1,6 +1,6 @@
 # Group plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/group/* 72f7eeb23400d0ab8affff2bd04b9f3cf016e2ac -->
+<!-- SOURCE-CHECKSUM pkg/spi/group/* 70857e1ae1e930df87b79433ef30be20568e30752d3b7214f4deafc12aa2cedc7ff3d7d01e46e2cd72f7eeb23400d0ab8affff2bd04b9f3cf016e2ac -->
 
 ## API
 
