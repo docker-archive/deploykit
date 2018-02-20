@@ -1,13 +1,12 @@
 package internal
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/docker/infrakit/pkg/spi/instance"
-	testutil "github.com/docker/infrakit/pkg/testing"
 	testutil_instance "github.com/docker/infrakit/pkg/testing/instance"
+	testutil_scope "github.com/docker/infrakit/pkg/testing/scope"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -49,13 +48,13 @@ KeySelector: \{\{.link\}\}
 		},
 	}
 
-	testScope := testutil.DefaultScope()
+	testScope := testutil_scope.DefaultScope()
 	testScope.ResolveInstance = func(n string) (instance.Plugin, error) {
 		lookup <- n
 		return testInstancePlugin, nil
 	}
 
-	err = observer.Init(testScope, testutil.FakeLeader(true), 1*time.Second)
+	err = observer.Init(testScope, testutil_scope.FakeLeader(true), 1*time.Second)
 	require.NoError(t, err)
 
 	observer.Start()
@@ -71,7 +70,6 @@ KeySelector: \{\{.link\}\}
 
 	count := 0
 	for samples := range observer.Observations() {
-		fmt.Println(">>> here3")
 		seen = samples
 		require.Equal(t, expected, seen)
 		count++
@@ -131,12 +129,12 @@ KeySelector: \{\{.link\}\}
 		},
 	}
 
-	testScope := testutil.DefaultScope()
+	testScope := testutil_scope.DefaultScope()
 	testScope.ResolveInstance = func(n string) (instance.Plugin, error) {
 		return testInstancePlugin, nil
 	}
 
-	err = observer.Init(testScope, testutil.FakeLeader(true), 1*time.Second)
+	err = observer.Init(testScope, testutil_scope.FakeLeader(true), 1*time.Second)
 	require.NoError(t, err)
 
 	observer.Start()

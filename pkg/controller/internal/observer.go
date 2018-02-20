@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/plugin"
 	instance_plugin "github.com/docker/infrakit/pkg/plugin/instance"
 	"github.com/docker/infrakit/pkg/run/scope"
@@ -44,7 +43,7 @@ type InstanceObserver struct {
 	// extractKey is a function that can extract the key from an instance.Description
 	extractKey func(instance.Description) (string, error)
 
-	poller *controller.Poller
+	poller *Poller
 	ticker <-chan time.Time
 	paused bool
 	lock   sync.RWMutex
@@ -81,7 +80,7 @@ func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadershi
 	o.observations = make(chan []instance.Description, 1)
 
 	o.ticker = time.Tick(o.ObserveInterval.AtLeast(minObserveInterval))
-	o.poller = controller.PollWithCleanup(
+	o.poller = PollWithCleanup(
 		// This determines if the action should be taken when time is up
 		func() bool {
 

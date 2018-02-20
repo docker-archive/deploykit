@@ -1,14 +1,11 @@
-package controller
+package internal
 
 import (
 	"sync"
 	"time"
 
-	logutil "github.com/docker/infrakit/pkg/log"
 	"golang.org/x/net/context"
 )
-
-var log = logutil.New("module", "controller")
 
 // Poller is the entity that executes a unit of work at a predefined interval
 type Poller struct {

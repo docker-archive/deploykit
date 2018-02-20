@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/docker/infrakit/pkg/controller"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/types"
 )
 

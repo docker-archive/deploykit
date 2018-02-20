@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/controller"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )

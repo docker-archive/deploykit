@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc_server "github.com/docker/infrakit/pkg/rpc/server"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	testing_controller "github.com/docker/infrakit/pkg/testing/controller"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"

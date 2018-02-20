@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/infrakit/pkg/controller"
 	gc "github.com/docker/infrakit/pkg/controller/gc/types"
 	"github.com/docker/infrakit/pkg/controller/internal"
 	"github.com/docker/infrakit/pkg/fsm"
 	instance_plugin "github.com/docker/infrakit/pkg/plugin/instance"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
@@ -57,7 +57,7 @@ type reaper struct {
 
 	running bool
 	freed   bool
-	poller  *controller.Poller
+	poller  *internal.Poller
 	ticker  <-chan time.Time
 
 	nodeSource     instance.Plugin
@@ -205,7 +205,7 @@ func (r *reaper) updateSpec(spec types.Spec) error {
 	}
 
 	r.ticker = time.Tick(properties.ObserveInterval.Duration())
-	r.poller = controller.Poll(
+	r.poller = internal.Poll(
 		// This determines if the action should be taken when time is up
 		func() bool {
 			log.Debug("checking before poll", "V", debugV2)

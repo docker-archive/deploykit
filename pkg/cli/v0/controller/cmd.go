@@ -2,8 +2,8 @@ package controller
 
 import (
 	"github.com/docker/infrakit/pkg/cli"
-	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/spf13/cobra"
 )
 

@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/infrakit/pkg/controller"
 	enrollment "github.com/docker/infrakit/pkg/controller/enrollment/types"
+	"github.com/docker/infrakit/pkg/controller/internal"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/stack"
@@ -36,7 +37,7 @@ type enroller struct {
 	leader func() stack.Leadership
 	scope  scope.Scope
 
-	poller *controller.Poller
+	poller *internal.Poller
 	ticker <-chan time.Time
 	lock   sync.RWMutex
 
@@ -63,7 +64,7 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 	}
 	l.ticker = time.Tick(l.options.SyncInterval.Duration())
 
-	l.poller = controller.Poll(
+	l.poller = internal.Poll(
 		// This determines if the action should be taken when time is up
 		func() bool {
 			isLeader := mustTrue(l.isLeader())
