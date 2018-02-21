@@ -62,7 +62,6 @@ type modelProperties struct {
 	WaitBeforeInstanceDestroy fsm.Tick
 	WaitBeforeReprovision     fsm.Tick
 	WaitBeforeCleanup         fsm.Tick
-	MaxSwarmNodeDownVisits    int // max visits to the swarm node down state
 	RmNodeBufferSize          int
 	RmInstanceBufferSize      int
 }
