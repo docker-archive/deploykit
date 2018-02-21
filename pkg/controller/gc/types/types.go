@@ -5,7 +5,6 @@ import (
 
 	"github.com/docker/infrakit/pkg/controller/internal"
 	logutil "github.com/docker/infrakit/pkg/log"
-	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/types"
@@ -52,23 +51,8 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	}, nil
 }
 
-// PluginSpec has information about the plugin
-type PluginSpec struct {
-	// Plugin is the name of the instance plugin
-	Plugin plugin.Name
-
-	// Labels are the labels to use when querying for instances. This is the namespace.
-	Labels map[string]string
-
-	// Properties is the properties to configure the instance with.
-	Properties *types.Any `json:",omitempty" yaml:",omitempty"`
-}
-
 // Properties is the schema of the configuration in the types.Spec.Properties
 type Properties struct {
-
-	// ObserveInterval is the polling interval for checking nodes and instances
-	ObserveInterval types.Duration
 
 	// Model is the workflow model to use
 	Model string
