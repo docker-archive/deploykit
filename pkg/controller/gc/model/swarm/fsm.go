@@ -33,8 +33,8 @@ const (
 	reap
 )
 
-// SwarmNodeFromDescription returns a docker node that is assumed to be attached as a Properties
-func SwarmNodeFromDescription(desc instance.Description) (swarm.Node, error) {
+// NodeFromDescription returns a docker node that is assumed to be attached as a Properties
+func NodeFromDescription(desc instance.Description) (swarm.Node, error) {
 	node := swarm.Node{}
 	if desc.Properties == nil {
 		return node, fmt.Errorf("no docker node information %v", desc)
@@ -108,7 +108,7 @@ func (m *model) New() fsm.FSM {
 
 func (m *model) FoundNode(fsm fsm.FSM, desc instance.Description) error {
 	// look at node's status - down, ready, etc.
-	node, err := SwarmNodeFromDescription(desc)
+	node, err := NodeFromDescription(desc)
 	if err != nil {
 		return err
 	}
