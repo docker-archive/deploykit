@@ -17,7 +17,7 @@ var (
 
 	debugV  = logutil.V(100)
 	debugV2 = logutil.V(500)
-	debugV3 = logutil.V(1000)
+	debugV3 = logutil.V(550)
 )
 
 // Backend is the admin / server interface

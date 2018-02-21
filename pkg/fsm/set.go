@@ -53,7 +53,7 @@ func (s *Set) Signal(signal Signal, instance ID, optionalData ...interface{}) er
 		return ErrUnknownSignal{Signal: signal}
 	}
 
-	log.Debug("Signal", "set", s.options.Name, "signal", signal, "instance", instance)
+	log.Debug("Signal", "set", s.options.Name, "signal", s.spec.SignalName(signal), "instance", instance)
 	s.events <- &event{instance: instance, signal: signal, data: optionalData}
 	return nil
 }
@@ -216,7 +216,7 @@ func (s *Set) handleAdd(tid int64, initial Index) error {
 		},
 	}
 
-	log.Debug("add: set deadline", "name", s.options.Name, "tid", tid, "id", id, "initial", initial)
+	log.Debug("add: set deadline", "name", s.options.Name, "tid", tid, "id", id, "initial", s.spec.StateName(initial))
 	if err := s.processDeadline(tid, new, initial); err != nil {
 		return err
 	}
@@ -289,7 +289,8 @@ func (s *Set) handleClockTick(tid int64) error {
 
 			} else if ttl != nil {
 
-				log.Debug("deadline exceeded", "name", s.options.Name, "tid", tid, "id", instance.id, "raise", ttl.Raise)
+				log.Error("deadline exceeded", "name", s.options.Name, "tid", tid, "id", instance.id,
+					"raise", s.spec.SignalName(ttl.Raise))
 
 				s.raise(tid, instance.id, ttl.Raise, instance.state)
 			}
@@ -320,18 +321,19 @@ func (s *Set) processDeadline(tid int64, instance *instance, state Index) error 
 			// in the queue and deadline is different now
 			log.Debug("deadline updating", "name", s.options.Name, "tid", tid,
 				"instance", instance.id, "deadline", instance.deadline,
-				"state", instance.index)
+				"deadline-queue-index", instance.index)
 			s.deadlines.update(instance)
 		} else {
 			log.Debug("deadline removing", "name", s.options.Name, "tid", tid,
 				"instance", instance.id, "deadline", instance.deadline,
-				"state", instance.index)
+				"deadline-queue-index", instance.index)
 			s.deadlines.remove(instance)
 		}
 	} else if instance.deadline > 0 {
 		// index == -1 means it's not in the queue yet and we have a deadline
 		log.Debug("deadline enqueuing", "name", s.options.Name, "tid", tid,
-			"instance", instance.id, "deadline", instance.deadline, "state", instance.index)
+			"instance", instance.id, "deadline", instance.deadline,
+			"deadline-queue-index", instance.index)
 		s.deadlines.enqueue(instance)
 	}
 
@@ -349,7 +351,8 @@ func (s *Set) processVisitLimit(tid int64, instance *instance, state Index) erro
 		if limit.Value > 0 && instance.visits[state] == limit.Value {
 
 			log.Debug("Max visit limit hit", "name", s.options.Name, "tid", tid,
-				"instance", instance.id, "state", instance.state, "raise", limit.Raise)
+				"instance", instance.id, "state", s.spec.StateName(instance.state),
+				"raise", s.spec.SignalName(limit.Raise))
 
 			s.raise(tid, instance.id, limit.Raise, instance.state)
 
@@ -363,7 +366,7 @@ func (s *Set) processVisitLimit(tid int64, instance *instance, state Index) erro
 func (s *Set) raise(tid int64, id ID, signal Signal, current Index) (err error) {
 	defer func() {
 		log.Debug("instance.signal", "name", s.options.Name, "instance", id,
-			"signal", signal, "state", current, "err", err)
+			"signal", s.spec.SignalName(signal), "state", s.spec.StateName(current), "err", err)
 	}()
 
 	if _, has := s.spec.signals[signal]; !has {
@@ -396,8 +399,11 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 	}
 
 	log.Debug("Transition", "name", s.options.Name, "tid", tid,
-		"instance", instance.id, "state", current, "signal", event.signal, "next", next,
-		"deadline", instance.deadline, "index", instance.index)
+		"instance", instance.id,
+		"state", s.spec.StateName(current),
+		"signal", s.spec.SignalName(event.signal),
+		"next", s.spec.StateName(next),
+		"deadline", instance.deadline, "fsm-index", instance.index)
 
 	// any flap detection?
 	limit := s.spec.flap(current, next)

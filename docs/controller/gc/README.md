@@ -44,6 +44,19 @@ Start infrakit:
 ```
 infrakit use gc start
 ```
+This starts up the manager as `mystack` and the gc controller, a simulator plugin simulating Docker instances (Nodes),
+a simulator plugin simulating vm instances (Instances).
+
+Now commit the configuration for garbage collection:
+
+```
+infrakit local mystack/gc commit -y ./gc.yml
+```
+
+This will start the garbage collector (gc) controller in the infrakit process started earlier.  Now we can
+simulate provisioning of vm instances (via the `vm/compute` instance plugin) and installation of Docker engines
+(via the `docker/compute` instance plugin).  We can then remove the instances to simulate removing the Docker engine
+or terminating the vm instance and watch the garbage collector go to work.
 
 Provision and Install Docker
 
@@ -76,3 +89,17 @@ ID                            	LOGICAL                       	TAGS              
 ```
 So this represents some state of the cluster where we have an instance running a node that are associated together
 via the link label.  This allows us correlate physical resources with entities in a cluster.
+
+At this point, you may want to watch the instance plugins. In separate windows:
+
+```
+watch -d infrakit local vm/compute describe
+```
+This will list all the vm instances.
+
+```
+watch -d infrakit local docker/compute describe -p --properties-view {{.Properties.status.state}}
+```
+The `properties-view` expression will select the simulated Docker node state (e.g. `ready`, `down`)
+
+

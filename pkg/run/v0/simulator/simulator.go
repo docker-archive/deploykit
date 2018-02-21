@@ -101,7 +101,7 @@ func Run(scope scope.Scope, name plugin.Name,
 		impls[run.Instance] = instanceMap
 	}
 	for _, n := range options.InstanceTypes {
-		instanceMap[n] = NewInstance(n, options)
+		instanceMap[n] = NewInstance(name, n, options)
 	}
 
 	l4Map := map[string]loadbalancer.L4{}

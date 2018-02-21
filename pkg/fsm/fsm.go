@@ -218,8 +218,14 @@ func (s *Spec) error(current Index, signal Signal) (next Index, err error) {
 // transition takes the fsm from a current state, with given signal, to the next state.
 // returns error if the transition is not possible.
 func (s *Spec) transition(current Index, signal Signal) (next Index, action Action, err error) {
+
+	next = -1
 	defer func() {
-		log.Debug("transition:", "current", current, "signal", signal, "next", next, "action", action, "err", err)
+		log.Debug("transition:",
+			"current", s.StateName(current),
+			"signal", s.SignalName(signal),
+			"next", s.StateName(next),
+			"action", action, "err", err)
 	}()
 
 	state, has := s.states[current]

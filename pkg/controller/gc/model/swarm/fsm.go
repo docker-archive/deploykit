@@ -33,8 +33,8 @@ const (
 	reap
 )
 
-// NodeFromDescription returns a docker node that is assumed to be attached as a Properties
-func NodeFromDescription(desc instance.Description) (swarm.Node, error) {
+// SwarmNodeFromDescription returns a docker node that is assumed to be attached as a Properties
+func SwarmNodeFromDescription(desc instance.Description) (swarm.Node, error) {
 	node := swarm.Node{}
 	if desc.Properties == nil {
 		return node, fmt.Errorf("no docker node information %v", desc)
@@ -62,6 +62,7 @@ type modelProperties struct {
 	WaitBeforeInstanceDestroy fsm.Tick
 	WaitBeforeReprovision     fsm.Tick
 	WaitBeforeCleanup         fsm.Tick
+	MaxSwarmNodeDownVisits    int // max visits to the swarm node down state
 	RmNodeBufferSize          int
 	RmInstanceBufferSize      int
 }
@@ -107,13 +108,14 @@ func (m *model) New() fsm.FSM {
 
 func (m *model) FoundNode(fsm fsm.FSM, desc instance.Description) error {
 	// look at node's status - down, ready, etc.
-	node, err := NodeFromDescription(desc)
+	node, err := SwarmNodeFromDescription(desc)
 	if err != nil {
 		return err
 	}
 
 	if node.Status.State != swarm.NodeStateReady {
 		fsm.Signal(dockerNodeDown)
+		log.Error("swarm node down", "node", node)
 		return nil
 	}
 
@@ -122,10 +124,17 @@ func (m *model) FoundNode(fsm fsm.FSM, desc instance.Description) error {
 			switch node.ManagerStatus.Reachability {
 			case swarm.ReachabilityReachable:
 				fsm.Signal(dockerNodeReady)
+				return nil
 			default:
 				fsm.Signal(dockerNodeDown)
+				log.Error("swarm manager node down", "node", node)
+				return nil
 			}
 		}
+	}
+
+	if node.Status.State == swarm.NodeStateReady {
+		fsm.Signal(dockerNodeReady)
 	}
 
 	return fmt.Errorf("unknown state in node %v, no signals triggered", node)
@@ -242,7 +251,6 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 			TTL:   fsm.Expiry{modelProperties.WaitBeforeInstanceDestroy, reap},
 			Transitions: map[fsm.Signal]fsm.Index{
 				dockerNodeReady: swarmNode, // late joiner
-				dockerNodeDown:  swarmNode,
 				instanceGone:    removedInstance,
 				reap:            removedInstance,
 			},

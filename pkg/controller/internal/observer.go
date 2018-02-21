@@ -121,6 +121,11 @@ func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadershi
 	return nil
 }
 
+// KeyOf returns the key of the instance based on the key extractor configured here
+func (o *InstanceObserver) KeyOf(instance instance.Description) (string, error) {
+	return o.extractKey(instance)
+}
+
 // Start starts the observations
 func (o *InstanceObserver) Start() {
 	o.lock.Lock()

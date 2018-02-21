@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 
+	"github.com/docker/infrakit/pkg/controller/internal"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
@@ -34,17 +35,17 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	return depends.Runnables{
 		depends.AsRunnable(
 			types.Spec{
-				Kind: properties.InstanceSource.Plugin.Lookup(),
+				Kind: properties.InstanceObserver.Plugin.Lookup(),
 				Metadata: types.Metadata{
-					Name: properties.InstanceSource.Plugin.String(),
+					Name: properties.InstanceObserver.Plugin.String(),
 				},
 			},
 		),
 		depends.AsRunnable(
 			types.Spec{
-				Kind: properties.NodeSource.Plugin.Lookup(),
+				Kind: properties.NodeObserver.Plugin.Lookup(),
 				Metadata: types.Metadata{
-					Name: properties.NodeSource.Plugin.String(),
+					Name: properties.NodeObserver.Plugin.String(),
 				},
 			},
 		),
@@ -75,24 +76,11 @@ type Properties struct {
 	// ModelProperties contains model-specific configurations
 	ModelProperties *types.Any
 
-	// InstanceSource is the name of the instance plugin which will receive the
-	// synchronization messages of provision / destroy based on the
-	// changes in the List
-	InstanceSource PluginSpec
+	// InstanceObserver is the observer of 'instances' side
+	InstanceObserver internal.InstanceObserver
 
-	// InstanceKeySelector is a string template for selecting the join key from
-	// an instance's instance.Description. This selector template should use escapes
-	// so that the template {{ and }} are preserved.  For example,
-	// SourceKeySelector: \{\{ .ID \}\}  # selects the ID field.
-	InstanceKeySelector string
-
-	// NodeSource is the name of the instance plugin which will get info on the cluster 'nodes' such
-	// as swarm engine or k8s kublets.
-	NodeSource PluginSpec
-
-	// NodeKeySelector is a string template for selecting the join key from
-	// a node's instance.Description.
-	NodeKeySelector string
+	// NodeObserver is the observer of the 'node' side
+	NodeObserver internal.InstanceObserver
 }
 
 // Validate validates the input properties

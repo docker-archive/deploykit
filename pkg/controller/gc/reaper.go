@@ -19,11 +19,12 @@ import (
 
 type stateMachine struct {
 	fsm.FSM
+	*fsm.Spec
 }
 
 func (f stateMachine) MarshalJSON() ([]byte, error) {
 	any, err := types.AnyValue(map[string]interface{}{
-		"state": f.State(),
+		"state": f.StateName(f.State()),
 	})
 	if err != nil {
 		return nil, err
@@ -32,10 +33,10 @@ func (f stateMachine) MarshalJSON() ([]byte, error) {
 }
 
 type item struct {
-	link     string
-	instance instance.Description
-	node     instance.Description
-	fsm      stateMachine
+	Link     string
+	Instance instance.Description
+	Node     instance.Description
+	FSM      stateMachine
 }
 
 type reaper struct {
@@ -49,19 +50,16 @@ type reaper struct {
 	scope  scope.Scope
 	model  Model
 
-	nodes     []instance.Description // last observation
-	instances []instance.Description // last observation
-
-	nodeKeyExtractor     func(instance.Description) (string, error)
-	instanceKeyExtractor func(instance.Description) (string, error)
+	nodeObserver     *internal.InstanceObserver
+	instanceObserver *internal.InstanceObserver
 
 	running bool
 	freed   bool
 	poller  *internal.Poller
 	ticker  <-chan time.Time
 
-	nodeSource     instance.Plugin
-	instanceSource instance.Plugin
+	nodes     instance.Plugin
+	instances instance.Plugin
 
 	lock sync.RWMutex
 }
@@ -84,6 +82,10 @@ func (r *reaper) object() (*types.Object, error) {
 		return nil, err
 	}
 
+	r.spec.Metadata.Identity = &types.Identity{
+		ID: r.spec.Metadata.Name,
+	}
+
 	object := types.Object{
 		Spec:  r.spec,
 		State: snapshot,
@@ -96,17 +98,28 @@ func (r *reaper) Start() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	if r.poller != nil {
-		ctx := context.Background()
+	r.start()
+}
 
-		r.model.Start()
-		log.Info("model started")
+func (r *reaper) start() {
+	ctx := context.Background()
 
-		go r.poller.Run(ctx)
-		go r.gc(ctx)
+	r.model.Start()
+	log.Info("model started")
 
-		r.running = true
-	}
+	go r.instanceObserver.Start()
+	log.Info("instance started")
+
+	go r.nodeObserver.Start()
+	log.Info("node started")
+
+	go r.gc(ctx)
+	log.Info("gc started")
+
+	go r.processObservations(ctx)
+	log.Info("processing observations")
+
+	r.running = true
 }
 
 // Running returns true if reaper is running
@@ -121,9 +134,8 @@ func (r *reaper) Stop() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	if r.poller != nil {
-		r.poller.Stop()
-	}
+	r.instanceObserver.Stop()
+	r.nodeObserver.Stop()
 	return nil
 }
 
@@ -133,12 +145,15 @@ func (r *reaper) Plan(controller.Operation, types.Spec) (*types.Object, *control
 }
 
 func (r *reaper) Enforce(spec types.Spec) (*types.Object, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	log.Debug("Enforce", "spec", spec, "V", debugV)
 
 	if err := r.updateSpec(spec); err != nil {
 		return nil, err
 	}
-	r.Start()
+	r.start()
 	return r.object()
 }
 
@@ -149,9 +164,11 @@ func (r *reaper) Inspect() (*types.Object, error) {
 }
 
 func (r *reaper) Pause() (*types.Object, error) {
-	if r.Running() {
-		r.Stop()
-	}
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.instanceObserver.Pause(true)
+	r.nodeObserver.Pause(true)
 	return r.Inspect()
 }
 
@@ -172,65 +189,48 @@ func (r *reaper) updateSpec(spec types.Spec) error {
 		return err
 	}
 
-	r.properties = properties
-
 	ctx := context.Background()
 	if err := properties.Validate(ctx); err != nil {
 		return err
 	}
-
-	r.nodeKeyExtractor = internal.KeyExtractor(properties.NodeKeySelector)
-	r.instanceKeyExtractor = internal.KeyExtractor(properties.InstanceKeySelector)
 
 	model, err := model(properties)
 	if err != nil {
 		return err
 	}
 
-	r.nodeSource = instance_plugin.LazyConnect(
+	instanceObserver := properties.InstanceObserver
+	if err := instanceObserver.Init(r.scope, r.leader, r.options.PluginRetryInterval.Duration()); err != nil {
+		return err
+	}
+
+	nodeObserver := properties.NodeObserver
+	if err := nodeObserver.Init(r.scope, r.leader, r.options.PluginRetryInterval.Duration()); err != nil {
+		return err
+	}
+
+	r.instanceObserver = &instanceObserver
+	r.nodeObserver = &nodeObserver
+
+	r.instances = instance_plugin.LazyConnect(
 		func() (instance.Plugin, error) {
-			return r.scope.Instance(properties.NodeSource.Plugin.String())
+			return r.scope.Instance(r.instanceObserver.Plugin.String())
 		},
 		r.options.PluginRetryInterval.Duration())
-	r.instanceSource = instance_plugin.LazyConnect(
+	r.nodes = instance_plugin.LazyConnect(
 		func() (instance.Plugin, error) {
-			return r.scope.Instance(properties.InstanceSource.Plugin.String())
+			return r.scope.Instance(r.nodeObserver.Plugin.String())
 		},
 		r.options.PluginRetryInterval.Duration())
 
-	r.spec = spec
 	// set identity
 	r.spec.Metadata.Identity = &types.Identity{
 		ID: r.spec.Metadata.Name,
 	}
-
-	r.ticker = time.Tick(properties.ObserveInterval.Duration())
-	r.poller = internal.Poll(
-		// This determines if the action should be taken when time is up
-		func() bool {
-			log.Debug("checking before poll", "V", debugV2)
-			isLeader := false
-			if r.leader != nil {
-				v, err := r.leader().IsLeader()
-				if err == nil {
-					isLeader = v
-				}
-			}
-			log.Debug("polling", "isLeader", isLeader, "V", debugV2, "freed", r.freed)
-			return isLeader && !r.freed
-		},
-		// This does the work
-		func() (err error) {
-			ctx := context.Background()
-			return r.pollAndSignal(ctx)
-		},
-		r.ticker)
-
-	log.Info("poller", "poll", r.properties.ObserveInterval.Duration())
-
-	r.model = model
-
 	r.freed = false
+	r.properties = properties
+	r.model = model
+	r.spec = spec
 	return nil
 }
 
@@ -245,29 +245,13 @@ func (r *reaper) snapshot() (*types.Any, error) {
 	return types.AnyValue(view)
 }
 
-func (r *reaper) observe(ctx context.Context) (nodes []instance.Description,
-	instances []instance.Description, err error) {
-
-	log.Debug("observe start", "V", debugV)
-
-	nodes, err = r.nodeSource.DescribeInstances(r.properties.NodeSource.Labels, true)
-	if err != nil {
-		return
-	}
-
-	instances, err = r.instanceSource.DescribeInstances(r.properties.InstanceSource.Labels, true)
-
-	log.Debug("observe", "V", debugV, "nodes", nodes, "instances", instances)
-	return
-}
-
 func (r *reaper) getNodeDescription(i fsm.FSM) *instance.Description {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	for _, item := range r.items {
-		if item.fsm.ID() == i.ID() {
-			desc := item.node
+		if item.FSM.ID() == i.ID() {
+			desc := item.Node
 			return &desc
 		}
 	}
@@ -279,8 +263,8 @@ func (r *reaper) getInstanceDescription(i fsm.FSM) *instance.Description {
 	defer r.lock.RUnlock()
 
 	for _, item := range r.items {
-		if item.fsm.ID() == i.ID() {
-			desc := item.instance
+		if item.FSM.ID() == i.ID() {
+			desc := item.Instance
 			return &desc
 		}
 	}
@@ -307,7 +291,7 @@ func (r *reaper) gc(ctx context.Context) {
 
 			t := r.getNodeDescription(m)
 			if t != nil {
-				err := r.nodeSource.Destroy(t.ID, instance.Termination)
+				err := r.nodes.Destroy(t.ID, instance.Termination)
 
 				log.Debug("nodeDestroy", "id", t.ID, "node", t, "V", debugV)
 
@@ -324,7 +308,7 @@ func (r *reaper) gc(ctx context.Context) {
 
 			t := r.getInstanceDescription(m)
 			if t != nil {
-				err := r.instanceSource.Destroy(t.ID, instance.Termination)
+				err := r.instances.Destroy(t.ID, instance.Termination)
 
 				log.Debug("instanceDestroy", "id", t.ID, "instance", t, "V", debugV)
 
@@ -336,106 +320,106 @@ func (r *reaper) gc(ctx context.Context) {
 	}
 }
 
-func (r *reaper) pollAndSignal(ctx context.Context) error {
-	log.Debug("polling starts", "V", debugV)
+func (r *reaper) processObservations(ctx context.Context) {
+	nodes, instances := []instance.Description{}, []instance.Description{}
 
-	nodes, instances, err := r.observe(ctx)
-	if err != nil {
-		return err
+	for {
+		select {
+		case found, ok := <-r.nodeObserver.Observations():
+			if !ok {
+				return
+			}
+
+			for _, node := range found {
+				key, err := r.nodeObserver.KeyOf(node)
+				if err != nil {
+					continue // bad data but shouldn't halt everything else
+				}
+
+				found, has := r.items[key]
+				if !has {
+					r.items[key] = &item{
+						Link: key,
+						Node: node,
+						FSM:  stateMachine{r.model.New(), r.model.Spec()},
+					}
+				} else {
+					r.model.FoundNode(found.FSM, node)
+					found.Node = node
+
+					log.Debug("foundNode", "node", node, "V", debugV)
+				}
+			}
+
+			// differences for lost nodes
+			for _, lost := range instance.Difference(
+				instance.Descriptions(nodes), r.nodeObserver.KeyOf,
+				instance.Descriptions(found), r.nodeObserver.KeyOf,
+			) {
+
+				key, err := r.nodeObserver.KeyOf(lost)
+				if err != nil {
+					continue // bad data but shouldn't halt everything else
+				}
+
+				item, has := r.items[key]
+				if has {
+					r.model.LostNode(item.FSM)
+					delete(r.items, key)
+
+					log.Debug("lostNode", "node", lost, "key", key, "V", debugV)
+				}
+			}
+
+			nodes = found
+
+		case found, ok := <-r.instanceObserver.Observations():
+			if !ok {
+				return
+			}
+
+			for _, instance := range found {
+				key, err := r.instanceObserver.KeyOf(instance)
+				if err != nil {
+					continue // bad data but shouldn't halt everything else
+				}
+
+				found, has := r.items[key]
+				if !has {
+					r.items[key] = &item{
+						Link:     key,
+						Instance: instance,
+						FSM:      stateMachine{r.model.New(), r.model.Spec()},
+					}
+				} else {
+					r.model.FoundInstance(found.FSM, instance)
+					found.Instance = instance
+
+					log.Debug("foundInstance", "instance", instance, "V", debugV)
+				}
+			}
+
+			// differences for lost nodes
+			for _, lost := range instance.Difference(
+				instance.Descriptions(instances), r.instanceObserver.KeyOf,
+				instance.Descriptions(found), r.instanceObserver.KeyOf,
+			) {
+
+				key, err := r.instanceObserver.KeyOf(lost)
+				if err != nil {
+					continue // bad data but shouldn't halt everything else
+				}
+
+				item, has := r.items[key]
+				if has {
+					r.model.LostInstance(item.FSM)
+					delete(r.items, key)
+
+					log.Debug("lostInstance", "instance", lost, "key", key, "V", debugV)
+				}
+			}
+
+			instances = found
+		}
 	}
-
-	// update the observations for the next poll
-	defer func() {
-		r.instances = instances
-		r.nodes = nodes
-	}()
-
-	for _, instance := range instances {
-		key, err := r.instanceKeyExtractor(instance)
-		if err != nil {
-			continue // bad data but shouldn't halt everything else
-		}
-
-		found, has := r.items[key]
-		if !has {
-			r.items[key] = &item{
-				instance: instance,
-				fsm:      stateMachine{r.model.New()},
-			}
-		} else {
-			r.model.FoundInstance(found.fsm, instance)
-			found.instance = instance
-
-			log.Debug("foundInstance", "instance", instance, "V", debugV)
-		}
-	}
-
-	for _, node := range nodes {
-		key, err := r.nodeKeyExtractor(node)
-		if err != nil {
-			continue // bad data but shouldn't halt everything else
-		}
-
-		found, has := r.items[key]
-		if !has {
-			r.items[key] = &item{
-				node: node,
-				fsm:  stateMachine{r.model.New()},
-			}
-		} else {
-			r.model.FoundNode(found.fsm, node)
-			found.node = node
-
-			log.Debug("foundNode", "node", node, "V", debugV)
-		}
-	}
-
-	// compute the lost nodes / instances
-	if len(r.nodes) > 0 {
-
-		diff := instance.Difference(
-			instance.Descriptions(r.nodes), r.nodeKeyExtractor,
-			instance.Descriptions(nodes), r.nodeKeyExtractor)
-
-		for _, lost := range diff {
-
-			key, err := r.nodeKeyExtractor(lost)
-			if err != nil {
-				continue // bad data but shouldn't halt everything else
-			}
-
-			item, has := r.items[key]
-			if has {
-				r.model.LostNode(item.fsm)
-				delete(r.items, key)
-
-				log.Debug("lostNode", "node", lost, "key", key, "V", debugV)
-			}
-		}
-	}
-
-	if len(r.instances) > 0 {
-
-		diff := instance.Difference(
-			instance.Descriptions(r.instances), r.instanceKeyExtractor,
-			instance.Descriptions(instances), r.instanceKeyExtractor)
-
-		for _, lost := range diff {
-
-			key, err := r.instanceKeyExtractor(lost)
-			if err != nil {
-				continue // bad data but shouldn't halt everything else
-			}
-
-			item, has := r.items[key]
-			if has {
-				r.model.LostInstance(item.fsm)
-				delete(r.items, key)
-
-				log.Debug("lostInstance", "instance", lost, "key", key, "V", debugV)
-			}
-		}
-	}
-
-	return nil
 }

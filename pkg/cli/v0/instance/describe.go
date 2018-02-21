@@ -2,8 +2,10 @@ package instance
 
 import (
 	"os"
+	"sort"
 
 	"github.com/docker/infrakit/pkg/cli"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +38,10 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			return err
 		}
 
-		return services.Output(os.Stdout, desc, renderer)
+		instances := instance.Descriptions(desc)
+		sort.Sort(instances)
+
+		return services.Output(os.Stdout, []instance.Description(instances), renderer)
 	}
 	return describe
 }
