@@ -6,11 +6,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/CiscoUcs/UCS-Terraform/ucsclient"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
-	"github.com/micdoher/terraform-provider-ucs/ucsclient"
 )
 
 var log = logutil.New("module", "cli/x")
