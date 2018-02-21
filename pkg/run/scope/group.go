@@ -1,20 +1,15 @@
 package scope
 
 import (
-	group_controller "github.com/docker/infrakit/pkg/controller/group"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc "github.com/docker/infrakit/pkg/rpc/group"
 	"github.com/docker/infrakit/pkg/spi/group"
 )
 
-// Group implements lookup for Group plugin
-func (f fullScope) _Group(name string) (group.Plugin, error) {
-	return DefaultGroupResolver(f)(name)
-}
-
+// Group resolves a name to a group Plugin
 func (f fullScope) Group(name string) (group.Plugin, error) {
-	return group_controller.LazyConnect(
+	return group.LazyConnect(
 		func() (group.Plugin, error) {
 			log.Debug("looking up group backend", "name", name)
 			return DefaultGroupResolver(f)(name)

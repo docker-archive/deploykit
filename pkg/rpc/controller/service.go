@@ -3,12 +3,12 @@ package controller
 import (
 	"net/http"
 
-	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/internal"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/types"
 )
 

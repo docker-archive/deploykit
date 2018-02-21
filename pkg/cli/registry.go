@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/rpc"
 	"github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/spf13/cobra"
 )

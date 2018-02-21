@@ -1,14 +1,11 @@
-package controller
+package internal
 
 import (
 	"sync"
 	"time"
 
-	logutil "github.com/docker/infrakit/pkg/log"
 	"golang.org/x/net/context"
 )
-
-var log = logutil.New("module", "controller")
 
 // Poller is the entity that executes a unit of work at a predefined interval
 type Poller struct {
@@ -17,6 +14,7 @@ type Poller struct {
 	stop      chan interface{}
 	shouldRun func() bool
 	work      func() error
+	cleanup   func()
 	running   bool
 	lock      sync.Mutex
 }
@@ -30,6 +28,13 @@ func Poll(shouldRun func() bool, work func() error, ticker <-chan time.Time) *Po
 		shouldRun: shouldRun,
 		work:      work,
 	}
+}
+
+// PollWithCleanup creates a poller with a clean up function that is invoked after the poller stops terminally.
+func PollWithCleanup(shouldRun func() bool, work func() error, ticker <-chan time.Time, cleanup func()) *Poller {
+	p := Poll(shouldRun, work, ticker)
+	p.cleanup = cleanup
+	return p
 }
 
 // Err returns the errors encountered by the poller
@@ -64,6 +69,11 @@ func (p *Poller) Run(ctx context.Context) {
 		p.err = make(chan error, 2)
 	}
 
+	defer func() {
+		if p.cleanup != nil {
+			p.cleanup()
+		}
+	}()
 	for {
 
 		if p.shouldRun() {

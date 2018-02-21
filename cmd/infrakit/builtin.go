@@ -6,6 +6,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/combo"
 	_ "github.com/docker/infrakit/pkg/run/v0/enrollment"
 	_ "github.com/docker/infrakit/pkg/run/v0/file"
+	_ "github.com/docker/infrakit/pkg/run/v0/gc"
 	_ "github.com/docker/infrakit/pkg/run/v0/group"
 	_ "github.com/docker/infrakit/pkg/run/v0/image"
 	_ "github.com/docker/infrakit/pkg/run/v0/ingress"

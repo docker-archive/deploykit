@@ -3,10 +3,10 @@ package scope
 import (
 	"time"
 
-	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/plugin"
 	rpc "github.com/docker/infrakit/pkg/rpc/controller"
+	"github.com/docker/infrakit/pkg/spi/controller"
 )
 
 const defaultPluginPollInterval = 2 * time.Second

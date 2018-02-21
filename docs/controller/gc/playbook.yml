@@ -1,0 +1,9 @@
+
+# Start infrakit
+start : start.sh
+
+# Create a single swarm node
+install-docker: fake-install-docker.yml
+
+# Create a vm instance
+provision-vm: fake-provision-vm.yml

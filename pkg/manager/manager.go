@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/leader"
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
@@ -495,7 +495,7 @@ func (m *manager) execPlugins(config globalSpec,
 
 		// TODO(chungers) ==> temporary
 		switch k.Kind {
-		case "ingress", "enrollment":
+		case "ingress", "enrollment", "gc":
 
 			cp, err := m.scope.Controller(r.Handler.String())
 			if err != nil {
@@ -510,7 +510,7 @@ func (m *manager) execPlugins(config globalSpec,
 					return controllerWork(cp, r.Spec)
 				},
 			}
-			log.Debug("queued operation for ingress/enrollment", "key", k, "record", r, "V", debugV)
+			log.Debug("queued operation for controller", "key", k, "record", r, "V", debugV)
 
 		case "group": // not ideal to use string here.
 			id := group.ID(k.Name)

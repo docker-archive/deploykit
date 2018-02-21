@@ -6,6 +6,7 @@ import (
 	"time"
 
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/store"
 	"github.com/docker/infrakit/pkg/store/file"
@@ -20,8 +21,9 @@ const (
 )
 
 // NewInstance returns a typed instance plugin
-func NewInstance(name string, options Options) instance.Plugin {
+func NewInstance(pname plugin.Name, name string, options Options) instance.Plugin {
 	l := &instanceSimulator{
+		plugin:  pname,
 		name:    name,
 		options: options,
 	}
@@ -33,7 +35,7 @@ func NewInstance(name string, options Options) instance.Plugin {
 		l.instances = mem.NewStore(name)
 	}
 
-	log.Info("Simulator starting", "delay", options.StartDelay, "name", name)
+	log.Info("Simulator starting", "delay", options.StartDelay, "name", name, "plugin", pname)
 	go func() {
 		// Intentionally hold the lock for the duration of
 		// the delay to make the plugin unavailable
@@ -45,10 +47,10 @@ func NewInstance(name string, options Options) instance.Plugin {
 		for {
 			select {
 			case <-delay:
-				log.Info("Delay done. Continue", "name", name)
+				log.Info("Delay done. Continue", "name", name, "plugin", pname)
 				return
 			case <-time.Tick(1 * time.Second):
-				log.Info("Simulator starting up.", "name", name)
+				log.Info("Simulator starting up.", "name", name, "plugin", pname)
 			}
 		}
 	}()
@@ -57,6 +59,7 @@ func NewInstance(name string, options Options) instance.Plugin {
 }
 
 type instanceSimulator struct {
+	plugin    plugin.Name
 	name      string
 	instances store.KV
 	lock      sync.Mutex
@@ -65,13 +68,13 @@ type instanceSimulator struct {
 
 // Validate performs local validation on a provision request.
 func (s *instanceSimulator) Validate(req *types.Any) error {
-	instanceLogger.Debug("Validate", "req", req)
+	instanceLogger.Debug("Validate", "req", req, "plugin", s.plugin)
 	return nil
 }
 
 // Provision creates a new instance based on the spec.
 func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) {
-	instanceLogger.Debug("Provision", "name", s.name, "spec", spec, "V", debugV)
+	instanceLogger.Debug("Provision", "name", s.name, "spec", spec, "V", debugV, "plugin", s.plugin)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -103,13 +106,13 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 	}
 
 	err = s.instances.Write(description.ID, buff)
-	instanceLogger.Debug("Provisioned", "id", description.ID, "spec", spec, "err", err)
+	instanceLogger.Debug("Provisioned", "id", description.ID, "spec", spec, "err", err, "plugin", s.plugin)
 	return &description.ID, err
 }
 
 // Label labels the instance
 func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) error {
-	instanceLogger.Debug("Label", "name", s.name, "instance", key, "labels", labels, "V", debugV)
+	instanceLogger.Debug("Label", "name", s.name, "instance", key, "labels", labels, "V", debugV, "plugin", s.plugin)
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -149,7 +152,7 @@ func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) err
 
 // Destroy terminates an existing instance.
 func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Context) error {
-	instanceLogger.Debug("Destroy", "name", s.name, "instance", instance, "context", context, "V", debugV)
+	instanceLogger.Debug("Destroy", "name", s.name, "instance", instance, "context", context, "V", debugV, "plugin", s.plugin)
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -168,7 +171,7 @@ func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Conte
 // The properties flag indicates the client is interested in receiving details about each instance.
 func (s *instanceSimulator) DescribeInstances(labels map[string]string,
 	properties bool) ([]instance.Description, error) {
-	instanceLogger.Debug("DescribeInstances", "name", s.name, "labels", labels, "V", debugV)
+	instanceLogger.Debug("DescribeInstances", "name", s.name, "labels", labels, "V", debugV, "plugin", s.plugin)
 
 	s.lock.Lock()
 	defer s.lock.Unlock()

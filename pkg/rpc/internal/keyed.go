@@ -11,7 +11,7 @@ import (
 
 var log = logutil.New("module", "rpc/internal")
 
-const debugV = logutil.V(600)
+const debugV = logutil.V(1000)
 
 // ServeKeyed returns a map containing keyed rpc objects
 func ServeKeyed(listFunc func() (map[string]interface{}, error)) *Keyed {

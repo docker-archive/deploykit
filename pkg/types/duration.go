@@ -14,6 +14,24 @@ func (d Duration) Duration() time.Duration {
 	return time.Duration(d)
 }
 
+// AtLeast returns the a duration that is either greater or at least as long as the input
+func (d Duration) AtLeast(min time.Duration) time.Duration {
+	this := d.Duration()
+	if min > this {
+		return min
+	}
+	return this
+}
+
+// AtMost returns the a duration that is either less than or at most as long as the input
+func (d Duration) AtMost(max time.Duration) time.Duration {
+	this := d.Duration()
+	if max < this {
+		return max
+	}
+	return this
+}
+
 // FromDuration constructs a Duration from a time.Duration
 func FromDuration(d time.Duration) Duration {
 	return Duration(d)

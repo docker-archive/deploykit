@@ -4,8 +4,8 @@ import (
 	gsync "sync"
 	"time"
 
-	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
+	"github.com/docker/infrakit/pkg/controller/internal"
 	"github.com/docker/infrakit/pkg/core"
 	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -66,7 +66,7 @@ type managed struct {
 
 	// polling
 	ticker <-chan time.Time
-	poller *controller.Poller
+	poller *internal.Poller
 
 	groupClients     map[plugin.Name]group.Plugin
 	groupClientsLock gsync.RWMutex

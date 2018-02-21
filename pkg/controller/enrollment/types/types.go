@@ -3,10 +3,10 @@ package types
 import (
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/depends"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -145,7 +145,7 @@ type Options struct {
 	// be indexed, value values are "EnableDestroy" and "DisableDestroy
 	SourceParseErrPolicy string
 
-	// SourceKeySelector is a string template for selecting the join key from
+	// EnrollmentKeySelector is a string template for selecting the join key from
 	// a enrollment plugin's instance.Description.
 	EnrollmentKeySelector string
 

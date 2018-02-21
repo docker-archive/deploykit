@@ -1,10 +1,10 @@
 package manager
 
 import (
-	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/leader"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/stack"
@@ -17,7 +17,7 @@ var (
 
 	debugV  = logutil.V(100)
 	debugV2 = logutil.V(500)
-	debugV3 = logutil.V(1000)
+	debugV3 = logutil.V(550)
 )
 
 // Backend is the admin / server interface

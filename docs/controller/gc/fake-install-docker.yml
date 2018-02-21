@@ -1,0 +1,17 @@
+{{/* Input to create instance in the simulator */}}
+{{/* =% instanceProvision `docker/compute` %= */}}
+
+{{ $joinKey := flag "join-key" "string" "Join key" | prompt "Join key to label the Docker engine:" "string" }}
+{{ $state := flag "state" "string" "ready" | prompt "State of the Docker Swarm node (ready|down):" "string" }}
+Tags:
+  link : {{ $joinKey }} # note that this will be used as the join key in the gc.yml's NodeKeySelector
+  created: {{ now | htmlDate }}
+  user: {{ env `USER` }}
+  type: docker-engine
+
+Properties:
+  # properties here match swarm.Node struct
+  status:
+    state: {{$state}}
+  spec:
+    role: worker

@@ -3,10 +3,10 @@ package ingress
 import (
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/controller"
 	ingress "github.com/docker/infrakit/pkg/controller/ingress/types"
 	"github.com/docker/infrakit/pkg/controller/internal"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"

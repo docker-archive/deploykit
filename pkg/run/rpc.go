@@ -5,7 +5,6 @@ package run
 import (
 	"fmt"
 
-	"github.com/docker/infrakit/pkg/controller"
 	"github.com/docker/infrakit/pkg/discovery"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -21,6 +20,7 @@ import (
 	resource_rpc "github.com/docker/infrakit/pkg/rpc/resource"
 	"github.com/docker/infrakit/pkg/rpc/server"
 	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/flavor"
 	"github.com/docker/infrakit/pkg/spi/group"

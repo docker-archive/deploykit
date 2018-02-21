@@ -49,7 +49,13 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			func(w io.Writer, v interface{}) error {
 				fmt.Printf("%-10s  %-15s  %-15s\n", "KIND", "NAME", "ID")
 				for _, o := range objects {
-					fmt.Printf("%-10s  %-15s  %-15s\n", o.Spec.Kind, o.Spec.Metadata.Name, o.Spec.Metadata.Identity.ID)
+
+					id := "-"
+					if o.Spec.Metadata.Identity != nil {
+						id = o.Spec.Metadata.Identity.ID
+					}
+
+					fmt.Printf("%-10s  %-15s  %-15s\n", o.Spec.Kind, o.Spec.Metadata.Name, id)
 				}
 				return nil
 			})

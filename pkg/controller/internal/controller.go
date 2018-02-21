@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/docker/infrakit/pkg/controller"
 	logutil "github.com/docker/infrakit/pkg/log"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
-var log = logutil.New("module", "controller/internal")
-
-const debugV = logutil.V(500)
+var (
+	log     = logutil.New("module", "controller/internal")
+	debugV  = logutil.V(500)
+	debugV2 = logutil.V(900)
+)
 
 // ControlLoop gives status and means to stop the object
 type ControlLoop interface {
@@ -175,7 +177,13 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 
 			log.Debug("creating new object to replace running instance.")
 
-			// Create a new object
+			// Create a new object, update default identity
+			if spec.Metadata.Identity == nil {
+				spec.Metadata.Identity = &types.Identity{
+					ID: spec.Metadata.Name,
+				}
+			}
+
 			newManaged, err := c.alloc(spec)
 			if err != nil {
 				log.Error("cannot allocate a new managed object", "spec", spec, "err", err)

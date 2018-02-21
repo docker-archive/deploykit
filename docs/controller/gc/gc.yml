@@ -1,0 +1,27 @@
+kind: gc
+metadata:
+  name: swarm-gc  # socket file = nfs and the name of control loop is 'workers'
+properties:
+
+  Model: swarm # only workflow implemented at the moment
+
+  ModelProperties:
+    TickUnit:                  2s
+    NoData:                    20 # Deadline ticks for no matching node or instance to go into auto-gc
+    DockerNodeJoin:            10 # Deadline ticks for finding a matched docker node after finding an instance
+    WaitDescribeInstances:     5  # Deadline ticks for finding a matched instance after finding a docker node
+    WaitBeforeReprovision:     8  # After Docker Node Down, wait this many ticks before terminating instance
+    WaitBeforeInstanceDestroy: 2  # Another wait period after we are ready to terminate the instance
+    WaitBeforeCleanup:         5  # After removing instance, wait this long before removing docker node
+
+  # Observe instances
+  InstanceObserver:
+    Plugin: vm/compute
+    KeySelector: \{\{.Tags.link\}\}
+    ObserveInterval: 1s
+
+  # Observe nodes
+  NodeObserver:
+    Plugin: docker/compute
+    KeySelector: \{\{.Tags.link\}\}
+    ObserveInterval: 1s
