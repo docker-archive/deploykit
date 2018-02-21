@@ -23,7 +23,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
-	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/afero"
 )
 
@@ -84,6 +83,7 @@ type plugin struct {
 	pluginLookup    func() discovery.Plugins
 	envs            []string
 	cachedInstances *[]instance.Description
+	terraform       tf
 }
 
 // ImportResource defines a resource that should be imported
@@ -109,8 +109,19 @@ type ImportOptions struct {
 }
 
 // NewTerraformInstancePlugin returns an instance plugin backed by disk files.
-func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *ImportOptions, pretend bool) (instance.Plugin, error) {
-	logger.Info("NewTerraformInstancePlugin", "dir", options.Dir)
+func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *ImportOptions) (instance.Plugin, error) {
+	return newPlugin(options, importOpts, false, terraformLookup)
+}
+
+// newPlugin is the internal function that returns an instance plugin backed by disk files. This function
+// allows us to override the pretend flag for testing.
+func newPlugin(
+	options terraform_types.Options,
+	importOpts *ImportOptions,
+	pretend bool,
+	tfLookup func(string, []string) (tf, error)) (instance.Plugin, error) {
+
+	logger.Info("newPlugin", "dir", options.Dir)
 
 	var pluginLookup func() discovery.Plugins
 	if !options.Standalone {
@@ -125,13 +136,20 @@ func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *Imp
 			return plugins
 		}
 	}
-	// // Environment varables to include when invoking terraform
+	// Environment varables to include when invoking terraform
 	envs, err := options.ParseOptionsEnvs()
 	if err != nil {
-		logger.Error("NewTerraformInstancePlugin",
+		logger.Error("newPlugin",
 			"msg", "error parsing configuration Env Options",
 			"err", err)
 		return nil, err
+	}
+	tf, err := tfLookup(options.Dir, envs)
+	if err != nil {
+		logger.Error("newPlugin",
+			"msg", "error looking up terraform",
+			"err", err)
+		panic(err)
 	}
 	p := plugin{
 		Dir:          options.Dir,
@@ -140,15 +158,13 @@ func NewTerraformInstancePlugin(options terraform_types.Options, importOpts *Imp
 		pluginLookup: pluginLookup,
 		envs:         envs,
 		pretend:      pretend,
+		terraform:    tf,
 	}
 	if err := p.processImport(importOpts); err != nil {
 		panic(err)
 	}
 	// Populate the instance cache
-	fns := describeFns{
-		tfShow: p.doTerraformShow,
-	}
-	p.refreshNilInstanceCache(fns)
+	p.refreshNilInstanceCache()
 	// Ensure that tha apply goroutine is always running; it will only run "terraform apply"
 	// if the current node is the leader. However, when leadership changes, a Provision is
 	// not guaranteed to be executed so we need to create the goroutine now.
@@ -187,14 +203,7 @@ func (p *plugin) processImport(importOpts *ImportOptions) error {
 		}
 	}
 
-	// Define the functions for import and import the VM
-	fns := importFns{
-		tfShow:     p.doTerraformShow,
-		tfImport:   p.doTerraformImport,
-		tfShowInst: p.doTerraformShowForInstance,
-		tfClean:    p.cleanupFailedImport,
-	}
-	err := p.importResources(fns, importOpts.Resources, importOpts.InstanceSpec)
+	err := p.importResources(importOpts.Resources, importOpts.InstanceSpec)
 	if err != nil {
 		logger.Error("processImport", "msg", "Failed to import instances", "error", err)
 		return err
@@ -1146,25 +1155,17 @@ func parseAttachTag(tf *TFormat) ([]string, error) {
 	return []string{}, nil
 }
 
-// External functions using during describe; broken out for testing
-type describeFns struct {
-	tfShow func(resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
-}
-
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-	fns := describeFns{
-		tfShow: p.doTerraformShow,
-	}
-	return p.doDescribeInstances(fns, tags, properties)
+	return p.doDescribeInstances(tags, properties)
 }
 
 // doDescribeInstances returns descriptions of all instances matching all of the provided tags.
-func (p *plugin) doDescribeInstances(fns describeFns, tags map[string]string, properties bool) ([]instance.Description, error) {
+func (p *plugin) doDescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
 	logger.Debug("DescribeInstances", "tags", tags, "V", debugV1)
 	// The cache may have been nil-ified, check and refresh
 	if p.isCacheNil() {
-		p.refreshNilInstanceCache(fns)
+		p.refreshNilInstanceCache()
 	}
 	// Should have a cache, acquire read lock
 	p.fsLock.RLock()
@@ -1209,7 +1210,7 @@ func (p *plugin) clearCachedInstances() {
 }
 
 // refreshNilInstanceCache re-populates the cache if it is nil
-func (p *plugin) refreshNilInstanceCache(fns describeFns) {
+func (p *plugin) refreshNilInstanceCache() {
 	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
 	if p.cachedInstances != nil {
@@ -1241,7 +1242,7 @@ func (p *plugin) refreshNilInstanceCache(fns describeFns) {
 		resFilter = append(resFilter, resType)
 	}
 	if len(resFilter) > 0 {
-		if result, err := fns.tfShow(resFilter, nil); err == nil {
+		if result, err := p.terraform.doTerraformShow(resFilter, nil); err == nil {
 			terraformShowResult = result
 		} else {
 			logger.Warn("refreshCachedInstances", "terraform show error", err)
@@ -1356,17 +1357,9 @@ func terraformLogicalID(props TResourceProperties) *instance.LogicalID {
 	return nil
 }
 
-// External functions using during import; broken out for testing
-type importFns struct {
-	tfShow     func(resTypes []TResourceType, propFilter []string) (map[TResourceType]map[TResourceName]TResourceProperties, error)
-	tfImport   func(resType TResourceType, filename, resID string) error
-	tfShowInst func(id string) (TResourceProperties, error)
-	tfClean    func(resType TResourceType, resName string)
-}
-
 // importResource imports the resource with the given ID into terraform and creates a
 // .tf.json.new file based on the given spec
-func (p *plugin) importResources(fns importFns, resources []*ImportResource, spec *instance.Spec) error {
+func (p *plugin) importResources(resources []*ImportResource, spec *instance.Spec) error {
 	// Acquire lock since we are creating a tf.json.new file and updating terraform state
 	p.fsLock.Lock()
 	defer p.fsLock.Unlock()
@@ -1412,7 +1405,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	for resType := range showResourceTypesMap {
 		showResourceTypes = append(showResourceTypes, resType)
 	}
-	existingResources, err := fns.tfShow(showResourceTypes, []string{"id"})
+	existingResources, err := p.terraform.doTerraformShow(showResourceTypes, []string{"id"})
 	if err != nil {
 		return err
 	}
@@ -1496,7 +1489,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 			"msg",
 			fmt.Sprintf("Importing %v %v into terraform as resource %v ...", string(*r.ResourceType), string(*r.ResourceID), string(r.FinalResourceName)))
 		r.SuccessfullyImported = true
-		if err = fns.tfImport(*r.ResourceType, string(r.FinalResourceName), *r.ResourceID); err != nil {
+		if err = p.terraform.doTerraformImport(p.fs, *r.ResourceType, string(r.FinalResourceName), *r.ResourceID, true); err != nil {
 			errorToThrow = err
 			break
 		}
@@ -1505,7 +1498,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	// Parse the terraform show output
 	if errorToThrow == nil {
 		for _, r := range resources {
-			importedProps, err := fns.tfShowInst(fmt.Sprintf("%v.%v", string(*r.ResourceType), r.FinalResourceName))
+			importedProps, err := p.terraform.doTerraformShowForInstance(fmt.Sprintf("%v.%v", string(*r.ResourceType), r.FinalResourceName))
 			if err != nil {
 				errorToThrow = err
 				break
@@ -1547,7 +1540,7 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	if errorToThrow != nil {
 		for _, r := range resources {
 			if r.SuccessfullyImported {
-				fns.tfClean(*r.ResourceType, string(r.FinalResourceName))
+				p.terraform.doTerraformStateRemove(*r.ResourceType, string(r.FinalResourceName))
 			}
 		}
 		for _, path := range paths {
@@ -1561,18 +1554,6 @@ func (p *plugin) importResources(fns importFns, resources []*ImportResource, spe
 	}
 
 	return p.terraformApply()
-}
-
-// cleanupFailedImport removes the resource from the terraform state file
-func (p *plugin) cleanupFailedImport(vmType TResourceType, vmName string) {
-	command := exec.Command(fmt.Sprintf("terraform state rm %v.%v", vmType, vmName)).
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start()
-	if err == nil {
-		command.Wait()
-	}
 }
 
 // writeTfJSONFilesForImport writes out the final tf.json[.new] file by grouping all
@@ -1864,16 +1845,4 @@ func determineFinalPropsForImport(res *ImportResource) {
 		}
 	}
 	res.FinalProps = finalProps
-}
-
-// doTerraformImport shells out to run `terraform import`
-func (p *plugin) doTerraformImport(resType TResourceType, resName, id string) error {
-	command := exec.Command(fmt.Sprintf("terraform import %v.%v %s", resType, resName, id)).
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
-		return err
-	}
-	return command.Wait()
 }

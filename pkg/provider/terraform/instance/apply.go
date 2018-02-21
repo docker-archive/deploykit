@@ -1,9 +1,7 @@
 package instance
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -16,7 +14,6 @@ import (
 	manager_discovery "github.com/docker/infrakit/pkg/manager/discovery"
 	ibmcloud_client "github.com/docker/infrakit/pkg/provider/ibmcloud/client"
 	"github.com/docker/infrakit/pkg/types"
-	"github.com/docker/infrakit/pkg/util/exec"
 	"github.com/spf13/afero"
 )
 
@@ -55,18 +52,6 @@ func (p *plugin) terraformApply() error {
 			// Conditionally apply terraform
 			if p.shouldApply() {
 				fns := tfFuncs{
-					tfRefresh: func() error {
-						command := exec.Command("terraform refresh").
-							InheritEnvs(true).
-							WithEnvs(p.envs...).
-							WithDir(p.Dir)
-						if err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start(); err != nil {
-							return err
-						}
-						return command.Wait()
-					},
-					tfStateList:         p.doTerraformStateList,
-					tfImport:            p.doTerraformImport,
 					getExistingResource: p.getExistingResource,
 				}
 				// The trigger for an apply is typically from a group commit, sleep for a few seconds so
@@ -90,7 +75,7 @@ func (p *plugin) terraformApply() error {
 					}
 				}
 				if err := p.handleFiles(fns); err == nil {
-					if err = p.doTerraformApply(); err == nil {
+					if err = p.terraform.doTerraformApply(); err == nil {
 						// Goroutine was interrupted, this likely means that there was a file change; now that
 						// apply is finished we want to clear the cache since we expect a delta
 						if initial {
@@ -130,20 +115,6 @@ func (p *plugin) terraformApply() error {
 	return nil
 }
 
-// doTerraformApply executes "terraform apply"
-func (p *plugin) doTerraformApply() error {
-	logger.Info("doTerraformApply", "msg", "Applying plan")
-	command := exec.Command("terraform apply -refresh=false").
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	err := command.WithStdout(os.Stdout).WithStderr(os.Stdout).Start()
-	if err == nil {
-		return command.Wait()
-	}
-	return err
-}
-
 // shouldApply returns true if "terraform apply" should execute; this happens if
 // either the plugin is configured to be standalone or if the associated manager
 // plugin is the current leader.
@@ -172,9 +143,6 @@ func (p *plugin) shouldApply() bool {
 
 // External functions to use during when pruning files; broken out for testing
 type tfFuncs struct {
-	tfRefresh           func() error
-	tfStateList         func() (map[TResourceType]map[TResourceName]struct{}, error)
-	tfImport            func(resType TResourceType, resName, resID string) error
 	getExistingResource func(resType TResourceType, resName TResourceName, props TResourceProperties) (*string, error)
 }
 
@@ -260,19 +228,19 @@ func (p *plugin) handleFiles(fns tfFuncs) error {
 
 	// Get the current resources, this must happen before a refresh so that we can
 	// identity orphans from an incomplete "apply"
-	tfStateResourcesBefore, err := fns.tfStateList()
+	tfStateResourcesBefore, err := p.terraform.doTerraformStateList()
 	if err != nil {
 		return err
 	}
 
 	// Refresh all resources, anything deleted from the backend will be removed
 	// from the state file
-	if err = fns.tfRefresh(); err != nil {
+	if err = p.terraform.doTerraformRefresh(); err != nil {
 		return err
 	}
 
 	// And now get the updated resources
-	tfStateResourcesAfter, err := fns.tfStateList()
+	tfStateResourcesAfter, err := p.terraform.doTerraformStateList()
 	if err != nil {
 		return err
 	}
@@ -446,14 +414,14 @@ func (p *plugin) handleFilePruning(
 							resName))
 					pruneFiles[resFilenameProps.FileName] = struct{}{}
 				} else {
-					// Import resource
+					// Import resource. Note that the input tf.json file is already on disk.
 					logger.Info("handleFilePruning",
 						"msg",
 						fmt.Sprintf("Importing %v %v into terraform as resource %v ...",
 							string(resType),
 							*importID,
 							string(resName)))
-					if err = fns.tfImport(resType, string(resName), *importID); err != nil {
+					if err = p.terraform.doTerraformImport(p.fs, resType, string(resName), *importID, false); err != nil {
 						return err
 					}
 				}
@@ -526,44 +494,4 @@ func (p *plugin) getExistingResource(resType TResourceType, resName TResourceNam
 	}
 	logger.Warn("getExistingResource", "msg", fmt.Sprintf("Unsupported VM type for backend retrival: %v", resType))
 	return nil, nil
-}
-
-// doTerraformStateList shells out to run `terraform state list` and parses the result
-func (p *plugin) doTerraformStateList() (map[TResourceType]map[TResourceName]struct{}, error) {
-	result := map[TResourceType]map[TResourceName]struct{}{}
-	command := exec.Command("terraform state list -no-color").
-		InheritEnvs(true).
-		WithEnvs(p.envs...).
-		WithDir(p.Dir)
-	command.StartWithHandlers(
-		nil,
-		func(r io.Reader) error {
-			reader := bufio.NewReader(r)
-			for {
-				lineBytes, _, err := reader.ReadLine()
-				if err != nil {
-					break
-				}
-				line := string(lineBytes)
-				logger.Debug("doTerraformStateList", "output", line, "V", debugV3)
-				// Every line should have <resource-type>.<resource-name>
-				if !strings.Contains(line, ".") {
-					logger.Error("doTerraformStateList", "msg", "Invalid line from 'terraform state list'", "line", line)
-					continue
-				}
-				split := strings.Split(strings.TrimSpace(line), ".")
-				resType := TResourceType(split[0])
-				resName := TResourceName(split[1])
-				if resourceMap, has := result[resType]; has {
-					resourceMap[resName] = struct{}{}
-				} else {
-					result[resType] = map[TResourceName]struct{}{resName: {}}
-				}
-			}
-			return nil
-		},
-		nil)
-
-	err := command.Wait()
-	return result, err
 }

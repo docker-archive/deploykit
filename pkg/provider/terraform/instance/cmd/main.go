@@ -107,7 +107,6 @@ func main() {
 				InstanceSpec: importInstSpec,
 				Resources:    resources,
 			},
-			false,
 		)
 		if err != nil {
 			log.Error("error initializing pluing", "err", err)
