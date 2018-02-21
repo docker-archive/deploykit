@@ -36,6 +36,7 @@ package grpc
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strings"
 	"sync"
@@ -45,6 +46,7 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/transport"
 )
@@ -86,22 +88,32 @@ var (
 // dialOptions configure a Dial call. dialOptions are set by the DialOption
 // values passed to Dial.
 type dialOptions struct {
-	unaryInt  UnaryClientInterceptor
-	streamInt StreamClientInterceptor
-	codec     Codec
-	cp        Compressor
-	dc        Decompressor
-	bs        backoffStrategy
-	balancer  Balancer
-	block     bool
-	insecure  bool
-	timeout   time.Duration
-	scChan    <-chan ServiceConfig
-	copts     transport.ConnectOptions
+	unaryInt   UnaryClientInterceptor
+	streamInt  StreamClientInterceptor
+	codec      Codec
+	cp         Compressor
+	dc         Decompressor
+	bs         backoffStrategy
+	balancer   Balancer
+	block      bool
+	insecure   bool
+	timeout    time.Duration
+	scChan     <-chan ServiceConfig
+	copts      transport.ConnectOptions
+	maxMsgSize int
 }
+
+const defaultClientMaxMsgSize = math.MaxInt32
 
 // DialOption configures how we set up the connection.
 type DialOption func(*dialOptions)
+
+// WithMaxMsgSize returns a DialOption which sets the maximum message size the client can receive.
+func WithMaxMsgSize(s int) DialOption {
+	return func(o *dialOptions) {
+		o.maxMsgSize = s
+	}
+}
 
 // WithCodec returns a DialOption which sets a codec for message marshaling and unmarshaling.
 func WithCodec(c Codec) DialOption {
@@ -249,6 +261,13 @@ func WithUserAgent(s string) DialOption {
 	}
 }
 
+// WithKeepaliveParams returns a DialOption that specifies keepalive paramaters for the client transport.
+func WithKeepaliveParams(kp keepalive.ClientParameters) DialOption {
+	return func(o *dialOptions) {
+		o.copts.KeepaliveParams = kp
+	}
+}
+
 // WithUnaryInterceptor returns a DialOption that specifies the interceptor for unary RPCs.
 func WithUnaryInterceptor(f UnaryClientInterceptor) DialOption {
 	return func(o *dialOptions) {
@@ -288,9 +307,18 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 		conns:  make(map[Address]*addrConn),
 	}
 	cc.ctx, cc.cancel = context.WithCancel(context.Background())
+	cc.dopts.maxMsgSize = defaultClientMaxMsgSize
 	for _, opt := range opts {
 		opt(&cc.dopts)
 	}
+
+	grpcUA := "grpc-go/" + Version
+	if cc.dopts.copts.UserAgent != "" {
+		cc.dopts.copts.UserAgent += " " + grpcUA
+	} else {
+		cc.dopts.copts.UserAgent = grpcUA
+	}
+
 	if cc.dopts.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, cc.dopts.timeout)
@@ -777,6 +805,8 @@ func (ac *addrConn) resetTransport(closeTransport bool) error {
 			Metadata: ac.addr.Metadata,
 		}
 		newTransport, err := transport.NewClientTransport(ctx, sinfo, ac.dopts.copts)
+		// Don't call cancel in success path due to a race in Go 1.6:
+		// https://github.com/golang/go/issues/15078.
 		if err != nil {
 			cancel()
 

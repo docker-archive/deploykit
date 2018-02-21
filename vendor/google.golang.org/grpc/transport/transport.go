@@ -45,8 +45,10 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
+	"golang.org/x/net/http2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/tap"
@@ -213,6 +215,11 @@ type Stream struct {
 	// the status received from the server.
 	statusCode codes.Code
 	statusDesc string
+	// rstStream indicates whether a RST_STREAM frame needs to be sent
+	// to the server to signify that this stream is closing.
+	rstStream bool
+	// rstError is the error that needs to be sent along with the RST_STREAM frame.
+	rstError http2.ErrCode
 }
 
 // RecvCompress returns the compression algorithm applied to the inbound
@@ -331,6 +338,12 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return
 }
 
+// GoString is implemented by Stream so context.String() won't
+// race when printing %#v.
+func (s *Stream) GoString() string {
+	return fmt.Sprintf("<stream: %p, %v>", s, s.method)
+}
+
 // The key to save transport.Stream in the context.
 type streamKey struct{}
 
@@ -385,6 +398,8 @@ type ConnectOptions struct {
 	PerRPCCredentials []credentials.PerRPCCredentials
 	// TransportCredentials stores the Authenticator required to setup a client connection.
 	TransportCredentials credentials.TransportCredentials
+	// KeepaliveParams stores the keepalive parameters.
+	KeepaliveParams keepalive.ClientParameters
 	// StatsHandler stores the handler for stats.
 	StatsHandler stats.Handler
 }
