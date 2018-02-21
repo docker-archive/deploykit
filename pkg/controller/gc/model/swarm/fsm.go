@@ -196,6 +196,13 @@ func (m *model) dockerNodeRm(i fsm.FSM) error {
 	return nil
 }
 
+func longer(a, b time.Duration) time.Duration {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
 func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 
@@ -213,11 +220,11 @@ func BuildModel(properties gc_types.Properties) (gc.Model, error) {
 		instanceDestroyChan: make(chan fsm.FSM, modelProperties.RmInstanceBufferSize),
 	}
 
-	// Take the longer of the 2 intervals so that the fsm operates on a slower clock.
-	d := model.modelProperties.TickUnit.Duration()
-	if d < model.ObserveInterval.Duration() {
-		d = model.ObserveInterval.Duration()
-	}
+	d := longer(model.modelProperties.TickUnit.Duration(), longer(
+		properties.NodeObserver.ObserveInterval.Duration(),
+		properties.InstanceObserver.ObserveInterval.Duration(),
+	))
+
 	model.tickSize = d
 	model.clock = fsm.Wall(time.Tick(d))
 
