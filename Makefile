@@ -54,7 +54,7 @@ get-tools:
 	@go get -u \
 		github.com/golang/lint/golint \
 		github.com/wfarner/blockcheck \
-		github.com/rancher/trash
+		github.com/golang/dep/cmd/dep
 
 vet:
 	@echo "+ $@"
@@ -201,7 +201,7 @@ test-full:
 
 vendor-update:
 	@echo "+ $@"
-	@trash -u
+	@dep ensure -update
 
 terraform-linux:
 	@echo "+ $@"
