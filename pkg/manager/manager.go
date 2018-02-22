@@ -495,7 +495,7 @@ func (m *manager) execPlugins(config globalSpec,
 
 		// TODO(chungers) ==> temporary
 		switch k.Kind {
-		case "ingress", "enrollment", "gc":
+		case "ingress", "enrollment", "gc", "resource":
 
 			cp, err := m.scope.Controller(r.Handler.String())
 			if err != nil {

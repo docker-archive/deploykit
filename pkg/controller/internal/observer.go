@@ -37,6 +37,9 @@ type InstanceObserver struct {
 	// observations is a channel to receive a slice of current observations
 	observations chan []instance.Description
 
+	// lost is a channel to receive a slice of instances that have been lost in the current sample since last
+	lost chan []instance.Description
+
 	// observe is a function that returns the latest observations
 	observe func() ([]instance.Description, error)
 
@@ -77,7 +80,10 @@ func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadershi
 		return instancePlugin.DescribeInstances(o.Labels, true)
 	}
 
-	o.observations = make(chan []instance.Description, 1)
+	o.observations = make(chan []instance.Description, 10)
+	o.lost = make(chan []instance.Description, 10)
+
+	last := []instance.Description{}
 
 	o.ticker = time.Tick(o.ObserveInterval.AtLeast(minObserveInterval))
 	o.poller = PollWithCleanup(
@@ -106,11 +112,20 @@ func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadershi
 				return err
 			}
 
+			// send the current observations
 			select {
 			case o.observations <- instances:
 			default:
 			}
 
+			// send the lost instances
+			lost := o.Difference(last, instances)
+			select {
+			case o.lost <- []instance.Description(lost):
+			default:
+			}
+
+			last = instances
 			return nil
 		},
 		o.ticker,
@@ -150,12 +165,18 @@ func (o *InstanceObserver) Stop() {
 
 	if o.poller != nil {
 		o.poller.Stop()
+		o.poller = nil
 	}
 }
 
 // Observations returns the channel to receive observations.  When stopped, the channel is closed.
 func (o *InstanceObserver) Observations() <-chan []instance.Description {
 	return o.observations
+}
+
+// Lost returns the channel to receive instances that are missing in the current sample from the last.
+func (o *InstanceObserver) Lost() <-chan []instance.Description {
+	return o.lost
 }
 
 // Difference computes the difference before and after samples

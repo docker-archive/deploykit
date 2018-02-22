@@ -1,0 +1,24 @@
+kind: resource
+metadata:
+  name: networking
+properties:
+  cloud1-net1:
+    plugin: cloud1/net
+    labels:
+      cloud: cloud1
+      type: network
+    ObserveInterval: 1s
+    KeySelector: \{\{.Tags.name\}\}
+    Properties:
+      cidr: 10.20.100.0/24
+      gateway: 10.20.0.1
+  cloud2-net1:
+    plugin: cloud2/net
+    labels:
+      cloud: cloud2
+      type: network
+    ObserveInterval: 1s
+    KeySelector: \{\{.Tags.name\}\}
+    Properties:
+      cidr: 192.178.100.0/24
+      gateway: 192.178.0.1

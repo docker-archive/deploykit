@@ -1,0 +1,274 @@
+package internal
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/docker/infrakit/pkg/fsm"
+	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/controller"
+	"github.com/docker/infrakit/pkg/spi/stack"
+	"github.com/docker/infrakit/pkg/types"
+)
+
+// stateMachine is a struct for a single state machine and its definition
+type stateMachine struct {
+	fsm.FSM
+	*fsm.Spec
+}
+
+func (f stateMachine) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + f.StateName(f.State()) + `"`), nil
+}
+
+// Item is an item in the collection.
+type Item struct {
+	Key        string
+	State      stateMachine
+	Properties map[string]interface{}
+}
+
+// Collection is a Managed that tracks a set of finite state machines.
+type Collection struct {
+
+	// PlanFunc returns a plan based on the intent
+	PlanFunc func(controller.Operation, types.Spec) (controller.Plan, error)
+
+	// StartFunc begins the actual processing. This will be started in a goroutine
+	StartFunc func(context.Context)
+
+	// UpdateSpecFunc is called when a new spec is posted.  This will be executed
+	// with exclusive lock on the collection.
+	UpdateSpecFunc func(types.Spec) error
+
+	// PauseFunc is called when the controller tries to pause.
+	PauseFunc func(bool)
+
+	// StopFunc is called when the collection is stopped terminally.
+	StopFunc func() error
+
+	// TerminateFunc is called when this collection is to be destroyed / terminated.
+	// This is not the same as Stop, which stops monitoring.
+	TerminateFunc func() error
+
+	spec  types.Spec
+	items map[string]*Item
+	stop  chan struct{}
+
+	leader func() stack.Leadership
+	scope  scope.Scope
+
+	running bool
+	freed   bool
+	poller  *Poller
+	ticker  <-chan time.Time
+
+	lock sync.RWMutex
+}
+
+// NewCollection returns a Managed controller object that represents a collection
+// of finite state machines (FSM).
+func NewCollection(scope scope.Scope, leader func() stack.Leadership) (*Collection, error) {
+	c := &Collection{
+		leader: leader,
+		scope:  scope,
+		items:  map[string]*Item{},
+		stop:   make(chan struct{}),
+	}
+	return c, nil
+}
+
+// Put puts an item by key
+func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]interface{}) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.items[k] = &Item{
+		Key:        k,
+		State:      stateMachine{fsm, spec},
+		Properties: data,
+	}
+}
+
+// Scope returns the scope the collection uses to access plugins
+func (c *Collection) Scope() scope.Scope {
+	return c.scope
+}
+
+// LeaderFunc returns the leadership lookup
+func (c *Collection) LeaderFunc() stack.Leadership {
+	return c.leader()
+}
+
+// Get returns an item by key. Nil if not present
+func (c *Collection) Get(k string) *Item {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	if i, has := c.items[k]; has {
+		copy := *i
+		return &copy
+	}
+	return nil
+}
+
+// object returns the state
+func (c *Collection) object() (*types.Object, error) {
+	snapshot, err := c.snapshot()
+	if err != nil {
+		return nil, err
+	}
+
+	c.spec.Metadata.Identity = &types.Identity{
+		ID: c.spec.Metadata.Name,
+	}
+
+	object := types.Object{
+		Spec:  c.spec,
+		State: snapshot,
+	}
+	return &object, nil
+}
+
+// Start starts the managed
+func (c *Collection) Start() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.start()
+}
+
+func (c *Collection) start() {
+	if c.StartFunc == nil {
+		return
+	}
+
+	log.Debug("starting collection", "V", debugV)
+
+	ctx := context.Background()
+	go c.StartFunc(ctx)
+
+	c.running = true
+}
+
+// Running returns true if managed is running
+func (c *Collection) Running() bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.running
+}
+
+func (c *Collection) Stop() error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	log.Debug("Stop", "V", debugV)
+
+	if c.Stop == nil {
+		return nil
+	}
+
+	return c.Stop()
+}
+
+func (c *Collection) Plan(v controller.Operation, s types.Spec) (*types.Object, *controller.Plan, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	log.Debug("Plan", "op", v, "spec", s, "V", debugV)
+
+	o, err := c.object()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if c.PlanFunc == nil {
+		return o, nil, err
+	}
+
+	p, err := c.PlanFunc(v, s)
+	return o, &p, err
+}
+
+func (c *Collection) Enforce(spec types.Spec) (*types.Object, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	log.Debug("Enforce", "spec", spec, "V", debugV)
+
+	if c.UpdateSpecFunc != nil {
+		if err := c.UpdateSpecFunc(spec); err != nil {
+			return nil, err
+		}
+	}
+	c.freed = false
+	c.spec = spec
+	c.items = map[string]*Item{} // reset
+
+	c.start()
+	return c.object()
+}
+
+func (c *Collection) Inspect() (*types.Object, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	v, err := c.object()
+	log.Debug("Inspect", "object", *v, "err", err, "V", debugV)
+
+	return v, err
+}
+
+func (c *Collection) Pause() (*types.Object, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.PauseFunc == nil {
+		return c.Inspect()
+	}
+
+	c.PauseFunc(true)
+	return c.Inspect()
+}
+
+func (c *Collection) Free() (*types.Object, error) {
+	return c.Pause()
+}
+
+func (c *Collection) Terminate() (*types.Object, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.TerminateFunc != nil {
+		err := c.TerminateFunc()
+		if err != nil {
+			return nil, err
+		}
+		return c.Inspect()
+	}
+	return nil, fmt.Errorf("not supported")
+}
+
+func (c *Collection) snapshot() (*types.Any, error) {
+	view := []Item{}
+
+	for _, item := range c.items {
+		obj := *item
+		view = append(view, obj)
+	}
+
+	return types.AnyValue(view)
+}
+
+// Visit visits the items managed in this collection
+func (c *Collection) Visit(v func(Item) bool) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	for _, item := range c.items {
+		if !v(*item) {
+			break
+		}
+	}
+}

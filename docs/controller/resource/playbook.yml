@@ -1,0 +1,3 @@
+
+# Start infrakit
+start : start.sh
