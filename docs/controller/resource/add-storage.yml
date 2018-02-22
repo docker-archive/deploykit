@@ -1,0 +1,13 @@
+{{/* Input to create instance in the simulator */}}
+{{/* =% instanceProvision `cloud1/disk` %= */}}
+
+{{ $name := flag "name" "string" "Name of the disk" | prompt "name?" "string" }}
+{{ $size := flag "size" "string" "Size of the disk" "10TB" }}
+
+Tags:
+  cloud: cloud1
+  type: storage
+  name: {{ $name }}
+Properties:
+  fs: ext4
+  size: {{ $size }}

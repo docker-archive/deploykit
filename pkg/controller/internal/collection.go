@@ -36,7 +36,8 @@ type Collection struct {
 	// PlanFunc returns a plan based on the intent
 	PlanFunc func(controller.Operation, types.Spec) (controller.Plan, error)
 
-	// StartFunc begins the actual processing. This will be started in a goroutine
+	// StartFunc begins the actual processing. This will be called synchronously
+	// so the body needs to start goroutines.
 	StartFunc func(context.Context)
 
 	// UpdateSpecFunc is called when a new spec is posted.  This will be executed
@@ -91,6 +92,13 @@ func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]
 	}
 }
 
+// Get returns an item by key.
+func (c *Collection) Get(k string) *Item {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.items[k]
+}
+
 // Scope returns the scope the collection uses to access plugins
 func (c *Collection) Scope() scope.Scope {
 	return c.scope
@@ -99,17 +107,6 @@ func (c *Collection) Scope() scope.Scope {
 // LeaderFunc returns the leadership lookup
 func (c *Collection) LeaderFunc() stack.Leadership {
 	return c.leader()
-}
-
-// Get returns an item by key. Nil if not present
-func (c *Collection) Get(k string) *Item {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	if i, has := c.items[k]; has {
-		copy := *i
-		return &copy
-	}
-	return nil
 }
 
 // object returns the state
@@ -146,7 +143,7 @@ func (c *Collection) start() {
 	log.Debug("starting collection", "V", debugV)
 
 	ctx := context.Background()
-	go c.StartFunc(ctx)
+	c.StartFunc(ctx)
 
 	c.running = true
 }
@@ -159,19 +156,21 @@ func (c *Collection) Running() bool {
 	return c.running
 }
 
+// Stop stops the collection from monitoring and any processing.  This operation is terminal.
 func (c *Collection) Stop() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	log.Debug("Stop", "V", debugV)
 
-	if c.Stop == nil {
+	if c.StopFunc == nil {
 		return nil
 	}
 
-	return c.Stop()
+	return c.StopFunc()
 }
 
+// Plan returns a plan, the current state, or error
 func (c *Collection) Plan(v controller.Operation, s types.Spec) (*types.Object, *controller.Plan, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -191,6 +190,9 @@ func (c *Collection) Plan(v controller.Operation, s types.Spec) (*types.Object, 
 	return o, &p, err
 }
 
+// Enforce will call the behavior to update the spec once it passes validation, and the collection
+// will start running / polling.  Since the collection is one-time use (it gets created and replaced by
+// the base controller implementation), enforce will be called only once.
 func (c *Collection) Enforce(spec types.Spec) (*types.Object, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -210,6 +212,7 @@ func (c *Collection) Enforce(spec types.Spec) (*types.Object, error) {
 	return c.object()
 }
 
+// Inspect inspects the current state of the collection.
 func (c *Collection) Inspect() (*types.Object, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -220,6 +223,7 @@ func (c *Collection) Inspect() (*types.Object, error) {
 	return v, err
 }
 
+// Pause pauses the collection from monitoring and reconciling. This is temporary compared to Stop.
 func (c *Collection) Pause() (*types.Object, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -232,10 +236,12 @@ func (c *Collection) Pause() (*types.Object, error) {
 	return c.Inspect()
 }
 
+// Free is an alias for Pause
 func (c *Collection) Free() (*types.Object, error) {
 	return c.Pause()
 }
 
+// Terminate destroys the resources associated with this collection.
 func (c *Collection) Terminate() (*types.Object, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()

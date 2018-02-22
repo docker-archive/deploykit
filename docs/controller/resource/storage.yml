@@ -10,7 +10,7 @@ properties:
     ObserveInterval: 1s
     KeySelector: \{\{.Tags.name\}\}
     Properties:
-      nfs: shared
+      fs: ext4
       size: 1TB
   cloud2-net1:
     plugin: cloud2/disk
@@ -20,5 +20,5 @@ properties:
     ObserveInterval: 1s
     KeySelector: \{\{.Tags.name\}\}
     Properties:
-      nfs: shared
+      fs: ext4
       size: 1TB

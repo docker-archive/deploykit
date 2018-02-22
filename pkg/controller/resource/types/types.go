@@ -47,7 +47,7 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 }
 
 // Properties is the schema of the configuration in the types.Spec.Properties
-type Properties map[string]internal.InstanceAccess
+type Properties map[string]*internal.InstanceAccess
 
 // Validate validates the input properties
 func (p Properties) Validate(ctx context.Context) error {

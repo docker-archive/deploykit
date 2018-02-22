@@ -1,3 +1,8 @@
 
 # Start infrakit
 start : start.sh
+
+add-cloud1-net1: add-cloud1-net1.yml
+add-cloud2-net1: add-cloud2-net1.yml
+
+add-storage: add-storage.yml

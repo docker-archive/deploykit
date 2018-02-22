@@ -141,7 +141,7 @@ func (o *InstanceObserver) KeyOf(instance instance.Description) (string, error) 
 	return o.extractKey(instance)
 }
 
-// Start starts the observations
+// Start starts the observations. This call is nonblocking.
 func (o *InstanceObserver) Start() {
 	o.lock.Lock()
 	defer o.lock.Unlock()

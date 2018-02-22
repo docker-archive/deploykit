@@ -13,7 +13,7 @@ import (
 // while providing the same interface methods as an instance Plugin.
 // It also contains the fields necessary for provisioning an instance.
 type InstanceAccess struct {
-	InstanceObserver `json:,inline" yaml:",inline"`
+	InstanceObserver `json:",inline" yaml:",inline"`
 
 	// Spec is the spec to use when provisioning the instance
 	instance.Spec `json:",inline" yaml:",inline"`

@@ -14,7 +14,7 @@ import (
 
 func TestInstanceAccessMarshal(t *testing.T) {
 
-	dict := map[string]InstanceAccess{}
+	dict := map[string]*InstanceAccess{}
 
 	access1 := new(InstanceAccess)
 	err := types.Decode([]byte(`
@@ -35,12 +35,12 @@ properties:
 
 	require.NoError(t, err)
 
-	dict["test1"] = *access1
+	dict["test1"] = access1
 
 	any, err := types.AnyValue(dict)
 	require.NoError(t, err)
 
-	dict2 := map[string]InstanceAccess{}
+	dict2 := map[string]*InstanceAccess{}
 	err = any.Decode(&dict2)
 
 	require.NoError(t, err)
