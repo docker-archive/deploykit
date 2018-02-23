@@ -288,25 +288,6 @@ func (t *Template) Fetch(p string, opt ...interface{}) (string, error) {
 
 // Source 'sources' the input file at url, also inherits all the variables.
 func (t *Template) Source(p string, opt ...interface{}) (string, error) {
-	// headers, context := headersAndContext(opt...)
-	// loc := p
-	// if strings.Index(loc, "str://") == -1 {
-	// 	u, err := GetURL(t.url, p)
-	// 	if err != nil {
-	// 		return "", err
-	// 	}
-	// 	loc = u.String()
-	// }
-
-	// prev := t.options.CustomizeFetch
-	// t.options.CustomizeFetch = func(req *http.Request) {
-	// 	setHeaders(req, headers)
-	// 	if prev != nil {
-	// 		prev(req)
-	// 	}
-	// }
-	// sourced, err := NewTemplate(loc, t.options)
-
 	_, context, sourced, err := t.raw(p, opt...)
 	if err != nil {
 		return "", err
@@ -325,26 +306,6 @@ func (t *Template) Source(p string, opt ...interface{}) (string, error) {
 
 // Include includes the template at the url inline.
 func (t *Template) Include(p string, opt ...interface{}) (string, error) {
-	// headers, context := headersAndContext(opt...)
-	// loc := p
-	// if strings.Index(loc, "str://") == -1 {
-	// 	u, err := GetURL(t.url, p)
-	// 	if err != nil {
-	// 		return "", err
-	// 	}
-	// 	loc = u.String()
-	// }
-
-	// prev := t.options.CustomizeFetch
-	// t.options.CustomizeFetch = func(req *http.Request) {
-	// 	setHeaders(req, headers)
-	// 	if prev != nil {
-	// 		prev(req)
-	// 	}
-	// }
-
-	// included, err := NewTemplate(loc, t.options)
-
 	_, context, included, err := t.raw(p, opt...)
 	if err != nil {
 		return "", err
@@ -451,22 +412,11 @@ func (t *Template) DefaultFuncs() []Function {
 			Func: t.Var,
 		},
 		{
-			Name: "k",
-			Description: []string{
-				"Get value from dictionary by key.",
-				"First arg is the key, second must be a map[string]interface{}",
-			},
-			Func: // MapIndex gets the value of key from map
-			func(k interface{}, m map[string]interface{}) interface{} {
-				return m[fmt.Sprintf("%v", k)]
-			},
-		},
-		{
 			Name: "q",
 			Description: []string{
 				"Runs a JMESPath (http://jmespath.org/) query (first arg) on the object (second arg).",
 				"The return value is an object which needs to be rendered properly for the format of the document.",
-				"Example: {{ include \"https://httpbin.org/get\" | from_json | q \"origin\" }}",
+				"Example: {{ include \"https://httpbin.org/get\" | jsonDecode | q \"origin\" }}",
 				"returns the origin of http request.",
 			},
 			Func: QueryObject,

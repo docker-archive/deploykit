@@ -20,6 +20,7 @@ type View struct {
 	properties         bool
 	tagsTemplate       string
 	propertiesTemplate string
+	viewTemplate       string // view is a generic template to render the instance.Description to whatever.
 }
 
 // FlagSet returns a flagset to bind
@@ -35,6 +36,11 @@ func (v *View) FlagSet() *pflag.FlagSet {
 	fs.StringVarP(&v.tagsTemplate, "tags-view", "t", v.tagsTemplate, "Template for rendering tags")
 	fs.StringVarP(&v.propertiesTemplate, "properties-view", "w", v.propertiesTemplate, "Template for rendering properties")
 	fs.BoolVarP(&v.quiet, "quiet", "q", v.quiet, "Print rows without column headers")
+
+	// if set, render this column and id only
+	fs.StringVarP(&v.viewTemplate, "description-view", "z", v.viewTemplate,
+		"Template for rendering the view on the description")
+
 	return fs
 }
 
@@ -107,7 +113,9 @@ func (v *View) Renderer(matcher func(instance.Description) bool) (func(w io.Writ
 		}
 
 		if !v.quiet {
-			if v.properties {
+			if v.viewTemplate != "" {
+				fmt.Printf("%-30s\t%-30s\n", "ID", "VIEW")
+			} else if v.properties {
 				fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", "ID", "LOGICAL", "TAGS", "PROPERTIES")
 
 			} else {
@@ -133,30 +141,44 @@ func (v *View) Renderer(matcher func(instance.Description) bool) (func(w io.Writ
 				logical = string(*d.LogicalID)
 			}
 
-			tagViewBuff := ""
-			if v.tagsTemplate == "*" {
-				// default -- this is a hack
-				printTags := []string{}
-				for k, v := range d.Tags {
-					printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
-				}
-				sort.Strings(printTags)
-				tagViewBuff = strings.Join(printTags, ",")
-			} else {
-				tagViewBuff = renderTags(d.Tags, tagsView)
-			}
+			if v.viewTemplate != "" {
 
-			if v.properties {
-
-				if v.quiet {
-					// special render only the properties
-					fmt.Printf("%s", renderProperties(d.Properties, propertiesView))
+				column := "-"
+				if view, err := d.View(v.viewTemplate); err == nil {
+					column = view
 				} else {
-					fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff,
-						renderProperties(d.Properties, propertiesView))
+					column = err.Error()
 				}
+				fmt.Printf("%-30s\t%-30s\n", d.ID, column)
+
 			} else {
-				fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff)
+
+				tagViewBuff := ""
+				if v.tagsTemplate == "*" {
+					// default -- this is a hack
+					printTags := []string{}
+					for k, v := range d.Tags {
+						printTags = append(printTags, fmt.Sprintf("%s=%s", k, v))
+					}
+					sort.Strings(printTags)
+					tagViewBuff = strings.Join(printTags, ",")
+				} else {
+					tagViewBuff = renderTags(d.Tags, tagsView)
+				}
+
+				if v.properties {
+
+					if v.quiet {
+						// special render only the properties
+						fmt.Printf("%s", renderProperties(d.Properties, propertiesView))
+					} else {
+						fmt.Printf("%-30s\t%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff,
+							renderProperties(d.Properties, propertiesView))
+					}
+				} else {
+					fmt.Printf("%-30s\t%-30s\t%-s\n", d.ID, logical, tagViewBuff)
+				}
+
 			}
 		}
 		return nil

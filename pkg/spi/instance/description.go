@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/deckarep/golang-set"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -21,6 +22,20 @@ func (d Description) Compare(other Description) int {
 		return 1
 	}
 	return 0
+}
+
+// View returns a view of the Description given the text template. The text template
+// can contain escaped \{\{\}\} template expression delimiters.
+func (d Description) View(viewTemplate string) (string, error) {
+	buff := template.Unescape([]byte(viewTemplate))
+	t, err := template.NewTemplate(
+		"str://"+string(buff),
+		template.Options{MultiPass: false, MissingKey: template.MissingKeyError},
+	)
+	if err != nil {
+		return "", err
+	}
+	return t.Render(d)
 }
 
 // Descriptions is a collection of descriptions
