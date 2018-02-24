@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/deckarep/golang-set"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -21,6 +22,39 @@ func (d Description) Compare(other Description) int {
 		return 1
 	}
 	return 0
+}
+
+// View returns a view of the Description given the text template. The text template
+// can contain escaped \{\{\}\} template expression delimiters.
+func (d Description) View(viewTemplate string) (string, error) {
+	buff := template.Unescape([]byte(viewTemplate))
+	t, err := template.NewTemplate(
+		"str://"+string(buff),
+		template.Options{MultiPass: false, MissingKey: template.MissingKeyError},
+	)
+	if err != nil {
+		return "", err
+	}
+	// this is a substitute struct type to make the Properties searchable
+	type desc struct {
+		ID         ID
+		LogicalID  *LogicalID
+		Tags       map[string]string
+		Properties interface{}
+	}
+
+	var p interface{}
+	if err := d.Properties.Decode(&p); err != nil {
+		return "", err
+	}
+
+	v := desc{
+		ID:         d.ID,
+		LogicalID:  d.LogicalID,
+		Tags:       d.Tags,
+		Properties: p,
+	}
+	return t.Render(v)
 }
 
 // Descriptions is a collection of descriptions
