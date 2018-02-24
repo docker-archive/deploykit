@@ -35,7 +35,26 @@ func (d Description) View(viewTemplate string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return t.Render(d)
+	// this is a substitute struct type to make the Properties searchable
+	type desc struct {
+		ID         ID
+		LogicalID  *LogicalID
+		Tags       map[string]string
+		Properties interface{}
+	}
+
+	var p interface{}
+	if err := d.Properties.Decode(&p); err != nil {
+		return "", err
+	}
+
+	v := desc{
+		ID:         d.ID,
+		LogicalID:  d.LogicalID,
+		Tags:       d.Tags,
+		Properties: p,
+	}
+	return t.Render(v)
 }
 
 // Descriptions is a collection of descriptions
