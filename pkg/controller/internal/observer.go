@@ -10,7 +10,6 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/stack"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -167,28 +166,14 @@ func (o *InstanceObserver) Difference(before, after []instance.Description) inst
 	return instance.Difference(instance.Descriptions(before), keyFunc, instance.Descriptions(after), keyFunc)
 }
 
-// templateFrom returns a template after it has un-escaped any escape sequences
-func templateFrom(source []byte) (*template.Template, error) {
-	buff := template.Unescape(source)
-	return template.NewTemplate(
-		"str://"+string(buff),
-		template.Options{MultiPass: false, MissingKey: template.MissingKeyError},
-	)
-}
-
 // KeyExtractor returns a function that can extract the link key from an instance description
 func KeyExtractor(text string) func(instance.Description) (string, error) {
-	if text != "" {
-		t, err := templateFrom([]byte(text))
-		if err == nil {
-			return func(i instance.Description) (view string, err error) {
-				view, err = t.Render(i)
-				return
-			}
-		}
-	}
-
 	return func(i instance.Description) (string, error) {
+		v, err := i.View(text)
+		if err == nil {
+			return v, nil
+		}
+
 		if i.LogicalID != nil {
 			return string(*i.LogicalID), nil
 		}

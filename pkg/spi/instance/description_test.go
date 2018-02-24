@@ -3,8 +3,48 @@ package instance
 import (
 	"testing"
 
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 )
+
+func testView(d Description, v string) string {
+	vv, err := d.View(v)
+	if err != nil {
+		panic(err)
+	}
+	return vv
+}
+
+func TestView(t *testing.T) {
+
+	require.Equal(t, "id", testView(Description{
+		ID: ID("id"),
+	}, `{{.ID}}`))
+
+	require.Equal(t, "id", testView(Description{
+		LogicalID: LogicalIDFromString("id"),
+	}, `{{.LogicalID}}`))
+
+	require.Equal(t, "foo", testView(Description{
+		Tags: map[string]string{
+			"bar": "foo",
+		},
+	}, `{{.Tags.bar}}`))
+
+	require.Equal(t, "foo", testView(Description{
+		Tags: map[string]string{
+			"bar-bar": "foo",
+		},
+	}, `{{ index .Tags "bar-bar" }}`))
+
+	// Note that we can index into a types.Any
+	require.Equal(t, "foobar", testView(Description{
+		Tags: map[string]string{
+			"bar-bar": "foo",
+		},
+		Properties: types.AnyValueMust(map[string]interface{}{"Bar": "bar"}),
+	}, `{{ index .Tags "bar-bar" }}{{ .Properties.Bar }}`))
+}
 
 func TestDifference(t *testing.T) {
 

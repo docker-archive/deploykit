@@ -1,6 +1,6 @@
 # Instance plugin API
 
-<!-- SOURCE-CHECKSUM pkg/spi/instance/* c29fb64f4d6cbd56d7a085fb02568d1f8c4e141227794ff667edbe7b8ca10b371af8a87f5205cfb203bfa69728c94e4cfcbffee847776cfaf562f2d517c82f21a8ae7d45773a1db15dbfeb7b52420f4f -->
+<!-- SOURCE-CHECKSUM pkg/spi/instance/* b7d7100e6261e912addc2aa4d928eefab416a3a5636a80371ab23060e44d57bbf51df065992de83003bfa69728c94e4cfcbffee847776cfaf562f2d517c82f21a8ae7d45773a1db15dbfeb7b52420f4f -->
 
 
 
