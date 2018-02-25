@@ -118,6 +118,7 @@ func (c *collection) run(ctx context.Context) {
 					}
 
 					log.Info("lost", "instance", n, "name", lost.name, "key", k)
+					c.Collection.Delete(k)
 				}
 
 			case found, ok := <-allFound:

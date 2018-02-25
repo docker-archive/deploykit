@@ -155,15 +155,27 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 
 // Put puts an item by key
 func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]interface{}) *Item {
+	if data == nil {
+		data = map[string]interface{}{}
+	}
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	v := &Item{
-		Key:   k,
-		State: stateMachine{fsm, spec},
-		Data:  data,
+
+	if item, has := c.items[k]; has {
+		item.Key = k
+		item.State = stateMachine{fsm, spec}
+		for k, v := range data {
+			item.Data[k] = v
+		}
+	} else {
+		c.items[k] = &Item{
+			Key:   k,
+			State: stateMachine{fsm, spec},
+			Data:  data,
+		}
 	}
-	c.items[k] = v
-	return v
+	return c.items[k]
 }
 
 // Get returns an item by key.
@@ -171,6 +183,13 @@ func (c *Collection) Get(k string) *Item {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return c.items[k]
+}
+
+// Delete an item by key
+func (c *Collection) Delete(k string) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	delete(c.items, k)
 }
 
 // Scope returns the scope the collection uses to access plugins
