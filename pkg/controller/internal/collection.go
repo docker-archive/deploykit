@@ -12,7 +12,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
-	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -65,8 +64,7 @@ type Collection struct {
 	items map[string]*Item
 	stop  chan struct{}
 
-	leader func() stack.Leadership
-	scope  scope.Scope
+	scope scope.Scope
 
 	running bool
 	freed   bool
@@ -81,9 +79,8 @@ type Collection struct {
 
 // NewCollection returns a Managed controller object that represents a collection
 // of finite state machines (FSM).
-func NewCollection(scope scope.Scope, leader func() stack.Leadership) (*Collection, error) {
+func NewCollection(scope scope.Scope) (*Collection, error) {
 	c := &Collection{
-		leader:          leader,
 		scope:           scope,
 		items:           map[string]*Item{},
 		metadataUpdates: make(chan func(map[string]interface{})),
@@ -179,11 +176,6 @@ func (c *Collection) Get(k string) *Item {
 // Scope returns the scope the collection uses to access plugins
 func (c *Collection) Scope() scope.Scope {
 	return c.scope
-}
-
-// LeaderFunc returns the leadership lookup
-func (c *Collection) LeaderFunc() stack.Leadership {
-	return c.leader()
 }
 
 // object returns the state

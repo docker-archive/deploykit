@@ -8,7 +8,6 @@ import (
 	resource "github.com/docker/infrakit/pkg/controller/resource/types"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -19,14 +18,13 @@ type collection struct {
 	options    resource.Options
 }
 
-func newCollection(scope scope.Scope, leader func() stack.Leadership,
-	options resource.Options) (internal.Managed, error) {
+func newCollection(scope scope.Scope, options resource.Options) (internal.Managed, error) {
 
 	if err := options.Validate(context.Background()); err != nil {
 		return nil, err
 	}
 
-	base, err := internal.NewCollection(scope, leader)
+	base, err := internal.NewCollection(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +188,7 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 	// of resources in a collection.  For large pools of the same thing, we will implement a dedicated
 	// pool controller.
 	for _, access := range properties {
-		err = access.Init(c.Scope(), c.LeaderFunc, c.options.PluginRetryInterval.AtLeast(1*time.Second))
+		err = access.Init(c.Scope(), c.options.PluginRetryInterval.AtLeast(1*time.Second))
 		if err != nil {
 			return err
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -88,12 +89,21 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	log.Info("Decoded input", "config", options)
 
+	leader := func() stack.Leadership {
+		return leadership(scope.Plugins)
+	}
+
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: enrollment.NewTypedControllers(scope,
-			func() stack.Leadership {
-				return leadership(scope.Plugins)
-			}, options),
+		run.Controller: func() (map[string]controller.Controller, error) {
+			m := map[string]controller.Controller{}
+			if all, err := enrollment.NewTypedControllers(scope, options)(); err == nil {
+				for k, p := range all {
+					m[k] = controller.Singleton(p, leader)
+				}
+			}
+			return m, nil
+		},
 	}
 
 	return

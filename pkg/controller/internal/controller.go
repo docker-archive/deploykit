@@ -4,76 +4,29 @@ import (
 	"fmt"
 	"sync"
 
-	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/metadata"
-	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
-
-var (
-	log     = logutil.New("module", "controller/internal")
-	debugV  = logutil.V(500)
-	debugV2 = logutil.V(900)
-)
-
-// ControlLoop gives status and means to stop the object
-type ControlLoop interface {
-	Start()
-	Running() bool
-	Stop() error
-}
-
-// Managed is the interface implemented by managed objects within a controller
-type Managed interface {
-	ControlLoop
-
-	Metadata() metadata.Plugin
-
-	Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error)
-	Enforce(types.Spec) (*types.Object, error)
-	Inspect() (*types.Object, error)
-	Free() (*types.Object, error)
-	Terminate() (*types.Object, error)
-}
 
 // Controller implements the pkg/controller/Controller interface and manages a collection of controls
 type Controller struct {
 	alloc   func(types.Spec) (Managed, error)
 	keyfunc func(types.Metadata) string
 	managed map[string]*Managed
-	leader  func() stack.Leadership
 	lock    sync.RWMutex
 }
 
 // NewController creates a controller injecting dependencies
-func NewController(l func() stack.Leadership,
-	alloc func(types.Spec) (Managed, error),
+func NewController(alloc func(types.Spec) (Managed, error),
 	keyfunc func(types.Metadata) string) *Controller {
 
 	c := &Controller{
 		keyfunc: keyfunc,
 		alloc:   alloc,
-		leader:  l,
 		managed: map[string]*Managed{},
 	}
 	return c
-}
-
-func (c *Controller) leaderGuard() error {
-	check := c.leader()
-	if check == nil {
-		return fmt.Errorf("cannot determine leader status")
-	}
-
-	is, err := check.IsLeader()
-	if err != nil {
-		return err
-	}
-	if !is {
-		return fmt.Errorf("not a leader")
-	}
-	return nil
 }
 
 func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**Managed, error) {
@@ -144,7 +97,6 @@ func (c *Controller) Controllers() (map[string]controller.Controller, error) {
 			managed: map[string]*Managed{
 				k: v, // Scope to this as only instance
 			},
-			leader: c.leader,
 		}
 	}
 	return out, nil
@@ -297,10 +249,6 @@ func (c *Controller) describe(search *types.Metadata) (objects []types.Object, e
 func (c *Controller) Free(search *types.Metadata) (objects []types.Object, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
-	if err = c.leaderGuard(); err != nil {
-		return
-	}
 
 	described, err := c.describe(search)
 	if err != nil {

@@ -12,7 +12,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
-	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"golang.org/x/net/context"
@@ -30,13 +29,11 @@ import (
 // could be implemented as a proxied instance plugin (using the
 // interceptor pattern).
 type enroller struct {
-	stack.Leadership
 	spec       types.Spec
 	properties enrollment.Properties
 	options    enrollment.Options
 
-	leader func() stack.Leadership
-	scope  scope.Scope
+	scope scope.Scope
 
 	poller *internal.Poller
 	ticker <-chan time.Time
@@ -54,9 +51,8 @@ type enroller struct {
 	enrollmentPropertiesTemplate *template.Template
 }
 
-func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enrollment.Options) (*enroller, error) {
+func newEnroller(scope scope.Scope, options enrollment.Options) (*enroller, error) {
 	l := &enroller{
-		leader:  leader,
 		scope:   scope,
 		options: options,
 	}
@@ -68,9 +64,7 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 	l.poller = internal.Poll(
 		// This determines if the action should be taken when time is up
 		func() bool {
-			isLeader := mustTrue(l.isLeader())
-			log.Debug("polling", "isLeader", isLeader, "V", debugV2)
-			return isLeader
+			return true
 		},
 		// This does the work
 		func() (err error) {
@@ -84,23 +78,6 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 // Metadata returns an optional metadata.Plugin implementation
 func (l *enroller) Metadata() metadata.Plugin {
 	return nil
-}
-
-func (l *enroller) isLeader() (is bool, err error) {
-	check := l.leader()
-	if check == nil {
-		err = fmt.Errorf("cannot determine leader status")
-		return
-	}
-	is, err = check.IsLeader()
-	return
-}
-
-func mustTrue(v bool, e error) bool {
-	if e != nil {
-		return false
-	}
-	return v
 }
 
 // object returns the state

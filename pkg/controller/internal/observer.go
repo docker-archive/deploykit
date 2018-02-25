@@ -9,7 +9,6 @@ import (
 	instance_plugin "github.com/docker/infrakit/pkg/plugin/instance"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -58,7 +57,7 @@ var (
 )
 
 // Init initializes the observer so that it can be started
-func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadership, retry time.Duration) error {
+func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 
 	o.lock.Lock()
 	defer o.lock.Unlock()
@@ -88,20 +87,10 @@ func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadershi
 	o.poller = PollWithCleanup(
 		// This determines if the action should be taken when time is up
 		func() bool {
-
-			log.Debug("checking before poll", "V", debugV2)
-			isLeader := false
-			if leader != nil {
-				v, err := leader().IsLeader()
-				if err == nil {
-					isLeader = v
-				}
-			}
-
 			o.lock.RLock()
 			defer o.lock.RUnlock()
-			log.Debug("polling", "isLeader", isLeader, "V", debugV2, "freed", o.paused)
-			return isLeader && !o.paused
+			log.Debug("polling", "V", debugV2, "freed", o.paused)
+			return !o.paused
 		},
 		// This does the work
 		func() (err error) {

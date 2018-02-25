@@ -55,7 +55,6 @@ func TestEnrollerInitOptions(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		DefaultOptions)
 	require.NoError(t, err)
 	require.Equal(t, types.FromDuration(time.Duration(5*time.Second)), e.options.SyncInterval)
@@ -68,7 +67,6 @@ func TestEnrollerInitOptions(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		enrollment.Options{
 			SyncInterval:             types.FromDuration(time.Duration(10 * time.Second)),
 			SourceParseErrPolicy:     enrollment.SourceParseErrorDisableDestroy,
@@ -85,7 +83,6 @@ func TestEnrollerInitOptions(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		enrollment.Options{
 			SyncInterval:             types.FromDuration(time.Duration(-1 * time.Second)),
 			SourceParseErrPolicy:     DefaultOptions.SourceParseErrPolicy,
@@ -100,7 +97,6 @@ func TestEnrollerInitOptions(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		enrollment.Options{
 			SyncInterval:             DefaultOptions.SyncInterval,
 			SourceParseErrPolicy:     "bogus-SourceParseErrPolicy",
@@ -135,7 +131,6 @@ func TestEnroller(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		DefaultOptions)
 	require.NoError(t, err)
 	enroller.groupPlugin = &group_test.Plugin{
@@ -247,7 +242,6 @@ func _TestEnrollerNoTags(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		DefaultOptions)
 	require.NoError(t, err)
 	enroller.groupPlugin = &group_test.Plugin{
@@ -366,7 +360,6 @@ func TestEnrollerSourceParseError(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		DefaultOptions)
 	require.NoError(t, err)
 	enroller.groupPlugin = &group_test.Plugin{
@@ -502,7 +495,6 @@ func TestEnrollerEnrolledParseError(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		DefaultOptions)
 	require.NoError(t, err)
 	enroller.groupPlugin = &group_test.Plugin{
@@ -619,7 +611,6 @@ func TestEnrollerOptionParsing(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		DefaultOptions)
 	require.NoError(t, err)
 	require.Equal(t, types.FromDuration(time.Duration(5*time.Second)), enroller.options.SyncInterval)
@@ -634,7 +625,6 @@ func TestEnrollerOptionParsing(t *testing.T) {
 						"test": &plugin.Endpoint{},
 					}
 				}),
-				fakeLeader(false),
 				enrollment.Options{
 					SyncInterval:             DefaultOptions.SyncInterval,
 					SourceParseErrPolicy:     srcParseErrorOp,
@@ -663,7 +653,6 @@ func TestEnrollerUpdateSpecOptionParsing(t *testing.T) {
 				"test": &plugin.Endpoint{},
 			}
 		}),
-		fakeLeader(false),
 		DefaultOptions)
 	require.NoError(t, err)
 	require.Equal(t, enrollment.SourceParseErrorEnableDestroy, enroller.options.SourceParseErrPolicy)

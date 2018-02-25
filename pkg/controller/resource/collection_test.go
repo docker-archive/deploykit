@@ -12,13 +12,11 @@ func TestCollection(t *testing.T) {
 
 	c, err := newCollection(
 		scope.DefaultScope(),
-		scope.FakeLeader(true),
 		resource.Options{})
 	require.Error(t, err) // buffer size is 0
 
 	c, err = newCollection(
 		scope.DefaultScope(),
-		scope.FakeLeader(true),
 		resource.Options{
 			LostBufferSize:  100,
 			FoundBufferSize: 100,

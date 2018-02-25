@@ -54,7 +54,7 @@ KeySelector: \{\{.link\}\}
 		return testInstancePlugin, nil
 	}
 
-	err = observer.Init(testScope, testutil_scope.FakeLeader(true), 1*time.Second)
+	err = observer.Init(testScope, 1*time.Second)
 	require.NoError(t, err)
 
 	observer.Start()
@@ -134,7 +134,7 @@ KeySelector: \{\{.link\}\}
 		return testInstancePlugin, nil
 	}
 
-	err = observer.Init(testScope, testutil_scope.FakeLeader(true), 1*time.Second)
+	err = observer.Init(testScope, 1*time.Second)
 	require.NoError(t, err)
 
 	observer.Start()

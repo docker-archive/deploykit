@@ -6,7 +6,6 @@ import (
 	instance_plugin "github.com/docker/infrakit/pkg/plugin/instance"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/spi/stack"
 )
 
 // InstanceAccess is an entity capable of observing an instance plugin
@@ -23,8 +22,8 @@ type InstanceAccess struct {
 }
 
 // Init overrides InstanceObserver.Init() to provide additional initialization.
-func (a *InstanceAccess) Init(scope scope.Scope, leader func() stack.Leadership, retry time.Duration) error {
-	if err := a.InstanceObserver.Init(scope, leader, retry); err != nil {
+func (a *InstanceAccess) Init(scope scope.Scope, retry time.Duration) error {
+	if err := a.InstanceObserver.Init(scope, retry); err != nil {
 		return err
 	}
 	a.Plugin = instance_plugin.LazyConnect(

@@ -9,7 +9,6 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/metadata"
-	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -32,15 +31,13 @@ type Components struct {
 	Metadata    func() (map[string]metadata.Plugin, error)
 }
 
-// NewController returns a controller implementation
-func NewController(scope scope.Scope,
-	leader func() stack.Leadership, options resource.Options) *Components {
+// NewComponents returns a controller implementation
+func NewComponents(scope scope.Scope, options resource.Options) *Components {
 
 	controller := internal.NewController(
-		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
-			return newCollection(scope, leader, options)
+			return newCollection(scope, options)
 		},
 		// the key function
 		func(metadata types.Metadata) string {

@@ -14,7 +14,6 @@ import (
 	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
-	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -47,9 +46,8 @@ type reaper struct {
 	items      map[string]*item
 	stop       chan struct{}
 
-	leader func() stack.Leadership
-	scope  scope.Scope
-	model  Model
+	scope scope.Scope
+	model Model
 
 	nodeObserver     *internal.InstanceObserver
 	instanceObserver *internal.InstanceObserver
@@ -65,9 +63,8 @@ type reaper struct {
 	lock sync.RWMutex
 }
 
-func newReaper(scope scope.Scope, leader func() stack.Leadership, options gc.Options) (internal.Managed, error) {
+func newReaper(scope scope.Scope, options gc.Options) (internal.Managed, error) {
 	r := &reaper{
-		leader:  leader,
 		scope:   scope,
 		options: options,
 		items:   map[string]*item{},
@@ -206,12 +203,12 @@ func (r *reaper) updateSpec(spec types.Spec) error {
 	}
 
 	instanceObserver := properties.InstanceObserver
-	if err := instanceObserver.Init(r.scope, r.leader, r.options.PluginRetryInterval.Duration()); err != nil {
+	if err := instanceObserver.Init(r.scope, r.options.PluginRetryInterval.Duration()); err != nil {
 		return err
 	}
 
 	nodeObserver := properties.NodeObserver
-	if err := nodeObserver.Init(r.scope, r.leader, r.options.PluginRetryInterval.Duration()); err != nil {
+	if err := nodeObserver.Init(r.scope, r.options.PluginRetryInterval.Duration()); err != nil {
 		return err
 	}
 

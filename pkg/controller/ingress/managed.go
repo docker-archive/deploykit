@@ -116,6 +116,6 @@ func (c *managed) started() bool {
 }
 
 // Metadata returns an optional metadata.Plugin implementation
-func (r *managed) Metadata() metadata.Plugin {
+func (c *managed) Metadata() metadata.Plugin {
 	return nil
 }

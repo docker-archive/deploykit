@@ -10,6 +10,7 @@ import (
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -67,14 +68,23 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	transport.Name = name
 
-	resource := resource.NewController(scope,
-		func() stack.Leadership {
-			return leadership(scope.Plugins)
-		}, options)
+	resource := resource.NewComponents(scope, options)
+
+	leader := func() stack.Leadership {
+		return leadership(scope.Plugins)
+	}
 
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: resource.Controllers,
-		run.Metadata:   resource.Metadata,
+		run.Controller: func() (map[string]controller.Controller, error) {
+			singletons := map[string]controller.Controller{}
+			if controllers, err := resource.Controllers(); err == nil {
+				for k, c := range controllers {
+					singletons[k] = controller.Singleton(c, leader)
+				}
+			}
+			return singletons, nil
+		},
+		run.Metadata: resource.Metadata,
 	}
 
 	return

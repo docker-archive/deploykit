@@ -118,7 +118,7 @@ properties:
 		return testInstancePlugin, nil
 	}
 
-	err = access.Init(testScope, testutil_scope.FakeLeader(true), 1*time.Second)
+	err = access.Init(testScope, 1*time.Second)
 	require.NoError(t, err)
 
 	require.NotNil(t, access.Plugin)
