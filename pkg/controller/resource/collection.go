@@ -49,8 +49,8 @@ func (c *collection) run(ctx context.Context) {
 		instances []instance.Description
 	}
 
-	allLost := make(chan *event, 100)
-	allFound := make(chan *event, 100)
+	allLost := make(chan *event, c.options.LostBufferSize)
+	allFound := make(chan *event, c.options.FoundBufferSize)
 
 	accessors := map[string]*internal.InstanceAccess(c.properties)
 

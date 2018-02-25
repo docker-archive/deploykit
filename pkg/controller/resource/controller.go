@@ -21,6 +21,8 @@ var (
 	// DefaultOptions return an Options with default values filled in.
 	DefaultOptions = resource.Options{
 		PluginRetryInterval: types.Duration(1 * time.Second),
+		LostBufferSize:      10,
+		FoundBufferSize:     10,
 	}
 )
 

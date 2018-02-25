@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/docker/infrakit/pkg/controller/internal"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -59,9 +60,21 @@ type Options struct {
 
 	// PluginRetryInterval is the interval for retrying to connect to the plugins
 	PluginRetryInterval types.Duration
+
+	// LostBufferSize is the size of the buffered chanel for lost []instance.Description
+	LostBufferSize int
+
+	// FoundBufferSize is the size of the buffered chanel for lost []instance.Description
+	FoundBufferSize int
 }
 
 // Validate validates the controller's options
 func (p Options) Validate(ctx context.Context) error {
+	if p.LostBufferSize == 0 {
+		return fmt.Errorf("lost buffer size cannot be 0")
+	}
+	if p.FoundBufferSize == 0 {
+		return fmt.Errorf("found buffer size cannot be 0")
+	}
 	return nil
 }
