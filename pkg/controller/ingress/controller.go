@@ -43,7 +43,7 @@ func NewTypedControllers(scope scope.Scope,
 		func(metadata types.Metadata) string {
 			return metadata.Name
 		},
-	)).ManagedObjects
+	)).Controllers
 }
 
 // Plan implements internal/Managed

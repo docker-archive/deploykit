@@ -17,7 +17,7 @@ properties:
     labels:
       cloud: cloud2
       type: storage
-    ObserveInterval: 1s
+    ObserveInterval: 5s
     KeySelector: \{\{.Tags.name\}\}
     Properties:
       fs: ext4

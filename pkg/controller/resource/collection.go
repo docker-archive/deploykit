@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"time"
 
 	"github.com/docker/infrakit/pkg/controller/internal"
 	resource "github.com/docker/infrakit/pkg/controller/resource/types"
@@ -107,6 +108,10 @@ func (c *collection) run(ctx context.Context) {
 					log.Warn("cannot find accessor for lost instance", "name", lost.name)
 					break
 				}
+
+				// Update the view in the metadata plugin
+				c.MetadataRemove(accessor.KeyOf, lost.instances)
+
 				for _, n := range lost.instances {
 					k, err := accessor.KeyOf(n)
 					if err != nil {
@@ -115,9 +120,6 @@ func (c *collection) run(ctx context.Context) {
 					}
 
 					log.Info("lost", "instance", n, "name", lost.name, "key", k)
-
-					// Update the view in the metadata plugin
-					c.MetadataRemove(k)
 				}
 
 			case found, ok := <-allFound:
@@ -131,6 +133,10 @@ func (c *collection) run(ctx context.Context) {
 					log.Warn("cannot find accessor for found instance", "name", found.name)
 					break
 				}
+
+				// Update the view in the metadata plugin
+				c.MetadataExport(accessor.KeyOf, found.instances)
+
 				for _, n := range found.instances {
 					k, err := accessor.KeyOf(n)
 					if err != nil {
@@ -146,8 +152,6 @@ func (c *collection) run(ctx context.Context) {
 						})
 					}
 
-					// Update the view in the metadata plugin
-					c.MetadataExport(k, n)
 				}
 			}
 		}
@@ -186,7 +190,7 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 	// of resources in a collection.  For large pools of the same thing, we will implement a dedicated
 	// pool controller.
 	for _, access := range properties {
-		err = access.Init(c.Scope(), c.LeaderFunc, c.options.PluginRetryInterval.Duration())
+		err = access.Init(c.Scope(), c.LeaderFunc, c.options.PluginRetryInterval.AtLeast(1*time.Second))
 		if err != nil {
 			return err
 		}

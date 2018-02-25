@@ -57,7 +57,7 @@ func NewTypedControllers(scope scope.Scope, leader func() stack.Leadership,
 		func(metadata types.Metadata) string {
 			return metadata.Name
 		},
-	)).ManagedObjects
+	)).Controllers
 }
 
 func (l *enroller) started() bool {

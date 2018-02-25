@@ -77,7 +77,6 @@ func (c *Controller) leaderGuard() error {
 }
 
 func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**Managed, error) {
-
 	log.Debug("getManaged", "search", search, "spec", spec, "V", debugV)
 
 	out := []**Managed{}
@@ -116,6 +115,9 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 
 // Metadata exposes any metdata implementations
 func (c *Controller) Metadata() (plugins map[string]metadata.Plugin, err error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	plugins = map[string]metadata.Plugin{}
 
 	for k, m := range c.managed {
@@ -125,6 +127,27 @@ func (c *Controller) Metadata() (plugins map[string]metadata.Plugin, err error) 
 		}
 	}
 	return plugins, nil
+}
+
+// Controllers returns a map of managed objects as subcontrollers
+func (c *Controller) Controllers() (map[string]controller.Controller, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	out := map[string]controller.Controller{
+		"": c,
+	}
+	for k, v := range c.managed {
+		out[k] = &Controller{
+			alloc:   c.alloc,
+			keyfunc: c.keyfunc,
+			managed: map[string]*Managed{
+				k: v, // Scope to this as only instance
+			},
+			leader: c.leader,
+		}
+	}
+	return out, nil
 }
 
 // Plan is a commit without actually making the changes.  The controller returns a proposed object state
@@ -242,25 +265,19 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 // metadata can be a tags search.  An object has state, and its original spec can be accessed as well.
 // A nil Metadata will instruct the controller to return all objects under management.
 func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, err error) {
+	defer log.Debug("Describe", "search", search, "V", debugV, "err", err)
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
+	return c.describe(search)
+}
+
+func (c *Controller) describe(search *types.Metadata) (objects []types.Object, err error) {
 	m := []**Managed{}
 	m, err = c.getManaged(search, nil)
-
-	log.Debug("Describe", "search", search, "V", debugV, "managed", m, "err", err)
-
 	if err != nil {
 		return
-	}
-
-	if len(m) == 0 {
-		ss := fmt.Sprintf("%v", search)
-		if search != nil {
-			ss = fmt.Sprintf("%v", *search)
-		}
-		return nil, fmt.Errorf("no managed object found %v", ss)
 	}
 
 	objects = []types.Object{}
@@ -278,14 +295,14 @@ func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, e
 
 // Free tells the controller to pause management of objects matching.  To resume, commit again.
 func (c *Controller) Free(search *types.Metadata) (objects []types.Object, err error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	if err = c.leaderGuard(); err != nil {
 		return
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	described, err := c.Describe(search)
+	described, err := c.describe(search)
 	if err != nil {
 		return nil, err
 	}
@@ -306,25 +323,4 @@ func (c *Controller) Free(search *types.Metadata) (objects []types.Object, err e
 		objects = append(objects, candidate)
 	}
 	return
-}
-
-// ManagedObjects returns a map of managed objects
-func (c *Controller) ManagedObjects() (map[string]controller.Controller, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	out := map[string]controller.Controller{
-		"": c,
-	}
-	for k, v := range c.managed {
-		out[k] = &Controller{
-			alloc:   c.alloc,
-			keyfunc: c.keyfunc,
-			managed: map[string]*Managed{
-				k: v, // Scope to this as only instance
-			},
-			leader: c.leader,
-		}
-	}
-	return out, nil
 }

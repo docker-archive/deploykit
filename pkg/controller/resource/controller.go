@@ -48,7 +48,7 @@ func NewController(scope scope.Scope,
 		},
 	)
 	return &Components{
-		Controllers: controller.ManagedObjects,
+		Controllers: controller.Controllers,
 		Metadata:    controller.Metadata,
 	}
 }

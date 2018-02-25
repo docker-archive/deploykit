@@ -37,5 +37,5 @@ func NewController(scope scope.Scope,
 		func(metadata types.Metadata) string {
 			return metadata.Name
 		},
-	)).ManagedObjects
+	)).Controllers
 }

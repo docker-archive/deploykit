@@ -14,7 +14,16 @@ func TestCollection(t *testing.T) {
 		scope.DefaultScope(),
 		scope.FakeLeader(true),
 		resource.Options{})
+	require.Error(t, err) // buffer size is 0
+
+	c, err = newCollection(
+		scope.DefaultScope(),
+		scope.FakeLeader(true),
+		resource.Options{
+			LostBufferSize:  100,
+			FoundBufferSize: 100,
+		})
 	require.NoError(t, err)
-	require.NotNil(t, c.Metadata())
+	require.NotNil(t, c)
 
 }

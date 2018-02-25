@@ -23,14 +23,18 @@ type stateMachine struct {
 }
 
 func (f stateMachine) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + f.StateName(f.State()) + `"`), nil
+	state := "-"
+	if f.FSM != nil && f.Spec != nil {
+		state = f.StateName(f.State())
+	}
+	return []byte(`"` + state + `"`), nil
 }
 
 // Item is an item in the collection.
 type Item struct {
-	Key        string
-	State      stateMachine
-	Properties map[string]interface{}
+	Key   string
+	State stateMachine
+	Data  map[string]interface{}
 }
 
 // Collection is a Managed that tracks a set of finite state machines.
@@ -96,21 +100,27 @@ func (c *Collection) Metadata() metadata.Plugin {
 }
 
 // MetadataRemove removes the object in the metadata plugin interface
-func (c *Collection) MetadataRemove(k string) {
+func (c *Collection) MetadataRemove(key func(instance.Description) (string, error), v []instance.Description) {
 	c.metadataUpdates <- func(view map[string]interface{}) {
-		delete(view, k)
+
+		for _, d := range v {
+
+			k, err := key(d)
+			if err != nil {
+				log.Error("cannot get key", "instance", d)
+				continue
+			}
+
+			delete(view, k)
+		}
 	}
 }
 
-// MetadataExport exports the object in the metadata plugin interface
-func (c *Collection) MetadataExport(k string, d instance.Description) error {
+// MetadataExport exports the objects in the metadata plugin interface. A keyfunc is required to compute
+// the key based on the instance.
+func (c *Collection) MetadataExport(key func(instance.Description) (string, error), v []instance.Description) error {
 
-	var p interface{}
-	if err := d.Properties.Decode(&p); err != nil {
-		log.Error("cannot decode properties", "instance", d.ID, "err", err)
-		return err
-	}
-
+	// metadata entry struct ==> this struct copies the instance.Description
 	type entry struct {
 		ID         instance.ID
 		LogicalID  *instance.LogicalID
@@ -118,12 +128,29 @@ func (c *Collection) MetadataExport(k string, d instance.Description) error {
 		Properties interface{} // changed from types.Any
 	}
 
+	// A single update sets all of the instances
 	c.metadataUpdates <- func(view map[string]interface{}) {
-		view[k] = &entry{
-			ID:         d.ID,
-			LogicalID:  d.LogicalID,
-			Tags:       d.Tags,
-			Properties: p,
+
+		for _, d := range v {
+
+			k, err := key(d)
+			if err != nil {
+				log.Error("cannot get key", "instance", d)
+				continue
+			}
+
+			var p interface{}
+			if err := d.Properties.Decode(&p); err != nil {
+				log.Error("cannot decode properties", "instance", d.ID, "err", err)
+			}
+
+			view[k] = &entry{
+				ID:         d.ID,
+				LogicalID:  d.LogicalID,
+				Tags:       d.Tags,
+				Properties: p,
+			}
+
 		}
 	}
 	return nil
@@ -134,9 +161,9 @@ func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	v := &Item{
-		Key:        k,
-		State:      stateMachine{fsm, spec},
-		Properties: data,
+		Key:   k,
+		State: stateMachine{fsm, spec},
+		Data:  data,
 	}
 	c.items[k] = v
 	return v
