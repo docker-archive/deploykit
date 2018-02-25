@@ -6,6 +6,7 @@ import (
 
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/controller"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -26,6 +27,8 @@ type ControlLoop interface {
 // Managed is the interface implemented by managed objects within a controller
 type Managed interface {
 	ControlLoop
+
+	Metadata() metadata.Plugin
 
 	Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error)
 	Enforce(types.Spec) (*types.Object, error)
@@ -109,6 +112,19 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 
 	log.Debug("found managed", "search", search, "spec", spec, "found", out)
 	return out, nil
+}
+
+// Metadata exposes any metdata implementations
+func (c *Controller) Metadata() (plugins map[string]metadata.Plugin, err error) {
+	plugins = map[string]metadata.Plugin{}
+
+	for k, m := range c.managed {
+		p := (*m).Metadata()
+		if p != nil {
+			plugins[k] = p
+		}
+	}
+	return plugins, nil
 }
 
 // Plan is a commit without actually making the changes.  The controller returns a proposed object state

@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -78,6 +79,11 @@ func newEnroller(scope scope.Scope, leader func() stack.Leadership, options enro
 		l.ticker)
 
 	return l, nil
+}
+
+// Metadata returns an optional metadata.Plugin implementation
+func (l *enroller) Metadata() metadata.Plugin {
+	return nil
 }
 
 func (l *enroller) isLeader() (is bool, err error) {

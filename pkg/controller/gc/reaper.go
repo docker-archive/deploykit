@@ -13,6 +13,7 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -91,6 +92,11 @@ func (r *reaper) object() (*types.Object, error) {
 		State: snapshot,
 	}
 	return &object, nil
+}
+
+// Metadata returns an optional metadata.Plugin implementation
+func (r *reaper) Metadata() metadata.Plugin {
+	return nil
 }
 
 // Start starts the reaper

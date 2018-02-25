@@ -73,7 +73,8 @@ func Run(scope scope.Scope, name plugin.Name,
 		}, options)
 
 	impls = map[run.PluginCode]interface{}{
-		run.Controller: resource,
+		run.Controller: resource.Controllers,
+		run.Metadata:   resource.Metadata,
 	}
 
 	return

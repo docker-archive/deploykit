@@ -16,8 +16,6 @@ type collection struct {
 
 	properties resource.Properties
 	options    resource.Options
-
-	instancePlugins map[string]*internal.InstanceObserver
 }
 
 func newCollection(scope scope.Scope, leader func() stack.Leadership,
@@ -32,26 +30,25 @@ func newCollection(scope scope.Scope, leader func() stack.Leadership,
 		return nil, err
 	}
 	c := &collection{
-		Collection:      base,
-		options:         options,
-		instancePlugins: map[string]*internal.InstanceObserver{},
+		Collection: base,
+		options:    options,
 	}
 
 	// set the behaviors
-	base.StartFunc = c.start
+	base.StartFunc = c.run
 	base.StopFunc = c.stop
 	base.UpdateSpecFunc = c.updateSpec
 	return c, nil
 }
 
-func (c *collection) start(ctx context.Context) {
-	log.Info("starting")
+func (c *collection) run(ctx context.Context) {
 
 	// channels that aggregate from all the instance accessors
 	type event struct {
 		name      string
 		instances []instance.Description
 	}
+
 	allLost := make(chan *event, 100)
 	allFound := make(chan *event, 100)
 
@@ -89,7 +86,13 @@ func (c *collection) start(ctx context.Context) {
 		accessor.Start()
 	}
 
+	type entry struct {
+		Key        string
+		Properties interface{}
+	}
+
 	go func() {
+
 		for {
 
 			select {
@@ -112,6 +115,9 @@ func (c *collection) start(ctx context.Context) {
 					}
 
 					log.Info("lost", "instance", n, "name", lost.name, "key", k)
+
+					// Update the view in the metadata plugin
+					c.MetadataRemove(k)
 				}
 
 			case found, ok := <-allFound:
@@ -132,6 +138,16 @@ func (c *collection) start(ctx context.Context) {
 						break
 					}
 					log.Info("found", "instance", n, "name", found.name, "key", k)
+
+					item := c.Collection.Get(k)
+					if item == nil {
+						item = c.Put(k, nil, nil, map[string]interface{}{
+							"instance": n,
+						})
+					}
+
+					// Update the view in the metadata plugin
+					c.MetadataExport(k, n)
 				}
 			}
 		}

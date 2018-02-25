@@ -7,8 +7,11 @@ import (
 	"time"
 
 	"github.com/docker/infrakit/pkg/fsm"
+	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/controller"
+	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -66,6 +69,9 @@ type Collection struct {
 	poller  *Poller
 	ticker  <-chan time.Time
 
+	metadata        metadata.Plugin
+	metadataUpdates chan func(map[string]interface{})
+
 	lock sync.RWMutex
 }
 
@@ -73,23 +79,67 @@ type Collection struct {
 // of finite state machines (FSM).
 func NewCollection(scope scope.Scope, leader func() stack.Leadership) (*Collection, error) {
 	c := &Collection{
-		leader: leader,
-		scope:  scope,
-		items:  map[string]*Item{},
-		stop:   make(chan struct{}),
+		leader:          leader,
+		scope:           scope,
+		items:           map[string]*Item{},
+		metadataUpdates: make(chan func(map[string]interface{})),
+		stop:            make(chan struct{}),
 	}
+
+	c.metadata = metadata_plugin.NewPluginFromChannel(c.metadataUpdates)
 	return c, nil
 }
 
+// Metadata returns a metadata plugin implementation. Optional; ok to be nil
+func (c *Collection) Metadata() metadata.Plugin {
+	return c.metadata
+}
+
+// MetadataRemove removes the object in the metadata plugin interface
+func (c *Collection) MetadataRemove(k string) {
+	c.metadataUpdates <- func(view map[string]interface{}) {
+		delete(view, k)
+	}
+}
+
+// MetadataExport exports the object in the metadata plugin interface
+func (c *Collection) MetadataExport(k string, d instance.Description) error {
+
+	var p interface{}
+	if err := d.Properties.Decode(&p); err != nil {
+		log.Error("cannot decode properties", "instance", d.ID, "err", err)
+		return err
+	}
+
+	type entry struct {
+		ID         instance.ID
+		LogicalID  *instance.LogicalID
+		Tags       map[string]string
+		Properties interface{} // changed from types.Any
+	}
+
+	c.metadataUpdates <- func(view map[string]interface{}) {
+		view[k] = &entry{
+			ID:         d.ID,
+			LogicalID:  d.LogicalID,
+			Tags:       d.Tags,
+			Properties: p,
+		}
+	}
+	return nil
+}
+
 // Put puts an item by key
-func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]interface{}) {
+func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]interface{}) *Item {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.items[k] = &Item{
+	v := &Item{
 		Key:        k,
 		State:      stateMachine{fsm, spec},
 		Properties: data,
 	}
+	c.items[k] = v
+	return v
 }
 
 // Get returns an item by key.
@@ -162,6 +212,11 @@ func (c *Collection) Stop() error {
 	defer c.lock.Unlock()
 
 	log.Debug("Stop", "V", debugV)
+
+	if c.metadataUpdates != nil {
+		close(c.metadataUpdates)
+		c.metadataUpdates = nil
+	}
 
 	if c.StopFunc == nil {
 		return nil

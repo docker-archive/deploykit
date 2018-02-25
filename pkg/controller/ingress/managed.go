@@ -14,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -112,4 +113,9 @@ func (c *managed) started() bool {
 	defer c.lock.RUnlock()
 
 	return c.process != nil && c.poller != nil
+}
+
+// Metadata returns an optional metadata.Plugin implementation
+func (r *managed) Metadata() metadata.Plugin {
+	return nil
 }
