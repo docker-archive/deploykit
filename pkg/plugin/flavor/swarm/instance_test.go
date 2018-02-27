@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
 	mock_client "github.com/docker/infrakit/pkg/mock/docker/docker/client"
 	"github.com/docker/infrakit/pkg/spi/instance"
@@ -11,6 +12,7 @@ import (
 	"github.com/docker/infrakit/pkg/util/docker"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/context"
 )
 
 func TestSwarmInstDescribeError(t *testing.T) {
@@ -192,7 +194,7 @@ func TestSwarmInstDescribeNodesWithoutProps(t *testing.T) {
 		insts)
 }
 
-func TestSwarmInstDestroy(t *testing.T) {
+func TestSwarmInstDestroyNoNodes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -201,11 +203,88 @@ func TestSwarmInstDestroy(t *testing.T) {
 		return client, nil
 	}, docker.ConnectInfo{})
 
+	nodeID := "abc1234"
 	client.EXPECT().Close().AnyTimes()
+	expectedErr := fmt.Errorf("no-node-error")
+	client.EXPECT().NodeInspectWithRaw(context.Background(), nodeID).Return(swarm.Node{}, nil, expectedErr).Times(1)
 
-	err := p.Destroy(instance.ID(""), instance.Termination)
+	err := p.Destroy(instance.ID(nodeID), instance.Termination)
 	require.Error(t, err)
-	require.EqualError(t, err, "Destroy not yet supported for swarm instance")
+	require.Equal(t, expectedErr, err)
+}
+
+func TestSwarmInstDestroyManager(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := mock_client.NewMockAPIClientCloser(ctrl)
+	p := NewInstancePlugin(func(Spec) (docker.APIClientCloser, error) {
+		return client, nil
+	}, docker.ConnectInfo{})
+
+	nodeID := "abc1234"
+	nodeVersion := uint64(1234)
+	node := swarm.Node{
+		ID: nodeID,
+		Spec: swarm.NodeSpec{
+			Role: swarm.NodeRoleManager,
+		},
+		Meta: swarm.Meta{
+			Version: swarm.Version{
+				Index: nodeVersion,
+			},
+		},
+	}
+	nodeSpecUpdate := swarm.NodeSpec{
+		Role: swarm.NodeRoleWorker,
+	}
+	client.EXPECT().Close().AnyTimes()
+	client.EXPECT().NodeInspectWithRaw(context.Background(), nodeID).Return(node, nil, nil).Times(1)
+	client.EXPECT().NodeUpdate(
+		context.Background(),
+		nodeID,
+		swarm.Version{Index: nodeVersion},
+		nodeSpecUpdate).Return(nil).Times(1)
+	client.EXPECT().NodeRemove(
+		context.Background(),
+		nodeID,
+		docker_types.NodeRemoveOptions{Force: true}).Return(nil).Times(1)
+
+	err := p.Destroy(instance.ID(nodeID), instance.Termination)
+	require.NoError(t, err)
+}
+
+func TestSwarmInstDestroyWorker(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := mock_client.NewMockAPIClientCloser(ctrl)
+	p := NewInstancePlugin(func(Spec) (docker.APIClientCloser, error) {
+		return client, nil
+	}, docker.ConnectInfo{})
+
+	nodeID := "abc1234"
+	nodeVersion := uint64(1234)
+	node := swarm.Node{
+		ID: nodeID,
+		Spec: swarm.NodeSpec{
+			Role: swarm.NodeRoleWorker,
+		},
+		Meta: swarm.Meta{
+			Version: swarm.Version{
+				Index: nodeVersion,
+			},
+		},
+	}
+	client.EXPECT().Close().AnyTimes()
+	client.EXPECT().NodeInspectWithRaw(context.Background(), nodeID).Return(node, nil, nil).Times(1)
+	client.EXPECT().NodeRemove(
+		context.Background(),
+		nodeID,
+		docker_types.NodeRemoveOptions{Force: true}).Return(nil).Times(1)
+
+	err := p.Destroy(instance.ID(nodeID), instance.Termination)
+	require.NoError(t, err)
 }
 
 func TestSwarmInstValidate(t *testing.T) {
