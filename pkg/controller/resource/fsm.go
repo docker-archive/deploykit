@@ -13,6 +13,7 @@ import (
 var defaultModelProperties = resource.ModelProperties{
 	TickUnit:                    types.FromDuration(1 * time.Second),
 	WaitBeforeProvision:         fsm.Tick(10),
+	WaitBeforeDestroy:           fsm.Tick(10),
 	InstanceProvisionBufferSize: 10,
 	InstanceDestroyBufferSize:   10,
 }
@@ -49,8 +50,12 @@ func (m *model) Provision() <-chan fsm.FSM {
 	return m.instanceProvisionChan
 }
 
-func (m *model) New() fsm.FSM {
+func (m *model) Requested() fsm.FSM {
 	return m.set.Add(requested)
+}
+
+func (m *model) Unmatched() fsm.FSM {
+	return m.set.Add(unmatched)
 }
 
 func (m *model) Spec() *fsm.Spec {
@@ -125,6 +130,9 @@ const (
 	waiting
 	ready
 	cannotProvision
+	unmatched
+	terminating
+	terminated
 
 	// Signals
 	resourceFound fsm.Signal = iota
@@ -133,6 +141,7 @@ const (
 	provisionError
 	dependencyMissing
 	dependencyReady
+	terminate
 )
 
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
@@ -206,6 +215,28 @@ func BuildModel(properties resource.Properties) (resource.Model, error) {
 		fsm.State{
 			Index: cannotProvision,
 		},
+		fsm.State{
+			Index: unmatched,
+			TTL:   fsm.Expiry{properties.WaitBeforeDestroy, terminate},
+			Transitions: map[fsm.Signal]fsm.Index{
+				terminate: terminating,
+			},
+			Actions: map[fsm.Signal]fsm.Action{
+				terminate: func(n fsm.FSM) error {
+					model.instanceDestroyChan <- n
+					return nil
+				},
+			},
+		},
+		fsm.State{
+			Index: terminating,
+			Transitions: map[fsm.Signal]fsm.Index{
+				resourceLost: terminated,
+			},
+		},
+		fsm.State{
+			Index: terminated,
+		},
 	)
 
 	if err != nil {
@@ -218,10 +249,14 @@ func BuildModel(properties resource.Properties) (resource.Model, error) {
 		provisioning:    "PROVISIONING",
 		waiting:         "WAITING",
 		cannotProvision: "CANNOT_PROVISION",
+		unmatched:       "UNMATCHED",
+		terminating:     "TERMINATING",
+		terminated:      "TERMINATED",
 	}).SetSignalNames(map[fsm.Signal]string{
 		resourceFound:     "resource_found",
 		resourceLost:      "resource_lost",
 		provision:         "provision",
+		terminate:         "terminate",
 		provisionError:    "provision_error",
 		dependencyMissing: "dependency_missing",
 		dependencyReady:   "dependency_ready",

@@ -185,6 +185,19 @@ func (c *Collection) Get(k string) *Item {
 	return c.items[k]
 }
 
+// GetByFSM returns an item by the state machine
+func (c *Collection) GetByFSM(f fsm.FSM) (item *Item) {
+	c.Visit(func(i Item) bool {
+		if i.State.ID() == f.ID() {
+			copy := i
+			item = &copy
+			return false
+		}
+		return true
+	})
+	return
+}
+
 // Delete an item by key
 func (c *Collection) Delete(k string) {
 	c.lock.RLock()

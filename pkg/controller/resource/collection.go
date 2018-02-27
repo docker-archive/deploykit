@@ -68,6 +68,12 @@ func (c *collection) run(ctx context.Context) {
 	// Start the model
 	c.model.Start()
 
+	// For each accessor / resource we create one fsm
+	for k := range c.properties.Resources {
+		f := c.model.Requested()
+		c.Put(k, f, c.model.Spec(), nil)
+	}
+
 	destroyCh := c.model.Destroy()
 	provisionCh := c.model.Provision()
 
@@ -78,13 +84,30 @@ func (c *collection) run(ctx context.Context) {
 				if !ok {
 					return
 				}
-				log.Info("Destroy", "fsm", f.ID())
+
+				item := c.Collection.GetByFSM(f)
+				if item != nil {
+					accessor := c.properties.Resources[item.Key]
+					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
+				}
 
 			case f, ok := <-provisionCh:
 				if !ok {
 					return
 				}
-				log.Info("Provision", "fsm", f.ID())
+
+				item := c.Collection.GetByFSM(f)
+				if item != nil {
+					accessor := c.properties.Resources[item.Key]
+					log.Info("Provision", "fsm", f.ID(), "item", item, "accessor", accessor)
+
+					instanceId, err := accessor.Provision(c.populateDependencies)
+					if err != nil {
+						log.Error("cannot provision", "err", err)
+					} else {
+						log.Info("provisioned", "id", instanceId)
+					}
+				}
 			}
 		}
 	}()
@@ -206,13 +229,17 @@ func (c *collection) run(ctx context.Context) {
 					}
 					item := c.Collection.Get(k)
 					if item == nil {
-						item = c.Put(k, nil, nil, map[string]interface{}{
+						// In this case, the fsm isn't requested.. it's something we get out of band
+						// that somehow shows up (or from previous runs but now the user has
+						// removed it from the spec and performed a commit.
+						f := c.model.Unmatched()
+						item = c.Put(k, f, c.model.Spec(), map[string]interface{}{
 							"instance": n,
 						})
-
-						// Notify watchers if any
-						c.watch.Notify(k)
 					}
+
+					// Notify watchers if any
+					c.watch.Notify(k)
 
 					log.Info("found", "instance", n, "name", found.name, "key", k)
 					c.model.Found() <- item.State.FSM
@@ -307,6 +334,10 @@ func keyFromPath(path types.Path) (key string, err error) {
 	}
 	key = *k
 	return
+}
+
+func (c *collection) populateDependencies(spec instance.Spec) (instance.Spec, error) {
+	return spec, nil
 }
 
 // depends parses the blob and returns a list of paths

@@ -59,7 +59,8 @@ type Model interface {
 	Start()
 	Stop()
 	Spec() *fsm.Spec
-	New() fsm.FSM
+	Requested() fsm.FSM
+	Unmatched() fsm.FSM
 	Found() chan<- fsm.FSM
 	Lost() chan<- fsm.FSM
 	Provision() <-chan fsm.FSM
@@ -70,6 +71,7 @@ type Model interface {
 type ModelProperties struct {
 	TickUnit                    types.Duration
 	WaitBeforeProvision         fsm.Tick
+	WaitBeforeDestroy           fsm.Tick
 	InstanceProvisionBufferSize int
 	InstanceDestroyBufferSize   int
 }

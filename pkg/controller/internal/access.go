@@ -35,6 +35,14 @@ func (a *InstanceAccess) Init(scope scope.Scope, retry time.Duration) error {
 }
 
 // Provision provisions an instance using the spec included in the struct
-func (a *InstanceAccess) Provision() (*instance.ID, error) {
-	return a.Plugin.Provision(a.Spec)
+func (a *InstanceAccess) Provision(process func(instance.Spec) (instance.Spec, error)) (*instance.ID, error) {
+	spec := a.Spec
+	if process != nil {
+		processed, err := process(spec)
+		if err != nil {
+			return nil, err
+		}
+		spec = processed
+	}
+	return a.Plugin.Provision(spec)
 }
