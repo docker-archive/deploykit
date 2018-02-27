@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/controller/internal"
+	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/controller"
@@ -33,7 +34,7 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	}
 
 	dep := depends.Runnables{}
-	for _, access := range properties {
+	for _, access := range properties.Resources {
 		dep = append(dep,
 			depends.AsRunnable(
 				types.Spec{
@@ -48,7 +49,30 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 }
 
 // Properties is the schema of the configuration in the types.Spec.Properties
-type Properties map[string]*internal.InstanceAccess
+type Properties struct {
+	Resources       map[string]*internal.InstanceAccess
+	ModelProperties `json:",inline" yaml:",inline"`
+}
+
+// Model is the interface offered by the workflow model.
+type Model interface {
+	Start()
+	Stop()
+	Spec() *fsm.Spec
+	New() fsm.FSM
+	Found() chan<- fsm.FSM
+	Lost() chan<- fsm.FSM
+	Provision() <-chan fsm.FSM
+	Destroy() <-chan fsm.FSM
+}
+
+// ModelProperties contain fsm tuning parameters
+type ModelProperties struct {
+	TickUnit                    types.Duration
+	WaitBeforeProvision         fsm.Tick
+	InstanceProvisionBufferSize int
+	InstanceDestroyBufferSize   int
+}
 
 // Validate validates the input properties
 func (p Properties) Validate(ctx context.Context) error {

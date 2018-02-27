@@ -231,6 +231,7 @@ func startAtPath(listen []string, discoverPath string,
 		}
 		l, err := net.Listen("tcp", listen[0])
 		if err != nil {
+			log.Error("error listening tcp", "err", err)
 			return nil, err
 		}
 		listener = l
@@ -255,6 +256,7 @@ func startAtPath(listen []string, discoverPath string,
 		}
 		l, err := net.Listen("unix", discoverPath)
 		if err != nil {
+			log.Error("error listening unix", "err", err)
 			return nil, err
 		}
 		listener = l
@@ -270,7 +272,7 @@ func startAtPath(listen []string, discoverPath string,
 
 		err := gracefulServer.Serve(listener)
 		if err != nil {
-			log.Warn("err", "err", err)
+			log.Error("http server err", "err", err)
 		}
 
 		for _, ch := range stops {

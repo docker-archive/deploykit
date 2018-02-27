@@ -2,23 +2,26 @@ kind: resource
 metadata:
   name: storage
 properties:
-  cloud1-net1:
-    plugin: cloud1/disk
-    labels:
-      cloud: cloud1
-      type: storage
-    ObserveInterval: 1s
-    KeySelector: \{\{.Tags.name\}\}
-    Properties:
-      fs: ext4
-      size: 1TB
-  cloud2-net1:
-    plugin: cloud2/disk
-    labels:
-      cloud: cloud2
-      type: storage
-    ObserveInterval: 5s
-    KeySelector: \{\{.Tags.name\}\}
-    Properties:
-      fs: ext4
-      size: 1TB
+  resources:
+    cloud1-net1:
+      plugin: cloud1/disk
+      labels:
+        cloud: cloud1
+        type: storage
+        user: {{ env `USER` }}
+      ObserveInterval: 0.5s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        fs: ext4
+        size: 1TB
+    cloud2-net1:
+      plugin: cloud2/disk
+      labels:
+        cloud: cloud2
+        type: storage
+        user: {{ env `USER` }}
+      ObserveInterval: 0.5s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        fs: ext4
+        size: 1TB
