@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	docker_types "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/docker/client"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/docker/infrakit/pkg/util/docker"
@@ -28,7 +30,11 @@ type InstancePlugin struct {
 	connectinfo docker.ConnectInfo
 }
 
-// DescribeInstances .
+// DescribeInstances returns a slice of instance.Description objects, each having:
+// - Docker node ID as ID
+// - Docker engine labels as Tags
+// - Docker node "infrakit-link" engine label as the LogicalID (if set)
+// - Docker node data as Properties
 func (s *InstancePlugin) DescribeInstances(labels map[string]string, properties bool) ([]instance.Description, error) {
 	dockerClient, err := s.base.getDockerClient(Spec{Docker: s.connectinfo})
 	if err != nil {
@@ -73,15 +79,58 @@ func (s *InstancePlugin) DescribeInstances(labels map[string]string, properties 
 	return result, nil
 }
 
-// Destroy .
-func (s *InstancePlugin) Destroy(instance instance.ID, context instance.Context) error {
+// Destroy removes the node with the given instance ID from the swarm. If the node is currently
+// a manager then it is demoted prior to removal.
+func (s *InstancePlugin) Destroy(instance instance.ID, instContext instance.Context) error {
 	dockerClient, err := s.base.getDockerClient(Spec{Docker: s.connectinfo})
 	if err != nil {
 		return err
 	}
 	defer dockerClient.Close()
-	// TODO: remove node from swarm
-	return fmt.Errorf("Destroy not yet supported for swarm instance")
+
+	// Retrieve the swarm node with the given ID
+	ctx := context.Background()
+	nodeID := string(instance)
+	nodeInfo, _, err := dockerClient.NodeInspectWithRaw(ctx, nodeID)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			log.Warn("Unable to remove from swarm - not found in swarm", "id", nodeID)
+			return nil
+		}
+		log.Info("Swarm node removal, failed to inspect node",
+			"id", nodeID,
+			"error", err)
+		return err
+	}
+
+	// If the node is a manager then demote
+	if nodeInfo.Spec.Role == swarm.NodeRoleManager {
+		nodeInfo.Spec.Role = swarm.NodeRoleWorker
+		if err := dockerClient.NodeUpdate(ctx, nodeID, nodeInfo.Version, nodeInfo.Spec); err != nil {
+			log.Warn("Swarm node removal, failed to demote manager",
+				"hostname", nodeInfo.Description.Hostname,
+				"id", nodeID,
+				"error", err)
+			return err
+		}
+		log.Info("Swarm node removal, successfully demoted manager",
+			"hostname", nodeInfo.Description.Hostname,
+			"id", nodeID)
+	}
+
+	// And remove
+	if err := dockerClient.NodeRemove(ctx, nodeID, docker_types.NodeRemoveOptions{Force: true}); err != nil {
+		log.Warn("Swarm node removal, failed to remove node",
+			"hostname", nodeInfo.Description.Hostname,
+			"id", nodeID,
+			"error", err)
+		return err
+	}
+	log.Info("Successfully removed node from swarm",
+		"hostname", nodeInfo.Description.Hostname,
+		"id", instance)
+	return nil
+
 }
 
 // Validate is not suported
