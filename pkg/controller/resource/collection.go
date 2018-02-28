@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/docker/infrakit/pkg/controller/internal"
@@ -12,12 +13,24 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+type resources map[string]instance.Description
+
+func (r resources) eval(p types.Path) (interface{}, error) {
+	v := types.Get(p, r)
+	if v == nil {
+		return nil, fmt.Errorf("missing data")
+	}
+	return v, nil
+}
+
 type collection struct {
 	*internal.Collection
 
 	properties resource.Properties
 	options    resource.Options
-	model      resource.Model
+	model      *Model
+
+	resources resources
 
 	watch    *Watch
 	watching map[string]Watchers
@@ -38,6 +51,7 @@ func newCollection(scope scope.Scope, options resource.Options) (internal.Manage
 		Collection: base,
 		options:    options,
 		watch:      &Watch{},
+		resources:  resources{},
 		watching:   map[string]Watchers{},
 	}
 
@@ -56,10 +70,7 @@ func (c *collection) run(ctx context.Context) {
 		instances []instance.Description
 	}
 
-	allLost := make(chan *event, c.options.LostBufferSize)
-	allFound := make(chan *event, c.options.FoundBufferSize)
-	allDependsMet := make(chan *event, len(c.properties.Resources))
-
+	dependencyComplete := make(chan *event, len(c.properties.Resources))
 	accessors := map[string]*internal.InstanceAccess(c.properties.Resources)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -74,55 +85,21 @@ func (c *collection) run(ctx context.Context) {
 		c.Put(k, f, c.model.Spec(), nil)
 	}
 
-	destroyCh := c.model.Destroy()
-	provisionCh := c.model.Provision()
-
-	go func() {
-		for {
-			select {
-			case f, ok := <-destroyCh:
-				if !ok {
-					return
-				}
-
-				item := c.Collection.GetByFSM(f)
-				if item != nil {
-					accessor := c.properties.Resources[item.Key]
-					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
-				}
-
-			case f, ok := <-provisionCh:
-				if !ok {
-					return
-				}
-
-				item := c.Collection.GetByFSM(f)
-				if item != nil {
-					accessor := c.properties.Resources[item.Key]
-					log.Info("Provision", "fsm", f.ID(), "item", item, "accessor", accessor)
-
-					instanceId, err := accessor.Provision(c.populateDependencies)
-					if err != nil {
-						log.Error("cannot provision", "err", err)
-					} else {
-						log.Info("provisioned", "id", instanceId)
-					}
-				}
-			}
-		}
-	}()
-
 	// Start all the watchers that have any dependencies
 	for k, w := range c.watching {
 		ch := w.FanIn(ctx)
 		go func(n string) {
 			<-ch
 			// send event we got dependency satisified
-			allDependsMet <- &event{name: n}
+			dependencyComplete <- &event{name: n}
 		}(k)
 	}
 
 	// Start all the instance accessors and wire up the events.
+
+	lostInstances := make(chan *event, c.properties.ChannelBufferSize)  // ch to aggregate all lost events
+	foundInstances := make(chan *event, c.properties.ChannelBufferSize) // ch to aggregate all found events
+
 	for k, a := range accessors {
 
 		name := k
@@ -138,14 +115,14 @@ func (c *collection) run(ctx context.Context) {
 						log.Debug("found events done", "name", name, "V", debugV)
 						return
 					}
-					allFound <- &event{name: name, instances: list}
+					foundInstances <- &event{name: name, instances: list}
 
 				case list, ok := <-accessor.Lost():
 					if !ok {
 						log.Debug("lost events done", "name", name, "V", debugV)
 						return
 					}
-					allLost <- &event{name: name, instances: list}
+					lostInstances <- &event{name: name, instances: list}
 				}
 			}
 		}()
@@ -154,30 +131,62 @@ func (c *collection) run(ctx context.Context) {
 		accessor.Start()
 	}
 
-	type entry struct {
-		Key        string
-		Properties interface{}
-	}
-
 	go func() {
 
 		for {
 
 			select {
 
-			case depends, ok := <-allDependsMet:
+			case f, ok := <-c.model.Destroy():
 				if !ok {
-					log.Info("All depends done")
+					return
+				}
+
+				item := c.Collection.GetByFSM(f)
+				if item != nil {
+					accessor := c.properties.Resources[item.Key]
+					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
+				}
+
+			case f, ok := <-c.model.Provision():
+				if !ok {
+					return
+				}
+
+				item := c.Collection.GetByFSM(f)
+				if item != nil {
+					accessor := c.properties.Resources[item.Key]
+					log.Info("Provision", "fsm", f.ID(), "item", item, "accessor", accessor)
+
+					spec, err := c.populateDependencies(accessor.Spec)
+					if err != nil {
+						item.State.Signal(dependencyMissing)
+						continue
+					}
+					instanceId, err := accessor.Provision(spec)
+					if err != nil {
+						log.Error("cannot provision", "err", err)
+						item.State.Signal(provisionError)
+
+					} else {
+						log.Info("provisioned", "id", instanceId)
+						/// don't do anything. next sample will make sure it moves to ready
+					}
+				}
+
+			case haveAllData, ok := <-dependencyComplete:
+				if !ok {
+					log.Info("All haveAllData done")
 					return
 				}
 				// Signal that we have all dependencies met for a given object
-				item := c.Collection.Get(depends.name)
+				item := c.Collection.Get(haveAllData.name)
 				if item != nil {
-					log.Info("Has all dependencies", "name", depends.name)
-					c.model.Found() <- item.State.FSM
+					log.Info("Has all dependencies", "name", haveAllData.name)
+					item.State.Signal(dependencyReady)
 				}
 
-			case lost, ok := <-allLost:
+			case lost, ok := <-lostInstances:
 				if !ok {
 					log.Info("Lost aggregator done")
 					return
@@ -201,12 +210,12 @@ func (c *collection) run(ctx context.Context) {
 
 					if item := c.Collection.Get(k); item != nil {
 						log.Info("lost", "instance", n, "name", lost.name, "key", k)
-						c.model.Lost() <- item.State.FSM
+						item.State.Signal(resourceLost)
 					}
-
+					delete(c.resources, k)
 				}
 
-			case found, ok := <-allFound:
+			case found, ok := <-foundInstances:
 				if !ok {
 					log.Info("Found aggregator done")
 					return
@@ -238,11 +247,13 @@ func (c *collection) run(ctx context.Context) {
 						})
 					}
 
+					c.resources[k] = n
+
 					// Notify watchers if any
 					c.watch.Notify(k)
 
 					log.Info("found", "instance", n, "name", found.name, "key", k)
-					c.model.Found() <- item.State.FSM
+					item.State.Signal(resourceFound)
 				}
 			}
 		}
@@ -313,7 +324,7 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 	}
 
 	// build the fsm model
-	var model resource.Model
+	var model *Model
 	model, err = BuildModel(properties)
 	if err != nil {
 		return
@@ -326,6 +337,60 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 	return
 }
 
+// Assumption: the spec.Properties is fully rendered.  We can take the spec.Properties and
+// generate a list of dependencies via depends().  Now we are rendering this spec.Properties
+// into the final form with all the dependencies substituted.
+func (c *collection) populateDependencies(spec instance.Spec) (instance.Spec, error) {
+	processed := spec
+	var properties interface{}
+	err := types.Decode(processed.Properties.Bytes(), &properties)
+	if err != nil {
+		return spec, err
+	}
+
+	properties, _ = dependV(properties, c.resources.eval) // should have all values populated
+	any, err := types.AnyValue(properties)
+	if err != nil {
+		return spec, err
+	}
+
+	processed.Properties = any
+	return processed, nil
+}
+
+func dependV(v interface{}, fetcher func(types.Path) (interface{}, error)) (interface{}, bool) {
+	substituted := false
+	switch v := v.(type) {
+	case map[string]interface{}:
+		for k, vv := range v {
+			newV, substitute := dependV(vv, fetcher)
+			if substitute {
+				v[k] = newV
+				substituted = true
+			}
+		}
+	case []interface{}:
+		for i, vv := range v {
+			newV, substitute := dependV(vv, fetcher)
+			if substitute {
+				v[i] = newV
+				substituted = true
+			}
+		}
+	case string:
+		if p, ok := parseDepends(v); ok {
+			// found a depend, now get the real value and swap
+			newV, err := fetcher(p)
+			if err != nil {
+				return err, true // return an error attached at the same location
+			}
+			return newV, true
+		}
+	default:
+	}
+	return v, substituted
+}
+
 func keyFromPath(path types.Path) (key string, err error) {
 	k := path.Clean().Index(0)
 	if k == nil {
@@ -336,12 +401,47 @@ func keyFromPath(path types.Path) (key string, err error) {
 	return
 }
 
-func (c *collection) populateDependencies(spec instance.Spec) (instance.Spec, error) {
-	return spec, nil
+// depends parses the blob and returns a list of paths. The path's first component is the
+// name of the resource. e.g. dep `net1/cidr`
+func depends(any *types.Any) []types.Path {
+	var v interface{}
+	err := any.Decode(&v)
+	if err != nil {
+		return nil
+	}
+	l := parse(v, []types.Path{})
+	types.SortPaths(l)
+	return l
 }
 
-// depends parses the blob and returns a list of paths
-// examples)  dep `./net1/cidr` , dep `mystack/resource/networking/net2`
-func depends(any *types.Any) []types.Path {
-	return nil
+// Special format of a string value to denote a dependency on another resource's (within the same collection)
+// property field.  Eg. "@depends('net1/cidr')@"
+var dependsRegex = regexp.MustCompile("\\@depends\\('(([[:alnum:]]|\\.|/|\\[|\\])+)'\\)\\@")
+
+func parse(v interface{}, found []types.Path) (out []types.Path) {
+	switch v := v.(type) {
+	case map[string]interface{}:
+		for _, vv := range v {
+			out = append(out, parse(vv, nil)...)
+		}
+	case []interface{}:
+		for _, vv := range v {
+			out = append(out, parse(vv, nil)...)
+		}
+	case string:
+		if p, ok := parseDepends(v); ok {
+			out = append(out, p)
+		}
+	default:
+	}
+	out = append(found, out...)
+	return
+}
+
+func parseDepends(text string) (types.Path, bool) {
+	matches := dependsRegex.FindStringSubmatch(text)
+	if len(matches) > 1 {
+		return types.PathFromString(matches[1]), true
+	}
+	return types.Path{}, false
 }

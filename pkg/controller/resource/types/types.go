@@ -54,26 +54,12 @@ type Properties struct {
 	ModelProperties `json:",inline" yaml:",inline"`
 }
 
-// Model is the interface offered by the workflow model.
-type Model interface {
-	Start()
-	Stop()
-	Spec() *fsm.Spec
-	Requested() fsm.FSM
-	Unmatched() fsm.FSM
-	Found() chan<- fsm.FSM
-	Lost() chan<- fsm.FSM
-	Provision() <-chan fsm.FSM
-	Destroy() <-chan fsm.FSM
-}
-
 // ModelProperties contain fsm tuning parameters
 type ModelProperties struct {
-	TickUnit                    types.Duration
-	WaitBeforeProvision         fsm.Tick
-	WaitBeforeDestroy           fsm.Tick
-	InstanceProvisionBufferSize int
-	InstanceDestroyBufferSize   int
+	TickUnit            types.Duration
+	WaitBeforeProvision fsm.Tick
+	WaitBeforeDestroy   fsm.Tick
+	ChannelBufferSize   int
 }
 
 // Validate validates the input properties

@@ -61,11 +61,10 @@ func PathsFromStrings(a string, b ...string) Paths {
 
 // String returns the string representation of path
 func (p Path) String() string {
-	s := strings.Join([]string(p), "/")
-	if len(s) == 0 {
+	if len(p) == 0 {
 		return "."
 	}
-	return s
+	return strings.Join(p, "/")
 }
 
 // Valid returns true if is a valid path
@@ -206,7 +205,6 @@ func (p Path) Equal(other Path) bool {
 	return true
 }
 
-// Less return true if the path is lexicographically less than the other
 func (p Path) Less(other Path) bool {
 	min := len(p)
 	if len(other) < min {
@@ -224,12 +222,12 @@ func (p Path) Less(other Path) bool {
 type Paths []Path
 
 func (p Paths) Len() int           { return len(p) }
-func (p Paths) Less(i, j int) bool { return Path(p[i]).Less(Path(p[j])) }
+func (p Paths) Less(i, j int) bool { return p[i].String() < p[j].String() }
 func (p Paths) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // Sort sorts the paths. This will mutate the ordering of the paths in this slice.
-func (p *Paths) Sort() {
-	sort.Sort(*p)
+func (p Paths) Sort() {
+	sort.Sort(p)
 }
 
 // SortPaths sorts the paths

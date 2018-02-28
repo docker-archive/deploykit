@@ -11,14 +11,14 @@ import (
 )
 
 var defaultModelProperties = resource.ModelProperties{
-	TickUnit:                    types.FromDuration(1 * time.Second),
-	WaitBeforeProvision:         fsm.Tick(10),
-	WaitBeforeDestroy:           fsm.Tick(10),
-	InstanceProvisionBufferSize: 10,
-	InstanceDestroyBufferSize:   10,
+	TickUnit:            types.FromDuration(1 * time.Second),
+	WaitBeforeProvision: fsm.Tick(10),
+	WaitBeforeDestroy:   fsm.Tick(10),
+	ChannelBufferSize:   10,
 }
 
-type model struct {
+// Model encapsulates the workflow / state machines for provisioning resources
+type Model struct {
 	spec     *fsm.Spec
 	set      *fsm.Set
 	clock    *fsm.Clock
@@ -28,69 +28,48 @@ type model struct {
 
 	instanceDestroyChan   chan fsm.FSM
 	instanceProvisionChan chan fsm.FSM
-	instanceFoundChan     chan fsm.FSM
-	instanceLostChan      chan fsm.FSM
 
 	lock sync.RWMutex
 }
 
-func (m *model) Found() chan<- fsm.FSM {
-	return m.instanceFoundChan
-}
-
-func (m *model) Lost() chan<- fsm.FSM {
-	return m.instanceLostChan
-}
-
-func (m *model) Destroy() <-chan fsm.FSM {
+// Destroy is the channel to get signals to destroy an instance
+func (m *Model) Destroy() <-chan fsm.FSM {
 	return m.instanceDestroyChan
 }
 
-func (m *model) Provision() <-chan fsm.FSM {
+// Provision is the channel to get signals to provision new instance
+func (m *Model) Provision() <-chan fsm.FSM {
 	return m.instanceProvisionChan
 }
 
-func (m *model) Requested() fsm.FSM {
+// Requested adds a new fsm in the requested state
+func (m *Model) Requested() fsm.FSM {
 	return m.set.Add(requested)
 }
 
-func (m *model) Unmatched() fsm.FSM {
+// Unmatched adds a new fsm in unmatched state
+func (m *Model) Unmatched() fsm.FSM {
 	return m.set.Add(unmatched)
 }
 
-func (m *model) Spec() *fsm.Spec {
+// Spec returns the model description
+func (m *Model) Spec() *fsm.Spec {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	return m.spec
 }
 
-func (m *model) Start() {
+// Start starts the model
+func (m *Model) Start() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	m.clock.Start()
 	m.set = fsm.NewSet(m.spec, m.clock, fsm.DefaultOptions("resource"))
-	go func() {
-		for {
-			select {
-
-			case resource, ok := <-m.instanceFoundChan:
-				if !ok {
-					return
-				}
-				resource.Signal(resourceFound)
-			case resource, ok := <-m.instanceLostChan:
-				if !ok {
-					return
-				}
-				resource.Signal(resourceLost)
-			}
-		}
-	}()
 }
 
-func (m *model) Stop() {
+func (m *Model) Stop() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -99,11 +78,9 @@ func (m *model) Stop() {
 
 	close(m.instanceDestroyChan)
 	close(m.instanceProvisionChan)
-	close(m.instanceFoundChan)
-	close(m.instanceLostChan)
 }
 
-func (m *model) instanceDestroy(i fsm.FSM) error {
+func (m *Model) instanceDestroy(i fsm.FSM) error {
 	if m.instanceDestroyChan == nil {
 		return fmt.Errorf("not initialized")
 	}
@@ -145,12 +122,12 @@ const (
 )
 
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
-func BuildModel(properties resource.Properties) (resource.Model, error) {
+func BuildModel(properties resource.Properties) (*Model, error) {
 
-	model := &model{
+	model := &Model{
 		Properties:            properties,
-		instanceDestroyChan:   make(chan fsm.FSM, properties.InstanceDestroyBufferSize),
-		instanceProvisionChan: make(chan fsm.FSM, properties.InstanceProvisionBufferSize),
+		instanceDestroyChan:   make(chan fsm.FSM, properties.ChannelBufferSize),
+		instanceProvisionChan: make(chan fsm.FSM, properties.ChannelBufferSize),
 		tickSize:              1 * time.Second,
 	}
 
