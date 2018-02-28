@@ -1,8 +1,11 @@
 FROM alpine:latest
 
-RUN apk add --update wget ca-certificates openssl libvirt-dev openssh
+RUN apk add --update wget ca-certificates openssl libvirt-dev libvirt-static openssh
 
 RUN mkdir -p /infrakit/plugins /infrakit/configs /infrakit/logs /infrakit/cli /infrakit/instance/terraform
+
+# Default single node leader file
+RUN echo manager1 > /infrakit/leader
 
 VOLUME /infrakit
 WORKDIR /infrakit

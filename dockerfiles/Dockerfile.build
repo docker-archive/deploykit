@@ -1,6 +1,6 @@
-FROM golang:1.8-alpine
+FROM golang:1.10.0-alpine3.7
 
-RUN apk add --update git make gcc musl-dev wget ca-certificates openssl libvirt-dev
+RUN apk add --update git make gcc musl-dev wget ca-certificates openssl libvirt-dev libvirt-static
 RUN go get github.com/rancher/trash
 
 WORKDIR /go/src/github.com/docker/infrakit
@@ -8,6 +8,5 @@ WORKDIR /go/src/github.com/docker/infrakit
 VOLUME [ "/go/src/github.com/docker/infrakit/build" ]
 
 COPY . ./
-RUN trash  # Force updating the vendored sources per spec; this slows the build but is most correct.
 
 CMD make build-binaries terraform-linux

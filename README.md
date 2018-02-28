@@ -110,7 +110,7 @@ git clone git@github.com:docker/infrakit.git
 cd infrakit
 ```
 
-We recommended go version 1.7.1 or greater for all platforms.
+We recommended go version 1.9 or greater for all platforms.
 
 Also install a few build tools:
 ```shell
@@ -126,34 +126,8 @@ $ make ci
 ```shell
 $ make binaries
 ```
-Executables will be placed in the `./build` directory.
-This will produce binaries for tools and several reference Plugin implementations:
-  + [`infrakit`](cmd/infrakit/README.md): a command line interface to interact with plugins
-  + [`infrakit-group-default`](cmd/group/README.md): the default [Group plugin](./pkg/spi/group)
-  + [`infrakit-instance-file`](examples/instance/file): an Instance plugin using dummy files to represent instances
-  + [`infrakit-instance-terraform`](pkg/provider/terraform/instance):
-    an Instance plugin integrating [Terraform](https://www.terraform.io)
-  + [`infrakit-instance-vagrant`](examples/instance/vagrant):
-    an Instance plugin using [Vagrant](https://www.vagrantup.com/)
-  + [`infrakit-instance-docker`](examples/instance/docker):
-    an Instance plugin for provisioning Docker containers via the Docker API
-  + [`infrakit-instance-maas`](examples/instance/maas):
-    an Instance plugin using [MaaS](https://maas.io) to provision bare metal servers
-  + [`infrakit-instance-hyperkit`](pkg/plugin/instance/hyperkit):
-    an Instance plugin using [HyperKit](https://github.com/docker/hyperkit) to provision Xhyve-based guest vm's on Mac OSX
-  + [`infrakit-instance-libvirt`](pkg/plugin/instance/libvirt):
-    an Instance plugin using libvirt to provision KVM / QEMU vm instances
-  + [`infrakit-instance-packet`](pkg/plugin/instance/packet):
-    an Instance plugin for provisioning bare-metal servers from [Packet.net](https://packet.net)
-  + [`infrakit-flavor-vanilla`](examples/flavor/vanilla):
-    a Flavor plugin for plain vanilla set up with user data and labels
-  + [`infrakit-flavor-zookeeper`](examples/flavor/zookeeper):
-    a Flavor plugin for [Apache ZooKeeper](https://zookeeper.apache.org/) ensemble members
-  + [`infrakit-flavor-swarm`](examples/flavor/swarm):
-    a Flavor plugin for Docker in [Swarm mode](https://docs.docker.com/engine/swarm/).
-
-All provided binaries have a `help` sub-command to get usage and a `version` sub-command to identify the build revision.
-
+Executables will be placed in the `./build` directory.  There is only one executable `infrakit` which can
+be used as CLI and as server, based on the CLI verbs and flags.
 
 # Design
 
