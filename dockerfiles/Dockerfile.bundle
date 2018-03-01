@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add --update wget ca-certificates openssl libvirt-dev libvirt-static openssh
+RUN apk add --update wget ca-certificates openssl libvirt-dev libvirt-static openssh file
 
 RUN mkdir -p /infrakit/plugins /infrakit/configs /infrakit/logs /infrakit/cli /infrakit/instance/terraform
 
