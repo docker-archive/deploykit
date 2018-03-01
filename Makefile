@@ -101,61 +101,12 @@ endef
 # actual binaries that need to be built:
 $(call define_binary_target,infrakit,github.com/docker/infrakit/cmd/infrakit)
 
-
-# preserves the build/* binaries but use script to call 'infrakit plugin start' instead:
-define plugin_start_template
-build/$(1): $(SRCS)
-	@echo "#!/bin/sh\n# invoke plugin $(1) as $(2)\ninfrakit plugin start $(2) --log 5" > build/$(1)$(EXE_EXT)
-	@chmod a+x build/$(1)$(EXE_EXT)
-endef
-define define_plugin_start_target
-	$(eval $(call plugin_start_template,$(1),$(2)))
-endef
-
-$(call define_plugin_start_target,infrakit-group-default,group)
-$(call define_plugin_start_target,infrakit-instance-aws,aws)
-$(call define_plugin_start_target,infrakit-instance-digitalocean,digitalocean)
-$(call define_plugin_start_target,infrakit-instance-docker,docker)
-$(call define_plugin_start_target,infrakit-instance-gcp,google)
-$(call define_plugin_start_target,infrakit-instance-hyperkit,hyperkit)
-$(call define_plugin_start_target,infrakit-instance-image,image)
-$(call define_plugin_start_target,infrakit-instance-maas,maas)
-$(call define_plugin_start_target,infrakit-instance-packet,packet)
-$(call define_plugin_start_target,infrakit-instance-rackhd,rackhd)
-$(call define_plugin_start_target,infrakit-instance-terraform,terraform)
-$(call define_plugin_start_target,infrakit-instance-vagrant,vagrant)
-$(call define_plugin_start_target,infrakit-instance-vsphere,vsphere)
-$(call define_plugin_start_target,infrakit-flavor-kubernetes,kubernetes)
-$(call define_plugin_start_target,infrakit-flavor-swarm,swarm)
-$(call define_plugin_start_target,infrakit-metadata-aws,aws)
-
-build-plugin-start-scripts: build/infrakit \
-		build/infrakit-instance-aws \
-		build/infrakit-instance-digitalocean \
-		build/infrakit-instance-docker \
-		build/infrakit-instance-gcp \
-		build/infrakit-instance-hyperkit \
-		build/infrakit-instance-image \
-		build/infrakit-instance-maas \
-		build/infrakit-instance-packet \
-		build/infrakit-instance-rackhd \
-		build/infrakit-instance-terraform \
-		build/infrakit-instance-vagrant \
-		build/infrakit-instance-vsphere \
-		build/infrakit-flavor-kubernetes \
-		build/infrakit-flavor-swarm \
-		build/infrakit-group-default \
-		build/infrakit-metadata-aws \
-
-ifeq ($(OS),Windows_NT)
-build/infrakit-instance-libvirt:
-# noop on windows
-else
-$(call define_plugin_start_target,infrakit-instance-libvirt,libvirt)
-endif
+infrakit-linux: $(SRCS)
+	CGO_ENABLED=0 go build -a -installsuffix cgo -o build/infrakit -tags "netgo $(GO_BUILD_TAGS)" \
+		-ldflags "-X github.com/docker/infrakit/pkg/cli.Version=$(VERSION) -X github.com/docker/infrakit/pkg/cli.Revision=$(REVISION) -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=$(DOCKER_CLIENT_VERSION) -linkmode external -s -w -extldflags \"-static\" " github.com/docker/infrakit/cmd/infrakit
 
 
-binaries: clean build-binaries build-plugin-start-scripts
+binaries: clean build-binaries
 build-binaries:	build/infrakit
 	@echo "+ $@"
 ifneq (,$(findstring .m,$(VERSION)))
