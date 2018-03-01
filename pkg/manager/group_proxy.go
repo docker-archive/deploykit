@@ -85,7 +85,9 @@ func (m *manager) queue(name string, work func() (retry bool, err error)) <-chan
 		name: name,
 		operation: func() (bool, error) {
 			retry, err := work()
-			close(wait)
+			if err == nil && !retry {
+				close(wait)
+			}
 			return retry, err
 		},
 	}

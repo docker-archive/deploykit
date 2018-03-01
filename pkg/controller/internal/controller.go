@@ -192,8 +192,9 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 			log.Debug("Swapped running managed object", "managed", m[0])
 		}
 
-		log.Debug("calling enforce", "spec", spec, "m", managed)
+		log.Debug("Called enforce", "spec", spec, "m", managed)
 		o, e := (*managed).Enforce(spec)
+		log.Debug("Called enforce", "spec", spec, "m", managed)
 		if o != nil {
 			object = *o
 		}

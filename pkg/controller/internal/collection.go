@@ -211,21 +211,24 @@ func (c *Collection) Scope() scope.Scope {
 }
 
 // object returns the state
-func (c *Collection) object() (*types.Object, error) {
-	snapshot, err := c.snapshot()
-	if err != nil {
-		return nil, err
+func (c *Collection) object() (object *types.Object, err error) {
+	defer log.Debug("object", "ref", object, "err", err)
+	snapshot, e := c.snapshot()
+	if e != nil {
+		err = e
+		return
 	}
 
 	c.spec.Metadata.Identity = &types.Identity{
 		ID: c.spec.Metadata.Name,
 	}
 
-	object := types.Object{
+	object = &types.Object{
 		Spec:  c.spec,
 		State: snapshot,
 	}
-	return &object, nil
+
+	return
 }
 
 // Start starts the managed
@@ -307,6 +310,7 @@ func (c *Collection) Enforce(spec types.Spec) (*types.Object, error) {
 
 	if c.UpdateSpecFunc != nil {
 		if err := c.UpdateSpecFunc(spec); err != nil {
+			log.Error("updating spec", "err", err)
 			return nil, err
 		}
 	}

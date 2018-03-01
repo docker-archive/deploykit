@@ -205,6 +205,7 @@ func (p Path) Equal(other Path) bool {
 	return true
 }
 
+// Less returns true if the receiver is lexicographically less than the other
 func (p Path) Less(other Path) bool {
 	min := len(p)
 	if len(other) < min {

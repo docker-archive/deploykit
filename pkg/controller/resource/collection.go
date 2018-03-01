@@ -13,6 +13,13 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+// DefaultProperties is the default properties for the controller
+var (
+	DefaultProperties = resource.Properties{
+		ModelProperties: defaultModelProperties,
+	}
+)
+
 type resources map[string]instance.Description
 
 func (r resources) eval(p types.Path) (interface{}, error) {
@@ -26,7 +33,7 @@ func (r resources) eval(p types.Path) (interface{}, error) {
 type collection struct {
 	*internal.Collection
 
-	properties resource.Properties
+	properties *resource.Properties
 	options    resource.Options
 	model      *Model
 
@@ -64,6 +71,9 @@ func newCollection(scope scope.Scope, options resource.Options) (internal.Manage
 
 func (c *collection) run(ctx context.Context) {
 
+	// Start the model
+	c.model.Start()
+
 	// channels that aggregate from all the instance accessors
 	type event struct {
 		name      string
@@ -76,15 +86,6 @@ func (c *collection) run(ctx context.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 
-	// Start the model
-	c.model.Start()
-
-	// For each accessor / resource we create one fsm
-	for k := range c.properties.Resources {
-		f := c.model.Requested()
-		c.Put(k, f, c.model.Spec(), nil)
-	}
-
 	// Start all the watchers that have any dependencies
 	for k, w := range c.watching {
 		ch := w.FanIn(ctx)
@@ -93,6 +94,7 @@ func (c *collection) run(ctx context.Context) {
 			// send event we got dependency satisified
 			dependencyComplete <- &event{name: n}
 		}(k)
+		log.Debug("aggregator", "key", k, "watch", w)
 	}
 
 	// Start all the instance accessors and wire up the events.
@@ -129,6 +131,7 @@ func (c *collection) run(ctx context.Context) {
 
 		// start
 		accessor.Start()
+		log.Debug("accessor started", "key", k)
 	}
 
 	go func() {
@@ -163,13 +166,13 @@ func (c *collection) run(ctx context.Context) {
 						item.State.Signal(dependencyMissing)
 						continue
 					}
-					instanceId, err := accessor.Provision(spec)
+					instanceID, err := accessor.Provision(spec)
 					if err != nil {
 						log.Error("cannot provision", "err", err)
 						item.State.Signal(provisionError)
 
 					} else {
-						log.Info("provisioned", "id", instanceId)
+						log.Info("provisioned", "id", instanceID)
 						/// don't do anything. next sample will make sure it moves to ready
 					}
 				}
@@ -258,6 +261,19 @@ func (c *collection) run(ctx context.Context) {
 			}
 		}
 	}()
+
+	log.Debug("Components running. About to seed instances")
+
+	// Seed the initial fsm instances for each named resource in the config
+	// For each accessor / resource we create one fsm
+	for k := range c.properties.Resources {
+		log.Debug("requesting", "key", k)
+		f := c.model.Requested()
+		c.Put(k, f, c.model.Spec(), nil)
+		log.Debug("requested", "id", f.ID(), "key", k)
+	}
+
+	log.Debug("Seeded instances. Running.")
 }
 
 func (c *collection) stop() error {
@@ -277,7 +293,8 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 	defer log.Debug("updateSpec", "spec", spec, "err", err)
 
 	// parse input, then select the model to use
-	properties := resource.Properties{}
+	properties := DefaultProperties
+
 	err = spec.Properties.Decode(&properties)
 	if err != nil {
 		return
@@ -300,8 +317,26 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 		}
 	}
 
-	watch := &Watch{}
-	watching := map[string]Watchers{}
+	watch, watching := processWatches(properties)
+	log.Debug("watch/watching", "watch", watch, "watching", watching)
+
+	// build the fsm model
+	var model *Model
+	model, err = BuildModel(properties)
+	if err != nil {
+		return
+	}
+
+	c.model = model
+	c.watch = watch
+	c.watching = watching
+	c.properties = &properties
+	return
+}
+
+func processWatches(properties resource.Properties) (watch *Watch, watching map[string]Watchers) {
+	watch = &Watch{}
+	watching = map[string]Watchers{}
 
 	for key, access := range properties.Resources {
 		watchers := Watchers{}
@@ -322,18 +357,6 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 
 		watching[key] = watchers
 	}
-
-	// build the fsm model
-	var model *Model
-	model, err = BuildModel(properties)
-	if err != nil {
-		return
-	}
-
-	c.model = model
-	c.watch = watch
-	c.watching = watching
-	c.properties = properties
 	return
 }
 
@@ -416,7 +439,7 @@ func depends(any *types.Any) []types.Path {
 
 // Special format of a string value to denote a dependency on another resource's (within the same collection)
 // property field.  Eg. "@depends('net1/cidr')@"
-var dependsRegex = regexp.MustCompile("\\@depends\\('(([[:alnum:]]|\\.|/|\\[|\\])+)'\\)\\@")
+var dependsRegex = regexp.MustCompile("\\@depend\\('(([[:alnum:]]|-|_|\\.|/|\\[|\\])+)'\\)\\@")
 
 func parse(v interface{}, found []types.Path) (out []types.Path) {
 	switch v := v.(type) {

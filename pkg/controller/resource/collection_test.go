@@ -44,11 +44,11 @@ func TestKeyFromPath(t *testing.T) {
 
 func TestParseDepends(t *testing.T) {
 	require.False(t, dependsRegex.MatchString("gopher"))
-	require.False(t, dependsRegex.MatchString("@depends()"))
-	require.True(t, dependsRegex.MatchString("@depends('./bca/xyz/foo')@"))
-	require.True(t, dependsRegex.MatchString("@depends('bca/xyz/foo')@"))
-	require.True(t, dependsRegex.MatchString("@depends('bca/xyz/foo/field2')@"))
-	require.True(t, dependsRegex.MatchString("@depends('bca/xyz/foo/[2]')@"))
+	require.False(t, dependsRegex.MatchString("@depend()"))
+	require.True(t, dependsRegex.MatchString("@depend('./bca/xyz/foo')@"))
+	require.True(t, dependsRegex.MatchString("@depend('bca/xyz/foo')@"))
+	require.True(t, dependsRegex.MatchString("@depend('bca/xyz/foo/field2')@"))
+	require.True(t, dependsRegex.MatchString("@depend('bca/xyz/foo/[2]')@"))
 
 	{
 		_, match := parseDepends("foo")
@@ -59,7 +59,7 @@ func TestParseDepends(t *testing.T) {
 		require.False(t, match)
 	}
 	{
-		p, match := parseDepends("@depends('foo/bar/baz')@")
+		p, match := parseDepends("@depend('foo/bar/baz')@")
 		require.True(t, match)
 		require.Equal(t, `foo/bar/baz`, p.String())
 	}
@@ -69,7 +69,7 @@ func TestParseDepends(t *testing.T) {
 		require.NoError(t, types.Decode([]byte(`
 field1: bar
 field2: 2
-field3: "@depends('net1/foo/bar')@"
+field3: "@depend('net1/foo/bar')@"
 `), &v))
 		require.Equal(t, []types.Path{types.PathFromString(`net1/foo/bar`)}, parse(v, []types.Path{}))
 		require.Equal(t, []types.Path{types.PathFromString(`net1/foo/bar`)}, depends(types.AnyValueMust(v)))
@@ -88,14 +88,14 @@ field2: 2
 		require.NoError(t, types.Decode([]byte(`
 field1: bar
 field2: 2
-field3: "@depends('net1/foo/bar/1')@"
+field3: "@depend('net1')@"
 field4:
   object_field1 : test
-  object_field2 : "@depends('net1/foo/bar/2')@"
-field5: "@depends('net1/foo/bar/3')@"
+  object_field2 : "@depend('net1/foo/bar/2')@"
+field5: "@depend('net1/foo/bar/3')@"
 `), &v))
 		require.Equal(t, types.PathsFromStrings(
-			`net1/foo/bar/1`,
+			`net1`,
 			`net1/foo/bar/2`,
 			`net1/foo/bar/3`,
 		), types.Paths(depends(types.AnyValueMust(v))))
@@ -105,16 +105,16 @@ field5: "@depends('net1/foo/bar/3')@"
 		require.NoError(t, types.Decode([]byte(`
 field1: bar
 field2: 2
-field3: "@depends('net1/foo/bar/1')@"
+field3: "@depend('net1/foo/bar/1')@"
 field4:
   object_field1 : test
-  object_field2 : "@depends('net1/foo/bar/2')@"
+  object_field2 : "@depend('net1/foo/bar/2')@"
   object_field3 :
-    - element1: "@depends('net1/foo/bar/3/1')@"
-    - element2: "@depends('net1/foo/bar/3/2')@"
-    - element3: "@depends('net1/foo/bar/3/3')@"
-    - element4: "@depends('net1/foo/bar/3/4')@"
-field5: "@depends('net1/foo/bar/4')@"
+    - element1: "@depend('net1/foo/bar/3/1')@"
+    - element2: "@depend('net1/foo/bar/3/2')@"
+    - element3: "@depend('net1/foo/bar/3/3')@"
+    - element4: "@depend('net1/foo/bar/3/4')@"
+field5: "@depend('net1/foo/bar/4')@"
 `), &v))
 
 		list1 := types.PathsFromStrings(
@@ -140,16 +140,16 @@ func TestSubstituteDepends(t *testing.T) {
 		require.NoError(t, types.Decode([]byte(`
 field1: bar
 field2: 2
-field3: "@depends('net1/foo/bar/1')@"
+field3: "@depend('net1/foo/bar/1')@"
 field4:
   object_field1 : test
-  object_field2 : "@depends('net1/foo/bar/2')@"
+  object_field2 : "@depend('net1/foo/bar/2')@"
   object_field3 :
-    - element1: "@depends('net1/foo/bar/3/1')@"
-    - element2: "@depends('net1/foo/bar/3/2')@"
-    - element3: "@depends('net1/foo/bar/3/3')@"
-    - element4: "@depends('net1/foo/bar/3/4')@"
-field5: "@depends('net1/foo/bar/4')@"
+    - element1: "@depend('net1/foo/bar/3/1')@"
+    - element2: "@depend('net1/foo/bar/3/2')@"
+    - element3: "@depend('net1/foo/bar/3/3')@"
+    - element4: "@depend('net1/foo/bar/3/4')@"
+field5: "@depend('net1/foo/bar/4')@"
 `), &v))
 
 		store := map[string]interface{}{
@@ -177,5 +177,123 @@ field5: "@depends('net1/foo/bar/4')@"
 		require.Equal(t, store[`net1/foo/bar/4`], types.Get(types.PathFromString(`field5`), vv))
 
 	}
+
+}
+
+func TestProcessWatches(t *testing.T) {
+
+	buff := []byte(`
+kind: resource
+metadata:
+  name: resources
+properties:
+  resources:
+    az1-net1:
+      plugin: az1/net
+      labels:
+        az: az1
+        type: network
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        cidr: 10.20.100.0/24
+        gateway: 10.20.0.1
+    az1-net2:
+      plugin: az1/net
+      labels:
+        az: az1
+        type: network
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        wait: "@depend('az1-net1/ID')@"
+        cidr: 10.20.200.0/24
+        gateway: 10.20.0.1
+    az2-net1:
+      plugin: az2/net
+      labels:
+        az: az2
+        type: network
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        wait: "@depend('az1-net1/ID')@"
+        cidr: 192.178.100.0/24
+        gateway: 192.178.0.1
+    az2-net2:
+      plugin: az2/net
+      labels:
+        az: az2
+        type: network
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        wait: "@depend('az1-net1/ID')@"
+        cidr: 192.178.200.0/24
+        gateway: 192.178.0.1
+    az1-disk1:
+      plugin: az1/disk
+      labels:
+        az: az1
+        type: storage
+      ObserveInterval: 0.5s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        net: "@depend('az1-net1/ID')@"
+        gw: "@depend('az1-net1/Properties/gateway')@"
+        fs: ext4
+        size: 1TB
+    az1-disk2:
+      plugin: az1/disk
+      labels:
+        az: az1
+        type: storage
+      ObserveInterval: 0.5s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        net: "@depend('az1-net2/ID')@"
+        gw: "@depend('az1-net2/Properties/gateway')@"
+        fs: ext4
+        size: 1TB
+    az2-disk1:
+      plugin: az2/disk
+      labels:
+        az: az2
+        type: storage
+      ObserveInterval: 0.5s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        net: "@depend('az2-net1/ID')@"
+        gw: "@depend('az2-net1/Properties/gateway')@"
+        fs: ext4
+        size: 1TB
+    az2-disk1:
+      plugin: az2/disk
+      labels:
+        az: az2
+        type: storage
+      ObserveInterval: 0.5s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        net: "@depend('az2-net2/ID')@"
+        gw: "@depend('az2-net2/Properties/gateway')@"
+        fs: ext4
+        size: 1TB
+`)
+
+	var spec types.Spec
+	err := types.Decode(buff, &spec)
+	require.NoError(t, err)
+
+	properties := DefaultProperties
+	err = spec.Properties.Decode(&properties)
+	require.NoError(t, err)
+
+	watch, watching := processWatches(properties)
+
+	// check the file... count the number of occurrences
+	require.Equal(t, 5, len(watch.watchers["az1-net1"]))
+	require.Equal(t, 2, len(watch.watchers["az2-net2"]))
+	require.Equal(t, 1, len(watching["az1-net2"]))
 
 }

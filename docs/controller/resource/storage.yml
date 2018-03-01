@@ -3,24 +3,46 @@ metadata:
   name: storage
 properties:
   resources:
-    cloud1-net1:
-      plugin: cloud1/disk
+    az1-disk1:
+      plugin: az1/disk
       labels:
-        cloud: cloud1
+        az: az1
         type: storage
         user: {{ env `USER` }}
-      ObserveInterval: 0.5s
+      ObserveInterval: 1s
       KeySelector: \{\{.Tags.name\}\}
       Properties:
         fs: ext4
         size: 1TB
-    cloud2-net1:
-      plugin: cloud2/disk
+    az1-disk2:
+      plugin: az1/disk
       labels:
-        cloud: cloud2
+        az: az1
         type: storage
         user: {{ env `USER` }}
-      ObserveInterval: 0.5s
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        fs: ext4
+        size: 1TB
+    az2-disk1:
+      plugin: az2/disk
+      labels:
+        az: az2
+        type: storage
+        user: {{ env `USER` }}
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        fs: ext4
+        size: 1TB
+    az2-disk1:
+      plugin: az2/disk
+      labels:
+        az: az2
+        type: storage
+        user: {{ env `USER` }}
+      ObserveInterval: 1s
       KeySelector: \{\{.Tags.name\}\}
       Properties:
         fs: ext4

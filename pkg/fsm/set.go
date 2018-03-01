@@ -121,13 +121,14 @@ func (s *Set) Name() string {
 }
 
 // Get returns the instance by id. Nil if no id matched
-func (s *Set) Get(id ID) FSM {
-	blocker := make(chan FSM, 1)
+func (s *Set) Get(id ID) (found FSM) {
+	blocker := make(chan struct{})
 	s.reads <- func(set Set) {
 		defer close(blocker)
-		blocker <- set.members[id]
+		found = set.members[id]
 	}
-	return <-blocker
+	<-blocker
+	return
 }
 
 // Add adds an instance given initial state
@@ -216,11 +217,15 @@ func (s *Set) handleAdd(tid int64, initial Index) error {
 		},
 	}
 
-	log.Debug("add: set deadline", "name", s.options.Name, "tid", tid, "id", id, "initial", s.spec.StateName(initial))
 	if err := s.processDeadline(tid, new, initial); err != nil {
+		log.Error("error process deadline", "err", err)
 		return err
 	}
-
+	if new.index > -1 {
+		log.Debug("Set deadline", "name", s.options.Name,
+			"tid", tid, "id", id, "initial", s.spec.StateName(initial),
+			"deadline", new.deadline, "order", new.index)
+	}
 	// update index
 	s.members[id] = new
 	s.bystate[initial][id] = new
@@ -230,7 +235,6 @@ func (s *Set) handleAdd(tid int64, initial Index) error {
 		id:     new.id,
 		parent: s,
 	}
-
 	return nil
 }
 
@@ -290,7 +294,7 @@ func (s *Set) handleClockTick(tid int64) error {
 			} else if ttl != nil {
 
 				log.Error("deadline exceeded", "name", s.options.Name, "tid", tid, "id", instance.id,
-					"raise", s.spec.SignalName(ttl.Raise))
+					"raise", s.spec.SignalName(ttl.Raise), "now", now)
 
 				s.raise(tid, instance.id, ttl.Raise, instance.state)
 			}
@@ -305,6 +309,10 @@ func (s *Set) handleClockTick(tid int64) error {
 
 func (s *Set) processDeadline(tid int64, instance *instance, state Index) error {
 	now := s.ct()
+
+	log.Debug("process deadline", "now", now,
+		"tid", tid, "instance", instance, "state", s.spec.StateName(state), "V", debugV)
+
 	ttl := Tick(0)
 	// check for TTL
 	if exp, err := s.spec.expiry(state); err != nil {
@@ -427,7 +435,7 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 		instance.data = event.data
 	}
 
-	log.Debug("Transtion", "action", action, "next", next)
+	log.Debug("Transition", "action", action, "next", next)
 	// call action before transitiion
 	if action != nil {
 		if err := action(instance); err != nil {

@@ -1,10 +1,10 @@
 {{/* Input to create instance in the simulator */}}
-{{/* =% instanceProvision `cloud2/net` %= */}}
+{{/* =% instanceProvision `az2/net` %= */}}
 
 Tags:
-  cloud: cloud2
+  az: az2
   type: network
-  name: cloud2-net1
+  name: az2-net1
 Properties:
   cidr: 192.178.100.0/24
   gateway: 192.178.0.1

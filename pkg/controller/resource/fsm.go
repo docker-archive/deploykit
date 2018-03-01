@@ -65,38 +65,24 @@ func (m *Model) Start() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.clock.Start()
-	m.set = fsm.NewSet(m.spec, m.clock, fsm.DefaultOptions("resource"))
+	if m.set == nil {
+		m.clock.Start()
+		m.set = fsm.NewSet(m.spec, m.clock, fsm.DefaultOptions("resource"))
+	}
 }
 
+// Stop stops the model
 func (m *Model) Stop() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.set.Stop()
-	m.clock.Stop()
+	if m.set != nil {
+		m.set.Stop()
+		m.clock.Stop()
+	}
 
 	close(m.instanceDestroyChan)
 	close(m.instanceProvisionChan)
-}
-
-func (m *Model) instanceDestroy(i fsm.FSM) error {
-	if m.instanceDestroyChan == nil {
-		return fmt.Errorf("not initialized")
-	}
-
-	m.instanceDestroyChan <- i
-	return nil
-}
-
-func longest(t ...time.Duration) time.Duration {
-	var max time.Duration
-	for _, tt := range t {
-		if tt > max {
-			max = tt
-		}
-	}
-	return max
 }
 
 const (
@@ -124,6 +110,10 @@ const (
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
 func BuildModel(properties resource.Properties) (*Model, error) {
 
+	if properties.WaitBeforeProvision == 0 {
+		return nil, fmt.Errorf("invalid WaitBeforeProvision tickSize")
+	}
+
 	model := &Model{
 		Properties:            properties,
 		instanceDestroyChan:   make(chan fsm.FSM, properties.ChannelBufferSize),
@@ -138,15 +128,18 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 		}
 	}
 
+	log.Info("model", "tickSize", model.tickSize)
+
 	model.clock = fsm.Wall(time.Tick(model.tickSize))
 
 	spec, err := fsm.Define(
 		fsm.State{
 			Index: requested,
-			TTL:   fsm.Expiry{properties.WaitBeforeProvision, provision},
+			//TTL:   fsm.Expiry{properties.WaitBeforeProvision, provision},
 			Transitions: map[fsm.Signal]fsm.Index{
 				resourceFound: ready,
 				resourceLost:  provisioning,
+				provision:     provisioning,
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				provision: func(n fsm.FSM) error {
