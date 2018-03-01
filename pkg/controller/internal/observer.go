@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -55,6 +56,32 @@ type InstanceObserver struct {
 var (
 	minObserveInterval = 1 * time.Second
 )
+
+// Validate validates the receiver with default values provided if some optional fields are not set.
+func (o *InstanceObserver) Validate(defaults InstanceObserver) error {
+	if o.Plugin.Zero() {
+		return fmt.Errorf("missing plugin name")
+	}
+
+	if o.Labels == nil {
+		o.Labels = defaults.Labels
+	}
+
+	if o.ObserveInterval == 0 {
+		o.ObserveInterval = defaults.ObserveInterval
+	}
+	if o.ObserveInterval == 0 {
+		return fmt.Errorf("observe interval not specified")
+	}
+
+	if o.KeySelector == "" {
+		o.KeySelector = defaults.KeySelector
+	}
+	if o.KeySelector == "" {
+		return fmt.Errorf("key selector not specified")
+	}
+	return nil
+}
 
 // Init initializes the observer so that it can be started
 func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {

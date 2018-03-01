@@ -2,6 +2,7 @@ package gc
 
 import (
 	"context"
+	"time"
 
 	gc "github.com/docker/infrakit/pkg/controller/gc/types"
 	"github.com/docker/infrakit/pkg/controller/internal"
@@ -81,6 +82,12 @@ func (r *reaper) stop() error {
 	return nil
 }
 
+var (
+	defaultInstanceObserver = internal.InstanceObserver{
+		ObserveInterval: types.Duration(1 * time.Second),
+	}
+)
+
 func (r *reaper) updateSpec(spec types.Spec) error {
 	// parse input, then select the model to use
 	properties := gc.Properties{}
@@ -101,11 +108,17 @@ func (r *reaper) updateSpec(spec types.Spec) error {
 	}
 
 	instanceObserver := properties.InstanceObserver
+	if err := instanceObserver.Validate(defaultInstanceObserver); err != nil {
+		return err
+	}
 	if err := instanceObserver.Init(r.scope, r.options.PluginRetryInterval.Duration()); err != nil {
 		return err
 	}
 
 	nodeObserver := properties.NodeObserver
+	if err := nodeObserver.Validate(defaultInstanceObserver); err != nil {
+		return err
+	}
 	if err := nodeObserver.Init(r.scope, r.options.PluginRetryInterval.Duration()); err != nil {
 		return err
 	}

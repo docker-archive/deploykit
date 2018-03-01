@@ -146,7 +146,7 @@ properties:
 	}
 
 	// provision
-	id, err := access.Provision()
+	id, err := access.Provision(access.Spec)
 	require.NoError(t, err)
 	require.Equal(t, "1", string(*id))
 

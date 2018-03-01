@@ -21,6 +21,11 @@ func NamesFrom(list []string) Names {
 // Name is a reference to the plugin.  Places where it appears include JSON files as type of field `Plugin`.
 type Name string
 
+// Zero returns true if the name is zero value
+func (n Name) Zero() bool {
+	return len(n) == 0
+}
+
 // NameFrom creates a name from the parts
 func NameFrom(lookup, sub string) Name {
 	if sub != "" {

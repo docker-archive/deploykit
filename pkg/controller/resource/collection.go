@@ -10,13 +10,20 @@ import (
 	resource "github.com/docker/infrakit/pkg/controller/resource/types"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
-// DefaultProperties is the default properties for the controller
 var (
+	// DefaultProperties is the default properties for the controller
 	DefaultProperties = resource.Properties{
 		ModelProperties: defaultModelProperties,
+	}
+
+	// DefaultAccessProperties specifies some default parameters
+	DefaultAccessProperties = internal.InstanceObserver{
+		ObserveInterval: types.Duration(1 * time.Second),
+		KeySelector:     template.EscapeString(`{{.Tags.infrakit_resource_name}}`),
 	}
 )
 
@@ -257,6 +264,7 @@ func (c *collection) run(ctx context.Context) {
 
 					log.Info("found", "instance", n, "name", found.name, "key", k)
 					item.State.Signal(resourceFound)
+					item.Data["instance"] = n
 				}
 			}
 		}
@@ -311,6 +319,12 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 	// of resources in a collection.  For large pools of the same thing, we will implement a dedicated
 	// pool controller.
 	for _, access := range properties.Resources {
+
+		err = access.InstanceObserver.Validate(DefaultAccessProperties)
+		if err != nil {
+			return err
+		}
+
 		err = access.Init(c.Scope(), c.options.PluginRetryInterval.AtLeast(1*time.Second))
 		if err != nil {
 			return err
