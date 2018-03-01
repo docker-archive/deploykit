@@ -109,6 +109,11 @@ type Options struct {
 	IgnoreUndefinedSignals bool
 }
 
+type addOp struct {
+	initial Index
+	result  chan FSM
+}
+
 // Set is a collection of fsm instances that follow a given spec.  This is
 // the primary interface to manipulate the instances... by sending signals to it via channels.
 type Set struct {
@@ -121,8 +126,7 @@ type Set struct {
 	bystate      map[Index]map[ID]*instance
 	reads        chan func(Set) // given a view which is a copy of the Set
 	stop         chan struct{}
-	add          chan Index // add an instance with initial state
-	new          chan FSM
+	add          chan addOp
 	delete       chan ID // delete an instance with id
 	errors       chan error
 	events       chan *event

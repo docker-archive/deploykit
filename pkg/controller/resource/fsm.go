@@ -12,8 +12,8 @@ import (
 
 var defaultModelProperties = resource.ModelProperties{
 	TickUnit:            types.FromDuration(1 * time.Second),
-	WaitBeforeProvision: fsm.Tick(10),
-	WaitBeforeDestroy:   fsm.Tick(10),
+	WaitBeforeProvision: fsm.Tick(60),
+	WaitBeforeDestroy:   fsm.Tick(60),
 	ChannelBufferSize:   10,
 }
 
@@ -135,7 +135,7 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 	spec, err := fsm.Define(
 		fsm.State{
 			Index: requested,
-			//TTL:   fsm.Expiry{properties.WaitBeforeProvision, provision},
+			TTL:   fsm.Expiry{properties.WaitBeforeProvision, provision},
 			Transitions: map[fsm.Signal]fsm.Index{
 				resourceFound: ready,
 				resourceLost:  provisioning,
@@ -173,7 +173,7 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 			Index: ready,
 			Transitions: map[fsm.Signal]fsm.Index{
 				resourceLost:  provisioning,
-				resourceFound: ready,
+				resourceFound: ready, // just loops back to self in the ready state
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				resourceLost: func(n fsm.FSM) error {

@@ -1,3 +1,16 @@
+package resource
+
+import (
+	"testing"
+
+	resource "github.com/docker/infrakit/pkg/controller/resource/types"
+	"github.com/docker/infrakit/pkg/fsm"
+	"github.com/docker/infrakit/pkg/types"
+	"github.com/stretchr/testify/require"
+)
+
+func testProperties(t *testing.T) resource.Properties {
+	buff := []byte(`
 kind: resource
 metadata:
   name: resources
@@ -51,7 +64,7 @@ properties:
       labels:
         az: az1
         type: storage
-      ObserveInterval: 1s
+      ObserveInterval: 0.5s
       KeySelector: \{\{.Tags.infrakit_resource_name\}\}
       Properties:
         net: "@depend('az1-net1/ID')@"
@@ -63,7 +76,7 @@ properties:
       labels:
         az: az1
         type: storage
-      ObserveInterval: 1s
+      ObserveInterval: 0.5s
       KeySelector: \{\{.Tags.infrakit_resource_name\}\}
       Properties:
         net: "@depend('az1-net2/ID')@"
@@ -75,7 +88,7 @@ properties:
       labels:
         az: az2
         type: storage
-      ObserveInterval: 1s
+      ObserveInterval: 0.5s
       KeySelector: \{\{.Tags.infrakit_resource_name\}\}
       Properties:
         net: "@depend('az2-net1/ID')@"
@@ -87,10 +100,37 @@ properties:
       labels:
         az: az2
         type: storage
-      ObserveInterval: 1s
+      ObserveInterval: 0.5s
       KeySelector: \{\{.Tags.infrakit_resource_name\}\}
       Properties:
         net: "@depend('az2-net2/ID')@"
         gw: "@depend('az2-net2/Properties/gateway')@"
         fs: ext4
         size: 1TB
+`)
+
+	var spec types.Spec
+	err := types.Decode(buff, &spec)
+	require.NoError(t, err)
+
+	properties := DefaultProperties
+	err = spec.Properties.Decode(&properties)
+	require.NoError(t, err)
+	return properties
+}
+
+func TestModel(t *testing.T) {
+
+	model, err := BuildModel(testProperties(t))
+	require.NoError(t, err)
+
+	model.Start()
+
+	total := 100
+	list := []fsm.FSM{}
+	for i := 0; i < total; i++ {
+		list = append(list, model.Requested())
+	}
+
+	model.Stop()
+}

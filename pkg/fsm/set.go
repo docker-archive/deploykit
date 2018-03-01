@@ -29,12 +29,11 @@ func NewSet(spec *Spec, clock *Clock, optional ...Options) *Set {
 		members:      map[ID]*instance{},
 		bystate:      map[Index]map[ID]*instance{},
 		reads:        make(chan func(Set)),
-		add:          make(chan Index),
+		add:          make(chan addOp),
 		delete:       make(chan ID),
 		errors:       make(chan error),
 		events:       make(chan *event),
 		transactions: make(chan *txn, options.BufferSize),
-		new:          make(chan FSM),
 		deadlines:    newQueue(),
 	}
 
@@ -133,8 +132,9 @@ func (s *Set) Get(id ID) (found FSM) {
 
 // Add adds an instance given initial state
 func (s *Set) Add(initial Index) FSM {
-	s.add <- initial
-	return <-s.new
+	op := addOp{initial: initial, result: make(chan FSM)}
+	s.add <- op
+	return <-op.result
 }
 
 // Delete deletes an instance
@@ -201,37 +201,37 @@ func (s *Set) handleError(tid int64, err error, ctx interface{}) {
 	default:
 	}
 }
-func (s *Set) handleAdd(tid int64, initial Index) error {
+func (s *Set) handleAdd(tid int64, op addOp) error {
 	// add a new instance
 	id := s.next
 	s.next++
 
 	new := &instance{
 		id:     id,
-		state:  initial,
+		state:  op.initial,
 		index:  -1,
 		parent: s,
 		flaps:  *newFlaps(),
 		visits: map[Index]int{
-			initial: 1,
+			op.initial: 1,
 		},
 	}
 
-	if err := s.processDeadline(tid, new, initial); err != nil {
+	if err := s.processDeadline(tid, new, op.initial); err != nil {
 		log.Error("error process deadline", "err", err)
 		return err
 	}
 	if new.index > -1 {
 		log.Debug("Set deadline", "name", s.options.Name,
-			"tid", tid, "id", id, "initial", s.spec.StateName(initial),
-			"deadline", new.deadline, "order", new.index)
+			"tid", tid, "id", id, "initial", s.spec.StateName(op.initial),
+			"deadline", new.deadline, "queuePosition", new.index)
 	}
 	// update index
 	s.members[id] = new
-	s.bystate[initial][id] = new
+	s.bystate[op.initial][id] = new
 
 	// return a copy here so we don't have problems with races trying to read / write the same pointer
-	s.new <- &instance{
+	op.result <- &instance{
 		id:     new.id,
 		parent: s,
 	}
@@ -309,10 +309,6 @@ func (s *Set) handleClockTick(tid int64) error {
 
 func (s *Set) processDeadline(tid int64, instance *instance, state Index) error {
 	now := s.ct()
-
-	log.Debug("process deadline", "now", now,
-		"tid", tid, "instance", instance, "state", s.spec.StateName(state), "V", debugV)
-
 	ttl := Tick(0)
 	// check for TTL
 	if exp, err := s.spec.expiry(state); err != nil {
@@ -327,21 +323,21 @@ func (s *Set) processDeadline(tid int64, instance *instance, state Index) error 
 		// case where this instance is in the deadlines queue (since it has a > -1 index)
 		if instance.deadline > 0 {
 			// in the queue and deadline is different now
-			log.Debug("deadline updating", "name", s.options.Name, "tid", tid,
+			log.Debug("Deadline updating", "now", now, "name", s.options.Name, "tid", tid,
 				"instance", instance.id, "deadline", instance.deadline,
-				"deadline-queue-index", instance.index)
+				"deadline-queue-index", instance.index, "V", debugV2)
 			s.deadlines.update(instance)
 		} else {
-			log.Debug("deadline removing", "name", s.options.Name, "tid", tid,
+			log.Debug("Deadline removing", "now", now, "name", s.options.Name, "tid", tid,
 				"instance", instance.id, "deadline", instance.deadline,
-				"deadline-queue-index", instance.index)
+				"deadline-queue-index", instance.index, "V", debugV2)
 			s.deadlines.remove(instance)
 		}
 	} else if instance.deadline > 0 {
 		// index == -1 means it's not in the queue yet and we have a deadline
-		log.Debug("deadline enqueuing", "name", s.options.Name, "tid", tid,
+		log.Debug("Deadline enqueuing", "now", now, "name", s.options.Name, "tid", tid,
 			"instance", instance.id, "deadline", instance.deadline,
-			"deadline-queue-index", instance.index)
+			"deadline-queue-index", instance.index, "V", debugV2)
 		s.deadlines.enqueue(instance)
 	}
 
@@ -395,6 +391,8 @@ func (s *Set) raise(tid int64, id ID, signal Signal, current Index) (err error) 
 
 func (s *Set) handleEvent(tid int64, event *event) error {
 
+	now := s.ct()
+
 	instance, has := s.members[event.instance]
 	if !has {
 		return ErrUnknownFSM(event.instance)
@@ -406,12 +404,14 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 		return err
 	}
 
-	log.Debug("Transition", "name", s.options.Name, "tid", tid,
+	log.Debug("Transition",
+		"now", now,
+		"name", s.options.Name, "tid", tid,
 		"instance", instance.id,
 		"state", s.spec.StateName(current),
 		"signal", s.spec.SignalName(event.signal),
 		"next", s.spec.StateName(next),
-		"deadline", instance.deadline, "fsm-index", instance.index)
+		"deadline", instance.deadline, "deadlineQueueIndex", instance.index)
 
 	// any flap detection?
 	limit := s.spec.flap(current, next)
@@ -435,9 +435,18 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 		instance.data = event.data
 	}
 
-	log.Debug("Transition", "action", action, "next", next)
 	// call action before transitiion
 	if action != nil {
+
+		log.Debug("Invoking action",
+			"now", now,
+			"name", s.options.Name, "tid", tid,
+			"instance", instance.id,
+			"state", s.spec.StateName(current),
+			"signal", s.spec.SignalName(event.signal),
+			"next", s.spec.StateName(next),
+			"deadline", instance.deadline, "deadlineQueueIndex", instance.index)
+
 		if err := action(instance); err != nil {
 
 			log.Debug("Error transition", "err", err)
@@ -455,6 +464,8 @@ func (s *Set) handleEvent(tid int64, event *event) error {
 			}
 		}
 	}
+
+	// Action has been run... We landed in the new state (next)
 
 	// process deadline, if any
 	if err := s.processDeadline(tid, instance, next); err != nil {
@@ -534,12 +545,10 @@ func (s *Set) run() {
 				if !ok {
 					break loop
 				}
-
-				copy := initial
 				tx = &txn{
 					tid: tid,
 					Func: func(tid int64) (interface{}, error) {
-						return copy, s.handleAdd(tid, copy)
+						return initial.initial, s.handleAdd(tid, initial)
 					},
 				}
 

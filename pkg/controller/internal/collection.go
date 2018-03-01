@@ -33,35 +33,36 @@ func (f stateMachine) MarshalJSON() ([]byte, error) {
 type Item struct {
 	Key   string
 	State stateMachine
-	Data  map[string]interface{}
+	Data  map[string]interface{} `json:",omitempty"`
 }
 
 // Collection is a Managed that tracks a set of finite state machines.
 type Collection struct {
 
 	// PlanFunc returns a plan based on the intent
-	PlanFunc func(controller.Operation, types.Spec) (controller.Plan, error)
+	PlanFunc func(controller.Operation, types.Spec) (controller.Plan, error) `json:"-"`
 
 	// StartFunc begins the actual processing. This will be called synchronously
 	// so the body needs to start goroutines.
-	StartFunc func(context.Context)
+	StartFunc func(context.Context) `json:"-"`
 
 	// UpdateSpecFunc is called when a new spec is posted.  This will be executed
 	// with exclusive lock on the collection.
-	UpdateSpecFunc func(types.Spec) error
+	UpdateSpecFunc func(types.Spec) error `json:"-"`
 
 	// PauseFunc is called when the controller tries to pause.
-	PauseFunc func(bool)
+	PauseFunc func(bool) `json:"-"`
 
 	// StopFunc is called when the collection is stopped terminally.
-	StopFunc func() error
+	StopFunc func() error `json:"-"`
 
 	// TerminateFunc is called when this collection is to be destroyed / terminated.
 	// This is not the same as Stop, which stops monitoring.
-	TerminateFunc func() error
+	TerminateFunc func() error `json:"-"`
 
-	spec  types.Spec
-	items map[string]*Item
+	types.Spec
+
+	items map[string]*Item // read/writes of this will not be synchronized by the lock.
 	stop  chan struct{}
 
 	scope scope.Scope
@@ -74,6 +75,7 @@ type Collection struct {
 	metadata        metadata.Plugin
 	metadataUpdates chan func(map[string]interface{})
 
+	// This lock is used to guard the Managed methods.
 	lock sync.RWMutex
 }
 
@@ -153,14 +155,11 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 	return nil
 }
 
-// Put puts an item by key
+// Put puts an item by key - this is unsynchronized so caller / user needs to synchronize the Put
 func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]interface{}) *Item {
 	if data == nil {
 		data = map[string]interface{}{}
 	}
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
 
 	if item, has := c.items[k]; has {
 		item.Key = k
@@ -178,10 +177,8 @@ func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]
 	return c.items[k]
 }
 
-// Get returns an item by key.
+// Get returns an item by key. This is unsynchronized so caller / user needs to synchronize as needed.
 func (c *Collection) Get(k string) *Item {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
 	return c.items[k]
 }
 
@@ -198,10 +195,8 @@ func (c *Collection) GetByFSM(f fsm.FSM) (item *Item) {
 	return
 }
 
-// Delete an item by key
+// Delete an item by key. This is unsychronized.
 func (c *Collection) Delete(k string) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
 	delete(c.items, k)
 }
 
@@ -219,12 +214,12 @@ func (c *Collection) object() (object *types.Object, err error) {
 		return
 	}
 
-	c.spec.Metadata.Identity = &types.Identity{
-		ID: c.spec.Metadata.Name,
+	c.Spec.Metadata.Identity = &types.Identity{
+		ID: c.Spec.Metadata.Name,
 	}
 
 	object = &types.Object{
-		Spec:  c.spec,
+		Spec:  c.Spec,
 		State: snapshot,
 	}
 
@@ -306,7 +301,7 @@ func (c *Collection) Enforce(spec types.Spec) (*types.Object, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	log.Debug("Enforce", "spec", spec, "V", debugV)
+	defer log.Debug("Enforce", "spec", spec, "V", debugV)
 
 	if c.UpdateSpecFunc != nil {
 		if err := c.UpdateSpecFunc(spec); err != nil {
@@ -315,7 +310,7 @@ func (c *Collection) Enforce(spec types.Spec) (*types.Object, error) {
 		}
 	}
 	c.freed = false
-	c.spec = spec
+	c.Spec = spec
 	c.items = map[string]*Item{} // reset
 
 	c.start()
@@ -377,11 +372,8 @@ func (c *Collection) snapshot() (*types.Any, error) {
 	return types.AnyValue(view)
 }
 
-// Visit visits the items managed in this collection
+// Visit visits the items managed in this collection. This is unsynchronized.
 func (c *Collection) Visit(v func(Item) bool) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
 	for _, item := range c.items {
 		if !v(*item) {
 			break

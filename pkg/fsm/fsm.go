@@ -225,7 +225,7 @@ func (s *Spec) transition(current Index, signal Signal) (next Index, action Acti
 			"current", s.StateName(current),
 			"signal", s.SignalName(signal),
 			"next", s.StateName(next),
-			"action", action, "err", err)
+			"action", action, "err", err, "V", debugV2)
 	}()
 
 	state, has := s.states[current]

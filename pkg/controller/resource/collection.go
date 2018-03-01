@@ -161,7 +161,7 @@ func (c *collection) run(ctx context.Context) {
 					accessor := c.properties.Resources[item.Key]
 					log.Info("Provision", "fsm", f.ID(), "item", item, "accessor", accessor)
 
-					spec, err := c.populateDependencies(accessor.Spec)
+					spec, err := c.populateDependencies(item.Key, accessor.Spec)
 					if err != nil {
 						item.State.Signal(dependencyMissing)
 						continue
@@ -363,7 +363,8 @@ func processWatches(properties resource.Properties) (watch *Watch, watching map[
 // Assumption: the spec.Properties is fully rendered.  We can take the spec.Properties and
 // generate a list of dependencies via depends().  Now we are rendering this spec.Properties
 // into the final form with all the dependencies substituted.
-func (c *collection) populateDependencies(spec instance.Spec) (instance.Spec, error) {
+func (c *collection) populateDependencies(resourceName string, spec instance.Spec) (instance.Spec, error) {
+
 	processed := spec
 	var properties interface{}
 	err := types.Decode(processed.Properties.Bytes(), &properties)
@@ -378,8 +379,29 @@ func (c *collection) populateDependencies(spec instance.Spec) (instance.Spec, er
 	}
 
 	processed.Properties = any
+
+	processed.Tags = map[string]string{
+		ResourceNameLabel:       resourceName,
+		ResourceCollectionLabel: c.Collection.Spec.Metadata.Name,
+	}
+	types.NewLink().WriteMap(processed.Tags)
+
+	// Additional labels in the InstanceAccess spec
+	access := c.properties.Resources[resourceName]
+	if access != nil {
+		for k, v := range access.Labels {
+			processed.Tags[k] = v
+		}
+	}
 	return processed, nil
 }
+
+const (
+	// ResourceNameLabel is the label name used for labeling the resource with the name in the collection
+	ResourceNameLabel = "infrakit_resource_name"
+	// ResourceCollectionLabel is the the label used to label the name of the collection
+	ResourceCollectionLabel = "infrakit_resource_collection"
+)
 
 func dependV(v interface{}, fetcher func(types.Path) (interface{}, error)) (interface{}, bool) {
 	substituted := false
