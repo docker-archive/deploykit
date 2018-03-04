@@ -16,16 +16,24 @@ func PluginServer(p event.Plugin) *Event {
 	return &Event{plugin: p}
 }
 
-// PluginServerWithTypes which supports multiple types of event plugins. The de-multiplexing
+// PluginServerWithNames which supports multiple types of event plugins. The de-multiplexing
 // is done by the server's RPC method implementations.
-func PluginServerWithTypes(typed map[string]event.Plugin) *Event {
-	return &Event{typedPlugins: typed}
+func PluginServerWithNames(plugins func() (map[string]event.Plugin, error)) *Event {
+	return &Event{plugins: plugins}
 }
 
 // Event the exported type needed to conform to json-rpc call convention
 type Event struct {
-	plugin       event.Plugin
-	typedPlugins map[string]event.Plugin // by type, as qualified in the name of the plugin
+	plugin  event.Plugin
+	plugins func() (map[string]event.Plugin, error) // by type, as qualified in the name of the plugin
+}
+
+func (p *Event) typedPlugins() map[string]event.Plugin {
+	m, err := p.plugins()
+	if err != nil {
+		return map[string]event.Plugin{}
+	}
+	return m
 }
 
 // WithBase sets the base plugin to the given plugin object
@@ -35,8 +43,8 @@ func (p *Event) WithBase(m event.Plugin) *Event {
 }
 
 // WithTypes sets the typed plugins to the given map of plugins (by type name)
-func (p *Event) WithTypes(typed map[string]event.Plugin) *Event {
-	p.typedPlugins = typed
+func (p *Event) WithTypes(plugins func() (map[string]event.Plugin, error)) *Event {
+	p.plugins = plugins
 	return p
 }
 
@@ -61,7 +69,7 @@ func (p *Event) ImplementedInterface() spi.InterfaceSpec {
 // Objects returns the objects exposed by this service (or kind/ category)
 func (p *Event) Objects() []rpc.Object {
 	types := []string{}
-	for k := range p.typedPlugins {
+	for k := range p.typedPlugins() {
 		types = append(types, k)
 	}
 	if p.plugin != nil {
@@ -79,7 +87,7 @@ func (p *Event) getPlugin(eventType string) event.Plugin {
 	if eventType == "" {
 		return p.plugin
 	}
-	if p, has := p.typedPlugins[eventType]; has {
+	if p, has := p.typedPlugins()[eventType]; has {
 		return p
 	}
 	return nil
@@ -139,14 +147,14 @@ func (p *Event) list(topic types.Path) ([]string, error) {
 			}
 			nodes = append(nodes, n...)
 		}
-		for k := range p.typedPlugins {
+		for k := range p.typedPlugins() {
 			nodes = append(nodes, k)
 		}
 		sort.Strings(nodes)
 		return nodes, nil
 	}
 
-	c, has := p.typedPlugins[topic[0]]
+	c, has := p.typedPlugins()[topic[0]]
 	if !has {
 
 		if p.plugin == nil {
@@ -195,7 +203,7 @@ func (p *Event) PublishOn(c chan<- *event.Event) {
 		pub.PublishOn(c)
 	}
 
-	for name, typed := range p.typedPlugins {
+	for name, typed := range p.typedPlugins() {
 		if pub := asPublisher(typed); pub != nil {
 
 			cc := make(chan *event.Event)
