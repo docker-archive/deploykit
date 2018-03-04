@@ -65,8 +65,10 @@ func Run(scope scope.Scope, name plugin.Name,
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Metadata: metadata_plugin.NewPluginFromData(timeQueries),
-		run.Event: map[string]event.Plugin{
-			"streams": timerEvents,
+		run.Event: func() (map[string]event.Plugin, error) {
+			return map[string]event.Plugin{
+				"streams": timerEvents,
+			}, nil
 		},
 	}
 	onStop = func() { close(stop) }

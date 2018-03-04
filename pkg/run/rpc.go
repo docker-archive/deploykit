@@ -140,14 +140,15 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 			}
 		case Event:
 			switch pp := p.(type) {
-			case map[string]event.Plugin:
-				log.Debug("event_rpc.PluginServerWithTypes", "pp", pp)
-				plugins = append(plugins, event_rpc.PluginServerWithTypes(pp))
+			case func() (map[string]event.Plugin, error):
+				log.Debug("event_rpc.PluginServerWithNames", "pp", pp)
+				plugins = append(plugins, event_rpc.PluginServerWithNames(pp))
 			case event.Plugin:
 				log.Debug("event_rpc.PluginServer", "pp", pp)
 				plugins = append(plugins, event_rpc.PluginServer(pp))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
+				panic(err)
 				return
 			}
 		case Group:

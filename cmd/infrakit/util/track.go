@@ -66,7 +66,9 @@ func trackCommand(scp scope.Scope) *cobra.Command {
 
 		run.Plugin(plugin.DefaultTransport(*name),
 			// As event plugin
-			event_rpc.PluginServerWithTypes(trackers),
+			event_rpc.PluginServerWithNames(func() (map[string]event.Plugin, error) {
+				return trackers, nil
+			}),
 		)
 		return nil
 	}
