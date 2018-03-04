@@ -100,7 +100,7 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				plugins = append(plugins, instance_rpc.PluginServer(pp))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
-				return
+				panic(err)
 			}
 		case Flavor:
 			switch pp := p.(type) {
@@ -112,7 +112,7 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				plugins = append(plugins, flavor_rpc.PluginServer(pp))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
-				return
+				panic(err)
 			}
 		case MetadataUpdatable:
 			switch pp := p.(type) {
@@ -124,7 +124,7 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				plugins = append(plugins, metadata_rpc.UpdatableServer(pp))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
-				return
+				panic(err)
 			}
 		case Metadata:
 			switch pp := p.(type) {
@@ -136,19 +136,19 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				plugins = append(plugins, metadata_rpc.Server(pp))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
-				return
+				panic(err)
 			}
 		case Event:
 			switch pp := p.(type) {
-			case map[string]event.Plugin:
-				log.Debug("event_rpc.PluginServerWithTypes", "pp", pp)
-				plugins = append(plugins, event_rpc.PluginServerWithTypes(pp))
+			case func() (map[string]event.Plugin, error):
+				log.Debug("event_rpc.PluginServerWithNames", "pp", pp)
+				plugins = append(plugins, event_rpc.PluginServerWithNames(pp))
 			case event.Plugin:
 				log.Debug("event_rpc.PluginServer", "pp", pp)
 				plugins = append(plugins, event_rpc.PluginServer(pp))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
-				return
+				panic(err)
 			}
 		case Group:
 			switch pp := p.(type) {
@@ -160,7 +160,7 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				plugins = append(plugins, group_rpc.PluginServer(p.(group.Plugin)))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
-				return
+				panic(err)
 			}
 		case Resource:
 			log.Debug("resource_rpc.PluginServer", "p", p)
@@ -180,12 +180,13 @@ func ServeRPC(transport plugin.Transport, onStop func(),
 				plugins = append(plugins, loadbalancer_rpc.PluginServer(p.(loadbalancer.L4)))
 			default:
 				err = fmt.Errorf("bad plugin %v for code %v", p, code)
-				return
+				panic(err)
 			}
 
 		default:
 			err = fmt.Errorf("unknown plugin %v, code %v", p, code)
-			return
+			panic(err)
+
 		}
 
 	}

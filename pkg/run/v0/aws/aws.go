@@ -171,8 +171,10 @@ func Run(scope scope.Scope, name plugin.Name,
 	if options.MonitorPollInterval > 0 {
 		log.Info("run the event source for watching instance add/removes", "poll", options.MonitorPollInterval)
 		monitor := &aws_instance.Monitor{Plugin: instancePlugin}
-		impls[run.Event] = map[string]event.Plugin{
-			"ec2-instance": monitor.Init(),
+		impls[run.Event] = func() (map[string]event.Plugin, error) {
+			return map[string]event.Plugin{
+				"ec2-instance": monitor.Init(),
+			}, nil
 		}
 		onStop = func() {
 			monitor.Stop()

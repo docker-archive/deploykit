@@ -44,26 +44,28 @@ func TestEventMultiPlugin(t *testing.T) {
 	types.Put(types.PathFromString("instance/create"), stub, m)
 	types.Put(types.PathFromString("instance/delete"), stub, m)
 
-	server, err := rpc_server.StartPluginAtPath(socketPath, rpc_event.PluginServerWithTypes(
-		map[string]event.Plugin{
-			"compute": &testing_event.Plugin{
-				Publisher: (*testing_event.Publisher)(nil),
-				DoList: func(topic types.Path) ([]string, error) {
-					return types.List(topic, m), nil
+	server, err := rpc_server.StartPluginAtPath(socketPath, rpc_event.PluginServerWithNames(
+		func() (map[string]event.Plugin, error) {
+			return map[string]event.Plugin{
+				"compute": &testing_event.Plugin{
+					Publisher: (*testing_event.Publisher)(nil),
+					DoList: func(topic types.Path) ([]string, error) {
+						return types.List(topic, m), nil
+					},
 				},
-			},
-			"storage": &testing_event.Plugin{
-				Publisher: (*testing_event.Publisher)(nil),
-				DoList: func(topic types.Path) ([]string, error) {
-					return types.List(topic, m), nil
+				"storage": &testing_event.Plugin{
+					Publisher: (*testing_event.Publisher)(nil),
+					DoList: func(topic types.Path) ([]string, error) {
+						return types.List(topic, m), nil
+					},
 				},
-			},
-			"device": &testing_event.Plugin{
-				Publisher: (*testing_event.Publisher)(nil),
-				DoList: func(topic types.Path) ([]string, error) {
-					return nil, nil
+				"device": &testing_event.Plugin{
+					Publisher: (*testing_event.Publisher)(nil),
+					DoList: func(topic types.Path) ([]string, error) {
+						return nil, nil
+					},
 				},
-			},
+			}, nil
 		}).WithBase(
 		&testing_event.Plugin{
 			Publisher: (*testing_event.Publisher)(nil),
@@ -91,7 +93,7 @@ func TestEventMultiPlugin(t *testing.T) {
 	server.Stop()
 }
 
-func _TestEventPluginPublishSubscribe(t *testing.T) {
+func TestEventPluginPublishSubscribe(t *testing.T) {
 	socketPath := tempSocket()
 
 	calledPublisher0 := make(chan struct{})
@@ -171,10 +173,12 @@ func _TestEventPluginPublishSubscribe(t *testing.T) {
 	require.NotNil(t, pub1)
 	require.NotNil(t, pub2)
 
-	var impl rpc_server.VersionedInterface = rpc_event.PluginServerWithTypes(
-		map[string]event.Plugin{
-			"compute": plugin0,
-			"storage": plugin1,
+	var impl rpc_server.VersionedInterface = rpc_event.PluginServerWithNames(
+		func() (map[string]event.Plugin, error) {
+			return map[string]event.Plugin{
+				"compute": plugin0,
+				"storage": plugin1,
+			}, nil
 		})
 
 	server, err := rpc_server.StartPluginAtPath(socketPath, impl)
