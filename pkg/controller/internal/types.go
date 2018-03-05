@@ -3,6 +3,7 @@ package internal
 import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/controller"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -25,6 +26,7 @@ type Managed interface {
 	ControlLoop
 
 	Metadata() metadata.Plugin
+	Events() event.Plugin
 
 	Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error)
 	Enforce(types.Spec) (*types.Object, error)

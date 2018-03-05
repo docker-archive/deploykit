@@ -58,7 +58,7 @@ var (
 )
 
 // Validate validates the receiver with default values provided if some optional fields are not set.
-func (o *InstanceObserver) Validate(defaults InstanceObserver) error {
+func (o *InstanceObserver) Validate(defaults *InstanceObserver) error {
 	if o.Plugin.Zero() {
 		return fmt.Errorf("missing plugin name")
 	}

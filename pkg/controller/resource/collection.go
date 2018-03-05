@@ -21,7 +21,7 @@ var (
 	}
 
 	// DefaultAccessProperties specifies some default parameters
-	DefaultAccessProperties = internal.InstanceObserver{
+	DefaultAccessProperties = &internal.InstanceObserver{
 		ObserveInterval: types.Duration(1 * time.Second),
 		KeySelector:     template.EscapeString(`{{.Tags.infrakit_resource_name}}`),
 	}
@@ -209,7 +209,7 @@ func (c *collection) run(ctx context.Context) {
 				}
 
 				// Update the view in the metadata plugin
-				c.MetadataRemove(accessor.KeyOf, lost.instances)
+				c.MetadataGone(accessor.KeyOf, lost.instances)
 
 				for _, n := range lost.instances {
 					k, err := accessor.KeyOf(n)

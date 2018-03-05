@@ -10,6 +10,7 @@ import (
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/controller"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
@@ -75,9 +76,27 @@ type Collection struct {
 	metadata        metadata.Plugin
 	metadataUpdates chan func(map[string]interface{})
 
+	topics map[string]interface{} // events
+	events chan *event.Event
+
 	// This lock is used to guard the Managed methods.
 	lock sync.RWMutex
 }
+
+var (
+
+	// TopicMetadataUpdate is the topic to get metadata updates
+	TopicMetadataUpdate = types.PathFromString("metadata/update")
+
+	// TopicMetadataGone is the topic to get metadata gone
+	TopicMetadataGone = types.PathFromString("metadata/gone")
+
+	// TopicCollectionUpdate is the topic to get collection updates
+	TopicCollectionUpdate = types.PathFromString("collection/update")
+
+	// TopicCollectionGone is the topic to get collection gones
+	TopicCollectionGone = types.PathFromString("collection/gone")
+)
 
 // NewCollection returns a Managed controller object that represents a collection
 // of finite state machines (FSM).
@@ -87,10 +106,27 @@ func NewCollection(scope scope.Scope) (*Collection, error) {
 		items:           map[string]*Item{},
 		metadataUpdates: make(chan func(map[string]interface{})),
 		stop:            make(chan struct{}),
+		topics:          map[string]interface{}{},
+		events:          make(chan *event.Event, 64),
 	}
 
+	stub := func() interface{} { return "TODO" } // TODO - rationalize this
+
+	for _, topic := range []types.Path{
+		TopicMetadataUpdate,
+		TopicMetadataGone,
+		TopicCollectionUpdate,
+		TopicCollectionGone,
+	} {
+		types.Put(topic, stub, c.topics)
+	}
 	c.metadata = metadata_plugin.NewPluginFromChannel(c.metadataUpdates)
 	return c, nil
+}
+
+// EventType is the type of the events emitted by this object
+func (c *Collection) EventType() event.Type {
+	return event.Type("resource/" + c.Spec.Metadata.Name)
 }
 
 // Metadata returns a metadata plugin implementation. Optional; ok to be nil
@@ -98,8 +134,47 @@ func (c *Collection) Metadata() metadata.Plugin {
 	return c.metadata
 }
 
-// MetadataRemove removes the object in the metadata plugin interface
-func (c *Collection) MetadataRemove(key func(instance.Description) (string, error), v []instance.Description) {
+// Events returns events plugin implementation. Optional; ok to be nil
+func (c *Collection) Events() event.Plugin {
+	return c
+}
+
+// EventCh returns the events channel to publish events
+func (c *Collection) EventCh() chan<- *event.Event {
+	return c.events
+}
+
+// List implements event.List
+func (c *Collection) List(topic types.Path) ([]string, error) {
+	return types.List(topic, c.topics), nil
+}
+
+// PublishOn sets the channel to publish on
+func (c *Collection) PublishOn(events chan<- *event.Event) {
+	log.Debug("PublishOn")
+	go func() {
+		for {
+			evt, ok := <-c.events
+
+			log.Debug("Event", "event", evt, "ok", ok, "V", debugV2)
+
+			if !ok {
+				return
+			}
+
+			// non-blocking send
+			select {
+			case events <- evt:
+			default:
+			}
+		}
+	}()
+
+	return
+}
+
+// MetadataGone removes the object in the metadata plugin interface
+func (c *Collection) MetadataGone(key func(instance.Description) (string, error), v []instance.Description) {
 	c.metadataUpdates <- func(view map[string]interface{}) {
 
 		for _, d := range v {
@@ -112,6 +187,20 @@ func (c *Collection) MetadataRemove(key func(instance.Description) (string, erro
 
 			delete(view, k)
 		}
+	}
+
+	for _, d := range v {
+
+		k, err := key(d)
+		if err != nil {
+			log.Error("cannot get key", "instance", d)
+			continue
+		}
+
+		c.events <- event.Event{
+			Type: c.EventType(),
+			ID:   k,
+		}.Init().Now().WithTopic(TopicMetadataGone.String()).WithDataMust(k)
 	}
 }
 
@@ -149,14 +238,29 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 				Tags:       d.Tags,
 				Properties: p,
 			}
-
 		}
 	}
+
+	for _, d := range v {
+		c.events <- event.Event{
+			Type: c.EventType(),
+			ID:   string(d.ID),
+		}.Init().Now().WithTopic(TopicMetadataUpdate.String()).WithDataMust(d)
+	}
+
 	return nil
 }
 
 // Put puts an item by key - this is unsynchronized so caller / user needs to synchronize the Put
 func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]interface{}) *Item {
+
+	defer func() {
+		c.events <- event.Event{
+			Type: c.EventType(),
+			ID:   string(k),
+		}.Init().Now().WithTopic(TopicCollectionUpdate.String()).WithDataMust(spec.StateName(fsm.State()))
+	}()
+
 	if data == nil {
 		data = map[string]interface{}{}
 	}
@@ -197,6 +301,12 @@ func (c *Collection) GetByFSM(f fsm.FSM) (item *Item) {
 
 // Delete an item by key. This is unsychronized.
 func (c *Collection) Delete(k string) {
+	defer func() {
+		c.events <- event.Event{
+			Type: c.EventType(),
+			ID:   string(k),
+		}.Init().Now().WithTopic(TopicCollectionGone.String())
+	}()
 	delete(c.items, k)
 }
 
@@ -265,6 +375,11 @@ func (c *Collection) Stop() error {
 	if c.metadataUpdates != nil {
 		close(c.metadataUpdates)
 		c.metadataUpdates = nil
+	}
+
+	if c.events != nil {
+		close(c.events)
+		c.events = nil
 	}
 
 	if c.StopFunc == nil {

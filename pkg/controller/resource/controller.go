@@ -8,6 +8,7 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/controller"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -29,6 +30,7 @@ var (
 type Components struct {
 	Controllers func() (map[string]controller.Controller, error)
 	Metadata    func() (map[string]metadata.Plugin, error)
+	Events      func() (map[string]event.Plugin, error)
 }
 
 // NewComponents returns a controller implementation
@@ -44,8 +46,10 @@ func NewComponents(scope scope.Scope, options resource.Options) *Components {
 			return metadata.Name
 		},
 	)
+
 	return &Components{
 		Controllers: controller.Controllers,
 		Metadata:    controller.Metadata,
+		Events:      controller.Events,
 	}
 }

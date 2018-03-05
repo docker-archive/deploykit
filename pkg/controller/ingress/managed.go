@@ -11,6 +11,7 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
@@ -117,5 +118,10 @@ func (c *managed) started() bool {
 
 // Metadata returns an optional metadata.Plugin implementation
 func (c *managed) Metadata() metadata.Plugin {
+	return nil
+}
+
+// Events returns an optional events.Plugin implementation
+func (c *managed) Events() event.Plugin {
 	return nil
 }

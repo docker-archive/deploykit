@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/fsm"
 	instance_plugin "github.com/docker/infrakit/pkg/plugin/instance"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
@@ -58,6 +59,11 @@ func (r *reaper) Metadata() metadata.Plugin {
 	return nil
 }
 
+// Events returns an optional event.Plugin implementation
+func (r *reaper) Events() event.Plugin {
+	return nil
+}
+
 func (r *reaper) run(ctx context.Context) {
 
 	r.model.Start()
@@ -83,7 +89,7 @@ func (r *reaper) stop() error {
 }
 
 var (
-	defaultInstanceObserver = internal.InstanceObserver{
+	defaultInstanceObserver = &internal.InstanceObserver{
 		ObserveInterval: types.Duration(1 * time.Second),
 	}
 )

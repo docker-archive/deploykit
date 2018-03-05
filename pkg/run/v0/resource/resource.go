@@ -85,6 +85,7 @@ func Run(scope scope.Scope, name plugin.Name,
 			return singletons, nil
 		},
 		run.Metadata: resource.Metadata,
+		run.Event:    resource.Events,
 	}
 
 	return

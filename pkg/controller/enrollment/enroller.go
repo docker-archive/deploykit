@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/controller/internal"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/controller"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -77,6 +78,11 @@ func newEnroller(scope scope.Scope, options enrollment.Options) (*enroller, erro
 
 // Metadata returns an optional metadata.Plugin implementation
 func (l *enroller) Metadata() metadata.Plugin {
+	return nil
+}
+
+// Events returns events plugin implementation. Optional; ok to be nil
+func (l *enroller) Events() event.Plugin {
 	return nil
 }
 

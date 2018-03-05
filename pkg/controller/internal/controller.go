@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/docker/infrakit/pkg/spi/controller"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -75,6 +76,22 @@ func (c *Controller) Metadata() (plugins map[string]metadata.Plugin, err error) 
 
 	for k, m := range c.managed {
 		p := (*m).Metadata()
+		if p != nil {
+			plugins[k] = p
+		}
+	}
+	return plugins, nil
+}
+
+// Events exposes any events implementations
+func (c *Controller) Events() (plugins map[string]event.Plugin, err error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	plugins = map[string]event.Plugin{}
+
+	for k, m := range c.managed {
+		p := (*m).Events()
 		if p != nil {
 			plugins[k] = p
 		}
