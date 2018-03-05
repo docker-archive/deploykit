@@ -30,7 +30,7 @@ var (
 type Components struct {
 	Controllers func() (map[string]controller.Controller, error)
 	Metadata    func() (map[string]metadata.Plugin, error)
-	Events      func() (map[string]event.Plugin, error)
+	Events      event.Plugin
 }
 
 // NewComponents returns a controller implementation
@@ -50,6 +50,6 @@ func NewComponents(scope scope.Scope, options resource.Options) *Components {
 	return &Components{
 		Controllers: controller.Controllers,
 		Metadata:    controller.Metadata,
-		Events:      controller.Events,
+		Events:      controller,
 	}
 }

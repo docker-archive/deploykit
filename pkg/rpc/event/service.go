@@ -29,6 +29,10 @@ type Event struct {
 }
 
 func (p *Event) typedPlugins() map[string]event.Plugin {
+	if p.plugins == nil {
+		return map[string]event.Plugin{}
+	}
+
 	m, err := p.plugins()
 	if err != nil {
 		return map[string]event.Plugin{}

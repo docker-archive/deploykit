@@ -151,7 +151,6 @@ func (c *Collection) List(topic types.Path) ([]string, error) {
 
 // PublishOn sets the channel to publish on
 func (c *Collection) PublishOn(events chan<- *event.Event) {
-	log.Debug("PublishOn")
 	go func() {
 		for {
 			evt, ok := <-c.events
@@ -166,6 +165,7 @@ func (c *Collection) PublishOn(events chan<- *event.Event) {
 			select {
 			case events <- evt:
 			default:
+				log.Warn("Event may not be sent", "event", evt)
 			}
 		}
 	}()

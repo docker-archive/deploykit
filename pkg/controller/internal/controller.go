@@ -15,6 +15,7 @@ type Controller struct {
 	alloc   func(types.Spec) (Managed, error)
 	keyfunc func(types.Metadata) string
 	managed map[string]*Managed
+	events  chan<- *event.Event
 	lock    sync.RWMutex
 }
 
@@ -56,6 +57,13 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 			}
 
 			c.managed[key] = &m
+
+			if eventPlugin := m.Events(); eventPlugin != nil {
+				if publisher, is := eventPlugin.(event.Publisher); is {
+					publisher.PublishOn(c.events)
+				}
+			}
+
 		} else {
 			return out, nil
 		}
@@ -85,18 +93,37 @@ func (c *Controller) Metadata() (plugins map[string]metadata.Plugin, err error) 
 
 // Events exposes any events implementations
 func (c *Controller) Events() (plugins map[string]event.Plugin, err error) {
+	plugins = map[string]event.Plugin{
+		"events": c,
+	}
+	return plugins, nil
+}
+
+// List implements event.List
+func (c *Controller) List(topic types.Path) ([]string, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	plugins = map[string]event.Plugin{}
+	if len(topic) == 0 || topic.Dot() {
+		out := []string{}
+		for k := range c.managed {
+			out = append(out, k)
+		}
+		return out, nil
+	}
 
-	for k, m := range c.managed {
-		p := (*m).Events()
-		if p != nil {
-			plugins[k] = p
+	key := *topic.Index(0)
+	if m, has := c.managed[key]; has {
+		if p := (*m).Events(); p != nil {
+			return p.List(topic.Shift(1))
 		}
 	}
-	return plugins, nil
+	return nil, nil
+}
+
+// PublishOn sets the channel to publish on
+func (c *Controller) PublishOn(events chan<- *event.Event) {
+	c.events = events
 }
 
 // Controllers returns a map of managed objects as subcontrollers
