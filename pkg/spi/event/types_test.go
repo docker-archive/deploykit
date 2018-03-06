@@ -2,6 +2,7 @@ package event
 
 import (
 	"testing"
+	"time"
 
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -17,10 +18,11 @@ func TestEventBuilder(t *testing.T) {
 	require.Equal(t, "myhost", event.ID)
 	require.Equal(t, types.PathFromString("instance/create"), event.Topic)
 
+	<-time.After(10 * time.Millisecond) // note that this will force a later time stamp when init by copy
 	event2 := event.Init().WithTopic("instance/delete")
 	require.Equal(t, event.ID, event2.ID)
 	require.Equal(t, event.Data, event2.Data)
-	require.Equal(t, event.Timestamp, event2.Timestamp)
+	require.True(t, event.Timestamp.Before(event2.Timestamp))
 
 	event.WithData(map[string]bool{"foo": true})
 	require.NotEqual(t, event.Data, event2.Data)

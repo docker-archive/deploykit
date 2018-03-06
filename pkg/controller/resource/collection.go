@@ -9,6 +9,7 @@ import (
 	"github.com/docker/infrakit/pkg/controller/internal"
 	resource "github.com/docker/infrakit/pkg/controller/resource/types"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -51,6 +52,26 @@ type collection struct {
 	cancel   func()
 }
 
+var (
+	// TopicProvision is the topic for provision
+	TopicProvision = types.PathFromString("provision")
+
+	// TopicProvisionErr is the topic for provision error
+	TopicProvisionErr = types.PathFromString("provision/error")
+
+	// TopicDestroy is the topic for destroy
+	TopicDestroy = types.PathFromString("destroy")
+
+	// TopicDestroyErr is the topic for destroy error
+	TopicDestroyErr = types.PathFromString("destroy/error")
+
+	// TopicPending is the topic for waiting for data
+	TopicPending = types.PathFromString("pending")
+
+	// TopicReady is the topic for resource ready
+	TopicReady = types.PathFromString("ready")
+)
+
 func newCollection(scope scope.Scope, options resource.Options) (internal.Managed, error) {
 
 	if err := options.Validate(context.Background()); err != nil {
@@ -68,11 +89,11 @@ func newCollection(scope scope.Scope, options resource.Options) (internal.Manage
 		resources:  resources{},
 		watching:   map[string]Watchers{},
 	}
-
 	// set the behaviors
 	base.StartFunc = c.run
 	base.StopFunc = c.stop
 	base.UpdateSpecFunc = c.updateSpec
+
 	return c, nil
 }
 
@@ -82,12 +103,12 @@ func (c *collection) run(ctx context.Context) {
 	c.model.Start()
 
 	// channels that aggregate from all the instance accessors
-	type event struct {
+	type observation struct {
 		name      string
 		instances []instance.Description
 	}
 
-	dependencyComplete := make(chan *event, len(c.properties.Resources))
+	dependencyComplete := make(chan *observation, len(c.properties.Resources))
 	accessors := map[string]*internal.InstanceAccess(c.properties.Resources)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -99,15 +120,15 @@ func (c *collection) run(ctx context.Context) {
 		go func(n string) {
 			<-ch
 			// send event we got dependency satisified
-			dependencyComplete <- &event{name: n}
+			dependencyComplete <- &observation{name: n}
 		}(k)
 		log.Debug("aggregator", "key", k, "watch", w)
 	}
 
-	// Start all the instance accessors and wire up the events.
+	// Start all the instance accessors and wire up the observations.
 
-	lostInstances := make(chan *event, c.properties.ChannelBufferSize)  // ch to aggregate all lost events
-	foundInstances := make(chan *event, c.properties.ChannelBufferSize) // ch to aggregate all found events
+	lostInstances := make(chan *observation, c.properties.ChannelBufferSize)  // ch to aggregate all lost observations
+	foundInstances := make(chan *observation, c.properties.ChannelBufferSize) // ch to aggregate all found observations
 
 	for k, a := range accessors {
 
@@ -121,17 +142,17 @@ func (c *collection) run(ctx context.Context) {
 				select {
 				case list, ok := <-accessor.Observations():
 					if !ok {
-						log.Debug("found events done", "name", name, "V", debugV)
+						log.Debug("found observations done", "name", name, "V", debugV)
 						return
 					}
-					foundInstances <- &event{name: name, instances: list}
+					foundInstances <- &observation{name: name, instances: list}
 
 				case list, ok := <-accessor.Lost():
 					if !ok {
 						log.Debug("lost events done", "name", name, "V", debugV)
 						return
 					}
-					lostInstances <- &event{name: name, instances: list}
+					lostInstances <- &observation{name: name, instances: list}
 				}
 			}
 		}()
@@ -156,6 +177,16 @@ func (c *collection) run(ctx context.Context) {
 				if item != nil {
 					accessor := c.properties.Resources[item.Key]
 					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
+
+					// TODO - call instancePlugin.Destroy
+					d := item.Data["instance"]
+					if d != nil {
+						if dd, is := d.(instance.Description); is {
+							err := accessor.Destroy(dd.ID, instance.Termination)
+							log.Info("Destroy", "err", err)
+						}
+					}
+					c.Collection.Delete(item.Key)
 				}
 
 			case f, ok := <-c.model.Provision():
@@ -178,8 +209,15 @@ func (c *collection) run(ctx context.Context) {
 						log.Error("cannot provision", "err", err)
 						item.State.Signal(provisionError)
 
+						c.EventCh() <- event.Event{
+							Topic:   c.Topic(TopicProvisionErr),
+							Type:    event.Type("ProvisionErr"),
+							ID:      c.EventID(item.Key),
+							Message: "error when provision",
+						}.Init().WithError(err)
+
 					} else {
-						log.Info("provisioned", "id", instanceID)
+						log.Info("Provisioned", "id", instanceID)
 						/// don't do anything. next sample will make sure it moves to ready
 					}
 				}
@@ -192,7 +230,7 @@ func (c *collection) run(ctx context.Context) {
 				// Signal that we have all dependencies met for a given object
 				item := c.Collection.Get(haveAllData.name)
 				if item != nil {
-					log.Info("Has all dependencies", "name", haveAllData.name)
+					log.Debug("Met all dependencies", "name", haveAllData.name, "V", debugV)
 					item.State.Signal(dependencyReady)
 				}
 
@@ -238,7 +276,7 @@ func (c *collection) run(ctx context.Context) {
 				}
 
 				// Update the view in the metadata plugin
-				c.MetadataExport(accessor.KeyOf, found.instances)
+				export := []instance.Description{}
 
 				for _, n := range found.instances {
 					k, err := accessor.KeyOf(n)
@@ -255,6 +293,19 @@ func (c *collection) run(ctx context.Context) {
 						item = c.Put(k, f, c.model.Spec(), map[string]interface{}{
 							"instance": n,
 						})
+
+						export = append(export, n) // export to metadata
+
+					} else {
+						// if we already have entries stored, then see if the data changed
+						prev := item.Data["instance"]
+						if prev == nil {
+							export = append(export, n)
+						} else if dd, is := prev.(instance.Description); is {
+							if dd.Fingerprint() != n.Fingerprint() {
+								export = append(export, n)
+							}
+						}
 					}
 
 					c.resources[k] = n
@@ -266,6 +317,8 @@ func (c *collection) run(ctx context.Context) {
 					item.State.Signal(resourceFound)
 					item.Data["instance"] = n
 				}
+
+				c.MetadataExport(accessor.KeyOf, export)
 			}
 		}
 	}()

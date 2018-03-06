@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"path"
 	"sync"
 	"time"
 
@@ -98,8 +99,14 @@ var (
 	TopicCollectionGone = types.PathFromString("collection/gone")
 )
 
-func (c *Collection) topic(p types.Path) types.Path {
+// Topic returns a topic suitable for the events in this collection
+func (c *Collection) Topic(p types.Path) types.Path {
 	return types.PathFromString(c.Spec.Metadata.Name).Join(p)
+}
+
+// EventID is the type of the events emitted by this object
+func (c *Collection) EventID(v string) string {
+	return path.Join(c.Spec.Metadata.Name, v)
 }
 
 // NewCollection returns a Managed controller object that represents a collection
@@ -126,11 +133,6 @@ func NewCollection(scope scope.Scope) (*Collection, error) {
 	}
 	c.metadata = metadata_plugin.NewPluginFromChannel(c.metadataUpdates)
 	return c, nil
-}
-
-// EventType is the type of the events emitted by this object
-func (c *Collection) EventType() event.Type {
-	return event.Type("resource/" + c.Spec.Metadata.Name)
 }
 
 // Metadata returns a metadata plugin implementation. Optional; ok to be nil
@@ -161,16 +163,8 @@ func (c *Collection) PublishOn(events chan<- *event.Event) {
 			if !ok {
 				return
 			}
-
 			events <- evt
 			log.Debug("Event", "event", evt, "ok", ok, "V", debugV2)
-
-			// // non-blocking send
-			// select {
-			// case events <- evt:
-			// default:
-			// 	log.Warn("Event may not be sent", "event", evt)
-			// }
 		}
 	}()
 
@@ -202,9 +196,9 @@ func (c *Collection) MetadataGone(key func(instance.Description) (string, error)
 		}
 
 		c.events <- event.Event{
-			Topic:   c.topic(TopicMetadataGone),
-			Type:    c.EventType(),
-			ID:      k,
+			Topic:   c.Topic(TopicMetadataGone),
+			Type:    event.Type("MetadataGone"),
+			ID:      c.EventID(k),
 			Message: "metadata gone",
 		}.Init().WithDataMust(k)
 	}
@@ -216,10 +210,16 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 
 	// metadata entry struct ==> this struct copies the instance.Description
 	type entry struct {
-		ID         instance.ID
-		LogicalID  *instance.LogicalID
-		Tags       map[string]string
-		Properties interface{} // changed from types.Any
+		ID          instance.ID
+		LogicalID   *instance.LogicalID
+		Tags        map[string]string
+		Properties  interface{} // changed from types.Any
+		description instance.Description
+	}
+
+	type update struct {
+		description instance.Description
+		key         string
 	}
 
 	// A single update sets all of the instances
@@ -238,22 +238,21 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 				log.Error("cannot decode properties", "instance", d.ID, "err", err)
 			}
 
-			view[k] = &entry{
-				ID:         d.ID,
-				LogicalID:  d.LogicalID,
-				Tags:       d.Tags,
-				Properties: p,
+			view[k] = entry{
+				ID:          d.ID,
+				LogicalID:   d.LogicalID,
+				Tags:        d.Tags,
+				Properties:  p,
+				description: d,
 			}
-		}
-	}
 
-	for _, d := range v {
-		c.events <- event.Event{
-			Topic:   c.topic(TopicMetadataUpdate),
-			Type:    c.EventType(),
-			ID:      string(d.ID),
-			Message: "update metadata",
-		}.Init().WithDataMust(d)
+			c.events <- event.Event{
+				Topic:   c.Topic(TopicMetadataUpdate),
+				Type:    event.Type("MetadataUpdate"),
+				ID:      c.EventID(k),
+				Message: "update metadata",
+			}.Init().WithDataMust(d)
+		}
 	}
 
 	return nil
@@ -262,13 +261,17 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 // Put puts an item by key - this is unsynchronized so caller / user needs to synchronize the Put
 func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]interface{}) *Item {
 
+	changed := false
+
 	defer func() {
-		c.events <- event.Event{
-			Topic:   c.topic(TopicCollectionUpdate),
-			Type:    c.EventType(),
-			ID:      string(k),
-			Message: "update collection",
-		}.Init().WithDataMust(spec.StateName(fsm.State()))
+		if changed {
+			c.events <- event.Event{
+				Topic:   c.Topic(TopicCollectionUpdate),
+				Type:    event.Type("CollectionUpdate"),
+				ID:      c.EventID(k),
+				Message: "update collection",
+			}.Init().WithDataMust(spec.StateName(fsm.State()))
+		}
 	}()
 
 	if data == nil {
@@ -276,12 +279,19 @@ func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]
 	}
 
 	if item, has := c.items[k]; has {
+
+		changed = item.State.State() != fsm.State()
+
 		item.Key = k
 		item.State = stateMachine{fsm, spec}
 		for k, v := range data {
 			item.Data[k] = v
 		}
+
 	} else {
+
+		changed = true
+
 		c.items[k] = &Item{
 			Key:   k,
 			State: stateMachine{fsm, spec},
@@ -313,10 +323,10 @@ func (c *Collection) GetByFSM(f fsm.FSM) (item *Item) {
 func (c *Collection) Delete(k string) {
 	defer func() {
 		c.events <- &event.Event{
-			Topic:   c.topic(TopicCollectionGone),
-			Type:    c.EventType(),
-			ID:      string(k),
-			Message: "object gone",
+			Topic:   c.Topic(TopicCollectionGone),
+			Type:    event.Type("CollectionGone"),
+			ID:      c.EventID(k),
+			Message: "Removed from collection",
 		}
 	}()
 	delete(c.items, k)

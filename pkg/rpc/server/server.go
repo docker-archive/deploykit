@@ -197,8 +197,17 @@ func startAtPath(listen []string, discoverPath string,
 	router.HandleFunc(rpc_server.URLAPI, info.ShowAPI)
 	router.HandleFunc(rpc_server.URLFunctions, info.ShowTemplateFunctions)
 
+	// Disable this so that clients can connect/subscribe to streams before the topics
+	// actually become available (dynamically added topics)
+	// TODO(chungers) - make this an option somehow
+	skipTopicValidation := true
+
 	intercept := broker.Interceptor{
 		Pre: func(topic string, headers map[string][]string) error {
+			if skipTopicValidation {
+				return nil
+			}
+
 			for _, target := range targets {
 				if v, is := target.(event.Validator); is {
 					if err := v.Validate(types.PathFromString(topic)); err == nil {
